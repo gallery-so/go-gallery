@@ -282,7 +282,7 @@ func (n *NotificationHandlers) subscribe(ctx context.Context, topic, name string
 }
 
 func (n *NotificationHandlers) receiveNewNotificationsFromPubSub() {
-	sub, err := n.subscribe(context.Background(), env.GetString(context.Background(), "PUBSUB_TOPIC_NEW_NOTIFICATIONS"), fmt.Sprintf("new-notifications-%s", persist.GenerateID()))
+	sub, err := n.subscribe(context.Background(), env.GetString("PUBSUB_TOPIC_NEW_NOTIFICATIONS"), fmt.Sprintf("new-notifications-%s", persist.GenerateID()))
 	if err != nil {
 		logger.For(nil).Errorf("error creating updated notifications subscription: %s", err)
 		panic(err)
@@ -323,7 +323,7 @@ func (n *NotificationHandlers) receiveNewNotificationsFromPubSub() {
 }
 
 func (n *NotificationHandlers) receiveUpdatedNotificationsFromPubSub() {
-	sub, err := n.subscribe(context.Background(), env.GetString(context.Background(), "PUBSUB_TOPIC_UPDATED_NOTIFICATIONS"), fmt.Sprintf("updated-notifications-%s", persist.GenerateID()))
+	sub, err := n.subscribe(context.Background(), env.GetString("PUBSUB_TOPIC_UPDATED_NOTIFICATIONS"), fmt.Sprintf("updated-notifications-%s", persist.GenerateID()))
 	if err != nil {
 		logger.For(nil).Errorf("error creating updated notifications subscription: %s", err)
 		panic(err)
@@ -373,7 +373,7 @@ func insertAndPublishNotif(ctx context.Context, notif db.Notification, queries *
 	if err != nil {
 		return err
 	}
-	t := ps.Topic(env.GetString(ctx, "PUBSUB_TOPIC_NEW_NOTIFICATIONS"))
+	t := ps.Topic(env.GetString("PUBSUB_TOPIC_NEW_NOTIFICATIONS"))
 	result := t.Publish(ctx, &pubsub.Message{
 		Data: marshalled,
 	})
@@ -419,7 +419,7 @@ func updateAndPublishNotif(ctx context.Context, notif db.Notification, mostRecen
 	if err != nil {
 		return err
 	}
-	t := ps.Topic(env.GetString(ctx, "PUBSUB_TOPIC_UPDATED_NOTIFICATIONS"))
+	t := ps.Topic(env.GetString("PUBSUB_TOPIC_UPDATED_NOTIFICATIONS"))
 	result := t.Publish(ctx, &pubsub.Message{
 		Data: marshalled,
 	})

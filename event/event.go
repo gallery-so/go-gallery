@@ -319,7 +319,7 @@ func (h feedHandler) handleDelayed(ctx context.Context, persistedEvent db.Event)
 		return nil
 	}
 
-	scheduleOn := persistedEvent.CreatedAt.Add(time.Duration(env.Get[int](ctx, "GCLOUD_FEED_BUFFER_SECS")) * time.Second)
+	scheduleOn := persistedEvent.CreatedAt.Add(time.Duration(env.GetInt("GCLOUD_FEED_BUFFER_SECS")) * time.Second)
 	return task.CreateTaskForFeed(ctx, scheduleOn, task.FeedMessage{ID: persistedEvent.ID}, h.tc)
 }
 

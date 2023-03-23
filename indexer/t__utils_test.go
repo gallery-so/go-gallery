@@ -76,7 +76,7 @@ func newMockIndexer(db *sql.DB, pool *pgxpool.Pool) *indexer {
 	rpcEnabled = true
 	ethClient := rpc.NewEthSocketClient()
 	storageClient := newStorageClient(context.Background())
-	bucket := storageClient.Bucket(env.GetString(context.Background(), "GCLOUD_TOKEN_LOGS_BUCKET"))
+	bucket := storageClient.Bucket(env.GetString("GCLOUD_TOKEN_LOGS_BUCKET"))
 
 	i := newIndexer(ethClient, nil, nil, nil, postgres.NewTokenRepository(db), postgres.NewContractRepository(db), refresh.AddressFilterRepository{Bucket: bucket}, persist.ChainETH, defaultTransferEvents, func(ctx context.Context, curBlock, nextBlock *big.Int, topics [][]common.Hash) ([]types.Log, error) {
 		transferAgainLogs := []types.Log{{

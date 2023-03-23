@@ -12,15 +12,15 @@ import (
 )
 
 func prepareRequest(ctx context.Context, body []byte) (*http.Request, error) {
-	url := fmt.Sprintf("%s/channels/%s/messages", env.GetString(ctx, "DISCORD_API"), env.GetString(ctx, "CHANNEL_ID"))
+	url := fmt.Sprintf("%s/channels/%s/messages", env.GetString("DISCORD_API"), env.GetString("CHANNEL_ID"))
 
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("Authorization", "Bot "+env.GetString(ctx, "BOT_TOKEN"))
-	req.Header.Set("User-Agent", env.GetString(ctx, "AGENT_NAME"))
+	req.Header.Set("Authorization", "Bot "+env.GetString("BOT_TOKEN"))
+	req.Header.Set("User-Agent", env.GetString("AGENT_NAME"))
 	req.Header.Set("Content-Type", "application/json")
 	return req, nil
 }

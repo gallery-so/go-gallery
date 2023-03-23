@@ -40,7 +40,7 @@ func coreInitServer() *gin.Engine {
 
 	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger())
 
-	if env.GetString(context.Background(), "ENV") != "production" {
+	if env.GetString("ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
 		logrus.SetLevel(logrus.DebugLevel)
 	}
@@ -51,7 +51,7 @@ func coreInitServer() *gin.Engine {
 	c := server.ClientInit(context.Background())
 	mc := server.NewMultichainProvider(c)
 
-	return handlersInitServer(router, mc, c.Repos, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, env.GetString(context.Background(), "GCLOUD_TOKEN_CONTENT_BUCKET"), t)
+	return handlersInitServer(router, mc, c.Repos, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
 }
 
 func setDefaults() {
@@ -76,7 +76,7 @@ func setDefaults() {
 
 	viper.AutomaticEnv()
 
-	if env.GetString(context.Background(), "ENV") != "local" {
+	if env.GetString("ENV") != "local" {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
 	} else {
 		fi := "local"
@@ -87,7 +87,7 @@ func setDefaults() {
 		util.LoadEncryptedEnvFile(envFile)
 	}
 
-	if env.GetString(context.Background(), "ENV") != "local" {
+	if env.GetString("ENV") != "local" {
 		util.VarNotSetTo("SENTRY_DSN", "")
 		util.VarNotSetTo("VERSION", "")
 	}
@@ -98,7 +98,7 @@ func newThrottler() *throttle.Locker {
 }
 
 func initSentry() {
-	if env.GetString(context.Background(), "ENV") == "local" {
+	if env.GetString("ENV") == "local" {
 		logger.For(nil).Info("skipping sentry init")
 		return
 	}
@@ -106,10 +106,10 @@ func initSentry() {
 	logger.For(nil).Info("initializing sentry...")
 
 	err := sentry.Init(sentry.ClientOptions{
-		Dsn:              env.GetString(context.Background(), "SENTRY_DSN"),
-		Environment:      env.GetString(context.Background(), "ENV"),
-		TracesSampleRate: env.Get[float64](context.Background(), "SENTRY_TRACES_SAMPLE_RATE"),
-		Release:          env.GetString(context.Background(), "VERSION"),
+		Dsn:              env.GetString("SENTRY_DSN"),
+		Environment:      env.GetString("ENV"),
+		TracesSampleRate: env.GetFloat64("SENTRY_TRACES_SAMPLE_RATE"),
+		Release:          env.GetString("VERSION"),
 		AttachStacktrace: true,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			event = auth.ScrubEventCookies(event, hint)

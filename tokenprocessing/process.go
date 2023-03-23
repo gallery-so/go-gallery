@@ -44,7 +44,8 @@ func processMediaForUsersTokensOfChain(mc *multichain.Provider, tokenRepo *postg
 		ctx := logger.NewContextWithFields(c, logrus.Fields{"userID": input.UserID})
 
 		if err := throttler.Lock(ctx, input.UserID.String()); err != nil {
-			util.ErrResponse(c, http.StatusOK, err)
+			// Reply with a non-200 status so that the message is tried again later on
+			util.ErrResponse(c, http.StatusTooManyRequests, err)
 			return
 		}
 		defer throttler.Unlock(ctx, input.UserID.String())

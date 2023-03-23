@@ -66,10 +66,10 @@ func JWTGeneratePipeline(pCtx context.Context, pUserID persist.DBID) (string, er
 
 func jwtGenerate(pIssuerStr string, pUserID persist.DBID) (string, error) {
 
-	signingKeyBytesLst := []byte(env.GetString(context.Background(), "JWT_SECRET"))
+	signingKeyBytesLst := []byte(env.GetString("JWT_SECRET"))
 
 	creationTimeUNIXint := time.Now().UnixNano() / 1000000000
-	expiresAtUNIXint := creationTimeUNIXint + env.Get[int64](context.Background(), "JWT_TTL") // expire N number of secs from now
+	expiresAtUNIXint := creationTimeUNIXint + env.GetInt64("JWT_TTL") // expire N number of secs from now
 	claims := jwtClaims{
 		pUserID,
 		jwt.StandardClaims{

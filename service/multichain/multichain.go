@@ -404,15 +404,15 @@ outer:
 	return err
 }
 
-func (p *Provider) prepTokensForTokenProcessing(ctx context.Context, tokensFromProviders []chainTokens, addressToContract map[string]persist.DBID, user persist.User) ([]persist.TokenGallery, error) {
+func (p *Provider) prepTokensForTokenProcessing(ctx context.Context, tokensFromProviders []chainTokens, addressToContract map[string]persist.DBID, user persist.User) ([]persist.TokenGallery, map[persist.TokenIdentifiers]bool, error) {
 	providerTokens, err := tokensToNewDedupedTokens(ctx, tokensFromProviders, addressToContract, user)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	currentTokens, err := p.Repos.TokenRepository.GetByUserID(ctx, user.ID, 0, 0)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	tokenLookup := make(map[persist.TokenIdentifiers]persist.TokenGallery)
@@ -420,28 +420,37 @@ func (p *Provider) prepTokensForTokenProcessing(ctx context.Context, tokensFromP
 		tokenLookup[token.TokenIdentifiers()] = token
 	}
 
+	newTokens := make(map[persist.TokenIdentifiers]bool)
+
 	for i, token := range providerTokens {
+		existingToken, exists := tokenLookup[token.TokenIdentifiers()]
 		// Add already existing media to the provider token if it exists so that
 		// we can display media for a token while it gets handled by tokenprocessing
-		if dbToken := tokenLookup[token.TokenIdentifiers()]; !token.Media.IsServable() && dbToken.Media.IsServable() {
-			providerTokens[i].Media = dbToken.Media
+		if !token.Media.IsServable() && existingToken.Media.IsServable() {
+			providerTokens[i].Media = existingToken.Media
 		}
+
 		// There's no available media for the token at this point, so set the state to syncing
 		// so we can show the loading state instead of a broken token while tokenprocessing handles it.
-		if !providerTokens[i].Media.IsServable() {
+		if !exists && !token.Media.IsServable() {
 			providerTokens[i].Media = persist.Media{MediaType: persist.MediaTypeSyncing}
+		}
+
+		if !exists {
+			newTokens[token.TokenIdentifiers()] = true
 		}
 	}
 
-	return providerTokens, nil
+	return providerTokens, newTokens, nil
 }
 
 func (p *Provider) processTokensForOwnersOfContract(ctx context.Context, contractID persist.DBID, users map[persist.DBID]persist.User, chainTokensForUsers map[persist.DBID][]chainTokens, addressToContract map[string]persist.DBID) error {
 	tokensToUpsert := make([]persist.TokenGallery, 0, len(chainTokensForUsers)*3)
 	userTokenOffsets := make(map[persist.DBID][2]int)
+	newUserTokens := make(map[persist.DBID]map[persist.TokenIdentifiers]bool)
 
 	for userID, user := range users {
-		tokens, err := p.prepTokensForTokenProcessing(ctx, chainTokensForUsers[userID], addressToContract, user)
+		tokens, newTokens, err := p.prepTokensForTokenProcessing(ctx, chainTokensForUsers[userID], addressToContract, user)
 		if err != nil {
 			return err
 		}
@@ -449,6 +458,7 @@ func (p *Provider) processTokensForOwnersOfContract(ctx context.Context, contrac
 		start := len(tokensToUpsert)
 		tokensToUpsert = append(tokensToUpsert, tokens...)
 		userTokenOffsets[userID] = [2]int{start, start + len(tokens)}
+		newUserTokens[userID] = newTokens
 	}
 
 	persistedTokens, err := p.Repos.TokenRepository.BulkUpsertTokensOfContract(ctx, contractID, tokensToUpsert, false)
@@ -463,7 +473,16 @@ func (p *Provider) processTokensForOwnersOfContract(ctx context.Context, contrac
 
 	errors := make([]error, 0)
 	for userID, offset := range userTokenOffsets {
-		err = p.sendTokensToTokenProcessing(ctx, userID, persistedTokens[offset[0]:offset[1]])
+		start, end := offset[0], offset[1]
+		userTokenIDs := make([]persist.DBID, 0, end-start)
+
+		for _, token := range persistedTokens[start:end] {
+			if newUserTokens[userID][token.TokenIdentifiers()] {
+				userTokenIDs = append(userTokenIDs, token.ID)
+			}
+		}
+
+		err = p.sendTokensToTokenProcessing(ctx, userID, userTokenIDs)
 		if err != nil {
 			errors = append(errors, err)
 		}
@@ -477,7 +496,7 @@ func (p *Provider) processTokensForOwnersOfContract(ctx context.Context, contrac
 }
 
 func (p *Provider) processTokensForUser(ctx context.Context, tokensFromProviders []chainTokens, addressToContract map[string]persist.DBID, user persist.User, chains []persist.Chain, skipDelete bool) ([]persist.TokenGallery, error) {
-	dedupedTokens, err := p.prepTokensForTokenProcessing(ctx, tokensFromProviders, addressToContract, user)
+	dedupedTokens, newTokens, err := p.prepTokensForTokenProcessing(ctx, tokensFromProviders, addressToContract, user)
 	if err != nil {
 		return nil, err
 	}
@@ -487,27 +506,25 @@ func (p *Provider) processTokensForUser(ctx context.Context, tokensFromProviders
 		return nil, err
 	}
 
-	err = p.sendTokensToTokenProcessing(ctx, user.ID, persistedTokens)
-	return persistedTokens, err
-}
-
-func (p *Provider) sendTokensToTokenProcessing(ctx context.Context, userID persist.DBID, tokens []persist.TokenGallery) error {
-	tokensToProcess := make([]persist.DBID, 0, len(tokens))
-	for _, token := range tokens {
-		// Process net new tokens based on the creation and update time so that new tokens are handled at least once by tokenprocessing.
-		// Also process tokens that are in a syncing state either from this sync or tokens that were left syncing for whatever reason.
-		if (token.CreationTime.Time() == token.LastUpdated.Time()) || token.Media.MediaType == persist.MediaTypeSyncing {
-			tokensToProcess = append(tokensToProcess, token.ID)
+	tokenIDs := make([]persist.DBID, 0, len(newTokens))
+	for _, token := range persistedTokens {
+		if newTokens[token.TokenIdentifiers()] {
+			tokenIDs = append(tokenIDs, token.ID)
 		}
 	}
 
-	if len(tokensToProcess) == 0 {
+	err = p.sendTokensToTokenProcessing(ctx, user.ID, tokenIDs)
+	return persistedTokens, err
+}
+
+func (p *Provider) sendTokensToTokenProcessing(ctx context.Context, userID persist.DBID, tokens []persist.DBID) error {
+	if len(tokens) == 0 {
 		return nil
 	}
 
 	return task.CreateTaskForTokenProcessing(ctx, p.TasksClient, task.TokenProcessingUserMessage{
 		UserID:   userID,
-		TokenIDs: tokensToProcess,
+		TokenIDs: tokens,
 	})
 }
 
@@ -524,7 +541,7 @@ func (p *Provider) processTokenMedia(ctx context.Context, tokenID persist.TokenI
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/media/process/token", env.GetString(ctx, "TOKEN_PROCESSING_URL")), bytes.NewBuffer(asJSON))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/media/process/token", env.GetString("TOKEN_PROCESSING_URL")), bytes.NewBuffer(asJSON))
 	if err != nil {
 		return err
 	}

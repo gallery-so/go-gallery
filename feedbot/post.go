@@ -326,7 +326,7 @@ func (s *PostSender) Send(ctx context.Context, post string) error {
 }
 
 func userURL(username string) string {
-	return fmt.Sprintf("%s/%s", env.GetString(context.Background(), "GALLERY_HOST"), username)
+	return fmt.Sprintf("%s/%s", env.GetString("GALLERY_HOST"), username)
 }
 
 func collectionURL(username, collectionID string) string {
