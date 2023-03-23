@@ -1176,15 +1176,9 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 			// If we've never seen the incoming token before, then add it.
 			if !seen {
 				seenTokens[ti] = candidateToken
-			} else if !existingToken.Media.IsServable() && candidateToken.Media.IsServable() {
-				if existingToken.Media.MediaType.IsAnimationLike() && persist.TokenURI(existingToken.Media.ThumbnailURL).IsRenderable() && !persist.TokenURI(candidateToken.Media.ThumbnailURL).IsRenderable() {
-					candidateToken.Media.ThumbnailURL = existingToken.Media.ThumbnailURL
-				}
+			} else if len(existingToken.TokenMetadata) < len(candidateToken.TokenMetadata) {
 				seenTokens[ti] = candidateToken
-			} else if existingToken.Media.IsServable() {
-				if candidateToken.Media.MediaType.IsAnimationLike() && !persist.TokenURI(existingToken.Media.ThumbnailURL).IsRenderable() && persist.TokenURI(candidateToken.Media.ThumbnailURL).IsRenderable() {
-					existingToken.Media.ThumbnailURL = candidateToken.Media.ThumbnailURL
-				}
+			} else if len(existingToken.TokenMetadata) > len(candidateToken.TokenMetadata) {
 				seenTokens[ti] = existingToken
 			}
 
