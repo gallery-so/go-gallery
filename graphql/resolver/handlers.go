@@ -186,7 +186,7 @@ func FrontendBuildAuthDirectiveHandler() func(ctx context.Context, obj interface
 		password := usernameAndPasswordParts[1]
 		passwordBytes := []byte(password)
 
-		if cmp := subtle.ConstantTimeCompare([]byte(env.GetString(ctx, "FRONTEND_APQ_UPLOAD_AUTH_TOKEN")), passwordBytes); cmp != 1 {
+		if cmp := subtle.ConstantTimeCompare([]byte(env.GetString("FRONTEND_APQ_UPLOAD_AUTH_TOKEN")), passwordBytes); cmp != 1 {
 			return authError, nil
 		}
 
@@ -242,7 +242,7 @@ func AuthRequiredDirectiveHandler() func(ctx context.Context, obj interface{}, n
 func RestrictEnvironmentDirectiveHandler() func(ctx context.Context, obj interface{}, next gqlgen.Resolver, allowed []string) (res interface{}, err error) {
 
 	restrictionErr := errors.New("schema restriction: functionality not allowed in the current environment")
-	env := env.GetString(context.Background(), "ENV")
+	env := env.GetString("ENV")
 	return func(ctx context.Context, obj interface{}, next gqlgen.Resolver, allowed []string) (res interface{}, err error) {
 
 		for _, allowedEnv := range allowed {

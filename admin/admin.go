@@ -34,7 +34,7 @@ func CoreInit(pqClient *sql.DB) *gin.Engine {
 
 	log.SetReportCaller(true)
 
-	if env.GetString(context.Background(), "ENV") != "production" {
+	if env.GetString("ENV") != "production" {
 		log.SetLevel(log.DebugLevel)
 		gin.SetMode(gin.DebugMode)
 	}
@@ -44,7 +44,7 @@ func CoreInit(pqClient *sql.DB) *gin.Engine {
 
 	var s *storage.Client
 	var err error
-	if env.GetString(context.Background(), "ENV") != "local" {
+	if env.GetString("ENV") != "local" {
 		s, err = storage.NewClient(context.Background())
 	} else {
 		s, err = storage.NewClient(context.Background(), option.WithCredentialsJSON(util.LoadEncryptedServiceKey("./secrets/prod/service-key.json")))

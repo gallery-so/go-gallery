@@ -26,10 +26,10 @@ func NewPubSub(pCtx context.Context, opts ...option.ClientOption) (*PubSub, erro
 
 func NewClient(ctx context.Context) *pubsub.Client {
 	options := []option.ClientOption{}
-	projectID := env.GetString(ctx, "GOOGLE_CLOUD_PROJECT")
+	projectID := env.GetString("GOOGLE_CLOUD_PROJECT")
 
-	if env.GetString(ctx, "ENV") == "local" {
-		if host := env.GetString(ctx, "PUBSUB_EMULATOR_HOST"); host != "" {
+	if env.GetString("ENV") == "local" {
+		if host := env.GetString("PUBSUB_EMULATOR_HOST"); host != "" {
 			projectID = "gallery-local"
 			options = append(
 				options,

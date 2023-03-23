@@ -35,7 +35,7 @@ func coreInit(pgx *pgxpool.Pool) *gin.Engine {
 	router := gin.Default()
 	router.Use(middleware.ErrLogger(), middleware.Sentry(true), middleware.Tracing())
 
-	if env.GetString(context.Background(), "ENV") != "production" {
+	if env.GetString("ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
 	}
 
@@ -58,14 +58,14 @@ func setDefaults() {
 	viper.SetDefault("GAE_VERSION", "")
 	viper.AutomaticEnv()
 
-	if env.GetString(context.Background(), "ENV") != "local" {
+	if env.GetString("ENV") != "local" {
 		util.VarNotSetTo("SENTRY_DSN", "")
 		util.VarNotSetTo("GAE_VERSION", "")
 	}
 }
 
 func initSentry() {
-	if env.GetString(context.Background(), "ENV") == "local" {
+	if env.GetString("ENV") == "local" {
 		logger.For(nil).Info("skipping sentry init")
 		return
 	}
@@ -73,9 +73,9 @@ func initSentry() {
 	logger.For(nil).Info("initializing sentry...")
 
 	err := sentry.Init(sentry.ClientOptions{
-		Dsn:              env.GetString(context.Background(), "SENTRY_DSN"),
-		Environment:      env.GetString(context.Background(), "ENV"),
-		TracesSampleRate: env.Get[float64](context.Background(), "SENTRY_TRACES_SAMPLE_RATE"),
+		Dsn:              env.GetString("SENTRY_DSN"),
+		Environment:      env.GetString("ENV"),
+		TracesSampleRate: env.GetFloat64("SENTRY_TRACES_SAMPLE_RATE"),
 		AttachStacktrace: true,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			event = auth.ScrubEventCookies(event, hint)

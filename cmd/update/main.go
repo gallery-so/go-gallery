@@ -76,7 +76,7 @@ func processAddresses(addresses <-chan persist.Address, wg *sync.WaitGroup) {
 				panic(err)
 			}
 
-			req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/nfts/refresh", env.GetString(ctx, "INDEXER_HOST")), bytes.NewBuffer(j))
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/nfts/refresh", env.GetString("INDEXER_HOST")), bytes.NewBuffer(j))
 			if err != nil {
 				logrus.Errorf("error creating req: %s", err)
 				return

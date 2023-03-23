@@ -34,7 +34,7 @@ func RetoolAuthorized(ctx context.Context) error {
 	password := usernameAndPasswordParts[1]
 	passwordBytes := []byte(password)
 
-	if cmp := subtle.ConstantTimeCompare([]byte(env.GetString(ctx, "RETOOL_AUTH_TOKEN")), passwordBytes); cmp != 1 {
+	if cmp := subtle.ConstantTimeCompare([]byte(env.GetString("RETOOL_AUTH_TOKEN")), passwordBytes); cmp != 1 {
 		return errRetoolUnauthorized
 	}
 

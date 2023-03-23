@@ -84,7 +84,7 @@ var postfixesToMediaTypes = map[string]mediaWithContentType{
 func NewStorageClient(ctx context.Context) *storage.Client {
 	opts := append([]option.ClientOption{}, option.WithScopes([]string{storage.ScopeFullControl}...))
 
-	if env.GetString(ctx, "ENV") == "local" {
+	if env.GetString("ENV") == "local" {
 		fi, err := util.LoadEncryptedServiceKeyOrError("./secrets/dev/service-key-dev.json")
 		if err != nil {
 			logger.For(ctx).WithError(err).Error("failed to find service key file (local), running without storage client")
@@ -548,7 +548,7 @@ func remapPaths(mediaURL string) string {
 	switch persist.TokenURI(mediaURL).Type() {
 	case persist.URITypeIPFS, persist.URITypeIPFSAPI:
 		path := util.GetURIPath(mediaURL, false)
-		return fmt.Sprintf("%s/ipfs/%s", env.GetString(context.Background(), "IPFS_URL"), path)
+		return fmt.Sprintf("%s/ipfs/%s", env.GetString("IPFS_URL"), path)
 	case persist.URITypeArweave:
 		path := util.GetURIPath(mediaURL, false)
 		return fmt.Sprintf("https://arweave.net/%s", path)

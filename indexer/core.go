@@ -46,7 +46,7 @@ func coreInit(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) (*gin.Engin
 	logger.SetLoggerOptions(func(logger *logrus.Logger) {
 		logger.AddHook(sentryutil.SentryLoggerHook)
 		logger.SetLevel(logrus.InfoLevel)
-		if env.GetString(context.Background(), "ENV") != "production" && !quietLogs {
+		if env.GetString("ENV") != "production" && !quietLogs {
 			logger.SetLevel(logrus.DebugLevel)
 		}
 	})
@@ -57,17 +57,17 @@ func coreInit(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) (*gin.Engin
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
 
-	if env.GetString(context.Background(), "ENV") == "production" || enableRPC {
+	if env.GetString("ENV") == "production" || enableRPC {
 		rpcEnabled = true
 	}
 
-	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(env.Get[int](context.Background(), "CHAIN")), defaultTransferEvents, nil, fromBlock, toBlock)
+	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(env.GetInt("CHAIN")), defaultTransferEvents, nil, fromBlock, toBlock)
 
 	router := gin.Default()
 
 	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger())
 
-	if env.GetString(context.Background(), "ENV") != "production" {
+	if env.GetString("ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
 	}
 
@@ -81,7 +81,7 @@ func coreInitServer(quietLogs, enableRPC bool) *gin.Engine {
 	logger.InitWithGCPDefaults()
 	logger.SetLoggerOptions(func(logger *logrus.Logger) {
 		logger.SetLevel(logrus.InfoLevel)
-		if env.GetString(ctx, "ENV") != "production" && !quietLogs {
+		if env.GetString("ENV") != "production" && !quietLogs {
 			logger.SetLevel(logrus.DebugLevel)
 		}
 	})
@@ -92,7 +92,7 @@ func coreInitServer(quietLogs, enableRPC bool) *gin.Engine {
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
 
-	if env.GetString(ctx, "ENV") == "production" || enableRPC {
+	if env.GetString("ENV") == "production" || enableRPC {
 		rpcEnabled = true
 	}
 
@@ -100,7 +100,7 @@ func coreInitServer(quietLogs, enableRPC bool) *gin.Engine {
 
 	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger())
 
-	if env.GetString(ctx, "ENV") != "production" {
+	if env.GetString("ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
 		logrus.SetLevel(logrus.DebugLevel)
 	}
@@ -110,9 +110,9 @@ func coreInitServer(quietLogs, enableRPC bool) *gin.Engine {
 	queueChan := make(chan processTokensInput)
 	t := newThrottler()
 
-	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(env.Get[int](ctx, "CHAIN")), defaultTransferEvents, nil, nil, nil)
+	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(env.GetInt("CHAIN")), defaultTransferEvents, nil, nil, nil)
 
-	go processMissingMetadata(ctx, queueChan, tokenRepo, contractRepo, ipfsClient, ethClient, arweaveClient, s, env.GetString(ctx, "GCLOUD_TOKEN_CONTENT_BUCKET"), t)
+	go processMissingMetadata(ctx, queueChan, tokenRepo, contractRepo, ipfsClient, ethClient, arweaveClient, s, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
 	return handlersInitServer(router, queueChan, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s, i)
 }
 
@@ -140,7 +140,7 @@ func SetDefaults() {
 }
 
 func LoadConfigFile(service string, manualEnv string) {
-	if env.GetString(context.Background(), "ENV") != "local" {
+	if env.GetString("ENV") != "local" {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
 		return
 	}
@@ -149,14 +149,14 @@ func LoadConfigFile(service string, manualEnv string) {
 
 func ValidateEnv() {
 	util.VarNotSetTo("RPC_URL", "")
-	if env.GetString(context.Background(), "ENV") != "local" {
+	if env.GetString("ENV") != "local" {
 		util.VarNotSetTo("SENTRY_DSN", "")
 	}
 }
 
 func newRepos(storageClient *storage.Client) (persist.TokenRepository, persist.ContractRepository, refresh.AddressFilterRepository) {
 	pgClient := postgres.MustCreateClient()
-	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), refresh.AddressFilterRepository{Bucket: storageClient.Bucket(env.GetString(context.Background(), "GCLOUD_TOKEN_LOGS_BUCKET"))}
+	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), refresh.AddressFilterRepository{Bucket: storageClient.Bucket(env.GetString("GCLOUD_TOKEN_LOGS_BUCKET"))}
 }
 
 func newThrottler() *throttle.Locker {
@@ -164,7 +164,7 @@ func newThrottler() *throttle.Locker {
 }
 
 func initSentry() {
-	if env.GetString(context.Background(), "ENV") == "local" {
+	if env.GetString("ENV") == "local" {
 		logger.For(nil).Info("skipping sentry init")
 		return
 	}
@@ -172,15 +172,15 @@ func initSentry() {
 	logger.For(nil).Info("initializing sentry...")
 
 	err := sentry.Init(sentry.ClientOptions{
-		Dsn:         env.GetString(context.Background(), "SENTRY_DSN"),
-		Environment: env.GetString(context.Background(), "ENV"),
+		Dsn:         env.GetString("SENTRY_DSN"),
+		Environment: env.GetString("ENV"),
 		TracesSampler: sentry.TracesSamplerFunc(func(ctx sentry.SamplingContext) sentry.Sampled {
 			if ctx.Span.Op == rpc.GethSocketOpName {
 				return sentry.UniformTracesSampler(0.01).Sample(ctx)
 			}
-			return sentry.UniformTracesSampler(env.Get[float64](context.Background(), "SENTRY_TRACES_SAMPLE_RATE")).Sample(ctx)
+			return sentry.UniformTracesSampler(env.GetFloat64("SENTRY_TRACES_SAMPLE_RATE")).Sample(ctx)
 		}),
-		Release:          env.GetString(context.Background(), "VERSION"),
+		Release:          env.GetString("VERSION"),
 		AttachStacktrace: true,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			event = auth.ScrubEventCookies(event, hint)

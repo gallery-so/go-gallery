@@ -223,7 +223,7 @@ func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 		dbMu:              &sync.Mutex{},
 		stateMu:           &sync.Mutex{},
 
-		tokenBucket: env.GetString(context.Background(), "GCLOUD_TOKEN_CONTENT_BUCKET"),
+		tokenBucket: env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"),
 
 		chain: pChain,
 
@@ -487,7 +487,7 @@ func (i *indexer) fetchLogs(ctx context.Context, startingBlock persist.BlockNumb
 
 func (i *indexer) defaultGetLogs(ctx context.Context, curBlock, nextBlock *big.Int, topics [][]common.Hash) ([]types.Log, error) {
 	var logsTo []types.Log
-	reader, err := i.storageClient.Bucket(env.GetString(ctx, "GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%d-%d", curBlock, nextBlock)).NewReader(ctx)
+	reader, err := i.storageClient.Bucket(env.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%d-%d", curBlock, nextBlock)).NewReader(ctx)
 	if err != nil {
 		logger.For(ctx).WithError(err).Warn("error getting logs from GCP")
 	} else {
@@ -1297,7 +1297,7 @@ func transfersToTransfersAtBlock(transfers []rpc.Transfer) []transfersAtBlock {
 
 func saveLogsInBlockRange(ctx context.Context, curBlock, nextBlock string, logsTo []types.Log, storageClient *storage.Client) {
 	logger.For(ctx).Infof("Saving logs in block range %s to %s", curBlock, nextBlock)
-	obj := storageClient.Bucket(env.GetString(ctx, "GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%s-%s", curBlock, nextBlock))
+	obj := storageClient.Bucket(env.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%s-%s", curBlock, nextBlock))
 	obj.Delete(ctx)
 	storageWriter := obj.NewWriter(ctx)
 
