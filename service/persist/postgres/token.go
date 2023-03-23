@@ -14,28 +14,29 @@ import (
 
 // TokenRepository represents a postgres repository for tokens
 type TokenRepository struct {
-	db                                         *sql.DB
-	getByWalletStmt                            *sql.Stmt
-	getByWalletPaginateStmt                    *sql.Stmt
-	getOwnedByContractStmt                     *sql.Stmt
-	getOwnedByContractPaginateStmt             *sql.Stmt
-	getByContractStmt                          *sql.Stmt
-	getByContractPaginateStmt                  *sql.Stmt
-	getByTokenIdentifiersStmt                  *sql.Stmt
-	getByTokenIdentifiersPaginateStmt          *sql.Stmt
-	getByIdentifiersStmt                       *sql.Stmt
-	getExistsByTokenIdentifiersStmt            *sql.Stmt
-	getMetadataByTokenIdentifiersStmt          *sql.Stmt
-	updateOwnerUnsafeStmt                      *sql.Stmt
-	updateBalanceUnsafeStmt                    *sql.Stmt
-	updateURIByTokenIdentifiersStmt            *sql.Stmt
-	updateMetadataFieldsByTokenIdentifiersStmt *sql.Stmt
-	mostRecentBlockStmt                        *sql.Stmt
-	upsert721Stmt                              *sql.Stmt
-	upsert1155Stmt                             *sql.Stmt
-	deleteStmt                                 *sql.Stmt
-	deleteByIDStmt                             *sql.Stmt
-	getURIByTokenIdentifiersStmt               *sql.Stmt
+	db                                                   *sql.DB
+	getByWalletStmt                                      *sql.Stmt
+	getByWalletPaginateStmt                              *sql.Stmt
+	getOwnedByContractStmt                               *sql.Stmt
+	getOwnedByContractPaginateStmt                       *sql.Stmt
+	getByContractStmt                                    *sql.Stmt
+	getByContractPaginateStmt                            *sql.Stmt
+	getByTokenIdentifiersStmt                            *sql.Stmt
+	getByTokenIdentifiersPaginateStmt                    *sql.Stmt
+	getByIdentifiersStmt                                 *sql.Stmt
+	getExistsByTokenIdentifiersStmt                      *sql.Stmt
+	getMetadataByTokenIdentifiersStmt                    *sql.Stmt
+	updateOwnerUnsafeStmt                                *sql.Stmt
+	updateBalanceUnsafeStmt                              *sql.Stmt
+	updateURIByTokenIdentifiersStmt                      *sql.Stmt
+	updateAllMetadataDerivedFieldsByTokenIdentifiersStmt *sql.Stmt
+	updateMetadataFieldByTokenIdentifiersStmt            *sql.Stmt
+	mostRecentBlockStmt                                  *sql.Stmt
+	upsert721Stmt                                        *sql.Stmt
+	upsert1155Stmt                                       *sql.Stmt
+	deleteStmt                                           *sql.Stmt
+	deleteByIDStmt                                       *sql.Stmt
+	getURIByTokenIdentifiersStmt                         *sql.Stmt
 }
 
 // NewTokenRepository creates a new TokenRepository
@@ -85,16 +86,19 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 	updateURIByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET TOKEN_URI = $1, LAST_UPDATED = $2 WHERE TOKEN_ID = $3 AND CONTRACT_ADDRESS = $4;`)
 	checkNoErr(err)
 
-	updateMetadataFieldsByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET NAME = $1, DESCRIPTION = $2, LAST_UPDATED = $3 WHERE TOKEN_ID = $4 AND CONTRACT_ADDRESS = $5 AND DELETED = false;`)
+	updateAllMetadataDerivedFieldsByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET NAME = $1, DESCRIPTION = $2, LAST_UPDATED = $3 WHERE TOKEN_ID = $4 AND CONTRACT_ADDRESS = $5 AND DELETED = false;`)
+	checkNoErr(err)
+
+	updateMetadataFieldsByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET TOKEN_URI = $1, TOKEN_METADATA = $2, LAST_UPDATED = $3 WHERE TOKEN_ID = $4 AND CONTRACT_ADDRESS = $5 AND DELETED = false;`)
 	checkNoErr(err)
 
 	mostRecentBlockStmt, err := db.PrepareContext(ctx, `SELECT MAX(BLOCK_NUMBER) FROM tokens;`)
 	checkNoErr(err)
 
-	upsert721Stmt, err := db.PrepareContext(ctx, `INSERT INTO tokens (ID,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) ON CONFLICT (TOKEN_ID,CONTRACT_ADDRESS) WHERE TOKEN_TYPE = 'ERC-721' DO UPDATE SET TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,OWNER_ADDRESS = EXCLUDED.OWNER_ADDRESS,OWNERSHIP_HISTORY = EXCLUDED.OWNERSHIP_HISTORY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,CREATED_AT = EXCLUDED.CREATED_AT,LAST_UPDATED = EXCLUDED.LAST_UPDATED;`)
+	upsert721Stmt, err := db.PrepareContext(ctx, `INSERT INTO tokens (ID,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) ON CONFLICT (TOKEN_ID,CONTRACT_ADDRESS) WHERE TOKEN_TYPE = 'ERC-721' DO UPDATE SET TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,OWNER_ADDRESS = EXCLUDED.OWNER_ADDRESS,OWNERSHIP_HISTORY = EXCLUDED.OWNERSHIP_HISTORY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,CREATED_AT = EXCLUDED.CREATED_AT,LAST_UPDATED = EXCLUDED.LAST_UPDATED;`)
 	checkNoErr(err)
 
-	upsert1155Stmt, err := db.PrepareContext(ctx, `INSERT INTO tokens (ID,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) ON CONFLICT (TOKEN_ID,CONTRACT_ADDRESS,OWNER_ADDRESS) WHERE TOKEN_TYPE = 'ERC-1155' DO UPDATE SET TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,OWNER_ADDRESS = EXCLUDED.OWNER_ADDRESS,OWNERSHIP_HISTORY = EXCLUDED.OWNERSHIP_HISTORY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,CREATED_AT = EXCLUDED.CREATED_AT,LAST_UPDATED = EXCLUDED.LAST_UPDATED;`)
+	upsert1155Stmt, err := db.PrepareContext(ctx, `INSERT INTO tokens (ID,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) ON CONFLICT (TOKEN_ID,CONTRACT_ADDRESS,OWNER_ADDRESS) WHERE TOKEN_TYPE = 'ERC-1155' DO UPDATE SET TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,OWNER_ADDRESS = EXCLUDED.OWNER_ADDRESS,OWNERSHIP_HISTORY = EXCLUDED.OWNERSHIP_HISTORY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,CREATED_AT = EXCLUDED.CREATED_AT,LAST_UPDATED = EXCLUDED.LAST_UPDATED;`)
 	checkNoErr(err)
 
 	deleteStmt, err := db.PrepareContext(ctx, `DELETE FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2 AND OWNER_ADDRESS = $3 and TOKEN_TYPE = $4;`)
@@ -103,32 +107,33 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 	deleteByIDStmt, err := db.PrepareContext(ctx, `DELETE FROM tokens WHERE ID = $1;`)
 	checkNoErr(err)
 
-	getURIByTokenIdentifiersStmt, err := db.PrepareContext(ctx, `SELECT TOKEN_URI FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2 WHERE LENGTH(TOKEN_URI) > 0 ORDER BY BLOCK_NUMBER DESC LIMIT 1;`)
+	getURIByTokenIdentifiersStmt, err := db.PrepareContext(ctx, `SELECT TOKEN_URI FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2 AND LENGTH(TOKEN_URI) > 0 ORDER BY BLOCK_NUMBER DESC LIMIT 1;`)
 	checkNoErr(err)
 
 	return &TokenRepository{
-		db:                                         db,
-		getByWalletStmt:                            getByWalletStmt,
-		getByWalletPaginateStmt:                    getByWalletPaginateStmt,
-		getOwnedByContractStmt:                     getOwnedByContractStmt,
-		getOwnedByContractPaginateStmt:             getOwnedByContractPaginateStmt,
-		getByContractStmt:                          getByContractStmt,
-		getByContractPaginateStmt:                  getByContractPaginateStmt,
-		getByTokenIdentifiersStmt:                  getByTokenIdentifiersStmt,
-		getByTokenIdentifiersPaginateStmt:          getByTokenIdentifiersPaginateStmt,
-		getMetadataByTokenIdentifiersStmt:          getMetadataByTokenIdentifiersStmt,
-		updateOwnerUnsafeStmt:                      updateOwnerUnsafeStmt,
-		updateBalanceUnsafeStmt:                    updateBalanceUnsafeStmt,
-		updateURIByTokenIdentifiersStmt:            updateURIByTokenIdentifiersUnsafeStmt,
-		updateMetadataFieldsByTokenIdentifiersStmt: updateMetadataFieldsByTokenIdentifiersUnsafeStmt,
-		mostRecentBlockStmt:                        mostRecentBlockStmt,
-		upsert721Stmt:                              upsert721Stmt,
-		upsert1155Stmt:                             upsert1155Stmt,
-		deleteStmt:                                 deleteStmt,
-		deleteByIDStmt:                             deleteByIDStmt,
-		getByIdentifiersStmt:                       getByIdentifiersStmt,
-		getExistsByTokenIdentifiersStmt:            getExistsByTokenIdentifiersStmt,
-		getURIByTokenIdentifiersStmt:               getURIByTokenIdentifiersStmt,
+		db:                                db,
+		getByWalletStmt:                   getByWalletStmt,
+		getByWalletPaginateStmt:           getByWalletPaginateStmt,
+		getOwnedByContractStmt:            getOwnedByContractStmt,
+		getOwnedByContractPaginateStmt:    getOwnedByContractPaginateStmt,
+		getByContractStmt:                 getByContractStmt,
+		getByContractPaginateStmt:         getByContractPaginateStmt,
+		getByTokenIdentifiersStmt:         getByTokenIdentifiersStmt,
+		getByTokenIdentifiersPaginateStmt: getByTokenIdentifiersPaginateStmt,
+		getMetadataByTokenIdentifiersStmt: getMetadataByTokenIdentifiersStmt,
+		updateOwnerUnsafeStmt:             updateOwnerUnsafeStmt,
+		updateBalanceUnsafeStmt:           updateBalanceUnsafeStmt,
+		updateURIByTokenIdentifiersStmt:   updateURIByTokenIdentifiersUnsafeStmt,
+		updateAllMetadataDerivedFieldsByTokenIdentifiersStmt: updateAllMetadataDerivedFieldsByTokenIdentifiersUnsafeStmt,
+		mostRecentBlockStmt:                       mostRecentBlockStmt,
+		upsert721Stmt:                             upsert721Stmt,
+		upsert1155Stmt:                            upsert1155Stmt,
+		deleteStmt:                                deleteStmt,
+		deleteByIDStmt:                            deleteByIDStmt,
+		getByIdentifiersStmt:                      getByIdentifiersStmt,
+		getExistsByTokenIdentifiersStmt:           getExistsByTokenIdentifiersStmt,
+		getURIByTokenIdentifiersStmt:              getURIByTokenIdentifiersStmt,
+		updateMetadataFieldByTokenIdentifiersStmt: updateMetadataFieldsByTokenIdentifiersUnsafeStmt,
 	}
 
 }
@@ -491,7 +496,10 @@ func (t *TokenRepository) UpdateByTokenIdentifiers(pCtx context.Context, pTokenI
 		res, err = t.updateURIByTokenIdentifiersStmt.ExecContext(pCtx, update.TokenURI, update.LastUpdated, pTokenID, pContractAddress)
 	case persist.TokenUpdateMetadataDerivedFieldsInput:
 		update := pUpdate.(persist.TokenUpdateMetadataDerivedFieldsInput)
-		res, err = t.updateMetadataFieldsByTokenIdentifiersStmt.ExecContext(pCtx, update.Name, update.Description, update.LastUpdated, pTokenID, pContractAddress)
+		res, err = t.updateAllMetadataDerivedFieldsByTokenIdentifiersStmt.ExecContext(pCtx, update.Name, update.Description, update.LastUpdated, pTokenID, pContractAddress)
+	case persist.TokenUpdateMetadataFieldsInput:
+		update := pUpdate.(persist.TokenUpdateMetadataFieldsInput)
+		res, err = t.updateMetadataFieldByTokenIdentifiersStmt.ExecContext(pCtx, update.TokenURI, update.Metadata, update.LastUpdated, pTokenID, pContractAddress)
 	default:
 		return fmt.Errorf("unsupported update type: %T", pUpdate)
 	}

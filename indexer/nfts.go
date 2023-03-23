@@ -242,7 +242,7 @@ func getTokenMetadata(nftRepository persist.TokenRepository, ipfsClient *shell.S
 			return
 		}
 
-		if err := nftRepository.UpdateByTokenIdentifiers(ctx, input.TokenID, input.ContractAddress, persist.TokenUpdateAllURIDerivedFieldsInput{
+		if err := nftRepository.UpdateByTokenIdentifiers(ctx, input.TokenID, input.ContractAddress, persist.TokenUpdateMetadataFieldsInput{
 			Metadata: newMetadata,
 			TokenURI: newURI,
 		}); err != nil {

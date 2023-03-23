@@ -131,6 +131,13 @@ type TokenUpdateAllMetadataFieldsInput struct {
 	Description NullString    `json:"description"`
 }
 
+type TokenUpdateMetadataFieldsInput struct {
+	LastUpdated LastUpdatedTime `json:"last_updated"`
+
+	Metadata TokenMetadata `json:"token_metadata"`
+	TokenURI TokenURI      `json:"token_uri"`
+}
+
 // TokenUpdateURIInput represents an update to just a token's URI field
 type TokenUpdateURIInput struct {
 	LastUpdated LastUpdatedTime `json:"last_updated"`

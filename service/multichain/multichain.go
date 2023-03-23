@@ -326,7 +326,7 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 
 	wg := sync.WaitGroup{}
 	for c, a := range chainsToAddresses {
-		logger.For(ctx).Infof("updating media for user %s wallets %s", user.Username, a)
+		logger.For(ctx).Infof("syncing tokens for user %s wallets %s", user.Username, a)
 		chain := c
 		addresses := a
 		wg.Add(len(addresses))
