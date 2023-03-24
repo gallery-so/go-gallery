@@ -872,54 +872,261 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
 
 		tokens := assertSyncedTokens(t, response, err, 1)
-		imgMedia := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
-		assert.Equal(t, *imgMedia.MediaType, string(persist.MediaTypeImage))
-		assert.NotEmpty(t, imgMedia.MediaURL)
+		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
+		assert.Equal(t, string(persist.MediaTypeImage), *media.MediaType)
+		assert.NotEmpty(t, media.MediaURL)
 	})
 
 	t.Run("sync should process video", func(t *testing.T) {
+		ctx := context.Background()
+		userF := newUserFixture(t)
+		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/video")
+		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+
+		tokens := assertSyncedTokens(t, response, err, 1)
+		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia)
+		assert.Equal(t, string(persist.MediaTypeVideo), *media.MediaType)
+		assert.NotEmpty(t, media.MediaURL)
 	})
 
 	t.Run("sync should process iframe", func(t *testing.T) {
+		ctx := context.Background()
+		userF := newUserFixture(t)
+		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/iframe")
+		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+
+		tokens := assertSyncedTokens(t, response, err, 1)
+		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaHtmlMedia)
+		assert.Equal(t, string(persist.MediaTypeHTML), *media.MediaType)
+		assert.NotEmpty(t, media.MediaURL)
 	})
 
 	t.Run("sync should process gif", func(t *testing.T) {
+		ctx := context.Background()
+		userF := newUserFixture(t)
+		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/gif")
+		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+
+		tokens := assertSyncedTokens(t, response, err, 1)
+		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia)
+		assert.Equal(t, string(persist.MediaTypeGIF), *media.MediaType)
+		assert.NotEmpty(t, media.MediaURL)
 	})
 
 	t.Run("sync should process bad metadata", func(t *testing.T) {
+		ctx := context.Background()
+		userF := newUserFixture(t)
+		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/bad")
+		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+
+		tokens := assertSyncedTokens(t, response, err, 1)
+		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia)
+		assert.Equal(t, "", *media.MediaType)
+		assert.Empty(t, media.MediaURL)
 	})
 
 	t.Run("sync should process missing metadata", func(t *testing.T) {
+		ctx := context.Background()
+		userF := newUserFixture(t)
+		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/notfound")
+		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+
+		tokens := assertSyncedTokens(t, response, err, 1)
+		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia)
+		assert.Equal(t, "", *media.MediaType)
+		assert.Empty(t, media.MediaURL)
+	})
+
+	t.Run("sync should process bad media", func(t *testing.T) {
+		ctx := context.Background()
+		userF := newUserFixture(t)
+		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/media/bad")
+		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+
+		tokens := assertSyncedTokens(t, response, err, 1)
+		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia)
+		assert.Equal(t, string(persist.MediaTypeUnknown), *media.MediaType)
+		assert.NotEmpty(t, media.MediaURL)
+	})
+
+	t.Run("sync should process missing media", func(t *testing.T) {
+		ctx := context.Background()
+		userF := newUserFixture(t)
+		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/media/notfound")
+		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+
+		tokens := assertSyncedTokens(t, response, err, 1)
+		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia)
+		assert.Equal(t, string(persist.MediaTypeUnknown), *media.MediaType)
+		assert.NotEmpty(t, media.MediaURL)
 	})
 
 	t.Run("sync should process svg", func(t *testing.T) {
+		ctx := context.Background()
+		userF := newUserFixture(t)
+		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/svg")
+		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+
+		tokens := assertSyncedTokens(t, response, err, 1)
+		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
+		assert.Equal(t, string(persist.MediaTypeSVG), *media.MediaType)
+		assert.NotEmpty(t, media.MediaURL)
 	})
 
 	t.Run("sync should process base64svg", func(t *testing.T) {
+		ctx := context.Background()
+		userF := newUserFixture(t)
+		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/base64svg")
+		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+
+		tokens := assertSyncedTokens(t, response, err, 1)
+		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
+		assert.Equal(t, string(persist.MediaTypeSVG), *media.MediaType)
+		assert.NotEmpty(t, media.MediaURL)
+	})
+
+	t.Run("sync should process base64", func(t *testing.T) {
+		ctx := context.Background()
+		userF := newUserFixture(t)
+		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/base64")
+		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+
+		tokens := assertSyncedTokens(t, response, err, 1)
+		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
+		assert.Equal(t, *media.MediaType, string(persist.MediaTypeSVG))
+		assert.NotEmpty(t, media.MediaURL)
 	})
 
 	t.Run("sync should process ipfs", func(t *testing.T) {
+		ctx := context.Background()
+		userF := newUserFixture(t)
+		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/media/ipfs")
+		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+
+		tokens := assertSyncedTokens(t, response, err, 1)
+		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
+		assert.Equal(t, *media.MediaType, string(persist.MediaTypeImage))
+		assert.NotEmpty(t, media.MediaURL)
 	})
 
 	t.Run("sync should process bad dns", func(t *testing.T) {
+		ctx := context.Background()
+		userF := newUserFixture(t)
+		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/media/dnsbad")
+		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+
+		tokens := assertSyncedTokens(t, response, err, 1)
+		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
+		assert.Equal(t, string(persist.MediaTypeImage), *media.MediaType)
+		assert.NotEmpty(t, media.MediaURL)
 	})
 
 	t.Run("sync should process different keyword", func(t *testing.T) {
+		ctx := context.Background()
+		userF := newUserFixture(t)
+		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/differentkeyword")
+		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+
+		tokens := assertSyncedTokens(t, response, err, 1)
+		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
+		assert.Equal(t, string(persist.MediaTypeImage), *media.MediaType)
+		assert.NotEmpty(t, media.MediaURL)
 	})
 
 	t.Run("sync should process wrong keyword", func(t *testing.T) {
+		ctx := context.Background()
+		userF := newUserFixture(t)
+		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/wrongkeyword")
+		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+
+		tokens := assertSyncedTokens(t, response, err, 1)
+		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia)
+		assert.Equal(t, string(persist.MediaTypeVideo), *media.MediaType)
+		assert.NotEmpty(t, media.MediaURL)
 	})
 
 	t.Run("sync should process animation", func(t *testing.T) {
+		ctx := context.Background()
+		userF := newUserFixture(t)
+		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/animation")
+		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+
+		tokens := assertSyncedTokens(t, response, err, 1)
+		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia)
+		assert.Equal(t, string(persist.MediaTypeAnimation), *media.MediaType)
+		assert.NotEmpty(t, media.MediaURL)
 	})
 
 	t.Run("sync should process pdf", func(t *testing.T) {
+		ctx := context.Background()
+		userF := newUserFixture(t)
+		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/pdf")
+		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+
+		tokens := assertSyncedTokens(t, response, err, 1)
+		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia)
+		assert.Equal(t, string(persist.MediaTypePDF), *media.MediaType)
+		assert.NotEmpty(t, media.MediaURL)
 	})
 
 	t.Run("sync should process text", func(t *testing.T) {
+		ctx := context.Background()
+		userF := newUserFixture(t)
+		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/text")
+		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+
+		tokens := assertSyncedTokens(t, response, err, 1)
+		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia)
+		assert.Equal(t, string(persist.MediaTypeText), *media.MediaType)
+		assert.NotEmpty(t, media.MediaURL)
 	})
 
 	t.Run("sync should process bad image", func(t *testing.T) {
+		ctx := context.Background()
+		userF := newUserFixture(t)
+		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/badimage")
+		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+
+		tokens := assertSyncedTokens(t, response, err, 1)
+		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
+		assert.Equal(t, string(persist.MediaTypeImage), *media.MediaType)
+		assert.NotEmpty(t, media.MediaURL)
 	})
 }
 

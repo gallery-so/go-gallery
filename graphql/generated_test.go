@@ -4627,7 +4627,9 @@ func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserToken
 
 // syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaAudioMedia includes the requested fields of the GraphQL type AudioMedia.
 type syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaAudioMedia struct {
-	Typename *string `json:"__typename"`
+	Typename  *string `json:"__typename"`
+	MediaURL  *string `json:"mediaURL"`
+	MediaType *string `json:"mediaType"`
 }
 
 // GetTypename returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaAudioMedia.Typename, and is useful for accessing the field via an interface.
@@ -4635,9 +4637,21 @@ func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserToken
 	return v.Typename
 }
 
+// GetMediaURL returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaAudioMedia.MediaURL, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaAudioMedia) GetMediaURL() *string {
+	return v.MediaURL
+}
+
+// GetMediaType returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaAudioMedia.MediaType, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaAudioMedia) GetMediaType() *string {
+	return v.MediaType
+}
+
 // syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia includes the requested fields of the GraphQL type GIFMedia.
 type syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia struct {
-	Typename *string `json:"__typename"`
+	Typename  *string `json:"__typename"`
+	MediaURL  *string `json:"mediaURL"`
+	MediaType *string `json:"mediaType"`
 }
 
 // GetTypename returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia.Typename, and is useful for accessing the field via an interface.
@@ -4645,9 +4659,21 @@ func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserToken
 	return v.Typename
 }
 
+// GetMediaURL returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia.MediaURL, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia) GetMediaURL() *string {
+	return v.MediaURL
+}
+
+// GetMediaType returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia.MediaType, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia) GetMediaType() *string {
+	return v.MediaType
+}
+
 // syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia includes the requested fields of the GraphQL type GltfMedia.
 type syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia struct {
-	Typename *string `json:"__typename"`
+	Typename  *string `json:"__typename"`
+	MediaURL  *string `json:"mediaURL"`
+	MediaType *string `json:"mediaType"`
 }
 
 // GetTypename returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia.Typename, and is useful for accessing the field via an interface.
@@ -4655,14 +4681,36 @@ func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserToken
 	return v.Typename
 }
 
+// GetMediaURL returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia.MediaURL, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia) GetMediaURL() *string {
+	return v.MediaURL
+}
+
+// GetMediaType returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia.MediaType, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia) GetMediaType() *string {
+	return v.MediaType
+}
+
 // syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaHtmlMedia includes the requested fields of the GraphQL type HtmlMedia.
 type syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaHtmlMedia struct {
-	Typename *string `json:"__typename"`
+	Typename  *string `json:"__typename"`
+	MediaURL  *string `json:"mediaURL"`
+	MediaType *string `json:"mediaType"`
 }
 
 // GetTypename returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaHtmlMedia.Typename, and is useful for accessing the field via an interface.
 func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaHtmlMedia) GetTypename() *string {
 	return v.Typename
+}
+
+// GetMediaURL returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaHtmlMedia.MediaURL, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaHtmlMedia) GetMediaURL() *string {
+	return v.MediaURL
+}
+
+// GetMediaType returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaHtmlMedia.MediaType, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaHtmlMedia) GetMediaType() *string {
+	return v.MediaType
 }
 
 // syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia includes the requested fields of the GraphQL type ImageMedia.
@@ -4689,7 +4737,9 @@ func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserToken
 
 // syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia includes the requested fields of the GraphQL type InvalidMedia.
 type syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia struct {
-	Typename *string `json:"__typename"`
+	Typename  *string `json:"__typename"`
+	MediaURL  *string `json:"mediaURL"`
+	MediaType *string `json:"mediaType"`
 }
 
 // GetTypename returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia.Typename, and is useful for accessing the field via an interface.
@@ -4697,14 +4747,36 @@ func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserToken
 	return v.Typename
 }
 
+// GetMediaURL returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia.MediaURL, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia) GetMediaURL() *string {
+	return v.MediaURL
+}
+
+// GetMediaType returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia.MediaType, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia) GetMediaType() *string {
+	return v.MediaType
+}
+
 // syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaJsonMedia includes the requested fields of the GraphQL type JsonMedia.
 type syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaJsonMedia struct {
-	Typename *string `json:"__typename"`
+	Typename  *string `json:"__typename"`
+	MediaURL  *string `json:"mediaURL"`
+	MediaType *string `json:"mediaType"`
 }
 
 // GetTypename returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaJsonMedia.Typename, and is useful for accessing the field via an interface.
 func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaJsonMedia) GetTypename() *string {
 	return v.Typename
+}
+
+// GetMediaURL returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaJsonMedia.MediaURL, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaJsonMedia) GetMediaURL() *string {
+	return v.MediaURL
+}
+
+// GetMediaType returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaJsonMedia.MediaType, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaJsonMedia) GetMediaType() *string {
+	return v.MediaType
 }
 
 // syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype includes the requested fields of the GraphQL interface MediaSubtype.
@@ -4922,7 +4994,9 @@ func __marshalsyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUser
 
 // syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia includes the requested fields of the GraphQL type PdfMedia.
 type syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia struct {
-	Typename *string `json:"__typename"`
+	Typename  *string `json:"__typename"`
+	MediaURL  *string `json:"mediaURL"`
+	MediaType *string `json:"mediaType"`
 }
 
 // GetTypename returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia.Typename, and is useful for accessing the field via an interface.
@@ -4930,9 +5004,21 @@ func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserToken
 	return v.Typename
 }
 
+// GetMediaURL returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia.MediaURL, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia) GetMediaURL() *string {
+	return v.MediaURL
+}
+
+// GetMediaType returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia.MediaType, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia) GetMediaType() *string {
+	return v.MediaType
+}
+
 // syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia includes the requested fields of the GraphQL type SyncingMedia.
 type syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia struct {
-	Typename *string `json:"__typename"`
+	Typename  *string `json:"__typename"`
+	MediaURL  *string `json:"mediaURL"`
+	MediaType *string `json:"mediaType"`
 }
 
 // GetTypename returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia.Typename, and is useful for accessing the field via an interface.
@@ -4940,9 +5026,21 @@ func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserToken
 	return v.Typename
 }
 
+// GetMediaURL returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia.MediaURL, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia) GetMediaURL() *string {
+	return v.MediaURL
+}
+
+// GetMediaType returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia.MediaType, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia) GetMediaType() *string {
+	return v.MediaType
+}
+
 // syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia includes the requested fields of the GraphQL type TextMedia.
 type syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia struct {
-	Typename *string `json:"__typename"`
+	Typename  *string `json:"__typename"`
+	MediaURL  *string `json:"mediaURL"`
+	MediaType *string `json:"mediaType"`
 }
 
 // GetTypename returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia.Typename, and is useful for accessing the field via an interface.
@@ -4950,9 +5048,21 @@ func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserToken
 	return v.Typename
 }
 
+// GetMediaURL returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia.MediaURL, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia) GetMediaURL() *string {
+	return v.MediaURL
+}
+
+// GetMediaType returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia.MediaType, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia) GetMediaType() *string {
+	return v.MediaType
+}
+
 // syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia includes the requested fields of the GraphQL type UnknownMedia.
 type syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia struct {
-	Typename *string `json:"__typename"`
+	Typename  *string `json:"__typename"`
+	MediaURL  *string `json:"mediaURL"`
+	MediaType *string `json:"mediaType"`
 }
 
 // GetTypename returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia.Typename, and is useful for accessing the field via an interface.
@@ -4960,14 +5070,36 @@ func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserToken
 	return v.Typename
 }
 
+// GetMediaURL returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia.MediaURL, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia) GetMediaURL() *string {
+	return v.MediaURL
+}
+
+// GetMediaType returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia.MediaType, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia) GetMediaType() *string {
+	return v.MediaType
+}
+
 // syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia includes the requested fields of the GraphQL type VideoMedia.
 type syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia struct {
-	Typename *string `json:"__typename"`
+	Typename  *string `json:"__typename"`
+	MediaURL  *string `json:"mediaURL"`
+	MediaType *string `json:"mediaType"`
 }
 
 // GetTypename returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia.Typename, and is useful for accessing the field via an interface.
 func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia) GetTypename() *string {
 	return v.Typename
+}
+
+// GetMediaURL returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia.MediaURL, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia) GetMediaURL() *string {
+	return v.MediaURL
+}
+
+// GetMediaType returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia.MediaType, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia) GetMediaType() *string {
+	return v.MediaType
 }
 
 // trendingFeedQueryResponse is returned by trendingFeedQuery on success.
@@ -9038,6 +9170,50 @@ mutation syncTokensMutation ($chains: [Chain!]) {
 						media {
 							__typename
 							... on ImageMedia {
+								mediaURL
+								mediaType
+							}
+							... on GIFMedia {
+								mediaURL
+								mediaType
+							}
+							... on VideoMedia {
+								mediaURL
+								mediaType
+							}
+							... on AudioMedia {
+								mediaURL
+								mediaType
+							}
+							... on TextMedia {
+								mediaURL
+								mediaType
+							}
+							... on PdfMedia {
+								mediaURL
+								mediaType
+							}
+							... on HtmlMedia {
+								mediaURL
+								mediaType
+							}
+							... on JsonMedia {
+								mediaURL
+								mediaType
+							}
+							... on GltfMedia {
+								mediaURL
+								mediaType
+							}
+							... on UnknownMedia {
+								mediaURL
+								mediaType
+							}
+							... on SyncingMedia {
+								mediaURL
+								mediaType
+							}
+							... on InvalidMedia {
 								mediaURL
 								mediaType
 							}

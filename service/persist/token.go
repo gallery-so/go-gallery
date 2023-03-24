@@ -415,7 +415,7 @@ func MediaFromContentType(contentType string) MediaType {
 	switch spl[0] {
 	case "image":
 		switch spl[1] {
-		case "svg":
+		case "svg", "svg+xml":
 			return MediaTypeSVG
 		case "gif":
 			return MediaTypeGIF
@@ -433,8 +433,12 @@ func MediaFromContentType(contentType string) MediaType {
 		default:
 			return MediaTypeText
 		}
-	case "pdf":
-		return MediaTypePDF
+	case "application":
+		switch spl[1] {
+		case "pdf":
+			return MediaTypePDF
+		}
+		fallthrough
 	default:
 		return MediaTypeUnknown
 	}

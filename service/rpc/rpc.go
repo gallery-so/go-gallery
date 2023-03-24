@@ -721,13 +721,11 @@ func GetIPFSData(pCtx context.Context, ipfsClient *shell.Shell, path string) ([]
 func getHeaders(ctx context.Context, method, url string) (http.Header, error) {
 	req, err := http.NewRequestWithContext(ctx, method, url, nil)
 	if err != nil {
-		panic(err)
 		return nil, err
 	}
 
 	resp, err := defaultHTTPClient.Do(req)
 	if err != nil {
-		panic(err)
 		return nil, err
 	}
 

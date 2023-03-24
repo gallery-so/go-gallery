@@ -347,7 +347,6 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 				subWg := &sync.WaitGroup{}
 				subWg.Add(len(providers))
 				for i, p := range providers {
-					_ = p.(tokensFetcher)
 					if fetcher, ok := p.(tokensFetcher); ok {
 						go func(fetcher tokensFetcher, priority int) {
 							defer subWg.Done()
@@ -527,10 +526,7 @@ func (p *Provider) sendTokensToTokenProcessing(ctx context.Context, userID persi
 	if len(tokens) == 0 {
 		return nil
 	}
-	return p.SendTokens(ctx, task.TokenProcessingUserMessage{
-		UserID:   userID,
-		TokenIDs: tokens,
-	})
+	return p.SendTokens(ctx, task.TokenProcessingUserMessage{UserID: userID, TokenIDs: tokens})
 }
 
 func (p *Provider) processTokenMedia(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, ownerAddress persist.Address, imageKeywords, animationKeywords []string) error {

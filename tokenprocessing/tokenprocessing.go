@@ -33,7 +33,7 @@ func InitServer() {
 	http.Handle("/", router)
 }
 
-func CoreInitServer(c *server.Clients, provider *multichain.Provider) *gin.Engine {
+func CoreInitServer(c *server.Clients, mc *multichain.Provider) *gin.Engine {
 	initSentry()
 	logger.InitWithGCPDefaults()
 
@@ -52,7 +52,7 @@ func CoreInitServer(c *server.Clients, provider *multichain.Provider) *gin.Engin
 
 	t := newThrottler()
 
-	return handlersInitServer(router, provider, c.Repos, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, env.GetString(context.Background(), "GCLOUD_TOKEN_CONTENT_BUCKET"), t)
+	return handlersInitServer(router, mc, c.Repos, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
 }
 
 func setDefaults() {

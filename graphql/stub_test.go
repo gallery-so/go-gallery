@@ -128,8 +128,7 @@ func sendTokensNOOP(context.Context, task.TokenProcessingUserMessage) error {
 	return nil
 }
 
-// handler should be configured with a provider that supports fetching tokenmetadata
-// the provider should be able to get configured to call a specific endpoint from	tokenprocessing
+// sendTokensToHTTPHandler makes an HTTP request to the passed handler
 func sendTokensToHTTPHandler(handler http.Handler, method, endpoint string) multichain.SendTokens {
 	return func(ctx context.Context, t task.TokenProcessingUserMessage) error {
 		byt, _ := json.Marshal(t)

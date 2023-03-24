@@ -280,6 +280,50 @@ mutation syncTokensMutation($chains: [Chain!]) {
                 mediaURL
                 mediaType
               }
+              ...on GIFMedia {
+                mediaURL
+                mediaType
+              }
+              ...on VideoMedia {
+                mediaURL
+                mediaType
+              }
+              ...on AudioMedia {
+                mediaURL
+                mediaType
+              }
+              ...on TextMedia {
+                mediaURL
+                mediaType
+              }
+              ...on PdfMedia {
+                mediaURL
+                mediaType
+              }
+              ...on HtmlMedia {
+                mediaURL
+                mediaType
+              }
+              ...on JsonMedia {
+                mediaURL
+                mediaType
+              }
+              ...on GltfMedia {
+                mediaURL
+                mediaType
+              }
+              ...on UnknownMedia {
+                mediaURL
+                mediaType
+              }
+              ...on SyncingMedia {
+                mediaURL
+                mediaType
+              }
+              ...on InvalidMedia {
+                mediaURL
+                mediaType
+              }
             }
           }
         }
