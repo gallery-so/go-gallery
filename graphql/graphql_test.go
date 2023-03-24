@@ -802,9 +802,7 @@ func testSyncDeletesOldTokens(t *testing.T) {
 
 	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum})
 
-	require.NoError(t, err)
-	payload := (*response.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
-	assert.Len(t, payload.Viewer.User.Tokens, len(provider.Tokens))
+	assertSyncedTokens(t, response, err, 4)
 }
 
 func testSyncShouldCombineProviders(t *testing.T) {
@@ -822,9 +820,7 @@ func testSyncShouldCombineProviders(t *testing.T) {
 
 	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum})
 
-	require.NoError(t, err)
-	payload := (*response.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
-	assert.Len(t, payload.Viewer.User.Tokens, len(providerA.Tokens)+len(providerB.Tokens))
+	assertSyncedTokens(t, response, err, len(providerA.Tokens)+len(providerB.Tokens))
 }
 
 func testSyncShouldMergeDuplicatesInProvider(t *testing.T) {
@@ -836,9 +832,7 @@ func testSyncShouldMergeDuplicatesInProvider(t *testing.T) {
 
 	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum})
 
-	require.NoError(t, err)
-	payload := (*response.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
-	assert.Len(t, payload.Viewer.User.Tokens, 1)
+	assertSyncedTokens(t, response, err, 1)
 }
 
 func testSyncShouldMergeDuplicatesAcrossProviders(t *testing.T) {
@@ -851,21 +845,36 @@ func testSyncShouldMergeDuplicatesAcrossProviders(t *testing.T) {
 
 	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum})
 
-	require.NoError(t, err)
-	payload := (*response.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
-	assert.Len(t, payload.Viewer.User.Tokens, 1)
+	assertSyncedTokens(t, response, err, 1)
 }
 
 func testSyncShouldProcessMedia(t *testing.T) {
+	metadataServer := newMetadataServerFixture(t)
+
+	patchMetadata := func(t *testing.T, ctx context.Context, address, endpoint string) http.Handler {
+		contract := multichain.ChainAgnosticContract{Address: "0x123", Name: "testContract"}
+		provider := newStubProvider(
+			withContractTokens(contract, address, 1),
+			withFetchMetadata(fetchFromDummyEndpoint(metadataServer.URL, endpoint)),
+		)
+		clients := server.ClientInit(ctx)
+		mc := newMultichainProvider(clients, sendTokensNOOP, []any{provider})
+		t.Cleanup(clients.Close)
+		return handlerWithProviders(t, sendTokensToTokenProcessing(clients, &mc), provider)
+	}
+
 	t.Run("sync should process image", func(t *testing.T) {
+		ctx := context.Background()
 		userF := newUserFixture(t)
-		token := defaultToken(userF.Wallet.Address)
-		backendProvider := newStubProvider(withTokens([]multichain.ChainAgnosticToken{token}))
-		tokenProcessingProvider := newStubProvider(withFetchMetadata(fetchFromDummyEndpoint("/metadata/image")))
-		c := server.ClientInit(context.Background())
-		mc := newMultichainProvider(c, sendTokensNOOP, tokenProcessingProvider)
-		t.Cleanup(c.Close)
-		h := handlerWithProviders(t, sendTokensToTokenProcessing(c, &mc), backendProvider)
+		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/image")
+		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+
+		tokens := assertSyncedTokens(t, response, err, 1)
+		imgMedia := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
+		assert.Equal(t, *imgMedia.MediaType, string(persist.MediaTypeImage))
+		assert.NotEmpty(t, imgMedia.MediaURL)
 	})
 
 	t.Run("sync should process video", func(t *testing.T) {
@@ -912,6 +921,14 @@ func testSyncShouldProcessMedia(t *testing.T) {
 
 	t.Run("sync should process bad image", func(t *testing.T) {
 	})
+}
+
+func assertSyncedTokens(t *testing.T, response *syncTokensMutationResponse, err error, expectedLen int) []*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensToken {
+	t.Helper()
+	require.NoError(t, err)
+	payload := (*response.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
+	assert.Len(t, payload.Viewer.User.Tokens, expectedLen)
+	return payload.Viewer.User.Tokens
 }
 
 // authMechanismInput signs a nonce with an ethereum wallet
@@ -1110,20 +1127,20 @@ func defaultHandler(t *testing.T) http.Handler {
 }
 
 // handlerWithProviders returns a GraphQL http.Handler
-func handlerWithProviders(t *testing.T, sendTokens multichain.SendTokens, p ...any) http.Handler {
+func handlerWithProviders(t *testing.T, sendTokens multichain.SendTokens, providers ...any) http.Handler {
 	c := server.ClientInit(context.Background())
-	provider := newMultichainProvider(c, sendTokens, p)
+	provider := newMultichainProvider(c, sendTokens, providers)
 	recommender := newStubRecommender(t, []persist.DBID{})
 	t.Cleanup(c.Close)
 	return server.CoreInit(c, &provider, recommender)
 }
 
 // newMultichainProvider a new multichain provider configured with the given providers
-func newMultichainProvider(c *server.Clients, sendToken multichain.SendTokens, p ...any) multichain.Provider {
+func newMultichainProvider(c *server.Clients, sendToken multichain.SendTokens, providers []any) multichain.Provider {
 	return multichain.Provider{
 		Repos:      c.Repos,
 		Queries:    c.Queries,
-		Chains:     map[persist.Chain][]any{persist.ChainETH: p},
+		Chains:     map[persist.Chain][]any{persist.ChainETH: providers},
 		SendTokens: sendToken,
 	}
 }

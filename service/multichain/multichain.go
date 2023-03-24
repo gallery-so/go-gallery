@@ -347,6 +347,7 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 				subWg := &sync.WaitGroup{}
 				subWg.Add(len(providers))
 				for i, p := range providers {
+					_ = p.(tokensFetcher)
 					if fetcher, ok := p.(tokensFetcher); ok {
 						go func(fetcher tokensFetcher, priority int) {
 							defer subWg.Done()

@@ -275,6 +275,12 @@ mutation syncTokensMutation($chains: [Chain!]) {
             chain
             dbid
             tokenId
+            media {
+              ...on ImageMedia {
+                mediaURL
+                mediaType
+              }
+            }
           }
         }
       }

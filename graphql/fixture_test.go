@@ -10,12 +10,12 @@ import (
 	"cloud.google.com/go/cloudtasks/apiv2/cloudtaskspb"
 	migrate "github.com/mikeydub/go-gallery/db"
 	"github.com/mikeydub/go-gallery/docker"
+	"github.com/mikeydub/go-gallery/graphql/dummymetadata"
 	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
 	"github.com/mikeydub/go-gallery/service/task"
-	"github.com/mikeydub/go-gallery/tests/integration/dummymetadata"
 	"github.com/mikeydub/go-gallery/tokenprocessing"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/stretchr/testify/require"
@@ -140,9 +140,14 @@ func usePubSub(t *testing.T) {
 // useTokenProcessing starts a HTTP server for tokenprocessing
 func useTokenProcessing(t *testing.T) {
 	t.Helper()
-	server := httptest.NewServer(tokenprocessing.CoreInitServer())
+	c := server.ClientInit(context.Background())
+	p := server.NewMultichainProvider(c)
+	server := httptest.NewServer(tokenprocessing.CoreInitServer(c, p))
 	t.Setenv("TOKEN_PROCESSING_URL", server.URL)
-	t.Cleanup(func() { server.Close() })
+	t.Cleanup(func() {
+		server.Close()
+		c.Close()
+	})
 }
 
 type serverFixture struct {
@@ -158,7 +163,7 @@ func newServerFixture(t *testing.T) serverFixture {
 }
 
 // newMetadataServerFixture starts a HTTP server for fetching static metadata
-func useMetadataServer(t *testing.T) serverFixture {
+func newMetadataServerFixture(t *testing.T) serverFixture {
 	t.Helper()
 	server := httptest.NewServer(dummymetadata.CoreInitServer())
 	t.Cleanup(func() { server.Close() })

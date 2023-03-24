@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -14,80 +15,44 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/recommend"
 	"github.com/mikeydub/go-gallery/service/task"
-	"github.com/mikeydub/go-gallery/tests/integration/dummymetadata"
 	"github.com/mikeydub/go-gallery/tokenprocessing"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/stretchr/testify/mock"
 )
 
-// stubTokenMetadataFetcher returns a canned metadata response
-type stubTokenMetadataFetcher struct {
+// stubProvider returns a canned set of tokens and contracts
+type stubProvider struct {
+	Contracts     []multichain.ChainAgnosticContract
+	Tokens        []multichain.ChainAgnosticToken
 	FetchMetadata func() (persist.TokenMetadata, error)
 }
 
-func (p *stubTokenMetadataFetcher) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti ChainAgnosticIdentifiers, ownerAddress persist.Address) (persist.TokenMetadata, error) {
-	return p.FetchMetadata()
-}
-
-// fetchMetadataFromDummyMetadata returns static metadata from the dummymetadata server
-func fetchMetadataFromDummyMetadata(endpoint string) (persist.TokenMetadata, error) {
-	handler := dummymetadata.CoreInitServer()
-	req := httptest.NewRequest(http.MethodGet, endpoint, nil)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, req)
-
-	res := w.Result()
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		return nil, util.BodyAsError(res)
-	}
-
-	var data persist.TokenMetadata
-	json.Unmarshal(w.Body.Bytes(), &data)
-	return data, nil
-}
-
-// fetchFromDummyEndpoint fetches metadata from the given endpoint
-func fetchFromDummyEndpoint(endpoint string) func() (persist.TokenMetadata, error) {
-	return func() (persist.TokenMetadata, error) {
-		return fetchMetadataFromDummyMetadata(endpoint)
-	}
-}
-
-// stubTokensFetcher returns a canned set of tokens and contracts
-type stubTokensFetcher struct {
-	Contracts []multichain.ChainAgnosticContract
-	Tokens    []multichain.ChainAgnosticToken
-}
-
-func (p *stubTokensFetcher) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (p stubProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	return p.Tokens, p.Contracts, nil
 }
 
-func (p *stubTokensFetcher) GetTokensByContractAddress(ctx context.Context, contract persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (p stubProvider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (persist.TokenMetadata, error) {
+	return p.FetchMetadata()
+}
+
+func (p stubProvider) GetTokensByContractAddress(ctx context.Context, contract persist.Address, limit int, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	panic("not implemented")
 }
 
-func (p *stubTokensFetcher) GetTokensByContractAddressAndOwner(ctx context.Context, owner persist.Address, contract persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (p stubProvider) GetTokensByContractAddressAndOwner(ctx context.Context, owner persist.Address, contract persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	panic("not implemented")
 }
 
-func (p *stubTokensFetcher) GetTokensByTokenIdentifiersAndOwner(context.Context, multichain.ChainAgnosticIdentifiers, persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (p stubProvider) GetTokensByTokenIdentifiersAndOwner(context.Context, multichain.ChainAgnosticIdentifiers, persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	panic("not implemented")
-}
-
-// stubProvider returns a canned set of tokens and contracts
-type stubProvider struct {
-	stubTokensFetcher
-	stubTokenMetadataFetcher
 }
 
 type providerOpt func(*stubProvider)
 
-func newStubProvider(opts ...providerOpt) *stubProvider {
-	provider := &stubProvider{}
+func newStubProvider(opts ...providerOpt) stubProvider {
+	provider := stubProvider{}
 	for _, opt := range opts {
-		opt(provider)
+		opt(&provider)
 	}
 	return provider
 }
@@ -132,7 +97,7 @@ func withFetchMetadata(f func() (persist.TokenMetadata, error)) providerOpt {
 }
 
 // defaultStubProvider returns a stubProvider that returns dummy tokens
-func defaultStubProvider(address string) *stubProvider {
+func defaultStubProvider(address string) stubProvider {
 	contract := multichain.ChainAgnosticContract{Address: "0x123", Name: "testContract"}
 	return newStubProvider(withContractTokens(contract, address, 10))
 }
@@ -172,15 +137,60 @@ func sendTokensToHTTPHandler(handler http.Handler, method, endpoint string) mult
 		req := httptest.NewRequest(method, endpoint, r)
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
+		res := w.Result()
+		if res.StatusCode != http.StatusOK {
+			panic(util.BodyAsError(res))
+		}
 		return nil
 	}
 }
 
 // sendTokensToTokenProcessing processes a batch of tokens synchronously through tokenprocessing
 func sendTokensToTokenProcessing(c *server.Clients, provider *multichain.Provider) multichain.SendTokens {
-	return func(context.Context, task.TokenProcessingUserMessage) error {
+	return func(ctx context.Context, t task.TokenProcessingUserMessage) error {
 		h := tokenprocessing.CoreInitServer(c, provider)
-		sendTokensToHTTPHandler(h, http.MethodPost, "/media/process")
-		return nil
+		return sendTokensToHTTPHandler(h, http.MethodPost, "/media/process")(ctx, t)
+	}
+}
+
+// fetchMetadataFromDummyMetadata returns static metadata from the dummymetadata server
+func fetchMetadataFromDummyMetadata(url, endpoint string) (persist.TokenMetadata, error) {
+	r := httptest.NewRequest(http.MethodGet, url+endpoint, nil)
+	r.RequestURI = ""
+	res, err := http.DefaultClient.Do(r)
+	if err != nil {
+		panic(err)
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		panic(err)
+		return nil, err
+	}
+
+	var data persist.TokenMetadata
+	err = json.Unmarshal(body, &data)
+	if err != nil {
+		panic(err)
+	}
+	return data, err
+	// w := httptest.NewRecorder()
+
+	// res := w.Result()
+	// defer res.Body.Close()
+	// if res.StatusCode != http.StatusOK {
+	// 	return nil, util.BodyAsError(res)
+	// }
+	// var data persist.TokenMetadata
+	// json.Unmarshal(w.Body.Bytes(), &data)
+	// return data, nil
+}
+
+// fetchFromDummyEndpoint fetches metadata from the given endpoint
+func fetchFromDummyEndpoint(url, endpoint string) func() (persist.TokenMetadata, error) {
+	return func() (persist.TokenMetadata, error) {
+		return fetchMetadataFromDummyMetadata(url, endpoint)
 	}
 }

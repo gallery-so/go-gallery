@@ -157,6 +157,8 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 		description = t.Description.String()
 	}
 
+	fmt.Printf("\n\nMETADATA: %s\n\n", newMetadata)
+
 	totalTimeOfMedia := time.Now()
 	newMedia, err := media.MakePreviewsForMetadata(ctx, newMetadata, contractAddress, persist.TokenID(t.TokenID.String()), t.TokenURI, t.Chain, ipfsClient, arweaveClient, stg, tokenBucket, image, animation)
 	if err != nil {
@@ -185,6 +187,7 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 		LastUpdated: persist.LastUpdatedTime{},
 	}
 	if err := tokenRepo.UpdateByTokenIdentifiersUnsafe(ctx, t.TokenID, contractAddress, t.Chain, up); err != nil {
+		fmt.Println(t.TokenID, contractAddress, t.Chain, fmt.Sprintf("%+v", up))
 		logger.For(ctx).Errorf("error updating media for %s-%s-%d: %s", t.TokenID, contractAddress, t.Chain, err)
 		return err
 	}
