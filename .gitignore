@@ -24,8 +24,6 @@ yarn.lock
 _deploy*
 _local*
 
-*.mp4
-*.jpg
 
 refresh.json
 
