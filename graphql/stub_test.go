@@ -139,7 +139,7 @@ func sendTokensToHTTPHandler(handler http.Handler, method, endpoint string) mult
 		handler.ServeHTTP(w, req)
 		res := w.Result()
 		if res.StatusCode != http.StatusOK {
-			panic(util.BodyAsError(res))
+			return util.BodyAsError(res)
 		}
 		return nil
 	}
@@ -157,35 +157,21 @@ func sendTokensToTokenProcessing(c *server.Clients, provider *multichain.Provide
 func fetchMetadataFromDummyMetadata(url, endpoint string) (persist.TokenMetadata, error) {
 	r := httptest.NewRequest(http.MethodGet, url+endpoint, nil)
 	r.RequestURI = ""
+
 	res, err := http.DefaultClient.Do(r)
 	if err != nil {
-		panic(err)
 		return nil, err
 	}
 	defer res.Body.Close()
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		panic(err)
 		return nil, err
 	}
 
 	var data persist.TokenMetadata
 	err = json.Unmarshal(body, &data)
-	if err != nil {
-		panic(err)
-	}
 	return data, err
-	// w := httptest.NewRecorder()
-
-	// res := w.Result()
-	// defer res.Body.Close()
-	// if res.StatusCode != http.StatusOK {
-	// 	return nil, util.BodyAsError(res)
-	// }
-	// var data persist.TokenMetadata
-	// json.Unmarshal(w.Body.Bytes(), &data)
-	// return data, nil
 }
 
 // fetchFromDummyEndpoint fetches metadata from the given endpoint
