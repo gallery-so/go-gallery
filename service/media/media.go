@@ -929,14 +929,22 @@ func PredictMediaType(pCtx context.Context, url string) (persist.MediaType, stri
 		return persist.MediaTypeSVG, "image/svg", int64(len(asURI.String())), nil
 	case persist.URITypeBase64BMP:
 		return persist.MediaTypeBase64BMP, "image/bmp", int64(len(asURI.String())), nil
-	case persist.URITypeHTTP, persist.URITypeIPFSAPI, persist.URITypeIPFSGateway:
-		contentType, contentLength, err := rpc.GetHTTPHeaders(pCtx, url)
-		if err != nil {
+	case persist.URITypeIPFS, persist.URITypeIPFSGateway:
+		var path string
+		if uriType == persist.URITypeIPFS {
+			path = strings.TrimPrefix(asURI.String(), "ipfs://")
+		} else {
+			path = util.GetURIPath(asURI.String(), false)
+		}
+		contentType, contentLength, err := rpc.GetIPFSHeaders(pCtx, path)
+		if err == nil {
+			return persist.MediaFromContentType(contentType), contentType, contentLength, nil
+		} else if err != nil && uriType == persist.URITypeIPFS {
 			return persist.MediaTypeUnknown, "", 0, err
 		}
-		return persist.MediaFromContentType(contentType), contentType, contentLength, nil
-	case persist.URITypeIPFS:
-		contentType, contentLength, err := rpc.GetIPFSHeaders(pCtx, strings.TrimPrefix(asURI.String(), "ipfs://"))
+		fallthrough
+	case persist.URITypeHTTP, persist.URITypeIPFSAPI:
+		contentType, contentLength, err := rpc.GetHTTPHeaders(pCtx, url)
 		if err != nil {
 			return persist.MediaTypeUnknown, "", 0, err
 		}

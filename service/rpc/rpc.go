@@ -491,7 +491,16 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 		}
 		buf := bytes.NewBuffer(util.RemoveBOM(bs))
 		return util.NewFileHeaderReader(buf), nil
-	case persist.URITypeHTTP, persist.URITypeIPFSGateway:
+	case persist.URITypeIPFSGateway:
+		path := util.GetURIPath(asString, false)
+		resp, err := GetIPFSResponse(ctx, ipfsClient, path)
+		if err != nil {
+			logger.For(ctx).Errorf("Error getting data from IPFS: %s", err)
+		} else {
+			return util.NewFileHeaderReader(resp), nil
+		}
+		fallthrough
+	case persist.URITypeHTTP:
 		req, err := http.NewRequestWithContext(ctx, "GET", asString, nil)
 		if err != nil {
 			return nil, fmt.Errorf("error creating request: %s", err)
