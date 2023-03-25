@@ -863,7 +863,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		return handlerWithProviders(t, sendTokensToTokenProcessing(clients, &mc), provider)
 	}
 
-	t.Run("sync should process image", func(t *testing.T) {
+	t.Run("should process image", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/image")
@@ -874,10 +874,10 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
 		assert.Equal(t, string(persist.MediaTypeImage), *media.MediaType)
-		assert.NotEmpty(t, media.MediaURL)
+		assert.NotEmpty(t, *media.MediaURL)
 	})
 
-	t.Run("sync should process video", func(t *testing.T) {
+	t.Run("should process video", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/video")
@@ -888,10 +888,10 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia)
 		assert.Equal(t, string(persist.MediaTypeVideo), *media.MediaType)
-		assert.NotEmpty(t, media.MediaURL)
+		assert.NotEmpty(t, *media.MediaURL)
 	})
 
-	t.Run("sync should process iframe", func(t *testing.T) {
+	t.Run("should process iframe", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/iframe")
@@ -902,10 +902,10 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaHtmlMedia)
 		assert.Equal(t, string(persist.MediaTypeHTML), *media.MediaType)
-		assert.NotEmpty(t, media.MediaURL)
+		assert.NotEmpty(t, *media.MediaURL)
 	})
 
-	t.Run("sync should process gif", func(t *testing.T) {
+	t.Run("should process gif", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/gif")
@@ -916,10 +916,10 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia)
 		assert.Equal(t, string(persist.MediaTypeGIF), *media.MediaType)
-		assert.NotEmpty(t, media.MediaURL)
+		assert.NotEmpty(t, *media.MediaURL)
 	})
 
-	t.Run("sync should process bad metadata", func(t *testing.T) {
+	t.Run("should process bad metadata", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/bad")
@@ -930,10 +930,10 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia)
 		assert.Equal(t, "", *media.MediaType)
-		assert.Empty(t, media.MediaURL)
+		assert.Empty(t, *media.MediaURL)
 	})
 
-	t.Run("sync should process missing metadata", func(t *testing.T) {
+	t.Run("should process missing metadata", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/notfound")
@@ -944,10 +944,10 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia)
 		assert.Equal(t, "", *media.MediaType)
-		assert.Empty(t, media.MediaURL)
+		assert.Empty(t, *media.MediaURL)
 	})
 
-	t.Run("sync should process bad media", func(t *testing.T) {
+	t.Run("should process bad media", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/media/bad")
@@ -958,10 +958,10 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia)
 		assert.Equal(t, string(persist.MediaTypeUnknown), *media.MediaType)
-		assert.NotEmpty(t, media.MediaURL)
+		assert.NotEmpty(t, *media.MediaURL)
 	})
 
-	t.Run("sync should process missing media", func(t *testing.T) {
+	t.Run("should process missing media", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/media/notfound")
@@ -972,10 +972,10 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia)
 		assert.Equal(t, string(persist.MediaTypeUnknown), *media.MediaType)
-		assert.NotEmpty(t, media.MediaURL)
+		assert.NotEmpty(t, *media.MediaURL)
 	})
 
-	t.Run("sync should process svg", func(t *testing.T) {
+	t.Run("should process svg", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/svg")
@@ -986,10 +986,10 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
 		assert.Equal(t, string(persist.MediaTypeSVG), *media.MediaType)
-		assert.NotEmpty(t, media.MediaURL)
+		assert.NotEmpty(t, *media.MediaURL)
 	})
 
-	t.Run("sync should process base64svg", func(t *testing.T) {
+	t.Run("should process base64svg", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/base64svg")
@@ -1000,10 +1000,11 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
 		assert.Equal(t, string(persist.MediaTypeSVG), *media.MediaType)
-		assert.NotEmpty(t, media.MediaURL)
+		assert.NotEmpty(t, *media.MediaURL)
 	})
 
-	t.Run("sync should process base64", func(t *testing.T) {
+	t.Run("should process base64", func(t *testing.T) {
+		// t.SkipNow()
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/base64")
@@ -1013,11 +1014,11 @@ func testSyncShouldProcessMedia(t *testing.T) {
 
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
-		assert.Equal(t, *media.MediaType, string(persist.MediaTypeSVG))
-		assert.NotEmpty(t, media.MediaURL)
+		assert.Equal(t, *media.MediaType, string(persist.MediaTypeImage))
+		assert.NotEmpty(t, *media.MediaURL)
 	})
 
-	t.Run("sync should process ipfs", func(t *testing.T) {
+	t.Run("should process ipfs", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/media/ipfs")
@@ -1028,10 +1029,10 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
 		assert.Equal(t, *media.MediaType, string(persist.MediaTypeImage))
-		assert.NotEmpty(t, media.MediaURL)
+		assert.NotEmpty(t, *media.MediaURL)
 	})
 
-	t.Run("sync should process bad dns", func(t *testing.T) {
+	t.Run("should process bad dns", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/media/dnsbad")
@@ -1042,10 +1043,10 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
 		assert.Equal(t, string(persist.MediaTypeImage), *media.MediaType)
-		assert.NotEmpty(t, media.MediaURL)
+		assert.NotEmpty(t, *media.MediaURL)
 	})
 
-	t.Run("sync should process different keyword", func(t *testing.T) {
+	t.Run("should process different keyword", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/differentkeyword")
@@ -1056,10 +1057,10 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
 		assert.Equal(t, string(persist.MediaTypeImage), *media.MediaType)
-		assert.NotEmpty(t, media.MediaURL)
+		assert.NotEmpty(t, *media.MediaURL)
 	})
 
-	t.Run("sync should process wrong keyword", func(t *testing.T) {
+	t.Run("should process wrong keyword", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/wrongkeyword")
@@ -1070,10 +1071,10 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia)
 		assert.Equal(t, string(persist.MediaTypeVideo), *media.MediaType)
-		assert.NotEmpty(t, media.MediaURL)
+		assert.NotEmpty(t, *media.MediaURL)
 	})
 
-	t.Run("sync should process animation", func(t *testing.T) {
+	t.Run("should process animation", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/animation")
@@ -1084,10 +1085,10 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia)
 		assert.Equal(t, string(persist.MediaTypeAnimation), *media.MediaType)
-		assert.NotEmpty(t, media.MediaURL)
+		assert.NotEmpty(t, *media.MediaURL)
 	})
 
-	t.Run("sync should process pdf", func(t *testing.T) {
+	t.Run("should process pdf", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/pdf")
@@ -1098,10 +1099,10 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia)
 		assert.Equal(t, string(persist.MediaTypePDF), *media.MediaType)
-		assert.NotEmpty(t, media.MediaURL)
+		assert.NotEmpty(t, *media.MediaURL)
 	})
 
-	t.Run("sync should process text", func(t *testing.T) {
+	t.Run("should process text", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/text")
@@ -1112,10 +1113,10 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia)
 		assert.Equal(t, string(persist.MediaTypeText), *media.MediaType)
-		assert.NotEmpty(t, media.MediaURL)
+		assert.NotEmpty(t, *media.MediaURL)
 	})
 
-	t.Run("sync should process bad image", func(t *testing.T) {
+	t.Run("should process bad image", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/badimage")
@@ -1126,7 +1127,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
 		assert.Equal(t, string(persist.MediaTypeImage), *media.MediaType)
-		assert.NotEmpty(t, media.MediaURL)
+		assert.NotEmpty(t, *media.MediaURL)
 	})
 }
 

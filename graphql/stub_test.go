@@ -14,6 +14,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/recommend"
+	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/tokenprocessing"
 	"github.com/mikeydub/go-gallery/util"
@@ -168,9 +169,11 @@ func fetchMetadataFromDummyMetadata(url, endpoint string) (persist.TokenMetadata
 		return nil, err
 	}
 
-	var data persist.TokenMetadata
-	err = json.Unmarshal(body, &data)
-	return data, err
+	return rpc.GetMetadataFromURI(context.Background(), persist.TokenURI(body), nil, nil)
+
+	// var data persist.TokenMetadata
+	// err = json.Unmarshal(body, &data)
+	// return data, err
 }
 
 // fetchFromDummyEndpoint fetches metadata from the given endpoint

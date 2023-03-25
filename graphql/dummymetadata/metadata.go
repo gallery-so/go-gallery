@@ -32,7 +32,7 @@ func mediaURL(key, endpoint string) func(c *gin.Context) {
 }
 
 func base64MetadataHandler(c *gin.Context) {
-	asJSON := map[string]string{"image_url": formatURL(c, "media/base64")}
+	asJSON := map[string]string{"image_url": formatURL(c, "media/image")}
 
 	asBytes, err := json.Marshal(asJSON)
 	if err != nil {
@@ -40,6 +40,5 @@ func base64MetadataHandler(c *gin.Context) {
 	}
 
 	asBase64 := base64.StdEncoding.EncodeToString(asBytes)
-
-	c.Data(http.StatusOK, "application/octet-stream", []byte(asBase64))
+	c.Data(http.StatusOK, "application/octet-stream", []byte("data:application/json;base64,"+asBase64))
 }

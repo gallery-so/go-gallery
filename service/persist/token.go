@@ -378,6 +378,7 @@ type svgXML struct {
 
 // SniffMediaType will attempt to detect the media type for a given array of bytes
 func SniffMediaType(buf []byte) (MediaType, string) {
+	fmt.Printf("\n\nsniffedBytes=%s\n\n", string(buf))
 
 	var asXML svgXML
 	if err := xml.Unmarshal(buf, &asXML); err == nil {
@@ -390,6 +391,9 @@ func SniffMediaType(buf []byte) (MediaType, string) {
 	if whereCharset != -1 {
 		contentType = contentType[:whereCharset]
 	}
+
+	fmt.Printf("\npredictedContentType=%s\n", contentType)
+
 	if contentType == "application/octet-stream" || contentType == "text/plain" {
 		// fallback of http.DetectContentType
 		if strings.EqualFold(string(buf[:4]), "glTF") {
@@ -399,7 +403,12 @@ func SniffMediaType(buf []byte) (MediaType, string) {
 		if strings.HasPrefix(strings.TrimSpace(string(buf[:20])), "{") && util.ContainsAnyString(strings.TrimSpace(string(buf)), gltfFields...) {
 			return MediaTypeAnimation, "model/gltf+json"
 		}
+
+		if strings.HasPrefix(string(buf), "data:") {
+			return MediaTypeSVG, "image/svg+xml;base64"
+		}
 	}
+
 	return MediaFromContentType(contentType), contentType
 }
 
@@ -606,6 +615,9 @@ func (uri *TokenURI) Scan(src interface{}) error {
 func (uri TokenURI) Type() URIType {
 	asString := uri.String()
 	asString = strings.TrimSpace(asString)
+
+	fmt.Printf("\n\ntokenURI eval Type=%s\n\n", asString)
+
 	switch {
 	case strings.HasPrefix(asString, "ipfs"), strings.HasPrefix(asString, "Qm"):
 		return URITypeIPFS
