@@ -8,10 +8,6 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
-	"image"
-	"image/gif"
-	"image/jpeg"
-	"image/png"
 	"io"
 	"net"
 	"net/http"
@@ -36,7 +32,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/qmuntal/gltf"
 	htransport "google.golang.org/api/transport/http"
 )
 
@@ -125,9 +120,9 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		res                  persist.Media
 	)
 
-	// if vURL != "" {
-	// 	vidCh = downloadMediaFromURL(pCtx, storageClient, arweaveClient, ipfsClient, "video", vURL, name, tokenBucket)
-	// }
+	if vURL != "" {
+		vidCh = downloadMediaFromURL(pCtx, storageClient, arweaveClient, ipfsClient, "video", vURL, name, tokenBucket)
+	}
 	if imgURL != "" {
 		imgCh = downloadMediaFromURL(pCtx, storageClient, arweaveClient, ipfsClient, "image", imgURL, name, tokenBucket)
 	}
@@ -837,7 +832,7 @@ outer:
 
 	if !mediaType.IsValid() {
 		timeBeforeSniff := time.Now()
-		bytesToSniff, _ := reader.Headers() // 512 bytes
+		bytesToSniff, _ := reader.Headers()
 		mediaType, contentType = persist.SniffMediaType(bytesToSniff)
 		logger.For(pCtx).Infof("sniffed media type for %s: %s in %s", truncateString(mediaURL, 50), mediaType, time.Since(timeBeforeSniff))
 	}
@@ -921,9 +916,6 @@ func PredictMediaType(pCtx context.Context, url string) (persist.MediaType, stri
 	}
 	asURI := persist.TokenURI(url)
 	uriType := asURI.Type()
-
-	fmt.Printf("\n\nURL=%s;uriType=%s\n\n", url, uriType)
-
 	logger.For(pCtx).Debugf("predicting media type for %s with URI type %s", url, uriType)
 	switch uriType {
 	case persist.URITypeBase64JSON, persist.URITypeJSON:
@@ -951,50 +943,9 @@ func PredictMediaType(pCtx context.Context, url string) (persist.MediaType, stri
 		if err != nil {
 			return persist.MediaTypeUnknown, "", 0, err
 		}
-		fmt.Printf("\n\ncontentType=%s;err=%s\n\n", contentType, err)
 		return persist.MediaFromContentType(contentType), contentType, contentLength, nil
 	}
 	return persist.MediaTypeUnknown, "", 0, nil
-}
-
-// GuessMediaType guesses the media type of the given bytes.
-func GuessMediaType(bs []byte) (persist.MediaType, string) {
-
-	cpy := make([]byte, len(bs))
-	copy(cpy, bs)
-	cpyBuff := bytes.NewBuffer(cpy)
-	if _, err := gif.Decode(cpyBuff); err == nil {
-		return persist.MediaTypeGIF, "image/gif"
-	}
-	cpy = make([]byte, len(bs))
-	copy(cpy, bs)
-	cpyBuff = bytes.NewBuffer(cpy)
-	if _, _, err := image.Decode(cpyBuff); err == nil {
-		return persist.MediaTypeImage, "image"
-	}
-	cpy = make([]byte, len(bs))
-	copy(cpy, bs)
-	cpyBuff = bytes.NewBuffer(cpy)
-	if _, err := png.Decode(cpyBuff); err == nil {
-		return persist.MediaTypeImage, "image/png"
-
-	}
-	cpy = make([]byte, len(bs))
-	copy(cpy, bs)
-	cpyBuff = bytes.NewBuffer(cpy)
-	if _, err := jpeg.Decode(cpyBuff); err == nil {
-		return persist.MediaTypeImage, "image/jpeg"
-	}
-	cpy = make([]byte, len(bs))
-	copy(cpy, bs)
-	cpyBuff = bytes.NewBuffer(cpy)
-	var doc gltf.Document
-	if err := gltf.NewDecoder(cpyBuff).Decode(&doc); err == nil {
-		return persist.MediaTypeAnimation, "model/gltf-binary"
-	}
-
-	return persist.MediaTypeUnknown, ""
-
 }
 
 func thumbnailVideoToWriter(ctx context.Context, url string, writer io.Writer) error {

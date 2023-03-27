@@ -590,7 +590,7 @@ func DecodeMetadataFromURI(ctx context.Context, turi persist.TokenURI, into *per
 		if err != nil {
 			return fmt.Errorf("error decoding base64 metadata: %s \n\n%s", err, b64data)
 		}
-		into = &persist.TokenMetadata{"image": string(decoded)}
+		*into = persist.TokenMetadata{"image": string(decoded)}
 		return nil
 	case persist.URITypeIPFS, persist.URITypeIPFSGateway:
 
@@ -648,36 +648,6 @@ func DecodeMetadataFromURI(ctx context.Context, turi persist.TokenURI, into *per
 		return fmt.Errorf("unknown token URI type for metadata: %s", turi.Type())
 	}
 
-}
-
-func GetIPFSResponse(pCtx context.Context, ipfsClient *shell.Shell, path string) (io.ReadCloser, error) {
-	fromHTTP := func(ctx context.Context) fetchResulter {
-		url := fmt.Sprintf("%s/ipfs/%s", env.GetString("IPFS_URL"), path)
-		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-		if err != nil {
-			return ipfsResult{err: err}
-		}
-
-		resp, err := defaultHTTPClient.Do(req)
-		if err != nil {
-			return ipfsResult{err: err}
-		}
-
-		if resp.StatusCode > 399 || resp.StatusCode < 200 {
-			return ipfsResult{err: ErrHTTP{Status: resp.StatusCode, URL: url}}
-		}
-
-		return ipfsResult{resp: resp.Body}
-	}
-
-	fromIPFS := func(context.Context) fetchResulter {
-		reader, err := ipfsClient.Cat(path)
-		return ipfsResult{reader, err}
-	}
-
-	result := firstNonError(pCtx, fromHTTP, fromIPFS)
-	response := result.(ipfsResult)
-	return response.resp, response.Error()
 }
 
 func GetIPFSData(pCtx context.Context, ipfsClient *shell.Shell, path string) ([]byte, error) {
@@ -760,10 +730,16 @@ func firstNonError(ctx context.Context, fetches ...func(context.Context) fetchRe
 	for i := range fetches {
 		go func(i int) { c <- fetches[i](ctx) }(i)
 	}
-	if r := <-c; r.Error() == nil {
-		return r
+	i := 0
+	var r fetchResulter
+	for i < len(fetches) {
+		r = <-c
+		if r.Error() == nil {
+			return r
+		}
+		i++
 	}
-	return <-c
+	return r
 }
 
 func getContentHeaders(ctx context.Context, url string) (contentType string, contentLength int64, err error) {
@@ -783,6 +759,36 @@ func getContentHeaders(ctx context.Context, url string) (contentType string, con
 	result := firstNonError(ctx, fromHEAD, fromGET)
 	headers := result.(headerResult)
 	return headers.contentType, headers.contentLength, headers.Error()
+}
+
+func GetIPFSResponse(pCtx context.Context, ipfsClient *shell.Shell, path string) (io.ReadCloser, error) {
+	fromHTTP := func(ctx context.Context) fetchResulter {
+		url := fmt.Sprintf("%s/ipfs/%s", env.GetString("IPFS_URL"), path)
+		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+		if err != nil {
+			return ipfsResult{err: err}
+		}
+
+		resp, err := defaultHTTPClient.Do(req)
+		if err != nil {
+			return ipfsResult{err: err}
+		}
+
+		if resp.StatusCode > 399 || resp.StatusCode < 200 {
+			return ipfsResult{err: ErrHTTP{Status: resp.StatusCode, URL: url}}
+		}
+
+		return ipfsResult{resp: resp.Body}
+	}
+
+	fromIPFS := func(context.Context) fetchResulter {
+		reader, err := ipfsClient.Cat(path)
+		return ipfsResult{reader, err}
+	}
+
+	result := firstNonError(pCtx, fromHTTP, fromIPFS)
+	response := result.(ipfsResult)
+	return response.resp, response.Error()
 }
 
 // GetIPFSHeaders returns the headers for the given IPFS hash

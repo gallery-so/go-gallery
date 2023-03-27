@@ -170,10 +170,6 @@ func fetchMetadataFromDummyMetadata(url, endpoint string) (persist.TokenMetadata
 	}
 
 	return rpc.GetMetadataFromURI(context.Background(), persist.TokenURI(body), nil, nil)
-
-	// var data persist.TokenMetadata
-	// err = json.Unmarshal(body, &data)
-	// return data, err
 }
 
 // fetchFromDummyEndpoint fetches metadata from the given endpoint

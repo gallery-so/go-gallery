@@ -989,7 +989,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		assert.NotEmpty(t, *media.MediaURL)
 	})
 
-	t.Run("should process base64svg", func(t *testing.T) {
+	t.Run("should process base64 encoded svg", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/base64svg")
@@ -1003,8 +1003,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		assert.NotEmpty(t, *media.MediaURL)
 	})
 
-	t.Run("should process base64", func(t *testing.T) {
-		// t.SkipNow()
+	t.Run("should process base64 encoded metadata", func(t *testing.T) {
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/base64")
