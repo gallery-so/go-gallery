@@ -32,6 +32,9 @@ const staleCommunityTime = time.Minute * 30
 
 const maxCommunitySize = 10_000
 
+// SendTokens is called to process a user's batch of tokens
+type SendTokens func(context.Context, task.TokenProcessingUserMessage) error
+
 type Provider struct {
 	Repos   *postgres.Repositories
 	Queries *coredb.Queries
@@ -39,7 +42,7 @@ type Provider struct {
 	Chains  map[persist.Chain][]interface{}
 	// some chains use the addresses of other chains, this will map of chain we want tokens from => chain that's address will be used for lookup
 	ChainAddressOverrides ChainOverrideMap
-	TasksClient           *cloudtasks.Client
+	SendTokens            SendTokens
 }
 
 // BlockchainInfo retrieves blockchain info from all chains
@@ -199,10 +202,12 @@ func NewProvider(ctx context.Context, repos *postgres.Repositories, queries *cor
 	return &Provider{
 		Repos:                 repos,
 		Cache:                 cache,
-		TasksClient:           taskClient,
 		Queries:               queries,
 		Chains:                validateProviders(ctx, providers),
 		ChainAddressOverrides: chainOverrides,
+		SendTokens: func(ctx context.Context, t task.TokenProcessingUserMessage) error {
+			return task.CreateTaskForTokenProcessing(ctx, taskClient, t)
+		},
 	}
 }
 
@@ -326,7 +331,7 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 
 	wg := sync.WaitGroup{}
 	for c, a := range chainsToAddresses {
-		logger.For(ctx).Infof("updating media for user %s wallets %s", user.Username, a)
+		logger.For(ctx).Infof("syncing tokens for user %s wallets %s", user.Username, a)
 		chain := c
 		addresses := a
 		wg.Add(len(addresses))
@@ -521,11 +526,7 @@ func (p *Provider) sendTokensToTokenProcessing(ctx context.Context, userID persi
 	if len(tokens) == 0 {
 		return nil
 	}
-
-	return task.CreateTaskForTokenProcessing(ctx, p.TasksClient, task.TokenProcessingUserMessage{
-		UserID:   userID,
-		TokenIDs: tokens,
-	})
+	return p.SendTokens(ctx, task.TokenProcessingUserMessage{UserID: userID, TokenIDs: tokens})
 }
 
 func (p *Provider) processTokenMedia(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, ownerAddress persist.Address, imageKeywords, animationKeywords []string) error {
@@ -775,8 +776,7 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 					}
 				}
 
-				if err := p.Repos.TokenRepository.UpdateByTokenIdentifiersUnsafe(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, persist.TokenUpdateAllURIDerivedFieldsInput{
-					Media:       refreshedToken.Media,
+				if err := p.Repos.TokenRepository.UpdateByTokenIdentifiersUnsafe(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, persist.TokenUpdateAllMetadataFieldsInput{
 					Metadata:    refreshedToken.TokenMetadata,
 					Name:        persist.NullString(refreshedToken.Name),
 					LastUpdated: persist.LastUpdatedTime{},
@@ -1194,16 +1194,8 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 			// If we've never seen the incoming token before, then add it.
 			if !seen {
 				seenTokens[ti] = candidateToken
-			} else if !existingToken.Media.IsServable() && candidateToken.Media.IsServable() {
-				if existingToken.Media.MediaType.IsAnimationLike() && persist.TokenURI(existingToken.Media.ThumbnailURL).IsRenderable() && !persist.TokenURI(candidateToken.Media.ThumbnailURL).IsRenderable() {
-					candidateToken.Media.ThumbnailURL = existingToken.Media.ThumbnailURL
-				}
+			} else if len(existingToken.TokenMetadata) < len(candidateToken.TokenMetadata) {
 				seenTokens[ti] = candidateToken
-			} else if existingToken.Media.IsServable() {
-				if candidateToken.Media.MediaType.IsAnimationLike() && !persist.TokenURI(existingToken.Media.ThumbnailURL).IsRenderable() && persist.TokenURI(candidateToken.Media.ThumbnailURL).IsRenderable() {
-					existingToken.Media.ThumbnailURL = candidateToken.Media.ThumbnailURL
-				}
-				seenTokens[ti] = existingToken
 			}
 
 			var found bool

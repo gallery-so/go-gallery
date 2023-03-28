@@ -7044,6 +7044,7 @@ enum UserExperienceType {
   MerchStoreUpsell
   MaintenanceFeb2023
   TwitterConnectionOnboardingUpsell
+  UpsellMintMemento4
 }
 
 type UserExperience {
