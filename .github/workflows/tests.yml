@@ -1,7 +1,7 @@
 name: ci
 on: [push]
 jobs:
-  graphql-unit-tests:
+  core-tests:
     runs-on: ubuntu-latest
     env:
       GOOGLE_CREDENTIALS: ${{ secrets.GCP_DEV_CREDENTIALS }}
