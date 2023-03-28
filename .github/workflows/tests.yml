@@ -48,7 +48,7 @@ jobs:
       - name: Test
         run: |
           mkdir -p /tmp/test-reports
-          gotestsum --junitfile /tmp/test-reports/unit-tests.xml -- -tags=debug_tools -short ./...
+          gotestsum --junitfile /tmp/test-reports/unit-tests.xml -- -v -tags=debug_tools ./...
   lint:
     runs-on: ubuntu-latest
     steps:
