@@ -446,9 +446,11 @@ func FetchAssetsForTokenIdentifiers(ctx context.Context, contractAddress persist
 func FetchAssetsForTokenIdentifiersAndOwner(ctx context.Context, ownerAddress, contractAddress persist.EthereumAddress, tokenID TokenID) ([]Asset, error) {
 	url := baseURL.JoinPath("assets")
 	setPagingParams(url)
-	setOwner(url, ownerAddress)
 	setContractAddress(url, contractAddress)
 	setTokenID(url, tokenID)
+	if ownerAddress != "" {
+		setOwner(url, ownerAddress)
+	}
 
 	req, err := authRequest(ctx, url.String())
 	if err != nil {
