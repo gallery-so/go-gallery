@@ -590,7 +590,7 @@ func DecodeMetadataFromURI(ctx context.Context, turi persist.TokenURI, into *per
 		if err != nil {
 			return fmt.Errorf("error decoding base64 metadata: %s \n\n%s", err, b64data)
 		}
-		into = &persist.TokenMetadata{"image": string(decoded)}
+		*into = persist.TokenMetadata{"image": string(decoded)}
 		return nil
 	case persist.URITypeIPFS, persist.URITypeIPFSGateway:
 
@@ -650,61 +650,6 @@ func DecodeMetadataFromURI(ctx context.Context, turi persist.TokenURI, into *per
 
 }
 
-func GetIPFSResponse(pCtx context.Context, ipfsClient *shell.Shell, path string) (io.ReadCloser, error) {
-	// Either an io.ReadCloser or an error
-	responseCh := make(chan interface{})
-
-	// Via HTTP gateway
-	go func() {
-		url := fmt.Sprintf("%s/ipfs/%s", env.GetString("IPFS_URL"), path)
-		req, err := http.NewRequestWithContext(pCtx, "GET", url, nil)
-		if err != nil {
-			responseCh <- err
-			return
-		}
-		resp, err := defaultHTTPClient.Do(req)
-		if err != nil {
-			responseCh <- err
-			return
-		}
-		if resp.StatusCode > 399 || resp.StatusCode < 200 {
-			responseCh <- ErrHTTP{Status: resp.StatusCode, URL: url}
-		}
-		responseCh <- resp.Body
-	}()
-
-	// Via IPFS cat
-	go func() {
-		if reader, err := ipfsClient.Cat(path); err != nil {
-			responseCh <- err
-		} else {
-			responseCh <- reader
-		}
-	}()
-
-	// Check if we can return the first reply
-	reply := <-responseCh
-	if result, ok := reply.(io.ReadCloser); ok {
-
-		// Close the second reply if we get one
-		go func() {
-			reply = <-responseCh
-			if result, ok := reply.(io.ReadCloser); ok {
-				result.Close()
-			}
-		}()
-
-		return result, nil
-	}
-
-	// Otherwise wait for the second reply
-	reply = <-responseCh
-	if result, ok := reply.(io.ReadCloser); ok {
-		return result, nil
-	}
-	return nil, reply.(error)
-}
-
 func GetIPFSData(pCtx context.Context, ipfsClient *shell.Shell, path string) ([]byte, error) {
 	response, err := GetIPFSResponse(pCtx, ipfsClient, path)
 	if err != nil {
@@ -757,23 +702,107 @@ func parseContentType(contentType string) string {
 	return contentType
 }
 
+type fetchResulter interface {
+	Error() error
+}
+
+type headerResult struct {
+	contentType   string
+	contentLength int64
+	err           error
+}
+
+func (r headerResult) Error() error {
+	return r.err
+}
+
+type ipfsResult struct {
+	resp io.ReadCloser
+	err  error
+}
+
+func (r ipfsResult) Error() error {
+	return r.err
+}
+
+func firstNonError(ctx context.Context, fetches ...func(context.Context) fetchResulter) fetchResulter {
+	c := make(chan fetchResulter)
+	done := make(chan bool)
+
+	for i := range fetches {
+		go func(i int) {
+			select {
+			case <-ctx.Done():
+				return
+			case <-done:
+				return
+			case c <- fetches[i](ctx):
+			}
+		}(i)
+	}
+
+	var lastError fetchResulter
+
+	for i := 0; i < len(fetches); i++ {
+		r := <-c
+		if r.Error() == nil {
+			close(done)
+			return r
+		}
+		lastError = r
+		i++
+	}
+
+	return lastError
+}
+
 func getContentHeaders(ctx context.Context, url string) (contentType string, contentLength int64, err error) {
-	// Check if server supports HEAD
-	if headers, err := getHeaders(ctx, "HEAD", url); err == nil {
-		contentType = parseContentType(headers.Get("Content-Type"))
-		contentLength, err = parseContentLength(headers.Get("Content-Length"))
-		return contentType, contentLength, err
+	contentHeader := func(method, url string) func(ctx context.Context) fetchResulter {
+		return func(ctx context.Context) fetchResulter {
+			headers, err := getHeaders(ctx, method, url)
+			if err != nil {
+				return headerResult{err: err}
+			}
+			contentType := parseContentType(headers.Get("Content-Type"))
+			contentLength, err := parseContentLength(headers.Get("Content-Length"))
+			return headerResult{contentType, contentLength, err}
+		}
+	}
+	fromHEAD := contentHeader(http.MethodHead, url)
+	fromGET := contentHeader(http.MethodGet, url)
+	result := firstNonError(ctx, fromHEAD, fromGET)
+	headers := result.(headerResult)
+	return headers.contentType, headers.contentLength, headers.Error()
+}
+
+func GetIPFSResponse(pCtx context.Context, ipfsClient *shell.Shell, path string) (io.ReadCloser, error) {
+	fromHTTP := func(ctx context.Context) fetchResulter {
+		url := fmt.Sprintf("%s/ipfs/%s", env.GetString("IPFS_URL"), path)
+		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+		if err != nil {
+			return ipfsResult{err: err}
+		}
+
+		resp, err := defaultHTTPClient.Do(req)
+		if err != nil {
+			return ipfsResult{err: err}
+		}
+
+		if resp.StatusCode > 399 || resp.StatusCode < 200 {
+			return ipfsResult{err: ErrHTTP{Status: resp.StatusCode, URL: url}}
+		}
+
+		return ipfsResult{resp: resp.Body}
 	}
 
-	// Otherwise try GET
-	headers, err := getHeaders(ctx, "GET", url)
-	if err == nil {
-		contentType = parseContentType(headers.Get("Content-Type"))
-		contentLength, err = parseContentLength(headers.Get("Content-Length"))
-		return contentType, contentLength, err
+	fromIPFS := func(context.Context) fetchResulter {
+		reader, err := ipfsClient.Cat(path)
+		return ipfsResult{reader, err}
 	}
 
-	return contentType, contentLength, err
+	result := firstNonError(pCtx, fromHTTP, fromIPFS)
+	response := result.(ipfsResult)
+	return response.resp, response.Error()
 }
 
 // GetIPFSHeaders returns the headers for the given IPFS hash

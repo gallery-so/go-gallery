@@ -1086,11 +1086,12 @@ type FollowUserPayload struct {
 func (FollowUserPayload) IsFollowUserPayloadOrError() {}
 
 type GIFMedia struct {
-	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`
-	MediaURL         *string          `json:"mediaURL"`
-	MediaType        *string          `json:"mediaType"`
-	ContentRenderURL *string          `json:"contentRenderURL"`
-	Dimensions       *MediaDimensions `json:"dimensions"`
+	PreviewURLs       *PreviewURLSet   `json:"previewURLs"`
+	StaticPreviewURLs *PreviewURLSet   `json:"staticPreviewURLs"`
+	MediaURL          *string          `json:"mediaURL"`
+	MediaType         *string          `json:"mediaType"`
+	ContentRenderURL  *string          `json:"contentRenderURL"`
+	Dimensions        *MediaDimensions `json:"dimensions"`
 }
 
 func (GIFMedia) IsMediaSubtype() {}
@@ -2253,6 +2254,7 @@ const (
 	UserExperienceTypeMerchStoreUpsell                  UserExperienceType = "MerchStoreUpsell"
 	UserExperienceTypeMaintenanceFeb2023                UserExperienceType = "MaintenanceFeb2023"
 	UserExperienceTypeTwitterConnectionOnboardingUpsell UserExperienceType = "TwitterConnectionOnboardingUpsell"
+	UserExperienceTypeUpsellMintMemento4                UserExperienceType = "UpsellMintMemento4"
 )
 
 var AllUserExperienceType = []UserExperienceType{
@@ -2261,11 +2263,12 @@ var AllUserExperienceType = []UserExperienceType{
 	UserExperienceTypeMerchStoreUpsell,
 	UserExperienceTypeMaintenanceFeb2023,
 	UserExperienceTypeTwitterConnectionOnboardingUpsell,
+	UserExperienceTypeUpsellMintMemento4,
 }
 
 func (e UserExperienceType) IsValid() bool {
 	switch e {
-	case UserExperienceTypeMultiGalleryAnnouncement, UserExperienceTypeEmailUpsell, UserExperienceTypeMerchStoreUpsell, UserExperienceTypeMaintenanceFeb2023, UserExperienceTypeTwitterConnectionOnboardingUpsell:
+	case UserExperienceTypeMultiGalleryAnnouncement, UserExperienceTypeEmailUpsell, UserExperienceTypeMerchStoreUpsell, UserExperienceTypeMaintenanceFeb2023, UserExperienceTypeTwitterConnectionOnboardingUpsell, UserExperienceTypeUpsellMintMemento4:
 		return true
 	}
 	return false

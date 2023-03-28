@@ -497,11 +497,12 @@ type ComplexityRoot struct {
 	}
 
 	GIFMedia struct {
-		ContentRenderURL func(childComplexity int) int
-		Dimensions       func(childComplexity int) int
-		MediaType        func(childComplexity int) int
-		MediaURL         func(childComplexity int) int
-		PreviewURLs      func(childComplexity int) int
+		ContentRenderURL  func(childComplexity int) int
+		Dimensions        func(childComplexity int) int
+		MediaType         func(childComplexity int) int
+		MediaURL          func(childComplexity int) int
+		PreviewURLs       func(childComplexity int) int
+		StaticPreviewURLs func(childComplexity int) int
 	}
 
 	Gallery struct {
@@ -2892,6 +2893,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.GIFMedia.PreviewURLs(childComplexity), true
+
+	case "GIFMedia.staticPreviewURLs":
+		if e.complexity.GIFMedia.StaticPreviewURLs == nil {
+			break
+		}
+
+		return e.complexity.GIFMedia.StaticPreviewURLs(childComplexity), true
 
 	case "Gallery.collections":
 		if e.complexity.Gallery.Collections == nil {
@@ -6631,6 +6639,7 @@ type ImageMedia implements Media {
 
 type GIFMedia implements Media {
   previewURLs: PreviewURLSet
+  staticPreviewURLs: PreviewURLSet
   mediaURL: String
   mediaType: String
 
@@ -7035,6 +7044,7 @@ enum UserExperienceType {
   MerchStoreUpsell
   MaintenanceFeb2023
   TwitterConnectionOnboardingUpsell
+  UpsellMintMemento4
 }
 
 type UserExperience {
@@ -7400,10 +7410,7 @@ type SearchCommunitiesPayload {
 
 union SearchCommunitiesPayloadOrError = SearchCommunitiesPayload | ErrInvalidInput
 
-union SocialQueriesOrError =
-    SocialQueries
-  | ErrNotAuthorized
-  | ErrNeedsToReconnectSocial
+union SocialQueriesOrError = SocialQueries | ErrNotAuthorized | ErrNeedsToReconnectSocial
 
 type Query {
   node(id: ID!): Node
@@ -20134,6 +20141,65 @@ func (ec *executionContext) _GIFMedia_previewURLs(ctx context.Context, field gra
 }
 
 func (ec *executionContext) fieldContext_GIFMedia_previewURLs(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GIFMedia",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "raw":
+				return ec.fieldContext_PreviewURLSet_raw(ctx, field)
+			case "thumbnail":
+				return ec.fieldContext_PreviewURLSet_thumbnail(ctx, field)
+			case "small":
+				return ec.fieldContext_PreviewURLSet_small(ctx, field)
+			case "medium":
+				return ec.fieldContext_PreviewURLSet_medium(ctx, field)
+			case "large":
+				return ec.fieldContext_PreviewURLSet_large(ctx, field)
+			case "srcSet":
+				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "liveRender":
+				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
+			case "blurhash":
+				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GIFMedia_staticPreviewURLs(ctx context.Context, field graphql.CollectedField, obj *model.GIFMedia) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_GIFMedia_staticPreviewURLs(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.StaticPreviewURLs, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.PreviewURLSet)
+	fc.Result = res
+	return ec.marshalOPreviewURLSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreviewURLSet(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_GIFMedia_staticPreviewURLs(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "GIFMedia",
 		Field:      field,
@@ -52424,6 +52490,10 @@ func (ec *executionContext) _GIFMedia(ctx context.Context, sel ast.SelectionSet,
 		case "previewURLs":
 
 			out.Values[i] = ec._GIFMedia_previewURLs(ctx, field, obj)
+
+		case "staticPreviewURLs":
+
+			out.Values[i] = ec._GIFMedia_staticPreviewURLs(ctx, field, obj)
 
 		case "mediaURL":
 

@@ -1887,7 +1887,7 @@ func getMediaForToken(ctx context.Context, token db.Token) model.MediaSubtype {
 
 }
 
-func getPreviewUrls(ctx context.Context, media persist.Media) *model.PreviewURLSet {
+func getPreviewUrls(ctx context.Context, media persist.Media, options ...mediamapper.Option) *model.PreviewURLSet {
 	url := media.ThumbnailURL.String()
 	if (media.MediaType == persist.MediaTypeImage || media.MediaType == persist.MediaTypeSVG || media.MediaType == persist.MediaTypeGIF) && url == "" {
 		url = media.MediaURL.String()
@@ -1902,11 +1902,11 @@ func getPreviewUrls(ctx context.Context, media persist.Media) *model.PreviewURLS
 
 	return &model.PreviewURLSet{
 		Raw:        &preview,
-		Thumbnail:  util.ToPointer(mm.GetThumbnailImageUrl(preview)),
-		Small:      util.ToPointer(mm.GetSmallImageUrl(preview)),
-		Medium:     util.ToPointer(mm.GetMediumImageUrl(preview)),
-		Large:      util.ToPointer(mm.GetLargeImageUrl(preview)),
-		SrcSet:     util.ToPointer(mm.GetSrcSet(preview)),
+		Thumbnail:  util.ToPointer(mm.GetThumbnailImageUrl(preview, options...)),
+		Small:      util.ToPointer(mm.GetSmallImageUrl(preview, options...)),
+		Medium:     util.ToPointer(mm.GetMediumImageUrl(preview, options...)),
+		Large:      util.ToPointer(mm.GetLargeImageUrl(preview, options...)),
+		SrcSet:     util.ToPointer(mm.GetSrcSet(preview, options...)),
 		LiveRender: &live,
 	}
 }
@@ -1927,11 +1927,12 @@ func getGIFMedia(ctx context.Context, media persist.Media) model.GIFMedia {
 	url := remapLargeImageUrls(media.MediaURL.String())
 
 	return model.GIFMedia{
-		PreviewURLs:      getPreviewUrls(ctx, media),
-		MediaURL:         util.ToPointer(media.MediaURL.String()),
-		MediaType:        (*string)(&media.MediaType),
-		ContentRenderURL: &url,
-		Dimensions:       mediaToDimensions(media),
+		PreviewURLs:       getPreviewUrls(ctx, media),
+		StaticPreviewURLs: getPreviewUrls(ctx, media, mediamapper.WithStaticImage()),
+		MediaURL:          util.ToPointer(media.MediaURL.String()),
+		MediaType:         (*string)(&media.MediaType),
+		ContentRenderURL:  &url,
+		Dimensions:        mediaToDimensions(media),
 	}
 }
 

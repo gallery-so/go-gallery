@@ -212,6 +212,7 @@ type ImageMedia implements Media {
 
 type GIFMedia implements Media {
   previewURLs: PreviewURLSet
+  staticPreviewURLs: PreviewURLSet
   mediaURL: String
   mediaType: String
 
@@ -616,6 +617,7 @@ enum UserExperienceType {
   MerchStoreUpsell
   MaintenanceFeb2023
   TwitterConnectionOnboardingUpsell
+  UpsellMintMemento4
 }
 
 type UserExperience {
