@@ -1195,8 +1195,6 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 				seenTokens[ti] = candidateToken
 			} else if len(existingToken.TokenMetadata) < len(candidateToken.TokenMetadata) {
 				seenTokens[ti] = candidateToken
-			} else if len(existingToken.TokenMetadata) > len(candidateToken.TokenMetadata) {
-				seenTokens[ti] = existingToken
 			}
 
 			var found bool
