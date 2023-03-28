@@ -4524,9 +4524,10 @@ func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUser) Get
 
 // syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensToken includes the requested fields of the GraphQL type Token.
 type syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensToken struct {
-	Chain   *Chain       `json:"chain"`
-	Dbid    persist.DBID `json:"dbid"`
-	TokenId *string      `json:"tokenId"`
+	Chain   *Chain                                                                                          `json:"chain"`
+	Dbid    persist.DBID                                                                                    `json:"dbid"`
+	TokenId *string                                                                                         `json:"tokenId"`
+	Media   *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype `json:"-"`
 }
 
 // GetChain returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensToken.Chain, and is useful for accessing the field via an interface.
@@ -4542,6 +4543,563 @@ func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserToken
 // GetTokenId returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensToken.TokenId, and is useful for accessing the field via an interface.
 func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensToken) GetTokenId() *string {
 	return v.TokenId
+}
+
+// GetMedia returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensToken.Media, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensToken) GetMedia() *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype {
+	return v.Media
+}
+
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensToken) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensToken
+		Media json.RawMessage `json:"media"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensToken = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.Media
+		src := firstPass.Media
+		if len(src) != 0 && string(src) != "null" {
+			*dst = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype)
+			err = __unmarshalsyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype(
+				src, *dst)
+			if err != nil {
+				return fmt.Errorf(
+					"Unable to unmarshal syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensToken.Media: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshalsyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensToken struct {
+	Chain *Chain `json:"chain"`
+
+	Dbid persist.DBID `json:"dbid"`
+
+	TokenId *string `json:"tokenId"`
+
+	Media json.RawMessage `json:"media"`
+}
+
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensToken) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensToken) __premarshalJSON() (*__premarshalsyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensToken, error) {
+	var retval __premarshalsyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensToken
+
+	retval.Chain = v.Chain
+	retval.Dbid = v.Dbid
+	retval.TokenId = v.TokenId
+	{
+
+		dst := &retval.Media
+		src := v.Media
+		if src != nil {
+			var err error
+			*dst, err = __marshalsyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype(
+				src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"Unable to marshal syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensToken.Media: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaAudioMedia includes the requested fields of the GraphQL type AudioMedia.
+type syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaAudioMedia struct {
+	Typename  *string `json:"__typename"`
+	MediaURL  *string `json:"mediaURL"`
+	MediaType *string `json:"mediaType"`
+}
+
+// GetTypename returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaAudioMedia.Typename, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaAudioMedia) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMediaURL returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaAudioMedia.MediaURL, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaAudioMedia) GetMediaURL() *string {
+	return v.MediaURL
+}
+
+// GetMediaType returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaAudioMedia.MediaType, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaAudioMedia) GetMediaType() *string {
+	return v.MediaType
+}
+
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia includes the requested fields of the GraphQL type GIFMedia.
+type syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia struct {
+	Typename  *string `json:"__typename"`
+	MediaURL  *string `json:"mediaURL"`
+	MediaType *string `json:"mediaType"`
+}
+
+// GetTypename returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia.Typename, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMediaURL returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia.MediaURL, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia) GetMediaURL() *string {
+	return v.MediaURL
+}
+
+// GetMediaType returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia.MediaType, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia) GetMediaType() *string {
+	return v.MediaType
+}
+
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia includes the requested fields of the GraphQL type GltfMedia.
+type syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia struct {
+	Typename  *string `json:"__typename"`
+	MediaURL  *string `json:"mediaURL"`
+	MediaType *string `json:"mediaType"`
+}
+
+// GetTypename returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia.Typename, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMediaURL returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia.MediaURL, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia) GetMediaURL() *string {
+	return v.MediaURL
+}
+
+// GetMediaType returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia.MediaType, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia) GetMediaType() *string {
+	return v.MediaType
+}
+
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaHtmlMedia includes the requested fields of the GraphQL type HtmlMedia.
+type syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaHtmlMedia struct {
+	Typename  *string `json:"__typename"`
+	MediaURL  *string `json:"mediaURL"`
+	MediaType *string `json:"mediaType"`
+}
+
+// GetTypename returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaHtmlMedia.Typename, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaHtmlMedia) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMediaURL returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaHtmlMedia.MediaURL, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaHtmlMedia) GetMediaURL() *string {
+	return v.MediaURL
+}
+
+// GetMediaType returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaHtmlMedia.MediaType, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaHtmlMedia) GetMediaType() *string {
+	return v.MediaType
+}
+
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia includes the requested fields of the GraphQL type ImageMedia.
+type syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia struct {
+	Typename  *string `json:"__typename"`
+	MediaURL  *string `json:"mediaURL"`
+	MediaType *string `json:"mediaType"`
+}
+
+// GetTypename returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia.Typename, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMediaURL returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia.MediaURL, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia) GetMediaURL() *string {
+	return v.MediaURL
+}
+
+// GetMediaType returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia.MediaType, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia) GetMediaType() *string {
+	return v.MediaType
+}
+
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia includes the requested fields of the GraphQL type InvalidMedia.
+type syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia struct {
+	Typename  *string `json:"__typename"`
+	MediaURL  *string `json:"mediaURL"`
+	MediaType *string `json:"mediaType"`
+}
+
+// GetTypename returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia.Typename, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMediaURL returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia.MediaURL, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia) GetMediaURL() *string {
+	return v.MediaURL
+}
+
+// GetMediaType returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia.MediaType, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia) GetMediaType() *string {
+	return v.MediaType
+}
+
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaJsonMedia includes the requested fields of the GraphQL type JsonMedia.
+type syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaJsonMedia struct {
+	Typename  *string `json:"__typename"`
+	MediaURL  *string `json:"mediaURL"`
+	MediaType *string `json:"mediaType"`
+}
+
+// GetTypename returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaJsonMedia.Typename, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaJsonMedia) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMediaURL returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaJsonMedia.MediaURL, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaJsonMedia) GetMediaURL() *string {
+	return v.MediaURL
+}
+
+// GetMediaType returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaJsonMedia.MediaType, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaJsonMedia) GetMediaType() *string {
+	return v.MediaType
+}
+
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype includes the requested fields of the GraphQL interface MediaSubtype.
+//
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype is implemented by the following types:
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaAudioMedia
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaHtmlMedia
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaJsonMedia
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia
+type syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype interface {
+	implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() *string
+}
+
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
+}
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
+}
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
+}
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaAudioMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
+}
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
+}
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
+}
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaHtmlMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
+}
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaJsonMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
+}
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
+}
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
+}
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
+}
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
+}
+
+func __unmarshalsyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype(b []byte, v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "ImageMedia":
+		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
+		return json.Unmarshal(b, *v)
+	case "GIFMedia":
+		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia)
+		return json.Unmarshal(b, *v)
+	case "VideoMedia":
+		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia)
+		return json.Unmarshal(b, *v)
+	case "AudioMedia":
+		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaAudioMedia)
+		return json.Unmarshal(b, *v)
+	case "TextMedia":
+		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia)
+		return json.Unmarshal(b, *v)
+	case "PdfMedia":
+		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia)
+		return json.Unmarshal(b, *v)
+	case "HtmlMedia":
+		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaHtmlMedia)
+		return json.Unmarshal(b, *v)
+	case "JsonMedia":
+		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaJsonMedia)
+		return json.Unmarshal(b, *v)
+	case "GltfMedia":
+		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia)
+		return json.Unmarshal(b, *v)
+	case "UnknownMedia":
+		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia)
+		return json.Unmarshal(b, *v)
+	case "SyncingMedia":
+		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia)
+		return json.Unmarshal(b, *v)
+	case "InvalidMedia":
+		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing MediaSubtype.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshalsyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype(v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia:
+		typename = "ImageMedia"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia
+		}{typename, v}
+		return json.Marshal(result)
+	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia:
+		typename = "GIFMedia"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia
+		}{typename, v}
+		return json.Marshal(result)
+	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia:
+		typename = "VideoMedia"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia
+		}{typename, v}
+		return json.Marshal(result)
+	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaAudioMedia:
+		typename = "AudioMedia"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaAudioMedia
+		}{typename, v}
+		return json.Marshal(result)
+	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia:
+		typename = "TextMedia"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia
+		}{typename, v}
+		return json.Marshal(result)
+	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia:
+		typename = "PdfMedia"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia
+		}{typename, v}
+		return json.Marshal(result)
+	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaHtmlMedia:
+		typename = "HtmlMedia"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaHtmlMedia
+		}{typename, v}
+		return json.Marshal(result)
+	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaJsonMedia:
+		typename = "JsonMedia"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaJsonMedia
+		}{typename, v}
+		return json.Marshal(result)
+	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia:
+		typename = "GltfMedia"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia
+		}{typename, v}
+		return json.Marshal(result)
+	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia:
+		typename = "UnknownMedia"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia
+		}{typename, v}
+		return json.Marshal(result)
+	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia:
+		typename = "SyncingMedia"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia
+		}{typename, v}
+		return json.Marshal(result)
+	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia:
+		typename = "InvalidMedia"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype: "%T"`, v)
+	}
+}
+
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia includes the requested fields of the GraphQL type PdfMedia.
+type syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia struct {
+	Typename  *string `json:"__typename"`
+	MediaURL  *string `json:"mediaURL"`
+	MediaType *string `json:"mediaType"`
+}
+
+// GetTypename returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia.Typename, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMediaURL returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia.MediaURL, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia) GetMediaURL() *string {
+	return v.MediaURL
+}
+
+// GetMediaType returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia.MediaType, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia) GetMediaType() *string {
+	return v.MediaType
+}
+
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia includes the requested fields of the GraphQL type SyncingMedia.
+type syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia struct {
+	Typename  *string `json:"__typename"`
+	MediaURL  *string `json:"mediaURL"`
+	MediaType *string `json:"mediaType"`
+}
+
+// GetTypename returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia.Typename, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMediaURL returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia.MediaURL, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia) GetMediaURL() *string {
+	return v.MediaURL
+}
+
+// GetMediaType returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia.MediaType, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia) GetMediaType() *string {
+	return v.MediaType
+}
+
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia includes the requested fields of the GraphQL type TextMedia.
+type syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia struct {
+	Typename  *string `json:"__typename"`
+	MediaURL  *string `json:"mediaURL"`
+	MediaType *string `json:"mediaType"`
+}
+
+// GetTypename returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia.Typename, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMediaURL returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia.MediaURL, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia) GetMediaURL() *string {
+	return v.MediaURL
+}
+
+// GetMediaType returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia.MediaType, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia) GetMediaType() *string {
+	return v.MediaType
+}
+
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia includes the requested fields of the GraphQL type UnknownMedia.
+type syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia struct {
+	Typename  *string `json:"__typename"`
+	MediaURL  *string `json:"mediaURL"`
+	MediaType *string `json:"mediaType"`
+}
+
+// GetTypename returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia.Typename, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMediaURL returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia.MediaURL, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia) GetMediaURL() *string {
+	return v.MediaURL
+}
+
+// GetMediaType returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia.MediaType, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia) GetMediaType() *string {
+	return v.MediaType
+}
+
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia includes the requested fields of the GraphQL type VideoMedia.
+type syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia struct {
+	Typename  *string `json:"__typename"`
+	MediaURL  *string `json:"mediaURL"`
+	MediaType *string `json:"mediaType"`
+}
+
+// GetTypename returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia.Typename, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMediaURL returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia.MediaURL, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia) GetMediaURL() *string {
+	return v.MediaURL
+}
+
+// GetMediaType returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia.MediaType, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia) GetMediaType() *string {
+	return v.MediaType
 }
 
 // trendingFeedQueryResponse is returned by trendingFeedQuery on success.
@@ -8609,6 +9167,57 @@ mutation syncTokensMutation ($chains: [Chain!]) {
 						chain
 						dbid
 						tokenId
+						media {
+							__typename
+							... on ImageMedia {
+								mediaURL
+								mediaType
+							}
+							... on GIFMedia {
+								mediaURL
+								mediaType
+							}
+							... on VideoMedia {
+								mediaURL
+								mediaType
+							}
+							... on AudioMedia {
+								mediaURL
+								mediaType
+							}
+							... on TextMedia {
+								mediaURL
+								mediaType
+							}
+							... on PdfMedia {
+								mediaURL
+								mediaType
+							}
+							... on HtmlMedia {
+								mediaURL
+								mediaType
+							}
+							... on JsonMedia {
+								mediaURL
+								mediaType
+							}
+							... on GltfMedia {
+								mediaURL
+								mediaType
+							}
+							... on UnknownMedia {
+								mediaURL
+								mediaType
+							}
+							... on SyncingMedia {
+								mediaURL
+								mediaType
+							}
+							... on InvalidMedia {
+								mediaURL
+								mediaType
+							}
+						}
 					}
 				}
 			}
