@@ -31,7 +31,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/tracing"
-	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 )
 
@@ -83,73 +82,9 @@ func (e errForTokenAtBlockAndIndex) OrderInfo() blockchainOrderInfo {
 // eventHash represents an event keccak256 hash
 type eventHash string
 
-type tokenMetadata struct {
-	ti persist.EthereumTokenIdentifiers
-	md persist.TokenMetadata
-}
-
-type tokenBalances struct {
-	ti      persist.EthereumTokenIdentifiers
-	boi     blockchainOrderInfo
-	from    persist.EthereumAddress
-	to      persist.EthereumAddress
-	fromAmt *big.Int
-	toAmt   *big.Int
-}
-
-func (t tokenBalances) TokenIdentifiers() persist.EthereumTokenIdentifiers {
-	return t.ti
-}
-
-func (t tokenBalances) OrderInfo() blockchainOrderInfo {
-	return t.boi
-}
-
-type tokenURI struct {
-	boi blockchainOrderInfo
-	ti  persist.EthereumTokenIdentifiers
-	uri persist.TokenURI
-}
-
-func (t tokenURI) TokenIdentifiers() persist.EthereumTokenIdentifiers {
-	return t.ti
-}
-
-func (t tokenURI) OrderInfo() blockchainOrderInfo {
-	return t.boi
-}
-
-type tokenBalancesAtBlock struct {
-	ti       persist.EthereumTokenIdentifiers
-	boi      blockchainOrderInfo
-	balances map[persist.EthereumAddress]balanceAtBlock
-}
-
-func (t tokenBalancesAtBlock) TokenIdentifiers() persist.EthereumTokenIdentifiers {
-	return t.ti
-}
-
-func (t tokenBalancesAtBlock) OrderInfo() blockchainOrderInfo {
-	return t.boi
-}
-
 type transfersAtBlock struct {
 	block     persist.BlockNumber
 	transfers []rpc.Transfer
-}
-
-type ownerAtBlock struct {
-	ti    persist.EthereumTokenIdentifiers
-	boi   blockchainOrderInfo
-	owner persist.EthereumAddress
-}
-
-func (o ownerAtBlock) TokenIdentifiers() persist.EthereumTokenIdentifiers {
-	return o.ti
-}
-
-func (o ownerAtBlock) OrderInfo() blockchainOrderInfo {
-	return o.boi
 }
 
 type contractAtBlock struct {
@@ -164,31 +99,6 @@ func (o contractAtBlock) TokenIdentifiers() persist.EthereumTokenIdentifiers {
 
 func (o contractAtBlock) OrderInfo() blockchainOrderInfo {
 	return o.boi
-}
-
-type previousOwnersAtBlock struct {
-	owners []ownerAtBlock
-	ti     persist.EthereumTokenIdentifiers
-	boi    blockchainOrderInfo
-}
-
-func (p previousOwnersAtBlock) TokenIdentifiers() persist.EthereumTokenIdentifiers {
-	return p.ti
-}
-
-func (p previousOwnersAtBlock) OrderInfo() blockchainOrderInfo {
-	return p.boi
-}
-
-type balanceAtBlock struct {
-	ti    persist.EthereumTokenIdentifiers
-	block persist.BlockNumber
-	amnt  *big.Int
-}
-
-type tokenMedia struct {
-	ti    persist.EthereumTokenIdentifiers
-	media persist.Media
 }
 
 type getLogsFunc func(ctx context.Context, curBlock, nextBlock *big.Int, topics [][]common.Hash) ([]types.Log, error)
@@ -837,74 +747,6 @@ func (i *indexer) processTransfers(ctx context.Context, transfers []transfersAtB
 
 	}
 
-}
-
-func getBalances(ctx context.Context, contractAddress persist.EthereumAddress, from persist.EthereumAddress, tokenID persist.TokenID, key persist.EthereumTokenIdentifiers, blockNumber persist.BlockNumber, txIndex uint, to persist.EthereumAddress, ethClient *ethclient.Client) (tokenBalances, error) {
-	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
-	defer cancel()
-
-	var fromBalance, toBalance *big.Int
-	var err error
-
-	if from.String() != persist.ZeroAddress.String() {
-		fromBalance, err = rpc.RetryGetBalanceOfERC1155Token(ctx, from, contractAddress, tokenID, ethClient)
-		if err != nil {
-			return tokenBalances{}, err
-		}
-	}
-	if to.String() != persist.ZeroAddress.String() {
-		toBalance, err = rpc.RetryGetBalanceOfERC1155Token(ctx, to, contractAddress, tokenID, ethClient)
-		if err != nil {
-			return tokenBalances{}, err
-		}
-	}
-
-	// MaxUint because there is no txIndex, this is simply the most up to date balance on the blockchain so it should always be ahead of any other information at this block
-	// CurBlock becuase the RPC functions return the current balance, not the balance of the block being processed
-	bal := tokenBalances{key, blockchainOrderInfo{blockNumber: blockNumber, txIndex: txIndex}, from, to, fromBalance, toBalance}
-	return bal, nil
-}
-
-func getOwner(ctx context.Context, contractAddress persist.EthereumAddress, tokenID persist.TokenID, key persist.EthereumTokenIdentifiers, blockNumber persist.BlockNumber, txIndex uint, ethClient *ethclient.Client) (ownerAtBlock, error) {
-	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
-	defer cancel()
-
-	owner, err := rpc.RetryGetOwnerOfERC721Token(ctx, contractAddress, tokenID, ethClient)
-	if err != nil {
-		return ownerAtBlock{}, err
-	}
-
-	// MaxUint because there is no txIndex, this is simply the most up to date balance on the blockchain so it should always be ahead of any other information at this block
-	// CurBlock becuase the RPC functions return the current balance, not the balance of the block being processed
-	bal := ownerAtBlock{key, blockchainOrderInfo{blockNumber: blockNumber, txIndex: txIndex}, owner}
-	return bal, nil
-}
-
-func getURI(ctx context.Context, contractAddress persist.EthereumAddress, tokenID persist.TokenID, tokenType persist.TokenType, ethClient *ethclient.Client) persist.TokenURI {
-	u, err := rpc.RetryGetTokenURI(ctx, tokenType, contractAddress, tokenID, ethClient)
-	if err != nil {
-		logEntry := logger.For(ctx).WithError(err).WithFields(logrus.Fields{
-			"tokenType":       tokenType,
-			"tokenID":         tokenID,
-			"contractAddress": contractAddress,
-			"rpcCall":         "eth_call",
-		})
-		logEthCallRPCError(logEntry, err, "error getting URI for token")
-
-		if strings.Contains(err.Error(), "execution reverted") {
-			u = persist.InvalidTokenURI
-		}
-	}
-
-	u = u.ReplaceID(tokenID)
-	if (len(u.String())) > util.KB {
-		logger.For(ctx).Infof("URI size for %s-%s: %s", contractAddress, tokenID, util.InByteSizeFormat(uint64(len(u.String()))))
-		if (len(u.String())) > util.KB*100 {
-			logger.For(ctx).Errorf("Skipping URI for %s-%s with size: %s", contractAddress, tokenID, util.InByteSizeFormat(uint64(len(u.String()))))
-			return ""
-		}
-	}
-	return u
 }
 
 // TOKENS FUNCS ---------------------------------------------------------------
