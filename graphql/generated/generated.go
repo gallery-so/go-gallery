@@ -7035,6 +7035,7 @@ enum UserExperienceType {
   MerchStoreUpsell
   MaintenanceFeb2023
   TwitterConnectionOnboardingUpsell
+  UpsellMintMemento4
 }
 
 type UserExperience {
@@ -7400,10 +7401,7 @@ type SearchCommunitiesPayload {
 
 union SearchCommunitiesPayloadOrError = SearchCommunitiesPayload | ErrInvalidInput
 
-union SocialQueriesOrError =
-    SocialQueries
-  | ErrNotAuthorized
-  | ErrNeedsToReconnectSocial
+union SocialQueriesOrError = SocialQueries | ErrNotAuthorized | ErrNeedsToReconnectSocial
 
 type Query {
   node(id: ID!): Node

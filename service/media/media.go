@@ -8,10 +8,6 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
-	"image"
-	"image/gif"
-	"image/jpeg"
-	"image/png"
 	"io"
 	"net"
 	"net/http"
@@ -36,7 +32,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/qmuntal/gltf"
 	htransport "google.golang.org/api/transport/http"
 )
 
@@ -951,46 +946,6 @@ func PredictMediaType(pCtx context.Context, url string) (persist.MediaType, stri
 		return persist.MediaFromContentType(contentType), contentType, contentLength, nil
 	}
 	return persist.MediaTypeUnknown, "", 0, nil
-}
-
-// GuessMediaType guesses the media type of the given bytes.
-func GuessMediaType(bs []byte) (persist.MediaType, string) {
-
-	cpy := make([]byte, len(bs))
-	copy(cpy, bs)
-	cpyBuff := bytes.NewBuffer(cpy)
-	if _, err := gif.Decode(cpyBuff); err == nil {
-		return persist.MediaTypeGIF, "image/gif"
-	}
-	cpy = make([]byte, len(bs))
-	copy(cpy, bs)
-	cpyBuff = bytes.NewBuffer(cpy)
-	if _, _, err := image.Decode(cpyBuff); err == nil {
-		return persist.MediaTypeImage, "image"
-	}
-	cpy = make([]byte, len(bs))
-	copy(cpy, bs)
-	cpyBuff = bytes.NewBuffer(cpy)
-	if _, err := png.Decode(cpyBuff); err == nil {
-		return persist.MediaTypeImage, "image/png"
-
-	}
-	cpy = make([]byte, len(bs))
-	copy(cpy, bs)
-	cpyBuff = bytes.NewBuffer(cpy)
-	if _, err := jpeg.Decode(cpyBuff); err == nil {
-		return persist.MediaTypeImage, "image/jpeg"
-	}
-	cpy = make([]byte, len(bs))
-	copy(cpy, bs)
-	cpyBuff = bytes.NewBuffer(cpy)
-	var doc gltf.Document
-	if err := gltf.NewDecoder(cpyBuff).Decode(&doc); err == nil {
-		return persist.MediaTypeAnimation, "model/gltf-binary"
-	}
-
-	return persist.MediaTypeUnknown, ""
-
 }
 
 func thumbnailVideoToWriter(ctx context.Context, url string, writer io.Writer) error {

@@ -206,8 +206,6 @@ type Token struct {
 	Deleted      NullBool        `json:"-"`
 	LastUpdated  LastUpdatedTime `json:"last_updated"`
 
-	Media Media `json:"media"`
-
 	TokenType TokenType `json:"token_type"`
 
 	Chain Chain `json:"chain"`
@@ -232,6 +230,10 @@ type Token struct {
 type Dimensions struct {
 	Width  int `json:"width"`
 	Height int `json:"height"`
+}
+
+func (d Dimensions) Valid() bool {
+	return d.Width > 0 && d.Height > 0
 }
 
 // Media represents a token's media content with processed images from metadata
@@ -335,8 +337,8 @@ type TokenRepository interface {
 	GetByContract(context.Context, EthereumAddress, int64, int64) ([]Token, error)
 	GetOwnedByContract(context.Context, EthereumAddress, EthereumAddress, int64, int64) ([]Token, Contract, error)
 	GetByTokenIdentifiers(context.Context, TokenID, EthereumAddress, int64, int64) ([]Token, error)
+	GetURIByTokenIdentifiers(context.Context, TokenID, EthereumAddress) (TokenURI, error)
 	GetByIdentifiers(context.Context, TokenID, EthereumAddress, EthereumAddress) (Token, error)
-	GetMetadataByTokenIdentifiers(context.Context, TokenID, EthereumAddress) (TokenURI, TokenMetadata, Media, error)
 	DeleteByID(context.Context, DBID) error
 	BulkUpsert(context.Context, []Token) error
 	Upsert(context.Context, Token) error
@@ -415,7 +417,7 @@ func MediaFromContentType(contentType string) MediaType {
 	switch spl[0] {
 	case "image":
 		switch spl[1] {
-		case "svg":
+		case "svg", "svg+xml":
 			return MediaTypeSVG
 		case "gif":
 			return MediaTypeGIF
@@ -433,8 +435,12 @@ func MediaFromContentType(contentType string) MediaType {
 		default:
 			return MediaTypeText
 		}
-	case "pdf":
-		return MediaTypePDF
+	case "application":
+		switch spl[1] {
+		case "pdf":
+			return MediaTypePDF
+		}
+		fallthrough
 	default:
 		return MediaTypeUnknown
 	}
