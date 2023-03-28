@@ -32,6 +32,9 @@ const staleCommunityTime = time.Minute * 30
 
 const maxCommunitySize = 10_000
 
+// SendTokens is called to process a user's batch of tokens
+type SendTokens func(context.Context, task.TokenProcessingUserMessage) error
+
 type Provider struct {
 	Repos   *postgres.Repositories
 	Queries *coredb.Queries
@@ -39,7 +42,7 @@ type Provider struct {
 	Chains  map[persist.Chain][]interface{}
 	// some chains use the addresses of other chains, this will map of chain we want tokens from => chain that's address will be used for lookup
 	ChainAddressOverrides ChainOverrideMap
-	TasksClient           *cloudtasks.Client
+	SendTokens            SendTokens
 }
 
 // BlockchainInfo retrieves blockchain info from all chains
@@ -199,10 +202,12 @@ func NewProvider(ctx context.Context, repos *postgres.Repositories, queries *cor
 	return &Provider{
 		Repos:                 repos,
 		Cache:                 cache,
-		TasksClient:           taskClient,
 		Queries:               queries,
 		Chains:                validateProviders(ctx, providers),
 		ChainAddressOverrides: chainOverrides,
+		SendTokens: func(ctx context.Context, t task.TokenProcessingUserMessage) error {
+			return task.CreateTaskForTokenProcessing(ctx, taskClient, t)
+		},
 	}
 }
 
@@ -521,11 +526,7 @@ func (p *Provider) sendTokensToTokenProcessing(ctx context.Context, userID persi
 	if len(tokens) == 0 {
 		return nil
 	}
-
-	return task.CreateTaskForTokenProcessing(ctx, p.TasksClient, task.TokenProcessingUserMessage{
-		UserID:   userID,
-		TokenIDs: tokens,
-	})
+	return p.SendTokens(ctx, task.TokenProcessingUserMessage{UserID: userID, TokenIDs: tokens})
 }
 
 func (p *Provider) processTokenMedia(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, ownerAddress persist.Address, imageKeywords, animationKeywords []string) error {
