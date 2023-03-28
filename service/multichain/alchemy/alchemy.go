@@ -563,12 +563,21 @@ func alchemyTokenToChainAgnosticToken(owner persist.EthereumAddress, token Token
 }
 
 func alchemyTokenToMetadata(token Token) persist.TokenMetadata {
-	return persist.TokenMetadata{
+	firstWithFormat, ok := util.FindFirst(token.Media, func(m Media) bool {
+		return m.Format != ""
+	})
+	metadata := persist.TokenMetadata{
 		"image_url":    token.Metadata.Image,
 		"name":         token.Metadata.Name,
 		"description":  token.Metadata.Description,
 		"external_url": token.Metadata.ExternalURL,
 	}
+
+	if ok {
+		metadata["media_type"] = formatToMediaType(firstWithFormat.Format)
+		metadata["format"] = firstWithFormat.Format
+	}
+	return metadata
 }
 
 func formatToMediaType(format string) persist.MediaType {
