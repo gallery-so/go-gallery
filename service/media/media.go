@@ -146,6 +146,10 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		mediaType = vidResult.mediaType
 	}
 
+	if asString, ok := metadata["media_type"].(string); !mediaType.IsValid() && ok && asString != "" {
+		mediaType = persist.MediaType(asString)
+	}
+
 	pCtx = logger.NewContextWithFields(pCtx, logrus.Fields{"mediaType": mediaType})
 	logger.For(pCtx).Infof("using '%s' as the mediaType", mediaType)
 
