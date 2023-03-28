@@ -109,33 +109,69 @@ func getDefaultParams() []imgix.IxParam {
 	}
 }
 
-func (u *MediaMapper) buildPreviewImageUrl(sourceUrl string, width int, params []imgix.IxParam) string {
+func (u *MediaMapper) buildPreviewImageUrl(sourceUrl string, width int, params []imgix.IxParam, options ...Option) string {
 	if sourceUrl == "" {
 		return sourceUrl
 	}
 
 	sourceUrl = setGoogleWidthParams(sourceUrl, width)
+	params = applyOptions(params, options)
+
 	return u.urlBuilder.CreateURL(sourceUrl, params...)
 }
 
-func (u *MediaMapper) GetThumbnailImageUrl(sourceUrl string) string {
-	return u.buildPreviewImageUrl(sourceUrl, thumbnailWidth, u.thumbnailUrlParams)
+func (u *MediaMapper) buildSrcSet(sourceUrl string, params []imgix.IxParam, options ...Option) string {
+	if sourceUrl == "" {
+		return sourceUrl
+	}
+
+	params = applyOptions(params, options)
+
+	return u.urlBuilder.CreateSrcset(sourceUrl, params)
 }
 
-func (u *MediaMapper) GetSmallImageUrl(sourceUrl string) string {
-	return u.buildPreviewImageUrl(sourceUrl, smallWidth, u.smallUrlParams)
+func applyOptions(params []imgix.IxParam, options []Option) []imgix.IxParam {
+	// Options will append to the params slice, so we need to make a copy of it
+	// to ensure we're not modifying a shared set of params
+	if len(options) > 0 {
+		p := make([]imgix.IxParam, len(params))
+		copy(p, params)
+		params = p
+
+		for _, option := range options {
+			option(&params)
+		}
+	}
+
+	return params
 }
 
-func (u *MediaMapper) GetMediumImageUrl(sourceUrl string) string {
-	return u.buildPreviewImageUrl(sourceUrl, mediumWidth, u.mediumUrlParams)
+type Option func(*[]imgix.IxParam)
+
+func WithStaticImage() Option {
+	return func(params *[]imgix.IxParam) {
+		*params = append(*params, imgix.Param("frame", "1"))
+	}
 }
 
-func (u *MediaMapper) GetLargeImageUrl(sourceUrl string) string {
-	return u.buildPreviewImageUrl(sourceUrl, largeWidth, u.largeUrlParams)
+func (u *MediaMapper) GetThumbnailImageUrl(sourceUrl string, options ...Option) string {
+	return u.buildPreviewImageUrl(sourceUrl, thumbnailWidth, u.thumbnailUrlParams, options...)
 }
 
-func (u *MediaMapper) GetSrcSet(sourceUrl string) string {
-	return u.urlBuilder.CreateSrcset(sourceUrl, u.srcSetParams)
+func (u *MediaMapper) GetSmallImageUrl(sourceUrl string, options ...Option) string {
+	return u.buildPreviewImageUrl(sourceUrl, smallWidth, u.smallUrlParams, options...)
+}
+
+func (u *MediaMapper) GetMediumImageUrl(sourceUrl string, options ...Option) string {
+	return u.buildPreviewImageUrl(sourceUrl, mediumWidth, u.mediumUrlParams, options...)
+}
+
+func (u *MediaMapper) GetLargeImageUrl(sourceUrl string, options ...Option) string {
+	return u.buildPreviewImageUrl(sourceUrl, largeWidth, u.largeUrlParams, options...)
+}
+
+func (u *MediaMapper) GetSrcSet(sourceUrl string, options ...Option) string {
+	return u.buildSrcSet(sourceUrl, u.srcSetParams, options...)
 }
 
 func (u *MediaMapper) GetBlurhash(sourceUrl string) *string {

@@ -1086,11 +1086,12 @@ type FollowUserPayload struct {
 func (FollowUserPayload) IsFollowUserPayloadOrError() {}
 
 type GIFMedia struct {
-	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`
-	MediaURL         *string          `json:"mediaURL"`
-	MediaType        *string          `json:"mediaType"`
-	ContentRenderURL *string          `json:"contentRenderURL"`
-	Dimensions       *MediaDimensions `json:"dimensions"`
+	PreviewURLs       *PreviewURLSet   `json:"previewURLs"`
+	StaticPreviewURLs *PreviewURLSet   `json:"staticPreviewURLs"`
+	MediaURL          *string          `json:"mediaURL"`
+	MediaType         *string          `json:"mediaType"`
+	ContentRenderURL  *string          `json:"contentRenderURL"`
+	Dimensions        *MediaDimensions `json:"dimensions"`
 }
 
 func (GIFMedia) IsMediaSubtype() {}
