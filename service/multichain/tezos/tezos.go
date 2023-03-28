@@ -665,14 +665,13 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 				return
 			}
 			tid := persist.TokenID(tzToken.Token.TokenID.toBase16String())
-			med := makeTempMedia(ctx, tid, tzToken.Token.Contract.Address, agnosticMetadata, d.ipfsGatewayURL)
 
 			agnostic := multichain.ChainAgnosticToken{
-				TokenType:       persist.TokenTypeERC1155,
-				Description:     tzToken.Token.Metadata.Description,
-				Name:            tzToken.Token.Metadata.Name,
-				TokenID:         tid,
-				Media:           med,
+				TokenType:   persist.TokenTypeERC1155,
+				Description: tzToken.Token.Metadata.Description,
+				Name:        tzToken.Token.Metadata.Name,
+				TokenID:     tid,
+
 				ContractAddress: tzToken.Token.Contract.Address,
 				Quantity:        persist.HexString(tzToken.Balance.toBase16String()),
 				TokenMetadata:   agnosticMetadata,
@@ -721,38 +720,6 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 			resultContracts = append(resultContracts, contract)
 		}
 	}
-}
-
-func makeTempMedia(ctx context.Context, tokenID persist.TokenID, contract persist.Address, agnosticMetadata persist.TokenMetadata, ipfsGatewayURL string) persist.Media {
-	med := persist.Media{
-		MediaType: persist.MediaTypeSyncing,
-	}
-	imKeywords, animKeywords := persist.ChainTezos.BaseKeywords()
-	img, anim := media.FindImageAndAnimationURLs(ctx, tokenID, contract, agnosticMetadata, "", media.TezAnimationKeywords(imKeywords), media.TezImageKeywords(animKeywords), false)
-	if persist.TokenURI(anim).Type() == persist.URITypeIPFS {
-		removedIPFS := strings.Replace(anim, "ipfs://", "", 1)
-		removedIPFS = strings.Replace(removedIPFS, "ipfs/", "", 1)
-		anim = fmt.Sprintf("%s/ipfs/%s", ipfsGatewayURL, removedIPFS)
-	}
-	if persist.TokenURI(img).Type() == persist.URITypeIPFS {
-		removedIPFS := strings.Replace(img, "ipfs://", "", 1)
-		removedIPFS = strings.Replace(removedIPFS, "ipfs/", "", 1)
-		img = fmt.Sprintf("%s/ipfs/%s", ipfsGatewayURL, removedIPFS)
-	}
-	if anim != "" {
-		if persist.TokenURI(anim).Type() == persist.URITypeIPFS {
-			removedIPFS := strings.Replace(anim, "ipfs://", "", 1)
-			removedIPFS = strings.Replace(removedIPFS, "ipfs/", "", 1)
-			anim = fmt.Sprintf("%s/ipfs/%s", ipfsGatewayURL, removedIPFS)
-		}
-		med.MediaURL = persist.NullString(anim)
-		if img != "" {
-			med.ThumbnailURL = persist.NullString(img)
-		}
-	} else if img != "" {
-		med.MediaURL = persist.NullString(img)
-	}
-	return med
 }
 
 func dedupeBalances(tzTokens []tzktBalanceToken) []tzktBalanceToken {

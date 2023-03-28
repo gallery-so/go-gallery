@@ -53,8 +53,6 @@ type BlockchainInfo struct {
 
 // ChainAgnosticToken is a token that is agnostic to the chain it is on
 type ChainAgnosticToken struct {
-	Media persist.Media `json:"media"`
-
 	TokenType persist.TokenType `json:"token_type"`
 
 	Name        string `json:"name"`
@@ -763,19 +761,6 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 					return err
 				}
 
-				currentTokenState, err := p.Repos.TokenRepository.GetByTokenIdentifiers(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, 0, 0)
-				if err != nil {
-					return err
-				}
-
-				// Add existing media to the token if it already exists so theres
-				// something to display for when no providers had media for it
-				for i := 0; !refreshedToken.Media.IsServable() && i < len(currentTokenState); i++ {
-					if !refreshedToken.Media.IsServable() && currentTokenState[i].Media.IsServable() {
-						refreshedToken.Media = currentTokenState[i].Media
-					}
-				}
-
 				if err := p.Repos.TokenRepository.UpdateByTokenIdentifiersUnsafe(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, persist.TokenUpdateAllMetadataFieldsInput{
 					Metadata:    refreshedToken.TokenMetadata,
 					Name:        persist.NullString(refreshedToken.Name),
@@ -1176,7 +1161,6 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 			existingToken, seen := seenTokens[ti]
 
 			candidateToken := persist.TokenGallery{
-				Media:                token.Media,
 				TokenType:            token.TokenType,
 				Chain:                chainToken.chain,
 				Name:                 persist.NullString(token.Name),

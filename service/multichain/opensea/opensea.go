@@ -22,7 +22,6 @@ import (
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
@@ -580,8 +579,6 @@ func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsCha
 			for _, n := range assetsReceived.assets {
 				nft := n
 				wp.Submit(func() {
-					innerCtx, cancel := context.WithTimeout(ctx, time.Second*10)
-					defer cancel()
 					var tokenType persist.TokenType
 					switch nft.Contract.ContractSchemaName {
 					case "ERC721", "CRYPTOPUNKS":
@@ -598,29 +595,6 @@ func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsCha
 						"description":   nft.Description,
 						"image_url":     nft.ImageOriginalURL,
 						"animation_url": nft.AnimationOriginalURL,
-					}
-
-					med := persist.Media{ThumbnailURL: persist.NullString(firstNonEmptyString(nft.ImageURL, nft.ImagePreviewURL, nft.ImageThumbnailURL))}
-					switch {
-					case nft.AnimationURL != "":
-						med.MediaURL = persist.NullString(nft.AnimationURL)
-						med.MediaType, _, _, err = media.PredictMediaType(innerCtx, nft.AnimationURL)
-
-					case nft.AnimationOriginalURL != "":
-						med.MediaURL = persist.NullString(nft.AnimationOriginalURL)
-						med.MediaType, _, _, err = media.PredictMediaType(innerCtx, nft.AnimationOriginalURL)
-
-					case nft.ImageURL != "":
-						med.MediaURL = persist.NullString(nft.ImageURL)
-						med.MediaType, _, _, err = media.PredictMediaType(innerCtx, nft.ImageURL)
-
-					case nft.ImageOriginalURL != "":
-						med.MediaURL = persist.NullString(nft.ImageOriginalURL)
-						med.MediaType, _, _, err = media.PredictMediaType(innerCtx, nft.ImageOriginalURL)
-
-					default:
-						med.MediaURL = persist.NullString(nft.ImageThumbnailURL)
-						med.MediaType, _, _, err = media.PredictMediaType(innerCtx, nft.ImageThumbnailURL)
 					}
 
 					if err != nil {
@@ -656,7 +630,6 @@ func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsCha
 						ExternalURL:     nft.ExternalURL,
 						BlockNumber:     persist.BlockNumber(block),
 						TokenMetadata:   metadata,
-						Media:           med,
 						Quantity:        "1",
 						IsSpam:          util.ToPointer(false), // OpenSea filters spam on their side
 					}
