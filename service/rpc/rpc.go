@@ -727,19 +727,33 @@ func (r ipfsResult) Error() error {
 
 func firstNonError(ctx context.Context, fetches ...func(context.Context) fetchResulter) fetchResulter {
 	c := make(chan fetchResulter)
+	done := make(chan bool)
+
 	for i := range fetches {
-		go func(i int) { c <- fetches[i](ctx) }(i)
+		go func(i int) {
+			select {
+			case <-ctx.Done():
+				return
+			case <-done:
+				return
+			case c <- fetches[i](ctx):
+			}
+		}(i)
 	}
-	i := 0
-	var r fetchResulter
-	for i < len(fetches) {
-		r = <-c
+
+	var lastError fetchResulter
+
+	for i := 0; i < len(fetches); i++ {
+		r := <-c
 		if r.Error() == nil {
+			close(done)
 			return r
 		}
+		lastError = r
 		i++
 	}
-	return r
+
+	return lastError
 }
 
 func getContentHeaders(ctx context.Context, url string) (contentType string, contentLength int64, err error) {
