@@ -10,6 +10,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/everFinance/goar"
+	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -154,7 +156,7 @@ func sendTokensToTokenProcessing(c *server.Clients, provider *multichain.Provide
 }
 
 // fetchMetadataFromDummyMetadata returns static metadata from the dummymetadata server
-func fetchMetadataFromDummyMetadata(url, endpoint string) (persist.TokenMetadata, error) {
+func fetchMetadataFromDummyMetadata(url, endpoint string, ipfsClient *shell.Shell, arweaveClient *goar.Client) (persist.TokenMetadata, error) {
 	r := httptest.NewRequest(http.MethodGet, url+endpoint, nil)
 	r.RequestURI = ""
 
@@ -169,12 +171,12 @@ func fetchMetadataFromDummyMetadata(url, endpoint string) (persist.TokenMetadata
 		return nil, err
 	}
 
-	return rpc.GetMetadataFromURI(context.Background(), persist.TokenURI(body), nil, nil)
+	return rpc.GetMetadataFromURI(context.Background(), persist.TokenURI(body), ipfsClient, arweaveClient)
 }
 
 // fetchFromDummyEndpoint fetches metadata from the given endpoint
-func fetchFromDummyEndpoint(url, endpoint string) func() (persist.TokenMetadata, error) {
+func fetchFromDummyEndpoint(url, endpoint string, ipfsClient *shell.Shell, arweaveClient *goar.Client) func() (persist.TokenMetadata, error) {
 	return func() (persist.TokenMetadata, error) {
-		return fetchMetadataFromDummyMetadata(url, endpoint)
+		return fetchMetadataFromDummyMetadata(url, endpoint, ipfsClient, arweaveClient)
 	}
 }

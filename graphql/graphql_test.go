@@ -853,11 +853,11 @@ func testSyncShouldProcessMedia(t *testing.T) {
 
 	patchMetadata := func(t *testing.T, ctx context.Context, address, endpoint string) http.Handler {
 		contract := multichain.ChainAgnosticContract{Address: "0x123", Name: "testContract"}
+		clients := server.ClientInit(ctx)
 		provider := newStubProvider(
 			withContractTokens(contract, address, 1),
-			withFetchMetadata(fetchFromDummyEndpoint(metadataServer.URL, endpoint)),
+			withFetchMetadata(fetchFromDummyEndpoint(metadataServer.URL, endpoint, clients.IPFSClient, clients.ArweaveClient)),
 		)
-		clients := server.ClientInit(ctx)
 		mc := newMultichainProvider(clients, sendTokensNOOP, []any{provider})
 		t.Cleanup(clients.Close)
 		return handlerWithProviders(t, sendTokensToTokenProcessing(clients, &mc), provider)
