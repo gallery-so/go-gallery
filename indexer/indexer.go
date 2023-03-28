@@ -393,8 +393,6 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 	go i.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transfers, enabledPlugins)
 	i.processTokens(ctx, plugins.contracts.out)
 
-	check := <-logsToCheckAgainst
-	i.checkTokensExistForLogs(ctx, check)
 	logger.For(ctx).Warnf("Finished processing %d blocks from block %d in %s", blocksPerLogsCall, start.Uint64(), time.Since(startTime))
 }
 
@@ -409,67 +407,6 @@ func (i *indexer) startNewBlocksPipeline(ctx context.Context, topics [][]common.
 	go i.pollNewLogs(sentryutil.NewSentryHubContext(ctx), transfers, logsToCheckAgainst, topics)
 	go i.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transfers, enabledPlugins)
 	i.processTokens(ctx, plugins.contracts.out)
-
-	check := <-logsToCheckAgainst
-	i.checkTokensExistForLogs(ctx, check)
-}
-
-func (i *indexer) checkTokensExistForLogs(ctx context.Context, logs []types.Log) {
-	span, ctx := tracing.StartSpan(ctx, "indexer.checkTokensExistForLogs", "checkTokensExistForLogs")
-	defer tracing.FinishSpan(span)
-
-	doesNotExist := make(chan types.Log)
-
-	wp := workerpool.New(defaultWorkerPoolSize)
-
-	for _, log := range logs {
-		log := log
-		wp.Submit(func() {
-			ctx := sentryutil.NewSentryHubContext(ctx)
-			defer recoverAndWait(ctx)
-			defer sentryutil.RecoverAndRaise(ctx)
-			tis, err := getTokenIdentifiersFromLog(ctx, log)
-			if err != nil {
-				logger.For(ctx).Errorf("error getting token identifiers from log: %s", err)
-				return
-			}
-			for _, ti := range tis {
-				if ti.tokenType == persist.TokenTypeERC1155 {
-					balance, err := rpc.GetBalanceOfERC1155Token(ctx, ti.ownerAddress, ti.contractAddress, ti.tokenID, i.ethClient)
-					if err != nil {
-						logger.For(ctx).Errorf("error getting balance of ERC1155 token: %s", err)
-						return
-					}
-					if balance.Cmp(big.NewInt(0)) == 0 {
-						logger.For(ctx).Debugf("balance of ERC1155 token is 0, skipping check")
-						return
-					}
-				}
-				exists, err := i.tokenRepo.TokenExistsByTokenIdentifiers(ctx, ti.tokenID, ti.contractAddress)
-				if err != nil {
-					logger.For(ctx).Errorf("error checking if token exists: %s", err)
-					return
-				}
-				if !exists {
-					doesNotExist <- log
-				}
-			}
-		})
-	}
-
-	go func() {
-		wp.StopWait()
-		close(doesNotExist)
-	}()
-
-	for log := range doesNotExist {
-		marshalled, err := json.Marshal(log)
-		if err != nil {
-			panic(err)
-		}
-
-		logger.For(ctx).Errorf("token does not exist for log: %s", marshalled)
-	}
 
 }
 

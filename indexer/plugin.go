@@ -180,7 +180,7 @@ func newContractsPlugin(ctx context.Context, ethClient *ethclient.Client) contra
 		}
 
 		wp.StopWait()
-		logger.For(ctx).Info("owners plugin finished sending")
+		logger.For(ctx).Info("contracts plugin finished sending")
 	}()
 
 	return contractTransfersPlugin{
