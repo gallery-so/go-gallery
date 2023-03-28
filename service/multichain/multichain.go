@@ -326,7 +326,7 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 
 	wg := sync.WaitGroup{}
 	for c, a := range chainsToAddresses {
-		logger.For(ctx).Infof("updating media for user %s wallets %s", user.Username, a)
+		logger.For(ctx).Infof("syncing tokens for user %s wallets %s", user.Username, a)
 		chain := c
 		addresses := a
 		wg.Add(len(addresses))
@@ -775,8 +775,7 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 					}
 				}
 
-				if err := p.Repos.TokenRepository.UpdateByTokenIdentifiersUnsafe(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, persist.TokenUpdateAllURIDerivedFieldsInput{
-					Media:       refreshedToken.Media,
+				if err := p.Repos.TokenRepository.UpdateByTokenIdentifiersUnsafe(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, persist.TokenUpdateAllMetadataFieldsInput{
 					Metadata:    refreshedToken.TokenMetadata,
 					Name:        persist.NullString(refreshedToken.Name),
 					LastUpdated: persist.LastUpdatedTime{},
@@ -1194,16 +1193,8 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 			// If we've never seen the incoming token before, then add it.
 			if !seen {
 				seenTokens[ti] = candidateToken
-			} else if !existingToken.Media.IsServable() && candidateToken.Media.IsServable() {
-				if existingToken.Media.MediaType.IsAnimationLike() && persist.TokenURI(existingToken.Media.ThumbnailURL).IsRenderable() && !persist.TokenURI(candidateToken.Media.ThumbnailURL).IsRenderable() {
-					candidateToken.Media.ThumbnailURL = existingToken.Media.ThumbnailURL
-				}
+			} else if len(existingToken.TokenMetadata) < len(candidateToken.TokenMetadata) {
 				seenTokens[ti] = candidateToken
-			} else if existingToken.Media.IsServable() {
-				if candidateToken.Media.MediaType.IsAnimationLike() && !persist.TokenURI(existingToken.Media.ThumbnailURL).IsRenderable() && persist.TokenURI(candidateToken.Media.ThumbnailURL).IsRenderable() {
-					existingToken.Media.ThumbnailURL = candidateToken.Media.ThumbnailURL
-				}
-				seenTokens[ti] = existingToken
 			}
 
 			var found bool

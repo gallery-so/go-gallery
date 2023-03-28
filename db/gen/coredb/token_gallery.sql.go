@@ -23,11 +23,11 @@ insert into tokens
   , name
   , description
   , collectors_note
-  , media
   , token_type
   , token_id
   , quantity
   , ownership_history
+  , media
   , token_metadata
   , external_url
   , block_number
@@ -49,11 +49,11 @@ insert into tokens
     , name
     , description
     , collectors_note
-    , media
     , token_type
     , token_id
     , quantity
     , ownership_history[ownership_history_start_idx::int:ownership_history_end_idx::int]
+    , media
     , token_metadata
     , external_url
     , block_number
@@ -75,13 +75,13 @@ insert into tokens
       , unnest($6::varchar[]) as name
       , unnest($7::varchar[]) as description
       , unnest($8::varchar[]) as collectors_note
-      , unnest($9::jsonb[]) as media
-      , unnest($10::varchar[]) as token_type
-      , unnest($11::varchar[]) as token_id
-      , unnest($12::varchar[]) as quantity
-      , $13::jsonb[] as ownership_history
-      , unnest($14::int[]) as ownership_history_start_idx
-      , unnest($15::int[]) as ownership_history_end_idx
+      , unnest($9::varchar[]) as token_type
+      , unnest($10::varchar[]) as token_id
+      , unnest($11::varchar[]) as quantity
+      , $12::jsonb[] as ownership_history
+      , unnest($13::int[]) as ownership_history_start_idx
+      , unnest($14::int[]) as ownership_history_end_idx
+      , unnest($15::jsonb[]) as media
       , unnest($16::jsonb[]) as token_metadata
       , unnest($17::varchar[]) as external_url
       , unnest($18::bigint[]) as block_number
@@ -99,8 +99,7 @@ insert into tokens
 )
 on conflict (token_id, contract, chain, owner_user_id) where deleted = false
 do update set
-  media = excluded.media
-  , token_type = excluded.token_type
+  token_type = excluded.token_type
   , chain = excluded.chain
   , name = excluded.name
   , description = excluded.description
@@ -129,13 +128,13 @@ type UpsertTokensParams struct {
 	Name                     []string
 	Description              []string
 	CollectorsNote           []string
-	Media                    []pgtype.JSONB
 	TokenType                []string
 	TokenID                  []string
 	Quantity                 []string
 	OwnershipHistory         []pgtype.JSONB
 	OwnershipHistoryStartIdx []int32
 	OwnershipHistoryEndIdx   []int32
+	Media                    []pgtype.JSONB
 	TokenMetadata            []pgtype.JSONB
 	ExternalUrl              []string
 	BlockNumber              []int64
@@ -161,13 +160,13 @@ func (q *Queries) UpsertTokens(ctx context.Context, arg UpsertTokensParams) ([]T
 		arg.Name,
 		arg.Description,
 		arg.CollectorsNote,
-		arg.Media,
 		arg.TokenType,
 		arg.TokenID,
 		arg.Quantity,
 		arg.OwnershipHistory,
 		arg.OwnershipHistoryStartIdx,
 		arg.OwnershipHistoryEndIdx,
+		arg.Media,
 		arg.TokenMetadata,
 		arg.ExternalUrl,
 		arg.BlockNumber,

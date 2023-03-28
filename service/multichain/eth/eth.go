@@ -628,7 +628,6 @@ func tokensToChainAgnostic(tokens []persist.Token) []multichain.ChainAgnosticTok
 			ContractAddress:  persist.Address(token.ContractAddress.String()),
 			OwnerAddress:     persist.Address(token.OwnerAddress.String()),
 			TokenURI:         token.TokenURI,
-			Media:            token.Media,
 			TokenType:        token.TokenType,
 			Name:             token.Name.String(),
 			Description:      token.Description.String(),
