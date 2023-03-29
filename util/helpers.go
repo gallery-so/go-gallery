@@ -272,6 +272,21 @@ func FindFirst[T any](s []T, f func(T) bool) (T, bool) {
 	return *new(T), false
 }
 
+func Filter[T any](s []T, f func(T) bool, filterInPlace bool) []T {
+	var r []T
+	if filterInPlace {
+		r = s[:0]
+	} else {
+		r = make([]T, 0, len(s))
+	}
+	for _, v := range s {
+		if f(v) {
+			r = append(r, v)
+		}
+	}
+	return r
+}
+
 // StringToPointerIfNotEmpty returns a pointer to the string if it is a non-empty string
 func StringToPointerIfNotEmpty(str string) *string {
 	if str == "" {
