@@ -343,9 +343,9 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 					return
 				}
 				subWg := &sync.WaitGroup{}
-				subWg.Add(len(providers))
 				for i, p := range providers {
 					if fetcher, ok := p.(tokensFetcher); ok {
+						subWg.Add(1)
 						go func(fetcher tokensFetcher, priority int) {
 							defer subWg.Done()
 							tokens, contracts, err := fetcher.GetTokensByWalletAddress(ctx, addr, 0, 0)
@@ -353,6 +353,8 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 								errChan <- errWithPriority{err: err, priority: priority}
 								return
 							}
+
+							logger.For(ctx).Debugf("got %d tokens and %d contracts from provider %d", len(tokens), len(contracts), priority)
 
 							incomingTokens <- chainTokens{chain: chain, tokens: tokens, priority: priority}
 							incomingContracts <- chainContracts{chain: chain, contracts: contracts, priority: priority}

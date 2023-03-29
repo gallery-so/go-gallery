@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -31,27 +32,43 @@ type Media struct {
 	Format    string `json:"format"`
 	Bytes     int    `json:"bytes"`
 }
-type MetadataAttribute struct {
-	TraitType string `json:"trait_type"`
-	Value     string `json:"value"`
-}
 
 type Metadata struct {
-	Image           string              `json:"image"`
-	ExternalURL     string              `json:"external_url"`
-	BackgroundColor string              `json:"background_color"`
-	Name            string              `json:"name"`
-	Description     string              `json:"description"`
-	Attributes      []MetadataAttribute `json:"attributes"`
+	Image           string `json:"image"`
+	ExternalURL     string `json:"external_url"`
+	BackgroundColor string `json:"background_color"`
+	Name            string `json:"name"`
+	Description     string `json:"description"`
+}
+
+// UnmarshalJSON is a custom unmarshaler for the Metadata struct
+func (m *Metadata) UnmarshalJSON(data []byte) error {
+
+	type Alias Metadata
+	aux := Alias{}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+
+		asString := ""
+		if err := json.Unmarshal(data, &asString); err != nil {
+			fmt.Printf("failed to unmarshal Metadata as string: %s", err)
+			return nil
+		}
+
+		fmt.Println("Metadata as string:", asString)
+		return nil
+	}
+
+	*m = Metadata(aux)
+	return nil
 }
 
 type ContractMetadata struct {
-	Name                string `json:"name"`
-	Symbol              string `json:"symbol"`
-	TotalSupply         string `json:"totalSupply"`
-	TokenType           string `json:"tokenType"`
-	ContractDeployer    string `json:"contractDeployer"`
-	DeployedBlockNumber string `json:"deployedBlockNumber"`
+	Name             string `json:"name"`
+	Symbol           string `json:"symbol"`
+	TotalSupply      string `json:"totalSupply"`
+	TokenType        string `json:"tokenType"`
+	ContractDeployer string `json:"contractDeployer"`
 }
 
 type Contract struct {
@@ -86,6 +103,10 @@ type TokenIdentifiers struct {
 	TokenMetadata ContractMetadata `json:"tokenMetadata"`
 }
 
+type SpamInfo struct {
+	IsSpam string `json:"isSpam"`
+}
+
 type Token struct {
 	Contract         Contract         `json:"contract"`
 	ID               TokenIdentifiers `json:"id"`
@@ -97,6 +118,7 @@ type Token struct {
 	Metadata         Metadata         `json:"metadata"`
 	ContractMetadata ContractMetadata `json:"contractMetadata"`
 	TimeLastUpdated  time.Time        `json:"timeLastUpdated"`
+	SpamInfo         SpamInfo         `json:"spamInfo"`
 }
 
 type tokensPaginated interface {
@@ -105,14 +127,15 @@ type tokensPaginated interface {
 }
 
 type getNFTsResponse struct {
-	OwnedNFTs  []Token `json:"ownedNFTs"`
+	OwnedNFTs  []Token `json:"ownedNfts"`
 	PageKey    string  `json:"pageKey"`
 	TotalCount int     `json:"totalCount"`
 }
 
 func (r *getNFTsResponse) GetTokensFromResponse(resp *http.Response) ([]Token, error) {
+	r.OwnedNFTs = nil
 	if err := json.NewDecoder(resp.Body).Decode(r); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode response: %w (%s)", err, resp.Request.URL)
 	}
 	return r.OwnedNFTs, nil
 }
@@ -127,6 +150,8 @@ type getNFTsForCollectionResponse struct {
 }
 
 func (r *getNFTsForCollectionResponse) GetTokensFromResponse(resp *http.Response) ([]Token, error) {
+	r.NFTs = nil
+
 	if err := json.NewDecoder(resp.Body).Decode(r); err != nil {
 		return nil, err
 	}
@@ -146,6 +171,7 @@ type getNFTsForCollectionWithOwnerResponse struct {
 }
 
 func (r *getNFTsForCollectionWithOwnerResponse) GetTokensFromResponse(resp *http.Response) ([]Token, error) {
+	r.NFTs = nil
 	if err := json.NewDecoder(resp.Body).Decode(r); err != nil {
 		return nil, err
 	}
@@ -198,12 +224,13 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 	}
 
 	cTokens, cContracts := alchemyTokensToChainAgnosticTokensForOwner(persist.EthereumAddress(addr), tokens)
+
 	return cTokens, cContracts, nil
 }
 
-func getNFTsPaginate[T tokensPaginated](ctx context.Context, baseURL string, defaultLimit, defaultOffset int, pageKeyName string, limit, offset int, pageKey string, httpClient *http.Client, respType T) ([]Token, error) {
+func getNFTsPaginate[T tokensPaginated](ctx context.Context, baseURL string, defaultLimit, defaultOffset int, pageKeyName string, limit, offset int, pageKey string, httpClient *http.Client, result T) ([]Token, error) {
 
-	tokens := make([]Token, 0, limit)
+	tokens := []Token{}
 	url := baseURL
 
 	if pageKey != "" && pageKeyName != "" {
@@ -226,7 +253,7 @@ func getNFTsPaginate[T tokensPaginated](ctx context.Context, baseURL string, def
 		return nil, fmt.Errorf("failed to get tokens from alchemy api: %s", resp.Status)
 	}
 
-	newTokens, err := respType.GetTokensFromResponse(resp)
+	newTokens, err := result.GetTokensFromResponse(resp)
 	if err != nil {
 		return nil, err
 	}
@@ -247,14 +274,15 @@ func getNFTsPaginate[T tokensPaginated](ctx context.Context, baseURL string, def
 
 	tokens = append(tokens, newTokens...)
 
-	if respType.GetNextPageKey() != "" {
+	if result.GetNextPageKey() != "" && result.GetNextPageKey() != pageKey {
+
 		if limit > 0 {
 			limit -= 100
 		}
 		if offset > 0 {
 			offset -= 100
 		}
-		newTokens, err := getNFTsPaginate(ctx, baseURL, defaultLimit, defaultOffset, pageKeyName, limit, offset, respType.GetNextPageKey(), httpClient, respType)
+		newTokens, err := getNFTsPaginate(ctx, baseURL, defaultLimit, defaultOffset, pageKeyName, limit, offset, result.GetNextPageKey(), httpClient, result)
 		if err != nil {
 			return nil, err
 		}
@@ -590,23 +618,30 @@ func alchemyTokenToChainAgnosticToken(owner persist.EthereumAddress, token Token
 		bal = big.NewInt(1)
 	}
 
-	return multichain.ChainAgnosticToken{
-			TokenType:       tokenType,
-			Name:            token.Title,
-			Description:     token.Metadata.Description,
-			TokenURI:        persist.TokenURI(token.TokenURI.Raw),
-			TokenMetadata:   alchemyTokenToMetadata(token),
-			TokenID:         token.ID.TokenID.ToTokenID(),
-			Quantity:        persist.HexString(bal.Text(16)),
-			OwnerAddress:    persist.Address(owner),
-			ContractAddress: persist.Address(token.Contract.Address),
-			ExternalURL:     token.Metadata.ExternalURL,
-		}, multichain.ChainAgnosticContract{
-			Address:        persist.Address(token.Contract.Address),
-			Symbol:         token.ContractMetadata.Symbol,
-			Name:           token.ContractMetadata.Name,
-			CreatorAddress: persist.Address(token.ContractMetadata.ContractDeployer),
-		}
+	t := multichain.ChainAgnosticToken{
+		TokenType:       tokenType,
+		Name:            token.Title,
+		Description:     token.Metadata.Description,
+		TokenURI:        persist.TokenURI(token.TokenURI.Raw),
+		TokenMetadata:   alchemyTokenToMetadata(token),
+		TokenID:         token.ID.TokenID.ToTokenID(),
+		Quantity:        persist.HexString(bal.Text(16)),
+		OwnerAddress:    persist.Address(owner),
+		ContractAddress: persist.Address(token.Contract.Address),
+		ExternalURL:     token.Metadata.ExternalURL,
+	}
+
+	isSpam, err := strconv.ParseBool(token.SpamInfo.IsSpam)
+	if err == nil {
+		t.IsSpam = &isSpam
+	}
+
+	return t, multichain.ChainAgnosticContract{
+		Address:        persist.Address(token.Contract.Address),
+		Symbol:         token.ContractMetadata.Symbol,
+		Name:           token.ContractMetadata.Name,
+		CreatorAddress: persist.Address(token.ContractMetadata.ContractDeployer),
+	}
 }
 
 func alchemyTokenToMetadata(token Token) persist.TokenMetadata {
