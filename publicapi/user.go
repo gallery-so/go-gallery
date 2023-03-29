@@ -784,7 +784,7 @@ func (api UserAPI) SharedCommunities(ctx context.Context, userID persist.DBID, b
 	return contracts, pageInfo, nil
 }
 
-func (api UserAPI) CreatedCommunities(ctx context.Context, userID persist.DBID, before, after *string, first, last *int) ([]db.Contract, PageInfo, error) {
+func (api UserAPI) CreatedCommunities(ctx context.Context, userID persist.DBID, chains []persist.Chain, before, after *string, first, last *int) ([]db.Contract, PageInfo, error) {
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userID": {userID, "required"},
 	}); err != nil {

@@ -18,7 +18,6 @@ type ContractGalleryRepository struct {
 	queries               *db.Queries
 	getByIDStmt           *sql.Stmt
 	getByAddressStmt      *sql.Stmt
-	getByAddressesStmt    *sql.Stmt
 	upsertByAddressStmt   *sql.Stmt
 	getOwnersStmt         *sql.Stmt
 	getUserByWalletIDStmt *sql.Stmt
@@ -34,9 +33,6 @@ func NewContractGalleryRepository(db *sql.DB, queries *db.Queries) *ContractGall
 	checkNoErr(err)
 
 	getByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,SYMBOL,NAME,CREATOR_ADDRESS,CHAIN FROM contracts WHERE ADDRESS = $1 AND CHAIN = $2 AND DELETED = false;`)
-	checkNoErr(err)
-
-	getByAddressesStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,SYMBOL,NAME,CREATOR_ADDRESS,CHAIN FROM contracts WHERE ADDRESS = ANY($1) AND CHAIN = $2 AND DELETED = false;`)
 	checkNoErr(err)
 
 	upsertByAddressStmt, err := db.PrepareContext(ctx, `INSERT INTO contracts (ID,VERSION,ADDRESS,SYMBOL,NAME,CREATOR_ADDRESS,CHAIN) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (ADDRESS,CHAIN) DO UPDATE SET VERSION = $2, ADDRESS = $3, SYMBOL = $4, NAME = $5, CREATOR_ADDRESS = $6, CHAIN = $7;`)
@@ -57,7 +53,7 @@ func NewContractGalleryRepository(db *sql.DB, queries *db.Queries) *ContractGall
 	getPreviewNFTsStmt, err := db.PrepareContext(ctx, `SELECT MEDIA->>'thumbnail_url' FROM tokens WHERE CONTRACT = $1 AND DELETED = false AND OWNED_BY_WALLETS && $2 AND LENGTH(MEDIA->>'thumbnail_url') > 0 ORDER BY ID LIMIT 3`)
 	checkNoErr(err)
 
-	return &ContractGalleryRepository{db: db, queries: queries, getByIDStmt: getByIDStmt, getByAddressStmt: getByAddressStmt, upsertByAddressStmt: upsertByAddressStmt, getByAddressesStmt: getByAddressesStmt, getOwnersStmt: getOwnersStmt, getUserByWalletIDStmt: getUserByWalletIDStmt, getPreviewNFTsStmt: getPreviewNFTsStmt}
+	return &ContractGalleryRepository{db: db, queries: queries, getByIDStmt: getByIDStmt, getByAddressStmt: getByAddressStmt, upsertByAddressStmt: upsertByAddressStmt, getOwnersStmt: getOwnersStmt, getUserByWalletIDStmt: getUserByWalletIDStmt, getPreviewNFTsStmt: getPreviewNFTsStmt}
 }
 
 func (c *ContractGalleryRepository) GetByID(ctx context.Context, id persist.DBID) (persist.ContractGallery, error) {
@@ -81,31 +77,6 @@ func (c *ContractGalleryRepository) GetByAddress(pCtx context.Context, pAddress 
 	return contract, nil
 }
 
-// GetByAddresses returns the contract with the given address
-func (c *ContractGalleryRepository) GetByAddresses(pCtx context.Context, pAddresses []persist.Address, pChain persist.Chain) ([]persist.ContractGallery, error) {
-	res := []persist.ContractGallery{}
-	rows, err := c.getByAddressesStmt.QueryContext(pCtx, pAddresses, pChain)
-	if err != nil {
-		return res, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var contract persist.ContractGallery
-		err := rows.Scan(&contract.ID, &contract.Version, &contract.CreationTime, &contract.LastUpdated, &contract.Address, &contract.Symbol, &contract.Name, &contract.CreatorAddress, &contract.Chain)
-		if err != nil {
-			return res, err
-		}
-		res = append(res, contract)
-	}
-
-	if err := rows.Err(); err != nil {
-		return res, err
-	}
-
-	return res, nil
-}
-
 // UpsertByAddress upserts the contract with the given address
 func (c *ContractGalleryRepository) UpsertByAddress(pCtx context.Context, pAddress persist.Address, pChain persist.Chain, pContract persist.ContractGallery) error {
 	_, err := c.upsertByAddressStmt.ExecContext(pCtx, persist.GenerateID(), pContract.Version, pContract.Address, pContract.Symbol, pContract.Name, pContract.CreatorAddress, pContract.Chain)
@@ -117,26 +88,67 @@ func (c *ContractGalleryRepository) UpsertByAddress(pCtx context.Context, pAddre
 }
 
 // BulkUpsert bulk upserts the contracts by address
-func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, pContracts []persist.ContractGallery) error {
+func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, pContracts []persist.ContractGallery) ([]persist.ContractGallery, error) {
 	if len(pContracts) == 0 {
-		return nil
-	}
-	pContracts = removeDuplicateContractsGallery(pContracts)
-	sqlStr := `INSERT INTO contracts (ID,VERSION,ADDRESS,SYMBOL,NAME,CREATOR_ADDRESS,CHAIN) VALUES `
-	vals := make([]interface{}, 0, len(pContracts)*7)
-	for i, contract := range pContracts {
-		sqlStr += generateValuesPlaceholders(7, i*7, nil)
-		vals = append(vals, persist.GenerateID(), contract.Version, contract.Address, contract.Symbol, contract.Name, contract.CreatorAddress, contract.Chain)
-		sqlStr += ","
-	}
-	sqlStr = sqlStr[:len(sqlStr)-1]
-	sqlStr += ` ON CONFLICT (ADDRESS, CHAIN) DO UPDATE SET SYMBOL = EXCLUDED.SYMBOL,NAME = EXCLUDED.NAME,CREATOR_ADDRESS = EXCLUDED.CREATOR_ADDRESS,CHAIN = EXCLUDED.CHAIN;`
-	_, err := c.db.ExecContext(pCtx, sqlStr, vals...)
-	if err != nil {
-		return fmt.Errorf("error bulk upserting contracts: %v - SQL: %s -- VALS: %+v", err, sqlStr, vals)
+		return []persist.ContractGallery{}, nil
 	}
 
-	return nil
+	contracts := removeDuplicateContractsGallery(pContracts)
+	params := db.UpsertContractsParams{}
+	now := time.Now()
+
+	// addIDIfMissing is used because sqlc was unable to bind arrays of our own custom types
+	// i.e. an array of persist.DBIDs instead of an array of strings. A zero-valued persist.DBID
+	// generates a new ID on insert, but instead we need to generate an ID beforehand.
+	addIDIfMissing := func(t *persist.ContractGallery) {
+		if t.ID == persist.DBID("") {
+			(*t).ID = persist.GenerateID()
+		}
+	}
+
+	// addTimesIfMissing is required because sqlc was unable to bind arrays of our own custom types
+	// i.e. an array of persist.CreationTime instead of an array of time.Time. A zero-valued persist.CreationTime
+	// uses the current time as the column value, but instead we need to manually add a time to the struct.
+	addTimesIfMissing := func(t *persist.ContractGallery) {
+		if t.CreationTime.Time().IsZero() {
+			(*t).CreationTime = persist.CreationTime(now)
+		}
+		if t.LastUpdated.Time().IsZero() {
+			(*t).LastUpdated = persist.LastUpdatedTime(now)
+		}
+	}
+
+	for i := range contracts {
+		c := &contracts[i]
+		addIDIfMissing(c)
+		addTimesIfMissing(c)
+		params.ID = append(params.ID, c.ID.String())
+		params.Deleted = append(params.Deleted, c.Deleted.Bool())
+		params.Version = append(params.Version, c.Version.Int32())
+		params.CreatedAt = append(params.CreatedAt, c.CreationTime.Time())
+		params.LastUpdated = append(params.LastUpdated, c.LastUpdated.Time())
+		params.Address = append(params.Address, c.Address.String())
+		params.Symbol = append(params.Symbol, c.Symbol.String())
+		params.Name = append(params.Name, c.Name.String())
+		params.CreatorAddress = append(params.CreatorAddress, c.CreatorAddress.String())
+		params.Chain = append(params.Chain, int32(c.Chain))
+	}
+
+	upserted, err := c.queries.UpsertContracts(pCtx, params)
+	if err != nil {
+		return nil, err
+	}
+
+	// Update contracts with the existing data if the contract already exists.
+	// We only update these fields because the other fields get overwritten with
+	// the incoming contract
+	for i := range contracts {
+		c := &upserted[i]
+		(*c).ID = upserted[i].ID
+		(*c).CreatedAt = upserted[i].CreatedAt
+	}
+
+	return contracts, nil
 }
 
 func (c *ContractGalleryRepository) GetOwnersByAddress(ctx context.Context, contractAddr persist.Address, chain persist.Chain, limit, offset int) ([]persist.TokenHolder, error) {
@@ -233,22 +245,6 @@ func (c *ContractGalleryRepository) GetOwnersByAddress(ctx context.Context, cont
 
 	return result, nil
 
-}
-
-func removeDuplicates(pContracts []persist.Contract) []persist.Contract {
-	if len(pContracts) == 0 {
-		return pContracts
-	}
-	unique := map[persist.EthereumAddress]bool{}
-	result := make([]persist.Contract, 0, len(pContracts))
-	for _, v := range pContracts {
-		if unique[v.Address] {
-			continue
-		}
-		result = append(result, v)
-		unique[v.Address] = true
-	}
-	return result
 }
 
 func removeDuplicateContractsGallery(pContracts []persist.ContractGallery) []persist.ContractGallery {

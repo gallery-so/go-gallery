@@ -72,6 +72,15 @@ type ContractRelevance struct {
 	Score int32
 }
 
+type CreatorContract struct {
+	ID          persist.DBID
+	CreatorID   persist.DBID
+	ContractID  persist.DBID
+	CreatedAt   time.Time
+	LastUpdated time.Time
+	Deleted     bool
+}
+
 type DevMetadataUser struct {
 	UserID          persist.DBID
 	HasEmailAddress persist.Email

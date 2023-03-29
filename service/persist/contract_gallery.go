@@ -34,7 +34,6 @@ type ErrGalleryContractNotFound struct {
 type ContractGalleryRepository interface {
 	GetByID(ctx context.Context, id DBID) (ContractGallery, error)
 	GetByAddress(context.Context, Address, Chain) (ContractGallery, error)
-	GetByAddresses(context.Context, []Address, Chain) ([]ContractGallery, error)
 	UpsertByAddress(context.Context, Address, Chain, ContractGallery) error
 	BulkUpsert(context.Context, []ContractGallery) error
 	GetOwnersByAddress(context.Context, Address, Chain, int, int) ([]TokenHolder, error)

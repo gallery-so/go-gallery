@@ -1400,17 +1400,6 @@ input DebugSocialAuth {
   username: String!
 }
 
-input DeepRefreshInput {
-  chain: Chain!
-}
-
-type DeepRefreshPayload {
-  chain: Chain
-  submitted: Boolean
-}
-
-union DeepRefreshPayloadOrError = DeepRefreshPayload | ErrNotAuthorized
-
 union LoginPayloadOrError =
     LoginPayload
   | ErrUserNotFound
@@ -2023,7 +2012,6 @@ type Mutation {
   refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
   refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
   refreshContract(contractId: DBID!): RefreshContractPayloadOrError
-  deepRefresh(input: DeepRefreshInput!): DeepRefreshPayloadOrError @authRequired
 
   getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
 

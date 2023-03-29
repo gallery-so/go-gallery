@@ -67,10 +67,6 @@ type CreateUserPayloadOrError interface {
 	IsCreateUserPayloadOrError()
 }
 
-type DeepRefreshPayloadOrError interface {
-	IsDeepRefreshPayloadOrError()
-}
-
 type DeleteCollectionPayloadOrError interface {
 	IsDeleteCollectionPayloadOrError()
 }
@@ -685,17 +681,6 @@ type DebugSocialAuth struct {
 	Username string                 `json:"username"`
 }
 
-type DeepRefreshInput struct {
-	Chain persist.Chain `json:"chain"`
-}
-
-type DeepRefreshPayload struct {
-	Chain     *persist.Chain `json:"chain"`
-	Submitted *bool          `json:"submitted"`
-}
-
-func (DeepRefreshPayload) IsDeepRefreshPayloadOrError() {}
-
 type DeleteCollectionPayload struct {
 	Gallery *Gallery `json:"gallery"`
 }
@@ -929,7 +914,6 @@ func (ErrNotAuthorized) IsRemoveUserWalletsPayloadOrError()            {}
 func (ErrNotAuthorized) IsUpdateUserInfoPayloadOrError()               {}
 func (ErrNotAuthorized) IsSyncTokensPayloadOrError()                   {}
 func (ErrNotAuthorized) IsError()                                      {}
-func (ErrNotAuthorized) IsDeepRefreshPayloadOrError()                  {}
 func (ErrNotAuthorized) IsAddRolesToUserPayloadOrError()               {}
 func (ErrNotAuthorized) IsRevokeRolesFromUserPayloadOrError()          {}
 func (ErrNotAuthorized) IsUploadPersistedQueriesPayloadOrError()       {}

@@ -497,7 +497,23 @@ func (r *galleryUserResolver) SharedCommunities(ctx context.Context, obj *model.
 
 // CreatedCommunities is the resolver for the createdCommunities field.
 func (r *galleryUserResolver) CreatedCommunities(ctx context.Context, obj *model.GalleryUser, chains []persist.Chain, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error) {
-	panic(fmt.Errorf("not implemented: CreatedCommunities - createdCommunities"))
+	communities, pageInfo, err := publicapi.For(ctx).User.CreatedCommunities(ctx, obj.UserID, chains, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	edges := make([]*model.CommunityEdge, len(communities))
+	for i, community := range communities {
+		edges[i] = &model.CommunityEdge{
+			Node:   communityToModel(ctx, community, util.ToPointer(false)),
+			Cursor: nil, // not used by relay, but relay will complain without this field existing
+		}
+	}
+
+	return &model.CommunitiesConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
 }
 
 // AddUserWallet is the resolver for the addUserWallet field.
@@ -854,18 +870,6 @@ func (r *mutationResolver) RefreshContract(ctx context.Context, contractID persi
 	}
 
 	return output, nil
-}
-
-// DeepRefresh is the resolver for the deepRefresh field.
-func (r *mutationResolver) DeepRefresh(ctx context.Context, input model.DeepRefreshInput) (model.DeepRefreshPayloadOrError, error) {
-	err := publicapi.For(ctx).Token.DeepRefreshByChain(ctx, input.Chain)
-	if err != nil {
-		return nil, err
-	}
-	return model.DeepRefreshPayload{
-		Chain:     &input.Chain,
-		Submitted: util.ToPointer(true),
-	}, nil
 }
 
 // GetAuthNonce is the resolver for the getAuthNonce field.
