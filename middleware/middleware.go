@@ -36,6 +36,19 @@ func AdminRequired() gin.HandlerFunc {
 	}
 }
 
+// BasicHeaderAuthRequired is a middleware that checks if the request has a Basic Auth header matching
+// the specified username and password. Username is optional and will be ignored if nil.
+func BasicHeaderAuthRequired(username *string, password string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if !auth.BasicHeaderAuthorized(c, username, password) {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: "Unauthorized"})
+			return
+		}
+
+		c.Next()
+	}
+}
+
 // AddAuthToContext is a middleware that validates auth data and stores the results in the context
 func AddAuthToContext() gin.HandlerFunc {
 	return func(c *gin.Context) {

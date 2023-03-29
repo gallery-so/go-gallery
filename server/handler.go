@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -49,8 +50,10 @@ import (
 func handlersInit(router *gin.Engine, repos *postgres.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, mcProvider *multichain.Provider, throttler *throttle.Locker, taskClient *cloudtasks.Client, pub *pubsub.Client, lock *redislock.Client, secrets *secretmanager.Client, graphqlAPQCache *redis.Cache, feedCache *redis.Cache, socialCache *redis.Cache, magicClient *magicclient.API, recommender *recommend.Recommender) *gin.Engine {
 
 	graphqlGroup := router.Group("/glry/graphql")
-
 	graphqlHandlersInit(graphqlGroup, repos, queries, ethClient, ipfsClient, arweaveClient, stg, mcProvider, throttler, taskClient, pub, lock, secrets, graphqlAPQCache, feedCache, socialCache, magicClient, recommender)
+
+	jobsGroup := router.Group("/jobs", middleware.BasicHeaderAuthRequired(nil, env.GetString("JOB_AUTH_TOKEN")))
+	jobHandlersInit(jobsGroup, queries)
 
 	router.GET("/alive", healthCheckHandler())
 
@@ -176,6 +179,17 @@ func graphqlPlaygroundHandler() gin.HandlerFunc {
 
 func healthCheckHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+	}
+}
+
+func jobHandlersInit(group *gin.RouterGroup, queries *db.Queries) {
+	group.POST("/push-notifications", pushNotificationsJobHandler(queries))
+}
+
+func pushNotificationsJobHandler(queries *db.Queries) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		fmt.Printf("Push notifications job started at %s", time.Now().Format(time.RFC3339))
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
