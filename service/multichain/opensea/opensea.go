@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -164,7 +165,10 @@ func (p *Provider) GetTokensByWalletAddress(ctx context.Context, address persist
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
-		streamAssetsForWallet(ctx, assetsChan, persist.EthereumAddress(address))
+		err := streamAssetsForWallet(ctx, persist.EthereumAddress(address), WithResultCh(assetsChan))
+		if err != nil {
+			assetsChan <- assetsReceieved{err: err}
+		}
 	}()
 
 	return assetsToTokens(ctx, address, assetsChan, p.ethClient)
@@ -175,7 +179,10 @@ func (p *Provider) GetTokensByContractAddress(ctx context.Context, address persi
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
-		streamAssetsForContract(ctx, assetsChan, persist.EthereumAddress(address))
+		err := streamAssetsForContract(ctx, persist.EthereumAddress(address), WithResultCh(assetsChan))
+		if err != nil {
+			assetsChan <- assetsReceieved{err: err}
+		}
 	}()
 	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient)
 	if err != nil {
@@ -193,7 +200,10 @@ func (p *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, owner
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
-		streamAssetsForContractAddressAndOwner(ctx, assetsChan, persist.EthereumAddress(owner), persist.EthereumAddress(address))
+		err := streamAssetsForContractAddressAndOwner(ctx, persist.EthereumAddress(owner), persist.EthereumAddress(address), WithResultCh(assetsChan))
+		if err != nil {
+			assetsChan <- assetsReceieved{err: err}
+		}
 	}()
 	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient)
 	if err != nil {
@@ -211,7 +221,10 @@ func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, ti multichai
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
-		streamAssetsForTokenIdentifiers(ctx, assetsChan, persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID.Base10String()))
+		err := streamAssetsForTokenIdentifiers(ctx, persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID.Base10String()), WithResultCh(assetsChan))
+		if err != nil {
+			assetsChan <- assetsReceieved{err: err}
+		}
 	}()
 	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient)
 	if err != nil {
@@ -228,7 +241,10 @@ func (p *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, ti m
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
-		streamAssetsForTokenIdentifiersAndOwner(ctx, assetsChan, persist.EthereumAddress(ownerAddress), persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID.Base10String()))
+		err := streamAssetsForTokenIdentifiersAndOwner(ctx, persist.EthereumAddress(ownerAddress), persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID.Base10String()), WithResultCh(assetsChan))
+		if err != nil {
+			assetsChan <- assetsReceieved{err: err}
+		}
 	}()
 	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient)
 	if err != nil {
@@ -271,6 +287,11 @@ func (d *Provider) GetOwnedTokensByContract(context.Context, persist.Address, pe
 
 func (d *Provider) GetDisplayNameByAddress(ctx context.Context, addr persist.Address) string {
 	return addr.String()
+}
+
+// CreatedContracts returns contracts created by the provided address
+func (d *Provider) CreatedContracts(ctx context.Context, address persist.Address) ([]multichain.ChainAgnosticContract, error) {
+	return nil, nil
 }
 
 // VerifySignature will verify a signature using all available methods (eth_sign and personal_sign)
@@ -389,75 +410,50 @@ func verifySignature(pSignatureStr string,
 	}
 }
 
+type QueryOptions struct {
+	outCh    chan assetsReceieved
+	sortAsc  bool
+	pageSize int
+}
+
+type OptionFunc func(o *QueryOptions)
+
+func DefaultArgs() QueryOptions {
+	return QueryOptions{
+		outCh:    make(chan assetsReceieved),
+		sortAsc:  false,
+		pageSize: 50,
+	}
+}
+
+func WithResultCh(outCh chan assetsReceieved) func(o *QueryOptions) {
+	return func(o *QueryOptions) {
+		o.outCh = outCh
+	}
+}
+
 func FetchAssetsForWallet(ctx context.Context, address persist.EthereumAddress) ([]Asset, error) {
+	args := DefaultArgs()
 	url := baseURL.JoinPath("assets")
-	setPagingParams(url)
+	setPagingParams(url, args.sortAsc, args.pageSize)
 	setOwner(url, address)
 
-	req, err := authRequest(ctx, url.String())
-	if err != nil {
-		return nil, err
+	outCh := make(chan assetsReceieved)
+
+	go func() {
+		defer close(args.outCh)
+		streamAssetsForWallet(ctx, address, WithResultCh(outCh))
+	}()
+
+	assets := make([]Asset, 0)
+	for a := range args.outCh {
+		if a.err != nil {
+			return nil, a.err
+		}
+		assets = append(assets, a.assets...)
 	}
 
-	return paginateAssets(req)
-}
-
-func FetchAssetsForContract(ctx context.Context, address persist.EthereumAddress) ([]Asset, error) {
-	url := baseURL.JoinPath("assets")
-	setPagingParams(url)
-	setContractAddress(url, address)
-
-	req, err := authRequest(ctx, url.String())
-	if err != nil {
-		return nil, err
-	}
-
-	return paginateAssets(req)
-}
-
-func FetchAssetsForContractAddressAndOwner(ctx context.Context, ownerAddress, contractAddress persist.EthereumAddress) ([]Asset, error) {
-	url := baseURL.JoinPath("assets")
-	setPagingParams(url)
-	setOwner(url, ownerAddress)
-	setContractAddress(url, contractAddress)
-
-	req, err := authRequest(ctx, url.String())
-	if err != nil {
-		return nil, err
-	}
-
-	return paginateAssets(req)
-}
-
-func FetchAssetsForTokenIdentifiers(ctx context.Context, contractAddress persist.EthereumAddress, tokenID TokenID) ([]Asset, error) {
-	url := baseURL.JoinPath("assets")
-	setPagingParams(url)
-	setContractAddress(url, contractAddress)
-	setTokenID(url, tokenID)
-
-	req, err := authRequest(ctx, url.String())
-	if err != nil {
-		return nil, err
-	}
-
-	return paginateAssets(req)
-}
-
-func FetchAssetsForTokenIdentifiersAndOwner(ctx context.Context, ownerAddress, contractAddress persist.EthereumAddress, tokenID TokenID) ([]Asset, error) {
-	url := baseURL.JoinPath("assets")
-	setPagingParams(url)
-	setContractAddress(url, contractAddress)
-	setTokenID(url, tokenID)
-	if ownerAddress != "" {
-		setOwner(url, ownerAddress)
-	}
-
-	req, err := authRequest(ctx, url.String())
-	if err != nil {
-		return nil, err
-	}
-
-	return paginateAssets(req)
+	return assets, nil
 }
 
 // FetchCollectionsForAddress returns all collections that `address` has at least one token for
@@ -517,44 +513,74 @@ func FetchContractByAddress(pCtx context.Context, pContract persist.EthereumAddr
 	return contract, nil
 }
 
-func streamAssetsForWallet(ctx context.Context, assetsChan chan<- assetsReceieved, address persist.EthereumAddress) {
-	assets, err := FetchAssetsForWallet(ctx, address)
+func streamAssets(ctx context.Context, url *url.URL, outCh chan assetsReceieved) error {
+	req, err := authRequest(ctx, url.String())
 	if err != nil {
-		assetsChan <- assetsReceieved{err: err}
+		return err
 	}
-	assetsChan <- assetsReceieved{assets: assets}
+	paginateAssets(req, outCh)
+	return nil
 }
 
-func streamAssetsForContract(ctx context.Context, assetsChan chan<- assetsReceieved, address persist.EthereumAddress) {
-	assets, err := FetchAssetsForContract(ctx, address)
-	if err != nil {
-		assetsChan <- assetsReceieved{err: err}
+func streamAssetsForWallet(ctx context.Context, address persist.EthereumAddress, opts ...OptionFunc) error {
+	args := DefaultArgs()
+	for _, opt := range opts {
+		opt(&args)
 	}
-	assetsChan <- assetsReceieved{assets: assets}
+	url := baseURL.JoinPath("assets")
+	setPagingParams(url, args.sortAsc, args.pageSize)
+	setOwner(url, address)
+	return streamAssets(ctx, url, args.outCh)
 }
 
-func streamAssetsForContractAddressAndOwner(ctx context.Context, assetsChan chan<- assetsReceieved, ownerAddress, contractAddress persist.EthereumAddress) {
-	assets, err := FetchAssetsForContractAddressAndOwner(ctx, ownerAddress, contractAddress)
-	if err != nil {
-		assetsChan <- assetsReceieved{err: err}
+func streamAssetsForContract(ctx context.Context, address persist.EthereumAddress, opts ...OptionFunc) error {
+	args := DefaultArgs()
+	for _, opt := range opts {
+		opt(&args)
 	}
-	assetsChan <- assetsReceieved{assets: assets}
+	url := baseURL.JoinPath("assets")
+	setPagingParams(url, args.sortAsc, args.pageSize)
+	setContractAddress(url, address)
+	return streamAssets(ctx, url, args.outCh)
 }
 
-func streamAssetsForTokenIdentifiers(ctx context.Context, assetsChan chan<- assetsReceieved, contractAddress persist.EthereumAddress, tokenID TokenID) {
-	assets, err := FetchAssetsForTokenIdentifiers(ctx, contractAddress, tokenID)
-	if err != nil {
-		assetsChan <- assetsReceieved{err: err}
+func streamAssetsForContractAddressAndOwner(ctx context.Context, ownerAddress, contractAddress persist.EthereumAddress, opts ...OptionFunc) error {
+	args := DefaultArgs()
+	for _, opt := range opts {
+		opt(&args)
 	}
-	assetsChan <- assetsReceieved{assets: assets}
+	url := baseURL.JoinPath("assets")
+	setPagingParams(url, args.sortAsc, args.pageSize)
+	setOwner(url, ownerAddress)
+	setContractAddress(url, contractAddress)
+	return streamAssets(ctx, url, args.outCh)
 }
 
-func streamAssetsForTokenIdentifiersAndOwner(ctx context.Context, assetsChan chan<- assetsReceieved, ownerAddress, contractAddress persist.EthereumAddress, tokenID TokenID) {
-	assets, err := FetchAssetsForTokenIdentifiersAndOwner(ctx, ownerAddress, contractAddress, tokenID)
-	if err != nil {
-		assetsChan <- assetsReceieved{err: err}
+func streamAssetsForTokenIdentifiers(ctx context.Context, contractAddress persist.EthereumAddress, tokenID TokenID, opts ...OptionFunc) error {
+	args := DefaultArgs()
+	for _, opt := range opts {
+		opt(&args)
 	}
-	assetsChan <- assetsReceieved{assets: assets}
+	url := baseURL.JoinPath("assets")
+	setPagingParams(url, args.sortAsc, args.pageSize)
+	setContractAddress(url, contractAddress)
+	setTokenID(url, tokenID)
+	return streamAssets(ctx, url, args.outCh)
+}
+
+func streamAssetsForTokenIdentifiersAndOwner(ctx context.Context, ownerAddress, contractAddress persist.EthereumAddress, tokenID TokenID, opts ...OptionFunc) error {
+	args := DefaultArgs()
+	for _, opt := range opts {
+		opt(&args)
+	}
+	url := baseURL.JoinPath("assets")
+	setPagingParams(url, args.sortAsc, args.pageSize)
+	setContractAddress(url, contractAddress)
+	setTokenID(url, tokenID)
+	if ownerAddress != "" {
+		setOwner(url, ownerAddress)
+	}
+	return streamAssets(ctx, url, args.outCh)
 }
 
 func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsChan <-chan assetsReceieved, ethClient *ethclient.Client) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
@@ -741,34 +767,32 @@ func authRequest(ctx context.Context, url string) (*http.Request, error) {
 	return req, nil
 }
 
-func paginateAssets(req *http.Request) ([]Asset, error) {
-	result := make([]Asset, 0)
+func paginateAssets(req *http.Request, outCh chan assetsReceieved) {
 	for {
 		resp, err := retry.RetryRequest(http.DefaultClient, req)
 		if err != nil {
-			return nil, err
+			outCh <- assetsReceieved{err: err}
+			return
 		}
 
 		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
-			return nil, util.BodyAsError(resp)
+			outCh <- assetsReceieved{err: util.BodyAsError(resp)}
+			return
 		}
 
 		assets := Assets{}
-
-		err = util.UnmarshallBody(&assets, resp.Body)
-		if err != nil {
-			return nil, err
+		if err := util.UnmarshallBody(&assets, resp.Body); err != nil {
+			outCh <- assetsReceieved{err: err}
+			return
 		}
 
-		for _, asset := range assets.Assets {
-			result = append(result, asset)
-		}
+		outCh <- assetsReceieved{assets: assets.Assets}
 
 		// No more pages to paginate
 		if assets.Next == "" {
-			return result, nil
+			return
 		}
 
 		query := req.URL.Query()
@@ -777,10 +801,14 @@ func paginateAssets(req *http.Request) ([]Asset, error) {
 	}
 }
 
-func setPagingParams(url *url.URL) {
+func setPagingParams(url *url.URL, sortAsc bool, pageSize int) {
+	sortOrder := "asc"
+	if !sortAsc {
+		sortOrder = "desc"
+	}
 	query := url.Query()
-	query.Set("order_direction", "desc")
-	query.Set("limit", "50")
+	query.Set("order_direction", sortOrder)
+	query.Set("limit", strconv.Itoa(pageSize))
 	url.RawQuery = query.Encode()
 }
 

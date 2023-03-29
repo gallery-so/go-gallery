@@ -99,6 +99,7 @@ type GalleryUser implements Node @goEmbedHelper {
   sharedCommunities(before: String, after: String, first: Int, last: Int): CommunitiesConnection
     @authRequired
     @goField(forceResolver: true)
+  createdCommunities(chains: [Chain!], before: String, after: String, first: Int, last: Int): CommunitiesConnection @goField(forceResolver: true)
 }
 
 type Wallet implements Node {
@@ -461,6 +462,7 @@ type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) @g
 
   contractAddress: ChainAddress
   creatorAddress: ChainAddress
+  creator: GalleryUser @goField(forceResolver: true)
   chain: Chain
   name: String
   description: String

@@ -1829,6 +1829,7 @@ func communityToModel(ctx context.Context, community db.Contract, forceRefresh *
 		ProfileBannerURL: util.ToPointer(community.ProfileBannerUrl.String),
 		BadgeURL:         util.ToPointer(community.BadgeUrl.String),
 		Owners:           nil, // handled by dedicated resolver
+		Creator:          nil, // handled by dedicated resolver
 	}
 }
 

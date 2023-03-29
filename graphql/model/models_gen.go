@@ -573,6 +573,7 @@ type Community struct {
 	LastUpdated       *time.Time              `json:"lastUpdated"`
 	ContractAddress   *persist.ChainAddress   `json:"contractAddress"`
 	CreatorAddress    *persist.ChainAddress   `json:"creatorAddress"`
+	Creator           *GalleryUser            `json:"creator"`
 	Chain             *persist.Chain          `json:"chain"`
 	Name              *string                 `json:"name"`
 	Description       *string                 `json:"description"`
@@ -1165,6 +1166,7 @@ type GalleryUser struct {
 	Feed                *FeedConnection        `json:"feed"`
 	SharedFollowers     *UsersConnection       `json:"sharedFollowers"`
 	SharedCommunities   *CommunitiesConnection `json:"sharedCommunities"`
+	CreatedCommunities  *CommunitiesConnection `json:"createdCommunities"`
 }
 
 func (GalleryUser) IsNode()                              {}

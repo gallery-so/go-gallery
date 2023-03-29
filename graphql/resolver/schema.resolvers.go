@@ -166,6 +166,14 @@ func (r *commentOnFeedEventPayloadResolver) FeedEvent(ctx context.Context, obj *
 	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
 }
 
+// Creator is the resolver for the creator field.
+func (r *communityResolver) Creator(ctx context.Context, obj *model.Community) (*model.GalleryUser, error) {
+	if obj.CreatorAddress == nil {
+		return nil, nil
+	}
+	return resolveGalleryUserByAddress(ctx, *obj.CreatorAddress)
+}
+
 // TokensInCommunity is the resolver for the tokensInCommunity field.
 func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokensConnection, error) {
 	if onlyGalleryUsers == nil || (onlyGalleryUsers != nil && !*onlyGalleryUsers) {
@@ -485,6 +493,11 @@ func (r *galleryUserResolver) SharedCommunities(ctx context.Context, obj *model.
 		Edges:    edges,
 		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}, nil
+}
+
+// CreatedCommunities is the resolver for the createdCommunities field.
+func (r *galleryUserResolver) CreatedCommunities(ctx context.Context, obj *model.GalleryUser, chains []persist.Chain, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error) {
+	panic(fmt.Errorf("not implemented: CreatedCommunities - createdCommunities"))
 }
 
 // AddUserWallet is the resolver for the addUserWallet field.

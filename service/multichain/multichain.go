@@ -185,6 +185,11 @@ type contractRefresher interface {
 	RefreshContract(context.Context, persist.Address) error
 }
 
+// contractFetcher supports fetching contracts
+type contractFetcher interface {
+	CreatedContracts(context.Context, persist.Address) ([]ChainAgnosticContract, error)
+}
+
 // deepRefresher supports deep refreshes
 type deepRefresher interface {
 	DeepRefresh(ctx context.Context, address persist.Address) error
@@ -213,92 +218,109 @@ func NewProvider(ctx context.Context, repos *postgres.Repositories, queries *cor
 
 var chainValidation map[persist.Chain]validation = map[persist.Chain]validation{
 	persist.ChainETH: {
-		nameResolver:          true,
-		verifier:              true,
-		tokensFetcher:         true,
-		tokenRefresher:        true,
-		tokenFetcherRefresher: true,
-		contractRefresher:     true,
-		tokenMetadataFetcher:  true,
+		NameResolver:          true,
+		Verifier:              true,
+		TokensFetcher:         true,
+		TokenRefresher:        true,
+		TokenFetcherRefresher: true,
+		ContractRefresher:     true,
+		TokenMetadataFetcher:  true,
 	},
 	persist.ChainTezos: {
-		tokensFetcher:         true,
-		tokenFetcherRefresher: true,
+		TokensFetcher:         true,
+		TokenFetcherRefresher: true,
 	},
 	persist.ChainPOAP: {
-		nameResolver:  true,
-		tokensFetcher: true,
+		NameResolver:  true,
+		TokensFetcher: true,
 	},
 }
 
 type validation struct {
-	nameResolver          bool
-	verifier              bool
-	tokensFetcher         bool
-	tokenRefresher        bool
-	tokenFetcherRefresher bool
-	tokenMetadataFetcher  bool
-	contractRefresher     bool
+	NameResolver          bool `json:"nameResolver"`
+	Verifier              bool `json:"verifier"`
+	TokensFetcher         bool `json:"tokensFetcher"`
+	TokenRefresher        bool `json:"tokenRefresher"`
+	TokenFetcherRefresher bool `json:"tokenFetcherRefresher"`
+	TokenMetadataFetcher  bool `json:"tokenMetadataFetcher"`
+	ContractRefresher     bool `json:"contractRefresher"`
+	ContractFetcher       bool `json:"contractFetcher"`
 }
 
-func validateProviders(ctx context.Context, providers []interface{}) map[persist.Chain][]interface{} {
-	chains := map[persist.Chain][]interface{}{}
-
+func validateProviders(ctx context.Context, providers []any) map[persist.Chain][]any {
+	provided := make(map[persist.Chain][]any)
 	for _, p := range providers {
 		cfg := p.(configurer)
 		info, err := cfg.GetBlockchainInfo(ctx)
 		if err != nil {
 			panic(err)
 		}
-		chains[info.Chain] = append(chains[info.Chain], cfg)
+		provided[info.Chain] = append(provided[info.Chain], cfg)
 	}
 
-	for chain, providers := range chains {
-		requirements, ok := chainValidation[chain]
-		if !ok {
-			logger.For(ctx).Warnf("chain=%d has no provider validation", chain)
-			continue
-		}
+	passesValidation := true
+	errorMsg := "\n[ multichain validation ]\n"
 
-		hasImplementor := validation{}
+	validateChain := func(chain persist.Chain, expected, actual map[string]bool) {
+		fail := false
+		header := fmt.Sprintf("validation results for chain: %d\n", chain)
+		for s := range expected {
+			if expected[s] && !actual[s] {
+				if !fail {
+					errorMsg += header
+				}
+				fail = true
+				errorMsg += fmt.Sprintf("\t* missing implemntation of %s\n", s)
+			}
+		}
+		passesValidation = passesValidation && !fail
+	}
+
+	for chain, spec := range chainValidation {
+		providers := provided[chain]
+
+		expected := make(map[string]bool)
+		byt, _ := json.Marshal(spec)
+		json.Unmarshal(byt, &expected)
+
+		actual := make(map[string]bool)
+
+		markValid := func(i string) {
+			actual[i] = true
+			expected[i] = true
+		}
 
 		for _, p := range providers {
 			if _, ok := p.(nameResolver); ok {
-				hasImplementor.nameResolver = true
-				requirements.nameResolver = true
+				markValid("nameResolver")
 			}
 			if _, ok := p.(verifier); ok {
-				hasImplementor.verifier = true
-				requirements.verifier = true
+				markValid("verifier")
 			}
 			if _, ok := p.(tokensFetcher); ok {
-				hasImplementor.tokensFetcher = true
-				requirements.tokensFetcher = true
+				markValid("tokensFetcher")
 			}
 			if _, ok := p.(tokenRefresher); ok {
-				hasImplementor.tokenRefresher = true
-				requirements.tokenRefresher = true
+				markValid("tokenRefresher")
 			}
 			if _, ok := p.(tokenFetcherRefresher); ok {
-				hasImplementor.tokenFetcherRefresher = true
-				requirements.tokenFetcherRefresher = true
+				markValid("tokenFetcherRefresher")
 			}
 			if _, ok := p.(contractRefresher); ok {
-				hasImplementor.contractRefresher = true
-				requirements.contractRefresher = true
+				markValid("contractRefresher")
 			}
 			if _, ok := p.(tokenMetadataFetcher); ok {
-				hasImplementor.tokenMetadataFetcher = true
-				requirements.tokenMetadataFetcher = true
+				markValid("tokenMetadataFetcher")
 			}
 		}
-
-		if hasImplementor != requirements {
-			panic(fmt.Sprintf("chain=%d;got=%+v;want=%+v", chain, hasImplementor, requirements))
-		}
+		validateChain(chain, expected, actual)
 	}
 
-	return chains
+	if !passesValidation {
+		panic(errorMsg)
+	}
+
+	return provided
 }
 
 // SyncTokens updates the media for all tokens for a user
