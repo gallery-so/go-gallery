@@ -19,7 +19,6 @@ import (
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/contracts"
-	"github.com/mikeydub/go-gallery/indexer/refresh"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
@@ -557,67 +556,6 @@ func updateTokens(tokenRepository persist.TokenRepository, ethClient *ethclient.
 			return
 		}
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
-	}
-}
-
-func processRefreshes(idxr *indexer, storageClient *storage.Client) gin.HandlerFunc {
-	events := eventsToTopics(idxr.eventHashes)
-	return func(c *gin.Context) {
-		filterManager := refresh.NewBlockFilterManager(c, storageClient)
-		defer filterManager.Close()
-
-		refreshPool := workerpool.New(refresh.DefaultConfig.DefaultPoolSize)
-
-		message := task.DeepRefreshMessage{}
-		if err := c.ShouldBindJSON(&message); err != nil {
-			util.ErrResponse(c, http.StatusOK, err)
-			return
-		}
-
-		refreshRange, err := refresh.ResolveRange(message.RefreshRange)
-		if err != nil && errors.Is(err, refresh.ErrInvalidRefreshRange) {
-			util.ErrResponse(c, http.StatusOK, err)
-			return
-		}
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-
-		for block := refreshRange[0]; block < refreshRange[1]; block += blocksPerLogsCall {
-			b := block
-			refreshPool.Submit(func() {
-				ctx := sentryutil.NewSentryHubContext(c)
-
-				exists, err := refresh.AddressExists(ctx, filterManager, message.OwnerAddress, b, b+persist.BlockNumber(blocksPerLogsCall))
-				if err != nil {
-					if err != refresh.ErrNoFilter {
-						logger.For(ctx).WithError(err).Info("failed to fetch filter")
-					}
-					exists = true
-				}
-
-				// Don't need the filter anymore
-				filterManager.Clear(ctx, b, b+persist.BlockNumber(blocksPerLogsCall))
-
-				if exists {
-					transferCh := make(chan []transfersAtBlock)
-					plugins := NewTransferPlugins(ctx, idxr.ethClient, idxr.tokenRepo, idxr.addressFilterRepo)
-					enabledPlugins := []chan<- PluginMsg{plugins.balances.in, plugins.owners.in, plugins.uris.in}
-					go func() {
-						ctx := sentryutil.NewSentryHubContext(ctx)
-						logs := idxr.fetchLogs(ctx, b, events)
-						transfers := filterTransfers(ctx, message, logsToTransfers(ctx, logs))
-						transfersAtBlock := transfersToTransfersAtBlock(transfers)
-						transferCh <- transfersAtBlock
-						close(transferCh)
-					}()
-					go idxr.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transferCh, enabledPlugins)
-					idxr.processTokens(ctx, plugins.uris.out, plugins.owners.out, plugins.previousOwners.out, plugins.balances.out, nil)
-				}
-			})
-		}
-		refreshPool.StopWait()
 	}
 }
 
