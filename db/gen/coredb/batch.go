@@ -850,6 +850,113 @@ func (b *GetContractsDisplayedByUserIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getCreatedContractsBatchPaginate = `-- name: GetCreatedContractsBatchPaginate :batchmany
+select c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description
+from users, creator_contracts, contracts c
+where creator_contracts.creator_id = $1
+	and users.id = $1
+	and creator_contracts.contract_id = c.id
+	and contracts.chain = any(string_to_array($2, ',')::int[])
+	and users.deleted = false
+	and creator_contracts.deleted = false
+	and contracts.deleted = false
+  and (c.created_at, c.id) > ($3, $4)
+  and (c.created_at, c.id) < ( $5, $6)
+order by case when $7::bool then (c.created_at, c.id) end asc,
+        case when not $7::bool then (c.created_at, c.id) end desc
+limit $8
+`
+
+type GetCreatedContractsBatchPaginateBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type GetCreatedContractsBatchPaginateParams struct {
+	UserID        persist.DBID
+	Chains        string
+	CurBeforeTime time.Time
+	CurBeforeID   persist.DBID
+	CurAfterTime  time.Time
+	CurAfterID    persist.DBID
+	PagingForward bool
+	Limit         int32
+}
+
+// The @chains param is passed as a string instead of an array so that the generated
+// input struct can be used as a cache key within a dataloader since only comparable
+// types can be used as keys in a map
+func (q *Queries) GetCreatedContractsBatchPaginate(ctx context.Context, arg []GetCreatedContractsBatchPaginateParams) *GetCreatedContractsBatchPaginateBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.UserID,
+			a.Chains,
+			a.CurBeforeTime,
+			a.CurBeforeID,
+			a.CurAfterTime,
+			a.CurAfterID,
+			a.PagingForward,
+			a.Limit,
+		}
+		batch.Queue(getCreatedContractsBatchPaginate, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetCreatedContractsBatchPaginateBatchResults{br, len(arg), false}
+}
+
+func (b *GetCreatedContractsBatchPaginateBatchResults) Query(f func(int, []Contract, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var items []Contract
+		if b.closed {
+			if f != nil {
+				f(t, items, errors.New("batch already closed"))
+			}
+			continue
+		}
+		err := func() error {
+			rows, err := b.br.Query()
+			defer rows.Close()
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var i Contract
+				if err := rows.Scan(
+					&i.ID,
+					&i.Deleted,
+					&i.Version,
+					&i.CreatedAt,
+					&i.LastUpdated,
+					&i.Name,
+					&i.Symbol,
+					&i.Address,
+					&i.CreatorAddress,
+					&i.Chain,
+					&i.ProfileBannerUrl,
+					&i.ProfileImageUrl,
+					&i.BadgeUrl,
+					&i.Description,
+				); err != nil {
+					return err
+				}
+				items = append(items, i)
+			}
+			return rows.Err()
+		}()
+		if f != nil {
+			f(t, items, err)
+		}
+	}
+}
+
+func (b *GetCreatedContractsBatchPaginateBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const getEventByIdBatch = `-- name: GetEventByIdBatch :batchone
 SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption, group_id FROM feed_events WHERE id = $1 AND deleted = false
 `

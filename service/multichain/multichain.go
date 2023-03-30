@@ -114,11 +114,6 @@ type TokenHolder struct {
 	PreviewTokens []string        `json:"preview_tokens"`
 }
 
-// ErrChainNotFound is an error that occurs when a chain provider for a given chain is not registered in the MultichainProvider
-type ErrChainNotFound struct {
-	Chain persist.Chain
-}
-
 type chainTokens struct {
 	priority int
 	chain    persist.Chain
@@ -140,6 +135,10 @@ type tokenIdentifiers struct {
 type errWithPriority struct {
 	err      error
 	priority int
+}
+
+func (e errWithPriority) Error() string {
+	return fmt.Sprintf("error with priority %d: %s", e.priority, e.err)
 }
 
 // configurer maintains provider settings
@@ -374,42 +373,6 @@ func contractsToDBIDs(contracts []persist.ContractGallery) map[string]persist.DB
 	return m
 }
 
-func (p *Provider) ContractsCreatedByUserID(ctx context.Context, userID persist.DBID, chains []persist.Chain) ([]persist.ContractGallery, error) {
-	user, err := p.Repos.UserRepository.GetByID(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-
-	fetchers := matchingProviders[contractFetcher](p.Chains, chains...)
-	searchAddresses := matchingAddresses(user.Wallets, chains)
-	g := pool.NewWithResults[chainContracts]().WithContext(ctx).WithCancelOnError()
-
-	for chain, addresses := range searchAddresses {
-		for priority, fetcher := range fetchers[chain] {
-			for _, address := range addresses {
-				c := chain
-				p := priority
-				f := fetcher
-				a := address
-				g.Go(func(ctx context.Context) (chainContracts, error) {
-					contracts, err := f.CreatedContracts(ctx, a)
-					if err != nil {
-						return chainContracts{}, err
-					}
-					return chainContracts{p, c, contracts}, nil
-				})
-			}
-		}
-	}
-
-	results, err := g.Wait()
-	if err != nil {
-		return nil, err
-	}
-
-	return p.processContracts(ctx, results)
-}
-
 // SyncTokens updates the media for all tokens for a user
 // TODO consider updating contracts as well
 func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains []persist.Chain) error {
@@ -443,14 +406,9 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 			go func(addr persist.Address, chain persist.Chain) {
 				defer wg.Done()
 				start := time.Now()
-				providers, ok := p.Chains[chain]
-				if !ok {
-					errChan <- ErrChainNotFound{Chain: chain}
-					return
-				}
+				fetchers := matchingProvidersForChain[tokensFetcher](p.Chains, chain)
 				subWg := &sync.WaitGroup{}
-				subWg.Add(len(providers))
-				fetchers := providersMatchingInterface[tokensFetcher](providers)
+				subWg.Add(len(fetchers))
 				for i, fetcher := range fetchers {
 					go func(fetcher tokensFetcher, priority int) {
 						defer subWg.Done()
@@ -509,6 +467,47 @@ outer:
 	}
 
 	_, err = p.processTokensForUser(ctx, tokensFromProviders, persistedContracts, user, chains, false)
+	return err
+}
+
+// SyncContractsCreatedByUserID queries each provider to identify contracts created by the given user.
+// The method returns after the contracts have been saved to the database. Note that its possible
+// for a provider to not return all contracts created by the user, but only new contracts created
+// since the last sync, if any.
+func (p *Provider) SyncContractsCreatedByUserID(ctx context.Context, userID persist.DBID, chains []persist.Chain) error {
+	user, err := p.Repos.UserRepository.GetByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	fetchers := matchingProviders[contractFetcher](p.Chains, chains...)
+	searchAddresses := matchingAddresses(user.Wallets, chains)
+	g := pool.NewWithResults[chainContracts]().WithContext(ctx).WithCancelOnError()
+
+	for chain, addresses := range searchAddresses {
+		for priority, fetcher := range fetchers[chain] {
+			for _, address := range addresses {
+				c := chain
+				p := priority
+				f := fetcher
+				a := address
+				g.Go(func(ctx context.Context) (chainContracts, error) {
+					contracts, err := f.CreatedContracts(ctx, a)
+					if err != nil {
+						return chainContracts{}, err
+					}
+					return chainContracts{p, c, contracts}, nil
+				})
+			}
+		}
+	}
+
+	results, err := g.Wait()
+	if err != nil {
+		return err
+	}
+
+	_, err = p.processContracts(ctx, results)
 	return err
 }
 
@@ -739,14 +738,10 @@ func (p *Provider) GetTokensOfContractForWallet(ctx context.Context, contractAdd
 
 // GetTokenMetadataByTokenIdentifiers will get the metadata for a given token identifier
 func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contractAddress persist.Address, tokenID persist.TokenID, ownerAddress persist.Address, chain persist.Chain) (persist.TokenMetadata, error) {
-	if _, ok := d.Chains[chain]; !ok {
-		return nil, nil
-	}
-
 	var metadata persist.TokenMetadata
 	var err error
 
-	fetchers := providersMatchingInterface[tokenMetadataFetcher](d.Chains[chain])
+	fetchers := matchingProvidersForChain[tokenMetadataFetcher](d.Chains, chain)
 
 	for _, fetcher := range fetchers {
 		metadata, err = fetcher.GetTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: contractAddress, TokenID: tokenID}, ownerAddress)
@@ -760,10 +755,6 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contr
 
 // RunWalletCreationHooks runs hooks for when a wallet is created
 func (d *Provider) RunWalletCreationHooks(ctx context.Context, userID persist.DBID, walletAddress persist.Address, walletType persist.WalletType, chain persist.Chain) error {
-	if _, ok := d.Chains[chain]; !ok {
-		return nil
-	}
-
 	// User doesn't exist
 	_, err := d.Repos.UserRepository.GetByID(ctx, userID)
 	if err != nil {
@@ -771,14 +762,12 @@ func (d *Provider) RunWalletCreationHooks(ctx context.Context, userID persist.DB
 	}
 
 	// TODO check if user wallets contains wallet using new util.Contains in other PR
-
-	hookers := providersMatchingInterface[walletHooker](d.Chains[chain])
+	hookers := matchingProvidersForChain[walletHooker](d.Chains, chain)
 
 	for _, hooker := range hookers {
 		if err := hooker.WalletCreated(ctx, userID, walletAddress, walletType); err != nil {
 			return err
 		}
-
 	}
 
 	return nil
@@ -786,12 +775,7 @@ func (d *Provider) RunWalletCreationHooks(ctx context.Context, userID persist.DB
 
 // VerifySignature verifies a signature for a wallet address
 func (p *Provider) VerifySignature(ctx context.Context, pSig string, pNonce string, pChainAddress persist.ChainPubKey, pWalletType persist.WalletType) (bool, error) {
-	providers, ok := p.Chains[pChainAddress.Chain()]
-	if !ok {
-		return false, ErrChainNotFound{Chain: pChainAddress.Chain()}
-	}
-
-	verifiers := providersMatchingInterface[verifier](providers)
+	verifiers := matchingProvidersForChain[verifier](p.Chains, pChainAddress.Chain())
 
 	for _, verifier := range verifiers {
 		if valid, err := verifier.VerifySignature(ctx, pChainAddress.PubKey(), pWalletType, pNonce, pSig); err != nil || !valid {
@@ -1341,14 +1325,6 @@ func addressAtBlockToAddressAtBlock(ctx context.Context, addresses []ChainAgnost
 
 func (t ChainAgnosticIdentifiers) String() string {
 	return fmt.Sprintf("%s-%s", t.ContractAddress, t.TokenID)
-}
-
-func (e ErrChainNotFound) Error() string {
-	return fmt.Sprintf("chain provider not found for chain: %d", e.Chain)
-}
-
-func (e errWithPriority) Error() string {
-	return fmt.Sprintf("error with priority %d: %s", e.priority, e.err)
 }
 
 func dedupeWallets(wallets []persist.Wallet) []persist.Wallet {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -795,7 +796,59 @@ func (api UserAPI) CreatedCommunities(ctx context.Context, userID persist.DBID, 
 		return nil, PageInfo{}, err
 	}
 
-	return nil, PageInfo{}, nil
+	// Run a sync to catch new contracts
+	err := api.multichainProvider.SyncContractsCreatedByUserID(ctx, userID, chains)
+	if err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	queryFunc := func(params timeIDPagingParams) ([]any, error) {
+		serializedChains := make([]string, len(chains))
+		for i, c := range chains {
+			serializedChains[i] = strconv.Itoa(int(c))
+		}
+		keys, err := api.loaders.ContractsLoaderByCreatorID.Load(db.GetCreatedContractsBatchPaginateParams{
+			UserID:        userID,
+			Chains:        strings.Join(serializedChains, ","),
+			CurBeforeTime: params.CursorBeforeTime,
+			CurBeforeID:   params.CursorBeforeID,
+			CurAfterTime:  params.CursorAfterTime,
+			CurAfterID:    params.CursorAfterID,
+			PagingForward: params.PagingForward,
+			Limit:         params.Limit,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		results := make([]any, len(keys))
+		for i, key := range keys {
+			results[i] = key
+		}
+
+		return results, nil
+	}
+
+	cursorFunc := func(node any) (time.Time, persist.DBID, error) {
+		if row, ok := node.(db.Contract); ok {
+			return row.CreatedAt, row.ID, nil
+		}
+		return time.Time{}, "", fmt.Errorf("node is not a db.GetSharedContractsBatchPaginateRow")
+	}
+
+	paginator := timeIDPaginator{
+		QueryFunc:  queryFunc,
+		CursorFunc: cursorFunc,
+	}
+
+	results, pageInfo, err := paginator.paginate(before, after, first, last)
+
+	contracts := make([]db.Contract, len(results))
+	for i, result := range results {
+		contracts[i] = result.(db.Contract)
+	}
+
+	return nil, pageInfo, nil
 }
 
 func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {

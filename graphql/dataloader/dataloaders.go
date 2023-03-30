@@ -20,6 +20,7 @@
 //go:generate go run github.com/gallery-so/dataloaden TokensLoaderByIDAndChain github.com/mikeydub/go-gallery/graphql/dataloader.IDAndChain []github.com/mikeydub/go-gallery/db/gen/coredb.Token
 //go:generate go run github.com/gallery-so/dataloaden ContractLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Contract
 //go:generate go run github.com/gallery-so/dataloaden ContractsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Contract
+//go:generate go run github.com/gallery-so/dataloaden ContractsLoaderByCreatorID github.com/mikeydub/go-gallery/db/gen/coredb.GetCreatedContractsBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.Contract
 //go:generate go run github.com/gallery-so/dataloaden ContractLoaderByChainAddress github.com/mikeydub/go-gallery/service/persist.ChainAddress github.com/mikeydub/go-gallery/db/gen/coredb.Contract
 //go:generate go run github.com/gallery-so/dataloaden GlobalFeedLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginateGlobalFeedParams []github.com/mikeydub/go-gallery/db/gen/coredb.FeedEvent
 //go:generate go run github.com/gallery-so/dataloaden PersonalFeedLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginatePersonalFeedByUserIDParams []github.com/mikeydub/go-gallery/db/gen/coredb.FeedEvent
@@ -94,6 +95,7 @@ type Loaders struct {
 	OwnerByTokenID                   *UserLoaderByID
 	ContractByContractID             *ContractLoaderByID
 	ContractsByUserID                *ContractsLoaderByID
+	ContractsLoaderByCreatorID       *ContractsLoaderByCreatorID
 	ContractByChainAddress           *ContractLoaderByChainAddress
 	FollowersByUserID                *UsersLoaderByID
 	FollowingByUserID                *UsersLoaderByID
@@ -260,6 +262,8 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 	})
 
 	loaders.ContractsByUserID = NewContractsLoaderByID(defaults, loadContractsByUserID(q))
+
+	loaders.ContractsLoaderByCreatorID = NewContractsLoaderByCreatorID(defaults, loadContractsByCreatorID(q))
 
 	loaders.FeedEventByFeedEventID = NewEventLoaderByID(defaults, loadEventById(q), EventLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(event db.FeedEvent) persist.DBID { return event.ID },
@@ -925,6 +929,26 @@ func loadContractsByUserID(q *db.Queries) func(context.Context, []persist.DBID) 
 		defer b.Close()
 
 		b.Query(func(i int, c []db.Contract, err error) {
+			contracts[i], errors[i] = c, err
+		})
+
+		return contracts, errors
+	}
+}
+
+func loadContractsByCreatorID(q *db.Queries) func(context.Context, []db.GetCreatedContractsBatchPaginateParams) ([][]db.Contract, []error) {
+	return func(ctx context.Context, params []db.GetCreatedContractsBatchPaginateParams) ([][]db.Contract, []error) {
+		contracts := make([][]db.Contract, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetCreatedContractsBatchPaginate(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, c []db.Contract, err error) {
+			// XXX
+			if err != nil {
+				panic(err)
+			}
 			contracts[i], errors[i] = c, err
 		})
 

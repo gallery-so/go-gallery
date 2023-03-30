@@ -66,6 +66,7 @@ require (
 require (
 	github.com/ertan/go-farcaster v1.0.0-beta
 	github.com/jinzhu/copier v0.3.5
+	github.com/sourcegraph/conc v0.3.0
 	go.mozilla.org/sops/v3 v3.7.3
 )
 
@@ -219,7 +220,6 @@ require (
 	github.com/samuel/go-zookeeper v0.0.0-20190810000440-0ceca61e4d75 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
-	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/afero v1.9.2 // indirect
