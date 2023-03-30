@@ -159,24 +159,18 @@ type walletHooker interface {
 	WalletCreated(context.Context, persist.DBID, persist.Address, persist.WalletType) error
 }
 
-// tokensFetcher supports fetching tokens for syncing
-type tokensFetcher interface {
+// tokensOwnerFetcher supports fetching tokens for syncing
+type tokensOwnerFetcher interface {
 	GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
-	GetTokensByContractAddress(ctx context.Context, contract persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error)
-	GetTokensByContractAddressAndOwner(ctx context.Context, owner persist.Address, contract persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error)
 	GetTokensByTokenIdentifiersAndOwner(context.Context, ChainAgnosticIdentifiers, persist.Address) (ChainAgnosticToken, ChainAgnosticContract, error)
 }
 
-// tokenRefresher supports refreshes of a token
-type tokenRefresher interface {
-	RefreshToken(context.Context, ChainAgnosticIdentifiers, persist.Address) error
+type tokensContractFetcher interface {
+	GetTokensByContractAddress(ctx context.Context, contract persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error)
+	GetTokensByContractAddressAndOwner(ctx context.Context, owner persist.Address, contract persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error)
 }
 
-// tokenFetcherRefresher is the interface that combines the tokenFetcher and tokenRefresher interface
-type tokenFetcherRefresher interface {
-	tokensFetcher
-	tokenRefresher
-}
+// tokenRefresher supports refreshes of a token
 
 // contractRefresher supports refreshes of a contract
 type contractRefresher interface {
@@ -213,28 +207,25 @@ var chainValidation map[persist.Chain]validation = map[persist.Chain]validation{
 	persist.ChainETH: {
 		nameResolver:          true,
 		verifier:              true,
-		tokensFetcher:         true,
-		tokenRefresher:        true,
-		tokenFetcherRefresher: true,
+		tokensOwnerFetcher:    true,
+		tokensContractFetcher: true,
 		contractRefresher:     true,
 		tokenMetadataFetcher:  true,
 	},
 	persist.ChainTezos: {
-		tokensFetcher:         true,
-		tokenFetcherRefresher: true,
+		tokensOwnerFetcher: true,
 	},
 	persist.ChainPOAP: {
-		nameResolver:  true,
-		tokensFetcher: true,
+		nameResolver:       true,
+		tokensOwnerFetcher: true,
 	},
 }
 
 type validation struct {
 	nameResolver          bool
 	verifier              bool
-	tokensFetcher         bool
-	tokenRefresher        bool
-	tokenFetcherRefresher bool
+	tokensOwnerFetcher    bool
+	tokensContractFetcher bool
 	tokenMetadataFetcher  bool
 	contractRefresher     bool
 }
@@ -269,17 +260,13 @@ func validateProviders(ctx context.Context, providers []interface{}) map[persist
 				hasImplementor.verifier = true
 				requirements.verifier = true
 			}
-			if _, ok := p.(tokensFetcher); ok {
-				hasImplementor.tokensFetcher = true
-				requirements.tokensFetcher = true
+			if _, ok := p.(tokensOwnerFetcher); ok {
+				hasImplementor.tokensOwnerFetcher = true
+				requirements.tokensOwnerFetcher = true
 			}
-			if _, ok := p.(tokenRefresher); ok {
-				hasImplementor.tokenRefresher = true
-				requirements.tokenRefresher = true
-			}
-			if _, ok := p.(tokenFetcherRefresher); ok {
-				hasImplementor.tokenFetcherRefresher = true
-				requirements.tokenFetcherRefresher = true
+			if _, ok := p.(tokensContractFetcher); ok {
+				hasImplementor.tokensContractFetcher = true
+				requirements.tokensContractFetcher = true
 			}
 			if _, ok := p.(contractRefresher); ok {
 				hasImplementor.contractRefresher = true
@@ -344,9 +331,9 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 				}
 				subWg := &sync.WaitGroup{}
 				for i, p := range providers {
-					if fetcher, ok := p.(tokensFetcher); ok {
+					if fetcher, ok := p.(tokensOwnerFetcher); ok {
 						subWg.Add(1)
-						go func(fetcher tokensFetcher, priority int) {
+						go func(fetcher tokensOwnerFetcher, priority int) {
 							defer subWg.Done()
 							tokens, contracts, err := fetcher.GetTokensByWalletAddress(ctx, addr, 0, 0)
 							if err != nil {
@@ -611,7 +598,7 @@ func (p *Provider) GetTokensOfContractForWallet(ctx context.Context, contractAdd
 	tokensFromProviders := make([]chainTokens, 0, len(providers))
 	contracts := make([]chainContracts, 0, len(providers))
 	for i, prov := range providers {
-		tFetcher, ok := prov.(tokensFetcher)
+		tFetcher, ok := prov.(tokensContractFetcher)
 		if !ok {
 			continue
 		}
@@ -744,17 +731,12 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 		return err
 	}
 	for i, provider := range providers {
-		refresher, ok := provider.(tokenFetcherRefresher)
+		refresher, ok := provider.(tokensOwnerFetcher)
 		if !ok {
 			continue
 		}
 
 		id := ChainAgnosticIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID}
-		for _, ownerAddress := range ownerAddresses {
-			if err := refresher.RefreshToken(ctx, id, ownerAddress); err != nil {
-				return err
-			}
-		}
 
 		if i == 0 {
 			for _, ownerAddress := range ownerAddresses {
@@ -826,9 +808,9 @@ func (p *Provider) RefreshTokensForContract(ctx context.Context, ci persist.Cont
 	done := make(chan struct{})
 	wg := &sync.WaitGroup{}
 	for i, provider := range providers {
-		if fetcher, ok := provider.(tokensFetcher); ok {
+		if fetcher, ok := provider.(tokensContractFetcher); ok {
 			wg.Add(1)
-			go func(priority int, p tokensFetcher) {
+			go func(priority int, p tokensContractFetcher) {
 				defer wg.Done()
 				tokens, contract, err := p.GetTokensByContractAddress(ctx, ci.ContractAddress, maxCommunitySize, 0)
 				if err != nil {

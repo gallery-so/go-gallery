@@ -113,7 +113,7 @@ type Token struct {
 	Balance          string           `json:"balance"`
 	Title            string           `json:"title"`
 	Description      string           `json:"description"`
-	TokenURI         TokenURI         `json:"owner"`
+	TokenURI         TokenURI         `json:"tokenUri"`
 	Media            []Media          `json:"media"`
 	Metadata         Metadata         `json:"metadata"`
 	ContractMetadata ContractMetadata `json:"contractMetadata"`
@@ -211,10 +211,6 @@ func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.Blockchain
 	}, nil
 }
 
-func (d *Provider) RefreshToken(context.Context, multichain.ChainAgnosticIdentifiers, persist.Address) error {
-	return nil
-}
-
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the Ethereum Blockchain
 func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	url := fmt.Sprintf("%s/getNFTs?owner=%s&withMetadata=true&orderBy=transferTime", d.alchemyAPIURL, addr)
@@ -294,7 +290,7 @@ func getNFTsPaginate[T tokensPaginated](ctx context.Context, baseURL string, def
 
 // GetTokenMetadataByTokenIdentifiers retrieves a token's metadata for a given contract address and token ID
 func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (persist.TokenMetadata, error) {
-	tokens, _, err := d.retryGetToken(ctx, ti, false, 0)
+	tokens, _, err := d.getTokenWithMetadata(ctx, ti, false, 0)
 	if err != nil {
 		return persist.TokenMetadata{}, err
 	}
@@ -307,7 +303,7 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti mu
 	return token.TokenMetadata, nil
 }
 
-func (d *Provider) retryGetToken(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, forceRefresh bool, timeout time.Duration) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (d *Provider) getTokenWithMetadata(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, forceRefresh bool, timeout time.Duration) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	if timeout == 0 {
 		timeout = (time.Second * 20) / time.Millisecond
 	}
@@ -325,9 +321,6 @@ func (d *Provider) retryGetToken(ctx context.Context, ti multichain.ChainAgnosti
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		if forceRefresh == false {
-			return d.retryGetToken(ctx, ti, true, timeout)
-		}
 		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("failed to get token metadata from alchemy api: %s", resp.Status)
 	}
 
@@ -335,6 +328,10 @@ func (d *Provider) retryGetToken(ctx context.Context, ti multichain.ChainAgnosti
 	var token Token
 	if err := json.NewDecoder(resp.Body).Decode(&token); err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
+	}
+
+	if token.Metadata.Image == "" && forceRefresh == false {
+		return d.getTokenWithMetadata(ctx, ti, true, timeout)
 	}
 
 	tokens, contracts, err := d.alchemyTokensToChainAgnosticTokens(ctx, []Token{token})
@@ -386,11 +383,11 @@ func (d *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, contr
 
 // GetTokensByTokenIdentifiers retrieves tokens for a token identifiers on the Ethereum Blockchain
 func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	return d.retryGetToken(ctx, tokenIdentifiers, false, 0)
+	return d.getTokenWithMetadata(ctx, tokenIdentifiers, false, 0)
 }
 
 func (d *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	tokens, contract, err := d.retryGetToken(ctx, tokenIdentifiers, false, 0)
+	tokens, contract, err := d.getTokenWithMetadata(ctx, tokenIdentifiers, false, 0)
 	if err != nil {
 		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
 	}
@@ -656,29 +653,8 @@ func alchemyTokenToMetadata(token Token) persist.TokenMetadata {
 	}
 
 	if ok {
-		metadata["media_type"] = formatToMediaType(firstWithFormat.Format)
+		metadata["media_type"] = firstWithFormat.Format
 		metadata["format"] = firstWithFormat.Format
 	}
 	return metadata
-}
-
-func formatToMediaType(format string) persist.MediaType {
-	switch format {
-	case "jpeg", "png", "image", "jpg", "webp":
-		return persist.MediaTypeImage
-	case "gif":
-		return persist.MediaTypeGIF
-	case "video", "mp4", "quicktime":
-		return persist.MediaTypeVideo
-	case "audio", "mp3", "wav":
-		return persist.MediaTypeAudio
-	case "pdf":
-		return persist.MediaTypePDF
-	case "html", "iframe":
-		return persist.MediaTypeHTML
-	case "svg":
-		return persist.MediaTypeSVG
-	default:
-		return persist.MediaTypeUnknown
-	}
 }

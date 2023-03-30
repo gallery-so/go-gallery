@@ -13,18 +13,15 @@ import (
 type FallbackProvider struct {
 	Primary interface {
 		configurer
-		tokenFetcherRefresher
+		tokensOwnerFetcher
+		tokensContractFetcher
 	}
-	Fallback tokensFetcher
+	Fallback tokensOwnerFetcher
 	Eval     func(context.Context, ChainAgnosticToken) bool
 }
 
 func (f FallbackProvider) GetBlockchainInfo(ctx context.Context) (BlockchainInfo, error) {
 	return f.Primary.GetBlockchainInfo(ctx)
-}
-
-func (f FallbackProvider) RefreshToken(ctx context.Context, tokenIdentifiers ChainAgnosticIdentifiers, owner persist.Address) error {
-	return f.Primary.RefreshToken(ctx, tokenIdentifiers, owner)
 }
 
 func (f FallbackProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]ChainAgnosticToken, []ChainAgnosticContract, error) {
