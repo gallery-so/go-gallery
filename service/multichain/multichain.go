@@ -258,8 +258,8 @@ type validation struct {
 func validateProviders(ctx context.Context, providers []interface{}) map[persist.Chain][]interface{} {
 	chains := map[persist.Chain][]interface{}{}
 
-	for _, p := range providers {
-		cfg := p.(configurer)
+	configurers := getChainProvidersForTask[configurer](providers)
+	for _, cfg := range configurers {
 		info, err := cfg.GetBlockchainInfo(ctx)
 		if err != nil {
 			panic(err)
