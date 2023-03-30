@@ -64,6 +64,22 @@ func (api ContractAPI) GetContractByAddress(ctx context.Context, contractAddress
 	return &contract, nil
 }
 
+func (api ContractAPI) GetParentContractByHierarchyID(ctx context.Context, hierarchyID persist.DBID) (*db.Contract, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"hierarchyID": {hierarchyID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	contract, err := api.loaders.ContractByHierarchyID.Load(hierarchyID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &contract, nil
+}
+
 func (api ContractAPI) GetContractsByUserID(ctx context.Context, userID persist.DBID) ([]db.Contract, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{

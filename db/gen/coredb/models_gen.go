@@ -67,18 +67,19 @@ type Contract struct {
 	Description      sql.NullString
 }
 
-type ContractRelevance struct {
-	ID    persist.DBID
-	Score int32
-}
-
-type CreatorContract struct {
+type ContractHierarchy struct {
 	ID          persist.DBID
 	CreatorID   persist.DBID
-	ContractID  persist.DBID
+	ParentID    persist.DBID
+	ExternalID  persist.DBID
 	CreatedAt   time.Time
 	LastUpdated time.Time
 	Deleted     bool
+}
+
+type ContractRelevance struct {
+	ID    persist.DBID
+	Score int32
 }
 
 type DevMetadataUser struct {
@@ -319,6 +320,15 @@ type SpamUserScore struct {
 	DecidedAt     sql.NullTime
 	Deleted       bool
 	CreatedAt     time.Time
+}
+
+type SubcontractToken struct {
+	ID          persist.DBID
+	TokenID     persist.DBID
+	HierarchyID persist.DBID
+	CreatedAt   time.Time
+	LastUpdated time.Time
+	Deleted     bool
 }
 
 type Token struct {

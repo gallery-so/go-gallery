@@ -176,7 +176,16 @@ func (r *communityResolver) Creator(ctx context.Context, obj *model.Community) (
 
 // ParentCommunity is the resolver for the parentCommunity field.
 func (r *communityResolver) ParentCommunity(ctx context.Context, obj *model.Community) (*model.Community, error) {
-	panic(fmt.Errorf("not implemented: ParentCommunity - parentCommunity"))
+	if obj.HelperCommunityData.HierarchyID == "" {
+		return nil, nil
+	}
+
+	community, err := publicapi.For(ctx).Contract.GetParentContractByHierarchyID(ctx, obj.HelperCommunityData.HierarchyID)
+	if err != nil {
+		return nil, err
+	}
+
+	return communityToModel(ctx, *community, util.ToPointer(false)), nil
 }
 
 // TokensInCommunity is the resolver for the tokensInCommunity field.

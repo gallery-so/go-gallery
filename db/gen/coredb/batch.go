@@ -680,6 +680,67 @@ func (b *GetContractByChainAddressBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getContractByHierarchyIDBatch = `-- name: GetContractByHierarchyIDBatch :batchone
+select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description from contracts, contract_hierarchies
+where contract_hierarchies.id = $1 and contracts.id = contract_hierarchies.parent_id and contract_hierarchies.deleted = false and contracts.deleted = false
+`
+
+type GetContractByHierarchyIDBatchBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+func (q *Queries) GetContractByHierarchyIDBatch(ctx context.Context, id []persist.DBID) *GetContractByHierarchyIDBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range id {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(getContractByHierarchyIDBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetContractByHierarchyIDBatchBatchResults{br, len(id), false}
+}
+
+func (b *GetContractByHierarchyIDBatchBatchResults) QueryRow(f func(int, Contract, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var i Contract
+		if b.closed {
+			if f != nil {
+				f(t, i, errors.New("batch already closed"))
+			}
+			continue
+		}
+		row := b.br.QueryRow()
+		err := row.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Name,
+			&i.Symbol,
+			&i.Address,
+			&i.CreatorAddress,
+			&i.Chain,
+			&i.ProfileBannerUrl,
+			&i.ProfileImageUrl,
+			&i.BadgeUrl,
+			&i.Description,
+		)
+		if f != nil {
+			f(t, i, err)
+		}
+	}
+}
+
+func (b *GetContractByHierarchyIDBatchBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const getContractsByUserIDBatch = `-- name: GetContractsByUserIDBatch :batchmany
 SELECT DISTINCT ON (contracts.id) contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description FROM contracts, tokens
     WHERE tokens.owner_user_id = $1 AND tokens.contract = contracts.id
@@ -852,13 +913,13 @@ func (b *GetContractsDisplayedByUserIDBatchBatchResults) Close() error {
 
 const getCreatedContractsBatchPaginate = `-- name: GetCreatedContractsBatchPaginate :batchmany
 select c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description
-from users, creator_contracts, contracts c
-where creator_contracts.creator_id = $1
+from users, contract_hierarchies, contracts c
+where contract_hierarchies.creator_id = $1
 	and users.id = $1
-	and creator_contracts.contract_id = c.id
+	and contract_hierarchies.contract_id = c.id
 	and contracts.chain = any(string_to_array($2, ',')::int[])
 	and users.deleted = false
-	and creator_contracts.deleted = false
+	and contract_hierarchies.deleted = false
 	and contracts.deleted = false
   and (c.created_at, c.id) > ($3, $4)
   and (c.created_at, c.id) < ( $5, $6)
@@ -887,6 +948,7 @@ type GetCreatedContractsBatchPaginateParams struct {
 // The @chains param is passed as a string instead of an array so that the generated
 // input struct can be used as a cache key within a dataloader since only comparable
 // types can be used as keys in a map
+// TODO: Fix this
 func (q *Queries) GetCreatedContractsBatchPaginate(ctx context.Context, arg []GetCreatedContractsBatchPaginateParams) *GetCreatedContractsBatchPaginateBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range arg {

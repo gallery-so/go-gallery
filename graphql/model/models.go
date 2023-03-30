@@ -46,6 +46,7 @@ type HelperViewerData struct {
 
 type HelperCommunityData struct {
 	ForceRefresh *bool
+	HierarchyID  persist.DBID
 }
 
 type HelperTokensAddedToCollectionFeedEventDataData struct {

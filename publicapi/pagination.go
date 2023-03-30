@@ -197,7 +197,6 @@ func (p *timeIDPaginator) decodeCursor(cursor string) (time.Time, persist.DBID, 
 		return time.Time{}, "", err
 	}
 
-	fmt.Printf("got cursor;time=%s;id=%s\n", t, id)
 	return t, id, nil
 }
 
@@ -380,19 +379,10 @@ func (p *sharedContractsPaginator) decodeCursor(cursor string) (bool, bool, int,
 
 func (p *sharedContractsPaginator) paginate(before *string, after *string, first *int, last *int) ([]interface{}, PageInfo, error) {
 	queryFunc := func(limit int32, pagingForward bool) ([]interface{}, error) {
-		// cursorBeforeDisplayedByUserA := true
-		// cursorBeforeDisplayedByUserB := true
-		// cursorBeforeOwnedCount := math.MaxInt32
-		// cursorBeforeContractID := defaultCursorBeforeID
-		// cursorAfterDisplayedByUserA := false
-		// cursorAfterDisplayedByUserB := false
-		// cursorAfterOwnedCount := -1
-		// cursorAfterContractID := defaultCursorAfterID
-
 		cursorBeforeDisplayedByUserA := false
 		cursorBeforeDisplayedByUserB := false
 		cursorBeforeOwnedCount := -1
-		cursorBeforeContractID := persist.DBID("")
+		cursorBeforeContractID := defaultCursorBeforeID
 		cursorAfterDisplayedByUserA := true
 		cursorAfterDisplayedByUserB := true
 		cursorAfterOwnedCount := math.MaxInt32
