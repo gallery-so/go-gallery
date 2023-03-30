@@ -147,11 +147,11 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	}
 
 	if asString, ok := metadata["media_type"].(string); !mediaType.IsValid() && ok && asString != "" {
-		mediaType = persist.MediaType(formatToMediaType(asString))
+		mediaType = persist.MediaType(RawFormatToMediaType(asString))
 	}
 
 	if asString, ok := metadata["format"].(string); !mediaType.IsValid() && ok && asString != "" {
-		mediaType = persist.MediaType(formatToMediaType(asString))
+		mediaType = persist.MediaType(RawFormatToMediaType(asString))
 	}
 
 	pCtx = logger.NewContextWithFields(pCtx, logrus.Fields{"mediaType": mediaType})
@@ -1093,7 +1093,7 @@ func newObjectWriter(ctx context.Context, client *storage.Client, bucket, fileNa
 	return writer
 }
 
-func formatToMediaType(format string) persist.MediaType {
+func RawFormatToMediaType(format string) persist.MediaType {
 	switch format {
 	case "jpeg", "png", "image", "jpg", "webp":
 		return persist.MediaTypeImage
@@ -1107,7 +1107,7 @@ func formatToMediaType(format string) persist.MediaType {
 		return persist.MediaTypePDF
 	case "html", "iframe":
 		return persist.MediaTypeHTML
-	case "svg":
+	case "svg", "svg+xml":
 		return persist.MediaTypeSVG
 	default:
 		return persist.MediaTypeUnknown

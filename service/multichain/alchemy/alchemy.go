@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
@@ -35,6 +36,7 @@ type Media struct {
 
 type Metadata struct {
 	Image           string `json:"image"`
+	AnimationURL    string `json:"animation_url"`
 	ExternalURL     string `json:"external_url"`
 	BackgroundColor string `json:"background_color"`
 	Name            string `json:"name"`
@@ -642,19 +644,37 @@ func alchemyTokenToChainAgnosticToken(owner persist.EthereumAddress, token Token
 }
 
 func alchemyTokenToMetadata(token Token) persist.TokenMetadata {
-	firstWithFormat, ok := util.FindFirst(token.Media, func(m Media) bool {
+	firstWithFormat, hasFormat := util.FindFirst(token.Media, func(m Media) bool {
 		return m.Format != ""
 	})
 	metadata := persist.TokenMetadata{
-		"image_url":    token.Metadata.Image,
 		"name":         token.Metadata.Name,
 		"description":  token.Metadata.Description,
 		"external_url": token.Metadata.ExternalURL,
 	}
 
-	if ok {
+	if token.Metadata.AnimationURL != "" {
+		metadata["animation_url"] = token.Metadata.AnimationURL
+	}
+
+	if hasFormat {
 		metadata["media_type"] = firstWithFormat.Format
 		metadata["format"] = firstWithFormat.Format
+
+		if _, ok := metadata["animation_url"]; !ok {
+			medType := media.RawFormatToMediaType(firstWithFormat.Format)
+			if medType.IsAnimationLike() {
+				metadata["animation_url"] = token.Metadata.Image
+				if firstWithFormat.Thumbnail != "" {
+					metadata["image_url"] = firstWithFormat.Thumbnail
+				}
+				return metadata
+			}
+		}
+	}
+
+	if token.Metadata.Image != "" {
+		metadata["image_url"] = token.Metadata.Image
 	}
 	return metadata
 }

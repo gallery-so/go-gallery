@@ -287,7 +287,6 @@ func validateProviders(ctx context.Context, providers []interface{}) map[persist
 }
 
 // SyncTokens updates the media for all tokens for a user
-// TODO consider updating contracts as well
 func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains []persist.Chain) error {
 	user, err := p.Repos.UserRepository.GetByID(ctx, userID)
 	if err != nil {
@@ -730,7 +729,8 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 	if err != nil {
 		return err
 	}
-	for i, provider := range providers {
+outer:
+	for _, provider := range providers {
 		refresher, ok := provider.(tokensOwnerFetcher)
 		if !ok {
 			continue
@@ -738,41 +738,43 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 
 		id := ChainAgnosticIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID}
 
-		if i == 0 {
-			for _, ownerAddress := range ownerAddresses {
-				refreshedToken, contract, err := refresher.GetTokensByTokenIdentifiersAndOwner(ctx, id, ownerAddress)
-				if err != nil {
-					return err
-				}
-
-				if err := p.Repos.TokenRepository.UpdateByTokenIdentifiersUnsafe(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, persist.TokenUpdateAllMetadataFieldsInput{
-					Metadata:    refreshedToken.TokenMetadata,
-					Name:        persist.NullString(refreshedToken.Name),
-					LastUpdated: persist.LastUpdatedTime{},
-					TokenURI:    refreshedToken.TokenURI,
-					Description: persist.NullString(refreshedToken.Description),
-				}); err != nil {
-					return err
-				}
-
-				image, anim := ti.Chain.BaseKeywords()
-				err = p.processTokenMedia(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, refreshedToken.OwnerAddress, image, anim)
-				if err != nil {
-					return err
-				}
-
-				if err := p.Repos.ContractRepository.UpsertByAddress(ctx, ti.ContractAddress, ti.Chain, persist.ContractGallery{
-					Chain:          ti.Chain,
-					Address:        persist.Address(ti.Chain.NormalizeAddress(ti.ContractAddress)),
-					Symbol:         persist.NullString(contract.Symbol),
-					Name:           persist.NullString(contract.Name),
-					CreatorAddress: contract.CreatorAddress,
-				}); err != nil {
-					return err
-				}
+		for i, ownerAddress := range ownerAddresses {
+			refreshedToken, contract, err := refresher.GetTokensByTokenIdentifiersAndOwner(ctx, id, ownerAddress)
+			if err != nil {
+				return err
 			}
 
+			if !refreshedToken.hasMetadata() && i == 0 {
+				continue outer
+			}
+
+			if err := p.Repos.TokenRepository.UpdateByTokenIdentifiersUnsafe(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, persist.TokenUpdateAllMetadataFieldsInput{
+				Metadata:    refreshedToken.TokenMetadata,
+				Name:        persist.NullString(refreshedToken.Name),
+				LastUpdated: persist.LastUpdatedTime{},
+				TokenURI:    refreshedToken.TokenURI,
+				Description: persist.NullString(refreshedToken.Description),
+			}); err != nil {
+				return err
+			}
+
+			image, anim := ti.Chain.BaseKeywords()
+			err = p.processTokenMedia(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, refreshedToken.OwnerAddress, image, anim)
+			if err != nil {
+				return err
+			}
+
+			if err := p.Repos.ContractRepository.UpsertByAddress(ctx, ti.ContractAddress, ti.Chain, persist.ContractGallery{
+				Chain:          ti.Chain,
+				Address:        persist.Address(ti.Chain.NormalizeAddress(ti.ContractAddress)),
+				Symbol:         persist.NullString(contract.Symbol),
+				Name:           persist.NullString(contract.Name),
+				CreatorAddress: contract.CreatorAddress,
+			}); err != nil {
+				return err
+			}
 		}
+
 	}
 	return nil
 }
