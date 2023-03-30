@@ -8,9 +8,9 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-// FallbackProvider will call its fallback if the primary Provider's token
+// EvalFallbackProvider will call its fallback if the primary Provider's token
 // response is unsuitable based on Eval
-type FallbackProvider struct {
+type EvalFallbackProvider struct {
 	Primary interface {
 		configurer
 		tokensOwnerFetcher
@@ -20,11 +20,16 @@ type FallbackProvider struct {
 	Eval     func(context.Context, ChainAgnosticToken) bool
 }
 
-func (f FallbackProvider) GetBlockchainInfo(ctx context.Context) (BlockchainInfo, error) {
+type FailureFallbackProvider struct {
+	Primary  tokensOwnerFetcher
+	Fallback tokensOwnerFetcher
+}
+
+func (f EvalFallbackProvider) GetBlockchainInfo(ctx context.Context) (BlockchainInfo, error) {
 	return f.Primary.GetBlockchainInfo(ctx)
 }
 
-func (f FallbackProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]ChainAgnosticToken, []ChainAgnosticContract, error) {
+func (f EvalFallbackProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]ChainAgnosticToken, []ChainAgnosticContract, error) {
 	tokens, contracts, err := f.Primary.GetTokensByWalletAddress(ctx, address, limit, offset)
 	if err != nil {
 		return nil, nil, err
@@ -33,7 +38,7 @@ func (f FallbackProvider) GetTokensByWalletAddress(ctx context.Context, address 
 	return tokens, contracts, nil
 }
 
-func (f FallbackProvider) GetTokensByContractAddress(ctx context.Context, contract persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error) {
+func (f EvalFallbackProvider) GetTokensByContractAddress(ctx context.Context, contract persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error) {
 	tokens, agnosticContract, err := f.Primary.GetTokensByContractAddress(ctx, contract, limit, offset)
 	if err != nil {
 		return nil, ChainAgnosticContract{}, err
@@ -42,7 +47,7 @@ func (f FallbackProvider) GetTokensByContractAddress(ctx context.Context, contra
 	return tokens, agnosticContract, nil
 }
 
-func (f FallbackProvider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, id ChainAgnosticIdentifiers, address persist.Address) (ChainAgnosticToken, ChainAgnosticContract, error) {
+func (f EvalFallbackProvider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, id ChainAgnosticIdentifiers, address persist.Address) (ChainAgnosticToken, ChainAgnosticContract, error) {
 	token, contract, err := f.Primary.GetTokensByTokenIdentifiersAndOwner(ctx, id, address)
 	if err != nil {
 		return ChainAgnosticToken{}, ChainAgnosticContract{}, err
@@ -53,7 +58,7 @@ func (f FallbackProvider) GetTokensByTokenIdentifiersAndOwner(ctx context.Contex
 	return token, contract, nil
 }
 
-func (f FallbackProvider) GetTokensByContractAddressAndOwner(ctx context.Context, owner persist.Address, contractAddress persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error) {
+func (f EvalFallbackProvider) GetTokensByContractAddressAndOwner(ctx context.Context, owner persist.Address, contractAddress persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error) {
 	tokens, contract, err := f.Primary.GetTokensByContractAddressAndOwner(ctx, owner, contractAddress, limit, offset)
 	if err != nil {
 		return nil, ChainAgnosticContract{}, err
@@ -62,7 +67,7 @@ func (f FallbackProvider) GetTokensByContractAddressAndOwner(ctx context.Context
 	return tokens, contract, err
 }
 
-func (f FallbackProvider) resolveTokens(ctx context.Context, tokens []ChainAgnosticToken) []ChainAgnosticToken {
+func (f EvalFallbackProvider) resolveTokens(ctx context.Context, tokens []ChainAgnosticToken) []ChainAgnosticToken {
 	usableTokens := make([]ChainAgnosticToken, len(tokens))
 	var wg sync.WaitGroup
 
@@ -82,7 +87,7 @@ func (f FallbackProvider) resolveTokens(ctx context.Context, tokens []ChainAgnos
 	return usableTokens
 }
 
-func (f *FallbackProvider) callFallback(ctx context.Context, primary ChainAgnosticToken) ChainAgnosticToken {
+func (f *EvalFallbackProvider) callFallback(ctx context.Context, primary ChainAgnosticToken) ChainAgnosticToken {
 	id := ChainAgnosticIdentifiers{primary.ContractAddress, primary.TokenID}
 	backup, _, err := f.Fallback.GetTokensByTokenIdentifiersAndOwner(ctx, id, primary.OwnerAddress)
 	if err == nil && f.Eval(ctx, backup) {
@@ -90,4 +95,31 @@ func (f *FallbackProvider) callFallback(ctx context.Context, primary ChainAgnost
 	}
 	logger.For(ctx).WithError(err).Warn("failed to call fallback")
 	return primary
+}
+
+func (f *EvalFallbackProvider) GetSubproviders() []any {
+	return []any{f.Primary, f.Fallback}
+}
+
+func (f FailureFallbackProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]ChainAgnosticToken, []ChainAgnosticContract, error) {
+	tokens, contracts, err := f.Primary.GetTokensByWalletAddress(ctx, address, limit, offset)
+	if err != nil {
+		logger.For(ctx).WithError(err).Warn("failed to get tokens by wallet address from primary in failure fallback")
+		return f.Fallback.GetTokensByWalletAddress(ctx, address, limit, offset)
+	}
+
+	return tokens, contracts, nil
+}
+
+func (f FailureFallbackProvider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, id ChainAgnosticIdentifiers, address persist.Address) (ChainAgnosticToken, ChainAgnosticContract, error) {
+	token, contract, err := f.Primary.GetTokensByTokenIdentifiersAndOwner(ctx, id, address)
+	if err != nil {
+		logger.For(ctx).WithError(err).Warn("failed to get token by token identifiers and owner from primary in failure fallback")
+		return f.Fallback.GetTokensByTokenIdentifiersAndOwner(ctx, id, address)
+	}
+	return token, contract, nil
+}
+
+func (f *FailureFallbackProvider) GetSubproviders() []any {
+	return []any{f.Primary, f.Fallback}
 }

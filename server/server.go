@@ -34,6 +34,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/multichain/alchemy"
 	"github.com/mikeydub/go-gallery/service/multichain/eth"
+	"github.com/mikeydub/go-gallery/service/multichain/infura"
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/mikeydub/go-gallery/service/multichain/poap"
 	"github.com/mikeydub/go-gallery/service/multichain/tezos"
@@ -221,6 +222,8 @@ func SetDefaults() {
 	viper.SetDefault("FEEDBOT_URL", "")
 	viper.SetDefault("GCLOUD_FEEDBOT_TASK_QUEUE", "projects/gallery-local/locations/here/queues/feedbot")
 	viper.SetDefault("ALCHEMY_API_URL", "https://eth-goerli.g.alchemy.com/v2/_2u--i79yarLYdOT4Bgydqa0dBceVRLD")
+	viper.SetDefault("INFURA_API_KEY", "")
+	viper.SetDefault("INFURA_API_SECRET", "")
 
 	viper.AutomaticEnv()
 
@@ -277,9 +280,13 @@ func NewMultichainProvider(c *Clients) *multichain.Provider {
 	ethChain := persist.ChainETH
 	overrides := multichain.ChainOverrideMap{persist.ChainPOAP: &ethChain}
 	alchemyProvider := alchemy.NewProvider(c.HTTPClient)
+	infuraProvider := infura.NewProvider(c.HTTPClient)
+
+	failureEthProvider := multichain.FailureFallbackProvider{Primary: infuraProvider, Fallback: alchemyProvider}
+
 	ethProvider := eth.NewProvider(env.GetString("INDEXER_HOST"), c.HTTPClient, c.EthClient, c.TaskClient)
 	openseaProvider := opensea.NewProvider(c.EthClient, c.HTTPClient)
-	tezosProvider := multichain.FallbackProvider{
+	tezosProvider := multichain.EvalFallbackProvider{
 		Primary:  tezos.NewProvider(env.GetString("TEZOS_API_URL"), env.GetString("TOKEN_PROCESSING_URL"), env.GetString("IPFS_URL"), c.HTTPClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET")),
 		Fallback: tezos.NewObjktProvider(env.GetString("IPFS_URL")),
 		Eval: func(ctx context.Context, token multichain.ChainAgnosticToken) bool {
@@ -290,7 +297,7 @@ func NewMultichainProvider(c *Clients) *multichain.Provider {
 	cache := redis.NewCache(redis.CommunitiesDB)
 	return multichain.NewProvider(context.Background(), c.Repos, c.Queries, cache, c.TaskClient,
 		overrides,
-		alchemyProvider,
+		failureEthProvider,
 		ethProvider,
 		openseaProvider,
 		tezosProvider,
