@@ -333,10 +333,6 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 		return time.Time{}, []persist.TokenGallery{}, nil
 	}
 
-	tokens = t.dedupeTokens(tokens)
-	params := db.UpsertTokensParams{}
-	now := time.Now()
-
 	appendWalletList := func(dest *[]string, src []persist.Wallet, startIndices, endIndices *[]int32) {
 		items := make([]persist.DBID, len(src))
 		for i, wallet := range src {
@@ -362,6 +358,8 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 		}
 	}
 
+	now := time.Now()
+
 	// addTimesIfMissing is required because sqlc was unable to bind arrays of our own custom types
 	// i.e. an array of persist.CreationTime instead of an array of time.Time. A zero-valued persist.CreationTime
 	// uses the current time as the column value, but instead we need to manually add a time to the struct.
@@ -376,6 +374,9 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 			(*t).LastUpdated = persist.LastUpdatedTime(now)
 		}
 	}
+
+	tokens = t.dedupeTokens(tokens)
+	params := db.UpsertTokensParams{}
 
 	var errors []error
 

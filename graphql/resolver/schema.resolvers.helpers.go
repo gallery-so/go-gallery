@@ -42,7 +42,6 @@ var nodeFetcher = model.NodeFetcher{
 	OnMembershipTier:   resolveMembershipTierByMembershipId,
 	OnToken:            resolveTokenByTokenID,
 	OnWallet:           resolveWalletByAddress,
-	OnContract:         resolveContractByContractID,
 	OnFeedEvent:        resolveFeedEventByEventID,
 	OnAdmire:           resolveAdmireByAdmireID,
 	OnComment:          resolveCommentByCommentID,
@@ -54,13 +53,25 @@ var nodeFetcher = model.NodeFetcher{
 	OnCollectionToken: func(ctx context.Context, tokenId string, collectionId string) (*model.CollectionToken, error) {
 		return resolveCollectionTokenByID(ctx, persist.DBID(tokenId), persist.DBID(collectionId))
 	},
-
-	OnCommunity: func(ctx context.Context, contractAddress string, chain string) (*model.Community, error) {
-		if parsed, err := strconv.Atoi(chain); err == nil {
-			return resolveCommunityByContractAddress(ctx, persist.NewChainAddress(persist.Address(contractAddress), persist.Chain(parsed)), util.ToPointer(false))
-		} else {
+	OnContract: func(ctx context.Context, contractAddress string, chain string) (*model.Contract, error) {
+		chainAsInt, err := strconv.Atoi(chain)
+		if err != nil {
 			return nil, err
 		}
+
+		contract, err := publicapi.For(ctx).Contract.GetContractByAddress(ctx, persist.NewChainAddress(persist.Address(contractAddress), persist.Chain(chainAsInt)))
+		if err != nil {
+			return nil, err
+		}
+
+		return contractToModel(ctx, *contract), nil
+	},
+	OnCommunity: func(ctx context.Context, dbid persist.DBID) (*model.Community, error) {
+		community, err := publicapi.For(ctx).Contract.GetContractByID(ctx, dbid)
+		if err != nil {
+			return nil, err
+		}
+		return communityToModel(ctx, *community, util.ToPointer(false)), nil
 	},
 	OnSomeoneAdmiredYourFeedEventNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneAdmiredYourFeedEventNotification, error) {
 		notif, err := resolveNotificationByID(ctx, dbid)

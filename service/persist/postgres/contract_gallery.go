@@ -140,8 +140,8 @@ func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, pContracts 
 	}
 
 	// Update contracts with the existing data if the contract already exists.
-	// We only update these fields because the other fields get overwritten with
-	// the incoming contract
+	// We only update these fields because the upsert logic ensures that the remaining fields
+	// use the new row.
 	for i := range contracts {
 		c := &upserted[i]
 		(*c).ID = upserted[i].ID

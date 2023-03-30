@@ -137,10 +137,6 @@ type errWithPriority struct {
 	priority int
 }
 
-func (e errWithPriority) Error() string {
-	return fmt.Sprintf("error with priority %d: %s", e.priority, e.err)
-}
-
 // configurer maintains provider settings
 type configurer interface {
 	GetBlockchainInfo(context.Context) (BlockchainInfo, error)
@@ -474,10 +470,17 @@ outer:
 // The method returns after the contracts have been saved to the database. Note that its possible
 // for a provider to not return all contracts created by the user, but only new contracts created
 // since the last sync, if any.
-func (p *Provider) SyncContractsCreatedByUserID(ctx context.Context, userID persist.DBID, chains []persist.Chain) error {
+func (p *Provider) SyncContractsCreatedByUserID(ctx context.Context, userID persist.DBID, chains []persist.Chain, includeAll bool) error {
 	user, err := p.Repos.UserRepository.GetByID(ctx, userID)
 	if err != nil {
 		return err
+	}
+
+	if includeAll {
+		chains = make([]persist.Chain, 0)
+		for chain := range p.Chains {
+			chains = append(chains, chain)
+		}
 	}
 
 	fetchers := matchingProviders[contractFetcher](p.Chains, chains...)
@@ -1325,6 +1328,10 @@ func addressAtBlockToAddressAtBlock(ctx context.Context, addresses []ChainAgnost
 
 func (t ChainAgnosticIdentifiers) String() string {
 	return fmt.Sprintf("%s-%s", t.ContractAddress, t.TokenID)
+}
+
+func (e errWithPriority) Error() string {
+	return fmt.Sprintf("error with priority %d: %s", e.priority, e.err)
 }
 
 func dedupeWallets(wallets []persist.Wallet) []persist.Wallet {

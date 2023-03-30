@@ -570,6 +570,7 @@ type Community struct {
 	ContractAddress   *persist.ChainAddress   `json:"contractAddress"`
 	CreatorAddress    *persist.ChainAddress   `json:"creatorAddress"`
 	Creator           *GalleryUser            `json:"creator"`
+	ParentCommunity   *Community              `json:"parentCommunity"`
 	Chain             *persist.Chain          `json:"chain"`
 	Name              *string                 `json:"name"`
 	Description       *string                 `json:"description"`
@@ -668,6 +669,11 @@ type CreateUserPayload struct {
 }
 
 func (CreateUserPayload) IsCreateUserPayloadOrError() {}
+
+type CreatedCommunitiesInput struct {
+	Chains           []persist.Chain `json:"chains"`
+	IncludeAllChains *bool           `json:"includeAllChains"`
+}
 
 type DebugAuth struct {
 	AsUsername     *string                 `json:"asUsername"`

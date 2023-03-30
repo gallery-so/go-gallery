@@ -174,6 +174,11 @@ func (r *communityResolver) Creator(ctx context.Context, obj *model.Community) (
 	return resolveGalleryUserByAddress(ctx, *obj.CreatorAddress)
 }
 
+// ParentCommunity is the resolver for the parentCommunity field.
+func (r *communityResolver) ParentCommunity(ctx context.Context, obj *model.Community) (*model.Community, error) {
+	panic(fmt.Errorf("not implemented: ParentCommunity - parentCommunity"))
+}
+
 // TokensInCommunity is the resolver for the tokensInCommunity field.
 func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokensConnection, error) {
 	if onlyGalleryUsers == nil || (onlyGalleryUsers != nil && !*onlyGalleryUsers) {
@@ -496,8 +501,13 @@ func (r *galleryUserResolver) SharedCommunities(ctx context.Context, obj *model.
 }
 
 // CreatedCommunities is the resolver for the createdCommunities field.
-func (r *galleryUserResolver) CreatedCommunities(ctx context.Context, obj *model.GalleryUser, chains []persist.Chain, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error) {
-	communities, pageInfo, err := publicapi.For(ctx).User.CreatedCommunities(ctx, obj.UserID, chains, before, after, first, last)
+func (r *galleryUserResolver) CreatedCommunities(ctx context.Context, obj *model.GalleryUser, input model.CreatedCommunitiesInput, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error) {
+	includeAll := false
+	if input.IncludeAllChains != nil {
+		includeAll = *input.IncludeAllChains
+	}
+
+	communities, pageInfo, err := publicapi.For(ctx).User.CreatedCommunities(ctx, obj.UserID, input.Chains, includeAll, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}

@@ -979,13 +979,13 @@ limit sqlc.arg('limit');
 -- input struct can be used as a cache key within a dataloader since only comparable
 -- types can be used as keys in a map
 select c.*
-from users, creator_contracts, contracts c
-where creator_contracts.creator_id = @user_id
+from users, creator_omnibus_contracts, contracts c
+where creator_omnibus_contracts.creator_id = @user_id
 	and users.id = @user_id
-	and creator_contracts.contract_id = c.id
+	and creator_omnibus_contracts.contract_id = c.id
 	and contracts.chain = any(string_to_array(@chains, ',')::int[])
 	and users.deleted = false
-	and creator_contracts.deleted = false
+	and creator_omnibus_contracts.deleted = false
 	and contracts.deleted = false
   and (c.created_at, c.id) > (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
   and (c.created_at, c.id) < ( sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))

@@ -785,7 +785,7 @@ func (api UserAPI) SharedCommunities(ctx context.Context, userID persist.DBID, b
 	return contracts, pageInfo, nil
 }
 
-func (api UserAPI) CreatedCommunities(ctx context.Context, userID persist.DBID, chains []persist.Chain, before, after *string, first, last *int) ([]db.Contract, PageInfo, error) {
+func (api UserAPI) CreatedCommunities(ctx context.Context, userID persist.DBID, chains []persist.Chain, includeAllChains bool, before, after *string, first, last *int) ([]db.Contract, PageInfo, error) {
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userID": {userID, "required"},
 	}); err != nil {
@@ -797,7 +797,7 @@ func (api UserAPI) CreatedCommunities(ctx context.Context, userID persist.DBID, 
 	}
 
 	// Run a sync to catch new contracts
-	err := api.multichainProvider.SyncContractsCreatedByUserID(ctx, userID, chains)
+	err := api.multichainProvider.SyncContractsCreatedByUserID(ctx, userID, chains, includeAllChains)
 	if err != nil {
 		return nil, PageInfo{}, err
 	}
@@ -833,7 +833,7 @@ func (api UserAPI) CreatedCommunities(ctx context.Context, userID persist.DBID, 
 		if row, ok := node.(db.Contract); ok {
 			return row.CreatedAt, row.ID, nil
 		}
-		return time.Time{}, "", fmt.Errorf("node is not a db.GetSharedContractsBatchPaginateRow")
+		return time.Time{}, "", fmt.Errorf("node is not a db.Contract")
 	}
 
 	paginator := timeIDPaginator{
