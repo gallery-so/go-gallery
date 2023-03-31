@@ -572,7 +572,7 @@ func remapMedia(media persist.Media) persist.Media {
 
 func FindImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, metadata persist.TokenMetadata, tokenURI persist.TokenURI, animationKeywords, imageKeywords Keywords, predict bool) (imgURL string, vURL string) {
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"tokenID": tokenID, "contractAddress": contractAddress})
-	if metaMedia, ok := metadata["media"].(map[string]interface{}); ok {
+	if metaMedia, ok := metadata["media"].(map[string]any); ok {
 		logger.For(ctx).Debugf("found media metadata: %s", metaMedia)
 		var mediaType persist.MediaType
 

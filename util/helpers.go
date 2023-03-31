@@ -109,12 +109,12 @@ func ContainsAnyString(s string, strs ...string) bool {
 
 // UnmarshallBody takes a request body and unmarshals it into the given struct
 // input must be a pointer to a struct with json tags
-func UnmarshallBody(pInput interface{}, body io.Reader) error {
+func UnmarshallBody(pInput any, body io.Reader) error {
 	return json.NewDecoder(body).Decode(pInput)
 }
 
 // GetValueFromMap is a function that returns the value at the first occurence of a given key in a map that potentially contains nested maps
-func GetValueFromMap(m map[string]interface{}, key string, searchDepth int) interface{} {
+func GetValueFromMap(m map[string]any, key string, searchDepth int) any {
 	if searchDepth == 0 {
 		return nil
 	}
@@ -126,14 +126,14 @@ func GetValueFromMap(m map[string]interface{}, key string, searchDepth int) inte
 			return v
 		}
 
-		if nest, ok := v.(map[string]interface{}); ok {
+		if nest, ok := v.(map[string]any); ok {
 			if nestVal := GetValueFromMap(nest, key, searchDepth-1); nestVal != nil {
 				return nestVal
 			}
 		}
-		if array, ok := v.([]interface{}); ok {
+		if array, ok := v.([]any); ok {
 			for _, arrayVal := range array {
-				if nest, ok := arrayVal.(map[string]interface{}); ok {
+				if nest, ok := arrayVal.(map[string]any); ok {
 					if nestVal := GetValueFromMap(nest, key, searchDepth-1); nestVal != nil {
 						return nestVal
 					}
@@ -146,7 +146,7 @@ func GetValueFromMap(m map[string]interface{}, key string, searchDepth int) inte
 
 // GetValueFromMapUnsafe is a function that returns the value at the first occurence of a given key in a map that potentially contains nested maps
 // This function is unsafe because it will also return if the specified key is a substring of any key found in the map
-func GetValueFromMapUnsafe(m map[string]interface{}, key string, searchDepth int) interface{} {
+func GetValueFromMapUnsafe(m map[string]any, key string, searchDepth int) any {
 	if searchDepth == 0 {
 		return nil
 	}
@@ -159,14 +159,14 @@ func GetValueFromMapUnsafe(m map[string]interface{}, key string, searchDepth int
 			return v
 		}
 
-		if nest, ok := v.(map[string]interface{}); ok {
+		if nest, ok := v.(map[string]any); ok {
 			if nestVal := GetValueFromMap(nest, key, searchDepth-1); nestVal != nil {
 				return nestVal
 			}
 		}
-		if array, ok := v.([]interface{}); ok {
+		if array, ok := v.([]any); ok {
 			for _, arrayVal := range array {
-				if nest, ok := arrayVal.(map[string]interface{}); ok {
+				if nest, ok := arrayVal.(map[string]any); ok {
 					if nestVal := GetValueFromMap(nest, key, searchDepth-1); nestVal != nil {
 						return nestVal
 					}
@@ -452,7 +452,7 @@ func GetURIPath(initial string, withoutQuery bool) string {
 }
 
 // FindFirstFieldFromMap finds the first field in the map that contains the given field
-func FindFirstFieldFromMap(it map[string]interface{}, fields ...string) interface{} {
+func FindFirstFieldFromMap(it map[string]any, fields ...string) any {
 
 	for _, field := range fields {
 		if val := GetValueFromMapUnsafe(it, field, DefaultSearchDepth); val != nil {
