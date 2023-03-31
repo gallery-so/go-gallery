@@ -1857,6 +1857,31 @@ func getUrlExtension(url string) string {
 }
 
 func getMediaForToken(ctx context.Context, token db.Token) model.MediaSubtype {
+	if token.OwnerUserID == "a3ff91986625382ff776067619200efe" || token.OwnerUserID == "0ee2e57673712ca11ca6bf6cb9619e6a" {
+		click := "https://storage.googleapis.com/gallery-prod-325303.appspot.com/click.png"
+		vid := "https://storage.googleapis.com/gallery-prod-325303.appspot.com/rickroll.mp4"
+		medtype := string(persist.MediaTypeVideo)
+		return model.VideoMedia{
+			PreviewURLs: &model.PreviewURLSet{
+				Thumbnail:  &click,
+				Raw:        &click,
+				Small:      &click,
+				Medium:     &click,
+				Large:      &click,
+				SrcSet:     &click,
+				LiveRender: &click,
+				Blurhash:   &click,
+			},
+			MediaType: &medtype,
+			MediaURL:  &vid,
+			ContentRenderURLs: &model.VideoURLSet{
+				Raw:    &vid,
+				Small:  &vid,
+				Medium: &vid,
+				Large:  &vid,
+			},
+		}
+	}
 	med := token.Media
 	switch med.MediaType {
 	case persist.MediaTypeImage, persist.MediaTypeSVG:
