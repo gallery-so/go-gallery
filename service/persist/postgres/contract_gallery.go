@@ -100,21 +100,18 @@ func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, pContracts 
 	// addIDIfMissing is used because sqlc was unable to bind arrays of our own custom types
 	// i.e. an array of persist.DBIDs instead of an array of strings. A zero-valued persist.DBID
 	// generates a new ID on insert, but instead we need to generate an ID beforehand.
-	addIDIfMissing := func(t *persist.ContractGallery) {
-		if t.ID == persist.DBID("") {
-			(*t).ID = persist.GenerateID()
+	addIDIfMissing := func(c *persist.ContractGallery) {
+		if c.ID == persist.DBID("") {
+			(*c).ID = persist.GenerateID()
 		}
 	}
 
 	// addTimesIfMissing is required because sqlc was unable to bind arrays of our own custom types
 	// i.e. an array of persist.CreationTime instead of an array of time.Time. A zero-valued persist.CreationTime
 	// uses the current time as the column value, but instead we need to manually add a time to the struct.
-	addTimesIfMissing := func(t *persist.ContractGallery) {
-		if t.CreationTime.Time().IsZero() {
-			(*t).CreationTime = persist.CreationTime(now)
-		}
-		if t.LastUpdated.Time().IsZero() {
-			(*t).LastUpdated = persist.LastUpdatedTime(now)
+	addTimesIfMissing := func(c *persist.ContractGallery) {
+		if c.CreationTime.Time().IsZero() {
+			(*c).CreationTime = persist.CreationTime(now)
 		}
 	}
 
@@ -126,7 +123,6 @@ func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, pContracts 
 		params.Deleted = append(params.Deleted, c.Deleted.Bool())
 		params.Version = append(params.Version, c.Version.Int32())
 		params.CreatedAt = append(params.CreatedAt, c.CreationTime.Time())
-		params.LastUpdated = append(params.LastUpdated, c.LastUpdated.Time())
 		params.Address = append(params.Address, c.Address.String())
 		params.Symbol = append(params.Symbol, c.Symbol.String())
 		params.Name = append(params.Name, c.Name.String())

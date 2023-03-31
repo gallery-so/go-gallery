@@ -94,7 +94,7 @@ type Loaders struct {
 	NewTokensByFeedEventID           *TokensLoaderByID
 	OwnerByTokenID                   *UserLoaderByID
 	ContractByContractID             *ContractLoaderByID
-	ContractByHierarchyID            *ContractLoaderByID
+	ContractBySubgroupID             *ContractLoaderByID
 	ContractsByUserID                *ContractsLoaderByID
 	ContractsLoaderByCreatorID       *ContractsLoaderByCreatorID
 	ContractByChainAddress           *ContractLoaderByChainAddress
@@ -256,7 +256,7 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 		AutoCacheWithKey: func(contract db.Contract) persist.DBID { return contract.ID },
 	})
 
-	loaders.ContractByHierarchyID = NewContractLoaderByID(defaults, loadContractByHierarchyID(q), ContractLoaderByIDCacheSubscriptions{
+	loaders.ContractBySubgroupID = NewContractLoaderByID(defaults, loadContractBySubgroupID(q), ContractLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(contract db.Contract) persist.DBID { return contract.ID },
 	})
 
@@ -898,12 +898,12 @@ func loadContractByContractID(q *db.Queries) func(context.Context, []persist.DBI
 	}
 }
 
-func loadContractByHierarchyID(q *db.Queries) func(context.Context, []persist.DBID) ([]db.Contract, []error) {
+func loadContractBySubgroupID(q *db.Queries) func(context.Context, []persist.DBID) ([]db.Contract, []error) {
 	return func(ctx context.Context, hierarchyIDs []persist.DBID) ([]db.Contract, []error) {
 		contracts := make([]db.Contract, len(hierarchyIDs))
 		errors := make([]error, len(hierarchyIDs))
 
-		b := q.GetContractByHierarchyIDBatch(ctx, hierarchyIDs)
+		b := q.GetContractBySubgroupIDBatch(ctx, hierarchyIDs)
 		defer b.Close()
 
 		b.QueryRow(func(i int, c db.Contract, err error) {

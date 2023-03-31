@@ -67,7 +67,12 @@ type Contract struct {
 	Description      sql.NullString
 }
 
-type ContractHierarchy struct {
+type ContractRelevance struct {
+	ID    persist.DBID
+	Score int32
+}
+
+type ContractSubgroup struct {
 	ID          persist.DBID
 	CreatorID   persist.DBID
 	ParentID    persist.DBID
@@ -75,11 +80,6 @@ type ContractHierarchy struct {
 	CreatedAt   time.Time
 	LastUpdated time.Time
 	Deleted     bool
-}
-
-type ContractRelevance struct {
-	ID    persist.DBID
-	Score int32
 }
 
 type DevMetadataUser struct {
@@ -322,15 +322,6 @@ type SpamUserScore struct {
 	CreatedAt     time.Time
 }
 
-type SubcontractToken struct {
-	ID          persist.DBID
-	TokenID     persist.DBID
-	HierarchyID persist.DBID
-	CreatedAt   time.Time
-	LastUpdated time.Time
-	Deleted     bool
-}
-
 type Token struct {
 	ID                   persist.DBID
 	Deleted              bool
@@ -356,6 +347,15 @@ type Token struct {
 	IsUserMarkedSpam     sql.NullBool
 	IsProviderMarkedSpam sql.NullBool
 	LastSynced           time.Time
+}
+
+type TokenSubgroup struct {
+	ID          persist.DBID
+	TokenID     persist.DBID
+	SubgroupID  persist.DBID
+	CreatedAt   time.Time
+	LastUpdated time.Time
+	Deleted     bool
 }
 
 type TopRecommendedUser struct {

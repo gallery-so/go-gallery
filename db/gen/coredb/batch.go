@@ -680,30 +680,30 @@ func (b *GetContractByChainAddressBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
-const getContractByHierarchyIDBatch = `-- name: GetContractByHierarchyIDBatch :batchone
-select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description from contracts, contract_hierarchies
-where contract_hierarchies.id = $1 and contracts.id = contract_hierarchies.parent_id and contract_hierarchies.deleted = false and contracts.deleted = false
+const getContractBySubgroupIDBatch = `-- name: GetContractBySubgroupIDBatch :batchone
+select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description from contracts, contract_subgroups
+where contract_subgroups.id = $1 and contracts.id = contract_subgroups.parent_id and contract_subgroups.deleted = false and contracts.deleted = false
 `
 
-type GetContractByHierarchyIDBatchBatchResults struct {
+type GetContractBySubgroupIDBatchBatchResults struct {
 	br     pgx.BatchResults
 	tot    int
 	closed bool
 }
 
-func (q *Queries) GetContractByHierarchyIDBatch(ctx context.Context, id []persist.DBID) *GetContractByHierarchyIDBatchBatchResults {
+func (q *Queries) GetContractBySubgroupIDBatch(ctx context.Context, id []persist.DBID) *GetContractBySubgroupIDBatchBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range id {
 		vals := []interface{}{
 			a,
 		}
-		batch.Queue(getContractByHierarchyIDBatch, vals...)
+		batch.Queue(getContractBySubgroupIDBatch, vals...)
 	}
 	br := q.db.SendBatch(ctx, batch)
-	return &GetContractByHierarchyIDBatchBatchResults{br, len(id), false}
+	return &GetContractBySubgroupIDBatchBatchResults{br, len(id), false}
 }
 
-func (b *GetContractByHierarchyIDBatchBatchResults) QueryRow(f func(int, Contract, error)) {
+func (b *GetContractBySubgroupIDBatchBatchResults) QueryRow(f func(int, Contract, error)) {
 	defer b.br.Close()
 	for t := 0; t < b.tot; t++ {
 		var i Contract
@@ -736,7 +736,7 @@ func (b *GetContractByHierarchyIDBatchBatchResults) QueryRow(f func(int, Contrac
 	}
 }
 
-func (b *GetContractByHierarchyIDBatchBatchResults) Close() error {
+func (b *GetContractBySubgroupIDBatchBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }
@@ -913,13 +913,13 @@ func (b *GetContractsDisplayedByUserIDBatchBatchResults) Close() error {
 
 const getCreatedContractsBatchPaginate = `-- name: GetCreatedContractsBatchPaginate :batchmany
 select c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description
-from users, contract_hierarchies, contracts c
-where contract_hierarchies.creator_id = $1
+from users, contract_subgroups, contracts c
+where contract_subgroups.creator_id = $1
 	and users.id = $1
-	and contract_hierarchies.contract_id = c.id
+	and contract_subgroups.contract_id = c.id
 	and contracts.chain = any(string_to_array($2, ',')::int[])
 	and users.deleted = false
-	and contract_hierarchies.deleted = false
+	and contract_subgroups.deleted = false
 	and contracts.deleted = false
   and (c.created_at, c.id) > ($3, $4)
   and (c.created_at, c.id) < ( $5, $6)

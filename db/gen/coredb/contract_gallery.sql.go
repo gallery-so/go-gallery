@@ -17,7 +17,6 @@ insert into contracts
   , deleted
   , version
   , created_at
-  , last_updated
   , address
   , symbol
   , name
@@ -29,12 +28,11 @@ insert into contracts
   , unnest($2::boolean[])
   , unnest($3::int[])
   , unnest($4::timestamptz[])
-  , unnest($5::timestamptz[])
+  , unnest($5::varchar[])
   , unnest($6::varchar[])
   , unnest($7::varchar[])
   , unnest($8::varchar[])
-  , unnest($9::varchar[])
-  , unnest($10::int[])
+  , unnest($9::int[])
 )
 on conflict (address, chain) where deleted = false
 do update set
@@ -43,7 +41,7 @@ do update set
   , name = excluded.name
   , creator_address = excluded.creator_address
   , chain = excluded.chain
-  , last_updated = excluded.last_updated
+  , last_updated = now()
 returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description
 `
 
@@ -52,7 +50,6 @@ type UpsertContractsParams struct {
 	Deleted        []bool
 	Version        []int32
 	CreatedAt      []time.Time
-	LastUpdated    []time.Time
 	Address        []string
 	Symbol         []string
 	Name           []string
@@ -66,7 +63,6 @@ func (q *Queries) UpsertContracts(ctx context.Context, arg UpsertContractsParams
 		arg.Deleted,
 		arg.Version,
 		arg.CreatedAt,
-		arg.LastUpdated,
 		arg.Address,
 		arg.Symbol,
 		arg.Name,
@@ -95,6 +91,154 @@ func (q *Queries) UpsertContracts(ctx context.Context, arg UpsertContractsParams
 			&i.ProfileImageUrl,
 			&i.BadgeUrl,
 			&i.Description,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const upsertCreatedTokens = `-- name: UpsertCreatedTokens :many
+with contract_subgroups_data(
+  id
+  , deleted
+  , created_at
+  , creator_id
+  , parent_id
+  , external_id
+  , contract_address
+  , chain
+) as (
+  select
+  unnest($1::varchar[])
+  , unnest($2::boolean[])
+  , unnest($3::timestamptz[])
+  , unnest($4::varchar[])
+  , unnest($5::varchar[])
+  , unnest($6::varchar[])
+  , unnest($7::varchar[])
+  , unnest($8::varchar[])
+),
+token_subgroups_data(
+  id
+  , deleted
+  , token_id
+  , subgroup_id
+  , created_at
+  , contract_address
+  , chain
+) as (
+  select
+  unnest($9::varchar[])
+  , unnest($10::boolean[])
+  , unnest($11::varchar[])
+  , unnest($12::varchar[])
+  , unnest($13::timestamptz[])
+  , unnest($14::varchar[])
+  , unnest($15::varchar[])
+),
+insert_contract_subgroups as (
+  insert into contract_subgroups
+  (
+    id
+    , creator_id
+    , parent_id
+    , external_id
+    , created_at
+    , deleted
+  ) (
+    select
+    id
+    , creator_id
+    , parent_id
+    , external_id
+    , created_at
+    , deleted
+    from contract_subgroups_data
+  )
+  on conflict (creator_id, parent_id) where deleted = false
+  do update set external_id = excluded.external_id , last_updated = now()
+  returning id, creator_id, parent_id, external_id, created_at, last_updated, deleted
+)
+insert into token_subgroups (
+  id
+  , token_id
+  , subgroup_id
+  , created_at
+  , deleted
+) (
+  select
+  t.id
+  , t.token_id
+  , i.id
+  , t.created_at
+  , t.deleted
+  from token_subgroups_data t, contract_subgroups_data c, insert_contract_subgroups i
+  where
+    t.contract_address = c.contract_address
+    and t.chain = c.chain
+    and c.contract_address = i.parent_id
+    and c.creator_id = i.creator_id
+)
+on conflict(token_id, subgroup_id) where deleted = false
+do update set last_updated = now()
+returning id, token_id, subgroup_id, created_at, last_updated, deleted
+`
+
+type UpsertCreatedTokensParams struct {
+	ContractID              []string
+	ContractDeleted         []bool
+	ContractCreatedAt       []time.Time
+	ContractCreatorID       []string
+	ContractParentID        []string
+	ContractExternalID      []string
+	ContractContractAddress []string
+	ContractChain           []string
+	TokenID                 []string
+	TokenDeleted            []bool
+	TokenTokenID            []string
+	TokenSubgroupID         []string
+	TokenCreatedAt          []time.Time
+	TokenContractAddress    []string
+	TokenChain              []string
+}
+
+func (q *Queries) UpsertCreatedTokens(ctx context.Context, arg UpsertCreatedTokensParams) ([]TokenSubgroup, error) {
+	rows, err := q.db.Query(ctx, upsertCreatedTokens,
+		arg.ContractID,
+		arg.ContractDeleted,
+		arg.ContractCreatedAt,
+		arg.ContractCreatorID,
+		arg.ContractParentID,
+		arg.ContractExternalID,
+		arg.ContractContractAddress,
+		arg.ContractChain,
+		arg.TokenID,
+		arg.TokenDeleted,
+		arg.TokenTokenID,
+		arg.TokenSubgroupID,
+		arg.TokenCreatedAt,
+		arg.TokenContractAddress,
+		arg.TokenChain,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []TokenSubgroup
+	for rows.Next() {
+		var i TokenSubgroup
+		if err := rows.Scan(
+			&i.ID,
+			&i.TokenID,
+			&i.SubgroupID,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Deleted,
 		); err != nil {
 			return nil, err
 		}

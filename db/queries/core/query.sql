@@ -126,9 +126,9 @@ SELECT w.* FROM users u, unnest(u.wallets) WITH ORDINALITY AS a(wallet_id, walle
 -- name: GetContractByID :one
 select * FROM contracts WHERE id = $1 AND deleted = false;
 
--- name: GetContractByHierarchyIDBatch :batchone
-select contracts.* from contracts, contract_hierarchies
-where contract_hierarchies.id = $1 and contracts.id = contract_hierarchies.parent_id and contract_hierarchies.deleted = false and contracts.deleted = false;
+-- name: GetContractBySubgroupIDBatch :batchone
+select contracts.* from contracts, contract_subgroups
+where contract_subgroups.id = $1 and contracts.id = contract_subgroups.parent_id and contract_subgroups.deleted = false and contracts.deleted = false;
 
 -- name: GetContractsByIDs :many
 SELECT * from contracts WHERE id = ANY(@contract_ids) AND deleted = false;
@@ -984,13 +984,13 @@ limit sqlc.arg('limit');
 -- types can be used as keys in a map
 -- TODO: Fix this
 select c.*
-from users, contract_hierarchies, contracts c
-where contract_hierarchies.creator_id = @user_id
+from users, contract_subgroups, contracts c
+where contract_subgroups.creator_id = @user_id
 	and users.id = @user_id
-	and contract_hierarchies.contract_id = c.id
+	and contract_subgroups.contract_id = c.id
 	and contracts.chain = any(string_to_array(@chains, ',')::int[])
 	and users.deleted = false
-	and contract_hierarchies.deleted = false
+	and contract_subgroups.deleted = false
 	and contracts.deleted = false
   and (c.created_at, c.id) > (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
   and (c.created_at, c.id) < ( sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))

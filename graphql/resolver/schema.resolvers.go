@@ -176,11 +176,11 @@ func (r *communityResolver) Creator(ctx context.Context, obj *model.Community) (
 
 // ParentCommunity is the resolver for the parentCommunity field.
 func (r *communityResolver) ParentCommunity(ctx context.Context, obj *model.Community) (*model.Community, error) {
-	if obj.HelperCommunityData.HierarchyID == "" {
+	if obj.HelperCommunityData.SubgroupID == "" {
 		return nil, nil
 	}
 
-	community, err := publicapi.For(ctx).Contract.GetParentContractByHierarchyID(ctx, obj.HelperCommunityData.HierarchyID)
+	community, err := publicapi.For(ctx).Contract.GetParentContractBySubgroupID(ctx, obj.HelperCommunityData.HierarchyID)
 	if err != nil {
 		return nil, err
 	}

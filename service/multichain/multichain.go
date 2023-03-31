@@ -87,13 +87,12 @@ type ChainAgnosticAddressAtBlock struct {
 
 // ChainAgnosticContract is a contract that is agnostic to the chain it is on
 type ChainAgnosticContract struct {
-	Address        persist.Address `json:"address"`
-	Symbol         string          `json:"symbol"`
-	Name           string          `json:"name"`
-	Description    string          `json:"description"`
-	CreatorAddress persist.Address `json:"creator_address"`
-
-	LatestBlock persist.BlockNumber `json:"latest_block"`
+	Address        persist.Address     `json:"address"`
+	Symbol         string              `json:"symbol"`
+	Name           string              `json:"name"`
+	Description    string              `json:"description"`
+	CreatorAddress persist.Address     `json:"creator_address"`
+	LatestBlock    persist.BlockNumber `json:"latest_block"`
 }
 
 // ChainAgnosticIdentifiers identify tokens despite their chain
@@ -165,6 +164,11 @@ type tokensFetcher interface {
 	GetTokensByTokenIdentifiersAndOwner(context.Context, ChainAgnosticIdentifiers, persist.Address) (ChainAgnosticToken, ChainAgnosticContract, error)
 }
 
+// createdTokensFetcher supports fetching tokens created by an address
+type createdTokensFetcher interface {
+	GetCreatedTokensByWalletAddress(ctx context.Context, address persist.Address) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
+}
+
 // tokenRefresher supports refreshes of a token
 type tokenRefresher interface {
 	RefreshToken(context.Context, ChainAgnosticIdentifiers, persist.Address) error
@@ -179,11 +183,6 @@ type tokenFetcherRefresher interface {
 // contractRefresher supports refreshes of a contract
 type contractRefresher interface {
 	RefreshContract(context.Context, persist.Address) error
-}
-
-// contractFetcher supports fetching contracts
-type contractFetcher interface {
-	CreatedContracts(context.Context, persist.Address) ([]ChainAgnosticContract, error)
 }
 
 // tokenMetadataFetcher supports fetching token metadata
@@ -215,8 +214,8 @@ var chainValidation map[persist.Chain]validation = map[persist.Chain]validation{
 		TokenRefresher:        true,
 		TokenFetcherRefresher: true,
 		ContractRefresher:     true,
-		ContractFetcher:       true,
 		TokenMetadataFetcher:  true,
+		CreatedTokensFetcher:  true,
 	},
 	persist.ChainTezos: {
 		TokensFetcher:         true,
@@ -236,7 +235,7 @@ type validation struct {
 	TokenFetcherRefresher bool `json:"tokenFetcherRefresher"`
 	TokenMetadataFetcher  bool `json:"tokenMetadataFetcher"`
 	ContractRefresher     bool `json:"contractRefresher"`
-	ContractFetcher       bool `json:"contractFetcher"`
+	CreatedTokensFetcher  bool `json:"createdTokensFetcher"`
 }
 
 // validateProviders verifies that the input providers match the expected multichain spec and panics otherwise
@@ -302,11 +301,11 @@ func validateProviders(ctx context.Context, providers []any) map[persist.Chain][
 			if _, ok := p.(contractRefresher); ok {
 				markValid("contractRefresher")
 			}
-			if _, ok := p.(contractFetcher); ok {
-				markValid("contractFetcher")
-			}
 			if _, ok := p.(tokenMetadataFetcher); ok {
 				markValid("tokenMetadataFetcher")
+			}
+			if _, ok := p.(createdTokensFetcher); ok {
+				markValid("createdTokensFetcher")
 			}
 		}
 		validateChain(chain, expected, actual)
@@ -462,15 +461,50 @@ outer:
 		return err
 	}
 
-	_, err = p.processTokensForUser(ctx, tokensFromProviders, persistedContracts, user, chains, false)
+	_, err = p.replaceTokensForUser(ctx, tokensFromProviders, persistedContracts, user, chains)
 	return err
 }
 
-// SyncContractsCreatedByUserID queries each provider to identify contracts created by the given user.
+type createdResult struct {
+	Priority  int
+	Chain     persist.Chain
+	Contracts []ChainAgnosticContract
+	SubGroups []subGroup
+}
+
+type subGroup struct {
+	Slug           string
+	ParentContract persist.Address
+	Tokens         []ChainAgnosticToken
+}
+
+func (f createdResult) ToContracts() chainContracts {
+	return chainContracts{
+		priority:  f.Priority,
+		chain:     f.Chain,
+		contracts: f.Contracts,
+	}
+}
+
+func (f createdResult) ToTokens() chainTokens {
+	tokens := make([]ChainAgnosticToken, 0)
+	for _, subGroup := range f.SubGroups {
+		for _, token := range subGroup.Tokens {
+			tokens = append(tokens, token)
+		}
+	}
+	return chainTokens{
+		priority: f.Priority,
+		chain:    f.Chain,
+		tokens:   tokens,
+	}
+}
+
+// SyncTokensCreatedByUserID queries each provider to identify contracts created by the given user.
 // The method returns after the contracts have been saved to the database. Note that its possible
 // for a provider to not return all contracts created by the user, but only new contracts created
 // since the last sync, if any.
-func (p *Provider) SyncContractsCreatedByUserID(ctx context.Context, userID persist.DBID, chains []persist.Chain, includeAll bool) error {
+func (p *Provider) SyncTokensCreatedByUserID(ctx context.Context, userID persist.DBID, chains []persist.Chain, includeAll bool) error {
 	user, err := p.Repos.UserRepository.GetByID(ctx, userID)
 	if err != nil {
 		return err
@@ -483,9 +517,9 @@ func (p *Provider) SyncContractsCreatedByUserID(ctx context.Context, userID pers
 		}
 	}
 
-	fetchers := matchingProviders[contractFetcher](p.Chains, chains...)
+	fetchers := matchingProviders[createdTokensFetcher](p.Chains, chains...)
 	searchAddresses := matchingAddresses(user.Wallets, chains)
-	g := pool.NewWithResults[chainContracts]().WithContext(ctx).WithCancelOnError()
+	g := pool.NewWithResults[createdResult]().WithContext(ctx).WithCancelOnError()
 
 	for chain, addresses := range searchAddresses {
 		for priority, fetcher := range fetchers[chain] {
@@ -494,12 +528,17 @@ func (p *Provider) SyncContractsCreatedByUserID(ctx context.Context, userID pers
 				p := priority
 				f := fetcher
 				a := address
-				g.Go(func(ctx context.Context) (chainContracts, error) {
-					contracts, err := f.CreatedContracts(ctx, a)
+				g.Go(func(ctx context.Context) (createdResult, error) {
+					tokens, contracts, err := f.GetCreatedTokensByWalletAddress(ctx, a)
 					if err != nil {
-						return chainContracts{}, err
+						return createdResult{}, err
 					}
-					return chainContracts{p, c, contracts}, nil
+					return createdResult{
+						Priority:  p,
+						Chain:     c,
+						Contracts: contracts,
+						Tokens:    tokens,
+					}, nil
 				})
 			}
 		}
@@ -510,8 +549,30 @@ func (p *Provider) SyncContractsCreatedByUserID(ctx context.Context, userID pers
 		return err
 	}
 
-	_, err = p.processContracts(ctx, results)
-	return err
+	chainContracts := make([]chainContracts, 0, len(results))
+	for i, r := range results {
+		chainContracts[i] = r.ToContracts()
+	}
+
+	chainTokens := make([]chainTokens, 0, len(results))
+	for i, r := range results {
+		chainTokens[i] = r.ToTokens()
+	}
+
+	persistedContracts, err := p.processContracts(ctx, chainContracts)
+	if err != nil {
+		return err
+	}
+
+	persistedTokens, err := p.addTokensToUser(ctx, chainTokens, persistedContracts, user, chains)
+	if err != nil {
+		return err
+	}
+
+	return p.addSubgroups(ctx, userID, persistedContracts, persistedTokens, results)
+}
+
+func (p *Provider) addSubgroups(ctx context.Context, userID persist.DBID, contracts []persist.ContractGallery, tokens []persist.TokenGallery, results []createdResult) ([]persist.ContractHierachy, error) {
 }
 
 func (p *Provider) prepTokensForTokenProcessing(ctx context.Context, tokensFromProviders []chainTokens, contracts []persist.ContractGallery, user persist.User) ([]persist.TokenGallery, map[persist.TokenIdentifiers]bool, error) {
@@ -603,6 +664,14 @@ func (p *Provider) processTokensForOwnersOfContract(ctx context.Context, contrac
 	}
 
 	return nil
+}
+
+func (p *Provider) addTokensToUser(ctx context.Context, tokensFromProviders []chainTokens, contracts []persist.ContractGallery, user persist.User, chains []persist.Chain) ([]persist.TokenGallery, error) {
+	return p.processTokensForUser(ctx, tokensFromProviders, contracts, user, chains, false)
+}
+
+func (p *Provider) replaceTokensForUser(ctx context.Context, tokensFromProviders []chainTokens, contracts []persist.ContractGallery, user persist.User, chains []persist.Chain) ([]persist.TokenGallery, error) {
+	return p.processTokensForUser(ctx, tokensFromProviders, contracts, user, chains, true)
 }
 
 func (p *Provider) processTokensForUser(ctx context.Context, tokensFromProviders []chainTokens, contracts []persist.ContractGallery, user persist.User, chains []persist.Chain, skipDelete bool) ([]persist.TokenGallery, error) {
@@ -736,7 +805,7 @@ func (p *Provider) GetTokensOfContractForWallet(ctx context.Context, contractAdd
 		return nil, err
 	}
 
-	return p.processTokensForUser(ctx, tokensFromProviders, persistedContracts, user, []persist.Chain{wallet.Chain()}, true)
+	return p.addTokensToUser(ctx, tokensFromProviders, persistedContracts, user, []persist.Chain{wallet.Chain()})
 }
 
 // GetTokenMetadataByTokenIdentifiers will get the metadata for a given token identifier

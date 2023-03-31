@@ -39,6 +39,10 @@ var baseURL, _ = url.Parse("https://api.opensea.io/api/v1")
 
 var eip1271MagicValue = [4]byte{0x16, 0x26, 0xBA, 0x7E}
 
+var sharedStoreFrontAddresses = []persist.EthereumAddress{
+	"0x495f947276749ce646f68ac8c248420045cb7b5e",
+}
+
 type Provider struct {
 	httpClient *http.Client
 	ethClient  *ethclient.Client
@@ -121,6 +125,7 @@ type Collection struct {
 	Name                  string                  `json:"name"`
 	PayoutAddress         persist.EthereumAddress `json:"payout_address"`
 	PrimaryAssetContracts []Contract              `json:"primary_asset_contracts"`
+	Slug                  string                  `json:"slug"`
 }
 
 // Contract represents an NFT contract from Opensea
@@ -289,9 +294,17 @@ func (d *Provider) GetDisplayNameByAddress(ctx context.Context, addr persist.Add
 	return addr.String()
 }
 
-// CreatedContracts returns contracts created by the provided address
-func (d *Provider) CreatedContracts(ctx context.Context, address persist.Address) ([]multichain.ChainAgnosticContract, error) {
-	return nil, nil
+// GetCreatedTokensByWalletAddress returns a tokens created by the address under the Shared Storefront contract
+func (p *Provider) GetCreatedTokensByWalletAddress(ctx context.Context, walletAddress persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+	assetsChan := make(chan assetsReceieved)
+	go func() {
+		defer close(assetsChan)
+		err := streamAssetsForCollectionEditor(ctx, persist.EthereumAddress(walletAddress), WithResultCh(assetsChan), WithSortAsc(true))
+		if err != nil {
+			assetsChan <- assetsReceieved{err: err}
+		}
+	}()
+	return assetsToTokens(ctx, "", assetsChan, p.ethClient)
 }
 
 // VerifySignature will verify a signature using all available methods (eth_sign and personal_sign)
@@ -426,9 +439,15 @@ func DefaultArgs() QueryOptions {
 	}
 }
 
-func WithResultCh(outCh chan assetsReceieved) func(o *QueryOptions) {
+func WithResultCh(outCh chan assetsReceieved) OptionFunc {
 	return func(o *QueryOptions) {
 		o.outCh = outCh
+	}
+}
+
+func WithSortAsc(sortAsc bool) OptionFunc {
+	return func(o *QueryOptions) {
+		o.sortAsc = sortAsc
 	}
 }
 
@@ -579,6 +598,20 @@ func streamAssetsForTokenIdentifiersAndOwner(ctx context.Context, ownerAddress, 
 	setTokenID(url, tokenID)
 	if ownerAddress != "" {
 		setOwner(url, ownerAddress)
+	}
+	return streamAssets(ctx, url, args.outCh)
+}
+
+func streamAssetsForCollectionEditor(ctx context.Context, editorAddress persist.EthereumAddress, opts ...OptionFunc) error {
+	args := DefaultArgs()
+	for _, opt := range opts {
+		opt(&args)
+	}
+	url := baseURL.JoinPath("assets")
+	setPagingParams(url, args.sortAsc, args.pageSize)
+	setCollectionEditor(url, editorAddress)
+	for _, address := range sharedStoreFrontAddresses {
+		setContractAddress(url, address)
 	}
 	return streamAssets(ctx, url, args.outCh)
 }
@@ -833,6 +866,12 @@ func setContractAddress(url *url.URL, address persist.EthereumAddress) {
 func addContractAddress(url *url.URL, address persist.EthereumAddress) {
 	query := url.Query()
 	query.Add("asset_contract_addresses", address.String())
+	url.RawQuery = query.Encode()
+}
+
+func setCollectionEditor(url *url.URL, address persist.EthereumAddress) {
+	query := url.Query()
+	query.Add("collection_editor", address.String())
 	url.RawQuery = query.Encode()
 }
 
