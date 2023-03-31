@@ -51,6 +51,10 @@ type CommunityByAddressOrError interface {
 	IsCommunityByAddressOrError()
 }
 
+type CommunityGroup interface {
+	IsCommunityGroup()
+}
+
 type ConnectSocialAccountPayloadOrError interface {
 	IsConnectSocialAccountPayloadOrError()
 }
@@ -566,7 +570,6 @@ type CommunitiesConnection struct {
 type Community struct {
 	HelperCommunityData
 	Dbid              persist.DBID            `json:"dbid"`
-	SubGroupID        *persist.DBID           `json:"subGroupId"`
 	LastUpdated       *time.Time              `json:"lastUpdated"`
 	ContractAddress   *persist.ChainAddress   `json:"contractAddress"`
 	CreatorAddress    *persist.ChainAddress   `json:"creatorAddress"`
@@ -578,16 +581,28 @@ type Community struct {
 	ProfileImageURL   *string                 `json:"profileImageURL"`
 	ProfileBannerURL  *string                 `json:"profileBannerURL"`
 	BadgeURL          *string                 `json:"badgeURL"`
+	SubCommunities    []*SubCommunity         `json:"subCommunities"`
 	TokensInCommunity *TokensConnection       `json:"tokensInCommunity"`
 	Owners            *TokenHoldersConnection `json:"owners"`
 }
 
 func (Community) IsNode()                      {}
 func (Community) IsCommunityByAddressOrError() {}
+func (Community) IsCommunityGroup()            {}
 
 type CommunityEdge struct {
 	Node   *Community `json:"node"`
 	Cursor *string    `json:"cursor"`
+}
+
+type CommunityGroupConnection struct {
+	Edges    []*CommunityGroupEdge `json:"edges"`
+	PageInfo *PageInfo             `json:"pageInfo"`
+}
+
+type CommunityGroupEdge struct {
+	Node   CommunityGroup `json:"node"`
+	Cursor *string        `json:"cursor"`
 }
 
 type CommunitySearchResult struct {
@@ -671,8 +686,9 @@ type CreateUserPayload struct {
 func (CreateUserPayload) IsCreateUserPayloadOrError() {}
 
 type CreatedCommunitiesInput struct {
-	Chains           []persist.Chain `json:"chains"`
-	IncludeAllChains *bool           `json:"includeAllChains"`
+	Chains                []persist.Chain `json:"chains"`
+	IncludeSubCommunities bool            `json:"includeSubCommunities"`
+	IncludeAllChains      *bool           `json:"includeAllChains"`
 }
 
 type DebugAuth struct {
@@ -1136,27 +1152,27 @@ func (GalleryUpdatedFeedEventData) IsFeedEventData() {}
 
 type GalleryUser struct {
 	HelperGalleryUserData
-	Dbid                persist.DBID           `json:"dbid"`
-	Username            *string                `json:"username"`
-	Bio                 *string                `json:"bio"`
-	Traits              *string                `json:"traits"`
-	Universal           *bool                  `json:"universal"`
-	Roles               []*persist.Role        `json:"roles"`
-	SocialAccounts      *SocialAccounts        `json:"socialAccounts"`
-	Tokens              []*Token               `json:"tokens"`
-	TokensByChain       *ChainTokens           `json:"tokensByChain"`
-	Wallets             []*Wallet              `json:"wallets"`
-	PrimaryWallet       *Wallet                `json:"primaryWallet"`
-	FeaturedGallery     *Gallery               `json:"featuredGallery"`
-	Galleries           []*Gallery             `json:"galleries"`
-	Badges              []*Badge               `json:"badges"`
-	IsAuthenticatedUser *bool                  `json:"isAuthenticatedUser"`
-	Followers           []*GalleryUser         `json:"followers"`
-	Following           []*GalleryUser         `json:"following"`
-	Feed                *FeedConnection        `json:"feed"`
-	SharedFollowers     *UsersConnection       `json:"sharedFollowers"`
-	SharedCommunities   *CommunitiesConnection `json:"sharedCommunities"`
-	CreatedCommunities  *CommunitiesConnection `json:"createdCommunities"`
+	Dbid                persist.DBID              `json:"dbid"`
+	Username            *string                   `json:"username"`
+	Bio                 *string                   `json:"bio"`
+	Traits              *string                   `json:"traits"`
+	Universal           *bool                     `json:"universal"`
+	Roles               []*persist.Role           `json:"roles"`
+	SocialAccounts      *SocialAccounts           `json:"socialAccounts"`
+	Tokens              []*Token                  `json:"tokens"`
+	TokensByChain       *ChainTokens              `json:"tokensByChain"`
+	Wallets             []*Wallet                 `json:"wallets"`
+	PrimaryWallet       *Wallet                   `json:"primaryWallet"`
+	FeaturedGallery     *Gallery                  `json:"featuredGallery"`
+	Galleries           []*Gallery                `json:"galleries"`
+	Badges              []*Badge                  `json:"badges"`
+	IsAuthenticatedUser *bool                     `json:"isAuthenticatedUser"`
+	Followers           []*GalleryUser            `json:"followers"`
+	Following           []*GalleryUser            `json:"following"`
+	Feed                *FeedConnection           `json:"feed"`
+	SharedFollowers     *UsersConnection          `json:"sharedFollowers"`
+	SharedCommunities   *CommunitiesConnection    `json:"sharedCommunities"`
+	CreatedCommunities  *CommunityGroupConnection `json:"createdCommunities"`
 }
 
 func (GalleryUser) IsNode()                              {}
@@ -1595,6 +1611,20 @@ type SomeoneViewedYourGalleryNotification struct {
 func (SomeoneViewedYourGalleryNotification) IsNotification()        {}
 func (SomeoneViewedYourGalleryNotification) IsNode()                {}
 func (SomeoneViewedYourGalleryNotification) IsGroupedNotification() {}
+
+type SubCommunity struct {
+	Dbid              persist.DBID            `json:"dbid"`
+	CreatorAddress    *persist.ChainAddress   `json:"creatorAddress"`
+	Creator           *GalleryUser            `json:"creator"`
+	ParentCommunity   *Community              `json:"parentCommunity"`
+	Name              *string                 `json:"name"`
+	Description       *string                 `json:"description"`
+	TokensInCommunity *TokensConnection       `json:"tokensInCommunity"`
+	Owners            *TokenHoldersConnection `json:"owners"`
+}
+
+func (SubCommunity) IsNode()           {}
+func (SubCommunity) IsCommunityGroup() {}
 
 type SyncTokensForUsernamePayload struct {
 	Message string `json:"message"`

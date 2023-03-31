@@ -174,6 +174,11 @@ func (r *communityResolver) Creator(ctx context.Context, obj *model.Community) (
 	return resolveGalleryUserByAddress(ctx, *obj.CreatorAddress)
 }
 
+// SubCommunities is the resolver for the subCommunities field.
+func (r *communityResolver) SubCommunities(ctx context.Context, obj *model.Community) ([]*model.SubCommunity, error) {
+	panic(fmt.Errorf("not implemented: SubCommunities - subCommunities"))
+}
+
 // TokensInCommunity is the resolver for the tokensInCommunity field.
 func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokensConnection, error) {
 	if onlyGalleryUsers == nil || (onlyGalleryUsers != nil && !*onlyGalleryUsers) {
@@ -496,29 +501,30 @@ func (r *galleryUserResolver) SharedCommunities(ctx context.Context, obj *model.
 }
 
 // CreatedCommunities is the resolver for the createdCommunities field.
-func (r *galleryUserResolver) CreatedCommunities(ctx context.Context, obj *model.GalleryUser, input model.CreatedCommunitiesInput, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error) {
-	includeAll := false
-	if input.IncludeAllChains != nil {
-		includeAll = *input.IncludeAllChains
-	}
+func (r *galleryUserResolver) CreatedCommunities(ctx context.Context, obj *model.GalleryUser, input model.CreatedCommunitiesInput, before *string, after *string, first *int, last *int) (*model.CommunityGroupConnection, error) {
+	panic("not implemented")
+	// includeAll := false
+	// if input.IncludeAllChains != nil {
+	// 	includeAll = *input.IncludeAllChains
+	// }
 
-	communities, pageInfo, err := publicapi.For(ctx).User.CreatedCommunities(ctx, obj.UserID, input.Chains, includeAll, before, after, first, last)
-	if err != nil {
-		return nil, err
-	}
+	// communities, pageInfo, err := publicapi.For(ctx).User.CreatedCommunities(ctx, obj.UserID, input.Chains, includeAll, before, after, first, last)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-	edges := make([]*model.CommunityEdge, len(communities))
-	for i, community := range communities {
-		edges[i] = &model.CommunityEdge{
-			Node:   communityToModel(ctx, community, util.ToPointer(false)),
-			Cursor: nil, // not used by relay, but relay will complain without this field existing
-		}
-	}
+	// edges := make([]*model.CommunityEdge, len(communities))
+	// for i, community := range communities {
+	// 	edges[i] = &model.CommunityEdge{
+	// 		Node:   communityToModel(ctx, community, util.ToPointer(false)),
+	// 		Cursor: nil, // not used by relay, but relay will complain without this field existing
+	// 	}
+	// }
 
-	return &model.CommunitiesConnection{
-		Edges:    edges,
-		PageInfo: pageInfoToModel(ctx, pageInfo),
-	}, nil
+	// return &model.CommunitiesConnection{
+	// 	Edges:    edges,
+	// 	PageInfo: pageInfoToModel(ctx, pageInfo),
+	// }, nil
 }
 
 // AddUserWallet is the resolver for the addUserWallet field.
@@ -1945,6 +1951,26 @@ func (r *someoneViewedYourGalleryNotificationResolver) Gallery(ctx context.Conte
 	return resolveGalleryByGalleryID(ctx, obj.GalleryID)
 }
 
+// Creator is the resolver for the creator field.
+func (r *subCommunityResolver) Creator(ctx context.Context, obj *model.SubCommunity) (*model.GalleryUser, error) {
+	panic(fmt.Errorf("not implemented: Creator - creator"))
+}
+
+// ParentCommunity is the resolver for the parentCommunity field.
+func (r *subCommunityResolver) ParentCommunity(ctx context.Context, obj *model.SubCommunity) (*model.Community, error) {
+	panic(fmt.Errorf("not implemented: ParentCommunity - parentCommunity"))
+}
+
+// TokensInCommunity is the resolver for the tokensInCommunity field.
+func (r *subCommunityResolver) TokensInCommunity(ctx context.Context, obj *model.SubCommunity, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokensConnection, error) {
+	panic(fmt.Errorf("not implemented: TokensInCommunity - tokensInCommunity"))
+}
+
+// Owners is the resolver for the owners field.
+func (r *subCommunityResolver) Owners(ctx context.Context, obj *model.SubCommunity, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokenHoldersConnection, error) {
+	panic(fmt.Errorf("not implemented: Owners - owners"))
+}
+
 // NewNotification is the resolver for the newNotification field.
 func (r *subscriptionResolver) NewNotification(ctx context.Context) (<-chan model.Notification, error) {
 	return resolveNewNotificationSubscription(ctx), nil
@@ -2284,6 +2310,9 @@ func (r *Resolver) SomeoneViewedYourGalleryNotification() generated.SomeoneViewe
 	return &someoneViewedYourGalleryNotificationResolver{r}
 }
 
+// SubCommunity returns generated.SubCommunityResolver implementation.
+func (r *Resolver) SubCommunity() generated.SubCommunityResolver { return &subCommunityResolver{r} }
+
 // Subscription returns generated.SubscriptionResolver implementation.
 func (r *Resolver) Subscription() generated.SubscriptionResolver { return &subscriptionResolver{r} }
 
@@ -2367,6 +2396,7 @@ type someoneCommentedOnYourFeedEventNotificationResolver struct{ *Resolver }
 type someoneFollowedYouBackNotificationResolver struct{ *Resolver }
 type someoneFollowedYouNotificationResolver struct{ *Resolver }
 type someoneViewedYourGalleryNotificationResolver struct{ *Resolver }
+type subCommunityResolver struct{ *Resolver }
 type subscriptionResolver struct{ *Resolver }
 type tokenResolver struct{ *Resolver }
 type tokenHolderResolver struct{ *Resolver }

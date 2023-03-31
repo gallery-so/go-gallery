@@ -53,6 +53,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"CommunityGroup": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(CommunityGroup)
+		return obj, ok
+	},
+
 	"ConnectSocialAccountPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(ConnectSocialAccountPayloadOrError)
 		return obj, ok

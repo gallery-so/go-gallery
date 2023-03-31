@@ -47,7 +47,7 @@ func (r *Community) ID() GqlID {
 	// func (r *Community) GetGqlIDField_ContractAddress() string
 	// func (r *Community) GetGqlIDField_Chain() string
 	//-----------------------------------------------------------------------------------------------
-	return GqlID(fmt.Sprintf("Community:%s:%s:%s", r.GetGqlIDField_ContractAddress(), r.GetGqlIDField_Chain(), *r.SubGroupID))
+	return GqlID(fmt.Sprintf("Community:%s:%s", r.GetGqlIDField_ContractAddress(), r.GetGqlIDField_Chain()))
 }
 
 func (r *Contract) ID() GqlID {
@@ -102,6 +102,10 @@ func (r *SomeoneViewedYourGalleryNotification) ID() GqlID {
 	return GqlID(fmt.Sprintf("SomeoneViewedYourGalleryNotification:%s", r.Dbid))
 }
 
+func (r *SubCommunity) ID() GqlID {
+	return GqlID(fmt.Sprintf("SubCommunity:%s", r.Dbid))
+}
+
 func (r *Token) ID() GqlID {
 	return GqlID(fmt.Sprintf("Token:%s", r.Dbid))
 }
@@ -128,7 +132,7 @@ type NodeFetcher struct {
 	OnCollection                                  func(ctx context.Context, dbid persist.DBID) (*Collection, error)
 	OnCollectionToken                             func(ctx context.Context, tokenId string, collectionId string) (*CollectionToken, error)
 	OnComment                                     func(ctx context.Context, dbid persist.DBID) (*Comment, error)
-	OnCommunity                                   func(ctx context.Context, contractAddress string, chain string, subGroupId persist.DBID) (*Community, error)
+	OnCommunity                                   func(ctx context.Context, contractAddress string, chain string) (*Community, error)
 	OnContract                                    func(ctx context.Context, dbid persist.DBID) (*Contract, error)
 	OnDeletedNode                                 func(ctx context.Context, dbid persist.DBID) (*DeletedNode, error)
 	OnFeedEvent                                   func(ctx context.Context, dbid persist.DBID) (*FeedEvent, error)
@@ -142,6 +146,7 @@ type NodeFetcher struct {
 	OnSomeoneFollowedYouBackNotification          func(ctx context.Context, dbid persist.DBID) (*SomeoneFollowedYouBackNotification, error)
 	OnSomeoneFollowedYouNotification              func(ctx context.Context, dbid persist.DBID) (*SomeoneFollowedYouNotification, error)
 	OnSomeoneViewedYourGalleryNotification        func(ctx context.Context, dbid persist.DBID) (*SomeoneViewedYourGalleryNotification, error)
+	OnSubCommunity                                func(ctx context.Context, dbid persist.DBID) (*SubCommunity, error)
 	OnToken                                       func(ctx context.Context, dbid persist.DBID) (*Token, error)
 	OnViewer                                      func(ctx context.Context, userId string) (*Viewer, error)
 	OnWallet                                      func(ctx context.Context, dbid persist.DBID) (*Wallet, error)
@@ -178,10 +183,10 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 		}
 		return n.OnComment(ctx, persist.DBID(ids[0]))
 	case "Community":
-		if len(ids) != 3 {
-			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Community' type requires 3 ID component(s) (%d component(s) supplied)", len(ids))}
+		if len(ids) != 2 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Community' type requires 2 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
-		return n.OnCommunity(ctx, string(ids[0]), string(ids[1]), persist.DBID(ids[2]))
+		return n.OnCommunity(ctx, string(ids[0]), string(ids[1]))
 	case "Contract":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Contract' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
@@ -247,6 +252,11 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'SomeoneViewedYourGalleryNotification' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
 		return n.OnSomeoneViewedYourGalleryNotification(ctx, persist.DBID(ids[0]))
+	case "SubCommunity":
+		if len(ids) != 1 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'SubCommunity' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnSubCommunity(ctx, persist.DBID(ids[0]))
 	case "Token":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Token' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
@@ -305,6 +315,8 @@ func (n *NodeFetcher) ValidateHandlers() {
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnSomeoneFollowedYouNotification")
 	case n.OnSomeoneViewedYourGalleryNotification == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnSomeoneViewedYourGalleryNotification")
+	case n.OnSubCommunity == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnSubCommunity")
 	case n.OnToken == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnToken")
 	case n.OnViewer == nil:

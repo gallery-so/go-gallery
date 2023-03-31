@@ -55,7 +55,7 @@ var nodeFetcher = model.NodeFetcher{
 		return resolveCollectionTokenByID(ctx, persist.DBID(tokenId), persist.DBID(collectionId))
 	},
 
-	OnCommunity: func(ctx context.Context, contractAddress string, chain string, subGroupID persist.DBID) (*model.Community, error) {
+	OnCommunity: func(ctx context.Context, contractAddress string, chain string) (*model.Community, error) {
 		if parsed, err := strconv.Atoi(chain); err == nil {
 			return resolveCommunityByContractAddress(ctx, persist.NewChainAddress(persist.Address(contractAddress), persist.Chain(parsed)), util.ToPointer(false))
 		} else {

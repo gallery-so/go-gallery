@@ -105,7 +105,7 @@ type GalleryUser implements Node @goEmbedHelper {
     after: String
     first: Int
     last: Int
-  ): CommunitiesConnection @goField(forceResolver: true)
+  ): CommunityGroupConnection @goField(forceResolver: true)
 }
 
 type Wallet implements Node {
@@ -144,6 +144,7 @@ input ChainPubKeyInput {
 
 input CreatedCommunitiesInput {
   chains: [Chain!]
+  includeSubCommunities: Boolean!
   # When true, return all communities from all chains
   includeAllChains: Boolean
 }
@@ -466,10 +467,33 @@ type TokenHoldersConnection {
   pageInfo: PageInfo!
 }
 
-type Community implements Node @goGqlId(fields: ["contractAddress", "chain", "subGroupId"]) @goEmbedHelper {
+type SubCommunity implements Node {
   dbid: DBID!
   id: ID!
-  subGroupId: DBID
+  creatorAddress: ChainAddress
+  creator: GalleryUser @goField(forceResolver: true)
+  parentCommunity: Community @goField(forceResolver: true)
+  name: String
+  description: String
+  tokensInCommunity(
+    before: String
+    after: String
+    first: Int
+    last: Int
+    onlyGalleryUsers: Boolean
+  ): TokensConnection @goField(forceResolver: true)
+  owners(
+    before: String
+    after: String
+    first: Int
+    last: Int
+    onlyGalleryUsers: Boolean
+  ): TokenHoldersConnection @goField(forceResolver: true)
+}
+
+type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) @goEmbedHelper {
+  dbid: DBID!
+  id: ID!
 
   lastUpdated: Time
 
@@ -483,6 +507,7 @@ type Community implements Node @goGqlId(fields: ["contractAddress", "chain", "su
   profileImageURL: String
   profileBannerURL: String
   badgeURL: String
+  subCommunities: [SubCommunity] @goField(forceResolver: true)
 
   tokensInCommunity(
     before: String
@@ -905,6 +930,18 @@ type UserEdge {
 
 type UsersConnection {
   edges: [UserEdge]
+  pageInfo: PageInfo!
+}
+
+union CommunityGroup = Community | SubCommunity
+
+type CommunityGroupEdge {
+  node: CommunityGroup
+  cursor: String
+}
+
+type CommunityGroupConnection {
+  edges: [CommunityGroupEdge]
   pageInfo: PageInfo!
 }
 
