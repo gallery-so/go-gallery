@@ -21,7 +21,10 @@ type EvalFallbackProvider struct {
 }
 
 type FailureFallbackProvider struct {
-	Primary  tokensOwnerFetcher
+	Primary interface {
+		configurer
+		tokensOwnerFetcher
+	}
 	Fallback tokensOwnerFetcher
 }
 
@@ -101,6 +104,10 @@ func (f *EvalFallbackProvider) GetSubproviders() []any {
 	return []any{f.Primary, f.Fallback}
 }
 
+func (f FailureFallbackProvider) GetBlockchainInfo(ctx context.Context) (BlockchainInfo, error) {
+	return f.Primary.GetBlockchainInfo(ctx)
+}
+
 func (f FailureFallbackProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]ChainAgnosticToken, []ChainAgnosticContract, error) {
 	tokens, contracts, err := f.Primary.GetTokensByWalletAddress(ctx, address, limit, offset)
 	if err != nil {
@@ -120,6 +127,6 @@ func (f FailureFallbackProvider) GetTokensByTokenIdentifiersAndOwner(ctx context
 	return token, contract, nil
 }
 
-func (f *FailureFallbackProvider) GetSubproviders() []any {
+func (f FailureFallbackProvider) GetSubproviders() []any {
 	return []any{f.Primary, f.Fallback}
 }

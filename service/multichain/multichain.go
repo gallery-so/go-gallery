@@ -228,6 +228,21 @@ func getChainProvidersForTask[T any](providers []any) []T {
 	return result
 }
 
+func hasProvidersForTask[T any](providers []any) bool {
+	for _, p := range providers {
+		if _, ok := p.(T); ok {
+			return true
+		} else if subproviders, ok := p.(subproviderProvider); ok {
+			for _, subprovider := range subproviders.GetSubproviders() {
+				if _, ok := subprovider.(T); ok {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 var chainValidation map[persist.Chain]validation = map[persist.Chain]validation{
 	persist.ChainETH: {
 		nameResolver:          true,
@@ -276,31 +291,34 @@ func validateProviders(ctx context.Context, providers []interface{}) map[persist
 
 		hasImplementor := validation{}
 
-		for _, p := range providers {
-			if _, ok := p.(nameResolver); ok {
-				hasImplementor.nameResolver = true
-				requirements.nameResolver = true
-			}
-			if _, ok := p.(verifier); ok {
-				hasImplementor.verifier = true
-				requirements.verifier = true
-			}
-			if _, ok := p.(tokensOwnerFetcher); ok {
-				hasImplementor.tokensOwnerFetcher = true
-				requirements.tokensOwnerFetcher = true
-			}
-			if _, ok := p.(tokensContractFetcher); ok {
-				hasImplementor.tokensContractFetcher = true
-				requirements.tokensContractFetcher = true
-			}
-			if _, ok := p.(contractRefresher); ok {
-				hasImplementor.contractRefresher = true
-				requirements.contractRefresher = true
-			}
-			if _, ok := p.(tokenMetadataFetcher); ok {
-				hasImplementor.tokenMetadataFetcher = true
-				requirements.tokenMetadataFetcher = true
-			}
+		if hasNameResolver := hasProvidersForTask[nameResolver](providers); hasNameResolver {
+			hasImplementor.nameResolver = true
+			requirements.nameResolver = true
+		}
+
+		if hasVerifier := hasProvidersForTask[verifier](providers); hasVerifier {
+			hasImplementor.verifier = true
+			requirements.verifier = true
+		}
+
+		if hasTokensOwnerFetcher := hasProvidersForTask[tokensOwnerFetcher](providers); hasTokensOwnerFetcher {
+			hasImplementor.tokensOwnerFetcher = true
+			requirements.tokensOwnerFetcher = true
+		}
+
+		if hasTokensContractFetcher := hasProvidersForTask[tokensContractFetcher](providers); hasTokensContractFetcher {
+			hasImplementor.tokensContractFetcher = true
+			requirements.tokensContractFetcher = true
+		}
+
+		if hasContractRefresher := hasProvidersForTask[contractRefresher](providers); hasContractRefresher {
+			hasImplementor.contractRefresher = true
+			requirements.contractRefresher = true
+		}
+
+		if hasTokenMetadataFetcher := hasProvidersForTask[tokenMetadataFetcher](providers); hasTokenMetadataFetcher {
+			hasImplementor.tokenMetadataFetcher = true
+			requirements.tokenMetadataFetcher = true
 		}
 
 		if hasImplementor != requirements {
@@ -401,6 +419,7 @@ outer:
 		case <-ctx.Done():
 			return ctx.Err()
 		case err := <-errChan:
+			logger.For(ctx).Errorf("error while syncing tokens for user %s: %s", user.Username, err)
 			errs = append(errs, err)
 		}
 	}
@@ -650,19 +669,16 @@ func (p *Provider) GetTokensOfContractForWallet(ctx context.Context, contractAdd
 
 // GetTokenMetadataByTokenIdentifiers will get the metadata for a given token identifier
 func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contractAddress persist.Address, tokenID persist.TokenID, ownerAddress persist.Address, chain persist.Chain) (persist.TokenMetadata, error) {
-	if _, ok := d.Chains[chain]; !ok {
-		return nil, nil
-	}
 
 	var metadata persist.TokenMetadata
 	var err error
 
-	for _, provider := range d.Chains[chain] {
-		if metadataFetcher, ok := provider.(tokenMetadataFetcher); ok {
-			metadata, err = metadataFetcher.GetTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: contractAddress, TokenID: tokenID}, ownerAddress)
-			if err == nil && len(metadata) > 0 {
-				return metadata, nil
-			}
+	metadataFetchers := getChainProvidersForTask[tokenMetadataFetcher](d.Chains[chain])
+
+	for _, metadataFetcher := range metadataFetchers {
+		metadata, err = metadataFetcher.GetTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: contractAddress, TokenID: tokenID}, ownerAddress)
+		if err == nil && len(metadata) > 0 {
+			return metadata, nil
 		}
 	}
 
@@ -688,12 +704,12 @@ func (d *Provider) DeepRefreshByChain(ctx context.Context, userID persist.DBID, 
 		}
 	}
 
-	for _, provider := range d.Chains[chain] {
+	deepRefreshers := getChainProvidersForTask[deepRefresher](d.Chains[chain])
+
+	for _, refresher := range deepRefreshers {
 		for _, wallet := range addresses {
-			if refresher, ok := provider.(deepRefresher); ok {
-				if err := refresher.DeepRefresh(ctx, wallet); err != nil {
-					return err
-				}
+			if err := refresher.DeepRefresh(ctx, wallet); err != nil {
+				return err
 			}
 		}
 	}
@@ -703,9 +719,6 @@ func (d *Provider) DeepRefreshByChain(ctx context.Context, userID persist.DBID, 
 
 // RunWalletCreationHooks runs hooks for when a wallet is created
 func (d *Provider) RunWalletCreationHooks(ctx context.Context, userID persist.DBID, walletAddress persist.Address, walletType persist.WalletType, chain persist.Chain) error {
-	if _, ok := d.Chains[chain]; !ok {
-		return nil
-	}
 
 	// User doesn't exist
 	_, err := d.Repos.UserRepository.GetByID(ctx, userID)
@@ -713,16 +726,12 @@ func (d *Provider) RunWalletCreationHooks(ctx context.Context, userID persist.DB
 		return err
 	}
 
-	// TODO check if user wallets contains wallet using new util.Contains in other PR
+	walletHookers := getChainProvidersForTask[walletHooker](d.Chains[chain])
 
-	for _, provider := range d.Chains[chain] {
-
-		if hooker, ok := provider.(walletHooker); ok {
-			if err := hooker.WalletCreated(ctx, userID, walletAddress, walletType); err != nil {
-				return err
-			}
+	for _, hooker := range walletHookers {
+		if err := hooker.WalletCreated(ctx, userID, walletAddress, walletType); err != nil {
+			return err
 		}
-
 	}
 
 	return nil
@@ -752,12 +761,12 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 
 	ownerFetchers := getChainProvidersForTask[tokensOwnerFetcher](providers)
 outer:
-	for _, refresher := range ownerFetchers {
+	for _, ownerFetcher := range ownerFetchers {
 
 		id := ChainAgnosticIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID}
 
 		for i, ownerAddress := range ownerAddresses {
-			refreshedToken, contract, err := refresher.GetTokensByTokenIdentifiersAndOwner(ctx, id, ownerAddress)
+			refreshedToken, contract, err := ownerFetcher.GetTokensByTokenIdentifiersAndOwner(ctx, id, ownerAddress)
 			if err != nil {
 				return err
 			}
@@ -792,7 +801,7 @@ outer:
 				return err
 			}
 		}
-
+		return nil
 	}
 	return nil
 }

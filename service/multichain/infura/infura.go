@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"strings"
 
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/multichain"
@@ -38,17 +39,57 @@ func (t TokenID) ToTokenID() persist.TokenID {
 
 }
 
+type Metadata map[string]any
+
+func (m *Metadata) UnmarshalJSON(b []byte) error {
+	if len(b) == 0 || strings.EqualFold(string(b), "null") {
+		return nil
+	}
+
+	var s string
+	var newM map[string]any
+	if err := json.Unmarshal(b, &s); err != nil {
+		if err := json.Unmarshal(b, &newM); err != nil {
+			return fmt.Errorf("failed to unmarshal metadata: %w (%s)", err, string(b))
+		}
+	} else {
+		if err := json.Unmarshal([]byte(s), &newM); err != nil {
+			return fmt.Errorf("failed to unmarshal metadata from string: %w (%s) (%s)", err, s, string(b))
+		}
+	}
+	*m = newM
+
+	return nil
+}
+
 type Token struct {
 	Contract  persist.EthereumAddress `json:"contract"`
-	TokenID   TokenID                 `json:"token_id"`
+	TokenID   TokenID                 `json:"tokenId"`
 	Supply    string                  `json:"supply"`
 	TokenType string                  `json:"type"`
-	Metadata  persist.TokenMetadata   `json:"metadata"`
+	Metadata  Metadata                `json:"metadata"`
 }
 
 type getNFTsForOwnerResponse struct {
 	Cursor string  `json:"cursor"`
 	Assets []Token `json:"assets"`
+}
+
+type getOwnersResponse struct {
+	PageSize int     `json:"pageSize"`
+	Cursor   string  `json:"cursor"`
+	Owners   []Owner `json:"owners"`
+}
+
+type Owner struct {
+	TokenAddress persist.EthereumAddress `json:"tokenAddress"`
+	TokenID      TokenID                 `json:"tokenId"`
+	Amount       string                  `json:"amount"`
+	OwnerOf      persist.EthereumAddress `json:"ownerOf"`
+	ContractType string                  `json:"contractType"`
+	Name         string                  `json:"name"`
+	Symbol       string                  `json:"symbol"`
+	Metadata     Metadata                `json:"metadata"`
 }
 
 func (r *getNFTsForOwnerResponse) GetTokensFromResponse(resp *http.Response) ([]Token, error) {
@@ -62,8 +103,6 @@ func (r *getNFTsForOwnerResponse) GetTokensFromResponse(resp *http.Response) ([]
 func (r *getNFTsForOwnerResponse) GetNextPageKey() string {
 	return r.Cursor
 }
-
-// example request URL https://nft.api.infura.io/networks/1/accounts/0x0a267cf51ef038fc00e71801f5a524aec06e4f07/assets/nfts
 
 const baseURL = "https://nft.api.infura.io/networks/1"
 
@@ -94,11 +133,87 @@ func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.Blockchain
 }
 
 func (p *Provider) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
-	panic("implement me")
+	tokens, err := getNFTsPaginate(ctx, fmt.Sprintf("%s/accounts/%s/assets/nfts", baseURL, address), limit, offset, "", p.httpClient, p.apiKey, p.apiSecret, &getNFTsForOwnerResponse{})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if len(tokens) == 0 {
+		return nil, nil, nil
+	}
+
+	return p.ownedTokensToChainAgnosticTokens(ctx, address, tokens)
 }
 
 func (p *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, tids multichain.ChainAgnosticIdentifiers, owner persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	panic("implement me")
+	owners, err := p.getOwnersPaginate(ctx, tids, owner, "")
+	if err != nil {
+
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
+	}
+
+	if len(owners) == 0 {
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, fmt.Errorf("no owners found for token %s with owner %s", tids, owner)
+	}
+
+	tokens, contracts, err := p.ownersToTokensForOwner(ctx, owner, owners)
+	if err != nil {
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
+	}
+
+	if len(tokens) == 0 {
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, fmt.Errorf("no tokens found for owner %s with tids %s", owner, tids)
+	}
+
+	return tokens[0], contracts[0], nil
+}
+
+func (d *Provider) getOwnersPaginate(ctx context.Context, tids multichain.ChainAgnosticIdentifiers, owner persist.Address, pageKey string) ([]Owner, error) {
+
+	owners := []Owner{}
+
+	url := fmt.Sprintf("%s/nfts/%s/%s/owners", baseURL, tids.ContractAddress, tids.TokenID.Base10String())
+
+	if pageKey != "" {
+		url = fmt.Sprintf("%s?cursor=%s", url, pageKey)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.SetBasicAuth(d.apiKey, d.apiSecret)
+
+	resp, err := d.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get owners from infura api: %s", resp.Status)
+	}
+
+	ownersResp := getOwnersResponse{}
+	if err := json.NewDecoder(resp.Body).Decode(&ownersResp); err != nil {
+		return nil, err
+	}
+
+	owners = append(owners, ownersResp.Owners...)
+
+	if ownersResp.Cursor != "" && ownersResp.Cursor != pageKey {
+
+		newOwners, err := d.getOwnersPaginate(ctx, tids, owner, ownersResp.Cursor)
+		if err != nil {
+			return nil, err
+		}
+
+		owners = append(owners, newOwners...)
+	}
+
+	return owners, nil
 }
 
 func getNFTsPaginate[T tokensPaginated](ctx context.Context, startingURL string, limit, offset int, pageKey string, httpClient *http.Client, key, secret string, result T) ([]Token, error) {
@@ -207,6 +322,30 @@ func (p *Provider) getContractMetadata(ctx context.Context, contract persist.Eth
 	return chainAgnosticContract, nil
 }
 
+func (p *Provider) ownersToTokensForOwner(ctx context.Context, owner persist.Address, owners []Owner) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+	result := Token{}
+	found := false
+	for _, o := range owners {
+		if strings.EqualFold(owner.String(), o.OwnerOf.String()) {
+			result = Token{
+				Contract:  o.TokenAddress,
+				TokenID:   o.TokenID,
+				Supply:    o.Amount,
+				TokenType: o.ContractType,
+				Metadata:  o.Metadata,
+			}
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return nil, nil, fmt.Errorf("owner %s not found", owner.String())
+	}
+
+	return p.ownedTokensToChainAgnosticTokens(ctx, owner, []Token{result})
+}
+
 func (p *Provider) ownedTokensToChainAgnosticTokens(ctx context.Context, owner persist.Address, tokens []Token) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 
 	chainAgnosticTokens := []multichain.ChainAgnosticToken{}
@@ -250,7 +389,7 @@ func ownedTokenToChainAgnosticToken(owner persist.Address, token Token) multicha
 
 	chainAgnosticToken := multichain.ChainAgnosticToken{
 		TokenType:       tokenType,
-		TokenMetadata:   token.Metadata,
+		TokenMetadata:   persist.TokenMetadata(token.Metadata),
 		TokenID:         token.TokenID.ToTokenID(),
 		OwnerAddress:    owner,
 		ContractAddress: persist.Address(token.Contract),
