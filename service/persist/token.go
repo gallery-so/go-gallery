@@ -250,47 +250,6 @@ func (m Media) IsServable() bool {
 	return m.MediaURL != "" && m.MediaType.IsValid()
 }
 
-// NFT represents an old nft throughout the application
-type NFT struct {
-	Version         NullInt32       `json:"version"` // schema version for this model
-	ID              DBID            `json:"id" binding:"required"`
-	CreationTime    CreationTime    `json:"created_at"`
-	Deleted         NullBool        `json:"-"`
-	LastUpdatedTime LastUpdatedTime `json:"last_updated"`
-
-	CollectorsNote NullString `json:"collectors_note"`
-
-	// OwnerUsers     []*User  `bson:"owner_users" json:"owner_users"`
-	OwnerAddress EthereumAddress `json:"owner_address"`
-
-	MultipleOwners NullBool `json:"multiple_owners"`
-
-	Name                NullString      `json:"name"`
-	Description         NullString      `json:"description"`
-	ExternalURL         NullString      `json:"external_url"`
-	TokenMetadataURL    NullString      `json:"token_metadata_url"`
-	CreatorAddress      EthereumAddress `json:"creator_address"`
-	CreatorName         NullString      `json:"creator_name"`
-	Contract            NFTContract     `json:"asset_contract"`
-	TokenCollectionName NullString      `json:"token_collection_name"`
-
-	OpenseaID NullInt64 `json:"opensea_id"`
-	// OPEN_SEA_TOKEN_ID
-	// https://api.opensea.io/api/v1/asset/0xa7d8d9ef8d8ce8992df33d8b8cf4aebabd5bd270/26000331
-	// (/asset/:contract_address/:token_id)
-	OpenseaTokenID TokenID `json:"opensea_token_id"`
-
-	// IMAGES - OPENSEA
-	ImageURL             NullString `json:"image_url"`
-	ImageThumbnailURL    NullString `json:"image_thumbnail_url"`
-	ImagePreviewURL      NullString `json:"image_preview_url"`
-	ImageOriginalURL     NullString `json:"image_original_url"`
-	AnimationURL         NullString `json:"animation_url"`
-	AnimationOriginalURL NullString `json:"animation_original_url"`
-
-	AcquisitionDateStr NullString `json:"acquisition_date"`
-}
-
 // NFTContract represents a smart contract's information for a given NFT
 type NFTContract struct {
 	ContractAddress      EthereumAddress `json:"address"`
