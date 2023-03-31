@@ -133,6 +133,7 @@ func SetDefaults() {
 	viper.SetDefault("SENTRY_DSN", "")
 	viper.SetDefault("IMGIX_API_KEY", "")
 	viper.SetDefault("VERSION", "")
+	viper.SetDefault("ALCHEMY_API_URL", "")
 	viper.AutomaticEnv()
 }
 
