@@ -184,13 +184,6 @@ type deepRefresher interface {
 type tokenMetadataFetcher interface {
 	GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti ChainAgnosticIdentifiers, ownerAddress persist.Address) (persist.TokenMetadata, error)
 }
-type ConvertableToken interface {
-	ToChainAgnosticToken(any) ChainAgnosticToken
-}
-type TokensPaginated interface {
-	GetTokensFromResponse(resp *http.Response) ([]ConvertableToken, error)
-	GetNextPageKey() string
-}
 
 type subproviderProvider interface {
 	GetSubproviders() []any
