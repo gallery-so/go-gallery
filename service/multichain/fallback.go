@@ -20,6 +20,8 @@ type EvalFallbackProvider struct {
 	Eval     func(context.Context, ChainAgnosticToken) bool
 }
 
+// FailureFallbackProvider will call its fallback if the primary Provider's token
+// response fails (returns an error)
 type FailureFallbackProvider struct {
 	Primary interface {
 		configurer
