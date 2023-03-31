@@ -19,7 +19,7 @@ const (
 	objktEndpoint = "https://data.objkt.com/v3/graphql"
 )
 
-type inputArgs map[string]interface{}
+type inputArgs map[string]any
 
 type attribute struct {
 	Name  string

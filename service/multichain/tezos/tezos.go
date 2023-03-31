@@ -49,24 +49,24 @@ func (e ErrNoTokensFoundByIdentifiers) Error() string {
 }
 
 type tzMetadata struct {
-	Date               string      `json:"date"`
-	Name               string      `json:"name"`
-	Tags               interface{} `json:"tags"`
-	Image              string      `json:"image"`
-	Minter             string      `json:"minter"`
-	Rights             string      `json:"rights"`
-	Symbol             string      `json:"symbol"`
-	Formats            interface{}
-	Creators           interface{} `json:"creators"`
-	Decimals           string      `json:"decimals"`
-	Attributes         interface{}
-	DisplayURI         string      `json:"displayUri"`
-	ArtifactURI        string      `json:"artifactUri"`
-	Description        string      `json:"description"`
-	MintingTool        string      `json:"mintingTool"`
-	ThumbnailURI       string      `json:"thumbnailUri"`
-	IsBooleanAmount    interface{} `json:"isBooleanAmount"`
-	ShouldPreferSymbol interface{} `json:"shouldPreferSymbol"`
+	Date               string `json:"date"`
+	Name               string `json:"name"`
+	Tags               any    `json:"tags"`
+	Image              string `json:"image"`
+	Minter             string `json:"minter"`
+	Rights             string `json:"rights"`
+	Symbol             string `json:"symbol"`
+	Formats            any
+	Creators           any    `json:"creators"`
+	Decimals           string `json:"decimals"`
+	Attributes         any
+	DisplayURI         string `json:"displayUri"`
+	ArtifactURI        string `json:"artifactUri"`
+	Description        string `json:"description"`
+	MintingTool        string `json:"mintingTool"`
+	ThumbnailURI       string `json:"thumbnailUri"`
+	IsBooleanAmount    any    `json:"isBooleanAmount"`
+	ShouldPreferSymbol any    `json:"shouldPreferSymbol"`
 }
 
 type tzAccount struct {
