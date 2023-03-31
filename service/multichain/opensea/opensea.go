@@ -120,6 +120,7 @@ type Order struct {
 // Collection is a collection from OpenSea
 type Collection struct {
 	Name                  string                  `json:"name"`
+	Description           string                  `json:"description"`
 	PayoutAddress         persist.EthereumAddress `json:"payout_address"`
 	PrimaryAssetContracts []Contract              `json:"primary_asset_contracts"`
 	Slug                  string                  `json:"slug"`
@@ -639,6 +640,8 @@ func assetsToGroups(ctx context.Context, assetsChan <-chan assetsReceieved, ethC
 			if _, seen := slugs[slug]; !seen {
 				slugs[slug] = multichain.SubContractGroup{
 					Slug:           slug,
+					Name:           asset.Collection.Name,
+					Description:    asset.Collection.Description,
 					ParentContract: contracts[contractAsStr],
 					Tokens:         make([]multichain.ChainAgnosticToken, 0),
 				}

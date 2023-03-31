@@ -11,18 +11,7 @@ import (
 )
 
 const upsertContracts = `-- name: UpsertContracts :many
-insert into contracts
-(
-  id
-  , deleted
-  , version
-  , created_at
-  , address
-  , symbol
-  , name
-  , creator_address
-  , chain
-) (
+insert into contracts (id, deleted, version, created_at, address, symbol, name, creator_address, chain) (
   select
   unnest($1::varchar[])
   , unnest($2::boolean[])
@@ -34,13 +23,14 @@ insert into contracts
   , unnest($8::varchar[])
   , unnest($9::int[])
 )
-on conflict (address, chain) where deleted = false
+on conflict (address, chain)
 do update set
   symbol = excluded.symbol
   , version = excluded.version
   , name = excluded.name
   , creator_address = excluded.creator_address
   , chain = excluded.chain
+  , deleted = exlucded.deleted
   , last_updated = now()
 returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description
 `
@@ -103,16 +93,7 @@ func (q *Queries) UpsertContracts(ctx context.Context, arg UpsertContractsParams
 }
 
 const upsertCreatedTokens = `-- name: UpsertCreatedTokens :many
-with contract_subgroups_data(
-  id
-  , deleted
-  , created_at
-  , creator_id
-  , parent_id
-  , external_id
-  , contract_address
-  , chain
-) as (
+with contract_subgroups_data(id, deleted, created_at, creator_id, parent_id, external_id, name, description, contract_address, chain) as (
   select
   unnest($1::varchar[])
   , unnest($2::boolean[])
@@ -122,105 +103,79 @@ with contract_subgroups_data(
   , unnest($6::varchar[])
   , unnest($7::varchar[])
   , unnest($8::varchar[])
+  -- These fields are only used as conditions of the join
+  -- and aren't actually inserted into the table
+  , unnest($9::varchar[])
+  , unnest($10::int[])
 ),
-token_subgroups_data(
-  id
-  , deleted
-  , token_id
-  , subgroup_id
-  , created_at
-  , contract_address
-  , chain
-) as (
+token_subgroups_data(id, deleted, token_id, subgroup_id, created_at, contract_address, chain) as (
   select
-  unnest($9::varchar[])
-  , unnest($10::boolean[])
+  unnest($11::varchar[])
+  , unnest($12::boolean[])
+  , unnest($13::varchar[])
   , unnest($11::varchar[])
-  , unnest($12::varchar[])
-  , unnest($13::timestamptz[])
-  , unnest($14::varchar[])
+  , unnest($14::timestamptz[])
+  -- These fields are only used as conditions of the join
+  -- and aren't actually inserted into the table
   , unnest($15::varchar[])
+  , unnest($16::int[])
 ),
 insert_contract_subgroups as (
-  insert into contract_subgroups
-  (
-    id
-    , creator_id
-    , parent_id
-    , external_id
-    , created_at
-    , deleted
-  ) (
-    select
-    id
-    , creator_id
-    , parent_id
-    , external_id
-    , created_at
-    , deleted
+  insert into contract_subgroups (id, creator_id, parent_id, external_id, name, description, created_at, deleted) (
+    select id, creator_id, parent_id, external_id, name, description, created_at, deleted
     from contract_subgroups_data
   )
   on conflict (creator_id, parent_id) where deleted = false
-  do update set external_id = excluded.external_id , last_updated = now()
-  returning id, creator_id, parent_id, external_id, created_at, last_updated, deleted
+  do update set external_id = excluded.external_id, name = excluded.name, description = excluded.description, last_updated = now()
+  returning id, creator_id, parent_id, external_id, name, description, created_at, last_updated, deleted, version
 )
-insert into token_subgroups (
-  id
-  , token_id
-  , subgroup_id
-  , created_at
-  , deleted
-) (
-  select
-  t.id
-  , t.token_id
-  , i.id
-  , t.created_at
-  , t.deleted
+insert into token_subgroups (id , token_id, subgroup_id, created_at, deleted) (
+  select t.id, t.token_id, i.id, t.created_at, t.deleted
   from token_subgroups_data t, contract_subgroups_data c, insert_contract_subgroups i
-  where
-    t.contract_address = c.contract_address
+  where t.contract_address = c.contract_address
     and t.chain = c.chain
     and c.contract_address = i.parent_id
     and c.creator_id = i.creator_id
 )
 on conflict(token_id, subgroup_id) where deleted = false
-do update set last_updated = now()
+do update set deleted = excluded.deleted, last_updated = now()
 returning id, token_id, subgroup_id, created_at, last_updated, deleted
 `
 
 type UpsertCreatedTokensParams struct {
-	ContractID              []string
-	ContractDeleted         []bool
-	ContractCreatedAt       []time.Time
-	ContractCreatorID       []string
-	ContractParentID        []string
-	ContractExternalID      []string
-	ContractContractAddress []string
-	ContractChain           []string
-	TokenID                 []string
-	TokenDeleted            []bool
-	TokenTokenID            []string
-	TokenSubgroupID         []string
-	TokenCreatedAt          []time.Time
-	TokenContractAddress    []string
-	TokenChain              []string
+	ContractSubgroupID          []string
+	ContractDeleted             []bool
+	ContractCreatedAt           []time.Time
+	ContractSubgroupCreatorID   []string
+	ContractParentID            []string
+	ContractExternalID          []string
+	ContractSubgroupName        []string
+	ContractSubgroupDescription []string
+	ContractContractAddress     []string
+	ContractChain               []int32
+	TokenSubgroupID             []string
+	TokenDeleted                []bool
+	TokenDbid                   []string
+	TokenCreatedAt              []time.Time
+	TokenContractAddress        []string
+	TokenChain                  []int32
 }
 
 func (q *Queries) UpsertCreatedTokens(ctx context.Context, arg UpsertCreatedTokensParams) ([]TokenSubgroup, error) {
 	rows, err := q.db.Query(ctx, upsertCreatedTokens,
-		arg.ContractID,
+		arg.ContractSubgroupID,
 		arg.ContractDeleted,
 		arg.ContractCreatedAt,
-		arg.ContractCreatorID,
+		arg.ContractSubgroupCreatorID,
 		arg.ContractParentID,
 		arg.ContractExternalID,
+		arg.ContractSubgroupName,
+		arg.ContractSubgroupDescription,
 		arg.ContractContractAddress,
 		arg.ContractChain,
-		arg.TokenID,
-		arg.TokenDeleted,
-		arg.TokenTokenID,
 		arg.TokenSubgroupID,
+		arg.TokenDeleted,
+		arg.TokenDbid,
 		arg.TokenCreatedAt,
 		arg.TokenContractAddress,
 		arg.TokenChain,

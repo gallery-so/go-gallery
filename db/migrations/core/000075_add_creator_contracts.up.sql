@@ -1,6 +1,6 @@
 create table if not exists contract_subgroups (
   id varchar(255) primary key,
-  creator_address varchar(255) string,
+  creator_id varchar(255) references users(id),
   parent_id varchar(255) references contracts(id),
   external_id varchar(255),
   name varchar,
@@ -8,7 +8,7 @@ create table if not exists contract_subgroups (
   created_at timestamptz not null default current_timestamp,
   last_updated timestamptz not null default current_timestamp,
   deleted boolean default false not null,
-  version not null default 0,
+  version int not null default 0,
   unique(creator_address, parent_id)
 );
 

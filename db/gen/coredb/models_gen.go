@@ -77,9 +77,12 @@ type ContractSubgroup struct {
 	CreatorID   persist.DBID
 	ParentID    persist.DBID
 	ExternalID  persist.DBID
+	Name        sql.NullString
+	Description sql.NullString
 	CreatedAt   time.Time
 	LastUpdated time.Time
 	Deleted     bool
+	Version     int32
 }
 
 type DevMetadataUser struct {
