@@ -268,6 +268,6 @@ func contractToChainAgnostic(contract persist.Contract) multichain.ChainAgnostic
 		Address:        persist.Address(contract.Address.String()),
 		Name:           contract.Name.String(),
 		Symbol:         contract.Symbol.String(),
-		CreatorAddress: persist.Address(contract.CreatorAddress.String()),
+		CreatorAddress: persist.Address(contract.OwnerAddress.String()),
 	}
 }

@@ -352,6 +352,7 @@ solc:
 	solc --abi ./contracts/sol/Zora.sol > ./contracts/abi/Zora.abi
 	solc --abi ./contracts/sol/Merch.sol > ./contracts/abi/Merch.abi
 	solc --abi ./contracts/sol/PremiumCards.sol > ./contracts/abi/PremiumCards.abi
+	solc --abi ./contracts/sol/Ownable.sol > ./contracts/abi/Ownable.abi
 	tail -n +4 "./contracts/abi/IERC721.abi" > "./contracts/abi/IERC721.abi.tmp" && mv "./contracts/abi/IERC721.abi.tmp" "./contracts/abi/IERC721.abi"
 	tail -n +4 "./contracts/abi/IERC20.abi" > "./contracts/abi/IERC20.abi.tmp" && mv "./contracts/abi/IERC20.abi.tmp" "./contracts/abi/IERC20.abi"
 	tail -n +4 "./contracts/abi/IERC721Metadata.abi" > "./contracts/abi/IERC721Metadata.abi.tmp" && mv "./contracts/abi/IERC721Metadata.abi.tmp" "./contracts/abi/IERC721Metadata.abi"
@@ -364,6 +365,7 @@ solc:
 	tail -n +4 "./contracts/abi/Zora.abi" > "./contracts/abi/Zora.abi.tmp" && mv "./contracts/abi/Zora.abi.tmp" "./contracts/abi/Zora.abi"
 	tail -n +4 "./contracts/abi/Merch.abi" > "./contracts/abi/Merch.abi.tmp" && mv "./contracts/abi/Merch.abi.tmp" "./contracts/abi/Merch.abi"
 	tail -n +4 "./contracts/abi/PremiumCards.abi" > "./contracts/abi/PremiumCards.abi.tmp" && mv "./contracts/abi/PremiumCards.abi.tmp" "./contracts/abi/PremiumCards.abi"
+	tail -n +4 "./contracts/abi/Ownable.abi" > "./contracts/abi/Ownable.abi.tmp" && mv "./contracts/abi/Ownable.abi.tmp" "./contracts/abi/Ownable.abi"
 
 abi-gen:
 	abigen --abi=./contracts/abi/IERC721.abi --pkg=contracts --type=IERC721 > ./contracts/IERC721.go
@@ -378,6 +380,7 @@ abi-gen:
 	abigen --abi=./contracts/abi/Zora.abi --pkg=contracts --type=Zora > ./contracts/Zora.go
 	abigen --abi=./contracts/abi/Merch.abi --pkg=contracts --type=Merch > ./contracts/Merch.go
 	abigen --abi=./contracts/abi/PremiumCards.abi --pkg=contracts --type=PremiumCards > ./contracts/PremiumCards.go
+	abigen --abi=./contracts/abi/Ownable.abi --pkg=contracts --type=Ownable > ./contracts/Ownable.go
 
 # Miscellaneous stuff
 docker-start-clean:	docker-build

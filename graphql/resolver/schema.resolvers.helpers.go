@@ -1644,7 +1644,7 @@ func walletToModelSqlc(ctx context.Context, wallet db.Wallet) *model.Wallet {
 func contractToModel(ctx context.Context, contract db.Contract) *model.Contract {
 	chain := contract.Chain
 	addr := persist.NewChainAddress(contract.Address, chain)
-	creator := persist.NewChainAddress(contract.CreatorAddress, chain)
+	creator := persist.NewChainAddress(contract.OwnerAddress, chain)
 
 	return &model.Contract{
 		Dbid:             contract.ID,
@@ -1811,7 +1811,7 @@ func tokenCollectionToModel(ctx context.Context, token *model.Token, collectionI
 func communityToModel(ctx context.Context, community db.Contract, forceRefresh *bool) *model.Community {
 	lastUpdated := community.LastUpdated
 	contractAddress := persist.NewChainAddress(community.Address, community.Chain)
-	creatorAddress := persist.NewChainAddress(community.CreatorAddress, community.Chain)
+	creatorAddress := persist.NewChainAddress(community.OwnerAddress, community.Chain)
 	chain := community.Chain
 	return &model.Community{
 		HelperCommunityData: model.HelperCommunityData{

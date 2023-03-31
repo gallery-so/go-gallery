@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"net/http"
 	"sort"
 	"strconv"
 	"strings"
@@ -107,6 +108,7 @@ type getLogsFunc func(ctx context.Context, curBlock, nextBlock *big.Int, topics 
 // into a format used by the application
 type indexer struct {
 	ethClient         *ethclient.Client
+	httpClient        *http.Client
 	ipfsClient        *shell.Shell
 	arweaveClient     *goar.Client
 	storageClient     *storage.Client
@@ -135,12 +137,13 @@ type indexer struct {
 }
 
 // newIndexer sets up an indexer for retrieving the specified events that will process tokens
-func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, addressFilterRepo refresh.AddressFilterRepository, pChain persist.Chain, pEvents []eventHash, getLogsFunc getLogsFunc, startingBlock, maxBlock *uint64) *indexer {
+func newIndexer(ethClient *ethclient.Client, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, addressFilterRepo refresh.AddressFilterRepository, pChain persist.Chain, pEvents []eventHash, getLogsFunc getLogsFunc, startingBlock, maxBlock *uint64) *indexer {
 	if rpcEnabled && ethClient == nil {
 		panic("RPC is enabled but an ethClient wasn't provided!")
 	}
 	i := &indexer{
 		ethClient:         ethClient,
+		httpClient:        httpClient,
 		ipfsClient:        ipfsClient,
 		arweaveClient:     arweaveClient,
 		storageClient:     storageClient,
@@ -287,7 +290,7 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 
 	startTime := time.Now()
 	transfers := make(chan []transfersAtBlock)
-	plugins := NewTransferPlugins(ctx, i.ethClient, i.tokenRepo, i.addressFilterRepo)
+	plugins := NewTransferPlugins(ctx, i.ethClient, i.httpClient)
 	enabledPlugins := []chan<- TransferPluginMsg{plugins.contracts.in}
 
 	logsToCheckAgainst := make(chan []types.Log)
@@ -311,7 +314,7 @@ func (i *indexer) startNewBlocksPipeline(ctx context.Context, topics [][]common.
 	defer tracing.FinishSpan(span)
 
 	transfers := make(chan []transfersAtBlock)
-	plugins := NewTransferPlugins(ctx, i.ethClient, i.tokenRepo, i.addressFilterRepo)
+	plugins := NewTransferPlugins(ctx, i.ethClient, i.httpClient)
 	enabledPlugins := []chan<- TransferPluginMsg{plugins.contracts.in}
 	logsToCheckAgainst := make(chan []types.Log)
 	go i.pollNewLogs(sentryutil.NewSentryHubContext(ctx), transfers, logsToCheckAgainst, topics)
@@ -806,7 +809,7 @@ func contractsPluginReceiver(cur contractAtBlock, inc contractAtBlock) contractA
 	return inc
 }
 
-func fillContractFields(ctx context.Context, ethClient *ethclient.Client, contractAddress persist.EthereumAddress, lastSyncedBlock persist.BlockNumber) persist.Contract {
+func fillContractFields(ctx context.Context, ethClient *ethclient.Client, httpClient *http.Client, contractAddress persist.EthereumAddress, lastSyncedBlock persist.BlockNumber) persist.Contract {
 	c := persist.Contract{
 		Address:     contractAddress,
 		LatestBlock: lastSyncedBlock,
@@ -821,6 +824,15 @@ func fillContractFields(ctx context.Context, ethClient *ethclient.Client, contra
 	} else {
 		c.Name = persist.NullString(cMetadata.Name)
 		c.Symbol = persist.NullString(cMetadata.Symbol)
+	}
+
+	cOwner, err := GetContractOwner(ctx, contractAddress, ethClient, httpClient)
+	if err != nil {
+		logger.For(ctx).WithError(err).WithFields(logrus.Fields{
+			"contractAddress": contractAddress,
+		}).Error("error getting contract owner")
+	} else {
+		c.OwnerAddress = cOwner
 	}
 	return c
 }

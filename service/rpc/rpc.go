@@ -1000,6 +1000,23 @@ func GetContractCreator(ctx context.Context, contractAddress persist.EthereumAdd
 	return "", fmt.Errorf("could not find contract creator")
 }
 
+// GetContractOwner returns the address of the contract owner
+func GetContractOwner(ctx context.Context, contractAddress persist.EthereumAddress, ethClient *ethclient.Client) (persist.EthereumAddress, error) {
+	instance, err := contracts.NewOwnableCaller(contractAddress.Address(), ethClient)
+	if err != nil {
+		return "", err
+	}
+
+	owner, err := instance.Owner(&bind.CallOpts{
+		Context: ctx,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return persist.EthereumAddress(strings.ToLower(owner.String())), nil
+}
+
 /*
 	{
 	  "manifest": "arweave/paths",

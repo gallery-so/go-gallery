@@ -3,13 +3,13 @@ package indexer
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gammazero/workerpool"
 	"github.com/getsentry/sentry-go"
-	"github.com/mikeydub/go-gallery/indexer/refresh"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
@@ -67,9 +67,9 @@ func startSpan(ctx context.Context, plugin, op string) (*sentry.Span, context.Co
 // NewTransferPlugins returns a set of transfer plugins. Plugins have an `in` and an optional `out` channel that are handles to the service.
 // The `in` channel is used to submit a transfer to a plugin, and the `out` channel is used to receive results from a plugin, if any.
 // A plugin can be stopped by closing its `in` channel, which finishes the plugin and lets receivers know that its done.
-func NewTransferPlugins(ctx context.Context, ethClient *ethclient.Client, tokenRepo persist.TokenRepository, addressFilterRepo refresh.AddressFilterRepository) TransferPlugins {
+func NewTransferPlugins(ctx context.Context, ethClient *ethclient.Client, httpClient *http.Client) TransferPlugins {
 	return TransferPlugins{
-		contracts: newContractsPlugin(sentryutil.NewSentryHubContext(ctx), ethClient),
+		contracts: newContractsPlugin(sentryutil.NewSentryHubContext(ctx), ethClient, httpClient),
 	}
 }
 
@@ -129,7 +129,7 @@ type contractTransfersPlugin struct {
 	out chan contractAtBlock
 }
 
-func newContractsPlugin(ctx context.Context, ethClient *ethclient.Client) contractTransfersPlugin {
+func newContractsPlugin(ctx context.Context, ethClient *ethclient.Client, httpClient *http.Client) contractTransfersPlugin {
 	in := make(chan TransferPluginMsg)
 	out := make(chan contractAtBlock)
 
@@ -150,7 +150,7 @@ func newContractsPlugin(ctx context.Context, ethClient *ethclient.Client) contra
 				if persist.TokenType(msg.transfer.TokenType) == persist.TokenTypeERC721 {
 					if rpcEnabled {
 
-						contract := fillContractFields(ctx, ethClient, msg.transfer.ContractAddress, msg.transfer.BlockNumber)
+						contract := fillContractFields(ctx, ethClient, httpClient, msg.transfer.ContractAddress, msg.transfer.BlockNumber)
 						out <- contractAtBlock{
 							ti: msg.key,
 							boi: blockchainOrderInfo{

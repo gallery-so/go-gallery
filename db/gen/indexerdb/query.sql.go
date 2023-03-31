@@ -10,7 +10,7 @@ import (
 )
 
 const firstContract = `-- name: FirstContract :one
-SELECT id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, latest_block FROM contracts LIMIT 1
+SELECT id, deleted, version, created_at, last_updated, name, symbol, address, chain, latest_block, owner_address FROM contracts LIMIT 1
 `
 
 // sqlc needs at least one query in order to generate the models.
@@ -26,9 +26,9 @@ func (q *Queries) FirstContract(ctx context.Context) (Contract, error) {
 		&i.Name,
 		&i.Symbol,
 		&i.Address,
-		&i.CreatorAddress,
 		&i.Chain,
 		&i.LatestBlock,
+		&i.OwnerAddress,
 	)
 	return i, err
 }

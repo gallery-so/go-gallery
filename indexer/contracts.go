@@ -2,26 +2,39 @@ package indexer
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/multichain/alchemy"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/util"
 )
+
+func init() {
+	env.RegisterValidation("ALCHEMY_API_URL", "required")
+}
 
 // GetContractOutput is the response for getting a single smart contract
 type GetContractOutput struct {
 	Contract persist.Contract `json:"contract"`
 }
 
+// GetContractsOutput is the response for getting multiple smart contracts
+type GetContractsOutput struct {
+	Contracts []persist.Contract `json:"contracts"`
+}
+
 // GetContractInput is the input to the Get Contract endpoint
 type GetContractInput struct {
-	Address persist.EthereumAddress `form:"address,required"`
+	Address persist.EthereumAddress `form:"address"`
+	Owner   persist.EthereumAddress `form:"owner"`
 }
 
 // UpdateContractMetadataInput is used to refresh metadata for a given contract
@@ -38,17 +51,31 @@ func getContract(contractsRepo persist.ContractRepository) gin.HandlerFunc {
 			return
 		}
 
-		contract, err := contractsRepo.GetByAddress(c, input.Address)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
+		if input.Address != "" {
+			contract, err := contractsRepo.GetByAddress(c, input.Address)
+			if err != nil {
+				util.ErrResponse(c, http.StatusInternalServerError, err)
+				return
+			}
+			c.JSON(http.StatusOK, GetContractOutput{Contract: contract})
+			return
+		} else if input.Owner != "" {
+			contracts, err := contractsRepo.GetContractsOwnedByAddress(c, input.Address)
+			if err != nil {
+				util.ErrResponse(c, http.StatusInternalServerError, err)
+				return
+			}
+
+			c.JSON(http.StatusOK, GetContractsOutput{Contracts: contracts})
 			return
 		}
 
-		c.JSON(http.StatusOK, GetContractOutput{Contract: contract})
+		err := util.ErrInvalidInput{Reason: "must specify 'address' or 'owner' field"}
+		util.ErrResponse(c, http.StatusBadRequest, err)
 	}
 }
 
-func updateContractMetadata(contractsRepo persist.ContractRepository, ethClient *ethclient.Client) gin.HandlerFunc {
+func updateContractMetadata(contractsRepo persist.ContractRepository, ethClient *ethclient.Client, httpClient *http.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input UpdateContractMetadataInput
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -57,7 +84,7 @@ func updateContractMetadata(contractsRepo persist.ContractRepository, ethClient 
 			return
 		}
 
-		err := updateMetadataForContract(c, input, ethClient, contractsRepo)
+		err := updateMetadataForContract(c, input, ethClient, httpClient, contractsRepo)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -67,7 +94,7 @@ func updateContractMetadata(contractsRepo persist.ContractRepository, ethClient 
 	}
 }
 
-func updateMetadataForContract(c context.Context, input UpdateContractMetadataInput, ethClient *ethclient.Client, contractsRepo persist.ContractRepository) error {
+func updateMetadataForContract(c context.Context, input UpdateContractMetadataInput, ethClient *ethclient.Client, httpClient *http.Client, contractsRepo persist.ContractRepository) error {
 	newMetadata, err := rpc.GetTokenContractMetadata(c, input.Address, ethClient)
 	if err != nil {
 		return err
@@ -87,12 +114,42 @@ func updateMetadataForContract(c context.Context, input UpdateContractMetadataIn
 	timedContext, cancel := context.WithTimeout(c, time.Second*10)
 	defer cancel()
 
-	creator, err := rpc.GetContractCreator(timedContext, input.Address, ethClient)
+	owner, err := GetContractOwner(timedContext, input.Address, ethClient, httpClient)
 	if err != nil {
 		logger.For(c).WithError(err).Errorf("error finding creator address")
 	} else {
-		up.CreatorAddress = creator
+		up.OwnerAddress = owner
 	}
 
 	return contractsRepo.UpdateByAddress(c, input.Address, up)
+}
+
+func GetContractOwner(ctx context.Context, address persist.EthereumAddress, ethClient *ethclient.Client, httpClient *http.Client) (persist.EthereumAddress, error) {
+
+	owner, err := rpc.GetContractOwner(ctx, address, ethClient)
+	if err == nil {
+		return owner, nil
+	}
+	logger.For(ctx).WithError(err).Errorf("error finding owner address through ownable interface")
+
+	urlForContract := fmt.Sprintf("%s/getContractMetadata?contractAddress=%s", env.GetString("ALCHEMY_API_URL"), address)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlForContract, nil)
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+
+	var cmeta alchemy.GetContractMetadataResponse
+	if err := json.NewDecoder(resp.Body).Decode(&cmeta); err != nil {
+		return "", err
+	}
+
+	if cmeta.ContractMetadata.ContractDeployer != "" {
+		return cmeta.ContractMetadata.ContractDeployer, nil
+	}
+	return rpc.GetContractCreator(ctx, address, ethClient)
 }
