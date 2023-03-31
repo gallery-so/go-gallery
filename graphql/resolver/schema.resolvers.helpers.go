@@ -62,6 +62,9 @@ var nodeFetcher = model.NodeFetcher{
 			return nil, err
 		}
 	},
+	OnSubCommunity: func(ctx context.Context, dbid persist.DBID) (*model.SubCommunity, error) {
+		panic("not implemented")
+	},
 	OnSomeoneAdmiredYourFeedEventNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneAdmiredYourFeedEventNotification, error) {
 		notif, err := resolveNotificationByID(ctx, dbid)
 		if err != nil {

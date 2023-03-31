@@ -64,20 +64,31 @@ func (api ContractAPI) GetContractByAddress(ctx context.Context, contractAddress
 	return &contract, nil
 }
 
-func (api ContractAPI) GetParentContractBySubgroupID(ctx context.Context, hierarchyID persist.DBID) (*db.Contract, error) {
+func (api ContractAPI) GetParentContractBySubgroupID(ctx context.Context, subgroupID persist.DBID) (*db.Contract, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"hierarchyID": {hierarchyID, "required"},
+		"subgroupID": {subgroupID, "required"},
 	}); err != nil {
 		return nil, err
 	}
 
-	contract, err := api.loaders.ContractBySubgroupID.Load(hierarchyID)
+	contract, err := api.loaders.ContractBySubgroupID.Load(subgroupID)
 	if err != nil {
 		return nil, err
 	}
 
 	return &contract, nil
+}
+
+func (api ContractAPI) GetSubgroupsByCommunityID(ctx context.Context, contractID persist.DBID) ([]db.ContractSubgroup, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"contractID": {contractID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	return api.loaders.ContractSubgroupsByContractID.Load(contractID)
 }
 
 func (api ContractAPI) GetContractsByUserID(ctx context.Context, userID persist.DBID) ([]db.Contract, error) {

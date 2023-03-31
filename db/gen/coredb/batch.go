@@ -741,6 +741,76 @@ func (b *GetContractBySubgroupIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getContractSubgroupsByContractIDBatch = `-- name: GetContractSubgroupsByContractIDBatch :batchmany
+select id, creator_id, parent_id, external_id, name, description, creator_address, created_at, last_updated, deleted, version from contract_subgroups where parent_id = $1 and deleted = false
+`
+
+type GetContractSubgroupsByContractIDBatchBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+func (q *Queries) GetContractSubgroupsByContractIDBatch(ctx context.Context, parentID []persist.DBID) *GetContractSubgroupsByContractIDBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range parentID {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(getContractSubgroupsByContractIDBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetContractSubgroupsByContractIDBatchBatchResults{br, len(parentID), false}
+}
+
+func (b *GetContractSubgroupsByContractIDBatchBatchResults) Query(f func(int, []ContractSubgroup, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var items []ContractSubgroup
+		if b.closed {
+			if f != nil {
+				f(t, items, errors.New("batch already closed"))
+			}
+			continue
+		}
+		err := func() error {
+			rows, err := b.br.Query()
+			defer rows.Close()
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var i ContractSubgroup
+				if err := rows.Scan(
+					&i.ID,
+					&i.CreatorID,
+					&i.ParentID,
+					&i.ExternalID,
+					&i.Name,
+					&i.Description,
+					&i.CreatorAddress,
+					&i.CreatedAt,
+					&i.LastUpdated,
+					&i.Deleted,
+					&i.Version,
+				); err != nil {
+					return err
+				}
+				items = append(items, i)
+			}
+			return rows.Err()
+		}()
+		if f != nil {
+			f(t, items, err)
+		}
+	}
+}
+
+func (b *GetContractSubgroupsByContractIDBatchBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const getContractsByUserIDBatch = `-- name: GetContractsByUserIDBatch :batchmany
 SELECT DISTINCT ON (contracts.id) contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description FROM contracts, tokens
     WHERE tokens.owner_user_id = $1 AND tokens.contract = contracts.id

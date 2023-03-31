@@ -1014,3 +1014,6 @@ where a.user_id = @user_a_id
 -- name: AddPiiAccountCreationInfo :exec
 insert into pii.account_creation_info (user_id, ip_address, created_at) values (@user_id, @ip_address, now())
   on conflict do nothing;
+
+-- name: GetContractSubgroupsByContractIDBatch :batchmany
+select * from contract_subgroups where parent_id = $1 and deleted = false;

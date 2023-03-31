@@ -176,7 +176,27 @@ func (r *communityResolver) Creator(ctx context.Context, obj *model.Community) (
 
 // SubCommunities is the resolver for the subCommunities field.
 func (r *communityResolver) SubCommunities(ctx context.Context, obj *model.Community) ([]*model.SubCommunity, error) {
-	panic(fmt.Errorf("not implemented: SubCommunities - subCommunities"))
+	groups, err := publicapi.For(ctx).Contract.GetSubgroupsByCommunityID(ctx, obj.Dbid)
+	if err != nil {
+		return nil, err
+	}
+
+	subCommunities := make([]*model.SubCommunity, len(groups))
+
+	for i, group := range groups {
+		subCommunities[i] = &model.SubCommunity{
+			Dbid:              group.ID,
+			CreatorAddress:    util.ToPointer(persist.NewChainAddress(group.CreatorAddress, *obj.Chain)),
+			Creator:           &model.GalleryUser{Dbid: group.CreatorID}, // Remaining fields handled by dedicated resolver
+			ParentCommunity:   obj,
+			Name:              util.ToPointer(group.Name.String),
+			Description:       util.ToPointer(group.Description.String),
+			TokensInCommunity: nil, // Handled by dedicated resolver
+			Owners:            nil, // Handled by dedicated resolver
+		}
+	}
+
+	return subCommunities, nil
 }
 
 // TokensInCommunity is the resolver for the tokensInCommunity field.
@@ -1953,17 +1973,31 @@ func (r *someoneViewedYourGalleryNotificationResolver) Gallery(ctx context.Conte
 
 // Creator is the resolver for the creator field.
 func (r *subCommunityResolver) Creator(ctx context.Context, obj *model.SubCommunity) (*model.GalleryUser, error) {
-	panic(fmt.Errorf("not implemented: Creator - creator"))
+	return resolveGalleryUserByUserID(ctx, obj.Creator.Dbid)
 }
 
 // ParentCommunity is the resolver for the parentCommunity field.
 func (r *subCommunityResolver) ParentCommunity(ctx context.Context, obj *model.SubCommunity) (*model.Community, error) {
-	panic(fmt.Errorf("not implemented: ParentCommunity - parentCommunity"))
+	community, err := publicapi.For(ctx).Contract.GetParentContractBySubgroupID(ctx, obj.ParentCommunity.Dbid)
+	if err != nil {
+		return nil, err
+	}
+	return communityToModel(ctx, *community, util.ToPointer(false)), nil
 }
 
 // TokensInCommunity is the resolver for the tokensInCommunity field.
 func (r *subCommunityResolver) TokensInCommunity(ctx context.Context, obj *model.SubCommunity, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokensConnection, error) {
-	panic(fmt.Errorf("not implemented: TokensInCommunity - tokensInCommunity"))
+	if onlyGalleryUsers == nil || (onlyGalleryUsers != nil && !*onlyGalleryUsers) {
+		refresh := false
+		if obj.ForceRefresh != nil {
+			refresh = *obj.ForceRefresh
+		}
+		err := refreshTokensInContractAsync(ctx, obj.Dbid, refresh)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return resolveTokensByContractIDWithPagination(ctx, obj.Dbid, before, after, first, last, onlyGalleryUsers)
 }
 
 // Owners is the resolver for the owners field.

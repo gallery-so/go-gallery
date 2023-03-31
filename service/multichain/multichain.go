@@ -480,15 +480,18 @@ type subContractResult struct {
 	Groups   []SubContractGroup
 }
 
+// SubContractGroup represents a subset of tokens within a contract, identified by a slug
 type SubContractGroup struct {
 	Slug           string
 	Name           string
 	Description    string
+	CreatorAddress persist.Address
 	ParentContract ChainAgnosticContract
 	Tokens         []ChainAgnosticToken
 }
 
-func (s subContractResult) ToContracts() chainContracts {
+// Contracts returns umbrella contracts that the user has work deployed on across all chains
+func (s subContractResult) Contracts() chainContracts {
 	contracts := make([]ChainAgnosticContract, 0)
 	for _, subGroup := range s.Groups {
 		contracts = append(contracts, subGroup.ParentContract)
@@ -500,7 +503,8 @@ func (s subContractResult) ToContracts() chainContracts {
 	}
 }
 
-func (s subContractResult) ToTokens() chainTokens {
+// Tokens returns all tokens that the user has created across all chains
+func (s subContractResult) Tokens() chainTokens {
 	tokens := make([]ChainAgnosticToken, 0)
 	for _, subGroup := range s.Groups {
 		for _, token := range subGroup.Tokens {
@@ -512,6 +516,55 @@ func (s subContractResult) ToTokens() chainTokens {
 		chain:    s.Chain,
 		tokens:   tokens,
 	}
+}
+
+type subContractAggregate []subContractResult
+
+// Contracts combines all contracts from all results
+func (s subContractAggregate) Contracts() []chainContracts {
+	contracts := make([]chainContracts, 0, len(s))
+	for i, r := range s {
+		contracts[i] = r.Contracts()
+	}
+	return contracts
+}
+
+// Tokens combines all tokens from all results
+func (s subContractAggregate) Tokens() []chainTokens {
+	tokens := make([]chainTokens, 0, len(s))
+	for i, r := range s {
+		tokens[i] = r.Tokens()
+	}
+	return tokens
+}
+
+type createUserResult struct {
+	NewTokens map[persist.DBID][]chainTokens
+	NewUsers  map[persist.DBID]persist.User
+}
+
+type createUserAggregate []createUserResult
+
+// UserIDToTokens returns a map of user IDs to tokens
+func (c createUserAggregate) UserIDToTokens() map[persist.DBID][]chainTokens {
+	userIDToTokens := make(map[persist.DBID][]chainTokens)
+	for _, result := range c {
+		for userID, tokens := range result.NewTokens {
+			userIDToTokens[userID] = append(userIDToTokens[userID], tokens...)
+		}
+	}
+	return userIDToTokens
+}
+
+// UserIDtoUser returns a map of user IDs to users
+func (c createUserAggregate) UserIDtoUser() map[persist.DBID]persist.User {
+	userIDToUser := make(map[persist.DBID]persist.User)
+	for _, result := range c {
+		for userID, user := range result.NewUsers {
+			userIDToUser[userID] = user
+		}
+	}
+	return userIDToUser
 }
 
 // SyncTokensCreatedByUserID queries each provider to identify contracts created by the given user.
@@ -530,8 +583,9 @@ func (p *Provider) SyncTokensCreatedByUserID(ctx context.Context, userID persist
 
 	fetchers := matchingProviders[subContractGroupFetcher](p.Chains, chains...)
 	searchAddresses := matchingAddresses(user.Wallets, chains)
-	g := pool.NewWithResults[subContractResult]().WithContext(ctx).WithCancelOnError()
+	providerPool := pool.NewWithResults[subContractResult]().WithContext(ctx).WithCancelOnError()
 
+	// Fetch all tokens created by the user
 	for chain, addresses := range searchAddresses {
 		for priority, fetcher := range fetchers[chain] {
 			for _, address := range addresses {
@@ -539,7 +593,7 @@ func (p *Provider) SyncTokensCreatedByUserID(ctx context.Context, userID persist
 				p := priority
 				f := fetcher
 				a := address
-				g.Go(func(ctx context.Context) (subContractResult, error) {
+				providerPool.Go(func(ctx context.Context) (subContractResult, error) {
 					groups, err := f.GetCreatedTokensByWalletAddress(ctx, a)
 					if err != nil {
 						return subContractResult{}, err
@@ -554,36 +608,56 @@ func (p *Provider) SyncTokensCreatedByUserID(ctx context.Context, userID persist
 		}
 	}
 
-	results, err := g.Wait()
+	pResult, err := providerPool.Wait()
 	if err != nil {
 		return err
 	}
 
-	chainContracts := make([]chainContracts, 0, len(results))
-	for i, r := range results {
-		chainContracts[i] = r.ToContracts()
-	}
-	chainTokens := make([]chainTokens, 0, len(results))
-	for i, r := range results {
-		chainTokens[i] = r.ToTokens()
+	providersResult := subContractAggregate(pResult)
+
+	// Create universal users for owners that aren't users yet
+	createPool := pool.NewWithResults[createUserResult]().WithContext(ctx).WithCancelOnError()
+
+	for _, result := range providersResult {
+		createPool.Go(func(ctx context.Context) (createUserResult, error) {
+			newTokens, newUsers, err := p.createUsersForTokens(ctx, providersResult.Tokens(), result.Chain)
+			return createUserResult{newTokens, newUsers}, err
+		})
 	}
 
-	persistedContracts, err := p.processContracts(ctx, chainContracts)
+	cResult, err := createPool.Wait()
 	if err != nil {
 		return err
 	}
-	persistedTokens, err := p.AddTokensToUser(ctx, chainTokens, persistedContracts, user, chains)
+
+	createResult := createUserAggregate(cResult)
+	userIDToTokens := createResult.UserIDToTokens()
+	userIDToUser := createResult.UserIDtoUser()
+
+	// Persist the umbrella contracts on the off chance we don't have that contract stored yet
+	persistedContracts, err := p.processContracts(ctx, providersResult.Contracts())
 	if err != nil {
 		return err
+	}
+
+	persistedTokens := make([]persist.TokenGallery, 0)
+
+	// Add the tokens to each user
+	for userID, tokens := range userIDToTokens {
+		savedTokens, err := p.AddTokensToUser(ctx, tokens, persistedContracts, userIDToUser[userID], chains)
+		if err != nil {
+			return err
+		}
+		persistedTokens = append(persistedTokens, savedTokens...)
 	}
 
 	params := db.UpsertCreatedTokensParams{}
 	now := time.Now()
-
 	contractAddressDBIDs := contractAddressToDBID(persistedContracts)
 	tokenDBIDs := tokenIDstoDBID(persistedTokens)
 
-	for _, result := range results {
+	// Update the subgroup contract and token lookup tables in a single transaction
+	for _, result := range providersResult {
 		for _, group := range result.Groups {
 			parentContractDBID := contractAddressDBIDs[group.ParentContract.Address.String()]
 			params.ContractSubgroupID = append(params.ContractSubgroupID, persist.GenerateID().String())
@@ -608,8 +682,8 @@ func (p *Provider) SyncTokensCreatedByUserID(ctx context.Context, userID persist
 			}
 		}
 	}
-
 	_, err = p.Queries.UpsertCreatedTokens(ctx, params)
+
 	return err
 }
 

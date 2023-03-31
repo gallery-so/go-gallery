@@ -23,11 +23,12 @@ do update set
 returning *;
 
 -- name: UpsertCreatedTokens :many
-with contract_subgroups_data(id, deleted, created_at, creator_id, parent_id, external_id, name, description, contract_address, chain) as (
+with contract_subgroups_data(id, deleted, created_at, creator_address, creator_id, parent_id, external_id, name, description, contract_address, chain) as (
   select
   unnest(@contract_subgroup_id::varchar[])
   , unnest(@contract_deleted::boolean[])
   , unnest(@contract_created_at::timestamptz[])
+  , unnest(@contract_subgroup_creator_address::varchar[])
   , unnest(@contract_subgroup_creator_id::varchar[])
   , unnest(@contract_parent_id::varchar[])
   , unnest(@contract_external_id::varchar[])
@@ -51,12 +52,12 @@ token_subgroups_data(id, deleted, token_id, subgroup_id, created_at, contract_ad
   , unnest(@token_chain::int[])
 ),
 insert_contract_subgroups as (
-  insert into contract_subgroups (id, creator_id, parent_id, external_id, name, description, created_at, deleted) (
-    select id, creator_id, parent_id, external_id, name, description, created_at, deleted
+  insert into contract_subgroups (id, creator_address, creator_id, parent_id, external_id, name, description, created_at, deleted) (
+    select id, creator_address, creator_id, parent_id, external_id, name, description, created_at, deleted
     from contract_subgroups_data
   )
-  on conflict (creator_id, parent_id) where deleted = false
-  do update set external_id = excluded.external_id, name = excluded.name, description = excluded.description, last_updated = now()
+  on conflict (creator_id, parent_id, extneral_id) where deleted = false
+  do update set creator_address = excluded.creator_address, name = excluded.name, description = excluded.description, last_updated = now()
   returning *
 )
 insert into token_subgroups (id , token_id, subgroup_id, created_at, deleted) (

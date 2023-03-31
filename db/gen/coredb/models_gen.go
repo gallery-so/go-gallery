@@ -73,16 +73,17 @@ type ContractRelevance struct {
 }
 
 type ContractSubgroup struct {
-	ID          persist.DBID
-	CreatorID   persist.DBID
-	ParentID    persist.DBID
-	ExternalID  persist.DBID
-	Name        sql.NullString
-	Description sql.NullString
-	CreatedAt   time.Time
-	LastUpdated time.Time
-	Deleted     bool
-	Version     int32
+	ID             persist.DBID
+	CreatorID      persist.DBID
+	ParentID       persist.DBID
+	ExternalID     persist.DBID
+	Name           sql.NullString
+	Description    sql.NullString
+	CreatorAddress persist.Address
+	CreatedAt      time.Time
+	LastUpdated    time.Time
+	Deleted        bool
+	Version        int32
 }
 
 type DevMetadataUser struct {

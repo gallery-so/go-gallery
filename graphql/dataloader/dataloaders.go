@@ -40,6 +40,7 @@
 //go:generate go run github.com/gallery-so/dataloaden AdmireLoaderByActorAndFeedEvent github.com/mikeydub/go-gallery/db/gen/coredb.GetAdmireByActorIDAndFeedEventIDParams github.com/mikeydub/go-gallery/db/gen/coredb.Admire
 //go:generate go run github.com/gallery-so/dataloaden SharedFollowersLoaderByIDs github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedFollowersBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedFollowersBatchPaginateRow
 //go:generate go run github.com/gallery-so/dataloaden SharedContractsLoaderByIDs github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedContractsBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedContractsBatchPaginateRow
+//go:generate go run github.com/gallery-so/dataloaden ContractSubgroupLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.ContractSubgroup
 
 package dataloader
 
@@ -98,6 +99,7 @@ type Loaders struct {
 	ContractsByUserID                *ContractsLoaderByID
 	ContractsLoaderByCreatorID       *ContractsLoaderByCreatorID
 	ContractByChainAddress           *ContractLoaderByChainAddress
+	ContractSubgroupsByContractID    *ContractSubgroupLoaderByID
 	FollowersByUserID                *UsersLoaderByID
 	FollowingByUserID                *UsersLoaderByID
 	SharedFollowersByUserIDs         *SharedFollowersLoaderByIDs
@@ -265,6 +267,8 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 			return persist.NewChainAddress(contract.Address, contract.Chain)
 		},
 	})
+
+	loaders.ContractSubgroupsByContractID = NewContractSubgroupLoaderByID(defaults, loadContractSubgroupsByContractID(q))
 
 	loaders.ContractsByUserID = NewContractsLoaderByID(defaults, loadContractsByUserID(q))
 
@@ -938,6 +942,22 @@ func loadContractByChainAddress(q *db.Queries) func(context.Context, []persist.C
 		})
 
 		return contracts, errors
+	}
+}
+
+func loadContractSubgroupsByContractID(q *db.Queries) func(context.Context, []persist.DBID) ([][]db.ContractSubgroup, []error) {
+	return func(ctx context.Context, contractIDs []persist.DBID) ([][]db.ContractSubgroup, []error) {
+		groups := make([][]db.ContractSubgroup, len(contractIDs))
+		errors := make([]error, len(contractIDs))
+
+		b := q.GetContractSubgroupsByContractIDBatch(ctx, contractIDs)
+		defer b.Close()
+
+		b.Query(func(i int, c []db.ContractSubgroup, err error) {
+			groups[i], errors[i] = c, err
+		})
+
+		return groups, errors
 	}
 }
 
