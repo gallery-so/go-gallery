@@ -174,20 +174,6 @@ func (r *communityResolver) Creator(ctx context.Context, obj *model.Community) (
 	return resolveGalleryUserByAddress(ctx, *obj.CreatorAddress)
 }
 
-// ParentCommunity is the resolver for the parentCommunity field.
-func (r *communityResolver) ParentCommunity(ctx context.Context, obj *model.Community) (*model.Community, error) {
-	if obj.HelperCommunityData.SubgroupID == "" {
-		return nil, nil
-	}
-
-	community, err := publicapi.For(ctx).Contract.GetParentContractBySubgroupID(ctx, obj.HelperCommunityData.HierarchyID)
-	if err != nil {
-		return nil, err
-	}
-
-	return communityToModel(ctx, *community, util.ToPointer(false)), nil
-}
-
 // TokensInCommunity is the resolver for the tokensInCommunity field.
 func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokensConnection, error) {
 	if onlyGalleryUsers == nil || (onlyGalleryUsers != nil && !*onlyGalleryUsers) {

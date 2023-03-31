@@ -23,7 +23,6 @@ import (
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
@@ -39,9 +38,7 @@ var baseURL, _ = url.Parse("https://api.opensea.io/api/v1")
 
 var eip1271MagicValue = [4]byte{0x16, 0x26, 0xBA, 0x7E}
 
-var sharedStoreFrontAddresses = []persist.EthereumAddress{
-	"0x495f947276749ce646f68ac8c248420045cb7b5e",
-}
+var sharedStoreFrontAddress = persist.EthereumAddress("0x495f947276749ce646f68ac8c248420045cb7b5e")
 
 type Provider struct {
 	httpClient *http.Client
@@ -295,7 +292,7 @@ func (d *Provider) GetDisplayNameByAddress(ctx context.Context, addr persist.Add
 }
 
 // GetCreatedTokensByWalletAddress returns a tokens created by the address under the Shared Storefront contract
-func (p *Provider) GetCreatedTokensByWalletAddress(ctx context.Context, walletAddress persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (p *Provider) GetCreatedTokensByWalletAddress(ctx context.Context, walletAddress persist.Address) ([]multichain.SubContractGroup, error) {
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
@@ -304,7 +301,7 @@ func (p *Provider) GetCreatedTokensByWalletAddress(ctx context.Context, walletAd
 			assetsChan <- assetsReceieved{err: err}
 		}
 	}()
-	return assetsToTokens(ctx, "", assetsChan, p.ethClient)
+	return assetsToGroups(ctx, assetsChan, p.ethClient)
 }
 
 // VerifySignature will verify a signature using all available methods (eth_sign and personal_sign)
@@ -610,10 +607,110 @@ func streamAssetsForCollectionEditor(ctx context.Context, editorAddress persist.
 	url := baseURL.JoinPath("assets")
 	setPagingParams(url, args.sortAsc, args.pageSize)
 	setCollectionEditor(url, editorAddress)
-	for _, address := range sharedStoreFrontAddresses {
-		setContractAddress(url, address)
-	}
+	setContractAddress(url, sharedStoreFrontAddress)
 	return streamAssets(ctx, url, args.outCh)
+}
+
+// assetsToGroups converts a channel of assets to a slice of sub-contract groups
+func assetsToGroups(ctx context.Context, assetsChan <-chan assetsReceieved, ethClient *ethclient.Client) ([]multichain.SubContractGroup, error) {
+	block, err := ethClient.BlockNumber(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	slugs := make(map[string]multichain.SubContractGroup)
+	contracts := make(map[string]multichain.ChainAgnosticContract)
+
+	for page := range assetsChan {
+		if page.err != nil {
+			return nil, err
+		}
+		for _, asset := range page.assets {
+			contractAsStr := asset.Contract.ContractAddress.String()
+
+			// Add the parent contract if we haven't seen it before
+			if _, seen := contracts[contractAsStr]; !seen {
+				contracts[contractAsStr] = contractFromAsset(asset, persist.BlockNumber(block))
+			}
+
+			slug := asset.Collection.Slug
+
+			// Found a new subgroup
+			if _, seen := slugs[slug]; !seen {
+				slugs[slug] = multichain.SubContractGroup{
+					Slug:           slug,
+					ParentContract: contracts[contractAsStr],
+					Tokens:         make([]multichain.ChainAgnosticToken, 0),
+				}
+			}
+
+			token, err := tokenFromAsset(asset, persist.BlockNumber(block), persist.Address(asset.Owner.Address))
+			if err != nil {
+				logger.For(ctx).Error(err)
+				continue
+			}
+
+			// Add the token
+			group := slugs[slug]
+			group.Tokens = append(group.Tokens, token)
+			slugs[slug] = group
+		}
+	}
+
+	// Convert the map to a slice
+	groups := make([]multichain.SubContractGroup, 0)
+	for _, group := range slugs {
+		groups = append(groups, group)
+	}
+
+	return groups, nil
+}
+
+func tokenTypeFromAsset(asset Asset) (persist.TokenType, error) {
+	switch asset.Contract.ContractSchemaName {
+	case "ERC721", "CRYPTOPUNKS":
+		return persist.TokenTypeERC721, nil
+	case "ERC1155":
+		return persist.TokenTypeERC1155, nil
+	default:
+		return "", fmt.Errorf("unknown token type: %s", asset.Contract.ContractSchemaName)
+	}
+}
+
+func tokenFromAsset(asset Asset, block persist.BlockNumber, tokenOwner persist.Address) (multichain.ChainAgnosticToken, error) {
+	tokenType, err := tokenTypeFromAsset(asset)
+	if err != nil {
+		return multichain.ChainAgnosticToken{}, err
+	}
+	return multichain.ChainAgnosticToken{
+		TokenType:       tokenType,
+		Name:            asset.Name,
+		Description:     asset.Description,
+		TokenURI:        persist.TokenURI(asset.TokenMetadataURL),
+		TokenID:         persist.TokenID(asset.TokenID.ToBase16()),
+		OwnerAddress:    tokenOwner,
+		ContractAddress: persist.Address(asset.Contract.ContractAddress.String()),
+		ExternalURL:     asset.ExternalURL,
+		BlockNumber:     block,
+		TokenMetadata: persist.TokenMetadata{
+			"name":          asset.Name,
+			"description":   asset.Description,
+			"image_url":     asset.ImageOriginalURL,
+			"animation_url": asset.AnimationOriginalURL,
+		},
+		Quantity: "1",
+		IsSpam:   util.ToPointer(false), // OpenSea filters spam on their side
+	}, nil
+}
+
+func contractFromAsset(asset Asset, block persist.BlockNumber) multichain.ChainAgnosticContract {
+	return multichain.ChainAgnosticContract{
+		Address:        persist.Address(asset.Contract.ContractAddress.String()),
+		Symbol:         asset.Contract.ContractSymbol.String(),
+		Name:           asset.Contract.ContractName.String(),
+		CreatorAddress: persist.Address(asset.Creator.Address),
+		LatestBlock:    block,
+	}
 }
 
 func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsChan <-chan assetsReceieved, ethClient *ethclient.Client) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
@@ -641,60 +738,7 @@ func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsCha
 			for _, n := range assetsReceived.assets {
 				nft := n
 				wp.Submit(func() {
-					innerCtx, cancel := context.WithTimeout(ctx, time.Second*10)
-					defer cancel()
-					var tokenType persist.TokenType
-					switch nft.Contract.ContractSchemaName {
-					case "ERC721", "CRYPTOPUNKS":
-						tokenType = persist.TokenTypeERC721
-					case "ERC1155":
-						tokenType = persist.TokenTypeERC1155
-					default:
-						logger.For(ctx).Warnf("unknown token type: %s", nft.Contract.ContractSchemaName)
-						return
-					}
-
-					metadata := persist.TokenMetadata{
-						"name":          nft.Name,
-						"description":   nft.Description,
-						"image_url":     nft.ImageOriginalURL,
-						"animation_url": nft.AnimationOriginalURL,
-					}
-
-					med := persist.Media{ThumbnailURL: persist.NullString(firstNonEmptyString(nft.ImageURL, nft.ImagePreviewURL, nft.ImageThumbnailURL))}
-					switch {
-					case nft.AnimationURL != "":
-						med.MediaURL = persist.NullString(nft.AnimationURL)
-						med.MediaType, _, _, err = media.PredictMediaType(innerCtx, nft.AnimationURL)
-
-					case nft.AnimationOriginalURL != "":
-						med.MediaURL = persist.NullString(nft.AnimationOriginalURL)
-						med.MediaType, _, _, err = media.PredictMediaType(innerCtx, nft.AnimationOriginalURL)
-
-					case nft.ImageURL != "":
-						med.MediaURL = persist.NullString(nft.ImageURL)
-						med.MediaType, _, _, err = media.PredictMediaType(innerCtx, nft.ImageURL)
-
-					case nft.ImageOriginalURL != "":
-						med.MediaURL = persist.NullString(nft.ImageOriginalURL)
-						med.MediaType, _, _, err = media.PredictMediaType(innerCtx, nft.ImageOriginalURL)
-
-					default:
-						med.MediaURL = persist.NullString(nft.ImageThumbnailURL)
-						med.MediaType, _, _, err = media.PredictMediaType(innerCtx, nft.ImageThumbnailURL)
-					}
-
-					if err != nil {
-						logger.For(ctx).Errorf("failed to predict media type for %s: %s", nft.ImageThumbnailURL, err)
-					}
-
-					contract, ok := seenContracts.LoadOrStore(nft.Contract.ContractAddress.String(), multichain.ChainAgnosticContract{
-						Address:        persist.Address(nft.Contract.ContractAddress.String()),
-						Symbol:         nft.Contract.ContractSymbol.String(),
-						Name:           nft.Contract.ContractName.String(),
-						CreatorAddress: persist.Address(nft.Creator.Address),
-						LatestBlock:    persist.BlockNumber(block),
-					})
+					contract, ok := seenContracts.LoadOrStore(nft.Contract.ContractAddress.String(), contractFromAsset(nft, persist.BlockNumber(block)))
 					if !ok {
 						contractsChan <- contract.(multichain.ChainAgnosticContract)
 					} else {
@@ -706,21 +750,13 @@ func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsCha
 						tokenOwner = persist.Address(nft.Owner.Address)
 					}
 
-					tokensChan <- multichain.ChainAgnosticToken{
-						TokenType:       tokenType,
-						Name:            nft.Name,
-						Description:     nft.Description,
-						TokenURI:        persist.TokenURI(nft.TokenMetadataURL),
-						TokenID:         persist.TokenID(nft.TokenID.ToBase16()),
-						OwnerAddress:    tokenOwner,
-						ContractAddress: persist.Address(nft.Contract.ContractAddress.String()),
-						ExternalURL:     nft.ExternalURL,
-						BlockNumber:     persist.BlockNumber(block),
-						TokenMetadata:   metadata,
-						Media:           med,
-						Quantity:        "1",
-						IsSpam:          util.ToPointer(false), // OpenSea filters spam on their side
+					token, err := tokenFromAsset(nft, persist.BlockNumber(block), tokenOwner)
+					if err != nil {
+						logger.For(ctx).Error(err)
+						return
 					}
+
+					tokensChan <- token
 				})
 			}
 		}

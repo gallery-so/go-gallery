@@ -566,11 +566,11 @@ type CommunitiesConnection struct {
 type Community struct {
 	HelperCommunityData
 	Dbid              persist.DBID            `json:"dbid"`
+	SubGroupID        *persist.DBID           `json:"subGroupId"`
 	LastUpdated       *time.Time              `json:"lastUpdated"`
 	ContractAddress   *persist.ChainAddress   `json:"contractAddress"`
 	CreatorAddress    *persist.ChainAddress   `json:"creatorAddress"`
 	Creator           *GalleryUser            `json:"creator"`
-	ParentCommunity   *Community              `json:"parentCommunity"`
 	Chain             *persist.Chain          `json:"chain"`
 	Name              *string                 `json:"name"`
 	Description       *string                 `json:"description"`

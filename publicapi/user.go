@@ -797,7 +797,7 @@ func (api UserAPI) CreatedCommunities(ctx context.Context, userID persist.DBID, 
 	}
 
 	// Run a sync to catch new contracts
-	err := api.multichainProvider.SyncContractsCreatedByUserID(ctx, userID, chains, includeAllChains)
+	err := api.multichainProvider.SyncTokensCreatedByUserID(ctx, userID, chains, includeAllChains)
 	if err != nil {
 		return nil, PageInfo{}, err
 	}

@@ -18,11 +18,11 @@ func (r *CollectionToken) GetGqlIDField_CollectionID() string {
 	return r.HelperCollectionTokenData.CollectionId.String()
 }
 
-func (r *Contract) GetGqlIDField_Chain() string {
+func (r *Community) GetGqlIDField_Chain() string {
 	return fmt.Sprint(r.ContractAddress.Chain())
 }
 
-func (r *Contract) GetGqlIDField_ContractAddress() string {
+func (r *Community) GetGqlIDField_ContractAddress() string {
 	return r.ContractAddress.Address().String()
 }
 
@@ -46,7 +46,6 @@ type HelperViewerData struct {
 
 type HelperCommunityData struct {
 	ForceRefresh *bool
-	SubgroupID   persist.DBID
 }
 
 type HelperTokensAddedToCollectionFeedEventDataData struct {

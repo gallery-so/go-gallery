@@ -99,7 +99,13 @@ type GalleryUser implements Node @goEmbedHelper {
   sharedCommunities(before: String, after: String, first: Int, last: Int): CommunitiesConnection
     @authRequired
     @goField(forceResolver: true)
-  createdCommunities(input: CreatedCommunitiesInput!, before: String, after: String, first: Int, last: Int): CommunitiesConnection @goField(forceResolver: true)
+  createdCommunities(
+    input: CreatedCommunitiesInput!
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): CommunitiesConnection @goField(forceResolver: true)
 }
 
 type Wallet implements Node {
@@ -460,16 +466,16 @@ type TokenHoldersConnection {
   pageInfo: PageInfo!
 }
 
-type Community implements Node @goEmbedHelper {
+type Community implements Node @goGqlId(fields: ["contractAddress", "chain", "subGroupId"]) @goEmbedHelper {
   dbid: DBID!
   id: ID!
+  subGroupId: DBID
 
   lastUpdated: Time
 
   contractAddress: ChainAddress
   creatorAddress: ChainAddress
   creator: GalleryUser @goField(forceResolver: true)
-  parentCommunity: Community @goField(forceResolver: true)
   chain: Chain
   name: String
   description: String
@@ -495,7 +501,7 @@ type Community implements Node @goEmbedHelper {
   ): TokenHoldersConnection @goField(forceResolver: true)
 }
 
-type Contract implements Node @goGqlId(fields: ["contractAddress", "chain"]) {
+type Contract implements Node {
   id: ID!
   dbid: DBID!
 
