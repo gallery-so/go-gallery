@@ -39,7 +39,7 @@ type Provider struct {
 	Repos   *postgres.Repositories
 	Queries *coredb.Queries
 	Cache   *redis.Cache
-	Chains  map[persist.Chain][]interface{}
+	Chains  map[persist.Chain][]any
 	// some chains use the addresses of other chains, this will map of chain we want tokens from => chain that's address will be used for lookup
 	ChainAddressOverrides ChainOverrideMap
 	SendTokens            SendTokens
@@ -192,7 +192,7 @@ type subproviderProvider interface {
 type ChainOverrideMap = map[persist.Chain]*persist.Chain
 
 // NewProvider creates a new MultiChainDataRetriever
-func NewProvider(ctx context.Context, repos *postgres.Repositories, queries *coredb.Queries, cache *redis.Cache, taskClient *cloudtasks.Client, chainOverrides ChainOverrideMap, providers ...interface{}) *Provider {
+func NewProvider(ctx context.Context, repos *postgres.Repositories, queries *coredb.Queries, cache *redis.Cache, taskClient *cloudtasks.Client, chainOverrides ChainOverrideMap, providers ...any) *Provider {
 	return &Provider{
 		Repos:                 repos,
 		Cache:                 cache,
@@ -263,8 +263,8 @@ type validation struct {
 	contractRefresher     bool
 }
 
-func validateProviders(ctx context.Context, providers []interface{}) map[persist.Chain][]interface{} {
-	chains := map[persist.Chain][]interface{}{}
+func validateProviders(ctx context.Context, providers []any) map[persist.Chain][]any {
+	chains := map[persist.Chain][]any{}
 
 	configurers := getChainProvidersForTask[configurer](providers)
 	for _, cfg := range configurers {
@@ -551,7 +551,7 @@ func (p *Provider) sendTokensToTokenProcessing(ctx context.Context, userID persi
 }
 
 func (p *Provider) processTokenMedia(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, ownerAddress persist.Address, imageKeywords, animationKeywords []string) error {
-	input := map[string]interface{}{
+	input := map[string]any{
 		"token_id":           tokenID,
 		"contract_address":   contractAddress,
 		"chain":              chain,
@@ -894,7 +894,7 @@ outer:
 	return p.processTokensForOwnersOfContract(ctx, contract.ID, users, chainTokensForUsers, addressToContract)
 }
 
-func (d *Provider) getProvidersForChain(chain persist.Chain) ([]interface{}, error) {
+func (d *Provider) getProvidersForChain(chain persist.Chain) ([]any, error) {
 	providers, ok := d.Chains[chain]
 	if !ok {
 		return nil, ErrChainNotFound{Chain: chain}
