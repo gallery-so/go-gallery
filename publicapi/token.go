@@ -179,6 +179,11 @@ func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractI
 	return tokens, pageInfo, nil
 }
 
+// GetTokensBySubgroupID returns tokens that are part of a subgroup
+func (api TokenAPI) GetTokensBySubgroupID(ctx context.Context, subgroupID persist.DBID, before, after *string, first, last *int, onlyGalleryUsers bool) ([]db.Token, PageInfo, error) {
+	panic("not implemented")
+}
+
 func (api TokenAPI) GetTokensByIDs(ctx context.Context, tokenIDs []persist.DBID) ([]db.Token, error) {
 	tokens, errs := api.loaders.TokenByTokenID.LoadAll(tokenIDs)
 	foundTokens := tokens[:0]

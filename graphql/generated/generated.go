@@ -550,7 +550,7 @@ type ComplexityRoot struct {
 	GalleryUser struct {
 		Badges              func(childComplexity int) int
 		Bio                 func(childComplexity int) int
-		CreatedCommunities  func(childComplexity int, input model.CreatedCommunitiesInput, before *string, after *string, first *int, last *int) int
+		CreatedCommunities  func(childComplexity int, input model.CommunityGroupInput, before *string, after *string, first *int, last *int) int
 		Dbid                func(childComplexity int) int
 		FeaturedGallery     func(childComplexity int) int
 		Feed                func(childComplexity int, before *string, after *string, first *int, last *int) int
@@ -798,6 +798,7 @@ type ComplexityRoot struct {
 		CollectionTokenByID     func(childComplexity int, tokenID persist.DBID, collectionID persist.DBID) int
 		CollectionsByIds        func(childComplexity int, ids []persist.DBID) int
 		CommunityByAddress      func(childComplexity int, communityAddress persist.ChainAddress, forceRefresh *bool) int
+		CommunityGroupByAddress func(childComplexity int, input model.CommunityGroupInput, before *string, after *string, first *int, last *int) int
 		FeedEventByID           func(childComplexity int, id persist.DBID) int
 		GalleryByID             func(childComplexity int, id persist.DBID) int
 		GalleryOfTheWeekWinners func(childComplexity int) int
@@ -1364,7 +1365,7 @@ type GalleryUserResolver interface {
 	Feed(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
 	SharedFollowers(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.UsersConnection, error)
 	SharedCommunities(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error)
-	CreatedCommunities(ctx context.Context, obj *model.GalleryUser, input model.CreatedCommunitiesInput, before *string, after *string, first *int, last *int) (*model.CommunityGroupConnection, error)
+	CreatedCommunities(ctx context.Context, obj *model.GalleryUser, input model.CommunityGroupInput, before *string, after *string, first *int, last *int) (*model.CommunityGroupConnection, error)
 }
 type MutationResolver interface {
 	AddUserWallet(ctx context.Context, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) (model.AddUserWalletPayloadOrError, error)
@@ -1444,6 +1445,7 @@ type QueryResolver interface {
 	CollectionsByIds(ctx context.Context, ids []persist.DBID) ([]model.CollectionByIDOrError, error)
 	TokenByID(ctx context.Context, id persist.DBID) (model.TokenByIDOrError, error)
 	CollectionTokenByID(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (model.CollectionTokenByIDOrError, error)
+	CommunityGroupByAddress(ctx context.Context, input model.CommunityGroupInput, before *string, after *string, first *int, last *int) (*model.CommunityGroupConnection, error)
 	CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool) (model.CommunityByAddressOrError, error)
 	GeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error)
 	GalleryOfTheWeekWinners(ctx context.Context) ([]*model.GalleryUser, error)
@@ -1515,6 +1517,7 @@ type TokenResolver interface {
 type TokenHolderResolver interface {
 	Wallets(ctx context.Context, obj *model.TokenHolder) ([]*model.Wallet, error)
 	User(ctx context.Context, obj *model.TokenHolder) (*model.GalleryUser, error)
+	PreviewTokens(ctx context.Context, obj *model.TokenHolder) ([]*string, error)
 }
 type TokensAddedToCollectionFeedEventDataResolver interface {
 	Owner(ctx context.Context, obj *model.TokensAddedToCollectionFeedEventData) (*model.GalleryUser, error)
@@ -3137,7 +3140,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.GalleryUser.CreatedCommunities(childComplexity, args["input"].(model.CreatedCommunitiesInput), args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
+		return e.complexity.GalleryUser.CreatedCommunities(childComplexity, args["input"].(model.CommunityGroupInput), args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
 	case "GalleryUser.dbid":
 		if e.complexity.GalleryUser.Dbid == nil {
@@ -4615,6 +4618,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.CommunityByAddress(childComplexity, args["communityAddress"].(persist.ChainAddress), args["forceRefresh"].(*bool)), true
+
+	case "Query.communityGroupByAddress":
+		if e.complexity.Query.CommunityGroupByAddress == nil {
+			break
+		}
+
+		args, err := ec.field_Query_communityGroupByAddress_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.CommunityGroupByAddress(childComplexity, args["input"].(model.CommunityGroupInput), args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
 	case "Query.feedEventById":
 		if e.complexity.Query.FeedEventByID == nil {
@@ -6444,7 +6459,6 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputCreateCollectionInput,
 		ec.unmarshalInputCreateGalleryInput,
 		ec.unmarshalInputCreateUserInput,
-		ec.unmarshalInputCreatedCommunitiesInput,
 		ec.unmarshalInputDebugAuth,
 		ec.unmarshalInputDebugSocialAuth,
 		ec.unmarshalInputEoaAuth,
@@ -6479,6 +6493,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputUpdateUserInfoInput,
 		ec.unmarshalInputUploadPersistedQueriesInput,
 		ec.unmarshalInputVerifyEmailInput,
+		ec.unmarshalInputcommunityGroupInput,
 	)
 	first := true
 
@@ -6658,7 +6673,7 @@ type GalleryUser implements Node @goEmbedHelper {
     @authRequired
     @goField(forceResolver: true)
   createdCommunities(
-    input: CreatedCommunitiesInput!
+    input: communityGroupInput!
     before: String
     after: String
     first: Int
@@ -6700,7 +6715,7 @@ input ChainPubKeyInput {
   chain: Chain! @goField(forceResolver: true)
 }
 
-input CreatedCommunitiesInput {
+input communityGroupInput {
   chains: [Chain!]
   includeSubCommunities: Boolean!
   # When true, return all communities from all chains
@@ -6993,7 +7008,7 @@ type TokenHolder @goEmbedHelper {
   displayName: String
   wallets: [Wallet] @goField(forceResolver: true)
   user: GalleryUser @goField(forceResolver: true)
-  previewTokens: [String]
+  previewTokens: [String] @goField(forceResolver: true)
 }
 
 type MembershipTier implements Node {
@@ -7607,6 +7622,13 @@ type Query {
   collectionsByIds(ids: [DBID!]!): [CollectionByIdOrError]
   tokenById(id: DBID!): TokenByIdOrError
   collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
+  communityGroupByAddress(
+    input: communityGroupInput!
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): CommunityGroupConnection
   communityByAddress(
     communityAddress: ChainAddressInput!
     forceRefresh: Boolean
@@ -9042,10 +9064,10 @@ func (ec *executionContext) field_FeedEvent_interactions_args(ctx context.Contex
 func (ec *executionContext) field_GalleryUser_createdCommunities_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 model.CreatedCommunitiesInput
+	var arg0 model.CommunityGroupInput
 	if tmp, ok := rawArgs["input"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
-		arg0, err = ec.unmarshalNCreatedCommunitiesInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCreatedCommunitiesInput(ctx, tmp)
+		arg0, err = ec.unmarshalNcommunityGroupInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunityGroupInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -10242,6 +10264,57 @@ func (ec *executionContext) field_Query_communityByAddress_args(ctx context.Cont
 		}
 	}
 	args["forceRefresh"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_communityGroupByAddress_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.CommunityGroupInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNcommunityGroupInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunityGroupInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
+	var arg1 *string
+	if tmp, ok := rawArgs["before"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
+		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["before"] = arg1
+	var arg2 *string
+	if tmp, ok := rawArgs["after"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
+		arg2, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["after"] = arg2
+	var arg3 *int
+	if tmp, ok := rawArgs["first"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
+		arg3, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["first"] = arg3
+	var arg4 *int
+	if tmp, ok := rawArgs["last"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("last"))
+		arg4, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["last"] = arg4
 	return args, nil
 }
 
@@ -23327,7 +23400,7 @@ func (ec *executionContext) _GalleryUser_createdCommunities(ctx context.Context,
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.GalleryUser().CreatedCommunities(rctx, obj, fc.Args["input"].(model.CreatedCommunitiesInput), fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
+		return ec.resolvers.GalleryUser().CreatedCommunities(rctx, obj, fc.Args["input"].(model.CommunityGroupInput), fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -31782,6 +31855,63 @@ func (ec *executionContext) fieldContext_Query_collectionTokenById(ctx context.C
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_communityGroupByAddress(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_communityGroupByAddress(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().CommunityGroupByAddress(rctx, fc.Args["input"].(model.CommunityGroupInput), fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.CommunityGroupConnection)
+	fc.Result = res
+	return ec.marshalOCommunityGroupConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunityGroupConnection(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_communityGroupByAddress(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "edges":
+				return ec.fieldContext_CommunityGroupConnection_edges(ctx, field)
+			case "pageInfo":
+				return ec.fieldContext_CommunityGroupConnection_pageInfo(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type CommunityGroupConnection", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_communityGroupByAddress_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_communityByAddress(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Query_communityByAddress(ctx, field)
 	if err != nil {
@@ -38870,7 +39000,7 @@ func (ec *executionContext) _TokenHolder_previewTokens(ctx context.Context, fiel
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.PreviewTokens, nil
+		return ec.resolvers.TokenHolder().PreviewTokens(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -38888,8 +39018,8 @@ func (ec *executionContext) fieldContext_TokenHolder_previewTokens(ctx context.C
 	fc = &graphql.FieldContext{
 		Object:     "TokenHolder",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
 		},
@@ -46260,50 +46390,6 @@ func (ec *executionContext) unmarshalInputCreateUserInput(ctx context.Context, o
 	return it, nil
 }
 
-func (ec *executionContext) unmarshalInputCreatedCommunitiesInput(ctx context.Context, obj interface{}) (model.CreatedCommunitiesInput, error) {
-	var it model.CreatedCommunitiesInput
-	asMap := map[string]interface{}{}
-	for k, v := range obj.(map[string]interface{}) {
-		asMap[k] = v
-	}
-
-	fieldsInOrder := [...]string{"chains", "includeSubCommunities", "includeAllChains"}
-	for _, k := range fieldsInOrder {
-		v, ok := asMap[k]
-		if !ok {
-			continue
-		}
-		switch k {
-		case "chains":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chains"))
-			it.Chains, err = ec.unmarshalOChain2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainᚄ(ctx, v)
-			if err != nil {
-				return it, err
-			}
-		case "includeSubCommunities":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("includeSubCommunities"))
-			it.IncludeSubCommunities, err = ec.unmarshalNBoolean2bool(ctx, v)
-			if err != nil {
-				return it, err
-			}
-		case "includeAllChains":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("includeAllChains"))
-			it.IncludeAllChains, err = ec.unmarshalOBoolean2ᚖbool(ctx, v)
-			if err != nil {
-				return it, err
-			}
-		}
-	}
-
-	return it, nil
-}
-
 func (ec *executionContext) unmarshalInputDebugAuth(ctx context.Context, obj interface{}) (model.DebugAuth, error) {
 	var it model.DebugAuth
 	asMap := map[string]interface{}{}
@@ -47727,6 +47813,50 @@ func (ec *executionContext) unmarshalInputVerifyEmailInput(ctx context.Context, 
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("token"))
 			it.Token, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputcommunityGroupInput(ctx context.Context, obj interface{}) (model.CommunityGroupInput, error) {
+	var it model.CommunityGroupInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"chains", "includeSubCommunities", "includeAllChains"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "chains":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chains"))
+			it.Chains, err = ec.unmarshalOChain2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "includeSubCommunities":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("includeSubCommunities"))
+			it.IncludeSubCommunities, err = ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "includeAllChains":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("includeAllChains"))
+			it.IncludeAllChains, err = ec.unmarshalOBoolean2ᚖbool(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -55850,6 +55980,26 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			out.Concurrently(i, func() graphql.Marshaler {
 				return rrm(innerCtx)
 			})
+		case "communityGroupByAddress":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_communityGroupByAddress(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return rrm(innerCtx)
+			})
 		case "communityByAddress":
 			field := field
 
@@ -57695,9 +57845,22 @@ func (ec *executionContext) _TokenHolder(ctx context.Context, sel ast.SelectionS
 
 			})
 		case "previewTokens":
+			field := field
 
-			out.Values[i] = ec._TokenHolder_previewTokens(ctx, field, obj)
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._TokenHolder_previewTokens(ctx, field, obj)
+				return res
+			}
 
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -59764,11 +59927,6 @@ func (ec *executionContext) unmarshalNCreateUserInput2githubᚗcomᚋmikeydubᚋ
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) unmarshalNCreatedCommunitiesInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCreatedCommunitiesInput(ctx context.Context, v interface{}) (model.CreatedCommunitiesInput, error) {
-	res, err := ec.unmarshalInputCreatedCommunitiesInput(ctx, v)
-	return res, graphql.ErrorOnPath(ctx, err)
-}
-
 func (ec *executionContext) unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx context.Context, v interface{}) (persist.DBID, error) {
 	tmp, err := graphql.UnmarshalString(v)
 	res := persist.DBID(tmp)
@@ -60637,6 +60795,11 @@ func (ec *executionContext) marshalN__TypeKind2string(ctx context.Context, sel a
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) unmarshalNcommunityGroupInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunityGroupInput(ctx context.Context, v interface{}) (model.CommunityGroupInput, error) {
+	res, err := ec.unmarshalInputcommunityGroupInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalOAction2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAction(ctx context.Context, v interface{}) (*persist.Action, error) {

@@ -685,12 +685,6 @@ type CreateUserPayload struct {
 
 func (CreateUserPayload) IsCreateUserPayloadOrError() {}
 
-type CreatedCommunitiesInput struct {
-	Chains                []persist.Chain `json:"chains"`
-	IncludeSubCommunities bool            `json:"includeSubCommunities"`
-	IncludeAllChains      *bool           `json:"includeAllChains"`
-}
-
 type DebugAuth struct {
 	AsUsername     *string                 `json:"asUsername"`
 	UserID         *persist.DBID           `json:"userId"`
@@ -2097,6 +2091,12 @@ type Wallet struct {
 
 func (Wallet) IsNode()                {}
 func (Wallet) IsGalleryUserOrWallet() {}
+
+type CommunityGroupInput struct {
+	Chains                []persist.Chain `json:"chains"`
+	IncludeSubCommunities bool            `json:"includeSubCommunities"`
+	IncludeAllChains      *bool           `json:"includeAllChains"`
+}
 
 type EmailUnsubscriptionType string
 

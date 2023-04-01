@@ -25,6 +25,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
 	"github.com/sirupsen/logrus"
@@ -43,6 +44,7 @@ var sharedStoreFrontAddress = persist.EthereumAddress("0x495f947276749ce646f68ac
 type Provider struct {
 	httpClient *http.Client
 	ethClient  *ethclient.Client
+	cache      *redis.Cache
 }
 
 // TokenID represents a token ID from Opensea. It is separate from persist.TokenID because opensea returns token IDs in base 10 format instead of what we want, base 16
@@ -148,10 +150,11 @@ type ErrNoAssetsForWallets struct {
 }
 
 // NewProvider creates a new provider for opensea
-func NewProvider(ethClient *ethclient.Client, httpClient *http.Client) *Provider {
+func NewProvider(ethClient *ethclient.Client, httpClient *http.Client, redisClient *redis.Cache) *Provider {
 	return &Provider{
 		httpClient: httpClient,
 		ethClient:  ethClient,
+		cache:      redisClient,
 	}
 }
 
@@ -168,10 +171,7 @@ func (p *Provider) GetTokensByWalletAddress(ctx context.Context, address persist
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
-		err := streamAssetsForWallet(ctx, persist.EthereumAddress(address), WithResultCh(assetsChan))
-		if err != nil {
-			assetsChan <- assetsReceieved{err: err}
-		}
+		streamAssetsForWallet(ctx, persist.EthereumAddress(address), WithResultCh(assetsChan))
 	}()
 
 	return assetsToTokens(ctx, address, assetsChan, p.ethClient)
@@ -182,10 +182,7 @@ func (p *Provider) GetTokensByContractAddress(ctx context.Context, address persi
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
-		err := streamAssetsForContract(ctx, persist.EthereumAddress(address), WithResultCh(assetsChan))
-		if err != nil {
-			assetsChan <- assetsReceieved{err: err}
-		}
+		streamAssetsForContract(ctx, persist.EthereumAddress(address), WithResultCh(assetsChan))
 	}()
 	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient)
 	if err != nil {
@@ -203,10 +200,7 @@ func (p *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, owner
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
-		err := streamAssetsForContractAddressAndOwner(ctx, persist.EthereumAddress(owner), persist.EthereumAddress(address), WithResultCh(assetsChan))
-		if err != nil {
-			assetsChan <- assetsReceieved{err: err}
-		}
+		streamAssetsForContractAddressAndOwner(ctx, persist.EthereumAddress(owner), persist.EthereumAddress(address), WithResultCh(assetsChan))
 	}()
 	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient)
 	if err != nil {
@@ -224,10 +218,7 @@ func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, ti multichai
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
-		err := streamAssetsForTokenIdentifiers(ctx, persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID.Base10String()), WithResultCh(assetsChan))
-		if err != nil {
-			assetsChan <- assetsReceieved{err: err}
-		}
+		streamAssetsForTokenIdentifiers(ctx, persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID.Base10String()), WithResultCh(assetsChan))
 	}()
 	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient)
 	if err != nil {
@@ -244,10 +235,7 @@ func (p *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, ti m
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
-		err := streamAssetsForTokenIdentifiersAndOwner(ctx, persist.EthereumAddress(ownerAddress), persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID.Base10String()), WithResultCh(assetsChan))
-		if err != nil {
-			assetsChan <- assetsReceieved{err: err}
-		}
+		streamAssetsForTokenIdentifiersAndOwner(ctx, persist.EthereumAddress(ownerAddress), persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID.Base10String()), WithResultCh(assetsChan))
 	}()
 	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient)
 	if err != nil {
@@ -297,10 +285,7 @@ func (p *Provider) GetCreatedTokensByWalletAddress(ctx context.Context, walletAd
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
-		err := streamAssetsForCollectionEditor(ctx, persist.EthereumAddress(walletAddress), WithResultCh(assetsChan), WithSortAsc(true))
-		if err != nil {
-			assetsChan <- assetsReceieved{err: err}
-		}
+		streamAssetsForCollectionEditor(ctx, persist.EthereumAddress(walletAddress), WithResultCh(assetsChan), WithSortAsc(), WithCaching(p.cache), WithFromLastCursor())
 	}()
 	return assetsToGroups(ctx, assetsChan, p.ethClient)
 }
@@ -425,6 +410,8 @@ type QueryOptions struct {
 	outCh    chan assetsReceieved
 	sortAsc  bool
 	pageSize int
+	cache    *redis.Cache
+	useLast  bool
 }
 
 type OptionFunc func(o *QueryOptions)
@@ -437,15 +424,31 @@ func DefaultArgs() QueryOptions {
 	}
 }
 
+// WithResultCh allows you to specify a channel to receive the assets on
 func WithResultCh(outCh chan assetsReceieved) OptionFunc {
 	return func(o *QueryOptions) {
 		o.outCh = outCh
 	}
 }
 
-func WithSortAsc(sortAsc bool) OptionFunc {
+// WithSortAsc will sort the assets in ascending order
+func WithSortAsc() OptionFunc {
 	return func(o *QueryOptions) {
-		o.sortAsc = sortAsc
+		o.sortAsc = true
+	}
+}
+
+// WithCaching will enable cursor caching
+func WithCaching(cache *redis.Cache) OptionFunc {
+	return func(o *QueryOptions) {
+		o.cache = cache
+	}
+}
+
+// WithFromLastCursor will start the query from the last cursor
+func WithFromLastCursor() OptionFunc {
+	return func(o *QueryOptions) {
+		o.useLast = true
 	}
 }
 
@@ -478,11 +481,7 @@ func FetchCollectionsForAddress(ctx context.Context, address persist.EthereumAdd
 	url := baseURL.JoinPath("collections")
 	setAssetOwner(url, address)
 
-	req, err := authRequest(ctx, url.String())
-	if err != nil {
-		return nil, err
-	}
-
+	req := authRequest(ctx, url.String())
 	resp, err := retry.RetryRequest(http.DefaultClient, req)
 	if err != nil {
 		return nil, err
@@ -506,10 +505,7 @@ func FetchCollectionsForAddress(ctx context.Context, address persist.EthereumAdd
 func FetchContractByAddress(pCtx context.Context, pContract persist.EthereumAddress) (Contract, error) {
 	url := baseURL.JoinPath("asset_contract")
 
-	req, err := authRequest(pCtx, url.String())
-	if err != nil {
-		return Contract{}, err
-	}
+	req := authRequest(pCtx, url.String())
 
 	resp, err := retry.RetryRequest(http.DefaultClient, req)
 	if err != nil {
@@ -530,16 +526,7 @@ func FetchContractByAddress(pCtx context.Context, pContract persist.EthereumAddr
 	return contract, nil
 }
 
-func streamAssets(ctx context.Context, url *url.URL, outCh chan assetsReceieved) error {
-	req, err := authRequest(ctx, url.String())
-	if err != nil {
-		return err
-	}
-	paginateAssets(req, outCh)
-	return nil
-}
-
-func streamAssetsForWallet(ctx context.Context, address persist.EthereumAddress, opts ...OptionFunc) error {
+func streamAssetsForWallet(ctx context.Context, address persist.EthereumAddress, opts ...OptionFunc) {
 	args := DefaultArgs()
 	for _, opt := range opts {
 		opt(&args)
@@ -547,10 +534,10 @@ func streamAssetsForWallet(ctx context.Context, address persist.EthereumAddress,
 	url := baseURL.JoinPath("assets")
 	setPagingParams(url, args.sortAsc, args.pageSize)
 	setOwner(url, address)
-	return streamAssets(ctx, url, args.outCh)
+	paginateAssets(ctx, authRequest(ctx, url.String()), args.outCh, args.cache)
 }
 
-func streamAssetsForContract(ctx context.Context, address persist.EthereumAddress, opts ...OptionFunc) error {
+func streamAssetsForContract(ctx context.Context, address persist.EthereumAddress, opts ...OptionFunc) {
 	args := DefaultArgs()
 	for _, opt := range opts {
 		opt(&args)
@@ -558,10 +545,10 @@ func streamAssetsForContract(ctx context.Context, address persist.EthereumAddres
 	url := baseURL.JoinPath("assets")
 	setPagingParams(url, args.sortAsc, args.pageSize)
 	setContractAddress(url, address)
-	return streamAssets(ctx, url, args.outCh)
+	paginateAssets(ctx, authRequest(ctx, url.String()), args.outCh, args.cache)
 }
 
-func streamAssetsForContractAddressAndOwner(ctx context.Context, ownerAddress, contractAddress persist.EthereumAddress, opts ...OptionFunc) error {
+func streamAssetsForContractAddressAndOwner(ctx context.Context, ownerAddress, contractAddress persist.EthereumAddress, opts ...OptionFunc) {
 	args := DefaultArgs()
 	for _, opt := range opts {
 		opt(&args)
@@ -570,10 +557,10 @@ func streamAssetsForContractAddressAndOwner(ctx context.Context, ownerAddress, c
 	setPagingParams(url, args.sortAsc, args.pageSize)
 	setOwner(url, ownerAddress)
 	setContractAddress(url, contractAddress)
-	return streamAssets(ctx, url, args.outCh)
+	paginateAssets(ctx, authRequest(ctx, url.String()), args.outCh, args.cache)
 }
 
-func streamAssetsForTokenIdentifiers(ctx context.Context, contractAddress persist.EthereumAddress, tokenID TokenID, opts ...OptionFunc) error {
+func streamAssetsForTokenIdentifiers(ctx context.Context, contractAddress persist.EthereumAddress, tokenID TokenID, opts ...OptionFunc) {
 	args := DefaultArgs()
 	for _, opt := range opts {
 		opt(&args)
@@ -582,10 +569,10 @@ func streamAssetsForTokenIdentifiers(ctx context.Context, contractAddress persis
 	setPagingParams(url, args.sortAsc, args.pageSize)
 	setContractAddress(url, contractAddress)
 	setTokenID(url, tokenID)
-	return streamAssets(ctx, url, args.outCh)
+	paginateAssets(ctx, authRequest(ctx, url.String()), args.outCh, args.cache)
 }
 
-func streamAssetsForTokenIdentifiersAndOwner(ctx context.Context, ownerAddress, contractAddress persist.EthereumAddress, tokenID TokenID, opts ...OptionFunc) error {
+func streamAssetsForTokenIdentifiersAndOwner(ctx context.Context, ownerAddress, contractAddress persist.EthereumAddress, tokenID TokenID, opts ...OptionFunc) {
 	args := DefaultArgs()
 	for _, opt := range opts {
 		opt(&args)
@@ -597,10 +584,10 @@ func streamAssetsForTokenIdentifiersAndOwner(ctx context.Context, ownerAddress, 
 	if ownerAddress != "" {
 		setOwner(url, ownerAddress)
 	}
-	return streamAssets(ctx, url, args.outCh)
+	paginateAssets(ctx, authRequest(ctx, url.String()), args.outCh, args.cache)
 }
 
-func streamAssetsForCollectionEditor(ctx context.Context, editorAddress persist.EthereumAddress, opts ...OptionFunc) error {
+func streamAssetsForCollectionEditor(ctx context.Context, editorAddress persist.EthereumAddress, opts ...OptionFunc) {
 	args := DefaultArgs()
 	for _, opt := range opts {
 		opt(&args)
@@ -609,7 +596,8 @@ func streamAssetsForCollectionEditor(ctx context.Context, editorAddress persist.
 	setPagingParams(url, args.sortAsc, args.pageSize)
 	setCollectionEditor(url, editorAddress)
 	setContractAddress(url, sharedStoreFrontAddress)
-	return streamAssets(ctx, url, args.outCh)
+	setCursor(ctx, url, args.cache)
+	paginateAssets(ctx, authRequest(ctx, url.String()), args.outCh, args.cache)
 }
 
 // assetsToGroups converts a channel of assets to a slice of sub-contract groups
@@ -830,16 +818,17 @@ func firstNonEmptyString(strs ...string) string {
 }
 
 // authRequest returns a http.Request with authorization headers
-func authRequest(ctx context.Context, url string) (*http.Request, error) {
+func authRequest(ctx context.Context, url string) *http.Request {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 	req.Header.Set("X-API-KEY", env.GetString("OPENSEA_API_KEY"))
-	return req, nil
+	return req
 }
 
-func paginateAssets(req *http.Request, outCh chan assetsReceieved) {
+func paginateAssets(ctx context.Context, req *http.Request, outCh chan assetsReceieved, cache *redis.Cache) {
+	var lastCursor string
 	for {
 		resp, err := retry.RetryRequest(http.DefaultClient, req)
 		if err != nil {
@@ -864,9 +853,13 @@ func paginateAssets(req *http.Request, outCh chan assetsReceieved) {
 
 		// No more pages to paginate
 		if assets.Next == "" {
+			if cache != nil {
+				storeCursor(ctx, req.URL, cache, lastCursor)
+			}
 			return
 		}
 
+		lastCursor = assets.Next
 		query := req.URL.Query()
 		query.Set("cursor", assets.Next)
 		req.URL.RawQuery = query.Encode()
@@ -918,4 +911,21 @@ func setTokenID(url *url.URL, tokenID TokenID) {
 	query := url.Query()
 	query.Add("token_ids", string(tokenID))
 	url.RawQuery = query.Encode()
+}
+
+func setCursor(ctx context.Context, url *url.URL, cache *redis.Cache) {
+	key := fmt.Sprintf("provider:opensea:cursor:%s", url.String())
+	byt, err := cache.Get(ctx, key)
+	var notFoundErr redis.ErrKeyNotFound
+	if errors.As(err, &notFoundErr) {
+		return
+	}
+	query := url.Query()
+	query.Set("cursor", string(byt))
+	url.RawQuery = query.Encode()
+}
+
+func storeCursor(ctx context.Context, url *url.URL, cache *redis.Cache, cursor string) error {
+	key := fmt.Sprintf("provider:opensea:cursor:%s", url.String())
+	return cache.Set(ctx, key, []byte(cursor), 0)
 }

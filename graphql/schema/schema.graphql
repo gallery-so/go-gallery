@@ -100,7 +100,7 @@ type GalleryUser implements Node @goEmbedHelper {
     @authRequired
     @goField(forceResolver: true)
   createdCommunities(
-    input: CreatedCommunitiesInput!
+    input: communityGroupInput!
     before: String
     after: String
     first: Int
@@ -142,7 +142,7 @@ input ChainPubKeyInput {
   chain: Chain! @goField(forceResolver: true)
 }
 
-input CreatedCommunitiesInput {
+input communityGroupInput {
   chains: [Chain!]
   includeSubCommunities: Boolean!
   # When true, return all communities from all chains
@@ -435,7 +435,7 @@ type TokenHolder @goEmbedHelper {
   displayName: String
   wallets: [Wallet] @goField(forceResolver: true)
   user: GalleryUser @goField(forceResolver: true)
-  previewTokens: [String]
+  previewTokens: [String] @goField(forceResolver: true)
 }
 
 type MembershipTier implements Node {
@@ -1049,6 +1049,13 @@ type Query {
   collectionsByIds(ids: [DBID!]!): [CollectionByIdOrError]
   tokenById(id: DBID!): TokenByIdOrError
   collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
+  communityGroupByAddress(
+    input: communityGroupInput!
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): CommunityGroupConnection
   communityByAddress(
     communityAddress: ChainAddressInput!
     forceRefresh: Boolean

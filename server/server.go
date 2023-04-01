@@ -275,7 +275,7 @@ func NewMultichainProvider(c *Clients) *multichain.Provider {
 	ethChain := persist.ChainETH
 	overrides := multichain.ChainOverrideMap{persist.ChainPOAP: &ethChain}
 	ethProvider := eth.NewProvider(env.GetString("INDEXER_HOST"), c.HTTPClient, c.EthClient, c.TaskClient)
-	openseaProvider := opensea.NewProvider(c.EthClient, c.HTTPClient)
+	openseaProvider := opensea.NewProvider(c.EthClient, c.HTTPClient, redis.NewCache(redis.CommunitiesDB))
 	tezosProvider := multichain.FallbackProvider{
 		Primary:  tezos.NewProvider(env.GetString("TEZOS_API_URL"), env.GetString("TOKEN_PROCESSING_URL"), env.GetString("IPFS_URL"), c.HTTPClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET")),
 		Fallback: tezos.NewObjktProvider(env.GetString("IPFS_URL")),

@@ -16,7 +16,7 @@ create table if not exists contract_subgroups (
 create table if not exists token_subgroups (
   id varchar(255) primary key,
   token_id varchar(255) references tokens(id),
-  subgroup_id varchar(255) references contract_subgroups(id),
+  subgroup_id varchar(255) references contracts(id),
   created_at timestamptz not null default current_timestamp,
   last_updated timestamptz not null default current_timestamp,
   deleted boolean default false not null,
@@ -25,4 +25,4 @@ create table if not exists token_subgroups (
 
 create index if not exists contract_subgroup_creator_idx on contract_subgroups(creator_id) where deleted = false;
 create index if not exists contract_subgroup_parent_idx on contract_subgroups(parent_id) where deleted = false;
-create index if not exists contract_subgroup_tokens_idx on token_subgroups(subgroup_id) where deleted = false;
+create index if not exists token_subgroups_tokens_idx on token_subgroups(subgroup_id) where deleted = false;

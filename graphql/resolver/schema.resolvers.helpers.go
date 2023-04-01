@@ -476,12 +476,15 @@ func resolveTokensByContractID(ctx context.Context, contractID persist.DBID) ([]
 }
 
 func resolveTokensByContractIDWithPagination(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int, onlyGalleryUsers *bool) (*model.TokensConnection, error) {
-
 	tokens, pageInfo, err := publicapi.For(ctx).Token.GetTokensByContractIdPaginate(ctx, contractID, before, after, first, last, onlyGalleryUsers)
 	if err != nil {
 		return nil, err
 	}
+	connection := tokensToConnection(ctx, tokens, pageInfo)
+	return &connection, nil
+}
 
+func tokensToConnection(ctx context.Context, tokens []db.Token, pageInfo publicapi.PageInfo) model.TokensConnection {
 	edges := make([]*model.TokenEdge, len(tokens))
 	for i, token := range tokens {
 		edges[i] = &model.TokenEdge{
@@ -489,11 +492,10 @@ func resolveTokensByContractIDWithPagination(ctx context.Context, contractID per
 			Cursor: nil, // not used by relay, but relay will complain without this field existing
 		}
 	}
-
-	return &model.TokensConnection{
+	return model.TokensConnection{
 		Edges:    edges,
 		PageInfo: pageInfoToModel(ctx, pageInfo),
-	}, nil
+	}
 }
 
 func refreshTokensInContractAsync(ctx context.Context, contractID persist.DBID, forceRefresh bool) error {
@@ -628,6 +630,11 @@ func resolveCommunityOwnersByContractID(ctx context.Context, contractID persist.
 	if err != nil {
 		return nil, err
 	}
+	connection := ownersToConnection(ctx, owners, pageInfo)
+	return &connection, nil
+}
+
+func ownersToConnection(ctx, owners []db.TokenHolder, pageInfo publicapi.PageInfo) model.TokenHoldersConnection {
 	edges := make([]*model.TokenHolderEdge, len(owners))
 	for i, owner := range owners {
 		edges[i] = &model.TokenHolderEdge{
@@ -635,12 +642,10 @@ func resolveCommunityOwnersByContractID(ctx context.Context, contractID persist.
 			Cursor: nil, // not used by relay, but relay will complain without this field existing
 		}
 	}
-
-	return &model.TokenHoldersConnection{
+	return model.TokenHoldersConnection{
 		Edges:    edges,
 		PageInfo: pageInfoToModel(ctx, pageInfo),
-	}, nil
-
+	}
 }
 
 func resolveGeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error) {
