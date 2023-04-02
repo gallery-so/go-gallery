@@ -126,9 +126,9 @@ SELECT w.* FROM users u, unnest(u.wallets) WITH ORDINALITY AS a(wallet_id, walle
 -- name: GetContractByID :one
 select * FROM contracts WHERE id = $1 AND deleted = false;
 
--- name: GetContractBySubgroupIDBatch :batchone
-select contracts.* from contracts, contract_subgroups
-where contract_subgroups.id = $1 and contracts.id = contract_subgroups.parent_id and contract_subgroups.deleted = false and contracts.deleted = false;
+-- name: GetParentContractByChildIDBatch :batchone
+select parent.* from contracts child, contracts parent
+where child.id = $1 and child.deleted = false and child.parent_id = contracts.id and parent.deleted = false;
 
 -- name: GetContractsByIDs :many
 SELECT * from contracts WHERE id = ANY(@contract_ids) AND deleted = false;
@@ -137,7 +137,7 @@ SELECT * from contracts WHERE id = ANY(@contract_ids) AND deleted = false;
 select * FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false;
 
 -- name: GetContractByChainAddressBatch :batchone
-select * FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false;
+select * FROM contracts WHERE address = $1 AND chain = $2 AND parent_id IS NULL AND deleted = false;
 
 -- name: GetContractsByUserID :many
 SELECT DISTINCT ON (contracts.id) contracts.* FROM contracts, tokens
@@ -979,19 +979,16 @@ order by case when sqlc.arg('paging_forward')::bool then (a.displayed, b.display
 limit sqlc.arg('limit');
 
 -- name: GetCreatedContractsBatchPaginate :batchmany
--- The @chains param is passed as a string instead of an array so that the generated
--- input struct can be used as a cache key within a dataloader since only comparable
--- types can be used as keys in a map
--- TODO: Fix this
 select c.*
-from users, contract_subgroups, contracts c
-where contract_subgroups.creator_id = @user_id
-	and users.id = @user_id
-	and contract_subgroups.contract_id = c.id
+from users, contracts c, wallets w
+where users.id = @user_id
+  and wallets.id = any(users.wallets)
+  and contracts.creator_address = wallets.address
+  and contracts.chain = wallets.chain
 	and contracts.chain = any(string_to_array(@chains, ',')::int[])
 	and users.deleted = false
-	and contract_subgroups.deleted = false
 	and contracts.deleted = false
+  and wallets.deleted = false
   and (c.created_at, c.id) > (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
   and (c.created_at, c.id) < ( sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
 order by case when sqlc.arg('paging_forward')::bool then (c.created_at, c.id) end asc,
@@ -1015,5 +1012,26 @@ where a.user_id = @user_a_id
 insert into pii.account_creation_info (user_id, ip_address, created_at) values (@user_id, @ip_address, now())
   on conflict do nothing;
 
--- name: GetContractSubgroupsByContractIDBatch :batchmany
-select * from contract_subgroups where parent_id = $1 and deleted = false;
+-- name: GetChildContractsByParentIDBatchPaginate :batchmany
+select c.*
+from contracts c
+where
+  c.parent_id = @parent_id
+	and contracts.deleted = false
+  and (c.created_at, c.id) > (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+  and (c.created_at, c.id) < ( sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+order by case when sqlc.arg('paging_forward')::bool then (c.created_at, c.id) end asc,
+        case when not sqlc.arg('paging_forward')::bool then (c.created_at, c.id) end desc
+limit sqlc.arg('limit');
+
+-- name: GetContractsByAddressBatchPaginate :batchmany
+select c.*
+from contracts c
+where
+  (not @include_children::bool or c.parent_id is null)
+	and contracts.deleted = false
+  and (c.created_at, c.id) > (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+  and (c.created_at, c.id) < (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+order by case when sqlc.arg('paging_forward')::bool then (c.parent_id, c.created_at, c.id) end asc,
+        case when not sqlc.arg('paging_forward')::bool then (c.parent_id, c.created_at, c.id) end desc
+limit sqlc.arg('limit');

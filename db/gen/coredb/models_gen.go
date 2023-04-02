@@ -65,25 +65,12 @@ type Contract struct {
 	ProfileImageUrl  sql.NullString
 	BadgeUrl         sql.NullString
 	Description      sql.NullString
+	ParentID         persist.DBID
 }
 
 type ContractRelevance struct {
 	ID    persist.DBID
 	Score int32
-}
-
-type ContractSubgroup struct {
-	ID             persist.DBID
-	CreatorID      persist.DBID
-	ParentID       persist.DBID
-	ExternalID     persist.DBID
-	Name           sql.NullString
-	Description    sql.NullString
-	CreatorAddress persist.Address
-	CreatedAt      time.Time
-	LastUpdated    time.Time
-	Deleted        bool
-	Version        int32
 }
 
 type DevMetadataUser struct {
@@ -351,15 +338,7 @@ type Token struct {
 	IsUserMarkedSpam     sql.NullBool
 	IsProviderMarkedSpam sql.NullBool
 	LastSynced           time.Time
-}
-
-type TokenSubgroup struct {
-	ID          persist.DBID
-	TokenID     persist.DBID
-	SubgroupID  persist.DBID
-	CreatedAt   time.Time
-	LastUpdated time.Time
-	Deleted     bool
+	ChildContractID      persist.DBID
 }
 
 type TopRecommendedUser struct {

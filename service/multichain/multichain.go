@@ -569,6 +569,7 @@ func (c createUserAggregate) UserIDtoUser() map[persist.DBID]persist.User {
 
 // SyncTokensCreatedByUserID queries each provider to identify contracts created by the given user.
 func (p *Provider) SyncTokensCreatedByUserID(ctx context.Context, userID persist.DBID, chains []persist.Chain, includeAll bool) error {
+	panic("not implemented")
 	user, err := p.Repos.UserRepository.GetByID(ctx, userID)
 	if err != nil {
 		return err
@@ -651,40 +652,41 @@ func (p *Provider) SyncTokensCreatedByUserID(ctx context.Context, userID persist
 		persistedTokens = append(persistedTokens, savedTokens...)
 	}
 
-	params := db.UpsertCreatedTokensParams{}
-	now := time.Now()
-	contractAddressDBIDs := contractAddressToDBID(persistedContracts)
-	tokenDBIDs := tokenIDstoDBID(persistedTokens)
+	// params := db.UpsertCreatedTokensParams{}
+	// now := time.Now()
+	// contractAddressDBIDs := contractAddressToDBID(persistedContracts)
+	// tokenDBIDs := tokenIDstoDBID(persistedTokens)
 
-	// Update the subgroup contract and token lookup tables in a single transaction
-	for _, result := range providersResult {
-		for _, group := range result.Groups {
-			parentContractDBID := contractAddressDBIDs[group.ParentContract.Address.String()]
-			params.ContractSubgroupID = append(params.ContractSubgroupID, persist.GenerateID().String())
-			params.ContractDeleted = append(params.ContractDeleted, false)
-			params.ContractCreatedAt = append(params.ContractCreatedAt, now)
-			params.ContractSubgroupCreatorID = append(params.ContractSubgroupCreatorID, userID.String())
-			params.ContractParentID = append(params.ContractParentID, parentContractDBID.String())
-			params.ContractExternalID = append(params.ContractExternalID, group.Slug)
-			params.ContractSubgroupName = append(params.ContractSubgroupName, group.Name)
-			params.ContractSubgroupDescription = append(params.ContractSubgroupDescription, group.Description)
-			params.ContractContractAddress = append(params.ContractContractAddress, group.ParentContract.Address.String())
-			params.ContractChain = append(params.ContractChain, int32(result.Chain))
-			for _, token := range group.Tokens {
-				tokenIDs := persist.NewTokenIdentifiers(group.ParentContract.Address, token.TokenID, result.Chain)
-				tokenDBID := tokenDBIDs[tokenIDs]
-				params.TokenSubgroupID = append(params.TokenSubgroupID, persist.GenerateID().String())
-				params.TokenDeleted = append(params.TokenDeleted, false)
-				params.TokenDbid = append(params.TokenDbid, tokenDBID.String())
-				params.TokenCreatedAt = append(params.TokenCreatedAt, now)
-				params.TokenContractAddress = append(params.TokenContractAddress, group.ParentContract.Address.String())
-				params.TokenChain = append(params.TokenChain, int32(result.Chain))
-			}
-		}
-	}
-	_, err = p.Queries.UpsertCreatedTokens(ctx, params)
+	// // Update the subgroup contract and token lookup tables in a single transaction
+	// for _, result := range providersResult {
+	// 	for _, group := range result.Groups {
+	// 		parentContractDBID := contractAddressDBIDs[group.ParentContract.Address.String()]
+	// 		params.ContractSubgroupID = append(params.ContractSubgroupID, persist.GenerateID().String())
+	// 		params.ContractDeleted = append(params.ContractDeleted, false)
+	// 		params.ContractCreatedAt = append(params.ContractCreatedAt, now)
+	// 		params.ContractSubgroupCreatorID = append(params.ContractSubgroupCreatorID, userID.String())
+	// 		params.ContractParentID = append(params.ContractParentID, parentContractDBID.String())
+	// 		params.ContractExternalID = append(params.ContractExternalID, group.Slug)
+	// 		params.ContractSubgroupName = append(params.ContractSubgroupName, group.Name)
+	// 		params.ContractSubgroupDescription = append(params.ContractSubgroupDescription, group.Description)
+	// 		params.ContractContractAddress = append(params.ContractContractAddress, group.ParentContract.Address.String())
+	// 		params.ContractChain = append(params.ContractChain, int32(result.Chain))
+	// 		for _, token := range group.Tokens {
+	// 			tokenIDs := persist.NewTokenIdentifiers(group.ParentContract.Address, token.TokenID, result.Chain)
+	// 			tokenDBID := tokenDBIDs[tokenIDs]
+	// 			params.TokenSubgroupID = append(params.TokenSubgroupID, persist.GenerateID().String())
+	// 			params.TokenDeleted = append(params.TokenDeleted, false)
+	// 			params.TokenDbid = append(params.TokenDbid, tokenDBID.String())
+	// 			params.TokenCreatedAt = append(params.TokenCreatedAt, now)
+	// 			params.TokenContractAddress = append(params.TokenContractAddress, group.ParentContract.Address.String())
+	// 			params.TokenChain = append(params.TokenChain, int32(result.Chain))
+	// 		}
+	// 	}
+	// }
+	// _, err = p.Queries.UpsertCreatedTokens(ctx, params)
 
-	return err
+	// return err
+	return nil
 }
 
 func (p *Provider) prepTokensForTokenProcessing(ctx context.Context, tokensFromProviders []chainTokens, contracts []persist.ContractGallery, user persist.User) ([]persist.TokenGallery, map[persist.TokenIdentifiers]bool, error) {

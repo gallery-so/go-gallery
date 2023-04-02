@@ -703,7 +703,7 @@ func (api UserAPI) SharedFollowers(ctx context.Context, userID persist.DBID, bef
 		}
 	}
 
-	return users, pageInfo, nil
+	return users, pageInfo, err
 }
 
 func (api UserAPI) SharedCommunities(ctx context.Context, userID persist.DBID, before, after *string, first, last *int) ([]db.Contract, PageInfo, error) {
@@ -782,7 +782,7 @@ func (api UserAPI) SharedCommunities(ctx context.Context, userID persist.DBID, b
 		}
 	}
 
-	return contracts, pageInfo, nil
+	return contracts, pageInfo, err
 }
 
 func (api UserAPI) CreatedCommunities(ctx context.Context, userID persist.DBID, chains []persist.Chain, includeAllChains bool, before, after *string, first, last *int) ([]db.Contract, PageInfo, error) {
@@ -848,7 +848,7 @@ func (api UserAPI) CreatedCommunities(ctx context.Context, userID persist.DBID, 
 		contracts[i] = result.(db.Contract)
 	}
 
-	return nil, pageInfo, nil
+	return contracts, pageInfo, err
 }
 
 func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {

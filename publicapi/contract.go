@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
-	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -18,7 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
-	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -64,15 +62,73 @@ func (api ContractAPI) GetContractByAddress(ctx context.Context, contractAddress
 	return &contract, nil
 }
 
-func (api ContractAPI) GetParentContractBySubgroupID(ctx context.Context, subgroupID persist.DBID) (*db.Contract, error) {
+func (api ContractAPI) GetContractsByAddress(ctx context.Context, contractAddress persist.ChainAddress, includeChildren bool, before, after *string, first, last *int) ([]db.Contract, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"subgroupID": {subgroupID, "required"},
+		"contractAddress": {contractAddress, "required"},
+	}); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	queryFunc := func(params timeIDPagingParams) ([]any, error) {
+		keys, err := api.loaders.ContractsByChainAddress.Load(db.GetContractsByAddressBatchPaginateParams{
+			IncludeChildren: includeChildren,
+			CurBeforeTime:   params.CursorBeforeTime,
+			CurBeforeID:     params.CursorBeforeID,
+			CurAfterTime:    params.CursorAfterTime,
+			CurAfterID:      params.CursorAfterID,
+			PagingForward:   params.PagingForward,
+			Limit:           params.Limit,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		results := make([]any, len(keys))
+		for i, key := range keys {
+			results[i] = key
+		}
+
+		return results, nil
+	}
+
+	cursorFunc := func(i any) (time.Time, persist.DBID, error) {
+		if row, ok := i.(db.Contract); ok {
+			return row.CreatedAt, row.ID, nil
+		}
+		return time.Time{}, "", fmt.Errorf("node is not a db.Contract")
+	}
+
+	paginator := timeIDPaginator{
+		QueryFunc:  queryFunc,
+		CursorFunc: cursorFunc,
+	}
+
+	results, pageInfo, err := paginator.paginate(before, after, first, last)
+
+	contracts := make([]db.Contract, len(results))
+	for i, result := range results {
+		if contract, ok := result.(db.Contract); ok {
+			contracts[i] = contract
+		}
+	}
+
+	return contracts, pageInfo, err
+}
+
+func (api ContractAPI) GetParentContractByChildID(ctx context.Context, childID persist.DBID) (*db.Contract, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"childID": {childID, "required"},
 	}); err != nil {
 		return nil, err
 	}
 
-	contract, err := api.loaders.ContractBySubgroupID.Load(subgroupID)
+	contract, err := api.loaders.ContractByChildID.Load(childID)
 	if err != nil {
 		return nil, err
 	}
@@ -80,15 +136,62 @@ func (api ContractAPI) GetParentContractBySubgroupID(ctx context.Context, subgro
 	return &contract, nil
 }
 
-func (api ContractAPI) GetSubgroupsByCommunityID(ctx context.Context, contractID persist.DBID) ([]db.ContractSubgroup, error) {
+func (api ContractAPI) GetChildContractsByParentID(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int) ([]db.Contract, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"contractID": {contractID, "required"},
 	}); err != nil {
-		return nil, err
+		return nil, PageInfo{}, err
 	}
 
-	return api.loaders.ContractSubgroupsByContractID.Load(contractID)
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	queryFunc := func(params timeIDPagingParams) ([]any, error) {
+		keys, err := api.loaders.ContractsLoaderByParentID.Load(db.GetChildContractsByParentIDBatchPaginateParams{
+			ParentID:      contractID,
+			CurBeforeTime: params.CursorBeforeTime,
+			CurBeforeID:   params.CursorBeforeID,
+			CurAfterTime:  params.CursorAfterTime,
+			CurAfterID:    params.CursorAfterID,
+			PagingForward: params.PagingForward,
+			Limit:         params.Limit,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		results := make([]any, len(keys))
+		for i, key := range keys {
+			results[i] = key
+		}
+
+		return results, nil
+	}
+
+	cursorFunc := func(i any) (time.Time, persist.DBID, error) {
+		if row, ok := i.(db.Contract); ok {
+			return row.CreatedAt, row.ID, nil
+		}
+		return time.Time{}, "", fmt.Errorf("node is not a db.Contract")
+	}
+
+	paginator := timeIDPaginator{
+		QueryFunc:  queryFunc,
+		CursorFunc: cursorFunc,
+	}
+
+	results, pageInfo, err := paginator.paginate(before, after, first, last)
+
+	contracts := make([]db.Contract, len(results))
+	for i, result := range results {
+		if contract, ok := result.(db.Contract); ok {
+			contracts[i] = contract
+		}
+	}
+
+	return contracts, pageInfo, err
 }
 
 func (api ContractAPI) GetContractsByUserID(ctx context.Context, userID persist.DBID) ([]db.Contract, error) {
@@ -170,7 +273,7 @@ func (api ContractAPI) RefreshOwnersAsync(ctx context.Context, contractID persis
 	return task.CreateTaskForContractOwnerProcessing(ctx, in, api.taskClient)
 }
 
-func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, before, after *string, first, last *int, onlyGalleryUsers *bool) ([]*model.TokenHolder, PageInfo, error) {
+func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, before, after *string, first, last *int, onlyGalleryUsers *bool) ([]db.User, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"contractAddress": {contractAddress, "required"},
@@ -247,36 +350,19 @@ func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, 
 		return nil, PageInfo{}, err
 	}
 
-	owners := make([]*model.TokenHolder, len(results))
+	owners := make([]db.User, len(results))
 	for i, result := range results {
-		owner := result.(db.User)
-		walletIDs := make([]persist.DBID, len(owner.Wallets))
-		for j, wallet := range owner.Wallets {
-			walletIDs[j] = wallet.ID
-		}
-		previewURLs, err := api.queries.GetPreviewURLsByContractIdAndUserId(ctx, db.GetPreviewURLsByContractIdAndUserIdParams{
-			Contract:    contract.ID,
-			OwnerUserID: owner.ID,
-		})
-		if err != nil {
-			return nil, PageInfo{}, err
-		}
-
-		asPointers, err := util.Map(previewURLs, func(s string) (*string, error) {
-			return &s, nil
-		})
-
-		owners[i] = &model.TokenHolder{
-			HelperTokenHolderData: model.HelperTokenHolderData{
-				UserId:    owner.ID,
-				WalletIds: walletIDs,
-			},
-			DisplayName:   &owner.Username.String,
-			Wallets:       nil, // handled by a dedicated resolver
-			User:          nil, // handled by a dedicated resolver
-			PreviewTokens: asPointers,
+		if owner, ok := result.(db.User); ok {
+			owners[i] = owner
 		}
 	}
 
-	return owners, pageInfo, nil
+	return owners, pageInfo, err
+}
+
+func (api ContractAPI) GetPreviewURLsByContractIDandUserID(ctx context.Context, userID, contractID persist.DBID) ([]string, error) {
+	return api.queries.GetPreviewURLsByContractIdAndUserId(ctx, db.GetPreviewURLsByContractIdAndUserIdParams{
+		Contract:    contractID,
+		OwnerUserID: userID,
+	})
 }

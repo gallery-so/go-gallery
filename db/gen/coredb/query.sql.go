@@ -1164,7 +1164,7 @@ func (q *Queries) GetCommentsByCommentIDs(ctx context.Context, commentIds persis
 }
 
 const getContractByChainAddress = `-- name: GetContractByChainAddress :one
-select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false
+select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, parent_id FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false
 `
 
 type GetContractByChainAddressParams struct {
@@ -1190,12 +1190,13 @@ func (q *Queries) GetContractByChainAddress(ctx context.Context, arg GetContract
 		&i.ProfileImageUrl,
 		&i.BadgeUrl,
 		&i.Description,
+		&i.ParentID,
 	)
 	return i, err
 }
 
 const getContractByID = `-- name: GetContractByID :one
-select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description FROM contracts WHERE id = $1 AND deleted = false
+select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, parent_id FROM contracts WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetContractByID(ctx context.Context, id persist.DBID) (Contract, error) {
@@ -1216,12 +1217,13 @@ func (q *Queries) GetContractByID(ctx context.Context, id persist.DBID) (Contrac
 		&i.ProfileImageUrl,
 		&i.BadgeUrl,
 		&i.Description,
+		&i.ParentID,
 	)
 	return i, err
 }
 
 const getContractsByIDs = `-- name: GetContractsByIDs :many
-SELECT id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description from contracts WHERE id = ANY($1) AND deleted = false
+SELECT id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, parent_id from contracts WHERE id = ANY($1) AND deleted = false
 `
 
 func (q *Queries) GetContractsByIDs(ctx context.Context, contractIds persist.DBIDList) ([]Contract, error) {
@@ -1248,6 +1250,7 @@ func (q *Queries) GetContractsByIDs(ctx context.Context, contractIds persist.DBI
 			&i.ProfileImageUrl,
 			&i.BadgeUrl,
 			&i.Description,
+			&i.ParentID,
 		); err != nil {
 			return nil, err
 		}
@@ -1260,7 +1263,7 @@ func (q *Queries) GetContractsByIDs(ctx context.Context, contractIds persist.DBI
 }
 
 const getContractsByUserID = `-- name: GetContractsByUserID :many
-SELECT DISTINCT ON (contracts.id) contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description FROM contracts, tokens
+SELECT DISTINCT ON (contracts.id) contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.parent_id FROM contracts, tokens
     WHERE tokens.owner_user_id = $1 AND tokens.contract = contracts.id
     AND tokens.deleted = false AND contracts.deleted = false
 `
@@ -1289,6 +1292,7 @@ func (q *Queries) GetContractsByUserID(ctx context.Context, ownerUserID persist.
 			&i.ProfileImageUrl,
 			&i.BadgeUrl,
 			&i.Description,
+			&i.ParentID,
 		); err != nil {
 			return nil, err
 		}
@@ -2196,7 +2200,7 @@ func (q *Queries) GetSocialsByUserID(ctx context.Context, id persist.DBID) (pers
 }
 
 const getTokenById = `-- name: GetTokenById :one
-SELECT id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced FROM tokens WHERE id = $1 AND deleted = false
+SELECT id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, child_contract_id FROM tokens WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetTokenById(ctx context.Context, id persist.DBID) (Token, error) {
@@ -2227,12 +2231,13 @@ func (q *Queries) GetTokenById(ctx context.Context, id persist.DBID) (Token, err
 		&i.IsUserMarkedSpam,
 		&i.IsProviderMarkedSpam,
 		&i.LastSynced,
+		&i.ChildContractID,
 	)
 	return i, err
 }
 
 const getTokenByTokenIdentifiers = `-- name: GetTokenByTokenIdentifiers :one
-select id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced from tokens where tokens.token_id = $1 and contract = (select contracts.id from contracts where contracts.address = $2) and tokens.chain = $3 and tokens.deleted = false
+select id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, child_contract_id from tokens where tokens.token_id = $1 and contract = (select contracts.id from contracts where contracts.address = $2) and tokens.chain = $3 and tokens.deleted = false
 `
 
 type GetTokenByTokenIdentifiersParams struct {
@@ -2269,6 +2274,7 @@ func (q *Queries) GetTokenByTokenIdentifiers(ctx context.Context, arg GetTokenBy
 		&i.IsUserMarkedSpam,
 		&i.IsProviderMarkedSpam,
 		&i.LastSynced,
+		&i.ChildContractID,
 	)
 	return i, err
 }
@@ -2305,7 +2311,7 @@ func (q *Queries) GetTokenOwnerByID(ctx context.Context, id persist.DBID) (User,
 }
 
 const getTokensByCollectionId = `-- name: GetTokensByCollectionId :many
-SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced FROM users u, collections c, unnest(c.nfts)
+SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.child_contract_id FROM users u, collections c, unnest(c.nfts)
     WITH ORDINALITY AS x(nft_id, nft_ord)
     INNER JOIN tokens t ON t.id = x.nft_id
     WHERE u.id = t.owner_user_id AND t.owned_by_wallets && u.wallets
@@ -2351,6 +2357,7 @@ func (q *Queries) GetTokensByCollectionId(ctx context.Context, arg GetTokensByCo
 			&i.IsUserMarkedSpam,
 			&i.IsProviderMarkedSpam,
 			&i.LastSynced,
+			&i.ChildContractID,
 		); err != nil {
 			return nil, err
 		}
@@ -2363,7 +2370,7 @@ func (q *Queries) GetTokensByCollectionId(ctx context.Context, arg GetTokensByCo
 }
 
 const getTokensByContractId = `-- name: GetTokensByContractId :many
-SELECT id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced FROM tokens WHERE contract = $1 AND deleted = false
+SELECT id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, child_contract_id FROM tokens WHERE contract = $1 AND deleted = false
     ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC
 `
 
@@ -2401,6 +2408,7 @@ func (q *Queries) GetTokensByContractId(ctx context.Context, contract persist.DB
 			&i.IsUserMarkedSpam,
 			&i.IsProviderMarkedSpam,
 			&i.LastSynced,
+			&i.ChildContractID,
 		); err != nil {
 			return nil, err
 		}
@@ -2413,7 +2421,7 @@ func (q *Queries) GetTokensByContractId(ctx context.Context, contract persist.DB
 }
 
 const getTokensByContractIdPaginate = `-- name: GetTokensByContractIdPaginate :many
-SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced FROM tokens t
+SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.child_contract_id FROM tokens t
     JOIN users u ON u.id = t.owner_user_id
     WHERE t.contract = $1 AND t.deleted = false
     AND (NOT $3::bool OR u.universal = false)
@@ -2482,6 +2490,7 @@ func (q *Queries) GetTokensByContractIdPaginate(ctx context.Context, arg GetToke
 			&i.IsUserMarkedSpam,
 			&i.IsProviderMarkedSpam,
 			&i.LastSynced,
+			&i.ChildContractID,
 		); err != nil {
 			return nil, err
 		}
@@ -2494,7 +2503,7 @@ func (q *Queries) GetTokensByContractIdPaginate(ctx context.Context, arg GetToke
 }
 
 const getTokensByIDs = `-- name: GetTokensByIDs :many
-select id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced from tokens join unnest($1::varchar[]) with ordinality t(id, pos) using (id) where deleted = false order by t.pos asc
+select id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, child_contract_id from tokens join unnest($1::varchar[]) with ordinality t(id, pos) using (id) where deleted = false order by t.pos asc
 `
 
 func (q *Queries) GetTokensByIDs(ctx context.Context, tokenIds []string) ([]Token, error) {
@@ -2531,6 +2540,7 @@ func (q *Queries) GetTokensByIDs(ctx context.Context, tokenIds []string) ([]Toke
 			&i.IsUserMarkedSpam,
 			&i.IsProviderMarkedSpam,
 			&i.LastSynced,
+			&i.ChildContractID,
 		); err != nil {
 			return nil, err
 		}
@@ -2543,7 +2553,7 @@ func (q *Queries) GetTokensByIDs(ctx context.Context, tokenIds []string) ([]Toke
 }
 
 const getTokensByUserId = `-- name: GetTokensByUserId :many
-SELECT tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced FROM tokens, users
+SELECT tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.child_contract_id FROM tokens, users
     WHERE tokens.owner_user_id = $1 AND users.id = $1
       AND tokens.owned_by_wallets && users.wallets
       AND tokens.deleted = false AND users.deleted = false
@@ -2584,6 +2594,7 @@ func (q *Queries) GetTokensByUserId(ctx context.Context, ownerUserID persist.DBI
 			&i.IsUserMarkedSpam,
 			&i.IsProviderMarkedSpam,
 			&i.LastSynced,
+			&i.ChildContractID,
 		); err != nil {
 			return nil, err
 		}
@@ -2596,7 +2607,7 @@ func (q *Queries) GetTokensByUserId(ctx context.Context, ownerUserID persist.DBI
 }
 
 const getTokensByUserIdAndContractID = `-- name: GetTokensByUserIdAndContractID :many
-SELECT tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced FROM tokens, users
+SELECT tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.child_contract_id FROM tokens, users
     WHERE tokens.owner_user_id = $1 AND users.id = $1
       AND tokens.owned_by_wallets && users.wallets
       AND tokens.contract = $2
@@ -2643,6 +2654,7 @@ func (q *Queries) GetTokensByUserIdAndContractID(ctx context.Context, arg GetTok
 			&i.IsUserMarkedSpam,
 			&i.IsProviderMarkedSpam,
 			&i.LastSynced,
+			&i.ChildContractID,
 		); err != nil {
 			return nil, err
 		}
@@ -2655,7 +2667,7 @@ func (q *Queries) GetTokensByUserIdAndContractID(ctx context.Context, arg GetTok
 }
 
 const getTokensByWalletIds = `-- name: GetTokensByWalletIds :many
-SELECT id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced FROM tokens WHERE owned_by_wallets && $1 AND deleted = false
+SELECT id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, child_contract_id FROM tokens WHERE owned_by_wallets && $1 AND deleted = false
     ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC
 `
 
@@ -2693,6 +2705,7 @@ func (q *Queries) GetTokensByWalletIds(ctx context.Context, ownedByWallets persi
 			&i.IsUserMarkedSpam,
 			&i.IsProviderMarkedSpam,
 			&i.LastSynced,
+			&i.ChildContractID,
 		); err != nil {
 			return nil, err
 		}

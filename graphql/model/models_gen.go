@@ -51,10 +51,6 @@ type CommunityByAddressOrError interface {
 	IsCommunityByAddressOrError()
 }
 
-type CommunityGroup interface {
-	IsCommunityGroup()
-}
-
 type ConnectSocialAccountPayloadOrError interface {
 	IsConnectSocialAccountPayloadOrError()
 }
@@ -562,6 +558,12 @@ type CommentOnFeedEventPayload struct {
 
 func (CommentOnFeedEventPayload) IsCommentOnFeedEventPayloadOrError() {}
 
+type CommunitiesByAddressInput struct {
+	Address               *persist.ChainAddress `json:"address"`
+	ForceRefresh          *bool                 `json:"forceRefresh"`
+	IncludeSubCommunities *bool                 `json:"includeSubCommunities"`
+}
+
 type CommunitiesConnection struct {
 	Edges    []*CommunityEdge `json:"edges"`
 	PageInfo *PageInfo        `json:"pageInfo"`
@@ -581,28 +583,18 @@ type Community struct {
 	ProfileImageURL   *string                 `json:"profileImageURL"`
 	ProfileBannerURL  *string                 `json:"profileBannerURL"`
 	BadgeURL          *string                 `json:"badgeURL"`
-	SubCommunities    []*SubCommunity         `json:"subCommunities"`
+	ParentCommunity   *Community              `json:"parentCommunity"`
+	SubCommunities    *CommunitiesConnection  `json:"subCommunities"`
 	TokensInCommunity *TokensConnection       `json:"tokensInCommunity"`
 	Owners            *TokenHoldersConnection `json:"owners"`
 }
 
 func (Community) IsNode()                      {}
 func (Community) IsCommunityByAddressOrError() {}
-func (Community) IsCommunityGroup()            {}
 
 type CommunityEdge struct {
 	Node   *Community `json:"node"`
 	Cursor *string    `json:"cursor"`
-}
-
-type CommunityGroupConnection struct {
-	Edges    []*CommunityGroupEdge `json:"edges"`
-	PageInfo *PageInfo             `json:"pageInfo"`
-}
-
-type CommunityGroupEdge struct {
-	Node   CommunityGroup `json:"node"`
-	Cursor *string        `json:"cursor"`
 }
 
 type CommunitySearchResult struct {
@@ -684,6 +676,12 @@ type CreateUserPayload struct {
 }
 
 func (CreateUserPayload) IsCreateUserPayloadOrError() {}
+
+type CreatedCommunitiesInput struct {
+	IncludeAllChains      *bool           `json:"includeAllChains"`
+	Chains                []persist.Chain `json:"chains"`
+	IncludeSubCommunities bool            `json:"includeSubCommunities"`
+}
 
 type DebugAuth struct {
 	AsUsername     *string                 `json:"asUsername"`
@@ -1146,27 +1144,27 @@ func (GalleryUpdatedFeedEventData) IsFeedEventData() {}
 
 type GalleryUser struct {
 	HelperGalleryUserData
-	Dbid                persist.DBID              `json:"dbid"`
-	Username            *string                   `json:"username"`
-	Bio                 *string                   `json:"bio"`
-	Traits              *string                   `json:"traits"`
-	Universal           *bool                     `json:"universal"`
-	Roles               []*persist.Role           `json:"roles"`
-	SocialAccounts      *SocialAccounts           `json:"socialAccounts"`
-	Tokens              []*Token                  `json:"tokens"`
-	TokensByChain       *ChainTokens              `json:"tokensByChain"`
-	Wallets             []*Wallet                 `json:"wallets"`
-	PrimaryWallet       *Wallet                   `json:"primaryWallet"`
-	FeaturedGallery     *Gallery                  `json:"featuredGallery"`
-	Galleries           []*Gallery                `json:"galleries"`
-	Badges              []*Badge                  `json:"badges"`
-	IsAuthenticatedUser *bool                     `json:"isAuthenticatedUser"`
-	Followers           []*GalleryUser            `json:"followers"`
-	Following           []*GalleryUser            `json:"following"`
-	Feed                *FeedConnection           `json:"feed"`
-	SharedFollowers     *UsersConnection          `json:"sharedFollowers"`
-	SharedCommunities   *CommunitiesConnection    `json:"sharedCommunities"`
-	CreatedCommunities  *CommunityGroupConnection `json:"createdCommunities"`
+	Dbid                persist.DBID           `json:"dbid"`
+	Username            *string                `json:"username"`
+	Bio                 *string                `json:"bio"`
+	Traits              *string                `json:"traits"`
+	Universal           *bool                  `json:"universal"`
+	Roles               []*persist.Role        `json:"roles"`
+	SocialAccounts      *SocialAccounts        `json:"socialAccounts"`
+	Tokens              []*Token               `json:"tokens"`
+	TokensByChain       *ChainTokens           `json:"tokensByChain"`
+	Wallets             []*Wallet              `json:"wallets"`
+	PrimaryWallet       *Wallet                `json:"primaryWallet"`
+	FeaturedGallery     *Gallery               `json:"featuredGallery"`
+	Galleries           []*Gallery             `json:"galleries"`
+	Badges              []*Badge               `json:"badges"`
+	IsAuthenticatedUser *bool                  `json:"isAuthenticatedUser"`
+	Followers           []*GalleryUser         `json:"followers"`
+	Following           []*GalleryUser         `json:"following"`
+	Feed                *FeedConnection        `json:"feed"`
+	SharedFollowers     *UsersConnection       `json:"sharedFollowers"`
+	SharedCommunities   *CommunitiesConnection `json:"sharedCommunities"`
+	CreatedCommunities  *CommunitiesConnection `json:"createdCommunities"`
 }
 
 func (GalleryUser) IsNode()                              {}
@@ -1605,20 +1603,6 @@ type SomeoneViewedYourGalleryNotification struct {
 func (SomeoneViewedYourGalleryNotification) IsNotification()        {}
 func (SomeoneViewedYourGalleryNotification) IsNode()                {}
 func (SomeoneViewedYourGalleryNotification) IsGroupedNotification() {}
-
-type SubCommunity struct {
-	Dbid              persist.DBID            `json:"dbid"`
-	CreatorAddress    *persist.ChainAddress   `json:"creatorAddress"`
-	Creator           *GalleryUser            `json:"creator"`
-	ParentCommunity   *Community              `json:"parentCommunity"`
-	Name              *string                 `json:"name"`
-	Description       *string                 `json:"description"`
-	TokensInCommunity *TokensConnection       `json:"tokensInCommunity"`
-	Owners            *TokenHoldersConnection `json:"owners"`
-}
-
-func (SubCommunity) IsNode()           {}
-func (SubCommunity) IsCommunityGroup() {}
 
 type SyncTokensForUsernamePayload struct {
 	Message string `json:"message"`
@@ -2091,12 +2075,6 @@ type Wallet struct {
 
 func (Wallet) IsNode()                {}
 func (Wallet) IsGalleryUserOrWallet() {}
-
-type CommunityGroupInput struct {
-	Chains                []persist.Chain `json:"chains"`
-	IncludeSubCommunities bool            `json:"includeSubCommunities"`
-	IncludeAllChains      *bool           `json:"includeAllChains"`
-}
 
 type EmailUnsubscriptionType string
 

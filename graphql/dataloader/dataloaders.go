@@ -21,6 +21,7 @@
 //go:generate go run github.com/gallery-so/dataloaden ContractLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Contract
 //go:generate go run github.com/gallery-so/dataloaden ContractsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Contract
 //go:generate go run github.com/gallery-so/dataloaden ContractsLoaderByCreatorID github.com/mikeydub/go-gallery/db/gen/coredb.GetCreatedContractsBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.Contract
+//go:generate go run github.com/gallery-so/dataloaden ContractsLoaderByChainAddress github.com/mikeydub/go-gallery/db/gen/coredb.GetContractsByAddressBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.Contract
 //go:generate go run github.com/gallery-so/dataloaden ContractLoaderByChainAddress github.com/mikeydub/go-gallery/service/persist.ChainAddress github.com/mikeydub/go-gallery/db/gen/coredb.Contract
 //go:generate go run github.com/gallery-so/dataloaden GlobalFeedLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginateGlobalFeedParams []github.com/mikeydub/go-gallery/db/gen/coredb.FeedEvent
 //go:generate go run github.com/gallery-so/dataloaden PersonalFeedLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginatePersonalFeedByUserIDParams []github.com/mikeydub/go-gallery/db/gen/coredb.FeedEvent
@@ -40,7 +41,7 @@
 //go:generate go run github.com/gallery-so/dataloaden AdmireLoaderByActorAndFeedEvent github.com/mikeydub/go-gallery/db/gen/coredb.GetAdmireByActorIDAndFeedEventIDParams github.com/mikeydub/go-gallery/db/gen/coredb.Admire
 //go:generate go run github.com/gallery-so/dataloaden SharedFollowersLoaderByIDs github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedFollowersBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedFollowersBatchPaginateRow
 //go:generate go run github.com/gallery-so/dataloaden SharedContractsLoaderByIDs github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedContractsBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedContractsBatchPaginateRow
-//go:generate go run github.com/gallery-so/dataloaden ContractSubgroupLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.ContractSubgroup
+//go:generate go run github.com/gallery-so/dataloaden ContractsLoaderByParentID github.com/mikeydub/go-gallery/db/gen/coredb.GetChildContractsByParentIDBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.Contract
 
 package dataloader
 
@@ -95,11 +96,12 @@ type Loaders struct {
 	NewTokensByFeedEventID           *TokensLoaderByID
 	OwnerByTokenID                   *UserLoaderByID
 	ContractByContractID             *ContractLoaderByID
-	ContractBySubgroupID             *ContractLoaderByID
+	ContractByChildID                *ContractLoaderByID
 	ContractsByUserID                *ContractsLoaderByID
 	ContractsLoaderByCreatorID       *ContractsLoaderByCreatorID
+	ContractsLoaderByParentID        *ContractsLoaderByParentID
 	ContractByChainAddress           *ContractLoaderByChainAddress
-	ContractSubgroupsByContractID    *ContractSubgroupLoaderByID
+	ContractsByChainAddress          *ContractsLoaderByChainAddress
 	FollowersByUserID                *UsersLoaderByID
 	FollowingByUserID                *UsersLoaderByID
 	SharedFollowersByUserIDs         *SharedFollowersLoaderByIDs
@@ -258,7 +260,7 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 		AutoCacheWithKey: func(contract db.Contract) persist.DBID { return contract.ID },
 	})
 
-	loaders.ContractBySubgroupID = NewContractLoaderByID(defaults, loadContractBySubgroupID(q), ContractLoaderByIDCacheSubscriptions{
+	loaders.ContractByChildID = NewContractLoaderByID(defaults, loadContractByChildID(q), ContractLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(contract db.Contract) persist.DBID { return contract.ID },
 	})
 
@@ -268,11 +270,13 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 		},
 	})
 
-	loaders.ContractSubgroupsByContractID = NewContractSubgroupLoaderByID(defaults, loadContractSubgroupsByContractID(q))
+	loaders.ContractsByChainAddress = NewContractsLoaderByChainAddress(defaults, loadContractsByChainAddress(q))
 
 	loaders.ContractsByUserID = NewContractsLoaderByID(defaults, loadContractsByUserID(q))
 
 	loaders.ContractsLoaderByCreatorID = NewContractsLoaderByCreatorID(defaults, loadContractsByCreatorID(q))
+
+	loaders.ContractsLoaderByParentID = NewContractsLoaderByParentID(defaults, loadContractsByParentID(q))
 
 	loaders.FeedEventByFeedEventID = NewEventLoaderByID(defaults, loadEventById(q), EventLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(event db.FeedEvent) persist.DBID { return event.ID },
@@ -902,12 +906,12 @@ func loadContractByContractID(q *db.Queries) func(context.Context, []persist.DBI
 	}
 }
 
-func loadContractBySubgroupID(q *db.Queries) func(context.Context, []persist.DBID) ([]db.Contract, []error) {
+func loadContractByChildID(q *db.Queries) func(context.Context, []persist.DBID) ([]db.Contract, []error) {
 	return func(ctx context.Context, hierarchyIDs []persist.DBID) ([]db.Contract, []error) {
 		contracts := make([]db.Contract, len(hierarchyIDs))
 		errors := make([]error, len(hierarchyIDs))
 
-		b := q.GetContractBySubgroupIDBatch(ctx, hierarchyIDs)
+		b := q.GetParentContractByChildIDBatch(ctx, hierarchyIDs)
 		defer b.Close()
 
 		b.QueryRow(func(i int, c db.Contract, err error) {
@@ -945,19 +949,35 @@ func loadContractByChainAddress(q *db.Queries) func(context.Context, []persist.C
 	}
 }
 
-func loadContractSubgroupsByContractID(q *db.Queries) func(context.Context, []persist.DBID) ([][]db.ContractSubgroup, []error) {
-	return func(ctx context.Context, contractIDs []persist.DBID) ([][]db.ContractSubgroup, []error) {
-		groups := make([][]db.ContractSubgroup, len(contractIDs))
+func loadContractsBy(q *db.Queries) func(context.Context, []persist.DBID) ([][]db.Contract, []error) {
+	return func(ctx context.Context, contractIDs []persist.DBID) ([][]db.Contract, []error) {
+		contracts := make([][]db.Contract, len(contractIDs))
 		errors := make([]error, len(contractIDs))
 
-		b := q.GetContractSubgroupsByContractIDBatch(ctx, contractIDs)
+		b := q.GetContractsByUserIDBatch(ctx, contractIDs)
 		defer b.Close()
 
-		b.Query(func(i int, c []db.ContractSubgroup, err error) {
-			groups[i], errors[i] = c, err
+		b.Query(func(i int, c []db.Contract, err error) {
+			contracts[i], errors[i] = c, err
 		})
 
-		return groups, errors
+		return contracts, errors
+	}
+}
+
+func loadContractsByChainAddress(q *db.Queries) func(context.Context, []db.GetContractsByAddressBatchPaginateParams) ([][]db.Contract, []error) {
+	return func(ctx context.Context, params []db.GetContractsByAddressBatchPaginateParams) ([][]db.Contract, []error) {
+		contracts := make([][]db.Contract, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetContractsByAddressBatchPaginate(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, c []db.Contract, err error) {
+			contracts[i], errors[i] = c, err
+		})
+
+		return contracts, errors
 	}
 }
 
@@ -983,6 +1003,22 @@ func loadContractsByCreatorID(q *db.Queries) func(context.Context, []db.GetCreat
 		errors := make([]error, len(params))
 
 		b := q.GetCreatedContractsBatchPaginate(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, c []db.Contract, err error) {
+			contracts[i], errors[i] = c, err
+		})
+
+		return contracts, errors
+	}
+}
+
+func loadContractsByParentID(q *db.Queries) func(context.Context, []db.GetChildContractsByParentIDBatchPaginateParams) ([][]db.Contract, []error) {
+	return func(ctx context.Context, params []db.GetChildContractsByParentIDBatchPaginateParams) ([][]db.Contract, []error) {
+		contracts := make([][]db.Contract, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetChildContractsByParentIDBatchPaginate(ctx, params)
 		defer b.Close()
 
 		b.Query(func(i int, c []db.Contract, err error) {

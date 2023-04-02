@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/gammazero/workerpool"
@@ -55,15 +54,14 @@ var nodeFetcher = model.NodeFetcher{
 		return resolveCollectionTokenByID(ctx, persist.DBID(tokenId), persist.DBID(collectionId))
 	},
 
-	OnCommunity: func(ctx context.Context, contractAddress string, chain string) (*model.Community, error) {
-		if parsed, err := strconv.Atoi(chain); err == nil {
-			return resolveCommunityByContractAddress(ctx, persist.NewChainAddress(persist.Address(contractAddress), persist.Chain(parsed)), util.ToPointer(false))
-		} else {
+	// contractAddress and chain args are unused, but are required to match the NodeFetcher interface
+	// and needed to generate the node ID that differs from the contract node ID
+	OnCommunity: func(ctx context.Context, dbid persist.DBID, contractAddress string, chain string) (*model.Community, error) {
+		community, err := publicapi.For(ctx).Contract.GetContractByID(ctx, dbid)
+		if err != nil {
 			return nil, err
 		}
-	},
-	OnSubCommunity: func(ctx context.Context, dbid persist.DBID) (*model.SubCommunity, error) {
-		panic("not implemented")
+		return communityToModel(ctx, *community, util.ToPointer(false)), nil
 	},
 	OnSomeoneAdmiredYourFeedEventNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneAdmiredYourFeedEventNotification, error) {
 		notif, err := resolveNotificationByID(ctx, dbid)
@@ -630,15 +628,29 @@ func resolveCommunityOwnersByContractID(ctx context.Context, contractID persist.
 	if err != nil {
 		return nil, err
 	}
-	connection := ownersToConnection(ctx, owners, pageInfo)
+	connection := ownersToConnection(ctx, owners, contractID, pageInfo)
 	return &connection, nil
 }
 
-func ownersToConnection(ctx, owners []db.TokenHolder, pageInfo publicapi.PageInfo) model.TokenHoldersConnection {
+func ownersToConnection(ctx context.Context, owners []db.User, contractID persist.DBID, pageInfo publicapi.PageInfo) model.TokenHoldersConnection {
 	edges := make([]*model.TokenHolderEdge, len(owners))
 	for i, owner := range owners {
+		walletIDs := make([]persist.DBID, len(owner.Wallets))
+		for j, wallet := range owner.Wallets {
+			walletIDs[j] = wallet.ID
+		}
 		edges[i] = &model.TokenHolderEdge{
-			Node:   owner,
+			Node: &model.TokenHolder{
+				HelperTokenHolderData: model.HelperTokenHolderData{
+					UserId:     owner.ID,
+					WalletIds:  walletIDs,
+					ContractId: contractID,
+				},
+				DisplayName:   &owner.Username.String,
+				Wallets:       nil, // handled by a dedicated resolver
+				User:          nil, // handled by a dedicated resolver
+				PreviewTokens: nil, // handled by dedicated resolver
+			},
 			Cursor: nil, // not used by relay, but relay will complain without this field existing
 		}
 	}

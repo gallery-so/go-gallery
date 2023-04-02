@@ -36,8 +36,9 @@ type HelperCollectionTokenData struct {
 }
 
 type HelperTokenHolderData struct {
-	UserId    persist.DBID
-	WalletIds []persist.DBID
+	UserId     persist.DBID
+	WalletIds  []persist.DBID
+	ContractId persist.DBID
 }
 
 type HelperViewerData struct {

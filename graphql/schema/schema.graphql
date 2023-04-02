@@ -100,12 +100,12 @@ type GalleryUser implements Node @goEmbedHelper {
     @authRequired
     @goField(forceResolver: true)
   createdCommunities(
-    input: communityGroupInput!
+    input: CreatedCommunitiesInput!
     before: String
     after: String
     first: Int
     last: Int
-  ): CommunityGroupConnection @goField(forceResolver: true)
+  ): CommunitiesConnection @goField(forceResolver: true)
 }
 
 type Wallet implements Node {
@@ -142,11 +142,17 @@ input ChainPubKeyInput {
   chain: Chain! @goField(forceResolver: true)
 }
 
-input communityGroupInput {
+input CreatedCommunitiesInput {
+  # When true, return all communities from all chains. Ignores the "chains" argument.
+  includeAllChains: Boolean
   chains: [Chain!]
   includeSubCommunities: Boolean!
-  # When true, return all communities from all chains
-  includeAllChains: Boolean
+}
+
+input CommunitiesByAddressInput {
+  address: ChainAddressInput!
+  forceRefresh: Boolean = false
+  includeSubCommunities: Boolean = true
 }
 
 type Badge {
@@ -467,31 +473,7 @@ type TokenHoldersConnection {
   pageInfo: PageInfo!
 }
 
-type SubCommunity implements Node {
-  dbid: DBID!
-  id: ID!
-  creatorAddress: ChainAddress
-  creator: GalleryUser @goField(forceResolver: true)
-  parentCommunity: Community @goField(forceResolver: true)
-  name: String
-  description: String
-  tokensInCommunity(
-    before: String
-    after: String
-    first: Int
-    last: Int
-    onlyGalleryUsers: Boolean
-  ): TokensConnection @goField(forceResolver: true)
-  owners(
-    before: String
-    after: String
-    first: Int
-    last: Int
-    onlyGalleryUsers: Boolean
-  ): TokenHoldersConnection @goField(forceResolver: true)
-}
-
-type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) @goEmbedHelper {
+type Community implements Node @goGqlId(fields: ["dbid", "contractAddress", "chain"]) @goEmbedHelper {
   dbid: DBID!
   id: ID!
 
@@ -507,7 +489,13 @@ type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) @g
   profileImageURL: String
   profileBannerURL: String
   badgeURL: String
-  subCommunities: [SubCommunity] @goField(forceResolver: true)
+  parentCommunity: Community @goField(forceResolver: true)
+  subCommunities(
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): CommunitiesConnection @goField(forceResolver: true)
 
   tokensInCommunity(
     before: String
@@ -933,18 +921,6 @@ type UsersConnection {
   pageInfo: PageInfo!
 }
 
-union CommunityGroup = Community | SubCommunity
-
-type CommunityGroupEdge {
-  node: CommunityGroup
-  cursor: String
-}
-
-type CommunityGroupConnection {
-  edges: [CommunityGroupEdge]
-  pageInfo: PageInfo!
-}
-
 type CommunityEdge {
   node: Community
   cursor: String
@@ -1049,13 +1025,13 @@ type Query {
   collectionsByIds(ids: [DBID!]!): [CollectionByIdOrError]
   tokenById(id: DBID!): TokenByIdOrError
   collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
-  communityGroupByAddress(
-    input: communityGroupInput!
-    before: String
-    after: String
-    first: Int
-    last: Int
-  ): CommunityGroupConnection
+  communitiesByAddress(
+    input: CommunitiesByAddressInput!
+    before: String,
+    after: String,
+    first: Int,
+    last: Int,
+  ): CommunitiesConnection
   communityByAddress(
     communityAddress: ChainAddressInput!
     forceRefresh: Boolean
