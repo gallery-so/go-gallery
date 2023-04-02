@@ -558,12 +558,6 @@ type CommentOnFeedEventPayload struct {
 
 func (CommentOnFeedEventPayload) IsCommentOnFeedEventPayloadOrError() {}
 
-type CommunitiesByAddressInput struct {
-	Address               *persist.ChainAddress `json:"address"`
-	ForceRefresh          *bool                 `json:"forceRefresh"`
-	IncludeSubCommunities *bool                 `json:"includeSubCommunities"`
-}
-
 type CommunitiesConnection struct {
 	Edges    []*CommunityEdge `json:"edges"`
 	PageInfo *PageInfo        `json:"pageInfo"`

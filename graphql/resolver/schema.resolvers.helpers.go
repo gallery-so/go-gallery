@@ -1831,7 +1831,7 @@ func communityToModel(ctx context.Context, community db.Contract, forceRefresh *
 		Creator:           nil,                                        // handled by dedicated resolver
 		ParentCommunity:   &model.Community{Dbid: community.ParentID}, // remaining fields handlded by dedicated resolver
 		SubCommunities:    nil,                                        // handled by dedicated resolver
-		TokensInCommunity: nil,                                        // handled by dedicated resolver TODO: Double check resolved correctly
+		TokensInCommunity: nil,                                        // handled by dedicated resolver
 	}
 }
 

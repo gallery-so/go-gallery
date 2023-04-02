@@ -149,12 +149,6 @@ input CreatedCommunitiesInput {
   includeSubCommunities: Boolean!
 }
 
-input CommunitiesByAddressInput {
-  address: ChainAddressInput!
-  forceRefresh: Boolean = false
-  includeSubCommunities: Boolean = true
-}
-
 type Badge {
   name: String
   imageURL: String!
@@ -1025,13 +1019,6 @@ type Query {
   collectionsByIds(ids: [DBID!]!): [CollectionByIdOrError]
   tokenById(id: DBID!): TokenByIdOrError
   collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
-  communitiesByAddress(
-    input: CommunitiesByAddressInput!
-    before: String,
-    after: String,
-    first: Int,
-    last: Int,
-  ): CommunitiesConnection
   communityByAddress(
     communityAddress: ChainAddressInput!
     forceRefresh: Boolean

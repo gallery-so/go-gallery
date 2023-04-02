@@ -126,10 +126,6 @@ SELECT w.* FROM users u, unnest(u.wallets) WITH ORDINALITY AS a(wallet_id, walle
 -- name: GetContractByID :one
 select * FROM contracts WHERE id = $1 AND deleted = false;
 
--- name: GetParentContractByChildIDBatch :batchone
-select parent.* from contracts child, contracts parent
-where child.id = $1 and child.deleted = false and child.parent_id = contracts.id and parent.deleted = false;
-
 -- name: GetContractsByIDs :many
 SELECT * from contracts WHERE id = ANY(@contract_ids) AND deleted = false;
 
@@ -995,16 +991,4 @@ where
   and (c.created_at, c.id) < ( sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
 order by case when sqlc.arg('paging_forward')::bool then (c.created_at, c.id) end asc,
         case when not sqlc.arg('paging_forward')::bool then (c.created_at, c.id) end desc
-limit sqlc.arg('limit');
-
--- name: GetContractsByAddressBatchPaginate :batchmany
-select c.*
-from contracts c
-where
-  (not @include_children::bool or c.parent_id is null)
-	and contracts.deleted = false
-  and (c.created_at, c.id) > (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-  and (c.created_at, c.id) < (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
-order by case when sqlc.arg('paging_forward')::bool then (c.parent_id, c.created_at, c.id) end asc,
-        case when not sqlc.arg('paging_forward')::bool then (c.parent_id, c.created_at, c.id) end desc
 limit sqlc.arg('limit');

@@ -1673,30 +1673,6 @@ func (r *queryResolver) CollectionTokenByID(ctx context.Context, tokenID persist
 	return resolveCollectionTokenByID(ctx, tokenID, collectionID)
 }
 
-// CommunitiesByAddress is the resolver for the communitiesByAddress field.
-func (r *queryResolver) CommunitiesByAddress(ctx context.Context, input model.CommunitiesByAddressInput, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error) {
-	includeChildren := util.GetOptionalValue(input.IncludeSubCommunities, false)
-	forceRefresh := util.GetOptionalValue(input.ForceRefresh, false)
-
-	communities, pageInfo, err := publicapi.For(ctx).Contract.GetContractsByAddress(ctx, *input.Address, includeChildren, before, after, first, last)
-	if err != nil {
-		return nil, err
-	}
-
-	edges := make([]*model.CommunityEdge, len(communities))
-	for i, community := range communities {
-		edges[i] = &model.CommunityEdge{
-			Node:   communityToModel(ctx, community, &forceRefresh),
-			Cursor: nil, // not used by relay, but relay will complain without this field existing
-		}
-	}
-
-	return &model.CommunitiesConnection{
-		Edges:    edges,
-		PageInfo: pageInfoToModel(ctx, pageInfo),
-	}, nil
-}
-
 // CommunityByAddress is the resolver for the communityByAddress field.
 func (r *queryResolver) CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool) (model.CommunityByAddressOrError, error) {
 	return resolveCommunityByContractAddress(ctx, communityAddress, forceRefresh)
@@ -2447,13 +2423,3 @@ type viewerResolver struct{ *Resolver }
 type walletResolver struct{ *Resolver }
 type chainAddressInputResolver struct{ *Resolver }
 type chainPubKeyInputResolver struct{ *Resolver }
-
-// !!! WARNING !!!
-// The code below was going to be deleted when updating resolvers. It has been copied here so you have
-// one last chance to move it out of harms way if you want. There are two reasons this happens:
-//   - When renaming or deleting a resolver the old code will be put in here. You can safely delete
-//     it when you're done.
-//   - You have helper methods in this file. Move them out to keep these resolver files clean.
-func (r *communityResolver) ContractAddress(ctx context.Context, obj *model.Community) (*persist.ChainAddress, error) {
-	panic(fmt.Errorf("not implemented: ContractAddress - contractAddress"))
-}

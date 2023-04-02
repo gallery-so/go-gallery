@@ -20,7 +20,6 @@
 //go:generate go run github.com/gallery-so/dataloaden ContractLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Contract
 //go:generate go run github.com/gallery-so/dataloaden ContractsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Contract
 //go:generate go run github.com/gallery-so/dataloaden ContractsLoaderByCreatorID github.com/mikeydub/go-gallery/db/gen/coredb.GetCreatedContractsBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.Contract
-//go:generate go run github.com/gallery-so/dataloaden ContractsLoaderByChainAddress github.com/mikeydub/go-gallery/db/gen/coredb.GetContractsByAddressBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.Contract
 //go:generate go run github.com/gallery-so/dataloaden ContractLoaderByChainAddress github.com/mikeydub/go-gallery/service/persist.ChainAddress github.com/mikeydub/go-gallery/db/gen/coredb.Contract
 //go:generate go run github.com/gallery-so/dataloaden GlobalFeedLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginateGlobalFeedParams []github.com/mikeydub/go-gallery/db/gen/coredb.FeedEvent
 //go:generate go run github.com/gallery-so/dataloaden PersonalFeedLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginatePersonalFeedByUserIDParams []github.com/mikeydub/go-gallery/db/gen/coredb.FeedEvent
@@ -92,11 +91,9 @@ type Loaders struct {
 	NewTokensByFeedEventID        *TokensLoaderByID
 	OwnerByTokenID                *UserLoaderByID
 	ContractByContractID          *ContractLoaderByID
-	ContractByChildID             *ContractLoaderByID
 	ContractsLoaderByCreatorID    *ContractsLoaderByCreatorID
 	ContractsLoaderByParentID     *ContractsLoaderByParentID
 	ContractByChainAddress        *ContractLoaderByChainAddress
-	ContractsByChainAddress       *ContractsLoaderByChainAddress
 	FollowersByUserID             *UsersLoaderByID
 	FollowingByUserID             *UsersLoaderByID
 	SharedFollowersByUserIDs      *SharedFollowersLoaderByIDs
@@ -249,17 +246,11 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 		AutoCacheWithKey: func(contract db.Contract) persist.DBID { return contract.ID },
 	})
 
-	loaders.ContractByChildID = NewContractLoaderByID(defaults, loadContractByChildID(q), ContractLoaderByIDCacheSubscriptions{
-		AutoCacheWithKey: func(contract db.Contract) persist.DBID { return contract.ID },
-	})
-
 	loaders.ContractByChainAddress = NewContractLoaderByChainAddress(defaults, loadContractByChainAddress(q), ContractLoaderByChainAddressCacheSubscriptions{
 		AutoCacheWithKey: func(contract db.Contract) persist.ChainAddress {
 			return persist.NewChainAddress(contract.Address, contract.Chain)
 		},
 	})
-
-	loaders.ContractsByChainAddress = NewContractsLoaderByChainAddress(defaults, loadContractsByChainAddress(q))
 
 	loaders.ContractsLoaderByCreatorID = NewContractsLoaderByCreatorID(defaults, loadContractsByCreatorID(q))
 
@@ -853,22 +844,6 @@ func loadContractByContractID(q *db.Queries) func(context.Context, []persist.DBI
 	}
 }
 
-func loadContractByChildID(q *db.Queries) func(context.Context, []persist.DBID) ([]db.Contract, []error) {
-	return func(ctx context.Context, hierarchyIDs []persist.DBID) ([]db.Contract, []error) {
-		contracts := make([]db.Contract, len(hierarchyIDs))
-		errors := make([]error, len(hierarchyIDs))
-
-		b := q.GetParentContractByChildIDBatch(ctx, hierarchyIDs)
-		defer b.Close()
-
-		b.QueryRow(func(i int, c db.Contract, err error) {
-			contracts[i], errors[i] = c, err
-		})
-
-		return contracts, errors
-	}
-}
-
 func loadContractByChainAddress(q *db.Queries) func(context.Context, []persist.ChainAddress) ([]db.Contract, []error) {
 	return func(ctx context.Context, chainAddresses []persist.ChainAddress) ([]db.Contract, []error) {
 		contracts := make([]db.Contract, len(chainAddresses))
@@ -890,22 +865,6 @@ func loadContractByChainAddress(q *db.Queries) func(context.Context, []persist.C
 			if errors[i] == pgx.ErrNoRows {
 				errors[i] = persist.ErrGalleryContractNotFound{Address: chainAddresses[i].Address(), Chain: chainAddresses[i].Chain()}
 			}
-		})
-
-		return contracts, errors
-	}
-}
-
-func loadContractsByChainAddress(q *db.Queries) func(context.Context, []db.GetContractsByAddressBatchPaginateParams) ([][]db.Contract, []error) {
-	return func(ctx context.Context, params []db.GetContractsByAddressBatchPaginateParams) ([][]db.Contract, []error) {
-		contracts := make([][]db.Contract, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetContractsByAddressBatchPaginate(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, c []db.Contract, err error) {
-			contracts[i], errors[i] = c, err
 		})
 
 		return contracts, errors

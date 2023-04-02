@@ -787,7 +787,6 @@ type ComplexityRoot struct {
 		CollectionByID          func(childComplexity int, id persist.DBID) int
 		CollectionTokenByID     func(childComplexity int, tokenID persist.DBID, collectionID persist.DBID) int
 		CollectionsByIds        func(childComplexity int, ids []persist.DBID) int
-		CommunitiesByAddress    func(childComplexity int, input model.CommunitiesByAddressInput, before *string, after *string, first *int, last *int) int
 		CommunityByAddress      func(childComplexity int, communityAddress persist.ChainAddress, forceRefresh *bool) int
 		FeedEventByID           func(childComplexity int, id persist.DBID) int
 		GalleryByID             func(childComplexity int, id persist.DBID) int
@@ -1424,7 +1423,6 @@ type QueryResolver interface {
 	CollectionsByIds(ctx context.Context, ids []persist.DBID) ([]model.CollectionByIDOrError, error)
 	TokenByID(ctx context.Context, id persist.DBID) (model.TokenByIDOrError, error)
 	CollectionTokenByID(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (model.CollectionTokenByIDOrError, error)
-	CommunitiesByAddress(ctx context.Context, input model.CommunitiesByAddressInput, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error)
 	CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool) (model.CommunityByAddressOrError, error)
 	GeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error)
 	GalleryOfTheWeekWinners(ctx context.Context) ([]*model.GalleryUser, error)
@@ -4563,18 +4561,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.CollectionsByIds(childComplexity, args["ids"].([]persist.DBID)), true
 
-	case "Query.communitiesByAddress":
-		if e.complexity.Query.CommunitiesByAddress == nil {
-			break
-		}
-
-		args, err := ec.field_Query_communitiesByAddress_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Query.CommunitiesByAddress(childComplexity, args["input"].(model.CommunitiesByAddressInput), args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
-
 	case "Query.communityByAddress":
 		if e.complexity.Query.CommunityByAddress == nil {
 			break
@@ -6338,7 +6324,6 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputCollectionLayoutInput,
 		ec.unmarshalInputCollectionSectionLayoutInput,
 		ec.unmarshalInputCollectionTokenSettingsInput,
-		ec.unmarshalInputCommunitiesByAddressInput,
 		ec.unmarshalInputCreateCollectionInGalleryInput,
 		ec.unmarshalInputCreateCollectionInput,
 		ec.unmarshalInputCreateGalleryInput,
@@ -6604,12 +6589,6 @@ input CreatedCommunitiesInput {
   includeAllChains: Boolean
   chains: [Chain!]
   includeSubCommunities: Boolean!
-}
-
-input CommunitiesByAddressInput {
-  address: ChainAddressInput!
-  forceRefresh: Boolean = false
-  includeSubCommunities: Boolean = true
 }
 
 type Badge {
@@ -7482,13 +7461,6 @@ type Query {
   collectionsByIds(ids: [DBID!]!): [CollectionByIdOrError]
   tokenById(id: DBID!): TokenByIdOrError
   collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
-  communitiesByAddress(
-    input: CommunitiesByAddressInput!
-    before: String,
-    after: String,
-    first: Int,
-    last: Int,
-  ): CommunitiesConnection
   communityByAddress(
     communityAddress: ChainAddressInput!
     forceRefresh: Boolean
@@ -10142,57 +10114,6 @@ func (ec *executionContext) field_Query_collectionsByIds_args(ctx context.Contex
 		}
 	}
 	args["ids"] = arg0
-	return args, nil
-}
-
-func (ec *executionContext) field_Query_communitiesByAddress_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 model.CommunitiesByAddressInput
-	if tmp, ok := rawArgs["input"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
-		arg0, err = ec.unmarshalNCommunitiesByAddressInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunitiesByAddressInput(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["input"] = arg0
-	var arg1 *string
-	if tmp, ok := rawArgs["before"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
-		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["before"] = arg1
-	var arg2 *string
-	if tmp, ok := rawArgs["after"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
-		arg2, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["after"] = arg2
-	var arg3 *int
-	if tmp, ok := rawArgs["first"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
-		arg3, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["first"] = arg3
-	var arg4 *int
-	if tmp, ok := rawArgs["last"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("last"))
-		arg4, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["last"] = arg4
 	return args, nil
 }
 
@@ -31546,63 +31467,6 @@ func (ec *executionContext) fieldContext_Query_collectionTokenById(ctx context.C
 	return fc, nil
 }
 
-func (ec *executionContext) _Query_communitiesByAddress(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Query_communitiesByAddress(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().CommunitiesByAddress(rctx, fc.Args["input"].(model.CommunitiesByAddressInput), fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.CommunitiesConnection)
-	fc.Result = res
-	return ec.marshalOCommunitiesConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunitiesConnection(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Query_communitiesByAddress(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "edges":
-				return ec.fieldContext_CommunitiesConnection_edges(ctx, field)
-			case "pageInfo":
-				return ec.fieldContext_CommunitiesConnection_pageInfo(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type CommunitiesConnection", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_communitiesByAddress_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _Query_communityByAddress(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Query_communityByAddress(ctx, field)
 	if err != nil {
@@ -45322,57 +45186,6 @@ func (ec *executionContext) unmarshalInputCollectionTokenSettingsInput(ctx conte
 	return it, nil
 }
 
-func (ec *executionContext) unmarshalInputCommunitiesByAddressInput(ctx context.Context, obj interface{}) (model.CommunitiesByAddressInput, error) {
-	var it model.CommunitiesByAddressInput
-	asMap := map[string]interface{}{}
-	for k, v := range obj.(map[string]interface{}) {
-		asMap[k] = v
-	}
-
-	if _, present := asMap["forceRefresh"]; !present {
-		asMap["forceRefresh"] = false
-	}
-	if _, present := asMap["includeSubCommunities"]; !present {
-		asMap["includeSubCommunities"] = true
-	}
-
-	fieldsInOrder := [...]string{"address", "forceRefresh", "includeSubCommunities"}
-	for _, k := range fieldsInOrder {
-		v, ok := asMap[k]
-		if !ok {
-			continue
-		}
-		switch k {
-		case "address":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("address"))
-			it.Address, err = ec.unmarshalNChainAddressInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, v)
-			if err != nil {
-				return it, err
-			}
-		case "forceRefresh":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("forceRefresh"))
-			it.ForceRefresh, err = ec.unmarshalOBoolean2ᚖbool(ctx, v)
-			if err != nil {
-				return it, err
-			}
-		case "includeSubCommunities":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("includeSubCommunities"))
-			it.IncludeSubCommunities, err = ec.unmarshalOBoolean2ᚖbool(ctx, v)
-			if err != nil {
-				return it, err
-			}
-		}
-	}
-
-	return it, nil
-}
-
 func (ec *executionContext) unmarshalInputCreateCollectionInGalleryInput(ctx context.Context, obj interface{}) (model.CreateCollectionInGalleryInput, error) {
 	var it model.CreateCollectionInGalleryInput
 	asMap := map[string]interface{}{}
@@ -55153,26 +54966,6 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			out.Concurrently(i, func() graphql.Marshaler {
 				return rrm(innerCtx)
 			})
-		case "communitiesByAddress":
-			field := field
-
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Query_communitiesByAddress(ctx, field)
-				return res
-			}
-
-			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
-			}
-
-			out.Concurrently(i, func() graphql.Marshaler {
-				return rrm(innerCtx)
-			})
 		case "communityByAddress":
 			field := field
 
@@ -58958,11 +58751,6 @@ func (ec *executionContext) unmarshalNCollectionTokenSettingsInput2ᚕᚖgithub�
 func (ec *executionContext) unmarshalNCollectionTokenSettingsInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionTokenSettingsInput(ctx context.Context, v interface{}) (*model.CollectionTokenSettingsInput, error) {
 	res, err := ec.unmarshalInputCollectionTokenSettingsInput(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) unmarshalNCommunitiesByAddressInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunitiesByAddressInput(ctx context.Context, v interface{}) (model.CommunitiesByAddressInput, error) {
-	res, err := ec.unmarshalInputCommunitiesByAddressInput(ctx, v)
-	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalNCommunitySearchResult2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunitySearchResult(ctx context.Context, sel ast.SelectionSet, v *model.CommunitySearchResult) graphql.Marshaler {
