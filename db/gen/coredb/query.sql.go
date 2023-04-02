@@ -145,18 +145,20 @@ func (q *Queries) ClearNotificationsForUser(ctx context.Context, ownerID persist
 
 const countOwnersByContractId = `-- name: CountOwnersByContractId :one
 SELECT count(DISTINCT users.id) FROM users, tokens
-    WHERE tokens.contract = $1 AND tokens.owner_user_id = users.id
-    AND (NOT $2::bool OR users.universal = false)
+    WHERE CASE WHEN $2::bool THEN tokens.contract = $1 ELSE tokens.child_contract_id = $1 END
+    AND tokens.owner_user_id = users.id
+    AND (NOT $3::bool OR users.universal = false)
     AND tokens.deleted = false AND users.deleted = false
 `
 
 type CountOwnersByContractIdParams struct {
 	Contract         persist.DBID
+	IsRootNode       bool
 	GalleryUsersOnly bool
 }
 
 func (q *Queries) CountOwnersByContractId(ctx context.Context, arg CountOwnersByContractIdParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countOwnersByContractId, arg.Contract, arg.GalleryUsersOnly)
+	row := q.db.QueryRow(ctx, countOwnersByContractId, arg.Contract, arg.IsRootNode, arg.GalleryUsersOnly)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -240,16 +242,27 @@ func (q *Queries) CountSocialConnections(ctx context.Context, arg CountSocialCon
 }
 
 const countTokensByContractId = `-- name: CountTokensByContractId :one
-SELECT count(*) FROM tokens JOIN users ON users.id = tokens.owner_user_id WHERE contract = $1 AND (NOT $2::bool OR users.universal = false) AND tokens.deleted = false
+SELECT count(*)
+FROM tokens
+JOIN users ON users.id = tokens.owner_user_id
+WHERE CASE WHEN $3::bool THEN tokens.contract = $1 ELSE tokens.child_contract_id = $2 END
+  AND (NOT $4::bool OR users.universal = false) AND tokens.deleted = false
 `
 
 type CountTokensByContractIdParams struct {
 	Contract         persist.DBID
+	ChildContractID  persist.DBID
+	IsRootNode       bool
 	GalleryUsersOnly bool
 }
 
 func (q *Queries) CountTokensByContractId(ctx context.Context, arg CountTokensByContractIdParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countTokensByContractId, arg.Contract, arg.GalleryUsersOnly)
+	row := q.db.QueryRow(ctx, countTokensByContractId,
+		arg.Contract,
+		arg.ChildContractID,
+		arg.IsRootNode,
+		arg.GalleryUsersOnly,
+	)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -1228,48 +1241,6 @@ SELECT id, deleted, version, created_at, last_updated, name, symbol, address, cr
 
 func (q *Queries) GetContractsByIDs(ctx context.Context, contractIds persist.DBIDList) ([]Contract, error) {
 	rows, err := q.db.Query(ctx, getContractsByIDs, contractIds)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Contract
-	for rows.Next() {
-		var i Contract
-		if err := rows.Scan(
-			&i.ID,
-			&i.Deleted,
-			&i.Version,
-			&i.CreatedAt,
-			&i.LastUpdated,
-			&i.Name,
-			&i.Symbol,
-			&i.Address,
-			&i.CreatorAddress,
-			&i.Chain,
-			&i.ProfileBannerUrl,
-			&i.ProfileImageUrl,
-			&i.BadgeUrl,
-			&i.Description,
-			&i.ParentID,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getContractsByUserID = `-- name: GetContractsByUserID :many
-SELECT DISTINCT ON (contracts.id) contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.parent_id FROM contracts, tokens
-    WHERE tokens.owner_user_id = $1 AND tokens.contract = contracts.id
-    AND tokens.deleted = false AND contracts.deleted = false
-`
-
-func (q *Queries) GetContractsByUserID(ctx context.Context, ownerUserID persist.DBID) ([]Contract, error) {
-	rows, err := q.db.Query(ctx, getContractsByUserID, ownerUserID)
 	if err != nil {
 		return nil, err
 	}
@@ -2369,72 +2340,23 @@ func (q *Queries) GetTokensByCollectionId(ctx context.Context, arg GetTokensByCo
 	return items, nil
 }
 
-const getTokensByContractId = `-- name: GetTokensByContractId :many
-SELECT id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, child_contract_id FROM tokens WHERE contract = $1 AND deleted = false
-    ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC
-`
-
-func (q *Queries) GetTokensByContractId(ctx context.Context, contract persist.DBID) ([]Token, error) {
-	rows, err := q.db.Query(ctx, getTokensByContractId, contract)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Token
-	for rows.Next() {
-		var i Token
-		if err := rows.Scan(
-			&i.ID,
-			&i.Deleted,
-			&i.Version,
-			&i.CreatedAt,
-			&i.LastUpdated,
-			&i.Name,
-			&i.Description,
-			&i.CollectorsNote,
-			&i.Media,
-			&i.TokenUri,
-			&i.TokenType,
-			&i.TokenID,
-			&i.Quantity,
-			&i.OwnershipHistory,
-			&i.TokenMetadata,
-			&i.ExternalUrl,
-			&i.BlockNumber,
-			&i.OwnerUserID,
-			&i.OwnedByWallets,
-			&i.Chain,
-			&i.Contract,
-			&i.IsUserMarkedSpam,
-			&i.IsProviderMarkedSpam,
-			&i.LastSynced,
-			&i.ChildContractID,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getTokensByContractIdPaginate = `-- name: GetTokensByContractIdPaginate :many
 SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.child_contract_id FROM tokens t
     JOIN users u ON u.id = t.owner_user_id
-    WHERE t.contract = $1 AND t.deleted = false
-    AND (NOT $3::bool OR u.universal = false)
-    AND (u.universal,t.created_at,t.id) < ($4, $5::timestamptz, $6)
-    AND (u.universal,t.created_at,t.id) > ($7, $8::timestamptz, $9)
-    ORDER BY CASE WHEN $10::bool THEN (u.universal,t.created_at,t.id) END ASC,
-             CASE WHEN NOT $10::bool THEN (u.universal,t.created_at,t.id) END DESC
+    WHERE CASE WHEN $3::bool THEN t.contract = $1 ELSE t.child_contract_id = $1 END
+    AND t.deleted = false
+    AND (NOT $4::bool OR u.universal = false)
+    AND (u.universal,t.created_at,t.id) < ($5, $6::timestamptz, $7)
+    AND (u.universal,t.created_at,t.id) > ($8, $9::timestamptz, $10)
+    ORDER BY CASE WHEN $11::bool THEN (u.universal,t.created_at,t.id) END ASC,
+             CASE WHEN NOT $11::bool THEN (u.universal,t.created_at,t.id) END DESC
     LIMIT $2
 `
 
 type GetTokensByContractIdPaginateParams struct {
 	Contract           persist.DBID
 	Limit              int32
+	IsRootNode         bool
 	GalleryUsersOnly   bool
 	CurBeforeUniversal bool
 	CurBeforeTime      time.Time
@@ -2449,6 +2371,7 @@ func (q *Queries) GetTokensByContractIdPaginate(ctx context.Context, arg GetToke
 	rows, err := q.db.Query(ctx, getTokensByContractIdPaginate,
 		arg.Contract,
 		arg.Limit,
+		arg.IsRootNode,
 		arg.GalleryUsersOnly,
 		arg.CurBeforeUniversal,
 		arg.CurBeforeTime,
@@ -2562,66 +2485,6 @@ SELECT tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last
 
 func (q *Queries) GetTokensByUserId(ctx context.Context, ownerUserID persist.DBID) ([]Token, error) {
 	rows, err := q.db.Query(ctx, getTokensByUserId, ownerUserID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Token
-	for rows.Next() {
-		var i Token
-		if err := rows.Scan(
-			&i.ID,
-			&i.Deleted,
-			&i.Version,
-			&i.CreatedAt,
-			&i.LastUpdated,
-			&i.Name,
-			&i.Description,
-			&i.CollectorsNote,
-			&i.Media,
-			&i.TokenUri,
-			&i.TokenType,
-			&i.TokenID,
-			&i.Quantity,
-			&i.OwnershipHistory,
-			&i.TokenMetadata,
-			&i.ExternalUrl,
-			&i.BlockNumber,
-			&i.OwnerUserID,
-			&i.OwnedByWallets,
-			&i.Chain,
-			&i.Contract,
-			&i.IsUserMarkedSpam,
-			&i.IsProviderMarkedSpam,
-			&i.LastSynced,
-			&i.ChildContractID,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getTokensByUserIdAndContractID = `-- name: GetTokensByUserIdAndContractID :many
-SELECT tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.child_contract_id FROM tokens, users
-    WHERE tokens.owner_user_id = $1 AND users.id = $1
-      AND tokens.owned_by_wallets && users.wallets
-      AND tokens.contract = $2
-      AND tokens.deleted = false AND users.deleted = false
-    ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC
-`
-
-type GetTokensByUserIdAndContractIDParams struct {
-	OwnerUserID persist.DBID
-	Contract    persist.DBID
-}
-
-func (q *Queries) GetTokensByUserIdAndContractID(ctx context.Context, arg GetTokensByUserIdAndContractIDParams) ([]Token, error) {
-	rows, err := q.db.Query(ctx, getTokensByUserIdAndContractID, arg.OwnerUserID, arg.Contract)
 	if err != nil {
 		return nil, err
 	}

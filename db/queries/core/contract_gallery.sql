@@ -22,6 +22,10 @@ do update set
   , last_updated = now()
 returning *;
 
+-- insert parent contracts
+-- insert the subgroups contracts using the parent ids inserted in the step before
+-- insert tokens using the subgroup contracts ids in the step before
+
 -- -- name: UpsertCreatedTokens :many
 -- with contract_subgroups_data(id, deleted, created_at, creator_address, creator_id, parent_id, external_id, name, description, contract_address, chain) as (
 --   select

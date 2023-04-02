@@ -569,7 +569,6 @@ func (c createUserAggregate) UserIDtoUser() map[persist.DBID]persist.User {
 
 // SyncTokensCreatedByUserID queries each provider to identify contracts created by the given user.
 func (p *Provider) SyncTokensCreatedByUserID(ctx context.Context, userID persist.DBID, chains []persist.Chain, includeAll bool) error {
-	panic("not implemented")
 	user, err := p.Repos.UserRepository.GetByID(ctx, userID)
 	if err != nil {
 		return err
@@ -657,7 +656,7 @@ func (p *Provider) SyncTokensCreatedByUserID(ctx context.Context, userID persist
 	// contractAddressDBIDs := contractAddressToDBID(persistedContracts)
 	// tokenDBIDs := tokenIDstoDBID(persistedTokens)
 
-	// // Update the subgroup contract and token lookup tables in a single transaction
+	// // Update the subgroup contract and token lookup tables in a single query
 	// for _, result := range providersResult {
 	// 	for _, group := range result.Groups {
 	// 		parentContractDBID := contractAddressDBIDs[group.ParentContract.Address.String()]
@@ -685,7 +684,7 @@ func (p *Provider) SyncTokensCreatedByUserID(ctx context.Context, userID persist
 	// }
 	// _, err = p.Queries.UpsertCreatedTokens(ctx, params)
 
-	// return err
+	// // return err
 	return nil
 }
 

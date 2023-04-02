@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/gammazero/workerpool"
@@ -54,14 +55,12 @@ var nodeFetcher = model.NodeFetcher{
 		return resolveCollectionTokenByID(ctx, persist.DBID(tokenId), persist.DBID(collectionId))
 	},
 
-	// contractAddress and chain args are unused, but are required to match the NodeFetcher interface
-	// and needed to generate the node ID that differs from the contract node ID
-	OnCommunity: func(ctx context.Context, dbid persist.DBID, contractAddress string, chain string) (*model.Community, error) {
-		community, err := publicapi.For(ctx).Contract.GetContractByID(ctx, dbid)
-		if err != nil {
+	OnCommunity: func(ctx context.Context, contractAddress string, chain string) (*model.Community, error) {
+		if parsed, err := strconv.Atoi(chain); err == nil {
+			return resolveCommunityByContractAddress(ctx, persist.NewChainAddress(persist.Address(contractAddress), persist.Chain(parsed)), util.ToPointer(false))
+		} else {
 			return nil, err
 		}
-		return communityToModel(ctx, *community, util.ToPointer(false)), nil
 	},
 	OnSomeoneAdmiredYourFeedEventNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneAdmiredYourFeedEventNotification, error) {
 		notif, err := resolveNotificationByID(ctx, dbid)
@@ -453,28 +452,8 @@ func resolveTokensByWalletID(ctx context.Context, walletID persist.DBID) ([]*mod
 	return tokensToModel(ctx, tokens), nil
 }
 
-func resolveTokensByUserIDAndContractID(ctx context.Context, userID, contractID persist.DBID) ([]*model.Token, error) {
-
-	tokens, err := publicapi.For(ctx).Token.GetTokensByUserIDAndContractID(ctx, userID, contractID)
-	if err != nil {
-		return nil, err
-	}
-
-	return tokensToModel(ctx, tokens), nil
-}
-
-func resolveTokensByContractID(ctx context.Context, contractID persist.DBID) ([]*model.Token, error) {
-
-	tokens, err := publicapi.For(ctx).Token.GetTokensByContractId(ctx, contractID)
-	if err != nil {
-		return nil, err
-	}
-
-	return tokensToModel(ctx, tokens), nil
-}
-
-func resolveTokensByContractIDWithPagination(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int, onlyGalleryUsers *bool) (*model.TokensConnection, error) {
-	tokens, pageInfo, err := publicapi.For(ctx).Token.GetTokensByContractIdPaginate(ctx, contractID, before, after, first, last, onlyGalleryUsers)
+func resolveTokensByContractIDWithPagination(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int, onlyGalleryUsers, isRootNode bool) (*model.TokensConnection, error) {
+	tokens, pageInfo, err := publicapi.For(ctx).Token.GetTokensByContractIdPaginate(ctx, contractID, before, after, first, last, onlyGalleryUsers, isRootNode)
 	if err != nil {
 		return nil, err
 	}
@@ -619,12 +598,12 @@ func resolveCommunityByContractAddress(ctx context.Context, contractAddress pers
 	return communityToModel(ctx, *community, forceRefresh), nil
 }
 
-func resolveCommunityOwnersByContractID(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int, onlyGalleryUsers *bool) (*model.TokenHoldersConnection, error) {
+func resolveCommunityOwnersByContractID(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int, onlyGalleryUsers bool, isRootNode bool) (*model.TokenHoldersConnection, error) {
 	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, contractID)
 	if err != nil {
 		return nil, err
 	}
-	owners, pageInfo, err := publicapi.For(ctx).Contract.GetCommunityOwnersByContractAddress(ctx, persist.NewChainAddress(contract.Address, contract.Chain), before, after, first, last, onlyGalleryUsers)
+	owners, pageInfo, err := publicapi.For(ctx).Contract.GetCommunityOwnersByContractAddress(ctx, persist.NewChainAddress(contract.Address, contract.Chain), before, after, first, last, onlyGalleryUsers, isRootNode)
 	if err != nil {
 		return nil, err
 	}
@@ -1844,12 +1823,15 @@ func communityToModel(ctx context.Context, community db.Contract, forceRefresh *
 		Name:            util.ToPointer(community.Name.String),
 		Description:     util.ToPointer(community.Description.String),
 		// PreviewImage:     util.ToPointer(community.Pr.String()), // TODO do we still need this with the new image fields?
-		Chain:            &chain,
-		ProfileImageURL:  util.ToPointer(community.ProfileImageUrl.String),
-		ProfileBannerURL: util.ToPointer(community.ProfileBannerUrl.String),
-		BadgeURL:         util.ToPointer(community.BadgeUrl.String),
-		Owners:           nil, // handled by dedicated resolver
-		Creator:          nil, // handled by dedicated resolver
+		Chain:             &chain,
+		ProfileImageURL:   util.ToPointer(community.ProfileImageUrl.String),
+		ProfileBannerURL:  util.ToPointer(community.ProfileBannerUrl.String),
+		BadgeURL:          util.ToPointer(community.BadgeUrl.String),
+		Owners:            nil,                                        // handled by dedicated resolver
+		Creator:           nil,                                        // handled by dedicated resolver
+		ParentCommunity:   &model.Community{Dbid: community.ParentID}, // remaining fields handlded by dedicated resolver
+		SubCommunities:    nil,                                        // handled by dedicated resolver
+		TokensInCommunity: nil,                                        // handled by dedicated resolver TODO: Double check resolved correctly
 	}
 }
 

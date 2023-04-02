@@ -473,7 +473,7 @@ type TokenHoldersConnection {
   pageInfo: PageInfo!
 }
 
-type Community implements Node @goGqlId(fields: ["dbid", "contractAddress", "chain"]) @goEmbedHelper {
+type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) @goEmbedHelper {
   dbid: DBID!
   id: ID!
 

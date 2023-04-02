@@ -76,23 +76,7 @@ func (api TokenAPI) GetTokensByCollectionId(ctx context.Context, collectionID pe
 	return tokens, nil
 }
 
-func (api TokenAPI) GetTokensByContractId(ctx context.Context, contractID persist.DBID) ([]db.Token, error) {
-	// Validate
-	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"contractID": {contractID, "required"},
-	}); err != nil {
-		return nil, err
-	}
-
-	tokens, err := api.loaders.TokensByContractID.Load(contractID)
-	if err != nil {
-		return nil, err
-	}
-
-	return tokens, nil
-}
-
-func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int, onlyGalleryUsers *bool) ([]db.Token, PageInfo, error) {
+func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int, onlyGalleryUsers, isRootNode bool) ([]db.Token, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"contractID": {contractID, "required"},
@@ -104,18 +88,13 @@ func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractI
 		return nil, PageInfo{}, err
 	}
 
-	ogu := false
-	if onlyGalleryUsers != nil {
-		ogu = *onlyGalleryUsers
-	}
-
 	queryFunc := func(params boolTimeIDPagingParams) ([]interface{}, error) {
 
 		logger.For(ctx).Infof("GetTokensByContractIdPaginate: %+v", params)
 		tokens, err := api.queries.GetTokensByContractIdPaginate(ctx, db.GetTokensByContractIdPaginateParams{
 			Contract:           contractID,
 			Limit:              params.Limit,
-			GalleryUsersOnly:   ogu,
+			GalleryUsersOnly:   onlyGalleryUsers,
 			CurBeforeUniversal: params.CursorBeforeBool,
 			CurAfterUniversal:  params.CursorAfterBool,
 			CurBeforeTime:      params.CursorBeforeTime,
@@ -123,6 +102,7 @@ func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractI
 			CurAfterTime:       params.CursorAfterTime,
 			CurAfterID:         params.CursorAfterID,
 			PagingForward:      params.PagingForward,
+			IsRootNode:         isRootNode,
 		})
 		if err != nil {
 			return nil, err
@@ -139,7 +119,8 @@ func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractI
 	countFunc := func() (int, error) {
 		total, err := api.queries.CountTokensByContractId(ctx, db.CountTokensByContractIdParams{
 			Contract:         contractID,
-			GalleryUsersOnly: ogu,
+			GalleryUsersOnly: onlyGalleryUsers,
+			IsRootNode:       isRootNode,
 		})
 		return int(total), err
 	}
@@ -237,23 +218,6 @@ func (api TokenAPI) GetTokensByUserID(ctx context.Context, userID persist.DBID) 
 	}
 
 	tokens, err := api.loaders.TokensByUserID.Load(userID)
-	if err != nil {
-		return nil, err
-	}
-
-	return tokens, nil
-}
-
-func (api TokenAPI) GetTokensByUserIDAndContractID(ctx context.Context, userID, contractID persist.DBID) ([]db.Token, error) {
-	// Validate
-	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"userID":     {userID, "required"},
-		"contractID": {contractID, "required"},
-	}); err != nil {
-		return nil, err
-	}
-
-	tokens, err := api.loaders.TokensByUserIDAndContractID.Load(persist.DBIDTuple{userID, contractID})
 	if err != nil {
 		return nil, err
 	}

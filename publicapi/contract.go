@@ -194,22 +194,6 @@ func (api ContractAPI) GetChildContractsByParentID(ctx context.Context, contract
 	return contracts, pageInfo, err
 }
 
-func (api ContractAPI) GetContractsByUserID(ctx context.Context, userID persist.DBID) ([]db.Contract, error) {
-	// Validate
-	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"userID": {userID, "required"},
-	}); err != nil {
-		return nil, err
-	}
-
-	contracts, err := api.loaders.ContractsByUserID.Load(userID)
-	if err != nil {
-		return nil, err
-	}
-
-	return contracts, nil
-}
-
 func (api ContractAPI) GetContractsDisplayedByUserID(ctx context.Context, userID persist.DBID) ([]db.Contract, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
@@ -273,7 +257,7 @@ func (api ContractAPI) RefreshOwnersAsync(ctx context.Context, contractID persis
 	return task.CreateTaskForContractOwnerProcessing(ctx, in, api.taskClient)
 }
 
-func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, before, after *string, first, last *int, onlyGalleryUsers *bool) ([]db.User, PageInfo, error) {
+func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, before, after *string, first, last *int, onlyGalleryUsers, isRootNode bool) ([]db.User, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"contractAddress": {contractAddress, "required"},
@@ -290,17 +274,12 @@ func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, 
 		return nil, PageInfo{}, err
 	}
 
-	ogu := false
-	if onlyGalleryUsers != nil {
-		ogu = *onlyGalleryUsers
-	}
-
 	boolFunc := func(params boolTimeIDPagingParams) ([]interface{}, error) {
 
 		owners, err := api.loaders.OwnersByContractID.Load(db.GetOwnersByContractIdBatchPaginateParams{
 			Contract:           contract.ID,
 			Limit:              sql.NullInt32{Int32: int32(params.Limit), Valid: true},
-			GalleryUsersOnly:   ogu,
+			GalleryUsersOnly:   onlyGalleryUsers,
 			CurBeforeUniversal: params.CursorBeforeBool,
 			CurAfterUniversal:  params.CursorAfterBool,
 			CurBeforeTime:      params.CursorBeforeTime,
@@ -308,6 +287,7 @@ func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, 
 			CurAfterTime:       params.CursorAfterTime,
 			CurAfterID:         params.CursorAfterID,
 			PagingForward:      params.PagingForward,
+			IsRootNode:         isRootNode,
 		})
 
 		if err != nil {
@@ -326,7 +306,8 @@ func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, 
 
 		total, err := api.queries.CountOwnersByContractId(ctx, db.CountOwnersByContractIdParams{
 			Contract:         contract.ID,
-			GalleryUsersOnly: ogu,
+			GalleryUsersOnly: onlyGalleryUsers,
+			IsRootNode:       isRootNode,
 		})
 
 		return int(total), err

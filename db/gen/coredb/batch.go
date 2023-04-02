@@ -714,7 +714,7 @@ func (b *GetCommentsByActorIDBatchBatchResults) Close() error {
 }
 
 const getContractByChainAddressBatch = `-- name: GetContractByChainAddressBatch :batchone
-select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, parent_id FROM contracts WHERE address = $1 AND chain = $2 AND parent_id IS NULL AND deleted = false
+select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, parent_id FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false
 `
 
 type GetContractByChainAddressBatchBatchResults struct {
@@ -875,82 +875,6 @@ func (b *GetContractsByAddressBatchPaginateBatchResults) Query(f func(int, []Con
 }
 
 func (b *GetContractsByAddressBatchPaginateBatchResults) Close() error {
-	b.closed = true
-	return b.br.Close()
-}
-
-const getContractsByUserIDBatch = `-- name: GetContractsByUserIDBatch :batchmany
-SELECT DISTINCT ON (contracts.id) contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.parent_id FROM contracts, tokens
-    WHERE tokens.owner_user_id = $1 AND tokens.contract = contracts.id
-    AND tokens.deleted = false AND contracts.deleted = false
-`
-
-type GetContractsByUserIDBatchBatchResults struct {
-	br     pgx.BatchResults
-	tot    int
-	closed bool
-}
-
-func (q *Queries) GetContractsByUserIDBatch(ctx context.Context, ownerUserID []persist.DBID) *GetContractsByUserIDBatchBatchResults {
-	batch := &pgx.Batch{}
-	for _, a := range ownerUserID {
-		vals := []interface{}{
-			a,
-		}
-		batch.Queue(getContractsByUserIDBatch, vals...)
-	}
-	br := q.db.SendBatch(ctx, batch)
-	return &GetContractsByUserIDBatchBatchResults{br, len(ownerUserID), false}
-}
-
-func (b *GetContractsByUserIDBatchBatchResults) Query(f func(int, []Contract, error)) {
-	defer b.br.Close()
-	for t := 0; t < b.tot; t++ {
-		var items []Contract
-		if b.closed {
-			if f != nil {
-				f(t, items, errors.New("batch already closed"))
-			}
-			continue
-		}
-		err := func() error {
-			rows, err := b.br.Query()
-			defer rows.Close()
-			if err != nil {
-				return err
-			}
-			for rows.Next() {
-				var i Contract
-				if err := rows.Scan(
-					&i.ID,
-					&i.Deleted,
-					&i.Version,
-					&i.CreatedAt,
-					&i.LastUpdated,
-					&i.Name,
-					&i.Symbol,
-					&i.Address,
-					&i.CreatorAddress,
-					&i.Chain,
-					&i.ProfileBannerUrl,
-					&i.ProfileImageUrl,
-					&i.BadgeUrl,
-					&i.Description,
-					&i.ParentID,
-				); err != nil {
-					return err
-				}
-				items = append(items, i)
-			}
-			return rows.Err()
-		}()
-		if f != nil {
-			f(t, items, err)
-		}
-	}
-}
-
-func (b *GetContractsByUserIDBatchBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }
@@ -1763,14 +1687,14 @@ func (b *GetNotificationByIDBatchBatchResults) Close() error {
 const getOwnersByContractIdBatchPaginate = `-- name: GetOwnersByContractIdBatchPaginate :batchmany
 select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences from (
     select distinct on (u.id) u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences from users u, tokens t
-        where t.contract = $1 and t.owner_user_id = u.id
-        and (not $2::bool or u.universal = false)
-        and t.deleted = false and u.deleted = false
+        where case when $1::bool then t.contract = $2 else t.child_contract_id = $2 end
+          and (not $3::bool or u.universal = false)
+          and t.deleted = false and u.deleted = false
     ) as users
-    where (users.universal,users.created_at,users.id) < ($3, $4::timestamptz, $5)
-    and (users.universal,users.created_at,users.id) > ($6, $7::timestamptz, $8)
-    order by case when $9::bool then (users.universal,users.created_at,users.id) end asc,
-         case when not $9::bool then (users.universal,users.created_at,users.id) end desc limit $10
+    where (users.universal,users.created_at,users.id) < ($4, $5::timestamptz, $6)
+    and (users.universal,users.created_at,users.id) > ($7, $8::timestamptz, $9)
+    order by case when $10::bool then (users.universal,users.created_at,users.id) end asc,
+         case when not $10::bool then (users.universal,users.created_at,users.id) end desc limit $11
 `
 
 type GetOwnersByContractIdBatchPaginateBatchResults struct {
@@ -1780,6 +1704,7 @@ type GetOwnersByContractIdBatchPaginateBatchResults struct {
 }
 
 type GetOwnersByContractIdBatchPaginateParams struct {
+	IsRootNode         bool
 	Contract           persist.DBID
 	GalleryUsersOnly   bool
 	CurBeforeUniversal bool
@@ -1802,6 +1727,7 @@ func (q *Queries) GetOwnersByContractIdBatchPaginate(ctx context.Context, arg []
 	batch := &pgx.Batch{}
 	for _, a := range arg {
 		vals := []interface{}{
+			a.IsRootNode,
 			a.Contract,
 			a.GalleryUsersOnly,
 			a.CurBeforeUniversal,
@@ -2453,101 +2379,17 @@ func (b *GetTokensByCollectionIdBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
-const getTokensByContractIdBatch = `-- name: GetTokensByContractIdBatch :batchmany
-SELECT id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, child_contract_id FROM tokens WHERE contract = $1 AND deleted = false
-    ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC
-`
-
-type GetTokensByContractIdBatchBatchResults struct {
-	br     pgx.BatchResults
-	tot    int
-	closed bool
-}
-
-func (q *Queries) GetTokensByContractIdBatch(ctx context.Context, contract []persist.DBID) *GetTokensByContractIdBatchBatchResults {
-	batch := &pgx.Batch{}
-	for _, a := range contract {
-		vals := []interface{}{
-			a,
-		}
-		batch.Queue(getTokensByContractIdBatch, vals...)
-	}
-	br := q.db.SendBatch(ctx, batch)
-	return &GetTokensByContractIdBatchBatchResults{br, len(contract), false}
-}
-
-func (b *GetTokensByContractIdBatchBatchResults) Query(f func(int, []Token, error)) {
-	defer b.br.Close()
-	for t := 0; t < b.tot; t++ {
-		var items []Token
-		if b.closed {
-			if f != nil {
-				f(t, items, errors.New("batch already closed"))
-			}
-			continue
-		}
-		err := func() error {
-			rows, err := b.br.Query()
-			defer rows.Close()
-			if err != nil {
-				return err
-			}
-			for rows.Next() {
-				var i Token
-				if err := rows.Scan(
-					&i.ID,
-					&i.Deleted,
-					&i.Version,
-					&i.CreatedAt,
-					&i.LastUpdated,
-					&i.Name,
-					&i.Description,
-					&i.CollectorsNote,
-					&i.Media,
-					&i.TokenUri,
-					&i.TokenType,
-					&i.TokenID,
-					&i.Quantity,
-					&i.OwnershipHistory,
-					&i.TokenMetadata,
-					&i.ExternalUrl,
-					&i.BlockNumber,
-					&i.OwnerUserID,
-					&i.OwnedByWallets,
-					&i.Chain,
-					&i.Contract,
-					&i.IsUserMarkedSpam,
-					&i.IsProviderMarkedSpam,
-					&i.LastSynced,
-					&i.ChildContractID,
-				); err != nil {
-					return err
-				}
-				items = append(items, i)
-			}
-			return rows.Err()
-		}()
-		if f != nil {
-			f(t, items, err)
-		}
-	}
-}
-
-func (b *GetTokensByContractIdBatchBatchResults) Close() error {
-	b.closed = true
-	return b.br.Close()
-}
-
 const getTokensByContractIdBatchPaginate = `-- name: GetTokensByContractIdBatchPaginate :batchmany
 SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.child_contract_id FROM tokens t
     JOIN users u ON u.id = t.owner_user_id
-    WHERE t.contract = $1 AND t.deleted = false
-    AND (NOT $2::bool OR u.universal = false)
-    AND (u.universal,t.created_at,t.id) < ($3, $4::timestamptz, $5)
-    AND (u.universal,t.created_at,t.id) > ($6, $7::timestamptz, $8)
-    ORDER BY CASE WHEN $9::bool THEN (u.universal,t.created_at,t.id) END ASC,
-             CASE WHEN NOT $9::bool THEN (u.universal,t.created_at,t.id) END DESC
-    LIMIT $10
+    WHERE CASE WHEN $1::bool THEN t.contract = $2 ELSE t.child_contract_id = $2 END
+    AND t.deleted = false
+    AND (NOT $3::bool OR u.universal = false)
+    AND (u.universal,t.created_at,t.id) < ($4, $5::timestamptz, $6)
+    AND (u.universal,t.created_at,t.id) > ($7, $8::timestamptz, $9)
+    ORDER BY CASE WHEN $10::bool THEN (u.universal,t.created_at,t.id) END ASC,
+             CASE WHEN NOT $10::bool THEN (u.universal,t.created_at,t.id) END DESC
+    LIMIT $11
 `
 
 type GetTokensByContractIdBatchPaginateBatchResults struct {
@@ -2557,6 +2399,7 @@ type GetTokensByContractIdBatchPaginateBatchResults struct {
 }
 
 type GetTokensByContractIdBatchPaginateParams struct {
+	IsRootNode         bool
 	Contract           persist.DBID
 	GalleryUsersOnly   bool
 	CurBeforeUniversal bool
@@ -2573,6 +2416,7 @@ func (q *Queries) GetTokensByContractIdBatchPaginate(ctx context.Context, arg []
 	batch := &pgx.Batch{}
 	for _, a := range arg {
 		vals := []interface{}{
+			a.IsRootNode,
 			a.Contract,
 			a.GalleryUsersOnly,
 			a.CurBeforeUniversal,
@@ -2743,101 +2587,6 @@ func (b *GetTokensByUserIdAndChainBatchBatchResults) Query(f func(int, []Token, 
 }
 
 func (b *GetTokensByUserIdAndChainBatchBatchResults) Close() error {
-	b.closed = true
-	return b.br.Close()
-}
-
-const getTokensByUserIdAndContractIDBatch = `-- name: GetTokensByUserIdAndContractIDBatch :batchmany
-SELECT tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.child_contract_id FROM tokens, users
-    WHERE tokens.owner_user_id = $1 AND users.id = $1
-      AND tokens.owned_by_wallets && users.wallets
-      AND tokens.contract = $2
-      AND tokens.deleted = false AND users.deleted = false
-    ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC
-`
-
-type GetTokensByUserIdAndContractIDBatchBatchResults struct {
-	br     pgx.BatchResults
-	tot    int
-	closed bool
-}
-
-type GetTokensByUserIdAndContractIDBatchParams struct {
-	OwnerUserID persist.DBID
-	Contract    persist.DBID
-}
-
-func (q *Queries) GetTokensByUserIdAndContractIDBatch(ctx context.Context, arg []GetTokensByUserIdAndContractIDBatchParams) *GetTokensByUserIdAndContractIDBatchBatchResults {
-	batch := &pgx.Batch{}
-	for _, a := range arg {
-		vals := []interface{}{
-			a.OwnerUserID,
-			a.Contract,
-		}
-		batch.Queue(getTokensByUserIdAndContractIDBatch, vals...)
-	}
-	br := q.db.SendBatch(ctx, batch)
-	return &GetTokensByUserIdAndContractIDBatchBatchResults{br, len(arg), false}
-}
-
-func (b *GetTokensByUserIdAndContractIDBatchBatchResults) Query(f func(int, []Token, error)) {
-	defer b.br.Close()
-	for t := 0; t < b.tot; t++ {
-		var items []Token
-		if b.closed {
-			if f != nil {
-				f(t, items, errors.New("batch already closed"))
-			}
-			continue
-		}
-		err := func() error {
-			rows, err := b.br.Query()
-			defer rows.Close()
-			if err != nil {
-				return err
-			}
-			for rows.Next() {
-				var i Token
-				if err := rows.Scan(
-					&i.ID,
-					&i.Deleted,
-					&i.Version,
-					&i.CreatedAt,
-					&i.LastUpdated,
-					&i.Name,
-					&i.Description,
-					&i.CollectorsNote,
-					&i.Media,
-					&i.TokenUri,
-					&i.TokenType,
-					&i.TokenID,
-					&i.Quantity,
-					&i.OwnershipHistory,
-					&i.TokenMetadata,
-					&i.ExternalUrl,
-					&i.BlockNumber,
-					&i.OwnerUserID,
-					&i.OwnedByWallets,
-					&i.Chain,
-					&i.Contract,
-					&i.IsUserMarkedSpam,
-					&i.IsProviderMarkedSpam,
-					&i.LastSynced,
-					&i.ChildContractID,
-				); err != nil {
-					return err
-				}
-				items = append(items, i)
-			}
-			return rows.Err()
-		}()
-		if f != nil {
-			f(t, items, err)
-		}
-	}
-}
-
-func (b *GetTokensByUserIdAndContractIDBatchBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }

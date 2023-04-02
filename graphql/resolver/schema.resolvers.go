@@ -176,7 +176,7 @@ func (r *communityResolver) Creator(ctx context.Context, obj *model.Community) (
 
 // ParentCommunity is the resolver for the parentCommunity field.
 func (r *communityResolver) ParentCommunity(ctx context.Context, obj *model.Community) (*model.Community, error) {
-	contract, err := publicapi.For(ctx).Contract.GetParentContractByChildID(ctx, obj.Dbid)
+	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, obj.ParentCommunity.Dbid)
 	if err != nil {
 		return nil, err
 	}
@@ -207,33 +207,36 @@ func (r *communityResolver) SubCommunities(ctx context.Context, obj *model.Commu
 
 // TokensInCommunity is the resolver for the tokensInCommunity field.
 func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokensConnection, error) {
-	if onlyGalleryUsers == nil || (onlyGalleryUsers != nil && !*onlyGalleryUsers) {
-		refresh := false
-		if obj.ForceRefresh != nil {
-			refresh = *obj.ForceRefresh
-		}
-		err := refreshTokensInContractAsync(ctx, obj.Dbid, refresh)
+	onlyUsers := util.GetOptionalValue(onlyGalleryUsers, false)
+	forceRefresh := util.GetOptionalValue(obj.ForceRefresh, false)
+
+	if !onlyUsers {
+		err := refreshTokensInContractAsync(ctx, obj.Dbid, forceRefresh)
 		if err != nil {
 			return nil, err
 		}
 	}
-	return resolveTokensByContractIDWithPagination(ctx, obj.Dbid, before, after, first, last, onlyGalleryUsers)
+
+	isRootNode := obj.ParentCommunity.Dbid == ""
+
+	return resolveTokensByContractIDWithPagination(ctx, obj.Dbid, before, after, first, last, onlyUsers, isRootNode)
 }
 
 // Owners is the resolver for the owners field.
 func (r *communityResolver) Owners(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokenHoldersConnection, error) {
-	if onlyGalleryUsers == nil || (onlyGalleryUsers != nil && !*onlyGalleryUsers) {
-		refresh := false
-		if obj.ForceRefresh != nil {
-			refresh = *obj.ForceRefresh
-		}
-		err := refreshTokensInContractAsync(ctx, obj.Dbid, refresh)
+	onlyUsers := util.GetOptionalValue(onlyGalleryUsers, false)
+	forceRefresh := util.GetOptionalValue(obj.ForceRefresh, false)
+
+	if !onlyUsers {
+		err := refreshTokensInContractAsync(ctx, obj.Dbid, forceRefresh)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return resolveCommunityOwnersByContractID(ctx, obj.Dbid, before, after, first, last, onlyGalleryUsers)
+	isRootNode := obj.ParentCommunity.Dbid == ""
+
+	return resolveCommunityOwnersByContractID(ctx, obj.Dbid, before, after, first, last, onlyUsers, isRootNode)
 }
 
 // FeedEvent is the resolver for the feedEvent field.
@@ -1675,7 +1678,7 @@ func (r *queryResolver) CommunitiesByAddress(ctx context.Context, input model.Co
 	includeChildren := util.GetOptionalValue(input.IncludeSubCommunities, false)
 	forceRefresh := util.GetOptionalValue(input.ForceRefresh, false)
 
-	communities, pageInfo, err := publicapi.For(ctx).Contract.GetContractsByAddress(ctx, input.Address, includeChildren, before, after, first, last)
+	communities, pageInfo, err := publicapi.For(ctx).Contract.GetContractsByAddress(ctx, *input.Address, includeChildren, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}
@@ -2444,3 +2447,13 @@ type viewerResolver struct{ *Resolver }
 type walletResolver struct{ *Resolver }
 type chainAddressInputResolver struct{ *Resolver }
 type chainPubKeyInputResolver struct{ *Resolver }
+
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//   - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//     it when you're done.
+//   - You have helper methods in this file. Move them out to keep these resolver files clean.
+func (r *communityResolver) ContractAddress(ctx context.Context, obj *model.Community) (*persist.ChainAddress, error) {
+	panic(fmt.Errorf("not implemented: ContractAddress - contractAddress"))
+}
