@@ -723,22 +723,6 @@ func loadOwnerByTokenID(q *db.Queries) func(context.Context, []persist.DBID) ([]
 	}
 }
 
-func loadTokensByContractIDWithPagination(q *db.Queries) func(context.Context, []db.GetTokensByContractIdBatchPaginateParams) ([][]db.Token, []error) {
-	return func(ctx context.Context, params []db.GetTokensByContractIdBatchPaginateParams) ([][]db.Token, []error) {
-		tokens := make([][]db.Token, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetTokensByContractIdBatchPaginate(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, gtbcibpr []db.Token, err error) {
-			tokens[i], errors[i] = gtbcibpr, err
-		})
-
-		return tokens, errors
-	}
-}
-
 func loadTokensByWalletID(q *db.Queries) func(context.Context, []persist.DBID) ([][]db.Token, []error) {
 	return func(ctx context.Context, walletIds []persist.DBID) ([][]db.Token, []error) {
 		tokens := make([][]db.Token, len(walletIds))
