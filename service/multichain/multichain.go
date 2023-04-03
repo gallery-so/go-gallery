@@ -362,10 +362,13 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 	tokensFromProviders := make([]chainTokens, 0, len(user.Wallets))
 	contractsFromProviders := make([]chainContracts, 0, len(user.Wallets))
 
+	discrepencyLog := map[int]int{}
+
 outer:
 	for {
 		select {
 		case incomingTokens := <-incomingTokens:
+			discrepencyLog[incomingTokens.priority] = len(incomingTokens.tokens)
 			tokensFromProviders = append(tokensFromProviders, incomingTokens)
 		case incomingContracts, ok := <-incomingContracts:
 			if !ok {
@@ -384,6 +387,10 @@ outer:
 				return err
 			}
 		}
+	}
+
+	if !util.AllEqual(util.MapValues(discrepencyLog)) {
+		logger.For(ctx).Debugf("discrepency: %+v", discrepencyLog)
 	}
 
 	addressToContract, err := p.processContracts(ctx, contractsFromProviders)
