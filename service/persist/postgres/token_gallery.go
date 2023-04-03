@@ -342,32 +342,31 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 		}
 	}
 
-	now := time.Now()
-
 	// addTimesIfMissing is required because sqlc was unable to bind arrays of our own custom types
 	// i.e. an array of persist.CreationTime instead of an array of time.Time. A zero-valued persist.CreationTime
 	// uses the current time as the column value, but instead we need to manually add a time to the struct.
-	addTimesIfMissing := func(t *persist.TokenGallery) {
+	addTimesIfMissing := func(t *persist.TokenGallery, ts time.Time) {
 		if t.CreationTime.Time().IsZero() {
-			(*t).CreationTime = persist.CreationTime(now)
+			(*t).CreationTime = persist.CreationTime(ts)
 		}
 		if t.LastSynced.Time().IsZero() {
-			(*t).LastSynced = persist.LastUpdatedTime(now)
+			(*t).LastSynced = persist.LastUpdatedTime(ts)
 		}
 		if t.LastUpdated.Time().IsZero() {
-			(*t).LastUpdated = persist.LastUpdatedTime(now)
+			(*t).LastUpdated = persist.LastUpdatedTime(ts)
 		}
 	}
 
 	tokens = t.dedupeTokens(tokens)
 	params := db.UpsertTokensParams{}
+	now := time.Now()
 
 	var errors []error
 
 	for i := range tokens {
 		t := &tokens[i]
 		addIDIfMissing(t)
-		addTimesIfMissing(t)
+		addTimesIfMissing(t, now)
 		params.ID = append(params.ID, t.ID.String())
 		params.Deleted = append(params.Deleted, t.Deleted.Bool())
 		params.Version = append(params.Version, t.Version.Int32())

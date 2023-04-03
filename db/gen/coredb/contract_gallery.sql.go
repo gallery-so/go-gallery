@@ -13,18 +13,7 @@ import (
 )
 
 const upsertContracts = `-- name: UpsertContracts :many
-insert into contracts (
-  id
-  , deleted
-  , version
-  , created_at
-  , address
-  , symbol
-  , name
-  , creator_address
-  , chain
-  , description
-) (
+insert into contracts (id, deleted, version, created_at, address, symbol, name, creator_address, chain, description) (
   select
   unnest($1::varchar[])
   , unnest($2::boolean[])
@@ -37,7 +26,7 @@ insert into contracts (
   , unnest($9::int[])
   , unnest($10::varchar[])
 )
-on conflict (address, chain)
+on conflict (chain, parent_id, address)
 do update set
   symbol = excluded.symbol
   , version = excluded.version
@@ -128,6 +117,8 @@ child_contracts_data(id, deleted, created_at, name, address, creator_address, ch
     , unnest($11::boolean[]) as deleted
     , unnest($12::timestamptz[]) as created_at
     , unnest($13::varchar[]) as name
+    -- For child contracts, the address is the unique identifier specific to each contract
+    -- that uniquely identifies a child contract within a contract.
     , unnest($14::varchar[]) as address
     , unnest($15::varchar[]) as creator_address
     , unnest($16::int[]) as chain
@@ -163,7 +154,15 @@ tokens_data(id, deleted, created_at, name, description, token_type, token_id, qu
 insert_parent_contracts as (
   insert into contracts(id, deleted, created_at, name, symbol, address, creator_address, chain, description)
   (
-    select id, deleted, created_at, name, symbol, address, creator_address, chain, description
+    select id
+      , deleted
+      , created_at
+      , name
+      , symbol
+      , address
+      , creator_address
+      , chain
+      , description
     from parent_contracts_data
   )
   on conflict (chain, parent_id, address)
@@ -178,10 +177,19 @@ insert_parent_contracts as (
 insert_child_contracts as (
   insert into contracts (id, deleted, created_at, name, address, creator_address, chain, description, parent_id)
   (
-    select id, deleted, created_at, name, symbol, address, creator_address, chain, description, parent_id
+    select id
+      , deleted
+      , created_at
+      , name
+      , symbol
+      , address
+      , creator_address
+      , chain
+      , description
+      , parent_id
     from child_contracts_data
-    join insert_parent_contracts
-    on child_contracts_data.chain = insert_parent_contracts.chain and child_contracts_data.parent_address = insert_parent_contracts.address
+    -- Join on the inserted parent_contracts to get the parent's id
+    join insert_parent_contracts on child_contracts_data.chain = insert_parent_contracts.chain and child_contracts_data.parent_address = insert_parent_contracts.address
   )
   on conflict (chain, parent_id, address)
   do update set deleted = excluded.deleted
@@ -213,7 +221,9 @@ insert into tokens(id, deleted, created_at, name, description, token_type, quant
     , last_synced
     , insert_child_contracts.id
   from tokens_data
+  -- Join on the inserted parent contracts to get the parent's id
   join insert_parent_contracts on tokens_data.chain = insert_child_contracts.chain and tokens_data.contract_address = insert_parent_contracts.address
+  -- Join on the inserted child contracts to get the child's id
   join insert_child_contracts on tokens_data.chain = insert_child_contracts.chain and tokens_data.contract_address = insert_child_contracts.address
 )
 on conflict (token_id, contract, chain, owner_user_id) where deleted = false
@@ -276,12 +286,22 @@ type UpsertCreatedTokensParams struct {
 	TokenContractAddress          []string
 }
 
-// Data for parent contracts
-// Data for child contracts
-// Data for tokens
-// Insert parent contracts
-// Insert child contracts
-// Insert tokens
+// UpsertCreatedTokens bulk upserts parent contracts, child contracts and tokens in a single query using data-modifying CTEs.
+// Each data-modifying CTE returns the data that inserted or updated, which is used in the next CTE to insert or update the next table.
+//
+// This is so that we can:
+// * Reference the id of the parent contract when inserting the child contract
+// * Reference the id of the parent contract and the id of the child contract when inserting the token
+//
+// parent_contracts_data is the data to be inserted for the parent contracts
+// child_contracts_data is the data to be inserted for the child contract.
+// tokens_data is the data to be inserted for the tokens belonging to a child contract
+// Insert parent contracts, returning the inserted or updated rows
+// Insert child contracts with reference to the parent contract, returning the inserted or updated rows
+// Finally insert the tokens, with reference to the parent and child contract ids
+// Note that media related columns (token_uri, token_metadata, media) is not inserted or updated here, because it is assumed
+// that this data will be inserted later via tokenprocessing.
+// User-scoped data (collectors_note, is_user_marked_spam) is also not updated here.
 func (q *Queries) UpsertCreatedTokens(ctx context.Context, arg UpsertCreatedTokensParams) ([]Token, error) {
 	rows, err := q.db.Query(ctx, upsertCreatedTokens,
 		arg.ParentContractID,

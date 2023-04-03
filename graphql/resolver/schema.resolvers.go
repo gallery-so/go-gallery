@@ -193,7 +193,9 @@ func (r *communityResolver) SubCommunities(ctx context.Context, obj *model.Commu
 	edges := make([]*model.CommunityEdge, len(communities))
 	for i, community := range communities {
 		edges[i] = &model.CommunityEdge{
-			// TODO: Support refreshes for sub-communities
+			// TODO: We may want to support refreshes for sub-communities
+			// Currently, sub-communities are refreshed only when a user's created
+			// communities are requested.
 			Node:   communityToModel(ctx, community, util.ToPointer(false)),
 			Cursor: nil, // not used by relay, but relay will complain without this field existing
 		}

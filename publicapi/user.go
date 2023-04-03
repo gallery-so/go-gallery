@@ -796,7 +796,7 @@ func (api UserAPI) CreatedCommunities(ctx context.Context, userID persist.DBID, 
 		return nil, PageInfo{}, err
 	}
 
-	err := api.multichainProvider.SyncTokensCreatedOnSharedContract(ctx, userID, chains, includeAllChains)
+	err := api.multichainProvider.SyncTokensCreatedOnSharedContracts(ctx, userID, chains, includeAllChains)
 	if err != nil {
 		return nil, PageInfo{}, err
 	}

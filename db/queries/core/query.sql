@@ -25,10 +25,10 @@ SELECT * FROM users WHERE username_idempotent = lower($1) AND deleted = false;
 select users.*
 from users, wallets
 where wallets.address = sqlc.arg('address')
-	and wallets.chain = sqlc.arg('chain')::int
-	and array[wallets.id] <@ users.wallets
-	and wallets.deleted = false
-	and users.deleted = false;
+and wallets.chain = sqlc.arg('chain')::int
+and array[wallets.id] <@ users.wallets
+and wallets.deleted = false
+and users.deleted = false;
 
 -- name: GetUsersWithTrait :many
 SELECT * FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false;
@@ -790,9 +790,9 @@ edit_events as (
 select users.id
 from viewers, galleries, users, edit_events
 where viewers.gallery_id = galleries.id
-	and galleries.owner_user_id = users.id
-	and users.deleted = false
-	and galleries.deleted = false
+and galleries.owner_user_id = users.id
+and users.deleted = false
+and galleries.deleted = false
   and users.id = edit_events.actor_id
 group by users.id
 order by row_number() over(order by sum(viewers.viewer_count) desc, max(users.created_at) desc) asc
@@ -886,12 +886,12 @@ insert into follows (id, follower, followee, deleted) select unnest(@ids::varcha
 select users.*, a.created_at followed_on
 from users, follows a, follows b
 where a.follower = @follower
-	and a.followee = b.follower
-	and b.followee = @followee
-	and users.id = b.follower
-	and a.deleted = false
-	and b.deleted = false
-	and users.deleted = false
+and a.followee = b.follower
+and b.followee = @followee
+and users.id = b.follower
+and a.deleted = false
+and b.deleted = false
+and users.deleted = false
   and (a.created_at, users.id) > (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
   and (a.created_at, users.id) < (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
 order by case when sqlc.arg('paging_forward')::bool then (a.created_at, users.id) end desc,
@@ -902,12 +902,12 @@ limit sqlc.arg('limit');
 select count(*)
 from users, follows a, follows b
 where a.follower = @follower
-	and a.followee = b.follower
-	and b.followee = @followee
-	and users.id = b.follower
-	and a.deleted = false
-	and b.deleted = false
-	and users.deleted = false;
+and a.followee = b.follower
+and b.followee = @followee
+and users.id = b.follower
+and a.deleted = false
+and b.deleted = false
+and users.deleted = false;
 
 -- name: GetSharedContractsBatchPaginate :batchmany
 select contracts.*, a.displayed as displayed_by_user_a, b.displayed as displayed_by_user_b, a.owned_count
@@ -954,9 +954,9 @@ where users.id = @user_id
   and wallets.id = any(users.wallets)
   and contracts.creator_address = wallets.address
   and contracts.chain = wallets.chain
-	and contracts.chain = any(string_to_array(@chains, ',')::int[])
-	and users.deleted = false
-	and contracts.deleted = false
+  and contracts.chain = any(string_to_array(@chains, ',')::int[])
+  and users.deleted = false
+  and contracts.deleted = false
   and wallets.deleted = false
   and (c.created_at, c.id) > (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
   and (c.created_at, c.id) < ( sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
@@ -986,7 +986,7 @@ select c.*
 from contracts c
 where
   c.parent_id = @parent_id
-	and contracts.deleted = false
+  and contracts.deleted = false
   and (c.created_at, c.id) > (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
   and (c.created_at, c.id) < ( sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
 order by case when sqlc.arg('paging_forward')::bool then (c.created_at, c.id) end asc,

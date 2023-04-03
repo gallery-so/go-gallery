@@ -545,7 +545,11 @@ func (c combinedChildContractResults) ChildContracts() []ChildContract {
 	return contracts
 }
 
-// Tokens combines all tokens from all providers
+// TokensByOwnerAddress groups tokens by owner address across all providers
+func (c combinedChildContractResults) TokensByOwnerAddress() map[persist.Address][]chainTokens {
+	panic("not implemented")
+}
+
 func (c combinedChildContractResults) Tokens() []chainTokens {
 	tokens := make([]chainTokens, 0, len(c))
 	for i, p := range c {
@@ -663,6 +667,11 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 		params.ChildContractDescription = append(params.ChildContractDescription, child.Description)
 		params.ChildContractParentAddress = append(params.ChildContractParentAddress, child.ParentContract.Address.String())
 	}
+
+	// Result can be all created shared tokens for all platforms
+	// can be duplicated within a platform
+	// i.e. a user has two erc1155s
+	// should groupo tokens by user instead
 	for _, result := range combinedResult.Tokens() {
 		for _, token := range result.tokens {
 			owner := userLookup[token.OwnerAddress]
@@ -673,12 +682,19 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 			params.TokenDescription = append(params.TokenDescription, token.Description)
 			params.TokenTokenType = append(params.TokenTokenType, token.TokenType.String())
 			params.TokenTokenID = append(params.TokenTokenID, token.TokenID.String())
+			// TODO Maybe need to fix this
 			params.TokenQuantity = append(params.TokenQuantity, token.Quantity.String())
 			postgres.AppendAddressAtBlock(&params.TokenOwnershipHistory, fromMultichainToAddressAtBlock(token.OwnershipHistory), &params.TokenOwnershipHistoryStartIdx, &params.TokenOwnershipHistoryEndIdx, &errors)
 			params.TokenExternalUrl = append(params.TokenExternalUrl, token.ExternalURL)
 			params.TokenBlockNumber = append(params.TokenBlockNumber, token.BlockNumber.BigInt().Int64())
 			params.TokenOwnerUserID = append(params.TokenOwnerUserID, owner.ID.String())
-			postgres.AppendWalletList(&params.TokenOwnedByWallets, token.OwnedByWallets, &params.TokenOwnedByWalletsStartIdx, &params.TokenOwnedByWalletsEndIdx, &errors)
+			for _, wallet := range owner.Wallets {
+				if wallet.Address == token.OwnerAddress {
+				}
+			}
+			// Need lookup of owner address to wallet ID
+			// TODO Need to fix this
+			// XXX postgres.AppendWalletList(&params.TokenOwnedByWallets, token.OwnedByWallets, &params.TokenOwnedByWalletsStartIdx, &params.TokenOwnedByWalletsEndIdx, &errors)
 			params.TokenChain = append(params.TokenChain, int32(result.chain))
 			params.TokenIsProviderMarkedSpam = append(params.TokenIsProviderMarkedSpam, util.GetOptionalValue(token.IsSpam, false))
 			params.TokenLastSynced = append(params.TokenLastSynced, now)
@@ -692,7 +708,7 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 }
 
 func (p *Provider) prepTokensForTokenProcessing(ctx context.Context, tokensFromProviders []chainTokens, contracts []persist.ContractGallery, user persist.User) ([]persist.TokenGallery, map[persist.TokenIdentifiers]bool, error) {
-	providerTokens, err := tokensToNewDedupedTokens(ctx, tokensFromProviders, contracts, user)
+	providerTokens, err := tokensToNewDedupedTokens(tokensFromProviders, contracts, user)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1328,7 +1344,7 @@ func (d *Provider) processContracts(ctx context.Context, contractsFromProviders 
 	return d.Repos.ContractRepository.BulkUpsert(ctx, newContracts)
 }
 
-func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contracts []persist.ContractGallery, ownerUser persist.User) ([]persist.TokenGallery, error) {
+func tokensToNewDedupedTokens(tokens []chainTokens, contracts []persist.ContractGallery, ownerUser persist.User) ([]persist.TokenGallery, error) {
 	contractAddressDBIDs := contractAddressToDBID(contracts)
 	seenTokens := make(map[persist.TokenIdentifiers]persist.TokenGallery)
 
@@ -1349,7 +1365,7 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 		for _, token := range chainToken.tokens {
 
 			if token.Quantity.BigInt().Cmp(big.NewInt(0)) == 0 {
-				logger.For(ctx).Warnf("skipping token %s with quantity 0", token.Name)
+				logger.For(nil).Warnf("skipping token %s with quantity 0", token.Name)
 				continue
 			}
 

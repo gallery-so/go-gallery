@@ -1,16 +1,5 @@
 -- name: UpsertContracts :many
-insert into contracts (
-  id
-  , deleted
-  , version
-  , created_at
-  , address
-  , symbol
-  , name
-  , creator_address
-  , chain
-  , description
-) (
+insert into contracts (id, deleted, version, created_at, address, symbol, name, creator_address, chain, description) (
   select
   unnest(@id::varchar[])
   , unnest(@deleted::boolean[])
@@ -23,7 +12,7 @@ insert into contracts (
   , unnest(@chain::int[])
   , unnest(@description::varchar[])
 )
-on conflict (address, chain)
+on conflict (chain, parent_id, address)
 do update set
   symbol = excluded.symbol
   , version = excluded.version
@@ -35,7 +24,14 @@ do update set
 returning *;
 
 -- name: UpsertCreatedTokens :many
--- Data for parent contracts
+-- UpsertCreatedTokens bulk upserts parent contracts, child contracts and tokens in a single query using data-modifying CTEs.
+-- Each data-modifying CTE returns the data that inserted or updated, which is used in the next CTE to insert or update the next table.
+-- 
+-- This is so that we can:
+-- * Reference the id of the parent contract when inserting the child contract
+-- * Reference the id of the parent contract and the id of the child contract when inserting the token
+-- 
+-- parent_contracts_data is the data to be inserted for the parent contracts
 with parent_contracts_data(id, deleted, created_at, name, symbol, address, creator_address, chain, description) as (
   select
     unnest(@parent_contract_id::varchar[]) as id
@@ -48,13 +44,15 @@ with parent_contracts_data(id, deleted, created_at, name, symbol, address, creat
     , unnest(@parent_contract_chain::int[]) as chain
     , unnest(@parent_contract_description::varchar[]) as description
 ),
--- Data for child contracts
+-- child_contracts_data is the data to be inserted for the child contract.
 child_contracts_data(id, deleted, created_at, name, address, creator_address, chain, description, parent_id) as (
   select
     unnest(@child_contract_id::varchar[]) as id
     , unnest(@child_contract_deleted::boolean[]) as deleted
     , unnest(@child_contract_created_at::timestamptz[]) as created_at
     , unnest(@child_contract_name::varchar[]) as name
+    -- For child contracts, the address is the unique identifier specific to each contract
+    -- that uniquely identifies a child contract within a contract.
     , unnest(@child_contract_address::varchar[]) as address
     , unnest(@child_contract_creator_address::varchar[]) as creator_address
     , unnest(@child_contract_chain::int[]) as chain
@@ -62,7 +60,7 @@ child_contracts_data(id, deleted, created_at, name, address, creator_address, ch
      -- This field is only used as condition of the join
     , unnest(@child_contract_parent_address::varchar[]) as parent_address
 ),
--- Data for tokens
+-- tokens_data is the data to be inserted for the tokens belonging to a child contract
 tokens_data(id, deleted, created_at, name, description, token_type, token_id, quantity, ownership_history, ownership_history_start_idx, ownership_history_end_idx, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_provider_marked_spam, last_synced) as (
   select
     unnest(@token_id::varchar[]) as id
@@ -88,11 +86,19 @@ tokens_data(id, deleted, created_at, name, description, token_type, token_id, qu
      -- This field is only used as condition of the join
     , unnest(@token_contract_address::varchar[]) as contract_address
 ),
--- Insert parent contracts
+-- Insert parent contracts, returning the inserted or updated rows
 insert_parent_contracts as (
   insert into contracts(id, deleted, created_at, name, symbol, address, creator_address, chain, description)
   (
-    select id, deleted, created_at, name, symbol, address, creator_address, chain, description
+    select id
+      , deleted
+      , created_at
+      , name
+      , symbol
+      , address
+      , creator_address
+      , chain
+      , description
     from parent_contracts_data
   )
   on conflict (chain, parent_id, address)
@@ -104,14 +110,23 @@ insert_parent_contracts as (
     , last_updated = now()
   returning *
 ),
--- Insert child contracts
+-- Insert child contracts with reference to the parent contract, returning the inserted or updated rows
 insert_child_contracts as (
   insert into contracts (id, deleted, created_at, name, address, creator_address, chain, description, parent_id)
   (
-    select id, deleted, created_at, name, symbol, address, creator_address, chain, description, parent_id
+    select id
+      , deleted
+      , created_at
+      , name
+      , symbol
+      , address
+      , creator_address
+      , chain
+      , description
+      , parent_id
     from child_contracts_data
-    join insert_parent_contracts
-    on child_contracts_data.chain = insert_parent_contracts.chain and child_contracts_data.parent_address = insert_parent_contracts.address
+    -- Join on the inserted parent_contracts to get the parent's id
+    join insert_parent_contracts on child_contracts_data.chain = insert_parent_contracts.chain and child_contracts_data.parent_address = insert_parent_contracts.address
   )
   on conflict (chain, parent_id, address)
   do update set deleted = excluded.deleted
@@ -121,7 +136,10 @@ insert_child_contracts as (
     , last_updated = now()
   returning *
 )
--- Insert tokens
+-- Finally insert the tokens, with reference to the parent and child contract ids
+-- Note that media related columns (token_uri, token_metadata, media) is not inserted or updated here, because it is assumed
+-- that this data will be inserted later via tokenprocessing.
+-- User-scoped data (collectors_note, is_user_marked_spam) is also not updated here.
 insert into tokens(id, deleted, created_at, name, description, token_type, quantity, ownership_history, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_provider_marked_spam, last_synced, child_contract_id) (
   select
     id
@@ -144,7 +162,9 @@ insert into tokens(id, deleted, created_at, name, description, token_type, quant
     , last_synced
     , insert_child_contracts.id
   from tokens_data
+  -- Join on the inserted parent contracts to get the parent's id
   join insert_parent_contracts on tokens_data.chain = insert_child_contracts.chain and tokens_data.contract_address = insert_parent_contracts.address
+  -- Join on the inserted child contracts to get the child's id
   join insert_child_contracts on tokens_data.chain = insert_child_contracts.chain and tokens_data.contract_address = insert_child_contracts.address
 )
 on conflict (token_id, contract, chain, owner_user_id) where deleted = false
