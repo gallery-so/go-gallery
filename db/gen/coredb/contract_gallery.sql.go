@@ -8,10 +8,23 @@ package coredb
 import (
 	"context"
 	"time"
+
+	"github.com/jackc/pgtype"
 )
 
 const upsertContracts = `-- name: UpsertContracts :many
-insert into contracts (id, deleted, version, created_at, address, symbol, name, creator_address, chain) (
+insert into contracts (
+  id
+  , deleted
+  , version
+  , created_at
+  , address
+  , symbol
+  , name
+  , creator_address
+  , chain
+  , description
+) (
   select
   unnest($1::varchar[])
   , unnest($2::boolean[])
@@ -22,6 +35,7 @@ insert into contracts (id, deleted, version, created_at, address, symbol, name, 
   , unnest($7::varchar[])
   , unnest($8::varchar[])
   , unnest($9::int[])
+  , unnest($10::varchar[])
 )
 on conflict (address, chain)
 do update set
@@ -29,7 +43,7 @@ do update set
   , version = excluded.version
   , name = excluded.name
   , creator_address = excluded.creator_address
-  , chain = excluded.chain
+  , description = excluded.description
   , deleted = exlucded.deleted
   , last_updated = now()
 returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, parent_id
@@ -45,6 +59,7 @@ type UpsertContractsParams struct {
 	Name           []string
 	CreatorAddress []string
 	Chain          []int32
+	Description    []string
 }
 
 func (q *Queries) UpsertContracts(ctx context.Context, arg UpsertContractsParams) ([]Contract, error) {
@@ -58,6 +73,7 @@ func (q *Queries) UpsertContracts(ctx context.Context, arg UpsertContractsParams
 		arg.Name,
 		arg.CreatorAddress,
 		arg.Chain,
+		arg.Description,
 	)
 	if err != nil {
 		return nil, err
@@ -82,6 +98,265 @@ func (q *Queries) UpsertContracts(ctx context.Context, arg UpsertContractsParams
 			&i.BadgeUrl,
 			&i.Description,
 			&i.ParentID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const upsertCreatedTokens = `-- name: UpsertCreatedTokens :many
+with parent_contracts_data(id, deleted, created_at, name, symbol, address, creator_address, chain, description) as (
+  select
+    unnest($1::varchar[]) as id
+    , unnest($2::boolean[]) as deleted
+    , unnest($3::timestamptz[]) as created_at
+    , unnest($4::varchar[]) as name
+    , unnest($5::varchar[]) as symbol
+    , unnest($6::varchar[]) as address
+    , unnest($7::varchar[]) as creator_address
+    , unnest($8::int[]) as chain
+    , unnest($9::varchar[]) as description
+),
+child_contracts_data(id, deleted, created_at, name, address, creator_address, chain, description, parent_id) as (
+  select
+    unnest($10::varchar[]) as id
+    , unnest($11::boolean[]) as deleted
+    , unnest($12::timestamptz[]) as created_at
+    , unnest($13::varchar[]) as name
+    , unnest($14::varchar[]) as address
+    , unnest($15::varchar[]) as creator_address
+    , unnest($16::int[]) as chain
+    , unnest($17::varchar[]) as description
+     -- This field is only used as condition of the join
+    , unnest($18::varchar[]) as parent_address
+),
+tokens_data(id, deleted, created_at, name, description, token_type, token_id, quantity, ownership_history, ownership_history_start_idx, ownership_history_end_idx, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_provider_marked_spam, last_synced) as (
+  select
+    unnest($19::varchar[]) as id
+    , unnest($20::boolean[]) as deleted
+    , unnest($21::timestamptz[]) as created_at
+    , unnest($22::varchar[]) as name
+    , unnest($23::varchar[]) as description
+    , unnest($24::varchar[]) as token_type
+    , unnest($25::varchar[]) as token_id
+    , unnest($26::varchar[]) as quantity
+    , $27::jsonb[] as ownership_history
+    , unnest($28::int[]) as ownership_history_start_idx
+    , unnest($29::int[]) as ownership_history_end_idx
+    , unnest($30::varchar[]) as external_url
+    , unnest($31::bigint[]) as block_number
+    , unnest($32::varchar[]) as owner_user_id
+    , $33::varchar[] as owned_by_wallets
+    , unnest($34::int[]) as owned_by_wallets_start_idx
+    , unnest($35::int[]) as owned_by_wallets_end_idx
+    , unnest($36::int[]) as chain
+    , unnest($37::bool[]) as is_provider_marked_spam
+    , unnest($38::timestamptz[]) as last_synced
+     -- This field is only used as condition of the join
+    , unnest($39::varchar[]) as contract_address
+),
+insert_parent_contracts as (
+  insert into contracts(id, deleted, created_at, name, symbol, address, creator_address, chain, description)
+  (
+    select id, deleted, created_at, name, symbol, address, creator_address, chain, description
+    from parent_contracts_data
+  )
+  on conflict (chain, parent_id, address)
+  do update set deleted = excluded.deleted
+    , name = excluded.name
+    , symbol = excluded.symbol
+    , creator_address = excluded.creator_address
+    , description = excluded.description
+    , last_updated = now()
+  returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, parent_id
+),
+insert_child_contracts as (
+  insert into contracts (id, deleted, created_at, name, address, creator_address, chain, description, parent_id)
+  (
+    select id, deleted, created_at, name, symbol, address, creator_address, chain, description, parent_id
+    from child_contracts_data
+    join insert_parent_contracts
+    on child_contracts_data.chain = insert_parent_contracts.chain and child_contracts_data.parent_address = insert_parent_contracts.address
+  )
+  on conflict (chain, parent_id, address)
+  do update set deleted = excluded.deleted
+    , name = excluded.name
+    , creator_address = excluded.creator_address
+    , description = excluded.description
+    , last_updated = now()
+  returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, parent_id
+)
+insert into tokens(id, deleted, created_at, name, description, token_type, quantity, ownership_history, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_provider_marked_spam, last_synced, child_contract_id) (
+  select
+    id
+    , deleted 
+    , created_at
+    , last_updated
+    , name
+    , description
+    , token_type
+    , token_id
+    , quantity
+    , ownership_history[ownership_history_start_idx::int:ownership_history_end_idx::int]
+    , external_url
+    , block_number
+    , owner_user_id
+    , owned_by_wallets[owned_by_wallets_start_idx::int:owned_by_wallets_end_idx::int]
+    , chain
+    , insert_parent_contracts.id
+    , is_provider_marked_spam
+    , last_synced
+    , insert_child_contracts.id
+  from tokens_data
+  join insert_parent_contracts on tokens_data.chain = insert_child_contracts.chain and tokens_data.contract_address = insert_parent_contracts.address
+  join insert_child_contracts on tokens_data.chain = insert_child_contracts.chain and tokens_data.contract_address = insert_child_contracts.address
+)
+on conflict (token_id, contract, chain, owner_user_id) where deleted = false
+do update set
+  token_type = excluded.token_type
+  , chain = excluded.chain
+  , name = excluded.name
+  , description = excluded.description
+  , quantity = excluded.quantity
+  , owner_user_id = excluded.owner_user_id
+  , owned_by_wallets = excluded.owned_by_wallets
+  , ownership_history = tokens.ownership_history || excluded.ownership_history
+  , external_url = excluded.external_url
+  , block_number = excluded.block_number
+  , last_updated = excluded.last_updated
+  , is_provider_marked_spam = excluded.is_provider_marked_spam
+  , last_synced = greatest(excluded.last_synced,tokens.last_synced)
+returning id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, child_contract_id
+`
+
+type UpsertCreatedTokensParams struct {
+	ParentContractID              []string
+	ParentContractDeleted         []bool
+	ParentContractCreatedAt       []time.Time
+	ParentContractName            []string
+	ParentContractSymbol          []string
+	ParentContractAddress         []string
+	ParentContractCreatorAddress  []string
+	ParentContractChain           []int32
+	ParentContractDescription     []string
+	ChildContractID               []string
+	ChildContractDeleted          []bool
+	ChildContractCreatedAt        []time.Time
+	ChildContractName             []string
+	ChildContractAddress          []string
+	ChildContractCreatorAddress   []string
+	ChildContractChain            []int32
+	ChildContractDescription      []string
+	ChildContractParentAddress    []string
+	TokenID                       []string
+	TokenDeleted                  []bool
+	TokenCreatedAt                []time.Time
+	TokenName                     []string
+	TokenDescription              []string
+	TokenTokenType                []string
+	TokenTokenID                  []string
+	TokenQuantity                 []string
+	TokenOwnershipHistory         []pgtype.JSONB
+	TokenOwnershipHistoryStartIdx []int32
+	TokenOwnershipHistoryEndIdx   []int32
+	TokenExternalUrl              []string
+	TokenBlockNumber              []int64
+	TokenOwnerUserID              []string
+	TokenOwnedByWallets           []string
+	TokenOwnedByWalletsStartIdx   []int32
+	TokenOwnedByWalletsEndIdx     []int32
+	TokenChain                    []int32
+	TokenIsProviderMarkedSpam     []bool
+	TokenLastSynced               []time.Time
+	TokenContractAddress          []string
+}
+
+// Data for parent contracts
+// Data for child contracts
+// Data for tokens
+// Insert parent contracts
+// Insert child contracts
+// Insert tokens
+func (q *Queries) UpsertCreatedTokens(ctx context.Context, arg UpsertCreatedTokensParams) ([]Token, error) {
+	rows, err := q.db.Query(ctx, upsertCreatedTokens,
+		arg.ParentContractID,
+		arg.ParentContractDeleted,
+		arg.ParentContractCreatedAt,
+		arg.ParentContractName,
+		arg.ParentContractSymbol,
+		arg.ParentContractAddress,
+		arg.ParentContractCreatorAddress,
+		arg.ParentContractChain,
+		arg.ParentContractDescription,
+		arg.ChildContractID,
+		arg.ChildContractDeleted,
+		arg.ChildContractCreatedAt,
+		arg.ChildContractName,
+		arg.ChildContractAddress,
+		arg.ChildContractCreatorAddress,
+		arg.ChildContractChain,
+		arg.ChildContractDescription,
+		arg.ChildContractParentAddress,
+		arg.TokenID,
+		arg.TokenDeleted,
+		arg.TokenCreatedAt,
+		arg.TokenName,
+		arg.TokenDescription,
+		arg.TokenTokenType,
+		arg.TokenTokenID,
+		arg.TokenQuantity,
+		arg.TokenOwnershipHistory,
+		arg.TokenOwnershipHistoryStartIdx,
+		arg.TokenOwnershipHistoryEndIdx,
+		arg.TokenExternalUrl,
+		arg.TokenBlockNumber,
+		arg.TokenOwnerUserID,
+		arg.TokenOwnedByWallets,
+		arg.TokenOwnedByWalletsStartIdx,
+		arg.TokenOwnedByWalletsEndIdx,
+		arg.TokenChain,
+		arg.TokenIsProviderMarkedSpam,
+		arg.TokenLastSynced,
+		arg.TokenContractAddress,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Token
+	for rows.Next() {
+		var i Token
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Name,
+			&i.Description,
+			&i.CollectorsNote,
+			&i.Media,
+			&i.TokenUri,
+			&i.TokenType,
+			&i.TokenID,
+			&i.Quantity,
+			&i.OwnershipHistory,
+			&i.TokenMetadata,
+			&i.ExternalUrl,
+			&i.BlockNumber,
+			&i.OwnerUserID,
+			&i.OwnedByWallets,
+			&i.Chain,
+			&i.Contract,
+			&i.IsUserMarkedSpam,
+			&i.IsProviderMarkedSpam,
+			&i.LastSynced,
+			&i.ChildContractID,
 		); err != nil {
 			return nil, err
 		}

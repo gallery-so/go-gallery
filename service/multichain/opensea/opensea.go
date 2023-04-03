@@ -280,8 +280,8 @@ func (d *Provider) GetDisplayNameByAddress(ctx context.Context, addr persist.Add
 	return addr.String()
 }
 
-// GetCreatedTokensByWalletAddress returns a tokens created by the address under the Shared Storefront contract
-func (p *Provider) GetCreatedTokensByWalletAddress(ctx context.Context, walletAddress persist.Address) ([]multichain.SubContractGroup, error) {
+// GetContractsCreatedOnSharedContract returns a tokens created by the address under the Shared Storefront contract
+func (p *Provider) GetContractsCreatedOnSharedContract(ctx context.Context, walletAddress persist.Address) ([]multichain.ChildContract, error) {
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
@@ -595,20 +595,21 @@ func streamAssetsForCollectionEditor(ctx context.Context, editorAddress persist.
 	url := baseURL.JoinPath("assets")
 	setPagingParams(url, args.sortAsc, args.pageSize)
 	setCollectionEditor(url, editorAddress)
-	setContractAddress(url, sharedStoreFrontAddress)
 	setCursor(ctx, url, args.cache)
+	// Filter for only the Shared Storefront Address
+	setContractAddress(url, sharedStoreFrontAddress)
 	paginateAssets(ctx, authRequest(ctx, url.String()), args.outCh, args.cache)
 }
 
 // assetsToGroups converts a channel of assets to a slice of sub-contract groups
-func assetsToGroups(ctx context.Context, assetsChan <-chan assetsReceieved, ethClient *ethclient.Client) ([]multichain.SubContractGroup, error) {
+func assetsToGroups(ctx context.Context, assetsChan <-chan assetsReceieved, ethClient *ethclient.Client) ([]multichain.ChildContract, error) {
 	block, err := ethClient.BlockNumber(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	slugs := make(map[string]multichain.SubContractGroup)
-	contracts := make(map[string]multichain.ChainAgnosticContract)
+	childContracts := make(map[string]multichain.ChildContract)
+	parentContracts := make(map[string]multichain.ChainAgnosticContract)
 
 	for page := range assetsChan {
 		if page.err != nil {
@@ -618,19 +619,19 @@ func assetsToGroups(ctx context.Context, assetsChan <-chan assetsReceieved, ethC
 			contractAsStr := asset.Contract.ContractAddress.String()
 
 			// Add the parent contract if we haven't seen it before
-			if _, seen := contracts[contractAsStr]; !seen {
-				contracts[contractAsStr] = contractFromAsset(asset, persist.BlockNumber(block))
+			if _, seen := parentContracts[contractAsStr]; !seen {
+				parentContracts[contractAsStr] = contractFromAsset(asset, persist.BlockNumber(block))
 			}
 
-			slug := asset.Collection.Slug
+			childID := asset.Collection.Slug
 
-			// Found a new subgroup
-			if _, seen := slugs[slug]; !seen {
-				slugs[slug] = multichain.SubContractGroup{
-					Slug:           slug,
+			// Found a new child
+			if _, seen := childContracts[childID]; !seen {
+				childContracts[childID] = multichain.ChildContract{
+					ChildID:        childID,
 					Name:           asset.Collection.Name,
 					Description:    asset.Collection.Description,
-					ParentContract: contracts[contractAsStr],
+					ParentContract: parentContracts[contractAsStr],
 					Tokens:         make([]multichain.ChainAgnosticToken, 0),
 				}
 			}
@@ -642,19 +643,19 @@ func assetsToGroups(ctx context.Context, assetsChan <-chan assetsReceieved, ethC
 			}
 
 			// Add the token
-			group := slugs[slug]
-			group.Tokens = append(group.Tokens, token)
-			slugs[slug] = group
+			childContract := childContracts[childID]
+			childContract.Tokens = append(childContract.Tokens, token)
+			childContracts[childID] = childContract
 		}
 	}
 
 	// Convert the map to a slice
-	groups := make([]multichain.SubContractGroup, 0)
-	for _, group := range slugs {
-		groups = append(groups, group)
+	children := make([]multichain.ChildContract, 0)
+	for _, child := range childContracts {
+		children = append(children, child)
 	}
 
-	return groups, nil
+	return children, nil
 }
 
 func tokenTypeFromAsset(asset Asset) (persist.TokenType, error) {

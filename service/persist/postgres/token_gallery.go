@@ -333,22 +333,6 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 		return time.Time{}, []persist.TokenGallery{}, nil
 	}
 
-	appendWalletList := func(dest *[]string, src []persist.Wallet, startIndices, endIndices *[]int32) {
-		items := make([]persist.DBID, len(src))
-		for i, wallet := range src {
-			items[i] = wallet.ID
-		}
-		appendDBIDList(dest, items, startIndices, endIndices)
-	}
-
-	appendAddressAtBlock := func(dest *[]pgtype.JSONB, src []persist.AddressAtBlock, startIndices, endIndices *[]int32, errs *[]error) {
-		items := make([]any, len(src))
-		for i, item := range src {
-			items[i] = item
-		}
-		appendJSONBList(dest, items, startIndices, endIndices, errs)
-	}
-
 	// addIDIfMissing is used because sqlc was unable to bind arrays of our own custom types
 	// i.e. an array of persist.DBIDs instead of an array of strings. A zero-valued persist.DBID
 	// generates a new ID on insert, but instead we need to generate an ID beforehand.
@@ -395,13 +379,13 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 		params.TokenType = append(params.TokenType, t.TokenType.String())
 		params.TokenID = append(params.TokenID, t.TokenID.String())
 		params.Quantity = append(params.Quantity, t.Quantity.String())
-		appendAddressAtBlock(&params.OwnershipHistory, t.OwnershipHistory, &params.OwnershipHistoryStartIdx, &params.OwnershipHistoryEndIdx, &errors)
+		AppendAddressAtBlock(&params.OwnershipHistory, t.OwnershipHistory, &params.OwnershipHistoryStartIdx, &params.OwnershipHistoryEndIdx, &errors)
 		appendJSONB(&params.Media, t.Media, &errors)
 		appendJSONB(&params.TokenMetadata, t.TokenMetadata, &errors)
 		params.ExternalUrl = append(params.ExternalUrl, t.ExternalURL.String())
 		params.BlockNumber = append(params.BlockNumber, t.BlockNumber.BigInt().Int64())
 		params.OwnerUserID = append(params.OwnerUserID, t.OwnerUserID.String())
-		appendWalletList(&params.OwnedByWallets, t.OwnedByWallets, &params.OwnedByWalletsStartIdx, &params.OwnedByWalletsEndIdx)
+		AppendWalletList(&params.OwnedByWallets, t.OwnedByWallets, &params.OwnedByWalletsStartIdx, &params.OwnedByWalletsEndIdx)
 		params.Chain = append(params.Chain, int32(t.Chain))
 		params.Contract = append(params.Contract, t.Contract.String())
 		appendBool(&params.IsUserMarkedSpam, t.IsUserMarkedSpam, &errors)
@@ -431,6 +415,22 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 	}
 
 	return now, tokens, nil
+}
+
+func AppendAddressAtBlock(dest *[]pgtype.JSONB, src []persist.AddressAtBlock, startIndices, endIndices *[]int32, errs *[]error) {
+	items := make([]any, len(src))
+	for i, item := range src {
+		items[i] = item
+	}
+	appendJSONBList(dest, items, startIndices, endIndices, errs)
+}
+
+func AppendWalletList(dest *[]string, src []persist.Wallet, startIndices, endIndices *[]int32) {
+	items := make([]persist.DBID, len(src))
+	for i, wallet := range src {
+		items[i] = wallet.ID
+	}
+	appendDBIDList(dest, items, startIndices, endIndices)
 }
 
 func appendIndices(startIndices *[]int32, endIndices *[]int32, entryLength int) {
