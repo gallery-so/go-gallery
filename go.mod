@@ -41,7 +41,7 @@ require (
 	github.com/magiclabs/magic-admin-go v0.2.0
 	github.com/microcosm-cc/bluemonday v1.0.21
 	github.com/ory/dockertest v3.3.5+incompatible
-	github.com/qmuntal/gltf v0.22.0
+	github.com/qmuntal/gltf v0.22.0 // indirect
 	github.com/segmentio/ksuid v1.0.4
 	github.com/sendgrid/rest v2.6.9+incompatible
 	github.com/sendgrid/sendgrid-go v3.12.0+incompatible
