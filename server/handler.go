@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -184,12 +183,16 @@ func healthCheckHandler() gin.HandlerFunc {
 }
 
 func jobHandlersInit(group *gin.RouterGroup, queries *db.Queries) {
-	group.POST("/push-notifications", pushNotificationsJobHandler(queries))
+	group.POST("/check-push-tickets", pushTicketsJobHandler(queries))
 }
 
-func pushNotificationsJobHandler(queries *db.Queries) gin.HandlerFunc {
+func pushTicketsJobHandler(queries *db.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		fmt.Printf("Push notifications job started at %s", time.Now().Format(time.RFC3339))
+		err := notifications.CheckPushTickets(queries)
+		if err != nil {
+			// TODO: Appropriate error handling
+		}
+
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
