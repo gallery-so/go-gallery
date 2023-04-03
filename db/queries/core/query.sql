@@ -990,3 +990,12 @@ where a.user_id = @user_a_id
 -- name: AddPiiAccountCreationInfo :exec
 insert into pii.account_creation_info (user_id, ip_address, created_at) values (@user_id, @ip_address, now())
   on conflict do nothing;
+
+-- name: GetPushTokenByPushToken :one
+select * from push_notification_tokens where push_token = @push_token and deleted = false;
+
+-- name: CreatePushTokenForUser :one
+insert into push_notification_tokens (id, user_id, push_token, created_at, deleted) values (@id, @user_id, @push_token, now(), false) returning *;
+
+-- name: DeletePushTokensByIDs :exec
+update push_notification_tokens set deleted = true where id = any(@ids) and deleted = false;

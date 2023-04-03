@@ -696,6 +696,29 @@ func (q *Queries) CreateGalleryEvent(ctx context.Context, arg CreateGalleryEvent
 	return i, err
 }
 
+const createPushTokenForUser = `-- name: CreatePushTokenForUser :one
+insert into push_notification_tokens (id, user_id, push_token, created_at, deleted) values ($1, $2, $3, now(), false) returning id, user_id, push_token, created_at, deleted
+`
+
+type CreatePushTokenForUserParams struct {
+	ID        persist.DBID
+	UserID    persist.DBID
+	PushToken string
+}
+
+func (q *Queries) CreatePushTokenForUser(ctx context.Context, arg CreatePushTokenForUserParams) (PushNotificationToken, error) {
+	row := q.db.QueryRow(ctx, createPushTokenForUser, arg.ID, arg.UserID, arg.PushToken)
+	var i PushNotificationToken
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.PushToken,
+		&i.CreatedAt,
+		&i.Deleted,
+	)
+	return i, err
+}
+
 const createTokenEvent = `-- name: CreateTokenEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data, group_id, caption, gallery_id, collection_id) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, $9, $10) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id
 `
@@ -852,6 +875,15 @@ update collections set deleted = true, last_updated = now() where id = any($1::v
 
 func (q *Queries) DeleteCollections(ctx context.Context, ids []string) error {
 	_, err := q.db.Exec(ctx, deleteCollections, ids)
+	return err
+}
+
+const deletePushTokensByIDs = `-- name: DeletePushTokensByIDs :exec
+update push_notification_tokens set deleted = true where id = any($1) and deleted = false
+`
+
+func (q *Queries) DeletePushTokensByIDs(ctx context.Context, ids persist.DBIDList) error {
+	_, err := q.db.Exec(ctx, deletePushTokensByIDs, ids)
 	return err
 }
 
@@ -1959,6 +1991,23 @@ func (q *Queries) GetPreviewURLsByContractIdAndUserId(ctx context.Context, arg G
 		return nil, err
 	}
 	return items, nil
+}
+
+const getPushTokenByPushToken = `-- name: GetPushTokenByPushToken :one
+select id, user_id, push_token, created_at, deleted from push_notification_tokens where push_token = $1 and deleted = false
+`
+
+func (q *Queries) GetPushTokenByPushToken(ctx context.Context, pushToken string) (PushNotificationToken, error) {
+	row := q.db.QueryRow(ctx, getPushTokenByPushToken, pushToken)
+	var i PushNotificationToken
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.PushToken,
+		&i.CreatedAt,
+		&i.Deleted,
+	)
+	return i, err
 }
 
 const getRecentUnseenNotifications = `-- name: GetRecentUnseenNotifications :many
