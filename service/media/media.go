@@ -57,6 +57,15 @@ type errUnsupportedMediaType struct {
 	mediaType persist.MediaType
 }
 
+type errNoDataFromReader struct {
+	err error
+	url string
+}
+
+func (e errNoDataFromReader) Error() string {
+	return fmt.Sprintf("no data from reader: %s (url: %s)", e.err, e.url)
+}
+
 type mediaWithContentType struct {
 	mediaType   persist.MediaType
 	contentType string
@@ -180,6 +189,11 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		logger.For(pCtx).Debug("neither cached, deleting thumbnail if any")
 		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("thumbnail-%s", name), storageClient)
 		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("liverender-%s", name), storageClient)
+	}
+
+	// imgURL does not work, but vidURL does, don't try to use imgURL
+	if _, ok := imgResult.err.(errNoDataFromReader); ok && (vidResult.cached && vidResult.mediaType.IsAnimationLike()) {
+		imgURL = ""
 	}
 
 	switch mediaType {
@@ -833,7 +847,7 @@ outer:
 	timeBeforeDataReader := time.Now()
 	reader, err := rpc.GetDataFromURIAsReader(pCtx, asURI, ipfsClient, arweaveClient)
 	if err != nil {
-		return mediaType, false, fmt.Errorf("could not get reader for %s: %s", mediaURL, err)
+		return mediaType, false, errNoDataFromReader{err: err, url: mediaURL}
 	}
 	logger.For(pCtx).Infof("got reader for %s in %s", name, time.Since(timeBeforeDataReader))
 	defer reader.Close()
