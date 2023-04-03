@@ -221,7 +221,7 @@ func SetDefaults() {
 	viper.SetDefault("TWITTER_AUTH_REDIRECT_URI", "http://localhost:3000/auth/twitter")
 	viper.SetDefault("FEEDBOT_URL", "")
 	viper.SetDefault("GCLOUD_FEEDBOT_TASK_QUEUE", "projects/gallery-local/locations/here/queues/feedbot")
-	viper.SetDefault("ALCHEMY_API_URL", "https://eth-goerli.g.alchemy.com/v2/_2u--i79yarLYdOT4Bgydqa0dBceVRLD")
+	viper.SetDefault("ALCHEMY_API_URL", "")
 	viper.SetDefault("INFURA_API_KEY", "")
 	viper.SetDefault("INFURA_API_SECRET", "")
 
