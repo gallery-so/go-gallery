@@ -313,7 +313,7 @@ func (d *Provider) getTokenWithMetadata(ctx context.Context, ti multichain.Chain
 	if timeout == 0 {
 		timeout = (time.Second * 20) / time.Millisecond
 	}
-	url := fmt.Sprintf("%s/getNFTMetadata?contract=%s&tokenId=%s&tokenUri=0x%sTimeoutInMs=%d&refreshCache=%t", d.alchemyAPIURL, ti.ContractAddress, ti.TokenID, timeout, forceRefresh)
+	url := fmt.Sprintf("%s/getNFTMetadata?contractAddress=%s&tokenId=%s&tokenUriTimeoutInMs=%d&refreshCache=%t", d.alchemyAPIURL, ti.ContractAddress, ti.TokenID, timeout, forceRefresh)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
@@ -327,7 +327,8 @@ func (d *Provider) getTokenWithMetadata(ctx context.Context, ti multichain.Chain
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("failed to get token metadata from alchemy api: %s", resp.Status)
+		err := util.GetErrFromResp(resp)
+		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("failed to get token metadata from alchemy api: %s (%w)", resp.Status, err)
 	}
 
 	// will have most of the fields empty
@@ -346,7 +347,7 @@ func (d *Provider) getTokenWithMetadata(ctx context.Context, ti multichain.Chain
 	}
 
 	if len(contracts) == 0 {
-		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("failed to get token metadata from alchemy api: %s", resp.Status)
+		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("failed to get contracts from alchemy api")
 	}
 
 	return tokens, contracts[0], nil
@@ -624,7 +625,7 @@ func alchemyTokenToChainAgnosticToken(owner persist.EthereumAddress, token Token
 	t := multichain.ChainAgnosticToken{
 		TokenType:       tokenType,
 		Name:            token.Title,
-		Description:     token.Metadata.Description,
+		Description:     token.Description,
 		TokenURI:        persist.TokenURI(token.TokenURI.Raw),
 		TokenMetadata:   alchemyTokenToMetadata(token),
 		TokenID:         token.ID.TokenID.ToTokenID(),
