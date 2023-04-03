@@ -329,7 +329,7 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 		GalleryID:      galleryID,
 		SubjectID:      collectionID,
 		Data:           persist.EventData{CollectionTokenIDs: tokens},
-		Caption:        persist.StrToNullStr(caption),
+		Caption:        persist.StrPtrToNullStr(caption),
 	}, api.validator, caption)
 }
 

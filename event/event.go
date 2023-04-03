@@ -137,8 +137,8 @@ func DispatchGroup(ctx context.Context, groupID string, action persist.Action, c
 
 	if caption != nil {
 		err := sender.eventRepo.Queries.UpdateEventCaptionByGroup(ctx, db.UpdateEventCaptionByGroupParams{
-			Caption: persist.StrToNullStr(caption),
-			GroupID: persist.StrToNullStr(&groupID),
+			Caption: persist.StrPtrToNullStr(caption),
+			GroupID: persist.StrPtrToNullStr(&groupID),
 		})
 		if err != nil {
 			return nil, err
@@ -331,12 +331,12 @@ func (h feedHandler) handleImmediate(ctx context.Context, persistedEvent db.Even
 // handleGrouped processes a group of events into a single feed event.
 func (h feedHandler) handleGroup(ctx context.Context, groupID string, action persist.Action) (interface{}, error) {
 
-	existsForGroup, err := h.queries.IsFeedEventExistsForGroup(ctx, persist.StrToNullStr(&groupID))
+	existsForGroup, err := h.queries.IsFeedEventExistsForGroup(ctx, persist.StrPtrToNullStr(&groupID))
 	if err != nil {
 		return nil, err
 	}
 	if existsForGroup {
-		return h.queries.UpdateFeedEventCaptionByGroup(ctx, persist.StrToNullStr(&groupID))
+		return h.queries.UpdateFeedEventCaptionByGroup(ctx, persist.StrPtrToNullStr(&groupID))
 	}
 
 	feedEvent, err := h.eventBuilder.NewFeedEventFromGroup(ctx, groupID, action)

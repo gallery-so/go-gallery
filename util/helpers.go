@@ -571,7 +571,10 @@ func IsNullOrEmpty(s sql.NullString) bool {
 	return !s.Valid || s.String == ""
 }
 
-func ToNullString(s string) sql.NullString {
+func ToNullString(s string, emptyIsNull bool) sql.NullString {
+	if emptyIsNull && s == "" {
+		return sql.NullString{String: "", Valid: false}
+	}
 	return sql.NullString{String: s, Valid: true}
 }
 
