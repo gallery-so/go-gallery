@@ -313,7 +313,7 @@ func (d *Provider) getTokenWithMetadata(ctx context.Context, ti multichain.Chain
 	if timeout == 0 {
 		timeout = (time.Second * 20) / time.Millisecond
 	}
-	url := fmt.Sprintf("%s/getNFTMetadata?contractAddress=%s&tokenId=%s&tokenUriTimeoutInMs=%d&refreshCache=%t", d.alchemyAPIURL, ti.ContractAddress, ti.TokenID, timeout, forceRefresh)
+	url := fmt.Sprintf("%s/getNFTMetadata?contractAddress=%s&tokenId=%s&tokenUriTimeoutInMs=%d&refreshCache=%t", d.alchemyAPIURL, ti.ContractAddress, ti.TokenID.Base10String(), timeout, forceRefresh)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
