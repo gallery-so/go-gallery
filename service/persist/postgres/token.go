@@ -411,7 +411,7 @@ func (t *TokenRepository) upsertERC1155Tokens(pCtx context.Context, pTokens []pe
 	// Postgres only allows 65535 parameters at a time.
 	// TODO: Consider trying this implementation at some point instead of chunking:
 	//       https://klotzandrew.com/blog/postgres-passing-65535-parameter-limit
-	paramsPerRow := 20
+	paramsPerRow := 19
 	rowsPerQuery := 65535 / paramsPerRow
 
 	if len(pTokens) > rowsPerQuery {
