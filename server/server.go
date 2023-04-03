@@ -32,6 +32,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain"
+	"github.com/mikeydub/go-gallery/service/multichain/alchemy"
 	"github.com/mikeydub/go-gallery/service/multichain/eth"
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/mikeydub/go-gallery/service/multichain/poap"
@@ -219,6 +220,7 @@ func SetDefaults() {
 	viper.SetDefault("TWITTER_AUTH_REDIRECT_URI", "http://localhost:3000/auth/twitter")
 	viper.SetDefault("FEEDBOT_URL", "")
 	viper.SetDefault("GCLOUD_FEEDBOT_TASK_QUEUE", "projects/gallery-local/locations/here/queues/feedbot")
+	viper.SetDefault("ALCHEMY_API_URL", "")
 
 	viper.AutomaticEnv()
 
@@ -274,6 +276,7 @@ func initSentry() {
 func NewMultichainProvider(c *Clients) *multichain.Provider {
 	ethChain := persist.ChainETH
 	overrides := multichain.ChainOverrideMap{persist.ChainPOAP: &ethChain}
+	alchemyProvider := alchemy.NewProvider(c.HTTPClient)
 	ethProvider := eth.NewProvider(env.GetString("INDEXER_HOST"), c.HTTPClient, c.EthClient, c.TaskClient)
 	openseaProvider := opensea.NewProvider(c.EthClient, c.HTTPClient)
 	tezosProvider := multichain.FallbackProvider{
@@ -287,6 +290,7 @@ func NewMultichainProvider(c *Clients) *multichain.Provider {
 	cache := redis.NewCache(redis.CommunitiesDB)
 	return multichain.NewProvider(context.Background(), c.Repos, c.Queries, cache, c.TaskClient,
 		overrides,
+		alchemyProvider,
 		ethProvider,
 		openseaProvider,
 		tezosProvider,

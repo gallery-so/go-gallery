@@ -57,6 +57,15 @@ type errUnsupportedMediaType struct {
 	mediaType persist.MediaType
 }
 
+type errNoDataFromReader struct {
+	err error
+	url string
+}
+
+func (e errNoDataFromReader) Error() string {
+	return fmt.Sprintf("no data from reader: %s (url: %s)", e.err, e.url)
+}
+
 type mediaWithContentType struct {
 	mediaType   persist.MediaType
 	contentType string
@@ -146,6 +155,14 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		mediaType = vidResult.mediaType
 	}
 
+	if asString, ok := metadata["media_type"].(string); !mediaType.IsValid() && ok && asString != "" {
+		mediaType = persist.MediaType(RawFormatToMediaType(asString))
+	}
+
+	if asString, ok := metadata["format"].(string); !mediaType.IsValid() && ok && asString != "" {
+		mediaType = persist.MediaType(RawFormatToMediaType(asString))
+	}
+
 	pCtx = logger.NewContextWithFields(pCtx, logrus.Fields{"mediaType": mediaType})
 	logger.For(pCtx).Infof("using '%s' as the mediaType", mediaType)
 
@@ -172,6 +189,11 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		logger.For(pCtx).Debug("neither cached, deleting thumbnail if any")
 		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("thumbnail-%s", name), storageClient)
 		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("liverender-%s", name), storageClient)
+	}
+
+	// imgURL does not work, but vidURL does, don't try to use imgURL
+	if _, ok := imgResult.err.(errNoDataFromReader); ok && (vidResult.cached && vidResult.mediaType.IsAnimationLike()) {
+		imgURL = ""
 	}
 
 	switch mediaType {
@@ -564,7 +586,7 @@ func remapMedia(media persist.Media) persist.Media {
 
 func FindImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, metadata persist.TokenMetadata, tokenURI persist.TokenURI, animationKeywords, imageKeywords Keywords, predict bool) (imgURL string, vURL string) {
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"tokenID": tokenID, "contractAddress": contractAddress})
-	if metaMedia, ok := metadata["media"].(map[string]interface{}); ok {
+	if metaMedia, ok := metadata["media"].(map[string]any); ok {
 		logger.For(ctx).Debugf("found media metadata: %s", metaMedia)
 		var mediaType persist.MediaType
 
@@ -825,7 +847,7 @@ outer:
 	timeBeforeDataReader := time.Now()
 	reader, err := rpc.GetDataFromURIAsReader(pCtx, asURI, ipfsClient, arweaveClient)
 	if err != nil {
-		return mediaType, false, fmt.Errorf("could not get reader for %s: %s", mediaURL, err)
+		return mediaType, false, errNoDataFromReader{err: err, url: mediaURL}
 	}
 	logger.For(pCtx).Infof("got reader for %s in %s", name, time.Since(timeBeforeDataReader))
 	defer reader.Close()
@@ -1083,4 +1105,25 @@ func newObjectWriter(ctx context.Context, client *storage.Client, bucket, fileNa
 	writer.ObjectAttrs.ContentType = contentType
 	writer.CacheControl = "no-cache, no-store"
 	return writer
+}
+
+func RawFormatToMediaType(format string) persist.MediaType {
+	switch format {
+	case "jpeg", "png", "image", "jpg", "webp":
+		return persist.MediaTypeImage
+	case "gif":
+		return persist.MediaTypeGIF
+	case "video", "mp4", "quicktime":
+		return persist.MediaTypeVideo
+	case "audio", "mp3", "wav":
+		return persist.MediaTypeAudio
+	case "pdf":
+		return persist.MediaTypePDF
+	case "html", "iframe":
+		return persist.MediaTypeHTML
+	case "svg", "svg+xml":
+		return persist.MediaTypeSVG
+	default:
+		return persist.MediaTypeUnknown
+	}
 }
