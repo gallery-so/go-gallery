@@ -540,14 +540,32 @@ func (c combinedChildContractResults) ChildContracts() []ChildContract {
 	for _, p := range c {
 		contracts = append(contracts, p.ChildContracts...)
 	}
-	// TODO: We may want to dedupe across providers here, but its unlikely
-	// that the same umbrella contract will be returned by different providers
+	// TODO: We may want to dedupe across providers here, but its unlikely that
+	// the same child contract will be returned by different providers
 	return contracts
 }
 
 // TokensByOwnerAddress groups tokens by owner address across all providers
 func (c combinedChildContractResults) TokensByOwnerAddress() map[persist.Address][]chainTokens {
-	panic("not implemented")
+	tokensByOwner := make(map[persist.Address][]chainTokens)
+	for _, p := range c {
+		for _, token := range p.Tokens().tokens {
+			// This is a little inefficient to create a chainTokens of only one token,
+			// but we don't expect to have many tokens per owner
+			tokensByOwner[token.OwnerAddress] = append(tokensByOwner[token.OwnerAddress], chainTokens{
+				priority: p.Priority,
+				chain:    p.Chain,
+				tokens:   []ChainAgnosticToken{token},
+			})
+			tokensByOwner[token.OwnerAddress] = tokensToNewDedupedTokens(
+				tokensByOwner[token.OwnerAddress],
+				// This arg is used to add the DBID of the contract on the token
+				[]persist.Contract{}, 
+				nil,
+			)
+		}
+	}
+	return tokensByOwner
 }
 
 func (c combinedChildContractResults) Tokens() []chainTokens {
