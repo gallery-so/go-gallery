@@ -137,7 +137,7 @@ func dispatchEvent(ctx context.Context, evt db.Event, v *validator.Validate, cap
 	}
 
 	if caption != nil {
-		evt.Caption = persist.StrToNullStr(caption)
+		evt.Caption = persist.StrPtrToNullStr(caption)
 		return event.DispatchImmediate(ctx, []db.Event{evt})
 	}
 
@@ -153,7 +153,7 @@ func dispatchEvents(ctx context.Context, evts []db.Event, v *validator.Validate,
 
 	ctx = sentryutil.NewSentryHubGinContext(ctx)
 	for i, evt := range evts {
-		evt.GroupID = persist.StrToNullStr(editID)
+		evt.GroupID = persist.StrPtrToNullStr(editID)
 		if err := v.Struct(evt); err != nil {
 			return nil, err
 		}
@@ -162,7 +162,7 @@ func dispatchEvents(ctx context.Context, evts []db.Event, v *validator.Validate,
 
 	if caption != nil {
 		for i, evt := range evts {
-			evt.Caption = persist.StrToNullStr(caption)
+			evt.Caption = persist.StrPtrToNullStr(caption)
 			evts[i] = evt
 		}
 		return event.DispatchImmediate(ctx, evts)
