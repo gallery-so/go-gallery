@@ -796,28 +796,21 @@ func (api UserAPI) CreatedCommunities(ctx context.Context, userID persist.DBID, 
 		return nil, PageInfo{}, err
 	}
 
-	// TODO: This should be moved into a mutation rather than done here in the resolver
-	// The user would first sync their created tokens and contracts first, making it available
-	// for other users to query for
-	err := api.multichainProvider.SyncTokensCreatedOnSharedContracts(ctx, userID, chains, includeAllChains)
-	if err != nil {
-		return nil, PageInfo{}, err
-	}
-
 	queryFunc := func(params timeIDPagingParams) ([]any, error) {
 		serializedChains := make([]string, len(chains))
 		for i, c := range chains {
 			serializedChains[i] = strconv.Itoa(int(c))
 		}
 		keys, err := api.loaders.ContractsLoaderByCreatorID.Load(db.GetCreatedContractsBatchPaginateParams{
-			UserID:        userID,
-			Chains:        strings.Join(serializedChains, ","),
-			CurBeforeTime: params.CursorBeforeTime,
-			CurBeforeID:   params.CursorBeforeID,
-			CurAfterTime:  params.CursorAfterTime,
-			CurAfterID:    params.CursorAfterID,
-			PagingForward: params.PagingForward,
-			Limit:         params.Limit,
+			UserID:           userID,
+			Chains:           strings.Join(serializedChains, ","),
+			CurBeforeTime:    params.CursorBeforeTime,
+			CurBeforeID:      params.CursorBeforeID,
+			CurAfterTime:     params.CursorAfterTime,
+			CurAfterID:       params.CursorAfterID,
+			PagingForward:    params.PagingForward,
+			Limit:            params.Limit,
+			IncludeAllChains: includeAllChains,
 		})
 		if err != nil {
 			return nil, err

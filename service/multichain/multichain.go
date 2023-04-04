@@ -615,7 +615,7 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 	}
 
 	if includeAll {
-		chains = make([]persist.Chain, 0)
+		chains = make([]persist.Chain, len(p.Chains))
 		for chain := range p.Chains {
 			chains = append(chains, chain)
 		}

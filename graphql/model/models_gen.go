@@ -234,6 +234,10 @@ type SocialQueriesOrError interface {
 	IsSocialQueriesOrError()
 }
 
+type SyncCreatedTokensPayloadOrError interface {
+	IsSyncCreatedTokensPayloadOrError()
+}
+
 type SyncTokensForUsernamePayloadOrError interface {
 	IsSyncTokensForUsernamePayloadOrError()
 }
@@ -920,6 +924,7 @@ func (ErrNotAuthorized) IsAddUserWalletPayloadOrError()                {}
 func (ErrNotAuthorized) IsRemoveUserWalletsPayloadOrError()            {}
 func (ErrNotAuthorized) IsUpdateUserInfoPayloadOrError()               {}
 func (ErrNotAuthorized) IsSyncTokensPayloadOrError()                   {}
+func (ErrNotAuthorized) IsSyncCreatedTokensPayloadOrError()            {}
 func (ErrNotAuthorized) IsError()                                      {}
 func (ErrNotAuthorized) IsAddRolesToUserPayloadOrError()               {}
 func (ErrNotAuthorized) IsRevokeRolesFromUserPayloadOrError()          {}
@@ -950,6 +955,7 @@ type ErrSyncFailed struct {
 }
 
 func (ErrSyncFailed) IsSyncTokensPayloadOrError()            {}
+func (ErrSyncFailed) IsSyncCreatedTokensPayloadOrError()     {}
 func (ErrSyncFailed) IsRefreshTokenPayloadOrError()          {}
 func (ErrSyncFailed) IsRefreshCollectionPayloadOrError()     {}
 func (ErrSyncFailed) IsRefreshContractPayloadOrError()       {}
@@ -1596,6 +1602,17 @@ type SomeoneViewedYourGalleryNotification struct {
 func (SomeoneViewedYourGalleryNotification) IsNotification()        {}
 func (SomeoneViewedYourGalleryNotification) IsNode()                {}
 func (SomeoneViewedYourGalleryNotification) IsGroupedNotification() {}
+
+type SyncCreatedTokensInput struct {
+	IncludeAllChains *bool           `json:"includeAllChains"`
+	Chains           []persist.Chain `json:"chains"`
+}
+
+type SyncCreatedTokensPayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
+
+func (SyncCreatedTokensPayload) IsSyncCreatedTokensPayloadOrError() {}
 
 type SyncTokensForUsernamePayload struct {
 	Message string `json:"message"`

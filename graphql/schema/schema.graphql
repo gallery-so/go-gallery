@@ -148,6 +148,12 @@ input CreatedCommunitiesInput {
   chains: [Chain!]
 }
 
+input SyncCreatedTokensInput {
+  # When true, return all communities from all chains. Ignores the "chains" argument.
+  includeAllChains: Boolean
+  chains: [Chain!]
+}
+
 type Badge {
   name: String
   imageURL: String!
@@ -1268,6 +1274,12 @@ type SyncTokensPayload {
   viewer: Viewer
 }
 
+union SyncCreatedTokensPayloadOrError = SyncCreatedTokensPayload | ErrNotAuthorized | ErrSyncFailed
+
+type SyncCreatedTokensPayload {
+  viewer: Viewer
+}
+
 union RefreshTokenPayloadOrError = RefreshTokenPayload | ErrInvalidInput | ErrSyncFailed
 
 type RefreshTokenPayload {
@@ -2028,7 +2040,7 @@ type Mutation {
   setSpamPreference(input: SetSpamPreferenceInput!): SetSpamPreferencePayloadOrError @authRequired
 
   syncTokens(chains: [Chain!]): SyncTokensPayloadOrError @authRequired
-  syncCreatedTokens(chains: [Chain!]) SyncCreatedTokensPayloadOrError @authRequired
+  syncCreatedTokens(input: SyncCreatedTokensInput!): SyncCreatedTokensPayloadOrError @authRequired
   refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
   refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
   refreshContract(contractId: DBID!): RefreshContractPayloadOrError

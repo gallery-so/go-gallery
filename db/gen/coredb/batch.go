@@ -883,15 +883,15 @@ where users.id = $1
   and wallets.id = any(users.wallets)
   and contracts.creator_address = wallets.address
   and contracts.chain = wallets.chain
-  and contracts.chain = any(string_to_array($2, ',')::int[])
+  and ($2::bool or contracts.chain = any(string_to_array($3, ',')::int[]))
   and users.deleted = false
   and contracts.deleted = false
   and wallets.deleted = false
-  and (contracts.created_at, contracts.id) > ($3, $4)
-  and (contracts.created_at, contracts.id) < ( $5, $6)
-order by case when $7::bool then (contracts.created_at, contracts.id) end asc,
-        case when not $7::bool then (contracts.created_at, contracts.id) end desc
-limit $8
+  and (contracts.created_at, contracts.id) > ($4, $5)
+  and (contracts.created_at, contracts.id) < ( $6, $7)
+order by case when $8::bool then (contracts.created_at, contracts.id) end asc,
+        case when not $8::bool then (contracts.created_at, contracts.id) end desc
+limit $9
 `
 
 type GetCreatedContractsBatchPaginateBatchResults struct {
@@ -901,14 +901,15 @@ type GetCreatedContractsBatchPaginateBatchResults struct {
 }
 
 type GetCreatedContractsBatchPaginateParams struct {
-	UserID        persist.DBID
-	Chains        string
-	CurBeforeTime time.Time
-	CurBeforeID   persist.DBID
-	CurAfterTime  time.Time
-	CurAfterID    persist.DBID
-	PagingForward bool
-	Limit         int32
+	UserID           persist.DBID
+	IncludeAllChains bool
+	Chains           string
+	CurBeforeTime    time.Time
+	CurBeforeID      persist.DBID
+	CurAfterTime     time.Time
+	CurAfterID       persist.DBID
+	PagingForward    bool
+	Limit            int32
 }
 
 func (q *Queries) GetCreatedContractsBatchPaginate(ctx context.Context, arg []GetCreatedContractsBatchPaginateParams) *GetCreatedContractsBatchPaginateBatchResults {
@@ -916,6 +917,7 @@ func (q *Queries) GetCreatedContractsBatchPaginate(ctx context.Context, arg []Ge
 	for _, a := range arg {
 		vals := []interface{}{
 			a.UserID,
+			a.IncludeAllChains,
 			a.Chains,
 			a.CurBeforeTime,
 			a.CurBeforeID,

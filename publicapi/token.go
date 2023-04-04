@@ -299,6 +299,20 @@ func (api TokenAPI) SyncTokens(ctx context.Context, chains []persist.Chain) erro
 	return nil
 }
 
+func (api TokenAPI) SyncTokensCreatedByUser(ctx context.Context, chains []persist.Chain, includeAllChains bool) error {
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return err
+	}
+
+	if err := api.throttler.Lock(ctx, userID.String()); err != nil {
+		return ErrTokenRefreshFailed{Message: err.Error()}
+	}
+	defer api.throttler.Unlock(ctx, userID.String())
+
+	return api.multichainProvider.SyncTokensCreatedOnSharedContracts(ctx, userID, chains, includeAllChains)
+}
+
 func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) error {
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"tokenID": {tokenDBID, "required"},
