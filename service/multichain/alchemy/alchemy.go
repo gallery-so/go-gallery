@@ -208,7 +208,6 @@ func NewProvider(chain persist.Chain, httpClient *http.Client) *Provider {
 		apiURL = env.GetString("ALCHEMY_OPTIMISM_API_URL")
 	case persist.ChainPolygon:
 		apiURL = env.GetString("ALCHEMY_POLYGON_API_URL")
-
 	}
 
 	if apiURL == "" {
@@ -240,6 +239,11 @@ func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.Blockchain
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the Ethereum Blockchain
 func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	url := fmt.Sprintf("%s/getNFTs?owner=%s&withMetadata=true&orderBy=transferTime", d.alchemyAPIURL, addr)
+
+	if d.chain == persist.ChainPolygon {
+		url += "&excludeFilters[]=SPAM"
+	}
+
 	tokens, err := getNFTsPaginate(ctx, url, 100, 100, "pageKey", limit, offset, "", d.httpClient, &getNFTsResponse{})
 	if err != nil {
 		return nil, nil, err
