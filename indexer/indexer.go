@@ -313,8 +313,8 @@ func (i *indexer) startNewBlocksPipeline(ctx context.Context, topics [][]common.
 	transfers := make(chan []transfersAtBlock)
 	plugins := NewTransferPlugins(ctx, i.ethClient, i.tokenRepo, i.addressFilterRepo)
 	enabledPlugins := []chan<- TransferPluginMsg{plugins.contracts.in}
-	logsToCheckAgainst := make(chan []types.Log)
-	go i.pollNewLogs(sentryutil.NewSentryHubContext(ctx), transfers, logsToCheckAgainst, topics)
+
+	go i.pollNewLogs(sentryutil.NewSentryHubContext(ctx), transfers, topics)
 	go i.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transfers, enabledPlugins)
 	i.processTokens(ctx, plugins.contracts.out)
 
@@ -612,7 +612,7 @@ func getTokenIdentifiersFromLog(ctx context.Context, log types.Log) ([]tokenIden
 
 }
 
-func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transfersAtBlock, logsToCheckAgainst chan<- []types.Log, topics [][]common.Hash) {
+func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transfersAtBlock, topics [][]common.Hash) {
 	span, ctx := tracing.StartSpan(ctx, "indexer.logs", "pollLogs")
 	defer tracing.FinishSpan(span)
 	defer close(transfersChan)
@@ -625,9 +625,6 @@ func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transf
 	}
 
 	logger.For(ctx).Infof("Subscribing to new logs from block %d starting with block %d", mostRecentBlock, i.lastSyncedChunk)
-
-	// this chan will take in every log that we get when polling for logs in this pipeline
-	allLogsInPoll := make(chan []types.Log)
 
 	wp := workerpool.New(10)
 	// starting at the last chunk that we synced, poll for logs in chunks of blocksPerLogsCall
@@ -667,26 +664,14 @@ func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transf
 
 			logger.For(ctx).Debugf("Sending %d total transfers to transfers channel", len(transfers))
 			transfersChan <- transfersToTransfersAtBlock(transfers)
-			allLogsInPoll <- logsTo
 
 		})
-	}
-	go func() {
-		wp.StopWait()
-		close(allLogsInPoll)
-	}()
-
-	resultLogs := []types.Log{}
-	// combine all logs into one slice
-	for logs := range allLogsInPoll {
-		resultLogs = append(resultLogs, logs...)
 	}
 
 	logger.For(ctx).Infof("Processed logs from %d to %d.", i.lastSyncedChunk, mostRecentBlock)
 
 	i.updateLastSynced(mostRecentBlock - (mostRecentBlock % blocksPerLogsCall))
 
-	logsToCheckAgainst <- resultLogs
 }
 
 // TRANSFERS FUNCS -------------------------------------------------------------
