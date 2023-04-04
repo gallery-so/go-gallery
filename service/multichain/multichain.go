@@ -224,6 +224,11 @@ var chainValidation map[persist.Chain]validation = map[persist.Chain]validation{
 		tokenMetadataFetcher:  true,
 		tokensContractFetcher: true,
 	},
+	persist.ChainPolygon: {
+		tokensOwnerFetcher:    true,
+		tokenMetadataFetcher:  true,
+		tokensContractFetcher: true,
+	},
 }
 
 type validation struct {
