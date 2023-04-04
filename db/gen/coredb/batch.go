@@ -1589,8 +1589,8 @@ const getOwnersByContractIdBatchPaginate = `-- name: GetOwnersByContractIdBatchP
 select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences from (
     select distinct on (u.id) u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences from users u, tokens t
         where case when $1::bool then t.contract = $2 else t.child_contract_id = $2 end
-          and (not $3::bool or u.universal = false)
-          and t.deleted = false and u.deleted = false
+        and (not $3::bool or u.universal = false)
+        and t.deleted = false and u.deleted = false
     ) as users
     where (users.universal,users.created_at,users.id) < ($4, $5::timestamptz, $6)
     and (users.universal,users.created_at,users.id) > ($7, $8::timestamptz, $9)
@@ -1863,12 +1863,12 @@ const getSharedFollowersBatchPaginate = `-- name: GetSharedFollowersBatchPaginat
 select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, a.created_at followed_on
 from users, follows a, follows b
 where a.follower = $1
-  and a.followee = b.follower
-  and b.followee = $2
-  and users.id = b.follower
-  and a.deleted = false
-  and b.deleted = false
-  and users.deleted = false
+	and a.followee = b.follower
+	and b.followee = $2
+	and users.id = b.follower
+	and a.deleted = false
+	and b.deleted = false
+	and users.deleted = false
   and (a.created_at, users.id) > ($3, $4)
   and (a.created_at, users.id) < ($5, $6)
 order by case when $7::bool then (a.created_at, users.id) end desc,
@@ -2607,10 +2607,10 @@ const getUserByAddressBatch = `-- name: GetUserByAddressBatch :batchone
 select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences
 from users, wallets
 where wallets.address = $1
-and wallets.chain = $2::int
-and array[wallets.id] <@ users.wallets
-and wallets.deleted = false
-and users.deleted = false
+  and wallets.chain = $2::int
+  and array[wallets.id] <@ users.wallets
+  and wallets.deleted = false
+  and users.deleted = false
 `
 
 type GetUserByAddressBatchBatchResults struct {

@@ -25,7 +25,7 @@ returning *;
 
 -- name: UpsertCreatedTokens :many
 -- UpsertCreatedTokens bulk upserts parent contracts, child contracts and tokens in a single query using data-modifying CTEs.
--- Each data-modifying CTE returns the data that inserted or updated, which is used in the next CTE to insert or update the next table.
+-- Each data-modifying CTE returns the data that was inserted or updated, which is used to insert or update the next table.
 -- 
 -- This is so that we can:
 -- * Reference the id of the parent contract when inserting the child contract

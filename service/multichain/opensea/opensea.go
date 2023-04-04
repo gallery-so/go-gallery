@@ -26,6 +26,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/redis"
+	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
 	"github.com/sirupsen/logrus"
@@ -40,14 +41,14 @@ var baseURL, _ = url.Parse("https://api.opensea.io/api/v1")
 var eip1271MagicValue = [4]byte{0x16, 0x26, 0xBA, 0x7E}
 
 var sharedStoreFrontAddresses = []persist.EthereumAddress{
-	"0x4bea754665a141bf4837e743f8ca08507e8afb01",
-	"0x5e30b1d6f920364c847512e2528efdadf72a97a9",
-	"0xfda7a5ecd561af6a17506a686ad0a648857dcc14",
-	"0x80fa4ab88378853d97e30a9f002b084b1a4efd00",
-	"0x8798093380deea4af4007b8e874643c61ea2dae8",
 	"0x09200b963c52d3297a93af71f919e7829c53cf9a",
 	"0x37530eef6290a0be43d481e8feb5597c3a05f03e",
 	"0x495f947276749ce646f68ac8c248420045cb7b5e",
+	"0x4bea754665a141bf4837e743f8ca08507e8afb01",
+	"0x5e30b1d6f920364c847512e2528efdadf72a97a9",
+	"0x80fa4ab88378853d97e30a9f002b084b1a4efd00",
+	"0x8798093380deea4af4007b8e874643c61ea2dae8",
+	"0xfda7a5ecd561af6a17506a686ad0a648857dcc14",
 }
 
 type Provider struct {
@@ -299,7 +300,7 @@ func (p *Provider) GetContractsCreatedOnSharedContract(ctx context.Context, wall
 			WithResultCh(assetsChan),
 			WithSortAsc(),
 			WithCaching(p.cache),
-			WithFromLastCursor(),
+			// WithFromLastCursor(),
 		)
 	}()
 	return assetsToGroups(ctx, assetsChan, p.ethClient)
@@ -435,7 +436,7 @@ func DefaultArgs() QueryOptions {
 	return QueryOptions{
 		outCh:    make(chan assetsReceieved),
 		sortAsc:  false,
-		pageSize: 50,
+		pageSize: 200,
 	}
 }
 
@@ -610,11 +611,12 @@ func streamAssetsForCollectionEditor(ctx context.Context, editorAddress persist.
 	url := baseURL.JoinPath("assets")
 	setPagingParams(url, args.sortAsc, args.pageSize)
 	setCollectionEditor(url, editorAddress)
-	setCursor(ctx, url, args.cache)
 	// Filter for only the Shared Storefront Address
 	for _, address := range sharedStoreFrontAddresses {
 		addContractAddress(url, address)
 	}
+	// setCursor should be called last when all the query params have been added
+	setCursor(ctx, url, args.cache)
 	paginateAssets(ctx, authRequest(ctx, url.String()), args.sortAsc, args.outCh, args.cache)
 }
 
@@ -654,8 +656,39 @@ func assetsToGroups(ctx context.Context, assetsChan <-chan assetsReceieved, ethC
 			}
 
 			token, err := assetToToken(asset, persist.BlockNumber(block), persist.Address(asset.Owner.Address))
-			if err != nil {
+			var unknownSchemaErr unknownContractSchemaError
+
+			if errors.As(err, &unknownSchemaErr) {
 				logger.For(ctx).Error(err)
+				continue
+			}
+
+			if err != nil {
+				return nil, err
+			}
+
+			// Work-around because OS doesn't return the owner address for some reason
+			// All OS shared contracts are ERC1155 so this would involve find all owners
+			// that have a balance and creating a token with the correct balance per user
+			if token.OwnerAddress == "" {
+				var ownerAddress persist.EthereumAddress
+				var err error
+
+				switch token.TokenType {
+				case persist.TokenTypeERC721:
+					ownerAddress, err = rpc.RetryGetOwnerOfERC721Token(ctx, persist.EthereumAddress(token.ContractAddress), token.TokenID, ethClient)
+				case persist.TokenTypeERC1155:
+					panic("not implemented")
+				}
+
+				if err != nil {
+					logger.For(ctx).Error(err)
+				}
+
+				token.OwnerAddress = persist.Address(ownerAddress)
+			}
+
+			if token.OwnerAddress == "" {
 				continue
 			}
 
@@ -675,6 +708,14 @@ func assetsToGroups(ctx context.Context, assetsChan <-chan assetsReceieved, ethC
 	return children, nil
 }
 
+type unknownContractSchemaError struct {
+	schema string
+}
+
+func (e unknownContractSchemaError) Error() string {
+	return fmt.Sprintf("unknown token type: %s", e.schema)
+}
+
 func tokenTypeFromAsset(asset Asset) (persist.TokenType, error) {
 	switch asset.Contract.ContractSchemaName {
 	case "ERC721", "CRYPTOPUNKS":
@@ -682,7 +723,7 @@ func tokenTypeFromAsset(asset Asset) (persist.TokenType, error) {
 	case "ERC1155":
 		return persist.TokenTypeERC1155, nil
 	default:
-		return "", fmt.Errorf("unknown token type: %s", asset.Contract.ContractSchemaName)
+		return "", unknownContractSchemaError{asset.Contract.ContractSchemaName.String()}
 	}
 }
 
@@ -759,8 +800,16 @@ func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsCha
 					}
 
 					token, err := assetToToken(nft, persist.BlockNumber(block), tokenOwner)
-					if err != nil {
+
+					var unknownSchemaErr unknownContractSchemaError
+
+					if errors.As(err, &unknownSchemaErr) {
 						logger.For(ctx).Error(err)
+						return
+					}
+
+					if err != nil {
+						errChan <- err
 						return
 					}
 
@@ -883,9 +932,8 @@ func paginateAssets(ctx context.Context, req *http.Request, sortAsc bool, outCh 
 
 		lastCursor = cursor
 		query := req.URL.Query()
-		query.Set("cursor", assets.Next)
+		query.Set("cursor", cursor)
 		req.URL.RawQuery = query.Encode()
-		logger.For(ctx).Debugf("querying opensea for assets: %s", req.URL.String())
 	}
 }
 
@@ -951,6 +999,11 @@ func setCursor(ctx context.Context, url *url.URL, cache *redis.Cache) {
 }
 
 func storeCursor(ctx context.Context, url *url.URL, cache *redis.Cache, cursor string) error {
-	key := fmt.Sprintf("provider:opensea:cursor:%s", url.String())
+	// Remove cursor from the url because the url is used as the cache key
+	urlCopy := *url
+	query := urlCopy.Query()
+	query.Del("cursor")
+	urlCopy.RawQuery = query.Encode()
+	key := fmt.Sprintf("provider:opensea:cursor:%s", urlCopy.String())
 	return cache.Set(ctx, key, []byte(cursor), 0)
 }

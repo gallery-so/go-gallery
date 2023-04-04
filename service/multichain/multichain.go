@@ -85,18 +85,15 @@ type ChainAgnosticAddressAtBlock struct {
 	Block   persist.BlockNumber `json:"block"`
 }
 
-func (c ChainAgnosticAddressAtBlock) ToAddressAtBlock() persist.AddressAtBlock {
-	return persist.AddressAtBlock{Address: c.Address, Block: c.Block}
-}
-
 // ChainAgnosticContract is a contract that is agnostic to the chain it is on
 type ChainAgnosticContract struct {
-	Address        persist.Address     `json:"address"`
-	Symbol         string              `json:"symbol"`
-	Name           string              `json:"name"`
-	Description    string              `json:"description"`
-	CreatorAddress persist.Address     `json:"creator_address"`
-	LatestBlock    persist.BlockNumber `json:"latest_block"`
+	Address        persist.Address `json:"address"`
+	Symbol         string          `json:"symbol"`
+	Name           string          `json:"name"`
+	Description    string          `json:"description"`
+	CreatorAddress persist.Address `json:"creator_address"`
+
+	LatestBlock persist.BlockNumber `json:"latest_block"`
 }
 
 // ChainAgnosticIdentifiers identify tokens despite their chain
@@ -611,7 +608,6 @@ func addressToUser(c []userIDToUser) map[persist.Address]persist.User {
 }
 
 // SyncTokensCreatedOnSharedContracts queries each provider to identify contracts created by the given user.
-// This thing is broken because OpenSea's API does not return ownership information for their assets so we don't know what wallets own which tokens
 func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userID persist.DBID, chains []persist.Chain, includeAll bool) error {
 	user, err := p.Repos.UserRepository.GetByID(ctx, userID)
 	if err != nil {
@@ -714,6 +710,9 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 			tokenToChildContractLookup[tID] = child.ChildID
 		}
 	}
+	// NOTE: OpenSea's API currently doesn't return owner information, so inserting tokens will currently fail
+	// because of the non-null contrainst on the owned_by_wallets_column. A workaround is to only update
+	// tokens that already existed in the database, rather than also inserting new ones.
 	for ownerAddress, tokens := range ownerAddressToTokens {
 		for _, token := range tokens {
 			tID := persist.NewTokenIdentifiers(tokenDBIDsToParentAddress[token.ID], token.TokenID, token.Chain)
@@ -1559,7 +1558,7 @@ func tokenHoldersToTokenHolders(ctx context.Context, owners []persist.TokenHolde
 func fromMultichainToAddressAtBlock(addresses []ChainAgnosticAddressAtBlock) []persist.AddressAtBlock {
 	res := make([]persist.AddressAtBlock, len(addresses))
 	for i, addr := range addresses {
-		res[i] = addr.ToAddressAtBlock()
+		res[i] = persist.AddressAtBlock{Address: addr.Address, Block: addr.Block}
 	}
 	return res
 }

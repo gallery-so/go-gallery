@@ -194,12 +194,12 @@ const countSharedFollows = `-- name: CountSharedFollows :one
 select count(*)
 from users, follows a, follows b
 where a.follower = $1
-  and a.followee = b.follower
-  and b.followee = $2
-  and users.id = b.follower
-  and a.deleted = false
-  and b.deleted = false
-  and users.deleted = false
+	and a.followee = b.follower
+	and b.followee = $2
+	and users.id = b.follower
+	and a.deleted = false
+	and b.deleted = false
+	and users.deleted = false
 `
 
 type CountSharedFollowsParams struct {
@@ -3500,9 +3500,9 @@ edit_events as (
 select users.id
 from viewers, galleries, users, edit_events
 where viewers.gallery_id = galleries.id
-  and galleries.owner_user_id = users.id
-  and users.deleted = false
-  and galleries.deleted = false
+	and galleries.owner_user_id = users.id
+	and users.deleted = false
+	and galleries.deleted = false
   and users.id = edit_events.actor_id
 group by users.id
 order by row_number() over(order by sum(viewers.viewer_count) desc, max(users.created_at) desc) asc
