@@ -672,9 +672,8 @@ type CreateUserPayload struct {
 func (CreateUserPayload) IsCreateUserPayloadOrError() {}
 
 type CreatedCommunitiesInput struct {
-	IncludeAllChains      *bool           `json:"includeAllChains"`
-	Chains                []persist.Chain `json:"chains"`
-	IncludeSubCommunities bool            `json:"includeSubCommunities"`
+	IncludeAllChains *bool           `json:"includeAllChains"`
+	Chains           []persist.Chain `json:"chains"`
 }
 
 type DebugAuth struct {

@@ -796,6 +796,9 @@ func (api UserAPI) CreatedCommunities(ctx context.Context, userID persist.DBID, 
 		return nil, PageInfo{}, err
 	}
 
+	// TODO: This should be moved into a mutation rather than done here in the resolver
+	// The user would first sync their created tokens and contracts first, making it available
+	// for other users to query for
 	err := api.multichainProvider.SyncTokensCreatedOnSharedContracts(ctx, userID, chains, includeAllChains)
 	if err != nil {
 		return nil, PageInfo{}, err
@@ -841,6 +844,9 @@ func (api UserAPI) CreatedCommunities(ctx context.Context, userID persist.DBID, 
 	}
 
 	results, pageInfo, err := paginator.paginate(before, after, first, last)
+	if err != nil {
+		return nil, PageInfo{}, err
+	}
 
 	contracts := make([]db.Contract, len(results))
 	for i, result := range results {

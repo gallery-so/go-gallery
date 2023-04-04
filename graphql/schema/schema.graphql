@@ -146,7 +146,6 @@ input CreatedCommunitiesInput {
   # When true, return all communities from all chains. Ignores the "chains" argument.
   includeAllChains: Boolean
   chains: [Chain!]
-  includeSubCommunities: Boolean!
 }
 
 type Badge {

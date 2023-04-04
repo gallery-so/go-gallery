@@ -948,8 +948,8 @@ order by case when sqlc.arg('paging_forward')::bool then (a.displayed, b.display
 limit sqlc.arg('limit');
 
 -- name: GetCreatedContractsBatchPaginate :batchmany
-select c.*
-from users, contracts c, wallets w
+select contracts.*
+from users, contracts contracts, wallets
 where users.id = @user_id
   and wallets.id = any(users.wallets)
   and contracts.creator_address = wallets.address
@@ -958,10 +958,10 @@ where users.id = @user_id
   and users.deleted = false
   and contracts.deleted = false
   and wallets.deleted = false
-  and (c.created_at, c.id) > (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-  and (c.created_at, c.id) < ( sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
-order by case when sqlc.arg('paging_forward')::bool then (c.created_at, c.id) end asc,
-        case when not sqlc.arg('paging_forward')::bool then (c.created_at, c.id) end desc
+  and (contracts.created_at, contracts.id) > (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+  and (contracts.created_at, contracts.id) < ( sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+order by case when sqlc.arg('paging_forward')::bool then (contracts.created_at, contracts.id) end asc,
+        case when not sqlc.arg('paging_forward')::bool then (contracts.created_at, contracts.id) end desc
 limit sqlc.arg('limit');
 
 -- name: CountSharedContracts :one

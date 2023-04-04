@@ -877,8 +877,8 @@ func (b *GetContractsDisplayedByUserIDBatchBatchResults) Close() error {
 }
 
 const getCreatedContractsBatchPaginate = `-- name: GetCreatedContractsBatchPaginate :batchmany
-select c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.parent_id
-from users, contracts c, wallets w
+select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.parent_id
+from users, contracts contracts, wallets
 where users.id = $1
   and wallets.id = any(users.wallets)
   and contracts.creator_address = wallets.address
@@ -887,10 +887,10 @@ where users.id = $1
   and users.deleted = false
   and contracts.deleted = false
   and wallets.deleted = false
-  and (c.created_at, c.id) > ($3, $4)
-  and (c.created_at, c.id) < ( $5, $6)
-order by case when $7::bool then (c.created_at, c.id) end asc,
-        case when not $7::bool then (c.created_at, c.id) end desc
+  and (contracts.created_at, contracts.id) > ($3, $4)
+  and (contracts.created_at, contracts.id) < ( $5, $6)
+order by case when $7::bool then (contracts.created_at, contracts.id) end asc,
+        case when not $7::bool then (contracts.created_at, contracts.id) end desc
 limit $8
 `
 

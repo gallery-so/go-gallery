@@ -99,16 +99,6 @@ type ChainAgnosticContract struct {
 	LatestBlock    persist.BlockNumber `json:"latest_block"`
 }
 
-// ChildContract represents a subset of tokens within a contract, identified by a slug
-type ChildContract struct {
-	ChildID        string // Uniquely identifies a child contract within a parent contract
-	Name           string
-	Description    string
-	CreatorAddress persist.Address
-	ParentContract ChainAgnosticContract
-	Tokens         []ChainAgnosticToken
-}
-
 // ChainAgnosticIdentifiers identify tokens despite their chain
 type ChainAgnosticIdentifiers struct {
 	ContractAddress persist.Address `json:"contract_address"`
@@ -488,6 +478,17 @@ outer:
 	return err
 }
 
+// ChildContract represents a subset of tokens within a contract, identified by a unique ID
+type ChildContract struct {
+	ChildID        string // Uniquely identifies a child contract within a parent contract
+	Name           string
+	Description    string
+	CreatorAddress persist.Address
+	ParentContract ChainAgnosticContract
+	Tokens         []ChainAgnosticToken
+}
+
+// ChildContractResult is the result of a child contract query from a provider
 type ChildContractResult struct {
 	Priority       int
 	Chain          persist.Chain
@@ -527,51 +528,69 @@ type combinedChildContractResults []ChildContractResult
 
 // ParentContracts returns all umbrella contracts across all providers
 func (c combinedChildContractResults) ParentContracts() []persist.ContractGallery {
-	contracts := make([]chainContracts, 0, len(c))
-	for i, p := range c {
-		contracts[i] = p.ParentContracts()
+	contracts := make([]chainContracts, 0)
+	for _, p := range c {
+		contracts = append(contracts, p.ParentContracts())
 	}
 	return contractsToNewDedupedContracts(contracts)
 }
 
 // ChildContracts returns all child contracts across all providers
+// We don't dedupe because we don't expect the same child contract to be returned by multiple providers
 func (c combinedChildContractResults) ChildContracts() []ChildContract {
 	contracts := make([]ChildContract, 0)
 	for _, p := range c {
 		contracts = append(contracts, p.ChildContracts...)
 	}
-	// TODO: We may want to dedupe across providers here, but its unlikely that
-	// the same child contract will be returned by different providers
 	return contracts
 }
 
 // TokensByOwnerAddress groups tokens by owner address across all providers
-func (c combinedChildContractResults) TokensByOwnerAddress() map[persist.Address][]chainTokens {
-	tokensByOwner := make(map[persist.Address][]chainTokens)
-	for _, p := range c {
-		for _, token := range p.Tokens().tokens {
+func (c combinedChildContractResults) TokensByOwnerAddress(addressToUser map[persist.Address]persist.User) (ownerAddressToTokens map[persist.Address][]persist.TokenGallery, tokenDBIDsToContract map[persist.DBID]persist.Address) {
+	chainTokensByOwner := make(map[persist.Address][]chainTokens)
+	tokensByOwner := make(map[persist.Address][]persist.TokenGallery)
+	tokenDBIDsToAddress := make(map[persist.DBID]persist.Address)
+
+	for _, provider := range c.Tokens() {
+		for _, token := range provider.tokens {
 			// This is a little inefficient to create a chainTokens of only one token,
 			// but we don't expect to have many tokens per owner
-			tokensByOwner[token.OwnerAddress] = append(tokensByOwner[token.OwnerAddress], chainTokens{
-				priority: p.Priority,
-				chain:    p.Chain,
+			chainTokensByOwner[token.OwnerAddress] = append(chainTokensByOwner[token.OwnerAddress], chainTokens{
+				priority: provider.priority,
+				chain:    provider.chain,
 				tokens:   []ChainAgnosticToken{token},
 			})
-			tokensByOwner[token.OwnerAddress] = tokensToNewDedupedTokens(
-				tokensByOwner[token.OwnerAddress],
-				// This arg is used to add the DBID of the contract on the token
-				[]persist.Contract{}, 
-				nil,
-			)
 		}
 	}
-	return tokensByOwner
+
+	for ownerAddress, chainTokens := range chainTokensByOwner {
+		dedupedTokens, dbidToAddress := tokensToNewDedupedTokens(
+			chainTokens,
+			// This arg is used to add the DBID of the contract to the token
+			// but since we're inserting the contracts and tokens in the same query
+			// the contract ID can be left blank
+			[]persist.ContractGallery{},
+			addressToUser[ownerAddress],
+		)
+
+		// This is a lookup of DBID to address because converting
+		// the token to a persist.TokenGallery in the deduping step
+		// will lose the contract address because the contract's DBID is used instead
+		for dbid, address := range dbidToAddress {
+			tokenDBIDsToAddress[dbid] = address
+		}
+
+		tokensByOwner[ownerAddress] = dedupedTokens
+	}
+
+	return tokensByOwner, tokenDBIDsToAddress
 }
 
+// Tokens returns all tokens across all providers
 func (c combinedChildContractResults) Tokens() []chainTokens {
-	tokens := make([]chainTokens, 0, len(c))
-	for i, p := range c {
-		tokens[i] = p.Tokens()
+	tokens := make([]chainTokens, 0)
+	for _, p := range c {
+		tokens = append(tokens, p.Tokens())
 	}
 	return tokens
 }
@@ -592,6 +611,7 @@ func addressToUser(c []userIDToUser) map[persist.Address]persist.User {
 }
 
 // SyncTokensCreatedOnSharedContracts queries each provider to identify contracts created by the given user.
+// This thing is broken because OpenSea's API does not return ownership information for their assets so we don't know what wallets own which tokens
 func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userID persist.DBID, chains []persist.Chain, includeAll bool) error {
 	user, err := p.Repos.UserRepository.GetByID(ctx, userID)
 	if err != nil {
@@ -654,8 +674,13 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 		return err
 	}
 
-	addressToChain := make(map[persist.Address]persist.Chain)
-	userLookup := addressToUser(createUserResult)
+	// Creating a bunch of lookups to make the upsert query easier to write
+	// The code below is pretty hacky and probably should be refactored...
+	addressToChainLookup := make(map[persist.Address]persist.Chain)
+	addressToUserLookup := addressToUser(createUserResult)
+	ownerAddressToTokens, tokenDBIDsToParentAddress := combinedResult.TokensByOwnerAddress(addressToUserLookup)
+	tokenToChildContractLookup := make(map[persist.TokenIdentifiers]string)
+
 	params := db.UpsertCreatedTokensParams{}
 	now := time.Now()
 
@@ -671,10 +696,10 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 		params.ParentContractCreatorAddress = append(params.ParentContractCreatorAddress, contract.CreatorAddress.String())
 		params.ParentContractChain = append(params.ParentContractChain, int32(contract.Chain))
 		params.ParentContractDescription = append(params.ParentContractDescription, contract.Description.String())
-		addressToChain[contract.Address] = contract.Chain
+		addressToChainLookup[contract.Address] = contract.Chain
 	}
 	for _, child := range combinedResult.ChildContracts() {
-		chain := addressToChain[child.ParentContract.Address]
+		chain := addressToChainLookup[child.ParentContract.Address]
 		params.ChildContractID = append(params.ChildContractID, persist.GenerateID().String())
 		params.ChildContractDeleted = append(params.ChildContractDeleted, false)
 		params.ChildContractCreatedAt = append(params.ChildContractCreatedAt, now)
@@ -684,52 +709,49 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 		params.ChildContractChain = append(params.ChildContractChain, int32(chain))
 		params.ChildContractDescription = append(params.ChildContractDescription, child.Description)
 		params.ChildContractParentAddress = append(params.ChildContractParentAddress, child.ParentContract.Address.String())
+		for _, token := range child.Tokens {
+			tID := persist.NewTokenIdentifiers(child.ParentContract.Address, token.TokenID, addressToChainLookup[child.ParentContract.Address])
+			tokenToChildContractLookup[tID] = child.ChildID
+		}
 	}
-
-	// Result can be all created shared tokens for all platforms
-	// can be duplicated within a platform
-	// i.e. a user has two erc1155s
-	// should groupo tokens by user instead
-	for _, result := range combinedResult.Tokens() {
-		for _, token := range result.tokens {
-			owner := userLookup[token.OwnerAddress]
+	for ownerAddress, tokens := range ownerAddressToTokens {
+		for _, token := range tokens {
+			tID := persist.NewTokenIdentifiers(tokenDBIDsToParentAddress[token.ID], token.TokenID, token.Chain)
+			owner := addressToUserLookup[ownerAddress]
+			childContractAddress := tokenToChildContractLookup[tID]
 			params.TokenID = append(params.TokenID, persist.GenerateID().String())
 			params.TokenDeleted = append(params.TokenDeleted, false)
 			params.TokenCreatedAt = append(params.TokenCreatedAt, now)
-			params.TokenName = append(params.TokenName, token.Name)
-			params.TokenDescription = append(params.TokenDescription, token.Description)
+			params.TokenName = append(params.TokenName, token.Name.String())
+			params.TokenDescription = append(params.TokenDescription, token.Description.String())
 			params.TokenTokenType = append(params.TokenTokenType, token.TokenType.String())
 			params.TokenTokenID = append(params.TokenTokenID, token.TokenID.String())
-			// TODO Maybe need to fix this
 			params.TokenQuantity = append(params.TokenQuantity, token.Quantity.String())
-			postgres.AppendAddressAtBlock(&params.TokenOwnershipHistory, fromMultichainToAddressAtBlock(token.OwnershipHistory), &params.TokenOwnershipHistoryStartIdx, &params.TokenOwnershipHistoryEndIdx, &errors)
-			params.TokenExternalUrl = append(params.TokenExternalUrl, token.ExternalURL)
+			postgres.AppendAddressAtBlock(&params.TokenOwnershipHistory, token.OwnershipHistory, &params.TokenOwnershipHistoryStartIdx, &params.TokenOwnershipHistoryEndIdx, &errors)
+			params.TokenExternalUrl = append(params.TokenExternalUrl, token.ExternalURL.String())
 			params.TokenBlockNumber = append(params.TokenBlockNumber, token.BlockNumber.BigInt().Int64())
 			params.TokenOwnerUserID = append(params.TokenOwnerUserID, owner.ID.String())
-			for _, wallet := range owner.Wallets {
-				if wallet.Address == token.OwnerAddress {
-				}
-			}
-			// Need lookup of owner address to wallet ID
-			// TODO Need to fix this
-			// XXX postgres.AppendWalletList(&params.TokenOwnedByWallets, token.OwnedByWallets, &params.TokenOwnedByWalletsStartIdx, &params.TokenOwnedByWalletsEndIdx, &errors)
-			params.TokenChain = append(params.TokenChain, int32(result.chain))
-			params.TokenIsProviderMarkedSpam = append(params.TokenIsProviderMarkedSpam, util.GetOptionalValue(token.IsSpam, false))
+			postgres.AppendWalletList(&params.TokenOwnedByWallets, token.OwnedByWallets, &params.TokenOwnedByWalletsStartIdx, &params.TokenOwnedByWalletsEndIdx)
+			params.TokenChain = append(params.TokenChain, int32(token.Chain))
+			params.TokenIsProviderMarkedSpam = append(params.TokenIsProviderMarkedSpam, util.GetOptionalValue(token.IsProviderMarkedSpam, false))
 			params.TokenLastSynced = append(params.TokenLastSynced, now)
-			params.TokenContractAddress = append(params.TokenContractAddress, token.ContractAddress.String())
+			params.TokenParentContractAddress = append(params.TokenParentContractAddress, tokenDBIDsToParentAddress[token.ID].String())
+			params.TokenChildContractAddress = append(params.TokenChildContractAddress, childContractAddress)
 		}
 	}
 
-	_, err = p.Queries.UpsertCreatedTokens(ctx, params)
+	if len(errors) > 0 {
+		return errors[0]
+	}
+
+	insertedTokens, err := p.Queries.UpsertCreatedTokens(ctx, params)
+	logger.For(ctx).Debugf("inserted tokens: %d", len(insertedTokens))
 
 	return err
 }
 
 func (p *Provider) prepTokensForTokenProcessing(ctx context.Context, tokensFromProviders []chainTokens, contracts []persist.ContractGallery, user persist.User) ([]persist.TokenGallery, map[persist.TokenIdentifiers]bool, error) {
-	providerTokens, err := tokensToNewDedupedTokens(tokensFromProviders, contracts, user)
-	if err != nil {
-		return nil, nil, err
-	}
+	providerTokens, _ := tokensToNewDedupedTokens(tokensFromProviders, contracts, user)
 
 	currentTokens, err := p.Repos.TokenRepository.GetByUserID(ctx, user.ID, 0, 0)
 	if err != nil {
@@ -816,12 +838,14 @@ func (p *Provider) processTokensForOwnersOfContract(ctx context.Context, contrac
 	return nil
 }
 
+// AddTokensToUser will append to a user's existing tokens
 func (p *Provider) AddTokensToUser(ctx context.Context, tokensFromProviders []chainTokens, contracts []persist.ContractGallery, user persist.User, chains []persist.Chain) ([]persist.TokenGallery, error) {
-	return p.processTokensForUser(ctx, tokensFromProviders, contracts, user, chains, false)
+	return p.processTokensForUser(ctx, tokensFromProviders, contracts, user, chains, true)
 }
 
+// ReplaceTokensForUser will replace a user's existing tokens with the new tokens
 func (p *Provider) ReplaceTokensForUser(ctx context.Context, tokensFromProviders []chainTokens, contracts []persist.ContractGallery, user persist.User, chains []persist.Chain) ([]persist.TokenGallery, error) {
-	return p.processTokensForUser(ctx, tokensFromProviders, contracts, user, chains, true)
+	return p.processTokensForUser(ctx, tokensFromProviders, contracts, user, chains, false)
 }
 
 func (p *Provider) processTokensForUser(ctx context.Context, tokensFromProviders []chainTokens, contracts []persist.ContractGallery, user persist.User, chains []persist.Chain, skipDelete bool) ([]persist.TokenGallery, error) {
@@ -1362,13 +1386,15 @@ func (d *Provider) processContracts(ctx context.Context, contractsFromProviders 
 	return d.Repos.ContractRepository.BulkUpsert(ctx, newContracts)
 }
 
-func tokensToNewDedupedTokens(tokens []chainTokens, contracts []persist.ContractGallery, ownerUser persist.User) ([]persist.TokenGallery, error) {
+func tokensToNewDedupedTokens(tokens []chainTokens, contracts []persist.ContractGallery, ownerUser persist.User) ([]persist.TokenGallery, map[persist.DBID]persist.Address) {
 	contractAddressDBIDs := contractAddressToDBID(contracts)
 	seenTokens := make(map[persist.TokenIdentifiers]persist.TokenGallery)
 
 	seenWallets := make(map[persist.TokenIdentifiers][]persist.Wallet)
 	seenQuantities := make(map[persist.TokenIdentifiers]persist.HexString)
 	addressToWallets := make(map[string]persist.Wallet)
+	tokenDBIDToAddress := make(map[persist.DBID]persist.Address)
+
 	for _, wallet := range ownerUser.Wallets {
 		// could a normalized address ever overlap with the normalized address of another chain?
 		normalizedAddress := wallet.Chain.NormalizeAddress(wallet.Address)
@@ -1391,6 +1417,7 @@ func tokensToNewDedupedTokens(tokens []chainTokens, contracts []persist.Contract
 			existingToken, seen := seenTokens[ti]
 
 			candidateToken := persist.TokenGallery{
+				ID:                   persist.GenerateID(),
 				Media:                token.Media,
 				TokenType:            token.TokenType,
 				Chain:                chainToken.chain,
@@ -1432,12 +1459,13 @@ func tokensToNewDedupedTokens(tokens []chainTokens, contracts []persist.Contract
 				seenWallets[ti] = dedupeWallets(seenWallets[ti])
 			}
 
-			ownership := fromMultichainToAddressAtBlock(token.OwnershipHistory)
 			seenToken := seenTokens[ti]
+			ownership := fromMultichainToAddressAtBlock(token.OwnershipHistory)
 			seenToken.OwnershipHistory = ownership
 			seenToken.OwnedByWallets = seenWallets[ti]
 			seenToken.Quantity = seenQuantities[ti]
 			seenTokens[ti] = seenToken
+			tokenDBIDToAddress[seenTokens[ti].ID] = ti.ContractAddress
 		}
 	}
 
@@ -1460,8 +1488,7 @@ func tokensToNewDedupedTokens(tokens []chainTokens, contracts []persist.Contract
 		res[i] = t
 		i++
 	}
-
-	return res, nil
+	return res, tokenDBIDToAddress
 }
 
 func contractsToNewDedupedContracts(contracts []chainContracts) []persist.ContractGallery {

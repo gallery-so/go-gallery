@@ -6588,7 +6588,6 @@ input CreatedCommunitiesInput {
   # When true, return all communities from all chains. Ignores the "chains" argument.
   includeAllChains: Boolean
   chains: [Chain!]
-  includeSubCommunities: Boolean!
 }
 
 type Badge {
@@ -45457,7 +45456,7 @@ func (ec *executionContext) unmarshalInputCreatedCommunitiesInput(ctx context.Co
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"includeAllChains", "chains", "includeSubCommunities"}
+	fieldsInOrder := [...]string{"includeAllChains", "chains"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -45477,14 +45476,6 @@ func (ec *executionContext) unmarshalInputCreatedCommunitiesInput(ctx context.Co
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chains"))
 			it.Chains, err = ec.unmarshalOChain2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainᚄ(ctx, v)
-			if err != nil {
-				return it, err
-			}
-		case "includeSubCommunities":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("includeSubCommunities"))
-			it.IncludeSubCommunities, err = ec.unmarshalNBoolean2bool(ctx, v)
 			if err != nil {
 				return it, err
 			}

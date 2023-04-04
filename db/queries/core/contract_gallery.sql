@@ -19,7 +19,7 @@ do update set
   , name = excluded.name
   , creator_address = excluded.creator_address
   , description = excluded.description
-  , deleted = exlucded.deleted
+  , deleted = excluded.deleted
   , last_updated = now()
 returning *;
 
@@ -45,7 +45,7 @@ with parent_contracts_data(id, deleted, created_at, name, symbol, address, creat
     , unnest(@parent_contract_description::varchar[]) as description
 ),
 -- child_contracts_data is the data to be inserted for the child contract.
-child_contracts_data(id, deleted, created_at, name, address, creator_address, chain, description, parent_id) as (
+child_contracts_data(id, deleted, created_at, name, address, creator_address, chain, description, parent_address) as (
   select
     unnest(@child_contract_id::varchar[]) as id
     , unnest(@child_contract_deleted::boolean[]) as deleted
@@ -61,7 +61,30 @@ child_contracts_data(id, deleted, created_at, name, address, creator_address, ch
     , unnest(@child_contract_parent_address::varchar[]) as parent_address
 ),
 -- tokens_data is the data to be inserted for the tokens belonging to a child contract
-tokens_data(id, deleted, created_at, name, description, token_type, token_id, quantity, ownership_history, ownership_history_start_idx, ownership_history_end_idx, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_provider_marked_spam, last_synced) as (
+tokens_data(
+  id
+  , deleted
+  , created_at
+  , name
+  , description
+  , token_type
+  , token_id
+  , quantity
+  , ownership_history
+  , ownership_history_start_idx
+  , ownership_history_end_idx
+  , external_url
+  , block_number
+  , owner_user_id
+  , owned_by_wallets
+  , owned_by_wallets_start_idx
+  , owned_by_wallets_end_idx
+  , chain
+  , is_provider_marked_spam
+  , last_synced
+  , parent_contract_address
+  , child_contract_address
+) as (
   select
     unnest(@token_id::varchar[]) as id
     , unnest(@token_deleted::boolean[]) as deleted
@@ -83,8 +106,9 @@ tokens_data(id, deleted, created_at, name, description, token_type, token_id, qu
     , unnest(@token_chain::int[]) as chain
     , unnest(@token_is_provider_marked_spam::bool[]) as is_provider_marked_spam
     , unnest(@token_last_synced::timestamptz[]) as last_synced
-     -- This field is only used as condition of the join
-    , unnest(@token_contract_address::varchar[]) as contract_address
+     -- These fields are only used as condition of the join
+    , unnest(@token_parent_contract_address::varchar[]) as parent_contract_address
+    , unnest(@token_child_contract_address::varchar[]) as child_contract_address
 ),
 -- Insert parent contracts, returning the inserted or updated rows
 insert_parent_contracts as (
@@ -112,21 +136,20 @@ insert_parent_contracts as (
 ),
 -- Insert child contracts with reference to the parent contract, returning the inserted or updated rows
 insert_child_contracts as (
-  insert into contracts (id, deleted, created_at, name, address, creator_address, chain, description, parent_id)
+  insert into contracts(id, deleted, created_at, name, address, creator_address, chain, description, parent_id)
   (
-    select id
-      , deleted
-      , created_at
-      , name
-      , symbol
-      , address
-      , creator_address
-      , chain
-      , description
-      , parent_id
-    from child_contracts_data
+    select child.id
+      , child.deleted
+      , child.created_at
+      , child.name
+      , child.address
+      , child.creator_address
+      , child.chain
+      , child.description
+      , insert_parent_contracts.id
+    from child_contracts_data child
     -- Join on the inserted parent_contracts to get the parent's id
-    join insert_parent_contracts on child_contracts_data.chain = insert_parent_contracts.chain and child_contracts_data.parent_address = insert_parent_contracts.address
+    join insert_parent_contracts on child.chain = insert_parent_contracts.chain and child.parent_address = insert_parent_contracts.address
   )
   on conflict (chain, parent_id, address)
   do update set deleted = excluded.deleted
@@ -140,32 +163,50 @@ insert_child_contracts as (
 -- Note that media related columns (token_uri, token_metadata, media) is not inserted or updated here, because it is assumed
 -- that this data will be inserted later via tokenprocessing.
 -- User-scoped data (collectors_note, is_user_marked_spam) is also not updated here.
-insert into tokens(id, deleted, created_at, name, description, token_type, quantity, ownership_history, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_provider_marked_spam, last_synced, child_contract_id) (
+insert into tokens(
+  id
+  , deleted
+  , created_at
+  , name
+  , description
+  , token_type
+  , quantity
+  , token_id
+  , ownership_history
+  , external_url
+  , block_number
+  , owner_user_id
+  , owned_by_wallets
+  , chain
+  , contract
+  , is_provider_marked_spam
+  , last_synced
+  , child_contract_id
+) (
   select
-    id
-    , deleted 
-    , created_at
-    , last_updated
-    , name
-    , description
-    , token_type
-    , token_id
-    , quantity
-    , ownership_history[ownership_history_start_idx::int:ownership_history_end_idx::int]
-    , external_url
-    , block_number
-    , owner_user_id
-    , owned_by_wallets[owned_by_wallets_start_idx::int:owned_by_wallets_end_idx::int]
-    , chain
+    tokens_data.id
+    , tokens_data.deleted
+    , tokens_data.created_at
+    , tokens_data.name
+    , tokens_data.description
+    , tokens_data.token_type
+    , tokens_data.quantity
+    , tokens_data.token_id
+    , tokens_data.ownership_history[tokens_data.ownership_history_start_idx::int:tokens_data.ownership_history_end_idx::int]
+    , tokens_data.external_url
+    , tokens_data.block_number
+    , tokens_data.owner_user_id
+    , tokens_data.owned_by_wallets[tokens_data.owned_by_wallets_start_idx::int:tokens_data.owned_by_wallets_end_idx::int]
+    , tokens_data.chain
     , insert_parent_contracts.id
-    , is_provider_marked_spam
-    , last_synced
+    , tokens_data.is_provider_marked_spam
+    , tokens_data.last_synced
     , insert_child_contracts.id
   from tokens_data
   -- Join on the inserted parent contracts to get the parent's id
-  join insert_parent_contracts on tokens_data.chain = insert_child_contracts.chain and tokens_data.contract_address = insert_parent_contracts.address
+  join insert_parent_contracts on tokens_data.chain = insert_parent_contracts.chain and tokens_data.parent_contract_address = insert_parent_contracts.address
   -- Join on the inserted child contracts to get the child's id
-  join insert_child_contracts on tokens_data.chain = insert_child_contracts.chain and tokens_data.contract_address = insert_child_contracts.address
+  join insert_child_contracts on tokens_data.chain = insert_child_contracts.chain and tokens_data.child_contract_address = insert_child_contracts.address
 )
 on conflict (token_id, contract, chain, owner_user_id) where deleted = false
 do update set
@@ -179,7 +220,8 @@ do update set
   , ownership_history = tokens.ownership_history || excluded.ownership_history
   , external_url = excluded.external_url
   , block_number = excluded.block_number
-  , last_updated = excluded.last_updated
+  , last_updated = now()
   , is_provider_marked_spam = excluded.is_provider_marked_spam
   , last_synced = greatest(excluded.last_synced,tokens.last_synced)
+  , child_contract_id = excluded.child_contract_id
 returning *;
