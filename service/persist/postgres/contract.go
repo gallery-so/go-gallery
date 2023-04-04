@@ -11,10 +11,12 @@ import (
 
 // ContractRepository represents a contract repository in the postgres database
 type ContractRepository struct {
-	db                  *sql.DB
-	getByAddressStmt    *sql.Stmt
-	upsertByAddressStmt *sql.Stmt
-	updateByAddressStmt *sql.Stmt
+	db                          *sql.DB
+	getByAddressStmt            *sql.Stmt
+	upsertByAddressStmt         *sql.Stmt
+	updateByAddressStmt         *sql.Stmt
+	getMetadataByAddressStmt    *sql.Stmt
+	updateMetadataByAddressStmt *sql.Stmt
 }
 
 // NewContractRepository creates a new postgres repository for interacting with contracts
@@ -25,17 +27,44 @@ func NewContractRepository(db *sql.DB) *ContractRepository {
 	getByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,SYMBOL,NAME,LATEST_BLOCK,CREATOR_ADDRESS FROM contracts WHERE ADDRESS = $1 AND DELETED = false;`)
 	checkNoErr(err)
 
+	getMetadataByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,SYMBOL,NAME,LATEST_BLOCK,CREATOR_ADDRESS,CONTRACT_URI,CONTRACT_METADATA FROM contracts WHERE ADDRESS = $1 AND DELETED = false;`)
+	checkNoErr(err)
+
 	upsertByAddressStmt, err := db.PrepareContext(ctx, `INSERT INTO contracts (ID,VERSION,ADDRESS,SYMBOL,NAME,LATEST_BLOCK,CREATOR_ADDRESS) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (ADDRESS) DO UPDATE SET VERSION = $2,ADDRESS = $3,SYMBOL = $4,NAME = $5,LATEST_BLOCK = $6,CREATOR_ADDRESS = $7;`)
 	checkNoErr(err)
 
 	updateByAddressStmt, err := db.PrepareContext(ctx, `UPDATE contracts SET NAME = $2, SYMBOL = $3, CREATOR_ADDRESS = $4, LATEST_BLOCK = $5, LAST_UPDATED = $6 WHERE ADDRESS = $1;`)
 	checkNoErr(err)
 
-	return &ContractRepository{db: db, getByAddressStmt: getByAddressStmt, upsertByAddressStmt: upsertByAddressStmt, updateByAddressStmt: updateByAddressStmt}
+	updateMetadataByAddressStmt, err := db.PrepareContext(ctx, `UPDATE contracts SET NAME = $2, SYMBOL = $3, CREATOR_ADDRESS = $4, LATEST_BLOCK = $5, LAST_UPDATED = $6, CONTRACT_URI = $7, CONTRACT_METADATA = $8 WHERE ADDRESS = $1;`)
+	checkNoErr(err)
+
+	return &ContractRepository{db: db, getByAddressStmt: getByAddressStmt, upsertByAddressStmt: upsertByAddressStmt, updateByAddressStmt: updateByAddressStmt, getMetadataByAddressStmt: getMetadataByAddressStmt, updateMetadataByAddressStmt: updateMetadataByAddressStmt}
 }
 
 // GetByAddress returns the contract with the given address
 func (c *ContractRepository) GetByAddress(pCtx context.Context, pAddress persist.EthereumAddress) (persist.Contract, error) {
+	contract := persist.Contract{}
+	err := c.getByAddressStmt.QueryRowContext(pCtx, pAddress).Scan(&contract.ID, &contract.Version, &contract.CreationTime, &contract.LastUpdated, &contract.Address, &contract.Symbol, &contract.Name, &contract.LatestBlock, &contract.CreatorAddress)
+	if err != nil {
+		return persist.Contract{}, err
+	}
+
+	return contract, nil
+}
+
+func (c *ContractRepository) GetAllByAddress(pCtx context.Context, pAddress persist.EthereumAddress) (persist.Contract, error) {
+	contract := persist.Contract{}
+	err := c.getByAddressStmt.QueryRowContext(pCtx, pAddress).Scan(&contract.ID, &contract.Version, &contract.CreationTime, &contract.LastUpdated, &contract.Address, &contract.Symbol, &contract.Name, &contract.LatestBlock, &contract.CreatorAddress, &contract.ContractURI, &contract.ContractMetadata)
+	if err != nil {
+		return persist.Contract{}, err
+	}
+
+	return contract, nil
+}
+
+// GetByAddress returns the contract with the given address
+func (c *ContractRepository) GetMetadataByAddress(pCtx context.Context, pAddress persist.EthereumAddress) (persist.Contract, error) {
 	contract := persist.Contract{}
 	err := c.getByAddressStmt.QueryRowContext(pCtx, pAddress).Scan(&contract.ID, &contract.Version, &contract.CreationTime, &contract.LastUpdated, &contract.Address, &contract.Symbol, &contract.Name, &contract.LatestBlock, &contract.CreatorAddress)
 	if err != nil {
@@ -81,6 +110,13 @@ func (c *ContractRepository) BulkUpsert(pCtx context.Context, pContracts []persi
 // UpdateByAddress updates the given contract's metadata fields by its address field.
 func (c *ContractRepository) UpdateByAddress(ctx context.Context, addr persist.EthereumAddress, up persist.ContractUpdateInput) error {
 	if _, err := c.updateByAddressStmt.ExecContext(ctx, addr, up.Name, up.Symbol, up.CreatorAddress, up.LatestBlock, persist.LastUpdatedTime{}); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *ContractRepository) UpdateMetadataByAddress(ctx context.Context, addr persist.EthereumAddress, up persist.Contract) error {
+	if _, err := c.updateByAddressStmt.ExecContext(ctx, addr, up.Name, up.Symbol, up.CreatorAddress, up.LatestBlock, persist.LastUpdatedTime{}, up.ContractURI, up.ContractMetadata); err != nil {
 		return err
 	}
 	return nil

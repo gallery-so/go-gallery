@@ -20,8 +20,12 @@ type Contract struct {
 	Name           NullString      `json:"name"`
 	CreatorAddress EthereumAddress `json:"creator_address"`
 
-	LatestBlock BlockNumber `json:"latest_block"`
+	LatestBlock      BlockNumber      `json:"latest_block"`
+	ContractURI      NullString       `json:"contract_uri"`
+	ContractMetadata ContractMetadata `json:"contract_metadata"`
 }
+
+type ContractMetadata map[string]interface{}
 
 // ContractUpdateInput is the input for updating contract metadata fields
 type ContractUpdateInput struct {
