@@ -225,6 +225,26 @@ func MapKeys[T comparable, V any](m map[T]V) []T {
 	return result
 }
 
+func MapValues[T comparable, V any](m map[T]V) []V {
+	result := make([]V, 0, len(m))
+	for _, v := range m {
+		result = append(result, v)
+	}
+	return result
+}
+
+func AllEqual[T comparable](xs []T) bool {
+	if len(xs) == 0 {
+		return true
+	}
+	for _, x := range xs {
+		if x != xs[0] {
+			return false
+		}
+	}
+	return true
+}
+
 // Dedupe removes duplicate elements from a slice, preserving the order of the remaining elements.
 func Dedupe[T comparable](src []T, filterInPlace bool) []T {
 	var result []T
@@ -581,7 +601,10 @@ func IsNullOrEmpty(s sql.NullString) bool {
 	return !s.Valid || s.String == ""
 }
 
-func ToNullString(s string) sql.NullString {
+func ToNullString(s string, emptyIsNull bool) sql.NullString {
+	if emptyIsNull && s == "" {
+		return sql.NullString{String: "", Valid: false}
+	}
 	return sql.NullString{String: s, Valid: true}
 }
 
