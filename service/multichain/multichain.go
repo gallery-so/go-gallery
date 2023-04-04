@@ -219,6 +219,11 @@ var chainValidation map[persist.Chain]validation = map[persist.Chain]validation{
 		nameResolver:       true,
 		tokensOwnerFetcher: true,
 	},
+	persist.ChainOptimism: {
+		tokensOwnerFetcher:    true,
+		tokenMetadataFetcher:  true,
+		tokensContractFetcher: true,
+	},
 }
 
 type validation struct {
@@ -315,7 +320,7 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 
 	wg := sync.WaitGroup{}
 	for c, a := range chainsToAddresses {
-		logger.For(ctx).Infof("syncing tokens for user %s wallets %s", user.Username, a)
+		logger.For(ctx).Infof("syncing chain %d tokens for user %s wallets %s", c, user.Username, a)
 		chain := c
 		addresses := a
 		wg.Add(len(addresses))

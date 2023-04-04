@@ -275,9 +275,11 @@ func initSentry() {
 
 func NewMultichainProvider(c *Clients) *multichain.Provider {
 	ethChain := persist.ChainETH
-	overrides := multichain.ChainOverrideMap{persist.ChainPOAP: &ethChain}
-	alchemyProvider := alchemy.NewProvider(c.HTTPClient)
+	overrides := multichain.ChainOverrideMap{persist.ChainPOAP: &ethChain, persist.ChainOptimism: &ethChain, persist.ChainPolygon: &ethChain}
+	alchemyMainnetProvider := alchemy.NewProvider(persist.ChainETH, c.HTTPClient)
 	ethProvider := eth.NewProvider(env.GetString("INDEXER_HOST"), c.HTTPClient, c.EthClient, c.TaskClient)
+	alchemyOptimismProvider := alchemy.NewProvider(persist.ChainOptimism, c.HTTPClient)
+	alchemyPolygonProvider := alchemy.NewProvider(persist.ChainPolygon, c.HTTPClient)
 	openseaProvider := opensea.NewProvider(c.EthClient, c.HTTPClient)
 	tezosProvider := multichain.FallbackProvider{
 		Primary:  tezos.NewProvider(env.GetString("TEZOS_API_URL"), env.GetString("TOKEN_PROCESSING_URL"), env.GetString("IPFS_URL"), c.HTTPClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET")),
@@ -290,11 +292,13 @@ func NewMultichainProvider(c *Clients) *multichain.Provider {
 	cache := redis.NewCache(redis.CommunitiesDB)
 	return multichain.NewProvider(context.Background(), c.Repos, c.Queries, cache, c.TaskClient,
 		overrides,
-		alchemyProvider,
+		alchemyMainnetProvider,
 		ethProvider,
 		openseaProvider,
 		tezosProvider,
 		poapProvider,
+		alchemyOptimismProvider,
+		alchemyPolygonProvider,
 	)
 }
 
