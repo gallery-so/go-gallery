@@ -340,7 +340,7 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 								return
 							}
 
-							logger.For(ctx).Debugf("got %d tokens and %d contracts from provider %d", len(tokens), len(contracts), priority)
+							logger.For(ctx).Infof("got %d tokens and %d contracts from provider %d", len(tokens), len(contracts), priority)
 
 							incomingTokens <- chainTokens{chain: chain, tokens: tokens, priority: priority}
 							incomingContracts <- chainContracts{chain: chain, contracts: contracts, priority: priority}
@@ -362,10 +362,13 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 	tokensFromProviders := make([]chainTokens, 0, len(user.Wallets))
 	contractsFromProviders := make([]chainContracts, 0, len(user.Wallets))
 
+	discrepencyLog := map[int]int{}
+
 outer:
 	for {
 		select {
 		case incomingTokens := <-incomingTokens:
+			discrepencyLog[incomingTokens.priority] = len(incomingTokens.tokens)
 			tokensFromProviders = append(tokensFromProviders, incomingTokens)
 		case incomingContracts, ok := <-incomingContracts:
 			if !ok {
@@ -384,6 +387,10 @@ outer:
 				return err
 			}
 		}
+	}
+
+	if !util.AllEqual(util.MapValues(discrepencyLog)) {
+		logger.For(ctx).Debugf("discrepency: %+v", discrepencyLog)
 	}
 
 	addressToContract, err := p.processContracts(ctx, contractsFromProviders)
@@ -764,15 +771,18 @@ outer:
 				return err
 			}
 
+			name := util.ToNullString(contract.Name, true)
+
 			if err := p.Repos.ContractRepository.UpsertByAddress(ctx, ti.ContractAddress, ti.Chain, persist.ContractGallery{
 				Chain:        ti.Chain,
 				Address:      persist.Address(ti.Chain.NormalizeAddress(ti.ContractAddress)),
 				Symbol:       persist.NullString(contract.Symbol),
-				Name:         persist.NullString(contract.Name),
+				Name:         name,
 				OwnerAddress: contract.CreatorAddress,
 			}); err != nil {
 				return err
 			}
+
 		}
 
 	}
@@ -1233,7 +1243,7 @@ func contractsToNewDedupedContracts(ctx context.Context, contracts []chainContra
 	for _, chainContract := range contracts {
 		for _, contract := range chainContract.contracts {
 			if it, ok := seen[persist.NewChainAddress(contract.Address, chainContract.chain)]; ok {
-				if it.Name != "" {
+				if it.Name.String != "" {
 					continue
 				}
 			}
@@ -1241,7 +1251,7 @@ func contractsToNewDedupedContracts(ctx context.Context, contracts []chainContra
 				Chain:        chainContract.chain,
 				Address:      contract.Address,
 				Symbol:       persist.NullString(contract.Symbol),
-				Name:         persist.NullString(contract.Name),
+				Name:         util.ToNullString(contract.Name, true),
 				OwnerAddress: contract.CreatorAddress,
 			}
 			seen[persist.NewChainAddress(contract.Address, chainContract.chain)] = c

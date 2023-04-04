@@ -445,7 +445,7 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 	return multichain.ChainAgnosticContract{
 		Address:        persist.Address(contractMetadataResponse.Address),
 		Symbol:         contractMetadataResponse.ContractMetadata.Symbol,
-		Name:           contractMetadataResponse.ContractMetadata.Name,
+		Name:           questionContractNameWorkaround(contractMetadataResponse.ContractMetadata.Name),
 		CreatorAddress: persist.Address(contractMetadataResponse.ContractMetadata.ContractDeployer),
 	}, nil
 
@@ -643,7 +643,7 @@ func alchemyTokenToChainAgnosticToken(owner persist.EthereumAddress, token Token
 	return t, multichain.ChainAgnosticContract{
 		Address:        persist.Address(token.Contract.Address),
 		Symbol:         token.ContractMetadata.Symbol,
-		Name:           token.ContractMetadata.Name,
+		Name:           questionContractNameWorkaround(token.ContractMetadata.Name),
 		CreatorAddress: persist.Address(token.ContractMetadata.ContractDeployer),
 	}
 }
@@ -682,4 +682,11 @@ func alchemyTokenToMetadata(token Token) persist.TokenMetadata {
 		metadata["image_url"] = token.Metadata.Image
 	}
 	return metadata
+}
+
+func questionContractNameWorkaround(name string) string {
+	if strings.TrimSpace(strings.ReplaceAll(name, "?", "")) == "" {
+		return ""
+	}
+	return name
 }

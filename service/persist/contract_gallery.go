@@ -2,6 +2,7 @@ package persist
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 )
 
@@ -16,7 +17,7 @@ type ContractGallery struct {
 	Chain            Chain      `json:"chain"`
 	Address          Address    `json:"address"`
 	Symbol           NullString `json:"symbol"`
-	Name             NullString `json:"name"`
+	Name             sql.NullString `json:"name"`
 	Description      NullString `json:"description"`
 	OwnerAddress     Address    `json:"owner_address"`
 	ProfileImageURL  NullString `json:"profile_image_url"`

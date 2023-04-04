@@ -40,8 +40,8 @@ func (a TwitterAuthenticator) Authenticate(ctx context.Context) (*SocialAuthResu
 		ID:           persist.GenerateID(),
 		UserID:       a.UserID,
 		Provider:     persist.SocialProviderTwitter,
-		AccessToken:  util.ToNullString(access.AccessToken),
-		RefreshToken: util.ToNullString(access.RefreshToken),
+		AccessToken:  util.ToNullString(access.AccessToken, false),
+		RefreshToken: util.ToNullString(access.RefreshToken, false),
 	})
 	if err != nil {
 		return nil, err
