@@ -344,6 +344,106 @@ func GetMetadataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *
 
 }
 
+// GetMetadataFromURI parses and returns the NFT metadata for a given token URI
+func GetMetadataFromContractURI(ctx context.Context, curi persist.TokenURI, ipfsClient *shell.Shell, arweaveClient *goar.Client) (persist.ContractMetadata, error) {
+
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*2)
+	defer cancel()
+	var meta persist.ContractMetadata
+	err := DecodeMetadataFromContractURI(ctx, curi, &meta, ipfsClient, arweaveClient)
+	if err != nil {
+		return nil, err
+	}
+
+	return meta, nil
+
+}
+
+// DecodeMetadataFromURI calls URI and decodes the data into a metadata map
+func DecodeMetadataFromContractURI(ctx context.Context, curi persist.TokenURI, into *persist.ContractMetadata, ipfsClient *shell.Shell, arweaveClient *goar.Client) error {
+
+	d, _ := ctx.Deadline()
+	logger.For(ctx).Debugf("Getting metadata from URI: %s -timeout: %s", curi, time.Until(d))
+	asString := curi.String()
+
+	logger.For(ctx).Debugf("Getting metadata from %s with type %s", asString, curi.Type())
+
+	switch curi.Type() {
+	case persist.URITypeBase64JSON:
+		// decode the base64 encoded json
+		b64data := asString[strings.IndexByte(asString, ',')+1:]
+		decoded, err := base64.StdEncoding.DecodeString(string(b64data))
+		if err != nil {
+			return fmt.Errorf("error decoding base64 metadata: %s \n\n%s", err, b64data)
+		}
+
+		return json.Unmarshal(util.RemoveBOM(decoded), into)
+	case persist.URITypeBase64SVG:
+		b64data := asString[strings.IndexByte(asString, ',')+1:]
+		decoded, err := base64.StdEncoding.DecodeString(string(b64data))
+		if err != nil {
+			return fmt.Errorf("error decoding base64 metadata: %s \n\n%s", err, b64data)
+		}
+		*into = persist.ContractMetadata{"image": string(decoded)}
+		return nil
+	case persist.URITypeIPFS, persist.URITypeIPFSGateway:
+
+		bs, err := GetIPFSData(ctx, ipfsClient, util.GetURIPath(asString, false))
+		if err != nil {
+			return err
+		}
+		return json.Unmarshal(util.RemoveBOM(bs), into)
+	case persist.URITypeArweave:
+		path := strings.ReplaceAll(asString, "arweave://", "")
+		path = strings.ReplaceAll(path, "ar://", "")
+		result, err := GetArweaveData(arweaveClient, path)
+		if err != nil {
+			result, err = GetArweaveDataHTTP(ctx, path)
+			if err != nil {
+				return err
+			}
+		}
+		return json.Unmarshal(result, into)
+	case persist.URITypeHTTP:
+
+		req, err := http.NewRequestWithContext(ctx, "GET", asString, nil)
+		if err != nil {
+			return fmt.Errorf("error creating request: %s", err)
+		}
+		resp, err := defaultHTTPClient.Do(req)
+		if err != nil {
+			return fmt.Errorf("error getting metadata from http: %s", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode > 399 || resp.StatusCode < 200 {
+			return ErrHTTP{Status: resp.StatusCode, URL: asString}
+		}
+		return json.NewDecoder(resp.Body).Decode(into)
+	case persist.URITypeIPFSAPI:
+		parsedURL, err := url.Parse(asString)
+		if err != nil {
+			return err
+		}
+		query := parsedURL.Query().Get("arg")
+		it, err := ipfsClient.Cat(query)
+		if err != nil {
+			return err
+		}
+		defer it.Close()
+		return json.NewDecoder(it).Decode(into)
+	case persist.URITypeJSON, persist.URITypeSVG:
+		idx := strings.IndexByte(asString, '{')
+		if idx == -1 {
+			return json.Unmarshal(util.RemoveBOM([]byte(asString)), into)
+		}
+		return json.Unmarshal(util.RemoveBOM([]byte(asString[idx:])), into)
+
+	default:
+		return fmt.Errorf("unknown token URI type for metadata: %s", curi.Type())
+	}
+
+}
+
 // GetDataFromURI calls URI and returns the data
 func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shell.Shell, arweaveClient *goar.Client) ([]byte, error) {
 
@@ -814,6 +914,43 @@ func GetIPFSHeaders(ctx context.Context, path string) (contentType string, conte
 // GetHTTPHeaders returns the headers for the given URL
 func GetHTTPHeaders(ctx context.Context, url string) (contentType string, contentLength int64, err error) {
 	return getContentHeaders(ctx, url)
+}
+
+func GetContractURI(ctx context.Context, pTokenType persist.TokenType, pContractAddress persist.EthereumAddress, ethClient *ethclient.Client) (persist.TokenURI, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+	contractAddress := common.HexToAddress(string(pContractAddress))
+	switch pTokenType {
+	case persist.TokenTypeERC721:
+		instance, err := contracts.NewIERC721ContractURICaller(contractAddress, ethClient)
+		if err != nil {
+			return "", err
+		}
+		uri, err := instance.ContractURI(&bind.CallOpts{
+			Context: ctx,
+		})
+		return persist.TokenURI(strings.ReplaceAll(uri, "\x00", "")), nil
+	case persist.TokenTypeERC1155:
+		instance, err := contracts.NewIERC1155ContractURICaller(contractAddress, ethClient)
+		if err != nil {
+			return "", err
+		}
+		uri, err := instance.ContractURI(&bind.CallOpts{
+			Context: ctx,
+		})
+		return persist.TokenURI(strings.ReplaceAll(uri, "\x00", "")), nil
+	default:
+		if contractURI, err := GetContractURI(ctx, persist.TokenTypeERC721, pContractAddress, ethClient); err == nil {
+			return contractURI, nil
+		}
+
+		if contractURI, err := GetContractURI(ctx, persist.TokenTypeERC1155, pContractAddress, ethClient); err == nil {
+			return contractURI, nil
+		}
+
+		return "", fmt.Errorf("unsupported token type: %s", pTokenType)
+	}
+
 }
 
 // GetTokenURI returns metadata URI for a given token address.

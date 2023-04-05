@@ -21,7 +21,7 @@ type Contract struct {
 	CreatorAddress EthereumAddress `json:"creator_address"`
 
 	LatestBlock      BlockNumber      `json:"latest_block"`
-	ContractURI      NullString       `json:"contract_uri"`
+	ContractURI      TokenURI         `json:"contract_uri"`
 	ContractMetadata ContractMetadata `json:"contract_metadata"`
 }
 
