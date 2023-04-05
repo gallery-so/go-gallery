@@ -646,6 +646,9 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contr
 	for _, provider := range d.Chains[chain] {
 		if metadataFetcher, ok := provider.(tokenMetadataFetcher); ok {
 			metadata, err = metadataFetcher.GetTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: contractAddress, TokenID: tokenID}, ownerAddress)
+			if err != nil {
+				logger.For(ctx).Errorf("error fetching token metadata %s", err)
+			}
 			if err == nil && len(metadata) > 0 {
 				return metadata, nil
 			}
