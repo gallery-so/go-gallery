@@ -396,6 +396,7 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 		params.Quantity = append(params.Quantity, t.Quantity.String())
 		appendAddressAtBlock(&params.OwnershipHistory, t.OwnershipHistory, &params.OwnershipHistoryStartIdx, &params.OwnershipHistoryEndIdx, &errors)
 		appendJSONB(&params.Media, t.Media, &errors)
+		appendJSONB(&params.FallbackMedia, t.FallbackMedia, &errors)
 		appendJSONB(&params.TokenMetadata, t.TokenMetadata, &errors)
 		params.ExternalUrl = append(params.ExternalUrl, t.ExternalURL.String())
 		params.BlockNumber = append(params.BlockNumber, t.BlockNumber.BigInt().Int64())

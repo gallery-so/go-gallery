@@ -621,6 +621,10 @@ func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsCha
 						tokenOwner = persist.Address(nft.Owner.Address)
 					}
 
+					fallback := persist.FallbackMedia{
+						ImageURL: persist.NullString(firstNonEmptyString(nft.ImagePreviewURL, nft.ImageThumbnailURL, nft.ImageURL)),
+					}
+
 					tokensChan <- multichain.ChainAgnosticToken{
 						TokenType:       tokenType,
 						Name:            nft.Name,
@@ -628,6 +632,7 @@ func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsCha
 						TokenURI:        persist.TokenURI(nft.TokenMetadataURL),
 						TokenID:         persist.TokenID(nft.TokenID.ToBase16()),
 						OwnerAddress:    tokenOwner,
+						FallbackMedia:   fallback,
 						ContractAddress: persist.Address(nft.Contract.ContractAddress.String()),
 						ExternalURL:     nft.ExternalURL,
 						BlockNumber:     persist.BlockNumber(block),

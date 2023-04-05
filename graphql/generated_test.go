@@ -4648,6 +4648,16 @@ func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserToken
 	return v.MediaType
 }
 
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaFallbackMedia includes the requested fields of the GraphQL type FallbackMedia.
+type syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaFallbackMedia struct {
+	Typename *string `json:"__typename"`
+}
+
+// GetTypename returns syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaFallbackMedia.Typename, and is useful for accessing the field via an interface.
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaFallbackMedia) GetTypename() *string {
+	return v.Typename
+}
+
 // syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia includes the requested fields of the GraphQL type GIFMedia.
 type syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia struct {
 	Typename  *string `json:"__typename"`
@@ -4794,6 +4804,7 @@ func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserToken
 // syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia
 // syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia
 // syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaFallbackMedia
 // syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia
 type syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype interface {
 	implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype()
@@ -4822,6 +4833,8 @@ func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserToken
 func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
 }
 func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
+}
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaFallbackMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
 }
 func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
 }
@@ -4872,6 +4885,9 @@ func __unmarshalsyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUs
 		return json.Unmarshal(b, *v)
 	case "SyncingMedia":
 		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia)
+		return json.Unmarshal(b, *v)
+	case "FallbackMedia":
+		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaFallbackMedia)
 		return json.Unmarshal(b, *v)
 	case "InvalidMedia":
 		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia)
@@ -4975,6 +4991,14 @@ func __marshalsyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUser
 		result := struct {
 			TypeName string `json:"__typename"`
 			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia
+		}{typename, v}
+		return json.Marshal(result)
+	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaFallbackMedia:
+		typename = "FallbackMedia"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaFallbackMedia
 		}{typename, v}
 		return json.Marshal(result)
 	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia:

@@ -157,6 +157,7 @@ union MediaSubtype =
   | GltfMedia
   | UnknownMedia
   | SyncingMedia
+  | FallbackMedia
   | InvalidMedia
 
 type PreviewURLSet {
@@ -199,6 +200,14 @@ interface Media {
 
   # The dimensions of the media, if known
   dimensions: MediaDimensions
+}
+
+type FallbackMedia implements Media {
+  previewURLs: PreviewURLSet
+  mediaURL: String # will always be an image URL
+  mediaType: String
+
+  dimensions: MediaDimensions # will probably not be available unless the provider provides it
 }
 
 type ImageMedia implements Media {

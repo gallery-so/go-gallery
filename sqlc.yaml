@@ -80,6 +80,8 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.TokenID"
           - column: "tokens.media"
             go_type: "github.com/mikeydub/go-gallery/service/persist.Media"
+          - column: "tokens.fallback_media"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.FallbackMedia"
           - column: "tokens.ownership_history"
             go_type: "github.com/mikeydub/go-gallery/service/persist.AddressAtBlockList"
           - column: "tokens.token_metadata"

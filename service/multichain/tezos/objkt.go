@@ -9,6 +9,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
 	"github.com/shurcooL/graphql"
 	"github.com/sirupsen/logrus"
@@ -392,13 +393,21 @@ func (p *TezosObjktProvider) GetTokensByContractAddressAndOwner(ctx context.Cont
 	for _, token := range tokens {
 		tokenID := persist.TokenID(token.Token_ID.toBase16String())
 		metadata := createMetadata(token)
+
+		firstValidThumbnail, _ := util.FindFirst([]string{token.Thumbnail_URI, token.Display_URI, token.Artifact_URI}, func(s string) bool {
+			return persist.TokenURI(s).IsRenderable()
+		})
+
 		// Create token per holder
 		for _, holder := range token.Holders {
 			agnosticToken := multichain.ChainAgnosticToken{
-				TokenType:       persist.TokenTypeERC1155,
-				Description:     token.Description,
-				Name:            token.Name,
-				TokenID:         tokenID,
+				TokenType:   persist.TokenTypeERC1155,
+				Description: token.Description,
+				Name:        token.Name,
+				TokenID:     tokenID,
+				FallbackMedia: persist.FallbackMedia{
+					ImageURL: persist.NullString(firstValidThumbnail),
+				},
 				ContractAddress: agnosticContract.Address,
 				Quantity:        persist.HexString(fmt.Sprintf("%x", holder.Quantity)),
 				TokenMetadata:   metadata,
