@@ -1746,7 +1746,7 @@ func multichainTokenHolderToModel(ctx context.Context, tokenHolder multichain.To
 
 func tokenToModel(ctx context.Context, token db.Token) *model.Token {
 	chain := token.Chain
-	metadata, _ := token.TokenMetadata.MarshallJSON()
+	metadata, _ := token.TokenMetadata.MarshalJSON()
 	metadataString := string(metadata)
 	blockNumber := fmt.Sprint(token.BlockNumber.Int64)
 	tokenType := model.TokenType(token.TokenType.String)
