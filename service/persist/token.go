@@ -767,7 +767,7 @@ func (a EthereumAddress) Value() (driver.Value, error) {
 }
 
 // MarshallJSON implements the json.Marshaller interface for the address type
-func (a EthereumAddress) MarshallJSON() ([]byte, error) {
+func (a EthereumAddress) MarshalJSON() ([]byte, error) {
 	return json.Marshal(a.String())
 }
 
@@ -840,12 +840,13 @@ func (m *TokenMetadata) Scan(src interface{}) error {
 
 // Value implements the database/sql/driver Valuer interface for the TokenMetadata type
 func (m TokenMetadata) Value() (driver.Value, error) {
-	return m.MarshallJSON()
+	return m.MarshalJSON()
 }
 
-// MarshallJSON implements the json.Marshaller interface for the TokenMetadata type
-func (m TokenMetadata) MarshallJSON() ([]byte, error) {
-	val, err := json.Marshal(m)
+// MarshalJSON implements the json.Marshaller interface for the TokenMetadata type
+func (m TokenMetadata) MarshalJSON() ([]byte, error) {
+	asMap := map[string]interface{}(m)
+	val, err := json.Marshal(asMap)
 	if err != nil {
 		return nil, err
 	}
