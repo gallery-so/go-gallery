@@ -74,6 +74,7 @@ var rootCmd = &cobra.Command{
 		if appengine.IsAppEngine() {
 			appengine.Main()
 		} else {
+			logger.For(nil).Infof("Running in Default Mode with port :%d", port)
 			http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 		}
 	},

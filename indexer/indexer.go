@@ -128,6 +128,8 @@ type indexer struct {
 	lastSyncedChunk uint64  // Start block of the last chunk handled by the indexer
 	maxBlock        *uint64 // If provided, the indexer will only index up to maxBlock
 
+	contractOwnerStats *sync.Map // map[contractOwnerMethod]int - Used to track the number of times a contract owner method is used
+
 	isListening bool // Indicates if the indexer is waiting for new blocks
 
 	getLogsFunc getLogsFunc
@@ -159,12 +161,18 @@ func newIndexer(ethClient *ethclient.Client, httpClient *http.Client, ipfsClient
 
 		maxBlock: maxBlock,
 
+		contractOwnerStats: &sync.Map{},
+
 		eventHashes: pEvents,
 
 		getLogsFunc: getLogsFunc,
 
 		contractDBHooks: newContractHooks(contractRepo),
 		tokenDBHooks:    newTokenHooks(),
+
+		mostRecentBlock: 0,
+		lastSyncedChunk: 0,
+		isListening:     false,
 	}
 
 	if startingBlock != nil {
@@ -290,7 +298,7 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 
 	startTime := time.Now()
 	transfers := make(chan []transfersAtBlock)
-	plugins := NewTransferPlugins(ctx, i.ethClient, i.httpClient)
+	plugins := NewTransferPlugins(ctx, i.ethClient, i.httpClient, i.contractOwnerStats)
 	enabledPlugins := []chan<- TransferPluginMsg{plugins.contracts.in}
 
 	logsToCheckAgainst := make(chan []types.Log)
@@ -314,7 +322,7 @@ func (i *indexer) startNewBlocksPipeline(ctx context.Context, topics [][]common.
 	defer tracing.FinishSpan(span)
 
 	transfers := make(chan []transfersAtBlock)
-	plugins := NewTransferPlugins(ctx, i.ethClient, i.httpClient)
+	plugins := NewTransferPlugins(ctx, i.ethClient, i.httpClient, i.contractOwnerStats)
 	enabledPlugins := []chan<- TransferPluginMsg{plugins.contracts.in}
 
 	go i.pollNewLogs(sentryutil.NewSentryHubContext(ctx), transfers, topics)
@@ -794,7 +802,7 @@ func contractsPluginReceiver(cur contractAtBlock, inc contractAtBlock) contractA
 	return inc
 }
 
-func fillContractFields(ctx context.Context, ethClient *ethclient.Client, httpClient *http.Client, contractAddress persist.EthereumAddress, lastSyncedBlock persist.BlockNumber) persist.Contract {
+func fillContractFields(ctx context.Context, ethClient *ethclient.Client, httpClient *http.Client, contractAddress persist.EthereumAddress, lastSyncedBlock persist.BlockNumber, contractOwnerStats *sync.Map) persist.Contract {
 	c := persist.Contract{
 		Address:     contractAddress,
 		LatestBlock: lastSyncedBlock,
@@ -811,7 +819,7 @@ func fillContractFields(ctx context.Context, ethClient *ethclient.Client, httpCl
 		c.Symbol = persist.NullString(cMetadata.Symbol)
 	}
 
-	cOwner, err := GetContractOwner(ctx, contractAddress, ethClient, httpClient)
+	cOwner, method, err := GetContractOwner(ctx, contractAddress, ethClient, httpClient)
 	if err != nil {
 		logger.For(ctx).WithError(err).WithFields(logrus.Fields{
 			"contractAddress": contractAddress,
@@ -819,6 +827,14 @@ func fillContractFields(ctx context.Context, ethClient *ethclient.Client, httpCl
 	} else {
 		c.OwnerAddress = cOwner
 	}
+
+	it, ok := contractOwnerStats.LoadOrStore(method, 1)
+	if ok {
+		total := it.(int)
+		total++
+		contractOwnerStats.Store(method, total)
+	}
+
 	return c
 }
 

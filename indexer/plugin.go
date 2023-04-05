@@ -67,9 +67,9 @@ func startSpan(ctx context.Context, plugin, op string) (*sentry.Span, context.Co
 // NewTransferPlugins returns a set of transfer plugins. Plugins have an `in` and an optional `out` channel that are handles to the service.
 // The `in` channel is used to submit a transfer to a plugin, and the `out` channel is used to receive results from a plugin, if any.
 // A plugin can be stopped by closing its `in` channel, which finishes the plugin and lets receivers know that its done.
-func NewTransferPlugins(ctx context.Context, ethClient *ethclient.Client, httpClient *http.Client) TransferPlugins {
+func NewTransferPlugins(ctx context.Context, ethClient *ethclient.Client, httpClient *http.Client, contractOwnerStats *sync.Map) TransferPlugins {
 	return TransferPlugins{
-		contracts: newContractsPlugin(sentryutil.NewSentryHubContext(ctx), ethClient, httpClient),
+		contracts: newContractsPlugin(sentryutil.NewSentryHubContext(ctx), ethClient, httpClient, contractOwnerStats),
 	}
 }
 
@@ -129,7 +129,7 @@ type contractTransfersPlugin struct {
 	out chan contractAtBlock
 }
 
-func newContractsPlugin(ctx context.Context, ethClient *ethclient.Client, httpClient *http.Client) contractTransfersPlugin {
+func newContractsPlugin(ctx context.Context, ethClient *ethclient.Client, httpClient *http.Client, contractOwnerStats *sync.Map) contractTransfersPlugin {
 	in := make(chan TransferPluginMsg)
 	out := make(chan contractAtBlock)
 
@@ -150,7 +150,7 @@ func newContractsPlugin(ctx context.Context, ethClient *ethclient.Client, httpCl
 				if persist.TokenType(msg.transfer.TokenType) == persist.TokenTypeERC721 {
 					if rpcEnabled {
 
-						contract := fillContractFields(ctx, ethClient, httpClient, msg.transfer.ContractAddress, msg.transfer.BlockNumber)
+						contract := fillContractFields(ctx, ethClient, httpClient, msg.transfer.ContractAddress, msg.transfer.BlockNumber, contractOwnerStats)
 						out <- contractAtBlock{
 							ti: msg.key,
 							boi: blockchainOrderInfo{

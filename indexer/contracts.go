@@ -114,7 +114,7 @@ func updateMetadataForContract(c context.Context, input UpdateContractMetadataIn
 	timedContext, cancel := context.WithTimeout(c, time.Second*10)
 	defer cancel()
 
-	owner, err := GetContractOwner(timedContext, input.Address, ethClient, httpClient)
+	owner, _, err := GetContractOwner(timedContext, input.Address, ethClient, httpClient)
 	if err != nil {
 		logger.For(c).WithError(err).Errorf("error finding creator address")
 	} else {
@@ -124,32 +124,49 @@ func updateMetadataForContract(c context.Context, input UpdateContractMetadataIn
 	return contractsRepo.UpdateByAddress(c, input.Address, up)
 }
 
-func GetContractOwner(ctx context.Context, address persist.EthereumAddress, ethClient *ethclient.Client, httpClient *http.Client) (persist.EthereumAddress, error) {
+type contractOwnerMethod int
+
+const (
+	contractOwnerMethodFailed contractOwnerMethod = iota
+	contractOwnerMethodOwnable
+	contractOwnerMethodAlchemy
+	contractOwnerBinarySearch
+)
+
+func GetContractOwner(ctx context.Context, address persist.EthereumAddress, ethClient *ethclient.Client, httpClient *http.Client) (persist.EthereumAddress, contractOwnerMethod, error) {
 
 	owner, err := rpc.GetContractOwner(ctx, address, ethClient)
 	if err == nil {
-		return owner, nil
+		return owner, contractOwnerMethodOwnable, nil
 	}
-	logger.For(ctx).WithError(err).Errorf("error finding owner address through ownable interface")
+	logger.For(ctx).WithError(err).Error("error finding owner address through ownable interface")
 
 	urlForContract := fmt.Sprintf("%s/getContractMetadata?contractAddress=%s", env.GetString("ALCHEMY_API_URL"), address)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlForContract, nil)
 	if err != nil {
-		return "", err
+		return "", contractOwnerMethodFailed, err
 	}
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return "", err
+		return "", contractOwnerMethodFailed, err
 	}
 
 	var cmeta alchemy.GetContractMetadataResponse
 	if err := json.NewDecoder(resp.Body).Decode(&cmeta); err != nil {
-		return "", err
+		return "", contractOwnerMethodFailed, err
 	}
 
 	if cmeta.ContractMetadata.ContractDeployer != "" {
-		return cmeta.ContractMetadata.ContractDeployer, nil
+		return cmeta.ContractMetadata.ContractDeployer, contractOwnerMethodAlchemy, nil
 	}
-	return rpc.GetContractCreator(ctx, address, ethClient)
+
+	logger.For(ctx).WithError(err).Error("error finding owner address through alchemy")
+
+	creator, err := rpc.GetContractCreator(ctx, address, ethClient)
+	if err != nil {
+		logger.For(ctx).WithError(err).Error("error finding creator address with binary search")
+		return "", contractOwnerMethodFailed, err
+	}
+	return creator, contractOwnerBinarySearch, nil
 }
