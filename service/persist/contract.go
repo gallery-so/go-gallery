@@ -39,9 +39,11 @@ type ContractUpdateInput struct {
 // ContractRepository represents a repository for interacting with persisted contracts
 type ContractRepository interface {
 	GetByAddress(context.Context, EthereumAddress) (Contract, error)
+	GetMetadataByAddress(context.Context, EthereumAddress) (Contract, error)
 	UpdateByAddress(context.Context, EthereumAddress, ContractUpdateInput) error
 	UpsertByAddress(context.Context, EthereumAddress, Contract) error
 	BulkUpsert(context.Context, []Contract) error
+	UpdateMetadataByAddress(context.Context, EthereumAddress, Contract) error
 }
 
 // ErrContractNotFoundByAddress is an error type for when a contract is not found by address
