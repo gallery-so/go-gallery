@@ -282,11 +282,11 @@ func NewMultichainProvider(c *Clients) *multichain.Provider {
 	alchemyProvider := alchemy.NewProvider(c.HTTPClient)
 	infuraProvider := infura.NewProvider(c.HTTPClient)
 
-	failureEthProvider := multichain.FailureFallbackProvider{Primary: infuraProvider, Fallback: alchemyProvider}
+	failureEthProvider := multichain.SyncFailureFallbackProvider{Primary: infuraProvider, Fallback: alchemyProvider}
 
 	ethProvider := eth.NewProvider(env.GetString("INDEXER_HOST"), c.HTTPClient, c.EthClient, c.TaskClient)
 	openseaProvider := opensea.NewProvider(c.EthClient, c.HTTPClient)
-	tezosProvider := multichain.EvalFallbackProvider{
+	tezosProvider := multichain.SyncWithContractEvalFallbackProvider{
 		Primary:  tezos.NewProvider(env.GetString("TEZOS_API_URL"), env.GetString("TOKEN_PROCESSING_URL"), env.GetString("IPFS_URL"), c.HTTPClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET")),
 		Fallback: tezos.NewObjktProvider(env.GetString("IPFS_URL")),
 		Eval: func(ctx context.Context, token multichain.ChainAgnosticToken) bool {

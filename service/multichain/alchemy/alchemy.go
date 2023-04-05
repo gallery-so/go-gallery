@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 	"net/http"
 	"strconv"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -219,7 +221,7 @@ func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.Blockchain
 
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the Ethereum Blockchain
 func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
-	url := fmt.Sprintf("%s/getNFTs?owner=%s&withMetadata=true&orderBy=transferTime", d.alchemyAPIURL, addr)
+	url := fmt.Sprintf("%s/getNFTs?owner=%s&withMetadata=true", d.alchemyAPIURL, addr)
 	tokens, err := getNFTsPaginate(ctx, url, 100, "pageKey", limit, offset, "", d.httpClient, &getNFTsResponse{})
 	if err != nil {
 		return nil, nil, err
@@ -233,13 +235,13 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 func getNFTsPaginate[T tokensPaginated](ctx context.Context, baseURL string, defaultLimit int, pageKeyName string, limit, offset int, pageKey string, httpClient *http.Client, result T) ([]Token, error) {
 
 	tokens := []Token{}
-	url := baseURL
+	u := baseURL
 
 	if pageKey != "" && pageKeyName != "" {
-		url = fmt.Sprintf("%s&%s=%s", url, pageKeyName, pageKey)
+		u = fmt.Sprintf("%s&%s=%s", u, pageKeyName, pageKey)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -252,13 +254,18 @@ func getNFTsPaginate[T tokensPaginated](ctx context.Context, baseURL string, def
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to get tokens from alchemy api: %s", resp.Status)
+		asString, _ := ioutil.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to get tokens from alchemy api: %s (err: %s) (url: %s)", resp.Status, asString, u)
 	}
 
 	newTokens, err := result.GetTokensFromResponse(resp)
 	if err != nil {
 		return nil, err
 	}
+
+	nextPageKey := result.GetNextPageKey()
+
+	logger.For(ctx).Infof("got %d tokens for (cur page: %s, next page %s)", len(newTokens), pageKey, nextPageKey)
 
 	if offset > 0 && offset < defaultLimit {
 		if len(newTokens) > offset {
@@ -276,7 +283,7 @@ func getNFTsPaginate[T tokensPaginated](ctx context.Context, baseURL string, def
 
 	tokens = append(tokens, newTokens...)
 
-	if result.GetNextPageKey() != "" && result.GetNextPageKey() != pageKey {
+	if nextPageKey != "" && nextPageKey != pageKey {
 
 		if limit > 0 {
 			limit -= defaultLimit
@@ -284,7 +291,7 @@ func getNFTsPaginate[T tokensPaginated](ctx context.Context, baseURL string, def
 		if offset > 0 {
 			offset -= defaultLimit
 		}
-		newTokens, err := getNFTsPaginate(ctx, baseURL, defaultLimit, pageKeyName, limit, offset, result.GetNextPageKey(), httpClient, result)
+		newTokens, err := getNFTsPaginate(ctx, baseURL, defaultLimit, pageKeyName, limit, offset, nextPageKey, httpClient, result)
 		if err != nil {
 			return nil, err
 		}

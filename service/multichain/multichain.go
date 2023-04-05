@@ -185,7 +185,7 @@ type tokenMetadataFetcher interface {
 	GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti ChainAgnosticIdentifiers, ownerAddress persist.Address) (persist.TokenMetadata, error)
 }
 
-type subproviderProvider interface {
+type providerSupplier interface {
 	GetSubproviders() []any
 }
 
@@ -210,7 +210,7 @@ func getChainProvidersForTask[T any](providers []any) []T {
 	for _, p := range providers {
 		if provider, ok := p.(T); ok {
 			result = append(result, provider)
-		} else if subproviders, ok := p.(subproviderProvider); ok {
+		} else if subproviders, ok := p.(providerSupplier); ok {
 			for _, subprovider := range subproviders.GetSubproviders() {
 				if provider, ok := subprovider.(T); ok {
 					result = append(result, provider)
@@ -225,7 +225,7 @@ func hasProvidersForTask[T any](providers []any) bool {
 	for _, p := range providers {
 		if _, ok := p.(T); ok {
 			return true
-		} else if subproviders, ok := p.(subproviderProvider); ok {
+		} else if subproviders, ok := p.(providerSupplier); ok {
 			for _, subprovider := range subproviders.GetSubproviders() {
 				if _, ok := subprovider.(T); ok {
 					return true
@@ -421,7 +421,7 @@ outer:
 	}
 	if len(errs) > 0 && len(tokensFromProviders) == 0 {
 		return util.MultiErr(errs)
-  }
+	}
 	if !util.AllEqual(util.MapValues(discrepencyLog)) {
 		logger.For(ctx).Debugf("discrepency: %+v", discrepencyLog)
 	}
