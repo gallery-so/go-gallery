@@ -800,7 +800,26 @@ func GetIPFSResponse(pCtx context.Context, ipfsClient *shell.Shell, path string)
 		return ipfsResult{reader, err}
 	}
 
-	result := firstNonError(pCtx, fromHTTP, fromIPFS)
+	fromIPFSAPI := func(ctx context.Context) fetchResulter {
+		url := fmt.Sprintf("https://ipfs.io/ipfs/%s", path)
+		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+		if err != nil {
+			return ipfsResult{err: err}
+		}
+
+		resp, err := defaultHTTPClient.Do(req)
+		if err != nil {
+			return ipfsResult{err: err}
+		}
+
+		if resp.StatusCode > 399 || resp.StatusCode < 200 {
+			return ipfsResult{err: ErrHTTP{Status: resp.StatusCode, URL: url}}
+		}
+
+		return ipfsResult{resp: resp.Body}
+	}
+
+	result := firstNonError(pCtx, fromHTTP, fromIPFS, fromIPFSAPI)
 	response := result.(ipfsResult)
 	return response.resp, response.Error()
 }
