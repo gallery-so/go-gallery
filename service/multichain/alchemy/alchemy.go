@@ -301,20 +301,20 @@ func getNFTsPaginate[T tokensPaginated](ctx context.Context, baseURL string, def
 	return tokens, nil
 }
 
-// GetTokenMetadataByTokenIdentifiers retrieves a token's metadata for a given contract address and token ID
-func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (persist.TokenMetadata, error) {
-	tokens, _, err := d.getTokenWithMetadata(ctx, ti, false, 0)
-	if err != nil {
-		return persist.TokenMetadata{}, err
-	}
+// // GetTokenMetadataByTokenIdentifiers retrieves a token's metadata for a given contract address and token ID
+// func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (persist.TokenMetadata, error) {
+// 	tokens, _, err := d.getTokenWithMetadata(ctx, ti, false, 0)
+// 	if err != nil {
+// 		return persist.TokenMetadata{}, err
+// 	}
 
-	if len(tokens) == 0 {
-		return persist.TokenMetadata{}, fmt.Errorf("no token found for contract address %s and token ID %s", ti.ContractAddress, ti.TokenID)
-	}
+// 	if len(tokens) == 0 {
+// 		return persist.TokenMetadata{}, fmt.Errorf("no token found for contract address %s and token ID %s", ti.ContractAddress, ti.TokenID)
+// 	}
 
-	token := tokens[0]
-	return token.TokenMetadata, nil
-}
+// 	token := tokens[0]
+// 	return token.TokenMetadata, nil
+// }
 
 func (d *Provider) getTokenWithMetadata(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, forceRefresh bool, timeout time.Duration) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	if timeout == 0 {
@@ -393,11 +393,6 @@ func (d *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, contr
 		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("no contract found for contract address %s", contractAddress)
 	}
 	return cTokens, cContracts[0], nil
-}
-
-// GetTokensByTokenIdentifiers retrieves tokens for a token identifiers on the Ethereum Blockchain
-func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	return d.getTokenWithMetadata(ctx, tokenIdentifiers, false, 0)
 }
 
 func (d *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
