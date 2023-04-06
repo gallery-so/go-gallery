@@ -116,6 +116,8 @@ type indexer struct {
 	dbMu              *sync.Mutex // Manages writes to the db
 	stateMu           *sync.Mutex // Manages updates to the indexer's state
 
+	seenContracts *sync.Map // Stores the contract addresses that have been seen during indexing (so they won't be reprocessed)
+
 	tokenBucket string
 
 	chain persist.Chain
@@ -139,6 +141,7 @@ func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 	if rpcEnabled && ethClient == nil {
 		panic("RPC is enabled but an ethClient wasn't provided!")
 	}
+
 	i := &indexer{
 		ethClient:         ethClient,
 		ipfsClient:        ipfsClient,
@@ -149,6 +152,8 @@ func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 		addressFilterRepo: addressFilterRepo,
 		dbMu:              &sync.Mutex{},
 		stateMu:           &sync.Mutex{},
+
+		seenContracts: &sync.Map{},
 
 		tokenBucket: env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"),
 
@@ -287,7 +292,7 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 
 	startTime := time.Now()
 	transfers := make(chan []transfersAtBlock)
-	plugins := NewTransferPlugins(ctx, i.ethClient, i.tokenRepo, i.addressFilterRepo)
+	plugins := NewTransferPlugins(ctx, i.ethClient, i.contractRepo, i.seenContracts)
 	enabledPlugins := []chan<- TransferPluginMsg{plugins.contracts.in}
 
 	logsToCheckAgainst := make(chan []types.Log)
@@ -302,6 +307,7 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 	}()
 	go i.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transfers, enabledPlugins)
 	i.processTokens(ctx, plugins.contracts.out)
+	i.afterPipelineCleanup(ctx)
 
 	logger.For(ctx).Warnf("Finished processing %d blocks from block %d in %s", blocksPerLogsCall, start.Uint64(), time.Since(startTime))
 }
@@ -311,12 +317,13 @@ func (i *indexer) startNewBlocksPipeline(ctx context.Context, topics [][]common.
 	defer tracing.FinishSpan(span)
 
 	transfers := make(chan []transfersAtBlock)
-	plugins := NewTransferPlugins(ctx, i.ethClient, i.tokenRepo, i.addressFilterRepo)
+	plugins := NewTransferPlugins(ctx, i.ethClient, i.contractRepo, i.seenContracts)
 	enabledPlugins := []chan<- TransferPluginMsg{plugins.contracts.in}
 
 	go i.pollNewLogs(sentryutil.NewSentryHubContext(ctx), transfers, topics)
 	go i.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transfers, enabledPlugins)
 	i.processTokens(ctx, plugins.contracts.out)
+	i.afterPipelineCleanup(ctx)
 
 }
 
@@ -752,6 +759,10 @@ func (i *indexer) processTokens(ctx context.Context, contractsOut <-chan contrac
 	i.runDBHooks(ctx, contracts, []persist.Token{})
 }
 
+func (i *indexer) afterPipelineCleanup(ctx context.Context) {
+	i.seenContracts = &sync.Map{}
+}
+
 func contractsAtBlockToContracts(contractsAtBlock map[persist.EthereumTokenIdentifiers]contractAtBlock) []persist.Contract {
 	contracts := make([]persist.Contract, 0, len(contractsAtBlock))
 	seen := make(map[persist.EthereumAddress]bool)
@@ -791,22 +802,36 @@ func contractsPluginReceiver(cur contractAtBlock, inc contractAtBlock) contractA
 	return inc
 }
 
-func fillContractFields(ctx context.Context, ethClient *ethclient.Client, contractAddress persist.EthereumAddress, lastSyncedBlock persist.BlockNumber) persist.Contract {
+func fillContractFields(ctx context.Context, contractRepo persist.ContractRepository, ethClient *ethclient.Client, contractAddress persist.EthereumAddress, lastSyncedBlock persist.BlockNumber, seenContracts *sync.Map) persist.Contract {
 	c := persist.Contract{
 		Address:     contractAddress,
 		LatestBlock: lastSyncedBlock,
 	}
-	cMetadata, err := rpc.RetryGetTokenContractMetadata(ctx, contractAddress, ethClient)
-	if err != nil {
-		logEntry := logger.For(ctx).WithError(err).WithFields(logrus.Fields{
-			"contractAddress": contractAddress,
-			"rpcCall":         "eth_call",
-		})
-		logEthCallRPCError(logEntry, err, "error getting contract metadata")
-	} else {
-		c.Name = persist.NullString(cMetadata.Name)
-		c.Symbol = persist.NullString(cMetadata.Symbol)
+
+	if it, ok := seenContracts.Load(contractAddress); ok {
+		return it.(persist.Contract)
 	}
+
+	cur, err := contractRepo.GetByAddress(ctx, contractAddress)
+	if err == nil && (cur.Name != "" || cur.Symbol != "") {
+		c.Name = cur.Name
+		c.Symbol = cur.Symbol
+	} else {
+		cMetadata, err := rpc.GetTokenContractMetadata(ctx, contractAddress, ethClient)
+		if err != nil {
+			logEntry := logger.For(ctx).WithError(err).WithFields(logrus.Fields{
+				"contractAddress": contractAddress,
+				"rpcCall":         "eth_call",
+			})
+			logEthCallRPCError(logEntry, err, "error getting contract metadata")
+		} else {
+			c.Name = persist.NullString(cMetadata.Name)
+			c.Symbol = persist.NullString(cMetadata.Symbol)
+		}
+	}
+
+	seenContracts.Store(contractAddress, c)
+
 	return c
 }
 
