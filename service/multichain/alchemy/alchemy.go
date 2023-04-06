@@ -19,10 +19,6 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
-func init() {
-	env.RegisterValidation("ALCHEMY_API_KEY", "required")
-}
-
 type TokenURI struct {
 	Gateway string `json:"gateway"`
 	Raw     string `json:"raw"`
@@ -199,29 +195,55 @@ func (r getNFTsForCollectionWithOwnerResponse) GetNextPageKey() string {
 
 // Provider is an the struct for retrieving data from the Ethereum blockchain
 type Provider struct {
+	chain         persist.Chain
 	alchemyAPIURL string
 	httpClient    *http.Client
 }
 
 // NewProvider creates a new ethereum Provider
-func NewProvider(httpClient *http.Client) *Provider {
+func NewProvider(chain persist.Chain, httpClient *http.Client) *Provider {
+	var apiURL string
+	switch chain {
+	case persist.ChainETH:
+		apiURL = env.GetString("ALCHEMY_API_URL")
+	case persist.ChainOptimism:
+		apiURL = env.GetString("ALCHEMY_OPTIMISM_API_URL")
+	case persist.ChainPolygon:
+		apiURL = env.GetString("ALCHEMY_POLYGON_API_URL")
+	}
+
+	if apiURL == "" {
+		panic(fmt.Sprintf("no alchemy api url set for chain %d", chain))
+	}
+
 	return &Provider{
-		alchemyAPIURL: env.GetString("ALCHEMY_API_URL"),
+		alchemyAPIURL: apiURL,
+		chain:         chain,
 		httpClient:    httpClient,
 	}
 }
 
 // GetBlockchainInfo retrieves blockchain info for ETH
 func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.BlockchainInfo, error) {
+	chainID := 0
+	switch d.chain {
+	case persist.ChainOptimism:
+		chainID = 10
+	case persist.ChainPolygon:
+		chainID = 137
+	}
 	return multichain.BlockchainInfo{
-		Chain:   persist.ChainETH,
-		ChainID: 0,
+		Chain:   d.chain,
+		ChainID: chainID,
 	}, nil
 }
 
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the Ethereum Blockchain
 func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	url := fmt.Sprintf("%s/getNFTs?owner=%s&withMetadata=true", d.alchemyAPIURL, addr)
+	if d.chain == persist.ChainPolygon {
+		url += "&excludeFilters[]=SPAM"
+	}
 	tokens, err := getNFTsPaginate(ctx, url, 100, "pageKey", limit, offset, "", d.httpClient, &getNFTsResponse{})
 	if err != nil {
 		return nil, nil, err
