@@ -899,9 +899,6 @@ outer:
 
 	switch asURI.Type() {
 	case persist.URITypeIPFS, persist.URITypeArweave:
-		if mediaType == persist.MediaTypeHTML && persist.TokenURI(mediaURL).IsPathPrefixed() {
-			return mediaType, true, nil
-		}
 		logger.For(pCtx).Infof("caching %.2f mb of raw media with type '%s' for '%s' at '%s-%s'", float64(contentLength)/1024/1024, mediaType, mediaURL, ipfsPrefix, name)
 
 		if mediaType == persist.MediaTypeAnimation {
