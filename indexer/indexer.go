@@ -307,6 +307,7 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 	}()
 	go i.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transfers, enabledPlugins)
 	i.processTokens(ctx, plugins.contracts.out)
+	i.afterPipelineCleanup(ctx)
 
 	logger.For(ctx).Warnf("Finished processing %d blocks from block %d in %s", blocksPerLogsCall, start.Uint64(), time.Since(startTime))
 }
@@ -322,6 +323,7 @@ func (i *indexer) startNewBlocksPipeline(ctx context.Context, topics [][]common.
 	go i.pollNewLogs(sentryutil.NewSentryHubContext(ctx), transfers, topics)
 	go i.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transfers, enabledPlugins)
 	i.processTokens(ctx, plugins.contracts.out)
+	i.afterPipelineCleanup(ctx)
 
 }
 
@@ -755,6 +757,10 @@ func (i *indexer) processTokens(ctx context.Context, contractsOut <-chan contrac
 	contracts := contractsAtBlockToContracts(contractsMap)
 
 	i.runDBHooks(ctx, contracts, []persist.Token{})
+}
+
+func (i *indexer) afterPipelineCleanup(ctx context.Context) {
+	i.seenContracts = &sync.Map{}
 }
 
 func contractsAtBlockToContracts(contractsAtBlock map[persist.EthereumTokenIdentifiers]contractAtBlock) []persist.Contract {
