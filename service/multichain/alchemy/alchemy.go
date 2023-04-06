@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"math/big"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -259,9 +260,19 @@ func getNFTsPaginate[T tokensPaginated](ctx context.Context, baseURL string, def
 	tokens := []Token{}
 	u := baseURL
 
-	if pageKey != "" && pageKeyName != "" {
-		u = fmt.Sprintf("%s&%s=%s", u, pageKeyName, pageKey)
+	parsedURL, err := url.Parse(u)
+	if err != nil {
+		return nil, err
 	}
+
+	q := parsedURL.Query()
+
+	if pageKey != "" && pageKeyName != "" {
+		q.Set(pageKeyName, pageKey)
+	}
+
+	parsedURL.RawQuery = q.Encode()
+	u = parsedURL.String()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
