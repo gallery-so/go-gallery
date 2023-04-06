@@ -282,6 +282,42 @@ func getNFTsPaginate[T tokensPaginated](ctx context.Context, startingURL string,
 	return tokens, nil
 }
 
+type TokenMetadata struct {
+	Contract persist.Address `json:"contract"`
+	TokenID  persist.TokenID `json:"token_id"`
+	Metadata Metadata        `json:"metadata"`
+}
+
+// GetTokenMetadataByTokenIdentifiers retrieves a token's metadata for a given contract address and token ID
+func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (persist.TokenMetadata, error) {
+	url := fmt.Sprintf("%s/nfts/%s/tokens/%s", baseURL, ti.ContractAddress, ti.TokenID.Base10String())
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return persist.TokenMetadata{}, err
+	}
+
+	req.SetBasicAuth(p.apiKey, p.apiSecret)
+
+	resp, err := p.httpClient.Do(req)
+	if err != nil {
+		return persist.TokenMetadata{}, err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return persist.TokenMetadata{}, fmt.Errorf("failed to get token metadata from infura api: %s", resp.Status)
+	}
+
+	tokenMetadata := TokenMetadata{}
+	if err := json.NewDecoder(resp.Body).Decode(&tokenMetadata); err != nil {
+		return persist.TokenMetadata{}, err
+	}
+
+	return persist.TokenMetadata(tokenMetadata.Metadata), nil
+}
+
 type ContractMetadata struct {
 	Name   string `json:"name"`
 	Symbol string `json:"symbol"`
