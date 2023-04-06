@@ -254,12 +254,10 @@ var chainValidation map[persist.Chain]validation = map[persist.Chain]validation{
 	},
 	persist.ChainOptimism: {
 		tokensOwnerFetcher:    true,
-		tokenMetadataFetcher:  true,
 		tokensContractFetcher: true,
 	},
 	persist.ChainPolygon: {
 		tokensOwnerFetcher:    true,
-		tokenMetadataFetcher:  true,
 		tokensContractFetcher: true,
 	},
 }
@@ -685,8 +683,8 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contr
 
 	for _, metadataFetcher := range metadataFetchers {
 		metadata, err = metadataFetcher.GetTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: contractAddress, TokenID: tokenID}, ownerAddress)
-    if err != nil {
-				logger.For(ctx).Errorf("error fetching token metadata %s", err)
+		if err != nil {
+			logger.For(ctx).Errorf("error fetching token metadata %s", err)
 		}
 		if err == nil && len(metadata) > 0 {
 			return metadata, nil
