@@ -20,6 +20,7 @@ import (
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
+	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/sirupsen/logrus"
@@ -129,11 +130,12 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		res                  persist.Media
 	)
 
+	tids := persist.NewTokenIdentifiers(contractAddress, tokenID, chain)
 	if vURL != "" {
-		vidCh = downloadMediaFromURL(pCtx, storageClient, arweaveClient, ipfsClient, "video", vURL, name, tokenBucket)
+		vidCh = downloadMediaFromURL(pCtx, tids, storageClient, arweaveClient, ipfsClient, "video", vURL, name, tokenBucket)
 	}
 	if imgURL != "" {
-		imgCh = downloadMediaFromURL(pCtx, storageClient, arweaveClient, ipfsClient, "image", imgURL, name, tokenBucket)
+		imgCh = downloadMediaFromURL(pCtx, tids, storageClient, arweaveClient, ipfsClient, "image", imgURL, name, tokenBucket)
 	}
 
 	if vidCh != nil {
@@ -221,7 +223,7 @@ type cacheResult struct {
 	err       error
 }
 
-func downloadMediaFromURL(ctx context.Context, storageClient *storage.Client, arweaveClient *goar.Client, ipfsClient *shell.Shell, urlType, mediaURL, name, bucket string) chan cacheResult {
+func downloadMediaFromURL(ctx context.Context, tids persist.TokenIdentifiers, storageClient *storage.Client, arweaveClient *goar.Client, ipfsClient *shell.Shell, urlType, mediaURL, name, bucket string) chan cacheResult {
 	resultCh := make(chan cacheResult)
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
 		"tokenURIType": persist.TokenURI(mediaURL).Type(),
@@ -229,7 +231,7 @@ func downloadMediaFromURL(ctx context.Context, storageClient *storage.Client, ar
 	})
 
 	go func() {
-		mediaType, cached, err := downloadAndCache(ctx, mediaURL, name, urlType, ipfsClient, arweaveClient, storageClient, bucket)
+		mediaType, cached, err := downloadAndCache(ctx, tids, mediaURL, name, urlType, ipfsClient, arweaveClient, storageClient, bucket)
 		if err == nil {
 			resultCh <- cacheResult{mediaType, cached, err}
 			return
@@ -819,7 +821,7 @@ func getMediaServingURL(pCtx context.Context, bucketID, objectID string, client 
 	return fmt.Sprintf("https://storage.googleapis.com/%s/%s", bucketID, objectID), nil
 }
 
-func downloadAndCache(pCtx context.Context, mediaURL, name, ipfsPrefix string, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, bucket string) (persist.MediaType, bool, error) {
+func downloadAndCache(pCtx context.Context, tids persist.TokenIdentifiers, mediaURL, name, ipfsPrefix string, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, bucket string) (persist.MediaType, bool, error) {
 	asURI := persist.TokenURI(mediaURL)
 	timeBeforePredict := time.Now()
 	mediaType, contentType, contentLength, _ := PredictMediaType(pCtx, asURI.String())
@@ -847,7 +849,40 @@ outer:
 	timeBeforeDataReader := time.Now()
 	reader, err := rpc.GetDataFromURIAsReader(pCtx, asURI, ipfsClient, arweaveClient)
 	if err != nil {
-		return mediaType, false, errNoDataFromReader{err: err, url: mediaURL}
+
+		if tids.Chain == persist.ChainETH {
+			// if token is ETH, backup to asking opensea
+			assets, err := opensea.FetchAssetsForTokenIdentifiers(pCtx, persist.EthereumAddress(tids.ContractAddress), opensea.TokenID(tids.TokenID.Base10String()))
+			if err != nil || len(assets) == 0 {
+				// no data from opensea, return error
+				return mediaType, false, errNoDataFromReader{err: err, url: mediaURL}
+			}
+			found := false
+			for _, asset := range assets {
+				// does this asset have any valid URLs?
+				firstNonEmptyURL, ok := util.FindFirst([]string{asset.AnimationURL, asset.ImageURL, asset.ImagePreviewURL, asset.ImageOriginalURL, asset.ImageThumbnailURL}, func(s string) bool {
+					return s != ""
+				})
+				if !ok {
+					continue
+				}
+
+				reader, err = rpc.GetDataFromURIAsReader(pCtx, persist.TokenURI(firstNonEmptyURL), ipfsClient, arweaveClient)
+				if err != nil {
+					continue
+				}
+				// we have a valid reader for an opensea link
+				found = true
+				break
+			}
+
+			if !found {
+				// we couldn't find any valid URLs from opensea
+				return mediaType, false, errNoDataFromReader{err: err, url: mediaURL}
+			}
+		} else {
+			return mediaType, false, errNoDataFromReader{err: err, url: mediaURL}
+		}
 	}
 	logger.For(pCtx).Infof("got reader for %s in %s", name, time.Since(timeBeforeDataReader))
 	defer reader.Close()
