@@ -146,30 +146,16 @@ func newContractsPlugin(ctx context.Context, contractRepo persist.ContractReposi
 				child := span.StartChild("plugin.ownerPlugin")
 				child.Description = "handleMessage"
 
-				if rpcEnabled {
-
-					contract := fillContractFields(ctx, contractRepo, ethClient, msg.transfer.ContractAddress, msg.transfer.BlockNumber, seenContracts)
-					out <- contractAtBlock{
-						ti: msg.key,
-						boi: blockchainOrderInfo{
-							blockNumber: msg.transfer.BlockNumber,
-							txIndex:     msg.transfer.TxIndex,
-						},
-						contract: contract,
-					}
-
-				} else {
-					out <- contractAtBlock{
-						ti: msg.key,
-						boi: blockchainOrderInfo{
-							blockNumber: msg.transfer.BlockNumber,
-							txIndex:     msg.transfer.TxIndex,
-						},
-						contract: persist.Contract{
-							Address:     msg.transfer.ContractAddress,
-							LatestBlock: msg.transfer.BlockNumber,
-						},
-					}
+				out <- contractAtBlock{
+					ti: msg.key,
+					boi: blockchainOrderInfo{
+						blockNumber: msg.transfer.BlockNumber,
+						txIndex:     msg.transfer.TxIndex,
+					},
+					contract: persist.Contract{
+						Address:     msg.transfer.ContractAddress,
+						LatestBlock: msg.transfer.BlockNumber,
+					},
 				}
 
 				tracing.FinishSpan(child)
