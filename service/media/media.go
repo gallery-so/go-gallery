@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mikeydub/go-gallery/env"
@@ -169,35 +170,76 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	pCtx = logger.NewContextWithFields(pCtx, logrus.Fields{"mediaType": mediaType})
 	logger.For(pCtx).Infof("using '%s' as the mediaType", mediaType)
 
+	wg := &sync.WaitGroup{}
+
 	// if nothing was cached in the image step and the image step did process an image type, delete the now stale cached image
 	if !imgResult.cached && imgResult.mediaType.IsImageLike() {
 		logger.For(pCtx).Debug("imgResult not cached, deleting cached version if any")
-		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("image-%s", name), storageClient)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			deleteMedia(ctx, tokenBucket, fmt.Sprintf("image-%s", name), storageClient)
+		}()
 	}
 
 	// if nothing was cached in the image step and the image step did process an image type, delete the now stale cached live render
 	if !imgResult.cached && imgResult.mediaType.IsAnimationLike() {
 		logger.For(pCtx).Debug("imgResult not cached, deleting cached version if any")
-		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("liverender-%s", name), storageClient)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			deleteMedia(ctx, tokenBucket, fmt.Sprintf("liverender-%s", name), storageClient)
+		}()
 	}
 	// if nothing was cached in the video step and the video step did process a video type, delete the now stale cached video
 	if !vidResult.cached && vidResult.mediaType.IsAnimationLike() {
 		logger.For(pCtx).Debug("vidResult not cached, deleting cached version if any")
-		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("video-%s", name), storageClient)
-		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("liverender-%s", name), storageClient)
+		wg.Add(2)
+
+		go func() {
+			defer wg.Done()
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			deleteMedia(ctx, tokenBucket, fmt.Sprintf("video-%s", name), storageClient)
+		}()
+		go func() {
+			defer wg.Done()
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			deleteMedia(ctx, tokenBucket, fmt.Sprintf("liverender-%s", name), storageClient)
+		}()
 	}
 
 	// if something was cached but neither media type is animation type, we can assume that there was nothing thumbnailed therefore any thumbnail or liverender is stale
 	if (imgResult.cached || vidResult.cached) && (!imgResult.mediaType.IsAnimationLike() && !vidResult.mediaType.IsAnimationLike()) {
 		logger.For(pCtx).Debug("neither cached, deleting thumbnail if any")
-		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("thumbnail-%s", name), storageClient)
-		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("liverender-%s", name), storageClient)
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			deleteMedia(ctx, tokenBucket, fmt.Sprintf("thumbnail-%s", name), storageClient)
+		}()
+		go func() {
+			defer wg.Done()
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			deleteMedia(ctx, tokenBucket, fmt.Sprintf("liverender-%s", name), storageClient)
+		}()
 	}
 
 	// imgURL does not work, but vidURL does, don't try to use imgURL
 	if _, ok := imgResult.err.(errNoDataFromReader); ok && (vidResult.cached && vidResult.mediaType.IsAnimationLike()) {
 		imgURL = ""
 	}
+
+	logger.For(pCtx).Debug("waiting for all necessary media to be deleted")
+	wg.Wait()
+	logger.For(pCtx).Debug("deleting finished")
 
 	switch mediaType {
 	case persist.MediaTypeImage:
