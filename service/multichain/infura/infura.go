@@ -304,34 +304,34 @@ type TokenMetadata struct {
 }
 
 // GetTokenMetadataByTokenIdentifiers retrieves a token's metadata for a given contract address and token ID
-// func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (persist.TokenMetadata, error) {
-// 	url := fmt.Sprintf("%s/nfts/%s/tokens/%s", baseURL, ti.ContractAddress, ti.TokenID.Base10String())
+func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (persist.TokenMetadata, error) {
+	url := fmt.Sprintf("%s/nfts/%s/tokens/%s", baseURL, ti.ContractAddress, ti.TokenID.Base10String())
 
-// 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-// 	if err != nil {
-// 		return persist.TokenMetadata{}, err
-// 	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return persist.TokenMetadata{}, err
+	}
 
-// 	req.SetBasicAuth(p.apiKey, p.apiSecret)
+	req.SetBasicAuth(p.apiKey, p.apiSecret)
 
-// 	resp, err := p.httpClient.Do(req)
-// 	if err != nil {
-// 		return persist.TokenMetadata{}, err
-// 	}
+	resp, err := p.httpClient.Do(req)
+	if err != nil {
+		return persist.TokenMetadata{}, err
+	}
 
-// 	defer resp.Body.Close()
+	defer resp.Body.Close()
 
-// 	if resp.StatusCode != http.StatusOK {
-// 		return persist.TokenMetadata{}, fmt.Errorf("failed to get token metadata from infura api: %s", resp.Status)
-// 	}
+	if resp.StatusCode != http.StatusOK {
+		return persist.TokenMetadata{}, fmt.Errorf("failed to get token metadata from infura api: %s", resp.Status)
+	}
 
-// 	tokenMetadata := TokenMetadata{}
-// 	if err := json.NewDecoder(resp.Body).Decode(&tokenMetadata); err != nil {
-// 		return persist.TokenMetadata{}, err
-// 	}
+	tokenMetadata := TokenMetadata{}
+	if err := json.NewDecoder(resp.Body).Decode(&tokenMetadata); err != nil {
+		return persist.TokenMetadata{}, err
+	}
 
-// 	return persist.TokenMetadata(tokenMetadata.Metadata), nil
-// }
+	return persist.TokenMetadata(tokenMetadata.Metadata), nil
+}
 
 type ContractMetadata struct {
 	Name   string `json:"name"`
