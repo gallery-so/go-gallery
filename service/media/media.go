@@ -178,7 +178,9 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("image-%s", name), storageClient)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			deleteMedia(ctx, tokenBucket, fmt.Sprintf("image-%s", name), storageClient)
 		}()
 	}
 
@@ -188,7 +190,9 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("liverender-%s", name), storageClient)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			deleteMedia(ctx, tokenBucket, fmt.Sprintf("liverender-%s", name), storageClient)
 		}()
 	}
 	// if nothing was cached in the video step and the video step did process a video type, delete the now stale cached video
@@ -198,11 +202,15 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 		go func() {
 			defer wg.Done()
-			deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("video-%s", name), storageClient)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			deleteMedia(ctx, tokenBucket, fmt.Sprintf("video-%s", name), storageClient)
 		}()
 		go func() {
 			defer wg.Done()
-			deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("liverender-%s", name), storageClient)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			deleteMedia(ctx, tokenBucket, fmt.Sprintf("liverender-%s", name), storageClient)
 		}()
 	}
 
@@ -212,11 +220,15 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		wg.Add(2)
 		go func() {
 			defer wg.Done()
-			deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("thumbnail-%s", name), storageClient)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			deleteMedia(ctx, tokenBucket, fmt.Sprintf("thumbnail-%s", name), storageClient)
 		}()
 		go func() {
 			defer wg.Done()
-			deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("liverender-%s", name), storageClient)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			deleteMedia(ctx, tokenBucket, fmt.Sprintf("liverender-%s", name), storageClient)
 		}()
 	}
 
@@ -225,7 +237,9 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		imgURL = ""
 	}
 
+	logger.For(pCtx).Debug("waiting for all necessary media to be deleted")
 	wg.Wait()
+	logger.For(pCtx).Debug("deleting finished")
 
 	switch mediaType {
 	case persist.MediaTypeImage:
