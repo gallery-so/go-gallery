@@ -46,6 +46,11 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
+func init() {
+	env.RegisterValidation("IPFS_URL", "required")
+	env.RegisterValidation("FALLBACK_IPFS_URL", "required")
+}
+
 const (
 	defaultHTTPTimeout             = 30
 	defaultHTTPKeepAlive           = 600
@@ -789,7 +794,20 @@ func GetIPFSResponse(pCtx context.Context, ipfsClient *shell.Shell, path string)
 		}
 
 		if resp.StatusCode > 399 || resp.StatusCode < 200 {
-			return ipfsResult{err: ErrHTTP{Status: resp.StatusCode, URL: url}}
+			url := fmt.Sprintf("%s/ipfs/%s", env.GetString("FALLBACK_IPFS_URL"), path)
+			req, err = http.NewRequestWithContext(ctx, "GET", url, nil)
+			if err != nil {
+				return ipfsResult{err: err}
+			}
+
+			resp, err = defaultHTTPClient.Do(req)
+			if err != nil {
+				return ipfsResult{err: err}
+			}
+			if resp.StatusCode > 399 || resp.StatusCode < 200 {
+				return ipfsResult{err: ErrHTTP{Status: resp.StatusCode, URL: url}}
+			}
+			logger.For(ctx).Infof("IPFS HTTP fallback fallback successful %s", path)
 		}
 
 		logger.For(ctx).Infof("IPFS HTTP fallback successful %s", path)

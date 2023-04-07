@@ -120,6 +120,7 @@ func SetDefaults() {
 	viper.SetDefault("RPC_URL", "")
 	viper.SetDefault("IPFS_URL", "https://gallery.infura-ipfs.io")
 	viper.SetDefault("IPFS_API_URL", "https://ipfs.infura.io:5001")
+	viper.SetDefault("FALLBACK_IPFS_URL", "https://ipfs.io")
 	viper.SetDefault("IPFS_PROJECT_ID", "")
 	viper.SetDefault("IPFS_PROJECT_SECRET", "")
 	viper.SetDefault("CHAIN", 0)
