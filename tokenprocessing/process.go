@@ -66,7 +66,7 @@ func processMediaForUsersTokensOfChain(mc *multichain.Provider, tokenRepo *postg
 			wp.Submit(func() {
 				key := fmt.Sprintf("%s-%s-%d", t.TokenID, contract.Address, t.Chain)
 				imageKeywords, animationKeywords := t.Chain.BaseKeywords()
-				err := processToken(ctx, key, t, contract.Address, "", mc, ethClient, ipfsClient, arweaveClient, stg, tokenBucket, tokenRepo, imageKeywords, animationKeywords)
+				err := processToken(ctx, key, t, contract.Address, "", mc, ethClient, ipfsClient, arweaveClient, stg, tokenBucket, tokenRepo, imageKeywords, animationKeywords, false)
 				if err != nil {
 					logger.For(c).Errorf("Error processing token: %s", err)
 				}
@@ -114,7 +114,7 @@ func processMediaForToken(mc *multichain.Provider, tokenRepo *postgres.TokenGall
 			return
 		}
 
-		err = processToken(ctx, key, t, input.ContractAddress, input.OwnerAddress, mc, ethClient, ipfsClient, arweaveClient, stg, tokenBucket, tokenRepo, input.ImageKeywords, input.AnimationKeywords)
+		err = processToken(ctx, key, t, input.ContractAddress, input.OwnerAddress, mc, ethClient, ipfsClient, arweaveClient, stg, tokenBucket, tokenRepo, input.ImageKeywords, input.AnimationKeywords, true)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -124,7 +124,7 @@ func processMediaForToken(mc *multichain.Provider, tokenRepo *postgres.TokenGall
 	}
 }
 
-func processToken(c context.Context, key string, t persist.TokenGallery, contractAddress, ownerAddress persist.Address, mc *multichain.Provider, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, tokenRepo *postgres.TokenGalleryRepository, imageKeywords, animationKeywords []string) error {
+func processToken(c context.Context, key string, t persist.TokenGallery, contractAddress, ownerAddress persist.Address, mc *multichain.Provider, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, tokenRepo *postgres.TokenGalleryRepository, imageKeywords, animationKeywords []string, forceRefresh bool) error {
 	ctx := logger.NewContextWithFields(c, logrus.Fields{
 		"tokenDBID":       t.ID,
 		"tokenID":         t.TokenID,
@@ -138,15 +138,15 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 
 	newMetadata := t.TokenMetadata
 
-	// if time.Since(t.LastUpdated.Time()) > 24*time.Hour*7 || len(newMetadata) == 0 {
-	mcMetadata, err := mc.GetTokenMetadataByTokenIdentifiers(ctx, contractAddress, t.TokenID, ownerAddress, t.Chain)
-	if err != nil {
-		logger.For(ctx).Errorf("error getting metadata from chain: %s", err)
-	} else if mcMetadata != nil && len(mcMetadata) > 0 {
-		logger.For(ctx).Infof("got metadata from chain: %v", mcMetadata)
-		newMetadata = mcMetadata
+	if len(newMetadata) == 0 || forceRefresh {
+		mcMetadata, err := mc.GetTokenMetadataByTokenIdentifiers(ctx, contractAddress, t.TokenID, ownerAddress, t.Chain)
+		if err != nil {
+			logger.For(ctx).Errorf("error getting metadata from chain: %s", err)
+		} else if mcMetadata != nil && len(mcMetadata) > 0 {
+			logger.For(ctx).Infof("got metadata from chain: %v", mcMetadata)
+			newMetadata = mcMetadata
+		}
 	}
-	// }
 
 	image, animation := media.KeywordsForChain(t.Chain, imageKeywords, animationKeywords)
 
