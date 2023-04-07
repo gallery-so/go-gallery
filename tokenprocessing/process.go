@@ -138,14 +138,15 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 
 	newMetadata := t.TokenMetadata
 
-	if time.Since(t.LastUpdated.Time()) > 24*time.Hour*7 || len(newMetadata) == 0 {
-		mcMetadata, err := mc.GetTokenMetadataByTokenIdentifiers(ctx, contractAddress, t.TokenID, ownerAddress, t.Chain)
-		if err != nil {
-			logger.For(ctx).Errorf("error getting metadata from chain: %s", err)
-		} else if mcMetadata != nil && len(mcMetadata) > 0 {
-			newMetadata = mcMetadata
-		}
+	// if time.Since(t.LastUpdated.Time()) > 24*time.Hour*7 || len(newMetadata) == 0 {
+	mcMetadata, err := mc.GetTokenMetadataByTokenIdentifiers(ctx, contractAddress, t.TokenID, ownerAddress, t.Chain)
+	if err != nil {
+		logger.For(ctx).Errorf("error getting metadata from chain: %s", err)
+	} else if mcMetadata != nil && len(mcMetadata) > 0 {
+		logger.For(ctx).Infof("got metadata from chain: %v", mcMetadata)
+		newMetadata = mcMetadata
 	}
+	// }
 
 	image, animation := media.KeywordsForChain(t.Chain, imageKeywords, animationKeywords)
 

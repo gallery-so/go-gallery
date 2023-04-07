@@ -792,11 +792,14 @@ func GetIPFSResponse(pCtx context.Context, ipfsClient *shell.Shell, path string)
 			return ipfsResult{err: ErrHTTP{Status: resp.StatusCode, URL: url}}
 		}
 
+		logger.For(ctx).Infof("IPFS HTTP fallback successful %s", path)
+
 		return ipfsResult{resp: resp.Body}
 	}
 
-	fromIPFS := func(context.Context) fetchResulter {
+	fromIPFS := func(ctx context.Context) fetchResulter {
 		reader, err := ipfsClient.Cat(path)
+		logger.For(ctx).Infof("IPFS cat fallback successful %s", path)
 		return ipfsResult{reader, err}
 	}
 
@@ -815,6 +818,8 @@ func GetIPFSResponse(pCtx context.Context, ipfsClient *shell.Shell, path string)
 		if resp.StatusCode > 399 || resp.StatusCode < 200 {
 			return ipfsResult{err: ErrHTTP{Status: resp.StatusCode, URL: url}}
 		}
+
+		logger.For(ctx).Infof("IPFS API fallback successful %s", path)
 
 		return ipfsResult{resp: resp.Body}
 	}

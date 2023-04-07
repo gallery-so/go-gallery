@@ -84,6 +84,7 @@ var postfixesToMediaTypes = map[string]mediaWithContentType{
 	"gltf": {persist.MediaTypeAnimation, "model/gltf+json"},
 	"svg":  {persist.MediaTypeImage, "image/svg+xml"},
 	"pdf":  {persist.MediaTypePDF, "application/pdf"},
+	"html": {persist.MediaTypeHTML, "text/html"},
 }
 
 func NewStorageClient(ctx context.Context) *storage.Client {
@@ -231,7 +232,7 @@ func downloadMediaFromURL(ctx context.Context, tids persist.TokenIdentifiers, st
 	})
 
 	go func() {
-		mediaType, cached, err := downloadAndCache(ctx, tids, mediaURL, name, urlType, ipfsClient, arweaveClient, storageClient, bucket)
+		mediaType, cached, err := downloadAndCache(ctx, tids, mediaURL, name, urlType, ipfsClient, arweaveClient, storageClient, bucket, false)
 		if err == nil {
 			resultCh <- cacheResult{mediaType, cached, err}
 			return
@@ -821,7 +822,7 @@ func getMediaServingURL(pCtx context.Context, bucketID, objectID string, client 
 	return fmt.Sprintf("https://storage.googleapis.com/%s/%s", bucketID, objectID), nil
 }
 
-func downloadAndCache(pCtx context.Context, tids persist.TokenIdentifiers, mediaURL, name, ipfsPrefix string, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, bucket string) (persist.MediaType, bool, error) {
+func downloadAndCache(pCtx context.Context, tids persist.TokenIdentifiers, mediaURL, name, ipfsPrefix string, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, bucket string, isRecursive bool) (persist.MediaType, bool, error) {
 	asURI := persist.TokenURI(mediaURL)
 	timeBeforePredict := time.Now()
 	mediaType, contentType, contentLength, _ := PredictMediaType(pCtx, asURI.String())
@@ -850,14 +851,15 @@ outer:
 	reader, err := rpc.GetDataFromURIAsReader(pCtx, asURI, ipfsClient, arweaveClient)
 	if err != nil {
 
-		if tids.Chain == persist.ChainETH {
+		if !isRecursive && tids.Chain == persist.ChainETH {
+			logger.For(pCtx).Infof("failed to get data from uri '%s' for '%s', trying opensea", mediaURL, name)
 			// if token is ETH, backup to asking opensea
 			assets, err := opensea.FetchAssetsForTokenIdentifiers(pCtx, persist.EthereumAddress(tids.ContractAddress), opensea.TokenID(tids.TokenID.Base10String()))
 			if err != nil || len(assets) == 0 {
 				// no data from opensea, return error
 				return mediaType, false, errNoDataFromReader{err: err, url: mediaURL}
 			}
-			found := false
+
 			for _, asset := range assets {
 				// does this asset have any valid URLs?
 				firstNonEmptyURL, ok := util.FindFirst([]string{asset.AnimationURL, asset.ImageURL, asset.ImagePreviewURL, asset.ImageOriginalURL, asset.ImageThumbnailURL}, func(s string) bool {
@@ -871,18 +873,13 @@ outer:
 				if err != nil {
 					continue
 				}
-				// we have a valid reader for an opensea link
-				found = true
-				break
-			}
 
-			if !found {
-				// we couldn't find any valid URLs from opensea
-				return mediaType, false, errNoDataFromReader{err: err, url: mediaURL}
+				logger.For(pCtx).Infof("got reader for %s from opensea in %s (%s)", name, time.Since(timeBeforeDataReader), firstNonEmptyURL)
+				return downloadAndCache(pCtx, tids, firstNonEmptyURL, name, ipfsPrefix, ipfsClient, arweaveClient, storageClient, bucket, true)
 			}
-		} else {
-			return mediaType, false, errNoDataFromReader{err: err, url: mediaURL}
 		}
+		return mediaType, false, errNoDataFromReader{err: err, url: mediaURL}
+
 	}
 	logger.For(pCtx).Infof("got reader for %s in %s", name, time.Since(timeBeforeDataReader))
 	defer reader.Close()
