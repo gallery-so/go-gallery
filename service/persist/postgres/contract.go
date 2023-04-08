@@ -55,7 +55,7 @@ func (c *ContractRepository) GetByAddress(pCtx context.Context, pAddress persist
 
 func (c *ContractRepository) GetAllByAddress(pCtx context.Context, pAddress persist.EthereumAddress) (persist.Contract, error) {
 	contract := persist.Contract{}
-	err := c.getByAddressStmt.QueryRowContext(pCtx, pAddress).Scan(&contract.ID, &contract.Version, &contract.CreationTime, &contract.LastUpdated, &contract.Address, &contract.Symbol, &contract.Name, &contract.LatestBlock, &contract.CreatorAddress, &contract.ContractURI, &contract.ContractMetadata)
+	err := c.getMetadataByAddressStmt.QueryRowContext(pCtx, pAddress).Scan(&contract.ID, &contract.Version, &contract.CreationTime, &contract.LastUpdated, &contract.Address, &contract.Symbol, &contract.Name, &contract.LatestBlock, &contract.CreatorAddress, &contract.ContractURI, &contract.ContractMetadata)
 	if err != nil {
 		return persist.Contract{}, err
 	}
@@ -66,7 +66,7 @@ func (c *ContractRepository) GetAllByAddress(pCtx context.Context, pAddress pers
 // GetByAddress returns the contract with the given address
 func (c *ContractRepository) GetMetadataByAddress(pCtx context.Context, pAddress persist.EthereumAddress) (persist.Contract, error) {
 	contract := persist.Contract{}
-	err := c.getMetadataByAddressStmt.QueryRowContext(pCtx, pAddress).Scan(&contract.ID, &contract.Version, &contract.CreationTime, &contract.LastUpdated, &contract.Address, &contract.Symbol, &contract.Name, &contract.LatestBlock, &contract.CreatorAddress)
+	err := c.getMetadataByAddressStmt.QueryRowContext(pCtx, pAddress).Scan(&contract.ID, &contract.Version, &contract.CreationTime, &contract.LastUpdated, &contract.Address, &contract.Symbol, &contract.Name, &contract.LatestBlock, &contract.CreatorAddress, &contract.ContractURI, &contract.ContractMetadata)
 	if err != nil {
 		return persist.Contract{}, err
 	}
