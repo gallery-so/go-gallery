@@ -617,7 +617,7 @@ func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (
 		return db.Gallery{}, err
 	}
 
-	gc := util.GinContextFromContext(ctx)
+	gc := util.MustGetGinContext(ctx)
 
 	if auth.GetUserAuthedFromCtx(gc) {
 		userID, err := getAuthenticatedUserID(ctx)
@@ -656,7 +656,7 @@ func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (
 }
 
 func getExternalID(ctx context.Context) *string {
-	gc := util.GinContextFromContext(ctx)
+	gc := util.MustGetGinContext(ctx)
 	if ip := net.ParseIP(gc.ClientIP()); ip != nil && !ip.IsPrivate() {
 		hash := sha256.New()
 		hash.Write([]byte(env.GetString("BACKEND_SECRET") + ip.String()))

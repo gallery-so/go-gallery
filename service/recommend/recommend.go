@@ -24,7 +24,7 @@ func AddTo(c *gin.Context, r *Recommender) {
 }
 
 func For(ctx context.Context) *Recommender {
-	gc := util.GinContextFromContext(ctx)
+	gc := util.MustGetGinContext(ctx)
 	return gc.Value(contextKey).(*Recommender)
 }
 

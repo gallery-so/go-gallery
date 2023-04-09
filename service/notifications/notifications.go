@@ -75,7 +75,7 @@ func AddTo(ctx *gin.Context, notificationHandlers *NotificationHandlers) {
 }
 
 func For(ctx context.Context) *NotificationHandlers {
-	gc := util.GinContextFromContext(ctx)
+	gc := util.MustGetGinContext(ctx)
 	return gc.Value(NotificationHandlerContextKey).(*NotificationHandlers)
 }
 
