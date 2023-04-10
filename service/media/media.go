@@ -467,6 +467,25 @@ func getHTMLMedia(pCtx context.Context, name, tokenBucket string, storageClient 
 	res := persist.Media{
 		MediaType: persist.MediaTypeHTML,
 	}
+<<<<<<< Updated upstream
+=======
+
+	var query string
+	sep := strings.LastIndex(vURL, "?")
+	if sep != -1 {
+		query = vURL[sep:]
+	} else {
+		sep = strings.LastIndex(imgURL, "?")
+		if sep != -1 {
+			query = imgURL[sep:]
+		}
+	}
+
+	videoURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("video-%s", name), storageClient)
+	if err == nil {
+		vURL = videoURL + query
+	}
+>>>>>>> Stashed changes
 	if vURL != "" {
 		logger.For(pCtx).Infof("using vURL for %s: %s", name, vURL)
 		res.MediaURL = persist.NullString(vURL)
