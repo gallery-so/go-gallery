@@ -20,6 +20,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/throttle"
+	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -107,7 +108,7 @@ func coreInitServer(quietLogs, enableRPC bool) *gin.Engine {
 
 	logger.For(ctx).Info("Registering handlers...")
 
-	httpClient := &http.Client{Timeout: 10 * time.Minute}
+	httpClient := &http.Client{Timeout: 10 * time.Minute, Transport: tracing.NewTracingTransport(http.DefaultTransport, false)}
 
 	i := newIndexer(ethClient, httpClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(env.GetInt("CHAIN")), defaultTransferEvents, nil, nil, nil)
 	return handlersInitServer(router, tokenRepo, contractRepo, ethClient, httpClient, ipfsClient, arweaveClient, s, i)

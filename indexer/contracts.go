@@ -44,7 +44,6 @@ func getContract(contractsRepo persist.ContractRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input GetContractInput
 		if err := c.ShouldBindQuery(&input); err != nil {
-			err = util.ErrInvalidInput{Reason: fmt.Sprintf("must specify 'address' field: %v", err)}
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
@@ -58,7 +57,7 @@ func getContract(contractsRepo persist.ContractRepository) gin.HandlerFunc {
 			c.JSON(http.StatusOK, GetContractOutput{Contract: contract})
 			return
 		} else if input.Owner != "" {
-			contracts, err := contractsRepo.GetContractsOwnedByAddress(c, input.Address)
+			contracts, err := contractsRepo.GetContractsOwnedByAddress(c, input.Owner)
 			if err != nil {
 				util.ErrResponse(c, http.StatusInternalServerError, err)
 				return
