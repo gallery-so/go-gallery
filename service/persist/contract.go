@@ -15,19 +15,21 @@ type Contract struct {
 
 	Chain Chain `json:"chain"`
 
-	Address      EthereumAddress `json:"address"`
-	Symbol       NullString      `json:"symbol"`
-	Name         NullString      `json:"name"`
-	OwnerAddress EthereumAddress `json:"owner_address"`
+	Address        EthereumAddress `json:"address"`
+	Symbol         NullString      `json:"symbol"`
+	Name           NullString      `json:"name"`
+	OwnerAddress   EthereumAddress `json:"owner_address"`
+	CreatorAddress EthereumAddress `json:"creator_address"`
 
 	LatestBlock BlockNumber `json:"latest_block"`
 }
 
 // ContractUpdateInput is the input for updating contract metadata fields
 type ContractUpdateInput struct {
-	Symbol       NullString      `json:"symbol"`
-	Name         NullString      `json:"name"`
-	OwnerAddress EthereumAddress `json:"owner_address"`
+	Symbol         NullString      `json:"symbol"`
+	Name           NullString      `json:"name"`
+	OwnerAddress   EthereumAddress `json:"owner_address"`
+	CreatorAddress EthereumAddress `json:"creator_address"`
 
 	LatestBlock BlockNumber `json:"latest_block"`
 }

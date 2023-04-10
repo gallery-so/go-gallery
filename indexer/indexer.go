@@ -887,7 +887,8 @@ func fillContractFields(ctx context.Context, contracts []persist.Contract, contr
 			contract.Name = persist.NullString(c.Metadata.Name)
 			contract.Symbol = persist.NullString(c.Metadata.Symbol)
 
-			cOwner, method, err := GetContractOwner(ctx, c.Address, ethClient, httpClient)
+			var method = contractOwnerMethodAlchemy
+			cOwner, err := rpc.GetContractOwner(ctx, c.Address, ethClient)
 			if err != nil {
 				logger.For(ctx).WithError(err).WithFields(logrus.Fields{
 					"contractAddress": c.Address,
@@ -895,7 +896,14 @@ func fillContractFields(ctx context.Context, contracts []persist.Contract, contr
 				contract.OwnerAddress = c.ContractDeployer
 			} else {
 				contract.OwnerAddress = cOwner
+				method = contractOwnerMethodOwnable
 			}
+
+			if contract.OwnerAddress == "" {
+				method = contractOwnerMethodFailed
+			}
+
+			contract.CreatorAddress = c.ContractDeployer
 
 			it, ok := contractOwnerStats.LoadOrStore(method, 1)
 			if ok {

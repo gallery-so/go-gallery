@@ -2,7 +2,6 @@ package indexer
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -11,7 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/multichain/alchemy"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/util"
@@ -121,6 +119,8 @@ func updateMetadataForContract(c context.Context, input UpdateContractMetadataIn
 		up.OwnerAddress = owner
 	}
 
+	// TODO creator address
+
 	return contractsRepo.UpdateByAddress(c, input.Address, up)
 }
 
@@ -140,28 +140,6 @@ func GetContractOwner(ctx context.Context, address persist.EthereumAddress, ethC
 		return owner, contractOwnerMethodOwnable, nil
 	}
 	logger.For(ctx).WithError(err).Error("error finding owner address through ownable interface")
-
-	urlForContract := fmt.Sprintf("%s/getContractMetadata?contractAddress=%s", env.GetString("ALCHEMY_API_URL"), address)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlForContract, nil)
-	if err != nil {
-		return "", contractOwnerMethodFailed, err
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return "", contractOwnerMethodFailed, err
-	}
-
-	var cmeta alchemy.GetContractMetadataResponse
-	if err := json.NewDecoder(resp.Body).Decode(&cmeta); err != nil {
-		return "", contractOwnerMethodFailed, err
-	}
-
-	if cmeta.ContractMetadata.ContractDeployer != "" {
-		return cmeta.ContractMetadata.ContractDeployer, contractOwnerMethodAlchemy, nil
-	}
-
-	logger.For(ctx).WithError(err).Error("error finding owner address through alchemy")
 
 	creator, err := rpc.GetContractCreator(ctx, address, ethClient)
 	if err != nil {

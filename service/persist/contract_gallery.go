@@ -14,15 +14,16 @@ type ContractGallery struct {
 	Deleted      NullBool        `json:"-"`
 	LastUpdated  LastUpdatedTime `json:"last_updated"`
 
-	Chain            Chain      `json:"chain"`
-	Address          Address    `json:"address"`
-	Symbol           NullString `json:"symbol"`
+	Chain            Chain          `json:"chain"`
+	Address          Address        `json:"address"`
+	Symbol           NullString     `json:"symbol"`
 	Name             sql.NullString `json:"name"`
-	Description      NullString `json:"description"`
-	OwnerAddress     Address    `json:"owner_address"`
-	ProfileImageURL  NullString `json:"profile_image_url"`
-	ProfileBannerURL NullString `json:"profile_banner_url"`
-	BadgeURL         NullString `json:"badge_url"`
+	Description      NullString     `json:"description"`
+	OwnerAddress     Address        `json:"owner_address"`
+	CreatorAddress   Address        `json:"creator_address"`
+	ProfileImageURL  NullString     `json:"profile_image_url"`
+	ProfileBannerURL NullString     `json:"profile_banner_url"`
+	BadgeURL         NullString     `json:"badge_url"`
 }
 
 // ErrContractNotFoundByAddress is an error type for when a contract is not found by address
