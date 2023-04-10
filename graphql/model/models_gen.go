@@ -1008,6 +1008,11 @@ func (ErrUsernameNotAvailable) IsUpdateUserInfoPayloadOrError() {}
 func (ErrUsernameNotAvailable) IsError()                        {}
 func (ErrUsernameNotAvailable) IsCreateUserPayloadOrError()     {}
 
+type FallbackMedia struct {
+	MediaURL  *string `json:"mediaURL"`
+	MediaType *string `json:"mediaType"`
+}
+
 type FeedConnection struct {
 	Edges    []*FeedEdge `json:"edges"`
 	PageInfo *PageInfo   `json:"pageInfo"`
@@ -1622,6 +1627,7 @@ type SyncingMedia struct {
 	MediaType        *string          `json:"mediaType"`
 	ContentRenderURL *string          `json:"contentRenderURL"`
 	Dimensions       *MediaDimensions `json:"dimensions"`
+	FallbackMedia    *FallbackMedia   `json:"fallbackMedia"`
 }
 
 func (SyncingMedia) IsMediaSubtype() {}
@@ -1751,6 +1757,7 @@ type UnknownMedia struct {
 	MediaType        *string          `json:"mediaType"`
 	ContentRenderURL *string          `json:"contentRenderURL"`
 	Dimensions       *MediaDimensions `json:"dimensions"`
+	FallbackMedia    *FallbackMedia   `json:"fallbackMedia"`
 }
 
 func (UnknownMedia) IsMediaSubtype() {}

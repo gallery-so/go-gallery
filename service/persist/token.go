@@ -58,6 +58,8 @@ const (
 	MediaTypeUnknown MediaType = "unknown"
 	// MediaTypeSyncing represents a syncing media
 	MediaTypeSyncing MediaType = "syncing"
+	// MediaTypeFallback represents a fallback media
+	MediaTypeFallback MediaType = "fallback"
 )
 
 var mediaTypePriorities = []MediaType{MediaTypeHTML, MediaTypeAudio, MediaTypeAnimation, MediaTypeVideo, MediaTypeBase64BMP, MediaTypeGIF, MediaTypeSVG, MediaTypeImage, MediaTypeJSON, MediaTypeBase64Text, MediaTypeText, MediaTypeSyncing, MediaTypeUnknown, MediaTypeInvalid}
@@ -245,9 +247,9 @@ type Media struct {
 	Dimensions     Dimensions `json:"dimensions"`
 }
 
-// IsServable returns true if the token's Media has enough information to serve it's assets.
-func (m Media) IsServable() bool {
-	return m.MediaURL != "" && m.MediaType.IsValid()
+type FallbackMedia struct {
+	ImageURL   NullString `json:"image_url,omitempty"`
+	Dimensions Dimensions `json:"dimensions"`
 }
 
 // NFT represents an old nft throughout the application
@@ -752,6 +754,11 @@ func (hex HexString) Add(new HexString) HexString {
 	return HexString(asInt.Add(asInt, new.BigInt()).Text(16))
 }
 
+// IsServable returns true if the token's Media has enough information to serve it's assets.
+func (m Media) IsServable() bool {
+	return m.MediaURL != "" && m.MediaType.IsValid()
+}
+
 // Value implements the driver.Valuer interface for media
 func (m Media) Value() (driver.Value, error) {
 	return json.Marshal(m)
@@ -761,6 +768,25 @@ func (m Media) Value() (driver.Value, error) {
 func (m *Media) Scan(src interface{}) error {
 	if src == nil {
 		*m = Media{}
+		return nil
+	}
+	return json.Unmarshal(src.([]uint8), &m)
+}
+
+// IsServable returns true if the token's Media has enough information to serve it's assets.
+func (m FallbackMedia) IsServable() bool {
+	return m.ImageURL != ""
+}
+
+// Value implements the driver.Valuer interface for media
+func (m FallbackMedia) Value() (driver.Value, error) {
+	return json.Marshal(m)
+}
+
+// Scan implements the sql.Scanner interface for media
+func (m *FallbackMedia) Scan(src interface{}) error {
+	if src == nil {
+		*m = FallbackMedia{}
 		return nil
 	}
 	return json.Unmarshal(src.([]uint8), &m)

@@ -23,8 +23,9 @@ type TokenGallery struct {
 
 	LastSynced LastUpdatedTime `json:"last_synced"`
 
-	CollectorsNote NullString `json:"collectors_note"`
-	Media          Media      `json:"media"`
+	CollectorsNote NullString    `json:"collectors_note"`
+	Media          Media         `json:"media"`
+	FallbackMedia  FallbackMedia `json:"fallback_media"`
 
 	TokenType TokenType `json:"token_type"`
 
@@ -80,28 +81,6 @@ type TokenIdentifiers struct {
 type ContractIdentifiers struct {
 	ContractAddress Address `json:"contract_address"`
 	Chain           Chain   `json:"chain"`
-}
-
-// TokenInCollection represents a token within a collection
-type TokenInCollection struct {
-	ID           DBID         `json:"id" binding:"required"`
-	CreationTime CreationTime `json:"created_at"`
-
-	ContractAddress DBID `json:"contract_address"`
-
-	Chain Chain `json:"chain"`
-
-	Name        NullString `json:"name"`
-	Description NullString `json:"description"`
-
-	TokenType TokenType `json:"token_type"`
-
-	TokenURI     TokenURI `json:"token_uri"`
-	TokenID      TokenID  `json:"token_id"`
-	OwnerAddress DBID     `json:"owner_address"`
-
-	Media         Media         `json:"media"`
-	TokenMetadata TokenMetadata `json:"metadata"`
 }
 
 // TokenUpdateInfoInput represents a token update to update the token's user inputted info

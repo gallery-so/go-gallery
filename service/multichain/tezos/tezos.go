@@ -659,6 +659,7 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 				errChan <- err
 				return
 			}
+
 			var agnosticMetadata persist.TokenMetadata
 			if err := json.Unmarshal(metadata, &agnosticMetadata); err != nil {
 				errChan <- err
@@ -671,7 +672,9 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 				Description: tzToken.Token.Metadata.Description,
 				Name:        tzToken.Token.Metadata.Name,
 				TokenID:     tid,
-
+				FallbackMedia: persist.FallbackMedia{
+					ImageURL: persist.NullString(tzToken.Token.Metadata.Image),
+				},
 				ContractAddress: tzToken.Token.Contract.Address,
 				Quantity:        persist.HexString(tzToken.Balance.toBase16String()),
 				TokenMetadata:   agnosticMetadata,
