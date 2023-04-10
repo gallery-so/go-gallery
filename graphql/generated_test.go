@@ -454,6 +454,7 @@ const (
 	UserExperienceTypeMaintenancefeb2023                UserExperienceType = "MaintenanceFeb2023"
 	UserExperienceTypeTwitterconnectiononboardingupsell UserExperienceType = "TwitterConnectionOnboardingUpsell"
 	UserExperienceTypeUpsellmintmemento4                UserExperienceType = "UpsellMintMemento4"
+	UserExperienceTypeUpsellgalleryselects1             UserExperienceType = "UpsellGallerySelects1"
 )
 
 // __addUserWalletMutationInput is used internally by genqlient

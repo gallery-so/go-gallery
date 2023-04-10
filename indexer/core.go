@@ -61,7 +61,7 @@ func coreInit(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) (*gin.Engin
 		rpcEnabled = true
 	}
 
-	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(env.GetInt("CHAIN")), defaultTransferEvents, nil, fromBlock, toBlock)
+	i := newIndexer(ethClient, &http.Client{Timeout: 10 * time.Minute}, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(env.GetInt("CHAIN")), defaultTransferEvents, nil, fromBlock, toBlock)
 
 	router := gin.Default()
 
@@ -110,7 +110,7 @@ func coreInitServer(quietLogs, enableRPC bool) *gin.Engine {
 	queueChan := make(chan processTokensInput)
 	t := newThrottler()
 
-	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(env.GetInt("CHAIN")), defaultTransferEvents, nil, nil, nil)
+	i := newIndexer(ethClient, &http.Client{Timeout: 10 * time.Minute}, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(env.GetInt("CHAIN")), defaultTransferEvents, nil, nil, nil)
 
 	go processMissingMetadata(ctx, queueChan, tokenRepo, contractRepo, ipfsClient, ethClient, arweaveClient, s, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
 	return handlersInitServer(router, queueChan, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s, i)
@@ -120,6 +120,7 @@ func SetDefaults() {
 	viper.SetDefault("RPC_URL", "")
 	viper.SetDefault("IPFS_URL", "https://gallery.infura-ipfs.io")
 	viper.SetDefault("IPFS_API_URL", "https://ipfs.infura.io:5001")
+	viper.SetDefault("FALLBACK_IPFS_URL", "https://ipfs.io")
 	viper.SetDefault("IPFS_PROJECT_ID", "")
 	viper.SetDefault("IPFS_PROJECT_SECRET", "")
 	viper.SetDefault("CHAIN", 0)
@@ -136,6 +137,7 @@ func SetDefaults() {
 	viper.SetDefault("SENTRY_DSN", "")
 	viper.SetDefault("IMGIX_API_KEY", "")
 	viper.SetDefault("VERSION", "")
+	viper.SetDefault("ALCHEMY_API_URL", "")
 	viper.AutomaticEnv()
 }
 

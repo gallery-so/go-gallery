@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/mikeydub/go-gallery/env"
@@ -95,6 +96,7 @@ type Owner struct {
 
 func (r *getNFTsForOwnerResponse) GetTokensFromResponse(resp *http.Response) ([]Token, error) {
 	r.Assets = nil
+	r.Cursor = ""
 	if err := json.NewDecoder(resp.Body).Decode(r); err != nil {
 		return nil, err
 	}
@@ -102,7 +104,7 @@ func (r *getNFTsForOwnerResponse) GetTokensFromResponse(resp *http.Response) ([]
 }
 
 func (r *getNFTsForOwnerResponse) GetNextPageKey() string {
-	return r.Cursor
+	return url.QueryEscape(r.Cursor)
 }
 
 const baseURL = "https://nft.api.infura.io/networks/1"
@@ -220,13 +222,24 @@ func (d *Provider) getOwnersPaginate(ctx context.Context, tids multichain.ChainA
 func getNFTsPaginate[T tokensPaginated](ctx context.Context, startingURL string, limit, offset int, pageKey string, httpClient *http.Client, key, secret string, result T) ([]Token, error) {
 
 	tokens := []Token{}
-	url := startingURL
+	u := startingURL
 
-	if pageKey != "" {
-		url = fmt.Sprintf("%s&cursor=%s", url, pageKey)
+	parsedURL, err := url.Parse(u)
+	if err != nil {
+		return nil, err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	q := parsedURL.Query()
+
+	if pageKey != "" {
+		q.Set("cursor", pageKey)
+	}
+
+	parsedURL.RawQuery = q.Encode()
+
+	u = parsedURL.String()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -241,7 +254,7 @@ func getNFTsPaginate[T tokensPaginated](ctx context.Context, startingURL string,
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to get tokens from alchemy api: %s", resp.Status)
+		return nil, fmt.Errorf("failed to get tokens from infura api: %s (%s)", resp.Status, u)
 	}
 
 	newTokens, err := result.GetTokensFromResponse(resp)
@@ -265,7 +278,9 @@ func getNFTsPaginate[T tokensPaginated](ctx context.Context, startingURL string,
 
 	tokens = append(tokens, newTokens...)
 
-	if result.GetNextPageKey() != "" && result.GetNextPageKey() != pageKey {
+	next := result.GetNextPageKey()
+
+	if next != "" && next != pageKey {
 
 		if limit > 0 {
 			limit -= pageSize
@@ -273,7 +288,7 @@ func getNFTsPaginate[T tokensPaginated](ctx context.Context, startingURL string,
 		if offset > 0 {
 			offset -= pageSize
 		}
-		newTokens, err := getNFTsPaginate(ctx, startingURL, limit, offset, result.GetNextPageKey(), httpClient, key, secret, result)
+		newTokens, err := getNFTsPaginate(ctx, startingURL, limit, offset, next, httpClient, key, secret, result)
 		if err != nil {
 			return nil, err
 		}
@@ -281,6 +296,42 @@ func getNFTsPaginate[T tokensPaginated](ctx context.Context, startingURL string,
 	}
 
 	return tokens, nil
+}
+
+type TokenMetadata struct {
+	Contract persist.Address `json:"contract"`
+	TokenID  persist.TokenID `json:"token_id"`
+	Metadata Metadata        `json:"metadata"`
+}
+
+// GetTokenMetadataByTokenIdentifiers retrieves a token's metadata for a given contract address and token ID
+func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (persist.TokenMetadata, error) {
+	url := fmt.Sprintf("%s/nfts/%s/tokens/%s?resyncMetadata=true", baseURL, ti.ContractAddress, ti.TokenID.Base10String())
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return persist.TokenMetadata{}, err
+	}
+
+	req.SetBasicAuth(p.apiKey, p.apiSecret)
+
+	resp, err := p.httpClient.Do(req)
+	if err != nil {
+		return persist.TokenMetadata{}, err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return persist.TokenMetadata{}, fmt.Errorf("failed to get token metadata from infura api: %s", resp.Status)
+	}
+
+	tokenMetadata := TokenMetadata{}
+	if err := json.NewDecoder(resp.Body).Decode(&tokenMetadata); err != nil {
+		return persist.TokenMetadata{}, err
+	}
+
+	return persist.TokenMetadata(tokenMetadata.Metadata), nil
 }
 
 type ContractMetadata struct {

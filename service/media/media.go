@@ -15,11 +15,13 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
+	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/sirupsen/logrus"
@@ -83,6 +85,7 @@ var postfixesToMediaTypes = map[string]mediaWithContentType{
 	"gltf": {persist.MediaTypeAnimation, "model/gltf+json"},
 	"svg":  {persist.MediaTypeImage, "image/svg+xml"},
 	"pdf":  {persist.MediaTypePDF, "application/pdf"},
+	"html": {persist.MediaTypeHTML, "text/html"},
 }
 
 func NewStorageClient(ctx context.Context) *storage.Client {
@@ -129,11 +132,12 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		res                  persist.Media
 	)
 
+	tids := persist.NewTokenIdentifiers(contractAddress, tokenID, chain)
 	if vURL != "" {
-		vidCh = downloadMediaFromURL(pCtx, storageClient, arweaveClient, ipfsClient, "video", vURL, name, tokenBucket)
+		vidCh = downloadMediaFromURL(pCtx, tids, storageClient, arweaveClient, ipfsClient, "video", vURL, name, tokenBucket)
 	}
 	if imgURL != "" {
-		imgCh = downloadMediaFromURL(pCtx, storageClient, arweaveClient, ipfsClient, "image", imgURL, name, tokenBucket)
+		imgCh = downloadMediaFromURL(pCtx, tids, storageClient, arweaveClient, ipfsClient, "image", imgURL, name, tokenBucket)
 	}
 
 	if vidCh != nil {
@@ -166,35 +170,76 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	pCtx = logger.NewContextWithFields(pCtx, logrus.Fields{"mediaType": mediaType})
 	logger.For(pCtx).Infof("using '%s' as the mediaType", mediaType)
 
+	wg := &sync.WaitGroup{}
+
 	// if nothing was cached in the image step and the image step did process an image type, delete the now stale cached image
 	if !imgResult.cached && imgResult.mediaType.IsImageLike() {
 		logger.For(pCtx).Debug("imgResult not cached, deleting cached version if any")
-		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("image-%s", name), storageClient)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			deleteMedia(ctx, tokenBucket, fmt.Sprintf("image-%s", name), storageClient)
+		}()
 	}
 
 	// if nothing was cached in the image step and the image step did process an image type, delete the now stale cached live render
 	if !imgResult.cached && imgResult.mediaType.IsAnimationLike() {
 		logger.For(pCtx).Debug("imgResult not cached, deleting cached version if any")
-		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("liverender-%s", name), storageClient)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			deleteMedia(ctx, tokenBucket, fmt.Sprintf("liverender-%s", name), storageClient)
+		}()
 	}
 	// if nothing was cached in the video step and the video step did process a video type, delete the now stale cached video
 	if !vidResult.cached && vidResult.mediaType.IsAnimationLike() {
 		logger.For(pCtx).Debug("vidResult not cached, deleting cached version if any")
-		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("video-%s", name), storageClient)
-		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("liverender-%s", name), storageClient)
+		wg.Add(2)
+
+		go func() {
+			defer wg.Done()
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			deleteMedia(ctx, tokenBucket, fmt.Sprintf("video-%s", name), storageClient)
+		}()
+		go func() {
+			defer wg.Done()
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			deleteMedia(ctx, tokenBucket, fmt.Sprintf("liverender-%s", name), storageClient)
+		}()
 	}
 
 	// if something was cached but neither media type is animation type, we can assume that there was nothing thumbnailed therefore any thumbnail or liverender is stale
 	if (imgResult.cached || vidResult.cached) && (!imgResult.mediaType.IsAnimationLike() && !vidResult.mediaType.IsAnimationLike()) {
 		logger.For(pCtx).Debug("neither cached, deleting thumbnail if any")
-		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("thumbnail-%s", name), storageClient)
-		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("liverender-%s", name), storageClient)
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			deleteMedia(ctx, tokenBucket, fmt.Sprintf("thumbnail-%s", name), storageClient)
+		}()
+		go func() {
+			defer wg.Done()
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			deleteMedia(ctx, tokenBucket, fmt.Sprintf("liverender-%s", name), storageClient)
+		}()
 	}
 
 	// imgURL does not work, but vidURL does, don't try to use imgURL
 	if _, ok := imgResult.err.(errNoDataFromReader); ok && (vidResult.cached && vidResult.mediaType.IsAnimationLike()) {
 		imgURL = ""
 	}
+
+	logger.For(pCtx).Debug("waiting for all necessary media to be deleted")
+	wg.Wait()
+	logger.For(pCtx).Debug("deleting finished")
 
 	switch mediaType {
 	case persist.MediaTypeImage:
@@ -221,7 +266,7 @@ type cacheResult struct {
 	err       error
 }
 
-func downloadMediaFromURL(ctx context.Context, storageClient *storage.Client, arweaveClient *goar.Client, ipfsClient *shell.Shell, urlType, mediaURL, name, bucket string) chan cacheResult {
+func downloadMediaFromURL(ctx context.Context, tids persist.TokenIdentifiers, storageClient *storage.Client, arweaveClient *goar.Client, ipfsClient *shell.Shell, urlType, mediaURL, name, bucket string) chan cacheResult {
 	resultCh := make(chan cacheResult)
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
 		"tokenURIType": persist.TokenURI(mediaURL).Type(),
@@ -229,7 +274,7 @@ func downloadMediaFromURL(ctx context.Context, storageClient *storage.Client, ar
 	})
 
 	go func() {
-		mediaType, cached, err := downloadAndCache(ctx, mediaURL, name, urlType, ipfsClient, arweaveClient, storageClient, bucket)
+		mediaType, cached, err := downloadAndCache(ctx, tids, mediaURL, name, urlType, ipfsClient, arweaveClient, storageClient, bucket, false)
 		if err == nil {
 			resultCh <- cacheResult{mediaType, cached, err}
 			return
@@ -835,7 +880,7 @@ func getMediaServingURL(pCtx context.Context, bucketID, objectID string, client 
 	return fmt.Sprintf("https://storage.googleapis.com/%s/%s", bucketID, objectID), nil
 }
 
-func downloadAndCache(pCtx context.Context, mediaURL, name, ipfsPrefix string, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, bucket string) (persist.MediaType, bool, error) {
+func downloadAndCache(pCtx context.Context, tids persist.TokenIdentifiers, mediaURL, name, ipfsPrefix string, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, bucket string, isRecursive bool) (persist.MediaType, bool, error) {
 	asURI := persist.TokenURI(mediaURL)
 	timeBeforePredict := time.Now()
 	mediaType, contentType, contentLength, _ := PredictMediaType(pCtx, asURI.String())
@@ -863,7 +908,36 @@ outer:
 	timeBeforeDataReader := time.Now()
 	reader, err := rpc.GetDataFromURIAsReader(pCtx, asURI, ipfsClient, arweaveClient)
 	if err != nil {
+
+		if !isRecursive && tids.Chain == persist.ChainETH {
+			logger.For(pCtx).Infof("failed to get data from uri '%s' for '%s', trying opensea", mediaURL, name)
+			// if token is ETH, backup to asking opensea
+			assets, err := opensea.FetchAssetsForTokenIdentifiers(pCtx, persist.EthereumAddress(tids.ContractAddress), opensea.TokenID(tids.TokenID.Base10String()))
+			if err != nil || len(assets) == 0 {
+				// no data from opensea, return error
+				return mediaType, false, errNoDataFromReader{err: err, url: mediaURL}
+			}
+
+			for _, asset := range assets {
+				// does this asset have any valid URLs?
+				firstNonEmptyURL, ok := util.FindFirst([]string{asset.AnimationURL, asset.ImageURL, asset.ImagePreviewURL, asset.ImageOriginalURL, asset.ImageThumbnailURL}, func(s string) bool {
+					return s != ""
+				})
+				if !ok {
+					continue
+				}
+
+				reader, err = rpc.GetDataFromURIAsReader(pCtx, persist.TokenURI(firstNonEmptyURL), ipfsClient, arweaveClient)
+				if err != nil {
+					continue
+				}
+
+				logger.For(pCtx).Infof("got reader for %s from opensea in %s (%s)", name, time.Since(timeBeforeDataReader), firstNonEmptyURL)
+				return downloadAndCache(pCtx, tids, firstNonEmptyURL, name, ipfsPrefix, ipfsClient, arweaveClient, storageClient, bucket, true)
+			}
+		}
 		return mediaType, false, errNoDataFromReader{err: err, url: mediaURL}
+
 	}
 	logger.For(pCtx).Infof("got reader for %s in %s", name, time.Since(timeBeforeDataReader))
 	defer reader.Close()
@@ -915,9 +989,6 @@ outer:
 
 	switch asURI.Type() {
 	case persist.URITypeIPFS, persist.URITypeArweave:
-		if mediaType == persist.MediaTypeHTML && persist.TokenURI(mediaURL).IsPathPrefixed() {
-			return mediaType, true, nil
-		}
 		logger.For(pCtx).Infof("caching %.2f mb of raw media with type '%s' for '%s' at '%s-%s'", float64(contentLength)/1024/1024, mediaType, mediaURL, ipfsPrefix, name)
 
 		if mediaType == persist.MediaTypeAnimation {

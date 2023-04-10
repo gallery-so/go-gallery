@@ -517,6 +517,14 @@ func (c *Chain) UnmarshalJSON(data []byte) error {
 			*c = ChainETH
 		case "tezos":
 			*c = ChainTezos
+		case "arbitrum":
+			*c = ChainArbitrum
+		case "polygon":
+			*c = ChainPolygon
+		case "optimism":
+			*c = ChainOptimism
+		case "poap":
+			*c = ChainPOAP
 		}
 		return nil
 	}
@@ -557,6 +565,12 @@ func (c Chain) MarshalGQL(w io.Writer) {
 		w.Write([]byte(`"Tezos"`))
 	case ChainPOAP:
 		w.Write([]byte(`"POAP"`))
+	case ChainArbitrum:
+		w.Write([]byte(`"Arbitrum"`))
+	case ChainPolygon:
+		w.Write([]byte(`"Polygon"`))
+	case ChainOptimism:
+		w.Write([]byte(`"Optimism"`))
 	}
 }
 

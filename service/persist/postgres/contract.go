@@ -39,6 +39,11 @@ func (c *ContractRepository) GetByAddress(pCtx context.Context, pAddress persist
 	contract := persist.Contract{}
 	err := c.getByAddressStmt.QueryRowContext(pCtx, pAddress).Scan(&contract.ID, &contract.Version, &contract.CreationTime, &contract.LastUpdated, &contract.Address, &contract.Symbol, &contract.Name, &contract.LatestBlock, &contract.CreatorAddress)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return persist.Contract{}, persist.ErrContractNotFoundByAddress{
+				Address: pAddress,
+			}
+		}
 		return persist.Contract{}, err
 	}
 
