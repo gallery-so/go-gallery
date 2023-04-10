@@ -12,6 +12,7 @@ import (
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/util"
 )
 
 func init() {
@@ -438,11 +439,21 @@ func ownedTokenToChainAgnosticToken(owner persist.Address, token Token) multicha
 		b = big.NewInt(1)
 	}
 
+	var thumbnail string
+	if it, _ := util.GetValueFromMapUnsafe(token.Metadata, "thumbnail", util.DefaultSearchDepth).(string); persist.TokenURI(it).IsRenderable() {
+		thumbnail = it
+	} else if it, _ := util.GetValueFromMapUnsafe(token.Metadata, "image", util.DefaultSearchDepth).(string); persist.TokenURI(it).IsRenderable() {
+		thumbnail = it
+	}
+
 	chainAgnosticToken := multichain.ChainAgnosticToken{
-		TokenType:       tokenType,
-		TokenMetadata:   persist.TokenMetadata(token.Metadata),
-		TokenID:         token.TokenID.ToTokenID(),
-		OwnerAddress:    owner,
+		TokenType:     tokenType,
+		TokenMetadata: persist.TokenMetadata(token.Metadata),
+		TokenID:       token.TokenID.ToTokenID(),
+		OwnerAddress:  owner,
+		FallbackMedia: persist.FallbackMedia{
+			ImageURL: persist.NullString(thumbnail),
+		},
 		ContractAddress: persist.Address(token.Contract),
 		Quantity:        persist.HexString(b.Text(16)),
 	}

@@ -338,6 +338,7 @@ type Token struct {
 	IsUserMarkedSpam     sql.NullBool
 	IsProviderMarkedSpam sql.NullBool
 	LastSynced           time.Time
+	FallbackMedia        persist.FallbackMedia
 }
 
 type TopRecommendedUser struct {

@@ -513,10 +513,6 @@ func getHTMLMedia(pCtx context.Context, name, tokenBucket string, storageClient 
 		MediaType: persist.MediaTypeHTML,
 	}
 
-	videoURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("video-%s", name), storageClient)
-	if err == nil {
-		vURL = videoURL
-	}
 	if vURL != "" {
 		logger.For(pCtx).Infof("using vURL for %s: %s", name, vURL)
 		res.MediaURL = persist.NullString(vURL)
@@ -978,6 +974,9 @@ outer:
 
 	switch asURI.Type() {
 	case persist.URITypeIPFS, persist.URITypeArweave:
+		if mediaType == persist.MediaTypeHTML && asURI.IsPathPrefixed() {
+			return mediaType, false, nil
+		}
 		logger.For(pCtx).Infof("caching %.2f mb of raw media with type '%s' for '%s' at '%s-%s'", float64(contentLength)/1024/1024, mediaType, mediaURL, ipfsPrefix, name)
 
 		if mediaType == persist.MediaTypeAnimation {

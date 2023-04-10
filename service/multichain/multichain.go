@@ -66,6 +66,8 @@ type ChainAgnosticToken struct {
 	TokenMetadata    persist.TokenMetadata         `json:"metadata"`
 	ContractAddress  persist.Address               `json:"contract_address"`
 
+	FallbackMedia persist.FallbackMedia `json:"fallback_media"`
+
 	ExternalURL string `json:"external_url"`
 
 	BlockNumber persist.BlockNumber `json:"block_number"`
@@ -467,6 +469,10 @@ func (p *Provider) prepTokensForTokenProcessing(ctx context.Context, tokensFromP
 		// we can display media for a token while it gets handled by tokenprocessing
 		if !token.Media.IsServable() && existingToken.Media.IsServable() {
 			providerTokens[i].Media = existingToken.Media
+		}
+
+		if !token.FallbackMedia.IsServable() && existingToken.FallbackMedia.IsServable() {
+			providerTokens[i].FallbackMedia = existingToken.FallbackMedia
 		}
 
 		// There's no available media for the token at this point, so set the state to syncing
@@ -1194,9 +1200,10 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 				Chain:                chainToken.chain,
 				Name:                 persist.NullString(token.Name),
 				Description:          persist.NullString(token.Description),
-				TokenURI:             "", // We don't save tokenURI information
+				TokenURI:             "", // We don't save tokenURI information anymore
 				TokenID:              token.TokenID,
 				OwnerUserID:          ownerUser.ID,
+				FallbackMedia:        token.FallbackMedia,
 				TokenMetadata:        token.TokenMetadata,
 				Contract:             contractAddressIDs[chainToken.chain.NormalizeAddress(token.ContractAddress)],
 				ExternalURL:          persist.NullString(token.ExternalURL),
@@ -1208,6 +1215,9 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 			if !seen {
 				seenTokens[ti] = candidateToken
 			} else if len(existingToken.TokenMetadata) < len(candidateToken.TokenMetadata) {
+				if existingToken.FallbackMedia.IsServable() && !candidateToken.FallbackMedia.IsServable() {
+					candidateToken.FallbackMedia = existingToken.FallbackMedia
+				}
 				seenTokens[ti] = candidateToken
 			}
 

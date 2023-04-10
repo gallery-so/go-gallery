@@ -183,6 +183,11 @@ type MediaDimensions {
   aspectRatio: Float
 }
 
+type FallbackMedia {
+  mediaURL: String
+  mediaType: String
+}
+
 interface Media {
   # Various sizes of preview images for the media
   previewURLs: PreviewURLSet
@@ -290,6 +295,8 @@ type UnknownMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type SyncingMedia implements Media {
@@ -299,6 +306,8 @@ type SyncingMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type InvalidMedia implements Media {
