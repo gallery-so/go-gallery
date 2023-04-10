@@ -59,6 +59,7 @@ type Contract struct {
 	Name             sql.NullString
 	Symbol           sql.NullString
 	Address          persist.Address
+	CreatorAddress   persist.Address
 	Chain            persist.Chain
 	ProfileBannerUrl sql.NullString
 	ProfileImageUrl  sql.NullString

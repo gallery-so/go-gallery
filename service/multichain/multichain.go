@@ -252,6 +252,14 @@ var chainValidation map[persist.Chain]validation = map[persist.Chain]validation{
 		nameResolver:       true,
 		tokensOwnerFetcher: true,
 	},
+	persist.ChainOptimism: {
+		tokensOwnerFetcher:    true,
+		tokensContractFetcher: true,
+	},
+	persist.ChainPolygon: {
+		tokensOwnerFetcher:    true,
+		tokensContractFetcher: true,
+	},
 }
 
 type validation struct {
@@ -351,7 +359,7 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 
 	wg := sync.WaitGroup{}
 	for c, a := range chainsToAddresses {
-		logger.For(ctx).Infof("syncing tokens for user %s wallets %s", user.Username, a)
+		logger.For(ctx).Infof("syncing chain %d tokens for user %s wallets %s", c, user.Username, a)
 		chain := c
 		addresses := a
 		wg.Add(len(addresses))
@@ -675,8 +683,8 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contr
 
 	for _, metadataFetcher := range metadataFetchers {
 		metadata, err = metadataFetcher.GetTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: contractAddress, TokenID: tokenID}, ownerAddress)
-    if err != nil {
-				logger.For(ctx).Errorf("error fetching token metadata %s", err)
+		if err != nil {
+			logger.For(ctx).Errorf("error fetching token metadata %s", err)
 		}
 		if err == nil && len(metadata) > 0 {
 			return metadata, nil

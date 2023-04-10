@@ -3,11 +3,9 @@ package indexer
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gammazero/workerpool"
 	"github.com/getsentry/sentry-go"
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -67,9 +65,9 @@ func startSpan(ctx context.Context, plugin, op string) (*sentry.Span, context.Co
 // NewTransferPlugins returns a set of transfer plugins. Plugins have an `in` and an optional `out` channel that are handles to the service.
 // The `in` channel is used to submit a transfer to a plugin, and the `out` channel is used to receive results from a plugin, if any.
 // A plugin can be stopped by closing its `in` channel, which finishes the plugin and lets receivers know that its done.
-func NewTransferPlugins(ctx context.Context, ethClient *ethclient.Client, httpClient *http.Client, contractOwnerStats *sync.Map) TransferPlugins {
+func NewTransferPlugins(ctx context.Context) TransferPlugins {
 	return TransferPlugins{
-		contracts: newContractsPlugin(sentryutil.NewSentryHubContext(ctx), ethClient, httpClient, contractOwnerStats),
+		contracts: newContractsPlugin(sentryutil.NewSentryHubContext(ctx)),
 	}
 }
 
@@ -129,7 +127,7 @@ type contractTransfersPlugin struct {
 	out chan contractAtBlock
 }
 
-func newContractsPlugin(ctx context.Context, ethClient *ethclient.Client, httpClient *http.Client, contractOwnerStats *sync.Map) contractTransfersPlugin {
+func newContractsPlugin(ctx context.Context) contractTransfersPlugin {
 	in := make(chan TransferPluginMsg)
 	out := make(chan contractAtBlock)
 
@@ -147,32 +145,16 @@ func newContractsPlugin(ctx context.Context, ethClient *ethclient.Client, httpCl
 				child := span.StartChild("plugin.ownerPlugin")
 				child.Description = "handleMessage"
 
-				if persist.TokenType(msg.transfer.TokenType) == persist.TokenTypeERC721 {
-					if rpcEnabled {
-
-						contract := fillContractFields(ctx, ethClient, httpClient, msg.transfer.ContractAddress, msg.transfer.BlockNumber, contractOwnerStats)
-						out <- contractAtBlock{
-							ti: msg.key,
-							boi: blockchainOrderInfo{
-								blockNumber: msg.transfer.BlockNumber,
-								txIndex:     msg.transfer.TxIndex,
-							},
-							contract: contract,
-						}
-
-					} else {
-						out <- contractAtBlock{
-							ti: msg.key,
-							boi: blockchainOrderInfo{
-								blockNumber: msg.transfer.BlockNumber,
-								txIndex:     msg.transfer.TxIndex,
-							},
-							contract: persist.Contract{
-								Address:     msg.transfer.ContractAddress,
-								LatestBlock: msg.transfer.BlockNumber,
-							},
-						}
-					}
+				out <- contractAtBlock{
+					ti: msg.key,
+					boi: blockchainOrderInfo{
+						blockNumber: msg.transfer.BlockNumber,
+						txIndex:     msg.transfer.TxIndex,
+					},
+					contract: persist.Contract{
+						Address:     msg.transfer.ContractAddress,
+						LatestBlock: msg.transfer.BlockNumber,
+					},
 				}
 
 				tracing.FinishSpan(child)

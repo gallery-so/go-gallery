@@ -175,6 +175,7 @@ func SetDefaults() {
 	viper.SetDefault("POSTGRES_PASSWORD", "")
 	viper.SetDefault("POSTGRES_DB", "postgres")
 	viper.SetDefault("IPFS_URL", "https://gallery.infura-ipfs.io")
+	viper.SetDefault("FALLBACK_IPFS_URL", "https://ipfs.io")
 	viper.SetDefault("IPFS_API_URL", "https://ipfs.infura.io:5001")
 	viper.SetDefault("IPFS_PROJECT_ID", "")
 	viper.SetDefault("IPFS_PROJECT_SECRET", "")
@@ -278,13 +279,14 @@ func initSentry() {
 
 func NewMultichainProvider(c *Clients) *multichain.Provider {
 	ethChain := persist.ChainETH
-	overrides := multichain.ChainOverrideMap{persist.ChainPOAP: &ethChain}
-	alchemyProvider := alchemy.NewProvider(c.HTTPClient)
+	overrides := multichain.ChainOverrideMap{persist.ChainPOAP: &ethChain, persist.ChainOptimism: &ethChain, persist.ChainPolygon: &ethChain}
+	alchemyMainnetProvider := alchemy.NewProvider(persist.ChainETH, c.HTTPClient)
 	infuraProvider := infura.NewProvider(c.HTTPClient)
-
-	failureEthProvider := multichain.SyncFailureFallbackProvider{Primary: infuraProvider, Fallback: alchemyProvider}
+	failureEthProvider := multichain.SyncFailureFallbackProvider{Primary: infuraProvider, Fallback: alchemyMainnetProvider}
 
 	ethProvider := eth.NewProvider(env.GetString("INDEXER_HOST"), c.HTTPClient, c.EthClient, c.TaskClient)
+	alchemyOptimismProvider := alchemy.NewProvider(persist.ChainOptimism, c.HTTPClient)
+	alchemyPolygonProvider := alchemy.NewProvider(persist.ChainPolygon, c.HTTPClient)
 	openseaProvider := opensea.NewProvider(c.EthClient, c.HTTPClient)
 	tezosProvider := multichain.SyncWithContractEvalFallbackProvider{
 		Primary:  tezos.NewProvider(env.GetString("TEZOS_API_URL"), env.GetString("TOKEN_PROCESSING_URL"), env.GetString("IPFS_URL"), c.HTTPClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET")),
@@ -302,6 +304,8 @@ func NewMultichainProvider(c *Clients) *multichain.Provider {
 		openseaProvider,
 		tezosProvider,
 		poapProvider,
+		alchemyOptimismProvider,
+		alchemyPolygonProvider,
 	)
 }
 

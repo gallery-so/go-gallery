@@ -13,17 +13,18 @@ import (
 )
 
 type Contract struct {
-	ID           persist.DBID
-	Deleted      bool
-	Version      sql.NullInt32
-	CreatedAt    time.Time
-	LastUpdated  time.Time
-	Name         sql.NullString
-	Symbol       sql.NullString
-	Address      sql.NullString
-	Chain        sql.NullInt32
-	LatestBlock  sql.NullInt64
-	OwnerAddress sql.NullString
+	ID             persist.DBID
+	Deleted        bool
+	Version        sql.NullInt32
+	CreatedAt      time.Time
+	LastUpdated    time.Time
+	Name           sql.NullString
+	Symbol         sql.NullString
+	Address        sql.NullString
+	CreatorAddress sql.NullString
+	Chain          sql.NullInt32
+	LatestBlock    sql.NullInt64
+	OwnerAddress   sql.NullString
 }
 
 type Token struct {

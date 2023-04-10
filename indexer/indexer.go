@@ -1,9 +1,11 @@
 package indexer
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 	"net/http"
 	"sort"
@@ -28,15 +30,18 @@ import (
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/indexer/refresh"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/multichain/alchemy"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/tracing"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 )
 
 func init() {
 	env.RegisterValidation("GCLOUD_TOKEN_CONTENT_BUCKET", "required")
+	env.RegisterValidation("ALCHEMY_API_URL", "required")
 }
 
 const (
@@ -143,6 +148,9 @@ func newIndexer(ethClient *ethclient.Client, httpClient *http.Client, ipfsClient
 	if rpcEnabled && ethClient == nil {
 		panic("RPC is enabled but an ethClient wasn't provided!")
 	}
+
+	ownerStats := &sync.Map{}
+
 	i := &indexer{
 		ethClient:         ethClient,
 		httpClient:        httpClient,
@@ -161,13 +169,13 @@ func newIndexer(ethClient *ethclient.Client, httpClient *http.Client, ipfsClient
 
 		maxBlock: maxBlock,
 
-		contractOwnerStats: &sync.Map{},
+		contractOwnerStats: ownerStats,
 
 		eventHashes: pEvents,
 
 		getLogsFunc: getLogsFunc,
 
-		contractDBHooks: newContractHooks(contractRepo),
+		contractDBHooks: newContractHooks(contractRepo, ethClient, httpClient, ownerStats),
 		tokenDBHooks:    newTokenHooks(),
 
 		mostRecentBlock: 0,
@@ -298,7 +306,7 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 
 	startTime := time.Now()
 	transfers := make(chan []transfersAtBlock)
-	plugins := NewTransferPlugins(ctx, i.ethClient, i.httpClient, i.contractOwnerStats)
+	plugins := NewTransferPlugins(ctx)
 	enabledPlugins := []chan<- TransferPluginMsg{plugins.contracts.in}
 
 	logsToCheckAgainst := make(chan []types.Log)
@@ -322,7 +330,7 @@ func (i *indexer) startNewBlocksPipeline(ctx context.Context, topics [][]common.
 	defer tracing.FinishSpan(span)
 
 	transfers := make(chan []transfersAtBlock)
-	plugins := NewTransferPlugins(ctx, i.ethClient, i.httpClient, i.contractOwnerStats)
+	plugins := NewTransferPlugins(ctx)
 	enabledPlugins := []chan<- TransferPluginMsg{plugins.contracts.in}
 
 	go i.pollNewLogs(sentryutil.NewSentryHubContext(ctx), transfers, topics)
@@ -802,40 +810,110 @@ func contractsPluginReceiver(cur contractAtBlock, inc contractAtBlock) contractA
 	return inc
 }
 
-func fillContractFields(ctx context.Context, ethClient *ethclient.Client, httpClient *http.Client, contractAddress persist.EthereumAddress, lastSyncedBlock persist.BlockNumber, contractOwnerStats *sync.Map) persist.Contract {
-	c := persist.Contract{
-		Address:     contractAddress,
-		LatestBlock: lastSyncedBlock,
-	}
-	cMetadata, err := rpc.RetryGetTokenContractMetadata(ctx, contractAddress, ethClient)
-	if err != nil {
-		logEntry := logger.For(ctx).WithError(err).WithFields(logrus.Fields{
-			"contractAddress": contractAddress,
-			"rpcCall":         "eth_call",
-		})
-		logEthCallRPCError(logEntry, err, "error getting contract metadata")
-	} else {
-		c.Name = persist.NullString(cMetadata.Name)
-		c.Symbol = persist.NullString(cMetadata.Symbol)
+type alchemyContractMetadata struct {
+	Address          persist.EthereumAddress  `json:"address"`
+	Metadata         alchemy.ContractMetadata `json:"contractMetadata"`
+	ContractDeployer persist.EthereumAddress  `json:"contractDeployer"`
+}
+
+func fillContractFields(ctx context.Context, contracts []persist.Contract, contractRepo persist.ContractRepository, httpClient *http.Client, ethClient *ethclient.Client, contractOwnerStats *sync.Map) []persist.Contract {
+
+	result := make([]persist.Contract, 0, len(contracts))
+
+	contractsNotInDB := util.Filter(contracts, func(c persist.Contract) bool {
+		_, err := contractRepo.GetByAddress(ctx, c.Address)
+		if err != nil {
+			logger.For(ctx).WithError(err).Errorf("Error getting contract %s from db", c.Address)
+		}
+		return err != nil
+	}, true)
+
+	// process contracts in batches of 100
+	for i := 0; i < len(contractsNotInDB); i += 100 {
+		end := i + 100
+		if end > len(contracts) {
+			end = len(contracts)
+		}
+		batch := contracts[i:end]
+
+		cToAddr := make(map[string]persist.Contract)
+		for _, c := range batch {
+			cToAddr[c.Address.String()] = c
+		}
+
+		addresses := util.MapKeys(cToAddr)
+
+		// get contract metadata
+
+		u := fmt.Sprintf("%s/getContractMetadataBatch", env.GetString("ALCHEMY_API_URL"))
+
+		in := map[string][]string{"contractAddresses": addresses}
+		inAsJSON, err := json.Marshal(in)
+		if err != nil {
+			logger.For(ctx).WithError(err).Error("Failed to marshal contract metadata request")
+			continue
+		}
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewBuffer(inAsJSON))
+		if err != nil {
+			logger.For(ctx).WithError(err).Error("Failed to create contract metadata request")
+			continue
+		}
+
+		req.Header.Add("accept", "application/json")
+		req.Header.Add("content-type", "application/json")
+
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			logger.For(ctx).WithError(err).Error("Failed to execute contract metadata request")
+			continue
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			bodyAsBytes, _ := ioutil.ReadAll(resp.Body)
+			logger.For(ctx).Errorf("Failed to execute contract metadata request: %s status: %s (url: %s) (input: %s) ", string(bodyAsBytes), resp.Status, u, string(inAsJSON))
+			continue
+		}
+
+		var out []alchemyContractMetadata
+		err = json.NewDecoder(resp.Body).Decode(&out)
+		if err != nil {
+			logger.For(ctx).WithError(err).Error("Failed to decode contract metadata response")
+			continue
+		}
+
+		for _, c := range out {
+			contract := cToAddr[c.Address.String()]
+			contract.Name = persist.NullString(c.Metadata.Name)
+			contract.Symbol = persist.NullString(c.Metadata.Symbol)
+
+			cOwner, method, err := GetContractOwner(ctx, c.Address, ethClient, httpClient)
+			if err != nil {
+				logger.For(ctx).WithError(err).WithFields(logrus.Fields{
+					"contractAddress": c.Address,
+				}).Error("error getting contract owner")
+				contract.OwnerAddress = c.ContractDeployer
+			} else {
+				contract.OwnerAddress = cOwner
+			}
+
+			it, ok := contractOwnerStats.LoadOrStore(method, 1)
+			if ok {
+				total := it.(int)
+				total++
+				contractOwnerStats.Store(method, total)
+			}
+
+			result = append(result, contract)
+		}
+
+		logger.For(ctx).Infof("Fetched metadata for %d contracts", len(out))
+
 	}
 
-	cOwner, method, err := GetContractOwner(ctx, contractAddress, ethClient, httpClient)
-	if err != nil {
-		logger.For(ctx).WithError(err).WithFields(logrus.Fields{
-			"contractAddress": contractAddress,
-		}).Error("error getting contract owner")
-	} else {
-		c.OwnerAddress = cOwner
-	}
+	logger.For(ctx).Infof("Fetched metadata for %d contracts starting with %d contracts", len(result), len(contracts))
 
-	it, ok := contractOwnerStats.LoadOrStore(method, 1)
-	if ok {
-		total := it.(int)
-		total++
-		contractOwnerStats.Store(method, total)
-	}
-
-	return c
+	return result
 }
 
 // HELPER FUNCS ---------------------------------------------------------------
