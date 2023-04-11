@@ -809,11 +809,11 @@ outer:
 			name := util.ToNullString(contract.Name, true)
 
 			if err := p.Repos.ContractRepository.UpsertByAddress(ctx, ti.ContractAddress, ti.Chain, persist.ContractGallery{
-				Chain:          ti.Chain,
-				Address:        persist.Address(ti.Chain.NormalizeAddress(ti.ContractAddress)),
-				Symbol:         persist.NullString(contract.Symbol),
-				Name:           name,
-				CreatorAddress: contract.CreatorAddress,
+				Chain:        ti.Chain,
+				Address:      persist.Address(ti.Chain.NormalizeAddress(ti.ContractAddress)),
+				Symbol:       persist.NullString(contract.Symbol),
+				Name:         name,
+				OwnerAddress: contract.CreatorAddress,
 			}); err != nil {
 				return err
 			}
@@ -1291,11 +1291,11 @@ func contractsToNewDedupedContracts(ctx context.Context, contracts []chainContra
 				}
 			}
 			c := persist.ContractGallery{
-				Chain:          chainContract.chain,
-				Address:        contract.Address,
-				Symbol:         persist.NullString(contract.Symbol),
-				Name:           util.ToNullString(contract.Name, true),
-				CreatorAddress: contract.CreatorAddress,
+				Chain:        chainContract.chain,
+				Address:      contract.Address,
+				Symbol:       persist.NullString(contract.Symbol),
+				Name:         util.ToNullString(contract.Name, true),
+				OwnerAddress: contract.CreatorAddress,
 			}
 			seen[persist.NewChainAddress(contract.Address, chainContract.chain)] = c
 		}

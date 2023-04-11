@@ -24,6 +24,7 @@ type Contract struct {
 	CreatorAddress sql.NullString
 	Chain          sql.NullInt32
 	LatestBlock    sql.NullInt64
+	OwnerAddress   sql.NullString
 }
 
 type Token struct {

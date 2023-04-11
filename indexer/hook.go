@@ -3,7 +3,9 @@ package indexer
 import (
 	"context"
 	"net/http"
+	"sync"
 
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/sourcegraph/conc/pool"
@@ -11,11 +13,11 @@ import (
 
 type DBHook[T any] func(ctx context.Context, it []T) error
 
-func newContractHooks(repo persist.ContractRepository, httpClient *http.Client) []DBHook[persist.Contract] {
+func newContractHooks(repo persist.ContractRepository, ethClient *ethclient.Client, httpClient *http.Client, ownerStats *sync.Map) []DBHook[persist.Contract] {
 	return []DBHook[persist.Contract]{
 		func(ctx context.Context, it []persist.Contract) error {
 			upChan := make(chan []persist.Contract)
-			go fillContractFields(ctx, it, repo, httpClient, upChan)
+			go fillContractFields(ctx, it, repo, httpClient, ethClient, ownerStats, upChan)
 			p := pool.New().WithErrors().WithContext(ctx).WithMaxGoroutines(10)
 			for up := range upChan {
 				up := up

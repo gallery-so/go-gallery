@@ -114,10 +114,10 @@ type getLogsFunc func(ctx context.Context, curBlock, nextBlock *big.Int, topics 
 // into a format used by the application
 type indexer struct {
 	ethClient         *ethclient.Client
+	httpClient        *http.Client
 	ipfsClient        *shell.Shell
 	arweaveClient     *goar.Client
 	storageClient     *storage.Client
-	httpClient        *http.Client
 	tokenRepo         persist.TokenRepository
 	contractRepo      persist.ContractRepository
 	addressFilterRepo refresh.AddressFilterRepository
@@ -135,6 +135,8 @@ type indexer struct {
 	lastSyncedChunk uint64  // Start block of the last chunk handled by the indexer
 	maxBlock        *uint64 // If provided, the indexer will only index up to maxBlock
 
+	contractOwnerStats *sync.Map // map[contractOwnerMethod]int - Used to track the number of times a contract owner method is used
+
 	isListening bool // Indicates if the indexer is waiting for new blocks
 
 	getLogsFunc getLogsFunc
@@ -149,12 +151,14 @@ func newIndexer(ethClient *ethclient.Client, httpClient *http.Client, ipfsClient
 		panic("RPC is enabled but an ethClient wasn't provided!")
 	}
 
+	ownerStats := &sync.Map{}
+
 	i := &indexer{
 		ethClient:         ethClient,
+		httpClient:        httpClient,
 		ipfsClient:        ipfsClient,
 		arweaveClient:     arweaveClient,
 		storageClient:     storageClient,
-		httpClient:        httpClient,
 		tokenRepo:         tokenRepo,
 		contractRepo:      contractRepo,
 		addressFilterRepo: addressFilterRepo,
@@ -168,12 +172,18 @@ func newIndexer(ethClient *ethclient.Client, httpClient *http.Client, ipfsClient
 
 		maxBlock: maxBlock,
 
+		contractOwnerStats: ownerStats,
+
 		eventHashes: pEvents,
 
 		getLogsFunc: getLogsFunc,
 
-		contractDBHooks: newContractHooks(contractRepo, httpClient),
+		contractDBHooks: newContractHooks(contractRepo, ethClient, httpClient, ownerStats),
 		tokenDBHooks:    newTokenHooks(),
+
+		mostRecentBlock: 0,
+		lastSyncedChunk: 0,
+		isListening:     false,
 	}
 
 	if startingBlock != nil {
@@ -801,11 +811,12 @@ func contractsPluginReceiver(cur contractAtBlock, inc contractAtBlock) contractA
 }
 
 type alchemyContractMetadata struct {
-	Address  persist.EthereumAddress  `json:"address"`
-	Metadata alchemy.ContractMetadata `json:"contractMetadata"`
+	Address          persist.EthereumAddress  `json:"address"`
+	Metadata         alchemy.ContractMetadata `json:"contractMetadata"`
+	ContractDeployer persist.EthereumAddress  `json:"contractDeployer"`
 }
 
-func fillContractFields(ctx context.Context, contracts []persist.Contract, contractRepo persist.ContractRepository, httpClient *http.Client, upChan chan<- []persist.Contract) {
+func fillContractFields(ctx context.Context, contracts []persist.Contract, contractRepo persist.ContractRepository, httpClient *http.Client, ethClient *ethclient.Client, contractOwnerStats *sync.Map, upChan chan<- []persist.Contract) {
 	defer close(upChan)
 
 	contractsNotInDB := make(chan persist.Contract)
@@ -895,6 +906,32 @@ func fillContractFields(ctx context.Context, contracts []persist.Contract, contr
 			contract := cToAddr[c.Address.String()]
 			contract.Name = persist.NullString(c.Metadata.Name)
 			contract.Symbol = persist.NullString(c.Metadata.Symbol)
+
+			var method = contractOwnerMethodAlchemy
+			cOwner, err := rpc.GetContractOwner(ctx, c.Address, ethClient)
+			if err != nil {
+				logger.For(ctx).WithError(err).WithFields(logrus.Fields{
+					"contractAddress": c.Address,
+				}).Error("error getting contract owner")
+				contract.OwnerAddress = c.ContractDeployer
+			} else {
+				contract.OwnerAddress = cOwner
+				method = contractOwnerMethodOwnable
+			}
+
+			if contract.OwnerAddress == "" {
+				method = contractOwnerMethodFailed
+			}
+
+			contract.CreatorAddress = c.ContractDeployer
+
+			it, ok := contractOwnerStats.LoadOrStore(method, 1)
+			if ok {
+				total := it.(int)
+				total++
+				contractOwnerStats.Store(method, total)
+			}
+
 			toUp = append(toUp, contract)
 		}
 
