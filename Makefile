@@ -18,7 +18,9 @@ DEPLOY_VERSION       := $(CURRENT_BRANCH)-$(CURRENT_COMMIT_HASH)
 SET_GCP_PROJECT      = gcloud config set project $(GCP_PROJECT)
 APP_ENGINE_DEPLOY    = sops exec-file --no-fifo $(CONFIG_DIR)/$(SERVICE_FILE) 'gcloud beta app deploy --version $(DEPLOY_VERSION) --quiet $(APP_PROMOTE_FLAGS) --appyaml {}'
 CLOUD_RUN_DEPLOY     = sops exec-file $(CONFIG_DIR)/$(SERVICE_FILE) 'gcloud run deploy $(CLOUD_RUN_FLAGS) $(SERVICE) --env-vars-file {} --quiet'
+CLOUD_RUN_DEPLOY_NO_THROTTLE     = sops exec-file $(CONFIG_DIR)/$(SERVICE_FILE) 'gcloud run deploy $(CLOUD_RUN_FLAGS_NO_THROTTLE) $(SERVICE) --env-vars-file {} --quiet'
 CLOUD_RUN_FLAGS      = --image $(IMAGE_TAG) $(RUN_PROMOTE_FLAGS) --concurrency $(CONCURRENCY) --cpu $(CPU) --memory $(MEMORY) --port $(PORT) --timeout $(TIMEOUT) --platform managed --cpu-throttling --revision-suffix $(CURRENT_COMMIT_HASH) --vpc-connector $(VPC_CONNECTOR) --vpc-egress private-ranges-only --set-cloudsql-instances $(SQL_INSTANCES) --region $(REGION) --allow-unauthenticated
+CLOUD_RUN_FLAGS_NO_THROTTLE      = --image $(IMAGE_TAG) $(RUN_PROMOTE_FLAGS) --concurrency $(CONCURRENCY) --cpu $(CPU) --memory $(MEMORY) --port $(PORT) --timeout $(TIMEOUT) --platform managed --no-cpu-throttling --revision-suffix $(CURRENT_COMMIT_HASH) --vpc-connector $(VPC_CONNECTOR) --vpc-egress private-ranges-only --set-cloudsql-instances $(SQL_INSTANCES) --region $(REGION) --allow-unauthenticated
 SENTRY_RELEASE       = sentry-cli releases -o $(SENTRY_ORG) -p $(SENTRY_PROJECT)
 IMAGE_TAG            = $(DOCKER_REGISTRY)/$(GCP_PROJECT)/$(REPO)/$(CURRENT_BRANCH):$(CURRENT_COMMIT_HASH)
 DOCKER_BUILD         = docker build --file $(DOCKER_FILE) --platform linux/amd64 -t $(IMAGE_TAG) --build-arg VERSION=$(DEPLOY_VERSION) $(DOCKER_CONTEXT)
@@ -66,7 +68,6 @@ $(PROMOTE)-$(PROD)-%              : REQUIRED_SOPS_SECRETS  := $(SOPS_PROD_SECRET
 
 # Service files, add a line for each service and environment you want to deploy.
 $(DEPLOY)-$(DEV)-backend          : SERVICE_FILE := backend-env.yaml
-$(DEPLOY)-$(DEV)-indexer          : SERVICE_FILE := app-dev-indexer.yaml
 $(DEPLOY)-$(DEV)-indexer-server   : SERVICE_FILE := indexer-server-env.yaml
 $(DEPLOY)-$(DEV)-admin            : SERVICE_FILE := app-dev-admin.yaml
 $(DEPLOY)-$(DEV)-feed             : SERVICE_FILE := feed-env.yaml
@@ -76,7 +77,7 @@ $(DEPLOY)-$(DEV)-feedbot          : SERVICE_FILE := feedbot-env.yaml
 $(DEPLOY)-$(DEV)-routing-rules    : SERVICE_FILE := dispatch.yaml
 $(DEPLOY)-$(SANDBOX)-backend      : SERVICE_FILE := backend-sandbox-env.yaml
 $(DEPLOY)-$(PROD)-backend         : SERVICE_FILE := backend-env.yaml
-$(DEPLOY)-$(PROD)-indexer         : SERVICE_FILE := app-prod-indexer.yaml
+$(DEPLOY)-$(PROD)-indexer         : SERVICE_FILE := indexer-env.yaml
 $(DEPLOY)-$(PROD)-indexer-server  : SERVICE_FILE := indexer-server-env.yaml
 $(DEPLOY)-$(PROD)-admin           : SERVICE_FILE := app-prod-admin.yaml
 $(DEPLOY)-$(PROD)-feed            : SERVICE_FILE := feed-env.yaml
@@ -125,6 +126,14 @@ $(DEPLOY)-%-indexer-server             : MEMORY         := $(INDEXER_SERVER_MEMO
 $(DEPLOY)-%-indexer-server             : CONCURRENCY    := $(INDEXER_SERVER_CONCURRENCY)
 $(DEPLOY)-$(DEV)-indexer-server        : SERVICE        := indexer-api-dev
 $(DEPLOY)-$(PROD)-indexer-server       : SERVICE        := indexer-api
+$(DEPLOY)-%-indexer             	   : REPO           := indexer
+$(DEPLOY)-%-indexer             	   : DOCKER_FILE    := $(DOCKER_DIR)/indexer/Dockerfile
+$(DEPLOY)-%-indexer             	   : PORT           := 4000
+$(DEPLOY)-%-indexer             	   : TIMEOUT        := $(INDEXER_TIMEOUT)
+$(DEPLOY)-%-indexer             	   : CPU            := $(INDEXER_CPU)
+$(DEPLOY)-%-indexer             	   : MEMORY         := $(INDEXER_MEMORY)
+$(DEPLOY)-%-indexer             	   : CONCURRENCY    := $(INDEXER_CONCURRENCY)
+$(DEPLOY)-$(PROD)-indexer       	   : SERVICE        := indexer
 $(DEPLOY)-%-emails                     : REPO           := emails
 $(DEPLOY)-%-emails                     : DOCKER_FILE    := $(DOCKER_DIR)/emails/Dockerfile
 $(DEPLOY)-%-emails                     : PORT           := 5500
@@ -262,6 +271,13 @@ _$(DOCKER)-$(DEPLOY)-%:
 	@$(CLOUD_RUN_DEPLOY)
 	@if [ $$? -eq 0 ] && echo $(DEPLOY_FLAGS) | grep -e "--no-traffic" > /dev/null; then echo "\n\tVERSION: '$(CURRENT_COMMIT_HASH)' was deployed but is not currently receiving traffic.\n\tRun 'make promote-$(ENV)-$* version=$(CURRENT_COMMIT_HASH)' to promote it!\n"; else echo "\n\tVERSION: '$(CURRENT_COMMIT_HASH)' was deployed!\n"; fi
 
+_$(DOCKER)-no-throttle-$(DEPLOY)-%:
+	@$(DOCKER_BUILD)
+	@$(DOCKER_PUSH)
+	@$(CLOUD_RUN_DEPLOY_NO_THROTTLE)
+	@if [ $$? -eq 0 ] && echo $(DEPLOY_FLAGS) | grep -e "--no-traffic" > /dev/null; then echo "\n\tVERSION: '$(CURRENT_COMMIT_HASH)' was deployed but is not currently receiving traffic.\n\tRun 'make promote-$(ENV)-$* version=$(CURRENT_COMMIT_HASH)' to promote it!\n"; else echo "\n\tVERSION: '$(CURRENT_COMMIT_HASH)' was deployed!\n"; fi
+
+
 # Immediately migrates traffic to the input version
 _$(PROMOTE)-%:
 	@version='$(version)'; \
@@ -272,12 +288,6 @@ _$(DOCKER)-$(PROMOTE)-%:
 	@version='$(version)'; \
 	if [ -z "$$version" ]; then echo "Please add 'version=...' to the command!" ; exit 1; fi; \
 	gcloud run services update-traffic $(SERVICE) --to-revisions=$(SERVICE)-$$version=100
-
-# Stops all versions of a services EXCEPT the input version
-_$(STOP)-%:
-	@version='$(version)'; \
-	if [ -z "$$version" ]; then echo "Please add 'version=...' to the command!" ; exit 1; fi; \
-	gcloud beta app versions stop -s $(SERVICE) $$(gcloud beta app versions list -s "$(SERVICE)" | awk 'NR>1' | awk '{print $$2}' | grep -v $$version);
 
 # Creates a new release in Sentry. Requires sentry-cli, install it by running:
 #
@@ -295,7 +305,6 @@ _$(RELEASE)-%:
 
 # DEV deployments
 $(DEPLOY)-$(DEV)-backend          : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend
-$(DEPLOY)-$(DEV)-indexer          : _set-project-$(ENV) _$(DEPLOY)-indexer _$(RELEASE)-indexer
 $(DEPLOY)-$(DEV)-indexer-server   : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer-server _$(RELEASE)-indexer-server
 $(DEPLOY)-$(DEV)-tokenprocessing  : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-tokenprocessing _$(RELEASE)-tokenprocessing
 $(DEPLOY)-$(DEV)-emails           : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-emails _$(RELEASE)-emails
@@ -310,7 +319,7 @@ $(DEPLOY)-$(SANDBOX)-backend      : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-bac
 
 # PROD deployments
 $(DEPLOY)-$(PROD)-backend         : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend
-$(DEPLOY)-$(PROD)-indexer         : _set-project-$(ENV) _$(DEPLOY)-indexer _$(RELEASE)-indexer
+$(DEPLOY)-$(PROD)-indexer         : _set-project-$(ENV) _$(DOCKER)-no-throttle-$(DEPLOY)-indexer _$(RELEASE)-indexer
 $(DEPLOY)-$(PROD)-indexer-server  : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer-server _$(RELEASE)-indexer-server
 $(DEPLOY)-$(PROD)-tokenprocessing : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-tokenprocessing _$(RELEASE)-tokenprocessing
 $(DEPLOY)-$(PROD)-dummymetadata   : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-dummymetadata _$(RELEASE)-dummymetadata
@@ -327,7 +336,7 @@ $(DEPLOY)-$(PROD)-graphql-gateway : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-gra
 # $ make promote-prod-backend version=myVersion
 #
 $(PROMOTE)-$(PROD)-backend          : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-backend
-$(PROMOTE)-$(PROD)-indexer          : _set-project-$(ENV) _$(PROMOTE)-indexer _$(STOP)-indexer
+$(PROMOTE)-$(PROD)-indexer          : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-indexer
 $(PROMOTE)-$(PROD)-indexer-server   : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-indexer-server
 $(PROMOTE)-$(PROD)-tokenprocessing  : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-tokenprocessing
 $(PROMOTE)-$(PROD)-dummymetadata    : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-dummymetadata

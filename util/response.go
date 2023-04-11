@@ -48,3 +48,9 @@ func BodyAsError(res *http.Response) error {
 	}
 	return fmt.Errorf("%s", body)
 }
+
+func HealthCheckHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.JSON(http.StatusOK, SuccessResponse{Success: true})
+	}
+}

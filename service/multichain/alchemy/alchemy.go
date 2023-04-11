@@ -429,7 +429,7 @@ func (d *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, contr
 }
 
 func (d *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	tokens, contract, err := d.getTokenWithMetadata(ctx, tokenIdentifiers, false, 0)
+	tokens, contract, err := d.getTokenWithMetadata(ctx, tokenIdentifiers, true, 0)
 	if err != nil {
 		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
 	}
