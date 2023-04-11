@@ -28,7 +28,6 @@ func init() {
 
 	rootCmd.PersistentFlags().BoolVarP(&enableRPC, "enable-rpc", "r", false, "always enable RPC calls")
 	rootCmd.PersistentFlags().BoolVarP(&quietLogs, "quiet", "q", false, "hide debug logs")
-	rootCmd.Flags().Uint64VarP(&port, "port", "p", 4000, "port to serve on")
 	rootCmd.Flags().Uint64VarP(&fromBlock, "from-block", "f", 0, "first block to process")
 	rootCmd.Flags().Uint64VarP(&toBlock, "to-block", "t", 0, "last block to process")
 	rootCmd.MarkFlagsRequiredTogether("from-block", "to-block")
@@ -71,12 +70,9 @@ var rootCmd = &cobra.Command{
 		}
 
 		indexer.Init(from, to, quietLogs, enableRPC)
-		if appengine.IsAppEngine() {
-			appengine.Main()
-		} else {
-			logger.For(nil).Infof("Running in Default Mode with port :%d", port)
-			http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
-		}
+		fmt.Println("Running in Default Mode on port 4000")
+		http.ListenAndServe(":4000", nil)
+
 	},
 }
 

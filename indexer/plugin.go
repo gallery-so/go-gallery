@@ -138,7 +138,14 @@ func newContractsPlugin(ctx context.Context) contractTransfersPlugin {
 
 		wp := workerpool.New(pluginPoolSize)
 
+		seenContracts := map[persist.EthereumAddress]bool{}
+
 		for msg := range in {
+
+			if seenContracts[msg.transfer.ContractAddress] {
+				continue
+			}
+
 			msg := msg
 			wp.Submit(func() {
 
@@ -159,6 +166,8 @@ func newContractsPlugin(ctx context.Context) contractTransfersPlugin {
 
 				tracing.FinishSpan(child)
 			})
+
+			seenContracts[msg.transfer.ContractAddress] = true
 		}
 
 		wp.StopWait()
