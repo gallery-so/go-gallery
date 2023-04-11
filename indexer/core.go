@@ -27,9 +27,9 @@ import (
 
 // Init initializes the indexer
 func Init(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) {
-	router, _ := coreInit(fromBlock, toBlock, quietLogs, enableRPC)
+	router, i := coreInit(fromBlock, toBlock, quietLogs, enableRPC)
 	logger.For(nil).Info("Starting indexer...")
-	// go i.Start(sentry.SetHubOnContext(context.Background(), sentry.CurrentHub()))
+	go i.Start(sentry.SetHubOnContext(context.Background(), sentry.CurrentHub()))
 	http.Handle("/", router)
 }
 

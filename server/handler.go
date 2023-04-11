@@ -52,7 +52,7 @@ func handlersInit(router *gin.Engine, repos *postgres.Repositories, queries *db.
 
 	graphqlHandlersInit(graphqlGroup, repos, queries, ethClient, ipfsClient, arweaveClient, stg, mcProvider, throttler, taskClient, pub, lock, secrets, graphqlAPQCache, feedCache, socialCache, magicClient, recommender)
 
-	router.GET("/alive", healthCheckHandler())
+	router.GET("/alive", util.HealthCheckHandler())
 
 	return router
 }
@@ -171,11 +171,5 @@ func graphqlPlaygroundHandler() gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		h.ServeHTTP(c.Writer, c.Request)
-	}
-}
-
-func healthCheckHandler() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
