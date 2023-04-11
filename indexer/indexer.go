@@ -37,6 +37,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
+	"github.com/sourcegraph/conc/iter"
 )
 
 func init() {
@@ -122,8 +123,7 @@ type indexer struct {
 	addressFilterRepo refresh.AddressFilterRepository
 	dbMu              *sync.Mutex // Manages writes to the db
 	stateMu           *sync.Mutex // Manages updates to the indexer's state
-
-	seenContracts *sync.Map // Stores the contract addresses that have been seen during indexing (so they won't be reprocessed)
+	memoryMu          *sync.Mutex // Manages large memory operations
 
 	tokenBucket string
 
@@ -160,8 +160,7 @@ func newIndexer(ethClient *ethclient.Client, httpClient *http.Client, ipfsClient
 		addressFilterRepo: addressFilterRepo,
 		dbMu:              &sync.Mutex{},
 		stateMu:           &sync.Mutex{},
-
-		seenContracts: &sync.Map{},
+		memoryMu:          &sync.Mutex{},
 
 		tokenBucket: env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"),
 
@@ -300,7 +299,7 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 
 	startTime := time.Now()
 	transfers := make(chan []transfersAtBlock)
-	plugins := NewTransferPlugins(ctx, i.ethClient, i.contractRepo, i.seenContracts)
+	plugins := NewTransferPlugins(ctx)
 	enabledPlugins := []chan<- TransferPluginMsg{plugins.contracts.in}
 
 	logsToCheckAgainst := make(chan []types.Log)
@@ -315,7 +314,6 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 	}()
 	go i.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transfers, enabledPlugins)
 	i.processTokens(ctx, plugins.contracts.out)
-	i.afterPipelineCleanup(ctx)
 
 	logger.For(ctx).Warnf("Finished processing %d blocks from block %d in %s", blocksPerLogsCall, start.Uint64(), time.Since(startTime))
 }
@@ -325,13 +323,12 @@ func (i *indexer) startNewBlocksPipeline(ctx context.Context, topics [][]common.
 	defer tracing.FinishSpan(span)
 
 	transfers := make(chan []transfersAtBlock)
-	plugins := NewTransferPlugins(ctx, i.ethClient, i.contractRepo, i.seenContracts)
+	plugins := NewTransferPlugins(ctx)
 	enabledPlugins := []chan<- TransferPluginMsg{plugins.contracts.in}
 
 	go i.pollNewLogs(sentryutil.NewSentryHubContext(ctx), transfers, topics)
 	go i.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transfers, enabledPlugins)
 	i.processTokens(ctx, plugins.contracts.out)
-	i.afterPipelineCleanup(ctx)
 
 }
 
@@ -373,12 +370,18 @@ func (i *indexer) defaultGetLogs(ctx context.Context, curBlock, nextBlock *big.I
 	if err != nil {
 		logger.For(ctx).WithError(err).Warn("error getting logs from GCP")
 	} else {
-		defer reader.Close()
-		err = json.NewDecoder(reader).Decode(&logsTo)
-		if err != nil {
-			panic(err)
-		}
+		func() {
+			logger.For(ctx).Infof("Reading logs from GCP")
+			i.memoryMu.Lock()
+			defer i.memoryMu.Unlock()
+			defer reader.Close()
+			err = json.NewDecoder(reader).Decode(&logsTo)
+			if err != nil {
+				panic(err)
+			}
+		}()
 	}
+
 	if len(logsTo) > 0 {
 		lastLog := logsTo[len(logsTo)-1]
 		if nextBlock.Uint64()-lastLog.BlockNumber > (blocksPerLogsCall / 5) {
@@ -391,6 +394,7 @@ func (i *indexer) defaultGetLogs(ctx context.Context, curBlock, nextBlock *big.I
 	defer cancel()
 
 	if len(logsTo) == 0 && rpcEnabled {
+		logger.For(ctx).Infof("Reading logs from Blockchain")
 		logsTo, err = rpc.RetryGetLogs(rpcCtx, i.ethClient, ethereum.FilterQuery{
 			FromBlock: curBlock,
 			ToBlock:   nextBlock,
@@ -408,7 +412,7 @@ func (i *indexer) defaultGetLogs(ctx context.Context, curBlock, nextBlock *big.I
 			logEntry.Error("failed to fetch logs")
 			return []types.Log{}, nil
 		}
-		go saveLogsInBlockRange(ctx, curBlock.String(), nextBlock.String(), logsTo, i.storageClient)
+		go saveLogsInBlockRange(ctx, curBlock.String(), nextBlock.String(), logsTo, i.storageClient, i.memoryMu)
 	}
 	logger.For(ctx).Infof("Found %d logs at block %d", len(logsTo), curBlock.Uint64())
 	return logsTo, nil
@@ -430,7 +434,7 @@ func logsToTransfers(ctx context.Context, pLogs []types.Log) []rpc.Transfer {
 
 	result := make([]rpc.Transfer, 0, len(pLogs)*2)
 	for _, pLog := range pLogs {
-		initial := time.Now()
+
 		switch {
 		case strings.EqualFold(pLog.Topics[0].Hex(), string(transferEventHash)):
 
@@ -451,7 +455,6 @@ func logsToTransfers(ctx context.Context, pLogs []types.Log) []rpc.Transfer {
 				TxIndex:         pLog.TxIndex,
 			})
 
-			logger.For(ctx).Debugf("Processed transfer event in %s", time.Since(initial))
 		case strings.EqualFold(pLog.Topics[0].Hex(), string(transferSingleEventHash)):
 			if len(pLog.Topics) < 4 {
 				continue
@@ -486,7 +489,7 @@ func logsToTransfers(ctx context.Context, pLogs []types.Log) []rpc.Transfer {
 				BlockHash:       pLog.BlockHash,
 				TxIndex:         pLog.TxIndex,
 			})
-			logger.For(ctx).Debugf("Processed single transfer event in %s", time.Since(initial))
+
 		case strings.EqualFold(pLog.Topics[0].Hex(), string(transferBatchEventHash)):
 			if len(pLog.Topics) < 4 {
 				continue
@@ -524,7 +527,7 @@ func logsToTransfers(ctx context.Context, pLogs []types.Log) []rpc.Transfer {
 					TxIndex:         pLog.TxIndex,
 				})
 			}
-			logger.For(ctx).Debugf("Processed batch event in %s", time.Since(initial))
+
 		default:
 			logger.For(ctx).WithFields(logrus.Fields{
 				"address":   pLog.Address,
@@ -669,7 +672,7 @@ func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transf
 				return
 			}
 
-			go saveLogsInBlockRange(ctx, strconv.Itoa(int(curBlock)), strconv.Itoa(int(nextBlock)), logsTo, i.storageClient)
+			go saveLogsInBlockRange(ctx, strconv.Itoa(int(curBlock)), strconv.Itoa(int(nextBlock)), logsTo, i.storageClient, i.memoryMu)
 
 			logger.For(ctx).Infof("Found %d logs at block %d", len(logsTo), curBlock)
 
@@ -726,23 +729,14 @@ func (i *indexer) processTransfers(ctx context.Context, transfers []transfersAtB
 	for _, transferAtBlock := range transfers {
 		for _, transfer := range transferAtBlock.transfers {
 
-			initial := time.Now()
 			contractAddress := persist.EthereumAddress(transfer.ContractAddress.String())
-			from := transfer.From
-			to := transfer.To
+
 			tokenID := transfer.TokenID
 
 			key := persist.NewEthereumTokenIdentifiers(contractAddress, tokenID)
 
 			RunTransferPlugins(ctx, transfer, key, plugins)
 
-			logger.For(ctx).WithFields(logrus.Fields{
-				"tokenID":         tokenID,
-				"contractAddress": contractAddress,
-				"fromAddress":     from,
-				"toAddress":       to,
-				"duration":        time.Since(initial),
-			}).Debugf("Processed transfer %s to %s and from %s ", key, to, from)
 		}
 
 	}
@@ -765,10 +759,6 @@ func (i *indexer) processTokens(ctx context.Context, contractsOut <-chan contrac
 	contracts := contractsAtBlockToContracts(contractsMap)
 
 	i.runDBHooks(ctx, contracts, []persist.Token{})
-}
-
-func (i *indexer) afterPipelineCleanup(ctx context.Context) {
-	i.seenContracts = &sync.Map{}
 }
 
 func contractsAtBlockToContracts(contractsAtBlock map[persist.EthereumTokenIdentifiers]contractAtBlock) []persist.Contract {
@@ -815,25 +805,45 @@ type alchemyContractMetadata struct {
 	Metadata alchemy.ContractMetadata `json:"contractMetadata"`
 }
 
-func fillContractFields(ctx context.Context, contracts []persist.Contract, contractRepo persist.ContractRepository, httpClient *http.Client) []persist.Contract {
+func fillContractFields(ctx context.Context, contracts []persist.Contract, contractRepo persist.ContractRepository, httpClient *http.Client, upChan chan<- []persist.Contract) {
+	defer close(upChan)
 
-	result := make([]persist.Contract, 0, len(contracts))
+	contractsNotInDB := make(chan persist.Contract)
 
-	contractsNotInDB := util.Filter(contracts, func(c persist.Contract) bool {
-		_, err := contractRepo.GetByAddress(ctx, c.Address)
-		if err != nil {
-			logger.For(ctx).WithError(err).Errorf("Error getting contract %s from db", c.Address)
+	batched := make(chan []persist.Contract)
+
+	go func() {
+		defer close(contractsNotInDB)
+
+		iter.ForEach(contracts, func(c *persist.Contract) {
+			_, err := contractRepo.GetByAddress(ctx, c.Address)
+			if err == nil {
+				return
+			}
+			contractsNotInDB <- *c
+		})
+	}()
+
+	go func() {
+		defer close(batched)
+		var curBatch []persist.Contract
+		for contract := range contractsNotInDB {
+			curBatch = append(curBatch, contract)
+			if len(curBatch) == 100 {
+				logger.For(ctx).Infof("Batching %d contracts for metadata", len(curBatch))
+				batched <- curBatch
+				curBatch = []persist.Contract{}
+			}
 		}
-		return err != nil
-	}, true)
+		if len(curBatch) > 0 {
+			logger.For(ctx).Infof("Batching %d contracts for metadata", len(curBatch))
+			batched <- curBatch
+		}
+	}()
 
 	// process contracts in batches of 100
-	for i := 0; i < len(contractsNotInDB); i += 100 {
-		end := i + 100
-		if end > len(contracts) {
-			end = len(contracts)
-		}
-		batch := contracts[i:end]
+	for batch := range batched {
+		toUp := make([]persist.Contract, 0, 100)
 
 		cToAddr := make(map[string]persist.Contract)
 		for _, c := range batch {
@@ -885,16 +895,16 @@ func fillContractFields(ctx context.Context, contracts []persist.Contract, contr
 			contract := cToAddr[c.Address.String()]
 			contract.Name = persist.NullString(c.Metadata.Name)
 			contract.Symbol = persist.NullString(c.Metadata.Symbol)
-			result = append(result, contract)
+			toUp = append(toUp, contract)
 		}
 
-		logger.For(ctx).Infof("Fetched metadata for %d contracts", len(out))
+		logger.For(ctx).Infof("Fetched metadata for %d contracts", len(toUp))
 
+		upChan <- toUp
 	}
 
-	logger.For(ctx).Infof("Fetched metadata for %d contracts starting with %d contracts", len(result), len(contracts))
+	logger.For(ctx).Infof("Fetched metadata for total %d contracts", len(contracts))
 
-	return result
 }
 
 // HELPER FUNCS ---------------------------------------------------------------
@@ -928,7 +938,9 @@ func transfersToTransfersAtBlock(transfers []rpc.Transfer) []transfersAtBlock {
 	return allTransfersAtBlock
 }
 
-func saveLogsInBlockRange(ctx context.Context, curBlock, nextBlock string, logsTo []types.Log, storageClient *storage.Client) {
+func saveLogsInBlockRange(ctx context.Context, curBlock, nextBlock string, logsTo []types.Log, storageClient *storage.Client, memoryMu *sync.Mutex) {
+	memoryMu.Lock()
+	defer memoryMu.Unlock()
 	logger.For(ctx).Infof("Saving logs in block range %s to %s", curBlock, nextBlock)
 	obj := storageClient.Bucket(env.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%s-%s", curBlock, nextBlock))
 	obj.Delete(ctx)

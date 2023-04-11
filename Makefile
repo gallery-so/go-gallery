@@ -66,7 +66,6 @@ $(PROMOTE)-$(PROD)-%              : REQUIRED_SOPS_SECRETS  := $(SOPS_PROD_SECRET
 
 # Service files, add a line for each service and environment you want to deploy.
 $(DEPLOY)-$(DEV)-backend          : SERVICE_FILE := backend-env.yaml
-$(DEPLOY)-$(DEV)-indexer          : SERVICE_FILE := app-dev-indexer.yaml
 $(DEPLOY)-$(DEV)-indexer-server   : SERVICE_FILE := indexer-server-env.yaml
 $(DEPLOY)-$(DEV)-admin            : SERVICE_FILE := app-dev-admin.yaml
 $(DEPLOY)-$(DEV)-feed             : SERVICE_FILE := feed-env.yaml
@@ -76,7 +75,7 @@ $(DEPLOY)-$(DEV)-feedbot          : SERVICE_FILE := feedbot-env.yaml
 $(DEPLOY)-$(DEV)-routing-rules    : SERVICE_FILE := dispatch.yaml
 $(DEPLOY)-$(SANDBOX)-backend      : SERVICE_FILE := backend-sandbox-env.yaml
 $(DEPLOY)-$(PROD)-backend         : SERVICE_FILE := backend-env.yaml
-$(DEPLOY)-$(PROD)-indexer         : SERVICE_FILE := app-prod-indexer.yaml
+$(DEPLOY)-$(PROD)-indexer         : SERVICE_FILE := indexer-env.yaml
 $(DEPLOY)-$(PROD)-indexer-server  : SERVICE_FILE := indexer-server-env.yaml
 $(DEPLOY)-$(PROD)-admin           : SERVICE_FILE := app-prod-admin.yaml
 $(DEPLOY)-$(PROD)-feed            : SERVICE_FILE := feed-env.yaml
@@ -125,6 +124,14 @@ $(DEPLOY)-%-indexer-server             : MEMORY         := $(INDEXER_SERVER_MEMO
 $(DEPLOY)-%-indexer-server             : CONCURRENCY    := $(INDEXER_SERVER_CONCURRENCY)
 $(DEPLOY)-$(DEV)-indexer-server        : SERVICE        := indexer-api-dev
 $(DEPLOY)-$(PROD)-indexer-server       : SERVICE        := indexer-api
+$(DEPLOY)-%-indexer             	   : REPO           := indexer
+$(DEPLOY)-%-indexer             	   : DOCKER_FILE    := $(DOCKER_DIR)/indexer/Dockerfile
+$(DEPLOY)-%-indexer             	   : PORT           := 4000
+$(DEPLOY)-%-indexer             	   : TIMEOUT        := $(INDEXER_TIMEOUT)
+$(DEPLOY)-%-indexer             	   : CPU            := $(INDEXER_CPU)
+$(DEPLOY)-%-indexer             	   : MEMORY         := $(INDEXER_MEMORY)
+$(DEPLOY)-%-indexer             	   : CONCURRENCY    := $(INDEXER_CONCURRENCY)
+$(DEPLOY)-$(PROD)-indexer       	   : SERVICE        := indexer
 $(DEPLOY)-%-emails                     : REPO           := emails
 $(DEPLOY)-%-emails                     : DOCKER_FILE    := $(DOCKER_DIR)/emails/Dockerfile
 $(DEPLOY)-%-emails                     : PORT           := 5500
@@ -273,12 +280,6 @@ _$(DOCKER)-$(PROMOTE)-%:
 	if [ -z "$$version" ]; then echo "Please add 'version=...' to the command!" ; exit 1; fi; \
 	gcloud run services update-traffic $(SERVICE) --to-revisions=$(SERVICE)-$$version=100
 
-# Stops all versions of a services EXCEPT the input version
-_$(STOP)-%:
-	@version='$(version)'; \
-	if [ -z "$$version" ]; then echo "Please add 'version=...' to the command!" ; exit 1; fi; \
-	gcloud beta app versions stop -s $(SERVICE) $$(gcloud beta app versions list -s "$(SERVICE)" | awk 'NR>1' | awk '{print $$2}' | grep -v $$version);
-
 # Creates a new release in Sentry. Requires sentry-cli, install it by running:
 #
 #  $ curl -sL https://sentry.io/get-cli/ | bash
@@ -295,7 +296,6 @@ _$(RELEASE)-%:
 
 # DEV deployments
 $(DEPLOY)-$(DEV)-backend          : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend
-$(DEPLOY)-$(DEV)-indexer          : _set-project-$(ENV) _$(DEPLOY)-indexer _$(RELEASE)-indexer
 $(DEPLOY)-$(DEV)-indexer-server   : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer-server _$(RELEASE)-indexer-server
 $(DEPLOY)-$(DEV)-tokenprocessing  : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-tokenprocessing _$(RELEASE)-tokenprocessing
 $(DEPLOY)-$(DEV)-emails           : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-emails _$(RELEASE)-emails
@@ -310,7 +310,7 @@ $(DEPLOY)-$(SANDBOX)-backend      : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-bac
 
 # PROD deployments
 $(DEPLOY)-$(PROD)-backend         : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend
-$(DEPLOY)-$(PROD)-indexer         : _set-project-$(ENV) _$(DEPLOY)-indexer _$(RELEASE)-indexer
+$(DEPLOY)-$(PROD)-indexer         : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer _$(RELEASE)-indexer
 $(DEPLOY)-$(PROD)-indexer-server  : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer-server _$(RELEASE)-indexer-server
 $(DEPLOY)-$(PROD)-tokenprocessing : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-tokenprocessing _$(RELEASE)-tokenprocessing
 $(DEPLOY)-$(PROD)-dummymetadata   : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-dummymetadata _$(RELEASE)-dummymetadata
@@ -327,7 +327,7 @@ $(DEPLOY)-$(PROD)-graphql-gateway : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-gra
 # $ make promote-prod-backend version=myVersion
 #
 $(PROMOTE)-$(PROD)-backend          : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-backend
-$(PROMOTE)-$(PROD)-indexer          : _set-project-$(ENV) _$(PROMOTE)-indexer _$(STOP)-indexer
+$(PROMOTE)-$(PROD)-indexer          : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-indexer
 $(PROMOTE)-$(PROD)-indexer-server   : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-indexer-server
 $(PROMOTE)-$(PROD)-tokenprocessing  : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-tokenprocessing
 $(PROMOTE)-$(PROD)-dummymetadata    : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-dummymetadata
