@@ -65,6 +65,7 @@ type Contract struct {
 	ProfileImageUrl  sql.NullString
 	BadgeUrl         sql.NullString
 	Description      sql.NullString
+	OwnerAddress     persist.Address
 }
 
 type ContractRelevance struct {

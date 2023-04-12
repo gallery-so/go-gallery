@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gammazero/workerpool"
 	"github.com/getsentry/sentry-go"
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -66,9 +65,9 @@ func startSpan(ctx context.Context, plugin, op string) (*sentry.Span, context.Co
 // NewTransferPlugins returns a set of transfer plugins. Plugins have an `in` and an optional `out` channel that are handles to the service.
 // The `in` channel is used to submit a transfer to a plugin, and the `out` channel is used to receive results from a plugin, if any.
 // A plugin can be stopped by closing its `in` channel, which finishes the plugin and lets receivers know that its done.
-func NewTransferPlugins(ctx context.Context, ethClient *ethclient.Client, contractRepo persist.ContractRepository, seenContracts *sync.Map) TransferPlugins {
+func NewTransferPlugins(ctx context.Context) TransferPlugins {
 	return TransferPlugins{
-		contracts: newContractsPlugin(sentryutil.NewSentryHubContext(ctx), contractRepo, ethClient, seenContracts),
+		contracts: newContractsPlugin(sentryutil.NewSentryHubContext(ctx)),
 	}
 }
 
@@ -128,7 +127,7 @@ type contractTransfersPlugin struct {
 	out chan contractAtBlock
 }
 
-func newContractsPlugin(ctx context.Context, contractRepo persist.ContractRepository, ethClient *ethclient.Client, seenContracts *sync.Map) contractTransfersPlugin {
+func newContractsPlugin(ctx context.Context) contractTransfersPlugin {
 	in := make(chan TransferPluginMsg)
 	out := make(chan contractAtBlock)
 
@@ -139,7 +138,14 @@ func newContractsPlugin(ctx context.Context, contractRepo persist.ContractReposi
 
 		wp := workerpool.New(pluginPoolSize)
 
+		seenContracts := map[persist.EthereumAddress]bool{}
+
 		for msg := range in {
+
+			if seenContracts[msg.transfer.ContractAddress] {
+				continue
+			}
+
 			msg := msg
 			wp.Submit(func() {
 
@@ -160,6 +166,8 @@ func newContractsPlugin(ctx context.Context, contractRepo persist.ContractReposi
 
 				tracing.FinishSpan(child)
 			})
+
+			seenContracts[msg.transfer.ContractAddress] = true
 		}
 
 		wp.StopWait()

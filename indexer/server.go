@@ -16,11 +16,19 @@ func getStatus(i *indexer, tokenRepository persist.TokenRepository) gin.HandlerF
 
 		mostRecent, _ := tokenRepository.MostRecentBlock(ctx)
 
+		readableSyncMap := make(map[contractOwnerMethod]int)
+
+		i.contractOwnerStats.Range(func(key, value interface{}) bool {
+			readableSyncMap[key.(contractOwnerMethod)] = value.(int)
+			return true
+		})
+
 		c.JSON(http.StatusOK, gin.H{
 			"most_recent_blockchain": i.mostRecentBlock,
 			"most_recent_db":         mostRecent,
 			"last_synced_chunk":      i.lastSyncedChunk,
 			"is_listening":           i.isListening,
+			"contract_owner_stats":   readableSyncMap,
 		})
 	}
 }

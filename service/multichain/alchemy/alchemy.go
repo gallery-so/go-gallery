@@ -65,11 +65,11 @@ func (m *Metadata) UnmarshalJSON(data []byte) error {
 }
 
 type ContractMetadata struct {
-	Name             string `json:"name"`
-	Symbol           string `json:"symbol"`
-	TotalSupply      string `json:"totalSupply"`
-	TokenType        string `json:"tokenType"`
-	ContractDeployer string `json:"contractDeployer"`
+	Name             string                  `json:"name"`
+	Symbol           string                  `json:"symbol"`
+	TotalSupply      string                  `json:"totalSupply"`
+	TokenType        string                  `json:"tokenType"`
+	ContractDeployer persist.EthereumAddress `json:"contractDeployer"`
 }
 
 type Contract struct {
@@ -429,7 +429,7 @@ func (d *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, contr
 }
 
 func (d *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	tokens, contract, err := d.getTokenWithMetadata(ctx, tokenIdentifiers, false, 0)
+	tokens, contract, err := d.getTokenWithMetadata(ctx, tokenIdentifiers, true, 0)
 	if err != nil {
 		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
 	}
@@ -448,7 +448,7 @@ func (d *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, toke
 	return token, contract, nil
 }
 
-type contractMetadataResponse struct {
+type GetContractMetadataResponse struct {
 	Address          persist.EthereumAddress `json:"address"`
 	ContractMetadata ContractMetadata        `json:"contractMetadata"`
 }
@@ -472,7 +472,7 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 		return multichain.ChainAgnosticContract{}, fmt.Errorf("failed to get contract metadata from alchemy api: %s", resp.Status)
 	}
 
-	var contractMetadataResponse contractMetadataResponse
+	var contractMetadataResponse GetContractMetadataResponse
 	if err := json.NewDecoder(resp.Body).Decode(&contractMetadataResponse); err != nil {
 		return multichain.ChainAgnosticContract{}, err
 	}

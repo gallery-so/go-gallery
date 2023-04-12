@@ -19,6 +19,7 @@ type ContractGallery struct {
 	Symbol           NullString     `json:"symbol"`
 	Name             sql.NullString `json:"name"`
 	Description      NullString     `json:"description"`
+	OwnerAddress     Address        `json:"owner_address"`
 	CreatorAddress   Address        `json:"creator_address"`
 	ProfileImageURL  NullString     `json:"profile_image_url"`
 	ProfileBannerURL NullString     `json:"profile_banner_url"`
