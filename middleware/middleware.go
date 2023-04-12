@@ -133,8 +133,16 @@ func ErrLogger() gin.HandlerFunc {
 // See: https://gqlgen.com/recipes/gin/
 func GinContextToContext() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Add the Gin context to the request context, because some of our handlers (e.g. GraphQL)
+		// only receive the request context, not the Gin context
 		ctx := context.WithValue(c.Request.Context(), util.GinContextKey, c)
 		c.Request = c.Request.WithContext(ctx)
+
+		// Also add the Gin context to itself, just to ensure that this function works
+		// even when called from a handler that is using the Gin context (or one derived
+		// from it) in the first place
+		c.Set(util.GinContextKey, c)
+
 		c.Next()
 	}
 }

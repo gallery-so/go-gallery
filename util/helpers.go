@@ -363,9 +363,20 @@ func StringersToStrings[T fmt.Stringer](stringers []T) []string {
 	return strings
 }
 
-// GinContextFromContext retrieves a gin.Context previously stored in the request context via the GinContextToContext middleware,
-// or panics if no gin.Context can be retrieved (since there's nothing left for the resolver to do if it can't obtain the context).
-func GinContextFromContext(ctx context.Context) *gin.Context {
+// MustGetGinContext retrieves a gin.Context previously stored in the request context via the GinContextToContext
+// middleware, or panics if no gin.Context is found.
+func MustGetGinContext(ctx context.Context) *gin.Context {
+	gc := GetGinContext(ctx)
+	if gc == nil {
+		panic("gin.Context not found in specified context")
+	}
+
+	return gc
+}
+
+// GetGinContext retrieves a gin.Context previously stored in the request context via the GinContextToContext
+// middleware, or nil if no gin.Context is found.
+func GetGinContext(ctx context.Context) *gin.Context {
 	// If the current context is already a gin context, return it
 	if gc, ok := ctx.(*gin.Context); ok {
 		return gc
@@ -374,12 +385,13 @@ func GinContextFromContext(ctx context.Context) *gin.Context {
 	// Otherwise, find the gin context that was stored via middleware
 	ginContext := ctx.Value(GinContextKey)
 	if ginContext == nil {
-		panic("gin.Context not found in current context")
+		return nil
 	}
 
 	gc, ok := ginContext.(*gin.Context)
 	if !ok {
-		panic("gin.Context has wrong type")
+		logger.For(ctx).Error("gin.Context has wrong type")
+		return nil
 	}
 
 	return gc

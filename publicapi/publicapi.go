@@ -110,12 +110,12 @@ func For(ctx context.Context) *PublicAPI {
 	}
 
 	// If not, fall back to the one added to the gin context
-	gc := util.GinContextFromContext(ctx)
+	gc := util.MustGetGinContext(ctx)
 	return gc.Value(apiContextKey).(*PublicAPI)
 }
 
 func getAuthenticatedUserID(ctx context.Context) (persist.DBID, error) {
-	gc := util.GinContextFromContext(ctx)
+	gc := util.MustGetGinContext(ctx)
 	authError := auth.GetAuthErrorFromCtx(gc)
 
 	if authError != nil {
