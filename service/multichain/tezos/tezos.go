@@ -597,12 +597,6 @@ func (d *Provider) RefreshContract(ctx context.Context, addr persist.Address) er
 	return nil
 }
 
-// ValidateTokensForWallet validates tokens for a wallet address on the Tezos Blockchain
-func (d *Provider) ValidateTokensForWallet(ctx context.Context, wallet persist.Address, all bool) error {
-	return nil
-
-}
-
 // VerifySignature will verify a signature using the ed25519 algorithm
 // the address provided must be the tezos public key, not the hashed address
 func (d *Provider) VerifySignature(pCtx context.Context, pPubKey persist.PubKey, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {

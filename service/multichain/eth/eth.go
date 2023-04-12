@@ -18,13 +18,11 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mikeydub/go-gallery/contracts"
-	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/indexer"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -163,16 +161,6 @@ func (d *Provider) RefreshContract(ctx context.Context, addr persist.Address) er
 	}
 
 	return nil
-}
-
-// WalletCreated runs whenever a new wallet is created
-func (d *Provider) WalletCreated(ctx context.Context, userID persist.DBID, wallet persist.Address, walletType persist.WalletType) error {
-	if env.GetString("ENV") == "local" {
-		return nil
-	}
-	input := task.ValidateNFTsMessage{OwnerAddress: persist.EthereumAddress(wallet.String())}
-
-	return task.CreateTaskForWalletValidation(ctx, input, d.taskClient)
 }
 
 // VerifySignature will verify a signature using all available methods (eth_sign and personal_sign)
