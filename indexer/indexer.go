@@ -312,7 +312,6 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 	plugins := NewTransferPlugins(ctx)
 	enabledPlugins := []chan<- TransferPluginMsg{plugins.contracts.in}
 
-	logsToCheckAgainst := make(chan []types.Log)
 	go func() {
 		ctx := sentryutil.NewSentryHubContext(ctx)
 		span, ctx := tracing.StartSpan(ctx, "indexer.logs", "processLogs")
@@ -320,7 +319,6 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 
 		logs := i.fetchLogs(ctx, start, topics)
 		i.processLogs(ctx, transfers, logs)
-		logsToCheckAgainst <- logs
 	}()
 	go i.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transfers, enabledPlugins)
 	i.processTokens(ctx, plugins.contracts.out)
@@ -695,6 +693,8 @@ func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transf
 
 		})
 	}
+
+	wp.StopWait()
 
 	logger.For(ctx).Infof("Processed logs from %d to %d.", i.lastSyncedChunk, mostRecentBlock)
 
