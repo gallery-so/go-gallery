@@ -15,7 +15,7 @@ update blockchain_statistics set total_transfers = $1 where id = $2;
 update blockchain_statistics set total_tokens = $1, total_contracts = $2 where id = $3;
 
 -- name: UpdateStatisticSuccess :exec
-update blockchain_statistics set success = $1 where id = $2;
+update blockchain_statistics set success = $1, processing_time_seconds = $2 where id = $3;
 
 -- name: UpdateStatisticContractStats :exec
 update blockchain_statistics set contract_stats = $1 where id = $2;

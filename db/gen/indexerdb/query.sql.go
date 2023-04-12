@@ -69,16 +69,17 @@ func (q *Queries) UpdateStatisticContractStats(ctx context.Context, arg UpdateSt
 }
 
 const updateStatisticSuccess = `-- name: UpdateStatisticSuccess :exec
-update blockchain_statistics set success = $1 where id = $2
+update blockchain_statistics set success = $1, processing_time_seconds = $2 where id = $3
 `
 
 type UpdateStatisticSuccessParams struct {
-	Success bool
-	ID      persist.DBID
+	Success               bool
+	ProcessingTimeSeconds sql.NullInt64
+	ID                    persist.DBID
 }
 
 func (q *Queries) UpdateStatisticSuccess(ctx context.Context, arg UpdateStatisticSuccessParams) error {
-	_, err := q.db.Exec(ctx, updateStatisticSuccess, arg.Success, arg.ID)
+	_, err := q.db.Exec(ctx, updateStatisticSuccess, arg.Success, arg.ProcessingTimeSeconds, arg.ID)
 	return err
 }
 

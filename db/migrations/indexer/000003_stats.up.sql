@@ -12,7 +12,8 @@ create table if not exists blockchain_statistics (
     total_contracts bigint,
     success boolean default false not null,
     contract_stats jsonb,
-    token_stats jsonb
+    token_stats jsonb,
+    processing_time_seconds bigint
 );
 
 create unique index if not exists blockchain_statistics_blocks_idx on blockchain_statistics (block_start, block_end) where deleted = false;

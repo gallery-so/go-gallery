@@ -333,7 +333,7 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 	go i.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transfers, enabledPlugins, statsID)
 	i.processTokens(ctx, plugins.contracts.out, statsID)
 
-	err = i.queries.UpdateStatisticSuccess(ctx, indexerdb.UpdateStatisticSuccessParams{ID: statsID, Success: true})
+	err = i.queries.UpdateStatisticSuccess(ctx, indexerdb.UpdateStatisticSuccessParams{ID: statsID, Success: true, ProcessingTimeSeconds: sql.NullInt64{Int64: int64(time.Since(startTime) / time.Second), Valid: true}})
 	if err != nil {
 		panic(err)
 	}
