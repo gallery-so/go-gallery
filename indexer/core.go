@@ -8,6 +8,7 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/db/gen/indexerdb"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/indexer/refresh"
 	"github.com/mikeydub/go-gallery/middleware"
@@ -54,6 +55,7 @@ func coreInit(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) (*gin.Engin
 
 	s := media.NewStorageClient(context.Background())
 	tokenRepo, contractRepo, addressFilterRepo := newRepos(s)
+	queries := indexerdb.New(postgres.NewPgxClient())
 	ethClient := rpc.NewEthSocketClient()
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
@@ -62,7 +64,7 @@ func coreInit(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) (*gin.Engin
 		rpcEnabled = true
 	}
 
-	i := newIndexer(ethClient, &http.Client{Timeout: 10 * time.Minute}, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(env.GetInt("CHAIN")), defaultTransferEvents, nil, fromBlock, toBlock)
+	i := newIndexer(ethClient, &http.Client{Timeout: 10 * time.Minute}, ipfsClient, arweaveClient, s, queries, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(env.GetInt("CHAIN")), defaultTransferEvents, nil, fromBlock, toBlock)
 
 	router := gin.Default()
 
@@ -89,6 +91,7 @@ func coreInitServer(quietLogs, enableRPC bool) *gin.Engine {
 
 	s := media.NewStorageClient(context.Background())
 	tokenRepo, contractRepo, addressFilterRepo := newRepos(s)
+	queries := indexerdb.New(postgres.NewPgxClient())
 	ethClient := rpc.NewEthSocketClient()
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
@@ -110,7 +113,7 @@ func coreInitServer(quietLogs, enableRPC bool) *gin.Engine {
 
 	httpClient := &http.Client{Timeout: 10 * time.Minute, Transport: tracing.NewTracingTransport(http.DefaultTransport, false)}
 
-	i := newIndexer(ethClient, httpClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(env.GetInt("CHAIN")), defaultTransferEvents, nil, nil, nil)
+	i := newIndexer(ethClient, httpClient, ipfsClient, arweaveClient, s, queries, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(env.GetInt("CHAIN")), defaultTransferEvents, nil, nil, nil)
 	return handlersInitServer(router, tokenRepo, contractRepo, ethClient, httpClient, ipfsClient, arweaveClient, s, i)
 }
 

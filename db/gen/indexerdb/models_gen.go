@@ -12,6 +12,23 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
+type BlockchainStatistic struct {
+	ID             persist.DBID
+	Deleted        bool
+	Version        int32
+	CreatedAt      time.Time
+	LastUpdated    time.Time
+	BlockStart     persist.BlockNumber
+	BlockEnd       persist.BlockNumber
+	TotalLogs      sql.NullInt64
+	TotalTransfers sql.NullInt64
+	TotalTokens    sql.NullInt64
+	TotalContracts sql.NullInt64
+	Success        bool
+	ContractStats  pgtype.JSONB
+	TokenStats     pgtype.JSONB
+}
+
 type Contract struct {
 	ID             persist.DBID
 	Deleted        bool
