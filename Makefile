@@ -47,6 +47,7 @@ start-dev-sql-proxy  : REQUIRED_SOPS_SECRETS := $(SOPS_DEV_SECRETS)
 start-prod-sql-proxy : REQUIRED_SOPS_SECRETS := $(SOPS_PROD_SECRETS)
 migrate-dev-coredb   : REQUIRED_SOPS_SECRETS := $(SOPS_DEV_SECRETS)
 migrate-prod-coredb  : REQUIRED_SOPS_SECRETS := $(SOPS_PROD_SECRETS)
+migrate-prod-indexerdb : REQUIRED_SOPS_SECRETS := $(SOPS_PROD_SECRETS)
 
 # Environment-specific settings
 $(DEPLOY)-$(DEV)-%                : ENV                    := $(DEV)
@@ -459,6 +460,9 @@ migrate-prod-coredb: start-prod-sql-proxy confirm-prod-migrate
 	POSTGRES_PASSWORD=$(POSTGRES_MIGRATION_PASSWORD) \
 	POSTGRES_PORT=6543 \
 	go run cmd/migrate/main.go
+
+migrate-prod-indexerdb: start-prod-sql-proxy confirm-prod-migrate
+	migrate -path ./db/migrations/indexer -database "postgresql://postgres:$(POSTGRES_INDEXER_PASSWORD)@localhost:6545/postgres?sslmode=disable" up
 
 fix-sops-macs:
 	@cd secrets; ../scripts/fix-sops-macs.sh
