@@ -64,27 +64,9 @@ func setupTest(t *testing.T) (*assert.Assertions, *sql.DB, *pgxpool.Pool) {
 	db := postgres.MustCreateClient()
 	pgx := postgres.NewPgxClient()
 
-	seedNotifications(context.Background(), t, coredb.New(pgx), newRepos(db, pgx))
+	seedNotifications(context.Background(), t, coredb.New(pgx), postgres.NewRepositories(db, pgx))
 
 	return assert.New(t), db, pgx
-}
-
-func newRepos(pq *sql.DB, pgx *pgxpool.Pool) *postgres.Repositories {
-	queries := coredb.New(pgx)
-
-	return &postgres.Repositories{
-		UserRepository:        postgres.NewUserRepository(pq, queries, pgx),
-		NonceRepository:       postgres.NewNonceRepository(pq, queries),
-		TokenRepository:       postgres.NewTokenGalleryRepository(pq, queries),
-		CollectionRepository:  postgres.NewCollectionTokenRepository(pq, queries),
-		GalleryRepository:     postgres.NewGalleryRepository(queries),
-		ContractRepository:    postgres.NewContractGalleryRepository(pq, queries),
-		MembershipRepository:  postgres.NewMembershipRepository(pq, queries),
-		EarlyAccessRepository: postgres.NewEarlyAccessRepository(pq, queries),
-		WalletRepository:      postgres.NewWalletRepository(pq, queries),
-		AdmireRepository:      postgres.NewAdmireRepository(queries),
-		CommentRepository:     postgres.NewCommentRepository(pq, queries),
-	}
 }
 
 func seedNotifications(ctx context.Context, t *testing.T, q *coredb.Queries, repos *postgres.Repositories) {
