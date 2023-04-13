@@ -103,6 +103,7 @@ func NewUserRepository(db *sql.DB, queries *db.Queries, pgx *pgxpool.Pool) *User
 
 	return &UserRepository{
 		db:             db,
+		pgx:            pgx,
 		queries:        queries,
 		updateInfoStmt: updateInfoStmt,
 
