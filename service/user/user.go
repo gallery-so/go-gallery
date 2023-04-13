@@ -86,7 +86,7 @@ type MergeUsersInput struct {
 
 // CreateUser creates a new user
 func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username string, email *persist.Email, bio, galleryName, galleryDesc, galleryPos string, userRepo *postgres.UserRepository,
-	galleryRepo *postgres.GalleryRepository, queries *coredb.Queries, mp *multichain.Provider) (userID persist.DBID, galleryID persist.DBID, err error) {
+	queries *coredb.Queries, mp *multichain.Provider) (userID persist.DBID, galleryID persist.DBID, err error) {
 	gc := util.MustGetGinContext(pCtx)
 
 	authResult, err := authenticator.Authenticate(pCtx)
@@ -114,11 +114,6 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username
 	}
 
 	userID, err = userRepo.Create(pCtx, user, queries)
-	if err != nil {
-		return "", "", err
-	}
-
-	err = mp.RunWalletCreationHooks(pCtx, userID, wallet.ChainAddress.Address(), wallet.WalletType, wallet.ChainAddress.Chain())
 	if err != nil {
 		return "", "", err
 	}
@@ -194,7 +189,7 @@ func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pChainAddress p
 		return err
 	}
 
-	return mp.RunWalletCreationHooks(pCtx, pUserID, authenticatedAddress.ChainAddress.Address(), authenticatedAddress.WalletType, authenticatedAddress.ChainAddress.Chain())
+	return nil
 }
 
 // RemoveAddressesFromUserToken removes any amount of addresses from a user in the DB

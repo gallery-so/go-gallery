@@ -385,7 +385,7 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 	queries := api.queries.WithTx(tx)
 	defer tx.Rollback(ctx)
 
-	userID, galleryID, err = user.CreateUser(ctx, authenticator, username, email, bio, galleryName, galleryDesc, galleryPos, api.repos.UserRepository, api.repos.GalleryRepository, queries, api.multichainProvider)
+	userID, galleryID, err = user.CreateUser(ctx, authenticator, username, email, bio, galleryName, galleryDesc, galleryPos, api.repos.UserRepository, queries, api.multichainProvider)
 	if err != nil {
 		return "", "", err
 	}

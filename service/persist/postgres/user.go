@@ -277,10 +277,6 @@ func (u *UserRepository) Create(pCtx context.Context, pUser persist.CreateUserIn
 		return "", err
 	}
 
-	// TODO: Put this in the above transaction when refactoring UserRepository to use pgx+sqlc.
-	// At the moment, we'd have to mix sql.Tx and pgx.Tx, and it's easier just to assume
-	// for the time being that these inserts will work. Worst case scenario: the user has
-	// to enter their email address again after successfully creating an account.
 	if pUser.Email != nil {
 		err := queries.UpdateUserEmail(pCtx, coredb.UpdateUserEmailParams{
 			UserID:       userID,
