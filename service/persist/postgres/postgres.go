@@ -320,7 +320,7 @@ func NewRepositories(pq *sql.DB, pgx *pgxpool.Pool) *Repositories {
 	return &Repositories{
 		db:                    pq,
 		pool:                  pgx,
-		UserRepository:        NewUserRepository(pq, queries),
+		UserRepository:        NewUserRepository(pq, queries, pgx),
 		NonceRepository:       NewNonceRepository(pq, queries),
 		TokenRepository:       NewTokenGalleryRepository(pq, queries),
 		CollectionRepository:  NewCollectionTokenRepository(pq, queries),

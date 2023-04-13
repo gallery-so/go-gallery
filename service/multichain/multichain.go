@@ -1048,7 +1048,7 @@ func (p *Provider) createUsersForTokens(ctx context.Context, tokens []chainToken
 							Username:     username,
 							ChainAddress: persist.NewChainAddress(t.OwnerAddress, ct.chain),
 							Universal:    true,
-						})
+						}, nil)
 						if err != nil {
 							if _, ok := err.(persist.ErrUsernameNotAvailable); ok {
 								user, err = p.Repos.UserRepository.GetByUsername(ctx, username)

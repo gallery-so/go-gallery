@@ -86,7 +86,7 @@ type MergeUsersInput struct {
 
 // CreateUser creates a new user
 func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username string, email *persist.Email, bio, galleryName, galleryDesc, galleryPos string, userRepo *postgres.UserRepository,
-	galleryRepo *postgres.GalleryRepository, mp *multichain.Provider) (userID persist.DBID, galleryID persist.DBID, err error) {
+	galleryRepo *postgres.GalleryRepository, queries *coredb.Queries, mp *multichain.Provider) (userID persist.DBID, galleryID persist.DBID, err error) {
 	gc := util.MustGetGinContext(pCtx)
 
 	authResult, err := authenticator.Authenticate(pCtx)
@@ -113,7 +113,7 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username
 		WalletType:   wallet.WalletType,
 	}
 
-	userID, err = userRepo.Create(pCtx, user)
+	userID, err = userRepo.Create(pCtx, user, queries)
 	if err != nil {
 		return "", "", err
 	}
@@ -128,7 +128,7 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username
 		return "", "", err
 	}
 
-	gallery, err := galleryRepo.Create(pCtx, coredb.GalleryRepoCreateParams{
+	gallery, err := queries.GalleryRepoCreate(pCtx, coredb.GalleryRepoCreateParams{
 		GalleryID:   persist.GenerateID(),
 		OwnerUserID: userID,
 		Name:        galleryName,
@@ -174,7 +174,7 @@ func RemoveWalletsFromUser(pCtx context.Context, pUserID persist.DBID, pWalletID
 
 // AddWalletToUser adds a single wallet to a user in the DB because a signature needs to be provided and validated per address
 func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pChainAddress persist.ChainAddress, addressAuth auth.Authenticator,
-	userRepo *postgres.UserRepository, walletRepo *postgres.WalletRepository, mp *multichain.Provider) error {
+	userRepo *postgres.UserRepository, mp *multichain.Provider) error {
 
 	authResult, err := addressAuth.Authenticate(pCtx)
 	if err != nil {
@@ -190,7 +190,7 @@ func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pChainAddress p
 		return persist.ErrAddressNotOwnedByUser{ChainAddress: pChainAddress, UserID: authResult.User.ID}
 	}
 
-	if err := userRepo.AddWallet(pCtx, pUserID, authenticatedAddress.ChainAddress, authenticatedAddress.WalletType); err != nil {
+	if err := userRepo.AddWallet(pCtx, pUserID, authenticatedAddress.ChainAddress, authenticatedAddress.WalletType, nil); err != nil {
 		return err
 	}
 

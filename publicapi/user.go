@@ -301,7 +301,7 @@ func (api UserAPI) AddWalletToUser(ctx context.Context, chainAddress persist.Cha
 		return err
 	}
 
-	err = user.AddWalletToUser(ctx, userID, chainAddress, authenticator, api.repos.UserRepository, api.repos.WalletRepository, api.multichainProvider)
+	err = user.AddWalletToUser(ctx, userID, chainAddress, authenticator, api.repos.UserRepository, api.multichainProvider)
 	if err != nil {
 		return err
 	}
@@ -378,12 +378,19 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 		galleryPos = first
 	}
 
-	userID, galleryID, err = user.CreateUser(ctx, authenticator, username, email, bio, galleryName, galleryDesc, galleryPos, api.repos.UserRepository, api.repos.GalleryRepository, api.multichainProvider)
+	tx, err := api.repos.BeginTx(ctx)
+	if err != nil {
+		return "", "", err
+	}
+	queries := api.queries.WithTx(tx)
+	defer tx.Rollback(ctx)
+
+	userID, galleryID, err = user.CreateUser(ctx, authenticator, username, email, bio, galleryName, galleryDesc, galleryPos, api.repos.UserRepository, api.repos.GalleryRepository, queries, api.multichainProvider)
 	if err != nil {
 		return "", "", err
 	}
 
-	err = api.queries.UpdateUserFeaturedGallery(ctx, db.UpdateUserFeaturedGalleryParams{GalleryID: galleryID, UserID: userID})
+	err = queries.UpdateUserFeaturedGallery(ctx, db.UpdateUserFeaturedGalleryParams{GalleryID: galleryID, UserID: userID})
 	if err != nil {
 		return "", "", err
 	}
@@ -397,12 +404,17 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 	}
 
 	gc := util.MustGetGinContext(ctx)
-	err = api.queries.AddPiiAccountCreationInfo(ctx, db.AddPiiAccountCreationInfoParams{
+	err = queries.AddPiiAccountCreationInfo(ctx, db.AddPiiAccountCreationInfoParams{
 		UserID:    userID,
 		IpAddress: gc.ClientIP(),
 	})
 	if err != nil {
 		logger.For(ctx).Warnf("failed to get IP address for userID %s: %s\n", userID, err)
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		return "", "", err
 	}
 
 	// Send event
