@@ -210,7 +210,7 @@ func newHTTPClientForRPC(continueTrace bool, spanOptions ...sentry.SpanOption) *
 	})
 
 	return &http.Client{
-		Timeout: time.Second * defaultHTTPTimeout,
+		Timeout: 0,
 		Transport: tracing.NewTracingTransport(&http.Transport{
 			TLSClientConfig: &tls.Config{
 				RootCAs: pool,
