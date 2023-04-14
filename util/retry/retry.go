@@ -86,3 +86,20 @@ func RetryQueryWithRetry(ctx context.Context, c *graphql.Client, query any, vars
 	}
 	return ErrOutOfRetries
 }
+
+func RetryFunc(ctx context.Context, f func(ctx context.Context) error, shouldRetry func(error) bool, r Retry) error {
+	var err error
+	for i := 0; i < r.Tries; i++ {
+		err = f(ctx)
+		if err == nil {
+			return nil
+		}
+
+		if !shouldRetry(err) {
+			return err
+		}
+
+		r.Sleep(i)
+	}
+	return ErrOutOfRetries
+}
