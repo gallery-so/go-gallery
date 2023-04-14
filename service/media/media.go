@@ -1174,7 +1174,7 @@ func newObjectWriter(ctx context.Context, client *storage.Client, bucket, fileNa
 	writer := client.Bucket(bucket).Object(fileName).NewWriter(ctx)
 	writer.ObjectAttrs.ContentType = contentType
 	writer.ObjectAttrs.CacheControl = "no-cache, no-store"
-	writer.ChunkSize = 8 * 1024 * 1024 // Recommended ChunkSize is a multiple of 256 KB (e.g., 8 MB)
+	writer.ChunkSize = 8 * 1024 * 1024 // 8MB
 	return writer
 }
 
