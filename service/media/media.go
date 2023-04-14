@@ -1180,15 +1180,13 @@ func newObjectWriter(ctx context.Context, client *storage.Client, bucket, fileNa
 		writer.ObjectAttrs.ContentType = *contentType
 	}
 	writer.ObjectAttrs.CacheControl = "no-cache, no-store"
-	writer.ChunkSize = 8 * 1024 * 1024 // 8MB
+	writer.ChunkSize = 4 * 1024 * 1024 // 4MB
 	if contentLength != nil {
 		cl := *contentLength
 		if cl < 4*1024*1024 {
 			writer.ChunkSize = int(cl)
 		} else if cl > 32*1024*1024 {
 			writer.ChunkSize = 8 * 1024 * 1024
-		} else {
-			writer.ChunkSize = 4 * 1024 * 1024
 		}
 	}
 	return writer
