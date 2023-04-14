@@ -173,7 +173,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	deleteCtx, cancel := context.WithTimeout(pCtx, 25*time.Second)
 
-	p := pool.New().WithMaxGoroutines(4).WithContext(deleteCtx)
+	p := pool.New().WithContext(deleteCtx)
 
 	// if nothing was cached in the image step and the image step did process an image type, delete the now stale cached image
 	if !imgResult.cached && imgResult.mediaType.IsImageLike() {
