@@ -145,9 +145,9 @@ func main() {
 			default:
 
 				func() {
-					timeoutContext, cancel := context.WithTimeout(ctx, 30*time.Second)
+					ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 					defer cancel()
-					dims, err := getMediaDimensions(timeoutContext, media.MediaURL.String())
+					dims, err := getMediaDimensions(ctx, media.MediaURL.String())
 					if err != nil {
 						logrus.Errorf("failed to get dimensions for %s: %s", media.MediaURL, err)
 						return

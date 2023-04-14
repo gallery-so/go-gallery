@@ -129,7 +129,7 @@ func processMediaForToken(mc *multichain.Provider, tokenRepo *postgres.TokenGall
 }
 
 func processToken(c context.Context, key string, t persist.TokenGallery, contractAddress, ownerAddress persist.Address, mc *multichain.Provider, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, tokenRepo *postgres.TokenGalleryRepository, imageKeywords, animationKeywords []string, forceRefresh bool) error {
-	ctx := logger.NewContextWithFields(c, logrus.Fields{
+	loggerCtx := logger.NewContextWithFields(c, logrus.Fields{
 		"tokenDBID":       t.ID,
 		"tokenID":         t.TokenID,
 		"contractDBID":    t.Contract,
@@ -137,24 +137,24 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 		"chain":           t.Chain,
 	})
 	totalTime := time.Now()
-	timeoutCtx, cancel := context.WithTimeout(ctx, time.Minute*10)
+	ctx, cancel := context.WithTimeout(loggerCtx, time.Minute*10)
 	defer cancel()
 
 	newMetadata := t.TokenMetadata
 
 	if len(newMetadata) == 0 || forceRefresh {
-		mcMetadata, err := mc.GetTokenMetadataByTokenIdentifiers(timeoutCtx, contractAddress, t.TokenID, ownerAddress, t.Chain)
+		mcMetadata, err := mc.GetTokenMetadataByTokenIdentifiers(ctx, contractAddress, t.TokenID, ownerAddress, t.Chain)
 		if err != nil {
-			logger.For(timeoutCtx).Errorf("error getting metadata from chain: %s", err)
+			logger.For(ctx).Errorf("error getting metadata from chain: %s", err)
 		} else if mcMetadata != nil && len(mcMetadata) > 0 {
-			logger.For(timeoutCtx).Infof("got metadata from chain: %v", mcMetadata)
+			logger.For(ctx).Infof("got metadata from chain: %v", mcMetadata)
 			newMetadata = mcMetadata
 		}
 	}
 
 	image, animation := media.KeywordsForChain(t.Chain, imageKeywords, animationKeywords)
 
-	name, description := media.FindNameAndDescription(timeoutCtx, newMetadata)
+	name, description := media.FindNameAndDescription(ctx, newMetadata)
 
 	if name == "" {
 		name = t.Name.String()
@@ -165,18 +165,18 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 	}
 
 	totalTimeOfMedia := time.Now()
-	newMedia, err := media.MakePreviewsForMetadata(timeoutCtx, newMetadata, contractAddress, persist.TokenID(t.TokenID.String()), t.TokenURI, t.Chain, ipfsClient, arweaveClient, stg, tokenBucket, image, animation)
+	newMedia, err := media.MakePreviewsForMetadata(ctx, newMetadata, contractAddress, persist.TokenID(t.TokenID.String()), t.TokenURI, t.Chain, ipfsClient, arweaveClient, stg, tokenBucket, image, animation)
 	if err != nil {
-		logger.For(timeoutCtx).Errorf("error processing media for %s: %s", key, err)
+		logger.For(ctx).Errorf("error processing media for %s: %s", key, err)
 		newMedia = persist.Media{
 			MediaType: persist.MediaTypeUnknown,
 		}
 	}
-	logger.For(timeoutCtx).Infof("processing media took %s", time.Since(totalTimeOfMedia))
+	logger.For(ctx).Infof("processing media took %s", time.Since(totalTimeOfMedia))
 
 	// Don't replace existing usable media if tokenprocessing failed to get new media
 	if t.Media.IsServable() && !newMedia.IsServable() {
-		logger.For(timeoutCtx).Debugf("not replacing existing media for %s: cur %v new %v", key, t.Media.IsServable(), newMedia.IsServable())
+		logger.For(ctx).Debugf("not replacing existing media for %s: cur %v new %v", key, t.Media.IsServable(), newMedia.IsServable())
 		return nil
 	}
 
@@ -191,12 +191,12 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 		Description: persist.NullString(description),
 		LastUpdated: persist.LastUpdatedTime{},
 	}
-	if err := tokenRepo.UpdateByTokenIdentifiersUnsafe(timeoutCtx, t.TokenID, contractAddress, t.Chain, up); err != nil {
-		logger.For(timeoutCtx).Errorf("error updating media for %s-%s-%d: %s", t.TokenID, contractAddress, t.Chain, err)
+	if err := tokenRepo.UpdateByTokenIdentifiersUnsafe(ctx, t.TokenID, contractAddress, t.Chain, up); err != nil {
+		logger.For(ctx).Errorf("error updating media for %s-%s-%d: %s", t.TokenID, contractAddress, t.Chain, err)
 		return err
 	}
 
-	logger.For(timeoutCtx).Infof("total processing took %s", time.Since(totalTime))
+	logger.For(ctx).Infof("total processing took %s", time.Since(totalTime))
 	return nil
 }
 
