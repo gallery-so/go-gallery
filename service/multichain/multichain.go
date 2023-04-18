@@ -758,7 +758,7 @@ outer:
 		id := ChainAgnosticIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID}
 
 		for i, ownerAddress := range ownerAddresses {
-			refreshedToken, contract, err := ownerFetcher.GetTokensByTokenIdentifiersAndOwner(ctx, id, ownerAddress)
+			refreshedToken, _, err := ownerFetcher.GetTokensByTokenIdentifiersAndOwner(ctx, id, ownerAddress)
 			if err != nil {
 				return err
 			}
@@ -782,19 +782,6 @@ outer:
 			if err != nil {
 				return err
 			}
-
-			name := util.ToNullString(contract.Name, true)
-
-			if err := p.Repos.ContractRepository.UpsertByAddress(ctx, ti.ContractAddress, ti.Chain, persist.ContractGallery{
-				Chain:        ti.Chain,
-				Address:      persist.Address(ti.Chain.NormalizeAddress(ti.ContractAddress)),
-				Symbol:       persist.NullString(contract.Symbol),
-				Name:         name,
-				OwnerAddress: contract.CreatorAddress,
-			}); err != nil {
-				return err
-			}
-
 		}
 		return nil
 	}
