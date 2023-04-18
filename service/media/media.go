@@ -172,8 +172,6 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	var (
 		imgCh, animCh         chan cacheResult
 		imgResult, animResult cacheResult
-		mediaType             persist.MediaType
-		res                   persist.Media
 	)
 
 	if animURL != "" {
@@ -209,9 +207,9 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		panic("no objects to create media from and no errors returned")
 	}
 
-	res = createMediaFromCachedObjects(pCtx, tokenBucket, objects)
+	res := createMediaFromCachedObjects(pCtx, tokenBucket, objects)
 
-	logger.For(pCtx).Infof("media for %s of type %s: %+v", tids, mediaType, res)
+	logger.For(pCtx).Infof("media for %s: %+v", tids, res)
 	return res, nil
 }
 
