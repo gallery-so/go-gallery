@@ -52,7 +52,7 @@ func init() {
 }
 
 const (
-	defaultHTTPTimeout             = 30
+	defaultHTTPTimeout             = 600
 	defaultHTTPKeepAlive           = 600
 	defaultHTTPMaxIdleConns        = 100
 	defaultHTTPMaxIdleConnsPerHost = 100
@@ -164,13 +164,14 @@ func (h metricsHandler) Log(r *log.Record) error {
 // NewIPFSShell returns an IPFS shell
 func NewIPFSShell() *shell.Shell {
 	sh := shell.NewShellWithClient(env.GetString("IPFS_API_URL"), newClientForIPFS(env.GetString("IPFS_PROJECT_ID"), env.GetString("IPFS_PROJECT_SECRET"), false))
-	sh.SetTimeout(time.Minute * 2)
+	sh.SetTimeout(defaultHTTPTimeout * time.Second)
 	return sh
 }
 
 // newHTTPClientForIPFS returns an http.Client configured with default settings intended for IPFS calls.
 func newClientForIPFS(projectID, projectSecret string, continueOnly bool) *http.Client {
 	return &http.Client{
+		Timeout: defaultHTTPTimeout * time.Second,
 		Transport: authTransport{
 			RoundTripper:  tracing.NewTracingTransport(http.DefaultTransport, continueOnly),
 			ProjectID:     projectID,
@@ -209,7 +210,7 @@ func newHTTPClientForRPC(continueTrace bool, spanOptions ...sentry.SpanOption) *
 	})
 
 	return &http.Client{
-		Timeout: time.Second * defaultHTTPTimeout,
+		Timeout: 0,
 		Transport: tracing.NewTracingTransport(&http.Transport{
 			TLSClientConfig: &tls.Config{
 				RootCAs: pool,
@@ -337,8 +338,6 @@ func RetryGetTokenContractMetadata(ctx context.Context, contractAddress persist.
 // GetMetadataFromURI parses and returns the NFT metadata for a given token URI
 func GetMetadataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shell.Shell, arweaveClient *goar.Client) (persist.TokenMetadata, error) {
 
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*2)
-	defer cancel()
 	var meta persist.TokenMetadata
 	err := DecodeMetadataFromURI(ctx, turi, &meta, ipfsClient, arweaveClient)
 	if err != nil {

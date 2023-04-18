@@ -15,6 +15,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/task"
+	"github.com/sourcegraph/conc"
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/gammazero/workerpool"
@@ -354,15 +355,15 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 		}
 	}
 
-	wg := sync.WaitGroup{}
+	wg := conc.WaitGroup{}
 	for c, a := range chainsToAddresses {
 		logger.For(ctx).Infof("syncing chain %d tokens for user %s wallets %s", c, user.Username, a)
 		chain := c
 		addresses := a
-		wg.Add(len(addresses))
 		for _, addr := range addresses {
-			go func(addr persist.Address, chain persist.Chain) {
-				defer wg.Done()
+			addr := addr
+			chain := chain
+			wg.Go(func() {
 				start := time.Now()
 				providers, err := p.getProvidersForChain(chain)
 				if err != nil {
@@ -371,11 +372,12 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 				}
 
 				tokenFetchers := getChainProvidersForTask[tokensOwnerFetcher](providers)
-				subWg := &sync.WaitGroup{}
+				subWg := &conc.WaitGroup{}
 				for i, p := range tokenFetchers {
-					subWg.Add(1)
-					go func(fetcher tokensOwnerFetcher, priority int) {
-						defer subWg.Done()
+					fetcher := p
+					priority := i
+
+					subWg.Go(func() {
 						tokens, contracts, err := fetcher.GetTokensByWalletAddress(ctx, addr, 0, 0)
 						if err != nil {
 							errChan <- err
@@ -386,11 +388,11 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 
 						incomingTokens <- chainTokens{chain: chain, tokens: tokens, priority: priority}
 						incomingContracts <- chainContracts{chain: chain, contracts: contracts, priority: priority}
-					}(p, i)
+					})
 				}
 				subWg.Wait()
 				logger.For(ctx).Debugf("updated media for user %s wallet %s in %s", user.Username, addr, time.Since(start))
-			}(addr, chain)
+			})
 		}
 	}
 
