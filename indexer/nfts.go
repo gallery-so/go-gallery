@@ -66,12 +66,12 @@ func getTokenMetadata(nftRepository persist.TokenRepository, ipfsClient *shell.S
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
-		loggerCtx := logger.NewContextWithFields(c, logrus.Fields{
+		ctx := logger.NewContextWithFields(c, logrus.Fields{
 			"tokenID":         input.TokenID,
 			"contractAddress": input.ContractAddress,
 		})
 
-		ctx, cancel := context.WithTimeout(loggerCtx, time.Minute*10)
+		ctx, cancel := context.WithTimeout(ctx, time.Minute*10)
 		defer cancel()
 
 		curTokens, err := nftRepository.GetByTokenIdentifiers(ctx, input.TokenID, input.ContractAddress, -1, 0)

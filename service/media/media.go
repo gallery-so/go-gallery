@@ -173,13 +173,13 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	deleteCtx, cancel := context.WithTimeout(pCtx, 25*time.Second)
 
-	p := pool.New().WithContext(deleteCtx)
+	deletePool := pool.New().WithContext(deleteCtx)
 
 	// if nothing was cached in the image step and the image step did process an image type, delete the now stale cached image
 	if !imgResult.cached && imgResult.mediaType.IsImageLike() {
 		logger.For(pCtx).Debug("imgResult not cached, deleting cached version if any")
 
-		p.Go(func(ctx context.Context) error {
+		deletePool.Go(func(ctx context.Context) error {
 			return deleteMedia(ctx, tokenBucket, fmt.Sprintf("image-%s", name), storageClient)
 		})
 	}
@@ -188,7 +188,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	if !imgResult.cached && imgResult.mediaType.IsAnimationLike() {
 		logger.For(pCtx).Debug("imgResult not cached, deleting cached version if any")
 
-		p.Go(func(ctx context.Context) error {
+		deletePool.Go(func(ctx context.Context) error {
 			return deleteMedia(ctx, tokenBucket, fmt.Sprintf("liverender-%s", name), storageClient)
 		})
 	}
@@ -196,10 +196,10 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	if !vidResult.cached && vidResult.mediaType.IsAnimationLike() {
 		logger.For(pCtx).Debug("vidResult not cached, deleting cached version if any")
 
-		p.Go(func(ctx context.Context) error {
+		deletePool.Go(func(ctx context.Context) error {
 			return deleteMedia(ctx, tokenBucket, fmt.Sprintf("video-%s", name), storageClient)
 		})
-		p.Go(func(ctx context.Context) error {
+		deletePool.Go(func(ctx context.Context) error {
 			return deleteMedia(ctx, tokenBucket, fmt.Sprintf("liverender-%s", name), storageClient)
 		})
 	}
@@ -208,17 +208,17 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	if (imgResult.cached || vidResult.cached) && (!imgResult.mediaType.IsAnimationLike() && !vidResult.mediaType.IsAnimationLike()) {
 		logger.For(pCtx).Debug("neither cached, deleting thumbnail if any")
 
-		p.Go(func(ctx context.Context) error {
+		deletePool.Go(func(ctx context.Context) error {
 			return deleteMedia(ctx, tokenBucket, fmt.Sprintf("thumbnail-%s", name), storageClient)
 		})
-		p.Go(func(ctx context.Context) error {
+		deletePool.Go(func(ctx context.Context) error {
 			return deleteMedia(ctx, tokenBucket, fmt.Sprintf("liverender-%s", name), storageClient)
 		})
 	}
 
 	func() {
 		defer cancel()
-		p.Wait()
+		deletePool.Wait()
 	}()
 
 	// imgURL does not work, but vidURL does, don't try to use imgURL
@@ -867,8 +867,16 @@ func downloadAndCache(pCtx context.Context, tids persist.TokenIdentifiers, media
 	pCtx = logger.NewContextWithFields(pCtx, logrus.Fields{
 		"mediaType":   mediaType,
 		"contentType": contentType,
+		"mediaURL":    mediaURL,
 	})
-	logger.For(pCtx).Infof("predicted media type from '%s' as '%s' with length %s in %s", mediaURL, mediaType, util.InByteSizeFormat(uint64(util.FromPointer(contentLength))), time.Since(timeBeforePredict))
+	contentLengthStr := "nil"
+	if contentLength != nil {
+		contentLengthStr = util.InByteSizeFormat(uint64(util.FromPointer(contentLength)))
+	}
+	pCtx = logger.NewContextWithFields(pCtx, logrus.Fields{
+		"contentLength": contentLength,
+	})
+	logger.For(pCtx).Infof("predicted media type from '%s' as '%s' with length %s in %s", mediaURL, mediaType, contentLengthStr, time.Since(timeBeforePredict))
 
 outer:
 	switch mediaType {
@@ -925,7 +933,6 @@ outer:
 	if !mediaType.IsValid() {
 		timeBeforeSniff := time.Now()
 		bytesToSniff, _ := reader.Headers()
-		contentType = util.ToPointer("")
 		mediaType, *contentType = persist.SniffMediaType(bytesToSniff)
 		logger.For(pCtx).Infof("sniffed media type for %s: %s in %s", truncateString(mediaURL, 50), mediaType, time.Since(timeBeforeSniff))
 	}
@@ -973,9 +980,12 @@ outer:
 		if mediaType == persist.MediaTypeHTML && asURI.IsPathPrefixed() {
 			return mediaType, false, nil
 		}
-		if contentLength != nil {
-			logger.For(pCtx).Infof("caching %.2f mb of raw media with type '%s' for '%s' at '%s-%s'", float64(*contentLength)/1024/1024, mediaType, mediaURL, ipfsPrefix, name)
+
+		asMb := 0.0
+		if contentLength != nil && *contentLength > 0 {
+			asMb = float64(*contentLength) / 1024 / 1024
 		}
+		logger.For(pCtx).Infof("caching %.2f mb of raw media with type '%s' for '%s' at '%s-%s'", asMb, mediaType, mediaURL, ipfsPrefix, name)
 
 		if mediaType == persist.MediaTypeAnimation {
 			timeBeforeCache := time.Now()
