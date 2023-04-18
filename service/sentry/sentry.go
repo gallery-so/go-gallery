@@ -37,7 +37,7 @@ var logToSentryLevel = map[logrus.Level]sentry.Level{
 var sentryTrailLimit = 8
 
 func ReportRemappedError(ctx context.Context, originalErr error, remappedErr interface{}) {
-	hub := sentry.GetHubFromContext(ctx)
+	hub := SentryHubFromContext(ctx)
 	if hub == nil {
 		logger.For(ctx).Warnln("could not report error to Sentry because hub is nil")
 		return
@@ -135,7 +135,7 @@ func SetEventContext(scope *sentry.Scope, actorID, subjectID persist.DBID, actio
 // NewSentryHubGinContext returns a new Gin context with a cloned hub of the original context's hub.
 // The hub is added to the context's request so that the sentrygin middleware is able to find it.
 func NewSentryHubGinContext(ctx context.Context) *gin.Context {
-	cpy := util.GinContextFromContext(ctx).Copy()
+	cpy := util.MustGetGinContext(ctx).Copy()
 
 	if hub := SentryHubFromContext(cpy); hub != nil {
 		cpy.Request = cpy.Request.WithContext(sentry.SetHubOnContext(cpy.Request.Context(), hub.Clone()))
@@ -155,10 +155,7 @@ func NewSentryHubContext(ctx context.Context) context.Context {
 }
 
 // SentryHubFromContext gets a Hub from the supplied context, or from an underlying
-// gin.Context if one is available. NOTE: once gin 1.7.8 is released, this method can
-// be removed in favor of sentry's default "sentry.GetHubFromContext" method, as gin 1.7.8
-// will automatically check the request context for a value if it isn't found in the gin
-// context.
+// gin.Context if one is available.
 func SentryHubFromContext(ctx context.Context) *sentry.Hub {
 	// Get a hub via Sentry's standard mechanism if possible
 	if hub := sentry.GetHubFromContext(ctx); hub != nil {
@@ -166,9 +163,15 @@ func SentryHubFromContext(ctx context.Context) *sentry.Hub {
 	}
 
 	// Otherwise, see if there's a hub stored on the gin context
-	gc := util.GinContextFromContext(ctx)
-	if hub := sentrygin.GetHubFromContext(gc); hub != nil {
-		return hub
+	if gc := util.GetGinContext(ctx); gc != nil {
+		if hub := sentrygin.GetHubFromContext(gc); hub != nil {
+			return hub
+		}
+
+		// If not, try to get it from the request context
+		if hub := sentry.GetHubFromContext(gc.Request.Context()); hub != nil {
+			return hub
+		}
 	}
 
 	return nil

@@ -248,7 +248,7 @@ func (p *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, ti m
 		defer close(assetsChan)
 		streamAssetsForTokenIdentifiersAndOwner(ctx, persist.EthereumAddress(ownerAddress), persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID.Base10String()), WithResultCh(assetsChan))
 	}()
-	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient)
+	tokens, contracts, err := assetsToTokens(ctx, ownerAddress, assetsChan, p.ethClient)
 	if err != nil {
 		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
 	}
@@ -733,12 +733,15 @@ func assetToToken(asset Asset, block persist.BlockNumber, tokenOwner persist.Add
 		return multichain.ChainAgnosticToken{}, err
 	}
 	return multichain.ChainAgnosticToken{
-		TokenType:       tokenType,
-		Name:            asset.Name,
-		Description:     asset.Description,
-		TokenURI:        persist.TokenURI(asset.TokenMetadataURL),
-		TokenID:         persist.TokenID(asset.TokenID.ToBase16()),
-		OwnerAddress:    tokenOwner,
+		TokenType:    tokenType,
+		Name:         asset.Name,
+		Description:  asset.Description,
+		TokenURI:     persist.TokenURI(asset.TokenMetadataURL),
+		TokenID:      persist.TokenID(asset.TokenID.ToBase16()),
+		OwnerAddress: tokenOwner,
+		FallbackMedia: persist.FallbackMedia{
+			ImageURL: persist.NullString(firstNonEmptyString(asset.ImagePreviewURL, asset.ImageThumbnailURL, asset.ImageURL)),
+		},
 		ContractAddress: persist.Address(asset.Contract.ContractAddress.String()),
 		ExternalURL:     asset.ExternalURL,
 		BlockNumber:     block,

@@ -136,7 +136,7 @@ func (b *EventBuilder) NewFeedEventFromEvent(ctx context.Context, event db.Event
 }
 
 func (b *EventBuilder) NewFeedEventFromGroup(ctx context.Context, groupID string, action persist.Action) (*db.FeedEvent, error) {
-	actor, err := b.queries.GetActorForGroup(ctx, persist.StrToNullStr(&groupID))
+	actor, err := b.queries.GetActorForGroup(ctx, persist.StrPtrToNullStr(&groupID))
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +144,7 @@ func (b *EventBuilder) NewFeedEventFromGroup(ctx context.Context, groupID string
 	if err != nil || blocked {
 		return nil, err
 	}
-	events, err := b.eventRepo.Queries.GetEventsInGroup(ctx, persist.StrToNullStr(&groupID))
+	events, err := b.eventRepo.Queries.GetEventsInGroup(ctx, persist.StrPtrToNullStr(&groupID))
 	if err != nil {
 		return nil, err
 	}
@@ -267,8 +267,8 @@ func (b *EventBuilder) createGalleryUpdatedFeedEventFromEvents(ctx context.Conte
 		Action:    persist.ActionGalleryUpdated,
 		EventTime: merged.eventTime,
 		EventIds:  merged.eventIDs,
-		Caption:   persist.StrToNullStr(merged.caption),
-		GroupID:   persist.StrToNullStr(merged.groupID),
+		Caption:   persist.StrPtrToNullStr(merged.caption),
+		GroupID:   persist.StrPtrToNullStr(merged.groupID),
 		Data: persist.FeedEventData{
 			GalleryID:                                merged.galleryID,
 			GalleryName:                              merged.galleryName,

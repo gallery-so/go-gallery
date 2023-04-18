@@ -46,6 +46,11 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
+func init() {
+	env.RegisterValidation("IPFS_URL", "required")
+	env.RegisterValidation("FALLBACK_IPFS_URL", "required")
+}
+
 const (
 	defaultHTTPTimeout             = 30
 	defaultHTTPKeepAlive           = 600
@@ -789,18 +794,55 @@ func GetIPFSResponse(pCtx context.Context, ipfsClient *shell.Shell, path string)
 		}
 
 		if resp.StatusCode > 399 || resp.StatusCode < 200 {
-			return ipfsResult{err: ErrHTTP{Status: resp.StatusCode, URL: url}}
+			url := fmt.Sprintf("%s/ipfs/%s", env.GetString("FALLBACK_IPFS_URL"), path)
+			req, err = http.NewRequestWithContext(ctx, "GET", url, nil)
+			if err != nil {
+				return ipfsResult{err: err}
+			}
+
+			resp, err = defaultHTTPClient.Do(req)
+			if err != nil {
+				return ipfsResult{err: err}
+			}
+			if resp.StatusCode > 399 || resp.StatusCode < 200 {
+				return ipfsResult{err: ErrHTTP{Status: resp.StatusCode, URL: url}}
+			}
+			logger.For(ctx).Infof("IPFS HTTP fallback fallback successful %s", path)
 		}
+
+		logger.For(ctx).Infof("IPFS HTTP fallback successful %s", path)
 
 		return ipfsResult{resp: resp.Body}
 	}
 
-	fromIPFS := func(context.Context) fetchResulter {
+	fromIPFS := func(ctx context.Context) fetchResulter {
 		reader, err := ipfsClient.Cat(path)
+		logger.For(ctx).Infof("IPFS cat fallback successful %s", path)
 		return ipfsResult{reader, err}
 	}
 
-	result := firstNonError(pCtx, fromHTTP, fromIPFS)
+	fromIPFSAPI := func(ctx context.Context) fetchResulter {
+		url := fmt.Sprintf("https://ipfs.io/ipfs/%s", path)
+		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+		if err != nil {
+			return ipfsResult{err: err}
+		}
+
+		resp, err := defaultHTTPClient.Do(req)
+		if err != nil {
+			return ipfsResult{err: err}
+		}
+
+		if resp.StatusCode > 399 || resp.StatusCode < 200 {
+			return ipfsResult{err: ErrHTTP{Status: resp.StatusCode, URL: url}}
+		}
+
+		logger.For(ctx).Infof("IPFS API fallback successful %s", path)
+
+		return ipfsResult{resp: resp.Body}
+	}
+
+	result := firstNonError(pCtx, fromHTTP, fromIPFS, fromIPFSAPI)
 	response := result.(ipfsResult)
 	return response.resp, response.Error()
 }
@@ -998,6 +1040,23 @@ func GetContractCreator(ctx context.Context, contractAddress persist.EthereumAdd
 		}
 	}
 	return "", fmt.Errorf("could not find contract creator")
+}
+
+// GetContractOwner returns the address of the contract owner
+func GetContractOwner(ctx context.Context, contractAddress persist.EthereumAddress, ethClient *ethclient.Client) (persist.EthereumAddress, error) {
+	instance, err := contracts.NewOwnableCaller(contractAddress.Address(), ethClient)
+	if err != nil {
+		return "", err
+	}
+
+	owner, err := instance.Owner(&bind.CallOpts{
+		Context: ctx,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return persist.EthereumAddress(strings.ToLower(owner.String())), nil
 }
 
 /*

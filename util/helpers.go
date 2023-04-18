@@ -40,6 +40,16 @@ const (
 	EB = 1024 * PB
 )
 
+type MultiErr []error
+
+func (m MultiErr) Error() string {
+	var errStr string
+	for _, err := range m {
+		errStr += "(" + err.Error() + "),"
+	}
+	return fmt.Sprint("Multiple errors: [", errStr, "]")
+}
+
 // FileHeaderReader is a struct that wraps an io.Reader and pre-reads the first 512 bytes of the reader
 // When the reader is read, the first 512 bytes are returned first, then the rest of the reader is read,
 // so that the first 512 bytes are not lost
@@ -109,12 +119,12 @@ func ContainsAnyString(s string, strs ...string) bool {
 
 // UnmarshallBody takes a request body and unmarshals it into the given struct
 // input must be a pointer to a struct with json tags
-func UnmarshallBody(pInput interface{}, body io.Reader) error {
+func UnmarshallBody(pInput any, body io.Reader) error {
 	return json.NewDecoder(body).Decode(pInput)
 }
 
 // GetValueFromMap is a function that returns the value at the first occurence of a given key in a map that potentially contains nested maps
-func GetValueFromMap(m map[string]interface{}, key string, searchDepth int) interface{} {
+func GetValueFromMap(m map[string]any, key string, searchDepth int) any {
 	if searchDepth == 0 {
 		return nil
 	}
@@ -126,14 +136,14 @@ func GetValueFromMap(m map[string]interface{}, key string, searchDepth int) inte
 			return v
 		}
 
-		if nest, ok := v.(map[string]interface{}); ok {
+		if nest, ok := v.(map[string]any); ok {
 			if nestVal := GetValueFromMap(nest, key, searchDepth-1); nestVal != nil {
 				return nestVal
 			}
 		}
-		if array, ok := v.([]interface{}); ok {
+		if array, ok := v.([]any); ok {
 			for _, arrayVal := range array {
-				if nest, ok := arrayVal.(map[string]interface{}); ok {
+				if nest, ok := arrayVal.(map[string]any); ok {
 					if nestVal := GetValueFromMap(nest, key, searchDepth-1); nestVal != nil {
 						return nestVal
 					}
@@ -146,7 +156,7 @@ func GetValueFromMap(m map[string]interface{}, key string, searchDepth int) inte
 
 // GetValueFromMapUnsafe is a function that returns the value at the first occurence of a given key in a map that potentially contains nested maps
 // This function is unsafe because it will also return if the specified key is a substring of any key found in the map
-func GetValueFromMapUnsafe(m map[string]interface{}, key string, searchDepth int) interface{} {
+func GetValueFromMapUnsafe(m map[string]any, key string, searchDepth int) any {
 	if searchDepth == 0 {
 		return nil
 	}
@@ -159,14 +169,14 @@ func GetValueFromMapUnsafe(m map[string]interface{}, key string, searchDepth int
 			return v
 		}
 
-		if nest, ok := v.(map[string]interface{}); ok {
+		if nest, ok := v.(map[string]any); ok {
 			if nestVal := GetValueFromMap(nest, key, searchDepth-1); nestVal != nil {
 				return nestVal
 			}
 		}
-		if array, ok := v.([]interface{}); ok {
+		if array, ok := v.([]any); ok {
 			for _, arrayVal := range array {
-				if nest, ok := arrayVal.(map[string]interface{}); ok {
+				if nest, ok := arrayVal.(map[string]any); ok {
 					if nestVal := GetValueFromMap(nest, key, searchDepth-1); nestVal != nil {
 						return nestVal
 					}
@@ -213,6 +223,26 @@ func MapKeys[T comparable, V any](m map[T]V) []T {
 		result = append(result, k)
 	}
 	return result
+}
+
+func MapValues[T comparable, V any](m map[T]V) []V {
+	result := make([]V, 0, len(m))
+	for _, v := range m {
+		result = append(result, v)
+	}
+	return result
+}
+
+func AllEqual[T comparable](xs []T) bool {
+	if len(xs) == 0 {
+		return true
+	}
+	for _, x := range xs {
+		if x != xs[0] {
+			return false
+		}
+	}
+	return true
 }
 
 // Dedupe removes duplicate elements from a slice, preserving the order of the remaining elements.
@@ -272,6 +302,21 @@ func FindFirst[T any](s []T, f func(T) bool) (T, bool) {
 	return *new(T), false
 }
 
+func Filter[T any](s []T, f func(T) bool, filterInPlace bool) []T {
+	var r []T
+	if filterInPlace {
+		r = s[:0]
+	} else {
+		r = make([]T, 0, len(s))
+	}
+	for _, v := range s {
+		if f(v) {
+			r = append(r, v)
+		}
+	}
+	return r
+}
+
 // StringToPointerIfNotEmpty returns a pointer to the string if it is a non-empty string
 func StringToPointerIfNotEmpty(str string) *string {
 	if str == "" {
@@ -318,9 +363,20 @@ func StringersToStrings[T fmt.Stringer](stringers []T) []string {
 	return strings
 }
 
-// GinContextFromContext retrieves a gin.Context previously stored in the request context via the GinContextToContext middleware,
-// or panics if no gin.Context can be retrieved (since there's nothing left for the resolver to do if it can't obtain the context).
-func GinContextFromContext(ctx context.Context) *gin.Context {
+// MustGetGinContext retrieves a gin.Context previously stored in the request context via the GinContextToContext
+// middleware, or panics if no gin.Context is found.
+func MustGetGinContext(ctx context.Context) *gin.Context {
+	gc := GetGinContext(ctx)
+	if gc == nil {
+		panic("gin.Context not found in specified context")
+	}
+
+	return gc
+}
+
+// GetGinContext retrieves a gin.Context previously stored in the request context via the GinContextToContext
+// middleware, or nil if no gin.Context is found.
+func GetGinContext(ctx context.Context) *gin.Context {
 	// If the current context is already a gin context, return it
 	if gc, ok := ctx.(*gin.Context); ok {
 		return gc
@@ -329,12 +385,13 @@ func GinContextFromContext(ctx context.Context) *gin.Context {
 	// Otherwise, find the gin context that was stored via middleware
 	ginContext := ctx.Value(GinContextKey)
 	if ginContext == nil {
-		panic("gin.Context not found in current context")
+		return nil
 	}
 
 	gc, ok := ginContext.(*gin.Context)
 	if !ok {
-		panic("gin.Context has wrong type")
+		logger.For(ctx).Error("gin.Context has wrong type")
+		return nil
 	}
 
 	return gc
@@ -437,7 +494,7 @@ func GetURIPath(initial string, withoutQuery bool) string {
 }
 
 // FindFirstFieldFromMap finds the first field in the map that contains the given field
-func FindFirstFieldFromMap(it map[string]interface{}, fields ...string) interface{} {
+func FindFirstFieldFromMap(it map[string]any, fields ...string) any {
 
 	for _, field := range fields {
 		if val := GetValueFromMapUnsafe(it, field, DefaultSearchDepth); val != nil {
@@ -556,7 +613,10 @@ func IsNullOrEmpty(s sql.NullString) bool {
 	return !s.Valid || s.String == ""
 }
 
-func ToNullString(s string) sql.NullString {
+func ToNullString(s string, emptyIsNull bool) sql.NullString {
+	if emptyIsNull && s == "" {
+		return sql.NullString{String: "", Valid: false}
+	}
 	return sql.NullString{String: s, Valid: true}
 }
 

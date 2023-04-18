@@ -49,12 +49,12 @@ type UserAPI struct {
 }
 
 func (api UserAPI) GetLoggedInUserId(ctx context.Context) persist.DBID {
-	gc := util.GinContextFromContext(ctx)
+	gc := util.MustGetGinContext(ctx)
 	return auth.GetUserIDFromCtx(gc)
 }
 
 func (api UserAPI) IsUserLoggedIn(ctx context.Context) bool {
-	gc := util.GinContextFromContext(ctx)
+	gc := util.MustGetGinContext(ctx)
 	return auth.GetUserAuthedFromCtx(gc)
 }
 
@@ -397,7 +397,7 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 		}
 	}
 
-	gc := util.GinContextFromContext(ctx)
+	gc := util.MustGetGinContext(ctx)
 	err = api.queries.AddPiiAccountCreationInfo(ctx, db.AddPiiAccountCreationInfoParams{
 		UserID:    userID,
 		IpAddress: gc.ClientIP(),

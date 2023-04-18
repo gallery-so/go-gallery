@@ -20,7 +20,7 @@ poap_weight as (
     -- to offset the fact that we're going to multiply all addresses by 1000000000.
     select $5::float4 / 1000000000 as weight
 )
-select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.parent_id from contracts left join contract_relevance on contract_relevance.id = contracts.id,
+select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.parent_id, contracts.owner_address from contracts left join contract_relevance on contract_relevance.id = contracts.id,
      to_tsquery('simple', websearch_to_tsquery('simple', $1)::text || ':*') simple_partial_query,
      websearch_to_tsquery('simple', $1) simple_full_query,
      websearch_to_tsquery('english', $1) english_full_query,
@@ -81,6 +81,7 @@ func (q *Queries) SearchContracts(ctx context.Context, arg SearchContractsParams
 			&i.BadgeUrl,
 			&i.Description,
 			&i.ParentID,
+			&i.OwnerAddress,
 		); err != nil {
 			return nil, err
 		}

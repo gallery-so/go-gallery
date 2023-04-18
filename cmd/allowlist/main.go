@@ -7,15 +7,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/gammazero/workerpool"
-	"github.com/jackc/pgx/v4"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/spf13/viper"
 )
-
-type allowlist []persist.DBID
 
 func main() {
 
@@ -32,44 +27,19 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	allowlistFile, err := os.Open("./users_for_allowlist.json")
+	rows, err := pg.Query(ctx, "SELECT w.ADDRESS FROM pii.user_view u, wallets w WHERE NOT u.pii_socials->>'Twitter' = '' AND w.CHAIN = 0 AND w.ID = any(u.WALLETS) ORDER BY array_position(u.WALLETS, w.ID);")
 	if err != nil {
 		panic(err)
 	}
 
-	var a allowlist
-	err = json.NewDecoder(allowlistFile).Decode(&a)
-	if err != nil {
-		panic(err)
-	}
-
-	wallets := make([]persist.Address, 0, len(a))
-
-	wp := workerpool.New(100)
-	addrChan := make(chan persist.Address)
-
-	for _, userID := range a {
-		user := userID
-		wp.Submit(func() {
-			var walletAddress persist.Address
-			err = pg.QueryRow(ctx, "SELECT w.ADDRESS FROM users u, wallets w WHERE u.ID = $1 AND w.CHAIN = 0 AND w.ID = any(u.WALLETS) ORDER BY array_position(u.WALLETS, w.ID) LIMIT 1", user).Scan(&walletAddress)
-			if err != nil && err != pgx.ErrNoRows {
-				panic(err)
-			}
-			addrChan <- walletAddress
-		})
-	}
-
-	go func() {
-		wp.StopWait()
-		close(addrChan)
-	}()
-
-	for address := range addrChan {
-		if address != "" {
-			wallets = append(wallets, address)
-			logger.For(ctx).Infof("Found wallet address %s", address)
+	var wallets []persist.Address
+	for rows.Next() {
+		var address persist.Address
+		err = rows.Scan(&address)
+		if err != nil {
+			panic(err)
 		}
+		wallets = append(wallets, address)
 	}
 
 	asJSON, err := json.Marshal(dedupeAddresses(wallets))

@@ -284,7 +284,7 @@ func NewMagicLinkClient() *magicclient.API {
 
 // Login logs in a user with a given authentication scheme
 func Login(pCtx context.Context, authenticator Authenticator) (persist.DBID, error) {
-	gc := util.GinContextFromContext(pCtx)
+	gc := util.MustGetGinContext(pCtx)
 
 	authResult, err := authenticator.Authenticate(pCtx)
 	if err != nil {
@@ -307,7 +307,7 @@ func Login(pCtx context.Context, authenticator Authenticator) (persist.DBID, err
 }
 
 func Logout(pCtx context.Context) {
-	gc := util.GinContextFromContext(pCtx)
+	gc := util.MustGetGinContext(pCtx)
 	SetAuthStateForCtx(gc, "", ErrNoCookie)
 	SetJWTCookie(gc, "")
 }

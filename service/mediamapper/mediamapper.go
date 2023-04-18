@@ -43,7 +43,7 @@ func AddTo(c *gin.Context) {
 }
 
 func For(ctx context.Context) *MediaMapper {
-	gc := util.GinContextFromContext(ctx)
+	gc := util.MustGetGinContext(ctx)
 	return gc.Value(contextKey).(*MediaMapper)
 }
 

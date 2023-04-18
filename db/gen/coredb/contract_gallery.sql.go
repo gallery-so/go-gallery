@@ -13,7 +13,7 @@ import (
 )
 
 const upsertContracts = `-- name: UpsertContracts :many
-insert into contracts (id, deleted, version, created_at, address, symbol, name, creator_address, chain, description) (
+insert into contracts (id, deleted, version, created_at, address, symbol, name, owner_address, chain, description) (
   select
   unnest($1::varchar[])
   , unnest($2::boolean[])
@@ -31,24 +31,24 @@ do update set
   symbol = excluded.symbol
   , version = excluded.version
   , name = excluded.name
-  , creator_address = excluded.creator_address
+  , owner_address = excluded.owner_address
   , description = excluded.description
   , deleted = excluded.deleted
   , last_updated = now()
-returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, parent_id
+returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, parent_id, owner_address
 `
 
 type UpsertContractsParams struct {
-	ID             []string
-	Deleted        []bool
-	Version        []int32
-	CreatedAt      []time.Time
-	Address        []string
-	Symbol         []string
-	Name           []string
-	CreatorAddress []string
-	Chain          []int32
-	Description    []string
+	ID           []string
+	Deleted      []bool
+	Version      []int32
+	CreatedAt    []time.Time
+	Address      []string
+	Symbol       []string
+	Name         []string
+	OwnerAddress []string
+	Chain        []int32
+	Description  []string
 }
 
 func (q *Queries) UpsertContracts(ctx context.Context, arg UpsertContractsParams) ([]Contract, error) {
@@ -60,7 +60,7 @@ func (q *Queries) UpsertContracts(ctx context.Context, arg UpsertContractsParams
 		arg.Address,
 		arg.Symbol,
 		arg.Name,
-		arg.CreatorAddress,
+		arg.OwnerAddress,
 		arg.Chain,
 		arg.Description,
 	)
@@ -87,6 +87,7 @@ func (q *Queries) UpsertContracts(ctx context.Context, arg UpsertContractsParams
 			&i.BadgeUrl,
 			&i.Description,
 			&i.ParentID,
+			&i.OwnerAddress,
 		); err != nil {
 			return nil, err
 		}
@@ -196,7 +197,7 @@ insert_parent_contracts as (
     , creator_address = excluded.creator_address
     , description = excluded.description
     , last_updated = now()
-  returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, parent_id
+  returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, parent_id, owner_address
 ),
 insert_child_contracts as (
   insert into contracts(id, deleted, created_at, name, address, creator_address, chain, description, parent_id)
@@ -220,7 +221,7 @@ insert_child_contracts as (
     , creator_address = excluded.creator_address
     , description = excluded.description
     , last_updated = now()
-  returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, parent_id
+  returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, parent_id, owner_address
 )
 insert into tokens(
   id
@@ -283,7 +284,7 @@ do update set
   , is_provider_marked_spam = excluded.is_provider_marked_spam
   , last_synced = greatest(excluded.last_synced,tokens.last_synced)
   , child_contract_id = excluded.child_contract_id
-returning id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, child_contract_id
+returning id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, child_contract_id, fallback_media
 `
 
 type UpsertCreatedTokensParams struct {
@@ -421,6 +422,7 @@ func (q *Queries) UpsertCreatedTokens(ctx context.Context, arg UpsertCreatedToke
 			&i.IsProviderMarkedSpam,
 			&i.LastSynced,
 			&i.ChildContractID,
+			&i.FallbackMedia,
 		); err != nil {
 			return nil, err
 		}

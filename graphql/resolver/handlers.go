@@ -76,7 +76,7 @@ func MutationCachingHandler(newPublicAPI func(context.Context, bool) *publicapi.
 		}
 
 		// Get the request context so dataloaders will add their traces to the request span
-		gc := util.GinContextFromContext(ctx)
+		gc := util.MustGetGinContext(ctx)
 		requestContext := gc.Request.Context()
 
 		// Get or create a new public API with caching disabled, and push it to our context
@@ -161,7 +161,7 @@ func ExperimentalDirectiveHandler() func(ctx context.Context, obj interface{}, n
 
 func FrontendBuildAuthDirectiveHandler() func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
 	return func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
-		gc := util.GinContextFromContext(ctx)
+		gc := util.MustGetGinContext(ctx)
 
 		authError := model.ErrNotAuthorized{
 			Message: "Not authorized",
@@ -197,7 +197,7 @@ func FrontendBuildAuthDirectiveHandler() func(ctx context.Context, obj interface
 func AuthRequiredDirectiveHandler() func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
 
 	return func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
-		gc := util.GinContextFromContext(ctx)
+		gc := util.MustGetGinContext(ctx)
 
 		makeErrNotAuthorized := func(e string, c model.AuthorizationError) model.ErrNotAuthorized {
 			return model.ErrNotAuthorized{
@@ -370,7 +370,7 @@ func RequestReporter(schema *ast.Schema, log bool, trace bool) func(ctx context.
 		// Unique ID to make finding this particular log entry easy
 		locatorID := ksuid.New().String()
 
-		gc := util.GinContextFromContext(ctx)
+		gc := util.MustGetGinContext(ctx)
 		oc := gqlgen.GetOperationContext(ctx)
 		operationName := getOperationName(oc)
 		operationType := getOperationType(oc)

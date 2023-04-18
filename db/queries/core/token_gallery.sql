@@ -14,6 +14,7 @@ insert into tokens
   , quantity
   , ownership_history
   , media
+  , fallback_media
   , token_metadata
   , external_url
   , block_number
@@ -40,6 +41,7 @@ insert into tokens
     , quantity
     , ownership_history[ownership_history_start_idx::int:ownership_history_end_idx::int]
     , media
+    , fallback_media
     , token_metadata
     , external_url
     , block_number
@@ -68,6 +70,7 @@ insert into tokens
       , unnest(@ownership_history_start_idx::int[]) as ownership_history_start_idx
       , unnest(@ownership_history_end_idx::int[]) as ownership_history_end_idx
       , unnest(@media::jsonb[]) as media
+      , unnest(@fallback_media::jsonb[]) as fallback_media
       , unnest(@token_metadata::jsonb[]) as token_metadata
       , unnest(@external_url::varchar[]) as external_url
       , unnest(@block_number::bigint[]) as block_number
@@ -94,6 +97,7 @@ do update set
   , owner_user_id = excluded.owner_user_id
   , owned_by_wallets = excluded.owned_by_wallets
   , ownership_history = tokens.ownership_history || excluded.ownership_history
+  , fallback_media = excluded.fallback_media
   , token_metadata = excluded.token_metadata
   , external_url = excluded.external_url
   , block_number = excluded.block_number

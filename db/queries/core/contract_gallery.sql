@@ -1,5 +1,5 @@
 -- name: UpsertContracts :many
-insert into contracts (id, deleted, version, created_at, address, symbol, name, creator_address, chain, description) (
+insert into contracts (id, deleted, version, created_at, address, symbol, name, owner_address, chain, description) (
   select
   unnest(@id::varchar[])
   , unnest(@deleted::boolean[])
@@ -8,7 +8,7 @@ insert into contracts (id, deleted, version, created_at, address, symbol, name, 
   , unnest(@address::varchar[])
   , unnest(@symbol::varchar[])
   , unnest(@name::varchar[])
-  , unnest(@creator_address::varchar[])
+  , unnest(@owner_address::varchar[])
   , unnest(@chain::int[])
   , unnest(@description::varchar[])
 )
@@ -17,7 +17,7 @@ do update set
   symbol = excluded.symbol
   , version = excluded.version
   , name = excluded.name
-  , creator_address = excluded.creator_address
+  , owner_address = excluded.owner_address
   , description = excluded.description
   , deleted = excluded.deleted
   , last_updated = now()

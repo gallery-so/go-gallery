@@ -66,7 +66,7 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 
 // DispatchDelayed sends the event to all of its registered handlers.
 func DispatchDelayed(ctx context.Context, event db.Event) error {
-	gc := util.GinContextFromContext(ctx)
+	gc := util.MustGetGinContext(ctx)
 	sender := For(gc)
 
 	if _, handable := sender.registry[delayedKey][event.Action]; !handable {
@@ -87,7 +87,7 @@ func DispatchDelayed(ctx context.Context, event db.Event) error {
 
 // DispatchImmediate flushes the event immediately to its registered handlers.
 func DispatchImmediate(ctx context.Context, events []db.Event) (*db.FeedEvent, error) {
-	gc := util.GinContextFromContext(ctx)
+	gc := util.MustGetGinContext(ctx)
 	sender := For(gc)
 
 	for _, e := range events {
@@ -127,7 +127,7 @@ func DispatchImmediate(ctx context.Context, events []db.Event) (*db.FeedEvent, e
 
 // DispatchGroup flushes the event group immediately to its registered handlers.
 func DispatchGroup(ctx context.Context, groupID string, action persist.Action, caption *string) (*db.FeedEvent, error) {
-	gc := util.GinContextFromContext(ctx)
+	gc := util.MustGetGinContext(ctx)
 	sender := For(gc)
 
 	if _, handable := sender.registry[groupKey][action]; !handable {
@@ -137,8 +137,8 @@ func DispatchGroup(ctx context.Context, groupID string, action persist.Action, c
 
 	if caption != nil {
 		err := sender.eventRepo.Queries.UpdateEventCaptionByGroup(ctx, db.UpdateEventCaptionByGroupParams{
-			Caption: persist.StrToNullStr(caption),
-			GroupID: persist.StrToNullStr(&groupID),
+			Caption: persist.StrPtrToNullStr(caption),
+			GroupID: persist.StrPtrToNullStr(&groupID),
 		})
 		if err != nil {
 			return nil, err
@@ -164,7 +164,7 @@ func DispatchGroup(ctx context.Context, groupID string, action persist.Action, c
 }
 
 func For(ctx context.Context) *eventSender {
-	gc := util.GinContextFromContext(ctx)
+	gc := util.MustGetGinContext(ctx)
 	return gc.Value(eventSenderContextKey).(*eventSender)
 }
 
@@ -331,12 +331,12 @@ func (h feedHandler) handleImmediate(ctx context.Context, persistedEvent db.Even
 // handleGrouped processes a group of events into a single feed event.
 func (h feedHandler) handleGroup(ctx context.Context, groupID string, action persist.Action) (interface{}, error) {
 
-	existsForGroup, err := h.queries.IsFeedEventExistsForGroup(ctx, persist.StrToNullStr(&groupID))
+	existsForGroup, err := h.queries.IsFeedEventExistsForGroup(ctx, persist.StrPtrToNullStr(&groupID))
 	if err != nil {
 		return nil, err
 	}
 	if existsForGroup {
-		return h.queries.UpdateFeedEventCaptionByGroup(ctx, persist.StrToNullStr(&groupID))
+		return h.queries.UpdateFeedEventCaptionByGroup(ctx, persist.StrPtrToNullStr(&groupID))
 	}
 
 	feedEvent, err := h.eventBuilder.NewFeedEventFromGroup(ctx, groupID, action)

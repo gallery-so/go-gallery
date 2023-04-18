@@ -18,6 +18,7 @@ type ContractGalleryRepository struct {
 	queries               *db.Queries
 	getByIDStmt           *sql.Stmt
 	getByAddressStmt      *sql.Stmt
+	getByAddressesStmt    *sql.Stmt
 	upsertByAddressStmt   *sql.Stmt
 	getOwnersStmt         *sql.Stmt
 	getUserByWalletIDStmt *sql.Stmt
@@ -29,13 +30,16 @@ func NewContractGalleryRepository(db *sql.DB, queries *db.Queries) *ContractGall
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
-	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,SYMBOL,NAME,CREATOR_ADDRESS,CHAIN FROM contracts WHERE ID = $1;`)
+	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,SYMBOL,NAME,OWNER_ADDRESS,CHAIN FROM contracts WHERE ID = $1;`)
 	checkNoErr(err)
 
-	getByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,SYMBOL,NAME,CREATOR_ADDRESS,CHAIN FROM contracts WHERE ADDRESS = $1 AND CHAIN = $2 AND DELETED = false;`)
+	getByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,SYMBOL,NAME,OWNER_ADDRESS,CHAIN FROM contracts WHERE ADDRESS = $1 AND CHAIN = $2 AND DELETED = false;`)
 	checkNoErr(err)
 
-	upsertByAddressStmt, err := db.PrepareContext(ctx, `INSERT INTO contracts (ID,VERSION,ADDRESS,SYMBOL,NAME,CREATOR_ADDRESS,CHAIN) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (ADDRESS,CHAIN) DO UPDATE SET VERSION = $2, ADDRESS = $3, SYMBOL = $4, NAME = $5, CREATOR_ADDRESS = $6, CHAIN = $7;`)
+	getByAddressesStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,SYMBOL,NAME,OWNER_ADDRESS,CHAIN FROM contracts WHERE ADDRESS = ANY($1) AND CHAIN = $2 AND DELETED = false;`)
+	checkNoErr(err)
+
+	upsertByAddressStmt, err := db.PrepareContext(ctx, `INSERT INTO contracts (ID,VERSION,ADDRESS,SYMBOL,NAME,OWNER_ADDRESS,CHAIN) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (ADDRESS,CHAIN) DO UPDATE SET VERSION = $2, ADDRESS = $3, SYMBOL = $4, OWNER_ADDRESS = $6, CHAIN = $7;`)
 	checkNoErr(err)
 
 	getOwnersStmt, err := db.PrepareContext(ctx,
@@ -53,12 +57,12 @@ func NewContractGalleryRepository(db *sql.DB, queries *db.Queries) *ContractGall
 	getPreviewNFTsStmt, err := db.PrepareContext(ctx, `SELECT MEDIA->>'thumbnail_url' FROM tokens WHERE CONTRACT = $1 AND DELETED = false AND OWNED_BY_WALLETS && $2 AND LENGTH(MEDIA->>'thumbnail_url') > 0 ORDER BY ID LIMIT 3`)
 	checkNoErr(err)
 
-	return &ContractGalleryRepository{db: db, queries: queries, getByIDStmt: getByIDStmt, getByAddressStmt: getByAddressStmt, upsertByAddressStmt: upsertByAddressStmt, getOwnersStmt: getOwnersStmt, getUserByWalletIDStmt: getUserByWalletIDStmt, getPreviewNFTsStmt: getPreviewNFTsStmt}
+	return &ContractGalleryRepository{db: db, queries: queries, getByIDStmt: getByIDStmt, getByAddressStmt: getByAddressStmt, upsertByAddressStmt: upsertByAddressStmt, getByAddressesStmt: getByAddressesStmt, getOwnersStmt: getOwnersStmt, getUserByWalletIDStmt: getUserByWalletIDStmt, getPreviewNFTsStmt: getPreviewNFTsStmt}
 }
 
 func (c *ContractGalleryRepository) GetByID(ctx context.Context, id persist.DBID) (persist.ContractGallery, error) {
 	contract := persist.ContractGallery{}
-	err := c.getByIDStmt.QueryRowContext(ctx, id).Scan(&contract.ID, &contract.Version, &contract.CreationTime, &contract.LastUpdated, &contract.Address, &contract.Symbol, &contract.Name, &contract.CreatorAddress, &contract.Chain)
+	err := c.getByIDStmt.QueryRowContext(ctx, id).Scan(&contract.ID, &contract.Version, &contract.CreationTime, &contract.LastUpdated, &contract.Address, &contract.Symbol, &contract.Name, &contract.OwnerAddress, &contract.Chain)
 	if err != nil {
 		return persist.ContractGallery{}, err
 	}
@@ -69,7 +73,7 @@ func (c *ContractGalleryRepository) GetByID(ctx context.Context, id persist.DBID
 // GetByAddress returns the contract with the given address
 func (c *ContractGalleryRepository) GetByAddress(pCtx context.Context, pAddress persist.Address, pChain persist.Chain) (persist.ContractGallery, error) {
 	contract := persist.ContractGallery{}
-	err := c.getByAddressStmt.QueryRowContext(pCtx, pAddress, pChain).Scan(&contract.ID, &contract.Version, &contract.CreationTime, &contract.LastUpdated, &contract.Address, &contract.Symbol, &contract.Name, &contract.CreatorAddress, &contract.Chain)
+	err := c.getByAddressStmt.QueryRowContext(pCtx, pAddress, pChain).Scan(&contract.ID, &contract.Version, &contract.CreationTime, &contract.LastUpdated, &contract.Address, &contract.Symbol, &contract.Name, &contract.OwnerAddress, &contract.Chain)
 	if err != nil {
 		return persist.ContractGallery{}, err
 	}
@@ -77,9 +81,34 @@ func (c *ContractGalleryRepository) GetByAddress(pCtx context.Context, pAddress 
 	return contract, nil
 }
 
+// GetByAddresses returns the contract with the given address
+func (c *ContractGalleryRepository) GetByAddresses(pCtx context.Context, pAddresses []persist.Address, pChain persist.Chain) ([]persist.ContractGallery, error) {
+	res := []persist.ContractGallery{}
+	rows, err := c.getByAddressesStmt.QueryContext(pCtx, pAddresses, pChain)
+	if err != nil {
+		return res, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var contract persist.ContractGallery
+		err := rows.Scan(&contract.ID, &contract.Version, &contract.CreationTime, &contract.LastUpdated, &contract.Address, &contract.Symbol, &contract.Name, &contract.OwnerAddress, &contract.Chain)
+		if err != nil {
+			return res, err
+		}
+		res = append(res, contract)
+	}
+
+	if err := rows.Err(); err != nil {
+		return res, err
+	}
+
+	return res, nil
+}
+
 // UpsertByAddress upserts the contract with the given address
 func (c *ContractGalleryRepository) UpsertByAddress(pCtx context.Context, pAddress persist.Address, pChain persist.Chain, pContract persist.ContractGallery) error {
-	_, err := c.upsertByAddressStmt.ExecContext(pCtx, persist.GenerateID(), pContract.Version, pContract.Address, pContract.Symbol, pContract.Name, pContract.CreatorAddress, pContract.Chain)
+	_, err := c.upsertByAddressStmt.ExecContext(pCtx, persist.GenerateID(), pContract.Version, pContract.Address, pContract.Symbol, pContract.Name, pContract.OwnerAddress, pContract.Chain)
 	if err != nil {
 		return err
 	}
@@ -125,8 +154,8 @@ func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, pContracts 
 		params.CreatedAt = append(params.CreatedAt, c.CreationTime.Time())
 		params.Address = append(params.Address, c.Address.String())
 		params.Symbol = append(params.Symbol, c.Symbol.String())
-		params.Name = append(params.Name, c.Name.String())
-		params.CreatorAddress = append(params.CreatorAddress, c.CreatorAddress.String())
+		params.Name = append(params.Name, c.Name.String)
+		params.OwnerAddress = append(params.OwnerAddress, c.OwnerAddress.String())
 		params.Chain = append(params.Chain, int32(c.Chain))
 		params.Description = append(params.Description, c.Description.String())
 	}

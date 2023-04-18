@@ -9,6 +9,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
 	"github.com/shurcooL/graphql"
 	"github.com/sirupsen/logrus"
@@ -19,7 +20,7 @@ const (
 	objktEndpoint = "https://data.objkt.com/v3/graphql"
 )
 
-type inputArgs map[string]interface{}
+type inputArgs map[string]any
 
 type attribute struct {
 	Name  string
@@ -177,13 +178,13 @@ func (p *TezosObjktProvider) GetTokensByWalletAddress(ctx context.Context, owner
 		}
 
 		tokenID := persist.TokenID(node.Token.Token_ID.toBase16String())
-		media := makeTempMedia(ctx, tokenID, dedupeContracts[node.Token.Fa.Contract].Address, metadata, p.ipfsGatewayURL)
+
 		agnosticToken := multichain.ChainAgnosticToken{
-			TokenType:       persist.TokenTypeERC1155,
-			Description:     node.Token.Description,
-			Name:            node.Token.Name,
-			TokenID:         tokenID,
-			Media:           media,
+			TokenType:   persist.TokenTypeERC1155,
+			Description: node.Token.Description,
+			Name:        node.Token.Name,
+			TokenID:     tokenID,
+
 			ContractAddress: dedupeContracts[node.Token.Fa.Contract].Address,
 			Quantity:        persist.HexString(fmt.Sprintf("%x", node.Token.Holders[0].Quantity)),
 			TokenMetadata:   metadata,
@@ -241,14 +242,12 @@ func (p *TezosObjktProvider) GetTokensByTokenIdentifiersAndOwner(ctx context.Con
 	}
 
 	tokenID := persist.TokenID(token.Token_ID.toBase16String())
-	media := makeTempMedia(ctx, tokenID, agnosticContract.Address, metadata, p.ipfsGatewayURL)
 
 	agnosticToken := multichain.ChainAgnosticToken{
 		TokenType:       persist.TokenTypeERC1155,
 		Description:     token.Description,
 		Name:            token.Name,
 		TokenID:         tokenID,
-		Media:           media,
 		ContractAddress: agnosticContract.Address,
 		Quantity:        persist.HexString(fmt.Sprintf("%x", token.Holders[0].Quantity)),
 		TokenMetadata:   metadata,
@@ -316,7 +315,6 @@ func (p *TezosObjktProvider) GetTokensByContractAddress(ctx context.Context, con
 	for _, token := range tokens {
 		tokenID := persist.TokenID(token.Token_ID.toBase16String())
 		metadata := createMetadata(token)
-		media := makeTempMedia(ctx, tokenID, agnosticContract.Address, metadata, p.ipfsGatewayURL)
 		// Create token per holder
 		for _, holder := range token.Holders {
 			agnosticToken := multichain.ChainAgnosticToken{
@@ -324,7 +322,6 @@ func (p *TezosObjktProvider) GetTokensByContractAddress(ctx context.Context, con
 				Description:     token.Description,
 				Name:            token.Name,
 				TokenID:         tokenID,
-				Media:           media,
 				ContractAddress: agnosticContract.Address,
 				Quantity:        persist.HexString(fmt.Sprintf("%x", holder.Quantity)),
 				TokenMetadata:   metadata,
@@ -396,15 +393,21 @@ func (p *TezosObjktProvider) GetTokensByContractAddressAndOwner(ctx context.Cont
 	for _, token := range tokens {
 		tokenID := persist.TokenID(token.Token_ID.toBase16String())
 		metadata := createMetadata(token)
-		media := makeTempMedia(ctx, tokenID, agnosticContract.Address, metadata, p.ipfsGatewayURL)
+
+		firstValidThumbnail, _ := util.FindFirst([]string{token.Thumbnail_URI, token.Display_URI, token.Artifact_URI}, func(s string) bool {
+			return persist.TokenURI(s).IsRenderable()
+		})
+
 		// Create token per holder
 		for _, holder := range token.Holders {
 			agnosticToken := multichain.ChainAgnosticToken{
-				TokenType:       persist.TokenTypeERC1155,
-				Description:     token.Description,
-				Name:            token.Name,
-				TokenID:         tokenID,
-				Media:           media,
+				TokenType:   persist.TokenTypeERC1155,
+				Description: token.Description,
+				Name:        token.Name,
+				TokenID:     tokenID,
+				FallbackMedia: persist.FallbackMedia{
+					ImageURL: persist.NullString(firstValidThumbnail),
+				},
 				ContractAddress: agnosticContract.Address,
 				Quantity:        persist.HexString(fmt.Sprintf("%x", holder.Quantity)),
 				TokenMetadata:   metadata,

@@ -360,11 +360,10 @@ func (d *Provider) poapToToken(pPoap poapToken) multichain.ChainAgnosticToken {
 		Quantity:        "1",
 		ExternalURL:     pPoap.Event.EventURL,
 		ContractAddress: persist.Address(pPoap.Event.FancyID),
-		Media: persist.Media{
-			MediaType: persist.MediaTypeImage,
-			MediaURL:  persist.NullString(pPoap.Event.ImageURL),
+		TokenType:       persist.TokenTypeERC721,
+		FallbackMedia: persist.FallbackMedia{
+			ImageURL: persist.NullString(pPoap.Event.ImageURL),
 		},
-		TokenType: persist.TokenTypeERC721,
 		TokenMetadata: persist.TokenMetadata{
 			"event_id":    pPoap.Event.ID,
 			"supply":      pPoap.Event.Supply,

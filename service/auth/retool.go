@@ -14,7 +14,7 @@ import (
 var errRetoolUnauthorized = errors.New("not authorized")
 
 func RetoolAuthorized(ctx context.Context) error {
-	gc := util.GinContextFromContext(ctx)
+	gc := util.MustGetGinContext(ctx)
 
 	parts := strings.SplitN(gc.GetHeader("Authorization"), "Basic ", 2)
 	if len(parts) != 2 {

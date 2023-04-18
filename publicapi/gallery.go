@@ -113,8 +113,8 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 	for _, c := range update.CreatedCollections {
 		collectionID, err := q.CreateCollection(ctx, db.CreateCollectionParams{
 			ID:             persist.GenerateID(),
-			Name:           persist.StrToNullStr(&c.Name),
-			CollectorsNote: persist.StrToNullStr(&c.CollectorsNote),
+			Name:           persist.StrPtrToNullStr(&c.Name),
+			CollectorsNote: persist.StrPtrToNullStr(&c.CollectorsNote),
 			OwnerUserID:    curGal.OwnerUserID,
 			GalleryID:      update.GalleryID,
 			Layout:         modelToTokenLayout(c.Layout),
@@ -617,7 +617,7 @@ func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (
 		return db.Gallery{}, err
 	}
 
-	gc := util.GinContextFromContext(ctx)
+	gc := util.MustGetGinContext(ctx)
 
 	if auth.GetUserAuthedFromCtx(gc) {
 		userID, err := getAuthenticatedUserID(ctx)
@@ -645,7 +645,7 @@ func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (
 			SubjectID:      galleryID,
 			Action:         persist.ActionViewedGallery,
 			GalleryID:      galleryID,
-			ExternalID:     persist.StrToNullStr(getExternalID(ctx)),
+			ExternalID:     persist.StrPtrToNullStr(getExternalID(ctx)),
 		}, api.validator, nil)
 		if err != nil {
 			return db.Gallery{}, err
@@ -656,7 +656,7 @@ func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (
 }
 
 func getExternalID(ctx context.Context) *string {
-	gc := util.GinContextFromContext(ctx)
+	gc := util.MustGetGinContext(ctx)
 	if ip := net.ParseIP(gc.ClientIP()); ip != nil && !ip.IsPrivate() {
 		hash := sha256.New()
 		hash.Write([]byte(env.GetString("BACKEND_SECRET") + ip.String()))
