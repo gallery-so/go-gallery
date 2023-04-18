@@ -70,15 +70,15 @@ func (c *ContractRepository) BulkUpsert(pCtx context.Context, pContracts []persi
 		return nil
 	}
 	pContracts = removeDuplicateContracts(pContracts)
-	sqlStr := `INSERT INTO contracts (ID,VERSION,ADDRESS,SYMBOL,NAME,LATEST_BLOCK,OWNER_ADDRESS,CREATOR_ADDRESS) VALUES `
-	vals := make([]interface{}, 0, len(pContracts)*8)
+	sqlStr := `INSERT INTO contracts (ID,VERSION,ADDRESS,SYMBOL,NAME,LATEST_BLOCK,OWNER_ADDRESS,CREATOR_ADDRESS,IS_PROVIDER_MARKED_SPAM) VALUES `
+	vals := make([]interface{}, 0, len(pContracts)*9)
 	for i, contract := range pContracts {
-		sqlStr += generateValuesPlaceholders(8, i*8, nil)
-		vals = append(vals, persist.GenerateID(), contract.Version, contract.Address, contract.Symbol, contract.Name, contract.LatestBlock, contract.OwnerAddress, contract.CreatorAddress)
+		sqlStr += generateValuesPlaceholders(9, i*9, nil)
+		vals = append(vals, persist.GenerateID(), contract.Version, contract.Address, contract.Symbol, contract.Name, contract.LatestBlock, contract.OwnerAddress, contract.CreatorAddress, contract.IsProviderMarkedSpam)
 		sqlStr += ","
 	}
 	sqlStr = sqlStr[:len(sqlStr)-1]
-	sqlStr += ` ON CONFLICT (ADDRESS) DO UPDATE SET SYMBOL = EXCLUDED.SYMBOL,NAME = EXCLUDED.NAME,LATEST_BLOCK = EXCLUDED.LATEST_BLOCK,OWNER_ADDRESS = EXCLUDED.OWNER_ADDRESS, CREATOR_ADDRESS = EXCLUDED.CREATOR_ADDRESS;`
+	sqlStr += ` ON CONFLICT (ADDRESS) DO UPDATE SET SYMBOL = EXCLUDED.SYMBOL,NAME = EXCLUDED.NAME,LATEST_BLOCK = EXCLUDED.LATEST_BLOCK,OWNER_ADDRESS = EXCLUDED.OWNER_ADDRESS, CREATOR_ADDRESS = EXCLUDED.CREATOR_ADDRESS, IS_PROVIDER_MARKED_SPAM = EXCLUDED.IS_PROVIDER_MARKED_SPAM;`
 	_, err := c.db.ExecContext(pCtx, sqlStr, vals...)
 	if err != nil {
 		return fmt.Errorf("error bulk upserting contracts: %v - SQL: %s -- VALS: %+v", err, sqlStr, vals)

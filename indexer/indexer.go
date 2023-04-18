@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"math/big"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -957,6 +958,7 @@ func fillContractFields(ctx context.Context, contracts []persist.Contract, queri
 			logger.For(ctx).WithError(err).Error("Failed to execute contract metadata request")
 			continue
 		}
+		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
 			bodyAsBytes, _ := ioutil.ReadAll(resp.Body)
@@ -976,12 +978,12 @@ func fillContractFields(ctx context.Context, contracts []persist.Contract, queri
 			contract.Name = persist.NullString(c.Metadata.Name)
 			contract.Symbol = persist.NullString(c.Metadata.Symbol)
 
+			log := logger.For(ctx).WithFields(logrus.Fields{"contractAddress": c.Address})
+
 			var method = contractOwnerMethodAlchemy
 			cOwner, err := rpc.GetContractOwner(ctx, c.Address, ethClient)
 			if err != nil {
-				logger.For(ctx).WithError(err).WithFields(logrus.Fields{
-					"contractAddress": c.Address,
-				}).Error("error getting contract owner")
+				log.WithError(err).Error("error getting contract owner")
 				contract.OwnerAddress = c.ContractDeployer
 			} else {
 				contract.OwnerAddress = cOwner
@@ -993,6 +995,13 @@ func fillContractFields(ctx context.Context, contracts []persist.Contract, queri
 			}
 
 			contract.CreatorAddress = c.ContractDeployer
+
+			isSpam, err := isContractSpam(ctx, *httpClient, c.Address)
+			if err != nil {
+				log.WithError(err).Error("failed to check if contract is spam")
+			}
+
+			contract.IsProviderMarkedSpam = isSpam
 
 			it, ok := contractOwnerStats.LoadOrStore(method, 1)
 			if ok {
@@ -1035,6 +1044,42 @@ func fillContractFields(ctx context.Context, contracts []persist.Contract, queri
 
 	logger.For(ctx).Infof("Fetched metadata for total %d contracts", len(contracts))
 
+}
+
+// isContractSpam returns true if the contract is spam via an API call to Alchemy
+func isContractSpam(ctx context.Context, httpClient http.Client, address persist.EthereumAddress) (bool, error) {
+	baseURL, err := url.Parse(env.GetString("ALCHEMY_API_URL"))
+	if err != nil {
+		return false, err
+	}
+
+	spamEndpoint := baseURL.JoinPath("isSpamContract")
+	query := spamEndpoint.Query()
+	query.Add("contractAddress", address.String())
+	spamEndpoint.RawQuery = query.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, spamEndpoint.String(), nil)
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Add("accept", "application/json")
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer resp.Body.Close()
+
+	var isSpam bool
+
+	err = json.NewDecoder(resp.Body).Decode(&isSpam)
+	if err != nil {
+		return false, err
+	}
+
+	return isSpam, nil
 }
 
 // HELPER FUNCS ---------------------------------------------------------------
