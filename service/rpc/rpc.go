@@ -1204,10 +1204,6 @@ func (h ErrHTTP) Error() string {
 	return fmt.Sprintf("HTTP Error Status - %d | URL - %s", h.Status, h.URL)
 }
 
-func (h ErrHTTP) isRetryable() bool {
-	return h.Status == http.StatusTooManyRequests || h.Status == http.StatusServiceUnavailable
-}
-
 // valFromSlice returns the value from a slice formatted as [key val key val ...]
 func valFromSlice(s []interface{}, keyName string) interface{} {
 	for i, key := range s {
