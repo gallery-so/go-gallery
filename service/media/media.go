@@ -630,8 +630,8 @@ func purgeIfExists(ctx context.Context, bucket string, fileName string, client *
 	return nil
 }
 
-func persistToStorage(ctx context.Context, client *storage.Client, reader io.Reader, bucket, fileName string, contentType *string, contentLength *int64) error {
-	writer := newObjectWriter(ctx, client, bucket, fileName, contentType, contentLength)
+func persistToStorage(ctx context.Context, client *storage.Client, reader io.Reader, bucket, fileName string, contentType *string, contentLength *int64, metadata map[string]string) error {
+	writer := newObjectWriter(ctx, client, bucket, fileName, contentType, contentLength, metadata)
 	if err := retryWriteToCloudStorage(ctx, writer, reader); err != nil {
 		return fmt.Errorf("could not write to bucket %s for %s: %s", bucket, fileName, err)
 	}
@@ -696,7 +696,7 @@ func (m cachedMediaObject) storageURL(tokenBucket string) string {
 	return fmt.Sprintf("https://storage.googleapis.com/%s/%s", tokenBucket, m.fileName())
 }
 
-func cacheRawMedia(ctx context.Context, reader io.Reader, tids persist.TokenIdentifiers, mediaType persist.MediaType, contentLength *int64, contentType *string, defaultObjectType objectType, bucket string, client *storage.Client) (cachedMediaObject, error) {
+func cacheRawMedia(ctx context.Context, reader io.Reader, tids persist.TokenIdentifiers, mediaType persist.MediaType, contentLength *int64, contentType *string, defaultObjectType objectType, bucket, ogURL string, client *storage.Client) (cachedMediaObject, error) {
 
 	var objectType objectType
 	switch mediaType {
@@ -718,12 +718,16 @@ func cacheRawMedia(ctx context.Context, reader io.Reader, tids persist.TokenIden
 		contentLength:   contentLength,
 		objectType:      objectType,
 	}
-	err := persistToStorage(ctx, client, reader, bucket, object.fileName(), object.contentType, object.contentLength)
+	err := persistToStorage(ctx, client, reader, bucket, object.fileName(), object.contentType, object.contentLength,
+		map[string]string{
+			"originalURL": ogURL,
+			"mediaType":   mediaType.String(),
+		})
 	go purgeIfExists(context.Background(), bucket, object.fileName(), client)
 	return object, err
 }
 
-func cacheRawAnimationMedia(ctx context.Context, reader io.Reader, tids persist.TokenIdentifiers, mediaType persist.MediaType, bucket string, client *storage.Client) (cachedMediaObject, error) {
+func cacheRawAnimationMedia(ctx context.Context, reader io.Reader, tids persist.TokenIdentifiers, mediaType persist.MediaType, bucket, ogURL string, client *storage.Client) (cachedMediaObject, error) {
 
 	object := cachedMediaObject{
 		mediaType:       mediaType,
@@ -733,7 +737,10 @@ func cacheRawAnimationMedia(ctx context.Context, reader io.Reader, tids persist.
 		objectType:      ObjectTypeAnimation,
 	}
 
-	sw := newObjectWriter(ctx, client, bucket, object.fileName(), nil, nil)
+	sw := newObjectWriter(ctx, client, bucket, object.fileName(), nil, nil, map[string]string{
+		"originalURL": ogURL,
+		"mediaType":   mediaType.String(),
+	})
 	writer := gzip.NewWriter(sw)
 
 	err := retryWriteToCloudStorage(ctx, writer, reader)
@@ -768,7 +775,9 @@ func thumbnailAndCache(ctx context.Context, tids persist.TokenIdentifiers, video
 
 	timeBeforeCopy := time.Now()
 
-	sw := newObjectWriter(ctx, client, bucket, obj.fileName(), util.ToPointer("image/jpeg"), nil)
+	sw := newObjectWriter(ctx, client, bucket, obj.fileName(), util.ToPointer("image/jpeg"), nil, map[string]string{
+		"thumbnailedURL": videoURL,
+	})
 
 	logger.For(ctx).Infof("thumbnailing %s", videoURL)
 	if err := thumbnailVideoToWriter(ctx, videoURL, sw); err != nil {
@@ -801,7 +810,9 @@ func createLiveRenderAndCache(ctx context.Context, tids persist.TokenIdentifiers
 
 	timeBeforeCopy := time.Now()
 
-	sw := newObjectWriter(ctx, client, bucket, obj.fileName(), util.ToPointer("video/mp4"), nil)
+	sw := newObjectWriter(ctx, client, bucket, obj.fileName(), util.ToPointer("video/mp4"), nil, map[string]string{
+		"liveRenderedURL": videoURL,
+	})
 
 	logger.For(ctx).Infof("creating live render for %s", videoURL)
 	if err := createLiveRenderPreviewVideo(ctx, videoURL, sw); err != nil {
@@ -923,7 +934,7 @@ func cacheObjectFromURL(pCtx context.Context, tids persist.TokenIdentifiers, med
 
 	if mediaType == persist.MediaTypeAnimation {
 		timeBeforeCache := time.Now()
-		obj, err := cacheRawAnimationMedia(pCtx, reader, tids, mediaType, bucket, storageClient)
+		obj, err := cacheRawAnimationMedia(pCtx, reader, tids, mediaType, bucket, mediaURL, storageClient)
 		if err != nil {
 			return nil, err
 		}
@@ -932,7 +943,7 @@ func cacheObjectFromURL(pCtx context.Context, tids persist.TokenIdentifiers, med
 	}
 
 	timeBeforeCache := time.Now()
-	obj, err := cacheRawMedia(pCtx, reader, tids, mediaType, contentLength, contentType, defaultObjectType, bucket, storageClient)
+	obj, err := cacheRawMedia(pCtx, reader, tids, mediaType, contentLength, contentType, defaultObjectType, bucket, mediaURL, storageClient)
 	if err != nil {
 		return nil, err
 	}
@@ -1136,11 +1147,12 @@ func (e errUnsupportedMediaType) Error() string {
 	return fmt.Sprintf("unsupported media type %s", e.mediaType)
 }
 
-func newObjectWriter(ctx context.Context, client *storage.Client, bucket, fileName string, contentType *string, contentLength *int64) *storage.Writer {
+func newObjectWriter(ctx context.Context, client *storage.Client, bucket, fileName string, contentType *string, contentLength *int64, objMetadata map[string]string) *storage.Writer {
 	writer := client.Bucket(bucket).Object(fileName).NewWriter(ctx)
 	if contentType != nil {
 		writer.ObjectAttrs.ContentType = *contentType
 	}
+	writer.ObjectAttrs.Metadata = objMetadata
 	writer.ObjectAttrs.CacheControl = "no-cache, no-store"
 	writer.ChunkSize = 4 * 1024 * 1024 // 4MB
 	if contentLength != nil {
