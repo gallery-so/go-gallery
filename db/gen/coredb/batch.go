@@ -2609,10 +2609,10 @@ const getUserByAddressBatch = `-- name: GetUserByAddressBatch :batchone
 select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences
 from users, wallets
 where wallets.address = $1
-  and wallets.chain = $2::int
-  and array[wallets.id] <@ users.wallets
-  and wallets.deleted = false
-  and users.deleted = false
+	and wallets.chain = $2::int
+	and array[wallets.id] <@ users.wallets
+	and wallets.deleted = false
+	and users.deleted = false
 `
 
 type GetUserByAddressBatchBatchResults struct {

@@ -25,10 +25,10 @@ SELECT * FROM users WHERE username_idempotent = lower($1) AND deleted = false;
 select users.*
 from users, wallets
 where wallets.address = sqlc.arg('address')
-  and wallets.chain = sqlc.arg('chain')::int
-  and array[wallets.id] <@ users.wallets
-  and wallets.deleted = false
-  and users.deleted = false;
+	and wallets.chain = sqlc.arg('chain')::int
+	and array[wallets.id] <@ users.wallets
+	and wallets.deleted = false
+	and users.deleted = false;
 
 -- name: GetUsersWithTrait :many
 SELECT * FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false;

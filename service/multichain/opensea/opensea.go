@@ -300,7 +300,7 @@ func (p *Provider) GetContractsCreatedOnSharedContract(ctx context.Context, wall
 			WithResultCh(assetsChan),
 			WithSortAsc(),
 			WithCaching(p.cache),
-			// WithFromLastCursor(),
+			WithFromLastCursor(),
 		)
 	}()
 	return assetsToGroups(ctx, assetsChan, p.ethClient)
