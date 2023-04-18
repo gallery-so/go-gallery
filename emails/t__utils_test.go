@@ -64,39 +64,21 @@ func setupTest(t *testing.T) (*assert.Assertions, *sql.DB, *pgxpool.Pool) {
 	db := postgres.MustCreateClient()
 	pgx := postgres.NewPgxClient()
 
-	seedNotifications(context.Background(), t, coredb.New(pgx), newRepos(db, pgx))
+	seedNotifications(context.Background(), t, coredb.New(pgx), postgres.NewRepositories(db, pgx))
 
 	return assert.New(t), db, pgx
-}
-
-func newRepos(pq *sql.DB, pgx *pgxpool.Pool) *postgres.Repositories {
-	queries := coredb.New(pgx)
-
-	return &postgres.Repositories{
-		UserRepository:        postgres.NewUserRepository(pq, queries),
-		NonceRepository:       postgres.NewNonceRepository(pq, queries),
-		TokenRepository:       postgres.NewTokenGalleryRepository(pq, queries),
-		CollectionRepository:  postgres.NewCollectionTokenRepository(pq, queries),
-		GalleryRepository:     postgres.NewGalleryRepository(queries),
-		ContractRepository:    postgres.NewContractGalleryRepository(pq, queries),
-		MembershipRepository:  postgres.NewMembershipRepository(pq, queries),
-		EarlyAccessRepository: postgres.NewEarlyAccessRepository(pq, queries),
-		WalletRepository:      postgres.NewWalletRepository(pq, queries),
-		AdmireRepository:      postgres.NewAdmireRepository(queries),
-		CommentRepository:     postgres.NewCommentRepository(pq, queries),
-	}
 }
 
 func seedNotifications(ctx context.Context, t *testing.T, q *coredb.Queries, repos *postgres.Repositories) {
 
 	email := testUser.PiiEmailAddress
-	userID, err := repos.UserRepository.Create(ctx, persist.CreateUserInput{Username: testUser.Username.String, Email: &email, ChainAddress: persist.NewChainAddress("0x8914496dc01efcc49a2fa340331fb90969b6f1d2", persist.ChainETH)})
+	userID, err := repos.UserRepository.Create(ctx, persist.CreateUserInput{Username: testUser.Username.String, Email: &email, ChainAddress: persist.NewChainAddress("0x8914496dc01efcc49a2fa340331fb90969b6f1d2", persist.ChainETH)}, nil)
 	if err != nil {
 		t.Fatalf("failed to create user: %s", err)
 	}
 
 	email2 := testUser2.PiiEmailAddress
-	userID2, err := repos.UserRepository.Create(ctx, persist.CreateUserInput{Username: testUser2.Username.String, Email: &email2, ChainAddress: persist.NewChainAddress("0x9a3f9764b21adaf3c6fdf6f947e6d3340a3f8ac5", persist.ChainETH)})
+	userID2, err := repos.UserRepository.Create(ctx, persist.CreateUserInput{Username: testUser2.Username.String, Email: &email2, ChainAddress: persist.NewChainAddress("0x9a3f9764b21adaf3c6fdf6f947e6d3340a3f8ac5", persist.ChainETH)}, nil)
 	if err != nil {
 		t.Fatalf("failed to create user: %s", err)
 	}

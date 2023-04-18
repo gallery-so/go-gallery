@@ -990,3 +990,21 @@ where a.user_id = @user_a_id
 -- name: AddPiiAccountCreationInfo :exec
 insert into pii.account_creation_info (user_id, ip_address, created_at) values (@user_id, @ip_address, now())
   on conflict do nothing;
+
+-- name: GetUserByWalletID :one
+select * from users where array[@wallet::varchar]::varchar[] <@ wallets and deleted = false;
+
+-- name: DeleteUserByID :exec
+update users set deleted = true where id = $1;
+
+-- name: InsertWallet :exec
+insert into wallets (id, address, chain, wallet_type) values ($1, $2, $3, $4);
+
+-- name: DeleteWalletByID :exec
+update wallets set deleted = true, last_updated = now() where id = $1;
+
+-- name: InsertUser :exec
+insert into users (id, username, username_idempotent, bio, wallets, universal, email_unsubscriptions, primary_wallet_id) values ($1, $2, $3, $4, $5, $6, $7, $8) returning id;
+
+-- name: AddWalletToUserByID :exec
+update users set wallets = array_append(wallets, @wallet_id::varchar) where id = @user_id;

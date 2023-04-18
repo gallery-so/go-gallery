@@ -156,11 +156,6 @@ type verifier interface {
 	VerifySignature(ctx context.Context, pubKey persist.PubKey, walletType persist.WalletType, nonce string, sig string) (bool, error)
 }
 
-type walletHooker interface {
-	// WalletCreated is called when a wallet is created
-	WalletCreated(context.Context, persist.DBID, persist.Address, persist.WalletType) error
-}
-
 // tokensOwnerFetcher supports fetching tokens for syncing
 type tokensOwnerFetcher interface {
 	GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
@@ -732,26 +727,6 @@ func (d *Provider) DeepRefreshByChain(ctx context.Context, userID persist.DBID, 
 	return nil
 }
 
-// RunWalletCreationHooks runs hooks for when a wallet is created
-func (d *Provider) RunWalletCreationHooks(ctx context.Context, userID persist.DBID, walletAddress persist.Address, walletType persist.WalletType, chain persist.Chain) error {
-
-	// User doesn't exist
-	_, err := d.Repos.UserRepository.GetByID(ctx, userID)
-	if err != nil {
-		return err
-	}
-
-	walletHookers := getChainProvidersForTask[walletHooker](d.Chains[chain])
-
-	for _, hooker := range walletHookers {
-		if err := hooker.WalletCreated(ctx, userID, walletAddress, walletType); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 // VerifySignature verifies a signature for a wallet address
 func (p *Provider) VerifySignature(ctx context.Context, pSig string, pNonce string, pChainAddress persist.ChainPubKey, pWalletType persist.WalletType) (bool, error) {
 	providers, err := p.getProvidersForChain(pChainAddress.Chain())
@@ -1048,7 +1023,7 @@ func (p *Provider) createUsersForTokens(ctx context.Context, tokens []chainToken
 							Username:     username,
 							ChainAddress: persist.NewChainAddress(t.OwnerAddress, ct.chain),
 							Universal:    true,
-						})
+						}, nil)
 						if err != nil {
 							if _, ok := err.(persist.ErrUsernameNotAvailable); ok {
 								user, err = p.Repos.UserRepository.GetByUsername(ctx, username)
