@@ -160,11 +160,13 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	tids := persist.NewTokenIdentifiers(contractAddress, tokenID, chain)
 	if imgURL == "" && animURL == "" {
-		return persist.Media{}, errNoMediaURLs{
-			metadata: metadata,
-			tokenURI: tokenURI,
-			tids:     tids,
-		}
+		return persist.Media{
+				MediaType: persist.MediaTypeInvalid,
+			}, errNoMediaURLs{
+				metadata: metadata,
+				tokenURI: tokenURI,
+				tids:     tids,
+			}
 	}
 
 	logger.For(pCtx).Infof("got imgURL=%s;animURL=%s", imgURL, animURL)
@@ -199,6 +201,20 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	// neither download worked, unexpectedly
 	if (animResult.err != nil && len(animResult.cachedObjects) == 0) && (imgResult.err != nil && len(imgResult.cachedObjects) == 0) {
+
+		if invalidMediaErr, ok := animResult.err.(errInvalidMedia); ok {
+			return persist.Media{
+				MediaURL:  persist.NullString(invalidMediaErr.url),
+				MediaType: persist.MediaTypeInvalid,
+			}, util.MultiErr{animResult.err, imgResult.err}
+		}
+		if invalidMediaErr, ok := imgResult.err.(errInvalidMedia); ok {
+			return persist.Media{
+				MediaURL:  persist.NullString(invalidMediaErr.url),
+				MediaType: persist.MediaTypeInvalid,
+			}, util.MultiErr{animResult.err, imgResult.err}
+		}
+
 		return persist.Media{}, util.MultiErr{animResult.err, imgResult.err}
 	}
 
