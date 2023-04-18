@@ -177,10 +177,10 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	)
 
 	if animURL != "" {
-		animCh = storeObjectsForURL(pCtx, tids, storageClient, arweaveClient, ipfsClient, ObjectTypeAnimation, animURL, tokenBucket)
+		animCh = asyncCacheObjectsForURL(pCtx, tids, storageClient, arweaveClient, ipfsClient, ObjectTypeAnimation, animURL, tokenBucket)
 	}
 	if imgURL != "" {
-		imgCh = storeObjectsForURL(pCtx, tids, storageClient, arweaveClient, ipfsClient, ObjectTypeImage, imgURL, tokenBucket)
+		imgCh = asyncCacheObjectsForURL(pCtx, tids, storageClient, arweaveClient, ipfsClient, ObjectTypeImage, imgURL, tokenBucket)
 	}
 
 	if animCh != nil {
@@ -297,7 +297,7 @@ type cacheResult struct {
 	err           error
 }
 
-func storeObjectsForURL(ctx context.Context, tids persist.TokenIdentifiers, storageClient *storage.Client, arweaveClient *goar.Client, ipfsClient *shell.Shell, defaultObjectType objectType, mediaURL, bucket string) chan cacheResult {
+func asyncCacheObjectsForURL(ctx context.Context, tids persist.TokenIdentifiers, storageClient *storage.Client, arweaveClient *goar.Client, ipfsClient *shell.Shell, defaultObjectType objectType, mediaURL, bucket string) chan cacheResult {
 	resultCh := make(chan cacheResult)
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
 		"tokenURIType":      persist.TokenURI(mediaURL).Type(),
