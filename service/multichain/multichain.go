@@ -1196,6 +1196,11 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 					candidateToken.FallbackMedia = existingToken.FallbackMedia
 				}
 				seenTokens[ti] = candidateToken
+			} else {
+				if !existingToken.FallbackMedia.IsServable() && candidateToken.FallbackMedia.IsServable() {
+					existingToken.FallbackMedia = candidateToken.FallbackMedia
+					seenTokens[ti] = existingToken
+				}
 			}
 
 			var found bool

@@ -658,12 +658,12 @@ func alchemyTokenToChainAgnosticToken(owner persist.EthereumAddress, token Token
 	}
 
 	t := multichain.ChainAgnosticToken{
-		TokenType:       tokenType,
-		Name:            token.Title,
-		Description:     token.Description,
-		TokenURI:        persist.TokenURI(token.TokenURI.Raw),
-		TokenMetadata:   alchemyTokenToMetadata(token),
-		FallbackMedia:   alchemyTokenToFallback(token),
+		TokenType:     tokenType,
+		Name:          token.Title,
+		Description:   token.Description,
+		TokenURI:      persist.TokenURI(token.TokenURI.Raw),
+		TokenMetadata: alchemyTokenToMetadata(token),
+
 		TokenID:         token.ID.TokenID.ToTokenID(),
 		Quantity:        persist.HexString(bal.Text(16)),
 		OwnerAddress:    persist.Address(owner),
@@ -718,17 +718,4 @@ func alchemyTokenToMetadata(token Token) persist.TokenMetadata {
 		metadata["image_url"] = token.Metadata.Image
 	}
 	return metadata
-}
-
-func alchemyTokenToFallback(token Token) persist.FallbackMedia {
-	firstWithThumbnail, hasThumbnail := util.FindFirst(token.Media, func(m Media) bool {
-		return m.Thumbnail != ""
-	})
-	if !hasThumbnail {
-		return persist.FallbackMedia{}
-	}
-
-	return persist.FallbackMedia{
-		ImageURL: persist.NullString(firstWithThumbnail.Thumbnail),
-	}
 }
