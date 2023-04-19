@@ -2,6 +2,7 @@ package tokenprocessing
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"time"
@@ -117,6 +118,21 @@ func initSentry() {
 			event = auth.ScrubEventCookies(event, hint)
 			event = sentryutil.UpdateErrorFingerprints(event, hint)
 			event = sentryutil.UpdateLogErrorEvent(event, hint)
+
+			// Exclude spam events
+			event = func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+				fmt.Println("OVER HERE!!!")
+				spamContext := event.Contexts[sentryutil.SpamContextName]
+
+				for _, spammy := range spamContext {
+					if spammy.(bool) == true {
+						return nil
+					}
+				}
+
+				return event
+			}(event, hint)
+
 			return event
 		},
 	})

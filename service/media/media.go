@@ -21,7 +21,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
-	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util/retry"
 	"github.com/sirupsen/logrus"
@@ -120,6 +119,19 @@ func NewStorageClient(ctx context.Context) *storage.Client {
 	return storageClient
 }
 
+// MediaProcessingError is an error that occurs when handling media processiing for a token.
+type MediaProcessingError struct {
+	Chain           persist.Chain
+	ContractAddress persist.Address
+	TokenID         persist.TokenID
+	VideoErr        error // error that occurred when processing the video
+	ImageErr        error // error that occurred when processing the image
+}
+
+func (m MediaProcessingError) Error() string {
+	return fmt.Sprintf("error processing media for token(chain=%s;contractAddress=%s;tokenID=%s): videoErr=%s;imageErr=%s", m.Chain, m.ContractAddress, m.TokenID, m.VideoErr, m.ImageErr)
+}
+
 // MakePreviewsForMetadata uses a metadata map to generate media content and cache resized versions of the media content.
 func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadata, contractAddress persist.Address, tokenID persist.TokenID, tokenURI persist.TokenURI, chain persist.Chain, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, imageKeywords, animationKeywords Keywords) (persist.Media, error) {
 	name := fmt.Sprintf("%s-%s", contractAddress, tokenID)
@@ -150,7 +162,13 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	// Neither download worked
 	if (vidResult.err != nil && vidResult.mediaType == "") && (imgResult.err != nil && imgResult.mediaType == "") {
-		return persist.Media{}, vidResult.err // Just use the video error
+		return persist.Media{}, MediaProcessingError{
+			Chain:           chain,
+			ContractAddress: contractAddress,
+			TokenID:         tokenID,
+			VideoErr:        vidResult.err,
+			ImageErr:        imgResult.err,
+		}
 	}
 
 	if imgResult.mediaType != "" {
@@ -278,8 +296,8 @@ func downloadMediaFromURL(ctx context.Context, tids persist.TokenIdentifiers, st
 		case *googleapi.Error:
 			panic(fmt.Errorf("googleAPI error %s: %s", caught, err))
 		default:
-			logger.For(ctx).Error(err)
-			sentryutil.ReportError(ctx, err)
+			// XXX: logger.For(ctx).Error(err)
+			// XXX: sentryutil.ReportError(ctx, err)
 			resultCh <- cacheResult{mediaType, cached, err}
 		}
 	}()

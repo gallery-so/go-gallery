@@ -21,6 +21,8 @@ const (
 	errorContextName  = "error context"
 	eventContextName  = "event context"
 	loggerContextName = "logger context"
+	tokenContextName  = "token context"
+	SpamContextName   = "spam context"
 )
 
 // SentryLoggerHook forwards log entries to Sentry.
@@ -36,28 +38,49 @@ var logToSentryLevel = map[logrus.Level]sentry.Level{
 }
 var sentryTrailLimit = 8
 
+// ReportRemappedError reports an error with additional context indicating the original error and the remapped error.
 func ReportRemappedError(ctx context.Context, originalErr error, remappedErr interface{}) {
+	reportError(ctx, originalErr, remapError(originalErr, remappedErr))
+}
+
+// ReportTokenError reports an error that occurred while processing a token.
+func ReportTokenError(ctx context.Context, err error, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID, isProviderContractMarkedSpam, isProviderTokenMarkedSpam, isUserTokenMarkedSpam bool) {
+	reportError(ctx, err, func(scope *sentry.Scope) {
+		SetTokenContext(scope, chain, contractAddress, tokenID)
+		SetSpamContext(scope, isProviderContractMarkedSpam, isProviderTokenMarkedSpam, isUserTokenMarkedSpam)
+	})
+}
+
+func ReportError(ctx context.Context, err error) {
+	reportError(ctx, err)
+}
+
+// reportError applies any additional contexts to the error before reporting the error to Sentry.
+func reportError(ctx context.Context, err error, scopeFuncs ...func(*sentry.Scope)) {
 	hub := SentryHubFromContext(ctx)
 	if hub == nil {
 		logger.For(ctx).Warnln("could not report error to Sentry because hub is nil")
 		return
 	}
 
-	// Use a new scope so our error context and tag don't persist beyond this error
 	hub.WithScope(func(scope *sentry.Scope) {
+		for _, f := range scopeFuncs {
+			f(scope)
+		}
+		hub.CaptureException(err)
+	})
+}
+
+// remapError returns a function that can be used to set the error context on a Sentry scope.
+func remapError(originalErr error, remappedErr any) func(*sentry.Scope) {
+	return func(scope *sentry.Scope) {
 		if remappedErr != nil {
 			SetErrorContext(scope, true, fmt.Sprintf("%T", remappedErr))
 			scope.SetTag("remappedError", "true")
 		} else {
 			SetErrorContext(scope, false, "")
 		}
-
-		hub.CaptureException(originalErr)
-	})
-}
-
-func ReportError(ctx context.Context, err error) {
-	ReportRemappedError(ctx, err, nil)
+	}
 }
 
 func ScrubEventHeaders(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
@@ -130,6 +153,22 @@ func SetEventContext(scope *sentry.Scope, actorID, subjectID persist.DBID, actio
 	}
 
 	scope.SetContext(eventContextName, eventCtx)
+}
+
+func SetSpamContext(scope *sentry.Scope, isProviderContractMarkedSpam, isProviderTokenMarkedSpam, isUserTokenMarkedSpam bool) {
+	scope.SetContext(SpamContextName, sentry.Context{
+		"isProviderContractMarkedSpam": isProviderContractMarkedSpam,
+		"IsProvderTokenMarkedSpam":     isProviderTokenMarkedSpam,
+		"IsUserTokenMarkedSpam":        isUserTokenMarkedSpam,
+	})
+}
+
+func SetTokenContext(scope *sentry.Scope, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) {
+	scope.SetContext(tokenContextName, sentry.Context{
+		"Chain":           chain,
+		"ContractAddress": contractAddress,
+		"TokenID":         tokenID,
+	})
 }
 
 // NewSentryHubGinContext returns a new Gin context with a cloned hub of the original context's hub.
