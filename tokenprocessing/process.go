@@ -135,12 +135,16 @@ func processMediaForToken(mc *multichain.Provider, tokenRepo *postgres.TokenGall
 }
 
 func processToken(c context.Context, key string, t persist.TokenGallery, contract persist.ContractGallery, ownerAddress persist.Address, mc *multichain.Provider, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, tokenRepo *postgres.TokenGalleryRepository, imageKeywords, animationKeywords []string, forceRefresh bool) error {
+	// runID is a unique ID for this run of the pipeline
+	runID := persist.GenerateID()
+
 	loggerCtx := logger.NewContextWithFields(c, logrus.Fields{
 		"tokenDBID":       t.ID,
 		"tokenID":         t.TokenID,
 		"contractDBID":    t.Contract,
 		"contractAddress": contract.Address,
 		"chain":           t.Chain,
+		"runID":           runID,
 	})
 	totalTime := time.Now()
 	ctx, cancel := context.WithTimeout(loggerCtx, time.Minute*10)
@@ -174,11 +178,8 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 	newMedia, err := media.MakePreviewsForMetadata(ctx, newMetadata, contract.Address, persist.TokenID(t.TokenID.String()), t.TokenURI, t.Chain, ipfsClient, arweaveClient, stg, tokenBucket, image, animation)
 	if err != nil {
 		logger.For(ctx).Errorf("error processing media for %s: %s", key, err)
-		sentryutil.ReportTokenError(ctx, err, t.Chain, contract.Address, t.TokenID,
-			contract.IsProviderMarkedSpam,
-			util.GetOptionalValue(t.IsProviderMarkedSpam, false),
-			util.GetOptionalValue(t.IsUserMarkedSpam, false),
-		)
+		isSpam := contract.IsProviderMarkedSpam || util.GetOptionalValue(t.IsProviderMarkedSpam, false) || util.GetOptionalValue(t.IsUserMarkedSpam, false)
+		sentryutil.ReportTokenError(ctx, err, runID, t.Chain, contract.Address, t.TokenID, isSpam)
 		newMedia = persist.Media{MediaType: persist.MediaTypeUnknown}
 	}
 	logger.For(ctx).Infof("processing media took %s", time.Since(totalTimeOfMedia))

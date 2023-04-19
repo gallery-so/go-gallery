@@ -2,6 +2,7 @@ package tokenprocessing
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/redis"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
@@ -116,23 +118,8 @@ func initSentry() {
 		AttachStacktrace: true,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			event = auth.ScrubEventCookies(event, hint)
-			event = sentryutil.UpdateErrorFingerprints(event, hint)
-			event = sentryutil.UpdateLogErrorEvent(event, hint)
-
-			// Exclude spam events
-			event = func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
-				fmt.Println("OVER HERE!!!")
-				spamContext := event.Contexts[sentryutil.SpamContextName]
-
-				for _, spammy := range spamContext {
-					if spammy.(bool) == true {
-						return nil
-					}
-				}
-
-				return event
-			}(event, hint)
-
+			event = updateMediaProccessingFingerprints(event, hint)
+			event = excludeTokenSpam(event, hint)
 			return event
 		},
 	})
@@ -140,4 +127,53 @@ func initSentry() {
 	if err != nil {
 		logger.For(nil).Fatalf("failed to start sentry: %s", err)
 	}
+}
+
+func updateMediaProccessingFingerprints(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+	if event == nil || event.Exception == nil || hint == nil {
+		return event
+	}
+
+	var mediaErr media.MediaProcessingError
+
+	if errors.As(hint.OriginalException, &mediaErr) {
+		if event.Tags["chain"] == "" || event.Tags["contractAddress"] == "" {
+			return event
+		}
+
+		// Add both errors to the stack
+
+		if mediaErr.VideoErr != nil {
+			event.Exception = append(event.Exception, sentry.Exception{
+				Type:  fmt.Sprintf("%T", mediaErr.VideoErr),
+				Value: mediaErr.VideoErr.Error(),
+			})
+		}
+
+		if mediaErr.ImageErr != nil {
+			event.Exception = append(event.Exception, sentry.Exception{
+				Type:  fmt.Sprintf("%T", mediaErr.ImageErr),
+				Value: mediaErr.ImageErr.Error(),
+			})
+		}
+
+		// Move the original error to the end of the stack since the latest error is used as the title in Sentry
+		if len(event.Exception) > 1 {
+			title := fmt.Sprintf("chain=%s address=%s", event.Tags["chain"], event.Tags["contractAddress"])
+			event.Exception = append(event.Exception[1:], event.Exception[0])
+			event.Exception[len(event.Exception)-1].Type = title
+		}
+
+		// Group by the chain and contract
+		event.Fingerprint = []string{event.Tags["chain"], event.Tags["contractAddress"]}
+	}
+
+	return event
+}
+
+func excludeTokenSpam(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+	if event.Contexts[sentryutil.TokenContextName]["IsSpam"].(bool) == true {
+		return nil
+	}
+	return event
 }

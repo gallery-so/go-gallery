@@ -129,7 +129,7 @@ type MediaProcessingError struct {
 }
 
 func (m MediaProcessingError) Error() string {
-	return fmt.Sprintf("error processing media for token(chain=%s;contractAddress=%s;tokenID=%s): videoErr=%s;imageErr=%s", m.Chain, m.ContractAddress, m.TokenID, m.VideoErr, m.ImageErr)
+	return fmt.Sprintf("error with media for token(chain=%d,contractAddress=%s,tokenID=%s): videoError=%s;imageError=%s", m.Chain, m.ContractAddress, m.TokenID, m.VideoErr, m.ImageErr)
 }
 
 // MakePreviewsForMetadata uses a metadata map to generate media content and cache resized versions of the media content.
@@ -296,8 +296,6 @@ func downloadMediaFromURL(ctx context.Context, tids persist.TokenIdentifiers, st
 		case *googleapi.Error:
 			panic(fmt.Errorf("googleAPI error %s: %s", caught, err))
 		default:
-			// XXX: logger.For(ctx).Error(err)
-			// XXX: sentryutil.ReportError(ctx, err)
 			resultCh <- cacheResult{mediaType, cached, err}
 		}
 	}()
