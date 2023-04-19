@@ -1016,6 +1016,8 @@ func PredictMediaType(pCtx context.Context, url string) (persist.MediaType, *str
 		return persist.MediaTypeSVG, util.ToPointer("image/svg"), &lenURI, nil
 	case persist.URITypeBase64BMP:
 		return persist.MediaTypeBase64BMP, util.ToPointer("image/bmp"), &lenURI, nil
+	case persist.URITypeBase64PNG:
+		return persist.MediaTypeBase64PNG, util.ToPointer("image/png"), &lenURI, nil
 	case persist.URITypeIPFS:
 		contentType, contentLength, err := rpc.GetIPFSHeaders(pCtx, strings.TrimPrefix(asURI.String(), "ipfs://"))
 		if err != nil {
