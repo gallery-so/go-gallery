@@ -658,12 +658,11 @@ func alchemyTokenToChainAgnosticToken(owner persist.EthereumAddress, token Token
 	}
 
 	t := multichain.ChainAgnosticToken{
-		TokenType:     tokenType,
-		Name:          token.Title,
-		Description:   token.Description,
-		TokenURI:      persist.TokenURI(token.TokenURI.Raw),
-		TokenMetadata: alchemyTokenToMetadata(token),
-
+		TokenType:       tokenType,
+		Name:            token.Title,
+		Description:     token.Description,
+		TokenURI:        persist.TokenURI(token.TokenURI.Raw),
+		TokenMetadata:   alchemyTokenToMetadata(token),
 		TokenID:         token.ID.TokenID.ToTokenID(),
 		Quantity:        persist.HexString(bal.Text(16)),
 		OwnerAddress:    persist.Address(owner),
