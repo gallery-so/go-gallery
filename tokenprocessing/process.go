@@ -168,8 +168,10 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 	newMedia, err := media.MakePreviewsForMetadata(ctx, newMetadata, contractAddress, persist.TokenID(t.TokenID.String()), t.TokenURI, t.Chain, ipfsClient, arweaveClient, stg, tokenBucket, image, animation)
 	if err != nil {
 		logger.For(ctx).Errorf("error processing media for %s: %s", key, err)
-		newMedia = persist.Media{
-			MediaType: persist.MediaTypeUnknown,
+		if newMedia.MediaType != persist.MediaTypeInvalid {
+			newMedia = persist.Media{
+				MediaType: persist.MediaTypeUnknown,
+			}
 		}
 	}
 	logger.For(ctx).Infof("processing media took %s", time.Since(totalTimeOfMedia))
