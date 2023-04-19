@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/googleapis/gax-go/v2"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
@@ -143,6 +144,8 @@ func NewStorageClient(ctx context.Context) *storage.Client {
 	if err != nil {
 		panic(err)
 	}
+
+	storageClient.SetRetry(storage.WithPolicy(storage.RetryAlways), storage.WithBackoff(gax.Backoff{Initial: 100 * time.Millisecond, Max: 10 * time.Second, Multiplier: 1.3}), storage.WithErrorFunc(storage.ShouldRetry))
 
 	return storageClient
 }
@@ -320,7 +323,7 @@ func asyncCacheObjectsForURL(ctx context.Context, tids persist.TokenIdentifiers,
 	})
 
 	go func() {
-		cachedObjects, err := cacheObjectFromURL(ctx, tids, mediaURL, defaultObjectType, ipfsClient, arweaveClient, storageClient, bucket, false)
+		cachedObjects, err := cacheObjectsFromURL(ctx, tids, mediaURL, defaultObjectType, ipfsClient, arweaveClient, storageClient, bucket, false)
 		if err == nil {
 			resultCh <- cacheResult{cachedObjects, err}
 			return
@@ -658,7 +661,7 @@ func retryWriteToCloudStorage(ctx context.Context, writer io.Writer, reader io.R
 			return err
 		}
 		return nil
-	}, shouldRetryUpload, retry.DefaultRetry)
+	}, storage.ShouldRetry, retry.DefaultRetry)
 }
 
 type objectType int
@@ -856,7 +859,7 @@ func getMediaServingURL(pCtx context.Context, bucketID, objectID string, client 
 	return fmt.Sprintf("https://storage.googleapis.com/%s/%s", bucketID, objectID), nil
 }
 
-func cacheObjectFromURL(pCtx context.Context, tids persist.TokenIdentifiers, mediaURL string, defaultObjectType objectType, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, bucket string, isRecursive bool) ([]cachedMediaObject, error) {
+func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, mediaURL string, defaultObjectType objectType, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, bucket string, isRecursive bool) ([]cachedMediaObject, error) {
 
 	asURI := persist.TokenURI(mediaURL)
 	timeBeforePredict := time.Now()
@@ -918,7 +921,7 @@ func cacheObjectFromURL(pCtx context.Context, tids persist.TokenIdentifiers, med
 				}
 
 				logger.For(pCtx).Infof("got reader for %s from opensea in %s (%s)", tids, time.Since(timeBeforeDataReader), firstNonEmptyURL)
-				return cacheObjectFromURL(pCtx, tids, firstNonEmptyURL, defaultObjectType, ipfsClient, arweaveClient, storageClient, bucket, true)
+				return cacheObjectsFromURL(pCtx, tids, firstNonEmptyURL, defaultObjectType, ipfsClient, arweaveClient, storageClient, bucket, true)
 			}
 		}
 
@@ -1169,6 +1172,7 @@ func newObjectWriter(ctx context.Context, client *storage.Client, bucket, fileNa
 	writer.ObjectAttrs.Metadata = objMetadata
 	writer.ObjectAttrs.CacheControl = "no-cache, no-store"
 	writer.ChunkSize = 4 * 1024 * 1024 // 4MB
+	writer.ChunkRetryDeadline = 1 * time.Minute
 	if contentLength != nil {
 		cl := *contentLength
 		if cl < 4*1024*1024 {
@@ -1178,15 +1182,6 @@ func newObjectWriter(ctx context.Context, client *storage.Client, bucket, fileNa
 		}
 	}
 	return writer
-}
-
-func shouldRetryUpload(err error) bool {
-	if gerr, ok := err.(*googleapi.Error); ok {
-		// Retriable error codes: https://cloud.google.com/storage/docs/json_api/v1/status-codes
-		return gerr.Code == 500 || gerr.Code == 502 || gerr.Code == 503 || gerr.Code == 504
-	}
-
-	return err == io.ErrUnexpectedEOF
 }
 
 func RawFormatToMediaType(format string) persist.MediaType {
