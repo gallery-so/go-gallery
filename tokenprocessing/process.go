@@ -177,13 +177,10 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 	logger.For(ctx).Infof("processing media took %s", time.Since(totalTimeOfMedia))
 
 	// Don't replace existing usable media if tokenprocessing failed to get new media
+	// In the near future we will establish this state explicitly in the DB or in logs
 	if t.Media.IsServable() && !newMedia.IsServable() {
 		logger.For(ctx).Debugf("not replacing existing media for %s: cur %v new %v", key, t.Media.IsServable(), newMedia.IsServable())
 		return nil
-	}
-
-	if newMedia.MediaType.IsAnimationLike() && !persist.TokenURI(newMedia.ThumbnailURL).IsRenderable() && persist.TokenURI(t.Media.ThumbnailURL).IsRenderable() {
-		newMedia.ThumbnailURL = t.Media.ThumbnailURL
 	}
 
 	up := persist.TokenUpdateAllURIDerivedFieldsInput{
