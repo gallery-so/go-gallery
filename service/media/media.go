@@ -727,7 +727,7 @@ func cacheRawMedia(ctx context.Context, reader io.Reader, tids persist.TokenIden
 		objectType = ObjectTypeAnimation
 	case persist.MediaTypeSVG:
 		objectType = ObjectTypeSVG
-	case persist.MediaTypeBase64BMP:
+	case persist.MediaTypeBase64BMP, persist.MediaTypeBase64PNG:
 		objectType = ObjectTypeImage
 	default:
 		objectType = defaultObjectType
