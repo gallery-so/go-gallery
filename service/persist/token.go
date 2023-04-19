@@ -38,6 +38,8 @@ const (
 	MediaTypeSVG MediaType = "svg"
 	// MediaTypeBase64BMP represents a base64 encoded bmp file
 	MediaTypeBase64BMP MediaType = "base64bmp"
+	// MediaTypeBase64PNG represents a base64 encoded png file
+	MediaTypeBase64PNG MediaType = "base64png"
 	// MediaTypeText represents plain text
 	MediaTypeText MediaType = "text"
 	// MediaTypeHTML represents html
@@ -62,7 +64,7 @@ const (
 	MediaTypeFallback MediaType = "fallback"
 )
 
-var mediaTypePriorities = []MediaType{MediaTypeHTML, MediaTypeAudio, MediaTypeAnimation, MediaTypeVideo, MediaTypeBase64BMP, MediaTypeGIF, MediaTypeSVG, MediaTypeImage, MediaTypeJSON, MediaTypeBase64Text, MediaTypeText, MediaTypeSyncing, MediaTypeUnknown, MediaTypeInvalid}
+var mediaTypePriorities = []MediaType{MediaTypeHTML, MediaTypeAudio, MediaTypeAnimation, MediaTypeVideo, MediaTypeBase64BMP, MediaTypeBase64PNG, MediaTypeGIF, MediaTypeSVG, MediaTypeImage, MediaTypeJSON, MediaTypeBase64Text, MediaTypeText, MediaTypeSyncing, MediaTypeUnknown, MediaTypeInvalid}
 
 const (
 	// ChainETH represents the Ethereum blockchain
@@ -102,6 +104,8 @@ const (
 	URITypeBase64SVG URIType = "base64svg"
 	//URITypeBase64BMP represents a base64 encoded BMP
 	URITypeBase64BMP URIType = "base64bmp"
+	// URITypeBase64PNG represents a base64 encoded PNG
+	URITypeBase64PNG URIType = "base64png"
 	// URITypeSVG represents an SVG
 	URITypeSVG URIType = "svg"
 	// URITypeENS represents an ENS domain
@@ -594,6 +598,8 @@ func (uri TokenURI) Type() URIType {
 		return URITypeBase64SVG
 	case strings.HasPrefix(asString, "data:image/bmp;base64,"):
 		return URITypeBase64BMP
+	case strings.HasPrefix(asString, "data:image/png;base64,"):
+		return URITypeBase64PNG
 	case strings.Contains(asString, "ipfs.io/api"):
 		return URITypeIPFSAPI
 	case strings.Contains(asString, "/ipfs/"):
@@ -878,7 +884,7 @@ func (m MediaType) IsValid() bool {
 
 // IsImageLike returns true if the media type is a type that is expected to be like an image and not live render
 func (m MediaType) IsImageLike() bool {
-	return m == MediaTypeImage || m == MediaTypeGIF || m == MediaTypeBase64BMP || m == MediaTypeSVG
+	return m == MediaTypeImage || m == MediaTypeGIF || m == MediaTypeBase64BMP || m == MediaTypeSVG || m == MediaTypeBase64PNG
 }
 
 // IsAnimationLike returns true if the media type is a type that is expected to be like an animation and live render
