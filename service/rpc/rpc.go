@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"image/jpeg"
+	"image/png"
 	"io"
 	"io/fs"
 	"io/ioutil"
@@ -446,6 +447,25 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 			return nil, fmt.Errorf("error encoding jpeg data: %s \n\n%s", err, b64data)
 		}
 		return util.RemoveBOM(newImage.Bytes()), nil
+	case persist.URITypeBase64PNG:
+		b64data := asString[strings.IndexByte(asString, ',')+1:]
+		decoded, err := base64.RawStdEncoding.DecodeString(string(b64data))
+		if err != nil {
+			decoded, err = base64.StdEncoding.DecodeString(string(b64data))
+			if err != nil {
+				return nil, fmt.Errorf("error decoding base64 png data: %s \n\n%s", err, b64data)
+			}
+		}
+		img, err := png.Decode(bytes.NewReader(decoded))
+		if err != nil {
+			return nil, fmt.Errorf("error decoding png data: %s \n\n%s", err, b64data)
+		}
+		newImage := &bytes.Buffer{}
+		err = png.Encode(newImage, img)
+		if err != nil {
+			return nil, fmt.Errorf("error encoding jpeg data: %s \n\n%s", err, b64data)
+		}
+		return util.RemoveBOM(newImage.Bytes()), nil
 	default:
 		return []byte(turi), nil
 	}
@@ -558,6 +578,25 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 		}
 		newImage := &bytes.Buffer{}
 		err = jpeg.Encode(newImage, img, nil)
+		if err != nil {
+			return nil, fmt.Errorf("error encoding jpeg data: %s \n\n%s", err, b64data)
+		}
+		return util.NewFileHeaderReader(newImage), nil
+	case persist.URITypeBase64PNG:
+		b64data := asString[strings.IndexByte(asString, ',')+1:]
+		decoded, err := base64.RawStdEncoding.DecodeString(string(b64data))
+		if err != nil {
+			decoded, err = base64.StdEncoding.DecodeString(string(b64data))
+			if err != nil {
+				return nil, fmt.Errorf("error decoding base64 png data: %s \n\n%s", err, b64data)
+			}
+		}
+		img, err := png.Decode(bytes.NewReader(decoded))
+		if err != nil {
+			return nil, fmt.Errorf("error decoding png data: %s \n\n%s", err, b64data)
+		}
+		newImage := &bytes.Buffer{}
+		err = png.Encode(newImage, img)
 		if err != nil {
 			return nil, fmt.Errorf("error encoding jpeg data: %s \n\n%s", err, b64data)
 		}
