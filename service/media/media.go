@@ -75,6 +75,10 @@ type errInvalidMedia struct {
 	url string
 }
 
+type errNoCachedObjects struct {
+	tids persist.TokenIdentifiers
+}
+
 type errNoMediaURLs struct {
 	metadata persist.TokenMetadata
 	tokenURI persist.TokenURI
@@ -95,6 +99,10 @@ func (e errInvalidMedia) Error() string {
 
 func (e errNoMediaURLs) Error() string {
 	return fmt.Sprintf("no media URLs found in metadata: %s (metadata: %+v, tokenURI: %s)", e.tids, e.metadata, e.tokenURI)
+}
+
+func (e errNoCachedObjects) Error() string {
+	return fmt.Sprintf("no cached objects found for tids: %s", e.tids)
 }
 
 type mediaWithContentType struct {
@@ -164,12 +172,8 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	tids := persist.NewTokenIdentifiers(contractAddress, tokenID, chain)
 	if imgURL == "" && animURL == "" {
 		return persist.Media{
-				MediaType: persist.MediaTypeInvalid,
-			}, errNoMediaURLs{
-				metadata: metadata,
-				tokenURI: tokenURI,
-				tids:     tids,
-			}
+			MediaType: persist.MediaTypeInvalid,
+		}, errNoMediaURLs{metadata: metadata, tokenURI: tokenURI, tids: tids}
 	}
 
 	logger.For(pCtx).Infof("got imgURL=%s;animURL=%s", imgURL, animURL)
@@ -223,7 +227,9 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	// we should never get here, the caching should always return at least one object or an error saying why it didn't
 	if len(objects) == 0 {
-		panic("no objects to create media from and no errors returned")
+		return persist.Media{
+			MediaType: persist.MediaTypeInvalid,
+		}, errNoCachedObjects{tids: tids}
 	}
 
 	res := createMediaFromCachedObjects(pCtx, tokenBucket, objects)
