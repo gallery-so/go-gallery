@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 
@@ -56,34 +57,134 @@ func chatWithModel(ctx context.Context, client *openai.Client, modelID string, p
 	return "", fmt.Errorf("no completion choices")
 }
 
+func listModels(ctx context.Context, client *openai.Client) ([]openai.Model, error) {
+	models, err := client.ListModels(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return models.Models, nil
+}
+
+func listFineTunes(ctx context.Context, client *openai.Client) ([]openai.FineTune, error) {
+	fineTunings, err := client.ListFineTunes(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return fineTunings.Data, nil
+}
+
+func listFineTuneEvents(ctx context.Context, client *openai.Client, fineTuneID string) ([]openai.FineTuneEvent, error) {
+	fineTuneEvents, err := client.ListFineTuneEvents(ctx, fineTuneID)
+	if err != nil {
+		return nil, err
+	}
+
+	return fineTuneEvents.Data, nil
+}
+
+func cancelFineTune(ctx context.Context, client *openai.Client, fineTuneID string) error {
+	_, err := client.CancelFineTune(ctx, fineTuneID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func listFiles(ctx context.Context, client *openai.Client) ([]openai.File, error) {
+	files, err := client.ListFiles(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return files.Files, nil
+}
+
 func main() {
 	ctx := context.Background()
 
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	client := openai.NewClient(apiKey)
 
-	// Upload a file
-	filePath := "./service/openai/psuedo-gallery-code.txt"
-	purpose := "fine-tuning"
-	fileName := "pseudo-gallery-code.txt"
-	fileID, err := uploadFile(ctx, client, fileName, filePath, purpose)
+	// // Upload a file
+	// filePath := "./service/openai/gallery-generation_prepared.jsonl"
+	// purpose := "fine-tune"
+	// fileName := "gallery-generation_prepared.jsonl"
+	// fileID, err := uploadFile(ctx, client, fileName, filePath, purpose)
+	// if err != nil {
+	// 	fmt.Printf("Error uploading file: %v\n", err)
+	// 	return
+	// }
+
+	// fmt.Println("File uploaded successfully")
+
+	// // Create a fine-tuned model
+	// modelID := "curie"
+	// trainingFileID := fileID
+	// fineTunedModelID, err := createFineTunedModel(ctx, client, modelID, trainingFileID)
+	// if err != nil {
+	// 	fmt.Printf("Error creating fine-tuned model: %v\n", err)
+	// 	return
+	// }
+
+	// fmt.Println("Fine-tuned model created successfully")
+
+	// fis, err := listFiles(ctx, client)
+	// if err != nil {
+	// 	fmt.Printf("Error listing files: %v\n", err)
+	// 	return
+	// }
+
+	// for _, fi := range fis {
+	// 	fmt.Printf("File: %s, ID: %s \n", fi.FileName, fi.ID)
+	// }
+
+	// mis, err := listModels(ctx, client)
+	// if err != nil {
+	// 	fmt.Printf("Error listing models: %v\n", err)
+	// 	return
+	// }
+
+	// for _, mi := range mis {
+	// 	fmt.Printf("Model: %s, ID: %s \n", mi.Object, mi.ID)
+	// }
+
+	fts, err := listFineTunes(ctx, client)
 	if err != nil {
-		fmt.Printf("Error uploading file: %v\n", err)
+		fmt.Printf("Error listing fine-tunes: %v\n", err)
 		return
 	}
 
-	// Create a fine-tuned model
-	modelID := "text-gpt-3.5-turbo"
-	trainingFileID := fileID
-	fineTunedModelID, err := createFineTunedModel(ctx, client, modelID, trainingFileID)
-	if err != nil {
-		fmt.Printf("Error creating fine-tuned model: %v\n", err)
-		return
+	for _, ft := range fts {
+
+		asJSON, err := json.MarshalIndent(ft, "", "  ")
+		if err != nil {
+			fmt.Printf("Error marshaling fine-tune: %v\n", err)
+			return
+		}
+		fmt.Println(string(asJSON))
+
+		ftes, err := listFineTuneEvents(ctx, client, ft.ID)
+		if err != nil {
+			fmt.Printf("Error listing fine-tune events: %v\n", err)
+			return
+		}
+
+		for _, fte := range ftes {
+			asJSON, err := json.MarshalIndent(fte, "", "  ")
+			if err != nil {
+				fmt.Printf("Error marshaling fine-tune event: %v\n", err)
+				return
+			}
+			fmt.Println(string(asJSON))
+		}
 	}
 
 	// Chat with the model
-	prompt := "How does photosynthesis work?"
-	reply, err := chatWithModel(ctx, client, fineTunedModelID, prompt)
+	prompt := "Organize my NFTs into collections based on the NFT's collection|2,Autoglyph #1,Autoglyphs;5,Autoglyph #22,Autoglyphs;19,Autoglyph #523,Autoglyphs;23,Bridge #2,The Bridges;50,Bridge #51,The Bridges"
+	reply, err := chatWithModel(ctx, client, fts[0].FineTunedModel, prompt)
 	if err != nil {
 		fmt.Printf("Error chatting with model: %v\n", err)
 		return
@@ -91,42 +192,3 @@ func main() {
 
 	fmt.Printf("Model response: %s\n", reply)
 }
-
-// func main() {
-// 	client := openai.NewClient("your token")
-// 	messages := make([]openai.ChatCompletionMessage, 0)
-// 	reader := bufio.NewReader(os.Stdin)
-// 	fmt.Println("Conversation")
-// 	fmt.Println("---------------------")
-
-// 	for {
-// 		fmt.Print("-> ")
-// 		text, _ := reader.ReadString('\n')
-// 		// convert CRLF to LF
-// 		text = strings.Replace(text, "\n", "", -1)
-// 		messages = append(messages, openai.ChatCompletionMessage{
-// 			Role:    openai.ChatMessageRoleUser,
-// 			Content: text,
-// 		})
-
-// 		resp, err := client.CreateChatCompletion(
-// 			context.Background(),
-// 			openai.ChatCompletionRequest{
-// 				Model:    openai.GPT3Dot5Turbo,
-// 				Messages: messages,
-// 			},
-// 		)
-
-// 		if err != nil {
-// 			fmt.Printf("ChatCompletion error: %v\n", err)
-// 			continue
-// 		}
-
-// 		content := resp.Choices[0].Message.Content
-// 		messages = append(messages, openai.ChatCompletionMessage{
-// 			Role:    openai.ChatMessageRoleAssistant,
-// 			Content: content,
-// 		})
-// 		fmt.Println(content)
-// 	}
-// }
