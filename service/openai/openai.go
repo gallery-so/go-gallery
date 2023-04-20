@@ -102,6 +102,33 @@ func listFiles(ctx context.Context, client *openai.Client) ([]openai.File, error
 	return files.Files, nil
 }
 
+func chatWithContext(ctx context.Context, client *openai.Client, modelID string, prompt string) (string, error) {
+
+	bs, err := os.ReadFile("./service/openai/psuedo-lang.md")
+	if err != nil {
+		return "", err
+	}
+
+	completions, err := client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
+		Model:     modelID,
+		MaxTokens: 2048,
+		N:         1,
+		Messages: []openai.ChatCompletionMessage{
+			{Role: "system", Content: string(bs)},
+			{Role: "user", Content: fmt.Sprintf("Using the previous instructions, generate a code only response for the given prompt: %s", prompt)},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+
+	if len(completions.Choices) > 0 {
+		return completions.Choices[0].Message.Content, nil
+	}
+
+	return "", fmt.Errorf("no completion choices")
+}
+
 func main() {
 	ctx := context.Background()
 
@@ -182,9 +209,11 @@ func main() {
 		}
 	}
 
-	// Chat with the model
-	prompt := "Organize my NFTs into collections based on the NFT's collection|2,Autoglyph #1,Autoglyphs;5,Autoglyph #22,Autoglyphs;19,Autoglyph #523,Autoglyphs;23,Bridge #2,The Bridges;50,Bridge #51,The Bridges"
-	reply, err := chatWithModel(ctx, client, fts[0].FineTunedModel, prompt)
+	// prompt := "Organize my NFTs into collections based on the NFT's collection:2,Autoglyph #1,Autoglyphs;5,Autoglyph #22,Autoglyphs;19,Autoglyph #523,Autoglyphs;23,Bridge #2,The Bridges;50,Bridge #51,The Bridges"
+	// prompt := "Put all of my cat NFTs into a single collection:1,My Cat NFT #2,The Cats;2,My Cat NFT #4,The Cats"
+	// prompt := "Put all my NFTs into a single collection but split them into rows with 2 NFTs per row:1,My Cat NFT #2,The Cats;2,My Cat NFT #4,The Cats;4,My Cat NFT #6,The Cats;6,Monkey NFT #2,The Monkeys"
+	prompt := "Randomly assort my NFTs:2,Autoglyph #1,Autoglyphs;5,Autoglyph #22,Autoglyphs;19,Autoglyph #523,Autoglyphs;23,Bridge #2,The Bridges;50,Bridge #51,The Bridges"
+	reply, err := chatWithContext(ctx, client, "gpt-3.5-turbo-0301", prompt)
 	if err != nil {
 		fmt.Printf("Error chatting with model: %v\n", err)
 		return
