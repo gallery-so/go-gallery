@@ -621,17 +621,23 @@ func DecodeMetadataFromURI(ctx context.Context, turi persist.TokenURI, into *per
 	case persist.URITypeBase64JSON:
 		// decode the base64 encoded json
 		b64data := asString[strings.IndexByte(asString, ',')+1:]
-		decoded, err := base64.StdEncoding.DecodeString(string(b64data))
+		decoded, err := base64.RawStdEncoding.DecodeString(string(b64data))
 		if err != nil {
-			return fmt.Errorf("error decoding base64 metadata: %s \n\n%s", err, b64data)
+			decoded, err = base64.StdEncoding.DecodeString(string(b64data))
+			if err != nil {
+				return fmt.Errorf("error decoding base64 data: %s \n\n%s", err, b64data)
+			}
 		}
 
 		return json.Unmarshal(util.RemoveBOM(decoded), into)
 	case persist.URITypeBase64SVG:
 		b64data := asString[strings.IndexByte(asString, ',')+1:]
-		decoded, err := base64.StdEncoding.DecodeString(string(b64data))
+		decoded, err := base64.RawStdEncoding.DecodeString(string(b64data))
 		if err != nil {
-			return fmt.Errorf("error decoding base64 metadata: %s \n\n%s", err, b64data)
+			decoded, err = base64.StdEncoding.DecodeString(string(b64data))
+			if err != nil {
+				return fmt.Errorf("error decoding base64 data: %s \n\n%s", err, b64data)
+			}
 		}
 		*into = persist.TokenMetadata{"image": string(decoded)}
 		return nil
