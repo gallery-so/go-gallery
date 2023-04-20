@@ -746,6 +746,10 @@ func cacheRawMedia(ctx context.Context, reader io.Reader, tids persist.TokenIden
 			"originalURL": ogURL,
 			"mediaType":   mediaType.String(),
 		})
+	if err != nil {
+		logger.For(ctx).WithError(err).Errorf("could not persist media to storage")
+		return cachedMediaObject{}, err
+	}
 	go purgeIfExists(context.Background(), bucket, object.fileName(), client)
 	return object, err
 }
@@ -944,15 +948,21 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 		logger.For(pCtx).Infof("sniffed media type for %s: %s in %s", truncateString(mediaURL, 50), mediaType, time.Since(timeBeforeSniff))
 	}
 
-	pCtx = logger.NewContextWithFields(pCtx, logrus.Fields{
-		"finalMediaType":   mediaType,
-		"finalContentType": contentType,
-	})
+	if mediaType == persist.MediaTypeHTML {
+		return nil, errNotCacheable{url: mediaURL, mediaType: mediaType}
+	}
 
 	asMb := 0.0
 	if contentLength != nil && *contentLength > 0 {
 		asMb = float64(*contentLength) / 1024 / 1024
 	}
+
+	pCtx = logger.NewContextWithFields(pCtx, logrus.Fields{
+		"finalMediaType":   mediaType,
+		"finalContentType": contentType,
+		"mb":               asMb,
+	})
+
 	logger.For(pCtx).Infof("caching %.2f mb of raw media with type '%s' for '%s' at '%s-%s'", asMb, mediaType, mediaURL, defaultObjectType, tids)
 
 	if mediaType == persist.MediaTypeAnimation {
