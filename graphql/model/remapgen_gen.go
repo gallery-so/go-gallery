@@ -128,6 +128,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"GalleryConversePayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(GalleryConversePayloadOrError)
+		return obj, ok
+	},
+
 	"GalleryUserOrAddress": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(GalleryUserOrAddress)
 		return obj, ok

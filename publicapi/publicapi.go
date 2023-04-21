@@ -8,6 +8,7 @@ import (
 	admin "github.com/mikeydub/go-gallery/adminapi"
 	"github.com/mikeydub/go-gallery/graphql/apq"
 
+	"github.com/mikeydub/go-gallery/service/ai"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/redis"
 
@@ -60,10 +61,11 @@ type PublicAPI struct {
 	Social        *SocialAPI
 	Card          *CardAPI
 	Search        *SearchAPI
+	Conversation  *ConversationAPI
 }
 
 func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell,
-	arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider, taskClient *gcptasks.Client, throttler *throttle.Locker, secrets *secretmanager.Client, apq *apq.APQCache, feedCache *redis.Cache, socialCache *redis.Cache, magicClient *magicclient.API) *PublicAPI {
+	arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider, taskClient *gcptasks.Client, throttler *throttle.Locker, secrets *secretmanager.Client, apq *apq.APQCache, feedCache *redis.Cache, socialCache *redis.Cache, magicClient *magicclient.API, conversationClient *ai.ConversationClient) *PublicAPI {
 	loaders := dataloader.NewLoaders(ctx, queries, disableDataloaderCaching)
 	validator := validate.WithCustomValidators()
 
@@ -90,6 +92,7 @@ func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Rep
 		Social:        &SocialAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, redis: socialCache},
 		Card:          &CardAPI{validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, secrets: secrets},
 		Search:        &SearchAPI{queries: queries, loaders: loaders, validator: validator},
+		Conversation:  &ConversationAPI{queries: queries, conversationClient: conversationClient, validator: validator},
 	}
 }
 

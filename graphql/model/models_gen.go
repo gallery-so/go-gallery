@@ -111,6 +111,10 @@ type GalleryByIDPayloadOrError interface {
 	IsGalleryByIDPayloadOrError()
 }
 
+type GalleryConversePayloadOrError interface {
+	IsGalleryConversePayloadOrError()
+}
+
 type GalleryUserOrAddress interface {
 	IsGalleryUserOrAddress()
 }
@@ -881,6 +885,7 @@ func (ErrInvalidInput) IsUpdateSocialAccountDisplayedPayloadOrError()    {}
 func (ErrInvalidInput) IsMintPremiumCardToWalletPayloadOrError()         {}
 func (ErrInvalidInput) IsDisconnectSocialAccountPayloadOrError()         {}
 func (ErrInvalidInput) IsFollowAllSocialConnectionsPayloadOrError()      {}
+func (ErrInvalidInput) IsGalleryConversePayloadOrError()                 {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -952,6 +957,7 @@ func (ErrNotAuthorized) IsUpdateSocialAccountDisplayedPayloadOrError() {}
 func (ErrNotAuthorized) IsMintPremiumCardToWalletPayloadOrError()      {}
 func (ErrNotAuthorized) IsDisconnectSocialAccountPayloadOrError()      {}
 func (ErrNotAuthorized) IsFollowAllSocialConnectionsPayloadOrError()   {}
+func (ErrNotAuthorized) IsGalleryConversePayloadOrError()              {}
 
 type ErrSyncFailed struct {
 	Message string `json:"message"`
@@ -1115,6 +1121,18 @@ type Gallery struct {
 
 func (Gallery) IsNode()                      {}
 func (Gallery) IsGalleryByIDPayloadOrError() {}
+
+type GalleryConverseInput struct {
+	ConversationID *persist.DBID `json:"conversationID"`
+	Message        string        `json:"message"`
+}
+
+type GalleryConversePayload struct {
+	ConversationID persist.DBID `json:"conversationID"`
+	Result         string       `json:"result"`
+}
+
+func (GalleryConversePayload) IsGalleryConversePayloadOrError() {}
 
 type GalleryInfoUpdatedFeedEventData struct {
 	EventTime      *time.Time      `json:"eventTime"`

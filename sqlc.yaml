@@ -58,6 +58,11 @@ sql:
           - column: "galleries.collections"
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
 
+          - column: "conversations.messages"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.ConversationMessages"
+          - column: "conversations.given_ids"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.GivenIDs"
+
           # Socials
           - column: "pii.socials_auth.provider"
             go_type: "github.com/mikeydub/go-gallery/service/persist.SocialProvider"

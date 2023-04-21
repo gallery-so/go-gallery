@@ -1998,6 +1998,19 @@ union FollowAllSocialConnectionsPayloadOrError =
   | ErrNotAuthorized
   | ErrNeedsToReconnectSocial
 
+
+type GalleryConversePayload {
+  conversationID: DBID!
+  result: String!
+}
+
+union GalleryConversePayloadOrError = GalleryConversePayload | ErrInvalidInput | ErrNotAuthorized
+
+input GalleryConverseInput {
+  conversationID: DBID
+  message: String!
+}
+
 type Mutation {
   # User Mutations
   addUserWallet(
@@ -2120,6 +2133,8 @@ type Mutation {
   moveCollectionToGallery(
     input: MoveCollectionToGalleryInput
   ): MoveCollectionToGalleryPayloadOrError @authRequired
+  
+  galleryConverse(input: GalleryConverseInput!): GalleryConversePayloadOrError @authRequired
 }
 
 type Subscription {

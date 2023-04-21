@@ -73,6 +73,21 @@ type ContractRelevance struct {
 	Score int32
 }
 
+type Conversation struct {
+	ID            persist.DBID
+	UserID        persist.DBID
+	OpeningPrompt string
+	PsuedoTokens  string
+	OpeningState  string
+	CurrentState  string
+	Messages      persist.ConversationMessages
+	GivenIds      persist.GivenIDs
+	Helpful       sql.NullBool
+	Deleted       bool
+	CreatedAt     time.Time
+	LastUpdated   time.Time
+}
+
 type DevMetadataUser struct {
 	UserID          persist.DBID
 	HasEmailAddress persist.Email

@@ -28,6 +28,7 @@ import (
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/middleware"
+	"github.com/mikeydub/go-gallery/service/ai"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
@@ -70,18 +71,19 @@ func Init() {
 }
 
 type Clients struct {
-	Repos           *postgres.Repositories
-	Queries         *coredb.Queries
-	HTTPClient      *http.Client
-	EthClient       *ethclient.Client
-	IPFSClient      *shell.Shell
-	ArweaveClient   *goar.Client
-	StorageClient   *storage.Client
-	TaskClient      *cloudtasks.Client
-	SecretClient    *secretmanager.Client
-	PubSubClient    *pubsub.Client
-	MagicLinkClient *magicclient.API
-	closeFunc       func()
+	Repos              *postgres.Repositories
+	Queries            *coredb.Queries
+	HTTPClient         *http.Client
+	EthClient          *ethclient.Client
+	IPFSClient         *shell.Shell
+	ArweaveClient      *goar.Client
+	StorageClient      *storage.Client
+	TaskClient         *cloudtasks.Client
+	SecretClient       *secretmanager.Client
+	PubSubClient       *pubsub.Client
+	MagicLinkClient    *magicclient.API
+	ConversationClient *ai.ConversationClient
+	closeFunc          func()
 }
 
 func (c *Clients) Close() {
@@ -91,18 +93,20 @@ func (c *Clients) Close() {
 func ClientInit(ctx context.Context) *Clients {
 	pq := postgres.MustCreateClient()
 	pgx := postgres.NewPgxClient()
+	queries := db.New(pgx)
 	return &Clients{
-		Repos:           postgres.NewRepositories(pq, pgx),
-		Queries:         db.New(pgx),
-		HTTPClient:      &http.Client{Timeout: 10 * time.Minute},
-		EthClient:       rpc.NewEthClient(),
-		IPFSClient:      rpc.NewIPFSShell(),
-		ArweaveClient:   rpc.NewArweaveClient(),
-		StorageClient:   media.NewStorageClient(ctx),
-		TaskClient:      task.NewClient(ctx),
-		SecretClient:    newSecretsClient(),
-		PubSubClient:    gcp.NewClient(ctx),
-		MagicLinkClient: auth.NewMagicLinkClient(),
+		Repos:              postgres.NewRepositories(pq, pgx),
+		Queries:            queries,
+		HTTPClient:         &http.Client{Timeout: 10 * time.Minute},
+		EthClient:          rpc.NewEthClient(),
+		IPFSClient:         rpc.NewIPFSShell(),
+		ArweaveClient:      rpc.NewArweaveClient(),
+		StorageClient:      media.NewStorageClient(ctx),
+		TaskClient:         task.NewClient(ctx),
+		SecretClient:       newSecretsClient(),
+		PubSubClient:       gcp.NewClient(ctx),
+		MagicLinkClient:    auth.NewMagicLinkClient(),
+		ConversationClient: ai.NewConversationClient(queries),
 		closeFunc: func() {
 			pq.Close()
 			pgx.Close()
@@ -140,7 +144,7 @@ func CoreInit(c *Clients, provider *multichain.Provider, recommender *recommend.
 
 	recommender.Run(context.Background(), time.NewTicker(time.Hour))
 
-	return handlersInit(router, c.Repos, c.Queries, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, socialCache, c.MagicLinkClient, recommender)
+	return handlersInit(router, c.Repos, c.Queries, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, socialCache, c.MagicLinkClient, recommender, c.ConversationClient)
 }
 
 func newSecretsClient() *secretmanager.Client {
@@ -224,6 +228,8 @@ func SetDefaults() {
 	viper.SetDefault("ALCHEMY_API_URL", "")
 	viper.SetDefault("INFURA_API_KEY", "")
 	viper.SetDefault("INFURA_API_SECRET", "")
+	viper.SetDefault("OPENAI_API_KEY", "")
+	viper.SetDefault("OPENAI_MODEL_ID", "gpt-3.5-turbo")
 
 	viper.AutomaticEnv()
 

@@ -1515,6 +1515,18 @@ func (r *mutationResolver) MoveCollectionToGallery(ctx context.Context, input *m
 	}, nil
 }
 
+// GalleryConverse is the resolver for the galleryConverse field.
+func (r *mutationResolver) GalleryConverse(ctx context.Context, input model.GalleryConverseInput) (model.GalleryConversePayloadOrError, error) {
+	result, newConvID, err := publicapi.For(ctx).Conversation.GalleryConverse(ctx, input.Message, input.ConversationID)
+	if err != nil {
+		return nil, err
+	}
+	return model.GalleryConversePayload{
+		ConversationID: newConvID,
+		Result:         result,
+	}, nil
+}
+
 // Owner is the resolver for the owner field.
 func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error) {
 	panic(fmt.Errorf("not implemented"))

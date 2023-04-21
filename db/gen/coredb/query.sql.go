@@ -1336,6 +1336,30 @@ func (q *Queries) GetContractsByUserID(ctx context.Context, ownerUserID persist.
 	return items, nil
 }
 
+const getConversationByID = `-- name: GetConversationByID :one
+select id, user_id, opening_prompt, psuedo_tokens, opening_state, current_state, messages, given_ids, helpful, deleted, created_at, last_updated from conversations where id = $1 and deleted = false
+`
+
+func (q *Queries) GetConversationByID(ctx context.Context, id persist.DBID) (Conversation, error) {
+	row := q.db.QueryRow(ctx, getConversationByID, id)
+	var i Conversation
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.OpeningPrompt,
+		&i.PsuedoTokens,
+		&i.OpeningState,
+		&i.CurrentState,
+		&i.Messages,
+		&i.GivenIds,
+		&i.Helpful,
+		&i.Deleted,
+		&i.CreatedAt,
+		&i.LastUpdated,
+	)
+	return i, err
+}
+
 const getEvent = `-- name: GetEvent :one
 SELECT id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id FROM events WHERE id = $1 AND deleted = false
 `
@@ -3752,6 +3776,35 @@ func (q *Queries) HasLaterGroupedEvent(ctx context.Context, arg HasLaterGroupedE
 	return exists, err
 }
 
+const insertConversation = `-- name: InsertConversation :one
+insert into conversations (id, user_id, messages, psuedo_tokens, given_ids, opening_prompt, opening_state, current_state) values ($1, $2, $3, $4, $5, $6, $7, $7) returning id
+`
+
+type InsertConversationParams struct {
+	ID            persist.DBID
+	UserID        persist.DBID
+	Messages      persist.ConversationMessages
+	PsuedoTokens  string
+	GivenIds      persist.GivenIDs
+	OpeningPrompt string
+	OpeningState  string
+}
+
+func (q *Queries) InsertConversation(ctx context.Context, arg InsertConversationParams) (persist.DBID, error) {
+	row := q.db.QueryRow(ctx, insertConversation,
+		arg.ID,
+		arg.UserID,
+		arg.Messages,
+		arg.PsuedoTokens,
+		arg.GivenIds,
+		arg.OpeningPrompt,
+		arg.OpeningState,
+	)
+	var id persist.DBID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const insertUser = `-- name: InsertUser :exec
 insert into users (id, username, username_idempotent, bio, wallets, universal, email_unsubscriptions, primary_wallet_id) values ($1, $2, $3, $4, $5, $6, $7, $8) returning id
 `
@@ -4109,6 +4162,35 @@ func (q *Queries) UpdateCollectionsInfo(ctx context.Context, arg UpdateCollectio
 		arg.TokenSettings,
 		arg.Hidden,
 	)
+	return err
+}
+
+const updateConversationByID = `-- name: UpdateConversationByID :exec
+update conversations set last_updated = now(), messages = $1, current_state = $2 where id = $3
+`
+
+type UpdateConversationByIDParams struct {
+	Messages     persist.ConversationMessages
+	CurrentState string
+	ID           persist.DBID
+}
+
+func (q *Queries) UpdateConversationByID(ctx context.Context, arg UpdateConversationByIDParams) error {
+	_, err := q.db.Exec(ctx, updateConversationByID, arg.Messages, arg.CurrentState, arg.ID)
+	return err
+}
+
+const updateConversationHelpful = `-- name: UpdateConversationHelpful :exec
+update conversations set last_updated = now(), helpful = $1 where id = $2
+`
+
+type UpdateConversationHelpfulParams struct {
+	Helpful sql.NullBool
+	ID      persist.DBID
+}
+
+func (q *Queries) UpdateConversationHelpful(ctx context.Context, arg UpdateConversationHelpfulParams) error {
+	_, err := q.db.Exec(ctx, updateConversationHelpful, arg.Helpful, arg.ID)
 	return err
 }
 
