@@ -1013,10 +1013,10 @@ update users set wallets = array_append(wallets, @wallet_id::varchar) where id =
 select * from conversations where id = $1 and deleted = false;
 
 -- name: InsertConversation :one
-insert into conversations (id, user_id, messages, psuedo_tokens, given_ids, opening_prompt, opening_state, current_state) values ($1, $2, $3, $4, $5, $6, $7, $7) returning id;
+insert into conversations (id, user_id, messages, psuedo_tokens, given_ids, opening_prompt, opening_state, current_state, used_tokens) values ($1, $2, $3, $4, $5, $6, $7, $7, $8) returning id;
 
 -- name: UpdateConversationByID :exec
-update conversations set last_updated = now(), messages = @messages, current_state = @current_state where id = @id;
+update conversations set last_updated = now(), messages = @messages, current_state = @current_state, used_tokens = @used_tokens where id = @id;
 
 -- name: UpdateConversationHelpful :exec
 update conversations set last_updated = now(), helpful = @helpful where id = @id;

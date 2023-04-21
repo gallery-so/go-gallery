@@ -1337,7 +1337,7 @@ func (q *Queries) GetContractsByUserID(ctx context.Context, ownerUserID persist.
 }
 
 const getConversationByID = `-- name: GetConversationByID :one
-select id, user_id, opening_prompt, psuedo_tokens, opening_state, current_state, messages, given_ids, helpful, deleted, created_at, last_updated from conversations where id = $1 and deleted = false
+select id, user_id, opening_prompt, psuedo_tokens, opening_state, current_state, messages, given_ids, helpful, used_tokens, deleted, created_at, last_updated from conversations where id = $1 and deleted = false
 `
 
 func (q *Queries) GetConversationByID(ctx context.Context, id persist.DBID) (Conversation, error) {
@@ -1353,6 +1353,7 @@ func (q *Queries) GetConversationByID(ctx context.Context, id persist.DBID) (Con
 		&i.Messages,
 		&i.GivenIds,
 		&i.Helpful,
+		&i.UsedTokens,
 		&i.Deleted,
 		&i.CreatedAt,
 		&i.LastUpdated,
@@ -3777,7 +3778,7 @@ func (q *Queries) HasLaterGroupedEvent(ctx context.Context, arg HasLaterGroupedE
 }
 
 const insertConversation = `-- name: InsertConversation :one
-insert into conversations (id, user_id, messages, psuedo_tokens, given_ids, opening_prompt, opening_state, current_state) values ($1, $2, $3, $4, $5, $6, $7, $7) returning id
+insert into conversations (id, user_id, messages, psuedo_tokens, given_ids, opening_prompt, opening_state, current_state, used_tokens) values ($1, $2, $3, $4, $5, $6, $7, $7, $8) returning id
 `
 
 type InsertConversationParams struct {
@@ -3788,6 +3789,7 @@ type InsertConversationParams struct {
 	GivenIds      persist.GivenIDs
 	OpeningPrompt string
 	OpeningState  string
+	UsedTokens    int32
 }
 
 func (q *Queries) InsertConversation(ctx context.Context, arg InsertConversationParams) (persist.DBID, error) {
@@ -3799,6 +3801,7 @@ func (q *Queries) InsertConversation(ctx context.Context, arg InsertConversation
 		arg.GivenIds,
 		arg.OpeningPrompt,
 		arg.OpeningState,
+		arg.UsedTokens,
 	)
 	var id persist.DBID
 	err := row.Scan(&id)
@@ -4166,17 +4169,23 @@ func (q *Queries) UpdateCollectionsInfo(ctx context.Context, arg UpdateCollectio
 }
 
 const updateConversationByID = `-- name: UpdateConversationByID :exec
-update conversations set last_updated = now(), messages = $1, current_state = $2 where id = $3
+update conversations set last_updated = now(), messages = $1, current_state = $2, used_tokens = $3 where id = $4
 `
 
 type UpdateConversationByIDParams struct {
 	Messages     persist.ConversationMessages
 	CurrentState string
+	UsedTokens   int32
 	ID           persist.DBID
 }
 
 func (q *Queries) UpdateConversationByID(ctx context.Context, arg UpdateConversationByIDParams) error {
-	_, err := q.db.Exec(ctx, updateConversationByID, arg.Messages, arg.CurrentState, arg.ID)
+	_, err := q.db.Exec(ctx, updateConversationByID,
+		arg.Messages,
+		arg.CurrentState,
+		arg.UsedTokens,
+		arg.ID,
+	)
 	return err
 }
 

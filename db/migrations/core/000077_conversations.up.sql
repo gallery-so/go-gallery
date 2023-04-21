@@ -8,6 +8,7 @@ create table if not exists conversations (
     messages jsonb,
     given_ids jsonb,
     helpful bool,
+    used_tokens int not null default 0,
     deleted bool not null default false,
     created_at timestamptz not null default current_timestamp,
     last_updated timestamptz not null default current_timestamp

@@ -83,6 +83,7 @@ type Conversation struct {
 	Messages      persist.ConversationMessages
 	GivenIds      persist.GivenIDs
 	Helpful       sql.NullBool
+	UsedTokens    int32
 	Deleted       bool
 	CreatedAt     time.Time
 	LastUpdated   time.Time

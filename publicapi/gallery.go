@@ -80,12 +80,12 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 
 	curGal, err := api.loaders.GalleryByGalleryID.Load(update.GalleryID)
 	if err != nil {
-		return db.Gallery{}, err
+		return db.Gallery{}, fmt.Errorf("failed to load gallery %s: %w", update.GalleryID, err)
 	}
 
 	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
-		return db.Gallery{}, err
+		return db.Gallery{}, fmt.Errorf("failed to get authenticated user: %w", err)
 	}
 
 	if curGal.OwnerUserID != userID {
@@ -94,7 +94,7 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 
 	tx, err := api.repos.BeginTx(ctx)
 	if err != nil {
-		return db.Gallery{}, err
+		return db.Gallery{}, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback(ctx)
 
@@ -104,7 +104,7 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 	if len(update.DeletedCollections) > 0 {
 		err = q.DeleteCollections(ctx, util.StringersToStrings(update.DeletedCollections))
 		if err != nil {
-			return db.Gallery{}, err
+			return db.Gallery{}, fmt.Errorf("failed to delete collections: %w", err)
 		}
 	}
 
@@ -123,7 +123,7 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 			TokenSettings:  modelToTokenSettings(c.TokenSettings),
 		})
 		if err != nil {
-			return db.Gallery{}, err
+			return db.Gallery{}, fmt.Errorf("failed to create collection: %w", err)
 		}
 
 		events = append(events, db.Event{
@@ -148,7 +148,7 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 	if len(update.UpdatedCollections) > 0 {
 		collEvents, err := updateCollectionsInfoAndTokens(ctx, q, userID, update.GalleryID, update.UpdatedCollections)
 		if err != nil {
-			return db.Gallery{}, err
+			return db.Gallery{}, fmt.Errorf("failed to update collections: %w", err)
 		}
 
 		events = append(events, collEvents...)
@@ -170,7 +170,7 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 
 	err = q.UpdateGalleryInfo(ctx, params)
 	if err != nil {
-		return db.Gallery{}, err
+		return db.Gallery{}, fmt.Errorf("failed to update gallery info: %w", err)
 	}
 
 	if update.Name != nil || update.Description != nil {
@@ -209,18 +209,18 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 			Collections: asList,
 		})
 		if err != nil {
-			return db.Gallery{}, err
+			return db.Gallery{}, fmt.Errorf("failed to update gallery collections: %w", err)
 		}
 	}
 
 	err = tx.Commit(ctx)
 	if err != nil {
-		return db.Gallery{}, err
+		return db.Gallery{}, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	newGall, err := api.loaders.GalleryByGalleryID.Load(update.GalleryID)
 	if err != nil {
-		return db.Gallery{}, err
+		return db.Gallery{}, fmt.Errorf("failed to load gallery: %w", err)
 	}
 
 	if update.Caption != nil && *update.Caption == "" {
@@ -228,7 +228,7 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 	}
 	_, err = dispatchEvents(ctx, events, api.validator, update.EditID, nil)
 	if err != nil {
-		return db.Gallery{}, err
+		return db.Gallery{}, fmt.Errorf("failed to dispatch events: %w", err)
 	}
 
 	return newGall, nil

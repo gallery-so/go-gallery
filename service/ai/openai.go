@@ -112,7 +112,7 @@ func (c *ConversationClient) GalleryConverse(ctx context.Context, prompt string,
 		logger.For(ctx).Debugf("%s", prompt)
 	}
 
-	resp, err := c.retryConversationWithChastise(ctx, userID, messages, 3, func(s string) error {
+	resp, usedTokens, err := c.retryConversationWithChastise(ctx, userID, messages, int(curConversation.UsedTokens), 3, func(s string) error {
 		var err error
 		s, err = findPseudoCodeInResponse(s)
 		if err != nil {
@@ -124,6 +124,8 @@ func (c *ConversationClient) GalleryConverse(ctx context.Context, prompt string,
 	if err != nil {
 		return nil, nil, "", err
 	}
+
+	curConversation.UsedTokens = int32(usedTokens)
 
 	resp, err = findPseudoCodeInResponse(resp)
 	if err != nil {
@@ -155,15 +157,17 @@ func (c *ConversationClient) GalleryConverse(ctx context.Context, prompt string,
 			OpeningState:  curConversation.CurrentState,
 			PsuedoTokens:  curConversation.PsuedoTokens,
 			GivenIds:      curConversation.GivenIds,
+			UsedTokens:    curConversation.UsedTokens,
 		})
 		if err != nil {
 			return nil, nil, "", err
 		}
 	} else {
 		err := c.queries.UpdateConversationByID(ctx, coredb.UpdateConversationByIDParams{
+			ID:           curConversation.ID,
 			Messages:     curConversation.Messages,
 			CurrentState: curConversation.CurrentState,
-			ID:           curConversation.ID,
+			UsedTokens:   curConversation.UsedTokens,
 		})
 		if err != nil {
 			return nil, nil, "", err
@@ -174,21 +178,22 @@ func (c *ConversationClient) GalleryConverse(ctx context.Context, prompt string,
 
 }
 
-func (c *ConversationClient) retryConversationWithChastise(ctx context.Context, userID persist.DBID, messages persist.ConversationMessages, maxAttempts int, valid func(string) error) (string, error) {
+func (c *ConversationClient) retryConversationWithChastise(ctx context.Context, userID persist.DBID, messages persist.ConversationMessages, usedTokens, maxAttempts int, valid func(string) error) (string, int, error) {
+	curUsedTokens := usedTokens
 	for i := 0; i < maxAttempts; i++ {
 		completions, err := c.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
 			Model:     env.GetString("OPENAI_MODEL_ID"),
-			MaxTokens: 2048,
+			MaxTokens: 2500 - usedTokens,
 			N:         1,
 			Messages:  append([]openai.ChatCompletionMessage{{Role: "system", Content: string(c.pseudoLang)}}, messages...),
 			User:      userID.String(),
 		})
 		if err != nil {
-			return "", err
+			return "", 0, err
 		}
 
 		if len(completions.Choices) == 0 {
-			return "", fmt.Errorf("no completion choices")
+			return "", 0, fmt.Errorf("no completion choices")
 		}
 		content := completions.Choices[0].Message.Content
 
@@ -196,11 +201,11 @@ func (c *ConversationClient) retryConversationWithChastise(ctx context.Context, 
 
 		err = valid(content)
 		if err == nil {
-			return content, nil
+			return content, curUsedTokens + completions.Usage.TotalTokens, nil
 		}
 		chastise, err := c.chastiseResponse(ctx, err, i)
 		if err != nil {
-			return "", err
+			return "", 0, err
 		}
 		messages = append(messages, openai.ChatCompletionMessage{
 			Role:    "assistant",
@@ -208,11 +213,11 @@ func (c *ConversationClient) retryConversationWithChastise(ctx context.Context, 
 		})
 		messages = append(messages, openai.ChatCompletionMessage{
 			Role:    "system",
-			Content: fmt.Sprintf("You failed to generate valid response. This is the error returned because of your failure: %s \n%s\nTry again", err, chastise),
+			Content: fmt.Sprintf("You failed to generate valid response. This is the error returned because of your failure: %s \n%s\nTry again (code only)", err, chastise),
 		})
 
 	}
-	return "", fmt.Errorf("max attempts reached")
+	return "", 0, fmt.Errorf("max attempts reached")
 }
 
 func (c *ConversationClient) chastiseResponse(ctx context.Context, err error, attempt int) (string, error) {
