@@ -179,11 +179,14 @@ func (c *ConversationClient) GalleryConverse(ctx context.Context, prompt string,
 }
 
 func (c *ConversationClient) retryConversationWithChastise(ctx context.Context, userID persist.DBID, messages persist.ConversationMessages, usedTokens, maxAttempts int, valid func(string) error) (string, int, error) {
-	curUsedTokens := usedTokens
+	maxTokens := 4000 - usedTokens
+	if usedTokens == 0 {
+		maxTokens = 2048
+	}
 	for i := 0; i < maxAttempts; i++ {
 		completions, err := c.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
 			Model:     env.GetString("OPENAI_MODEL_ID"),
-			MaxTokens: 2500 - usedTokens,
+			MaxTokens: maxTokens,
 			N:         1,
 			Messages:  append([]openai.ChatCompletionMessage{{Role: "system", Content: string(c.pseudoLang)}}, messages...),
 			User:      userID.String(),
@@ -201,7 +204,7 @@ func (c *ConversationClient) retryConversationWithChastise(ctx context.Context, 
 
 		err = valid(content)
 		if err == nil {
-			return content, curUsedTokens + completions.Usage.TotalTokens, nil
+			return content, completions.Usage.TotalTokens, nil
 		}
 		chastise, err := c.chastiseResponse(ctx, err, i)
 		if err != nil {
