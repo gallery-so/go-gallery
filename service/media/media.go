@@ -102,7 +102,7 @@ func (e errNoMediaURLs) Error() string {
 }
 
 func (e errNoCachedObjects) Error() string {
-	return fmt.Sprintf("no cached objects found for tids: %s", e.tids)
+	return fmt.Sprintf("no cached objects found for token identifiers: %s", e.tids)
 }
 
 type mediaWithContentType struct {
@@ -199,7 +199,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	objects := append(animResult.cachedObjects, imgResult.cachedObjects...)
 
-	// we expectedly did not cache the given media type
+	// the media type is not cacheable but is valid
 	if notCacheableErr, ok := animResult.err.(errNotCacheable); ok {
 		return createRawMedia(pCtx, tids, notCacheableErr.mediaType, tokenBucket, animURL, imgURL, objects), nil
 	} else if notCacheableErr, ok := imgResult.err.(errNotCacheable); ok {
@@ -207,8 +207,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	}
 
 	// neither download worked, unexpectedly
-	if (animResult.err != nil && len(animResult.cachedObjects) == 0) && (imgResult.err != nil && len(imgResult.cachedObjects) == 0) {
-
+	if (animCh == nil || (animResult.err != nil && len(animResult.cachedObjects) == 0)) && (imgCh == nil || (imgResult.err != nil && len(imgResult.cachedObjects) == 0)) {
 		if invalidMediaErr, ok := animResult.err.(errInvalidMedia); ok {
 			return persist.Media{
 				MediaURL:  persist.NullString(invalidMediaErr.url),
@@ -225,7 +224,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		return persist.Media{}, util.MultiErr{animResult.err, imgResult.err}
 	}
 
-	// we should never get here, the caching should always return at least one object or an error saying why it didn't
+	// this should never be true, something is wrong if this is true
 	if len(objects) == 0 {
 		return persist.Media{
 			MediaType: persist.MediaTypeInvalid,
@@ -253,9 +252,11 @@ func createMediaFromCachedObjects(ctx context.Context, tokenBucket string, objec
 	for _, obj := range objects {
 		switch obj.objectType {
 		case ObjectTypeAnimation:
+			// if we receive an animation, that takes top priority and will be the primary object
 			primaryObject = obj
 			break
 		case ObjectTypeImage, ObjectTypeSVG:
+			// if we don't have an animation, an image like object will be the primary object
 			primaryObject = obj
 		}
 	}
@@ -263,6 +264,8 @@ func createMediaFromCachedObjects(ctx context.Context, tokenBucket string, objec
 	var thumbnailObject *cachedMediaObject
 	var liveRenderObject *cachedMediaObject
 	if primaryObject.objectType == ObjectTypeAnimation {
+		// animations should have a thumbnail that could be an image or svg or thumbnail
+		// thumbnail take top priority, then the other image types that could have been cached
 		for _, obj := range objects {
 			if obj.objectType == ObjectTypeImage || obj.objectType == ObjectTypeSVG {
 				thumbnailObject = &obj
@@ -272,6 +275,7 @@ func createMediaFromCachedObjects(ctx context.Context, tokenBucket string, objec
 			}
 		}
 	} else {
+		// it's not an animation, meaning its image like, so we only use a thumbnail when there explicitly is one
 		for _, obj := range objects {
 			if obj.objectType == ObjectTypeThumbnail {
 				thumbnailObject = &obj
@@ -280,6 +284,7 @@ func createMediaFromCachedObjects(ctx context.Context, tokenBucket string, objec
 		}
 	}
 
+	// live render can apply to any media type, if one explicitly exists, use it
 	for _, obj := range objects {
 		if obj.objectType == ObjectTypeLiveRender {
 			liveRenderObject = &obj
@@ -826,7 +831,7 @@ func createLiveRenderAndCache(ctx context.Context, tids persist.TokenIdentifiers
 
 	obj := cachedMediaObject{
 		objectType:      ObjectTypeLiveRender,
-		mediaType:       persist.MediaTypeImage,
+		mediaType:       persist.MediaTypeVideo,
 		tokenID:         tids.TokenID,
 		contractAddress: tids.ContractAddress,
 		chain:           tids.Chain,
