@@ -204,6 +204,8 @@ interface Media {
 
   # The dimensions of the media, if known
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type ImageMedia implements Media {
@@ -213,6 +215,8 @@ type ImageMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type GIFMedia implements Media {
@@ -223,6 +227,8 @@ type GIFMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type VideoMedia implements Media {
@@ -232,6 +238,8 @@ type VideoMedia implements Media {
 
   contentRenderURLs: VideoURLSet
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type AudioMedia implements Media {
@@ -241,6 +249,8 @@ type AudioMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type TextMedia implements Media {
@@ -250,6 +260,8 @@ type TextMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type PdfMedia implements Media {
@@ -259,6 +271,8 @@ type PdfMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type HtmlMedia implements Media {
@@ -268,6 +282,8 @@ type HtmlMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type JsonMedia implements Media {
@@ -277,6 +293,8 @@ type JsonMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type GltfMedia implements Media {
@@ -286,6 +304,8 @@ type GltfMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type UnknownMedia implements Media {
@@ -317,6 +337,8 @@ type InvalidMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 enum TokenType {
