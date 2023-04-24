@@ -43,12 +43,12 @@ func processMediaForUsersTokensOfChain(mc *multichain.Provider, tokenRepo *postg
 
 		ctx := logger.NewContextWithFields(c, logrus.Fields{"userID": input.UserID})
 
-		if err := throttler.Lock(ctx, input.UserID.String()); err != nil {
-			// Reply with a non-200 status so that the message is tried again later on
-			util.ErrResponse(c, http.StatusTooManyRequests, err)
-			return
-		}
-		defer throttler.Unlock(ctx, input.UserID.String())
+		// if err := throttler.Lock(ctx, input.UserID.String()); err != nil {
+		// 	// Reply with a non-200 status so that the message is tried again later on
+		// 	util.ErrResponse(c, http.StatusTooManyRequests, err)
+		// 	return
+		// }
+		// defer throttler.Unlock(ctx, input.UserID.String())
 
 		wp := pool.New().WithMaxGoroutines(50).WithContext(ctx)
 		for _, tokenID := range input.TokenIDs {
@@ -168,20 +168,19 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 	newMedia, err := media.MakePreviewsForMetadata(ctx, newMetadata, contractAddress, persist.TokenID(t.TokenID.String()), t.TokenURI, t.Chain, ipfsClient, arweaveClient, stg, tokenBucket, image, animation)
 	if err != nil {
 		logger.For(ctx).Errorf("error processing media for %s: %s", key, err)
-		newMedia = persist.Media{
-			MediaType: persist.MediaTypeUnknown,
+		if newMedia.MediaType != persist.MediaTypeInvalid {
+			newMedia = persist.Media{
+				MediaType: persist.MediaTypeUnknown,
+			}
 		}
 	}
 	logger.For(ctx).Infof("processing media took %s", time.Since(totalTimeOfMedia))
 
 	// Don't replace existing usable media if tokenprocessing failed to get new media
+	// In the near future we will establish this state explicitly in the DB or in logs
 	if t.Media.IsServable() && !newMedia.IsServable() {
 		logger.For(ctx).Debugf("not replacing existing media for %s: cur %v new %v", key, t.Media.IsServable(), newMedia.IsServable())
 		return nil
-	}
-
-	if newMedia.MediaType.IsAnimationLike() && !persist.TokenURI(newMedia.ThumbnailURL).IsRenderable() && persist.TokenURI(t.Media.ThumbnailURL).IsRenderable() {
-		newMedia.ThumbnailURL = t.Media.ThumbnailURL
 	}
 
 	up := persist.TokenUpdateAllURIDerivedFieldsInput{
