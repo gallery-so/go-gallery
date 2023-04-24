@@ -404,6 +404,7 @@ type AudioMedia struct {
 	MediaType        *string          `json:"mediaType"`
 	ContentRenderURL *string          `json:"contentRenderURL"`
 	Dimensions       *MediaDimensions `json:"dimensions"`
+	FallbackMedia    *FallbackMedia   `json:"fallbackMedia"`
 }
 
 func (AudioMedia) IsMediaSubtype() {}
@@ -1097,6 +1098,7 @@ type GIFMedia struct {
 	MediaType         *string          `json:"mediaType"`
 	ContentRenderURL  *string          `json:"contentRenderURL"`
 	Dimensions        *MediaDimensions `json:"dimensions"`
+	FallbackMedia     *FallbackMedia   `json:"fallbackMedia"`
 }
 
 func (GIFMedia) IsMediaSubtype() {}
@@ -1187,6 +1189,7 @@ type GltfMedia struct {
 	MediaType        *string          `json:"mediaType"`
 	ContentRenderURL *string          `json:"contentRenderURL"`
 	Dimensions       *MediaDimensions `json:"dimensions"`
+	FallbackMedia    *FallbackMedia   `json:"fallbackMedia"`
 }
 
 func (GltfMedia) IsMediaSubtype() {}
@@ -1214,6 +1217,7 @@ type HTMLMedia struct {
 	MediaType        *string          `json:"mediaType"`
 	ContentRenderURL *string          `json:"contentRenderURL"`
 	Dimensions       *MediaDimensions `json:"dimensions"`
+	FallbackMedia    *FallbackMedia   `json:"fallbackMedia"`
 }
 
 func (HTMLMedia) IsMediaSubtype() {}
@@ -1225,6 +1229,7 @@ type ImageMedia struct {
 	MediaType        *string          `json:"mediaType"`
 	ContentRenderURL *string          `json:"contentRenderURL"`
 	Dimensions       *MediaDimensions `json:"dimensions"`
+	FallbackMedia    *FallbackMedia   `json:"fallbackMedia"`
 }
 
 func (ImageMedia) IsMediaSubtype() {}
@@ -1236,6 +1241,7 @@ type InvalidMedia struct {
 	MediaType        *string          `json:"mediaType"`
 	ContentRenderURL *string          `json:"contentRenderURL"`
 	Dimensions       *MediaDimensions `json:"dimensions"`
+	FallbackMedia    *FallbackMedia   `json:"fallbackMedia"`
 }
 
 func (InvalidMedia) IsMediaSubtype() {}
@@ -1247,6 +1253,7 @@ type JSONMedia struct {
 	MediaType        *string          `json:"mediaType"`
 	ContentRenderURL *string          `json:"contentRenderURL"`
 	Dimensions       *MediaDimensions `json:"dimensions"`
+	FallbackMedia    *FallbackMedia   `json:"fallbackMedia"`
 }
 
 func (JSONMedia) IsMediaSubtype() {}
@@ -1372,6 +1379,7 @@ type PDFMedia struct {
 	MediaType        *string          `json:"mediaType"`
 	ContentRenderURL *string          `json:"contentRenderURL"`
 	Dimensions       *MediaDimensions `json:"dimensions"`
+	FallbackMedia    *FallbackMedia   `json:"fallbackMedia"`
 }
 
 func (PDFMedia) IsMediaSubtype() {}
@@ -1639,6 +1647,7 @@ type TextMedia struct {
 	MediaType        *string          `json:"mediaType"`
 	ContentRenderURL *string          `json:"contentRenderURL"`
 	Dimensions       *MediaDimensions `json:"dimensions"`
+	FallbackMedia    *FallbackMedia   `json:"fallbackMedia"`
 }
 
 func (TextMedia) IsMediaSubtype() {}
@@ -2030,6 +2039,7 @@ type VideoMedia struct {
 	MediaType         *string          `json:"mediaType"`
 	ContentRenderURLs *VideoURLSet     `json:"contentRenderURLs"`
 	Dimensions        *MediaDimensions `json:"dimensions"`
+	FallbackMedia     *FallbackMedia   `json:"fallbackMedia"`
 }
 
 func (VideoMedia) IsMediaSubtype() {}
