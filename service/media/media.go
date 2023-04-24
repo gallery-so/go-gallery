@@ -208,17 +208,21 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	// neither download worked, unexpectedly
 	if (animCh == nil || (animResult.err != nil && len(animResult.cachedObjects) == 0)) && (imgCh == nil || (imgResult.err != nil && len(imgResult.cachedObjects) == 0)) {
-		if invalidMediaErr, ok := animResult.err.(errInvalidMedia); ok {
-			return persist.Media{
-				MediaURL:  persist.NullString(invalidMediaErr.url),
-				MediaType: persist.MediaTypeInvalid,
-			}, util.MultiErr{animResult.err, imgResult.err}
+		if animCh != nil {
+			if invalidMediaErr, ok := animResult.err.(errInvalidMedia); ok {
+				return persist.Media{
+					MediaURL:  persist.NullString(invalidMediaErr.url),
+					MediaType: persist.MediaTypeInvalid,
+				}, util.MultiErr{animResult.err, imgResult.err}
+			}
 		}
-		if invalidMediaErr, ok := imgResult.err.(errInvalidMedia); ok {
-			return persist.Media{
-				MediaURL:  persist.NullString(invalidMediaErr.url),
-				MediaType: persist.MediaTypeInvalid,
-			}, util.MultiErr{animResult.err, imgResult.err}
+		if imgCh != nil {
+			if invalidMediaErr, ok := imgResult.err.(errInvalidMedia); ok {
+				return persist.Media{
+					MediaURL:  persist.NullString(invalidMediaErr.url),
+					MediaType: persist.MediaTypeInvalid,
+				}, util.MultiErr{animResult.err, imgResult.err}
+			}
 		}
 
 		return persist.Media{}, util.MultiErr{animResult.err, imgResult.err}
