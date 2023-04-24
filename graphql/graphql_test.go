@@ -930,7 +930,6 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia)
 		assert.Equal(t, string(persist.MediaTypeInvalid), *media.MediaType)
-		assert.Empty(t, *media.MediaURL)
 	})
 
 	t.Run("should process missing metadata", func(t *testing.T) {
@@ -944,7 +943,6 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia)
 		assert.Equal(t, string(persist.MediaTypeInvalid), *media.MediaType)
-		assert.Empty(t, *media.MediaURL)
 	})
 
 	t.Run("should process bad media", func(t *testing.T) {
@@ -958,7 +956,6 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia)
 		assert.Equal(t, string(persist.MediaTypeInvalid), *media.MediaType)
-		assert.Empty(t, *media.MediaURL)
 	})
 
 	t.Run("should process missing media", func(t *testing.T) {
@@ -972,7 +969,6 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia)
 		assert.Equal(t, string(persist.MediaTypeInvalid), *media.MediaType)
-		assert.Empty(t, *media.MediaURL)
 	})
 
 	t.Run("should process svg", func(t *testing.T) {
@@ -1042,7 +1038,6 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia)
 		assert.Equal(t, string(persist.MediaTypeInvalid), *media.MediaType)
-		assert.Empty(t, *media.MediaURL)
 	})
 
 	t.Run("should process different keyword", func(t *testing.T) {

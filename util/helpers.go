@@ -45,7 +45,9 @@ type MultiErr []error
 func (m MultiErr) Error() string {
 	var errStr string
 	for _, err := range m {
-		errStr += "(" + err.Error() + "),"
+		if err != nil {
+			errStr += "(" + err.Error() + "),"
+		}
 	}
 	return fmt.Sprint("Multiple errors: [", errStr, "]")
 }

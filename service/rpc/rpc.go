@@ -397,6 +397,12 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		}
 		resp, err := defaultHTTPClient.Do(req)
 		if err != nil {
+			if dnsErr, ok := err.(*net.DNSError); ok {
+				return nil, dnsErr
+			}
+			if urlErr, ok := err.(*url.Error); ok {
+				return nil, urlErr
+			}
 			return nil, fmt.Errorf("error getting data from http: %s", err)
 		}
 		defer resp.Body.Close()
@@ -531,7 +537,13 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 		}
 		resp, err := defaultHTTPClient.Do(req)
 		if err != nil {
-			return nil, fmt.Errorf("error getting data from http: %s", err)
+			if dnsErr, ok := err.(*net.DNSError); ok {
+				return nil, dnsErr
+			}
+			if urlErr, ok := err.(*url.Error); ok {
+				return nil, urlErr
+			}
+			return nil, fmt.Errorf("error getting data from http: %s <%T>", err, err)
 		}
 		if resp.StatusCode > 399 || resp.StatusCode < 200 {
 			return nil, ErrHTTP{Status: resp.StatusCode, URL: asString}

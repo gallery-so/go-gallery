@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"strconv"
@@ -908,16 +909,16 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 		// the reader is and always will be invalid
 		switch caught := err.(type) {
 		case rpc.ErrHTTP:
-			if caught.Status == http.StatusNotFound {
+			if caught.Status == http.StatusNotFound || caught.Status == http.StatusInternalServerError {
 				return nil, errInvalidMedia{url: mediaURL, err: err}
 			}
-		case *net.DNSError:
+		case *net.DNSError, *url.Error:
 			return nil, errInvalidMedia{url: mediaURL, err: err}
 		}
 
 		// if we're not already recursive, try opensea for ethereum tokens
 		if !isRecursive && tids.Chain == persist.ChainETH {
-			logger.For(pCtx).Infof("failed to get data from uri '%s' for '%s', trying opensea", mediaURL, tids)
+			logger.For(pCtx).Infof("failed to get data from uri '%s' for '%s' because of (err: %s <%T>), trying opensea", mediaURL, tids, err, err)
 			// if token is ETH, backup to asking opensea
 			assets, err := opensea.FetchAssetsForTokenIdentifiers(pCtx, persist.EthereumAddress(tids.ContractAddress), opensea.TokenID(tids.TokenID.Base10String()))
 			if err != nil || len(assets) == 0 {
@@ -993,7 +994,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 
 	result := []cachedMediaObject{obj}
 	if mediaType == persist.MediaTypeVideo {
-		videoURL := fmt.Sprintf("https://storage.googleapis.com/%s/%s", bucket, obj.fileName())
+		videoURL := obj.storageURL(bucket)
 		thumbObj, err := thumbnailAndCache(pCtx, tids, videoURL, bucket, storageClient)
 		if err != nil {
 			logger.For(pCtx).Errorf("could not create thumbnail for %s: %s", tids, err)
