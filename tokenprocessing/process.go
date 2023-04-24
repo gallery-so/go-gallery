@@ -242,3 +242,8 @@ func processOwnersForContractTokens(mc *multichain.Provider, contractRepo *postg
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
+
+func detectSpam() gin.HandlerFunc {
+	return func(c *gin.Context) {
+	}
+}

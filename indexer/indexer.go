@@ -996,13 +996,6 @@ func fillContractFields(ctx context.Context, contracts []persist.Contract, queri
 
 			contract.CreatorAddress = c.ContractDeployer
 
-			isSpam, err := isContractSpam(ctx, *httpClient, c.Address)
-			if err != nil {
-				log.WithError(err).Error("failed to check if contract is spam")
-			}
-
-			contract.IsProviderMarkedSpam = isSpam
-
 			it, ok := contractOwnerStats.LoadOrStore(method, 1)
 			if ok {
 				total := it.(int)

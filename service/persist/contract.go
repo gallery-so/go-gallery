@@ -21,8 +21,7 @@ type Contract struct {
 	OwnerAddress   EthereumAddress `json:"owner_address"`
 	CreatorAddress EthereumAddress `json:"creator_address"`
 
-	LatestBlock          BlockNumber `json:"latest_block"`
-	IsProviderMarkedSpam bool        `json:"is_provider_marked_spam"`
+	LatestBlock BlockNumber `json:"latest_block"`
 }
 
 // ContractUpdateInput is the input for updating contract metadata fields

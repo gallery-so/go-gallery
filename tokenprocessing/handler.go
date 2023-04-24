@@ -17,5 +17,7 @@ func handlersInitServer(router *gin.Engine, mc *multichain.Provider, repos *post
 	mediaGroup.POST("/process/token", processMediaForToken(mc, repos.TokenRepository, repos.ContractRepository, repos.UserRepository, repos.WalletRepository, ethClient, ipfsClient, arweaveClient, stg, tokenBucket, throttler))
 	ownersGroup := router.Group("/owners")
 	ownersGroup.POST("/process/contract", processOwnersForContractTokens(mc, repos.ContractRepository, throttler))
+	contractsGroup := router.Group("/contracts")
+	contractsGroup.POST("detect-spam", detectSpam())
 	return router
 }
