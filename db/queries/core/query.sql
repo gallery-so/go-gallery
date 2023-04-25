@@ -1012,7 +1012,8 @@ update users set wallets = array_append(wallets, @wallet_id::varchar) where id =
 -- name: InsertSpamContracts :exec
 with insert_spam_contracts as (
     insert into alchemy_spam_contracts (id, chain, address, created_at, is_spam) (
-        select unnest(@id::varchar[]) , unnest(@chain::int[])
+        select unnest(@id::varchar[])
+        , unnest(@chain::int[])
         , unnest(@address::varchar[])
         , unnest(@created_at::timestamptz[])
         , unnest(@is_spam::bool[])

@@ -71,9 +71,9 @@ func (c *ContractRepository) BulkUpsert(pCtx context.Context, pContracts []persi
 	}
 	pContracts = removeDuplicateContracts(pContracts)
 	sqlStr := `INSERT INTO contracts (ID,VERSION,ADDRESS,SYMBOL,NAME,LATEST_BLOCK,OWNER_ADDRESS,CREATOR_ADDRESS) VALUES `
-	vals := make([]interface{}, 0, len(pContracts)*9)
+	vals := make([]interface{}, 0, len(pContracts)*8)
 	for i, contract := range pContracts {
-		sqlStr += generateValuesPlaceholders(9, i*9, nil)
+		sqlStr += generateValuesPlaceholders(8, i*8, nil)
 		vals = append(vals, persist.GenerateID(), contract.Version, contract.Address, contract.Symbol, contract.Name, contract.LatestBlock, contract.OwnerAddress, contract.CreatorAddress)
 		sqlStr += ","
 	}

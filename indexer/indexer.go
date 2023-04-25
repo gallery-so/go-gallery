@@ -957,7 +957,6 @@ func fillContractFields(ctx context.Context, contracts []persist.Contract, queri
 			logger.For(ctx).WithError(err).Error("Failed to execute contract metadata request")
 			continue
 		}
-		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
 			bodyAsBytes, _ := ioutil.ReadAll(resp.Body)
@@ -977,12 +976,12 @@ func fillContractFields(ctx context.Context, contracts []persist.Contract, queri
 			contract.Name = persist.NullString(c.Metadata.Name)
 			contract.Symbol = persist.NullString(c.Metadata.Symbol)
 
-			log := logger.For(ctx).WithFields(logrus.Fields{"contractAddress": c.Address})
-
 			var method = contractOwnerMethodAlchemy
 			cOwner, err := rpc.GetContractOwner(ctx, c.Address, ethClient)
 			if err != nil {
-				log.WithError(err).Error("error getting contract owner")
+				logger.For(ctx).WithError(err).WithFields(logrus.Fields{
+					"contractAddress": c.Address,
+				}).Error("error getting contract owner")
 				contract.OwnerAddress = c.ContractDeployer
 			} else {
 				contract.OwnerAddress = cOwner
