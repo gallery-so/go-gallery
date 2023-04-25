@@ -30,13 +30,13 @@ func NewContractGalleryRepository(db *sql.DB, queries *db.Queries) *ContractGall
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
-	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,SYMBOL,NAME,OWNER_ADDRESS,CHAIN FROM contracts WHERE ID = $1;`)
+	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,SYMBOL,NAME,OWNER_ADDRESS,CHAIN,IS_PROVIDER_MARKED_SPAM FROM contracts WHERE ID = $1;`)
 	checkNoErr(err)
 
-	getByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,SYMBOL,NAME,OWNER_ADDRESS,CHAIN FROM contracts WHERE ADDRESS = $1 AND CHAIN = $2 AND DELETED = false;`)
+	getByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,SYMBOL,NAME,OWNER_ADDRESS,CHAIN,IS_PROVIDER_MARKED_SPAM FROM contracts WHERE ADDRESS = $1 AND CHAIN = $2 AND DELETED = false;`)
 	checkNoErr(err)
 
-	getByAddressesStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,SYMBOL,NAME,OWNER_ADDRESS,CHAIN FROM contracts WHERE ADDRESS = ANY($1) AND CHAIN = $2 AND DELETED = false;`)
+	getByAddressesStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,SYMBOL,NAME,OWNER_ADDRESS,CHAIN,IS_PROVIDER_MARKED_SPAM FROM contracts WHERE ADDRESS = ANY($1) AND CHAIN = $2 AND DELETED = false;`)
 	checkNoErr(err)
 
 	upsertByAddressStmt, err := db.PrepareContext(ctx, `INSERT INTO contracts (ID,VERSION,ADDRESS,SYMBOL,NAME,OWNER_ADDRESS,CHAIN) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (ADDRESS,CHAIN) DO UPDATE SET VERSION = $2, ADDRESS = $3, SYMBOL = $4, OWNER_ADDRESS = $6, CHAIN = $7;`)
@@ -126,11 +126,11 @@ func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, pContracts 
 	vals := make([]interface{}, 0, len(pContracts)*8)
 	for i, contract := range pContracts {
 		sqlStr += generateValuesPlaceholders(8, i*8, nil)
-		vals = append(vals, persist.GenerateID(), contract.Version, contract.Address, contract.Symbol, contract.Name, contract.OwnerAddress, contract.Chain, contract.IsProviderMarkedSpam)
+		vals = append(vals, persist.GenerateID(), contract.Version, contract.Address, contract.Symbol, contract.Name, contract.OwnerAddress, contract.Chain)
 		sqlStr += ","
 	}
 	sqlStr = sqlStr[:len(sqlStr)-1]
-	sqlStr += ` ON CONFLICT (ADDRESS, CHAIN) DO UPDATE SET SYMBOL = EXCLUDED.SYMBOL,NAME = EXCLUDED.NAME,OWNER_ADDRESS = EXCLUDED.OWNER_ADDRESS,CHAIN = EXCLUDED.CHAIN, IS_PROVIDER_MARKED_SPAM = EXCLUDED.IS_PROVIDER_MARKED_SPAM;`
+	sqlStr += ` ON CONFLICT (ADDRESS, CHAIN) DO UPDATE SET SYMBOL = EXCLUDED.SYMBOL,NAME = EXCLUDED.NAME,OWNER_ADDRESS = EXCLUDED.OWNER_ADDRESS,CHAIN = EXCLUDED.CHAIN,IS_PROVIDER_MARKED_SPAM = EXCLUDED.IS_PROVIDER_MARKED_SPAM;`
 	_, err := c.db.ExecContext(pCtx, sqlStr, vals...)
 	if err != nil {
 		return fmt.Errorf("error bulk upserting contracts: %v - SQL: %s -- VALS: %+v", err, sqlStr, vals)

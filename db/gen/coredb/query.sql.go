@@ -3756,6 +3756,38 @@ func (q *Queries) HasLaterGroupedEvent(ctx context.Context, arg HasLaterGroupedE
 	return exists, err
 }
 
+const insertSpamContracts = `-- name: InsertSpamContracts :exec
+with insert_spam_contracts as (
+    insert into alchemy_spam_contracts (id, chain, address, created_at, is_spam) (
+        select unnest($1::varchar[]) , unnest($2::int[])
+        , unnest($3::varchar[])
+        , unnest($4::timestamptz[])
+        , unnest($5::bool[])
+    ) on conflict(chain, address) do update set created_at = excluded.created_at, is_spam = excluded.is_spam
+    returning created_at
+)
+delete from alchemy_spam_contracts where created_at < (select created_at from insert_spam_contracts limit 1)
+`
+
+type InsertSpamContractsParams struct {
+	ID        []string
+	Chain     []int32
+	Address   []string
+	CreatedAt []time.Time
+	IsSpam    []bool
+}
+
+func (q *Queries) InsertSpamContracts(ctx context.Context, arg InsertSpamContractsParams) error {
+	_, err := q.db.Exec(ctx, insertSpamContracts,
+		arg.ID,
+		arg.Chain,
+		arg.Address,
+		arg.CreatedAt,
+		arg.IsSpam,
+	)
+	return err
+}
+
 const insertUser = `-- name: InsertUser :exec
 insert into users (id, username, username_idempotent, bio, wallets, universal, email_unsubscriptions, primary_wallet_id) values ($1, $2, $3, $4, $5, $6, $7, $8) returning id
 `

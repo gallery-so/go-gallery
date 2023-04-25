@@ -9,7 +9,6 @@ import (
 	"io/ioutil"
 	"math/big"
 	"net/http"
-	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -1037,42 +1036,6 @@ func fillContractFields(ctx context.Context, contracts []persist.Contract, queri
 
 	logger.For(ctx).Infof("Fetched metadata for total %d contracts", len(contracts))
 
-}
-
-// isContractSpam returns true if the contract is spam via an API call to Alchemy
-func isContractSpam(ctx context.Context, httpClient http.Client, address persist.EthereumAddress) (bool, error) {
-	baseURL, err := url.Parse(env.GetString("ALCHEMY_API_URL"))
-	if err != nil {
-		return false, err
-	}
-
-	spamEndpoint := baseURL.JoinPath("isSpamContract")
-	query := spamEndpoint.Query()
-	query.Add("contractAddress", address.String())
-	spamEndpoint.RawQuery = query.Encode()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, spamEndpoint.String(), nil)
-	if err != nil {
-		return false, err
-	}
-
-	req.Header.Add("accept", "application/json")
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return false, err
-	}
-
-	defer resp.Body.Close()
-
-	var isSpam bool
-
-	err = json.NewDecoder(resp.Body).Decode(&isSpam)
-	if err != nil {
-		return false, err
-	}
-
-	return isSpam, nil
 }
 
 // HELPER FUNCS ---------------------------------------------------------------

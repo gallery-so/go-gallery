@@ -18,6 +18,6 @@ func handlersInitServer(router *gin.Engine, mc *multichain.Provider, repos *post
 	ownersGroup := router.Group("/owners")
 	ownersGroup.POST("/process/contract", processOwnersForContractTokens(mc, repos.ContractRepository, throttler))
 	contractsGroup := router.Group("/contracts")
-	contractsGroup.POST("detect-spam", detectSpam())
+	contractsGroup.POST("/detect-spam", detectSpamContracts(mc.Queries))
 	return router
 }

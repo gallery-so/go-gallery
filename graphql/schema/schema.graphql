@@ -468,6 +468,7 @@ type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) @g
 
   lastUpdated: Time
 
+  contract: Contract
   contractAddress: ChainAddress
   creatorAddress: ChainAddress
   chain: Chain
@@ -508,6 +509,7 @@ type Contract implements Node {
   profileImageURL: String
   profileBannerURL: String
   badgeURL: String
+  isSpam: Boolean
 }
 
 # We have this extra type in case we need to stick authed data

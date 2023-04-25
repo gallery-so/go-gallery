@@ -571,6 +571,7 @@ type Community struct {
 	HelperCommunityData
 	Dbid              persist.DBID            `json:"dbid"`
 	LastUpdated       *time.Time              `json:"lastUpdated"`
+	Contract          *Contract               `json:"contract"`
 	ContractAddress   *persist.ChainAddress   `json:"contractAddress"`
 	CreatorAddress    *persist.ChainAddress   `json:"creatorAddress"`
 	Chain             *persist.Chain          `json:"chain"`
@@ -612,6 +613,7 @@ type Contract struct {
 	ProfileImageURL  *string               `json:"profileImageURL"`
 	ProfileBannerURL *string               `json:"profileBannerURL"`
 	BadgeURL         *string               `json:"badgeURL"`
+	IsSpam           *bool                 `json:"isSpam"`
 }
 
 func (Contract) IsNode() {}

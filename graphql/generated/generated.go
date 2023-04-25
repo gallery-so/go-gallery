@@ -253,6 +253,7 @@ type ComplexityRoot struct {
 	Community struct {
 		BadgeURL          func(childComplexity int) int
 		Chain             func(childComplexity int) int
+		Contract          func(childComplexity int) int
 		ContractAddress   func(childComplexity int) int
 		CreatorAddress    func(childComplexity int) int
 		Dbid              func(childComplexity int) int
@@ -287,6 +288,7 @@ type ComplexityRoot struct {
 		CreatorAddress   func(childComplexity int) int
 		Dbid             func(childComplexity int) int
 		ID               func(childComplexity int) int
+		IsSpam           func(childComplexity int) int
 		LastUpdated      func(childComplexity int) int
 		Name             func(childComplexity int) int
 		ProfileBannerURL func(childComplexity int) int
@@ -2136,6 +2138,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Community.Chain(childComplexity), true
 
+	case "Community.contract":
+		if e.complexity.Community.Contract == nil {
+			break
+		}
+
+		return e.complexity.Community.Contract(childComplexity), true
+
 	case "Community.contractAddress":
 		if e.complexity.Community.ContractAddress == nil {
 			break
@@ -2299,6 +2308,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Contract.ID(childComplexity), true
+
+	case "Contract.isSpam":
+		if e.complexity.Contract.IsSpam == nil {
+			break
+		}
+
+		return e.complexity.Contract.IsSpam(childComplexity), true
 
 	case "Contract.lastUpdated":
 		if e.complexity.Contract.LastUpdated == nil {
@@ -6930,6 +6946,7 @@ type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) @g
 
   lastUpdated: Time
 
+  contract: Contract
   contractAddress: ChainAddress
   creatorAddress: ChainAddress
   chain: Chain
@@ -6970,6 +6987,7 @@ type Contract implements Node {
   profileImageURL: String
   profileBannerURL: String
   badgeURL: String
+  isSpam: Boolean
 }
 
 # We have this extra type in case we need to stick authed data
@@ -12019,6 +12037,8 @@ func (ec *executionContext) fieldContext_Badge_contract(ctx context.Context, fie
 				return ec.fieldContext_Contract_profileBannerURL(ctx, field)
 			case "badgeURL":
 				return ec.fieldContext_Contract_badgeURL(ctx, field)
+			case "isSpam":
+				return ec.fieldContext_Contract_isSpam(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Contract", field.Name)
 		},
@@ -15315,6 +15335,71 @@ func (ec *executionContext) fieldContext_Community_lastUpdated(ctx context.Conte
 	return fc, nil
 }
 
+func (ec *executionContext) _Community_contract(ctx context.Context, field graphql.CollectedField, obj *model.Community) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Community_contract(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Contract, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Contract)
+	fc.Result = res
+	return ec.marshalOContract2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐContract(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Community_contract(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Community",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Contract_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Contract_dbid(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Contract_lastUpdated(ctx, field)
+			case "contractAddress":
+				return ec.fieldContext_Contract_contractAddress(ctx, field)
+			case "creatorAddress":
+				return ec.fieldContext_Contract_creatorAddress(ctx, field)
+			case "chain":
+				return ec.fieldContext_Contract_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Contract_name(ctx, field)
+			case "profileImageURL":
+				return ec.fieldContext_Contract_profileImageURL(ctx, field)
+			case "profileBannerURL":
+				return ec.fieldContext_Contract_profileBannerURL(ctx, field)
+			case "badgeURL":
+				return ec.fieldContext_Contract_badgeURL(ctx, field)
+			case "isSpam":
+				return ec.fieldContext_Contract_isSpam(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Contract", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Community_contractAddress(ctx context.Context, field graphql.CollectedField, obj *model.Community) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Community_contractAddress(ctx, field)
 	if err != nil {
@@ -15854,6 +15939,8 @@ func (ec *executionContext) fieldContext_CommunityEdge_node(ctx context.Context,
 				return ec.fieldContext_Community_id(ctx, field)
 			case "lastUpdated":
 				return ec.fieldContext_Community_lastUpdated(ctx, field)
+			case "contract":
+				return ec.fieldContext_Community_contract(ctx, field)
 			case "contractAddress":
 				return ec.fieldContext_Community_contractAddress(ctx, field)
 			case "creatorAddress":
@@ -15966,6 +16053,8 @@ func (ec *executionContext) fieldContext_CommunitySearchResult_community(ctx con
 				return ec.fieldContext_Community_id(ctx, field)
 			case "lastUpdated":
 				return ec.fieldContext_Community_lastUpdated(ctx, field)
+			case "contract":
+				return ec.fieldContext_Community_contract(ctx, field)
 			case "contractAddress":
 				return ec.fieldContext_Community_contractAddress(ctx, field)
 			case "creatorAddress":
@@ -16481,6 +16570,47 @@ func (ec *executionContext) fieldContext_Contract_badgeURL(ctx context.Context, 
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Contract_isSpam(ctx context.Context, field graphql.CollectedField, obj *model.Contract) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Contract_isSpam(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.IsSpam, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Contract_isSpam(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Contract",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
 		},
 	}
 	return fc, nil
@@ -32633,6 +32763,8 @@ func (ec *executionContext) fieldContext_RefreshContractPayload_contract(ctx con
 				return ec.fieldContext_Contract_profileBannerURL(ctx, field)
 			case "badgeURL":
 				return ec.fieldContext_Contract_badgeURL(ctx, field)
+			case "isSpam":
+				return ec.fieldContext_Contract_isSpam(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Contract", field.Name)
 		},
@@ -37323,6 +37455,8 @@ func (ec *executionContext) fieldContext_Token_contract(ctx context.Context, fie
 				return ec.fieldContext_Contract_profileBannerURL(ctx, field)
 			case "badgeURL":
 				return ec.fieldContext_Contract_badgeURL(ctx, field)
+			case "isSpam":
+				return ec.fieldContext_Contract_isSpam(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Contract", field.Name)
 		},
@@ -51029,6 +51163,10 @@ func (ec *executionContext) _Community(ctx context.Context, sel ast.SelectionSet
 
 			out.Values[i] = ec._Community_lastUpdated(ctx, field, obj)
 
+		case "contract":
+
+			out.Values[i] = ec._Community_contract(ctx, field, obj)
+
 		case "contractAddress":
 
 			out.Values[i] = ec._Community_contractAddress(ctx, field, obj)
@@ -51244,6 +51382,10 @@ func (ec *executionContext) _Contract(ctx context.Context, sel ast.SelectionSet,
 		case "badgeURL":
 
 			out.Values[i] = ec._Contract_badgeURL(ctx, field, obj)
+
+		case "isSpam":
+
+			out.Values[i] = ec._Contract_isSpam(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))

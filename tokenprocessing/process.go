@@ -2,11 +2,14 @@ package tokenprocessing
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/ethereum/go-ethereum/ethclient"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/sourcegraph/conc/pool"
 
@@ -14,6 +17,7 @@ import (
 	"github.com/everFinance/goar"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain"
@@ -22,6 +26,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/util/retry"
 	"github.com/sirupsen/logrus"
 )
 
@@ -217,11 +222,13 @@ func processOwnersForContractTokens(mc *multichain.Provider, contractRepo *postg
 			util.ErrResponse(c, http.StatusOK, err)
 			return
 		}
+
 		contract, err := contractRepo.GetByID(c, input.ContractID)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
+
 		key := fmt.Sprintf("%s-%d", contract.Address, contract.Chain)
 
 		if !input.ForceRefresh {
@@ -233,7 +240,7 @@ func processOwnersForContractTokens(mc *multichain.Provider, contractRepo *postg
 
 		// do not unlock, let expiry handle the unlock
 		logger.For(c).Infof("Processing: %s - Processing Collection Refresh", key)
-		if err := mc.RefreshTokensForContract(c, contract.ContractIdentifiers()); err != nil {
+		if err := mc.RefreshTokensForContract(c, persist.NewContractIdentifiers(contract.Address, contract.Chain)); err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
@@ -243,7 +250,68 @@ func processOwnersForContractTokens(mc *multichain.Provider, contractRepo *postg
 	}
 }
 
-func detectSpam() gin.HandlerFunc {
+func detectSpamContracts(queries *db.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		alchemyURL, err := url.Parse(env.GetString("ALCHEMY_NFT_API_URL"))
+		if err != nil {
+			panic(err)
+		}
+
+		spamEndpoint := alchemyURL.JoinPath("getSpamContracts")
+
+		req, err := http.NewRequestWithContext(c, http.MethodGet, spamEndpoint.String(), nil)
+		if err != nil {
+			util.ErrResponse(c, http.StatusOK, err)
+			return
+		}
+
+		req.Header.Add("accept", "application/json")
+
+		resp, err := retry.RetryRequest(http.DefaultClient, req)
+		if err != nil {
+			util.ErrResponse(c, http.StatusOK, err)
+			return
+		}
+
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			util.ErrResponse(c, http.StatusInternalServerError, util.BodyAsError(resp))
+			return
+		}
+
+		body := struct {
+			Contracts []persist.Address `json:"contractAddresses"`
+		}{}
+
+		err = json.NewDecoder(resp.Body).Decode(&body)
+		if err != nil {
+			util.ErrResponse(c, http.StatusOK, err)
+			return
+		}
+
+		params := db.InsertSpamContractsParams{}
+
+		now := time.Now()
+
+		for _, contract := range body.Contracts {
+			params.ID = append(params.ID, persist.GenerateID().String())
+			params.Chain = append(params.Chain, int32(persist.ChainETH))
+			params.Address = append(params.Address, persist.ChainETH.NormalizeAddress(contract))
+			params.CreatedAt = append(params.CreatedAt, now)
+			params.IsSpam = append(params.IsSpam, true)
+		}
+
+		if len(params.Address) == 0 {
+			panic("no spam contracts found")
+		}
+
+		err = queries.InsertSpamContracts(c, params)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }

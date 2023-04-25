@@ -22,6 +22,14 @@ type Admire struct {
 	LastUpdated time.Time
 }
 
+type AlchemySpamContract struct {
+	ID        persist.DBID
+	Chain     persist.Chain
+	Address   persist.Address
+	CreatedAt time.Time
+	IsSpam    bool
+}
+
 type Collection struct {
 	ID             persist.DBID
 	Deleted        bool

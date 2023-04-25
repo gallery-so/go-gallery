@@ -1008,3 +1008,15 @@ insert into users (id, username, username_idempotent, bio, wallets, universal, e
 
 -- name: AddWalletToUserByID :exec
 update users set wallets = array_append(wallets, @wallet_id::varchar) where id = @user_id;
+
+-- name: InsertSpamContracts :exec
+with insert_spam_contracts as (
+    insert into alchemy_spam_contracts (id, chain, address, created_at, is_spam) (
+        select unnest(@id::varchar[]) , unnest(@chain::int[])
+        , unnest(@address::varchar[])
+        , unnest(@created_at::timestamptz[])
+        , unnest(@is_spam::bool[])
+    ) on conflict(chain, address) do update set created_at = excluded.created_at, is_spam = excluded.is_spam
+    returning created_at
+)
+delete from alchemy_spam_contracts where created_at < (select created_at from insert_spam_contracts limit 1);
