@@ -65,27 +65,29 @@ $(PROMOTE)-$(PROD)-%              : ENV                    := $(PROD)
 $(PROMOTE)-$(PROD)-%              : REQUIRED_SOPS_SECRETS  := $(SOPS_PROD_SECRETS)
 
 # Service files, add a line for each service and environment you want to deploy.
-$(DEPLOY)-$(DEV)-backend          : SERVICE_FILE := backend-env.yaml
-$(DEPLOY)-$(DEV)-indexer          : SERVICE_FILE := app-dev-indexer.yaml
-$(DEPLOY)-$(DEV)-indexer-server   : SERVICE_FILE := indexer-server-env.yaml
-$(DEPLOY)-$(DEV)-admin            : SERVICE_FILE := app-dev-admin.yaml
-$(DEPLOY)-$(DEV)-feed             : SERVICE_FILE := feed-env.yaml
-$(DEPLOY)-$(DEV)-tokenprocessing  : SERVICE_FILE := tokenprocessing-env.yaml
-$(DEPLOY)-$(DEV)-emails           : SERVICE_FILE := emails-server-env.yaml
-$(DEPLOY)-$(DEV)-feedbot          : SERVICE_FILE := feedbot-env.yaml
-$(DEPLOY)-$(DEV)-routing-rules    : SERVICE_FILE := dispatch.yaml
-$(DEPLOY)-$(SANDBOX)-backend      : SERVICE_FILE := backend-sandbox-env.yaml
-$(DEPLOY)-$(PROD)-backend         : SERVICE_FILE := backend-env.yaml
-$(DEPLOY)-$(PROD)-indexer         : SERVICE_FILE := app-prod-indexer.yaml
-$(DEPLOY)-$(PROD)-indexer-server  : SERVICE_FILE := indexer-server-env.yaml
-$(DEPLOY)-$(PROD)-admin           : SERVICE_FILE := app-prod-admin.yaml
-$(DEPLOY)-$(PROD)-feed            : SERVICE_FILE := feed-env.yaml
-$(DEPLOY)-$(PROD)-feedbot         : SERVICE_FILE := feedbot-env.yaml
-$(DEPLOY)-$(PROD)-tokenprocessing : SERVICE_FILE := tokenprocessing-env.yaml
-$(DEPLOY)-$(PROD)-dummymetadata   : SERVICE_FILE := dummymetadata-env.yaml
-$(DEPLOY)-$(PROD)-emails          : SERVICE_FILE := emails-server-env.yaml
-$(DEPLOY)-$(PROD)-routing-rules   : SERVICE_FILE := dispatch.yaml
-$(DEPLOY)-$(DEV)-graphql-gateway   : SERVICE_FILE := graphql-gateway.yml
+$(DEPLOY)-$(DEV)-backend            : SERVICE_FILE := backend-env.yaml
+$(DEPLOY)-$(DEV)-indexer            : SERVICE_FILE := app-dev-indexer.yaml
+$(DEPLOY)-$(DEV)-indexer-server     : SERVICE_FILE := indexer-server-env.yaml
+$(DEPLOY)-$(DEV)-admin              : SERVICE_FILE := app-dev-admin.yaml
+$(DEPLOY)-$(DEV)-feed               : SERVICE_FILE := feed-env.yaml
+$(DEPLOY)-$(DEV)-tokenprocessing    : SERVICE_FILE := tokenprocessing-env.yaml
+$(DEPLOY)-$(DEV)-emails             : SERVICE_FILE := emails-server-env.yaml
+$(DEPLOY)-$(DEV)-feedbot            : SERVICE_FILE := feedbot-env.yaml
+$(DEPLOY)-$(DEV)-pushnotifications  : SERVICE_FILE := pushnotifications-env.yaml
+$(DEPLOY)-$(DEV)-routing-rules      : SERVICE_FILE := dispatch.yaml
+$(DEPLOY)-$(SANDBOX)-backend        : SERVICE_FILE := backend-sandbox-env.yaml
+$(DEPLOY)-$(PROD)-backend           : SERVICE_FILE := backend-env.yaml
+$(DEPLOY)-$(PROD)-indexer           : SERVICE_FILE := app-prod-indexer.yaml
+$(DEPLOY)-$(PROD)-indexer-server    : SERVICE_FILE := indexer-server-env.yaml
+$(DEPLOY)-$(PROD)-admin             : SERVICE_FILE := app-prod-admin.yaml
+$(DEPLOY)-$(PROD)-feed              : SERVICE_FILE := feed-env.yaml
+$(DEPLOY)-$(PROD)-feedbot           : SERVICE_FILE := feedbot-env.yaml
+$(DEPLOY)-$(PROD)-tokenprocessing   : SERVICE_FILE := tokenprocessing-env.yaml
+$(DEPLOY)-$(PROD)-dummymetadata     : SERVICE_FILE := dummymetadata-env.yaml
+$(DEPLOY)-$(PROD)-emails            : SERVICE_FILE := emails-server-env.yaml
+$(DEPLOY)-$(PROD)-pushnotifications : SERVICE_FILE := pushnotifications-env.yaml
+$(DEPLOY)-$(PROD)-routing-rules     : SERVICE_FILE := dispatch.yaml
+$(DEPLOY)-$(DEV)-graphql-gateway    : SERVICE_FILE := graphql-gateway.yml
 $(DEPLOY)-$(PROD)-graphql-gateway   : SERVICE_FILE := graphql-gateway.yml
 
 # Service to Sentry project mapping
@@ -97,6 +99,7 @@ $(DEPLOY)-%-dummymetadata         : SENTRY_PROJECT := dummymetadata
 $(DEPLOY)-%-feed                  : SENTRY_PROJECT := feed
 $(DEPLOY)-%-feedbot               : SENTRY_PROJECT := feedbot
 $(DEPLOY)-%-emails                : SENTRY_PROJECT := emails
+$(DEPLOY)-%-pushnotifications     : SENTRY_PROJECT := pushnotifications
 
 # Docker builds
 $(DEPLOY)-%-tokenprocessing            : REPO           := tokenprocessing
@@ -164,16 +167,25 @@ $(DEPLOY)-%-feedbot                    : MEMORY         := $(FEEDBOT_MEMORY)
 $(DEPLOY)-%-feedbot                    : CONCURRENCY    := $(FEEDBOT_CONCURRENCY)
 $(DEPLOY)-$(DEV)-feedbot               : SERVICE        := feedbot-dev
 $(DEPLOY)-$(PROD)-feedbot              : SERVICE        := feedbot
-$(DEPLOY)-%-graphql-gateway                    : REPO           := graphql-gateway
-$(DEPLOY)-$(DEV)-graphql-gateway               : DOCKER_FILE    := $(DOCKER_DIR)/graphql-gateway/$(DEV)/Dockerfile
-$(DEPLOY)-$(PROD)-graphql-gateway              : DOCKER_FILE    := $(DOCKER_DIR)/graphql-gateway/$(PROD)/Dockerfile
-$(DEPLOY)-%-graphql-gateway                    : PORT           := 8000
-$(DEPLOY)-%-graphql-gateway                    : TIMEOUT        := $(GRAPHQL_GATEWAY_TIMEOUT)
-$(DEPLOY)-%-graphql-gateway                    : CPU            := $(GRAPHQL_GATEWAY_CPU)
-$(DEPLOY)-%-graphql-gateway                    : MEMORY         := $(GRAPHQL_GATEWAY_MEMORY)
-$(DEPLOY)-%-graphql-gateway                    : CONCURRENCY    := $(GRAPHQL_GATEWAY_CONCURRENCY)
-$(DEPLOY)-$(DEV)-graphql-gateway               : SERVICE        := graphql-gateway-dev
-$(DEPLOY)-$(PROD)-graphql-gateway              : SERVICE        := graphql-gateway
+$(DEPLOY)-%-graphql-gateway            : REPO           := graphql-gateway
+$(DEPLOY)-$(DEV)-graphql-gateway       : DOCKER_FILE    := $(DOCKER_DIR)/graphql-gateway/$(DEV)/Dockerfile
+$(DEPLOY)-$(PROD)-graphql-gateway      : DOCKER_FILE    := $(DOCKER_DIR)/graphql-gateway/$(PROD)/Dockerfile
+$(DEPLOY)-%-graphql-gateway            : PORT           := 8000
+$(DEPLOY)-%-graphql-gateway            : TIMEOUT        := $(GRAPHQL_GATEWAY_TIMEOUT)
+$(DEPLOY)-%-graphql-gateway            : CPU            := $(GRAPHQL_GATEWAY_CPU)
+$(DEPLOY)-%-graphql-gateway            : MEMORY         := $(GRAPHQL_GATEWAY_MEMORY)
+$(DEPLOY)-%-graphql-gateway            : CONCURRENCY    := $(GRAPHQL_GATEWAY_CONCURRENCY)
+$(DEPLOY)-$(DEV)-graphql-gateway       : SERVICE        := graphql-gateway-dev
+$(DEPLOY)-$(PROD)-graphql-gateway      : SERVICE        := graphql-gateway
+$(DEPLOY)-%-pushnotifications          : REPO           := pushnotifications
+$(DEPLOY)-%-pushnotifications          : DOCKER_FILE    := $(DOCKER_DIR)/pushnotifications/Dockerfile
+$(DEPLOY)-%-pushnotifications          : PORT           := 6600
+$(DEPLOY)-%-pushnotifications          : TIMEOUT        := $(PUSHNOTIFICATIONS_TIMEOUT)
+$(DEPLOY)-%-pushnotifications          : CPU            := $(PUSHNOTIFICATIONS_CPU)
+$(DEPLOY)-%-pushnotifications          : MEMORY         := $(PUSHNOTIFICATIONS_MEMORY)
+$(DEPLOY)-%-pushnotifications          : CONCURRENCY    := $(PUSHNOTIFICATIONS_CONCURRENCY)
+$(DEPLOY)-$(DEV)-pushnotifications     : SERVICE        := pushnotifications-dev
+$(DEPLOY)-$(PROD)-pushnotifications    : SERVICE        := pushnotifications
 
 # Service name mappings
 $(PROMOTE)-%-backend                   : SERVICE := default
@@ -184,6 +196,7 @@ $(PROMOTE)-%-tokenprocessing           : SERVICE := tokenprocessing
 $(PROMOTE)-%-dummymetadata             : SERVICE := dummymetadata
 $(PROMOTE)-%-feed                      : SERVICE := feed
 $(PROMOTE)-%-feedbot                   : SERVICE := feedbot
+$(PROMOTE)-%-pushnotifications         : SERVICE := pushnotifications
 $(PROMOTE)-%-admin                     : SERVICE := admin
 
 #----------------------------------------------------------------
@@ -294,47 +307,50 @@ _$(RELEASE)-%:
 	@$(SENTRY_RELEASE) deploys $(DEPLOY_VERSION) new -n $(DEPLOY_VERSION) -e $(ENV)
 
 # DEV deployments
-$(DEPLOY)-$(DEV)-backend          : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend
-$(DEPLOY)-$(DEV)-indexer          : _set-project-$(ENV) _$(DEPLOY)-indexer _$(RELEASE)-indexer
-$(DEPLOY)-$(DEV)-indexer-server   : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer-server _$(RELEASE)-indexer-server
-$(DEPLOY)-$(DEV)-tokenprocessing  : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-tokenprocessing _$(RELEASE)-tokenprocessing
-$(DEPLOY)-$(DEV)-emails           : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-emails _$(RELEASE)-emails
-$(DEPLOY)-$(DEV)-admin            : _set-project-$(ENV) _$(DEPLOY)-admin
-$(DEPLOY)-$(DEV)-feed             : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feed _$(RELEASE)-feed
-$(DEPLOY)-$(DEV)-feedbot          : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feedbot _$(RELEASE)-feedbot
-$(DEPLOY)-$(DEV)-routing-rules    : _set-project-$(ENV) _$(DEPLOY)-routing-rules
+$(DEPLOY)-$(DEV)-backend           : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend
+$(DEPLOY)-$(DEV)-indexer           : _set-project-$(ENV) _$(DEPLOY)-indexer _$(RELEASE)-indexer
+$(DEPLOY)-$(DEV)-indexer-server    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer-server _$(RELEASE)-indexer-server
+$(DEPLOY)-$(DEV)-tokenprocessing   : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-tokenprocessing _$(RELEASE)-tokenprocessing
+$(DEPLOY)-$(DEV)-emails            : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-emails _$(RELEASE)-emails
+$(DEPLOY)-$(DEV)-admin             : _set-project-$(ENV) _$(DEPLOY)-admin
+$(DEPLOY)-$(DEV)-feed              : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feed _$(RELEASE)-feed
+$(DEPLOY)-$(DEV)-feedbot           : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feedbot _$(RELEASE)-feedbot
+$(DEPLOY)-$(DEV)-pushnotifications : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-pushnotifications _$(RELEASE)-pushnotifications
+$(DEPLOY)-$(DEV)-routing-rules     : _set-project-$(ENV) _$(DEPLOY)-routing-rules
 $(DEPLOY)-$(DEV)-graphql-gateway   : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-graphql-gateway
 
 # SANDBOX deployments
 $(DEPLOY)-$(SANDBOX)-backend      : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend # go server that uses dev upstream services
 
 # PROD deployments
-$(DEPLOY)-$(PROD)-backend         : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend
-$(DEPLOY)-$(PROD)-indexer         : _set-project-$(ENV) _$(DEPLOY)-indexer _$(RELEASE)-indexer
-$(DEPLOY)-$(PROD)-indexer-server  : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer-server _$(RELEASE)-indexer-server
-$(DEPLOY)-$(PROD)-tokenprocessing : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-tokenprocessing _$(RELEASE)-tokenprocessing
-$(DEPLOY)-$(PROD)-dummymetadata   : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-dummymetadata _$(RELEASE)-dummymetadata
-$(DEPLOY)-$(PROD)-emails          : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-emails _$(RELEASE)-emails
-$(DEPLOY)-$(PROD)-feed            : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feed _$(RELEASE)-feed
-$(DEPLOY)-$(PROD)-feedbot         : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feedbot _$(RELEASE)-feedbot
-$(DEPLOY)-$(PROD)-admin           : _set-project-$(ENV) _$(DEPLOY)-admin
-$(DEPLOY)-$(PROD)-routing-rules   : _set-project-$(ENV) _$(DEPLOY)-routing-rules
-$(DEPLOY)-$(PROD)-graphql-gateway : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-graphql-gateway
+$(DEPLOY)-$(PROD)-backend           : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend
+$(DEPLOY)-$(PROD)-indexer           : _set-project-$(ENV) _$(DEPLOY)-indexer _$(RELEASE)-indexer
+$(DEPLOY)-$(PROD)-indexer-server    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer-server _$(RELEASE)-indexer-server
+$(DEPLOY)-$(PROD)-tokenprocessing   : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-tokenprocessing _$(RELEASE)-tokenprocessing
+$(DEPLOY)-$(PROD)-dummymetadata     : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-dummymetadata _$(RELEASE)-dummymetadata
+$(DEPLOY)-$(PROD)-emails            : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-emails _$(RELEASE)-emails
+$(DEPLOY)-$(PROD)-feed              : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feed _$(RELEASE)-feed
+$(DEPLOY)-$(PROD)-feedbot           : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feedbot _$(RELEASE)-feedbot
+$(DEPLOY)-$(PROD)-pushnotifications : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-pushnotifications _$(RELEASE)-pushnotifications
+$(DEPLOY)-$(PROD)-admin             : _set-project-$(ENV) _$(DEPLOY)-admin
+$(DEPLOY)-$(PROD)-routing-rules     : _set-project-$(ENV) _$(DEPLOY)-routing-rules
+$(DEPLOY)-$(PROD)-graphql-gateway   : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-graphql-gateway
 
 # PROD promotions. Running these targets will migrate traffic to the specified version.
 # Example usage:
 #
 # $ make promote-prod-backend version=myVersion
 #
-$(PROMOTE)-$(PROD)-backend          : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-backend
-$(PROMOTE)-$(PROD)-indexer          : _set-project-$(ENV) _$(PROMOTE)-indexer _$(STOP)-indexer
-$(PROMOTE)-$(PROD)-indexer-server   : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-indexer-server
-$(PROMOTE)-$(PROD)-tokenprocessing  : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-tokenprocessing
-$(PROMOTE)-$(PROD)-dummymetadata    : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-dummymetadata
-$(PROMOTE)-$(PROD)-emails           : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-emails
-$(PROMOTE)-$(PROD)-feed             : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-feed
-$(PROMOTE)-$(PROD)-feedbot          : _set-project-$(ENV) _$(PROMOTE)-feedbot
-$(PROMOTE)-$(PROD)-admin            : _set-project-$(ENV) _$(PROMOTE)-admin
+$(PROMOTE)-$(PROD)-backend           : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-backend
+$(PROMOTE)-$(PROD)-indexer           : _set-project-$(ENV) _$(PROMOTE)-indexer _$(STOP)-indexer
+$(PROMOTE)-$(PROD)-indexer-server    : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-indexer-server
+$(PROMOTE)-$(PROD)-tokenprocessing   : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-tokenprocessing
+$(PROMOTE)-$(PROD)-dummymetadata     : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-dummymetadata
+$(PROMOTE)-$(PROD)-emails            : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-emails
+$(PROMOTE)-$(PROD)-feed              : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-feed
+$(PROMOTE)-$(PROD)-feedbot           : _set-project-$(ENV) _$(PROMOTE)-feedbot
+$(PROMOTE)-$(PROD)-pushnotifications : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-pushnotifications
+$(PROMOTE)-$(PROD)-admin             : _set-project-$(ENV) _$(PROMOTE)-admin
 
 # Contracts
 contracts: solc abi-gen

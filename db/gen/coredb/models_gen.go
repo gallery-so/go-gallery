@@ -282,7 +282,7 @@ type PiiUserView struct {
 type PushNotificationTicket struct {
 	ID               persist.DBID
 	PushTokenID      persist.DBID
-	TicketID         persist.DBID
+	TicketID         string
 	CreatedAt        time.Time
 	CheckAfter       time.Time
 	NumCheckAttempts int32
