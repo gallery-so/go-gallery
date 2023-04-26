@@ -2,6 +2,8 @@ package tokenprocessing
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"time"
@@ -13,7 +15,9 @@ import (
 	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain"
+	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/redis"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/throttle"
@@ -22,6 +26,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
+
+const sentryTokenContextName = "NFT context" // Sentry excludes contexts that contain "token" so we use "NFT" instead
 
 // InitServer initializes the mediaprocessing server
 func InitServer() {
@@ -115,8 +121,8 @@ func initSentry() {
 		AttachStacktrace: true,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			event = auth.ScrubEventCookies(event, hint)
-			event = sentryutil.UpdateErrorFingerprints(event, hint)
-			event = sentryutil.UpdateLogErrorEvent(event, hint)
+			event = updateMediaProccessingFingerprints(event, hint)
+			event = excludeTokenSpam(event, hint)
 			return event
 		},
 	})
@@ -124,4 +130,99 @@ func initSentry() {
 	if err != nil {
 		logger.For(nil).Fatalf("failed to start sentry: %s", err)
 	}
+}
+
+// reportTokenError reports an error that occurred while processing a token.
+func reportTokenError(ctx context.Context, err error, runID persist.DBID, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID, isSpam bool) {
+	sentryutil.ReportError(ctx, err, func(scope *sentry.Scope) {
+		setRunTags(scope, runID)
+		setTokenTags(scope, chain, contractAddress, tokenID)
+		setTokenContext(scope, chain, contractAddress, tokenID, isSpam)
+	})
+}
+
+func setTokenTags(scope *sentry.Scope, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) {
+	scope.SetTag("chain", fmt.Sprintf("%d", chain))
+	scope.SetTag("contractAddress", contractAddress.String())
+	scope.SetTag("nftID", string(tokenID))
+	assetPage := assetURL(chain, contractAddress, tokenID)
+	if len(assetPage) > 200 {
+		assetPage = "assetURL too long, see token context"
+	}
+	scope.SetTag("assetURL", assetPage)
+}
+
+func assetURL(chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) string {
+	switch chain {
+	case persist.ChainETH:
+		return fmt.Sprintf("https://opensea.io/assets/%s/%d", contractAddress.String(), tokenID.ToInt())
+	case persist.ChainTezos:
+		return fmt.Sprintf("https://objkt.com/asset/%s/%d", contractAddress.String(), tokenID.ToInt())
+	default:
+		return ""
+	}
+}
+
+func setTokenContext(scope *sentry.Scope, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID, isSpam bool) {
+	scope.SetContext(sentryTokenContextName, sentry.Context{
+		"Chain":           chain,
+		"ContractAddress": contractAddress,
+		"NftID":           tokenID, // Sentry drops fields containing 'token'
+		"IsSpam":          isSpam,
+		"AssetURL":        assetURL(chain, contractAddress, tokenID),
+	})
+}
+
+func setRunTags(scope *sentry.Scope, runID persist.DBID) {
+	scope.SetTag("runID", runID.String())
+	scope.SetTag("log", "go/tp-runs/"+runID.String())
+}
+
+func updateMediaProccessingFingerprints(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+	if event == nil || event.Exception == nil || hint == nil {
+		return event
+	}
+
+	var mediaErr media.MediaProcessingError
+
+	if errors.As(hint.OriginalException, &mediaErr) {
+		if event.Tags["chain"] == "" || event.Tags["contractAddress"] == "" {
+			return event
+		}
+
+		// Add both errors to the stack
+
+		if mediaErr.AnimationError != nil {
+			event.Exception = append(event.Exception, sentry.Exception{
+				Type:  fmt.Sprintf("%T", mediaErr.AnimationError),
+				Value: mediaErr.AnimationError.Error(),
+			})
+		}
+
+		if mediaErr.ImageError != nil {
+			event.Exception = append(event.Exception, sentry.Exception{
+				Type:  fmt.Sprintf("%T", mediaErr.ImageError),
+				Value: mediaErr.ImageError.Error(),
+			})
+		}
+
+		// Move the original error to the end of the stack since the latest error is used as the title in Sentry
+		if len(event.Exception) > 1 {
+			title := fmt.Sprintf("chain=%s address=%s", event.Tags["chain"], event.Tags["contractAddress"])
+			event.Exception = append(event.Exception[1:], event.Exception[0])
+			event.Exception[len(event.Exception)-1].Type = title
+		}
+
+		// Group by the chain and contract
+		event.Fingerprint = []string{event.Tags["chain"], event.Tags["contractAddress"]}
+	}
+
+	return event
+}
+
+func excludeTokenSpam(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+	if event.Contexts[sentryTokenContextName]["IsSpam"].(bool) == true {
+		return nil
+	}
+	return event
 }
