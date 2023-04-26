@@ -1196,7 +1196,7 @@ func (q *Queries) GetCommentsByCommentIDs(ctx context.Context, commentIds persis
 }
 
 const getContractByChainAddress = `-- name: GetContractByChainAddress :one
-select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false
+select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false
 `
 
 type GetContractByChainAddressParams struct {
@@ -1223,12 +1223,13 @@ func (q *Queries) GetContractByChainAddress(ctx context.Context, arg GetContract
 		&i.BadgeUrl,
 		&i.Description,
 		&i.OwnerAddress,
+		&i.IsProviderMarkedSpam,
 	)
 	return i, err
 }
 
 const getContractByID = `-- name: GetContractByID :one
-select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address FROM contracts WHERE id = $1 AND deleted = false
+select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam FROM contracts WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetContractByID(ctx context.Context, id persist.DBID) (Contract, error) {
@@ -1250,12 +1251,13 @@ func (q *Queries) GetContractByID(ctx context.Context, id persist.DBID) (Contrac
 		&i.BadgeUrl,
 		&i.Description,
 		&i.OwnerAddress,
+		&i.IsProviderMarkedSpam,
 	)
 	return i, err
 }
 
 const getContractsByIDs = `-- name: GetContractsByIDs :many
-SELECT id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address from contracts WHERE id = ANY($1) AND deleted = false
+SELECT id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam from contracts WHERE id = ANY($1) AND deleted = false
 `
 
 func (q *Queries) GetContractsByIDs(ctx context.Context, contractIds persist.DBIDList) ([]Contract, error) {
@@ -1283,6 +1285,7 @@ func (q *Queries) GetContractsByIDs(ctx context.Context, contractIds persist.DBI
 			&i.BadgeUrl,
 			&i.Description,
 			&i.OwnerAddress,
+			&i.IsProviderMarkedSpam,
 		); err != nil {
 			return nil, err
 		}
@@ -1295,7 +1298,7 @@ func (q *Queries) GetContractsByIDs(ctx context.Context, contractIds persist.DBI
 }
 
 const getContractsByUserID = `-- name: GetContractsByUserID :many
-SELECT DISTINCT ON (contracts.id) contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address FROM contracts, tokens
+SELECT DISTINCT ON (contracts.id) contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam FROM contracts, tokens
     WHERE tokens.owner_user_id = $1 AND tokens.contract = contracts.id
     AND tokens.deleted = false AND contracts.deleted = false
 `
@@ -1325,6 +1328,7 @@ func (q *Queries) GetContractsByUserID(ctx context.Context, ownerUserID persist.
 			&i.BadgeUrl,
 			&i.Description,
 			&i.OwnerAddress,
+			&i.IsProviderMarkedSpam,
 		); err != nil {
 			return nil, err
 		}
@@ -3759,6 +3763,39 @@ func (q *Queries) HasLaterGroupedEvent(ctx context.Context, arg HasLaterGroupedE
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const insertSpamContracts = `-- name: InsertSpamContracts :exec
+with insert_spam_contracts as (
+    insert into alchemy_spam_contracts (id, chain, address, created_at, is_spam) (
+        select unnest($1::varchar[])
+        , unnest($2::int[])
+        , unnest($3::varchar[])
+        , unnest($4::timestamptz[])
+        , unnest($5::bool[])
+    ) on conflict(chain, address) do update set created_at = excluded.created_at, is_spam = excluded.is_spam
+    returning created_at
+)
+delete from alchemy_spam_contracts where created_at < (select created_at from insert_spam_contracts limit 1)
+`
+
+type InsertSpamContractsParams struct {
+	ID        []string
+	Chain     []int32
+	Address   []string
+	CreatedAt []time.Time
+	IsSpam    []bool
+}
+
+func (q *Queries) InsertSpamContracts(ctx context.Context, arg InsertSpamContractsParams) error {
+	_, err := q.db.Exec(ctx, insertSpamContracts,
+		arg.ID,
+		arg.Chain,
+		arg.Address,
+		arg.CreatedAt,
+		arg.IsSpam,
+	)
+	return err
 }
 
 const insertTokenMedia = `-- name: InsertTokenMedia :exec

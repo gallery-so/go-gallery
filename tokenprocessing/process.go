@@ -2,9 +2,14 @@ package tokenprocessing
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"time"
 
+	"github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/sourcegraph/conc/pool"
 
@@ -15,6 +20,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/util/retry"
 	"github.com/sirupsen/logrus"
 )
 
@@ -60,7 +66,7 @@ func processMediaForUsersTokensOfChain(tp *tokenProcessor, tokenRepo *postgres.T
 			wp.Go(func(ctx context.Context) error {
 				key := fmt.Sprintf("%s-%s-%d", t.TokenID, contract.Address, t.Chain)
 				imageKeywords, animationKeywords := t.Chain.BaseKeywords()
-				err := tp.processTokenPipeline(ctx, key, t, contract.Address, "", imageKeywords, animationKeywords, persist.ProcessingCauseSync)
+				err := tp.processTokenPipeline(ctx, key, t, contract, "", imageKeywords, animationKeywords, persist.ProcessingCauseSync)
 				if err != nil {
 
 					logger.For(c).Errorf("Error processing token: %s", err)
@@ -78,7 +84,7 @@ func processMediaForUsersTokensOfChain(tp *tokenProcessor, tokenRepo *postgres.T
 	}
 }
 
-func processMediaForToken(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRepository, userRepo *postgres.UserRepository, walletRepo *postgres.WalletRepository, throttler *throttle.Locker) gin.HandlerFunc {
+func processMediaForToken(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRepository, contractRepo persist.ContractGalleryRepository, userRepo *postgres.UserRepository, walletRepo *postgres.WalletRepository, throttler *throttle.Locker) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input ProcessMediaForTokenInput
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -112,7 +118,13 @@ func processMediaForToken(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRe
 			return
 		}
 
-		err = tp.processTokenPipeline(ctx, key, t, input.ContractAddress, input.OwnerAddress, input.ImageKeywords, input.AnimationKeywords, persist.ProcessingCauseRefresh)
+		contract, err := contractRepo.GetByID(ctx, t.Contract)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		err = tp.processTokenPipeline(ctx, key, t, contract, input.OwnerAddress, input.ImageKeywords, input.AnimationKeywords, persist.ProcessingCauseRefresh)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -150,6 +162,73 @@ func processOwnersForContractTokens(mc *multichain.Provider, contractRepo *postg
 			return
 		}
 		logger.For(c).Infof("Processing: %s - Finished Processing Collection Refresh", key)
+
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+	}
+}
+
+// detectSpamContracts refreshes the alchemy_spam_contracts table with marked contracts from Alchemy
+func detectSpamContracts(queries *coredb.Queries) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		alchemyURL, err := url.Parse(env.GetString("ALCHEMY_NFT_API_URL"))
+		if err != nil {
+			panic(err)
+		}
+
+		spamEndpoint := alchemyURL.JoinPath("getSpamContracts")
+
+		req, err := http.NewRequestWithContext(c, http.MethodGet, spamEndpoint.String(), nil)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		req.Header.Add("accept", "application/json")
+
+		resp, err := retry.RetryRequest(http.DefaultClient, req)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			util.ErrResponse(c, http.StatusInternalServerError, util.BodyAsError(resp))
+			return
+		}
+
+		body := struct {
+			Contracts []persist.Address `json:"contractAddresses"`
+		}{}
+
+		err = json.NewDecoder(resp.Body).Decode(&body)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		params := coredb.InsertSpamContractsParams{}
+
+		now := time.Now()
+
+		for _, contract := range body.Contracts {
+			params.ID = append(params.ID, persist.GenerateID().String())
+			params.Chain = append(params.Chain, int32(persist.ChainETH))
+			params.Address = append(params.Address, persist.ChainETH.NormalizeAddress(contract))
+			params.CreatedAt = append(params.CreatedAt, now)
+			params.IsSpam = append(params.IsSpam, true)
+		}
+
+		if len(params.Address) == 0 {
+			panic("no spam contracts found")
+		}
+
+		err = queries.InsertSpamContracts(c, params)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}

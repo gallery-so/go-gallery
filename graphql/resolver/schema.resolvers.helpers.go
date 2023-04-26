@@ -1656,6 +1656,7 @@ func contractToModel(ctx context.Context, contract db.Contract) *model.Contract 
 		ProfileImageURL:  &contract.ProfileImageUrl.String,
 		ProfileBannerURL: &contract.ProfileBannerUrl.String,
 		BadgeURL:         &contract.BadgeUrl.String,
+		IsSpam:           &contract.IsProviderMarkedSpam,
 	}
 }
 
@@ -1819,6 +1820,7 @@ func communityToModel(ctx context.Context, community db.Contract, forceRefresh *
 		},
 		Dbid:            community.ID,
 		LastUpdated:     &lastUpdated,
+		Contract:        contractToModel(ctx, community),
 		ContractAddress: &contractAddress,
 		CreatorAddress:  &creatorAddress,
 		Name:            util.ToPointer(community.Name.String),

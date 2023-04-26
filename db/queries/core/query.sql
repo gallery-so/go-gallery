@@ -1026,3 +1026,15 @@ with old as (
 -- name: IsExistsTokenMediaByTokenIdentifers :one
 select exists(select 1 from token_media where token_media.contract = $1 and token_media.token_id = $2 and token_media.chain = $3 and active = true and deleted = false);
 
+-- name: InsertSpamContracts :exec
+with insert_spam_contracts as (
+    insert into alchemy_spam_contracts (id, chain, address, created_at, is_spam) (
+        select unnest(@id::varchar[])
+        , unnest(@chain::int[])
+        , unnest(@address::varchar[])
+        , unnest(@created_at::timestamptz[])
+        , unnest(@is_spam::bool[])
+    ) on conflict(chain, address) do update set created_at = excluded.created_at, is_spam = excluded.is_spam
+    returning created_at
+)
+delete from alchemy_spam_contracts where created_at < (select created_at from insert_spam_contracts limit 1);

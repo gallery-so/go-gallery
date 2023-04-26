@@ -14,6 +14,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -48,7 +49,7 @@ type tokenProcessingJob struct {
 	id                persist.DBID
 	key               string
 	token             persist.TokenGallery
-	contractAddress   persist.Address
+	contract          persist.ContractGallery
 	ownerAddress      persist.Address
 	imageKeywords     []string
 	animationKeywords []string
@@ -56,25 +57,27 @@ type tokenProcessingJob struct {
 	pipelineMetadata  *persist.PipelineMetadata
 }
 
-func (tp *tokenProcessor) processTokenPipeline(c context.Context, key string, t persist.TokenGallery, contractAddress, ownerAddress persist.Address, imageKeywords, animationKeywords []string, cause persist.ProcessingCause) error {
+func (tp *tokenProcessor) processTokenPipeline(c context.Context, key string, t persist.TokenGallery, contract persist.ContractGallery, ownerAddress persist.Address, imageKeywords, animationKeywords []string, cause persist.ProcessingCause) error {
 
+	runID := persist.GenerateID()
 	loggerCtx := logger.NewContextWithFields(c, logrus.Fields{
 		"tokenDBID":       t.ID,
 		"tokenID":         t.TokenID,
 		"contractDBID":    t.Contract,
-		"contractAddress": contractAddress,
+		"contractAddress": contract.Address,
 		"chain":           t.Chain,
+		"runID":           runID,
 	})
 
 	ctx, cancel := context.WithTimeout(loggerCtx, time.Minute*10)
 	defer cancel()
 	job := &tokenProcessingJob{
-		id: persist.GenerateID(),
+		id: runID,
 
 		tp:                tp,
 		key:               key,
 		token:             t,
-		contractAddress:   contractAddress,
+		contract:          contract,
 		ownerAddress:      ownerAddress,
 		imageKeywords:     imageKeywords,
 		animationKeywords: animationKeywords,
@@ -121,6 +124,8 @@ func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (coredb.
 
 	cachedObjects, err := tpj.cacheMediaObjects(ctx, result.Metadata)
 	if err != nil {
+		isSpam := tpj.contract.IsProviderMarkedSpam || util.GetOptionalValue(tpj.token.IsProviderMarkedSpam, false) || util.GetOptionalValue(tpj.token.IsUserMarkedSpam, false)
+		reportTokenError(ctx, err, tpj.id, tpj.token.Chain, tpj.contract.Address, tpj.token.TokenID, isSpam)
 		return result, err
 	}
 
@@ -135,7 +140,7 @@ func (tpj *tokenProcessingJob) retrieveMetadata(ctx context.Context) persist.Tok
 	newMetadata := tpj.token.TokenMetadata
 
 	if len(newMetadata) == 0 || tpj.cause == persist.ProcessingCauseRefresh {
-		mcMetadata, err := tpj.tp.mc.GetTokenMetadataByTokenIdentifiers(ctx, tpj.contractAddress, tpj.token.TokenID, tpj.ownerAddress, tpj.token.Chain)
+		mcMetadata, err := tpj.tp.mc.GetTokenMetadataByTokenIdentifiers(ctx, tpj.contract.Address, tpj.token.TokenID, tpj.ownerAddress, tpj.token.Chain)
 		if err != nil {
 			logger.For(ctx).Errorf("error getting metadata from chain: %s", err)
 			failStep(&tpj.pipelineMetadata.MetadataRetrieval)
@@ -169,7 +174,7 @@ func (tpj *tokenProcessingJob) retrieveTokenInfo(ctx context.Context, metadata p
 
 func (tpj *tokenProcessingJob) cacheMediaObjects(ctx context.Context, metadata persist.TokenMetadata) ([]media.CachedMediaObject, error) {
 	image, anim := media.KeywordsForChain(tpj.token.Chain, tpj.imageKeywords, tpj.animationKeywords)
-	return media.CacheObjectsForMetadata(ctx, metadata, tpj.contractAddress, persist.TokenID(tpj.token.TokenID.String()), tpj.token.TokenURI, tpj.token.Chain, tpj.tp.ipfsClient, tpj.tp.arweaveClient, tpj.tp.stg, tpj.tp.tokenBucket, image, anim)
+	return media.CacheObjectsForMetadata(ctx, metadata, tpj.contract.Address, persist.TokenID(tpj.token.TokenID.String()), tpj.token.TokenURI, tpj.token.Chain, tpj.tp.ipfsClient, tpj.tp.arweaveClient, tpj.tp.stg, tpj.tp.tokenBucket, image, anim)
 }
 
 func (tpj *tokenProcessingJob) createMediaFromCachedObjects(ctx context.Context, objects []media.CachedMediaObject) persist.Media {

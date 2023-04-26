@@ -36,28 +36,32 @@ var logToSentryLevel = map[logrus.Level]sentry.Level{
 }
 var sentryTrailLimit = 8
 
+// ReportRemappedError reports an error with additional context indicating the original error and the remapped error.
 func ReportRemappedError(ctx context.Context, originalErr error, remappedErr interface{}) {
-	hub := SentryHubFromContext(ctx)
-	if hub == nil {
-		logger.For(ctx).Warnln("could not report error to Sentry because hub is nil")
-		return
-	}
-
-	// Use a new scope so our error context and tag don't persist beyond this error
-	hub.WithScope(func(scope *sentry.Scope) {
+	ReportError(ctx, originalErr, func(scope *sentry.Scope) {
 		if remappedErr != nil {
 			SetErrorContext(scope, true, fmt.Sprintf("%T", remappedErr))
 			scope.SetTag("remappedError", "true")
 		} else {
 			SetErrorContext(scope, false, "")
 		}
-
-		hub.CaptureException(originalErr)
 	})
 }
 
-func ReportError(ctx context.Context, err error) {
-	ReportRemappedError(ctx, err, nil)
+// ReportError reports an error with optional scope functions to add additional context.
+func ReportError(ctx context.Context, err error, scopeFuncs ...func(*sentry.Scope)) {
+	hub := SentryHubFromContext(ctx)
+	if hub == nil {
+		logger.For(ctx).Warnln("could not report error to Sentry because hub is nil")
+		return
+	}
+
+	hub.WithScope(func(scope *sentry.Scope) {
+		for _, f := range scopeFuncs {
+			f(scope)
+		}
+		hub.CaptureException(err)
+	})
 }
 
 func ScrubEventHeaders(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {

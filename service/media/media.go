@@ -23,7 +23,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
-	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util/retry"
 	"github.com/sirupsen/logrus"
@@ -159,6 +158,19 @@ func NewStorageClient(ctx context.Context) *storage.Client {
 	return storageClient
 }
 
+// MediaProcessingError is an error that occurs when handling media processiing for a token.
+type MediaProcessingError struct {
+	Chain           persist.Chain
+	ContractAddress persist.Address
+	TokenID         persist.TokenID
+	AnimationError  error
+	ImageError      error
+}
+
+func (m MediaProcessingError) Error() string {
+	return fmt.Sprintf("error with media for token(chain=%d,contractAddress=%s,tokenID=%s): animationErr=%s;imageErr=%s", m.Chain, m.ContractAddress, m.TokenID, m.AnimationError, m.ImageError)
+}
+
 // CacheObjectsForMetadata uses a metadata map to generate media content and cache resized versions of the media content.
 func CacheObjectsForMetadata(pCtx context.Context, metadata persist.TokenMetadata, contractAddress persist.Address, tokenID persist.TokenID, tokenURI persist.TokenURI, chain persist.Chain, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, imageKeywords, animationKeywords Keywords) ([]CachedMediaObject, error) {
 
@@ -208,13 +220,25 @@ func CacheObjectsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	// neither download worked, unexpectedly
 	if (animCh == nil || (animResult.err != nil && len(animResult.cachedObjects) == 0)) && (imgCh == nil || (imgResult.err != nil && len(imgResult.cachedObjects) == 0)) {
 		if animCh != nil {
-			if invalidMediaErr, ok := animResult.err.(errInvalidMedia); ok {
-				return nil, invalidMediaErr
+			if _, ok := animResult.err.(errInvalidMedia); ok {
+				return nil, MediaProcessingError{
+					Chain:           chain,
+					ContractAddress: contractAddress,
+					TokenID:         tokenID,
+					AnimationError:  animResult.err,
+					ImageError:      imgResult.err,
+				}
 			}
 		}
 		if imgCh != nil {
-			if invalidMediaErr, ok := imgResult.err.(errInvalidMedia); ok {
-				return nil, invalidMediaErr
+			if _, ok := imgResult.err.(errInvalidMedia); ok {
+				return nil, MediaProcessingError{
+					Chain:           chain,
+					ContractAddress: contractAddress,
+					TokenID:         tokenID,
+					AnimationError:  animResult.err,
+					ImageError:      imgResult.err,
+				}
 			}
 		}
 
@@ -336,8 +360,6 @@ func asyncCacheObjectsForURL(ctx context.Context, tids persist.TokenIdentifiers,
 		case *googleapi.Error:
 			panic(fmt.Errorf("googleAPI error %s: %s", caught, err))
 		default:
-			logger.For(ctx).Error(err)
-			sentryutil.ReportError(ctx, err)
 			resultCh <- cacheResult{cachedObjects, err}
 		}
 	}()
