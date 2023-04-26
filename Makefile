@@ -125,15 +125,15 @@ $(DEPLOY)-%-indexer-server             : MEMORY         := $(INDEXER_SERVER_MEMO
 $(DEPLOY)-%-indexer-server             : CONCURRENCY    := $(INDEXER_SERVER_CONCURRENCY)
 $(DEPLOY)-$(DEV)-indexer-server        : SERVICE        := indexer-api-dev
 $(DEPLOY)-$(PROD)-indexer-server       : SERVICE        := indexer-api
-$(DEPLOY)-%-indexer             	     : REPO           := indexer
-$(DEPLOY)-%-indexer             	     : DOCKER_FILE    := $(DOCKER_DIR)/indexer/Dockerfile
-$(DEPLOY)-%-indexer             	     : PORT           := 4000
-$(DEPLOY)-%-indexer             	     : TIMEOUT        := $(INDEXER_TIMEOUT)
-$(DEPLOY)-%-indexer             	     : CPU            := $(INDEXER_CPU)
-$(DEPLOY)-%-indexer             	     : MEMORY         := $(INDEXER_MEMORY)
-$(DEPLOY)-%-indexer             	     : CONCURRENCY    := $(INDEXER_CONCURRENCY)
+$(DEPLOY)-%-indexer                    : REPO           := indexer
+$(DEPLOY)-%-indexer                    : DOCKER_FILE    := $(DOCKER_DIR)/indexer/Dockerfile
+$(DEPLOY)-%-indexer                    : PORT           := 4000
+$(DEPLOY)-%-indexer                    : TIMEOUT        := $(INDEXER_TIMEOUT)
+$(DEPLOY)-%-indexer                    : CPU            := $(INDEXER_CPU)
+$(DEPLOY)-%-indexer                    : MEMORY         := $(INDEXER_MEMORY)
+$(DEPLOY)-%-indexer                    : CONCURRENCY    := $(INDEXER_CONCURRENCY)
 $(DEPLOY)-%-indexer                    : DEPLOY_FLAGS   = $(BASE_DEPLOY_FLAGS) --no-cpu-throttling
-$(DEPLOY)-$(PROD)-indexer       	     : SERVICE        := indexer
+$(DEPLOY)-$(PROD)-indexer              : SERVICE        := indexer
 $(DEPLOY)-%-emails                     : REPO           := emails
 $(DEPLOY)-%-emails                     : DOCKER_FILE    := $(DOCKER_DIR)/emails/Dockerfile
 $(DEPLOY)-%-emails                     : PORT           := 5500
@@ -190,8 +190,8 @@ $(DEPLOY)-%-alchemy-spam               : CRON_LOCATION  := $(DEPLOY_REGION)
 $(DEPLOY)-%-alchemy-spam               : CRON_SCHEDULE  := '0 0 * * *'
 $(DEPLOY)-%-alchemy-spam               : CRON_URI       = $(shell gcloud run services describe $(URI_NAME) --region $(DEPLOY_REGION) --format 'value(status.url)')/contracts/detect-spam
 $(DEPLOY)-%-alchemy-spam               : CRON_METHOD    := POST
-$(DEPLOY)-$(DEV)-alchemy-spam					 : URI_NAME       := tokenprocessing-dev
-$(DEPLOY)-$(PROD)-alchemy-spam				 : URI_NAME       := tokenprocessing-v2
+$(DEPLOY)-$(DEV)-alchemy-spam  				 : URI_NAME       := tokenprocessing-dev
+$(DEPLOY)-$(PROD)-alchemy-spam  			 : URI_NAME       := tokenprocessing-v2
 
 # Service name mappings
 $(PROMOTE)-%-backend                   : SERVICE := default
@@ -330,7 +330,7 @@ $(DEPLOY)-$(SANDBOX)-backend      : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-bac
 
 # PROD deployments
 $(DEPLOY)-$(PROD)-backend         : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend
-$(DEPLOY)-$(PROD)-indexer         : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer # _$(RELEASE)-indexer
+$(DEPLOY)-$(PROD)-indexer         : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer _$(RELEASE)-indexer
 $(DEPLOY)-$(PROD)-indexer-server  : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer-server _$(RELEASE)-indexer-server
 $(DEPLOY)-$(PROD)-tokenprocessing : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-tokenprocessing _$(RELEASE)-tokenprocessing
 $(DEPLOY)-$(PROD)-dummymetadata   : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-dummymetadata _$(RELEASE)-dummymetadata
