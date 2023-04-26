@@ -358,10 +358,9 @@ func (b *GetAdmiresByActorIDBatchBatchResults) Close() error {
 }
 
 const getChildContractsByParentIDBatchPaginate = `-- name: GetChildContractsByParentIDBatchPaginate :batchmany
-select c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.parent_id, c.owner_address
+select c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.parent_id, c.owner_address, c.is_provider_marked_spam
 from contracts c
-where
-  c.parent_id = $1
+where c.parent_id = $1
   and contracts.deleted = false
   and (c.created_at, c.id) > ($2, $3)
   and (c.created_at, c.id) < ( $4, $5)
@@ -439,6 +438,7 @@ func (b *GetChildContractsByParentIDBatchPaginateBatchResults) Query(f func(int,
 					&i.Description,
 					&i.ParentID,
 					&i.OwnerAddress,
+					&i.IsProviderMarkedSpam,
 				); err != nil {
 					return err
 				}
@@ -715,7 +715,7 @@ func (b *GetCommentsByActorIDBatchBatchResults) Close() error {
 }
 
 const getContractByChainAddressBatch = `-- name: GetContractByChainAddressBatch :batchone
-select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, parent_id, owner_address FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false
+select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, parent_id, owner_address, is_provider_marked_spam FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false
 `
 
 type GetContractByChainAddressBatchBatchResults struct {
@@ -770,6 +770,7 @@ func (b *GetContractByChainAddressBatchBatchResults) QueryRow(f func(int, Contra
 			&i.Description,
 			&i.ParentID,
 			&i.OwnerAddress,
+			&i.IsProviderMarkedSpam,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -804,7 +805,7 @@ displayed as (
     and galleries.last_updated > last_refreshed.last_updated
     and collections.last_updated > last_refreshed.last_updated
 )
-select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.parent_id, contracts.owner_address from contracts, displayed
+select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.parent_id, contracts.owner_address, contracts.is_provider_marked_spam from contracts, displayed
 where contracts.id = displayed.contract_id and contracts.deleted = false
 `
 
@@ -861,6 +862,7 @@ func (b *GetContractsDisplayedByUserIDBatchBatchResults) Query(f func(int, []Con
 					&i.Description,
 					&i.ParentID,
 					&i.OwnerAddress,
+					&i.IsProviderMarkedSpam,
 				); err != nil {
 					return err
 				}
@@ -880,7 +882,7 @@ func (b *GetContractsDisplayedByUserIDBatchBatchResults) Close() error {
 }
 
 const getCreatedContractsBatchPaginate = `-- name: GetCreatedContractsBatchPaginate :batchmany
-select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.parent_id, contracts.owner_address
+select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.parent_id, contracts.owner_address, contracts.is_provider_marked_spam
 from users, contracts contracts, wallets
 where users.id = $1
   and wallets.id = any(users.wallets)
@@ -970,6 +972,7 @@ func (b *GetCreatedContractsBatchPaginateBatchResults) Query(f func(int, []Contr
 					&i.Description,
 					&i.ParentID,
 					&i.OwnerAddress,
+					&i.IsProviderMarkedSpam,
 				); err != nil {
 					return err
 				}
@@ -1708,7 +1711,7 @@ func (b *GetOwnersByContractIdBatchPaginateBatchResults) Close() error {
 }
 
 const getSharedContractsBatchPaginate = `-- name: GetSharedContractsBatchPaginate :batchmany
-select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.parent_id, contracts.owner_address, a.displayed as displayed_by_user_a, b.displayed as displayed_by_user_b, a.owned_count
+select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.parent_id, contracts.owner_address, contracts.is_provider_marked_spam, a.displayed as displayed_by_user_a, b.displayed as displayed_by_user_b, a.owned_count
 from owned_contracts a, owned_contracts b, contracts
 left join marketplace_contracts on contracts.id = marketplace_contracts.contract_id
 where a.user_id = $1
@@ -1768,25 +1771,26 @@ type GetSharedContractsBatchPaginateParams struct {
 }
 
 type GetSharedContractsBatchPaginateRow struct {
-	ID               persist.DBID
-	Deleted          bool
-	Version          sql.NullInt32
-	CreatedAt        time.Time
-	LastUpdated      time.Time
-	Name             sql.NullString
-	Symbol           sql.NullString
-	Address          persist.Address
-	CreatorAddress   persist.Address
-	Chain            persist.Chain
-	ProfileBannerUrl sql.NullString
-	ProfileImageUrl  sql.NullString
-	BadgeUrl         sql.NullString
-	Description      sql.NullString
-	ParentID         persist.DBID
-	OwnerAddress     persist.Address
-	DisplayedByUserA bool
-	DisplayedByUserB bool
-	OwnedCount       int64
+	ID                   persist.DBID
+	Deleted              bool
+	Version              sql.NullInt32
+	CreatedAt            time.Time
+	LastUpdated          time.Time
+	Name                 sql.NullString
+	Symbol               sql.NullString
+	Address              persist.Address
+	CreatorAddress       persist.Address
+	Chain                persist.Chain
+	ProfileBannerUrl     sql.NullString
+	ProfileImageUrl      sql.NullString
+	BadgeUrl             sql.NullString
+	Description          sql.NullString
+	ParentID             persist.DBID
+	OwnerAddress         persist.Address
+	IsProviderMarkedSpam bool
+	DisplayedByUserA     bool
+	DisplayedByUserB     bool
+	OwnedCount           int64
 }
 
 func (q *Queries) GetSharedContractsBatchPaginate(ctx context.Context, arg []GetSharedContractsBatchPaginateParams) *GetSharedContractsBatchPaginateBatchResults {
@@ -1847,6 +1851,7 @@ func (b *GetSharedContractsBatchPaginateBatchResults) Query(f func(int, []GetSha
 					&i.Description,
 					&i.ParentID,
 					&i.OwnerAddress,
+					&i.IsProviderMarkedSpam,
 					&i.DisplayedByUserA,
 					&i.DisplayedByUserB,
 					&i.OwnedCount,

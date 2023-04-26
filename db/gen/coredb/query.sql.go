@@ -89,6 +89,20 @@ func (q *Queries) AddUserRoles(ctx context.Context, arg AddUserRolesParams) erro
 	return err
 }
 
+const addWalletToUserByID = `-- name: AddWalletToUserByID :exec
+update users set wallets = array_append(wallets, $1::varchar) where id = $2
+`
+
+type AddWalletToUserByIDParams struct {
+	WalletID string
+	UserID   persist.DBID
+}
+
+func (q *Queries) AddWalletToUserByID(ctx context.Context, arg AddWalletToUserByIDParams) error {
+	_, err := q.db.Exec(ctx, addWalletToUserByID, arg.WalletID, arg.UserID)
+	return err
+}
+
 const blockUserFromFeed = `-- name: BlockUserFromFeed :exec
 INSERT INTO feed_blocklist (id, user_id, action) VALUES ($1, $2, $3)
 `
@@ -868,6 +882,15 @@ func (q *Queries) DeleteCollections(ctx context.Context, ids []string) error {
 	return err
 }
 
+const deleteUserByID = `-- name: DeleteUserByID :exec
+update users set deleted = true where id = $1
+`
+
+func (q *Queries) DeleteUserByID(ctx context.Context, id persist.DBID) error {
+	_, err := q.db.Exec(ctx, deleteUserByID, id)
+	return err
+}
+
 const deleteUserRoles = `-- name: DeleteUserRoles :exec
 update user_roles set deleted = true, last_updated = now() where user_id = $1 and role = any($2)
 `
@@ -879,6 +902,15 @@ type DeleteUserRolesParams struct {
 
 func (q *Queries) DeleteUserRoles(ctx context.Context, arg DeleteUserRolesParams) error {
 	_, err := q.db.Exec(ctx, deleteUserRoles, arg.UserID, arg.Roles)
+	return err
+}
+
+const deleteWalletByID = `-- name: DeleteWalletByID :exec
+update wallets set deleted = true, last_updated = now() where id = $1
+`
+
+func (q *Queries) DeleteWalletByID(ctx context.Context, id persist.DBID) error {
+	_, err := q.db.Exec(ctx, deleteWalletByID, id)
 	return err
 }
 
@@ -1177,7 +1209,7 @@ func (q *Queries) GetCommentsByCommentIDs(ctx context.Context, commentIds persis
 }
 
 const getContractByChainAddress = `-- name: GetContractByChainAddress :one
-select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, parent_id, owner_address FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false
+select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, parent_id, owner_address, is_provider_marked_spam FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false
 `
 
 type GetContractByChainAddressParams struct {
@@ -1205,12 +1237,13 @@ func (q *Queries) GetContractByChainAddress(ctx context.Context, arg GetContract
 		&i.Description,
 		&i.ParentID,
 		&i.OwnerAddress,
+		&i.IsProviderMarkedSpam,
 	)
 	return i, err
 }
 
 const getContractByID = `-- name: GetContractByID :one
-select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, parent_id, owner_address FROM contracts WHERE id = $1 AND deleted = false
+select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, parent_id, owner_address, is_provider_marked_spam FROM contracts WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetContractByID(ctx context.Context, id persist.DBID) (Contract, error) {
@@ -1233,12 +1266,13 @@ func (q *Queries) GetContractByID(ctx context.Context, id persist.DBID) (Contrac
 		&i.Description,
 		&i.ParentID,
 		&i.OwnerAddress,
+		&i.IsProviderMarkedSpam,
 	)
 	return i, err
 }
 
 const getContractsByIDs = `-- name: GetContractsByIDs :many
-SELECT id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, parent_id, owner_address from contracts WHERE id = ANY($1) AND deleted = false
+SELECT id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, parent_id, owner_address, is_provider_marked_spam from contracts WHERE id = ANY($1) AND deleted = false
 `
 
 func (q *Queries) GetContractsByIDs(ctx context.Context, contractIds persist.DBIDList) ([]Contract, error) {
@@ -1267,6 +1301,7 @@ func (q *Queries) GetContractsByIDs(ctx context.Context, contractIds persist.DBI
 			&i.Description,
 			&i.ParentID,
 			&i.OwnerAddress,
+			&i.IsProviderMarkedSpam,
 		); err != nil {
 			return nil, err
 		}
@@ -2723,6 +2758,35 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 	return i, err
 }
 
+const getUserByWalletID = `-- name: GetUserByWalletID :one
+select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences from users where array[$1::varchar]::varchar[] <@ wallets and deleted = false
+`
+
+func (q *Queries) GetUserByWalletID(ctx context.Context, wallet string) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByWalletID, wallet)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.Version,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.Username,
+		&i.UsernameIdempotent,
+		&i.Wallets,
+		&i.Bio,
+		&i.Traits,
+		&i.Universal,
+		&i.NotificationSettings,
+		&i.EmailVerified,
+		&i.EmailUnsubscriptions,
+		&i.FeaturedGallery,
+		&i.PrimaryWalletID,
+		&i.UserExperiences,
+	)
+	return i, err
+}
+
 const getUserExperiencesByUserID = `-- name: GetUserExperiencesByUserID :one
 select user_experiences from users where id = $1
 `
@@ -3562,6 +3626,89 @@ func (q *Queries) HasLaterGroupedEvent(ctx context.Context, arg HasLaterGroupedE
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const insertSpamContracts = `-- name: InsertSpamContracts :exec
+with insert_spam_contracts as (
+    insert into alchemy_spam_contracts (id, chain, address, created_at, is_spam) (
+        select unnest($1::varchar[])
+        , unnest($2::int[])
+        , unnest($3::varchar[])
+        , unnest($4::timestamptz[])
+        , unnest($5::bool[])
+    ) on conflict(chain, address) do update set created_at = excluded.created_at, is_spam = excluded.is_spam
+    returning created_at
+)
+delete from alchemy_spam_contracts where created_at < (select created_at from insert_spam_contracts limit 1)
+`
+
+type InsertSpamContractsParams struct {
+	ID        []string
+	Chain     []int32
+	Address   []string
+	CreatedAt []time.Time
+	IsSpam    []bool
+}
+
+func (q *Queries) InsertSpamContracts(ctx context.Context, arg InsertSpamContractsParams) error {
+	_, err := q.db.Exec(ctx, insertSpamContracts,
+		arg.ID,
+		arg.Chain,
+		arg.Address,
+		arg.CreatedAt,
+		arg.IsSpam,
+	)
+	return err
+}
+
+const insertUser = `-- name: InsertUser :exec
+insert into users (id, username, username_idempotent, bio, wallets, universal, email_unsubscriptions, primary_wallet_id) values ($1, $2, $3, $4, $5, $6, $7, $8) returning id
+`
+
+type InsertUserParams struct {
+	ID                   persist.DBID
+	Username             sql.NullString
+	UsernameIdempotent   sql.NullString
+	Bio                  sql.NullString
+	Wallets              persist.WalletList
+	Universal            bool
+	EmailUnsubscriptions persist.EmailUnsubscriptions
+	PrimaryWalletID      persist.DBID
+}
+
+func (q *Queries) InsertUser(ctx context.Context, arg InsertUserParams) error {
+	_, err := q.db.Exec(ctx, insertUser,
+		arg.ID,
+		arg.Username,
+		arg.UsernameIdempotent,
+		arg.Bio,
+		arg.Wallets,
+		arg.Universal,
+		arg.EmailUnsubscriptions,
+		arg.PrimaryWalletID,
+	)
+	return err
+}
+
+const insertWallet = `-- name: InsertWallet :exec
+insert into wallets (id, address, chain, wallet_type) values ($1, $2, $3, $4)
+`
+
+type InsertWalletParams struct {
+	ID         persist.DBID
+	Address    persist.Address
+	Chain      persist.Chain
+	WalletType persist.WalletType
+}
+
+func (q *Queries) InsertWallet(ctx context.Context, arg InsertWalletParams) error {
+	_, err := q.db.Exec(ctx, insertWallet,
+		arg.ID,
+		arg.Address,
+		arg.Chain,
+		arg.WalletType,
+	)
+	return err
 }
 
 const isActorActionActive = `-- name: IsActorActionActive :one

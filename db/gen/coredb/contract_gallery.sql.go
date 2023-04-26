@@ -35,7 +35,7 @@ do update set
   , description = excluded.description
   , deleted = excluded.deleted
   , last_updated = now()
-returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, parent_id, owner_address
+returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, parent_id, owner_address, is_provider_marked_spam
 `
 
 type UpsertContractsParams struct {
@@ -88,6 +88,7 @@ func (q *Queries) UpsertContracts(ctx context.Context, arg UpsertContractsParams
 			&i.Description,
 			&i.ParentID,
 			&i.OwnerAddress,
+			&i.IsProviderMarkedSpam,
 		); err != nil {
 			return nil, err
 		}
@@ -197,7 +198,7 @@ insert_parent_contracts as (
     , creator_address = excluded.creator_address
     , description = excluded.description
     , last_updated = now()
-  returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, parent_id, owner_address
+  returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, parent_id, owner_address, is_provider_marked_spam
 ),
 insert_child_contracts as (
   insert into contracts(id, deleted, created_at, name, address, creator_address, chain, description, parent_id)
@@ -221,7 +222,7 @@ insert_child_contracts as (
     , creator_address = excluded.creator_address
     , description = excluded.description
     , last_updated = now()
-  returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, parent_id, owner_address
+  returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, parent_id, owner_address, is_provider_marked_spam
 )
 insert into tokens(
   id
