@@ -143,17 +143,17 @@ func updateMediaProccessingFingerprints(event *sentry.Event, hint *sentry.EventH
 
 		// Add both errors to the stack
 
-		if mediaErr.VideoErr != nil {
+		if mediaErr.AnimationError != nil {
 			event.Exception = append(event.Exception, sentry.Exception{
-				Type:  fmt.Sprintf("%T", mediaErr.VideoErr),
-				Value: mediaErr.VideoErr.Error(),
+				Type:  fmt.Sprintf("%T", mediaErr.AnimationError),
+				Value: mediaErr.AnimationError.Error(),
 			})
 		}
 
-		if mediaErr.ImageErr != nil {
+		if mediaErr.ImageError != nil {
 			event.Exception = append(event.Exception, sentry.Exception{
-				Type:  fmt.Sprintf("%T", mediaErr.ImageErr),
-				Value: mediaErr.ImageErr.Error(),
+				Type:  fmt.Sprintf("%T", mediaErr.ImageError),
+				Value: mediaErr.ImageError.Error(),
 			})
 		}
 
