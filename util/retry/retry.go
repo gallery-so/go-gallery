@@ -2,7 +2,7 @@ package retry
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"math/rand"
 	"net/http"
 	"strings"
@@ -12,9 +12,17 @@ import (
 )
 
 var (
-	DefaultRetry    = Retry{Base: 4, Cap: 64, Tries: 12}
-	ErrOutOfRetries = errors.New("tried too many times")
+	DefaultRetry = Retry{Base: 4, Cap: 64, Tries: 12}
 )
+
+type ErrOutOfRetries struct {
+	Err   error
+	Retry Retry
+}
+
+func (e ErrOutOfRetries) Error() string {
+	return fmt.Sprintf("retried %d times: last error: %s", e.Retry.Tries, e.Err.Error())
+}
 
 type Retry struct {
 	Base  int // Min amount of time to sleep per iteration
@@ -63,7 +71,7 @@ func RetryRequestWithRetry(c *http.Client, req *http.Request, r Retry) (*http.Re
 
 		r.Sleep(i)
 	}
-	return nil, ErrOutOfRetries
+	return nil, ErrOutOfRetries{err, r}
 }
 
 func RetryQuery(ctx context.Context, c *graphql.Client, query any, vars map[string]any) error {
@@ -71,20 +79,9 @@ func RetryQuery(ctx context.Context, c *graphql.Client, query any, vars map[stri
 }
 
 func RetryQueryWithRetry(ctx context.Context, c *graphql.Client, query any, vars map[string]any, r Retry) error {
-	var err error
-	for i := 0; i < r.Tries; i++ {
-		err = c.Query(ctx, query, vars)
-		if err == nil {
-			return nil
-		}
-
-		if !strings.Contains(err.Error(), "429") {
-			return err
-		}
-
-		r.Sleep(i)
-	}
-	return ErrOutOfRetries
+	f := func(ctx context.Context) error { return c.Query(ctx, query, vars) }
+	shouldRetry := func(err error) bool { return strings.Contains(err.Error(), "429") }
+	return RetryFunc(ctx, f, shouldRetry, r)
 }
 
 func RetryFunc(ctx context.Context, f func(ctx context.Context) error, shouldRetry func(error) bool, r Retry) error {
@@ -101,5 +98,5 @@ func RetryFunc(ctx context.Context, f func(ctx context.Context) error, shouldRet
 
 		r.Sleep(i)
 	}
-	return ErrOutOfRetries
+	return ErrOutOfRetries{err, r}
 }
