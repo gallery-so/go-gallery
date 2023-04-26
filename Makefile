@@ -16,18 +16,19 @@ RELEASE              := release
 DOCKER               := docker
 DEPLOY_VERSION       := $(CURRENT_BRANCH)-$(CURRENT_COMMIT_HASH)
 SET_GCP_PROJECT      = gcloud config set project $(GCP_PROJECT)
-APP_ENGINE_DEPLOY    = sops exec-file --no-fifo $(CONFIG_DIR)/$(SERVICE_FILE) 'gcloud beta app deploy --version $(DEPLOY_VERSION) --quiet $(APP_PROMOTE_FLAGS) --appyaml {}'
-CLOUD_RUN_DEPLOY     = sops exec-file $(CONFIG_DIR)/$(SERVICE_FILE) 'gcloud run deploy $(CLOUD_RUN_FLAGS) $(SERVICE) --env-vars-file {} --quiet'
-CLOUD_RUN_DEPLOY_NO_THROTTLE     = sops exec-file $(CONFIG_DIR)/$(SERVICE_FILE) 'gcloud run deploy $(CLOUD_RUN_FLAGS_NO_THROTTLE) $(SERVICE) --env-vars-file {} --quiet'
-CLOUD_RUN_FLAGS      = --image $(IMAGE_TAG) $(RUN_PROMOTE_FLAGS) --concurrency $(CONCURRENCY) --cpu $(CPU) --memory $(MEMORY) --port $(PORT) --timeout $(TIMEOUT) --platform managed --cpu-throttling --revision-suffix $(CURRENT_COMMIT_HASH) --vpc-connector $(VPC_CONNECTOR) --vpc-egress private-ranges-only --set-cloudsql-instances $(SQL_INSTANCES) --region $(REGION) --allow-unauthenticated
-CLOUD_RUN_FLAGS_NO_THROTTLE      = --image $(IMAGE_TAG) $(RUN_PROMOTE_FLAGS) --concurrency $(CONCURRENCY) --cpu $(CPU) --memory $(MEMORY) --port $(PORT) --timeout $(TIMEOUT) --platform managed --no-cpu-throttling --revision-suffix $(CURRENT_COMMIT_HASH) --vpc-connector $(VPC_CONNECTOR) --vpc-egress private-ranges-only --set-cloudsql-instances $(SQL_INSTANCES) --region $(REGION) --allow-unauthenticated
+CLOUD_RUN_DEPLOY     = sops exec-file $(CONFIG_DIR)/$(SERVICE_FILE) 'gcloud run deploy $(DEPLOY_FLAGS) $(SERVICE) --env-vars-file {} --quiet'
+SCHEDULER_DEPLOY     = gcloud scheduler jobs create http $(CRON_NAME) --location $(CRON_LOCATION) --schedule $(CRON_SCHEDULE) --uri $(CRON_URI) --http-method $(CRON_METHOD)
+CRON_NAME            = $(CRON_PREFIX)-$(DEPLOY_VERSION)
+BASE_DEPLOY_FLAGS    = --image $(IMAGE_TAG) $(RUN_PROMOTE_FLAGS) --concurrency $(CONCURRENCY) --cpu $(CPU) --memory $(MEMORY) --port $(PORT) --timeout $(TIMEOUT) --platform managed --revision-suffix $(CURRENT_COMMIT_HASH) --vpc-connector $(VPC_CONNECTOR) --vpc-egress private-ranges-only --set-cloudsql-instances $(SQL_INSTANCES) --region $(REGION) --allow-unauthenticated
+DEPLOY_FLAGS         = $(BASE_DEPLOY_FLAGS) --cpu-throttling
+DEPLOY_REGION        = us-east1
 SENTRY_RELEASE       = sentry-cli releases -o $(SENTRY_ORG) -p $(SENTRY_PROJECT)
 IMAGE_TAG            = $(DOCKER_REGISTRY)/$(GCP_PROJECT)/$(REPO)/$(CURRENT_BRANCH):$(CURRENT_COMMIT_HASH)
 DOCKER_BUILD         = docker build --file $(DOCKER_FILE) --platform linux/amd64 -t $(IMAGE_TAG) --build-arg VERSION=$(DEPLOY_VERSION) $(DOCKER_CONTEXT)
 DOCKER_PUSH          = docker push $(IMAGE_TAG)
 DOCKER_DIR           := ./docker
 DOCKER_CONTEXT       := .
-DOCKER_REGISTRY      := us-east1-docker.pkg.dev
+DOCKER_REGISTRY      := $(DEPLOY_REGION)-docker.pkg.dev
 
 # Environments
 DEV     := dev
@@ -56,9 +57,6 @@ $(DEPLOY)-$(PROD)-%               : ENV                    := $(PROD)
 $(DEPLOY)-$(DEV)-%                : REQUIRED_SOPS_SECRETS  := $(SOPS_DEV_SECRETS)
 $(DEPLOY)-$(SANDBOX)-%            : REQUIRED_SOPS_SECRETS  := $(SOPS_DEV_SECRETS)
 $(DEPLOY)-$(PROD)-%               : REQUIRED_SOPS_SECRETS  := $(SOPS_PROD_SECRETS)
-$(DEPLOY)-$(DEV)-%                : APP_PROMOTE_FLAGS      := --promote --stop-previous-version
-$(DEPLOY)-$(SANDBOX)-%            : APP_PROMOTE_FLAGS      := --promote --stop-previous-version
-$(DEPLOY)-$(PROD)-%               : APP_PROMOTE_FLAGS      := --no-promote --no-stop-previous-version
 $(DEPLOY)-$(DEV)-%                : RUN_PROMOTE_FLAGS      :=
 $(DEPLOY)-$(PROD)-%               : RUN_PROMOTE_FLAGS      := --no-traffic
 $(DEPLOY)-$(DEV)-%                : CONFIG_DIR             := ./$(SOPS_SECRETS_DIR)/$(DEV)
@@ -87,8 +85,8 @@ $(DEPLOY)-$(PROD)-tokenprocessing : SERVICE_FILE := tokenprocessing-env.yaml
 $(DEPLOY)-$(PROD)-dummymetadata   : SERVICE_FILE := dummymetadata-env.yaml
 $(DEPLOY)-$(PROD)-emails          : SERVICE_FILE := emails-server-env.yaml
 $(DEPLOY)-$(PROD)-routing-rules   : SERVICE_FILE := dispatch.yaml
-$(DEPLOY)-$(DEV)-graphql-gateway   : SERVICE_FILE := graphql-gateway.yml
-$(DEPLOY)-$(PROD)-graphql-gateway   : SERVICE_FILE := graphql-gateway.yml
+$(DEPLOY)-$(DEV)-graphql-gateway  : SERVICE_FILE := graphql-gateway.yml
+$(DEPLOY)-$(PROD)-graphql-gateway : SERVICE_FILE := graphql-gateway.yml
 
 # Service to Sentry project mapping
 $(DEPLOY)-%-backend               : SENTRY_PROJECT := gallery-backend
@@ -127,14 +125,15 @@ $(DEPLOY)-%-indexer-server             : MEMORY         := $(INDEXER_SERVER_MEMO
 $(DEPLOY)-%-indexer-server             : CONCURRENCY    := $(INDEXER_SERVER_CONCURRENCY)
 $(DEPLOY)-$(DEV)-indexer-server        : SERVICE        := indexer-api-dev
 $(DEPLOY)-$(PROD)-indexer-server       : SERVICE        := indexer-api
-$(DEPLOY)-%-indexer             	   : REPO           := indexer
-$(DEPLOY)-%-indexer             	   : DOCKER_FILE    := $(DOCKER_DIR)/indexer/Dockerfile
-$(DEPLOY)-%-indexer             	   : PORT           := 4000
-$(DEPLOY)-%-indexer             	   : TIMEOUT        := $(INDEXER_TIMEOUT)
-$(DEPLOY)-%-indexer             	   : CPU            := $(INDEXER_CPU)
-$(DEPLOY)-%-indexer             	   : MEMORY         := $(INDEXER_MEMORY)
-$(DEPLOY)-%-indexer             	   : CONCURRENCY    := $(INDEXER_CONCURRENCY)
-$(DEPLOY)-$(PROD)-indexer       	   : SERVICE        := indexer
+$(DEPLOY)-%-indexer             	     : REPO           := indexer
+$(DEPLOY)-%-indexer             	     : DOCKER_FILE    := $(DOCKER_DIR)/indexer/Dockerfile
+$(DEPLOY)-%-indexer             	     : PORT           := 4000
+$(DEPLOY)-%-indexer             	     : TIMEOUT        := $(INDEXER_TIMEOUT)
+$(DEPLOY)-%-indexer             	     : CPU            := $(INDEXER_CPU)
+$(DEPLOY)-%-indexer             	     : MEMORY         := $(INDEXER_MEMORY)
+$(DEPLOY)-%-indexer             	     : CONCURRENCY    := $(INDEXER_CONCURRENCY)
+$(DEPLOY)-%-indexer                    : DEPLOY_FLAGS   = $(BASE_DEPLOY_FLAGS) --no-cpu-throttling
+$(DEPLOY)-$(PROD)-indexer       	     : SERVICE        := indexer
 $(DEPLOY)-%-emails                     : REPO           := emails
 $(DEPLOY)-%-emails                     : DOCKER_FILE    := $(DOCKER_DIR)/emails/Dockerfile
 $(DEPLOY)-%-emails                     : PORT           := 5500
@@ -174,16 +173,25 @@ $(DEPLOY)-%-feedbot                    : MEMORY         := $(FEEDBOT_MEMORY)
 $(DEPLOY)-%-feedbot                    : CONCURRENCY    := $(FEEDBOT_CONCURRENCY)
 $(DEPLOY)-$(DEV)-feedbot               : SERVICE        := feedbot-dev
 $(DEPLOY)-$(PROD)-feedbot              : SERVICE        := feedbot
-$(DEPLOY)-%-graphql-gateway                    : REPO           := graphql-gateway
-$(DEPLOY)-$(DEV)-graphql-gateway               : DOCKER_FILE    := $(DOCKER_DIR)/graphql-gateway/$(DEV)/Dockerfile
-$(DEPLOY)-$(PROD)-graphql-gateway              : DOCKER_FILE    := $(DOCKER_DIR)/graphql-gateway/$(PROD)/Dockerfile
-$(DEPLOY)-%-graphql-gateway                    : PORT           := 8000
-$(DEPLOY)-%-graphql-gateway                    : TIMEOUT        := $(GRAPHQL_GATEWAY_TIMEOUT)
-$(DEPLOY)-%-graphql-gateway                    : CPU            := $(GRAPHQL_GATEWAY_CPU)
-$(DEPLOY)-%-graphql-gateway                    : MEMORY         := $(GRAPHQL_GATEWAY_MEMORY)
-$(DEPLOY)-%-graphql-gateway                    : CONCURRENCY    := $(GRAPHQL_GATEWAY_CONCURRENCY)
-$(DEPLOY)-$(DEV)-graphql-gateway               : SERVICE        := graphql-gateway-dev
-$(DEPLOY)-$(PROD)-graphql-gateway              : SERVICE        := graphql-gateway
+$(DEPLOY)-%-graphql-gateway            : REPO           := graphql-gateway
+$(DEPLOY)-$(DEV)-graphql-gateway       : DOCKER_FILE    := $(DOCKER_DIR)/graphql-gateway/$(DEV)/Dockerfile
+$(DEPLOY)-$(PROD)-graphql-gateway      : DOCKER_FILE    := $(DOCKER_DIR)/graphql-gateway/$(PROD)/Dockerfile
+$(DEPLOY)-%-graphql-gateway            : PORT           := 8000
+$(DEPLOY)-%-graphql-gateway            : TIMEOUT        := $(GRAPHQL_GATEWAY_TIMEOUT)
+$(DEPLOY)-%-graphql-gateway            : CPU            := $(GRAPHQL_GATEWAY_CPU)
+$(DEPLOY)-%-graphql-gateway            : MEMORY         := $(GRAPHQL_GATEWAY_MEMORY)
+$(DEPLOY)-%-graphql-gateway            : CONCURRENCY    := $(GRAPHQL_GATEWAY_CONCURRENCY)
+$(DEPLOY)-$(DEV)-graphql-gateway       : SERVICE        := graphql-gateway-dev
+$(DEPLOY)-$(PROD)-graphql-gateway      : SERVICE        := graphql-gateway
+
+# Cloud Scheduler Jobs
+$(DEPLOY)-%-alchemy-spam               : CRON_PREFIX    := alchemy-spam
+$(DEPLOY)-%-alchemy-spam               : CRON_LOCATION  := $(DEPLOY_REGION)
+$(DEPLOY)-%-alchemy-spam               : CRON_SCHEDULE  := '0 0 * * *'
+$(DEPLOY)-%-alchemy-spam               : CRON_URI       = $(shell gcloud run services describe $(URI_NAME) --region $(DEPLOY_REGION) --format 'value(status.url)')/contracts/detect-spam
+$(DEPLOY)-%-alchemy-spam               : CRON_METHOD    := POST
+$(DEPLOY)-$(DEV)-alchemy-spam					 : URI_NAME       := tokenprocessing-dev
+$(DEPLOY)-$(PROD)-alchemy-spam				 : URI_NAME       := tokenprocessing-v2
 
 # Service name mappings
 $(PROMOTE)-%-backend                   : SERVICE := default
@@ -261,23 +269,24 @@ _set-project-$(ENV):
 	@echo "\n========== DEPLOYING TO '$(ENV)' ENVIRONMENT ==========\n"
 	$(SET_GCP_PROJECT)
 
-# Deploys the project
-_$(DEPLOY)-%:
-	@$(APP_ENGINE_DEPLOY)
-	@if [ $$? -eq 0 ] && echo $(APP_PROMOTE_FLAGS) | grep -e "--no-promote" > /dev/null; then echo "\n\tVERSION: '$(DEPLOY_VERSION)' was deployed but is not currently receiving traffic.\n\tRun 'make promote-$(ENV)-$* version=$(DEPLOY_VERSION)' to promote it!\n"; else echo "\n\tVERSION: '$(DEPLOY_VERSION)' was deployed!\n"; fi
-
 _$(DOCKER)-$(DEPLOY)-%:
 	@$(DOCKER_BUILD)
 	@$(DOCKER_PUSH)
 	@$(CLOUD_RUN_DEPLOY)
 	@if [ $$? -eq 0 ] && echo $(DEPLOY_FLAGS) | grep -e "--no-traffic" > /dev/null; then echo "\n\tVERSION: '$(CURRENT_COMMIT_HASH)' was deployed but is not currently receiving traffic.\n\tRun 'make promote-$(ENV)-$* version=$(CURRENT_COMMIT_HASH)' to promote it!\n"; else echo "\n\tVERSION: '$(CURRENT_COMMIT_HASH)' was deployed!\n"; fi
 
-_$(DOCKER)-no-throttle-$(DEPLOY)-%:
-	@$(DOCKER_BUILD)
-	@$(DOCKER_PUSH)
-	@$(CLOUD_RUN_DEPLOY_NO_THROTTLE)
-	@if [ $$? -eq 0 ] && echo $(DEPLOY_FLAGS) | grep -e "--no-traffic" > /dev/null; then echo "\n\tVERSION: '$(CURRENT_COMMIT_HASH)' was deployed but is not currently receiving traffic.\n\tRun 'make promote-$(ENV)-$* version=$(CURRENT_COMMIT_HASH)' to promote it!\n"; else echo "\n\tVERSION: '$(CURRENT_COMMIT_HASH)' was deployed!\n"; fi
+_$(CRON)-$(DEPLOY)-%:
+	@$(SCHEDULER_DEPLOY)
+	@echo Deployed job $(CRON_NAME) to $(ENV)
 
+# Pauses jobs besides the version being deployed
+_$(CRON)-$(PAUSE)-%:
+	@echo Pausing jobs besides $(CRON_NAME)...
+	@gcloud scheduler jobs list \
+		--location $(DEPLOY_REGION) \
+		--filter 'ID:$(CRON_PREFIX) AND NOT ID:$(CRON_NAME) AND STATE:enabled' \
+		--format 'value(ID)' \
+		| xargs -I {} gcloud scheduler jobs pause --location $(DEPLOY_REGION) --quiet {}
 
 # Immediately migrates traffic to the input version
 _$(PROMOTE)-%:
@@ -313,14 +322,15 @@ $(DEPLOY)-$(DEV)-admin            : _set-project-$(ENV) _$(DEPLOY)-admin
 $(DEPLOY)-$(DEV)-feed             : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feed _$(RELEASE)-feed
 $(DEPLOY)-$(DEV)-feedbot          : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feedbot _$(RELEASE)-feedbot
 $(DEPLOY)-$(DEV)-routing-rules    : _set-project-$(ENV) _$(DEPLOY)-routing-rules
-$(DEPLOY)-$(DEV)-graphql-gateway   : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-graphql-gateway
+$(DEPLOY)-$(DEV)-graphql-gateway  : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-graphql-gateway
+$(DEPLOY)-$(DEV)-alchemy-spam     : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-alchemy-spam _$(CRON)-$(PAUSE)-alchemy-spam
 
 # SANDBOX deployments
 $(DEPLOY)-$(SANDBOX)-backend      : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend # go server that uses dev upstream services
 
 # PROD deployments
 $(DEPLOY)-$(PROD)-backend         : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend
-$(DEPLOY)-$(PROD)-indexer         : _set-project-$(ENV) _$(DOCKER)-no-throttle-$(DEPLOY)-indexer _$(RELEASE)-indexer
+$(DEPLOY)-$(PROD)-indexer         : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer # _$(RELEASE)-indexer
 $(DEPLOY)-$(PROD)-indexer-server  : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer-server _$(RELEASE)-indexer-server
 $(DEPLOY)-$(PROD)-tokenprocessing : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-tokenprocessing _$(RELEASE)-tokenprocessing
 $(DEPLOY)-$(PROD)-dummymetadata   : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-dummymetadata _$(RELEASE)-dummymetadata
