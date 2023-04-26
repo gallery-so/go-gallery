@@ -1008,3 +1008,21 @@ insert into users (id, username, username_idempotent, bio, wallets, universal, e
 
 -- name: AddWalletToUserByID :exec
 update users set wallets = array_append(wallets, @wallet_id::varchar) where id = @user_id;
+
+-- name: InsertTokenProcessingJob :exec
+insert into token_processing_jobs (id, token_properties, pipeline_metadata, processing_cause, processor_version) values ($1, $2, $3, $4, $5);
+
+-- name: InsertTokenMedia :exec
+insert into token_media (id, contract, token_id, chain, metadata, media, name, description, processing_job_id, active) values ($1, $2, $3, $4, $5, $6, $7, $8, $9,true);
+
+-- name: UpdateTokenTokenMediaByTokenIdentifiers :exec
+update tokens set token_media = $1 where tokens.contract = $2 and tokens.token_id = $3 and tokens.chain = $4 and deleted = false;
+
+-- name: UpdateTokenMediaByTokenIdentifiers :exec
+with old as (
+  insert into token_media (id, contract, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated) (select $1, contract_address, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, last_updated from token_media where token_media.contract = $2 and token_media.token_id = $3 and token_media.chain = $4 and active = true and deleted = false)
+) update token_media set metadata = $5, media = $6, name = $7, description = $8, processing_job_id = $9 where token_media.contract = $2 and token_media.token_id = $3 and token_media.chain = $4 and active = true and deleted = false;
+
+-- name: IsExistsTokenMediaByTokenIdentifers :one
+select exists(select 1 from token_media where token_media.contract = $1 and token_media.token_id = $2 and token_media.chain = $3 and active = true and deleted = false);
+

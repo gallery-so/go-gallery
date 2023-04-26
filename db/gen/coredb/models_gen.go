@@ -339,6 +339,34 @@ type Token struct {
 	IsProviderMarkedSpam sql.NullBool
 	LastSynced           time.Time
 	FallbackMedia        persist.FallbackMedia
+	TokenMedia           sql.NullString
+}
+
+type TokenMedium struct {
+	ID              persist.DBID
+	CreatedAt       time.Time
+	LastUpdated     time.Time
+	Version         int32
+	Contract        persist.DBID
+	TokenID         persist.TokenID
+	Chain           persist.Chain
+	Active          bool
+	Metadata        persist.TokenMetadata
+	Media           persist.Media
+	Name            string
+	Description     string
+	ProcessingJobID persist.DBID
+	Deleted         bool
+}
+
+type TokenProcessingJob struct {
+	ID               persist.DBID
+	CreatedAt        time.Time
+	TokenProperties  persist.TokenProperties
+	PipelineMetadata persist.PipelineMetadata
+	ProcessingCause  persist.ProcessingCause
+	ProcessorVersion string
+	Deleted          bool
 }
 
 type TopRecommendedUser struct {

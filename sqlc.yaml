@@ -90,6 +90,28 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.AddressAtBlockList"
           - column: "tokens.token_metadata"
             go_type: "github.com/mikeydub/go-gallery/service/persist.TokenMetadata"
+          - column: tokens.token_media"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+          
+          # TokenMedia
+          - column: "token_media.metadata"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.TokenMetadata"
+          - column: "token_media.token_id"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.TokenID"
+          - column: "token_media.contract"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+          - column: "token_media.chain"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Chain"
+          - column: "token_media.media"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Media"
+
+          # TokenProcessingJobs
+          - column: "token_processing_jobs.pipeline_metadata"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.PipelineMetadata"
+          - column: "token_processing_jobs.token_properties"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.TokenProperties"
+          - column: "token_processing_jobs.processing_cause"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.ProcessingCause"
 
           # Membership
           - column: "membership.owners"
