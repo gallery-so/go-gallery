@@ -21,7 +21,6 @@ const (
 	errorContextName  = "error context"
 	eventContextName  = "event context"
 	loggerContextName = "logger context"
-	TokenContextName  = "NFT context" // Sentry excludes contexts that contain "token" so we use "NFT" instead
 )
 
 // SentryLoggerHook forwards log entries to Sentry.
@@ -39,7 +38,7 @@ var sentryTrailLimit = 8
 
 // ReportRemappedError reports an error with additional context indicating the original error and the remapped error.
 func ReportRemappedError(ctx context.Context, originalErr error, remappedErr interface{}) {
-	reportError(ctx, originalErr, func(scope *sentry.Scope) {
+	ReportError(ctx, originalErr, func(scope *sentry.Scope) {
 		if remappedErr != nil {
 			SetErrorContext(scope, true, fmt.Sprintf("%T", remappedErr))
 			scope.SetTag("remappedError", "true")
@@ -49,22 +48,8 @@ func ReportRemappedError(ctx context.Context, originalErr error, remappedErr int
 	})
 }
 
-// ReportTokenError reports an error that occurred while processing a token.
-func ReportTokenError(ctx context.Context, err error, runID persist.DBID, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID, isSpam bool) {
-	reportError(ctx, err, func(scope *sentry.Scope) {
-		SetRunTags(scope, runID)
-		SetTokenTags(scope, chain, contractAddress, tokenID)
-		SetTokenContext(scope, chain, contractAddress, tokenID, isSpam)
-	})
-}
-
-// ReportError reports an error to Sentry as-is.
-func ReportError(ctx context.Context, err error) {
-	reportError(ctx, err)
-}
-
-// reportError add any additional information to the scope before reporting the error to Sentry.
-func reportError(ctx context.Context, err error, scopeFuncs ...func(*sentry.Scope)) {
+// ReportError reports an error with optional scope functions to add additional context.
+func ReportError(ctx context.Context, err error, scopeFuncs ...func(*sentry.Scope)) {
 	hub := SentryHubFromContext(ctx)
 	if hub == nil {
 		logger.For(ctx).Warnln("could not report error to Sentry because hub is nil")
@@ -149,43 +134,6 @@ func SetEventContext(scope *sentry.Scope, actorID, subjectID persist.DBID, actio
 	}
 
 	scope.SetContext(eventContextName, eventCtx)
-}
-
-func SetTokenTags(scope *sentry.Scope, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) {
-	scope.SetTag("chain", fmt.Sprintf("%d", chain))
-	scope.SetTag("contractAddress", contractAddress.String())
-	scope.SetTag("nftID", string(tokenID))
-	assetPage := assetURL(chain, contractAddress, tokenID)
-	if len(assetPage) > 200 {
-		assetPage = "assetURL too long, see token context"
-	}
-	scope.SetTag("assetURL", assetPage)
-}
-
-func assetURL(chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) string {
-	switch chain {
-	case persist.ChainETH:
-		return fmt.Sprintf("https://opensea.io/assets/%s/%d", contractAddress.String(), tokenID.ToInt())
-	case persist.ChainTezos:
-		return fmt.Sprintf("https://objkt.com/asset/%s/%d", contractAddress.String(), tokenID.ToInt())
-	default:
-		return ""
-	}
-}
-
-func SetTokenContext(scope *sentry.Scope, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID, isSpam bool) {
-	scope.SetContext(TokenContextName, sentry.Context{
-		"Chain":           chain,
-		"ContractAddress": contractAddress,
-		"NftID":           tokenID, // Sentry drops fields containing 'token'
-		"IsSpam":          isSpam,
-		"AssetURL":        assetURL(chain, contractAddress, tokenID),
-	})
-}
-
-func SetRunTags(scope *sentry.Scope, runID persist.DBID) {
-	scope.SetTag("runID", runID.String())
-	scope.SetTag("log", "go/tp-runs/"+runID.String())
 }
 
 // NewSentryHubGinContext returns a new Gin context with a cloned hub of the original context's hub.

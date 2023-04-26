@@ -17,6 +17,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain"
+	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/redis"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/throttle"
@@ -25,6 +26,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
+
+const sentryTokenContextName = "NFT context" // Sentry excludes contexts that contain "token" so we use "NFT" instead
 
 // InitServer initializes the mediaprocessing server
 func InitServer() {
@@ -129,6 +132,52 @@ func initSentry() {
 	}
 }
 
+// reportTokenError reports an error that occurred while processing a token.
+func reportTokenError(ctx context.Context, err error, runID persist.DBID, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID, isSpam bool) {
+	sentryutil.ReportError(ctx, err, func(scope *sentry.Scope) {
+		setRunTags(scope, runID)
+		setTokenTags(scope, chain, contractAddress, tokenID)
+		setTokenContext(scope, chain, contractAddress, tokenID, isSpam)
+	})
+}
+
+func setTokenTags(scope *sentry.Scope, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) {
+	scope.SetTag("chain", fmt.Sprintf("%d", chain))
+	scope.SetTag("contractAddress", contractAddress.String())
+	scope.SetTag("nftID", string(tokenID))
+	assetPage := assetURL(chain, contractAddress, tokenID)
+	if len(assetPage) > 200 {
+		assetPage = "assetURL too long, see token context"
+	}
+	scope.SetTag("assetURL", assetPage)
+}
+
+func assetURL(chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) string {
+	switch chain {
+	case persist.ChainETH:
+		return fmt.Sprintf("https://opensea.io/assets/%s/%d", contractAddress.String(), tokenID.ToInt())
+	case persist.ChainTezos:
+		return fmt.Sprintf("https://objkt.com/asset/%s/%d", contractAddress.String(), tokenID.ToInt())
+	default:
+		return ""
+	}
+}
+
+func setTokenContext(scope *sentry.Scope, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID, isSpam bool) {
+	scope.SetContext(sentryTokenContextName, sentry.Context{
+		"Chain":           chain,
+		"ContractAddress": contractAddress,
+		"NftID":           tokenID, // Sentry drops fields containing 'token'
+		"IsSpam":          isSpam,
+		"AssetURL":        assetURL(chain, contractAddress, tokenID),
+	})
+}
+
+func setRunTags(scope *sentry.Scope, runID persist.DBID) {
+	scope.SetTag("runID", runID.String())
+	scope.SetTag("log", "go/tp-runs/"+runID.String())
+}
+
 func updateMediaProccessingFingerprints(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 	if event == nil || event.Exception == nil || hint == nil {
 		return event
@@ -172,7 +221,7 @@ func updateMediaProccessingFingerprints(event *sentry.Event, hint *sentry.EventH
 }
 
 func excludeTokenSpam(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
-	if event.Contexts[sentryutil.TokenContextName]["IsSpam"].(bool) == true {
+	if event.Contexts[sentryTokenContextName]["IsSpam"].(bool) == true {
 		return nil
 	}
 	return event

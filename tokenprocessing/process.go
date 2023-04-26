@@ -22,7 +22,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
-	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/util"
@@ -184,7 +183,7 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 	if err != nil {
 		logger.For(ctx).Errorf("error processing media for %s: %s", key, err)
 		isSpam := contract.IsProviderMarkedSpam || util.GetOptionalValue(t.IsProviderMarkedSpam, false) || util.GetOptionalValue(t.IsUserMarkedSpam, false)
-		sentryutil.ReportTokenError(ctx, err, runID, t.Chain, contract.Address, t.TokenID, isSpam)
+		reportTokenError(ctx, err, runID, t.Chain, contract.Address, t.TokenID, isSpam)
 		if newMedia.MediaType != persist.MediaTypeInvalid {
 			newMedia = persist.Media{
 				MediaType: persist.MediaTypeUnknown,
@@ -261,7 +260,7 @@ func detectSpamContracts(queries *db.Queries) gin.HandlerFunc {
 
 		req, err := http.NewRequestWithContext(c, http.MethodGet, spamEndpoint.String(), nil)
 		if err != nil {
-			util.ErrResponse(c, http.StatusOK, err)
+			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
@@ -269,7 +268,7 @@ func detectSpamContracts(queries *db.Queries) gin.HandlerFunc {
 
 		resp, err := retry.RetryRequest(http.DefaultClient, req)
 		if err != nil {
-			util.ErrResponse(c, http.StatusOK, err)
+			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
@@ -286,7 +285,7 @@ func detectSpamContracts(queries *db.Queries) gin.HandlerFunc {
 
 		err = json.NewDecoder(resp.Body).Decode(&body)
 		if err != nil {
-			util.ErrResponse(c, http.StatusOK, err)
+			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
