@@ -157,7 +157,7 @@ func SetTokenTags(scope *sentry.Scope, chain persist.Chain, contractAddress pers
 	scope.SetTag("nftID", string(tokenID))
 	assetPage := assetURL(chain, contractAddress, tokenID)
 	if len(assetPage) > 200 {
-		assetPage = "see token context"
+		assetPage = "assetURL too long, see token context"
 	}
 	scope.SetTag("assetURL", assetPage)
 }
@@ -177,7 +177,7 @@ func SetTokenContext(scope *sentry.Scope, chain persist.Chain, contractAddress p
 	scope.SetContext(TokenContextName, sentry.Context{
 		"Chain":           chain,
 		"ContractAddress": contractAddress,
-		"NftID":           tokenID, // Sentry strips fields containing 'token'
+		"NftID":           tokenID, // Sentry drops fields containing 'token'
 		"IsSpam":          isSpam,
 		"AssetURL":        assetURL(chain, contractAddress, tokenID),
 	})

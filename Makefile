@@ -28,7 +28,7 @@ DOCKER_BUILD         = docker build --file $(DOCKER_FILE) --platform linux/amd64
 DOCKER_PUSH          = docker push $(IMAGE_TAG)
 DOCKER_DIR           := ./docker
 DOCKER_CONTEXT       := .
-DOCKER_REGISTRY      := $(DEPLOY_REGION)-docker.pkg.dev
+DOCKER_REGISTRY      := us-east1-docker.pkg.dev
 
 # Environments
 DEV     := dev

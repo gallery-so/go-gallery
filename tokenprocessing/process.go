@@ -249,6 +249,7 @@ func processOwnersForContractTokens(mc *multichain.Provider, contractRepo *postg
 	}
 }
 
+// detectSpamContracts refreshes the alchemy_spam_contracts table with marked contracts from Alchemy
 func detectSpamContracts(queries *db.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		alchemyURL, err := url.Parse(env.GetString("ALCHEMY_NFT_API_URL"))
