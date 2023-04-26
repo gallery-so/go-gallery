@@ -340,6 +340,7 @@ $(DEPLOY)-$(PROD)-feedbot         : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-fee
 $(DEPLOY)-$(PROD)-admin           : _set-project-$(ENV) _$(DEPLOY)-admin
 $(DEPLOY)-$(PROD)-routing-rules   : _set-project-$(ENV) _$(DEPLOY)-routing-rules
 $(DEPLOY)-$(PROD)-graphql-gateway : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-graphql-gateway
+$(DEPLOY)-$(PROD)-alchemy-spam    : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-alchemy-spam _$(CRON)-$(PAUSE)-alchemy-spam
 
 # PROD promotions. Running these targets will migrate traffic to the specified version.
 # Example usage:
