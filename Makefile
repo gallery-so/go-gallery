@@ -190,8 +190,8 @@ $(DEPLOY)-%-alchemy-spam               : CRON_LOCATION  := $(DEPLOY_REGION)
 $(DEPLOY)-%-alchemy-spam               : CRON_SCHEDULE  := '0 0 * * *'
 $(DEPLOY)-%-alchemy-spam               : CRON_URI       = $(shell gcloud run services describe $(URI_NAME) --region $(DEPLOY_REGION) --format 'value(status.url)')/contracts/detect-spam
 $(DEPLOY)-%-alchemy-spam               : CRON_METHOD    := POST
-$(DEPLOY)-$(DEV)-alchemy-spam  				 : URI_NAME       := tokenprocessing-dev
-$(DEPLOY)-$(PROD)-alchemy-spam  			 : URI_NAME       := tokenprocessing-v2
+$(DEPLOY)-$(DEV)-alchemy-spam          : URI_NAME       := tokenprocessing-dev
+$(DEPLOY)-$(PROD)-alchemy-spam         : URI_NAME       := tokenprocessing-v2
 
 # Service name mappings
 $(PROMOTE)-%-backend                   : SERVICE := default
