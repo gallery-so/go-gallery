@@ -907,7 +907,11 @@ func (m MediaType) IsMorePriorityThan(other MediaType) bool {
 
 // Value implements the database/sql/driver Valuer interface for the MediaType type
 func (m MediaType) Value() (driver.Value, error) {
-	return string(m), nil
+	return m.String(), nil
+}
+
+func (m MediaType) String() string {
+	return string(m)
 }
 
 // Scan implements the database/sql Scanner interface for the MediaType type

@@ -397,6 +397,12 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		}
 		resp, err := defaultHTTPClient.Do(req)
 		if err != nil {
+			if dnsErr, ok := err.(*net.DNSError); ok {
+				return nil, dnsErr
+			}
+			if urlErr, ok := err.(*url.Error); ok {
+				return nil, urlErr
+			}
 			return nil, fmt.Errorf("error getting data from http: %s", err)
 		}
 		defer resp.Body.Close()
@@ -531,7 +537,13 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 		}
 		resp, err := defaultHTTPClient.Do(req)
 		if err != nil {
-			return nil, fmt.Errorf("error getting data from http: %s", err)
+			if dnsErr, ok := err.(*net.DNSError); ok {
+				return nil, dnsErr
+			}
+			if urlErr, ok := err.(*url.Error); ok {
+				return nil, urlErr
+			}
+			return nil, fmt.Errorf("error getting data from http: %s <%T>", err, err)
 		}
 		if resp.StatusCode > 399 || resp.StatusCode < 200 {
 			return nil, ErrHTTP{Status: resp.StatusCode, URL: asString}
@@ -621,17 +633,23 @@ func DecodeMetadataFromURI(ctx context.Context, turi persist.TokenURI, into *per
 	case persist.URITypeBase64JSON:
 		// decode the base64 encoded json
 		b64data := asString[strings.IndexByte(asString, ',')+1:]
-		decoded, err := base64.StdEncoding.DecodeString(string(b64data))
+		decoded, err := base64.RawStdEncoding.DecodeString(string(b64data))
 		if err != nil {
-			return fmt.Errorf("error decoding base64 metadata: %s \n\n%s", err, b64data)
+			decoded, err = base64.StdEncoding.DecodeString(string(b64data))
+			if err != nil {
+				return fmt.Errorf("error decoding base64 data: %s \n\n%s", err, b64data)
+			}
 		}
 
 		return json.Unmarshal(util.RemoveBOM(decoded), into)
 	case persist.URITypeBase64SVG:
 		b64data := asString[strings.IndexByte(asString, ',')+1:]
-		decoded, err := base64.StdEncoding.DecodeString(string(b64data))
+		decoded, err := base64.RawStdEncoding.DecodeString(string(b64data))
 		if err != nil {
-			return fmt.Errorf("error decoding base64 metadata: %s \n\n%s", err, b64data)
+			decoded, err = base64.StdEncoding.DecodeString(string(b64data))
+			if err != nil {
+				return fmt.Errorf("error decoding base64 data: %s \n\n%s", err, b64data)
+			}
 		}
 		*into = persist.TokenMetadata{"image": string(decoded)}
 		return nil

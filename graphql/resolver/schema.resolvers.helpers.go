@@ -1868,29 +1868,29 @@ func getMediaForToken(ctx context.Context, token db.Token) model.MediaSubtype {
 
 	switch med.MediaType {
 	case persist.MediaTypeImage, persist.MediaTypeSVG:
-		return getImageMedia(ctx, med)
+		return getImageMedia(ctx, med, fallbackMedia)
 	case persist.MediaTypeGIF:
-		return getGIFMedia(ctx, med)
+		return getGIFMedia(ctx, med, fallbackMedia)
 	case persist.MediaTypeVideo:
-		return getVideoMedia(ctx, med)
+		return getVideoMedia(ctx, med, fallbackMedia)
 	case persist.MediaTypeAudio:
-		return getAudioMedia(ctx, med)
+		return getAudioMedia(ctx, med, fallbackMedia)
 	case persist.MediaTypeHTML:
-		return getHtmlMedia(ctx, med)
+		return getHtmlMedia(ctx, med, fallbackMedia)
 	case persist.MediaTypeAnimation:
-		return getGltfMedia(ctx, med)
+		return getGltfMedia(ctx, med, fallbackMedia)
 	case persist.MediaTypeJSON:
-		return getJsonMedia(ctx, med)
+		return getJsonMedia(ctx, med, fallbackMedia)
 	case persist.MediaTypeText, persist.MediaTypeBase64Text:
-		return getTextMedia(ctx, med)
+		return getTextMedia(ctx, med, fallbackMedia)
 	case persist.MediaTypePDF:
-		return getPdfMedia(ctx, med)
+		return getPdfMedia(ctx, med, fallbackMedia)
 	case persist.MediaTypeUnknown:
 		return getUnknownMedia(ctx, med, fallbackMedia)
 	case persist.MediaTypeSyncing:
 		return getSyncingMedia(ctx, med, fallbackMedia)
 	default:
-		return getInvalidMedia(ctx, med)
+		return getInvalidMedia(ctx, med, fallbackMedia)
 	}
 
 }
@@ -1919,24 +1919,7 @@ func getPreviewUrls(ctx context.Context, media persist.Media, options ...mediama
 	}
 }
 
-func getFallbackPreviewURLs(ctx context.Context, media persist.FallbackMedia, options ...mediamapper.Option) *model.PreviewURLSet {
-	url := media.ImageURL.String()
-
-	preview := remapLargeImageUrls(url)
-	mm := mediamapper.For(ctx)
-
-	return &model.PreviewURLSet{
-		Raw:        &preview,
-		Thumbnail:  util.ToPointer(mm.GetThumbnailImageUrl(preview, options...)),
-		Small:      util.ToPointer(mm.GetSmallImageUrl(preview, options...)),
-		Medium:     util.ToPointer(mm.GetMediumImageUrl(preview, options...)),
-		Large:      util.ToPointer(mm.GetLargeImageUrl(preview, options...)),
-		SrcSet:     util.ToPointer(mm.GetSrcSet(preview, options...)),
-		LiveRender: &url,
-	}
-}
-
-func getImageMedia(ctx context.Context, media persist.Media) model.ImageMedia {
+func getImageMedia(ctx context.Context, media persist.Media, fallbackMedia *model.FallbackMedia) model.ImageMedia {
 	url := remapLargeImageUrls(media.MediaURL.String())
 
 	return model.ImageMedia{
@@ -1945,6 +1928,7 @@ func getImageMedia(ctx context.Context, media persist.Media) model.ImageMedia {
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: &url,
 		Dimensions:       mediaToDimensions(media.Dimensions),
+		FallbackMedia:    fallbackMedia,
 	}
 }
 
@@ -1957,7 +1941,7 @@ func getFallbackMedia(ctx context.Context, media persist.FallbackMedia) *model.F
 	}
 }
 
-func getGIFMedia(ctx context.Context, media persist.Media) model.GIFMedia {
+func getGIFMedia(ctx context.Context, media persist.Media, fallbackMedia *model.FallbackMedia) model.GIFMedia {
 	url := remapLargeImageUrls(media.MediaURL.String())
 
 	return model.GIFMedia{
@@ -1967,6 +1951,7 @@ func getGIFMedia(ctx context.Context, media persist.Media) model.GIFMedia {
 		MediaType:         (*string)(&media.MediaType),
 		ContentRenderURL:  &url,
 		Dimensions:        mediaToDimensions(media.Dimensions),
+		FallbackMedia:     fallbackMedia,
 	}
 }
 
@@ -1980,7 +1965,7 @@ func remapLargeImageUrls(url string) string {
 	return url
 }
 
-func getVideoMedia(ctx context.Context, media persist.Media) model.VideoMedia {
+func getVideoMedia(ctx context.Context, media persist.Media, fallbackMedia *model.FallbackMedia) model.VideoMedia {
 	asString := media.MediaURL.String()
 	videoUrls := model.VideoURLSet{
 		Raw:    &asString,
@@ -1995,66 +1980,73 @@ func getVideoMedia(ctx context.Context, media persist.Media) model.VideoMedia {
 		MediaType:         (*string)(&media.MediaType),
 		ContentRenderURLs: &videoUrls,
 		Dimensions:        mediaToDimensions(media.Dimensions),
+		FallbackMedia:     fallbackMedia,
 	}
 }
 
-func getAudioMedia(ctx context.Context, media persist.Media) model.AudioMedia {
+func getAudioMedia(ctx context.Context, media persist.Media, fallbackMedia *model.FallbackMedia) model.AudioMedia {
 	return model.AudioMedia{
 		PreviewURLs:      getPreviewUrls(ctx, media),
 		MediaURL:         util.ToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 		Dimensions:       mediaToDimensions(media.Dimensions),
+		FallbackMedia:    fallbackMedia,
 	}
 }
 
-func getTextMedia(ctx context.Context, media persist.Media) model.TextMedia {
+func getTextMedia(ctx context.Context, media persist.Media, fallbackMedia *model.FallbackMedia) model.TextMedia {
 	return model.TextMedia{
 		PreviewURLs:      getPreviewUrls(ctx, media),
 		MediaURL:         util.ToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 		Dimensions:       mediaToDimensions(media.Dimensions),
+		FallbackMedia:    fallbackMedia,
 	}
 }
 
-func getPdfMedia(ctx context.Context, media persist.Media) model.PDFMedia {
+func getPdfMedia(ctx context.Context, media persist.Media, fallbackMedia *model.FallbackMedia) model.PDFMedia {
 	return model.PDFMedia{
 		PreviewURLs:      getPreviewUrls(ctx, media),
 		MediaURL:         util.ToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 		Dimensions:       mediaToDimensions(media.Dimensions),
+		FallbackMedia:    fallbackMedia,
 	}
 }
 
-func getHtmlMedia(ctx context.Context, media persist.Media) model.HTMLMedia {
+func getHtmlMedia(ctx context.Context, media persist.Media, fallbackMedia *model.FallbackMedia) model.HTMLMedia {
 	return model.HTMLMedia{
 		PreviewURLs:      getPreviewUrls(ctx, media),
 		MediaURL:         util.ToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 		Dimensions:       mediaToDimensions(media.Dimensions),
+		FallbackMedia:    fallbackMedia,
 	}
 }
 
-func getJsonMedia(ctx context.Context, media persist.Media) model.JSONMedia {
+func getJsonMedia(ctx context.Context, media persist.Media, fallbackMedia *model.FallbackMedia) model.JSONMedia {
 	return model.JSONMedia{
 		PreviewURLs:      getPreviewUrls(ctx, media),
 		MediaURL:         util.ToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 		Dimensions:       mediaToDimensions(media.Dimensions),
+		FallbackMedia:    fallbackMedia,
 	}
 }
 
-func getGltfMedia(ctx context.Context, media persist.Media) model.GltfMedia {
+func getGltfMedia(ctx context.Context, media persist.Media, fallbackMedia *model.FallbackMedia) model.GltfMedia {
 	return model.GltfMedia{
 		PreviewURLs:      getPreviewUrls(ctx, media),
 		MediaURL:         util.ToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 		Dimensions:       mediaToDimensions(media.Dimensions),
+		FallbackMedia:    fallbackMedia,
 	}
 }
 
@@ -2080,13 +2072,14 @@ func getSyncingMedia(ctx context.Context, media persist.Media, fallbackMedia *mo
 	}
 }
 
-func getInvalidMedia(ctx context.Context, media persist.Media) model.InvalidMedia {
+func getInvalidMedia(ctx context.Context, media persist.Media, fallbackMedia *model.FallbackMedia) model.InvalidMedia {
 	return model.InvalidMedia{
 		PreviewURLs:      getPreviewUrls(ctx, media),
 		MediaURL:         util.ToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 		Dimensions:       mediaToDimensions(media.Dimensions),
+		FallbackMedia:    fallbackMedia,
 	}
 }
 
