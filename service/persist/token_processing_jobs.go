@@ -92,8 +92,32 @@ type PipelineMetadata struct {
 	NothingCachedWithErrors      PipelineStepStatus `json:"nothing_cached_errors,omitempty"`
 	NothingCachedWithoutErrors   PipelineStepStatus `json:"nothing_cached_no_errors,omitempty"`
 	CreateMediaFromCachedObjects PipelineStepStatus `json:"create_media_from_cached_objects,omitempty"`
+	CreateRawMedia               PipelineStepStatus `json:"create_raw_media,omitempty"`
 	SetUnknownMediaType          PipelineStepStatus `json:"set_default_media_type,omitempty"`
 	MediaResultComparison        PipelineStepStatus `json:"media_result_comparison,omitempty"`
 	UpdateTokenMetadataDB        PipelineStepStatus `json:"update_token_metadata_db,omitempty"`
 	UpdateJobDB                  PipelineStepStatus `json:"update_job_db,omitempty"`
+}
+
+func TrackStepStatus(status *PipelineStepStatus) func() {
+	if status == nil {
+		started := PipelineStepStatusStarted
+		status = &started
+	}
+	*status = PipelineStepStatusStarted
+	return func() {
+		if *status == PipelineStepStatusError {
+			return
+		}
+		*status = PipelineStepStatusSuccess
+	}
+
+}
+
+func FailStep(status *PipelineStepStatus) {
+	if status == nil {
+		errored := PipelineStepStatusError
+		status = &errored
+	}
+	*status = PipelineStepStatusError
 }

@@ -65,14 +65,14 @@ type errNoDataFromReader struct {
 	url string
 }
 
-type errNotCacheable struct {
-	url       string
-	mediaType persist.MediaType
+type ErrNotCacheable struct {
+	URL       string
+	MediaType persist.MediaType
 }
 
-type errInvalidMedia struct {
+type ErrInvalidMedia struct {
 	err error
-	url string
+	URL string
 }
 
 type errNoCachedObjects struct {
@@ -89,12 +89,12 @@ func (e errNoDataFromReader) Error() string {
 	return fmt.Sprintf("no data from reader: %s (url: %s)", e.err, e.url)
 }
 
-func (e errNotCacheable) Error() string {
-	return fmt.Sprintf("unsupported media for caching: %s (mediaURL: %s)", e.mediaType, e.url)
+func (e ErrNotCacheable) Error() string {
+	return fmt.Sprintf("unsupported media for caching: %s (mediaURL: %s)", e.MediaType, e.URL)
 }
 
-func (e errInvalidMedia) Error() string {
-	return fmt.Sprintf("invalid media: %s (url: %s)", e.err, e.url)
+func (e ErrInvalidMedia) Error() string {
+	return fmt.Sprintf("invalid media: %s (url: %s)", e.err, e.URL)
 }
 
 func (e errNoMediaURLs) Error() string {
@@ -211,16 +211,16 @@ func CacheObjectsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	objects := append(animResult.cachedObjects, imgResult.cachedObjects...)
 
 	// the media type is not cacheable but is valid
-	if notCacheableErr, ok := animResult.err.(errNotCacheable); ok {
+	if notCacheableErr, ok := animResult.err.(ErrNotCacheable); ok {
 		return nil, notCacheableErr
-	} else if notCacheableErr, ok := imgResult.err.(errNotCacheable); ok {
+	} else if notCacheableErr, ok := imgResult.err.(ErrNotCacheable); ok {
 		return nil, notCacheableErr
 	}
 
 	// neither download worked, unexpectedly
 	if (animCh == nil || (animResult.err != nil && len(animResult.cachedObjects) == 0)) && (imgCh == nil || (imgResult.err != nil && len(imgResult.cachedObjects) == 0)) {
 		if animCh != nil {
-			if _, ok := animResult.err.(errInvalidMedia); ok {
+			if _, ok := animResult.err.(ErrInvalidMedia); ok {
 				return nil, MediaProcessingError{
 					Chain:           chain,
 					ContractAddress: contractAddress,
@@ -231,7 +231,7 @@ func CacheObjectsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 			}
 		}
 		if imgCh != nil {
-			if _, ok := imgResult.err.(errInvalidMedia); ok {
+			if _, ok := imgResult.err.(ErrInvalidMedia); ok {
 				return nil, MediaProcessingError{
 					Chain:           chain,
 					ContractAddress: contractAddress,
@@ -266,7 +266,7 @@ func CreateRawMedia(pCtx context.Context, tids persist.TokenIdentifiers, mediaTy
 func CreateMediaFromCachedObjects(ctx context.Context, tokenBucket string, objects []CachedMediaObject) persist.Media {
 	var primaryObject CachedMediaObject
 	for _, obj := range objects {
-		switch obj.objectType {
+		switch obj.ObjectType {
 		case ObjectTypeAnimation:
 			// if we receive an animation, that takes top priority and will be the primary object
 			primaryObject = obj
@@ -279,13 +279,13 @@ func CreateMediaFromCachedObjects(ctx context.Context, tokenBucket string, objec
 
 	var thumbnailObject *CachedMediaObject
 	var liveRenderObject *CachedMediaObject
-	if primaryObject.objectType == ObjectTypeAnimation {
+	if primaryObject.ObjectType == ObjectTypeAnimation {
 		// animations should have a thumbnail that could be an image or svg or thumbnail
 		// thumbnail take top priority, then the other image types that could have been cached
 		for _, obj := range objects {
-			if obj.objectType == ObjectTypeImage || obj.objectType == ObjectTypeSVG {
+			if obj.ObjectType == ObjectTypeImage || obj.ObjectType == ObjectTypeSVG {
 				thumbnailObject = &obj
-			} else if obj.objectType == ObjectTypeThumbnail {
+			} else if obj.ObjectType == ObjectTypeThumbnail {
 				thumbnailObject = &obj
 				break
 			}
@@ -293,7 +293,7 @@ func CreateMediaFromCachedObjects(ctx context.Context, tokenBucket string, objec
 	} else {
 		// it's not an animation, meaning its image like, so we only use a thumbnail when there explicitly is one
 		for _, obj := range objects {
-			if obj.objectType == ObjectTypeThumbnail {
+			if obj.ObjectType == ObjectTypeThumbnail {
 				thumbnailObject = &obj
 				break
 			}
@@ -302,23 +302,23 @@ func CreateMediaFromCachedObjects(ctx context.Context, tokenBucket string, objec
 
 	// live render can apply to any media type, if one explicitly exists, use it
 	for _, obj := range objects {
-		if obj.objectType == ObjectTypeLiveRender {
+		if obj.ObjectType == ObjectTypeLiveRender {
 			liveRenderObject = &obj
 			break
 		}
 	}
 
 	result := persist.Media{
-		MediaURL:  persist.NullString(primaryObject.storageURL(tokenBucket)),
-		MediaType: primaryObject.mediaType,
+		MediaURL:  persist.NullString(primaryObject.StorageURL(tokenBucket)),
+		MediaType: primaryObject.MediaType,
 	}
 
 	if thumbnailObject != nil {
-		result.ThumbnailURL = persist.NullString(thumbnailObject.storageURL(tokenBucket))
+		result.ThumbnailURL = persist.NullString(thumbnailObject.StorageURL(tokenBucket))
 	}
 
 	if liveRenderObject != nil {
-		result.LivePreviewURL = persist.NullString(liveRenderObject.storageURL(tokenBucket))
+		result.LivePreviewURL = persist.NullString(liveRenderObject.StorageURL(tokenBucket))
 	}
 
 	var err error
@@ -454,11 +454,11 @@ func getHTMLMedia(pCtx context.Context, tids persist.TokenIdentifiers, tokenBuck
 	}
 	if len(cachedObjects) > 0 {
 		for _, obj := range cachedObjects {
-			if obj.objectType == ObjectTypeThumbnail {
-				res.ThumbnailURL = persist.NullString(obj.storageURL(tokenBucket))
+			if obj.ObjectType == ObjectTypeThumbnail {
+				res.ThumbnailURL = persist.NullString(obj.StorageURL(tokenBucket))
 				break
-			} else if obj.objectType == ObjectTypeImage {
-				res.ThumbnailURL = persist.NullString(obj.storageURL(tokenBucket))
+			} else if obj.ObjectType == ObjectTypeImage {
+				res.ThumbnailURL = persist.NullString(obj.StorageURL(tokenBucket))
 			}
 		}
 	}
@@ -718,23 +718,23 @@ func (o objectType) String() string {
 }
 
 type CachedMediaObject struct {
-	mediaType       persist.MediaType
-	tokenID         persist.TokenID
-	contractAddress persist.Address
-	chain           persist.Chain
-	contentType     *string
-	contentLength   *int64
-	objectType      objectType
+	MediaType       persist.MediaType
+	TokenID         persist.TokenID
+	ContractAddress persist.Address
+	Chain           persist.Chain
+	ContentType     *string
+	ContentLength   *int64
+	ObjectType      objectType
 }
 
 func (m CachedMediaObject) fileName() string {
-	if m.objectType.String() == "" || m.tokenID == "" || m.contractAddress == "" {
+	if m.ObjectType.String() == "" || m.TokenID == "" || m.ContractAddress == "" {
 		panic(fmt.Sprintf("invalid media object: %+v", m))
 	}
-	return fmt.Sprintf("%d-%s-%s-%s", m.chain, m.tokenID, m.contractAddress, m.objectType)
+	return fmt.Sprintf("%d-%s-%s-%s", m.Chain, m.TokenID, m.ContractAddress, m.ObjectType)
 }
 
-func (m CachedMediaObject) storageURL(tokenBucket string) string {
+func (m CachedMediaObject) StorageURL(tokenBucket string) string {
 	return fmt.Sprintf("https://storage.googleapis.com/%s/%s", tokenBucket, m.fileName())
 }
 
@@ -752,15 +752,15 @@ func cacheRawMedia(ctx context.Context, reader io.Reader, tids persist.TokenIden
 		objectType = defaultObjectType
 	}
 	object := CachedMediaObject{
-		mediaType:       mediaType,
-		tokenID:         tids.TokenID,
-		contractAddress: tids.ContractAddress,
-		chain:           tids.Chain,
-		contentType:     contentType,
-		contentLength:   contentLength,
-		objectType:      objectType,
+		MediaType:       mediaType,
+		TokenID:         tids.TokenID,
+		ContractAddress: tids.ContractAddress,
+		Chain:           tids.Chain,
+		ContentType:     contentType,
+		ContentLength:   contentLength,
+		ObjectType:      objectType,
 	}
-	err := persistToStorage(ctx, client, reader, bucket, object.fileName(), object.contentType, object.contentLength,
+	err := persistToStorage(ctx, client, reader, bucket, object.fileName(), object.ContentType, object.ContentLength,
 		map[string]string{
 			"originalURL": ogURL,
 			"mediaType":   mediaType.String(),
@@ -776,11 +776,11 @@ func cacheRawMedia(ctx context.Context, reader io.Reader, tids persist.TokenIden
 func cacheRawAnimationMedia(ctx context.Context, reader io.Reader, tids persist.TokenIdentifiers, mediaType persist.MediaType, bucket, ogURL string, client *storage.Client) (CachedMediaObject, error) {
 
 	object := CachedMediaObject{
-		mediaType:       mediaType,
-		tokenID:         tids.TokenID,
-		contractAddress: tids.ContractAddress,
-		chain:           tids.Chain,
-		objectType:      ObjectTypeAnimation,
+		MediaType:       mediaType,
+		TokenID:         tids.TokenID,
+		ContractAddress: tids.ContractAddress,
+		Chain:           tids.Chain,
+		ObjectType:      ObjectTypeAnimation,
 	}
 
 	sw := newObjectWriter(ctx, client, bucket, object.fileName(), nil, nil, map[string]string{
@@ -809,12 +809,12 @@ func cacheRawAnimationMedia(ctx context.Context, reader io.Reader, tids persist.
 func thumbnailAndCache(ctx context.Context, tids persist.TokenIdentifiers, videoURL, bucket string, client *storage.Client) (CachedMediaObject, error) {
 
 	obj := CachedMediaObject{
-		objectType:      ObjectTypeThumbnail,
-		mediaType:       persist.MediaTypeImage,
-		tokenID:         tids.TokenID,
-		contractAddress: tids.ContractAddress,
-		chain:           tids.Chain,
-		contentType:     util.ToPointer("image/png"),
+		ObjectType:      ObjectTypeThumbnail,
+		MediaType:       persist.MediaTypeImage,
+		TokenID:         tids.TokenID,
+		ContractAddress: tids.ContractAddress,
+		Chain:           tids.Chain,
+		ContentType:     util.ToPointer("image/png"),
 	}
 
 	logger.For(ctx).Infof("caching thumbnail for '%s'", obj.fileName())
@@ -844,12 +844,12 @@ func thumbnailAndCache(ctx context.Context, tids persist.TokenIdentifiers, video
 func createLiveRenderAndCache(ctx context.Context, tids persist.TokenIdentifiers, videoURL, bucket string, client *storage.Client) (CachedMediaObject, error) {
 
 	obj := CachedMediaObject{
-		objectType:      ObjectTypeLiveRender,
-		mediaType:       persist.MediaTypeVideo,
-		tokenID:         tids.TokenID,
-		contractAddress: tids.ContractAddress,
-		chain:           tids.Chain,
-		contentType:     util.ToPointer("video/mp4"),
+		ObjectType:      ObjectTypeLiveRender,
+		MediaType:       persist.MediaTypeVideo,
+		TokenID:         tids.TokenID,
+		ContractAddress: tids.ContractAddress,
+		Chain:           tids.Chain,
+		ContentType:     util.ToPointer("video/mp4"),
 	}
 
 	logger.For(ctx).Infof("caching live render media for '%s'", obj.fileName())
@@ -908,7 +908,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 	logger.For(pCtx).Infof("predicted media type from '%s' as '%s' with length %s in %s", mediaURL, mediaType, contentLengthStr, time.Since(timeBeforePredict))
 
 	if mediaType == persist.MediaTypeHTML {
-		return nil, errNotCacheable{url: mediaURL, mediaType: mediaType}
+		return nil, ErrNotCacheable{URL: mediaURL, MediaType: mediaType}
 	}
 
 	timeBeforeDataReader := time.Now()
@@ -919,10 +919,10 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 		switch caught := err.(type) {
 		case rpc.ErrHTTP:
 			if caught.Status == http.StatusNotFound || caught.Status == http.StatusInternalServerError {
-				return nil, errInvalidMedia{url: mediaURL, err: err}
+				return nil, ErrInvalidMedia{URL: mediaURL, err: err}
 			}
 		case *net.DNSError, *url.Error:
-			return nil, errInvalidMedia{url: mediaURL, err: err}
+			return nil, ErrInvalidMedia{URL: mediaURL, err: err}
 		}
 
 		// if we're not already recursive, try opensea for ethereum tokens
@@ -968,7 +968,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 	}
 
 	if mediaType == persist.MediaTypeHTML {
-		return nil, errNotCacheable{url: mediaURL, mediaType: mediaType}
+		return nil, ErrNotCacheable{URL: mediaURL, MediaType: mediaType}
 	}
 
 	asMb := 0.0
@@ -1003,7 +1003,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 
 	result := []CachedMediaObject{obj}
 	if mediaType == persist.MediaTypeVideo {
-		videoURL := obj.storageURL(bucket)
+		videoURL := obj.StorageURL(bucket)
 		thumbObj, err := thumbnailAndCache(pCtx, tids, videoURL, bucket, storageClient)
 		if err != nil {
 			logger.For(pCtx).Errorf("could not create thumbnail for %s: %s", tids, err)
