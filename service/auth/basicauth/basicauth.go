@@ -10,7 +10,7 @@ import (
 // AuthorizeHeader checks if the request has a Basic Auth header matching the specified
 // username and password. Username is optional and will be ignored if nil.
 func AuthorizeHeader(ctx context.Context, username *string, password string) bool {
-	gc := util.GinContextFromContext(ctx)
+	gc := util.MustGetGinContext(ctx)
 	headerUsername, headerPassword, ok := gc.Request.BasicAuth()
 	if !ok {
 		return false

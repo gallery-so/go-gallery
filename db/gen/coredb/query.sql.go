@@ -916,6 +916,15 @@ func (q *Queries) DeleteCollections(ctx context.Context, ids []string) error {
 	return err
 }
 
+const deletePushTokensByIDs = `-- name: DeletePushTokensByIDs :exec
+update push_notification_tokens set deleted = true where id = any($1) and deleted = false
+`
+
+func (q *Queries) DeletePushTokensByIDs(ctx context.Context, ids persist.DBIDList) error {
+	_, err := q.db.Exec(ctx, deletePushTokensByIDs, ids)
+	return err
+}
+
 const deleteUserByID = `-- name: DeleteUserByID :exec
 update users set deleted = true where id = $1
 `
@@ -3915,7 +3924,8 @@ func (q *Queries) HasLaterGroupedEvent(ctx context.Context, arg HasLaterGroupedE
 const insertSpamContracts = `-- name: InsertSpamContracts :exec
 with insert_spam_contracts as (
     insert into alchemy_spam_contracts (id, chain, address, created_at, is_spam) (
-        select unnest($1::varchar[]) , unnest($2::int[])
+        select unnest($1::varchar[])
+        , unnest($2::int[])
         , unnest($3::varchar[])
         , unnest($4::timestamptz[])
         , unnest($5::bool[])
