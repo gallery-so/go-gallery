@@ -462,9 +462,25 @@ func (p *Provider) prepTokensForTokenProcessing(ctx context.Context, tokensFromP
 
 	for i, token := range providerTokens {
 		existingToken, exists := tokenLookup[token.TokenIdentifiers()]
+
+		if existingToken.TokenMedia == "" {
+			// check if we have ever processed media for this token
+			if media, err := p.Queries.GetTokenMediaIDByTokenIdentifiers(ctx, coredb.GetTokenMediaIDByTokenIdentifiersParams{
+				Contract: token.Contract,
+				TokenID:  token.TokenID,
+				Chain:    token.Chain,
+			}); err == nil && media != "" {
+				providerTokens[i].TokenMedia = media
+			}
+		} else {
+			// if we have processed media for this token, use it
+			providerTokens[i].TokenMedia = token.TokenMedia
+		}
+
 		// Add already existing media to the provider token if it exists so that
 		// we can display media for a token while it gets handled by tokenprocessing
 		if !token.Media.IsServable() && existingToken.Media.IsServable() {
+			// TODO remove
 			providerTokens[i].Media = existingToken.Media
 		}
 
@@ -475,6 +491,7 @@ func (p *Provider) prepTokensForTokenProcessing(ctx context.Context, tokensFromP
 		// There's no available media for the token at this point, so set the state to syncing
 		// so we can show the loading state instead of a broken token while tokenprocessing handles it.
 		if !exists && !token.Media.IsServable() {
+			// TODO remove
 			providerTokens[i].Media = persist.Media{MediaType: persist.MediaTypeSyncing}
 		}
 

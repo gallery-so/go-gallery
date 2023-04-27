@@ -1026,6 +1026,9 @@ with old as (
 -- name: IsExistsTokenMediaByTokenIdentifers :one
 select exists(select 1 from token_medias where token_medias.contract = $1 and token_medias.token_id = $2 and token_medias.chain = $3 and active = true and deleted = false);
 
+-- name: GetTokenMediaIDByTokenIdentifiers :one
+select id from token_medias where token_medias.contract = $1 and token_medias.token_id = $2 and token_medias.chain = $3 and active = true and deleted = false;
+
 -- name: InsertSpamContracts :exec
 with insert_spam_contracts as (
     insert into alchemy_spam_contracts (id, chain, address, created_at, is_spam) (

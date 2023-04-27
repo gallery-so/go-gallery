@@ -2317,6 +2317,23 @@ func (q *Queries) GetTokenByTokenIdentifiers(ctx context.Context, arg GetTokenBy
 	return i, err
 }
 
+const getTokenMediaIDByTokenIdentifiers = `-- name: GetTokenMediaIDByTokenIdentifiers :one
+select id from token_medias where token_medias.contract = $1 and token_medias.token_id = $2 and token_medias.chain = $3 and active = true and deleted = false
+`
+
+type GetTokenMediaIDByTokenIdentifiersParams struct {
+	Contract persist.DBID
+	TokenID  persist.TokenID
+	Chain    persist.Chain
+}
+
+func (q *Queries) GetTokenMediaIDByTokenIdentifiers(ctx context.Context, arg GetTokenMediaIDByTokenIdentifiersParams) (persist.DBID, error) {
+	row := q.db.QueryRow(ctx, getTokenMediaIDByTokenIdentifiers, arg.Contract, arg.TokenID, arg.Chain)
+	var id persist.DBID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const getTokenOwnerByID = `-- name: GetTokenOwnerByID :one
 SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences FROM tokens t
     JOIN users u ON u.id = t.owner_user_id

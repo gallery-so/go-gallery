@@ -14,6 +14,7 @@ insert into tokens
   , quantity
   , ownership_history
   , media
+  , token_media
   , fallback_media
   , token_metadata
   , external_url
@@ -41,6 +42,7 @@ insert into tokens
     , quantity
     , ownership_history[ownership_history_start_idx::int:ownership_history_end_idx::int]
     , media
+    , token_media
     , fallback_media
     , token_metadata
     , external_url
@@ -70,6 +72,7 @@ insert into tokens
       , unnest(@ownership_history_start_idx::int[]) as ownership_history_start_idx
       , unnest(@ownership_history_end_idx::int[]) as ownership_history_end_idx
       , unnest(@media::jsonb[]) as media
+      , unnest(@token_media::varchar[]) as token_media
       , unnest(@fallback_media::jsonb[]) as fallback_media
       , unnest(@token_metadata::jsonb[]) as token_metadata
       , unnest(@external_url::varchar[]) as external_url
