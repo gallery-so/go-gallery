@@ -41,7 +41,7 @@ func coreInitServer() *gin.Engine {
 
 	router := gin.Default()
 	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.ErrLogger())
-	util.AddHealthCheckHandler(router)
+	router.GET("/alive", util.HealthCheckHandler())
 
 	// Return 200 on auth failures to prevent task/job retries
 	authOpts := middleware.BasicAuthOptionBuilder{}

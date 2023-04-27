@@ -25,7 +25,7 @@ func authRequired() gin.HandlerFunc {
 }
 
 func handlersInit(router *gin.Engine, gql *graphql.Client) *gin.Engine {
-	util.AddHealthCheckHandler(router)
+	router.GET("/ping", util.HealthCheckHandler())
 	router.POST("/tasks/feed-event", middleware.TaskRequired(), authRequired(), handleMessage(gql))
 	return router
 }

@@ -36,7 +36,7 @@ func taskRequired() gin.HandlerFunc {
 }
 
 func handlersInit(router *gin.Engine, queries *db.Queries, taskClient *cloudtasks.Client) *gin.Engine {
-	util.AddHealthCheckHandler(router)
+	router.GET("/ping", util.HealthCheckHandler())
 	router.POST("/tasks/feed-event", taskRequired(), handleEvent(queries, taskClient))
 	return router
 }
