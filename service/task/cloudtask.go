@@ -17,6 +17,7 @@ import (
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -175,6 +176,7 @@ func CreateTaskForTokenProcessing(ctx context.Context, client *gcptasks.Client, 
 
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
 	task := &taskspb.Task{
+		DispatchDeadline: durationpb.New(time.Minute * 30),
 		MessageType: &taskspb.Task_HttpRequest{
 			HttpRequest: &taskspb.HttpRequest{
 				HttpMethod: taskspb.HttpMethod_POST,
@@ -235,32 +237,6 @@ func CreateTaskForDeepRefresh(ctx context.Context, message DeepRefreshMessage, c
 			HttpRequest: &taskspb.HttpRequest{
 				HttpMethod: taskspb.HttpMethod_POST,
 				Url:        fmt.Sprintf("%s/tasks/refresh", env.GetString("INDEXER_HOST")),
-				Headers: map[string]string{
-					"Content-type": "application/json",
-					"sentry-trace": span.TraceID.String(),
-				},
-			},
-		},
-	}
-
-	body, err := json.Marshal(message)
-	if err != nil {
-		return err
-	}
-
-	return submitHttpTask(ctx, client, queue, task, body)
-}
-
-func CreateTaskForWalletValidation(ctx context.Context, message ValidateNFTsMessage, client *gcptasks.Client) error {
-	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForWalletValidate")
-	defer tracing.FinishSpan(span)
-
-	queue := env.GetString("GCLOUD_WALLET_VALIDATE_QUEUE")
-	task := &taskspb.Task{
-		MessageType: &taskspb.Task_HttpRequest{
-			HttpRequest: &taskspb.HttpRequest{
-				HttpMethod: taskspb.HttpMethod_POST,
-				Url:        fmt.Sprintf("%s/nfts/validate", env.GetString("INDEXER_HOST")),
 				Headers: map[string]string{
 					"Content-type": "application/json",
 					"sentry-trace": span.TraceID.String(),

@@ -95,7 +95,7 @@ func (e ErrUnknownResourceType) Error() string {
 	return fmt.Sprintf("unknown resource type: %v", e.ResourceType)
 }
 
-func StrToNullStr(s *string) sql.NullString {
+func StrPtrToNullStr(s *string) sql.NullString {
 	if s == nil {
 		return sql.NullString{}
 	}
@@ -111,7 +111,7 @@ func NullStrToStr(s sql.NullString) string {
 
 func DBIDToNullStr(id DBID) sql.NullString {
 	s := id.String()
-	return StrToNullStr(&s)
+	return StrPtrToNullStr(&s)
 }
 
 func NullStrToDBID(s sql.NullString) DBID {

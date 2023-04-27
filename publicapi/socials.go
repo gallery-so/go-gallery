@@ -276,8 +276,8 @@ func (api SocialAPI) newTwitterAPIForUser(ctx context.Context, userID persist.DB
 			ID:           persist.GenerateID(),
 			UserID:       userID,
 			Provider:     persist.SocialProviderTwitter,
-			AccessToken:  util.ToNullString(newSocials.AccessToken),
-			RefreshToken: util.ToNullString(newSocials.RefreshToken),
+			AccessToken:  util.ToNullString(newSocials.AccessToken, false),
+			RefreshToken: util.ToNullString(newSocials.RefreshToken, false),
 		})
 		if err != nil {
 			return nil, fmt.Errorf("error updating social auth: %w", err)

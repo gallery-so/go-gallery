@@ -22,6 +22,14 @@ type Admire struct {
 	LastUpdated time.Time
 }
 
+type AlchemySpamContract struct {
+	ID        persist.DBID
+	Chain     persist.Chain
+	Address   persist.Address
+	CreatedAt time.Time
+	IsSpam    bool
+}
+
 type Collection struct {
 	ID             persist.DBID
 	Deleted        bool
@@ -51,20 +59,22 @@ type Comment struct {
 }
 
 type Contract struct {
-	ID               persist.DBID
-	Deleted          bool
-	Version          sql.NullInt32
-	CreatedAt        time.Time
-	LastUpdated      time.Time
-	Name             sql.NullString
-	Symbol           sql.NullString
-	Address          persist.Address
-	CreatorAddress   persist.Address
-	Chain            persist.Chain
-	ProfileBannerUrl sql.NullString
-	ProfileImageUrl  sql.NullString
-	BadgeUrl         sql.NullString
-	Description      sql.NullString
+	ID                   persist.DBID
+	Deleted              bool
+	Version              sql.NullInt32
+	CreatedAt            time.Time
+	LastUpdated          time.Time
+	Name                 sql.NullString
+	Symbol               sql.NullString
+	Address              persist.Address
+	CreatorAddress       persist.Address
+	Chain                persist.Chain
+	ProfileBannerUrl     sql.NullString
+	ProfileImageUrl      sql.NullString
+	BadgeUrl             sql.NullString
+	Description          sql.NullString
+	OwnerAddress         persist.Address
+	IsProviderMarkedSpam bool
 }
 
 type ContractRelevance struct {
@@ -355,6 +365,7 @@ type Token struct {
 	IsUserMarkedSpam     sql.NullBool
 	IsProviderMarkedSpam sql.NullBool
 	LastSynced           time.Time
+	FallbackMedia        persist.FallbackMedia
 }
 
 type TopRecommendedUser struct {

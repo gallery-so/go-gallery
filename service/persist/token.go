@@ -38,6 +38,8 @@ const (
 	MediaTypeSVG MediaType = "svg"
 	// MediaTypeBase64BMP represents a base64 encoded bmp file
 	MediaTypeBase64BMP MediaType = "base64bmp"
+	// MediaTypeBase64PNG represents a base64 encoded png file
+	MediaTypeBase64PNG MediaType = "base64png"
 	// MediaTypeText represents plain text
 	MediaTypeText MediaType = "text"
 	// MediaTypeHTML represents html
@@ -58,9 +60,11 @@ const (
 	MediaTypeUnknown MediaType = "unknown"
 	// MediaTypeSyncing represents a syncing media
 	MediaTypeSyncing MediaType = "syncing"
+	// MediaTypeFallback represents a fallback media
+	MediaTypeFallback MediaType = "fallback"
 )
 
-var mediaTypePriorities = []MediaType{MediaTypeHTML, MediaTypeAudio, MediaTypeAnimation, MediaTypeVideo, MediaTypeBase64BMP, MediaTypeGIF, MediaTypeSVG, MediaTypeImage, MediaTypeJSON, MediaTypeBase64Text, MediaTypeText, MediaTypeSyncing, MediaTypeUnknown, MediaTypeInvalid}
+var mediaTypePriorities = []MediaType{MediaTypeHTML, MediaTypeAudio, MediaTypeAnimation, MediaTypeVideo, MediaTypeBase64BMP, MediaTypeBase64PNG, MediaTypeGIF, MediaTypeSVG, MediaTypeImage, MediaTypeJSON, MediaTypeBase64Text, MediaTypeText, MediaTypeSyncing, MediaTypeUnknown, MediaTypeInvalid}
 
 const (
 	// ChainETH represents the Ethereum blockchain
@@ -100,6 +104,8 @@ const (
 	URITypeBase64SVG URIType = "base64svg"
 	//URITypeBase64BMP represents a base64 encoded BMP
 	URITypeBase64BMP URIType = "base64bmp"
+	// URITypeBase64PNG represents a base64 encoded PNG
+	URITypeBase64PNG URIType = "base64png"
 	// URITypeSVG represents an SVG
 	URITypeSVG URIType = "svg"
 	// URITypeENS represents an ENS domain
@@ -245,50 +251,9 @@ type Media struct {
 	Dimensions     Dimensions `json:"dimensions"`
 }
 
-// IsServable returns true if the token's Media has enough information to serve it's assets.
-func (m Media) IsServable() bool {
-	return m.MediaURL != "" && m.MediaType.IsValid()
-}
-
-// NFT represents an old nft throughout the application
-type NFT struct {
-	Version         NullInt32       `json:"version"` // schema version for this model
-	ID              DBID            `json:"id" binding:"required"`
-	CreationTime    CreationTime    `json:"created_at"`
-	Deleted         NullBool        `json:"-"`
-	LastUpdatedTime LastUpdatedTime `json:"last_updated"`
-
-	CollectorsNote NullString `json:"collectors_note"`
-
-	// OwnerUsers     []*User  `bson:"owner_users" json:"owner_users"`
-	OwnerAddress EthereumAddress `json:"owner_address"`
-
-	MultipleOwners NullBool `json:"multiple_owners"`
-
-	Name                NullString      `json:"name"`
-	Description         NullString      `json:"description"`
-	ExternalURL         NullString      `json:"external_url"`
-	TokenMetadataURL    NullString      `json:"token_metadata_url"`
-	CreatorAddress      EthereumAddress `json:"creator_address"`
-	CreatorName         NullString      `json:"creator_name"`
-	Contract            NFTContract     `json:"asset_contract"`
-	TokenCollectionName NullString      `json:"token_collection_name"`
-
-	OpenseaID NullInt64 `json:"opensea_id"`
-	// OPEN_SEA_TOKEN_ID
-	// https://api.opensea.io/api/v1/asset/0xa7d8d9ef8d8ce8992df33d8b8cf4aebabd5bd270/26000331
-	// (/asset/:contract_address/:token_id)
-	OpenseaTokenID TokenID `json:"opensea_token_id"`
-
-	// IMAGES - OPENSEA
-	ImageURL             NullString `json:"image_url"`
-	ImageThumbnailURL    NullString `json:"image_thumbnail_url"`
-	ImagePreviewURL      NullString `json:"image_preview_url"`
-	ImageOriginalURL     NullString `json:"image_original_url"`
-	AnimationURL         NullString `json:"animation_url"`
-	AnimationOriginalURL NullString `json:"animation_original_url"`
-
-	AcquisitionDateStr NullString `json:"acquisition_date"`
+type FallbackMedia struct {
+	ImageURL   NullString `json:"image_url,omitempty"`
+	Dimensions Dimensions `json:"dimensions"`
 }
 
 // NFTContract represents a smart contract's information for a given NFT
@@ -515,6 +480,14 @@ func (c *Chain) UnmarshalJSON(data []byte) error {
 			*c = ChainETH
 		case "tezos":
 			*c = ChainTezos
+		case "arbitrum":
+			*c = ChainArbitrum
+		case "polygon":
+			*c = ChainPolygon
+		case "optimism":
+			*c = ChainOptimism
+		case "poap":
+			*c = ChainPOAP
 		}
 		return nil
 	}
@@ -555,6 +528,12 @@ func (c Chain) MarshalGQL(w io.Writer) {
 		w.Write([]byte(`"Tezos"`))
 	case ChainPOAP:
 		w.Write([]byte(`"POAP"`))
+	case ChainArbitrum:
+		w.Write([]byte(`"Arbitrum"`))
+	case ChainPolygon:
+		w.Write([]byte(`"Polygon"`))
+	case ChainOptimism:
+		w.Write([]byte(`"Optimism"`))
 	}
 }
 
@@ -619,6 +598,8 @@ func (uri TokenURI) Type() URIType {
 		return URITypeBase64SVG
 	case strings.HasPrefix(asString, "data:image/bmp;base64,"):
 		return URITypeBase64BMP
+	case strings.HasPrefix(asString, "data:image/png;base64,"):
+		return URITypeBase64PNG
 	case strings.Contains(asString, "ipfs.io/api"):
 		return URITypeIPFSAPI
 	case strings.Contains(asString, "/ipfs/"):
@@ -738,6 +719,11 @@ func (hex HexString) Add(new HexString) HexString {
 	return HexString(asInt.Add(asInt, new.BigInt()).Text(16))
 }
 
+// IsServable returns true if the token's Media has enough information to serve it's assets.
+func (m Media) IsServable() bool {
+	return m.MediaURL != "" && m.MediaType.IsValid()
+}
+
 // Value implements the driver.Valuer interface for media
 func (m Media) Value() (driver.Value, error) {
 	return json.Marshal(m)
@@ -747,6 +733,25 @@ func (m Media) Value() (driver.Value, error) {
 func (m *Media) Scan(src interface{}) error {
 	if src == nil {
 		*m = Media{}
+		return nil
+	}
+	return json.Unmarshal(src.([]uint8), &m)
+}
+
+// IsServable returns true if the token's Media has enough information to serve it's assets.
+func (m FallbackMedia) IsServable() bool {
+	return m.ImageURL != ""
+}
+
+// Value implements the driver.Valuer interface for media
+func (m FallbackMedia) Value() (driver.Value, error) {
+	return json.Marshal(m)
+}
+
+// Scan implements the sql.Scanner interface for media
+func (m *FallbackMedia) Scan(src interface{}) error {
+	if src == nil {
+		*m = FallbackMedia{}
 		return nil
 	}
 	return json.Unmarshal(src.([]uint8), &m)
@@ -767,7 +772,7 @@ func (a EthereumAddress) Value() (driver.Value, error) {
 }
 
 // MarshallJSON implements the json.Marshaller interface for the address type
-func (a EthereumAddress) MarshallJSON() ([]byte, error) {
+func (a EthereumAddress) MarshalJSON() ([]byte, error) {
 	return json.Marshal(a.String())
 }
 
@@ -840,12 +845,13 @@ func (m *TokenMetadata) Scan(src interface{}) error {
 
 // Value implements the database/sql/driver Valuer interface for the TokenMetadata type
 func (m TokenMetadata) Value() (driver.Value, error) {
-	return m.MarshallJSON()
+	return m.MarshalJSON()
 }
 
-// MarshallJSON implements the json.Marshaller interface for the TokenMetadata type
-func (m TokenMetadata) MarshallJSON() ([]byte, error) {
-	val, err := json.Marshal(m)
+// MarshalJSON implements the json.Marshaller interface for the TokenMetadata type
+func (m TokenMetadata) MarshalJSON() ([]byte, error) {
+	asMap := map[string]interface{}(m)
+	val, err := json.Marshal(asMap)
 	if err != nil {
 		return nil, err
 	}
@@ -878,7 +884,7 @@ func (m MediaType) IsValid() bool {
 
 // IsImageLike returns true if the media type is a type that is expected to be like an image and not live render
 func (m MediaType) IsImageLike() bool {
-	return m == MediaTypeImage || m == MediaTypeGIF || m == MediaTypeBase64BMP || m == MediaTypeSVG
+	return m == MediaTypeImage || m == MediaTypeGIF || m == MediaTypeBase64BMP || m == MediaTypeSVG || m == MediaTypeBase64PNG
 }
 
 // IsAnimationLike returns true if the media type is a type that is expected to be like an animation and live render
@@ -901,7 +907,11 @@ func (m MediaType) IsMorePriorityThan(other MediaType) bool {
 
 // Value implements the database/sql/driver Valuer interface for the MediaType type
 func (m MediaType) Value() (driver.Value, error) {
-	return string(m), nil
+	return m.String(), nil
+}
+
+func (m MediaType) String() string {
+	return string(m)
 }
 
 // Scan implements the database/sql Scanner interface for the MediaType type

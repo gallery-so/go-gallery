@@ -16,9 +16,12 @@ RELEASE              := release
 DOCKER               := docker
 DEPLOY_VERSION       := $(CURRENT_BRANCH)-$(CURRENT_COMMIT_HASH)
 SET_GCP_PROJECT      = gcloud config set project $(GCP_PROJECT)
-APP_ENGINE_DEPLOY    = sops exec-file --no-fifo $(CONFIG_DIR)/$(SERVICE_FILE) 'gcloud beta app deploy --version $(DEPLOY_VERSION) --quiet $(APP_PROMOTE_FLAGS) --appyaml {}'
-CLOUD_RUN_DEPLOY     = sops exec-file $(CONFIG_DIR)/$(SERVICE_FILE) 'gcloud run deploy $(CLOUD_RUN_FLAGS) $(SERVICE) --env-vars-file {} --quiet'
-CLOUD_RUN_FLAGS      = --image $(IMAGE_TAG) $(RUN_PROMOTE_FLAGS) --concurrency $(CONCURRENCY) --cpu $(CPU) --memory $(MEMORY) --port $(PORT) --timeout $(TIMEOUT) --platform managed --cpu-throttling --revision-suffix $(CURRENT_COMMIT_HASH) --vpc-connector $(VPC_CONNECTOR) --vpc-egress private-ranges-only --set-cloudsql-instances $(SQL_INSTANCES) --region $(REGION) --allow-unauthenticated
+CLOUD_RUN_DEPLOY     = sops exec-file $(CONFIG_DIR)/$(SERVICE_FILE) 'gcloud run deploy $(DEPLOY_FLAGS) $(SERVICE) --env-vars-file {} --quiet'
+SCHEDULER_DEPLOY     = gcloud scheduler jobs create http $(CRON_NAME) --location $(CRON_LOCATION) --schedule $(CRON_SCHEDULE) --uri $(CRON_URI) --http-method $(CRON_METHOD)
+CRON_NAME            = $(CRON_PREFIX)-$(DEPLOY_VERSION)
+BASE_DEPLOY_FLAGS    = --image $(IMAGE_TAG) $(RUN_PROMOTE_FLAGS) --concurrency $(CONCURRENCY) --cpu $(CPU) --memory $(MEMORY) --port $(PORT) --timeout $(TIMEOUT) --platform managed --revision-suffix $(CURRENT_COMMIT_HASH) --vpc-connector $(VPC_CONNECTOR) --vpc-egress private-ranges-only --set-cloudsql-instances $(SQL_INSTANCES) --region $(REGION) --allow-unauthenticated
+DEPLOY_FLAGS         = $(BASE_DEPLOY_FLAGS) --cpu-throttling
+DEPLOY_REGION        = us-east1
 SENTRY_RELEASE       = sentry-cli releases -o $(SENTRY_ORG) -p $(SENTRY_PROJECT)
 IMAGE_TAG            = $(DOCKER_REGISTRY)/$(GCP_PROJECT)/$(REPO)/$(CURRENT_BRANCH):$(CURRENT_COMMIT_HASH)
 DOCKER_BUILD         = docker build --file $(DOCKER_FILE) --platform linux/amd64 -t $(IMAGE_TAG) --build-arg VERSION=$(DEPLOY_VERSION) $(DOCKER_CONTEXT)
@@ -45,6 +48,7 @@ start-dev-sql-proxy  : REQUIRED_SOPS_SECRETS := $(SOPS_DEV_SECRETS)
 start-prod-sql-proxy : REQUIRED_SOPS_SECRETS := $(SOPS_PROD_SECRETS)
 migrate-dev-coredb   : REQUIRED_SOPS_SECRETS := $(SOPS_DEV_SECRETS)
 migrate-prod-coredb  : REQUIRED_SOPS_SECRETS := $(SOPS_PROD_SECRETS)
+migrate-prod-indexerdb : REQUIRED_SOPS_SECRETS := $(SOPS_PROD_SECRETS)
 
 # Environment-specific settings
 $(DEPLOY)-$(DEV)-%                : ENV                    := $(DEV)
@@ -53,9 +57,6 @@ $(DEPLOY)-$(PROD)-%               : ENV                    := $(PROD)
 $(DEPLOY)-$(DEV)-%                : REQUIRED_SOPS_SECRETS  := $(SOPS_DEV_SECRETS)
 $(DEPLOY)-$(SANDBOX)-%            : REQUIRED_SOPS_SECRETS  := $(SOPS_DEV_SECRETS)
 $(DEPLOY)-$(PROD)-%               : REQUIRED_SOPS_SECRETS  := $(SOPS_PROD_SECRETS)
-$(DEPLOY)-$(DEV)-%                : APP_PROMOTE_FLAGS      := --promote --stop-previous-version
-$(DEPLOY)-$(SANDBOX)-%            : APP_PROMOTE_FLAGS      := --promote --stop-previous-version
-$(DEPLOY)-$(PROD)-%               : APP_PROMOTE_FLAGS      := --no-promote --no-stop-previous-version
 $(DEPLOY)-$(DEV)-%                : RUN_PROMOTE_FLAGS      :=
 $(DEPLOY)-$(PROD)-%               : RUN_PROMOTE_FLAGS      := --no-traffic
 $(DEPLOY)-$(DEV)-%                : CONFIG_DIR             := ./$(SOPS_SECRETS_DIR)/$(DEV)
@@ -65,30 +66,27 @@ $(PROMOTE)-$(PROD)-%              : ENV                    := $(PROD)
 $(PROMOTE)-$(PROD)-%              : REQUIRED_SOPS_SECRETS  := $(SOPS_PROD_SECRETS)
 
 # Service files, add a line for each service and environment you want to deploy.
-$(DEPLOY)-$(DEV)-backend            : SERVICE_FILE := backend-env.yaml
-$(DEPLOY)-$(DEV)-indexer            : SERVICE_FILE := app-dev-indexer.yaml
-$(DEPLOY)-$(DEV)-indexer-server     : SERVICE_FILE := indexer-server-env.yaml
-$(DEPLOY)-$(DEV)-admin              : SERVICE_FILE := app-dev-admin.yaml
-$(DEPLOY)-$(DEV)-feed               : SERVICE_FILE := feed-env.yaml
-$(DEPLOY)-$(DEV)-tokenprocessing    : SERVICE_FILE := tokenprocessing-env.yaml
-$(DEPLOY)-$(DEV)-emails             : SERVICE_FILE := emails-server-env.yaml
-$(DEPLOY)-$(DEV)-feedbot            : SERVICE_FILE := feedbot-env.yaml
-$(DEPLOY)-$(DEV)-pushnotifications  : SERVICE_FILE := pushnotifications-env.yaml
-$(DEPLOY)-$(DEV)-routing-rules      : SERVICE_FILE := dispatch.yaml
-$(DEPLOY)-$(SANDBOX)-backend        : SERVICE_FILE := backend-sandbox-env.yaml
-$(DEPLOY)-$(PROD)-backend           : SERVICE_FILE := backend-env.yaml
-$(DEPLOY)-$(PROD)-indexer           : SERVICE_FILE := app-prod-indexer.yaml
-$(DEPLOY)-$(PROD)-indexer-server    : SERVICE_FILE := indexer-server-env.yaml
-$(DEPLOY)-$(PROD)-admin             : SERVICE_FILE := app-prod-admin.yaml
-$(DEPLOY)-$(PROD)-feed              : SERVICE_FILE := feed-env.yaml
-$(DEPLOY)-$(PROD)-feedbot           : SERVICE_FILE := feedbot-env.yaml
-$(DEPLOY)-$(PROD)-tokenprocessing   : SERVICE_FILE := tokenprocessing-env.yaml
-$(DEPLOY)-$(PROD)-dummymetadata     : SERVICE_FILE := dummymetadata-env.yaml
-$(DEPLOY)-$(PROD)-emails            : SERVICE_FILE := emails-server-env.yaml
-$(DEPLOY)-$(PROD)-pushnotifications : SERVICE_FILE := pushnotifications-env.yaml
-$(DEPLOY)-$(PROD)-routing-rules     : SERVICE_FILE := dispatch.yaml
-$(DEPLOY)-$(DEV)-graphql-gateway    : SERVICE_FILE := graphql-gateway.yml
-$(DEPLOY)-$(PROD)-graphql-gateway   : SERVICE_FILE := graphql-gateway.yml
+$(DEPLOY)-$(DEV)-backend          : SERVICE_FILE := backend-env.yaml
+$(DEPLOY)-$(DEV)-indexer-server   : SERVICE_FILE := indexer-server-env.yaml
+$(DEPLOY)-$(DEV)-admin            : SERVICE_FILE := app-dev-admin.yaml
+$(DEPLOY)-$(DEV)-feed             : SERVICE_FILE := feed-env.yaml
+$(DEPLOY)-$(DEV)-tokenprocessing  : SERVICE_FILE := tokenprocessing-env.yaml
+$(DEPLOY)-$(DEV)-emails           : SERVICE_FILE := emails-server-env.yaml
+$(DEPLOY)-$(DEV)-feedbot          : SERVICE_FILE := feedbot-env.yaml
+$(DEPLOY)-$(DEV)-routing-rules    : SERVICE_FILE := dispatch.yaml
+$(DEPLOY)-$(SANDBOX)-backend      : SERVICE_FILE := backend-sandbox-env.yaml
+$(DEPLOY)-$(PROD)-backend         : SERVICE_FILE := backend-env.yaml
+$(DEPLOY)-$(PROD)-indexer         : SERVICE_FILE := indexer-env.yaml
+$(DEPLOY)-$(PROD)-indexer-server  : SERVICE_FILE := indexer-server-env.yaml
+$(DEPLOY)-$(PROD)-admin           : SERVICE_FILE := app-prod-admin.yaml
+$(DEPLOY)-$(PROD)-feed            : SERVICE_FILE := feed-env.yaml
+$(DEPLOY)-$(PROD)-feedbot         : SERVICE_FILE := feedbot-env.yaml
+$(DEPLOY)-$(PROD)-tokenprocessing : SERVICE_FILE := tokenprocessing-env.yaml
+$(DEPLOY)-$(PROD)-dummymetadata   : SERVICE_FILE := dummymetadata-env.yaml
+$(DEPLOY)-$(PROD)-emails          : SERVICE_FILE := emails-server-env.yaml
+$(DEPLOY)-$(PROD)-routing-rules   : SERVICE_FILE := dispatch.yaml
+$(DEPLOY)-$(DEV)-graphql-gateway  : SERVICE_FILE := graphql-gateway.yml
+$(DEPLOY)-$(PROD)-graphql-gateway : SERVICE_FILE := graphql-gateway.yml
 
 # Service to Sentry project mapping
 $(DEPLOY)-%-backend               : SENTRY_PROJECT := gallery-backend
@@ -128,6 +126,15 @@ $(DEPLOY)-%-indexer-server             : MEMORY         := $(INDEXER_SERVER_MEMO
 $(DEPLOY)-%-indexer-server             : CONCURRENCY    := $(INDEXER_SERVER_CONCURRENCY)
 $(DEPLOY)-$(DEV)-indexer-server        : SERVICE        := indexer-api-dev
 $(DEPLOY)-$(PROD)-indexer-server       : SERVICE        := indexer-api
+$(DEPLOY)-%-indexer                    : REPO           := indexer
+$(DEPLOY)-%-indexer                    : DOCKER_FILE    := $(DOCKER_DIR)/indexer/Dockerfile
+$(DEPLOY)-%-indexer                    : PORT           := 4000
+$(DEPLOY)-%-indexer                    : TIMEOUT        := $(INDEXER_TIMEOUT)
+$(DEPLOY)-%-indexer                    : CPU            := $(INDEXER_CPU)
+$(DEPLOY)-%-indexer                    : MEMORY         := $(INDEXER_MEMORY)
+$(DEPLOY)-%-indexer                    : CONCURRENCY    := $(INDEXER_CONCURRENCY)
+$(DEPLOY)-%-indexer                    : DEPLOY_FLAGS   = $(BASE_DEPLOY_FLAGS) --no-cpu-throttling
+$(DEPLOY)-$(PROD)-indexer              : SERVICE        := indexer
 $(DEPLOY)-%-emails                     : REPO           := emails
 $(DEPLOY)-%-emails                     : DOCKER_FILE    := $(DOCKER_DIR)/emails/Dockerfile
 $(DEPLOY)-%-emails                     : PORT           := 5500
@@ -177,15 +184,15 @@ $(DEPLOY)-%-graphql-gateway            : MEMORY         := $(GRAPHQL_GATEWAY_MEM
 $(DEPLOY)-%-graphql-gateway            : CONCURRENCY    := $(GRAPHQL_GATEWAY_CONCURRENCY)
 $(DEPLOY)-$(DEV)-graphql-gateway       : SERVICE        := graphql-gateway-dev
 $(DEPLOY)-$(PROD)-graphql-gateway      : SERVICE        := graphql-gateway
-$(DEPLOY)-%-pushnotifications          : REPO           := pushnotifications
-$(DEPLOY)-%-pushnotifications          : DOCKER_FILE    := $(DOCKER_DIR)/pushnotifications/Dockerfile
-$(DEPLOY)-%-pushnotifications          : PORT           := 6600
-$(DEPLOY)-%-pushnotifications          : TIMEOUT        := $(PUSHNOTIFICATIONS_TIMEOUT)
-$(DEPLOY)-%-pushnotifications          : CPU            := $(PUSHNOTIFICATIONS_CPU)
-$(DEPLOY)-%-pushnotifications          : MEMORY         := $(PUSHNOTIFICATIONS_MEMORY)
-$(DEPLOY)-%-pushnotifications          : CONCURRENCY    := $(PUSHNOTIFICATIONS_CONCURRENCY)
-$(DEPLOY)-$(DEV)-pushnotifications     : SERVICE        := pushnotifications-dev
-$(DEPLOY)-$(PROD)-pushnotifications    : SERVICE        := pushnotifications
+
+# Cloud Scheduler Jobs
+$(DEPLOY)-%-alchemy-spam               : CRON_PREFIX    := alchemy-spam
+$(DEPLOY)-%-alchemy-spam               : CRON_LOCATION  := $(DEPLOY_REGION)
+$(DEPLOY)-%-alchemy-spam               : CRON_SCHEDULE  := '0 0 * * *'
+$(DEPLOY)-%-alchemy-spam               : CRON_URI       = $(shell gcloud run services describe $(URI_NAME) --region $(DEPLOY_REGION) --format 'value(status.url)')/contracts/detect-spam
+$(DEPLOY)-%-alchemy-spam               : CRON_METHOD    := POST
+$(DEPLOY)-$(DEV)-alchemy-spam          : URI_NAME       := tokenprocessing-dev
+$(DEPLOY)-$(PROD)-alchemy-spam         : URI_NAME       := tokenprocessing-v2
 
 # Service name mappings
 $(PROMOTE)-%-backend                   : SERVICE := default
@@ -264,16 +271,24 @@ _set-project-$(ENV):
 	@echo "\n========== DEPLOYING TO '$(ENV)' ENVIRONMENT ==========\n"
 	$(SET_GCP_PROJECT)
 
-# Deploys the project
-_$(DEPLOY)-%:
-	@$(APP_ENGINE_DEPLOY)
-	@if [ $$? -eq 0 ] && echo $(APP_PROMOTE_FLAGS) | grep -e "--no-promote" > /dev/null; then echo "\n\tVERSION: '$(DEPLOY_VERSION)' was deployed but is not currently receiving traffic.\n\tRun 'make promote-$(ENV)-$* version=$(DEPLOY_VERSION)' to promote it!\n"; else echo "\n\tVERSION: '$(DEPLOY_VERSION)' was deployed!\n"; fi
-
 _$(DOCKER)-$(DEPLOY)-%:
 	@$(DOCKER_BUILD)
 	@$(DOCKER_PUSH)
 	@$(CLOUD_RUN_DEPLOY)
 	@if [ $$? -eq 0 ] && echo $(DEPLOY_FLAGS) | grep -e "--no-traffic" > /dev/null; then echo "\n\tVERSION: '$(CURRENT_COMMIT_HASH)' was deployed but is not currently receiving traffic.\n\tRun 'make promote-$(ENV)-$* version=$(CURRENT_COMMIT_HASH)' to promote it!\n"; else echo "\n\tVERSION: '$(CURRENT_COMMIT_HASH)' was deployed!\n"; fi
+
+_$(CRON)-$(DEPLOY)-%:
+	@$(SCHEDULER_DEPLOY)
+	@echo Deployed job $(CRON_NAME) to $(ENV)
+
+# Pauses jobs besides the version being deployed
+_$(CRON)-$(PAUSE)-%:
+	@echo Pausing jobs besides $(CRON_NAME)...
+	@gcloud scheduler jobs list \
+		--location $(DEPLOY_REGION) \
+		--filter 'ID:$(CRON_PREFIX) AND NOT ID:$(CRON_NAME) AND STATE:enabled' \
+		--format 'value(ID)' \
+		| xargs -I {} gcloud scheduler jobs pause --location $(DEPLOY_REGION) --quiet {}
 
 # Immediately migrates traffic to the input version
 _$(PROMOTE)-%:
@@ -285,12 +300,6 @@ _$(DOCKER)-$(PROMOTE)-%:
 	@version='$(version)'; \
 	if [ -z "$$version" ]; then echo "Please add 'version=...' to the command!" ; exit 1; fi; \
 	gcloud run services update-traffic $(SERVICE) --to-revisions=$(SERVICE)-$$version=100
-
-# Stops all versions of a services EXCEPT the input version
-_$(STOP)-%:
-	@version='$(version)'; \
-	if [ -z "$$version" ]; then echo "Please add 'version=...' to the command!" ; exit 1; fi; \
-	gcloud beta app versions stop -s $(SERVICE) $$(gcloud beta app versions list -s "$(SERVICE)" | awk 'NR>1' | awk '{print $$2}' | grep -v $$version);
 
 # Creates a new release in Sentry. Requires sentry-cli, install it by running:
 #
@@ -307,50 +316,48 @@ _$(RELEASE)-%:
 	@$(SENTRY_RELEASE) deploys $(DEPLOY_VERSION) new -n $(DEPLOY_VERSION) -e $(ENV)
 
 # DEV deployments
-$(DEPLOY)-$(DEV)-backend           : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend
-$(DEPLOY)-$(DEV)-indexer           : _set-project-$(ENV) _$(DEPLOY)-indexer _$(RELEASE)-indexer
-$(DEPLOY)-$(DEV)-indexer-server    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer-server _$(RELEASE)-indexer-server
-$(DEPLOY)-$(DEV)-tokenprocessing   : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-tokenprocessing _$(RELEASE)-tokenprocessing
-$(DEPLOY)-$(DEV)-emails            : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-emails _$(RELEASE)-emails
-$(DEPLOY)-$(DEV)-admin             : _set-project-$(ENV) _$(DEPLOY)-admin
-$(DEPLOY)-$(DEV)-feed              : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feed _$(RELEASE)-feed
-$(DEPLOY)-$(DEV)-feedbot           : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feedbot _$(RELEASE)-feedbot
-$(DEPLOY)-$(DEV)-pushnotifications : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-pushnotifications _$(RELEASE)-pushnotifications
-$(DEPLOY)-$(DEV)-routing-rules     : _set-project-$(ENV) _$(DEPLOY)-routing-rules
-$(DEPLOY)-$(DEV)-graphql-gateway   : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-graphql-gateway
+$(DEPLOY)-$(DEV)-backend          : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend
+$(DEPLOY)-$(DEV)-indexer-server   : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer-server _$(RELEASE)-indexer-server
+$(DEPLOY)-$(DEV)-tokenprocessing  : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-tokenprocessing _$(RELEASE)-tokenprocessing
+$(DEPLOY)-$(DEV)-emails           : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-emails _$(RELEASE)-emails
+$(DEPLOY)-$(DEV)-admin            : _set-project-$(ENV) _$(DEPLOY)-admin
+$(DEPLOY)-$(DEV)-feed             : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feed _$(RELEASE)-feed
+$(DEPLOY)-$(DEV)-feedbot          : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feedbot _$(RELEASE)-feedbot
+$(DEPLOY)-$(DEV)-routing-rules    : _set-project-$(ENV) _$(DEPLOY)-routing-rules
+$(DEPLOY)-$(DEV)-graphql-gateway  : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-graphql-gateway
+$(DEPLOY)-$(DEV)-alchemy-spam     : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-alchemy-spam _$(CRON)-$(PAUSE)-alchemy-spam
 
 # SANDBOX deployments
 $(DEPLOY)-$(SANDBOX)-backend      : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend # go server that uses dev upstream services
 
 # PROD deployments
-$(DEPLOY)-$(PROD)-backend           : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend
-$(DEPLOY)-$(PROD)-indexer           : _set-project-$(ENV) _$(DEPLOY)-indexer _$(RELEASE)-indexer
-$(DEPLOY)-$(PROD)-indexer-server    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer-server _$(RELEASE)-indexer-server
-$(DEPLOY)-$(PROD)-tokenprocessing   : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-tokenprocessing _$(RELEASE)-tokenprocessing
-$(DEPLOY)-$(PROD)-dummymetadata     : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-dummymetadata _$(RELEASE)-dummymetadata
-$(DEPLOY)-$(PROD)-emails            : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-emails _$(RELEASE)-emails
-$(DEPLOY)-$(PROD)-feed              : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feed _$(RELEASE)-feed
-$(DEPLOY)-$(PROD)-feedbot           : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feedbot _$(RELEASE)-feedbot
-$(DEPLOY)-$(PROD)-pushnotifications : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-pushnotifications _$(RELEASE)-pushnotifications
-$(DEPLOY)-$(PROD)-admin             : _set-project-$(ENV) _$(DEPLOY)-admin
-$(DEPLOY)-$(PROD)-routing-rules     : _set-project-$(ENV) _$(DEPLOY)-routing-rules
-$(DEPLOY)-$(PROD)-graphql-gateway   : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-graphql-gateway
+$(DEPLOY)-$(PROD)-backend         : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend
+$(DEPLOY)-$(PROD)-indexer         : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer _$(RELEASE)-indexer
+$(DEPLOY)-$(PROD)-indexer-server  : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer-server _$(RELEASE)-indexer-server
+$(DEPLOY)-$(PROD)-tokenprocessing : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-tokenprocessing _$(RELEASE)-tokenprocessing
+$(DEPLOY)-$(PROD)-dummymetadata   : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-dummymetadata _$(RELEASE)-dummymetadata
+$(DEPLOY)-$(PROD)-emails          : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-emails _$(RELEASE)-emails
+$(DEPLOY)-$(PROD)-feed            : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feed _$(RELEASE)-feed
+$(DEPLOY)-$(PROD)-feedbot         : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feedbot _$(RELEASE)-feedbot
+$(DEPLOY)-$(PROD)-admin           : _set-project-$(ENV) _$(DEPLOY)-admin
+$(DEPLOY)-$(PROD)-routing-rules   : _set-project-$(ENV) _$(DEPLOY)-routing-rules
+$(DEPLOY)-$(PROD)-graphql-gateway : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-graphql-gateway
+$(DEPLOY)-$(PROD)-alchemy-spam    : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-alchemy-spam _$(CRON)-$(PAUSE)-alchemy-spam
 
 # PROD promotions. Running these targets will migrate traffic to the specified version.
 # Example usage:
 #
 # $ make promote-prod-backend version=myVersion
 #
-$(PROMOTE)-$(PROD)-backend           : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-backend
-$(PROMOTE)-$(PROD)-indexer           : _set-project-$(ENV) _$(PROMOTE)-indexer _$(STOP)-indexer
-$(PROMOTE)-$(PROD)-indexer-server    : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-indexer-server
-$(PROMOTE)-$(PROD)-tokenprocessing   : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-tokenprocessing
-$(PROMOTE)-$(PROD)-dummymetadata     : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-dummymetadata
-$(PROMOTE)-$(PROD)-emails            : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-emails
-$(PROMOTE)-$(PROD)-feed              : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-feed
-$(PROMOTE)-$(PROD)-feedbot           : _set-project-$(ENV) _$(PROMOTE)-feedbot
-$(PROMOTE)-$(PROD)-pushnotifications : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-pushnotifications
-$(PROMOTE)-$(PROD)-admin             : _set-project-$(ENV) _$(PROMOTE)-admin
+$(PROMOTE)-$(PROD)-backend          : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-backend
+$(PROMOTE)-$(PROD)-indexer          : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-indexer
+$(PROMOTE)-$(PROD)-indexer-server   : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-indexer-server
+$(PROMOTE)-$(PROD)-tokenprocessing  : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-tokenprocessing
+$(PROMOTE)-$(PROD)-dummymetadata    : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-dummymetadata
+$(PROMOTE)-$(PROD)-emails           : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-emails
+$(PROMOTE)-$(PROD)-feed             : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-feed
+$(PROMOTE)-$(PROD)-feedbot          : _set-project-$(ENV) _$(PROMOTE)-feedbot
+$(PROMOTE)-$(PROD)-admin            : _set-project-$(ENV) _$(PROMOTE)-admin
 
 # Contracts
 contracts: solc abi-gen
@@ -368,6 +375,7 @@ solc:
 	solc --abi ./contracts/sol/Zora.sol > ./contracts/abi/Zora.abi
 	solc --abi ./contracts/sol/Merch.sol > ./contracts/abi/Merch.abi
 	solc --abi ./contracts/sol/PremiumCards.sol > ./contracts/abi/PremiumCards.abi
+	solc --abi ./contracts/sol/Ownable.sol > ./contracts/abi/Ownable.abi
 	tail -n +4 "./contracts/abi/IERC721.abi" > "./contracts/abi/IERC721.abi.tmp" && mv "./contracts/abi/IERC721.abi.tmp" "./contracts/abi/IERC721.abi"
 	tail -n +4 "./contracts/abi/IERC20.abi" > "./contracts/abi/IERC20.abi.tmp" && mv "./contracts/abi/IERC20.abi.tmp" "./contracts/abi/IERC20.abi"
 	tail -n +4 "./contracts/abi/IERC721Metadata.abi" > "./contracts/abi/IERC721Metadata.abi.tmp" && mv "./contracts/abi/IERC721Metadata.abi.tmp" "./contracts/abi/IERC721Metadata.abi"
@@ -380,6 +388,7 @@ solc:
 	tail -n +4 "./contracts/abi/Zora.abi" > "./contracts/abi/Zora.abi.tmp" && mv "./contracts/abi/Zora.abi.tmp" "./contracts/abi/Zora.abi"
 	tail -n +4 "./contracts/abi/Merch.abi" > "./contracts/abi/Merch.abi.tmp" && mv "./contracts/abi/Merch.abi.tmp" "./contracts/abi/Merch.abi"
 	tail -n +4 "./contracts/abi/PremiumCards.abi" > "./contracts/abi/PremiumCards.abi.tmp" && mv "./contracts/abi/PremiumCards.abi.tmp" "./contracts/abi/PremiumCards.abi"
+	tail -n +4 "./contracts/abi/Ownable.abi" > "./contracts/abi/Ownable.abi.tmp" && mv "./contracts/abi/Ownable.abi.tmp" "./contracts/abi/Ownable.abi"
 
 abi-gen:
 	abigen --abi=./contracts/abi/IERC721.abi --pkg=contracts --type=IERC721 > ./contracts/IERC721.go
@@ -394,6 +403,7 @@ abi-gen:
 	abigen --abi=./contracts/abi/Zora.abi --pkg=contracts --type=Zora > ./contracts/Zora.go
 	abigen --abi=./contracts/abi/Merch.abi --pkg=contracts --type=Merch > ./contracts/Merch.go
 	abigen --abi=./contracts/abi/PremiumCards.abi --pkg=contracts --type=PremiumCards > ./contracts/PremiumCards.go
+	abigen --abi=./contracts/abi/Ownable.abi --pkg=contracts --type=Ownable > ./contracts/Ownable.go
 
 # Miscellaneous stuff
 docker-start-clean:	docker-build
@@ -463,6 +473,9 @@ migrate-prod-coredb: start-prod-sql-proxy confirm-prod-migrate
 	POSTGRES_PASSWORD=$(POSTGRES_MIGRATION_PASSWORD) \
 	POSTGRES_PORT=6543 \
 	go run cmd/migrate/main.go
+
+migrate-prod-indexerdb: start-prod-sql-proxy confirm-prod-migrate
+	migrate -path ./db/migrations/indexer -database "postgresql://postgres:$(POSTGRES_INDEXER_PASSWORD)@localhost:6545/postgres?sslmode=disable" up
 
 fix-sops-macs:
 	@cd secrets; ../scripts/fix-sops-macs.sh

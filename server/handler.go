@@ -51,10 +51,7 @@ func handlersInit(router *gin.Engine, repos *postgres.Repositories, queries *db.
 	graphqlGroup := router.Group("/glry/graphql")
 	graphqlHandlersInit(graphqlGroup, repos, queries, ethClient, ipfsClient, arweaveClient, stg, mcProvider, throttler, taskClient, pub, lock, secrets, graphqlAPQCache, feedCache, socialCache, magicClient, recommender)
 
-	jobsGroup := router.Group("/jobs", middleware.BasicHeaderAuthRequired(nil, env.GetString("JOB_AUTH_TOKEN")))
-	jobHandlersInit(jobsGroup, queries)
-
-	router.GET("/alive", healthCheckHandler())
+	router.GET("/alive", util.HealthCheckHandler())
 
 	return router
 }
@@ -173,26 +170,5 @@ func graphqlPlaygroundHandler() gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		h.ServeHTTP(c.Writer, c.Request)
-	}
-}
-
-func healthCheckHandler() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
-	}
-}
-
-func jobHandlersInit(group *gin.RouterGroup, queries *db.Queries) {
-	group.POST("/check-push-tickets", pushTicketsJobHandler(queries))
-}
-
-func pushTicketsJobHandler(queries *db.Queries) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		err := notifications.CheckPushTickets(queries)
-		if err != nil {
-			// TODO: Appropriate error handling
-		}
-
-		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }

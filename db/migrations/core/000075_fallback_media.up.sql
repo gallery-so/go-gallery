@@ -1,0 +1,1 @@
+alter table tokens add column fallback_media jsonb;

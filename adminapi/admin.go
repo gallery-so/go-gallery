@@ -127,7 +127,7 @@ func (api *AdminAPI) AddWalletToUserUnchecked(ctx context.Context, username stri
 		}, nil
 	}
 
-	return user.AddWalletToUser(ctx, u.ID, chainAddress, authenticator{authMethod}, api.repos.UserRepository, api.repos.WalletRepository, api.multichain)
+	return user.AddWalletToUser(ctx, u.ID, chainAddress, authenticator{authMethod}, api.repos.UserRepository, api.multichain)
 }
 
 func requireRetoolAuthorized(ctx context.Context) {

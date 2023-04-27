@@ -412,6 +412,7 @@ type AudioMedia struct {
 	MediaType        *string          `json:"mediaType"`
 	ContentRenderURL *string          `json:"contentRenderURL"`
 	Dimensions       *MediaDimensions `json:"dimensions"`
+	FallbackMedia    *FallbackMedia   `json:"fallbackMedia"`
 }
 
 func (AudioMedia) IsMediaSubtype() {}
@@ -579,6 +580,7 @@ type Community struct {
 	HelperCommunityData
 	Dbid              persist.DBID            `json:"dbid"`
 	LastUpdated       *time.Time              `json:"lastUpdated"`
+	Contract          *Contract               `json:"contract"`
 	ContractAddress   *persist.ChainAddress   `json:"contractAddress"`
 	CreatorAddress    *persist.ChainAddress   `json:"creatorAddress"`
 	Chain             *persist.Chain          `json:"chain"`
@@ -620,6 +622,7 @@ type Contract struct {
 	ProfileImageURL  *string               `json:"profileImageURL"`
 	ProfileBannerURL *string               `json:"profileBannerURL"`
 	BadgeURL         *string               `json:"badgeURL"`
+	IsSpam           *bool                 `json:"isSpam"`
 }
 
 func (Contract) IsNode() {}
@@ -1028,6 +1031,11 @@ func (ErrUsernameNotAvailable) IsUpdateUserInfoPayloadOrError() {}
 func (ErrUsernameNotAvailable) IsError()                        {}
 func (ErrUsernameNotAvailable) IsCreateUserPayloadOrError()     {}
 
+type FallbackMedia struct {
+	MediaURL  *string `json:"mediaURL"`
+	MediaType *string `json:"mediaType"`
+}
+
 type FeedConnection struct {
 	Edges    []*FeedEdge `json:"edges"`
 	PageInfo *PageInfo   `json:"pageInfo"`
@@ -1112,6 +1120,7 @@ type GIFMedia struct {
 	MediaType         *string          `json:"mediaType"`
 	ContentRenderURL  *string          `json:"contentRenderURL"`
 	Dimensions        *MediaDimensions `json:"dimensions"`
+	FallbackMedia     *FallbackMedia   `json:"fallbackMedia"`
 }
 
 func (GIFMedia) IsMediaSubtype() {}
@@ -1202,6 +1211,7 @@ type GltfMedia struct {
 	MediaType        *string          `json:"mediaType"`
 	ContentRenderURL *string          `json:"contentRenderURL"`
 	Dimensions       *MediaDimensions `json:"dimensions"`
+	FallbackMedia    *FallbackMedia   `json:"fallbackMedia"`
 }
 
 func (GltfMedia) IsMediaSubtype() {}
@@ -1229,6 +1239,7 @@ type HTMLMedia struct {
 	MediaType        *string          `json:"mediaType"`
 	ContentRenderURL *string          `json:"contentRenderURL"`
 	Dimensions       *MediaDimensions `json:"dimensions"`
+	FallbackMedia    *FallbackMedia   `json:"fallbackMedia"`
 }
 
 func (HTMLMedia) IsMediaSubtype() {}
@@ -1240,6 +1251,7 @@ type ImageMedia struct {
 	MediaType        *string          `json:"mediaType"`
 	ContentRenderURL *string          `json:"contentRenderURL"`
 	Dimensions       *MediaDimensions `json:"dimensions"`
+	FallbackMedia    *FallbackMedia   `json:"fallbackMedia"`
 }
 
 func (ImageMedia) IsMediaSubtype() {}
@@ -1251,6 +1263,7 @@ type InvalidMedia struct {
 	MediaType        *string          `json:"mediaType"`
 	ContentRenderURL *string          `json:"contentRenderURL"`
 	Dimensions       *MediaDimensions `json:"dimensions"`
+	FallbackMedia    *FallbackMedia   `json:"fallbackMedia"`
 }
 
 func (InvalidMedia) IsMediaSubtype() {}
@@ -1262,6 +1275,7 @@ type JSONMedia struct {
 	MediaType        *string          `json:"mediaType"`
 	ContentRenderURL *string          `json:"contentRenderURL"`
 	Dimensions       *MediaDimensions `json:"dimensions"`
+	FallbackMedia    *FallbackMedia   `json:"fallbackMedia"`
 }
 
 func (JSONMedia) IsMediaSubtype() {}
@@ -1387,6 +1401,7 @@ type PDFMedia struct {
 	MediaType        *string          `json:"mediaType"`
 	ContentRenderURL *string          `json:"contentRenderURL"`
 	Dimensions       *MediaDimensions `json:"dimensions"`
+	FallbackMedia    *FallbackMedia   `json:"fallbackMedia"`
 }
 
 func (PDFMedia) IsMediaSubtype() {}
@@ -1648,6 +1663,7 @@ type SyncingMedia struct {
 	MediaType        *string          `json:"mediaType"`
 	ContentRenderURL *string          `json:"contentRenderURL"`
 	Dimensions       *MediaDimensions `json:"dimensions"`
+	FallbackMedia    *FallbackMedia   `json:"fallbackMedia"`
 }
 
 func (SyncingMedia) IsMediaSubtype() {}
@@ -1659,6 +1675,7 @@ type TextMedia struct {
 	MediaType        *string          `json:"mediaType"`
 	ContentRenderURL *string          `json:"contentRenderURL"`
 	Dimensions       *MediaDimensions `json:"dimensions"`
+	FallbackMedia    *FallbackMedia   `json:"fallbackMedia"`
 }
 
 func (TextMedia) IsMediaSubtype() {}
@@ -1777,6 +1794,7 @@ type UnknownMedia struct {
 	MediaType        *string          `json:"mediaType"`
 	ContentRenderURL *string          `json:"contentRenderURL"`
 	Dimensions       *MediaDimensions `json:"dimensions"`
+	FallbackMedia    *FallbackMedia   `json:"fallbackMedia"`
 }
 
 func (UnknownMedia) IsMediaSubtype() {}
@@ -2055,6 +2073,7 @@ type VideoMedia struct {
 	MediaType         *string          `json:"mediaType"`
 	ContentRenderURLs *VideoURLSet     `json:"contentRenderURLs"`
 	Dimensions        *MediaDimensions `json:"dimensions"`
+	FallbackMedia     *FallbackMedia   `json:"fallbackMedia"`
 }
 
 func (VideoMedia) IsMediaSubtype() {}
@@ -2287,6 +2306,7 @@ const (
 	UserExperienceTypeMaintenanceFeb2023                UserExperienceType = "MaintenanceFeb2023"
 	UserExperienceTypeTwitterConnectionOnboardingUpsell UserExperienceType = "TwitterConnectionOnboardingUpsell"
 	UserExperienceTypeUpsellMintMemento4                UserExperienceType = "UpsellMintMemento4"
+	UserExperienceTypeUpsellGallerySelects1             UserExperienceType = "UpsellGallerySelects1"
 )
 
 var AllUserExperienceType = []UserExperienceType{
@@ -2296,11 +2316,12 @@ var AllUserExperienceType = []UserExperienceType{
 	UserExperienceTypeMaintenanceFeb2023,
 	UserExperienceTypeTwitterConnectionOnboardingUpsell,
 	UserExperienceTypeUpsellMintMemento4,
+	UserExperienceTypeUpsellGallerySelects1,
 }
 
 func (e UserExperienceType) IsValid() bool {
 	switch e {
-	case UserExperienceTypeMultiGalleryAnnouncement, UserExperienceTypeEmailUpsell, UserExperienceTypeMerchStoreUpsell, UserExperienceTypeMaintenanceFeb2023, UserExperienceTypeTwitterConnectionOnboardingUpsell, UserExperienceTypeUpsellMintMemento4:
+	case UserExperienceTypeMultiGalleryAnnouncement, UserExperienceTypeEmailUpsell, UserExperienceTypeMerchStoreUpsell, UserExperienceTypeMaintenanceFeb2023, UserExperienceTypeTwitterConnectionOnboardingUpsell, UserExperienceTypeUpsellMintMemento4, UserExperienceTypeUpsellGallerySelects1:
 		return true
 	}
 	return false

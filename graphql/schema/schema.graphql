@@ -183,6 +183,11 @@ type MediaDimensions {
   aspectRatio: Float
 }
 
+type FallbackMedia {
+  mediaURL: String
+  mediaType: String
+}
+
 interface Media {
   # Various sizes of preview images for the media
   previewURLs: PreviewURLSet
@@ -199,6 +204,8 @@ interface Media {
 
   # The dimensions of the media, if known
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type ImageMedia implements Media {
@@ -208,6 +215,8 @@ type ImageMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type GIFMedia implements Media {
@@ -218,6 +227,8 @@ type GIFMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type VideoMedia implements Media {
@@ -227,6 +238,8 @@ type VideoMedia implements Media {
 
   contentRenderURLs: VideoURLSet
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type AudioMedia implements Media {
@@ -236,6 +249,8 @@ type AudioMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type TextMedia implements Media {
@@ -245,6 +260,8 @@ type TextMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type PdfMedia implements Media {
@@ -254,6 +271,8 @@ type PdfMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type HtmlMedia implements Media {
@@ -263,6 +282,8 @@ type HtmlMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type JsonMedia implements Media {
@@ -272,6 +293,8 @@ type JsonMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type GltfMedia implements Media {
@@ -281,6 +304,8 @@ type GltfMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type UnknownMedia implements Media {
@@ -290,6 +315,8 @@ type UnknownMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type SyncingMedia implements Media {
@@ -299,6 +326,8 @@ type SyncingMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type InvalidMedia implements Media {
@@ -308,6 +337,8 @@ type InvalidMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 enum TokenType {
@@ -459,6 +490,7 @@ type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) @g
 
   lastUpdated: Time
 
+  contract: Contract
   contractAddress: ChainAddress
   creatorAddress: ChainAddress
   chain: Chain
@@ -499,6 +531,7 @@ type Contract implements Node {
   profileImageURL: String
   profileBannerURL: String
   badgeURL: String
+  isSpam: Boolean
 }
 
 # We have this extra type in case we need to stick authed data
@@ -618,6 +651,7 @@ enum UserExperienceType {
   MaintenanceFeb2023
   TwitterConnectionOnboardingUpsell
   UpsellMintMemento4
+  UpsellGallerySelects1
 }
 
 type UserExperience {

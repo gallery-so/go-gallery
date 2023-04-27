@@ -19,6 +19,10 @@ sql:
           # Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above
           - column: "*.id"
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+          - column: "*.block_start"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.BlockNumber"
+          - column: "*.block_end"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.BlockNumber"
 
   # Backend model gen
   - schema:
@@ -80,6 +84,8 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.TokenID"
           - column: "tokens.media"
             go_type: "github.com/mikeydub/go-gallery/service/persist.Media"
+          - column: "tokens.fallback_media"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.FallbackMedia"
           - column: "tokens.ownership_history"
             go_type: "github.com/mikeydub/go-gallery/service/persist.AddressAtBlockList"
           - column: "tokens.token_metadata"

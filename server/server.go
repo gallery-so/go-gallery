@@ -32,7 +32,9 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain"
+	"github.com/mikeydub/go-gallery/service/multichain/alchemy"
 	"github.com/mikeydub/go-gallery/service/multichain/eth"
+	"github.com/mikeydub/go-gallery/service/multichain/infura"
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/mikeydub/go-gallery/service/multichain/poap"
 	"github.com/mikeydub/go-gallery/service/multichain/tezos"
@@ -173,6 +175,7 @@ func SetDefaults() {
 	viper.SetDefault("POSTGRES_PASSWORD", "")
 	viper.SetDefault("POSTGRES_DB", "postgres")
 	viper.SetDefault("IPFS_URL", "https://gallery.infura-ipfs.io")
+	viper.SetDefault("FALLBACK_IPFS_URL", "https://ipfs.io")
 	viper.SetDefault("IPFS_API_URL", "https://ipfs.infura.io:5001")
 	viper.SetDefault("IPFS_PROJECT_ID", "")
 	viper.SetDefault("IPFS_PROJECT_SECRET", "")
@@ -192,7 +195,6 @@ func SetDefaults() {
 	viper.SetDefault("TASK_QUEUE_HOST", "")
 	viper.SetDefault("SENTRY_DSN", "")
 	viper.SetDefault("GCLOUD_FEED_QUEUE", "projects/gallery-local/locations/here/queues/feed-event")
-	viper.SetDefault("GCLOUD_WALLET_VALIDATE_QUEUE", "projects/gallery-dev-322005/locations/us-west2/queues/wallet-validate")
 	viper.SetDefault("GCLOUD_FEED_BUFFER_SECS", 20)
 	viper.SetDefault("FEED_SECRET", "feed-secret")
 	viper.SetDefault("TOKEN_PROCESSING_URL", "http://localhost:6500")
@@ -219,6 +221,9 @@ func SetDefaults() {
 	viper.SetDefault("TWITTER_AUTH_REDIRECT_URI", "http://localhost:3000/auth/twitter")
 	viper.SetDefault("FEEDBOT_URL", "")
 	viper.SetDefault("GCLOUD_FEEDBOT_TASK_QUEUE", "projects/gallery-local/locations/here/queues/feedbot")
+	viper.SetDefault("ALCHEMY_API_URL", "")
+	viper.SetDefault("INFURA_API_KEY", "")
+	viper.SetDefault("INFURA_API_SECRET", "")
 	viper.SetDefault("PUSH_NOTIFICATION_SECRET", "push-notification-secret")
 
 	viper.AutomaticEnv()
@@ -274,10 +279,16 @@ func initSentry() {
 
 func NewMultichainProvider(c *Clients) *multichain.Provider {
 	ethChain := persist.ChainETH
-	overrides := multichain.ChainOverrideMap{persist.ChainPOAP: &ethChain}
+	overrides := multichain.ChainOverrideMap{persist.ChainPOAP: &ethChain, persist.ChainOptimism: &ethChain, persist.ChainPolygon: &ethChain}
+	alchemyMainnetProvider := alchemy.NewProvider(persist.ChainETH, c.HTTPClient)
+	infuraProvider := infura.NewProvider(c.HTTPClient)
+	failureEthProvider := multichain.SyncFailureFallbackProvider{Primary: infuraProvider, Fallback: alchemyMainnetProvider}
+
 	ethProvider := eth.NewProvider(env.GetString("INDEXER_HOST"), c.HTTPClient, c.EthClient, c.TaskClient)
+	alchemyOptimismProvider := alchemy.NewProvider(persist.ChainOptimism, c.HTTPClient)
+	alchemyPolygonProvider := alchemy.NewProvider(persist.ChainPolygon, c.HTTPClient)
 	openseaProvider := opensea.NewProvider(c.EthClient, c.HTTPClient)
-	tezosProvider := multichain.FallbackProvider{
+	tezosProvider := multichain.SyncWithContractEvalFallbackProvider{
 		Primary:  tezos.NewProvider(env.GetString("TEZOS_API_URL"), env.GetString("TOKEN_PROCESSING_URL"), env.GetString("IPFS_URL"), c.HTTPClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET")),
 		Fallback: tezos.NewObjktProvider(env.GetString("IPFS_URL")),
 		Eval: func(ctx context.Context, token multichain.ChainAgnosticToken) bool {
@@ -288,10 +299,13 @@ func NewMultichainProvider(c *Clients) *multichain.Provider {
 	cache := redis.NewCache(redis.CommunitiesDB)
 	return multichain.NewProvider(context.Background(), c.Repos, c.Queries, cache, c.TaskClient,
 		overrides,
+		failureEthProvider,
 		ethProvider,
 		openseaProvider,
 		tezosProvider,
 		poapProvider,
+		alchemyOptimismProvider,
+		alchemyPolygonProvider,
 	)
 }
 

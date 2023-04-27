@@ -122,6 +122,7 @@ type ComplexityRoot struct {
 	AudioMedia struct {
 		ContentRenderURL func(childComplexity int) int
 		Dimensions       func(childComplexity int) int
+		FallbackMedia    func(childComplexity int) int
 		MediaType        func(childComplexity int) int
 		MediaURL         func(childComplexity int) int
 		PreviewURLs      func(childComplexity int) int
@@ -253,6 +254,7 @@ type ComplexityRoot struct {
 	Community struct {
 		BadgeURL          func(childComplexity int) int
 		Chain             func(childComplexity int) int
+		Contract          func(childComplexity int) int
 		ContractAddress   func(childComplexity int) int
 		CreatorAddress    func(childComplexity int) int
 		Dbid              func(childComplexity int) int
@@ -287,6 +289,7 @@ type ComplexityRoot struct {
 		CreatorAddress   func(childComplexity int) int
 		Dbid             func(childComplexity int) int
 		ID               func(childComplexity int) int
+		IsSpam           func(childComplexity int) int
 		LastUpdated      func(childComplexity int) int
 		Name             func(childComplexity int) int
 		ProfileBannerURL func(childComplexity int) int
@@ -431,6 +434,11 @@ type ComplexityRoot struct {
 		Message func(childComplexity int) int
 	}
 
+	FallbackMedia struct {
+		MediaType func(childComplexity int) int
+		MediaURL  func(childComplexity int) int
+	}
+
 	FeedConnection struct {
 		Edges    func(childComplexity int) int
 		PageInfo func(childComplexity int) int
@@ -503,6 +511,7 @@ type ComplexityRoot struct {
 	GIFMedia struct {
 		ContentRenderURL  func(childComplexity int) int
 		Dimensions        func(childComplexity int) int
+		FallbackMedia     func(childComplexity int) int
 		MediaType         func(childComplexity int) int
 		MediaURL          func(childComplexity int) int
 		PreviewURLs       func(childComplexity int) int
@@ -570,6 +579,7 @@ type ComplexityRoot struct {
 	GltfMedia struct {
 		ContentRenderURL func(childComplexity int) int
 		Dimensions       func(childComplexity int) int
+		FallbackMedia    func(childComplexity int) int
 		MediaType        func(childComplexity int) int
 		MediaURL         func(childComplexity int) int
 		PreviewURLs      func(childComplexity int) int
@@ -588,6 +598,7 @@ type ComplexityRoot struct {
 	HtmlMedia struct {
 		ContentRenderURL func(childComplexity int) int
 		Dimensions       func(childComplexity int) int
+		FallbackMedia    func(childComplexity int) int
 		MediaType        func(childComplexity int) int
 		MediaURL         func(childComplexity int) int
 		PreviewURLs      func(childComplexity int) int
@@ -596,6 +607,7 @@ type ComplexityRoot struct {
 	ImageMedia struct {
 		ContentRenderURL func(childComplexity int) int
 		Dimensions       func(childComplexity int) int
+		FallbackMedia    func(childComplexity int) int
 		MediaType        func(childComplexity int) int
 		MediaURL         func(childComplexity int) int
 		PreviewURLs      func(childComplexity int) int
@@ -604,6 +616,7 @@ type ComplexityRoot struct {
 	InvalidMedia struct {
 		ContentRenderURL func(childComplexity int) int
 		Dimensions       func(childComplexity int) int
+		FallbackMedia    func(childComplexity int) int
 		MediaType        func(childComplexity int) int
 		MediaURL         func(childComplexity int) int
 		PreviewURLs      func(childComplexity int) int
@@ -612,6 +625,7 @@ type ComplexityRoot struct {
 	JsonMedia struct {
 		ContentRenderURL func(childComplexity int) int
 		Dimensions       func(childComplexity int) int
+		FallbackMedia    func(childComplexity int) int
 		MediaType        func(childComplexity int) int
 		MediaURL         func(childComplexity int) int
 		PreviewURLs      func(childComplexity int) int
@@ -766,6 +780,7 @@ type ComplexityRoot struct {
 	PdfMedia struct {
 		ContentRenderURL func(childComplexity int) int
 		Dimensions       func(childComplexity int) int
+		FallbackMedia    func(childComplexity int) int
 		MediaType        func(childComplexity int) int
 		MediaURL         func(childComplexity int) int
 		PreviewURLs      func(childComplexity int) int
@@ -976,6 +991,7 @@ type ComplexityRoot struct {
 	SyncingMedia struct {
 		ContentRenderURL func(childComplexity int) int
 		Dimensions       func(childComplexity int) int
+		FallbackMedia    func(childComplexity int) int
 		MediaType        func(childComplexity int) int
 		MediaURL         func(childComplexity int) int
 		PreviewURLs      func(childComplexity int) int
@@ -984,6 +1000,7 @@ type ComplexityRoot struct {
 	TextMedia struct {
 		ContentRenderURL func(childComplexity int) int
 		Dimensions       func(childComplexity int) int
+		FallbackMedia    func(childComplexity int) int
 		MediaType        func(childComplexity int) int
 		MediaURL         func(childComplexity int) int
 		PreviewURLs      func(childComplexity int) int
@@ -1077,6 +1094,7 @@ type ComplexityRoot struct {
 	UnknownMedia struct {
 		ContentRenderURL func(childComplexity int) int
 		Dimensions       func(childComplexity int) int
+		FallbackMedia    func(childComplexity int) int
 		MediaType        func(childComplexity int) int
 		MediaURL         func(childComplexity int) int
 		PreviewURLs      func(childComplexity int) int
@@ -1204,6 +1222,7 @@ type ComplexityRoot struct {
 	VideoMedia struct {
 		ContentRenderURLs func(childComplexity int) int
 		Dimensions        func(childComplexity int) int
+		FallbackMedia     func(childComplexity int) int
 		MediaType         func(childComplexity int) int
 		MediaURL          func(childComplexity int) int
 		PreviewURLs       func(childComplexity int) int
@@ -1642,6 +1661,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.AudioMedia.Dimensions(childComplexity), true
+
+	case "AudioMedia.fallbackMedia":
+		if e.complexity.AudioMedia.FallbackMedia == nil {
+			break
+		}
+
+		return e.complexity.AudioMedia.FallbackMedia(childComplexity), true
 
 	case "AudioMedia.mediaType":
 		if e.complexity.AudioMedia.MediaType == nil {
@@ -2145,6 +2171,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Community.Chain(childComplexity), true
 
+	case "Community.contract":
+		if e.complexity.Community.Contract == nil {
+			break
+		}
+
+		return e.complexity.Community.Contract(childComplexity), true
+
 	case "Community.contractAddress":
 		if e.complexity.Community.ContractAddress == nil {
 			break
@@ -2308,6 +2341,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Contract.ID(childComplexity), true
+
+	case "Contract.isSpam":
+		if e.complexity.Contract.IsSpam == nil {
+			break
+		}
+
+		return e.complexity.Contract.IsSpam(childComplexity), true
 
 	case "Contract.lastUpdated":
 		if e.complexity.Contract.LastUpdated == nil {
@@ -2636,6 +2676,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ErrUsernameNotAvailable.Message(childComplexity), true
 
+	case "FallbackMedia.mediaType":
+		if e.complexity.FallbackMedia.MediaType == nil {
+			break
+		}
+
+		return e.complexity.FallbackMedia.MediaType(childComplexity), true
+
+	case "FallbackMedia.mediaURL":
+		if e.complexity.FallbackMedia.MediaURL == nil {
+			break
+		}
+
+		return e.complexity.FallbackMedia.MediaURL(childComplexity), true
+
 	case "FeedConnection.edges":
 		if e.complexity.FeedConnection.Edges == nil {
 			break
@@ -2895,6 +2949,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.GIFMedia.Dimensions(childComplexity), true
+
+	case "GIFMedia.fallbackMedia":
+		if e.complexity.GIFMedia.FallbackMedia == nil {
+			break
+		}
+
+		return e.complexity.GIFMedia.FallbackMedia(childComplexity), true
 
 	case "GIFMedia.mediaType":
 		if e.complexity.GIFMedia.MediaType == nil {
@@ -3259,6 +3320,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.GltfMedia.Dimensions(childComplexity), true
 
+	case "GltfMedia.fallbackMedia":
+		if e.complexity.GltfMedia.FallbackMedia == nil {
+			break
+		}
+
+		return e.complexity.GltfMedia.FallbackMedia(childComplexity), true
+
 	case "GltfMedia.mediaType":
 		if e.complexity.GltfMedia.MediaType == nil {
 			break
@@ -3322,6 +3390,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.HtmlMedia.Dimensions(childComplexity), true
 
+	case "HtmlMedia.fallbackMedia":
+		if e.complexity.HtmlMedia.FallbackMedia == nil {
+			break
+		}
+
+		return e.complexity.HtmlMedia.FallbackMedia(childComplexity), true
+
 	case "HtmlMedia.mediaType":
 		if e.complexity.HtmlMedia.MediaType == nil {
 			break
@@ -3356,6 +3431,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ImageMedia.Dimensions(childComplexity), true
+
+	case "ImageMedia.fallbackMedia":
+		if e.complexity.ImageMedia.FallbackMedia == nil {
+			break
+		}
+
+		return e.complexity.ImageMedia.FallbackMedia(childComplexity), true
 
 	case "ImageMedia.mediaType":
 		if e.complexity.ImageMedia.MediaType == nil {
@@ -3392,6 +3474,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.InvalidMedia.Dimensions(childComplexity), true
 
+	case "InvalidMedia.fallbackMedia":
+		if e.complexity.InvalidMedia.FallbackMedia == nil {
+			break
+		}
+
+		return e.complexity.InvalidMedia.FallbackMedia(childComplexity), true
+
 	case "InvalidMedia.mediaType":
 		if e.complexity.InvalidMedia.MediaType == nil {
 			break
@@ -3426,6 +3515,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.JsonMedia.Dimensions(childComplexity), true
+
+	case "JsonMedia.fallbackMedia":
+		if e.complexity.JsonMedia.FallbackMedia == nil {
+			break
+		}
+
+		return e.complexity.JsonMedia.FallbackMedia(childComplexity), true
 
 	case "JsonMedia.mediaType":
 		if e.complexity.JsonMedia.MediaType == nil {
@@ -4459,6 +4555,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.PdfMedia.Dimensions(childComplexity), true
 
+	case "PdfMedia.fallbackMedia":
+		if e.complexity.PdfMedia.FallbackMedia == nil {
+			break
+		}
+
+		return e.complexity.PdfMedia.FallbackMedia(childComplexity), true
+
 	case "PdfMedia.mediaType":
 		if e.complexity.PdfMedia.MediaType == nil {
 			break
@@ -5423,6 +5526,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.SyncingMedia.Dimensions(childComplexity), true
 
+	case "SyncingMedia.fallbackMedia":
+		if e.complexity.SyncingMedia.FallbackMedia == nil {
+			break
+		}
+
+		return e.complexity.SyncingMedia.FallbackMedia(childComplexity), true
+
 	case "SyncingMedia.mediaType":
 		if e.complexity.SyncingMedia.MediaType == nil {
 			break
@@ -5457,6 +5567,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.TextMedia.Dimensions(childComplexity), true
+
+	case "TextMedia.fallbackMedia":
+		if e.complexity.TextMedia.FallbackMedia == nil {
+			break
+		}
+
+		return e.complexity.TextMedia.FallbackMedia(childComplexity), true
 
 	case "TextMedia.mediaType":
 		if e.complexity.TextMedia.MediaType == nil {
@@ -5857,6 +5974,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.UnknownMedia.Dimensions(childComplexity), true
 
+	case "UnknownMedia.fallbackMedia":
+		if e.complexity.UnknownMedia.FallbackMedia == nil {
+			break
+		}
+
+		return e.complexity.UnknownMedia.FallbackMedia(childComplexity), true
+
 	case "UnknownMedia.mediaType":
 		if e.complexity.UnknownMedia.MediaType == nil {
 			break
@@ -6157,6 +6281,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.VideoMedia.Dimensions(childComplexity), true
+
+	case "VideoMedia.fallbackMedia":
+		if e.complexity.VideoMedia.FallbackMedia == nil {
+			break
+		}
+
+		return e.complexity.VideoMedia.FallbackMedia(childComplexity), true
 
 	case "VideoMedia.mediaType":
 		if e.complexity.VideoMedia.MediaType == nil {
@@ -6671,6 +6802,11 @@ type MediaDimensions {
   aspectRatio: Float
 }
 
+type FallbackMedia {
+  mediaURL: String
+  mediaType: String
+}
+
 interface Media {
   # Various sizes of preview images for the media
   previewURLs: PreviewURLSet
@@ -6687,6 +6823,8 @@ interface Media {
 
   # The dimensions of the media, if known
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type ImageMedia implements Media {
@@ -6696,6 +6834,8 @@ type ImageMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type GIFMedia implements Media {
@@ -6706,6 +6846,8 @@ type GIFMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type VideoMedia implements Media {
@@ -6715,6 +6857,8 @@ type VideoMedia implements Media {
 
   contentRenderURLs: VideoURLSet
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type AudioMedia implements Media {
@@ -6724,6 +6868,8 @@ type AudioMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type TextMedia implements Media {
@@ -6733,6 +6879,8 @@ type TextMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type PdfMedia implements Media {
@@ -6742,6 +6890,8 @@ type PdfMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type HtmlMedia implements Media {
@@ -6751,6 +6901,8 @@ type HtmlMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type JsonMedia implements Media {
@@ -6760,6 +6912,8 @@ type JsonMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type GltfMedia implements Media {
@@ -6769,6 +6923,8 @@ type GltfMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type UnknownMedia implements Media {
@@ -6778,6 +6934,8 @@ type UnknownMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type SyncingMedia implements Media {
@@ -6787,6 +6945,8 @@ type SyncingMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 type InvalidMedia implements Media {
@@ -6796,6 +6956,8 @@ type InvalidMedia implements Media {
 
   contentRenderURL: String
   dimensions: MediaDimensions
+
+  fallbackMedia: FallbackMedia
 }
 
 enum TokenType {
@@ -6947,6 +7109,7 @@ type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) @g
 
   lastUpdated: Time
 
+  contract: Contract
   contractAddress: ChainAddress
   creatorAddress: ChainAddress
   chain: Chain
@@ -6987,6 +7150,7 @@ type Contract implements Node {
   profileImageURL: String
   profileBannerURL: String
   badgeURL: String
+  isSpam: Boolean
 }
 
 # We have this extra type in case we need to stick authed data
@@ -7106,6 +7270,7 @@ enum UserExperienceType {
   MaintenanceFeb2023
   TwitterConnectionOnboardingUpsell
   UpsellMintMemento4
+  UpsellGallerySelects1
 }
 
 type UserExperience {
@@ -11868,6 +12033,53 @@ func (ec *executionContext) fieldContext_AudioMedia_dimensions(ctx context.Conte
 	return fc, nil
 }
 
+func (ec *executionContext) _AudioMedia_fallbackMedia(ctx context.Context, field graphql.CollectedField, obj *model.AudioMedia) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AudioMedia_fallbackMedia(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.FallbackMedia, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.FallbackMedia)
+	fc.Result = res
+	return ec.marshalOFallbackMedia2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFallbackMedia(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AudioMedia_fallbackMedia(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AudioMedia",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "mediaURL":
+				return ec.fieldContext_FallbackMedia_mediaURL(ctx, field)
+			case "mediaType":
+				return ec.fieldContext_FallbackMedia_mediaType(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type FallbackMedia", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _AuthNonce_nonce(ctx context.Context, field graphql.CollectedField, obj *model.AuthNonce) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_AuthNonce_nonce(ctx, field)
 	if err != nil {
@@ -12091,6 +12303,8 @@ func (ec *executionContext) fieldContext_Badge_contract(ctx context.Context, fie
 				return ec.fieldContext_Contract_profileBannerURL(ctx, field)
 			case "badgeURL":
 				return ec.fieldContext_Contract_badgeURL(ctx, field)
+			case "isSpam":
+				return ec.fieldContext_Contract_isSpam(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Contract", field.Name)
 		},
@@ -15387,6 +15601,71 @@ func (ec *executionContext) fieldContext_Community_lastUpdated(ctx context.Conte
 	return fc, nil
 }
 
+func (ec *executionContext) _Community_contract(ctx context.Context, field graphql.CollectedField, obj *model.Community) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Community_contract(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Contract, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Contract)
+	fc.Result = res
+	return ec.marshalOContract2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐContract(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Community_contract(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Community",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Contract_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Contract_dbid(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Contract_lastUpdated(ctx, field)
+			case "contractAddress":
+				return ec.fieldContext_Contract_contractAddress(ctx, field)
+			case "creatorAddress":
+				return ec.fieldContext_Contract_creatorAddress(ctx, field)
+			case "chain":
+				return ec.fieldContext_Contract_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Contract_name(ctx, field)
+			case "profileImageURL":
+				return ec.fieldContext_Contract_profileImageURL(ctx, field)
+			case "profileBannerURL":
+				return ec.fieldContext_Contract_profileBannerURL(ctx, field)
+			case "badgeURL":
+				return ec.fieldContext_Contract_badgeURL(ctx, field)
+			case "isSpam":
+				return ec.fieldContext_Contract_isSpam(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Contract", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Community_contractAddress(ctx context.Context, field graphql.CollectedField, obj *model.Community) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Community_contractAddress(ctx, field)
 	if err != nil {
@@ -15926,6 +16205,8 @@ func (ec *executionContext) fieldContext_CommunityEdge_node(ctx context.Context,
 				return ec.fieldContext_Community_id(ctx, field)
 			case "lastUpdated":
 				return ec.fieldContext_Community_lastUpdated(ctx, field)
+			case "contract":
+				return ec.fieldContext_Community_contract(ctx, field)
 			case "contractAddress":
 				return ec.fieldContext_Community_contractAddress(ctx, field)
 			case "creatorAddress":
@@ -16038,6 +16319,8 @@ func (ec *executionContext) fieldContext_CommunitySearchResult_community(ctx con
 				return ec.fieldContext_Community_id(ctx, field)
 			case "lastUpdated":
 				return ec.fieldContext_Community_lastUpdated(ctx, field)
+			case "contract":
+				return ec.fieldContext_Community_contract(ctx, field)
 			case "contractAddress":
 				return ec.fieldContext_Community_contractAddress(ctx, field)
 			case "creatorAddress":
@@ -16553,6 +16836,47 @@ func (ec *executionContext) fieldContext_Contract_badgeURL(ctx context.Context, 
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Contract_isSpam(ctx context.Context, field graphql.CollectedField, obj *model.Contract) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Contract_isSpam(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.IsSpam, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Contract_isSpam(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Contract",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
 		},
 	}
 	return fc, nil
@@ -18523,6 +18847,88 @@ func (ec *executionContext) _ErrUsernameNotAvailable_message(ctx context.Context
 func (ec *executionContext) fieldContext_ErrUsernameNotAvailable_message(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "ErrUsernameNotAvailable",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FallbackMedia_mediaURL(ctx context.Context, field graphql.CollectedField, obj *model.FallbackMedia) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FallbackMedia_mediaURL(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.MediaURL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FallbackMedia_mediaURL(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FallbackMedia",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FallbackMedia_mediaType(ctx context.Context, field graphql.CollectedField, obj *model.FallbackMedia) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FallbackMedia_mediaType(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.MediaType, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FallbackMedia_mediaType(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FallbackMedia",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -20558,6 +20964,53 @@ func (ec *executionContext) fieldContext_GIFMedia_dimensions(ctx context.Context
 				return ec.fieldContext_MediaDimensions_aspectRatio(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type MediaDimensions", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GIFMedia_fallbackMedia(ctx context.Context, field graphql.CollectedField, obj *model.GIFMedia) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_GIFMedia_fallbackMedia(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.FallbackMedia, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.FallbackMedia)
+	fc.Result = res
+	return ec.marshalOFallbackMedia2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFallbackMedia(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_GIFMedia_fallbackMedia(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GIFMedia",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "mediaURL":
+				return ec.fieldContext_FallbackMedia_mediaURL(ctx, field)
+			case "mediaType":
+				return ec.fieldContext_FallbackMedia_mediaType(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type FallbackMedia", field.Name)
 		},
 	}
 	return fc, nil
@@ -23105,6 +23558,53 @@ func (ec *executionContext) fieldContext_GltfMedia_dimensions(ctx context.Contex
 	return fc, nil
 }
 
+func (ec *executionContext) _GltfMedia_fallbackMedia(ctx context.Context, field graphql.CollectedField, obj *model.GltfMedia) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_GltfMedia_fallbackMedia(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.FallbackMedia, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.FallbackMedia)
+	fc.Result = res
+	return ec.marshalOFallbackMedia2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFallbackMedia(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_GltfMedia_fallbackMedia(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GltfMedia",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "mediaURL":
+				return ec.fieldContext_FallbackMedia_mediaURL(ctx, field)
+			case "mediaType":
+				return ec.fieldContext_FallbackMedia_mediaType(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type FallbackMedia", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _GroupNotificationUserEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.GroupNotificationUserEdge) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_GroupNotificationUserEdge_node(ctx, field)
 	if err != nil {
@@ -23564,6 +24064,53 @@ func (ec *executionContext) fieldContext_HtmlMedia_dimensions(ctx context.Contex
 	return fc, nil
 }
 
+func (ec *executionContext) _HtmlMedia_fallbackMedia(ctx context.Context, field graphql.CollectedField, obj *model.HTMLMedia) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_HtmlMedia_fallbackMedia(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.FallbackMedia, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.FallbackMedia)
+	fc.Result = res
+	return ec.marshalOFallbackMedia2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFallbackMedia(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_HtmlMedia_fallbackMedia(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HtmlMedia",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "mediaURL":
+				return ec.fieldContext_FallbackMedia_mediaURL(ctx, field)
+			case "mediaType":
+				return ec.fieldContext_FallbackMedia_mediaType(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type FallbackMedia", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _ImageMedia_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.ImageMedia) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_ImageMedia_previewURLs(ctx, field)
 	if err != nil {
@@ -23790,6 +24337,53 @@ func (ec *executionContext) fieldContext_ImageMedia_dimensions(ctx context.Conte
 				return ec.fieldContext_MediaDimensions_aspectRatio(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type MediaDimensions", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ImageMedia_fallbackMedia(ctx context.Context, field graphql.CollectedField, obj *model.ImageMedia) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ImageMedia_fallbackMedia(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.FallbackMedia, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.FallbackMedia)
+	fc.Result = res
+	return ec.marshalOFallbackMedia2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFallbackMedia(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ImageMedia_fallbackMedia(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ImageMedia",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "mediaURL":
+				return ec.fieldContext_FallbackMedia_mediaURL(ctx, field)
+			case "mediaType":
+				return ec.fieldContext_FallbackMedia_mediaType(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type FallbackMedia", field.Name)
 		},
 	}
 	return fc, nil
@@ -24026,6 +24620,53 @@ func (ec *executionContext) fieldContext_InvalidMedia_dimensions(ctx context.Con
 	return fc, nil
 }
 
+func (ec *executionContext) _InvalidMedia_fallbackMedia(ctx context.Context, field graphql.CollectedField, obj *model.InvalidMedia) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_InvalidMedia_fallbackMedia(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.FallbackMedia, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.FallbackMedia)
+	fc.Result = res
+	return ec.marshalOFallbackMedia2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFallbackMedia(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_InvalidMedia_fallbackMedia(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "InvalidMedia",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "mediaURL":
+				return ec.fieldContext_FallbackMedia_mediaURL(ctx, field)
+			case "mediaType":
+				return ec.fieldContext_FallbackMedia_mediaType(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type FallbackMedia", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _JsonMedia_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.JSONMedia) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_JsonMedia_previewURLs(ctx, field)
 	if err != nil {
@@ -24252,6 +24893,53 @@ func (ec *executionContext) fieldContext_JsonMedia_dimensions(ctx context.Contex
 				return ec.fieldContext_MediaDimensions_aspectRatio(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type MediaDimensions", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _JsonMedia_fallbackMedia(ctx context.Context, field graphql.CollectedField, obj *model.JSONMedia) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_JsonMedia_fallbackMedia(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.FallbackMedia, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.FallbackMedia)
+	fc.Result = res
+	return ec.marshalOFallbackMedia2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFallbackMedia(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_JsonMedia_fallbackMedia(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "JsonMedia",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "mediaURL":
+				return ec.fieldContext_FallbackMedia_mediaURL(ctx, field)
+			case "mediaType":
+				return ec.fieldContext_FallbackMedia_mediaType(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type FallbackMedia", field.Name)
 		},
 	}
 	return fc, nil
@@ -30369,6 +31057,53 @@ func (ec *executionContext) fieldContext_PdfMedia_dimensions(ctx context.Context
 	return fc, nil
 }
 
+func (ec *executionContext) _PdfMedia_fallbackMedia(ctx context.Context, field graphql.CollectedField, obj *model.PDFMedia) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PdfMedia_fallbackMedia(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.FallbackMedia, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.FallbackMedia)
+	fc.Result = res
+	return ec.marshalOFallbackMedia2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFallbackMedia(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PdfMedia_fallbackMedia(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PdfMedia",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "mediaURL":
+				return ec.fieldContext_FallbackMedia_mediaURL(ctx, field)
+			case "mediaType":
+				return ec.fieldContext_FallbackMedia_mediaType(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type FallbackMedia", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _PreverifyEmailPayload_email(ctx context.Context, field graphql.CollectedField, obj *model.PreverifyEmailPayload) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_PreverifyEmailPayload_email(ctx, field)
 	if err != nil {
@@ -32809,6 +33544,8 @@ func (ec *executionContext) fieldContext_RefreshContractPayload_contract(ctx con
 				return ec.fieldContext_Contract_profileBannerURL(ctx, field)
 			case "badgeURL":
 				return ec.fieldContext_Contract_badgeURL(ctx, field)
+			case "isSpam":
+				return ec.fieldContext_Contract_isSpam(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Contract", field.Name)
 		},
@@ -36502,6 +37239,53 @@ func (ec *executionContext) fieldContext_SyncingMedia_dimensions(ctx context.Con
 	return fc, nil
 }
 
+func (ec *executionContext) _SyncingMedia_fallbackMedia(ctx context.Context, field graphql.CollectedField, obj *model.SyncingMedia) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SyncingMedia_fallbackMedia(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.FallbackMedia, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.FallbackMedia)
+	fc.Result = res
+	return ec.marshalOFallbackMedia2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFallbackMedia(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SyncingMedia_fallbackMedia(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SyncingMedia",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "mediaURL":
+				return ec.fieldContext_FallbackMedia_mediaURL(ctx, field)
+			case "mediaType":
+				return ec.fieldContext_FallbackMedia_mediaType(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type FallbackMedia", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _TextMedia_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.TextMedia) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_TextMedia_previewURLs(ctx, field)
 	if err != nil {
@@ -36728,6 +37512,53 @@ func (ec *executionContext) fieldContext_TextMedia_dimensions(ctx context.Contex
 				return ec.fieldContext_MediaDimensions_aspectRatio(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type MediaDimensions", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TextMedia_fallbackMedia(ctx context.Context, field graphql.CollectedField, obj *model.TextMedia) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TextMedia_fallbackMedia(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.FallbackMedia, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.FallbackMedia)
+	fc.Result = res
+	return ec.marshalOFallbackMedia2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFallbackMedia(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TextMedia_fallbackMedia(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TextMedia",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "mediaURL":
+				return ec.fieldContext_FallbackMedia_mediaURL(ctx, field)
+			case "mediaType":
+				return ec.fieldContext_FallbackMedia_mediaType(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type FallbackMedia", field.Name)
 		},
 	}
 	return fc, nil
@@ -37515,6 +38346,8 @@ func (ec *executionContext) fieldContext_Token_contract(ctx context.Context, fie
 				return ec.fieldContext_Contract_profileBannerURL(ctx, field)
 			case "badgeURL":
 				return ec.fieldContext_Contract_badgeURL(ctx, field)
+			case "isSpam":
+				return ec.fieldContext_Contract_isSpam(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Contract", field.Name)
 		},
@@ -39604,8 +40437,8 @@ func (ec *executionContext) fieldContext_UnknownMedia_dimensions(ctx context.Con
 	return fc, nil
 }
 
-func (ec *executionContext) _UnregisterUserPushTokenPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.UnregisterUserPushTokenPayload) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_UnregisterUserPushTokenPayload_viewer(ctx, field)
+func (ec *executionContext) _UnknownMedia_fallbackMedia(ctx context.Context, field graphql.CollectedField, obj *model.UnknownMedia) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_UnknownMedia_fallbackMedia(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -39618,7 +40451,7 @@ func (ec *executionContext) _UnregisterUserPushTokenPayload_viewer(ctx context.C
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Viewer, nil
+		return obj.FallbackMedia, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -39627,41 +40460,25 @@ func (ec *executionContext) _UnregisterUserPushTokenPayload_viewer(ctx context.C
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*model.Viewer)
+	res := resTmp.(*model.FallbackMedia)
 	fc.Result = res
-	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
+	return ec.marshalOFallbackMedia2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFallbackMedia(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_UnregisterUserPushTokenPayload_viewer(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_UnknownMedia_fallbackMedia(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "UnregisterUserPushTokenPayload",
+		Object:     "UnknownMedia",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "id":
-				return ec.fieldContext_Viewer_id(ctx, field)
-			case "user":
-				return ec.fieldContext_Viewer_user(ctx, field)
-			case "socialAccounts":
-				return ec.fieldContext_Viewer_socialAccounts(ctx, field)
-			case "viewerGalleries":
-				return ec.fieldContext_Viewer_viewerGalleries(ctx, field)
-			case "feed":
-				return ec.fieldContext_Viewer_feed(ctx, field)
-			case "email":
-				return ec.fieldContext_Viewer_email(ctx, field)
-			case "notifications":
-				return ec.fieldContext_Viewer_notifications(ctx, field)
-			case "notificationSettings":
-				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
-			case "userExperiences":
-				return ec.fieldContext_Viewer_userExperiences(ctx, field)
-			case "suggestedUsers":
-				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			case "mediaURL":
+				return ec.fieldContext_FallbackMedia_mediaURL(ctx, field)
+			case "mediaType":
+				return ec.fieldContext_FallbackMedia_mediaType(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type FallbackMedia", field.Name)
 		},
 	}
 	return fc, nil
@@ -42048,6 +42865,53 @@ func (ec *executionContext) fieldContext_VideoMedia_dimensions(ctx context.Conte
 				return ec.fieldContext_MediaDimensions_aspectRatio(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type MediaDimensions", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _VideoMedia_fallbackMedia(ctx context.Context, field graphql.CollectedField, obj *model.VideoMedia) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_VideoMedia_fallbackMedia(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.FallbackMedia, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.FallbackMedia)
+	fc.Result = res
+	return ec.marshalOFallbackMedia2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFallbackMedia(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_VideoMedia_fallbackMedia(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "VideoMedia",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "mediaURL":
+				return ec.fieldContext_FallbackMedia_mediaURL(ctx, field)
+			case "mediaType":
+				return ec.fieldContext_FallbackMedia_mediaType(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type FallbackMedia", field.Name)
 		},
 	}
 	return fc, nil
@@ -50335,6 +51199,10 @@ func (ec *executionContext) _AudioMedia(ctx context.Context, sel ast.SelectionSe
 
 			out.Values[i] = ec._AudioMedia_dimensions(ctx, field, obj)
 
+		case "fallbackMedia":
+
+			out.Values[i] = ec._AudioMedia_fallbackMedia(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -51318,6 +52186,10 @@ func (ec *executionContext) _Community(ctx context.Context, sel ast.SelectionSet
 
 			out.Values[i] = ec._Community_lastUpdated(ctx, field, obj)
 
+		case "contract":
+
+			out.Values[i] = ec._Community_contract(ctx, field, obj)
+
 		case "contractAddress":
 
 			out.Values[i] = ec._Community_contractAddress(ctx, field, obj)
@@ -51533,6 +52405,10 @@ func (ec *executionContext) _Contract(ctx context.Context, sel ast.SelectionSet,
 		case "badgeURL":
 
 			out.Values[i] = ec._Contract_badgeURL(ctx, field, obj)
+
+		case "isSpam":
+
+			out.Values[i] = ec._Contract_isSpam(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -52509,6 +53385,35 @@ func (ec *executionContext) _ErrUsernameNotAvailable(ctx context.Context, sel as
 	return out
 }
 
+var fallbackMediaImplementors = []string{"FallbackMedia"}
+
+func (ec *executionContext) _FallbackMedia(ctx context.Context, sel ast.SelectionSet, obj *model.FallbackMedia) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, fallbackMediaImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("FallbackMedia")
+		case "mediaURL":
+
+			out.Values[i] = ec._FallbackMedia_mediaURL(ctx, field, obj)
+
+		case "mediaType":
+
+			out.Values[i] = ec._FallbackMedia_mediaType(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var feedConnectionImplementors = []string{"FeedConnection"}
 
 func (ec *executionContext) _FeedConnection(ctx context.Context, sel ast.SelectionSet, obj *model.FeedConnection) graphql.Marshaler {
@@ -53048,6 +53953,10 @@ func (ec *executionContext) _GIFMedia(ctx context.Context, sel ast.SelectionSet,
 		case "dimensions":
 
 			out.Values[i] = ec._GIFMedia_dimensions(ctx, field, obj)
+
+		case "fallbackMedia":
+
+			out.Values[i] = ec._GIFMedia_fallbackMedia(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -53652,6 +54561,10 @@ func (ec *executionContext) _GltfMedia(ctx context.Context, sel ast.SelectionSet
 
 			out.Values[i] = ec._GltfMedia_dimensions(ctx, field, obj)
 
+		case "fallbackMedia":
+
+			out.Values[i] = ec._GltfMedia_fallbackMedia(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -53751,6 +54664,10 @@ func (ec *executionContext) _HtmlMedia(ctx context.Context, sel ast.SelectionSet
 
 			out.Values[i] = ec._HtmlMedia_dimensions(ctx, field, obj)
 
+		case "fallbackMedia":
+
+			out.Values[i] = ec._HtmlMedia_fallbackMedia(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -53791,6 +54708,10 @@ func (ec *executionContext) _ImageMedia(ctx context.Context, sel ast.SelectionSe
 		case "dimensions":
 
 			out.Values[i] = ec._ImageMedia_dimensions(ctx, field, obj)
+
+		case "fallbackMedia":
+
+			out.Values[i] = ec._ImageMedia_fallbackMedia(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -53833,6 +54754,10 @@ func (ec *executionContext) _InvalidMedia(ctx context.Context, sel ast.Selection
 
 			out.Values[i] = ec._InvalidMedia_dimensions(ctx, field, obj)
 
+		case "fallbackMedia":
+
+			out.Values[i] = ec._InvalidMedia_fallbackMedia(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -53873,6 +54798,10 @@ func (ec *executionContext) _JsonMedia(ctx context.Context, sel ast.SelectionSet
 		case "dimensions":
 
 			out.Values[i] = ec._JsonMedia_dimensions(ctx, field, obj)
+
+		case "fallbackMedia":
+
+			out.Values[i] = ec._JsonMedia_fallbackMedia(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -54812,6 +55741,10 @@ func (ec *executionContext) _PdfMedia(ctx context.Context, sel ast.SelectionSet,
 		case "dimensions":
 
 			out.Values[i] = ec._PdfMedia_dimensions(ctx, field, obj)
+
+		case "fallbackMedia":
+
+			out.Values[i] = ec._PdfMedia_fallbackMedia(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -56651,6 +57584,10 @@ func (ec *executionContext) _SyncingMedia(ctx context.Context, sel ast.Selection
 
 			out.Values[i] = ec._SyncingMedia_dimensions(ctx, field, obj)
 
+		case "fallbackMedia":
+
+			out.Values[i] = ec._SyncingMedia_fallbackMedia(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -56691,6 +57628,10 @@ func (ec *executionContext) _TextMedia(ctx context.Context, sel ast.SelectionSet
 		case "dimensions":
 
 			out.Values[i] = ec._TextMedia_dimensions(ctx, field, obj)
+
+		case "fallbackMedia":
+
+			out.Values[i] = ec._TextMedia_fallbackMedia(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -57318,6 +58259,10 @@ func (ec *executionContext) _UnknownMedia(ctx context.Context, sel ast.Selection
 		case "dimensions":
 
 			out.Values[i] = ec._UnknownMedia_dimensions(ctx, field, obj)
+
+		case "fallbackMedia":
+
+			out.Values[i] = ec._UnknownMedia_fallbackMedia(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -58129,6 +59074,10 @@ func (ec *executionContext) _VideoMedia(ctx context.Context, sel ast.SelectionSe
 		case "dimensions":
 
 			out.Values[i] = ec._VideoMedia_dimensions(ctx, field, obj)
+
+		case "fallbackMedia":
+
+			out.Values[i] = ec._VideoMedia_fallbackMedia(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -60833,6 +61782,13 @@ func (ec *executionContext) unmarshalOEoaAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑ
 	}
 	res, err := ec.unmarshalInputEoaAuth(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOFallbackMedia2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFallbackMedia(ctx context.Context, sel ast.SelectionSet, v *model.FallbackMedia) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._FallbackMedia(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOFeedConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedConnection(ctx context.Context, sel ast.SelectionSet, v *model.FeedConnection) graphql.Marshaler {

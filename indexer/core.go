@@ -8,6 +8,7 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/db/gen/indexerdb"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/indexer/refresh"
 	"github.com/mikeydub/go-gallery/middleware"
@@ -20,6 +21,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/throttle"
+	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -53,6 +55,7 @@ func coreInit(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) (*gin.Engin
 
 	s := media.NewStorageClient(context.Background())
 	tokenRepo, contractRepo, addressFilterRepo := newRepos(s)
+	queries := indexerdb.New(postgres.NewPgxClient())
 	ethClient := rpc.NewEthSocketClient()
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
@@ -61,7 +64,7 @@ func coreInit(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) (*gin.Engin
 		rpcEnabled = true
 	}
 
-	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(env.GetInt("CHAIN")), defaultTransferEvents, nil, fromBlock, toBlock)
+	i := newIndexer(ethClient, &http.Client{Timeout: 10 * time.Minute}, ipfsClient, arweaveClient, s, queries, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(env.GetInt("CHAIN")), defaultTransferEvents, nil, fromBlock, toBlock)
 
 	router := gin.Default()
 
@@ -88,6 +91,7 @@ func coreInitServer(quietLogs, enableRPC bool) *gin.Engine {
 
 	s := media.NewStorageClient(context.Background())
 	tokenRepo, contractRepo, addressFilterRepo := newRepos(s)
+	queries := indexerdb.New(postgres.NewPgxClient())
 	ethClient := rpc.NewEthSocketClient()
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
@@ -107,19 +111,17 @@ func coreInitServer(quietLogs, enableRPC bool) *gin.Engine {
 
 	logger.For(ctx).Info("Registering handlers...")
 
-	queueChan := make(chan processTokensInput)
-	t := newThrottler()
+	httpClient := &http.Client{Timeout: 10 * time.Minute, Transport: tracing.NewTracingTransport(http.DefaultTransport, false)}
 
-	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(env.GetInt("CHAIN")), defaultTransferEvents, nil, nil, nil)
-
-	go processMissingMetadata(ctx, queueChan, tokenRepo, contractRepo, ipfsClient, ethClient, arweaveClient, s, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
-	return handlersInitServer(router, queueChan, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s, i)
+	i := newIndexer(ethClient, httpClient, ipfsClient, arweaveClient, s, queries, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(env.GetInt("CHAIN")), defaultTransferEvents, nil, nil, nil)
+	return handlersInitServer(router, tokenRepo, contractRepo, ethClient, httpClient, ipfsClient, arweaveClient, s, i)
 }
 
 func SetDefaults() {
 	viper.SetDefault("RPC_URL", "")
 	viper.SetDefault("IPFS_URL", "https://gallery.infura-ipfs.io")
 	viper.SetDefault("IPFS_API_URL", "https://ipfs.infura.io:5001")
+	viper.SetDefault("FALLBACK_IPFS_URL", "https://ipfs.io")
 	viper.SetDefault("IPFS_PROJECT_ID", "")
 	viper.SetDefault("IPFS_PROJECT_SECRET", "")
 	viper.SetDefault("CHAIN", 0)
@@ -136,6 +138,7 @@ func SetDefaults() {
 	viper.SetDefault("SENTRY_DSN", "")
 	viper.SetDefault("IMGIX_API_KEY", "")
 	viper.SetDefault("VERSION", "")
+	viper.SetDefault("ALCHEMY_API_URL", "")
 	viper.AutomaticEnv()
 }
 

@@ -50,7 +50,7 @@ type Collection struct {
 	CollectorsNote NullString                       `json:"collectors_note"`
 	OwnerUserID    DBID                             `json:"owner_user_id"`
 	GalleryID      DBID                             `json:"gallery_id"`
-	NFTs           []TokenInCollection              `json:"nfts"`
+	NFTs           []DBID                           `json:"nfts"`
 	Hidden         NullBool                         `json:"hidden"` // collections can be hidden from public-viewing
 	TokenSettings  map[DBID]CollectionTokenSettings `json:"token_settings"`
 }
@@ -110,17 +110,8 @@ type CollectionTokenSettings struct {
 // CollectionRepository represents the interface for interacting with the collection persistence layer
 type CollectionRepository interface {
 	Create(context.Context, CollectionDB) (DBID, error)
-	GetByUserID(context.Context, DBID) ([]Collection, error)
-	GetByID(context.Context, DBID) (Collection, error)
 	Update(context.Context, DBID, DBID, interface{}) error
 	UpdateTokens(context.Context, DBID, DBID, CollectionUpdateTokensInput) error
-	UpdateUnsafe(context.Context, DBID, interface{}) error
-	UpdateNFTsUnsafe(context.Context, DBID, CollectionUpdateTokensInput) error
-	// TODO move this to package multichain
-	ClaimNFTs(context.Context, DBID, []EthereumAddress, CollectionUpdateTokensInput) error
-	RemoveNFTsOfOldAddresses(context.Context, DBID) error
-	// TODO move this to package multichain
-	RemoveNFTsOfAddresses(context.Context, DBID, []EthereumAddress) error
 	Delete(context.Context, DBID, DBID) error
 }
 
