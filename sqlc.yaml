@@ -93,16 +93,16 @@ sql:
           - column: tokens.token_media"
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
           
-          # TokenMedia
-          - column: "token_media.metadata"
+          # TokenMedias
+          - column: "token_medias.metadata"
             go_type: "github.com/mikeydub/go-gallery/service/persist.TokenMetadata"
-          - column: "token_media.token_id"
+          - column: "token_medias.token_id"
             go_type: "github.com/mikeydub/go-gallery/service/persist.TokenID"
-          - column: "token_media.contract"
+          - column: "token_medias.contract"
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
-          - column: "token_media.chain"
+          - column: "token_medias.chain"
             go_type: "github.com/mikeydub/go-gallery/service/persist.Chain"
-          - column: "token_media.media"
+          - column: "token_medias.media"
             go_type: "github.com/mikeydub/go-gallery/service/persist.Media"
 
           # TokenProcessingJobs

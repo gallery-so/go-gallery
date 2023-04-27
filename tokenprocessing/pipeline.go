@@ -101,14 +101,14 @@ func (tpj *tokenProcessingJob) run(ctx context.Context) error {
 	return tpj.persistMedia(ctx, toInsert)
 }
 
-func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (coredb.TokenMedium, error) {
+func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (coredb.TokenMedia, error) {
 	defer func() {
 		if r := recover(); r != nil {
 			logger.For(ctx).Errorf("panic in createMediaForToken: %s", r)
 		}
 	}()
 
-	result := coredb.TokenMedium{
+	result := coredb.TokenMedia{
 		ID:              persist.GenerateID(),
 		Contract:        tpj.token.Contract,
 		TokenID:         tpj.token.TokenID,
@@ -214,7 +214,7 @@ func (tpj *tokenProcessingJob) isNewMediaPreferable(ctx context.Context, media p
 	return !tpj.token.Media.IsServable() && media.IsServable()
 }
 
-func (tpj *tokenProcessingJob) persistMedia(ctx context.Context, tmetadata coredb.TokenMedium) error {
+func (tpj *tokenProcessingJob) persistMedia(ctx context.Context, tmetadata coredb.TokenMedia) error {
 	if !tpj.isNewMediaPreferable(ctx, tmetadata.Media) {
 		tmetadata.Active = false
 	}
@@ -232,7 +232,7 @@ func (tpj *tokenProcessingJob) persistMedia(ctx context.Context, tmetadata cored
 	return errGroup.Wait()
 }
 
-func (tpj *tokenProcessingJob) updateTokenMetadataDB(ctx context.Context, tmetadata coredb.TokenMedium) error {
+func (tpj *tokenProcessingJob) updateTokenMetadataDB(ctx context.Context, tmetadata coredb.TokenMedia) error {
 	defer persist.TrackStepStatus(&tpj.pipelineMetadata.UpdateTokenMetadataDB)()
 	err := func() error {
 		if !tmetadata.Active {
@@ -298,7 +298,7 @@ func (tpj *tokenProcessingJob) updateTokenMetadataDB(ctx context.Context, tmetad
 	return nil
 }
 
-func (tpj *tokenProcessingJob) updateJobDB(ctx context.Context, tmetadata coredb.TokenMedium) error {
+func (tpj *tokenProcessingJob) updateJobDB(ctx context.Context, tmetadata coredb.TokenMedia) error {
 	defer persist.TrackStepStatus(&tpj.pipelineMetadata.UpdateJobDB)()
 	p := persist.TokenProperties{}
 	if tmetadata.Metadata != nil && len(tmetadata.Metadata) > 0 {

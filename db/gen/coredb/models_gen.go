@@ -351,7 +351,7 @@ type Token struct {
 	TokenMedia           sql.NullString
 }
 
-type TokenMedium struct {
+type TokenMedia struct {
 	ID              persist.DBID
 	CreatedAt       time.Time
 	LastUpdated     time.Time

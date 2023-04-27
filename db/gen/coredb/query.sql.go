@@ -3799,7 +3799,7 @@ func (q *Queries) InsertSpamContracts(ctx context.Context, arg InsertSpamContrac
 }
 
 const insertTokenMedia = `-- name: InsertTokenMedia :exec
-insert into token_media (id, contract, token_id, chain, metadata, media, name, description, processing_job_id, active) values ($1, $2, $3, $4, $5, $6, $7, $8, $9,true)
+insert into token_medias (id, contract, token_id, chain, metadata, media, name, description, processing_job_id, active) values ($1, $2, $3, $4, $5, $6, $7, $8, $9,true)
 `
 
 type InsertTokenMediaParams struct {
@@ -4018,7 +4018,7 @@ func (q *Queries) IsActorSubjectActive(ctx context.Context, arg IsActorSubjectAc
 }
 
 const isExistsTokenMediaByTokenIdentifers = `-- name: IsExistsTokenMediaByTokenIdentifers :one
-select exists(select 1 from token_media where token_media.contract = $1 and token_media.token_id = $2 and token_media.chain = $3 and active = true and deleted = false)
+select exists(select 1 from token_medias where token_medias.contract = $1 and token_medias.token_id = $2 and token_medias.chain = $3 and active = true and deleted = false)
 `
 
 type IsExistsTokenMediaByTokenIdentifersParams struct {
@@ -4387,8 +4387,8 @@ func (q *Queries) UpdateNotificationSettingsByID(ctx context.Context, arg Update
 
 const updateTokenMediaByTokenIdentifiers = `-- name: UpdateTokenMediaByTokenIdentifiers :exec
 with old as (
-  insert into token_media (id, contract, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated) (select $1, contract_address, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, last_updated from token_media where token_media.contract = $2 and token_media.token_id = $3 and token_media.chain = $4 and active = true and deleted = false)
-) update token_media set metadata = $5, media = $6, name = $7, description = $8, processing_job_id = $9 where token_media.contract = $2 and token_media.token_id = $3 and token_media.chain = $4 and active = true and deleted = false
+  insert into token_medias (id, contract, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated) (select $1, contract_address, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, last_updated from token_medias where token_medias.contract = $2 and token_medias.token_id = $3 and token_medias.chain = $4 and active = true and deleted = false)
+) update token_medias set metadata = $5, media = $6, name = $7, description = $8, processing_job_id = $9 where token_medias.contract = $2 and token_medias.token_id = $3 and token_medias.chain = $4 and active = true and deleted = false
 `
 
 type UpdateTokenMediaByTokenIdentifiersParams struct {
