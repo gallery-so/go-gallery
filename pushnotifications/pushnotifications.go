@@ -21,6 +21,11 @@ import (
 	"os"
 )
 
+func init() {
+	env.RegisterValidation("EXPO_PUSH_API_URL", "required")
+	env.RegisterValidation("PUSH_NOTIFICATION_SECRET", "required")
+}
+
 func InitServer() {
 	setDefaults()
 	router := coreInitServer()
@@ -147,6 +152,7 @@ func setDefaults() {
 	if env.GetString("ENV") != "local" {
 		util.VarNotSetTo("SENTRY_DSN", "")
 		util.VarNotSetTo("VERSION", "")
+		util.VarNotSetTo("PUSH_NOTIFICATION_SECRET", "push-notification-secret")
 	}
 }
 

@@ -247,6 +247,7 @@ func SetDefaults() {
 		util.VarNotSetTo("ETH_PRIVATE_KEY", "")
 		util.VarNotSetTo("RETOOL_AUTH_TOKEN", "TEST_TOKEN")
 		util.VarNotSetTo("BACKEND_SECRET", "BACKEND_SECRET")
+		util.VarNotSetTo("PUSH_NOTIFICATION_SECRET", "push-notification-secret")
 	}
 }
 
