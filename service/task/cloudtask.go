@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/auth/basicauth"
 	"time"
 
 	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
@@ -81,6 +82,11 @@ func CreateTaskForPushNotification(ctx context.Context, message PushNotification
 			HttpRequest: &taskspb.HttpRequest{
 				HttpMethod: taskspb.HttpMethod_POST,
 				Url:        url,
+				Headers: map[string]string{
+					"Content-type":  "application/json",
+					"Authorization": basicauth.MakeHeader(nil, env.GetString("PUSH_NOTIFICATION_SECRET")),
+					"sentry-trace":  span.TraceID.String(),
+				},
 			},
 		},
 	}

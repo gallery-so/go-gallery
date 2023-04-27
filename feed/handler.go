@@ -2,6 +2,7 @@ package feed
 
 import (
 	"errors"
+	"github.com/mikeydub/go-gallery/util"
 	"net/http"
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
@@ -35,7 +36,7 @@ func taskRequired() gin.HandlerFunc {
 }
 
 func handlersInit(router *gin.Engine, queries *db.Queries, taskClient *cloudtasks.Client) *gin.Engine {
-	router.GET("/ping", ping())
+	util.AddHealthCheckHandler(router)
 	router.POST("/tasks/feed-event", taskRequired(), handleEvent(queries, taskClient))
 	return router
 }

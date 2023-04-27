@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -574,4 +575,10 @@ func GetOptionalValue[T any](optional *T, fallback T) T {
 	}
 
 	return fallback
+}
+
+func AddHealthCheckHandler(router *gin.Engine) {
+	router.GET("/ping", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"ping": "pong"})
+	})
 }

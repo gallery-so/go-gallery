@@ -219,6 +219,7 @@ func SetDefaults() {
 	viper.SetDefault("TWITTER_AUTH_REDIRECT_URI", "http://localhost:3000/auth/twitter")
 	viper.SetDefault("FEEDBOT_URL", "")
 	viper.SetDefault("GCLOUD_FEEDBOT_TASK_QUEUE", "projects/gallery-local/locations/here/queues/feedbot")
+	viper.SetDefault("PUSH_NOTIFICATION_SECRET", "push-notification-secret")
 
 	viper.AutomaticEnv()
 

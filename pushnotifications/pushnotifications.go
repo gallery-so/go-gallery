@@ -32,15 +32,23 @@ func coreInitServer() *gin.Engine {
 	initSentry()
 	logger.InitWithGCPDefaults()
 
-	http.DefaultClient = &http.Client{Transport: tracing.NewTracingTransport(http.DefaultTransport, false)}
-
-	router := gin.Default()
-	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.ErrLogger())
-
 	if env.GetString("ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
 		logrus.SetLevel(logrus.DebugLevel)
 	}
+
+	http.DefaultClient = &http.Client{Transport: tracing.NewTracingTransport(http.DefaultTransport, false)}
+
+	router := gin.Default()
+	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.ErrLogger())
+	util.AddHealthCheckHandler(router)
+
+	// Return 200 on auth failures to prevent task/job retries
+	authOpts := middleware.BasicAuthOptionBuilder{}
+	basicAuthHandler := middleware.BasicHeaderAuthRequired(env.GetString("PUSH_NOTIFICATION_SECRET"), authOpts.WithFailureStatus(http.StatusOK))
+
+	taskGroup := router.Group("/tasks", basicAuthHandler, middleware.TaskRequired())
+	jobGroup := router.Group("/jobs", basicAuthHandler)
 
 	ctx := context.Background()
 
@@ -49,9 +57,12 @@ func coreInitServer() *gin.Engine {
 
 	logger.For(ctx).Info("Registering handlers...")
 
-	expoHandler := expo.NewPushNotificationHandler(ctx, queries)
-	router.POST("/tasks/send-push-notification", sendPushNotificationHandler(expoHandler))
-	router.POST("/check-push-tickets", checkPushTicketsHandler(expoHandler))
+	apiURL := env.GetString("EXPO_PUSH_API_URL")
+	accessToken := env.GetString("EXPO_PUSH_ACCESS_TOKEN")
+	expoHandler := expo.NewPushNotificationHandler(ctx, queries, apiURL, accessToken)
+
+	taskGroup.POST("send-push-notification", sendPushNotificationHandler(expoHandler))
+	jobGroup.POST("check-push-tickets", checkPushTicketsHandler(expoHandler))
 
 	return router
 }
@@ -107,7 +118,6 @@ func checkPushTicketsHandler(expoHandler *expo.PushNotificationHandler) gin.Hand
 	}
 }
 
-// TODO: Figure out what services we need here
 func setDefaults() {
 	viper.SetDefault("ENV", "local")
 	viper.SetDefault("POSTGRES_HOST", "0.0.0.0")
@@ -117,6 +127,9 @@ func setDefaults() {
 	viper.SetDefault("POSTGRES_DB", "postgres")
 	viper.SetDefault("SENTRY_DSN", "")
 	viper.SetDefault("VERSION", "")
+	viper.SetDefault("PUSH_NOTIFICATION_SECRET", "push-notification-secret")
+	viper.SetDefault("EXPO_PUSH_ACCESS_TOKEN", "")
+	viper.SetDefault("EXPO_PUSH_API_URL", "https://exp.host/--/api/v2/push")
 
 	viper.AutomaticEnv()
 

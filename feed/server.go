@@ -58,9 +58,3 @@ func handleEvent(queries *db.Queries, taskClient *cloudtasks.Client) gin.Handler
 		c.JSON(http.StatusOK, gin.H{"msg": fmt.Sprintf("event=%s processed", message.ID)})
 	}
 }
-
-func ping() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"ping": "pong"})
-	}
-}

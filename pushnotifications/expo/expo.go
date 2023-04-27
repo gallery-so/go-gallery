@@ -231,12 +231,13 @@ type PushMessage struct {
 	MutableContent bool `json:"mutableContent,omitempty"`
 }
 
-func NewClient() *Client {
+// NewClient creates a new Expo push client with the specified API URL and access token.
+// accessToken may be an empty string if the organization's push settings don't require an access token.
+func NewClient(apiURL string, accessToken string) *Client {
 	return &Client{
-		apiURL:     "https://exp.host/--/api/v2/push",
-		httpClient: http.DefaultClient,
-		// TODO: get accessToken from env file
-		accessToken: "",
+		apiURL:      apiURL,
+		httpClient:  http.DefaultClient,
+		accessToken: accessToken,
 	}
 }
 

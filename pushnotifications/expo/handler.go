@@ -13,9 +13,9 @@ import (
 	"time"
 )
 
-func NewPushNotificationHandler(ctx context.Context, queries *db.Queries) *PushNotificationHandler {
+func NewPushNotificationHandler(ctx context.Context, queries *db.Queries, apiURL string, accessToken string) *PushNotificationHandler {
 	return &PushNotificationHandler{
-		client:   NewClient(),
+		client:   NewClient(apiURL, accessToken),
 		ctx:      ctx,
 		queries:  queries,
 		maxBatch: 100, // per Expo docs, max 100 messages per API call
