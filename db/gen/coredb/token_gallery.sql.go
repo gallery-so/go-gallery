@@ -13,6 +13,12 @@ import (
 )
 
 const upsertTokens = `-- name: UpsertTokens :many
+with tids as (
+  select unnest($27::varchar[]) as token_id, unnest($28::varchar[]) as contract, unnest($29::int[]) as chain
+)
+, tms as (
+  select array_agg(id) as id from token_medias, tids where token_medias.token_id = tids.token_id and token_medias.contract = tids.contract and token_medias.chain = tids.chain and token_medias.active = true and token_medias.deleted = false
+)
 insert into tokens
 (
   id
@@ -28,7 +34,6 @@ insert into tokens
   , quantity
   , ownership_history
   , media
-  , token_media
   , fallback_media
   , token_metadata
   , external_url
@@ -41,9 +46,10 @@ insert into tokens
   , is_provider_marked_spam
   , last_synced
   , token_uri
+  , token_media
 ) (
   select
-    id
+    bulk_upsert.id
     , deleted 
     , version
     , created_at
@@ -52,23 +58,23 @@ insert into tokens
     , description
     , collectors_note
     , token_type
-    , token_id
+    , bulk_upsert.token_id
     , quantity
     , ownership_history[ownership_history_start_idx::int:ownership_history_end_idx::int]
     , media
-    , token_media
     , fallback_media
     , token_metadata
     , external_url
     , block_number
     , owner_user_id
     , owned_by_wallets[owned_by_wallets_start_idx::int:owned_by_wallets_end_idx::int]
-    , chain
-    , contract
+    , bulk_upsert.chain
+    , bulk_upsert.contract
     , is_user_marked_spam
     , is_provider_marked_spam
     , last_synced
     , token_uri
+    , media_id
   from (
     select
       unnest($1::varchar[]) as id
@@ -80,27 +86,27 @@ insert into tokens
       , unnest($7::varchar[]) as description
       , unnest($8::varchar[]) as collectors_note
       , unnest($9::varchar[]) as token_type
-      , unnest($10::varchar[]) as token_id
-      , unnest($11::varchar[]) as quantity
-      , $12::jsonb[] as ownership_history
-      , unnest($13::int[]) as ownership_history_start_idx
-      , unnest($14::int[]) as ownership_history_end_idx
-      , unnest($15::jsonb[]) as media
-      , unnest($16::varchar[]) as token_media
-      , unnest($17::jsonb[]) as fallback_media
-      , unnest($18::jsonb[]) as token_metadata
-      , unnest($19::varchar[]) as external_url
-      , unnest($20::bigint[]) as block_number
-      , unnest($21::varchar[]) as owner_user_id
-      , $22::varchar[] as owned_by_wallets
-      , unnest($23::int[]) as owned_by_wallets_start_idx
-      , unnest($24::int[]) as owned_by_wallets_end_idx
-      , unnest($25::int[]) as chain
-      , unnest($26::varchar[]) as contract
-      , unnest($27::bool[]) as is_user_marked_spam
-      , unnest($28::bool[]) as is_provider_marked_spam
-      , unnest($29::timestamptz[]) as last_synced
-      , unnest($30::varchar[]) as token_uri
+      , unnest($10::varchar[]) as quantity
+      , $11::jsonb[] as ownership_history
+      , unnest($12::int[]) as ownership_history_start_idx
+      , unnest($13::int[]) as ownership_history_end_idx
+      , unnest($14::jsonb[]) as media
+      , unnest($15::jsonb[]) as fallback_media
+      , unnest($16::jsonb[]) as token_metadata
+      , unnest($17::varchar[]) as external_url
+      , unnest($18::bigint[]) as block_number
+      , unnest($19::varchar[]) as owner_user_id
+      , $20::varchar[] as owned_by_wallets
+      , unnest($21::int[]) as owned_by_wallets_start_idx
+      , unnest($22::int[]) as owned_by_wallets_end_idx
+      , unnest($23::bool[]) as is_user_marked_spam
+      , unnest($24::bool[]) as is_provider_marked_spam
+      , unnest($25::timestamptz[]) as last_synced
+      , unnest($26::varchar[]) as token_uri
+      , unnest($27::varchar[]) as token_id
+      , unnest($28::varchar[]) as contract
+      , unnest($29::int[]) as chain
+      , unnest(tms.id) as media_id from tms
   ) bulk_upsert
 )
 on conflict (token_id, contract, chain, owner_user_id) where deleted = false
@@ -136,13 +142,11 @@ type UpsertTokensParams struct {
 	Description              []string
 	CollectorsNote           []string
 	TokenType                []string
-	TokenID                  []string
 	Quantity                 []string
 	OwnershipHistory         []pgtype.JSONB
 	OwnershipHistoryStartIdx []int32
 	OwnershipHistoryEndIdx   []int32
 	Media                    []pgtype.JSONB
-	TokenMedia               []string
 	FallbackMedia            []pgtype.JSONB
 	TokenMetadata            []pgtype.JSONB
 	ExternalUrl              []string
@@ -151,12 +155,13 @@ type UpsertTokensParams struct {
 	OwnedByWallets           []string
 	OwnedByWalletsStartIdx   []int32
 	OwnedByWalletsEndIdx     []int32
-	Chain                    []int32
-	Contract                 []string
 	IsUserMarkedSpam         []bool
 	IsProviderMarkedSpam     []bool
 	LastSynced               []time.Time
 	TokenUri                 []string
+	TokenID                  []string
+	Contract                 []string
+	Chain                    []int32
 }
 
 func (q *Queries) UpsertTokens(ctx context.Context, arg UpsertTokensParams) ([]Token, error) {
@@ -170,13 +175,11 @@ func (q *Queries) UpsertTokens(ctx context.Context, arg UpsertTokensParams) ([]T
 		arg.Description,
 		arg.CollectorsNote,
 		arg.TokenType,
-		arg.TokenID,
 		arg.Quantity,
 		arg.OwnershipHistory,
 		arg.OwnershipHistoryStartIdx,
 		arg.OwnershipHistoryEndIdx,
 		arg.Media,
-		arg.TokenMedia,
 		arg.FallbackMedia,
 		arg.TokenMetadata,
 		arg.ExternalUrl,
@@ -185,12 +188,13 @@ func (q *Queries) UpsertTokens(ctx context.Context, arg UpsertTokensParams) ([]T
 		arg.OwnedByWallets,
 		arg.OwnedByWalletsStartIdx,
 		arg.OwnedByWalletsEndIdx,
-		arg.Chain,
-		arg.Contract,
 		arg.IsUserMarkedSpam,
 		arg.IsProviderMarkedSpam,
 		arg.LastSynced,
 		arg.TokenUri,
+		arg.TokenID,
+		arg.Contract,
+		arg.Chain,
 	)
 	if err != nil {
 		return nil, err

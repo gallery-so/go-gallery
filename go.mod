@@ -33,8 +33,8 @@ require (
 	github.com/ipfs/go-ipfs-api v0.6.0
 	github.com/jackc/pgconn v1.14.0
 	github.com/jackc/pgtype v1.14.0
-	github.com/jackc/pgx/v4 v4.18.0
-	github.com/lib/pq v1.10.7
+	github.com/jackc/pgx/v4 v4.18.1
+	github.com/lib/pq v1.10.9
 	github.com/lucasb-eyer/go-colorful v1.2.0
 	github.com/machinebox/graphql v0.2.2
 	github.com/magiclabs/magic-admin-go v0.2.0

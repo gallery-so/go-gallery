@@ -1027,7 +1027,7 @@ with old as (
 select exists(select 1 from token_medias where token_medias.contract = $1 and token_medias.token_id = $2 and token_medias.chain = $3 and active = true and deleted = false);
 
 -- name: GetTokenMediaIDByTokenIdentifiers :one
-select id from token_medias where token_medias.contract = $1 and token_medias.token_id = $2 and token_medias.chain = $3 and active = true and deleted = false;
+select id from token_medias where contract = @contract and token_id = @token_id and chain = @chain and active = true and deleted = false;
 
 -- name: InsertSpamContracts :exec
 with insert_spam_contracts as (

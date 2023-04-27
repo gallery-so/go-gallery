@@ -2318,7 +2318,7 @@ func (q *Queries) GetTokenByTokenIdentifiers(ctx context.Context, arg GetTokenBy
 }
 
 const getTokenMediaIDByTokenIdentifiers = `-- name: GetTokenMediaIDByTokenIdentifiers :one
-select id from token_medias where token_medias.contract = $1 and token_medias.token_id = $2 and token_medias.chain = $3 and active = true and deleted = false
+select id from token_medias where contract = $1 and token_id = $2 and chain = $3 and active = true and deleted = false
 `
 
 type GetTokenMediaIDByTokenIdentifiersParams struct {

@@ -1,4 +1,10 @@
 -- name: UpsertTokens :many
+with tids as (
+  select unnest(@token_id::varchar[]) as token_id, unnest(@contract::varchar[]) as contract, unnest(@chain::int[]) as chain
+)
+, tms as (
+  select array_agg(id) as id from token_medias, tids where token_medias.token_id = tids.token_id and token_medias.contract = tids.contract and token_medias.chain = tids.chain and token_medias.active = true and token_medias.deleted = false
+)
 insert into tokens
 (
   id
@@ -14,7 +20,6 @@ insert into tokens
   , quantity
   , ownership_history
   , media
-  , token_media
   , fallback_media
   , token_metadata
   , external_url
@@ -27,9 +32,10 @@ insert into tokens
   , is_provider_marked_spam
   , last_synced
   , token_uri
+  , token_media
 ) (
   select
-    id
+    bulk_upsert.id
     , deleted 
     , version
     , created_at
@@ -38,23 +44,23 @@ insert into tokens
     , description
     , collectors_note
     , token_type
-    , token_id
+    , bulk_upsert.token_id
     , quantity
     , ownership_history[ownership_history_start_idx::int:ownership_history_end_idx::int]
     , media
-    , token_media
     , fallback_media
     , token_metadata
     , external_url
     , block_number
     , owner_user_id
     , owned_by_wallets[owned_by_wallets_start_idx::int:owned_by_wallets_end_idx::int]
-    , chain
-    , contract
+    , bulk_upsert.chain
+    , bulk_upsert.contract
     , is_user_marked_spam
     , is_provider_marked_spam
     , last_synced
     , token_uri
+    , media_id
   from (
     select
       unnest(@id::varchar[]) as id
@@ -66,13 +72,11 @@ insert into tokens
       , unnest(@description::varchar[]) as description
       , unnest(@collectors_note::varchar[]) as collectors_note
       , unnest(@token_type::varchar[]) as token_type
-      , unnest(@token_id::varchar[]) as token_id
       , unnest(@quantity::varchar[]) as quantity
       , @ownership_history::jsonb[] as ownership_history
       , unnest(@ownership_history_start_idx::int[]) as ownership_history_start_idx
       , unnest(@ownership_history_end_idx::int[]) as ownership_history_end_idx
       , unnest(@media::jsonb[]) as media
-      , unnest(@token_media::varchar[]) as token_media
       , unnest(@fallback_media::jsonb[]) as fallback_media
       , unnest(@token_metadata::jsonb[]) as token_metadata
       , unnest(@external_url::varchar[]) as external_url
@@ -81,12 +85,14 @@ insert into tokens
       , @owned_by_wallets::varchar[] as owned_by_wallets
       , unnest(@owned_by_wallets_start_idx::int[]) as owned_by_wallets_start_idx
       , unnest(@owned_by_wallets_end_idx::int[]) as owned_by_wallets_end_idx
-      , unnest(@chain::int[]) as chain
-      , unnest(@contract::varchar[]) as contract
       , unnest(@is_user_marked_spam::bool[]) as is_user_marked_spam
       , unnest(@is_provider_marked_spam::bool[]) as is_provider_marked_spam
       , unnest(@last_synced::timestamptz[]) as last_synced
       , unnest(@token_uri::varchar[]) as token_uri
+      , unnest(@token_id::varchar[]) as token_id
+      , unnest(@contract::varchar[]) as contract
+      , unnest(@chain::int[]) as chain
+      , unnest(tms.id) as media_id from tms
   ) bulk_upsert
 )
 on conflict (token_id, contract, chain, owner_user_id) where deleted = false

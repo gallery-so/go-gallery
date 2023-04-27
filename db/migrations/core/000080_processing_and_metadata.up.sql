@@ -15,7 +15,7 @@ create table if not exists token_medias (
     version int not null default 0,
     contract varchar(255) not null references contracts(id),
     token_id varchar not null,
-    chain varchar not null,
+    chain int not null,
     active bool not null,
     metadata jsonb not null,
     media jsonb not null,
