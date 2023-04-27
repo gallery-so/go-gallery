@@ -25,12 +25,10 @@ import (
 )
 
 type ProcessMediaForTokenInput struct {
-	TokenID           persist.TokenID `json:"token_id" binding:"required"`
-	ContractAddress   persist.Address `json:"contract_address" binding:"required"`
-	Chain             persist.Chain   `json:"chain"`
-	OwnerAddress      persist.Address `json:"owner_address" binding:"required"`
-	ImageKeywords     []string        `json:"image_keywords" binding:"required"`
-	AnimationKeywords []string        `json:"animation_keywords" binding:"required"`
+	TokenID         persist.TokenID `json:"token_id" binding:"required"`
+	ContractAddress persist.Address `json:"contract_address" binding:"required"`
+	Chain           persist.Chain   `json:"chain"`
+	OwnerAddress    persist.Address `json:"owner_address" binding:"required"`
 }
 
 func processMediaForUsersTokensOfChain(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRepository, contractRepo *postgres.ContractGalleryRepository, throttler *throttle.Locker) gin.HandlerFunc {
@@ -65,8 +63,7 @@ func processMediaForUsersTokensOfChain(tp *tokenProcessor, tokenRepo *postgres.T
 
 			wp.Go(func(ctx context.Context) error {
 				key := fmt.Sprintf("%s-%s-%d", t.TokenID, contract.Address, t.Chain)
-				imageKeywords, animationKeywords := t.Chain.BaseKeywords()
-				err := tp.processTokenPipeline(ctx, key, t, contract, "", imageKeywords, animationKeywords, persist.ProcessingCauseSync)
+				err := tp.processTokenPipeline(ctx, key, t, contract, "", persist.ProcessingCauseSync)
 				if err != nil {
 
 					logger.For(c).Errorf("Error processing token: %s", err)
@@ -124,7 +121,7 @@ func processMediaForToken(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRe
 			return
 		}
 
-		err = tp.processTokenPipeline(ctx, key, t, contract, input.OwnerAddress, input.ImageKeywords, input.AnimationKeywords, persist.ProcessingCauseRefresh)
+		err = tp.processTokenPipeline(ctx, key, t, contract, input.OwnerAddress, persist.ProcessingCauseRefresh)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return

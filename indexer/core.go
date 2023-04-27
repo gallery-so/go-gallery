@@ -14,7 +14,6 @@ import (
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/redis"
@@ -53,7 +52,7 @@ func coreInit(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) (*gin.Engin
 		}
 	})
 
-	s := media.NewStorageClient(context.Background())
+	s := rpc.NewStorageClient(context.Background())
 	tokenRepo, contractRepo, addressFilterRepo := newRepos(s)
 	queries := indexerdb.New(postgres.NewPgxClient())
 	ethClient := rpc.NewEthSocketClient()
@@ -89,7 +88,7 @@ func coreInitServer(quietLogs, enableRPC bool) *gin.Engine {
 		}
 	})
 
-	s := media.NewStorageClient(context.Background())
+	s := rpc.NewStorageClient(context.Background())
 	tokenRepo, contractRepo, addressFilterRepo := newRepos(s)
 	queries := indexerdb.New(postgres.NewPgxClient())
 	ethClient := rpc.NewEthSocketClient()

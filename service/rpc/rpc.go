@@ -23,9 +23,12 @@ import (
 	"strings"
 	"time"
 
+	"cloud.google.com/go/storage"
 	"golang.org/x/image/bmp"
+	"google.golang.org/api/option"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/googleapis/gax-go/v2"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/tracing"
@@ -45,6 +48,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
+	htransport "google.golang.org/api/transport/http"
 )
 
 func init() {
@@ -138,6 +142,39 @@ func NewEthSocketClient() *ethclient.Client {
 	}, defaultMetricsHandler))
 
 	return NewEthClient()
+}
+
+func NewStorageClient(ctx context.Context) *storage.Client {
+	opts := append([]option.ClientOption{}, option.WithScopes([]string{storage.ScopeFullControl}...))
+
+	if env.GetString("ENV") == "local" {
+		fi, err := util.LoadEncryptedServiceKeyOrError("./secrets/dev/service-key-dev.json")
+		if err != nil {
+			logger.For(ctx).WithError(err).Error("failed to find service key file (local), running without storage client")
+			return nil
+		}
+		opts = append(opts, option.WithCredentialsJSON(fi))
+	}
+
+	transport, err := htransport.NewTransport(ctx, tracing.NewTracingTransport(http.DefaultTransport, false), opts...)
+	if err != nil {
+		panic(err)
+	}
+
+	client, _, err := htransport.NewClient(ctx)
+	if err != nil {
+		panic(err)
+	}
+	client.Transport = transport
+
+	storageClient, err := storage.NewClient(ctx, option.WithHTTPClient(client))
+	if err != nil {
+		panic(err)
+	}
+
+	storageClient.SetRetry(storage.WithPolicy(storage.RetryAlways), storage.WithBackoff(gax.Backoff{Initial: 100 * time.Millisecond, Max: 10 * time.Second, Multiplier: 1.3}), storage.WithErrorFunc(storage.ShouldRetry))
+
+	return storageClient
 }
 
 // metricsHandler traces RPC records that get logged by the RPC client

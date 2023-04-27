@@ -481,7 +481,7 @@ func zora(ctx context.Context, turi persist.TokenURI, addr persist.EthereumAddre
 	contentType, ok := util.FindFirstFieldFromMap(tokenMetadata, "mimeType", "contentType", "content-type", "type").(string)
 	var mediaType persist.MediaType
 	if ok {
-		mediaType = persist.MediaFromContentType(contentType)
+		mediaType = media.MediaFromContentType(contentType)
 	} else {
 		mediaType, _, _, err = media.PredictMediaType(ctx, mediaURI)
 	}

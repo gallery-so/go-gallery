@@ -15,7 +15,6 @@ import (
 	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/redis"
@@ -185,7 +184,7 @@ func updateMediaProccessingFingerprints(event *sentry.Event, hint *sentry.EventH
 		return event
 	}
 
-	var mediaErr media.MediaProcessingError
+	var mediaErr MediaProcessingError
 
 	if errors.As(hint.OriginalException, &mediaErr) {
 		if event.Tags["chain"] == "" || event.Tags["contractAddress"] == "" {

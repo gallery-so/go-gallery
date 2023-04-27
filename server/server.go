@@ -30,7 +30,6 @@ import (
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/multichain/alchemy"
 	"github.com/mikeydub/go-gallery/service/multichain/eth"
@@ -98,7 +97,7 @@ func ClientInit(ctx context.Context) *Clients {
 		EthClient:       rpc.NewEthClient(),
 		IPFSClient:      rpc.NewIPFSShell(),
 		ArweaveClient:   rpc.NewArweaveClient(),
-		StorageClient:   media.NewStorageClient(ctx),
+		StorageClient:   rpc.NewStorageClient(ctx),
 		TaskClient:      task.NewClient(ctx),
 		SecretClient:    newSecretsClient(),
 		PubSubClient:    gcp.NewClient(ctx),

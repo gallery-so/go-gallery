@@ -38,10 +38,8 @@ type TokenProcessingUserMessage struct {
 }
 
 type TokenProcessingContractTokensMessage struct {
-	ContractID        persist.DBID `json:"contract_id" binding:"required"`
-	Imagekeywords     []string     `json:"image_keywords" binding:"required"`
-	Animationkeywords []string     `json:"animation_keywords" binding:"required"`
-	ForceRefresh      bool         `json:"force_refresh"`
+	ContractID   persist.DBID `json:"contract_id" binding:"required"`
+	ForceRefresh bool         `json:"force_refresh"`
 }
 
 // DeepRefreshMessage is the input message to the indexer-api for deep refreshes

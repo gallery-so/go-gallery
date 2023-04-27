@@ -6,8 +6,6 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/mikeydub/go-gallery/env"
-	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/stretchr/testify/assert"
@@ -24,9 +22,6 @@ func TestIndexLogs_Success(t *testing.T) {
 	defer cancel()
 
 	ethClient := rpc.NewEthClient()
-	ipfsShell := rpc.NewIPFSShell()
-	arweaveClient := rpc.NewArweaveClient()
-	stg := newStorageClient(ctx)
 
 	t.Run("it updates its state", func(t *testing.T) {
 		a.EqualValues(testBlockTo-blocksPerLogsCall, i.lastSyncedChunk)
@@ -60,50 +55,6 @@ func TestIndexLogs_Success(t *testing.T) {
 		token := tokenExistsInDB(t, a, i.tokenRepo, "0x0c2ee19b2a89943066c2dc7f1bddcc907f614033", "d9")
 		uri, err := rpc.GetTokenURI(ctx, persist.TokenTypeERC721, token.ContractAddress, token.TokenID, ethClient)
 		tokenURIHasExpectedType(t, a, err, uri, persist.URITypeBase64JSON)
-	})
-
-	t.Run("it can create image media", func(t *testing.T) {
-		token := tokenExistsInDB(t, a, i.tokenRepo, "0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d", "1")
-		uri, err := rpc.GetTokenURI(ctx, token.TokenType, token.ContractAddress, token.TokenID, ethClient)
-		tokenURIHasExpectedType(t, a, err, uri, persist.URITypeIPFS)
-
-		metadata, err := rpc.GetMetadataFromURI(ctx, uri, ipfsShell, arweaveClient)
-		mediaHasContent(t, a, err, metadata)
-
-		predicted, _, _, err := media.PredictMediaType(ctx, metadata["image"].(string))
-		mediaTypeHasExpectedType(t, a, err, persist.MediaTypeImage, predicted)
-
-		imageData, err := rpc.GetDataFromURI(ctx, persist.TokenURI(metadata["image"].(string)), ipfsShell, arweaveClient)
-		a.NoError(err)
-		a.NotEmpty(imageData)
-
-		predicted, _ = persist.SniffMediaType(imageData)
-		mediaTypeHasExpectedType(t, a, nil, persist.MediaTypeImage, predicted)
-
-		image, animation := media.KeywordsForChain(persist.ChainETH, imageKeywords, animationKeywords)
-		med, err := media.MakePreviewsForMetadata(ctx, metadata, persist.Address(token.ContractAddress), token.TokenID, uri, persist.ChainETH, ipfsShell, arweaveClient, stg, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), image, animation)
-		mediaTypeHasExpectedType(t, a, err, persist.MediaTypeImage, med.MediaType)
-		a.Empty(med.ThumbnailURL)
-		a.NotEmpty(med.MediaURL)
-
-		mediaType, _, _, err := media.PredictMediaType(ctx, med.MediaURL.String())
-		mediaTypeHasExpectedType(t, a, err, persist.MediaTypeImage, mediaType)
-	})
-
-	t.Run("it can create svg media", func(t *testing.T) {
-		token := tokenExistsInDB(t, a, i.tokenRepo, "0x69c40e500b84660cb2ab09cb9614fa2387f95f64", "1")
-
-		uri, err := rpc.GetTokenURI(ctx, token.TokenType, token.ContractAddress, token.TokenID, ethClient)
-		tokenURIHasExpectedType(t, a, err, uri, persist.URITypeBase64JSON)
-
-		metadata, err := rpc.GetMetadataFromURI(ctx, uri, ipfsShell, arweaveClient)
-		mediaHasContent(t, a, err, metadata)
-
-		image, animation := media.KeywordsForChain(persist.ChainETH, imageKeywords, animationKeywords)
-		med, err := media.MakePreviewsForMetadata(ctx, metadata, persist.Address(token.ContractAddress), token.TokenID, uri, persist.ChainETH, ipfsShell, arweaveClient, stg, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), image, animation)
-		mediaTypeHasExpectedType(t, a, err, persist.MediaTypeSVG, med.MediaType)
-		a.Empty(med.ThumbnailURL)
-		a.Contains(med.MediaURL.String(), "https://")
 	})
 
 }

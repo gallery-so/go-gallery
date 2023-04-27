@@ -4,11 +4,9 @@ import (
 	"context"
 	"database/sql/driver"
 	"encoding/json"
-	"encoding/xml"
 	"fmt"
 	"io"
 	"math/big"
-	"net/http"
 	"net/url"
 	"strings"
 
@@ -135,8 +133,6 @@ const InvalidTokenURI TokenURI = "INVALID"
 // ZeroAddress is the all-zero Ethereum address
 const ZeroAddress EthereumAddress = "0x0000000000000000000000000000000000000000"
 
-var gltfFields = []string{"scene", "scenes", "nodes", "meshes", "accessors", "bufferViews", "buffers", "materials", "textures", "images", "samplers", "cameras", "skins", "animations", "extensions", "extras"}
-
 // EthereumAddress represents an Ethereum address
 type EthereumAddress string
 
@@ -242,15 +238,6 @@ func (d Dimensions) Valid() bool {
 	return d.Width > 0 && d.Height > 0
 }
 
-// Media represents a token's media content with processed images from metadata
-type Media struct {
-	ThumbnailURL   NullString `json:"thumbnail_url,omitempty"`
-	LivePreviewURL NullString `json:"live_preview_url,omitempty"`
-	MediaURL       NullString `json:"media_url,omitempty"`
-	MediaType      MediaType  `json:"media_type"`
-	Dimensions     Dimensions `json:"dimensions"`
-}
-
 type FallbackMedia struct {
 	ImageURL   NullString `json:"image_url,omitempty"`
 	Dimensions Dimensions `json:"dimensions"`
@@ -337,78 +324,6 @@ type ErrTokensNotFoundByTokenID struct {
 
 type ErrTokensNotFoundByContract struct {
 	ContractAddress EthereumAddress
-}
-
-type svgXML struct {
-	XMLName xml.Name `xml:"svg"`
-}
-
-// SniffMediaType will attempt to detect the media type for a given array of bytes
-func SniffMediaType(buf []byte) (MediaType, string) {
-
-	var asXML svgXML
-	if err := xml.Unmarshal(buf, &asXML); err == nil {
-		return MediaTypeSVG, "image/svg+xml"
-	}
-
-	contentType := http.DetectContentType(buf)
-	contentType = strings.TrimSpace(contentType)
-	whereCharset := strings.IndexByte(contentType, ';')
-	if whereCharset != -1 {
-		contentType = contentType[:whereCharset]
-	}
-	if contentType == "application/octet-stream" || contentType == "text/plain" {
-		// fallback of http.DetectContentType
-		if strings.EqualFold(string(buf[:4]), "glTF") {
-			return MediaTypeAnimation, "model/gltf+binary"
-		}
-
-		if strings.HasPrefix(strings.TrimSpace(string(buf[:20])), "{") && util.ContainsAnyString(strings.TrimSpace(string(buf)), gltfFields...) {
-			return MediaTypeAnimation, "model/gltf+json"
-		}
-	}
-	return MediaFromContentType(contentType), contentType
-}
-
-// MediaFromContentType will attempt to convert a content type to a media type
-func MediaFromContentType(contentType string) MediaType {
-	contentType = strings.TrimSpace(contentType)
-	whereCharset := strings.IndexByte(contentType, ';')
-	if whereCharset != -1 {
-		contentType = contentType[:whereCharset]
-	}
-	spl := strings.Split(contentType, "/")
-
-	switch spl[0] {
-	case "image":
-		switch spl[1] {
-		case "svg", "svg+xml":
-			return MediaTypeSVG
-		case "gif":
-			return MediaTypeGIF
-		default:
-			return MediaTypeImage
-		}
-	case "video":
-		return MediaTypeVideo
-	case "audio":
-		return MediaTypeAudio
-	case "text":
-		switch spl[1] {
-		case "html":
-			return MediaTypeHTML
-		default:
-			return MediaTypeText
-		}
-	case "application":
-		switch spl[1] {
-		case "pdf":
-			return MediaTypePDF
-		}
-		fallthrough
-	default:
-		return MediaTypeUnknown
-	}
 }
 
 func (e ErrTokenNotFoundByID) Error() string {
@@ -717,25 +632,6 @@ func (hex HexString) BigInt() *big.Int {
 func (hex HexString) Add(new HexString) HexString {
 	asInt := hex.BigInt()
 	return HexString(asInt.Add(asInt, new.BigInt()).Text(16))
-}
-
-// IsServable returns true if the token's Media has enough information to serve it's assets.
-func (m Media) IsServable() bool {
-	return m.MediaURL != "" && m.MediaType.IsValid()
-}
-
-// Value implements the driver.Valuer interface for media
-func (m Media) Value() (driver.Value, error) {
-	return json.Marshal(m)
-}
-
-// Scan implements the sql.Scanner interface for media
-func (m *Media) Scan(src interface{}) error {
-	if src == nil {
-		*m = Media{}
-		return nil
-	}
-	return json.Unmarshal(src.([]uint8), &m)
 }
 
 // IsServable returns true if the token's Media has enough information to serve it's assets.

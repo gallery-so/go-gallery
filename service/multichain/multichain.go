@@ -566,14 +566,12 @@ func (p *Provider) sendTokensToTokenProcessing(ctx context.Context, userID persi
 	return p.SendTokens(ctx, task.TokenProcessingUserMessage{UserID: userID, TokenIDs: tokens})
 }
 
-func (p *Provider) processTokenMedia(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, ownerAddress persist.Address, imageKeywords, animationKeywords []string) error {
+func (p *Provider) processTokenMedia(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, ownerAddress persist.Address) error {
 	input := map[string]any{
-		"token_id":           tokenID,
-		"contract_address":   contractAddress,
-		"chain":              chain,
-		"owner_address":      ownerAddress,
-		"image_keywords":     imageKeywords,
-		"animation_keywords": animationKeywords,
+		"token_id":         tokenID,
+		"contract_address": contractAddress,
+		"chain":            chain,
+		"owner_address":    ownerAddress,
 	}
 	asJSON, err := json.Marshal(input)
 	if err != nil {
@@ -777,8 +775,7 @@ outer:
 				return err
 			}
 
-			image, anim := ti.Chain.BaseKeywords()
-			err = p.processTokenMedia(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, refreshedToken.OwnerAddress, image, anim)
+			err = p.processTokenMedia(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, refreshedToken.OwnerAddress)
 			if err != nil {
 				return err
 			}
