@@ -230,8 +230,8 @@ func (h *PushNotificationHandler) CheckPushTickets() error {
 
 func (h *PushNotificationHandler) checkPushTicketsRecursive(ctx context.Context, recursionDepth int) error {
 	if recursionDepth >= maxCheckPushTicketsRecursions {
-		// TODO: Report this to Sentry
-		return fmt.Errorf("checkPushTicketsRecursive: exceeded recursion depth (%d iterations)", maxCheckPushTicketsRecursions)
+		err := fmt.Errorf("checkPushTicketsRecursive: exceeded recursion depth (%d iterations)", maxCheckPushTicketsRecursions)
+		reportError(ctx, err)
 	}
 
 	tickets, err := h.queries.GetCheckablePushTickets(ctx, maxReceiptsPerRequest)
@@ -314,8 +314,8 @@ func processTicketReceipts(ctx context.Context, tickets []db.PushNotificationTic
 
 		if err == ErrMessageTooBig {
 			// Delete the push ticket -- no amount of retrying will fix ErrMessageTooBig
-			// TODO: Report to Sentry
 			logger.For(ctx).WithError(err).Error("Deleting push ticket (message too big)")
+			reportTicketError(ctx, err, ticket)
 			params.Deleted[i] = true
 			continue
 		}

@@ -6,7 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/getsentry/sentry-go"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
 	"net/http"
 	"time"
@@ -323,4 +326,22 @@ func (c *Client) GetReceipts(ctx context.Context, pushTicketIDs []string) (map[s
 	}
 
 	return output.Data, nil
+}
+
+func reportError(ctx context.Context, err error) {
+	sentryutil.ReportError(ctx, err)
+}
+
+func reportTicketError(ctx context.Context, err error, ticket db.PushNotificationTicket) {
+	sentryutil.ReportError(ctx, err, func(scope *sentry.Scope) {
+		setPushTicketTags(scope, ticket)
+	})
+}
+
+func setPushTicketTags(scope *sentry.Scope, ticket db.PushNotificationTicket) {
+	scope.SetTag("ticket.ID", ticket.ID.String())
+	scope.SetTag("ticket.TicketID", ticket.TicketID)
+	scope.SetTag("ticket.PushTokenID", ticket.PushTokenID.String())
+	scope.SetTag("ticket.NumCheckAttempts", fmt.Sprintf("%d", ticket.NumCheckAttempts))
+	scope.SetTag("ticket.CheckAfter", ticket.CheckAfter.String())
 }
