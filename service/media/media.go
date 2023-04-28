@@ -168,7 +168,14 @@ type MediaProcessingError struct {
 }
 
 func (m MediaProcessingError) Error() string {
-	return fmt.Sprintf("error with media for token(chain=%d,contractAddress=%s,tokenID=%s): animationErr=%s;imageErr=%s", m.Chain, m.ContractAddress, m.TokenID, m.AnimationError, m.ImageError)
+	mErr := fmt.Sprintf("issue with media for token(chain=%d, address=%s, id=%s)", m.Chain, m.ContractAddress, m.TokenID)
+	if m.AnimationError != nil {
+		mErr += fmt.Sprintf("; animation error = %s", m.AnimationError)
+	}
+	if m.ImageError != nil {
+		mErr += fmt.Sprintf("; image error = %s", m.ImageError)
+	}
+	return mErr
 }
 
 // MakePreviewsForMetadata uses a metadata map to generate media content and cache resized versions of the media content.
