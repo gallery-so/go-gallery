@@ -187,11 +187,6 @@ func updateMediaProccessingFingerprints(event *sentry.Event, hint *sentry.EventH
 	var mediaErr MediaProcessingError
 
 	if errors.As(hint.OriginalException, &mediaErr) {
-		if event.Tags["chain"] == "" || event.Tags["contractAddress"] == "" {
-			return event
-		}
-
-		// Add both errors to the stack
 
 		if mediaErr.AnimationError != nil {
 			event.Exception = append(event.Exception, sentry.Exception{
@@ -209,13 +204,15 @@ func updateMediaProccessingFingerprints(event *sentry.Event, hint *sentry.EventH
 
 		// Move the original error to the end of the stack since the latest error is used as the title in Sentry
 		if len(event.Exception) > 1 {
-			title := fmt.Sprintf("chain=%s address=%s", event.Tags["chain"], event.Tags["contractAddress"])
 			event.Exception = append(event.Exception[1:], event.Exception[0])
-			event.Exception[len(event.Exception)-1].Type = title
 		}
+	}
 
-		// Group by the chain and contract
+	// Group by the chain and contract
+	if event.Tags["chain"] != "" && event.Tags["contractAddress"] != "" {
 		event.Fingerprint = []string{event.Tags["chain"], event.Tags["contractAddress"]}
+		title := fmt.Sprintf("failed on chain=%s address=%s", event.Tags["chain"], event.Tags["contractAddress"])
+		event.Exception[len(event.Exception)-1].Type = title
 	}
 
 	return event
