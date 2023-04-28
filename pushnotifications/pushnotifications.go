@@ -23,7 +23,7 @@ import (
 
 func init() {
 	env.RegisterValidation("EXPO_PUSH_API_URL", "required")
-	env.RegisterValidation("PUSH_NOTIFICATION_SECRET", "required")
+	env.RegisterValidation("PUSH_NOTIFICATIONS_SECRET", "required")
 }
 
 func InitServer() {
@@ -50,7 +50,7 @@ func coreInitServer() *gin.Engine {
 
 	// Return 200 on auth failures to prevent task/job retries
 	authOpts := middleware.BasicAuthOptionBuilder{}
-	basicAuthHandler := middleware.BasicHeaderAuthRequired(env.GetString("PUSH_NOTIFICATION_SECRET"), authOpts.WithFailureStatus(http.StatusOK))
+	basicAuthHandler := middleware.BasicHeaderAuthRequired(env.GetString("PUSH_NOTIFICATIONS_SECRET"), authOpts.WithFailureStatus(http.StatusOK))
 
 	taskGroup := router.Group("/tasks", basicAuthHandler, middleware.TaskRequired())
 	jobGroup := router.Group("/jobs", basicAuthHandler)
@@ -132,7 +132,7 @@ func setDefaults() {
 	viper.SetDefault("POSTGRES_DB", "postgres")
 	viper.SetDefault("SENTRY_DSN", "")
 	viper.SetDefault("VERSION", "")
-	viper.SetDefault("PUSH_NOTIFICATION_SECRET", "push-notification-secret")
+	viper.SetDefault("PUSH_NOTIFICATIONS_SECRET", "push-notifications-secret")
 	viper.SetDefault("EXPO_PUSH_ACCESS_TOKEN", "")
 	viper.SetDefault("EXPO_PUSH_API_URL", "https://exp.host/--/api/v2/push")
 
@@ -152,7 +152,7 @@ func setDefaults() {
 	if env.GetString("ENV") != "local" {
 		util.VarNotSetTo("SENTRY_DSN", "")
 		util.VarNotSetTo("VERSION", "")
-		util.VarNotSetTo("PUSH_NOTIFICATION_SECRET", "push-notification-secret")
+		util.VarNotSetTo("PUSH_NOTIFICATIONS_SECRET", "push-notifications-secret")
 	}
 }
 

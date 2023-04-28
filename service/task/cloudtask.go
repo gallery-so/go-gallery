@@ -74,10 +74,10 @@ func CreateTaskForPushNotification(ctx context.Context, message PushNotification
 		"PushTokenID": message.PushTokenID,
 	})
 
-	url := fmt.Sprintf("%s/tasks/send-push-notification", env.GetString("PUSH_NOTIFICATION_URL"))
+	url := fmt.Sprintf("%s/tasks/send-push-notification", env.GetString("PUSH_NOTIFICATIONS_URL"))
 	logger.For(ctx).Infof("creating task for push notification, sending to %s", url)
 
-	queue := env.GetString("GCLOUD_PUSH_NOTIFICATION_QUEUE")
+	queue := env.GetString("GCLOUD_PUSH_NOTIFICATIONS_QUEUE")
 	task := &taskspb.Task{
 		MessageType: &taskspb.Task_HttpRequest{
 			HttpRequest: &taskspb.HttpRequest{
@@ -85,7 +85,7 @@ func CreateTaskForPushNotification(ctx context.Context, message PushNotification
 				Url:        url,
 				Headers: map[string]string{
 					"Content-type":  "application/json",
-					"Authorization": basicauth.MakeHeader(nil, env.GetString("PUSH_NOTIFICATION_SECRET")),
+					"Authorization": basicauth.MakeHeader(nil, env.GetString("PUSH_NOTIFICATIONS_SECRET")),
 					"sentry-trace":  span.TraceID.String(),
 				},
 			},
