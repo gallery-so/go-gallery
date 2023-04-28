@@ -159,9 +159,9 @@ type tokensOwnerFetcher interface {
 	GetTokensByTokenIdentifiersAndOwner(context.Context, ChainAgnosticIdentifiers, persist.Address) (ChainAgnosticToken, ChainAgnosticContract, error)
 }
 
-// childContractFetcher supports fetching tokens created by an address
+// childContractFetcher supports fetching
 type childContractFetcher interface {
-	GetContractsCreatedOnSharedContract(ctx context.Context, address persist.Address) ([]ChildContract, error)
+	GetChildContractsCreatedOnSharedContract(ctx context.Context, creatorAddress persist.Address) ([]ContractEdge, error)
 }
 
 // tokenRefresher supports refreshes of a token
@@ -191,7 +191,7 @@ type providerSupplier interface {
 type ChainOverrideMap = map[persist.Chain]*persist.Chain
 
 // NewProvider creates a new MultiChainDataRetriever
-func NewProvider(ctx context.Context, repos *postgres.Repositories, queries *coredb.Queries, cache *redis.Cache, taskClient *cloudtasks.Client, chainOverrides ChainOverrideMap, providers ...any) *Provider {
+func NewProvider(ctx context.Context, repos *postgres.Repositories, queries *db.Queries, cache *redis.Cache, taskClient *cloudtasks.Client, chainOverrides ChainOverrideMap, providers ...any) *Provider {
 	return &Provider{
 		Repos:                 repos,
 		Cache:                 cache,
@@ -204,37 +204,7 @@ func NewProvider(ctx context.Context, repos *postgres.Repositories, queries *cor
 	}
 }
 
-func getChainProvidersForTask[T any](providers []any) []T {
-	result := make([]T, 0, len(providers))
-	for _, p := range providers {
-		if provider, ok := p.(T); ok {
-			result = append(result, provider)
-		} else if subproviders, ok := p.(providerSupplier); ok {
-			for _, subprovider := range subproviders.GetSubproviders() {
-				if provider, ok := subprovider.(T); ok {
-					result = append(result, provider)
-				}
-			}
-		}
-	}
-	return result
-}
-
-func hasProvidersForTask[T any](providers []any) bool {
-	for _, p := range providers {
-		if _, ok := p.(T); ok {
-			return true
-		} else if subproviders, ok := p.(providerSupplier); ok {
-			for _, subprovider := range subproviders.GetSubproviders() {
-				if _, ok := subprovider.(T); ok {
-					return true
-				}
-			}
-		}
-	}
-	return false
-}
-
+// chainValidation is the required multichain configuration of providers to support each chain
 var chainValidation map[persist.Chain]validation = map[persist.Chain]validation{
 	persist.ChainETH: {
 		NameResolver:          true,
@@ -275,31 +245,19 @@ type validation struct {
 // validateProviders verifies that the input providers match the expected multichain spec and panics otherwise
 func validateProviders(ctx context.Context, providers []any) map[persist.Chain][]any {
 	provided := make(map[persist.Chain][]any)
-	for _, p := range providers {
-		info, err := p.(configurer).GetBlockchainInfo(ctx)
+
+	configurers := providersMatchingInterface[configurer](providers)
+
+	for _, configurer := range configurers {
+		info, err := configurer.GetBlockchainInfo(ctx)
 		if err != nil {
 			panic(err)
 		}
-		provided[info.Chain] = append(provided[info.Chain], p)
+		provided[info.Chain] = append(provided[info.Chain], configurer)
 	}
 
-	passesValidation := true
+	validConfig := true
 	errorMsg := "\n[ multichain validation ]\n"
-
-	validateChain := func(chain persist.Chain, expected, actual map[string]bool) {
-		fail := false
-		header := fmt.Sprintf("validation results for chain: %d\n", chain)
-		for s := range expected {
-			if expected[s] && !actual[s] {
-				if !fail {
-					fail = true
-					errorMsg += header
-				}
-				errorMsg += fmt.Sprintf("\t* missing implemntation of %s\n", s)
-			}
-		}
-		passesValidation = passesValidation && !fail
-	}
 
 	for chain, spec := range chainValidation {
 		providers := provided[chain]
@@ -340,10 +298,25 @@ func validateProviders(ctx context.Context, providers []any) map[persist.Chain][
 				expected["childContractFetcher"] = true
 			}
 		}
-		validateChain(chain, expected, actual)
+
+		// Validate the chain against the spec
+		validChain := true
+		header := fmt.Sprintf("validation results for chain: %d\n", chain)
+
+		for s := range expected {
+			if expected[s] && !actual[s] {
+				if validChain {
+					validChain = false
+					errorMsg += header
+				}
+				errorMsg += fmt.Sprintf("\t* missing implementation of %s\n", s)
+			}
+		}
+
+		validConfig = validConfig && validChain
 	}
 
-	if !passesValidation {
+	if !validConfig {
 		panic(errorMsg)
 	}
 
@@ -361,8 +334,8 @@ func providersMatchingInterface[T any](providers []any) []T {
 	return matches
 }
 
-// matchingProviders returns providers that adhere to the given interface per chain
-func matchingProviders[T any](availableProviders map[persist.Chain][]any, requestedChains ...persist.Chain) map[persist.Chain][]T {
+// matchingProvidersByChain returns providers that adhere to the given interface per chain
+func matchingProvidersByChain[T any](availableProviders map[persist.Chain][]any, requestedChains ...persist.Chain) map[persist.Chain][]T {
 	matches := make(map[persist.Chain][]T)
 	for availableChain, providers := range availableProviders {
 		for _, requestChain := range requestedChains {
@@ -375,7 +348,7 @@ func matchingProviders[T any](availableProviders map[persist.Chain][]any, reques
 }
 
 func matchingProvidersForChain[T any](availableProviders map[persist.Chain][]any, chain persist.Chain) []T {
-	return matchingProviders[T](availableProviders, chain)[chain]
+	return matchingProvidersByChain[T](availableProviders, chain)[chain]
 }
 
 // matchingAddresses returns wallet addresses that belong to any of the passed chains
@@ -509,6 +482,61 @@ outer:
 	return err
 }
 
+type ProviderChildContractResult struct {
+	Priority int
+	Chain    persist.Chain
+	Edges    []ContractEdge
+}
+
+type ContractEdge struct {
+	Parent   ChainAgnosticContract
+	Children []ChildContractRes
+}
+
+type ChildContractRes struct {
+	ChildID        string // Uniquely identifies a child contract within a parent contract
+	Name           string
+	Description    string
+	CreatorAddress persist.Address
+	Tokens         []ChainAgnosticToken
+}
+
+// combinedProviderChildContractResults is a helper type for combining results from multiple providers
+type combinedProviderChildContractResults []ProviderChildContractResult
+
+func (c combinedProviderChildContractResults) ParentContracts() []persist.ContractGallery {
+	combined := make([]chainContracts, 0)
+	for _, result := range c {
+		contracts := make([]ChainAgnosticContract, 0)
+
+		for _, edge := range result.Edges {
+			contracts = append(contracts, edge.Parent)
+		}
+
+		combined = append(combined, chainContracts{
+			priority:  result.Priority,
+			chain:     result.Chain,
+			contracts: contracts,
+		})
+	}
+	return contractsToNewDedupedContracts(combined)
+}
+
+func (c combinedProviderChildContractResults) Edges() []ContractEdge {
+	combined := make([]ContractEdge, 0)
+	for _, result := range c {
+		combined = append(combined, result.Edges...)
+	}
+	return combined
+}
+
+// ChildContractResult is the result of a child contract query from a provider
+type ChildContractResult struct {
+	Priority       int
+	Chain          persist.Chain
+	ChildContracts []ChildContract
+}
+
 // ChildContract represents a subset of tokens within a contract, identified by a unique ID
 type ChildContract struct {
 	ChildID        string // Uniquely identifies a child contract within a parent contract
@@ -517,13 +545,6 @@ type ChildContract struct {
 	CreatorAddress persist.Address
 	ParentContract ChainAgnosticContract
 	Tokens         []ChainAgnosticToken
-}
-
-// ChildContractResult is the result of a child contract query from a provider
-type ChildContractResult struct {
-	Priority       int
-	Chain          persist.Chain
-	ChildContracts []ChildContract
 }
 
 // ParentContracts returns all parent contracts
@@ -655,9 +676,9 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 		}
 	}
 
-	fetchers := matchingProviders[childContractFetcher](p.Chains, chains...)
+	fetchers := matchingProvidersByChain[childContractFetcher](p.Chains, chains...)
 	searchAddresses := matchingAddresses(user.Wallets, chains)
-	providerPool := pool.NewWithResults[ChildContractResult]().WithContext(ctx).WithCancelOnError()
+	providerPool := pool.NewWithResults[ProviderChildContractResult]().WithContext(ctx).WithCancelOnError()
 
 	// Fetch all tokens created by the user
 	for chain, addresses := range searchAddresses {
@@ -667,45 +688,46 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 				p := priority
 				f := fetcher
 				a := address
-				providerPool.Go(func(ctx context.Context) (ChildContractResult, error) {
-					contracts, err := f.GetContractsCreatedOnSharedContract(ctx, a)
+				providerPool.Go(func(ctx context.Context) (ProviderChildContractResult, error) {
+					contractEdges, err := f.GetChildContractsCreatedOnSharedContract(ctx, a)
 					if err != nil {
-						return ChildContractResult{}, err
+						return ProviderChildContractResult{}, err
 					}
-					return ChildContractResult{
-						Priority:       p,
-						Chain:          c,
-						ChildContracts: contracts,
+					return ProviderChildContractResult{
+						Priority: p,
+						Chain:    c,
+						Edges:    contractEdges,
+						// ChildContracts: contracts,
 					}, nil
 				})
 			}
 		}
 	}
 
+	// pResult is a list of provider results
 	pResult, err := providerPool.Wait()
 	if err != nil {
 		return err
 	}
 
-	combinedResult := combinedChildContractResults(pResult)
+	combinedResult := combinedProviderChildContractResults(pResult)
 
 	// Create universal users for owners that aren't users yet
-	createPool := pool.NewWithResults[userIDToUser]().WithContext(ctx).WithCancelOnError()
+	// createPool := pool.NewWithResults[userIDToUser]().WithContext(ctx).WithCancelOnError()
 
-	for _, result := range combinedResult {
-		createPool.Go(func(ctx context.Context) (userIDToUser, error) {
-			_, newUsers, err := p.createUsersForTokens(ctx, combinedResult.Tokens(), result.Chain)
-			return newUsers, err
-		})
-	}
+	// for _, result := range combinedResult {
+	// 	createPool.Go(func(ctx context.Context) (userIDToUser, error) {
+	// 		_, newUsers, err := p.createUsersForTokens(ctx, combinedResult.Tokens(), result.Chain)
+	// 		return newUsers, err
+	// 	})
+	// }
 
-	createUserResult, err := createPool.Wait()
-	if err != nil {
-		return err
-	}
+	// createUserResult, err := createPool.Wait()
+	// if err != nil {
+	// 	return err
+	// }
 
 	// Creating a bunch of lookups to make the upsert query easier to write
-	// The code below is pretty hacky and probably should be refactored...
 	addressToChainLookup := make(map[persist.Address]persist.Chain)
 	addressToUserLookup := addressToUser(createUserResult)
 	ownerAddressToTokens, tokenDBIDsToParentAddress := combinedResult.TokensByOwnerAddress(addressToUserLookup)
@@ -720,13 +742,15 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 		params.ParentContractID = append(params.ParentContractID, persist.GenerateID().String())
 		params.ParentContractDeleted = append(params.ParentContractDeleted, false)
 		params.ParentContractCreatedAt = append(params.ParentContractCreatedAt, now)
-		params.ParentContractName = append(params.ParentContractName, contract.Name.String())
+		params.ParentContractName = append(params.ParentContractName, contract.Name.String)
 		params.ParentContractSymbol = append(params.ParentContractSymbol, contract.Symbol.String())
 		params.ParentContractAddress = append(params.ParentContractAddress, contract.Address.String())
 		params.ParentContractCreatorAddress = append(params.ParentContractCreatorAddress, contract.CreatorAddress.String())
 		params.ParentContractChain = append(params.ParentContractChain, int32(contract.Chain))
 		params.ParentContractDescription = append(params.ParentContractDescription, contract.Description.String())
 		addressToChainLookup[contract.Address] = contract.Chain
+	}
+	for _, edge := range combinedResult.Edges {
 	}
 	for _, child := range combinedResult.ChildContracts() {
 		chain := addressToChainLookup[child.ParentContract.Address]
@@ -744,9 +768,6 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 			tokenToChildContractLookup[tID] = child.ChildID
 		}
 	}
-	// NOTE: OpenSea's API currently doesn't return owner information, so inserting tokens will currently fail
-	// because of the non-null contrainst on the owned_by_wallets_column. A workaround is to only update
-	// tokens that already existed in the database, rather than also inserting new ones.
 	for ownerAddress, tokens := range ownerAddressToTokens {
 		for _, token := range tokens {
 			tID := persist.NewTokenIdentifiers(tokenDBIDsToParentAddress[token.ID], token.TokenID, token.Chain)
@@ -763,7 +784,7 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 			postgres.AppendAddressAtBlock(&params.TokenOwnershipHistory, token.OwnershipHistory, &params.TokenOwnershipHistoryStartIdx, &params.TokenOwnershipHistoryEndIdx, &errors)
 			params.TokenExternalUrl = append(params.TokenExternalUrl, token.ExternalURL.String())
 			params.TokenBlockNumber = append(params.TokenBlockNumber, token.BlockNumber.BigInt().Int64())
-			params.TokenOwnerUserID = append(params.TokenOwnerUserID, owner.ID.String())
+			params.TokenOwnerUserID = append(params.TokenOwnerUserID, userID.String
 			postgres.AppendWalletList(&params.TokenOwnedByWallets, token.OwnedByWallets, &params.TokenOwnedByWalletsStartIdx, &params.TokenOwnedByWalletsEndIdx)
 			params.TokenChain = append(params.TokenChain, int32(token.Chain))
 			params.TokenIsProviderMarkedSpam = append(params.TokenIsProviderMarkedSpam, util.GetOptionalValue(token.IsProviderMarkedSpam, false))
