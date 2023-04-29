@@ -232,6 +232,7 @@ func (h *PushNotificationHandler) checkPushTicketsRecursive(ctx context.Context,
 	if recursionDepth >= maxCheckPushTicketsRecursions {
 		err := fmt.Errorf("checkPushTicketsRecursive: exceeded recursion depth (%d iterations)", maxCheckPushTicketsRecursions)
 		reportError(ctx, err)
+		return err
 	}
 
 	tickets, err := h.queries.GetCheckablePushTickets(ctx, maxReceiptsPerRequest)
