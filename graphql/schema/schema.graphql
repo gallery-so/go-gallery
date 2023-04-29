@@ -1406,6 +1406,9 @@ input DebugAuth @restrictEnvironment(allowed: ["local"]) {
   # The chainAddresses that will be returned from the resulting authenticator.
   # Cannot be used in conjunction with the asUsername parameter.
   chainAddresses: [ChainAddressInput!]
+
+  # A password required to use debug tools. Typically empty in local environments.
+  debugToolsPassword: String
 }
 
 input GnosisSafeAuth {
@@ -1430,6 +1433,9 @@ input DebugSocialAuth {
   provider: SocialAccountType!
   id: String!
   username: String!
+
+  # A password required to use debug tools. Typically empty in local environments.
+  debugToolsPassword: String
 }
 
 input DeepRefreshInput {
