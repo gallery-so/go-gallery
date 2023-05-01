@@ -129,21 +129,21 @@ jobs:
         run: make deploy-prod-feedbot
   deploy-dev-graphql-gateway:
     runs-on: ubuntu-latest
-      steps:
-        - uses: actions/checkout@v2
-        - name: "Install build deps"
-          uses: ./.github/actions/build-deps
-          with:
-            gcp-credentials-json: ${{ secrets.GCP_DEV_CREDENTIALS }}
-        - name: "Deploy"
-          run: make deploy-dev-graphql-gateway
+    steps:
+      - uses: actions/checkout@v2
+      - name: "Install build deps"
+        uses: ./.github/actions/build-deps
+        with:
+          gcp-credentials-json: ${{ secrets.GCP_DEV_CREDENTIALS }}
+      - name: "Deploy"
+        run: make deploy-dev-graphql-gateway
   deploy-prod-graphql-gateway:
     runs-on: ubuntu-latest
-      steps:
-        - uses: actions/checkout@v2
-        - name: "Install build deps"
-          uses: ./.github/actions/build-deps
-          with:
-            gcp-credentials-json: ${{ secrets.GCP_DEV_CREDENTIALS }}
-        - name: "Deploy"
-          run: make deploy-prod-graphql-gateway
+    steps:
+      - uses: actions/checkout@v2
+      - name: "Install build deps"
+        uses: ./.github/actions/build-deps
+        with:
+          gcp-credentials-json: ${{ secrets.GCP_DEV_CREDENTIALS }}
+      - name: "Deploy"
+        run: make deploy-prod-graphql-gateway
