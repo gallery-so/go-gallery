@@ -676,15 +676,17 @@ type CreateUserPayload struct {
 func (CreateUserPayload) IsCreateUserPayloadOrError() {}
 
 type DebugAuth struct {
-	AsUsername     *string                 `json:"asUsername"`
-	UserID         *persist.DBID           `json:"userId"`
-	ChainAddresses []*persist.ChainAddress `json:"chainAddresses"`
+	AsUsername         *string                 `json:"asUsername"`
+	UserID             *persist.DBID           `json:"userId"`
+	ChainAddresses     []*persist.ChainAddress `json:"chainAddresses"`
+	DebugToolsPassword *string                 `json:"debugToolsPassword"`
 }
 
 type DebugSocialAuth struct {
-	Provider persist.SocialProvider `json:"provider"`
-	ID       string                 `json:"id"`
-	Username string                 `json:"username"`
+	Provider           persist.SocialProvider `json:"provider"`
+	ID                 string                 `json:"id"`
+	Username           string                 `json:"username"`
+	DebugToolsPassword *string                `json:"debugToolsPassword"`
 }
 
 type DeepRefreshInput struct {

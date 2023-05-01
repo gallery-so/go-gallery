@@ -11,7 +11,8 @@ COPY go.mod go.sum /app/
 RUN go mod download
 
 COPY . /app
-RUN go build -o ./bin/backend ./cmd/server/main.go
+# Enable debug_tools on dev
+RUN go build -tags debug_tools -o ./bin/backend ./cmd/server/main.go
 
 ARG VERSION
 ENV GAE_VERSION=$VERSION
