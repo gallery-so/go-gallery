@@ -8032,11 +8032,11 @@ input EoaAuth {
   signature: String! @scrub
 }
 
-# DebugAuth is a local-only authentication mechanism for testing and debugging.
+# DebugAuth is a debug-only authentication mechanism for testing and debugging.
 # It creates an authenticator that will return the supplied userId and chainAddresses as if they had been
 # successfully authenticated. For existing users, the asUsername parameter may be supplied as a convenience
 # method to look up and return their userId and chainAddresses.
-input DebugAuth @restrictEnvironment(allowed: ["local"]) {
+input DebugAuth @restrictEnvironment(allowed: ["local", "development", "sandbox"]) {
   # Convenience method to authenticate as an existing user.
   # Cannot be used in conjunction with the userId and chainAddresses parameters.
   asUsername: String
@@ -8072,7 +8072,7 @@ input TwitterAuth {
   code: String!
 }
 
-input DebugSocialAuth {
+input DebugSocialAuth @restrictEnvironment(allowed: ["local", "development", "sandbox"]) {
   provider: SocialAccountType!
   id: String!
   username: String!
@@ -46018,7 +46018,7 @@ func (ec *executionContext) unmarshalInputAuthMechanism(ctx context.Context, obj
 				return ec.unmarshalODebugAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐDebugAuth(ctx, v)
 			}
 			directive1 := func(ctx context.Context) (interface{}, error) {
-				allowed, err := ec.unmarshalNString2ᚕstringᚄ(ctx, []interface{}{"local"})
+				allowed, err := ec.unmarshalNString2ᚕstringᚄ(ctx, []interface{}{"local", "development", "sandbox"})
 				if err != nil {
 					return nil, err
 				}
@@ -46530,7 +46530,7 @@ func (ec *executionContext) unmarshalInputDebugAuth(ctx context.Context, obj int
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("asUsername"))
 			directive0 := func(ctx context.Context) (interface{}, error) { return ec.unmarshalOString2ᚖstring(ctx, v) }
 			directive1 := func(ctx context.Context) (interface{}, error) {
-				allowed, err := ec.unmarshalNString2ᚕstringᚄ(ctx, []interface{}{"local"})
+				allowed, err := ec.unmarshalNString2ᚕstringᚄ(ctx, []interface{}{"local", "development", "sandbox"})
 				if err != nil {
 					return nil, err
 				}
@@ -46560,7 +46560,7 @@ func (ec *executionContext) unmarshalInputDebugAuth(ctx context.Context, obj int
 				return ec.unmarshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
 			}
 			directive1 := func(ctx context.Context) (interface{}, error) {
-				allowed, err := ec.unmarshalNString2ᚕstringᚄ(ctx, []interface{}{"local"})
+				allowed, err := ec.unmarshalNString2ᚕstringᚄ(ctx, []interface{}{"local", "development", "sandbox"})
 				if err != nil {
 					return nil, err
 				}
@@ -46590,7 +46590,7 @@ func (ec *executionContext) unmarshalInputDebugAuth(ctx context.Context, obj int
 				return ec.unmarshalOChainAddressInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddressᚄ(ctx, v)
 			}
 			directive1 := func(ctx context.Context) (interface{}, error) {
-				allowed, err := ec.unmarshalNString2ᚕstringᚄ(ctx, []interface{}{"local"})
+				allowed, err := ec.unmarshalNString2ᚕstringᚄ(ctx, []interface{}{"local", "development", "sandbox"})
 				if err != nil {
 					return nil, err
 				}
@@ -46618,7 +46618,7 @@ func (ec *executionContext) unmarshalInputDebugAuth(ctx context.Context, obj int
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("debugToolsPassword"))
 			directive0 := func(ctx context.Context) (interface{}, error) { return ec.unmarshalOString2ᚖstring(ctx, v) }
 			directive1 := func(ctx context.Context) (interface{}, error) {
-				allowed, err := ec.unmarshalNString2ᚕstringᚄ(ctx, []interface{}{"local"})
+				allowed, err := ec.unmarshalNString2ᚕstringᚄ(ctx, []interface{}{"local", "development", "sandbox"})
 				if err != nil {
 					return nil, err
 				}
@@ -46664,33 +46664,109 @@ func (ec *executionContext) unmarshalInputDebugSocialAuth(ctx context.Context, o
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("provider"))
-			it.Provider, err = ec.unmarshalNSocialAccountType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐSocialProvider(ctx, v)
+			directive0 := func(ctx context.Context) (interface{}, error) {
+				return ec.unmarshalNSocialAccountType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐSocialProvider(ctx, v)
+			}
+			directive1 := func(ctx context.Context) (interface{}, error) {
+				allowed, err := ec.unmarshalNString2ᚕstringᚄ(ctx, []interface{}{"local", "development", "sandbox"})
+				if err != nil {
+					return nil, err
+				}
+				if ec.directives.RestrictEnvironment == nil {
+					return nil, errors.New("directive restrictEnvironment is not implemented")
+				}
+				return ec.directives.RestrictEnvironment(ctx, obj, directive0, allowed)
+			}
+
+			tmp, err := directive1(ctx)
 			if err != nil {
-				return it, err
+				return it, graphql.ErrorOnPath(ctx, err)
+			}
+			if data, ok := tmp.(persist.SocialProvider); ok {
+				it.Provider = data
+			} else {
+				err := fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/service/persist.SocialProvider`, tmp)
+				return it, graphql.ErrorOnPath(ctx, err)
 			}
 		case "id":
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
-			it.ID, err = ec.unmarshalNString2string(ctx, v)
+			directive0 := func(ctx context.Context) (interface{}, error) { return ec.unmarshalNString2string(ctx, v) }
+			directive1 := func(ctx context.Context) (interface{}, error) {
+				allowed, err := ec.unmarshalNString2ᚕstringᚄ(ctx, []interface{}{"local", "development", "sandbox"})
+				if err != nil {
+					return nil, err
+				}
+				if ec.directives.RestrictEnvironment == nil {
+					return nil, errors.New("directive restrictEnvironment is not implemented")
+				}
+				return ec.directives.RestrictEnvironment(ctx, obj, directive0, allowed)
+			}
+
+			tmp, err := directive1(ctx)
 			if err != nil {
-				return it, err
+				return it, graphql.ErrorOnPath(ctx, err)
+			}
+			if data, ok := tmp.(string); ok {
+				it.ID = data
+			} else {
+				err := fmt.Errorf(`unexpected type %T from directive, should be string`, tmp)
+				return it, graphql.ErrorOnPath(ctx, err)
 			}
 		case "username":
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("username"))
-			it.Username, err = ec.unmarshalNString2string(ctx, v)
+			directive0 := func(ctx context.Context) (interface{}, error) { return ec.unmarshalNString2string(ctx, v) }
+			directive1 := func(ctx context.Context) (interface{}, error) {
+				allowed, err := ec.unmarshalNString2ᚕstringᚄ(ctx, []interface{}{"local", "development", "sandbox"})
+				if err != nil {
+					return nil, err
+				}
+				if ec.directives.RestrictEnvironment == nil {
+					return nil, errors.New("directive restrictEnvironment is not implemented")
+				}
+				return ec.directives.RestrictEnvironment(ctx, obj, directive0, allowed)
+			}
+
+			tmp, err := directive1(ctx)
 			if err != nil {
-				return it, err
+				return it, graphql.ErrorOnPath(ctx, err)
+			}
+			if data, ok := tmp.(string); ok {
+				it.Username = data
+			} else {
+				err := fmt.Errorf(`unexpected type %T from directive, should be string`, tmp)
+				return it, graphql.ErrorOnPath(ctx, err)
 			}
 		case "debugToolsPassword":
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("debugToolsPassword"))
-			it.DebugToolsPassword, err = ec.unmarshalOString2ᚖstring(ctx, v)
+			directive0 := func(ctx context.Context) (interface{}, error) { return ec.unmarshalOString2ᚖstring(ctx, v) }
+			directive1 := func(ctx context.Context) (interface{}, error) {
+				allowed, err := ec.unmarshalNString2ᚕstringᚄ(ctx, []interface{}{"local", "development", "sandbox"})
+				if err != nil {
+					return nil, err
+				}
+				if ec.directives.RestrictEnvironment == nil {
+					return nil, errors.New("directive restrictEnvironment is not implemented")
+				}
+				return ec.directives.RestrictEnvironment(ctx, obj, directive0, allowed)
+			}
+
+			tmp, err := directive1(ctx)
 			if err != nil {
-				return it, err
+				return it, graphql.ErrorOnPath(ctx, err)
+			}
+			if data, ok := tmp.(*string); ok {
+				it.DebugToolsPassword = data
+			} else if tmp == nil {
+				it.DebugToolsPassword = nil
+			} else {
+				err := fmt.Errorf(`unexpected type %T from directive, should be *string`, tmp)
+				return it, graphql.ErrorOnPath(ctx, err)
 			}
 		}
 	}
@@ -47180,9 +47256,31 @@ func (ec *executionContext) unmarshalInputSocialAuthMechanism(ctx context.Contex
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("debug"))
-			it.Debug, err = ec.unmarshalODebugSocialAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐDebugSocialAuth(ctx, v)
+			directive0 := func(ctx context.Context) (interface{}, error) {
+				return ec.unmarshalODebugSocialAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐDebugSocialAuth(ctx, v)
+			}
+			directive1 := func(ctx context.Context) (interface{}, error) {
+				allowed, err := ec.unmarshalNString2ᚕstringᚄ(ctx, []interface{}{"local", "development", "sandbox"})
+				if err != nil {
+					return nil, err
+				}
+				if ec.directives.RestrictEnvironment == nil {
+					return nil, errors.New("directive restrictEnvironment is not implemented")
+				}
+				return ec.directives.RestrictEnvironment(ctx, obj, directive0, allowed)
+			}
+
+			tmp, err := directive1(ctx)
 			if err != nil {
-				return it, err
+				return it, graphql.ErrorOnPath(ctx, err)
+			}
+			if data, ok := tmp.(*model.DebugSocialAuth); ok {
+				it.Debug = data
+			} else if tmp == nil {
+				it.Debug = nil
+			} else {
+				err := fmt.Errorf(`unexpected type %T from directive, should be *github.com/mikeydub/go-gallery/graphql/model.DebugSocialAuth`, tmp)
+				return it, graphql.ErrorOnPath(ctx, err)
 			}
 		}
 	}
