@@ -13,7 +13,6 @@ import (
 
 	"github.com/gammazero/workerpool"
 	"github.com/magiclabs/magic-admin-go/token"
-	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/emails"
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -185,7 +184,7 @@ func (r *Resolver) authMechanismToAuthenticator(ctx context.Context, m model.Aut
 	authApi := publicapi.For(ctx).Auth
 
 	if debugtools.Enabled {
-		if env.GetString("ENV") == "local" && m.Debug != nil {
+		if debugtools.IsDebugEnv() && m.Debug != nil {
 			return authApi.NewDebugAuthenticator(ctx, *m.Debug)
 		}
 	}
@@ -214,8 +213,9 @@ func (r *Resolver) authMechanismToAuthenticator(ctx context.Context, m model.Aut
 func (r *Resolver) socialAuthMechanismToAuthenticator(ctx context.Context, m model.SocialAuthMechanism) (socialauth.Authenticator, error) {
 
 	if debugtools.Enabled {
-		if env.GetString("ENV") == "local" && m.Debug != nil {
-			return debugtools.NewDebugSocialAuthenticator(m.Debug.Provider, m.Debug.ID, map[string]interface{}{"username": m.Debug.Username}), nil
+		if debugtools.IsDebugEnv() && m.Debug != nil {
+			password := util.FromPointer(m.Debug.DebugToolsPassword)
+			return debugtools.NewDebugSocialAuthenticator(m.Debug.Provider, m.Debug.ID, map[string]interface{}{"username": m.Debug.Username}, password), nil
 		}
 	}
 

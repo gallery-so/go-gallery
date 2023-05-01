@@ -24,11 +24,12 @@ DEPLOY_FLAGS         = $(BASE_DEPLOY_FLAGS) --cpu-throttling
 DEPLOY_REGION        = us-east1
 SENTRY_RELEASE       = sentry-cli releases -o $(SENTRY_ORG) -p $(SENTRY_PROJECT)
 IMAGE_TAG            = $(DOCKER_REGISTRY)/$(GCP_PROJECT)/$(REPO)/$(CURRENT_BRANCH):$(CURRENT_COMMIT_HASH)
-DOCKER_BUILD         = docker build --file $(DOCKER_FILE) --platform linux/amd64 -t $(IMAGE_TAG) --build-arg VERSION=$(DEPLOY_VERSION) $(DOCKER_CONTEXT)
+DOCKER_BUILD         = docker build --file $(DOCKER_FILE) --platform linux/amd64 -t $(IMAGE_TAG) --build-arg VERSION=$(DEPLOY_VERSION) --build-arg FFMPEG_VERSION=$(FFMPEG_VERSION) $(DOCKER_CONTEXT)
 DOCKER_PUSH          = docker push $(IMAGE_TAG)
 DOCKER_DIR           := ./docker
 DOCKER_CONTEXT       := .
 DOCKER_REGISTRY      := us-east1-docker.pkg.dev
+FFMPEG_VERSION       = 7:4.3.6-0+deb11u1
 
 # Environments
 DEV     := dev
