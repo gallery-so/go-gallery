@@ -25,7 +25,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
 	"github.com/sirupsen/logrus"
@@ -289,7 +288,7 @@ func (d *Provider) GetDisplayNameByAddress(ctx context.Context, addr persist.Add
 }
 
 // GetChildContractsCreatedOnSharedContract returns a tokens created by the address under the Shared Storefront contract
-func (p *Provider) GetChildContractsCreatedOnSharedContract(ctx context.Context, creatorAddress persist.Address) ([]multichain.ChildContract, error) {
+func (p *Provider) GetChildContractsCreatedOnSharedContract(ctx context.Context, creatorAddress persist.Address) ([]multichain.ContractEdge, error) {
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
@@ -628,7 +627,7 @@ func assetsByChildContract(ctx context.Context, assetsChan <-chan assetsReceieve
 			if _, seen := parents[parentAddress]; !seen {
 				parents[parentAddress] = multichain.ContractEdge{
 					Parent:   contractFromAsset(asset, persist.BlockNumber(block)),
-					Children: make([]multichain.ChildContractRes, 0),
+					Children: make([]multichain.ChildContract, 0),
 				}
 			}
 
@@ -637,7 +636,7 @@ func assetsByChildContract(ctx context.Context, assetsChan <-chan assetsReceieve
 			// Found a new child
 			if _, seen := childIdx[childID]; !seen {
 				parent := parents[parentAddress]
-				parent.Children = append(parent.Children, multichain.ChildContractRes{
+				parent.Children = append(parent.Children, multichain.ChildContract{
 					ChildID:        childID,
 					Name:           asset.Collection.Name,
 					Description:    asset.Collection.Description,
