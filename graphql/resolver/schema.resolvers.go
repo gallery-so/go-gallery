@@ -540,6 +540,34 @@ func (r *mutationResolver) UpdateUserInfo(ctx context.Context, input model.Updat
 	return output, nil
 }
 
+// RegisterUserPushToken is the resolver for the registerUserPushToken field.
+func (r *mutationResolver) RegisterUserPushToken(ctx context.Context, pushToken string) (model.RegisterUserPushTokenPayloadOrError, error) {
+	_, err := publicapi.For(ctx).User.CreatePushTokenForUser(ctx, pushToken)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.RegisterUserPushTokenPayload{
+		Viewer: resolveViewer(ctx),
+	}
+
+	return output, nil
+}
+
+// UnregisterUserPushToken is the resolver for the unregisterUserPushToken field.
+func (r *mutationResolver) UnregisterUserPushToken(ctx context.Context, pushToken string) (model.UnregisterUserPushTokenPayloadOrError, error) {
+	err := publicapi.For(ctx).User.DeletePushTokenByPushToken(ctx, pushToken)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.UnregisterUserPushTokenPayload{
+		Viewer: resolveViewer(ctx),
+	}
+
+	return output, nil
+}
+
 // UpdateGalleryCollections is the resolver for the updateGalleryCollections field.
 func (r *mutationResolver) UpdateGalleryCollections(ctx context.Context, input model.UpdateGalleryCollectionsInput) (model.UpdateGalleryCollectionsPayloadOrError, error) {
 	api := publicapi.For(ctx)

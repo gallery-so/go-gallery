@@ -165,6 +165,8 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrGalleryNotFound{Message: message}
 	case twitter.ErrInvalidRefreshToken:
 		mappedErr = model.ErrNeedsToReconnectSocial{SocialAccountType: persist.SocialProviderTwitter, Message: message}
+	case persist.ErrPushTokenBelongsToAnotherUser:
+		mappedErr = model.ErrPushTokenBelongsToAnotherUser{Message: message}
 	}
 
 	if mappedErr != nil {

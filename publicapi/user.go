@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/jackc/pgx/v4"
 	"strings"
 	"time"
 
@@ -1166,4 +1167,87 @@ func (api UserAPI) RecommendUsers(ctx context.Context, before, after *string, fi
 	}
 
 	return users, pageInfo, err
+}
+
+// CreatePushTokenForUser adds a push token to a user, or returns the existing push token if it's already been
+// added to this user. If the token can't be added because it belongs to another user, an error is returned.
+func (api UserAPI) CreatePushTokenForUser(ctx context.Context, pushToken string) (db.PushNotificationToken, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"pushToken": {pushToken, "required,min=1,max=255"},
+	}); err != nil {
+		return db.PushNotificationToken{}, err
+	}
+
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return db.PushNotificationToken{}, err
+	}
+
+	// Does the token already exist?
+	token, err := api.queries.GetPushTokenByPushToken(ctx, pushToken)
+
+	if err == nil {
+		// If the token exists and belongs to the current user, return it. Attempting to re-add
+		// a token that you've already registered is a no-op.
+		if token.UserID == userID {
+			return token, nil
+		}
+
+		// Otherwise, the token belongs to another user. Return an error.
+		return db.PushNotificationToken{}, persist.ErrPushTokenBelongsToAnotherUser{PushToken: pushToken}
+	}
+
+	// ErrNoRows is expected and means we can continue with creating the token. If we see any other
+	// error, return it.
+	if err != pgx.ErrNoRows {
+		return db.PushNotificationToken{}, err
+	}
+
+	token, err = api.queries.CreatePushTokenForUser(ctx, db.CreatePushTokenForUserParams{
+		ID:        persist.GenerateID(),
+		UserID:    userID,
+		PushToken: pushToken,
+	})
+
+	if err != nil {
+		return db.PushNotificationToken{}, err
+	}
+
+	return token, nil
+}
+
+// DeletePushTokenByPushToken removes a push token from a user, or does nothing if the token doesn't exist.
+// If the token can't be removed because it belongs to another user, an error is returned.
+func (api UserAPI) DeletePushTokenByPushToken(ctx context.Context, pushToken string) error {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"pushToken": {pushToken, "required,min=1,max=255"},
+	}); err != nil {
+		return err
+	}
+
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return err
+	}
+
+	existingToken, err := api.queries.GetPushTokenByPushToken(ctx, pushToken)
+	if err == nil {
+		// If the token exists and belongs to the current user, let them delete it.
+		if existingToken.UserID == userID {
+			return api.queries.DeletePushTokensByIDs(ctx, []persist.DBID{existingToken.ID})
+		}
+
+		// Otherwise, the token belongs to another user. Return an error.
+		return persist.ErrPushTokenBelongsToAnotherUser{PushToken: pushToken}
+	}
+
+	// ErrNoRows is okay and means the token doesn't exist. Unregistering it is a no-op
+	// and doesn't return an error.
+	if err == pgx.ErrNoRows {
+		return nil
+	}
+
+	return err
 }

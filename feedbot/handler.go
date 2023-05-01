@@ -2,7 +2,8 @@ package feedbot
 
 import (
 	"errors"
-	"fmt"
+	"github.com/mikeydub/go-gallery/middleware"
+	"github.com/mikeydub/go-gallery/util"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -10,32 +11,13 @@ import (
 	"github.com/shurcooL/graphql"
 )
 
-type errBadTaskRequest struct {
-	msg string
-}
-
-func (e errBadTaskRequest) Error() string {
-	return fmt.Sprintf("bad task request: %s", e.msg)
-}
-
-// TaskRequired checks that the request comes from Cloud Tasks and does a basic auth check.
-// Returns a 200 status to remove the message from the queue if it is a bad request.
-func TaskRequired() gin.HandlerFunc {
+// TODO: Use middleware.BasicHeaderAuthRequired. Requires reworking the sender to use
+// the appropriate header/encoding.
+func authRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		taskName := c.Request.Header.Get("X-CloudTasks-TaskName")
-		if taskName == "" {
-			c.AbortWithError(http.StatusOK, errBadTaskRequest{"invalid task"})
-			return
-		}
-
-		queueName := c.Request.Header.Get("X-CloudTasks-QueueName")
-		if queueName == "" {
-			c.AbortWithError(http.StatusOK, errBadTaskRequest{"invalid queue"})
-			return
-		}
-
 		creds := c.Request.Header.Get("Authorization")
 		if creds != "Basic "+env.GetString("FEEDBOT_SECRET") {
+			// Return 200 on auth failures to prevent task retries
 			c.AbortWithError(http.StatusOK, errors.New("unauthorized request"))
 			return
 		}
@@ -43,7 +25,7 @@ func TaskRequired() gin.HandlerFunc {
 }
 
 func handlersInit(router *gin.Engine, gql *graphql.Client) *gin.Engine {
-	router.GET("/ping", ping())
-	router.POST("/tasks/feed-event", TaskRequired(), handleMessage(gql))
+	router.GET("/ping", util.HealthCheckHandler())
+	router.POST("/tasks/feed-event", middleware.TaskRequired(), authRequired(), handleMessage(gql))
 	return router
 }

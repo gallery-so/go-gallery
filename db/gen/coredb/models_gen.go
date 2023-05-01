@@ -289,6 +289,24 @@ type PiiUserView struct {
 	PiiSocials           persist.Socials
 }
 
+type PushNotificationTicket struct {
+	ID               persist.DBID
+	PushTokenID      persist.DBID
+	TicketID         string
+	CreatedAt        time.Time
+	CheckAfter       time.Time
+	NumCheckAttempts int32
+	Deleted          bool
+}
+
+type PushNotificationToken struct {
+	ID        persist.DBID
+	UserID    persist.DBID
+	PushToken string
+	CreatedAt time.Time
+	Deleted   bool
+}
+
 type RecommendationResult struct {
 	ID                persist.DBID
 	Version           sql.NullInt32

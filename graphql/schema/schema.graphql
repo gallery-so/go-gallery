@@ -1275,6 +1275,26 @@ type UpdateUserInfoPayload {
   viewer: Viewer
 }
 
+union RegisterUserPushTokenPayloadOrError =
+    RegisterUserPushTokenPayload
+  | ErrNotAuthorized
+  | ErrInvalidInput
+  | ErrPushTokenBelongsToAnotherUser
+
+type RegisterUserPushTokenPayload {
+  viewer: Viewer
+}
+
+union UnregisterUserPushTokenPayloadOrError =
+    UnregisterUserPushTokenPayload
+  | ErrNotAuthorized
+  | ErrInvalidInput
+  | ErrPushTokenBelongsToAnotherUser
+
+type UnregisterUserPushTokenPayload {
+  viewer: Viewer
+}
+
 union SyncTokensPayloadOrError = SyncTokensPayload | ErrNotAuthorized | ErrSyncFailed
 
 type SyncTokensPayload {
@@ -1373,6 +1393,10 @@ type ErrAdmireAlreadyExists implements Error {
 }
 
 type ErrCommentNotFound implements Error {
+  message: String!
+}
+
+type ErrPushTokenBelongsToAnotherUser implements Error {
   message: String!
 }
 
@@ -2036,6 +2060,8 @@ type Mutation {
   ): AddUserWalletPayloadOrError @authRequired
   removeUserWallets(walletIds: [DBID!]!): RemoveUserWalletsPayloadOrError @authRequired
   updateUserInfo(input: UpdateUserInfoInput!): UpdateUserInfoPayloadOrError @authRequired
+  registerUserPushToken(pushToken: String!): RegisterUserPushTokenPayloadOrError @authRequired
+  unregisterUserPushToken(pushToken: String!): UnregisterUserPushTokenPayloadOrError @authRequired
 
   # Gallery Mutations
   updateGalleryCollections(

@@ -710,6 +710,53 @@ func (q *Queries) CreateGalleryEvent(ctx context.Context, arg CreateGalleryEvent
 	return i, err
 }
 
+const createPushTickets = `-- name: CreatePushTickets :exec
+insert into push_notification_tickets (id, push_token_id, ticket_id, created_at, check_after, num_check_attempts, deleted) values
+  (
+   unnest($1::text[]),
+   unnest($2::text[]),
+   unnest($3::text[]),
+   now(),
+   now() + interval '15 minutes',
+   0,
+   false
+  )
+`
+
+type CreatePushTicketsParams struct {
+	Ids          []string
+	PushTokenIds []string
+	TicketIds    []string
+}
+
+func (q *Queries) CreatePushTickets(ctx context.Context, arg CreatePushTicketsParams) error {
+	_, err := q.db.Exec(ctx, createPushTickets, arg.Ids, arg.PushTokenIds, arg.TicketIds)
+	return err
+}
+
+const createPushTokenForUser = `-- name: CreatePushTokenForUser :one
+insert into push_notification_tokens (id, user_id, push_token, created_at, deleted) values ($1, $2, $3, now(), false) returning id, user_id, push_token, created_at, deleted
+`
+
+type CreatePushTokenForUserParams struct {
+	ID        persist.DBID
+	UserID    persist.DBID
+	PushToken string
+}
+
+func (q *Queries) CreatePushTokenForUser(ctx context.Context, arg CreatePushTokenForUserParams) (PushNotificationToken, error) {
+	row := q.db.QueryRow(ctx, createPushTokenForUser, arg.ID, arg.UserID, arg.PushToken)
+	var i PushNotificationToken
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.PushToken,
+		&i.CreatedAt,
+		&i.Deleted,
+	)
+	return i, err
+}
+
 const createTokenEvent = `-- name: CreateTokenEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data, group_id, caption, gallery_id, collection_id) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, $9, $10) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id
 `
@@ -869,6 +916,15 @@ func (q *Queries) DeleteCollections(ctx context.Context, ids []string) error {
 	return err
 }
 
+const deletePushTokensByIDs = `-- name: DeletePushTokensByIDs :exec
+update push_notification_tokens set deleted = true where id = any($1) and deleted = false
+`
+
+func (q *Queries) DeletePushTokensByIDs(ctx context.Context, ids persist.DBIDList) error {
+	_, err := q.db.Exec(ctx, deletePushTokensByIDs, ids)
+	return err
+}
+
 const deleteUserByID = `-- name: DeleteUserByID :exec
 update users set deleted = true where id = $1
 `
@@ -1022,6 +1078,38 @@ func (q *Queries) GetAllTimeTrendingUserIDs(ctx context.Context, limit int32) ([
 			return nil, err
 		}
 		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getCheckablePushTickets = `-- name: GetCheckablePushTickets :many
+select id, push_token_id, ticket_id, created_at, check_after, num_check_attempts, deleted from push_notification_tickets where check_after <= now() and deleted = false limit $1
+`
+
+func (q *Queries) GetCheckablePushTickets(ctx context.Context, limit int32) ([]PushNotificationTicket, error) {
+	rows, err := q.db.Query(ctx, getCheckablePushTickets, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PushNotificationTicket
+	for rows.Next() {
+		var i PushNotificationTicket
+		if err := rows.Scan(
+			&i.ID,
+			&i.PushTokenID,
+			&i.TicketID,
+			&i.CreatedAt,
+			&i.CheckAfter,
+			&i.NumCheckAttempts,
+			&i.Deleted,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -1994,6 +2082,83 @@ func (q *Queries) GetPreviewURLsByContractIdAndUserId(ctx context.Context, arg G
 			return nil, err
 		}
 		items = append(items, thumbnail_url)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPushTokenByPushToken = `-- name: GetPushTokenByPushToken :one
+select id, user_id, push_token, created_at, deleted from push_notification_tokens where push_token = $1 and deleted = false
+`
+
+func (q *Queries) GetPushTokenByPushToken(ctx context.Context, pushToken string) (PushNotificationToken, error) {
+	row := q.db.QueryRow(ctx, getPushTokenByPushToken, pushToken)
+	var i PushNotificationToken
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.PushToken,
+		&i.CreatedAt,
+		&i.Deleted,
+	)
+	return i, err
+}
+
+const getPushTokensByIDs = `-- name: GetPushTokensByIDs :many
+select t.id, t.user_id, t.push_token, t.created_at, t.deleted from unnest($1::text[]) ids join push_notification_tokens t on t.id = ids and t.deleted = false
+`
+
+func (q *Queries) GetPushTokensByIDs(ctx context.Context, ids []string) ([]PushNotificationToken, error) {
+	rows, err := q.db.Query(ctx, getPushTokensByIDs, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PushNotificationToken
+	for rows.Next() {
+		var i PushNotificationToken
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.PushToken,
+			&i.CreatedAt,
+			&i.Deleted,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPushTokensByUserID = `-- name: GetPushTokensByUserID :many
+select id, user_id, push_token, created_at, deleted from push_notification_tokens where user_id = $1 and deleted = false
+`
+
+func (q *Queries) GetPushTokensByUserID(ctx context.Context, userID persist.DBID) ([]PushNotificationToken, error) {
+	rows, err := q.db.Query(ctx, getPushTokensByUserID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PushNotificationToken
+	for rows.Next() {
+		var i PushNotificationToken
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.PushToken,
+			&i.CreatedAt,
+			&i.Deleted,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -3759,7 +3924,8 @@ func (q *Queries) HasLaterGroupedEvent(ctx context.Context, arg HasLaterGroupedE
 const insertSpamContracts = `-- name: InsertSpamContracts :exec
 with insert_spam_contracts as (
     insert into alchemy_spam_contracts (id, chain, address, created_at, is_spam) (
-        select unnest($1::varchar[]) , unnest($2::int[])
+        select unnest($1::varchar[])
+        , unnest($2::int[])
         , unnest($3::varchar[])
         , unnest($4::timestamptz[])
         , unnest($5::bool[])
@@ -4301,6 +4467,30 @@ type UpdateNotificationSettingsByIDParams struct {
 
 func (q *Queries) UpdateNotificationSettingsByID(ctx context.Context, arg UpdateNotificationSettingsByIDParams) error {
 	_, err := q.db.Exec(ctx, updateNotificationSettingsByID, arg.ID, arg.NotificationSettings)
+	return err
+}
+
+const updatePushTickets = `-- name: UpdatePushTickets :exec
+with updates as (
+    select unnest($1::text[]) as id, unnest($2::timestamptz[]) as check_after, unnest($3::int[]) as num_check_attempts, unnest($4::bool[]) as deleted
+)
+update push_notification_tickets t set check_after = updates.check_after, num_check_attempts = updates.num_check_attempts, deleted = updates.deleted from updates where t.id = updates.id and t.deleted = false
+`
+
+type UpdatePushTicketsParams struct {
+	Ids              []string
+	CheckAfter       []time.Time
+	NumCheckAttempts []int32
+	Deleted          []bool
+}
+
+func (q *Queries) UpdatePushTickets(ctx context.Context, arg UpdatePushTicketsParams) error {
+	_, err := q.db.Exec(ctx, updatePushTickets,
+		arg.Ids,
+		arg.CheckAfter,
+		arg.NumCheckAttempts,
+		arg.Deleted,
+	)
 	return err
 }
 

@@ -406,6 +406,10 @@ type ComplexityRoot struct {
 		Message func(childComplexity int) int
 	}
 
+	ErrPushTokenBelongsToAnotherUser struct {
+		Message func(childComplexity int) int
+	}
+
 	ErrSyncFailed struct {
 		Message func(childComplexity int) int
 	}
@@ -706,6 +710,7 @@ type ComplexityRoot struct {
 		RefreshCollection               func(childComplexity int, collectionID persist.DBID) int
 		RefreshContract                 func(childComplexity int, contractID persist.DBID) int
 		RefreshToken                    func(childComplexity int, tokenID persist.DBID) int
+		RegisterUserPushToken           func(childComplexity int, pushToken string) int
 		RemoveAdmire                    func(childComplexity int, admireID persist.DBID) int
 		RemoveComment                   func(childComplexity int, commentID persist.DBID) int
 		RemoveUserWallets               func(childComplexity int, walletIds []persist.DBID) int
@@ -716,6 +721,7 @@ type ComplexityRoot struct {
 		SyncTokensForUsername           func(childComplexity int, username string, chains []persist.Chain) int
 		UnbanUserFromFeed               func(childComplexity int, username string) int
 		UnfollowUser                    func(childComplexity int, userID persist.DBID) int
+		UnregisterUserPushToken         func(childComplexity int, pushToken string) int
 		UnsubscribeFromEmailType        func(childComplexity int, input model.UnsubscribeFromEmailTypeInput) int
 		UpdateCollectionHidden          func(childComplexity int, input model.UpdateCollectionHiddenInput) int
 		UpdateCollectionInfo            func(childComplexity int, input model.UpdateCollectionInfoInput) int
@@ -846,6 +852,10 @@ type ComplexityRoot struct {
 
 	RefreshTokenPayload struct {
 		Token func(childComplexity int) int
+	}
+
+	RegisterUserPushTokenPayload struct {
+		Viewer func(childComplexity int) int
 	}
 
 	RemoveAdmirePayload struct {
@@ -1088,6 +1098,10 @@ type ComplexityRoot struct {
 		MediaType        func(childComplexity int) int
 		MediaURL         func(childComplexity int) int
 		PreviewURLs      func(childComplexity int) int
+	}
+
+	UnregisterUserPushTokenPayload struct {
+		Viewer func(childComplexity int) int
 	}
 
 	UnsubscribeFromEmailTypePayload struct {
@@ -1365,6 +1379,8 @@ type MutationResolver interface {
 	AddUserWallet(ctx context.Context, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) (model.AddUserWalletPayloadOrError, error)
 	RemoveUserWallets(ctx context.Context, walletIds []persist.DBID) (model.RemoveUserWalletsPayloadOrError, error)
 	UpdateUserInfo(ctx context.Context, input model.UpdateUserInfoInput) (model.UpdateUserInfoPayloadOrError, error)
+	RegisterUserPushToken(ctx context.Context, pushToken string) (model.RegisterUserPushTokenPayloadOrError, error)
+	UnregisterUserPushToken(ctx context.Context, pushToken string) (model.UnregisterUserPushTokenPayloadOrError, error)
 	UpdateGalleryCollections(ctx context.Context, input model.UpdateGalleryCollectionsInput) (model.UpdateGalleryCollectionsPayloadOrError, error)
 	CreateCollection(ctx context.Context, input model.CreateCollectionInput) (model.CreateCollectionPayloadOrError, error)
 	DeleteCollection(ctx context.Context, collectionID persist.DBID) (model.DeleteCollectionPayloadOrError, error)
@@ -2610,6 +2626,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ErrNotAuthorized.Message(childComplexity), true
+
+	case "ErrPushTokenBelongsToAnotherUser.message":
+		if e.complexity.ErrPushTokenBelongsToAnotherUser.Message == nil {
+			break
+		}
+
+		return e.complexity.ErrPushTokenBelongsToAnotherUser.Message(childComplexity), true
 
 	case "ErrSyncFailed.message":
 		if e.complexity.ErrSyncFailed.Message == nil {
@@ -4008,6 +4031,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.RefreshToken(childComplexity, args["tokenId"].(persist.DBID)), true
 
+	case "Mutation.registerUserPushToken":
+		if e.complexity.Mutation.RegisterUserPushToken == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_registerUserPushToken_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.RegisterUserPushToken(childComplexity, args["pushToken"].(string)), true
+
 	case "Mutation.removeAdmire":
 		if e.complexity.Mutation.RemoveAdmire == nil {
 			break
@@ -4122,6 +4157,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.UnfollowUser(childComplexity, args["userId"].(persist.DBID)), true
+
+	case "Mutation.unregisterUserPushToken":
+		if e.complexity.Mutation.UnregisterUserPushToken == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_unregisterUserPushToken_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UnregisterUserPushToken(childComplexity, args["pushToken"].(string)), true
 
 	case "Mutation.unsubscribeFromEmailType":
 		if e.complexity.Mutation.UnsubscribeFromEmailType == nil {
@@ -4963,6 +5010,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.RefreshTokenPayload.Token(childComplexity), true
+
+	case "RegisterUserPushTokenPayload.viewer":
+		if e.complexity.RegisterUserPushTokenPayload.Viewer == nil {
+			break
+		}
+
+		return e.complexity.RegisterUserPushTokenPayload.Viewer(childComplexity), true
 
 	case "RemoveAdmirePayload.admireID":
 		if e.complexity.RemoveAdmirePayload.AdmireID == nil {
@@ -5947,6 +6001,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.UnknownMedia.PreviewURLs(childComplexity), true
+
+	case "UnregisterUserPushTokenPayload.viewer":
+		if e.complexity.UnregisterUserPushTokenPayload.Viewer == nil {
+			break
+		}
+
+		return e.complexity.UnregisterUserPushTokenPayload.Viewer(childComplexity), true
 
 	case "UnsubscribeFromEmailTypePayload.viewer":
 		if e.complexity.UnsubscribeFromEmailTypePayload.Viewer == nil {
@@ -7833,6 +7894,26 @@ type UpdateUserInfoPayload {
   viewer: Viewer
 }
 
+union RegisterUserPushTokenPayloadOrError =
+    RegisterUserPushTokenPayload
+  | ErrNotAuthorized
+  | ErrInvalidInput
+  | ErrPushTokenBelongsToAnotherUser
+
+type RegisterUserPushTokenPayload {
+  viewer: Viewer
+}
+
+union UnregisterUserPushTokenPayloadOrError =
+    UnregisterUserPushTokenPayload
+  | ErrNotAuthorized
+  | ErrInvalidInput
+  | ErrPushTokenBelongsToAnotherUser
+
+type UnregisterUserPushTokenPayload {
+  viewer: Viewer
+}
+
 union SyncTokensPayloadOrError = SyncTokensPayload | ErrNotAuthorized | ErrSyncFailed
 
 type SyncTokensPayload {
@@ -7931,6 +8012,10 @@ type ErrAdmireAlreadyExists implements Error {
 }
 
 type ErrCommentNotFound implements Error {
+  message: String!
+}
+
+type ErrPushTokenBelongsToAnotherUser implements Error {
   message: String!
 }
 
@@ -8594,6 +8679,8 @@ type Mutation {
   ): AddUserWalletPayloadOrError @authRequired
   removeUserWallets(walletIds: [DBID!]!): RemoveUserWalletsPayloadOrError @authRequired
   updateUserInfo(input: UpdateUserInfoInput!): UpdateUserInfoPayloadOrError @authRequired
+  registerUserPushToken(pushToken: String!): RegisterUserPushTokenPayloadOrError @authRequired
+  unregisterUserPushToken(pushToken: String!): UnregisterUserPushTokenPayloadOrError @authRequired
 
   # Gallery Mutations
   updateGalleryCollections(
@@ -9633,6 +9720,21 @@ func (ec *executionContext) field_Mutation_refreshToken_args(ctx context.Context
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_registerUserPushToken_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["pushToken"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("pushToken"))
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["pushToken"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_removeAdmire_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -9783,6 +9885,21 @@ func (ec *executionContext) field_Mutation_unfollowUser_args(ctx context.Context
 		}
 	}
 	args["userId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_unregisterUserPushToken_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["pushToken"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("pushToken"))
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["pushToken"] = arg0
 	return args, nil
 }
 
@@ -18438,6 +18555,50 @@ func (ec *executionContext) fieldContext_ErrNotAuthorized_cause(ctx context.Cont
 	return fc, nil
 }
 
+func (ec *executionContext) _ErrPushTokenBelongsToAnotherUser_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrPushTokenBelongsToAnotherUser) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ErrPushTokenBelongsToAnotherUser_message(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ErrPushTokenBelongsToAnotherUser_message(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ErrPushTokenBelongsToAnotherUser",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _ErrSyncFailed_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrSyncFailed) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_ErrSyncFailed_message(ctx, field)
 	if err != nil {
@@ -26076,6 +26237,148 @@ func (ec *executionContext) fieldContext_Mutation_updateUserInfo(ctx context.Con
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_registerUserPushToken(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_registerUserPushToken(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().RegisterUserPushToken(rctx, fc.Args["pushToken"].(string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.RegisterUserPushTokenPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.RegisterUserPushTokenPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.RegisterUserPushTokenPayloadOrError)
+	fc.Result = res
+	return ec.marshalORegisterUserPushTokenPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRegisterUserPushTokenPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_registerUserPushToken(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type RegisterUserPushTokenPayloadOrError does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_registerUserPushToken_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_unregisterUserPushToken(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_unregisterUserPushToken(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().UnregisterUserPushToken(rctx, fc.Args["pushToken"].(string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.UnregisterUserPushTokenPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.UnregisterUserPushTokenPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.UnregisterUserPushTokenPayloadOrError)
+	fc.Result = res
+	return ec.marshalOUnregisterUserPushTokenPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUnregisterUserPushTokenPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_unregisterUserPushToken(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type UnregisterUserPushTokenPayloadOrError does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_unregisterUserPushToken_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_updateGalleryCollections(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Mutation_updateGalleryCollections(ctx, field)
 	if err != nil {
@@ -33347,6 +33650,69 @@ func (ec *executionContext) fieldContext_RefreshTokenPayload_token(ctx context.C
 	return fc, nil
 }
 
+func (ec *executionContext) _RegisterUserPushTokenPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.RegisterUserPushTokenPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RegisterUserPushTokenPayload_viewer(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Viewer, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Viewer)
+	fc.Result = res
+	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RegisterUserPushTokenPayload_viewer(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RegisterUserPushTokenPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Viewer_id(ctx, field)
+			case "user":
+				return ec.fieldContext_Viewer_user(ctx, field)
+			case "socialAccounts":
+				return ec.fieldContext_Viewer_socialAccounts(ctx, field)
+			case "viewerGalleries":
+				return ec.fieldContext_Viewer_viewerGalleries(ctx, field)
+			case "feed":
+				return ec.fieldContext_Viewer_feed(ctx, field)
+			case "email":
+				return ec.fieldContext_Viewer_email(ctx, field)
+			case "notifications":
+				return ec.fieldContext_Viewer_notifications(ctx, field)
+			case "notificationSettings":
+				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
+			case "userExperiences":
+				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _RemoveAdmirePayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.RemoveAdmirePayload) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_RemoveAdmirePayload_viewer(ctx, field)
 	if err != nil {
@@ -40119,6 +40485,69 @@ func (ec *executionContext) fieldContext_UnknownMedia_fallbackMedia(ctx context.
 				return ec.fieldContext_FallbackMedia_mediaType(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FallbackMedia", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _UnregisterUserPushTokenPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.UnregisterUserPushTokenPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_UnregisterUserPushTokenPayload_viewer(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Viewer, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Viewer)
+	fc.Result = res
+	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_UnregisterUserPushTokenPayload_viewer(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "UnregisterUserPushTokenPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Viewer_id(ctx, field)
+			case "user":
+				return ec.fieldContext_Viewer_user(ctx, field)
+			case "socialAccounts":
+				return ec.fieldContext_Viewer_socialAccounts(ctx, field)
+			case "viewerGalleries":
+				return ec.fieldContext_Viewer_viewerGalleries(ctx, field)
+			case "feed":
+				return ec.fieldContext_Viewer_feed(ctx, field)
+			case "email":
+				return ec.fieldContext_Viewer_email(ctx, field)
+			case "notifications":
+				return ec.fieldContext_Viewer_notifications(ctx, field)
+			case "notificationSettings":
+				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
+			case "userExperiences":
+				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
 	}
 	return fc, nil
@@ -48328,6 +48757,13 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 			return graphql.Null
 		}
 		return ec._ErrCommentNotFound(ctx, sel, obj)
+	case model.ErrPushTokenBelongsToAnotherUser:
+		return ec._ErrPushTokenBelongsToAnotherUser(ctx, sel, &obj)
+	case *model.ErrPushTokenBelongsToAnotherUser:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrPushTokenBelongsToAnotherUser(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -49383,6 +49819,43 @@ func (ec *executionContext) _RefreshTokenPayloadOrError(ctx context.Context, sel
 	}
 }
 
+func (ec *executionContext) _RegisterUserPushTokenPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.RegisterUserPushTokenPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.RegisterUserPushTokenPayload:
+		return ec._RegisterUserPushTokenPayload(ctx, sel, &obj)
+	case *model.RegisterUserPushTokenPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._RegisterUserPushTokenPayload(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	case model.ErrPushTokenBelongsToAnotherUser:
+		return ec._ErrPushTokenBelongsToAnotherUser(ctx, sel, &obj)
+	case *model.ErrPushTokenBelongsToAnotherUser:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrPushTokenBelongsToAnotherUser(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _RemoveAdmirePayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.RemoveAdmirePayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -49862,6 +50335,43 @@ func (ec *executionContext) _UnfollowUserPayloadOrError(ctx context.Context, sel
 			return graphql.Null
 		}
 		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _UnregisterUserPushTokenPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.UnregisterUserPushTokenPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.UnregisterUserPushTokenPayload:
+		return ec._UnregisterUserPushTokenPayload(ctx, sel, &obj)
+	case *model.UnregisterUserPushTokenPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._UnregisterUserPushTokenPayload(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	case model.ErrPushTokenBelongsToAnotherUser:
+		return ec._ErrPushTokenBelongsToAnotherUser(ctx, sel, &obj)
+	case *model.ErrPushTokenBelongsToAnotherUser:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrPushTokenBelongsToAnotherUser(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -52616,7 +53126,7 @@ func (ec *executionContext) _ErrGalleryNotFound(ctx context.Context, sel ast.Sel
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "SocialConnectionsOrError", "MerchTokensPayloadOrError", "SearchUsersPayloadOrError", "SearchGalleriesPayloadOrError", "SearchCommunitiesPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "RedeemMerchPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "SocialConnectionsOrError", "MerchTokensPayloadOrError", "SearchUsersPayloadOrError", "SearchGalleriesPayloadOrError", "SearchCommunitiesPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "RedeemMerchPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -52749,7 +53259,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "SocialQueriesOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "SyncTokensPayloadOrError", "Error", "DeepRefreshPayloadOrError", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "UnbanUserFromFeedPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "SocialQueriesOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "SyncTokensPayloadOrError", "Error", "DeepRefreshPayloadOrError", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "UnbanUserFromFeedPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
@@ -52769,6 +53279,34 @@ func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.Selec
 		case "cause":
 
 			out.Values[i] = ec._ErrNotAuthorized_cause(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var errPushTokenBelongsToAnotherUserImplementors = []string{"ErrPushTokenBelongsToAnotherUser", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "Error"}
+
+func (ec *executionContext) _ErrPushTokenBelongsToAnotherUser(ctx context.Context, sel ast.SelectionSet, obj *model.ErrPushTokenBelongsToAnotherUser) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, errPushTokenBelongsToAnotherUserImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ErrPushTokenBelongsToAnotherUser")
+		case "message":
+
+			out.Values[i] = ec._ErrPushTokenBelongsToAnotherUser_message(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
 				invalids++
@@ -54722,6 +55260,18 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 				return ec._Mutation_updateUserInfo(ctx, field)
 			})
 
+		case "registerUserPushToken":
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_registerUserPushToken(ctx, field)
+			})
+
+		case "unregisterUserPushToken":
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_unregisterUserPushToken(ctx, field)
+			})
+
 		case "updateGalleryCollections":
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
@@ -56144,6 +56694,31 @@ func (ec *executionContext) _RefreshTokenPayload(ctx context.Context, sel ast.Se
 		case "token":
 
 			out.Values[i] = ec._RefreshTokenPayload_token(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var registerUserPushTokenPayloadImplementors = []string{"RegisterUserPushTokenPayload", "RegisterUserPushTokenPayloadOrError"}
+
+func (ec *executionContext) _RegisterUserPushTokenPayload(ctx context.Context, sel ast.SelectionSet, obj *model.RegisterUserPushTokenPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, registerUserPushTokenPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("RegisterUserPushTokenPayload")
+		case "viewer":
+
+			out.Values[i] = ec._RegisterUserPushTokenPayload_viewer(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -57793,6 +58368,31 @@ func (ec *executionContext) _UnknownMedia(ctx context.Context, sel ast.Selection
 		case "fallbackMedia":
 
 			out.Values[i] = ec._UnknownMedia_fallbackMedia(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var unregisterUserPushTokenPayloadImplementors = []string{"UnregisterUserPushTokenPayload", "UnregisterUserPushTokenPayloadOrError"}
+
+func (ec *executionContext) _UnregisterUserPushTokenPayload(ctx context.Context, sel ast.SelectionSet, obj *model.UnregisterUserPushTokenPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, unregisterUserPushTokenPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("UnregisterUserPushTokenPayload")
+		case "viewer":
+
+			out.Values[i] = ec._UnregisterUserPushTokenPayload_viewer(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -62554,6 +63154,13 @@ func (ec *executionContext) marshalORefreshTokenPayloadOrError2githubᚗcomᚋmi
 	return ec._RefreshTokenPayloadOrError(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalORegisterUserPushTokenPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRegisterUserPushTokenPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.RegisterUserPushTokenPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._RegisterUserPushTokenPayloadOrError(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalORemoveAdmirePayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRemoveAdmirePayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.RemoveAdmirePayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -63159,6 +63766,13 @@ func (ec *executionContext) marshalOUnfollowUserPayloadOrError2githubᚗcomᚋmi
 		return graphql.Null
 	}
 	return ec._UnfollowUserPayloadOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOUnregisterUserPushTokenPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUnregisterUserPushTokenPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UnregisterUserPushTokenPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._UnregisterUserPushTokenPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOUnsubscribeFromEmailTypePayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUnsubscribeFromEmailTypePayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UnsubscribeFromEmailTypePayloadOrError) graphql.Marshaler {

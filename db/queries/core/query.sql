@@ -1021,3 +1021,39 @@ with insert_spam_contracts as (
     returning created_at
 )
 delete from alchemy_spam_contracts where created_at < (select created_at from insert_spam_contracts limit 1);
+
+-- name: GetPushTokenByPushToken :one
+select * from push_notification_tokens where push_token = @push_token and deleted = false;
+
+-- name: CreatePushTokenForUser :one
+insert into push_notification_tokens (id, user_id, push_token, created_at, deleted) values (@id, @user_id, @push_token, now(), false) returning *;
+
+-- name: DeletePushTokensByIDs :exec
+update push_notification_tokens set deleted = true where id = any(@ids) and deleted = false;
+
+-- name: GetPushTokensByUserID :many
+select * from push_notification_tokens where user_id = @user_id and deleted = false;
+
+-- name: GetPushTokensByIDs :many
+select t.* from unnest(@ids::text[]) ids join push_notification_tokens t on t.id = ids and t.deleted = false;
+
+-- name: CreatePushTickets :exec
+insert into push_notification_tickets (id, push_token_id, ticket_id, created_at, check_after, num_check_attempts, deleted) values
+  (
+   unnest(@ids::text[]),
+   unnest(@push_token_ids::text[]),
+   unnest(@ticket_ids::text[]),
+   now(),
+   now() + interval '15 minutes',
+   0,
+   false
+  );
+
+-- name: UpdatePushTickets :exec
+with updates as (
+    select unnest(@ids::text[]) as id, unnest(@check_after::timestamptz[]) as check_after, unnest(@num_check_attempts::int[]) as num_check_attempts, unnest(@deleted::bool[]) as deleted
+)
+update push_notification_tickets t set check_after = updates.check_after, num_check_attempts = updates.num_check_attempts, deleted = updates.deleted from updates where t.id = updates.id and t.deleted = false;
+
+-- name: GetCheckablePushTickets :many
+select * from push_notification_tickets where check_after <= now() and deleted = false limit sqlc.arg('limit');

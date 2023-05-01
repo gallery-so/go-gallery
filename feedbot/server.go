@@ -29,9 +29,3 @@ func handleMessage(gql *graphql.Client) gin.HandlerFunc {
 		c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("event=%s processed", message.FeedEventID)})
 	}
 }
-
-func ping() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"ping": "pong"})
-	}
-}

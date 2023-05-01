@@ -190,6 +190,10 @@ type RefreshTokenPayloadOrError interface {
 	IsRefreshTokenPayloadOrError()
 }
 
+type RegisterUserPushTokenPayloadOrError interface {
+	IsRegisterUserPushTokenPayloadOrError()
+}
+
 type RemoveAdmirePayloadOrError interface {
 	IsRemoveAdmirePayloadOrError()
 }
@@ -260,6 +264,10 @@ type UnbanUserFromFeedPayloadOrError interface {
 
 type UnfollowUserPayloadOrError interface {
 	IsUnfollowUserPayloadOrError()
+}
+
+type UnregisterUserPushTokenPayloadOrError interface {
+	IsUnregisterUserPushTokenPayloadOrError()
 }
 
 type UnsubscribeFromEmailTypePayloadOrError interface {
@@ -852,6 +860,8 @@ func (ErrInvalidInput) IsUpdateTokenInfoPayloadOrError()                 {}
 func (ErrInvalidInput) IsAddUserWalletPayloadOrError()                   {}
 func (ErrInvalidInput) IsRemoveUserWalletsPayloadOrError()               {}
 func (ErrInvalidInput) IsUpdateUserInfoPayloadOrError()                  {}
+func (ErrInvalidInput) IsRegisterUserPushTokenPayloadOrError()           {}
+func (ErrInvalidInput) IsUnregisterUserPushTokenPayloadOrError()         {}
 func (ErrInvalidInput) IsRefreshTokenPayloadOrError()                    {}
 func (ErrInvalidInput) IsRefreshCollectionPayloadOrError()               {}
 func (ErrInvalidInput) IsRefreshContractPayloadOrError()                 {}
@@ -931,6 +941,8 @@ func (ErrNotAuthorized) IsSetSpamPreferencePayloadOrError()            {}
 func (ErrNotAuthorized) IsAddUserWalletPayloadOrError()                {}
 func (ErrNotAuthorized) IsRemoveUserWalletsPayloadOrError()            {}
 func (ErrNotAuthorized) IsUpdateUserInfoPayloadOrError()               {}
+func (ErrNotAuthorized) IsRegisterUserPushTokenPayloadOrError()        {}
+func (ErrNotAuthorized) IsUnregisterUserPushTokenPayloadOrError()      {}
 func (ErrNotAuthorized) IsSyncTokensPayloadOrError()                   {}
 func (ErrNotAuthorized) IsError()                                      {}
 func (ErrNotAuthorized) IsDeepRefreshPayloadOrError()                  {}
@@ -957,6 +969,14 @@ func (ErrNotAuthorized) IsUpdateSocialAccountDisplayedPayloadOrError() {}
 func (ErrNotAuthorized) IsMintPremiumCardToWalletPayloadOrError()      {}
 func (ErrNotAuthorized) IsDisconnectSocialAccountPayloadOrError()      {}
 func (ErrNotAuthorized) IsFollowAllSocialConnectionsPayloadOrError()   {}
+
+type ErrPushTokenBelongsToAnotherUser struct {
+	Message string `json:"message"`
+}
+
+func (ErrPushTokenBelongsToAnotherUser) IsRegisterUserPushTokenPayloadOrError()   {}
+func (ErrPushTokenBelongsToAnotherUser) IsUnregisterUserPushTokenPayloadOrError() {}
+func (ErrPushTokenBelongsToAnotherUser) IsError()                                 {}
 
 type ErrSyncFailed struct {
 	Message string `json:"message"`
@@ -1454,6 +1474,12 @@ type RefreshTokenPayload struct {
 
 func (RefreshTokenPayload) IsRefreshTokenPayloadOrError() {}
 
+type RegisterUserPushTokenPayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
+
+func (RegisterUserPushTokenPayload) IsRegisterUserPushTokenPayloadOrError() {}
+
 type RemoveAdmirePayload struct {
 	Viewer    *Viewer       `json:"viewer"`
 	AdmireID  *persist.DBID `json:"admireID"`
@@ -1775,6 +1801,12 @@ type UnknownMedia struct {
 
 func (UnknownMedia) IsMediaSubtype() {}
 func (UnknownMedia) IsMedia()        {}
+
+type UnregisterUserPushTokenPayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
+
+func (UnregisterUserPushTokenPayload) IsUnregisterUserPushTokenPayloadOrError() {}
 
 type UnsubscribeFromEmailTypeInput struct {
 	Type  EmailUnsubscriptionType `json:"type"`
