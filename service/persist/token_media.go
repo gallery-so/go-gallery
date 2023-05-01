@@ -30,5 +30,5 @@ func (m *Media) Scan(src interface{}) error {
 		*m = Media{}
 		return nil
 	}
-	return json.Unmarshal(src.([]uint8), &m)
+	return json.Unmarshal(src.([]byte), &m)
 }

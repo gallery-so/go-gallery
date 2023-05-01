@@ -17,7 +17,20 @@ with tids as (
   select unnest($27::varchar[]) as token_id, unnest($28::varchar[]) as contract, unnest($29::int[]) as chain
 )
 , tms as (
-  select array_agg(id) as id from token_medias, tids where token_medias.token_id = tids.token_id and token_medias.contract = tids.contract and token_medias.chain = tids.chain and token_medias.active = true and token_medias.deleted = false
+  select
+    tids.token_id,
+    tids.contract,
+    tids.chain,
+    token_medias.id as media_id
+  from
+    tids
+    left join token_medias on (
+      token_medias.token_id = tids.token_id
+      and token_medias.contract = tids.contract
+      and token_medias.chain = tids.chain
+      and token_medias.active = true
+      and token_medias.deleted = false
+    )
 )
 insert into tokens
 (
@@ -106,7 +119,7 @@ insert into tokens
       , unnest($27::varchar[]) as token_id
       , unnest($28::varchar[]) as contract
       , unnest($29::int[]) as chain
-      , unnest(tms.id) as media_id from tms
+      , unnest(tms.media_id) as media_id from tms
   ) bulk_upsert
 )
 on conflict (token_id, contract, chain, owner_user_id) where deleted = false

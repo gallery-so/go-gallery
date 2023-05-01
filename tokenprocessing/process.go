@@ -62,8 +62,7 @@ func processMediaForUsersTokensOfChain(tp *tokenProcessor, tokenRepo *postgres.T
 			}
 
 			wp.Go(func(ctx context.Context) error {
-				key := fmt.Sprintf("%s-%s-%d", t.TokenID, contract.Address, t.Chain)
-				err := tp.processTokenPipeline(ctx, key, t, contract, "", persist.ProcessingCauseSync)
+				err := tp.processTokenPipeline(ctx, t, contract, "", persist.ProcessingCauseSync)
 				if err != nil {
 
 					logger.For(c).Errorf("Error processing token: %s", err)
@@ -88,12 +87,12 @@ func processMediaForToken(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRe
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
-		key := fmt.Sprintf("%s-%s-%d", input.TokenID, input.ContractAddress, input.Chain)
-		if err := throttler.Lock(c, key); err != nil {
+		lockerKey := fmt.Sprintf("%s-%s-%d", input.TokenID, input.ContractAddress, input.Chain)
+		if err := throttler.Lock(c, lockerKey); err != nil {
 			util.ErrResponse(c, http.StatusTooManyRequests, err)
 			return
 		}
-		defer throttler.Unlock(c, key)
+		defer throttler.Unlock(c, lockerKey)
 
 		wallet, err := walletRepo.GetByChainAddress(c, persist.NewChainAddress(input.OwnerAddress, input.Chain))
 		if err != nil {
@@ -121,7 +120,7 @@ func processMediaForToken(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRe
 			return
 		}
 
-		err = tp.processTokenPipeline(ctx, key, t, contract, input.OwnerAddress, persist.ProcessingCauseRefresh)
+		err = tp.processTokenPipeline(ctx, t, contract, input.OwnerAddress, persist.ProcessingCauseRefresh)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return

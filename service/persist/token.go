@@ -650,7 +650,7 @@ func (m *FallbackMedia) Scan(src interface{}) error {
 		*m = FallbackMedia{}
 		return nil
 	}
-	return json.Unmarshal(src.([]uint8), &m)
+	return json.Unmarshal(src.([]byte), &m)
 }
 
 func (a EthereumAddress) String() string {

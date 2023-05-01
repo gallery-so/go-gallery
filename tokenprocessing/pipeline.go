@@ -15,7 +15,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/sync/errgroup"
 )
 
 type tokenProcessor struct {
@@ -55,7 +54,7 @@ type tokenProcessingJob struct {
 	pipelineMetadata *persist.PipelineMetadata
 }
 
-func (tp *tokenProcessor) processTokenPipeline(c context.Context, key string, t persist.TokenGallery, contract persist.ContractGallery, ownerAddress persist.Address, cause persist.ProcessingCause) error {
+func (tp *tokenProcessor) processTokenPipeline(c context.Context, t persist.TokenGallery, contract persist.ContractGallery, ownerAddress persist.Address, cause persist.ProcessingCause) error {
 
 	runID := persist.GenerateID()
 
@@ -63,7 +62,7 @@ func (tp *tokenProcessor) processTokenPipeline(c context.Context, key string, t 
 		id: runID,
 
 		tp:           tp,
-		key:          key,
+		key:          persist.NewTokenIdentifiers(contract.Address, t.TokenID, t.Chain).String(),
 		token:        t,
 		contract:     contract,
 		ownerAddress: ownerAddress,
@@ -93,12 +92,17 @@ func (tp *tokenProcessor) processTokenPipeline(c context.Context, key string, t 
 }
 
 func (tpj *tokenProcessingJob) run(ctx context.Context) error {
-	toInsert, err := tpj.createMediaForToken(ctx)
+	tmedia, err := tpj.createMediaForToken(ctx)
 	if err != nil {
 		logger.For(ctx).Errorf("error creating media for token: %s", err)
 	}
 
-	return tpj.persistMedia(ctx, toInsert)
+	tmedia, err = tpj.persistMedia(ctx, tmedia)
+	if err != nil {
+		logger.For(ctx).Errorf("error persisting media for token: %s", err)
+	}
+
+	return tpj.updateJobDB(ctx, tmedia)
 }
 
 func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (coredb.TokenMedia, error) {
@@ -124,7 +128,6 @@ func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (coredb.
 	cachedObjects, err := tpj.cacheMediaObjects(ctx, result.Metadata)
 	if err != nil {
 		isSpam := tpj.contract.IsProviderMarkedSpam || util.GetOptionalValue(tpj.token.IsProviderMarkedSpam, false) || util.GetOptionalValue(tpj.token.IsUserMarkedSpam, false)
-		reportTokenError(ctx, err, tpj.id, tpj.token.Chain, tpj.contract.Address, tpj.token.TokenID, isSpam)
 		switch err.(type) {
 		case errNotCacheable:
 			errNotCacheable := err.(errNotCacheable)
@@ -135,18 +138,27 @@ func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (coredb.
 		case MediaProcessingError:
 			errMediaProcessing := err.(MediaProcessingError)
 			if errMediaProcessing.AnimationError != nil {
-				errInvalidMedia := err.(errInvalidMedia)
-				result.Media = persist.Media{MediaType: persist.MediaTypeInvalid, MediaURL: persist.NullString(errInvalidMedia.URL)}
+				if errInvalidMedia, ok := err.(errInvalidMedia); ok {
+					result.Media = persist.Media{MediaType: persist.MediaTypeInvalid, MediaURL: persist.NullString(errInvalidMedia.URL)}
+				}
 			} else if errMediaProcessing.ImageError != nil {
-				errInvalidMedia := err.(errInvalidMedia)
-				result.Media = persist.Media{MediaType: persist.MediaTypeInvalid, MediaURL: persist.NullString(errInvalidMedia.URL)}
+				if errInvalidMedia, ok := err.(errInvalidMedia); ok {
+					result.Media = persist.Media{MediaType: persist.MediaTypeInvalid, MediaURL: persist.NullString(errInvalidMedia.URL)}
+				}
 			}
+			reportTokenError(ctx, err, tpj.id, tpj.token.Chain, tpj.contract.Address, tpj.token.TokenID, isSpam)
 		case errInvalidMedia:
 			errInvalidMedia := err.(errInvalidMedia)
 			result.Media = persist.Media{MediaType: persist.MediaTypeInvalid, MediaURL: persist.NullString(errInvalidMedia.URL)}
+			reportTokenError(ctx, err, tpj.id, tpj.token.Chain, tpj.contract.Address, tpj.token.TokenID, isSpam)
 		default:
 			defer persist.TrackStepStatus(&tpj.pipelineMetadata.SetUnknownMediaType)()
 			result.Media = persist.Media{MediaType: persist.MediaTypeUnknown}
+			reportTokenError(ctx, err, tpj.id, tpj.token.Chain, tpj.contract.Address, tpj.token.TokenID, isSpam)
+		}
+
+		if result.Media.MediaType == "" {
+			result.Media.MediaType = persist.MediaTypeUnknown
 		}
 
 		return result, err
@@ -214,22 +226,13 @@ func (tpj *tokenProcessingJob) isNewMediaPreferable(ctx context.Context, media p
 	return !tpj.token.Media.IsServable() && media.IsServable()
 }
 
-func (tpj *tokenProcessingJob) persistMedia(ctx context.Context, tmetadata coredb.TokenMedia) error {
+func (tpj *tokenProcessingJob) persistMedia(ctx context.Context, tmetadata coredb.TokenMedia) (coredb.TokenMedia, error) {
 	if !tpj.isNewMediaPreferable(ctx, tmetadata.Media) {
 		tmetadata.Active = false
 	}
 
-	errGroup, ctx := errgroup.WithContext(ctx)
+	return tmetadata, tpj.updateTokenMetadataDB(ctx, tmetadata)
 
-	errGroup.Go(func() error {
-		return tpj.updateTokenMetadataDB(ctx, tmetadata)
-
-	})
-	errGroup.Go(func() error {
-		return tpj.updateJobDB(ctx, tmetadata)
-	})
-
-	return errGroup.Wait()
 }
 
 func (tpj *tokenProcessingJob) updateTokenMetadataDB(ctx context.Context, tmetadata coredb.TokenMedia) error {
@@ -246,9 +249,10 @@ func (tpj *tokenProcessingJob) updateTokenMetadataDB(ctx context.Context, tmetad
 				Name:            tmetadata.Name,
 				Description:     tmetadata.Description,
 				ProcessingJobID: tmetadata.ProcessingJobID,
+				Active:          false,
 			})
 		}
-		exists, err := tpj.tp.queries.IsExistsTokenMediaByTokenIdentifers(ctx, coredb.IsExistsTokenMediaByTokenIdentifersParams{
+		exists, err := tpj.tp.queries.IsExistsActiveTokenMediaByTokenIdentifers(ctx, coredb.IsExistsActiveTokenMediaByTokenIdentifersParams{
 			Contract: tpj.token.Contract,
 			TokenID:  tpj.token.TokenID,
 			Chain:    tpj.token.Chain,
@@ -258,7 +262,7 @@ func (tpj *tokenProcessingJob) updateTokenMetadataDB(ctx context.Context, tmetad
 		}
 
 		if exists {
-			return tpj.tp.queries.UpdateTokenMediaByTokenIdentifiers(ctx, coredb.UpdateTokenMediaByTokenIdentifiersParams{
+			return tpj.tp.queries.UpdateActiveTokenMediaByTokenIdentifiers(ctx, coredb.UpdateActiveTokenMediaByTokenIdentifiersParams{
 				ID:              tmetadata.ID,
 				Contract:        tpj.token.Contract,
 				TokenID:         tmetadata.TokenID,
@@ -280,6 +284,7 @@ func (tpj *tokenProcessingJob) updateTokenMetadataDB(ctx context.Context, tmetad
 			Name:            tmetadata.Name,
 			Description:     tmetadata.Description,
 			ProcessingJobID: tmetadata.ProcessingJobID,
+			Active:          true,
 		})
 		if err != nil {
 			return err

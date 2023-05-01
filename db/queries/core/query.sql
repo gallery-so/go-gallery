@@ -1013,21 +1013,18 @@ update users set wallets = array_append(wallets, @wallet_id::varchar) where id =
 insert into token_processing_jobs (id, token_properties, pipeline_metadata, processing_cause, processor_version) values ($1, $2, $3, $4, $5);
 
 -- name: InsertTokenMedia :exec
-insert into token_medias (id, contract, token_id, chain, metadata, media, name, description, processing_job_id, active) values ($1, $2, $3, $4, $5, $6, $7, $8, $9,true);
+insert into token_medias (id, contract, token_id, chain, metadata, media, name, description, processing_job_id, active) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
 
 -- name: UpdateTokenTokenMediaByTokenIdentifiers :exec
 update tokens set token_media = $1 where tokens.contract = $2 and tokens.token_id = $3 and tokens.chain = $4 and deleted = false;
 
--- name: UpdateTokenMediaByTokenIdentifiers :exec
+-- name: UpdateActiveTokenMediaByTokenIdentifiers :exec
 with old as (
   insert into token_medias (id, contract, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated) (select $1, contract_address, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, last_updated from token_medias where token_medias.contract = $2 and token_medias.token_id = $3 and token_medias.chain = $4 and active = true and deleted = false)
 ) update token_medias set metadata = $5, media = $6, name = $7, description = $8, processing_job_id = $9 where token_medias.contract = $2 and token_medias.token_id = $3 and token_medias.chain = $4 and active = true and deleted = false;
 
--- name: IsExistsTokenMediaByTokenIdentifers :one
+-- name: IsExistsActiveTokenMediaByTokenIdentifers :one
 select exists(select 1 from token_medias where token_medias.contract = $1 and token_medias.token_id = $2 and token_medias.chain = $3 and active = true and deleted = false);
-
--- name: GetTokenMediaIDByTokenIdentifiers :one
-select id from token_medias where contract = @contract and token_id = @token_id and chain = @chain and active = true and deleted = false;
 
 -- name: InsertSpamContracts :exec
 with insert_spam_contracts as (

@@ -2317,23 +2317,6 @@ func (q *Queries) GetTokenByTokenIdentifiers(ctx context.Context, arg GetTokenBy
 	return i, err
 }
 
-const getTokenMediaIDByTokenIdentifiers = `-- name: GetTokenMediaIDByTokenIdentifiers :one
-select id from token_medias where contract = $1 and token_id = $2 and chain = $3 and active = true and deleted = false
-`
-
-type GetTokenMediaIDByTokenIdentifiersParams struct {
-	Contract persist.DBID
-	TokenID  persist.TokenID
-	Chain    persist.Chain
-}
-
-func (q *Queries) GetTokenMediaIDByTokenIdentifiers(ctx context.Context, arg GetTokenMediaIDByTokenIdentifiersParams) (persist.DBID, error) {
-	row := q.db.QueryRow(ctx, getTokenMediaIDByTokenIdentifiers, arg.Contract, arg.TokenID, arg.Chain)
-	var id persist.DBID
-	err := row.Scan(&id)
-	return id, err
-}
-
 const getTokenOwnerByID = `-- name: GetTokenOwnerByID :one
 SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences FROM tokens t
     JOIN users u ON u.id = t.owner_user_id
@@ -3816,7 +3799,7 @@ func (q *Queries) InsertSpamContracts(ctx context.Context, arg InsertSpamContrac
 }
 
 const insertTokenMedia = `-- name: InsertTokenMedia :exec
-insert into token_medias (id, contract, token_id, chain, metadata, media, name, description, processing_job_id, active) values ($1, $2, $3, $4, $5, $6, $7, $8, $9,true)
+insert into token_medias (id, contract, token_id, chain, metadata, media, name, description, processing_job_id, active) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 `
 
 type InsertTokenMediaParams struct {
@@ -3829,6 +3812,7 @@ type InsertTokenMediaParams struct {
 	Name            string
 	Description     string
 	ProcessingJobID persist.DBID
+	Active          bool
 }
 
 func (q *Queries) InsertTokenMedia(ctx context.Context, arg InsertTokenMediaParams) error {
@@ -3842,6 +3826,7 @@ func (q *Queries) InsertTokenMedia(ctx context.Context, arg InsertTokenMediaPara
 		arg.Name,
 		arg.Description,
 		arg.ProcessingJobID,
+		arg.Active,
 	)
 	return err
 }
@@ -4034,18 +4019,18 @@ func (q *Queries) IsActorSubjectActive(ctx context.Context, arg IsActorSubjectAc
 	return exists, err
 }
 
-const isExistsTokenMediaByTokenIdentifers = `-- name: IsExistsTokenMediaByTokenIdentifers :one
+const isExistsActiveTokenMediaByTokenIdentifers = `-- name: IsExistsActiveTokenMediaByTokenIdentifers :one
 select exists(select 1 from token_medias where token_medias.contract = $1 and token_medias.token_id = $2 and token_medias.chain = $3 and active = true and deleted = false)
 `
 
-type IsExistsTokenMediaByTokenIdentifersParams struct {
+type IsExistsActiveTokenMediaByTokenIdentifersParams struct {
 	Contract persist.DBID
 	TokenID  persist.TokenID
 	Chain    persist.Chain
 }
 
-func (q *Queries) IsExistsTokenMediaByTokenIdentifers(ctx context.Context, arg IsExistsTokenMediaByTokenIdentifersParams) (bool, error) {
-	row := q.db.QueryRow(ctx, isExistsTokenMediaByTokenIdentifers, arg.Contract, arg.TokenID, arg.Chain)
+func (q *Queries) IsExistsActiveTokenMediaByTokenIdentifers(ctx context.Context, arg IsExistsActiveTokenMediaByTokenIdentifersParams) (bool, error) {
+	row := q.db.QueryRow(ctx, isExistsActiveTokenMediaByTokenIdentifers, arg.Contract, arg.TokenID, arg.Chain)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
@@ -4187,6 +4172,39 @@ UPDATE feed_blocklist SET deleted = true WHERE user_id = $1
 
 func (q *Queries) UnblockUserFromFeed(ctx context.Context, userID persist.DBID) error {
 	_, err := q.db.Exec(ctx, unblockUserFromFeed, userID)
+	return err
+}
+
+const updateActiveTokenMediaByTokenIdentifiers = `-- name: UpdateActiveTokenMediaByTokenIdentifiers :exec
+with old as (
+  insert into token_medias (id, contract, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated) (select $1, contract_address, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, last_updated from token_medias where token_medias.contract = $2 and token_medias.token_id = $3 and token_medias.chain = $4 and active = true and deleted = false)
+) update token_medias set metadata = $5, media = $6, name = $7, description = $8, processing_job_id = $9 where token_medias.contract = $2 and token_medias.token_id = $3 and token_medias.chain = $4 and active = true and deleted = false
+`
+
+type UpdateActiveTokenMediaByTokenIdentifiersParams struct {
+	ID              persist.DBID
+	Contract        persist.DBID
+	TokenID         persist.TokenID
+	Chain           persist.Chain
+	Metadata        persist.TokenMetadata
+	Media           persist.Media
+	Name            string
+	Description     string
+	ProcessingJobID persist.DBID
+}
+
+func (q *Queries) UpdateActiveTokenMediaByTokenIdentifiers(ctx context.Context, arg UpdateActiveTokenMediaByTokenIdentifiersParams) error {
+	_, err := q.db.Exec(ctx, updateActiveTokenMediaByTokenIdentifiers,
+		arg.ID,
+		arg.Contract,
+		arg.TokenID,
+		arg.Chain,
+		arg.Metadata,
+		arg.Media,
+		arg.Name,
+		arg.Description,
+		arg.ProcessingJobID,
+	)
 	return err
 }
 
@@ -4399,39 +4417,6 @@ type UpdateNotificationSettingsByIDParams struct {
 
 func (q *Queries) UpdateNotificationSettingsByID(ctx context.Context, arg UpdateNotificationSettingsByIDParams) error {
 	_, err := q.db.Exec(ctx, updateNotificationSettingsByID, arg.ID, arg.NotificationSettings)
-	return err
-}
-
-const updateTokenMediaByTokenIdentifiers = `-- name: UpdateTokenMediaByTokenIdentifiers :exec
-with old as (
-  insert into token_medias (id, contract, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated) (select $1, contract_address, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, last_updated from token_medias where token_medias.contract = $2 and token_medias.token_id = $3 and token_medias.chain = $4 and active = true and deleted = false)
-) update token_medias set metadata = $5, media = $6, name = $7, description = $8, processing_job_id = $9 where token_medias.contract = $2 and token_medias.token_id = $3 and token_medias.chain = $4 and active = true and deleted = false
-`
-
-type UpdateTokenMediaByTokenIdentifiersParams struct {
-	ID              persist.DBID
-	Contract        persist.DBID
-	TokenID         persist.TokenID
-	Chain           persist.Chain
-	Metadata        persist.TokenMetadata
-	Media           persist.Media
-	Name            string
-	Description     string
-	ProcessingJobID persist.DBID
-}
-
-func (q *Queries) UpdateTokenMediaByTokenIdentifiers(ctx context.Context, arg UpdateTokenMediaByTokenIdentifiersParams) error {
-	_, err := q.db.Exec(ctx, updateTokenMediaByTokenIdentifiers,
-		arg.ID,
-		arg.Contract,
-		arg.TokenID,
-		arg.Chain,
-		arg.Metadata,
-		arg.Media,
-		arg.Name,
-		arg.Description,
-		arg.ProcessingJobID,
-	)
 	return err
 }
 
