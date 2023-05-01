@@ -74,7 +74,7 @@ func PredictMediaType(pCtx context.Context, url string) (persist.MediaType, *str
 	case persist.URITypeBase64JSON, persist.URITypeJSON:
 		return persist.MediaTypeJSON, util.ToPointer("application/json"), &lenURI, nil
 	case persist.URITypeBase64SVG, persist.URITypeSVG:
-		return persist.MediaTypeSVG, util.ToPointer("image/svg"), &lenURI, nil
+		return persist.MediaTypeSVG, util.ToPointer("image/svg+xml"), &lenURI, nil
 	case persist.URITypeBase64BMP:
 		return persist.MediaTypeBase64BMP, util.ToPointer("image/bmp"), &lenURI, nil
 	case persist.URITypeBase64PNG:
