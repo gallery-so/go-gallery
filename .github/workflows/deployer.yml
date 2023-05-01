@@ -144,6 +144,6 @@ jobs:
       - name: "Install build deps"
         uses: ./.github/actions/build-deps
         with:
-          gcp-credentials-json: ${{ secrets.GCP_DEV_CREDENTIALS }}
+          gcp-credentials-json: ${{ secrets.GCP_PROD_CREDENTIALS }}
       - name: "Deploy"
         run: make deploy-prod-graphql-gateway
