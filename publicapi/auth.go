@@ -3,10 +3,10 @@ package publicapi
 import (
 	"context"
 	"fmt"
+	"github.com/mikeydub/go-gallery/util"
 
 	magicclient "github.com/magiclabs/magic-admin-go/client"
 	"github.com/magiclabs/magic-admin-go/token"
-	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -46,9 +46,11 @@ func (api AuthAPI) NewNonceAuthenticator(chainAddress persist.ChainPubKey, nonce
 }
 
 func (api AuthAPI) NewDebugAuthenticator(ctx context.Context, debugParams model.DebugAuth) (auth.Authenticator, error) {
-	if !debugtools.Enabled || env.GetString("ENV") != "local" {
-		return nil, fmt.Errorf("debug auth is only allowed in local environments with debugtools enabled")
+	if !debugtools.Enabled || !debugtools.IsDebugEnv() {
+		return nil, fmt.Errorf("debug auth is only allowed in local and development environments with debugtools enabled")
 	}
+
+	password := util.FromPointer(debugParams.DebugToolsPassword)
 
 	if debugParams.AsUsername == nil {
 		if debugParams.ChainAddresses == nil {
@@ -66,7 +68,7 @@ func (api AuthAPI) NewDebugAuthenticator(ctx context.Context, debugParams model.
 			user = &dbUser
 		}
 
-		return debugtools.NewDebugAuthenticator(user, chainAddressPointersToChainAddresses(debugParams.ChainAddresses)), nil
+		return debugtools.NewDebugAuthenticator(user, chainAddressPointersToChainAddresses(debugParams.ChainAddresses), password), nil
 	}
 
 	if debugParams.UserID != nil || debugParams.ChainAddresses != nil {
@@ -93,7 +95,7 @@ func (api AuthAPI) NewDebugAuthenticator(ctx context.Context, debugParams model.
 		addresses = append(addresses, persist.NewChainAddress(wallet.Address, wallet.Chain))
 	}
 
-	return debugtools.NewDebugAuthenticator(&user, addresses), nil
+	return debugtools.NewDebugAuthenticator(&user, addresses, password), nil
 }
 
 func (api AuthAPI) NewMagicLinkAuthenticator(token token.Token) auth.Authenticator {

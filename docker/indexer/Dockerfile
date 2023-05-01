@@ -2,8 +2,11 @@
 
 FROM golang:1.19-bullseye
 
+ARG VERSION
+ARG FFMPEG_VERSION
+
 RUN apt-get update
-RUN apt-get install -y ffmpeg=7:4.3.5-0+deb11u1 && rm -rf /var/lib/apt/lists/*
+RUN apt-get install -y ffmpeg=$FFMPEG_VERSION && rm -rf /var/lib/apt/lists/*
 
 # Install deps
 WORKDIR /app
@@ -17,7 +20,6 @@ RUN update-ca-certificates
 COPY . /app
 RUN go build -o ./bin/indexer ./cmd/indexer/main.go
 
-ARG VERSION
 ENV VERSION=$VERSION
 
 EXPOSE 4000

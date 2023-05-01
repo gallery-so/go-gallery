@@ -10,6 +10,7 @@ package debugtools
 
 import (
 	"context"
+	"crypto/subtle"
 	"errors"
 
 	"github.com/mikeydub/go-gallery/env"
@@ -27,10 +28,23 @@ func init() {
 	}
 }
 
-func (d DebugAuthenticator) Authenticate(ctx context.Context) (*auth.AuthResult, error) {
-	if env.GetString("ENV") != "local" {
-		return nil, errors.New("DebugAuthenticator may only be used in a local environment")
+func isValidPassword(password string) bool {
+	envPassword := env.GetString("DEBUG_TOOLS_PASSWORD")
+	if env.GetString("ENV") != "local" && envPassword == "" {
+		panic(errors.New("debug tools password must be set in non-local environments"))
 	}
+	return subtle.ConstantTimeCompare([]byte(envPassword), []byte(password)) == 1
+}
+
+func (d DebugAuthenticator) Authenticate(ctx context.Context) (*auth.AuthResult, error) {
+	if !IsDebugEnv() {
+		return nil, errors.New("DebugAuthenticator may only be used in a local and development environments")
+	}
+
+	if !isValidPassword(d.DebugToolsPassword) {
+		return nil, errors.New("invalid debug tools password")
+	}
+
 	wallets := make([]auth.AuthenticatedAddress, len(d.ChainAddresses))
 	for i, chainAddress := range d.ChainAddresses {
 		wallets[i] = auth.AuthenticatedAddress{
@@ -48,8 +62,12 @@ func (d DebugAuthenticator) Authenticate(ctx context.Context) (*auth.AuthResult,
 }
 
 func (d DebugSocialAuthenticator) Authenticate(ctx context.Context) (*socialauth.SocialAuthResult, error) {
-	if env.GetString("ENV") != "local" {
-		return nil, errors.New("DebugSocialAuthenticator may only be used in a local environment")
+	if !IsDebugEnv() {
+		return nil, errors.New("DebugSocialAuthenticator may only be used in a local and development environments")
+	}
+
+	if !isValidPassword(d.DebugToolsPassword) {
+		return nil, errors.New("invalid debug tools password")
 	}
 
 	authResult := socialauth.SocialAuthResult{

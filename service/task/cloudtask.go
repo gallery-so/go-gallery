@@ -2,19 +2,19 @@ package task
 
 import (
 	"context"
-	"fmt"
-
 	"encoding/json"
+	"fmt"
+	"github.com/mikeydub/go-gallery/service/auth/basicauth"
 	"time"
 
 	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
+	taskspb "cloud.google.com/go/cloudtasks/apiv2/cloudtaskspb"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
 	"google.golang.org/api/option"
-	taskspb "google.golang.org/genproto/googleapis/cloud/tasks/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -52,6 +52,50 @@ type DeepRefreshMessage struct {
 
 type ValidateNFTsMessage struct {
 	OwnerAddress persist.EthereumAddress `json:"wallet"`
+}
+
+type PushNotificationMessage struct {
+	PushTokenID persist.DBID   `json:"pushTokenID"`
+	Title       string         `json:"title"`
+	Subtitle    string         `json:"subtitle"`
+	Body        string         `json:"body"`
+	Data        map[string]any `json:"data"`
+	Sound       bool           `json:"sound"`
+	Badge       int            `json:"badge"`
+}
+
+func CreateTaskForPushNotification(ctx context.Context, message PushNotificationMessage, client *gcptasks.Client) error {
+	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForPushNotification")
+	defer tracing.FinishSpan(span)
+
+	tracing.AddEventDataToSpan(span, map[string]interface{}{
+		"PushTokenID": message.PushTokenID,
+	})
+
+	url := fmt.Sprintf("%s/tasks/send-push-notification", env.GetString("PUSH_NOTIFICATIONS_URL"))
+	logger.For(ctx).Infof("creating task for push notification, sending to %s", url)
+
+	queue := env.GetString("GCLOUD_PUSH_NOTIFICATIONS_QUEUE")
+	task := &taskspb.Task{
+		MessageType: &taskspb.Task_HttpRequest{
+			HttpRequest: &taskspb.HttpRequest{
+				HttpMethod: taskspb.HttpMethod_POST,
+				Url:        url,
+				Headers: map[string]string{
+					"Content-type":  "application/json",
+					"Authorization": basicauth.MakeHeader(nil, env.GetString("PUSH_NOTIFICATIONS_SECRET")),
+					"sentry-trace":  span.TraceID.String(),
+				},
+			},
+		},
+	}
+
+	body, err := json.Marshal(message)
+	if err != nil {
+		return err
+	}
+
+	return submitHttpTask(ctx, client, queue, task, body)
 }
 
 func CreateTaskForFeed(ctx context.Context, scheduleOn time.Time, message FeedMessage, client *gcptasks.Client) error {

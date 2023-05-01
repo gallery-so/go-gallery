@@ -267,6 +267,14 @@ func (e ErrWalletCreateFailed) Error() string {
 	return fmt.Sprintf("wallet create failed: address: %s, walletID: %s, error: %s", e.ChainAddress, e.WalletID, e.Err)
 }
 
+type ErrPushTokenBelongsToAnotherUser struct {
+	PushToken string
+}
+
+func (e ErrPushTokenBelongsToAnotherUser) Error() string {
+	return fmt.Sprintf("push token already belongs to another user: pushToken: %s", e.PushToken)
+}
+
 type Role string
 
 const (

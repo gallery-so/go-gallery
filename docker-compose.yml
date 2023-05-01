@@ -55,6 +55,7 @@ services:
       "-queue", "projects/gallery-local/locations/here/queues/token-processing",
       "-queue", "projects/gallery-local/locations/here/queues/indexer-refreshes",
       "-queue", "projects/gallery-local/locations/here/queues/wallet-validate",
+      "-queue", "projects/gallery-local/locations/here/queues/push-notifications",
     ]
   pubsub-emulator:
     image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
@@ -94,4 +95,14 @@ services:
   #   depends_on:
   #     - postgres
   #     - postgres_indexer
+  #     - redis
+  # Uncomment if you want to run pushnotifications locally as a container
+  # pushnotifications:
+  #   build:
+  #     context: "."
+  #     dockerfile: "docker/pushnotifications/Dockerfile"
+  #   ports:
+  #     - "6600:6600"
+  #   depends_on:
+  #     - postgres
   #     - redis

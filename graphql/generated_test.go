@@ -218,9 +218,10 @@ func (v *CreateUserInput) GetGalleryDescription() *string { return v.GalleryDesc
 func (v *CreateUserInput) GetGalleryPosition() *string { return v.GalleryPosition }
 
 type DebugAuth struct {
-	AsUsername     *string             `json:"asUsername"`
-	UserId         *persist.DBID       `json:"userId"`
-	ChainAddresses []ChainAddressInput `json:"chainAddresses"`
+	AsUsername         *string             `json:"asUsername"`
+	UserId             *persist.DBID       `json:"userId"`
+	ChainAddresses     []ChainAddressInput `json:"chainAddresses"`
+	DebugToolsPassword *string             `json:"debugToolsPassword"`
 }
 
 // GetAsUsername returns DebugAuth.AsUsername, and is useful for accessing the field via an interface.
@@ -232,10 +233,14 @@ func (v *DebugAuth) GetUserId() *persist.DBID { return v.UserId }
 // GetChainAddresses returns DebugAuth.ChainAddresses, and is useful for accessing the field via an interface.
 func (v *DebugAuth) GetChainAddresses() []ChainAddressInput { return v.ChainAddresses }
 
+// GetDebugToolsPassword returns DebugAuth.DebugToolsPassword, and is useful for accessing the field via an interface.
+func (v *DebugAuth) GetDebugToolsPassword() *string { return v.DebugToolsPassword }
+
 type DebugSocialAuth struct {
-	Provider SocialAccountType `json:"provider"`
-	Id       string            `json:"id"`
-	Username string            `json:"username"`
+	Provider           SocialAccountType `json:"provider"`
+	Id                 string            `json:"id"`
+	Username           string            `json:"username"`
+	DebugToolsPassword *string           `json:"debugToolsPassword"`
 }
 
 // GetProvider returns DebugSocialAuth.Provider, and is useful for accessing the field via an interface.
@@ -246,6 +251,9 @@ func (v *DebugSocialAuth) GetId() string { return v.Id }
 
 // GetUsername returns DebugSocialAuth.Username, and is useful for accessing the field via an interface.
 func (v *DebugSocialAuth) GetUsername() string { return v.Username }
+
+// GetDebugToolsPassword returns DebugSocialAuth.DebugToolsPassword, and is useful for accessing the field via an interface.
+func (v *DebugSocialAuth) GetDebugToolsPassword() *string { return v.DebugToolsPassword }
 
 type EoaAuth struct {
 	ChainPubKey ChainPubKeyInput `json:"chainPubKey"`

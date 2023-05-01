@@ -1275,6 +1275,26 @@ type UpdateUserInfoPayload {
   viewer: Viewer
 }
 
+union RegisterUserPushTokenPayloadOrError =
+    RegisterUserPushTokenPayload
+  | ErrNotAuthorized
+  | ErrInvalidInput
+  | ErrPushTokenBelongsToAnotherUser
+
+type RegisterUserPushTokenPayload {
+  viewer: Viewer
+}
+
+union UnregisterUserPushTokenPayloadOrError =
+    UnregisterUserPushTokenPayload
+  | ErrNotAuthorized
+  | ErrInvalidInput
+  | ErrPushTokenBelongsToAnotherUser
+
+type UnregisterUserPushTokenPayload {
+  viewer: Viewer
+}
+
 union SyncTokensPayloadOrError = SyncTokensPayload | ErrNotAuthorized | ErrSyncFailed
 
 type SyncTokensPayload {
@@ -1376,6 +1396,10 @@ type ErrCommentNotFound implements Error {
   message: String!
 }
 
+type ErrPushTokenBelongsToAnotherUser implements Error {
+  message: String!
+}
+
 input AuthMechanism {
   eoa: EoaAuth
   gnosisSafe: GnosisSafeAuth
@@ -1389,11 +1413,11 @@ input EoaAuth {
   signature: String! @scrub
 }
 
-# DebugAuth is a local-only authentication mechanism for testing and debugging.
+# DebugAuth is a debug-only authentication mechanism for testing and debugging.
 # It creates an authenticator that will return the supplied userId and chainAddresses as if they had been
 # successfully authenticated. For existing users, the asUsername parameter may be supplied as a convenience
 # method to look up and return their userId and chainAddresses.
-input DebugAuth @restrictEnvironment(allowed: ["local"]) {
+input DebugAuth @restrictEnvironment(allowed: ["local", "development", "sandbox"]) {
   # Convenience method to authenticate as an existing user.
   # Cannot be used in conjunction with the userId and chainAddresses parameters.
   asUsername: String
@@ -1406,6 +1430,9 @@ input DebugAuth @restrictEnvironment(allowed: ["local"]) {
   # The chainAddresses that will be returned from the resulting authenticator.
   # Cannot be used in conjunction with the asUsername parameter.
   chainAddresses: [ChainAddressInput!]
+
+  # A password required to use debug tools. Typically empty in local environments.
+  debugToolsPassword: String
 }
 
 input GnosisSafeAuth {
@@ -1426,10 +1453,13 @@ input TwitterAuth {
   code: String!
 }
 
-input DebugSocialAuth {
+input DebugSocialAuth @restrictEnvironment(allowed: ["local", "development", "sandbox"]) {
   provider: SocialAccountType!
   id: String!
   username: String!
+
+  # A password required to use debug tools. Typically empty in local environments.
+  debugToolsPassword: String
 }
 
 input DeepRefreshInput {
@@ -2030,6 +2060,8 @@ type Mutation {
   ): AddUserWalletPayloadOrError @authRequired
   removeUserWallets(walletIds: [DBID!]!): RemoveUserWalletsPayloadOrError @authRequired
   updateUserInfo(input: UpdateUserInfoInput!): UpdateUserInfoPayloadOrError @authRequired
+  registerUserPushToken(pushToken: String!): RegisterUserPushTokenPayloadOrError @authRequired
+  unregisterUserPushToken(pushToken: String!): UnregisterUserPushTokenPayloadOrError @authRequired
 
   # Gallery Mutations
   updateGalleryCollections(
