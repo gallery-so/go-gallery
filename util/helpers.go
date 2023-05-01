@@ -304,6 +304,13 @@ func FindFirst[T any](s []T, f func(T) bool) (T, bool) {
 	return *new(T), false
 }
 
+func MapFindOrNil[K comparable, T any](s map[K]T, key K) *T {
+	if val, ok := s[key]; ok {
+		return &val
+	}
+	return nil
+}
+
 func Filter[T any](s []T, f func(T) bool, filterInPlace bool) []T {
 	var r []T
 	if filterInPlace {

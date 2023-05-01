@@ -130,6 +130,8 @@ func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (coredb.
 		isSpam := tpj.contract.IsProviderMarkedSpam || util.GetOptionalValue(tpj.token.IsProviderMarkedSpam, false) || util.GetOptionalValue(tpj.token.IsUserMarkedSpam, false)
 		switch err.(type) {
 		case errNotCacheable:
+			// this error is returned for media types that we can not properly render if we cache, but it does not mean that we cached nothing
+			// we could have cached a thumbnail or something else alongside the other media.
 			errNotCacheable := err.(errNotCacheable)
 			first, _ := util.FindFirst(cachedObjects, func(c CachedMediaObject) bool {
 				return c.StorageURL(tpj.tp.tokenBucket) != "" && (c.ObjectType == ObjectTypeImage || c.ObjectType == ObjectTypeSVG || c.ObjectType == ObjectTypeThumbnail)
@@ -213,7 +215,11 @@ func (tpj *tokenProcessingJob) cacheMediaObjects(ctx context.Context, metadata p
 
 func (tpj *tokenProcessingJob) createMediaFromCachedObjects(ctx context.Context, objects []CachedMediaObject) persist.Media {
 	defer persist.TrackStepStatus(&tpj.pipelineMetadata.CreateMediaFromCachedObjects)()
-	return createMediaFromCachedObjects(ctx, tpj.tp.tokenBucket, objects)
+	in := map[objectType]CachedMediaObject{}
+	for _, obj := range objects {
+		in[obj.ObjectType] = obj
+	}
+	return createMediaFromCachedObjects(ctx, tpj.tp.tokenBucket, in)
 }
 
 func (tpj *tokenProcessingJob) createRawMedia(ctx context.Context, mediaType persist.MediaType, animURL, imgURL string, objects []CachedMediaObject) persist.Media {

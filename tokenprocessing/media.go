@@ -55,6 +55,10 @@ type errNoDataFromReader struct {
 	url string
 }
 
+type errNoDataFromOpensea struct {
+	errNoDataFromReader
+}
+
 type errNotCacheable struct {
 	URL       string
 	MediaType persist.MediaType
@@ -244,48 +248,38 @@ func createRawMedia(pCtx context.Context, tids persist.TokenIdentifiers, mediaTy
 
 }
 
-func createMediaFromCachedObjects(ctx context.Context, tokenBucket string, objects []CachedMediaObject) persist.Media {
+func createMediaFromCachedObjects(ctx context.Context, tokenBucket string, objects map[objectType]CachedMediaObject) persist.Media {
 	var primaryObject CachedMediaObject
-	for _, obj := range objects {
-		switch obj.ObjectType {
-		case ObjectTypeAnimation:
-			// if we receive an animation, that takes top priority and will be the primary object
-			primaryObject = obj
-			break
-		case ObjectTypeImage, ObjectTypeSVG:
-			// if we don't have an animation, an image like object will be the primary object
-			primaryObject = obj
-		}
+
+	if obj, ok := objects[ObjectTypeAnimation]; ok {
+		primaryObject = obj
+	} else if obj, ok := objects[ObjectTypeImage]; ok {
+		primaryObject = obj
+	} else if obj, ok := objects[ObjectTypeSVG]; ok {
+		primaryObject = obj
+	} else {
+		logger.For(ctx).Errorf("no primary object found for cached objects: %+v", objects)
 	}
 
 	var thumbnailObject *CachedMediaObject
-	var liveRenderObject *CachedMediaObject
+	var liveRenderObject = util.MapFindOrNil(objects, ObjectTypeLiveRender)
+
 	if primaryObject.ObjectType == ObjectTypeAnimation {
 		// animations should have a thumbnail that could be an image or svg or thumbnail
 		// thumbnail take top priority, then the other image types that could have been cached
-		for _, obj := range objects {
-			if obj.ObjectType == ObjectTypeImage || obj.ObjectType == ObjectTypeSVG {
-				thumbnailObject = &obj
-			} else if obj.ObjectType == ObjectTypeThumbnail {
-				thumbnailObject = &obj
-				break
-			}
+
+		if obj, ok := objects[ObjectTypeThumbnail]; ok {
+			thumbnailObject = &obj
+		} else if obj, ok := objects[ObjectTypeImage]; ok {
+			thumbnailObject = &obj
+		} else if obj, ok := objects[ObjectTypeSVG]; ok {
+			thumbnailObject = &obj
 		}
+
 	} else {
 		// it's not an animation, meaning its image like, so we only use a thumbnail when there explicitly is one
-		for _, obj := range objects {
-			if obj.ObjectType == ObjectTypeThumbnail {
-				thumbnailObject = &obj
-				break
-			}
-		}
-	}
-
-	// live render can apply to any media type, if one explicitly exists, use it
-	for _, obj := range objects {
-		if obj.ObjectType == ObjectTypeLiveRender {
-			liveRenderObject = &obj
-			break
+		if obj, ok := objects[ObjectTypeThumbnail]; ok {
+			thumbnailObject = &obj
 		}
 	}
 
@@ -930,11 +924,11 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 				return nil, false, errInvalidMedia{URL: mediaURL, err: err}
 			}
 
+			// if we're not already recursive, try opensea for ethereum tokens
 			if !isRecursive && tids.Chain == persist.ChainETH {
 				return nil, true, nil
 			}
 
-			// if we're not already recursive, try opensea for ethereum tokens
 			persist.FailStep(subMeta.ReaderRetrieval)
 			return nil, false, errNoDataFromReader{err: err, url: mediaURL}
 		}
@@ -952,7 +946,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 		assets, err := opensea.FetchAssetsForTokenIdentifiers(pCtx, persist.EthereumAddress(tids.ContractAddress), opensea.TokenID(tids.TokenID.Base10String()))
 		if err != nil || len(assets) == 0 {
 			// no data from opensea, return error
-			return nil, errNoDataFromReader{err: err, url: mediaURL}
+			return nil, errNoDataFromOpensea{errNoDataFromReader: errNoDataFromReader{err: err, url: mediaURL}}
 		}
 
 		for _, asset := range assets {
