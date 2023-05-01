@@ -729,9 +729,9 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 
 	// Creating a bunch of lookups to make the upsert query easier to write
 	addressToChainLookup := make(map[persist.Address]persist.Chain)
-	addressToUserLookup := addressToUser(createUserResult)
-	ownerAddressToTokens, tokenDBIDsToParentAddress := combinedResult.TokensByOwnerAddress(addressToUserLookup)
-	tokenToChildContractLookup := make(map[persist.TokenIdentifiers]string)
+	// addressToUserLookup := addressToUser(createUserResult)
+	// ownerAddressToTokens, tokenDBIDsToParentAddress := combinedResult.TokensByOwnerAddress(addressToUserLookup)
+	// tokenToChildContractLookup := make(map[persist.TokenIdentifiers]string)
 
 	params := db.UpsertCreatedTokensParams{}
 	now := time.Now()
@@ -750,49 +750,65 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 		params.ParentContractDescription = append(params.ParentContractDescription, contract.Description.String())
 		addressToChainLookup[contract.Address] = contract.Chain
 	}
-	for _, edge := range combinedResult.Edges {
-	}
-	for _, child := range combinedResult.ChildContracts() {
-		chain := addressToChainLookup[child.ParentContract.Address]
-		params.ChildContractID = append(params.ChildContractID, persist.GenerateID().String())
-		params.ChildContractDeleted = append(params.ChildContractDeleted, false)
-		params.ChildContractCreatedAt = append(params.ChildContractCreatedAt, now)
-		params.ChildContractName = append(params.ChildContractName, child.Name)
-		params.ChildContractAddress = append(params.ChildContractAddress, child.ChildID)
-		params.ChildContractCreatorAddress = append(params.ChildContractCreatorAddress, child.CreatorAddress.String())
-		params.ChildContractChain = append(params.ChildContractChain, int32(chain))
-		params.ChildContractDescription = append(params.ChildContractDescription, child.Description)
-		params.ChildContractParentAddress = append(params.ChildContractParentAddress, child.ParentContract.Address.String())
-		for _, token := range child.Tokens {
-			tID := persist.NewTokenIdentifiers(child.ParentContract.Address, token.TokenID, addressToChainLookup[child.ParentContract.Address])
-			tokenToChildContractLookup[tID] = child.ChildID
+	for _, edge := range combinedResult.Edges() {
+		for _, child := range edge.Children {
+			childID := persist.GenerateID()
+			params.ChildContractID = append(params.ChildContractID, childID.String())
+			params.ChildContractDeleted = append(params.ChildContractDeleted, false)
+			params.ChildContractCreatedAt = append(params.ChildContractCreatedAt, now)
+			params.ChildContractName = append(params.ChildContractName, child.Name)
+			params.ChildContractAddress = append(params.ChildContractAddress, child.ChildID)
+			params.ChildContractCreatorAddress = append(params.ChildContractCreatorAddress, child.CreatorAddress.String())
+			params.ChildContractChain = append(params.ChildContractChain, int32(addressToChainLookup[edge.Parent.Address]))
+			params.ChildContractDescription = append(params.ChildContractDescription, child.Description)
+			params.ChildContractParentAddress = append(params.ChildContractParentAddress, edge.Parent.Address.String())
+			for _, token := range child.Tokens {
+				params.TokenID = append(params.TokenID, persist.GenerateID().String())
+				params.TokenDeleted = append(params.TokenDeleted, false)
+			}
 		}
 	}
-	for ownerAddress, tokens := range ownerAddressToTokens {
-		for _, token := range tokens {
-			tID := persist.NewTokenIdentifiers(tokenDBIDsToParentAddress[token.ID], token.TokenID, token.Chain)
-			owner := addressToUserLookup[ownerAddress]
-			childContractAddress := tokenToChildContractLookup[tID]
-			params.TokenID = append(params.TokenID, persist.GenerateID().String())
-			params.TokenDeleted = append(params.TokenDeleted, false)
-			params.TokenCreatedAt = append(params.TokenCreatedAt, now)
-			params.TokenName = append(params.TokenName, token.Name.String())
-			params.TokenDescription = append(params.TokenDescription, token.Description.String())
-			params.TokenTokenType = append(params.TokenTokenType, token.TokenType.String())
-			params.TokenTokenID = append(params.TokenTokenID, token.TokenID.String())
-			params.TokenQuantity = append(params.TokenQuantity, token.Quantity.String())
-			postgres.AppendAddressAtBlock(&params.TokenOwnershipHistory, token.OwnershipHistory, &params.TokenOwnershipHistoryStartIdx, &params.TokenOwnershipHistoryEndIdx, &errors)
-			params.TokenExternalUrl = append(params.TokenExternalUrl, token.ExternalURL.String())
-			params.TokenBlockNumber = append(params.TokenBlockNumber, token.BlockNumber.BigInt().Int64())
-			params.TokenOwnerUserID = append(params.TokenOwnerUserID, userID.String
-			postgres.AppendWalletList(&params.TokenOwnedByWallets, token.OwnedByWallets, &params.TokenOwnedByWalletsStartIdx, &params.TokenOwnedByWalletsEndIdx)
-			params.TokenChain = append(params.TokenChain, int32(token.Chain))
-			params.TokenIsProviderMarkedSpam = append(params.TokenIsProviderMarkedSpam, util.GetOptionalValue(token.IsProviderMarkedSpam, false))
-			params.TokenLastSynced = append(params.TokenLastSynced, now)
-			params.TokenParentContractAddress = append(params.TokenParentContractAddress, tokenDBIDsToParentAddress[token.ID].String())
-			params.TokenChildContractAddress = append(params.TokenChildContractAddress, childContractAddress)
-		}
-	}
+	// for _, child := range combinedResult.ChildContracts() {
+	// 	chain := addressToChainLookup[child.ParentContract.Address]
+	// 	params.ChildContractID = append(params.ChildContractID, persist.GenerateID().String())
+	// 	params.ChildContractDeleted = append(params.ChildContractDeleted, false)
+	// 	params.ChildContractCreatedAt = append(params.ChildContractCreatedAt, now)
+	// 	params.ChildContractName = append(params.ChildContractName, child.Name)
+	// 	params.ChildContractAddress = append(params.ChildContractAddress, child.ChildID)
+	// 	params.ChildContractCreatorAddress = append(params.ChildContractCreatorAddress, child.CreatorAddress.String())
+	// 	params.ChildContractChain = append(params.ChildContractChain, int32(chain))
+	// 	params.ChildContractDescription = append(params.ChildContractDescription, child.Description)
+	// 	params.ChildContractParentAddress = append(params.ChildContractParentAddress, child.ParentContract.Address.String())
+	// 	for _, token := range child.Tokens {
+	// 		tID := persist.NewTokenIdentifiers(child.ParentContract.Address, token.TokenID, addressToChainLookup[child.ParentContract.Address])
+	// 		tokenToChildContractLookup[tID] = child.ChildID
+	// 	}
+	// }
+	// for ownerAddress, tokens := range ownerAddressToTokens {
+	// 	for _, token := range tokens {
+	// 		tID := persist.NewTokenIdentifiers(tokenDBIDsToParentAddress[token.ID], token.TokenID, token.Chain)
+	// 		owner := addressToUserLookup[ownerAddress]
+	// 		childContractAddress := tokenToChildContractLookup[tID]
+	// 		params.TokenID = append(params.TokenID, persist.GenerateID().String())
+	// 		params.TokenDeleted = append(params.TokenDeleted, false)
+	// 		params.TokenCreatedAt = append(params.TokenCreatedAt, now)
+	// 		params.TokenName = append(params.TokenName, token.Name.String())
+	// 		params.TokenDescription = append(params.TokenDescription, token.Description.String())
+	// 		params.TokenTokenType = append(params.TokenTokenType, token.TokenType.String())
+	// 		params.TokenTokenID = append(params.TokenTokenID, token.TokenID.String())
+	// 		params.TokenQuantity = append(params.TokenQuantity, token.Quantity.String())
+	// 		postgres.AppendAddressAtBlock(&params.TokenOwnershipHistory, token.OwnershipHistory, &params.TokenOwnershipHistoryStartIdx, &params.TokenOwnershipHistoryEndIdx, &errors)
+	// 		params.TokenExternalUrl = append(params.TokenExternalUrl, token.ExternalURL.String())
+	// 		params.TokenBlockNumber = append(params.TokenBlockNumber, token.BlockNumber.BigInt().Int64())
+	// 		params.TokenOwnerUserID = append(params.TokenOwnerUserID, userID.String())
+	// 		postgres.AppendWalletList(&params.TokenOwnedByWallets, token.OwnedByWallets, &params.TokenOwnedByWalletsStartIdx, &params.TokenOwnedByWalletsEndIdx)
+	// 		params.TokenChain = append(params.TokenChain, int32(token.Chain))
+	// 		params.TokenIsProviderMarkedSpam = append(params.TokenIsProviderMarkedSpam, util.GetOptionalValue(token.IsProviderMarkedSpam, false))
+	// 		params.TokenLastSynced = append(params.TokenLastSynced, now)
+	// 		params.TokenParentContractAddress = append(params.TokenParentContractAddress, tokenDBIDsToParentAddress[token.ID].String())
+	// 		params.TokenChildContractAddress = append(params.TokenChildContractAddress, childContractAddress)
+	// 	}
+	// }
 
 	if len(errors) > 0 {
 		return errors[0]
