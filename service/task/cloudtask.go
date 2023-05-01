@@ -128,6 +128,11 @@ func CreateTaskForTokenProcessing(ctx context.Context, client *gcptasks.Client, 
 
 	tracing.AddEventDataToSpan(span, map[string]interface{}{"User ID": message.UserID})
 
+	body, err := json.Marshal(message)
+	if err != nil {
+		return err
+	}
+
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
 	task := &taskspb.Task{
 		DispatchDeadline: durationpb.New(time.Minute * 30),
@@ -143,9 +148,23 @@ func CreateTaskForTokenProcessing(ctx context.Context, client *gcptasks.Client, 
 		},
 	}
 
-	body, err := json.Marshal(message)
+	err = submitHttpTask(ctx, client, queue, task, body)
 	if err != nil {
 		return err
+	}
+
+	task = &taskspb.Task{
+		DispatchDeadline: durationpb.New(time.Minute * 30),
+		MessageType: &taskspb.Task_HttpRequest{
+			HttpRequest: &taskspb.HttpRequest{
+				HttpMethod: taskspb.HttpMethod_POST,
+				Url:        fmt.Sprintf("%s/media/process", env.GetString("NEW_TOKEN_PROCESSING_URL")),
+				Headers: map[string]string{
+					"Content-type": "application/json",
+					"sentry-trace": span.TraceID.String(),
+				},
+			},
+		},
 	}
 
 	return submitHttpTask(ctx, client, queue, task, body)

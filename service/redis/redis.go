@@ -18,20 +18,21 @@ type ErrKeyNotFound struct {
 }
 
 const (
-	GalleriesDB               = 0
-	GalleriesTokenDB          = 1
-	CommunitiesDB             = 2
-	RequireNftsDB             = 3
-	TestSuiteDB               = 5
-	IndexerServerThrottleDB   = 6
-	RefreshNFTsThrottleDB     = 7
-	TokenProcessingThrottleDB = 8
-	EmailThrottleDB           = 9
-	NotificationLockDB        = 10
-	EmailRateLimiterDB        = 11
-	GraphQLAPQ                = 12
-	FeedDB                    = 13
-	SocialDB                  = 14
+	GalleriesDB                   = 0
+	GalleriesTokenDB              = 1
+	CommunitiesDB                 = 2
+	RequireNftsDB                 = 3
+	TestSuiteDB                   = 5
+	IndexerServerThrottleDB       = 6
+	RefreshNFTsThrottleDB         = 7
+	TokenProcessingThrottleDB     = 8
+	EmailThrottleDB               = 9
+	NotificationLockDB            = 10
+	EmailRateLimiterDB            = 11
+	GraphQLAPQ                    = 12
+	FeedDB                        = 13
+	SocialDB                      = 14
+	TokenProcessingTempThrottleDB = 15
 )
 
 // GetNameForDatabase returns a name for the given database ID, if available.

@@ -197,6 +197,8 @@ func SetDefaults() {
 	viper.SetDefault("GCLOUD_FEED_BUFFER_SECS", 20)
 	viper.SetDefault("FEED_SECRET", "feed-secret")
 	viper.SetDefault("TOKEN_PROCESSING_URL", "http://localhost:6500")
+	// TODO remove
+	viper.SetDefault("NEW_TOKEN_PROCESSING_URL", "")
 	viper.SetDefault("TEZOS_API_URL", "https://api.tzkt.io")
 	viper.SetDefault("POAP_API_KEY", "")
 	viper.SetDefault("POAP_AUTH_TOKEN", "")

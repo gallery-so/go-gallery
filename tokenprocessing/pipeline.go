@@ -133,8 +133,8 @@ func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (coredb.
 			// this error is returned for media types that we can not properly render if we cache, but it does not mean that we cached nothing
 			// we could have cached a thumbnail or something else alongside the other media.
 			errNotCacheable := err.(errNotCacheable)
-			first, _ := util.FindFirst(cachedObjects, func(c CachedMediaObject) bool {
-				return c.StorageURL(tpj.tp.tokenBucket) != "" && (c.ObjectType == ObjectTypeImage || c.ObjectType == ObjectTypeSVG || c.ObjectType == ObjectTypeThumbnail)
+			first, _ := util.FindFirst(cachedObjects, func(c cachedMediaObject) bool {
+				return c.StorageURL(tpj.tp.tokenBucket) != "" && (c.ObjectType == objectTypeImage || c.ObjectType == objectTypeSVG || c.ObjectType == objectTypeThumbnail)
 			})
 			result.Media = tpj.createRawMedia(ctx, errNotCacheable.MediaType, errNotCacheable.URL, first.StorageURL(tpj.tp.tokenBucket), cachedObjects)
 		case MediaProcessingError:
@@ -209,20 +209,20 @@ func (tpj *tokenProcessingJob) retrieveTokenInfo(ctx context.Context, metadata p
 	return name, description
 }
 
-func (tpj *tokenProcessingJob) cacheMediaObjects(ctx context.Context, metadata persist.TokenMetadata) ([]CachedMediaObject, error) {
+func (tpj *tokenProcessingJob) cacheMediaObjects(ctx context.Context, metadata persist.TokenMetadata) ([]cachedMediaObject, error) {
 	return cacheObjectsForMetadata(ctx, metadata, tpj.contract.Address, persist.TokenID(tpj.token.TokenID.String()), tpj.token.TokenURI, tpj.token.Chain, tpj.tp.ipfsClient, tpj.tp.arweaveClient, tpj.tp.stg, tpj.tp.tokenBucket, tpj.pipelineMetadata)
 }
 
-func (tpj *tokenProcessingJob) createMediaFromCachedObjects(ctx context.Context, objects []CachedMediaObject) persist.Media {
+func (tpj *tokenProcessingJob) createMediaFromCachedObjects(ctx context.Context, objects []cachedMediaObject) persist.Media {
 	defer persist.TrackStepStatus(&tpj.pipelineMetadata.CreateMediaFromCachedObjects)()
-	in := map[objectType]CachedMediaObject{}
+	in := map[objectType]cachedMediaObject{}
 	for _, obj := range objects {
 		in[obj.ObjectType] = obj
 	}
 	return createMediaFromCachedObjects(ctx, tpj.tp.tokenBucket, in)
 }
 
-func (tpj *tokenProcessingJob) createRawMedia(ctx context.Context, mediaType persist.MediaType, animURL, imgURL string, objects []CachedMediaObject) persist.Media {
+func (tpj *tokenProcessingJob) createRawMedia(ctx context.Context, mediaType persist.MediaType, animURL, imgURL string, objects []cachedMediaObject) persist.Media {
 	defer persist.TrackStepStatus(&tpj.pipelineMetadata.CreateRawMedia)()
 	return createRawMedia(ctx, persist.NewTokenIdentifiers(tpj.contract.Address, tpj.token.TokenID, tpj.token.Chain), mediaType, tpj.tp.tokenBucket, animURL, imgURL, objects)
 }
