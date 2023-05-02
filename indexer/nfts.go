@@ -92,7 +92,7 @@ func getTokenMetadata(nftRepository persist.TokenRepository, ipfsClient *shell.S
 			}
 		}
 
-		firstWithValidTokenURI, ok := util.FindFirst(curTokens, func(t persist.Token) bool {
+		firstWithValidTokenURI, _ := util.FindFirst(curTokens, func(t persist.Token) bool {
 			return t.TokenURI != ""
 		})
 
@@ -100,18 +100,18 @@ func getTokenMetadata(nftRepository persist.TokenRepository, ipfsClient *shell.S
 			return t.TokenType != ""
 		})
 
-		newURI := firstWithValidTokenURI.TokenURI
-
 		asEthAddress := persist.EthereumAddress(input.ContractAddress.String())
 		handler, hasCustomHandler := uniqueMetadataHandlers[asEthAddress]
 
-		if !ok || newURI == "" || newURI.Type() == persist.URITypeInvalid || newURI.Type() == persist.URITypeUnknown {
-			newURI, err = rpc.GetTokenURI(ctx, firstWithValidTokenType.TokenType, input.ContractAddress, input.TokenID, ethClient)
-			// It's possible to fetch metadata for some contracts even if URI data is missing.
-			if !hasCustomHandler && (err != nil || newURI == "") {
-				util.ErrResponse(c, http.StatusInternalServerError, errNoMetadataFound{Contract: input.ContractAddress, TokenID: input.TokenID})
-				return
-			}
+		newURI, err := rpc.GetTokenURI(ctx, firstWithValidTokenType.TokenType, input.ContractAddress, input.TokenID, ethClient)
+		// It's possible to fetch metadata for some contracts even if URI data is missing.
+		if !hasCustomHandler && (err != nil || newURI == "") {
+			util.ErrResponse(c, http.StatusInternalServerError, errNoMetadataFound{Contract: input.ContractAddress, TokenID: input.TokenID})
+			return
+		}
+
+		if newURI == "" {
+			newURI = firstWithValidTokenURI.TokenURI
 		}
 
 		newMetadata := firstWithValidTokenURI.TokenMetadata
