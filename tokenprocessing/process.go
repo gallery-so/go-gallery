@@ -31,7 +31,7 @@ type ProcessMediaForTokenInput struct {
 	OwnerAddress    persist.Address `json:"owner_address" binding:"required"`
 }
 
-func processMediaForUsersTokensOfChain(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRepository, contractRepo *postgres.ContractGalleryRepository, throttler *throttle.Locker) gin.HandlerFunc {
+func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRepository, contractRepo *postgres.ContractGalleryRepository, throttler *throttle.Locker) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input task.TokenProcessingUserMessage
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -41,12 +41,14 @@ func processMediaForUsersTokensOfChain(tp *tokenProcessor, tokenRepo *postgres.T
 
 		ctx := logger.NewContextWithFields(c, logrus.Fields{"userID": input.UserID})
 
-		if err := throttler.Lock(ctx, input.UserID.String()); err != nil {
-			// Reply with a non-200 status so that the message is tried again later on
-			util.ErrResponse(c, http.StatusTooManyRequests, err)
-			return
+		if env.GetString("ENV") != "local" {
+			if err := throttler.Lock(ctx, input.UserID.String()); err != nil {
+				// Reply with a non-200 status so that the message is tried again later on
+				util.ErrResponse(c, http.StatusTooManyRequests, err)
+				return
+			}
+			defer throttler.Unlock(ctx, input.UserID.String())
 		}
-		defer throttler.Unlock(ctx, input.UserID.String())
 
 		wp := pool.New().WithMaxGoroutines(50).WithContext(ctx)
 		for _, tokenID := range input.TokenIDs {

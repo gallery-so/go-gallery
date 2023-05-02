@@ -172,7 +172,7 @@ func NewStorageClient(ctx context.Context) *storage.Client {
 		panic(err)
 	}
 
-	storageClient.SetRetry(storage.WithPolicy(storage.RetryAlways), storage.WithBackoff(gax.Backoff{Initial: 100 * time.Millisecond, Max: 10 * time.Second, Multiplier: 1.3}), storage.WithErrorFunc(storage.ShouldRetry))
+	storageClient.SetRetry(storage.WithPolicy(storage.RetryAlways), storage.WithBackoff(gax.Backoff{Initial: 100 * time.Millisecond, Max: 2 * time.Minute, Multiplier: 1.3}), storage.WithErrorFunc(storage.ShouldRetry))
 
 	return storageClient
 }

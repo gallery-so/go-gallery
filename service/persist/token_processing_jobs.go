@@ -113,8 +113,6 @@ type PipelineMetadata struct {
 	CreateRawMedia                        PipelineStepStatus `json:"create_raw_media,omitempty"`
 	SetUnknownMediaType                   PipelineStepStatus `json:"set_default_media_type,omitempty"`
 	MediaResultComparison                 PipelineStepStatus `json:"media_result_comparison,omitempty"`
-	UpdateTokenMetadataDB                 PipelineStepStatus `json:"update_token_metadata_db,omitempty"`
-	UpdateJobDB                           PipelineStepStatus `json:"update_job_db,omitempty"`
 }
 
 func (p PipelineMetadata) Value() (driver.Value, error) {

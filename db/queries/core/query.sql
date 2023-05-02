@@ -1026,7 +1026,7 @@ with old as (
 -- name: IsExistsActiveTokenMediaByTokenIdentifers :one
 select exists(select 1 from token_medias where token_medias.contract_id = $1 and token_medias.token_id = $2 and token_medias.chain = $3 and active = true and deleted = false);
 
--- name: UpsertTokenMedia :one
+-- name: UpsertTokenMedia :exec
 with copy_on_overwrite as (
     insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
     (
@@ -1040,6 +1040,9 @@ with copy_on_overwrite as (
         limit 1
     )
 )
+, job as (
+  insert into token_processing_jobs (id, token_properties, pipeline_metadata, processing_cause, processor_version) values (@processing_job_id, @token_properties, @pipeline_metadata, @processing_cause, @processor_version)
+)
 insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
     values (@new_id, @contract_id, @token_id, @chain, @metadata, @media, @name, @description, @processing_job_id, @active, now(), now())
     on conflict (contract_id, token_id, chain) where active = true and deleted = false do update
@@ -1048,8 +1051,7 @@ insert into token_medias (id, contract_id, token_id, chain, metadata, media, nam
             name = excluded.name,
             description = excluded.description,
             processing_job_id = excluded.processing_job_id,
-            last_updated = now()
-            returning *;
+            last_updated = now();
 
 -- name: InsertSpamContracts :exec
 with insert_spam_contracts as (

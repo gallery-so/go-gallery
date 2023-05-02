@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/auth/basicauth"
 	"time"
+
+	"github.com/mikeydub/go-gallery/service/auth/basicauth"
 
 	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
 	taskspb "cloud.google.com/go/cloudtasks/apiv2/cloudtaskspb"
@@ -195,6 +196,10 @@ func CreateTaskForTokenProcessing(ctx context.Context, client *gcptasks.Client, 
 	err = submitHttpTask(ctx, client, queue, task, body)
 	if err != nil {
 		return err
+	}
+
+	if env.GetString("ENV") == "local" {
+		return nil
 	}
 
 	task = &taskspb.Task{

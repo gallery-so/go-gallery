@@ -4763,7 +4763,7 @@ func (q *Queries) UpsertSocialOAuth(ctx context.Context, arg UpsertSocialOAuthPa
 	return err
 }
 
-const upsertTokenMedia = `-- name: UpsertTokenMedia :one
+const upsertTokenMedia = `-- name: UpsertTokenMedia :exec
 with copy_on_overwrite as (
     insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
     (
@@ -4777,6 +4777,9 @@ with copy_on_overwrite as (
         limit 1
     )
 )
+, job as (
+  insert into token_processing_jobs (id, token_properties, pipeline_metadata, processing_cause, processor_version) values ($9, $11, $12, $13, $14)
+)
 insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now(), now())
     on conflict (contract_id, token_id, chain) where active = true and deleted = false do update
@@ -4786,24 +4789,27 @@ insert into token_medias (id, contract_id, token_id, chain, metadata, media, nam
             description = excluded.description,
             processing_job_id = excluded.processing_job_id,
             last_updated = now()
-            returning id, created_at, last_updated, version, contract_id, token_id, chain, active, metadata, media, name, description, processing_job_id, deleted
 `
 
 type UpsertTokenMediaParams struct {
-	NewID           persist.DBID
-	ContractID      persist.DBID
-	TokenID         persist.TokenID
-	Chain           persist.Chain
-	Metadata        persist.TokenMetadata
-	Media           persist.Media
-	Name            string
-	Description     string
-	ProcessingJobID persist.DBID
-	Active          bool
+	NewID            persist.DBID
+	ContractID       persist.DBID
+	TokenID          persist.TokenID
+	Chain            persist.Chain
+	Metadata         persist.TokenMetadata
+	Media            persist.Media
+	Name             string
+	Description      string
+	ProcessingJobID  persist.DBID
+	Active           bool
+	TokenProperties  persist.TokenProperties
+	PipelineMetadata persist.PipelineMetadata
+	ProcessingCause  persist.ProcessingCause
+	ProcessorVersion string
 }
 
-func (q *Queries) UpsertTokenMedia(ctx context.Context, arg UpsertTokenMediaParams) (TokenMedia, error) {
-	row := q.db.QueryRow(ctx, upsertTokenMedia,
+func (q *Queries) UpsertTokenMedia(ctx context.Context, arg UpsertTokenMediaParams) error {
+	_, err := q.db.Exec(ctx, upsertTokenMedia,
 		arg.NewID,
 		arg.ContractID,
 		arg.TokenID,
@@ -4814,25 +4820,12 @@ func (q *Queries) UpsertTokenMedia(ctx context.Context, arg UpsertTokenMediaPara
 		arg.Description,
 		arg.ProcessingJobID,
 		arg.Active,
+		arg.TokenProperties,
+		arg.PipelineMetadata,
+		arg.ProcessingCause,
+		arg.ProcessorVersion,
 	)
-	var i TokenMedia
-	err := row.Scan(
-		&i.ID,
-		&i.CreatedAt,
-		&i.LastUpdated,
-		&i.Version,
-		&i.ContractID,
-		&i.TokenID,
-		&i.Chain,
-		&i.Active,
-		&i.Metadata,
-		&i.Media,
-		&i.Name,
-		&i.Description,
-		&i.ProcessingJobID,
-		&i.Deleted,
-	)
-	return i, err
+	return err
 }
 
 const userHasDuplicateGalleryPositions = `-- name: UserHasDuplicateGalleryPositions :one

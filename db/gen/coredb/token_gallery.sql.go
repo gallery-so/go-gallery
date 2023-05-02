@@ -22,12 +22,12 @@ with tids as (
     tids.contract,
     tids.chain,
     token_medias.id as media_id,
-    ROW_NUMBER() OVER (PARTITION BY token_medias.id ORDER BY token_medias.last_updated) AS row_num
+    ROW_NUMBER() OVER (PARTITION BY tids.token_id, tids.contract, tids.chain ORDER BY token_medias.last_updated) AS row_num
   from
     tids
     left join token_medias on (
       token_medias.token_id = tids.token_id
-      and token_medias.contract = tids.contract
+      and token_medias.contract_id = tids.contract
       and token_medias.chain = tids.chain
       and token_medias.active = true
       and token_medias.deleted = false
@@ -35,10 +35,7 @@ with tids as (
 )
 , tms as (
   select
-    token_id,
-    contract,
-    chain,
-    media_id
+    array_agg(media_id) as media_id
   from
     limited_tms
   where
@@ -71,7 +68,7 @@ insert into tokens
   , is_provider_marked_spam
   , last_synced
   , token_uri
-  , token_media
+  , token_media_id
 ) (
   select
     id
@@ -138,12 +135,10 @@ insert into tokens
 on conflict (token_id, contract, chain, owner_user_id) where deleted = false
 do update set
   token_type = excluded.token_type
-  , chain = excluded.chain
   , name = excluded.name
   , description = excluded.description
   , token_uri = excluded.token_uri
   , quantity = excluded.quantity
-  , owner_user_id = excluded.owner_user_id
   , owned_by_wallets = excluded.owned_by_wallets
   , ownership_history = tokens.ownership_history || excluded.ownership_history
   , fallback_media = excluded.fallback_media

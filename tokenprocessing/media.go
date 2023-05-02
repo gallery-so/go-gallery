@@ -284,16 +284,16 @@ func createMediaFromCachedObjects(ctx context.Context, tokenBucket string, objec
 	}
 
 	result := persist.Media{
-		MediaURL:  persist.NullString(primaryObject.StorageURL(tokenBucket)),
+		MediaURL:  persist.NullString(primaryObject.storageURL(tokenBucket)),
 		MediaType: primaryObject.MediaType,
 	}
 
 	if thumbnailObject != nil {
-		result.ThumbnailURL = persist.NullString(thumbnailObject.StorageURL(tokenBucket))
+		result.ThumbnailURL = persist.NullString(thumbnailObject.storageURL(tokenBucket))
 	}
 
 	if liveRenderObject != nil {
-		result.LivePreviewURL = persist.NullString(liveRenderObject.StorageURL(tokenBucket))
+		result.LivePreviewURL = persist.NullString(liveRenderObject.storageURL(tokenBucket))
 	}
 
 	var err error
@@ -430,10 +430,10 @@ func getHTMLMedia(pCtx context.Context, tids persist.TokenIdentifiers, tokenBuck
 	if len(cachedObjects) > 0 {
 		for _, obj := range cachedObjects {
 			if obj.ObjectType == objectTypeThumbnail {
-				res.ThumbnailURL = persist.NullString(obj.StorageURL(tokenBucket))
+				res.ThumbnailURL = persist.NullString(obj.storageURL(tokenBucket))
 				break
 			} else if obj.ObjectType == objectTypeImage {
-				res.ThumbnailURL = persist.NullString(obj.StorageURL(tokenBucket))
+				res.ThumbnailURL = persist.NullString(obj.storageURL(tokenBucket))
 			}
 		}
 	}
@@ -691,6 +691,8 @@ func (o objectType) String() string {
 		return "liverender"
 	case objectTypeSVG:
 		return "svg"
+	case objectTypeUnknown:
+		return "unknown"
 	default:
 		panic(fmt.Sprintf("unknown object type: %d", o))
 	}
@@ -713,7 +715,7 @@ func (m cachedMediaObject) fileName() string {
 	return fmt.Sprintf("%d-%s-%s-%s", m.Chain, m.TokenID, m.ContractAddress, m.ObjectType)
 }
 
-func (m cachedMediaObject) StorageURL(tokenBucket string) string {
+func (m cachedMediaObject) storageURL(tokenBucket string) string {
 	return fmt.Sprintf("https://storage.googleapis.com/%s/%s", tokenBucket, m.fileName())
 }
 
@@ -1025,7 +1027,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 
 	result := []cachedMediaObject{obj}
 	if mediaType == persist.MediaTypeVideo {
-		videoURL := obj.StorageURL(bucket)
+		videoURL := obj.storageURL(bucket)
 		thumbObj, err := thumbnailAndCache(pCtx, tids, videoURL, bucket, storageClient, subMeta)
 		if err != nil {
 			logger.For(pCtx).Errorf("could not create thumbnail for %s: %s", tids, err)
@@ -1148,7 +1150,7 @@ func newObjectWriter(ctx context.Context, client *storage.Client, bucket, fileNa
 	writer.ObjectAttrs.Metadata = objMetadata
 	writer.ObjectAttrs.CacheControl = "no-cache, no-store"
 	writer.ChunkSize = 4 * 1024 * 1024 // 4MB
-	writer.ChunkRetryDeadline = 1 * time.Minute
+	writer.ChunkRetryDeadline = 3 * time.Minute
 	if contentLength != nil {
 		cl := *contentLength
 		if cl < 4*1024*1024 {

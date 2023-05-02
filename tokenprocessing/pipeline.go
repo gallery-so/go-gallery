@@ -97,20 +97,10 @@ func (tpj *tokenProcessingJob) run(ctx context.Context) error {
 		logger.For(ctx).Errorf("error creating media for token: %s", err)
 	}
 
-	tmedia, err = tpj.persistMedia(ctx, tmedia)
-	if err != nil {
-		logger.For(ctx).Errorf("error persisting media for token: %s", err)
-	}
-
-	return tpj.updateJobDB(ctx, tmedia)
+	return tpj.persistResults(ctx, tmedia)
 }
 
 func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (coredb.TokenMedia, error) {
-	defer func() {
-		if r := recover(); r != nil {
-			logger.For(ctx).Errorf("panic in createMediaForToken: %s", r)
-		}
-	}()
 
 	result := coredb.TokenMedia{
 		ID:              persist.GenerateID(),
@@ -134,9 +124,9 @@ func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (coredb.
 			// we could have cached a thumbnail or something else alongside the other media.
 			errNotCacheable := err.(errNotCacheable)
 			first, _ := util.FindFirst(cachedObjects, func(c cachedMediaObject) bool {
-				return c.StorageURL(tpj.tp.tokenBucket) != "" && (c.ObjectType == objectTypeImage || c.ObjectType == objectTypeSVG || c.ObjectType == objectTypeThumbnail)
+				return c.storageURL(tpj.tp.tokenBucket) != "" && (c.ObjectType == objectTypeImage || c.ObjectType == objectTypeSVG || c.ObjectType == objectTypeThumbnail)
 			})
-			result.Media = tpj.createRawMedia(ctx, errNotCacheable.MediaType, errNotCacheable.URL, first.StorageURL(tpj.tp.tokenBucket), cachedObjects)
+			result.Media = tpj.createRawMedia(ctx, errNotCacheable.MediaType, errNotCacheable.URL, first.storageURL(tpj.tp.tokenBucket), cachedObjects)
 		case MediaProcessingError:
 			errMediaProcessing := err.(MediaProcessingError)
 			if errMediaProcessing.AnimationError != nil {
@@ -232,66 +222,41 @@ func (tpj *tokenProcessingJob) isNewMediaPreferable(ctx context.Context, media p
 	return !tpj.token.Media.IsServable() && media.IsServable()
 }
 
-func (tpj *tokenProcessingJob) persistMedia(ctx context.Context, tmetadata coredb.TokenMedia) (coredb.TokenMedia, error) {
+func (tpj *tokenProcessingJob) persistResults(ctx context.Context, tmetadata coredb.TokenMedia) error {
 	if !tpj.isNewMediaPreferable(ctx, tmetadata.Media) {
 		tmetadata.Active = false
 	}
 
-	return tpj.updateTokenMetadataDB(ctx, tmetadata)
+	return tpj.upsertDB(ctx, tmetadata)
 
 }
 
-func (tpj *tokenProcessingJob) updateTokenMetadataDB(ctx context.Context, tmetadata coredb.TokenMedia) (coredb.TokenMedia, error) {
-	defer persist.TrackStepStatus(&tpj.pipelineMetadata.UpdateTokenMetadataDB)()
+func (tpj *tokenProcessingJob) upsertDB(ctx context.Context, tmetadata coredb.TokenMedia) error {
 
-	newMetadata, err := tpj.tp.queries.UpsertTokenMedia(ctx, coredb.UpsertTokenMediaParams{
-		NewID:           tmetadata.ID,
-		ContractID:      tpj.token.Contract,
-		TokenID:         tpj.token.TokenID,
-		Chain:           tpj.token.Chain,
-		Metadata:        tmetadata.Metadata,
-		Media:           tmetadata.Media,
-		Name:            tmetadata.Name,
-		Description:     tmetadata.Description,
-		ProcessingJobID: tmetadata.ProcessingJobID,
-		Active:          tmetadata.Active,
-	})
-	if err != nil {
-		persist.FailStep(&tpj.pipelineMetadata.UpdateTokenMetadataDB)
-		return tmetadata, err
-	}
-	return newMetadata, nil
-}
-
-func (tpj *tokenProcessingJob) updateJobDB(ctx context.Context, tmetadata coredb.TokenMedia) error {
-	defer persist.TrackStepStatus(&tpj.pipelineMetadata.UpdateJobDB)()
-	p := persist.TokenProperties{}
-	if tmetadata.Metadata != nil && len(tmetadata.Metadata) > 0 {
-		p.HasMetadata = true
-	}
-	if tmetadata.Media.MediaType.IsValid() && tmetadata.Media.MediaURL != "" {
-		p.HasPrimaryMedia = true
-	}
-	if tmetadata.Media.ThumbnailURL != "" {
-		p.HasThumbnail = true
-	}
-	if tmetadata.Media.LivePreviewURL != "" {
-		p.HasLiveRender = true
-	}
-	if tmetadata.Media.Dimensions.Valid() {
-		p.HasDimensions = true
+	p := persist.TokenProperties{
+		HasMetadata:     tmetadata.Metadata != nil && len(tmetadata.Metadata) > 0,
+		HasPrimaryMedia: tmetadata.Media.MediaType.IsValid() && tmetadata.Media.MediaURL != "",
+		HasThumbnail:    tmetadata.Media.ThumbnailURL != "",
+		HasLiveRender:   tmetadata.Media.LivePreviewURL != "",
+		HasDimensions:   tmetadata.Media.Dimensions.Valid(),
+		HasName:         tmetadata.Name != "",
+		HasDescription:  tmetadata.Description != "",
 	}
 
-	err := tpj.tp.queries.InsertTokenProcessingJob(ctx, coredb.InsertTokenProcessingJobParams{
-		ID:               tpj.id,
+	return tpj.tp.queries.UpsertTokenMedia(ctx, coredb.UpsertTokenMediaParams{
+		NewID:            tmetadata.ID,
+		ContractID:       tpj.token.Contract,
+		TokenID:          tpj.token.TokenID,
+		Chain:            tpj.token.Chain,
+		Metadata:         tmetadata.Metadata,
+		Media:            tmetadata.Media,
+		Name:             tmetadata.Name,
+		Description:      tmetadata.Description,
+		ProcessingJobID:  tmetadata.ProcessingJobID,
+		Active:           tmetadata.Active,
 		TokenProperties:  p,
 		PipelineMetadata: *tpj.pipelineMetadata,
 		ProcessingCause:  tpj.cause,
 		ProcessorVersion: "",
 	})
-	if err != nil {
-		persist.FailStep(&tpj.pipelineMetadata.UpdateJobDB)
-		return err
-	}
-	return nil
 }

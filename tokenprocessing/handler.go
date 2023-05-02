@@ -9,7 +9,7 @@ import (
 
 func handlersInitServer(router *gin.Engine, tp *tokenProcessor, mc *multichain.Provider, repos *postgres.Repositories, throttler *throttle.Locker) *gin.Engine {
 	mediaGroup := router.Group("/media")
-	mediaGroup.POST("/process", processMediaForUsersTokensOfChain(tp, repos.TokenRepository, repos.ContractRepository, throttler))
+	mediaGroup.POST("/process", processMediaForUsersTokens(tp, repos.TokenRepository, repos.ContractRepository, throttler))
 	mediaGroup.POST("/process/token", processMediaForToken(tp, repos.TokenRepository, repos.ContractRepository, repos.UserRepository, repos.WalletRepository, throttler))
 	ownersGroup := router.Group("/owners")
 	ownersGroup.POST("/process/contract", processOwnersForContractTokens(mc, repos.ContractRepository, throttler))
