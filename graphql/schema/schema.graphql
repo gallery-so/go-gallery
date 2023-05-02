@@ -521,12 +521,8 @@ type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) @g
   profileBannerURL: String
   badgeURL: String
   parentCommunity: CommunityEdge @goField(forceResolver: true)
-  subCommunities(
-    before: String
-    after: String
-    first: Int
-    last: Int
-  ): CommunitiesConnection @goField(forceResolver: true)
+  subCommunities(before: String, after: String, first: Int, last: Int): CommunitiesConnection
+    @goField(forceResolver: true)
 
   tokensInCommunity(
     before: String
