@@ -169,9 +169,9 @@ func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, pContracts 
 	// The remaining fields are skipped because the upsert logic ensures that the existing row is
 	// always replaced with the newer row.
 	for i := range contracts {
-		c := &upserted[i]
+		c := &contracts[i]
 		(*c).ID = upserted[i].ID
-		(*c).CreatedAt = upserted[i].CreatedAt
+		(*c).CreationTime = persist.CreationTime(upserted[i].CreatedAt)
 		(*c).ParentID = upserted[i].ParentID
 	}
 
