@@ -463,12 +463,10 @@ func (t *TokenRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUp
 
 	var res sql.Result
 	var err error
-	switch pUpdate.(type) {
+	switch update := pUpdate.(type) {
 	case persist.TokenUpdateOwnerInput:
-		update := pUpdate.(persist.TokenUpdateOwnerInput)
 		res, err = t.updateOwnerUnsafeStmt.ExecContext(pCtx, update.OwnerAddress, []persist.AddressAtBlock{{Address: persist.Address(update.OwnerAddress), Block: update.BlockNumber}}, update.BlockNumber, persist.LastUpdatedTime{}, pID)
 	case persist.TokenUpdateBalanceInput:
-		update := pUpdate.(persist.TokenUpdateBalanceInput)
 		res, err = t.updateBalanceUnsafeStmt.ExecContext(pCtx, update.Quantity, update.BlockNumber, persist.LastUpdatedTime{}, pID)
 	default:
 		return fmt.Errorf("unsupported update type: %T", pUpdate)
