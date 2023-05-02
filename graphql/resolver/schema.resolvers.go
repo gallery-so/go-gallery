@@ -175,12 +175,18 @@ func (r *communityResolver) Creator(ctx context.Context, obj *model.Community) (
 }
 
 // ParentCommunity is the resolver for the parentCommunity field.
-func (r *communityResolver) ParentCommunity(ctx context.Context, obj *model.Community) (*model.Community, error) {
-	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, obj.ParentCommunity.Dbid)
+func (r *communityResolver) ParentCommunity(ctx context.Context, obj *model.Community) (*model.CommunityEdge, error) {
+	if obj.ParentCommunity.Node.Dbid == "" {
+		return nil, nil
+	}
+
+	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, obj.ParentCommunity.Node.Dbid)
 	if err != nil {
 		return nil, err
 	}
-	return communityToModel(ctx, *contract, obj.HelperCommunityData.ForceRefresh), nil
+
+	obj.ParentCommunity.Node = communityToModel(ctx, *contract, obj.ParentCommunity.Node.ForceRefresh)
+	return obj.ParentCommunity, nil
 }
 
 // SubCommunities is the resolver for the subCommunities field.
@@ -193,9 +199,6 @@ func (r *communityResolver) SubCommunities(ctx context.Context, obj *model.Commu
 	edges := make([]*model.CommunityEdge, len(communities))
 	for i, community := range communities {
 		edges[i] = &model.CommunityEdge{
-			// TODO: We may want to support refreshes for sub-communities
-			// Currently, sub-communities are refreshed only when a user's created
-			// communities are requested.
 			Node:   communityToModel(ctx, community, util.ToPointer(false)),
 			Cursor: nil, // not used by relay, but relay will complain without this field existing
 		}
@@ -219,7 +222,7 @@ func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Co
 		}
 	}
 
-	isRootNode := obj.ParentCommunity.Dbid == ""
+	isRootNode := obj.ParentCommunity.Node.Dbid == ""
 
 	return resolveTokensByContractIDWithPagination(ctx, obj.Dbid, before, after, first, last, onlyUsers, isRootNode)
 }
@@ -236,7 +239,7 @@ func (r *communityResolver) Owners(ctx context.Context, obj *model.Community, be
 		}
 	}
 
-	isRootNode := obj.ParentCommunity.Dbid == ""
+	isRootNode := obj.ParentCommunity.Node.Dbid == ""
 
 	return resolveCommunityOwnersByContractID(ctx, obj.Dbid, before, after, first, last, onlyUsers, isRootNode)
 }

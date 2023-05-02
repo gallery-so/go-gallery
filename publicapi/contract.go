@@ -75,7 +75,7 @@ func (api ContractAPI) GetChildContractsByParentID(ctx context.Context, contract
 	}
 
 	queryFunc := func(params timeIDPagingParams) ([]any, error) {
-		keys, err := api.loaders.ContractsLoaderByParentID.Load(db.GetChildContractsByParentIDBatchPaginateParams{
+		queryParams := db.GetChildContractsByParentIDBatchPaginateParams{
 			ParentID:      contractID,
 			CurBeforeTime: params.CursorBeforeTime,
 			CurBeforeID:   params.CursorBeforeID,
@@ -83,7 +83,9 @@ func (api ContractAPI) GetChildContractsByParentID(ctx context.Context, contract
 			CurAfterID:    params.CursorAfterID,
 			PagingForward: params.PagingForward,
 			Limit:         params.Limit,
-		})
+		}
+
+		keys, err := api.loaders.ContractsLoaderByParentID.Load(queryParams)
 		if err != nil {
 			return nil, err
 		}

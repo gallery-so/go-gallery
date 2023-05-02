@@ -8,8 +8,6 @@ package coredb
 import (
 	"context"
 	"time"
-
-	"github.com/jackc/pgtype"
 )
 
 const upsertContracts = `-- name: UpsertContracts :many
@@ -26,7 +24,7 @@ insert into contracts (id, deleted, version, created_at, address, symbol, name, 
   , unnest($9::int[])
   , unnest($10::varchar[])
 )
-on conflict (chain, parent_id, address)
+on conflict (chain, address) where parent_id is null
 do update set
   symbol = excluded.symbol
   , version = excluded.version
@@ -35,7 +33,7 @@ do update set
   , description = excluded.description
   , deleted = excluded.deleted
   , last_updated = now()
-returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, parent_id, owner_address, is_provider_marked_spam
+returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id
 `
 
 type UpsertContractsParams struct {
@@ -86,9 +84,9 @@ func (q *Queries) UpsertContracts(ctx context.Context, arg UpsertContractsParams
 			&i.ProfileImageUrl,
 			&i.BadgeUrl,
 			&i.Description,
-			&i.ParentID,
 			&i.OwnerAddress,
 			&i.IsProviderMarkedSpam,
+			&i.ParentID,
 		); err != nil {
 			return nil, err
 		}
@@ -119,63 +117,11 @@ child_contracts_data(id, deleted, created_at, name, address, creator_address, ch
     , unnest($11::boolean[]) as deleted
     , unnest($12::timestamptz[]) as created_at
     , unnest($13::varchar[]) as name
-    -- For child contracts, the address is the unique identifier specific to each contract
-    -- that uniquely identifies a child contract within a contract.
     , unnest($14::varchar[]) as address
     , unnest($15::varchar[]) as creator_address
     , unnest($16::int[]) as chain
     , unnest($17::varchar[]) as description
-     -- This field is only used as condition of the join
     , unnest($18::varchar[]) as parent_address
-),
-tokens_data(
-  id
-  , deleted
-  , created_at
-  , name
-  , description
-  , token_type
-  , token_id
-  , quantity
-  , ownership_history
-  , ownership_history_start_idx
-  , ownership_history_end_idx
-  , external_url
-  , block_number
-  , owner_user_id
-  , owned_by_wallets
-  , owned_by_wallets_start_idx
-  , owned_by_wallets_end_idx
-  , chain
-  , is_provider_marked_spam
-  , last_synced
-  , parent_contract_address
-  , child_contract_address
-) as (
-  select
-    unnest($19::varchar[]) as id
-    , unnest($20::boolean[]) as deleted
-    , unnest($21::timestamptz[]) as created_at
-    , unnest($22::varchar[]) as name
-    , unnest($23::varchar[]) as description
-    , unnest($24::varchar[]) as token_type
-    , unnest($25::varchar[]) as token_id
-    , unnest($26::varchar[]) as quantity
-    , $27::jsonb[] as ownership_history
-    , unnest($28::int[]) as ownership_history_start_idx
-    , unnest($29::int[]) as ownership_history_end_idx
-    , unnest($30::varchar[]) as external_url
-    , unnest($31::bigint[]) as block_number
-    , unnest($32::varchar[]) as owner_user_id
-    , $33::varchar[] as owned_by_wallets
-    , unnest($34::int[]) as owned_by_wallets_start_idx
-    , unnest($35::int[]) as owned_by_wallets_end_idx
-    , unnest($36::int[]) as chain
-    , unnest($37::bool[]) as is_provider_marked_spam
-    , unnest($38::timestamptz[]) as last_synced
-     -- These fields are only used as condition of the join
-    , unnest($39::varchar[]) as parent_contract_address
-    , unnest($40::varchar[]) as child_contract_address
 ),
 insert_parent_contracts as (
   insert into contracts(id, deleted, created_at, name, symbol, address, creator_address, chain, description)
@@ -191,163 +137,63 @@ insert_parent_contracts as (
       , description
     from parent_contracts_data
   )
-  on conflict (chain, parent_id, address)
+  on conflict (chain, address) where parent_id is null
   do update set deleted = excluded.deleted
     , name = excluded.name
     , symbol = excluded.symbol
     , creator_address = excluded.creator_address
     , description = excluded.description
     , last_updated = now()
-  returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, parent_id, owner_address, is_provider_marked_spam
-),
-insert_child_contracts as (
-  insert into contracts(id, deleted, created_at, name, address, creator_address, chain, description, parent_id)
-  (
-    select child.id
-      , child.deleted
-      , child.created_at
-      , child.name
-      , child.address
-      , child.creator_address
-      , child.chain
-      , child.description
-      , insert_parent_contracts.id
-    from child_contracts_data child
-    -- Join on the inserted parent_contracts to get the parent's id
-    join insert_parent_contracts on child.chain = insert_parent_contracts.chain and child.parent_address = insert_parent_contracts.address
-  )
-  on conflict (chain, parent_id, address)
-  do update set deleted = excluded.deleted
-    , name = excluded.name
-    , creator_address = excluded.creator_address
-    , description = excluded.description
-    , last_updated = now()
-  returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, parent_id, owner_address, is_provider_marked_spam
+  returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id
 )
-insert into tokens(
-  id
-  , deleted
-  , created_at
-  , name
-  , description
-  , token_type
-  , quantity
-  , token_id
-  , ownership_history
-  , external_url
-  , block_number
-  , owner_user_id
-  , owned_by_wallets
-  , chain
-  , contract
-  , is_provider_marked_spam
-  , last_synced
-  , child_contract_id
-) (
-  select
-    tokens_data.id
-    , tokens_data.deleted
-    , tokens_data.created_at
-    , tokens_data.name
-    , tokens_data.description
-    , tokens_data.token_type
-    , tokens_data.quantity
-    , tokens_data.token_id
-    , tokens_data.ownership_history[tokens_data.ownership_history_start_idx::int:tokens_data.ownership_history_end_idx::int]
-    , tokens_data.external_url
-    , tokens_data.block_number
-    , tokens_data.owner_user_id
-    , tokens_data.owned_by_wallets[tokens_data.owned_by_wallets_start_idx::int:tokens_data.owned_by_wallets_end_idx::int]
-    , tokens_data.chain
+insert into contracts(id, deleted, created_at, name, address, creator_address, chain, description, parent_id)
+(
+  select child.id
+    , child.deleted
+    , child.created_at
+    , child.name
+    , child.address
+    , child.creator_address
+    , child.chain
+    , child.description
     , insert_parent_contracts.id
-    , tokens_data.is_provider_marked_spam
-    , tokens_data.last_synced
-    , insert_child_contracts.id
-  from tokens_data
-  -- Join on the inserted parent contracts to get the parent's id
-  join insert_parent_contracts on tokens_data.chain = insert_parent_contracts.chain and tokens_data.parent_contract_address = insert_parent_contracts.address
-  -- Join on the inserted child contracts to get the child's id
-  join insert_child_contracts on tokens_data.chain = insert_child_contracts.chain and tokens_data.child_contract_address = insert_child_contracts.address
+  from child_contracts_data child
+  join insert_parent_contracts on child.chain = insert_parent_contracts.chain and child.parent_address = insert_parent_contracts.address
 )
-on conflict (token_id, contract, chain, owner_user_id) where deleted = false
-do update set
-  token_type = excluded.token_type
-  , chain = excluded.chain
+on conflict (chain, parent_id, address) where parent_id is not null
+do update set deleted = excluded.deleted
   , name = excluded.name
+  , creator_address = excluded.creator_address
   , description = excluded.description
-  , quantity = excluded.quantity
-  , owner_user_id = excluded.owner_user_id
-  , owned_by_wallets = excluded.owned_by_wallets
-  , ownership_history = tokens.ownership_history || excluded.ownership_history
-  , external_url = excluded.external_url
-  , block_number = excluded.block_number
   , last_updated = now()
-  , is_provider_marked_spam = excluded.is_provider_marked_spam
-  , last_synced = greatest(excluded.last_synced,tokens.last_synced)
-  , child_contract_id = excluded.child_contract_id
-returning id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, child_contract_id, fallback_media
+returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id
 `
 
 type UpsertCreatedTokensParams struct {
-	ParentContractID              []string
-	ParentContractDeleted         []bool
-	ParentContractCreatedAt       []time.Time
-	ParentContractName            []string
-	ParentContractSymbol          []string
-	ParentContractAddress         []string
-	ParentContractCreatorAddress  []string
-	ParentContractChain           []int32
-	ParentContractDescription     []string
-	ChildContractID               []string
-	ChildContractDeleted          []bool
-	ChildContractCreatedAt        []time.Time
-	ChildContractName             []string
-	ChildContractAddress          []string
-	ChildContractCreatorAddress   []string
-	ChildContractChain            []int32
-	ChildContractDescription      []string
-	ChildContractParentAddress    []string
-	TokenID                       []string
-	TokenDeleted                  []bool
-	TokenCreatedAt                []time.Time
-	TokenName                     []string
-	TokenDescription              []string
-	TokenTokenType                []string
-	TokenTokenID                  []string
-	TokenQuantity                 []string
-	TokenOwnershipHistory         []pgtype.JSONB
-	TokenOwnershipHistoryStartIdx []int32
-	TokenOwnershipHistoryEndIdx   []int32
-	TokenExternalUrl              []string
-	TokenBlockNumber              []int64
-	TokenOwnerUserID              []string
-	TokenOwnedByWallets           []string
-	TokenOwnedByWalletsStartIdx   []int32
-	TokenOwnedByWalletsEndIdx     []int32
-	TokenChain                    []int32
-	TokenIsProviderMarkedSpam     []bool
-	TokenLastSynced               []time.Time
-	TokenParentContractAddress    []string
-	TokenChildContractAddress     []string
+	ParentContractID             []string
+	ParentContractDeleted        []bool
+	ParentContractCreatedAt      []time.Time
+	ParentContractName           []string
+	ParentContractSymbol         []string
+	ParentContractAddress        []string
+	ParentContractCreatorAddress []string
+	ParentContractChain          []int32
+	ParentContractDescription    []string
+	ChildContractID              []string
+	ChildContractDeleted         []bool
+	ChildContractCreatedAt       []time.Time
+	ChildContractName            []string
+	ChildContractAddress         []string
+	ChildContractCreatorAddress  []string
+	ChildContractChain           []int32
+	ChildContractDescription     []string
+	ChildContractParentAddress   []string
 }
 
-// UpsertCreatedTokens bulk upserts parent contracts, child contracts and tokens in a single query using data-modifying CTEs.
-// Each data-modifying CTE returns the data that was inserted or updated, which is used to insert or update the next table.
-//
-// This is so that we can:
-// * Reference the id of the parent contract when inserting the child contract
-// * Reference the id of the parent contract and the id of the child contract when inserting the token
-//
 // parent_contracts_data is the data to be inserted for the parent contracts
 // child_contracts_data is the data to be inserted for the child contract.
-// tokens_data is the data to be inserted for the tokens belonging to a child contract
 // Insert parent contracts, returning the inserted or updated rows
-// Insert child contracts with reference to the parent contract, returning the inserted or updated rows
-// Finally insert the tokens, with reference to the parent and child contract ids
-// Note that media related columns (token_uri, token_metadata, media) is not inserted or updated here, because it is assumed
-// that this data will be inserted later via tokenprocessing.
-// User-scoped data (collectors_note, is_user_marked_spam) is also not updated here.
-func (q *Queries) UpsertCreatedTokens(ctx context.Context, arg UpsertCreatedTokensParams) ([]Token, error) {
+func (q *Queries) UpsertCreatedTokens(ctx context.Context, arg UpsertCreatedTokensParams) ([]Contract, error) {
 	rows, err := q.db.Query(ctx, upsertCreatedTokens,
 		arg.ParentContractID,
 		arg.ParentContractDeleted,
@@ -367,36 +213,14 @@ func (q *Queries) UpsertCreatedTokens(ctx context.Context, arg UpsertCreatedToke
 		arg.ChildContractChain,
 		arg.ChildContractDescription,
 		arg.ChildContractParentAddress,
-		arg.TokenID,
-		arg.TokenDeleted,
-		arg.TokenCreatedAt,
-		arg.TokenName,
-		arg.TokenDescription,
-		arg.TokenTokenType,
-		arg.TokenTokenID,
-		arg.TokenQuantity,
-		arg.TokenOwnershipHistory,
-		arg.TokenOwnershipHistoryStartIdx,
-		arg.TokenOwnershipHistoryEndIdx,
-		arg.TokenExternalUrl,
-		arg.TokenBlockNumber,
-		arg.TokenOwnerUserID,
-		arg.TokenOwnedByWallets,
-		arg.TokenOwnedByWalletsStartIdx,
-		arg.TokenOwnedByWalletsEndIdx,
-		arg.TokenChain,
-		arg.TokenIsProviderMarkedSpam,
-		arg.TokenLastSynced,
-		arg.TokenParentContractAddress,
-		arg.TokenChildContractAddress,
 	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Token
+	var items []Contract
 	for rows.Next() {
-		var i Token
+		var i Contract
 		if err := rows.Scan(
 			&i.ID,
 			&i.Deleted,
@@ -404,26 +228,17 @@ func (q *Queries) UpsertCreatedTokens(ctx context.Context, arg UpsertCreatedToke
 			&i.CreatedAt,
 			&i.LastUpdated,
 			&i.Name,
-			&i.Description,
-			&i.CollectorsNote,
-			&i.Media,
-			&i.TokenUri,
-			&i.TokenType,
-			&i.TokenID,
-			&i.Quantity,
-			&i.OwnershipHistory,
-			&i.TokenMetadata,
-			&i.ExternalUrl,
-			&i.BlockNumber,
-			&i.OwnerUserID,
-			&i.OwnedByWallets,
+			&i.Symbol,
+			&i.Address,
+			&i.CreatorAddress,
 			&i.Chain,
-			&i.Contract,
-			&i.IsUserMarkedSpam,
+			&i.ProfileBannerUrl,
+			&i.ProfileImageUrl,
+			&i.BadgeUrl,
+			&i.Description,
+			&i.OwnerAddress,
 			&i.IsProviderMarkedSpam,
-			&i.LastSynced,
-			&i.ChildContractID,
-			&i.FallbackMedia,
+			&i.ParentID,
 		); err != nil {
 			return nil, err
 		}

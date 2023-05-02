@@ -583,7 +583,7 @@ type Community struct {
 	ProfileImageURL   *string                 `json:"profileImageURL"`
 	ProfileBannerURL  *string                 `json:"profileBannerURL"`
 	BadgeURL          *string                 `json:"badgeURL"`
-	ParentCommunity   *Community              `json:"parentCommunity"`
+	ParentCommunity   *CommunityEdge          `json:"parentCommunity"`
 	SubCommunities    *CommunitiesConnection  `json:"subCommunities"`
 	TokensInCommunity *TokensConnection       `json:"tokensInCommunity"`
 	Owners            *TokenHoldersConnection `json:"owners"`

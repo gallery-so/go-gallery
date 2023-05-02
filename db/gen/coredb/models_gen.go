@@ -73,9 +73,9 @@ type Contract struct {
 	ProfileImageUrl      sql.NullString
 	BadgeUrl             sql.NullString
 	Description          sql.NullString
-	ParentID             persist.DBID
 	OwnerAddress         persist.Address
 	IsProviderMarkedSpam bool
+	ParentID             persist.DBID
 }
 
 type ContractRelevance struct {
@@ -348,8 +348,8 @@ type Token struct {
 	IsUserMarkedSpam     sql.NullBool
 	IsProviderMarkedSpam sql.NullBool
 	LastSynced           time.Time
-	ChildContractID      persist.DBID
 	FallbackMedia        persist.FallbackMedia
+	ChildContractID      persist.DBID
 }
 
 type TopRecommendedUser struct {

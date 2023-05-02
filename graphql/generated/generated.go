@@ -1311,7 +1311,7 @@ type CommentOnFeedEventPayloadResolver interface {
 type CommunityResolver interface {
 	Creator(ctx context.Context, obj *model.Community) (*model.GalleryUser, error)
 
-	ParentCommunity(ctx context.Context, obj *model.Community) (*model.Community, error)
+	ParentCommunity(ctx context.Context, obj *model.Community) (*model.CommunityEdge, error)
 	SubCommunities(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error)
 	TokensInCommunity(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokensConnection, error)
 	Owners(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokenHoldersConnection, error)
@@ -7119,7 +7119,7 @@ type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) @g
   profileImageURL: String
   profileBannerURL: String
   badgeURL: String
-  parentCommunity: Community @goField(forceResolver: true)
+  parentCommunity: CommunityEdge @goField(forceResolver: true)
   subCommunities(
     before: String
     after: String
@@ -16212,9 +16212,9 @@ func (ec *executionContext) _Community_parentCommunity(ctx context.Context, fiel
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*model.Community)
+	res := resTmp.(*model.CommunityEdge)
 	fc.Result = res
-	return ec.marshalOCommunity2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunity(ctx, field.Selections, res)
+	return ec.marshalOCommunityEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunityEdge(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Community_parentCommunity(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -16225,42 +16225,12 @@ func (ec *executionContext) fieldContext_Community_parentCommunity(ctx context.C
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "dbid":
-				return ec.fieldContext_Community_dbid(ctx, field)
-			case "id":
-				return ec.fieldContext_Community_id(ctx, field)
-			case "lastUpdated":
-				return ec.fieldContext_Community_lastUpdated(ctx, field)
-			case "contractAddress":
-				return ec.fieldContext_Community_contractAddress(ctx, field)
-			case "creatorAddress":
-				return ec.fieldContext_Community_creatorAddress(ctx, field)
-			case "creator":
-				return ec.fieldContext_Community_creator(ctx, field)
-			case "chain":
-				return ec.fieldContext_Community_chain(ctx, field)
-			case "name":
-				return ec.fieldContext_Community_name(ctx, field)
-			case "description":
-				return ec.fieldContext_Community_description(ctx, field)
-			case "previewImage":
-				return ec.fieldContext_Community_previewImage(ctx, field)
-			case "profileImageURL":
-				return ec.fieldContext_Community_profileImageURL(ctx, field)
-			case "profileBannerURL":
-				return ec.fieldContext_Community_profileBannerURL(ctx, field)
-			case "badgeURL":
-				return ec.fieldContext_Community_badgeURL(ctx, field)
-			case "parentCommunity":
-				return ec.fieldContext_Community_parentCommunity(ctx, field)
-			case "subCommunities":
-				return ec.fieldContext_Community_subCommunities(ctx, field)
-			case "tokensInCommunity":
-				return ec.fieldContext_Community_tokensInCommunity(ctx, field)
-			case "owners":
-				return ec.fieldContext_Community_owners(ctx, field)
+			case "node":
+				return ec.fieldContext_CommunityEdge_node(ctx, field)
+			case "cursor":
+				return ec.fieldContext_CommunityEdge_cursor(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type CommunityEdge", field.Name)
 		},
 	}
 	return fc, nil

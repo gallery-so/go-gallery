@@ -985,9 +985,9 @@ insert into pii.account_creation_info (user_id, ip_address, created_at) values (
 select c.*
 from contracts c
 where c.parent_id = @parent_id
-  and contracts.deleted = false
-  and (c.created_at, c.id) > (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-  and (c.created_at, c.id) < ( sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+  and c.deleted = false
+  and (c.created_at, c.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+  and (c.created_at, c.id) > ( sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
 order by case when sqlc.arg('paging_forward')::bool then (c.created_at, c.id) end asc,
         case when not sqlc.arg('paging_forward')::bool then (c.created_at, c.id) end desc
 limit sqlc.arg('limit');

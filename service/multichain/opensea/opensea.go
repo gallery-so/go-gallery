@@ -424,7 +424,6 @@ type OptionFunc func(o *QueryOptions)
 
 var defaultOptions = QueryOptions{
 	outCh:    make(chan assetsReceieved),
-	sortAsc:  false,
 	pageSize: 200,
 }
 
@@ -511,10 +510,10 @@ func streamAssetsForToken(ctx context.Context, address persist.EthereumAddress, 
 		opt(&args)
 	}
 	url := baseURL.JoinPath("assets")
-	setPagingParams(url, args.sortAsc, args.pageSize)
+	setPagingParams(url, args.pageSize)
 	setContractAddress(url, address)
 	setTokenID(url, tokenID)
-	paginateAssets(ctx, authRequest(ctx, url.String()), args.sortAsc, args.outCh)
+	paginateAssets(ctx, authRequest(ctx, url.String()), args.outCh)
 }
 
 func streamAssetsForWallet(ctx context.Context, address persist.EthereumAddress, opts ...OptionFunc) {
@@ -523,9 +522,9 @@ func streamAssetsForWallet(ctx context.Context, address persist.EthereumAddress,
 		opt(&args)
 	}
 	url := baseURL.JoinPath("assets")
-	setPagingParams(url, args.sortAsc, args.pageSize)
+	setPagingParams(url, args.pageSize)
 	setOwner(url, address)
-	paginateAssets(ctx, authRequest(ctx, url.String()), args.sortAsc, args.outCh)
+	paginateAssets(ctx, authRequest(ctx, url.String()), args.outCh)
 }
 
 func streamAssetsForContract(ctx context.Context, address persist.EthereumAddress, opts ...OptionFunc) {
@@ -534,9 +533,9 @@ func streamAssetsForContract(ctx context.Context, address persist.EthereumAddres
 		opt(&args)
 	}
 	url := baseURL.JoinPath("assets")
-	setPagingParams(url, args.sortAsc, args.pageSize)
+	setPagingParams(url, args.pageSize)
 	setContractAddress(url, address)
-	paginateAssets(ctx, authRequest(ctx, url.String()), args.sortAsc, args.outCh)
+	paginateAssets(ctx, authRequest(ctx, url.String()), args.outCh)
 }
 
 func streamAssetsForContractAddressAndOwner(ctx context.Context, ownerAddress, contractAddress persist.EthereumAddress, opts ...OptionFunc) {
@@ -545,10 +544,10 @@ func streamAssetsForContractAddressAndOwner(ctx context.Context, ownerAddress, c
 		opt(&args)
 	}
 	url := baseURL.JoinPath("assets")
-	setPagingParams(url, args.sortAsc, args.pageSize)
+	setPagingParams(url, args.pageSize)
 	setOwner(url, ownerAddress)
 	setContractAddress(url, contractAddress)
-	paginateAssets(ctx, authRequest(ctx, url.String()), args.sortAsc, args.outCh)
+	paginateAssets(ctx, authRequest(ctx, url.String()), args.outCh)
 }
 
 func streamAssetsForTokenIdentifiers(ctx context.Context, contractAddress persist.EthereumAddress, tokenID TokenID, opts ...OptionFunc) {
@@ -557,10 +556,10 @@ func streamAssetsForTokenIdentifiers(ctx context.Context, contractAddress persis
 		opt(&args)
 	}
 	url := baseURL.JoinPath("assets")
-	setPagingParams(url, args.sortAsc, args.pageSize)
+	setPagingParams(url, args.pageSize)
 	setContractAddress(url, contractAddress)
 	setTokenID(url, tokenID)
-	paginateAssets(ctx, authRequest(ctx, url.String()), args.sortAsc, args.outCh)
+	paginateAssets(ctx, authRequest(ctx, url.String()), args.outCh)
 }
 
 func streamAssetsForTokenIdentifiersAndOwner(ctx context.Context, ownerAddress, contractAddress persist.EthereumAddress, tokenID TokenID, opts ...OptionFunc) {
@@ -569,13 +568,13 @@ func streamAssetsForTokenIdentifiersAndOwner(ctx context.Context, ownerAddress, 
 		opt(&args)
 	}
 	url := baseURL.JoinPath("assets")
-	setPagingParams(url, args.sortAsc, args.pageSize)
+	setPagingParams(url, args.pageSize)
 	setContractAddress(url, contractAddress)
 	setTokenID(url, tokenID)
 	if ownerAddress != "" {
 		setOwner(url, ownerAddress)
 	}
-	paginateAssets(ctx, authRequest(ctx, url.String()), args.sortAsc, args.outCh)
+	paginateAssets(ctx, authRequest(ctx, url.String()), args.outCh)
 }
 
 func streamAssetsForSharedContract(ctx context.Context, editorAddress persist.EthereumAddress, opts ...OptionFunc) {
@@ -584,13 +583,12 @@ func streamAssetsForSharedContract(ctx context.Context, editorAddress persist.Et
 		opt(&args)
 	}
 	url := baseURL.JoinPath("assets")
-	setPagingParams(url, args.sortAsc, args.pageSize)
+	setPagingParams(url, args.pageSize)
 	setCollectionEditor(url, editorAddress)
-	// Filter for only the Shared Storefront Address
 	for _, address := range sharedStoreFrontAddresses {
-		addContractAddress(url, address)
+		addContractAddresses(url, address)
 	}
-	paginateAssets(ctx, authRequest(ctx, url.String()), args.sortAsc, args.outCh)
+	paginateAssets(ctx, authRequest(ctx, url.String()), args.outCh)
 }
 
 // assetsByChildContract converts a channel of assets to a slice of sub-contract groups
@@ -849,7 +847,7 @@ func authRequest(ctx context.Context, url string) *http.Request {
 	return req
 }
 
-func paginateAssets(ctx context.Context, req *http.Request, sortAsc bool, outCh chan assetsReceieved) {
+func paginateAssets(ctx context.Context, req *http.Request, outCh chan assetsReceieved) {
 	for {
 		resp, err := retry.RetryRequest(http.DefaultClient, req)
 		if err != nil {
@@ -872,24 +870,19 @@ func paginateAssets(ctx context.Context, req *http.Request, sortAsc bool, outCh 
 
 		outCh <- assetsReceieved{assets: assets.Assets}
 
-		cursor := assets.Next
-		if sortAsc {
-			cursor = assets.Previous
+		if assets.Next == "" {
+			return
 		}
 
 		query := req.URL.Query()
-		query.Set("cursor", cursor)
+		query.Set("cursor", assets.Next)
 		req.URL.RawQuery = query.Encode()
 	}
 }
 
-func setPagingParams(url *url.URL, sortAsc bool, pageSize int) {
-	sortOrder := "asc"
-	if !sortAsc {
-		sortOrder = "desc"
-	}
+func setPagingParams(url *url.URL, pageSize int) {
 	query := url.Query()
-	query.Set("order_direction", sortOrder)
+	query.Set("order_direction", "desc")
 	query.Set("limit", strconv.Itoa(pageSize))
 	url.RawQuery = query.Encode()
 }
@@ -912,7 +905,7 @@ func setContractAddress(url *url.URL, address persist.EthereumAddress) {
 	url.RawQuery = query.Encode()
 }
 
-func addContractAddress(url *url.URL, address persist.EthereumAddress) {
+func addContractAddresses(url *url.URL, address persist.EthereumAddress) {
 	query := url.Query()
 	query.Add("asset_contract_addresses", address.String())
 	url.RawQuery = query.Encode()

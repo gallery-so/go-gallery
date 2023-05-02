@@ -1811,8 +1811,15 @@ func tokenCollectionToModel(ctx context.Context, token *model.Token, collectionI
 func communityToModel(ctx context.Context, community db.Contract, forceRefresh *bool) *model.Community {
 	lastUpdated := community.LastUpdated
 	contractAddress := persist.NewChainAddress(community.Address, community.Chain)
-	creatorAddress := persist.NewChainAddress(community.OwnerAddress, community.Chain)
 	chain := community.Chain
+
+	// TODO: Should this use CreatorAddress or OwnerAddress?
+	var creatorAddress *persist.ChainAddress
+	if community.CreatorAddress != "" {
+		chainAddress := persist.NewChainAddress(community.CreatorAddress, chain)
+		creatorAddress = &chainAddress
+	}
+
 	return &model.Community{
 		HelperCommunityData: model.HelperCommunityData{
 			ForceRefresh: forceRefresh,
@@ -1821,7 +1828,7 @@ func communityToModel(ctx context.Context, community db.Contract, forceRefresh *
 		LastUpdated:     &lastUpdated,
 		Contract:        contractToModel(ctx, community),
 		ContractAddress: &contractAddress,
-		CreatorAddress:  &creatorAddress,
+		CreatorAddress:  creatorAddress,
 		Name:            util.ToPointer(community.Name.String),
 		Description:     util.ToPointer(community.Description.String),
 		// PreviewImage:     util.ToPointer(community.Pr.String()), // TODO do we still need this with the new image fields?
@@ -1829,11 +1836,11 @@ func communityToModel(ctx context.Context, community db.Contract, forceRefresh *
 		ProfileImageURL:   util.ToPointer(community.ProfileImageUrl.String),
 		ProfileBannerURL:  util.ToPointer(community.ProfileBannerUrl.String),
 		BadgeURL:          util.ToPointer(community.BadgeUrl.String),
-		Owners:            nil,                                        // handled by dedicated resolver
-		Creator:           nil,                                        // handled by dedicated resolver
-		ParentCommunity:   &model.Community{Dbid: community.ParentID}, // remaining fields handlded by dedicated resolver
-		SubCommunities:    nil,                                        // handled by dedicated resolver
-		TokensInCommunity: nil,                                        // handled by dedicated resolver
+		Owners:            nil,                                                                    // handled by dedicated resolver
+		Creator:           nil,                                                                    // handled by dedicated resolver
+		ParentCommunity:   &model.CommunityEdge{Node: &model.Community{Dbid: community.ParentID}}, // remaining fields handlded by dedicated resolver
+		SubCommunities:    nil,                                                                    // handled by dedicated resolver
+		TokensInCommunity: nil,                                                                    // handled by dedicated resolver
 	}
 }
 

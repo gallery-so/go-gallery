@@ -1,7 +1,0 @@
-alter table contracts add column if not exists parent_id varchar(255) references contracts(id);
-create index if not exists contracts_parent_idx on contracts(parent_id) where deleted = false;
-create unique index if not exists contracts_chain_parent_address_idx on contracts(chain, parent_id, address);
-drop index if exists contract_address_chain_idx;
-
-alter table tokens add column if not exists child_contract_id varchar(255) references contracts(id);
-create index if not exists tokens_child_contract_idx on tokens(child_contract_id) where deleted = false;

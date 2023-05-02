@@ -520,7 +520,7 @@ type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) @g
   profileImageURL: String
   profileBannerURL: String
   badgeURL: String
-  parentCommunity: Community @goField(forceResolver: true)
+  parentCommunity: CommunityEdge @goField(forceResolver: true)
   subCommunities(
     before: String
     after: String
