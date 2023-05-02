@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgtype"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 
 	"github.com/lib/pq"
@@ -378,14 +377,14 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 		params.TokenType = append(params.TokenType, t.TokenType.String())
 		params.TokenID = append(params.TokenID, t.TokenID.String())
 		params.Quantity = append(params.Quantity, t.Quantity.String())
-		AppendAddressAtBlock(&params.OwnershipHistory, t.OwnershipHistory, &params.OwnershipHistoryStartIdx, &params.OwnershipHistoryEndIdx, &errors)
+		InsertHelpers.AppendAddressAtBlock(&params.OwnershipHistory, t.OwnershipHistory, &params.OwnershipHistoryStartIdx, &params.OwnershipHistoryEndIdx, &errors)
 		appendJSONB(&params.Media, t.Media, &errors)
 		appendJSONB(&params.FallbackMedia, t.FallbackMedia, &errors)
 		appendJSONB(&params.TokenMetadata, t.TokenMetadata, &errors)
 		params.ExternalUrl = append(params.ExternalUrl, t.ExternalURL.String())
 		params.BlockNumber = append(params.BlockNumber, t.BlockNumber.BigInt().Int64())
 		params.OwnerUserID = append(params.OwnerUserID, t.OwnerUserID.String())
-		AppendWalletList(&params.OwnedByWallets, t.OwnedByWallets, &params.OwnedByWalletsStartIdx, &params.OwnedByWalletsEndIdx)
+		InsertHelpers.AppendWalletList(&params.OwnedByWallets, t.OwnedByWallets, &params.OwnedByWalletsStartIdx, &params.OwnedByWalletsEndIdx)
 		params.Chain = append(params.Chain, int32(t.Chain))
 		params.Contract = append(params.Contract, t.Contract.String())
 		appendBool(&params.IsUserMarkedSpam, t.IsUserMarkedSpam, &errors)
@@ -415,66 +414,6 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 	}
 
 	return now, tokens, nil
-}
-
-func AppendAddressAtBlock(dest *[]pgtype.JSONB, src []persist.AddressAtBlock, startIndices, endIndices *[]int32, errs *[]error) {
-	items := make([]any, len(src))
-	for i, item := range src {
-		items[i] = item
-	}
-	appendJSONBList(dest, items, startIndices, endIndices, errs)
-}
-
-func AppendWalletList(dest *[]string, src []persist.Wallet, startIndices, endIndices *[]int32) {
-	items := make([]persist.DBID, len(src))
-	for i, wallet := range src {
-		items[i] = wallet.ID
-	}
-	appendDBIDList(dest, items, startIndices, endIndices)
-}
-
-func appendIndices(startIndices *[]int32, endIndices *[]int32, entryLength int) {
-	// Postgres uses 1-based indexing
-	startIndex := int32(1)
-	if len(*endIndices) > 0 {
-		startIndex = (*endIndices)[len(*endIndices)-1] + 1
-	}
-	*startIndices = append(*startIndices, startIndex)
-	*endIndices = append(*endIndices, startIndex+int32(entryLength)-1)
-}
-
-func appendBool(dest *[]bool, src *bool, errs *[]error) {
-	if src == nil {
-		*dest = append(*dest, false)
-		return
-	}
-	*dest = append(*dest, *src)
-}
-
-func appendJSONB(dest *[]pgtype.JSONB, src any, errs *[]error) error {
-	jsonb, err := persist.ToJSONB(src)
-	if err != nil {
-		*errs = append(*errs, err)
-		return err
-	}
-	*dest = append(*dest, jsonb)
-	return nil
-}
-
-func appendDBIDList(dest *[]string, src []persist.DBID, startIndices, endIndices *[]int32) {
-	for _, id := range src {
-		*dest = append(*dest, id.String())
-	}
-	appendIndices(startIndices, endIndices, len(src))
-}
-
-func appendJSONBList(dest *[]pgtype.JSONB, src []any, startIndices, endIndices *[]int32, errs *[]error) {
-	for _, item := range src {
-		if err := appendJSONB(dest, item, errs); err != nil {
-			return
-		}
-	}
-	appendIndices(startIndices, endIndices, len(src))
 }
 
 func (t *TokenGalleryRepository) excludeZeroQuantityTokens(pCtx context.Context, pTokens []persist.TokenGallery) ([]persist.TokenGallery, error) {

@@ -8,7 +8,6 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -59,9 +58,8 @@ type TokenID string
 
 // Assets is a list of NFTs from OpenSea
 type Assets struct {
-	Next     string  `json:"next"`
-	Previous string  `json:"previous"`
-	Assets   []Asset `json:"assets"`
+	Next   string  `json:"next"`
+	Assets []Asset `json:"assets"`
 }
 
 // Asset is an NFT from OpenSea
@@ -178,7 +176,7 @@ func (p *Provider) GetTokensByWalletAddress(ctx context.Context, address persist
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
-		streamAssetsForWallet(ctx, persist.EthereumAddress(address), WithResultCh(assetsChan))
+		streamAssetsForWallet(ctx, persist.EthereumAddress(address), assetsChan)
 	}()
 
 	return assetsToTokens(ctx, address, assetsChan, p.ethClient)
@@ -189,7 +187,7 @@ func (p *Provider) GetTokensByContractAddress(ctx context.Context, address persi
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
-		streamAssetsForContract(ctx, persist.EthereumAddress(address), WithResultCh(assetsChan))
+		streamAssetsForContract(ctx, persist.EthereumAddress(address), assetsChan)
 	}()
 	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient)
 	if err != nil {
@@ -207,7 +205,7 @@ func (p *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, owner
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
-		streamAssetsForContractAddressAndOwner(ctx, persist.EthereumAddress(owner), persist.EthereumAddress(address), WithResultCh(assetsChan))
+		streamAssetsForContractAddressAndOwner(ctx, persist.EthereumAddress(owner), persist.EthereumAddress(address), assetsChan)
 	}()
 	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient)
 	if err != nil {
@@ -225,7 +223,7 @@ func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, ti multichai
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
-		streamAssetsForTokenIdentifiers(ctx, persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID.Base10String()), WithResultCh(assetsChan))
+		streamAssetsForTokenIdentifiers(ctx, persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID.Base10String()), assetsChan)
 	}()
 	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient)
 	if err != nil {
@@ -242,7 +240,7 @@ func (p *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, ti m
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
-		streamAssetsForTokenIdentifiersAndOwner(ctx, persist.EthereumAddress(ownerAddress), persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID.Base10String()), WithResultCh(assetsChan))
+		streamAssetsForTokenIdentifiersAndOwner(ctx, persist.EthereumAddress(ownerAddress), persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID.Base10String()), assetsChan)
 	}()
 	tokens, contracts, err := assetsToTokens(ctx, ownerAddress, assetsChan, p.ethClient)
 	if err != nil {
@@ -292,7 +290,7 @@ func (p *Provider) GetChildContractsCreatedOnSharedContract(ctx context.Context,
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
-		streamAssetsForSharedContract(ctx, persist.EthereumAddress(creatorAddress), WithResultCh(assetsChan))
+		streamAssetsForSharedContract(ctx, persist.EthereumAddress(creatorAddress), assetsChan)
 	}()
 	return assetsByChildContract(ctx, assetsChan, p.ethClient, creatorAddress)
 }
@@ -413,40 +411,12 @@ func verifySignature(pSignatureStr string,
 	}
 }
 
-type QueryOptions struct {
-	outCh    chan assetsReceieved
-	sortAsc  bool
-	pageSize int
-	useLast  bool
-}
-
-type OptionFunc func(o *QueryOptions)
-
-var defaultOptions = QueryOptions{
-	outCh:    make(chan assetsReceieved),
-	pageSize: 200,
-}
-
-// WithResultCh allows you to specify a channel to receive the assets on
-func WithResultCh(outCh chan assetsReceieved) OptionFunc {
-	return func(o *QueryOptions) {
-		o.outCh = outCh
-	}
-}
-
-// WithSortAsc will sort the assets in ascending order
-func WithSortAsc() OptionFunc {
-	return func(o *QueryOptions) {
-		o.sortAsc = true
-	}
-}
-
 func FetchAssetsForWallet(ctx context.Context, address persist.EthereumAddress) ([]Asset, error) {
 	outCh := make(chan assetsReceieved)
 
 	go func() {
 		defer close(outCh)
-		streamAssetsForWallet(ctx, address, WithResultCh(outCh))
+		streamAssetsForWallet(ctx, address, outCh)
 	}()
 
 	assets := make([]Asset, 0)
@@ -465,7 +435,7 @@ func FetchAssetsForTokenIdentifiers(ctx context.Context, contractAddress persist
 
 	go func() {
 		defer close(outCh)
-		streamAssetsForToken(ctx, contractAddress, tokenID, WithResultCh(outCh))
+		streamAssetsForToken(ctx, contractAddress, tokenID, outCh)
 	}()
 
 	assets := make([]Asset, 0)
@@ -504,91 +474,63 @@ func FetchContractByAddress(pCtx context.Context, pContract persist.EthereumAddr
 	return contract, nil
 }
 
-func streamAssetsForToken(ctx context.Context, address persist.EthereumAddress, tokenID TokenID, opts ...OptionFunc) {
-	args := defaultOptions
-	for _, opt := range opts {
-		opt(&args)
-	}
+func streamAssetsForToken(ctx context.Context, address persist.EthereumAddress, tokenID TokenID, out chan assetsReceieved) {
 	url := baseURL.JoinPath("assets")
-	setPagingParams(url, args.pageSize)
+	setPagingParams(url)
 	setContractAddress(url, address)
 	setTokenID(url, tokenID)
-	paginateAssets(ctx, authRequest(ctx, url.String()), args.outCh)
+	paginateAssets(ctx, authRequest(ctx, url.String()), out)
 }
 
-func streamAssetsForWallet(ctx context.Context, address persist.EthereumAddress, opts ...OptionFunc) {
-	args := defaultOptions
-	for _, opt := range opts {
-		opt(&args)
-	}
+func streamAssetsForWallet(ctx context.Context, address persist.EthereumAddress, out chan assetsReceieved) {
 	url := baseURL.JoinPath("assets")
-	setPagingParams(url, args.pageSize)
+	setPagingParams(url)
 	setOwner(url, address)
-	paginateAssets(ctx, authRequest(ctx, url.String()), args.outCh)
+	paginateAssets(ctx, authRequest(ctx, url.String()), out)
 }
 
-func streamAssetsForContract(ctx context.Context, address persist.EthereumAddress, opts ...OptionFunc) {
-	args := defaultOptions
-	for _, opt := range opts {
-		opt(&args)
-	}
+func streamAssetsForContract(ctx context.Context, address persist.EthereumAddress, out chan assetsReceieved) {
 	url := baseURL.JoinPath("assets")
-	setPagingParams(url, args.pageSize)
+	setPagingParams(url)
 	setContractAddress(url, address)
-	paginateAssets(ctx, authRequest(ctx, url.String()), args.outCh)
+	paginateAssets(ctx, authRequest(ctx, url.String()), out)
 }
 
-func streamAssetsForContractAddressAndOwner(ctx context.Context, ownerAddress, contractAddress persist.EthereumAddress, opts ...OptionFunc) {
-	args := defaultOptions
-	for _, opt := range opts {
-		opt(&args)
-	}
+func streamAssetsForContractAddressAndOwner(ctx context.Context, ownerAddress, contractAddress persist.EthereumAddress, out chan assetsReceieved) {
 	url := baseURL.JoinPath("assets")
-	setPagingParams(url, args.pageSize)
+	setPagingParams(url)
 	setOwner(url, ownerAddress)
 	setContractAddress(url, contractAddress)
-	paginateAssets(ctx, authRequest(ctx, url.String()), args.outCh)
+	paginateAssets(ctx, authRequest(ctx, url.String()), out)
 }
 
-func streamAssetsForTokenIdentifiers(ctx context.Context, contractAddress persist.EthereumAddress, tokenID TokenID, opts ...OptionFunc) {
-	args := defaultOptions
-	for _, opt := range opts {
-		opt(&args)
-	}
+func streamAssetsForTokenIdentifiers(ctx context.Context, contractAddress persist.EthereumAddress, tokenID TokenID, out chan assetsReceieved) {
 	url := baseURL.JoinPath("assets")
-	setPagingParams(url, args.pageSize)
+	setPagingParams(url)
 	setContractAddress(url, contractAddress)
 	setTokenID(url, tokenID)
-	paginateAssets(ctx, authRequest(ctx, url.String()), args.outCh)
+	paginateAssets(ctx, authRequest(ctx, url.String()), out)
 }
 
-func streamAssetsForTokenIdentifiersAndOwner(ctx context.Context, ownerAddress, contractAddress persist.EthereumAddress, tokenID TokenID, opts ...OptionFunc) {
-	args := defaultOptions
-	for _, opt := range opts {
-		opt(&args)
-	}
+func streamAssetsForTokenIdentifiersAndOwner(ctx context.Context, ownerAddress, contractAddress persist.EthereumAddress, tokenID TokenID, out chan assetsReceieved) {
 	url := baseURL.JoinPath("assets")
-	setPagingParams(url, args.pageSize)
+	setPagingParams(url)
 	setContractAddress(url, contractAddress)
 	setTokenID(url, tokenID)
 	if ownerAddress != "" {
 		setOwner(url, ownerAddress)
 	}
-	paginateAssets(ctx, authRequest(ctx, url.String()), args.outCh)
+	paginateAssets(ctx, authRequest(ctx, url.String()), out)
 }
 
-func streamAssetsForSharedContract(ctx context.Context, editorAddress persist.EthereumAddress, opts ...OptionFunc) {
-	args := defaultOptions
-	for _, opt := range opts {
-		opt(&args)
-	}
+func streamAssetsForSharedContract(ctx context.Context, editorAddress persist.EthereumAddress, out chan assetsReceieved) {
 	url := baseURL.JoinPath("assets")
-	setPagingParams(url, args.pageSize)
+	setPagingParams(url)
 	setCollectionEditor(url, editorAddress)
 	for _, address := range sharedStoreFrontAddresses {
 		addContractAddresses(url, address)
 	}
-	paginateAssets(ctx, authRequest(ctx, url.String()), args.outCh)
+	paginateAssets(ctx, authRequest(ctx, url.String()), out)
 }
 
 // assetsByChildContract converts a channel of assets to a slice of sub-contract groups
@@ -880,10 +822,10 @@ func paginateAssets(ctx context.Context, req *http.Request, outCh chan assetsRec
 	}
 }
 
-func setPagingParams(url *url.URL, pageSize int) {
+func setPagingParams(url *url.URL) {
 	query := url.Query()
 	query.Set("order_direction", "desc")
-	query.Set("limit", strconv.Itoa(pageSize))
+	query.Set("limit", "50")
 	url.RawQuery = query.Encode()
 }
 

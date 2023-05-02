@@ -1,7 +1,6 @@
 -- name: UpsertContracts :many
 insert into contracts (id, deleted, version, created_at, address, symbol, name, owner_address, chain, description) (
-  select
-  unnest(@id::varchar[])
+  select unnest(@id::varchar[])
   , unnest(@deleted::boolean[])
   , unnest(@version::int[])
   , unnest(@created_at::timestamptz[])
@@ -13,8 +12,7 @@ insert into contracts (id, deleted, version, created_at, address, symbol, name, 
   , unnest(@description::varchar[])
 )
 on conflict (chain, address) where parent_id is null
-do update set
-  symbol = excluded.symbol
+do update set symbol = excluded.symbol
   , version = excluded.version
   , name = excluded.name
   , owner_address = excluded.owner_address
@@ -24,10 +22,8 @@ do update set
 returning *;
 
 -- name: UpsertCreatedTokens :many
--- parent_contracts_data is the data to be inserted for the parent contracts
 with parent_contracts_data(id, deleted, created_at, name, symbol, address, creator_address, chain, description) as (
-  select
-    unnest(@parent_contract_id::varchar[]) as id
+  select unnest(@parent_contract_id::varchar[]) as id
     , unnest(@parent_contract_deleted::boolean[]) as deleted
     , unnest(@parent_contract_created_at::timestamptz[]) as created_at
     , unnest(@parent_contract_name::varchar[]) as name
@@ -36,11 +32,9 @@ with parent_contracts_data(id, deleted, created_at, name, symbol, address, creat
     , unnest(@parent_contract_creator_address::varchar[]) as creator_address
     , unnest(@parent_contract_chain::int[]) as chain
     , unnest(@parent_contract_description::varchar[]) as description
-),
--- child_contracts_data is the data to be inserted for the child contract.
-child_contracts_data(id, deleted, created_at, name, address, creator_address, chain, description, parent_address) as (
-  select
-    unnest(@child_contract_id::varchar[]) as id
+)
+, child_contracts_data(id, deleted, created_at, name, address, creator_address, chain, description, parent_address) as (
+  select unnest(@child_contract_id::varchar[]) as id
     , unnest(@child_contract_deleted::boolean[]) as deleted
     , unnest(@child_contract_created_at::timestamptz[]) as created_at
     , unnest(@child_contract_name::varchar[]) as name
@@ -49,9 +43,7 @@ child_contracts_data(id, deleted, created_at, name, address, creator_address, ch
     , unnest(@child_contract_chain::int[]) as chain
     , unnest(@child_contract_description::varchar[]) as description
     , unnest(@child_contract_parent_address::varchar[]) as parent_address
-),
--- Insert parent contracts, returning the inserted or updated rows
-insert_parent_contracts as (
+), insert_parent_contracts as (
   insert into contracts(id, deleted, created_at, name, symbol, address, creator_address, chain, description)
   (
     select id
