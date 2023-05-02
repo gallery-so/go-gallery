@@ -13,7 +13,7 @@ create table if not exists token_medias (
     created_at timestamptz not null default current_timestamp,
     last_updated timestamptz not null default current_timestamp,
     version int not null default 0,
-    contract varchar(255) not null references contracts(id),
+    contract_id varchar(255) not null references contracts(id),
     token_id varchar not null,
     chain int not null,
     active bool not null,
@@ -25,7 +25,7 @@ create table if not exists token_medias (
     deleted bool not null default false
 );
 
-create unique index if not exists token_media_contract_token_id_chain_idx on token_medias (contract, token_id, chain) where active = true and deleted = false;
+create unique index if not exists token_media_contract_token_id_chain_idx on token_medias (contract_id, token_id, chain) where active = true and deleted = false;
 
-alter table tokens add column if not exists token_media varchar(255) references token_medias(id);
+alter table tokens add column if not exists token_media_id varchar(255) references token_medias(id);
 

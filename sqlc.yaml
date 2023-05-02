@@ -90,16 +90,12 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.AddressAtBlockList"
           - column: "tokens.token_metadata"
             go_type: "github.com/mikeydub/go-gallery/service/persist.TokenMetadata"
-          - column: tokens.token_media"
-            go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
           
           # TokenMedias
           - column: "token_medias.metadata"
             go_type: "github.com/mikeydub/go-gallery/service/persist.TokenMetadata"
           - column: "token_medias.token_id"
             go_type: "github.com/mikeydub/go-gallery/service/persist.TokenID"
-          - column: "token_medias.contract"
-            go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
           - column: "token_medias.chain"
             go_type: "github.com/mikeydub/go-gallery/service/persist.Chain"
           - column: "token_medias.media"

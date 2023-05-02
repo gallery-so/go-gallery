@@ -1013,18 +1013,43 @@ update users set wallets = array_append(wallets, @wallet_id::varchar) where id =
 insert into token_processing_jobs (id, token_properties, pipeline_metadata, processing_cause, processor_version) values ($1, $2, $3, $4, $5);
 
 -- name: InsertTokenMedia :exec
-insert into token_medias (id, contract, token_id, chain, metadata, media, name, description, processing_job_id, active) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
+insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
 
 -- name: UpdateTokenTokenMediaByTokenIdentifiers :exec
-update tokens set token_media = $1 where tokens.contract = $2 and tokens.token_id = $3 and tokens.chain = $4 and deleted = false;
+update tokens set token_media_id = $1 where tokens.contract = $2 and tokens.token_id = $3 and tokens.chain = $4 and deleted = false;
 
 -- name: UpdateActiveTokenMediaByTokenIdentifiers :exec
 with old as (
-  insert into token_medias (id, contract, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated) (select $1, contract_address, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, last_updated from token_medias where token_medias.contract = $2 and token_medias.token_id = $3 and token_medias.chain = $4 and active = true and deleted = false)
-) update token_medias set metadata = $5, media = $6, name = $7, description = $8, processing_job_id = $9 where token_medias.contract = $2 and token_medias.token_id = $3 and token_medias.chain = $4 and active = true and deleted = false;
+  insert into token_medias (id, contract, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated) (select $1, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, last_updated from token_medias where token_medias.contract_id = $2 and token_medias.token_id = $3 and token_medias.chain = $4 and active = true and deleted = false)
+) update token_medias set metadata = $5, media = $6, name = $7, description = $8, processing_job_id = $9 where token_medias.contract_id = $2 and token_medias.token_id = $3 and token_medias.chain = $4 and active = true and deleted = false;
 
 -- name: IsExistsActiveTokenMediaByTokenIdentifers :one
-select exists(select 1 from token_medias where token_medias.contract = $1 and token_medias.token_id = $2 and token_medias.chain = $3 and active = true and deleted = false);
+select exists(select 1 from token_medias where token_medias.contract_id = $1 and token_medias.token_id = $2 and token_medias.chain = $3 and active = true and deleted = false);
+
+-- name: UpsertTokenMedia :one
+with copy_on_overwrite as (
+    insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
+    (
+        select @new_id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, last_updated
+        from token_medias
+        where contract_id = @contract_id
+          and token_id = @token_id
+          and chain = @chain
+          and active = true
+          and deleted = false
+        limit 1
+    )
+)
+insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
+    values (@new_id, @contract_id, @token_id, @chain, @metadata, @media, @name, @description, @processing_job_id, @active, now(), now())
+    on conflict (contract_id, token_id, chain) where active = true and deleted = false do update
+        set metadata = excluded.metadata,
+            media = excluded.media,
+            name = excluded.name,
+            description = excluded.description,
+            processing_job_id = excluded.processing_job_id,
+            last_updated = now()
+            returning *;
 
 -- name: InsertSpamContracts :exec
 with insert_spam_contracts as (

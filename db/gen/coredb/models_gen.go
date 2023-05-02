@@ -366,7 +366,7 @@ type Token struct {
 	IsProviderMarkedSpam sql.NullBool
 	LastSynced           time.Time
 	FallbackMedia        persist.FallbackMedia
-	TokenMedia           sql.NullString
+	TokenMediaID         persist.DBID
 }
 
 type TokenMedia struct {
@@ -374,7 +374,7 @@ type TokenMedia struct {
 	CreatedAt       time.Time
 	LastUpdated     time.Time
 	Version         int32
-	Contract        persist.DBID
+	ContractID      persist.DBID
 	TokenID         persist.TokenID
 	Chain           persist.Chain
 	Active          bool

@@ -2401,7 +2401,7 @@ func (q *Queries) GetSocialsByUserID(ctx context.Context, id persist.DBID) (pers
 }
 
 const getTokenById = `-- name: GetTokenById :one
-SELECT id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media FROM tokens WHERE id = $1 AND deleted = false
+SELECT id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id FROM tokens WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetTokenById(ctx context.Context, id persist.DBID) (Token, error) {
@@ -2433,13 +2433,13 @@ func (q *Queries) GetTokenById(ctx context.Context, id persist.DBID) (Token, err
 		&i.IsProviderMarkedSpam,
 		&i.LastSynced,
 		&i.FallbackMedia,
-		&i.TokenMedia,
+		&i.TokenMediaID,
 	)
 	return i, err
 }
 
 const getTokenByTokenIdentifiers = `-- name: GetTokenByTokenIdentifiers :one
-select id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media from tokens where tokens.token_id = $1 and contract = (select contracts.id from contracts where contracts.address = $2) and tokens.chain = $3 and tokens.deleted = false
+select id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id from tokens where tokens.token_id = $1 and contract = (select contracts.id from contracts where contracts.address = $2) and tokens.chain = $3 and tokens.deleted = false
 `
 
 type GetTokenByTokenIdentifiersParams struct {
@@ -2477,7 +2477,7 @@ func (q *Queries) GetTokenByTokenIdentifiers(ctx context.Context, arg GetTokenBy
 		&i.IsProviderMarkedSpam,
 		&i.LastSynced,
 		&i.FallbackMedia,
-		&i.TokenMedia,
+		&i.TokenMediaID,
 	)
 	return i, err
 }
@@ -2514,7 +2514,7 @@ func (q *Queries) GetTokenOwnerByID(ctx context.Context, id persist.DBID) (User,
 }
 
 const getTokensByCollectionId = `-- name: GetTokensByCollectionId :many
-SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media FROM users u, collections c, unnest(c.nfts)
+SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id FROM users u, collections c, unnest(c.nfts)
     WITH ORDINALITY AS x(nft_id, nft_ord)
     INNER JOIN tokens t ON t.id = x.nft_id
     WHERE u.id = t.owner_user_id AND t.owned_by_wallets && u.wallets
@@ -2561,7 +2561,7 @@ func (q *Queries) GetTokensByCollectionId(ctx context.Context, arg GetTokensByCo
 			&i.IsProviderMarkedSpam,
 			&i.LastSynced,
 			&i.FallbackMedia,
-			&i.TokenMedia,
+			&i.TokenMediaID,
 		); err != nil {
 			return nil, err
 		}
@@ -2574,7 +2574,7 @@ func (q *Queries) GetTokensByCollectionId(ctx context.Context, arg GetTokensByCo
 }
 
 const getTokensByContractId = `-- name: GetTokensByContractId :many
-SELECT id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media FROM tokens WHERE contract = $1 AND deleted = false
+SELECT id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id FROM tokens WHERE contract = $1 AND deleted = false
     ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC
 `
 
@@ -2613,7 +2613,7 @@ func (q *Queries) GetTokensByContractId(ctx context.Context, contract persist.DB
 			&i.IsProviderMarkedSpam,
 			&i.LastSynced,
 			&i.FallbackMedia,
-			&i.TokenMedia,
+			&i.TokenMediaID,
 		); err != nil {
 			return nil, err
 		}
@@ -2626,7 +2626,7 @@ func (q *Queries) GetTokensByContractId(ctx context.Context, contract persist.DB
 }
 
 const getTokensByContractIdPaginate = `-- name: GetTokensByContractIdPaginate :many
-SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media FROM tokens t
+SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id FROM tokens t
     JOIN users u ON u.id = t.owner_user_id
     WHERE t.contract = $1 AND t.deleted = false
     AND (NOT $3::bool OR u.universal = false)
@@ -2696,7 +2696,7 @@ func (q *Queries) GetTokensByContractIdPaginate(ctx context.Context, arg GetToke
 			&i.IsProviderMarkedSpam,
 			&i.LastSynced,
 			&i.FallbackMedia,
-			&i.TokenMedia,
+			&i.TokenMediaID,
 		); err != nil {
 			return nil, err
 		}
@@ -2709,7 +2709,7 @@ func (q *Queries) GetTokensByContractIdPaginate(ctx context.Context, arg GetToke
 }
 
 const getTokensByIDs = `-- name: GetTokensByIDs :many
-select id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media from tokens join unnest($1::varchar[]) with ordinality t(id, pos) using (id) where deleted = false order by t.pos asc
+select id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id from tokens join unnest($1::varchar[]) with ordinality t(id, pos) using (id) where deleted = false order by t.pos asc
 `
 
 func (q *Queries) GetTokensByIDs(ctx context.Context, tokenIds []string) ([]Token, error) {
@@ -2747,7 +2747,7 @@ func (q *Queries) GetTokensByIDs(ctx context.Context, tokenIds []string) ([]Toke
 			&i.IsProviderMarkedSpam,
 			&i.LastSynced,
 			&i.FallbackMedia,
-			&i.TokenMedia,
+			&i.TokenMediaID,
 		); err != nil {
 			return nil, err
 		}
@@ -2760,7 +2760,7 @@ func (q *Queries) GetTokensByIDs(ctx context.Context, tokenIds []string) ([]Toke
 }
 
 const getTokensByUserId = `-- name: GetTokensByUserId :many
-SELECT tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media FROM tokens, users
+SELECT tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id FROM tokens, users
     WHERE tokens.owner_user_id = $1 AND users.id = $1
       AND tokens.owned_by_wallets && users.wallets
       AND tokens.deleted = false AND users.deleted = false
@@ -2802,7 +2802,7 @@ func (q *Queries) GetTokensByUserId(ctx context.Context, ownerUserID persist.DBI
 			&i.IsProviderMarkedSpam,
 			&i.LastSynced,
 			&i.FallbackMedia,
-			&i.TokenMedia,
+			&i.TokenMediaID,
 		); err != nil {
 			return nil, err
 		}
@@ -2815,7 +2815,7 @@ func (q *Queries) GetTokensByUserId(ctx context.Context, ownerUserID persist.DBI
 }
 
 const getTokensByUserIdAndContractID = `-- name: GetTokensByUserIdAndContractID :many
-SELECT tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media FROM tokens, users
+SELECT tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id FROM tokens, users
     WHERE tokens.owner_user_id = $1 AND users.id = $1
       AND tokens.owned_by_wallets && users.wallets
       AND tokens.contract = $2
@@ -2863,7 +2863,7 @@ func (q *Queries) GetTokensByUserIdAndContractID(ctx context.Context, arg GetTok
 			&i.IsProviderMarkedSpam,
 			&i.LastSynced,
 			&i.FallbackMedia,
-			&i.TokenMedia,
+			&i.TokenMediaID,
 		); err != nil {
 			return nil, err
 		}
@@ -2876,7 +2876,7 @@ func (q *Queries) GetTokensByUserIdAndContractID(ctx context.Context, arg GetTok
 }
 
 const getTokensByWalletIds = `-- name: GetTokensByWalletIds :many
-SELECT id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media FROM tokens WHERE owned_by_wallets && $1 AND deleted = false
+SELECT id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id FROM tokens WHERE owned_by_wallets && $1 AND deleted = false
     ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC
 `
 
@@ -2915,7 +2915,7 @@ func (q *Queries) GetTokensByWalletIds(ctx context.Context, ownedByWallets persi
 			&i.IsProviderMarkedSpam,
 			&i.LastSynced,
 			&i.FallbackMedia,
-			&i.TokenMedia,
+			&i.TokenMediaID,
 		); err != nil {
 			return nil, err
 		}
@@ -3964,12 +3964,12 @@ func (q *Queries) InsertSpamContracts(ctx context.Context, arg InsertSpamContrac
 }
 
 const insertTokenMedia = `-- name: InsertTokenMedia :exec
-insert into token_medias (id, contract, token_id, chain, metadata, media, name, description, processing_job_id, active) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 `
 
 type InsertTokenMediaParams struct {
 	ID              persist.DBID
-	Contract        persist.DBID
+	ContractID      persist.DBID
 	TokenID         persist.TokenID
 	Chain           persist.Chain
 	Metadata        persist.TokenMetadata
@@ -3983,7 +3983,7 @@ type InsertTokenMediaParams struct {
 func (q *Queries) InsertTokenMedia(ctx context.Context, arg InsertTokenMediaParams) error {
 	_, err := q.db.Exec(ctx, insertTokenMedia,
 		arg.ID,
-		arg.Contract,
+		arg.ContractID,
 		arg.TokenID,
 		arg.Chain,
 		arg.Metadata,
@@ -4185,17 +4185,17 @@ func (q *Queries) IsActorSubjectActive(ctx context.Context, arg IsActorSubjectAc
 }
 
 const isExistsActiveTokenMediaByTokenIdentifers = `-- name: IsExistsActiveTokenMediaByTokenIdentifers :one
-select exists(select 1 from token_medias where token_medias.contract = $1 and token_medias.token_id = $2 and token_medias.chain = $3 and active = true and deleted = false)
+select exists(select 1 from token_medias where token_medias.contract_id = $1 and token_medias.token_id = $2 and token_medias.chain = $3 and active = true and deleted = false)
 `
 
 type IsExistsActiveTokenMediaByTokenIdentifersParams struct {
-	Contract persist.DBID
-	TokenID  persist.TokenID
-	Chain    persist.Chain
+	ContractID persist.DBID
+	TokenID    persist.TokenID
+	Chain      persist.Chain
 }
 
 func (q *Queries) IsExistsActiveTokenMediaByTokenIdentifers(ctx context.Context, arg IsExistsActiveTokenMediaByTokenIdentifersParams) (bool, error) {
-	row := q.db.QueryRow(ctx, isExistsActiveTokenMediaByTokenIdentifers, arg.Contract, arg.TokenID, arg.Chain)
+	row := q.db.QueryRow(ctx, isExistsActiveTokenMediaByTokenIdentifers, arg.ContractID, arg.TokenID, arg.Chain)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
@@ -4342,13 +4342,13 @@ func (q *Queries) UnblockUserFromFeed(ctx context.Context, userID persist.DBID) 
 
 const updateActiveTokenMediaByTokenIdentifiers = `-- name: UpdateActiveTokenMediaByTokenIdentifiers :exec
 with old as (
-  insert into token_medias (id, contract, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated) (select $1, contract_address, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, last_updated from token_medias where token_medias.contract = $2 and token_medias.token_id = $3 and token_medias.chain = $4 and active = true and deleted = false)
-) update token_medias set metadata = $5, media = $6, name = $7, description = $8, processing_job_id = $9 where token_medias.contract = $2 and token_medias.token_id = $3 and token_medias.chain = $4 and active = true and deleted = false
+  insert into token_medias (id, contract, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated) (select $1, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, last_updated from token_medias where token_medias.contract_id = $2 and token_medias.token_id = $3 and token_medias.chain = $4 and active = true and deleted = false)
+) update token_medias set metadata = $5, media = $6, name = $7, description = $8, processing_job_id = $9 where token_medias.contract_id = $2 and token_medias.token_id = $3 and token_medias.chain = $4 and active = true and deleted = false
 `
 
 type UpdateActiveTokenMediaByTokenIdentifiersParams struct {
 	ID              persist.DBID
-	Contract        persist.DBID
+	ContractID      persist.DBID
 	TokenID         persist.TokenID
 	Chain           persist.Chain
 	Metadata        persist.TokenMetadata
@@ -4361,7 +4361,7 @@ type UpdateActiveTokenMediaByTokenIdentifiersParams struct {
 func (q *Queries) UpdateActiveTokenMediaByTokenIdentifiers(ctx context.Context, arg UpdateActiveTokenMediaByTokenIdentifiersParams) error {
 	_, err := q.db.Exec(ctx, updateActiveTokenMediaByTokenIdentifiers,
 		arg.ID,
-		arg.Contract,
+		arg.ContractID,
 		arg.TokenID,
 		arg.Chain,
 		arg.Metadata,
@@ -4610,19 +4610,19 @@ func (q *Queries) UpdatePushTickets(ctx context.Context, arg UpdatePushTicketsPa
 }
 
 const updateTokenTokenMediaByTokenIdentifiers = `-- name: UpdateTokenTokenMediaByTokenIdentifiers :exec
-update tokens set token_media = $1 where tokens.contract = $2 and tokens.token_id = $3 and tokens.chain = $4 and deleted = false
+update tokens set token_media_id = $1 where tokens.contract = $2 and tokens.token_id = $3 and tokens.chain = $4 and deleted = false
 `
 
 type UpdateTokenTokenMediaByTokenIdentifiersParams struct {
-	TokenMedia sql.NullString
-	Contract   persist.DBID
-	TokenID    persist.TokenID
-	Chain      persist.Chain
+	TokenMediaID persist.DBID
+	Contract     persist.DBID
+	TokenID      persist.TokenID
+	Chain        persist.Chain
 }
 
 func (q *Queries) UpdateTokenTokenMediaByTokenIdentifiers(ctx context.Context, arg UpdateTokenTokenMediaByTokenIdentifiersParams) error {
 	_, err := q.db.Exec(ctx, updateTokenTokenMediaByTokenIdentifiers,
-		arg.TokenMedia,
+		arg.TokenMediaID,
 		arg.Contract,
 		arg.TokenID,
 		arg.Chain,
@@ -4761,6 +4761,78 @@ func (q *Queries) UpsertSocialOAuth(ctx context.Context, arg UpsertSocialOAuthPa
 		arg.RefreshToken,
 	)
 	return err
+}
+
+const upsertTokenMedia = `-- name: UpsertTokenMedia :one
+with copy_on_overwrite as (
+    insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
+    (
+        select $1, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, last_updated
+        from token_medias
+        where contract_id = $2
+          and token_id = $3
+          and chain = $4
+          and active = true
+          and deleted = false
+        limit 1
+    )
+)
+insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
+    values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now(), now())
+    on conflict (contract_id, token_id, chain) where active = true and deleted = false do update
+        set metadata = excluded.metadata,
+            media = excluded.media,
+            name = excluded.name,
+            description = excluded.description,
+            processing_job_id = excluded.processing_job_id,
+            last_updated = now()
+            returning id, created_at, last_updated, version, contract_id, token_id, chain, active, metadata, media, name, description, processing_job_id, deleted
+`
+
+type UpsertTokenMediaParams struct {
+	NewID           persist.DBID
+	ContractID      persist.DBID
+	TokenID         persist.TokenID
+	Chain           persist.Chain
+	Metadata        persist.TokenMetadata
+	Media           persist.Media
+	Name            string
+	Description     string
+	ProcessingJobID persist.DBID
+	Active          bool
+}
+
+func (q *Queries) UpsertTokenMedia(ctx context.Context, arg UpsertTokenMediaParams) (TokenMedia, error) {
+	row := q.db.QueryRow(ctx, upsertTokenMedia,
+		arg.NewID,
+		arg.ContractID,
+		arg.TokenID,
+		arg.Chain,
+		arg.Metadata,
+		arg.Media,
+		arg.Name,
+		arg.Description,
+		arg.ProcessingJobID,
+		arg.Active,
+	)
+	var i TokenMedia
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.LastUpdated,
+		&i.Version,
+		&i.ContractID,
+		&i.TokenID,
+		&i.Chain,
+		&i.Active,
+		&i.Metadata,
+		&i.Media,
+		&i.Name,
+		&i.Description,
+		&i.ProcessingJobID,
+		&i.Deleted,
+	)
+	return i, err
 }
 
 const userHasDuplicateGalleryPositions = `-- name: UserHasDuplicateGalleryPositions :one

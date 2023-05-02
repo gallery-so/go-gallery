@@ -114,7 +114,7 @@ func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (coredb.
 
 	result := coredb.TokenMedia{
 		ID:              persist.GenerateID(),
-		Contract:        tpj.token.Contract,
+		ContractID:      tpj.token.Contract,
 		TokenID:         tpj.token.TokenID,
 		Chain:           tpj.token.Chain,
 		Active:          true,
@@ -237,76 +237,30 @@ func (tpj *tokenProcessingJob) persistMedia(ctx context.Context, tmetadata cored
 		tmetadata.Active = false
 	}
 
-	return tmetadata, tpj.updateTokenMetadataDB(ctx, tmetadata)
+	return tpj.updateTokenMetadataDB(ctx, tmetadata)
 
 }
 
-func (tpj *tokenProcessingJob) updateTokenMetadataDB(ctx context.Context, tmetadata coredb.TokenMedia) error {
+func (tpj *tokenProcessingJob) updateTokenMetadataDB(ctx context.Context, tmetadata coredb.TokenMedia) (coredb.TokenMedia, error) {
 	defer persist.TrackStepStatus(&tpj.pipelineMetadata.UpdateTokenMetadataDB)()
-	err := func() error {
-		if !tmetadata.Active {
-			return tpj.tp.queries.InsertTokenMedia(ctx, coredb.InsertTokenMediaParams{
-				ID:              tmetadata.ID,
-				Contract:        tmetadata.Contract,
-				TokenID:         tmetadata.TokenID,
-				Chain:           tmetadata.Chain,
-				Metadata:        tmetadata.Metadata,
-				Media:           tmetadata.Media,
-				Name:            tmetadata.Name,
-				Description:     tmetadata.Description,
-				ProcessingJobID: tmetadata.ProcessingJobID,
-				Active:          false,
-			})
-		}
-		exists, err := tpj.tp.queries.IsExistsActiveTokenMediaByTokenIdentifers(ctx, coredb.IsExistsActiveTokenMediaByTokenIdentifersParams{
-			Contract: tpj.token.Contract,
-			TokenID:  tpj.token.TokenID,
-			Chain:    tpj.token.Chain,
-		})
-		if err != nil {
-			return err
-		}
 
-		if exists {
-			return tpj.tp.queries.UpdateActiveTokenMediaByTokenIdentifiers(ctx, coredb.UpdateActiveTokenMediaByTokenIdentifiersParams{
-				ID:              tmetadata.ID,
-				Contract:        tpj.token.Contract,
-				TokenID:         tmetadata.TokenID,
-				Chain:           tpj.token.Chain,
-				Metadata:        tmetadata.Metadata,
-				Media:           tmetadata.Media,
-				Name:            tmetadata.Name,
-				Description:     tmetadata.Description,
-				ProcessingJobID: tmetadata.ProcessingJobID,
-			})
-		}
-		err = tpj.tp.queries.InsertTokenMedia(ctx, coredb.InsertTokenMediaParams{
-			ID:              tmetadata.ID,
-			Contract:        tmetadata.Contract,
-			TokenID:         tmetadata.TokenID,
-			Chain:           tmetadata.Chain,
-			Metadata:        tmetadata.Metadata,
-			Media:           tmetadata.Media,
-			Name:            tmetadata.Name,
-			Description:     tmetadata.Description,
-			ProcessingJobID: tmetadata.ProcessingJobID,
-			Active:          true,
-		})
-		if err != nil {
-			return err
-		}
-		return tpj.tp.queries.UpdateTokenTokenMediaByTokenIdentifiers(ctx, coredb.UpdateTokenTokenMediaByTokenIdentifiersParams{
-			TokenMedia: persist.DBIDToNullStr(tmetadata.ID),
-			Contract:   tpj.token.Contract,
-			TokenID:    tpj.token.TokenID,
-			Chain:      tpj.token.Chain,
-		})
-	}()
+	newMetadata, err := tpj.tp.queries.UpsertTokenMedia(ctx, coredb.UpsertTokenMediaParams{
+		NewID:           tmetadata.ID,
+		ContractID:      tpj.token.Contract,
+		TokenID:         tpj.token.TokenID,
+		Chain:           tpj.token.Chain,
+		Metadata:        tmetadata.Metadata,
+		Media:           tmetadata.Media,
+		Name:            tmetadata.Name,
+		Description:     tmetadata.Description,
+		ProcessingJobID: tmetadata.ProcessingJobID,
+		Active:          tmetadata.Active,
+	})
 	if err != nil {
 		persist.FailStep(&tpj.pipelineMetadata.UpdateTokenMetadataDB)
-		return err
+		return tmetadata, err
 	}
-	return nil
+	return newMetadata, nil
 }
 
 func (tpj *tokenProcessingJob) updateJobDB(ctx context.Context, tmetadata coredb.TokenMedia) error {
