@@ -164,11 +164,6 @@ type childContractFetcher interface {
 	GetChildContractsCreatedOnSharedContract(ctx context.Context, creatorAddress persist.Address) ([]ContractEdge, error)
 }
 
-// tokenRefresher supports refreshes of a token
-type tokenRefresher interface {
-	RefreshToken(context.Context, ChainAgnosticIdentifiers, persist.Address) error
-}
-
 type tokensContractFetcher interface {
 	GetTokensByContractAddress(ctx context.Context, contract persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error)
 	GetTokensByContractAddressAndOwner(ctx context.Context, owner persist.Address, contract persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error)
@@ -366,15 +361,6 @@ func contractAddressToDBID(contracts []persist.ContractGallery) map[string]persi
 	m := make(map[string]persist.DBID)
 	for _, contract := range contracts {
 		m[contract.Chain.NormalizeAddress(contract.Address)] = contract.ID
-	}
-	return m
-}
-
-// tokenIDstoDBID maps tokens to their DBIDs
-func tokenIDstoDBID(tokens []persist.TokenGallery) map[persist.TokenIdentifiers]persist.DBID {
-	m := make(map[persist.TokenIdentifiers]persist.DBID)
-	for _, token := range tokens {
-		m[token.TokenIdentifiers()] = token.ID
 	}
 	return m
 }
