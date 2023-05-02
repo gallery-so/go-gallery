@@ -12,8 +12,7 @@ import (
 
 const upsertContracts = `-- name: UpsertContracts :many
 insert into contracts (id, deleted, version, created_at, address, symbol, name, owner_address, chain, description) (
-  select
-  unnest($1::varchar[])
+  select unnest($1::varchar[])
   , unnest($2::boolean[])
   , unnest($3::int[])
   , unnest($4::timestamptz[])
@@ -25,8 +24,7 @@ insert into contracts (id, deleted, version, created_at, address, symbol, name, 
   , unnest($10::varchar[])
 )
 on conflict (chain, address) where parent_id is null
-do update set
-  symbol = excluded.symbol
+do update set symbol = excluded.symbol
   , version = excluded.version
   , name = excluded.name
   , owner_address = excluded.owner_address
@@ -100,8 +98,7 @@ func (q *Queries) UpsertContracts(ctx context.Context, arg UpsertContractsParams
 
 const upsertCreatedTokens = `-- name: UpsertCreatedTokens :many
 with parent_contracts_data(id, deleted, created_at, name, symbol, address, creator_address, chain, description) as (
-  select
-    unnest($1::varchar[]) as id
+  select unnest($1::varchar[]) as id
     , unnest($2::boolean[]) as deleted
     , unnest($3::timestamptz[]) as created_at
     , unnest($4::varchar[]) as name
@@ -110,10 +107,8 @@ with parent_contracts_data(id, deleted, created_at, name, symbol, address, creat
     , unnest($7::varchar[]) as creator_address
     , unnest($8::int[]) as chain
     , unnest($9::varchar[]) as description
-),
-child_contracts_data(id, deleted, created_at, name, address, creator_address, chain, description, parent_address) as (
-  select
-    unnest($10::varchar[]) as id
+), child_contracts_data(id, deleted, created_at, name, address, creator_address, chain, description, parent_address) as (
+  select unnest($10::varchar[]) as id
     , unnest($11::boolean[]) as deleted
     , unnest($12::timestamptz[]) as created_at
     , unnest($13::varchar[]) as name
@@ -122,19 +117,10 @@ child_contracts_data(id, deleted, created_at, name, address, creator_address, ch
     , unnest($16::int[]) as chain
     , unnest($17::varchar[]) as description
     , unnest($18::varchar[]) as parent_address
-),
-insert_parent_contracts as (
+), insert_parent_contracts as (
   insert into contracts(id, deleted, created_at, name, symbol, address, creator_address, chain, description)
   (
-    select id
-      , deleted
-      , created_at
-      , name
-      , symbol
-      , address
-      , creator_address
-      , chain
-      , description
+    select id, deleted, created_at, name, symbol, address, creator_address, chain, description
     from parent_contracts_data
   )
   on conflict (chain, address) where parent_id is null
@@ -148,15 +134,7 @@ insert_parent_contracts as (
 )
 insert into contracts(id, deleted, created_at, name, address, creator_address, chain, description, parent_id)
 (
-  select child.id
-    , child.deleted
-    , child.created_at
-    , child.name
-    , child.address
-    , child.creator_address
-    , child.chain
-    , child.description
-    , insert_parent_contracts.id
+  select child.id, child.deleted, child.created_at, child.name, child.address, child.creator_address, child.chain, child.description, insert_parent_contracts.id
   from child_contracts_data child
   join insert_parent_contracts on child.chain = insert_parent_contracts.chain and child.parent_address = insert_parent_contracts.address
 )
@@ -190,9 +168,6 @@ type UpsertCreatedTokensParams struct {
 	ChildContractParentAddress   []string
 }
 
-// parent_contracts_data is the data to be inserted for the parent contracts
-// child_contracts_data is the data to be inserted for the child contract.
-// Insert parent contracts, returning the inserted or updated rows
 func (q *Queries) UpsertCreatedTokens(ctx context.Context, arg UpsertCreatedTokensParams) ([]Contract, error) {
 	rows, err := q.db.Query(ctx, upsertCreatedTokens,
 		arg.ParentContractID,

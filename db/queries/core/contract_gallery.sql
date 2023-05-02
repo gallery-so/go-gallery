@@ -32,8 +32,7 @@ with parent_contracts_data(id, deleted, created_at, name, symbol, address, creat
     , unnest(@parent_contract_creator_address::varchar[]) as creator_address
     , unnest(@parent_contract_chain::int[]) as chain
     , unnest(@parent_contract_description::varchar[]) as description
-)
-, child_contracts_data(id, deleted, created_at, name, address, creator_address, chain, description, parent_address) as (
+), child_contracts_data(id, deleted, created_at, name, address, creator_address, chain, description, parent_address) as (
   select unnest(@child_contract_id::varchar[]) as id
     , unnest(@child_contract_deleted::boolean[]) as deleted
     , unnest(@child_contract_created_at::timestamptz[]) as created_at
@@ -46,15 +45,7 @@ with parent_contracts_data(id, deleted, created_at, name, symbol, address, creat
 ), insert_parent_contracts as (
   insert into contracts(id, deleted, created_at, name, symbol, address, creator_address, chain, description)
   (
-    select id
-      , deleted
-      , created_at
-      , name
-      , symbol
-      , address
-      , creator_address
-      , chain
-      , description
+    select id, deleted, created_at, name, symbol, address, creator_address, chain, description
     from parent_contracts_data
   )
   on conflict (chain, address) where parent_id is null
@@ -68,15 +59,7 @@ with parent_contracts_data(id, deleted, created_at, name, symbol, address, creat
 )
 insert into contracts(id, deleted, created_at, name, address, creator_address, chain, description, parent_id)
 (
-  select child.id
-    , child.deleted
-    , child.created_at
-    , child.name
-    , child.address
-    , child.creator_address
-    , child.chain
-    , child.description
-    , insert_parent_contracts.id
+  select child.id, child.deleted, child.created_at, child.name, child.address, child.creator_address, child.chain, child.description, insert_parent_contracts.id
   from child_contracts_data child
   join insert_parent_contracts on child.chain = insert_parent_contracts.chain and child.parent_address = insert_parent_contracts.address
 )
