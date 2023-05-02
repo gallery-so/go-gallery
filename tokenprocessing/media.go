@@ -1084,7 +1084,8 @@ func getMediaDimensions(ctx context.Context, url string) (persist.Dimensions, er
 	c.Stdout = outBuf
 	err := c.Run()
 	if err != nil {
-		return persist.Dimensions{}, err
+		logger.For(ctx).WithError(err).Errorf("failed to get dimensions for %s", url)
+		return getMediaDimensionsBackup(ctx, url)
 	}
 
 	var d dimensions
@@ -1094,7 +1095,7 @@ func getMediaDimensions(ctx context.Context, url string) (persist.Dimensions, er
 	}
 
 	if len(d.Streams) == 0 {
-		return persist.Dimensions{}, fmt.Errorf("no streams found in ffprobe output: %w", err)
+		return getMediaDimensionsBackup(ctx, url)
 	}
 
 	dims := persist.Dimensions{}
@@ -1110,7 +1111,64 @@ func getMediaDimensions(ctx context.Context, url string) (persist.Dimensions, er
 		break
 	}
 
+	if dims.Width == 0 || dims.Height == 0 {
+		return getMediaDimensionsBackup(ctx, url)
+	}
+
 	logger.For(ctx).Debugf("got dimensions %+v for %s", dims, url)
+	return dims, nil
+}
+
+func getMediaDimensionsBackup(ctx context.Context, url string) (persist.Dimensions, error) {
+	outBuf := &bytes.Buffer{}
+	curlCmd := exec.CommandContext(ctx, "curl", "-s", url)
+	identifyCmd := exec.CommandContext(ctx, "identify", "-format", "%wx%h", "-")
+	identifyCmd.Stderr = os.Stderr
+	identifyCmd.Stdout = outBuf
+
+	curlCmdStdout, err := curlCmd.StdoutPipe()
+	if err != nil {
+		return persist.Dimensions{}, fmt.Errorf("failed to create pipe for curl stdout: %w", err)
+	}
+
+	identifyCmd.Stdin = curlCmdStdout
+
+	err = curlCmd.Start()
+	if err != nil {
+		return persist.Dimensions{}, fmt.Errorf("failed to start curl command: %w", err)
+	}
+
+	err = identifyCmd.Run()
+	if err != nil {
+		return persist.Dimensions{}, err
+	}
+
+	err = curlCmd.Wait()
+	if err != nil {
+		return persist.Dimensions{}, fmt.Errorf("curl command exited with error: %w", err)
+	}
+
+	dimensionsStr := outBuf.String()
+	dimensionsSplit := strings.Split(dimensionsStr, "x")
+	if len(dimensionsSplit) != 2 {
+		return persist.Dimensions{}, fmt.Errorf("unexpected output format from identify: %s", dimensionsStr)
+	}
+
+	width, err := strconv.Atoi(dimensionsSplit[0])
+	if err != nil {
+		return persist.Dimensions{}, fmt.Errorf("failed to parse width: %w", err)
+	}
+
+	height, err := strconv.Atoi(dimensionsSplit[1])
+	if err != nil {
+		return persist.Dimensions{}, fmt.Errorf("failed to parse height: %w", err)
+	}
+
+	dims := persist.Dimensions{
+		Width:  width,
+		Height: height,
+	}
+
 	return dims, nil
 }
 
@@ -1147,16 +1205,21 @@ func newObjectWriter(ctx context.Context, client *storage.Client, bucket, fileNa
 	if contentType != nil {
 		writer.ObjectAttrs.ContentType = *contentType
 	}
+	writer.ProgressFunc = func(written int64) {
+		logger.For(ctx).Debugf("wrote %s to %s", util.InByteSizeFormat(uint64(written)), fileName)
+	}
 	writer.ObjectAttrs.Metadata = objMetadata
 	writer.ObjectAttrs.CacheControl = "no-cache, no-store"
 	writer.ChunkSize = 4 * 1024 * 1024 // 4MB
-	writer.ChunkRetryDeadline = 3 * time.Minute
+	writer.ChunkRetryDeadline = 10 * time.Minute
 	if contentLength != nil {
 		cl := *contentLength
 		if cl < 4*1024*1024 {
 			writer.ChunkSize = int(cl)
-		} else if cl > 32*1024*1024 {
+		} else if cl > 8*1024*1024 && cl < 32*1024*1024 {
 			writer.ChunkSize = 8 * 1024 * 1024
+		} else if cl > 32*1024*1024 {
+			writer.ChunkSize = 16 * 1024 * 1024
 		}
 	}
 	return writer

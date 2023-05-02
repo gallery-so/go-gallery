@@ -28,7 +28,7 @@ type tokenProcessor struct {
 	tokenRepo     *postgres.TokenGalleryRepository
 }
 
-func newTokenProcessor(queries *coredb.Queries, ethClient *ethclient.Client, mc *multichain.Provider, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, tokenRepo *postgres.TokenGalleryRepository) *tokenProcessor {
+func NewTokenProcessor(queries *coredb.Queries, ethClient *ethclient.Client, mc *multichain.Provider, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, tokenRepo *postgres.TokenGalleryRepository) *tokenProcessor {
 	return &tokenProcessor{
 		queries:       queries,
 		ethClient:     ethClient,
@@ -54,7 +54,7 @@ type tokenProcessingJob struct {
 	pipelineMetadata *persist.PipelineMetadata
 }
 
-func (tp *tokenProcessor) processTokenPipeline(c context.Context, t persist.TokenGallery, contract persist.ContractGallery, ownerAddress persist.Address, cause persist.ProcessingCause) error {
+func (tp *tokenProcessor) ProcessTokenPipeline(c context.Context, t persist.TokenGallery, contract persist.ContractGallery, ownerAddress persist.Address, cause persist.ProcessingCause) error {
 
 	runID := persist.GenerateID()
 
@@ -244,7 +244,8 @@ func (tpj *tokenProcessingJob) upsertDB(ctx context.Context, tmetadata coredb.To
 	}
 
 	return tpj.tp.queries.UpsertTokenMedia(ctx, coredb.UpsertTokenMediaParams{
-		NewID:            tmetadata.ID,
+		NewID:            persist.GenerateID(),
+		AnotherNewID:     persist.GenerateID(),
 		ContractID:       tpj.token.Contract,
 		TokenID:          tpj.token.TokenID,
 		Chain:            tpj.token.Chain,

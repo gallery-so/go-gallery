@@ -1085,6 +1085,123 @@ func (q *Queries) GetAllTimeTrendingUserIDs(ctx context.Context, limit int32) ([
 	return items, nil
 }
 
+const getAllTokensWithContracts = `-- name: GetAllTokensWithContracts :many
+select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id, contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam from tokens join contracts on contracts.id = tokens.contract where tokens.deleted = false order by tokens.last_updated desc limit $1 offset $2
+`
+
+type GetAllTokensWithContractsParams struct {
+	Limit  int32
+	Offset int32
+}
+
+type GetAllTokensWithContractsRow struct {
+	ID                     persist.DBID
+	Deleted                bool
+	Version                sql.NullInt32
+	CreatedAt              time.Time
+	LastUpdated            time.Time
+	Name                   sql.NullString
+	Description            sql.NullString
+	CollectorsNote         sql.NullString
+	Media                  persist.Media
+	TokenUri               sql.NullString
+	TokenType              sql.NullString
+	TokenID                persist.TokenID
+	Quantity               sql.NullString
+	OwnershipHistory       persist.AddressAtBlockList
+	TokenMetadata          persist.TokenMetadata
+	ExternalUrl            sql.NullString
+	BlockNumber            sql.NullInt64
+	OwnerUserID            persist.DBID
+	OwnedByWallets         persist.DBIDList
+	Chain                  persist.Chain
+	Contract               persist.DBID
+	IsUserMarkedSpam       sql.NullBool
+	IsProviderMarkedSpam   sql.NullBool
+	LastSynced             time.Time
+	FallbackMedia          persist.FallbackMedia
+	TokenMediaID           persist.DBID
+	ID_2                   persist.DBID
+	Deleted_2              bool
+	Version_2              sql.NullInt32
+	CreatedAt_2            time.Time
+	LastUpdated_2          time.Time
+	Name_2                 sql.NullString
+	Symbol                 sql.NullString
+	Address                persist.Address
+	CreatorAddress         persist.Address
+	Chain_2                persist.Chain
+	ProfileBannerUrl       sql.NullString
+	ProfileImageUrl        sql.NullString
+	BadgeUrl               sql.NullString
+	Description_2          sql.NullString
+	OwnerAddress           persist.Address
+	IsProviderMarkedSpam_2 bool
+}
+
+func (q *Queries) GetAllTokensWithContracts(ctx context.Context, arg GetAllTokensWithContractsParams) ([]GetAllTokensWithContractsRow, error) {
+	rows, err := q.db.Query(ctx, getAllTokensWithContracts, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetAllTokensWithContractsRow
+	for rows.Next() {
+		var i GetAllTokensWithContractsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Name,
+			&i.Description,
+			&i.CollectorsNote,
+			&i.Media,
+			&i.TokenUri,
+			&i.TokenType,
+			&i.TokenID,
+			&i.Quantity,
+			&i.OwnershipHistory,
+			&i.TokenMetadata,
+			&i.ExternalUrl,
+			&i.BlockNumber,
+			&i.OwnerUserID,
+			&i.OwnedByWallets,
+			&i.Chain,
+			&i.Contract,
+			&i.IsUserMarkedSpam,
+			&i.IsProviderMarkedSpam,
+			&i.LastSynced,
+			&i.FallbackMedia,
+			&i.TokenMediaID,
+			&i.ID_2,
+			&i.Deleted_2,
+			&i.Version_2,
+			&i.CreatedAt_2,
+			&i.LastUpdated_2,
+			&i.Name_2,
+			&i.Symbol,
+			&i.Address,
+			&i.CreatorAddress,
+			&i.Chain_2,
+			&i.ProfileBannerUrl,
+			&i.ProfileImageUrl,
+			&i.BadgeUrl,
+			&i.Description_2,
+			&i.OwnerAddress,
+			&i.IsProviderMarkedSpam_2,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getCheckablePushTickets = `-- name: GetCheckablePushTickets :many
 select id, push_token_id, ticket_id, created_at, check_after, num_check_attempts, deleted from push_notification_tickets where check_after <= now() and deleted = false limit $1
 `
@@ -4767,7 +4884,7 @@ const upsertTokenMedia = `-- name: UpsertTokenMedia :exec
 with copy_on_overwrite as (
     insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
     (
-        select $1, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, last_updated
+        select $10, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, last_updated
         from token_medias
         where contract_id = $2
           and token_id = $3
@@ -4778,10 +4895,10 @@ with copy_on_overwrite as (
     )
 )
 , job as (
-  insert into token_processing_jobs (id, token_properties, pipeline_metadata, processing_cause, processor_version) values ($9, $11, $12, $13, $14)
+  insert into token_processing_jobs (id, token_properties, pipeline_metadata, processing_cause, processor_version) values ($11, $12, $13, $14, $15) returning id, created_at, token_properties, pipeline_metadata, processing_cause, processor_version, deleted
 )
-insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
-    values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now(), now())
+insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated) 
+    (select $1, $2, $3, $4, $5, $6, $7, $8, job.id, $9, now(), now() from job)
     on conflict (contract_id, token_id, chain) where active = true and deleted = false do update
         set metadata = excluded.metadata,
             media = excluded.media,
@@ -4792,7 +4909,7 @@ insert into token_medias (id, contract_id, token_id, chain, metadata, media, nam
 `
 
 type UpsertTokenMediaParams struct {
-	NewID            persist.DBID
+	AnotherNewID     persist.DBID
 	ContractID       persist.DBID
 	TokenID          persist.TokenID
 	Chain            persist.Chain
@@ -4800,8 +4917,9 @@ type UpsertTokenMediaParams struct {
 	Media            persist.Media
 	Name             string
 	Description      string
-	ProcessingJobID  persist.DBID
 	Active           bool
+	NewID            persist.DBID
+	ProcessingJobID  persist.DBID
 	TokenProperties  persist.TokenProperties
 	PipelineMetadata persist.PipelineMetadata
 	ProcessingCause  persist.ProcessingCause
@@ -4810,7 +4928,7 @@ type UpsertTokenMediaParams struct {
 
 func (q *Queries) UpsertTokenMedia(ctx context.Context, arg UpsertTokenMediaParams) error {
 	_, err := q.db.Exec(ctx, upsertTokenMedia,
-		arg.NewID,
+		arg.AnotherNewID,
 		arg.ContractID,
 		arg.TokenID,
 		arg.Chain,
@@ -4818,8 +4936,9 @@ func (q *Queries) UpsertTokenMedia(ctx context.Context, arg UpsertTokenMediaPara
 		arg.Media,
 		arg.Name,
 		arg.Description,
-		arg.ProcessingJobID,
 		arg.Active,
+		arg.NewID,
+		arg.ProcessingJobID,
 		arg.TokenProperties,
 		arg.PipelineMetadata,
 		arg.ProcessingCause,

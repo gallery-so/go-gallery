@@ -57,7 +57,7 @@ func CoreInitServer(c *server.Clients, mc *multichain.Provider) *gin.Engine {
 
 	t := newThrottler()
 
-	tp := newTokenProcessor(c.Queries, c.EthClient, mc, c.IPFSClient, c.ArweaveClient, c.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), c.Repos.TokenRepository)
+	tp := NewTokenProcessor(c.Queries, c.EthClient, mc, c.IPFSClient, c.ArweaveClient, c.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), c.Repos.TokenRepository)
 
 	return handlersInitServer(router, tp, mc, c.Repos, t)
 }

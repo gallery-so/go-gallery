@@ -41,14 +41,12 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 
 		ctx := logger.NewContextWithFields(c, logrus.Fields{"userID": input.UserID})
 
-		if env.GetString("ENV") != "local" {
-			if err := throttler.Lock(ctx, input.UserID.String()); err != nil {
-				// Reply with a non-200 status so that the message is tried again later on
-				util.ErrResponse(c, http.StatusTooManyRequests, err)
-				return
-			}
-			defer throttler.Unlock(ctx, input.UserID.String())
+		if err := throttler.Lock(ctx, input.UserID.String()); err != nil {
+			// Reply with a non-200 status so that the message is tried again later on
+			util.ErrResponse(c, http.StatusTooManyRequests, err)
+			return
 		}
+		defer throttler.Unlock(ctx, input.UserID.String())
 
 		wp := pool.New().WithMaxGoroutines(50).WithContext(ctx)
 		for _, tokenID := range input.TokenIDs {
@@ -64,7 +62,7 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 			}
 
 			wp.Go(func(ctx context.Context) error {
-				err := tp.processTokenPipeline(ctx, t, contract, "", persist.ProcessingCauseSync)
+				err := tp.ProcessTokenPipeline(ctx, t, contract, "", persist.ProcessingCauseSync)
 				if err != nil {
 
 					logger.For(c).Errorf("Error processing token: %s", err)
@@ -122,7 +120,7 @@ func processMediaForToken(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRe
 			return
 		}
 
-		err = tp.processTokenPipeline(ctx, t, contract, input.OwnerAddress, persist.ProcessingCauseRefresh)
+		err = tp.ProcessTokenPipeline(ctx, t, contract, input.OwnerAddress, persist.ProcessingCauseRefresh)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return

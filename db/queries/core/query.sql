@@ -1041,10 +1041,10 @@ with copy_on_overwrite as (
     )
 )
 , job as (
-  insert into token_processing_jobs (id, token_properties, pipeline_metadata, processing_cause, processor_version) values (@processing_job_id, @token_properties, @pipeline_metadata, @processing_cause, @processor_version)
+  insert into token_processing_jobs (id, token_properties, pipeline_metadata, processing_cause, processor_version) values (@processing_job_id, @token_properties, @pipeline_metadata, @processing_cause, @processor_version) returning *
 )
-insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
-    values (@new_id, @contract_id, @token_id, @chain, @metadata, @media, @name, @description, @processing_job_id, @active, now(), now())
+insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated) 
+    (select @another_new_id, @contract_id, @token_id, @chain, @metadata, @media, @name, @description, job.id, @active, now(), now() from job)
     on conflict (contract_id, token_id, chain) where active = true and deleted = false do update
         set metadata = excluded.metadata,
             media = excluded.media,
@@ -1101,3 +1101,6 @@ update push_notification_tickets t set check_after = updates.check_after, num_ch
 
 -- name: GetCheckablePushTickets :many
 select * from push_notification_tickets where check_after <= now() and deleted = false limit sqlc.arg('limit');
+
+-- name: GetAllTokensWithContracts :many
+select tokens.*, contracts.* from tokens join contracts on contracts.id = tokens.contract where tokens.deleted = false order by tokens.last_updated desc limit $1 offset $2;
