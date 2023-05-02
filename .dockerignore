@@ -22,6 +22,7 @@
 !docker
 !debugtools
 !tokenprocessing
+!pushnotifications
 !root-certs
 !emails
 !adminapi

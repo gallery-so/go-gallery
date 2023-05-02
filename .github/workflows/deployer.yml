@@ -127,3 +127,45 @@ jobs:
           gcp-credentials-json: ${{ secrets.GCP_PROD_CREDENTIALS }}
       - name: "Deploy"
         run: make deploy-prod-feedbot
+  deploy-dev-graphql-gateway:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: "Install build deps"
+        uses: ./.github/actions/build-deps
+        with:
+          gcp-credentials-json: ${{ secrets.GCP_DEV_CREDENTIALS }}
+      - name: "Deploy"
+        run: make deploy-dev-graphql-gateway
+  deploy-prod-graphql-gateway:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: "Install build deps"
+        uses: ./.github/actions/build-deps
+        with:
+          gcp-credentials-json: ${{ secrets.GCP_PROD_CREDENTIALS }}
+      - name: "Deploy"
+        run: make deploy-prod-graphql-gateway
+  deploy-dev-pushnotifications:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: "Install build deps"
+        uses: ./.github/actions/build-deps
+        with:
+          sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          gcp-credentials-json: ${{ secrets.GCP_DEV_CREDENTIALS }}
+      - name: "Deploy"
+        run: make deploy-dev-pushnotifications
+  deploy-prod-pushnotifications:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: "Install build deps"
+        uses: ./.github/actions/build-deps
+        with:
+          sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          gcp-credentials-json: ${{ secrets.GCP_PROD_CREDENTIALS }}
+      - name: "Deploy"
+        run: make deploy-prod-pushnotifications
