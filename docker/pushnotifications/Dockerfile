@@ -14,7 +14,7 @@ COPY . /app
 RUN go build -o ./bin/pushnotifications ./cmd/pushnotifications/main.go
 
 ARG VERSION
-ENV GAE_VERSION=$VERSION
+ENV VERSION=$VERSION
 
 EXPOSE 6600
 USER nobody
