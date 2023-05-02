@@ -8,7 +8,7 @@ with tids as (
     tids.contract,
     tids.chain,
     token_medias.id as media_id,
-    ROW_NUMBER() OVER (PARTITION BY token_medias.id ORDER BY token_medias.last_updated) AS row_num
+    ROW_NUMBER() OVER (PARTITION BY tids.token_id, tids.contract, tids.chain ORDER BY token_medias.last_updated) AS row_num
   from
     tids
     left join token_medias on (
