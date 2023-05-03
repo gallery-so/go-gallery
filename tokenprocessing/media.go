@@ -744,7 +744,7 @@ func cacheRawMedia(ctx context.Context, reader io.Reader, tids persist.TokenIden
 	}
 	err := persistToStorage(ctx, client, reader, bucket, object.fileName(), object.ContentType, object.ContentLength,
 		map[string]string{
-			"originalURL": ogURL,
+			"originalURL": truncateString(ogURL, 100),
 			"mediaType":   mediaType.String(),
 		})
 	if err != nil {
@@ -768,7 +768,7 @@ func cacheRawAnimationMedia(ctx context.Context, reader io.Reader, tids persist.
 	}
 
 	sw := newObjectWriter(ctx, client, bucket, object.fileName(), nil, nil, map[string]string{
-		"originalURL": ogURL,
+		"originalURL": truncateString(ogURL, 100),
 		"mediaType":   mediaType.String(),
 	})
 	writer := gzip.NewWriter(sw)
@@ -1211,8 +1211,8 @@ func newObjectWriter(ctx context.Context, client *storage.Client, bucket, fileNa
 	writer.ObjectAttrs.Metadata = objMetadata
 	writer.ObjectAttrs.CacheControl = "no-cache, no-store"
 	writer.ChunkSize = 4 * 1024 * 1024 // 4MB
-	writer.ChunkRetryDeadline = 10 * time.Minute
-	if contentLength != nil {
+	writer.ChunkRetryDeadline = 2 * time.Minute
+	if contentLength != nil && env.GetString("ENV") != "local" {
 		cl := *contentLength
 		if cl < 4*1024*1024 {
 			writer.ChunkSize = int(cl)

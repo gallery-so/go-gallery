@@ -13,34 +13,6 @@ import (
 )
 
 const upsertTokens = `-- name: UpsertTokens :many
-with tids as (
-  select unnest($27::varchar[]) as token_id, unnest($28::varchar[]) as contract, unnest($29::int[]) as chain
-)
-, limited_tms as (
-  select
-    tids.token_id,
-    tids.contract,
-    tids.chain,
-    token_medias.id as media_id,
-    ROW_NUMBER() OVER (PARTITION BY tids.token_id, tids.contract, tids.chain ORDER BY token_medias.last_updated) AS row_num
-  from
-    tids
-    left join token_medias on (
-      token_medias.token_id = tids.token_id
-      and token_medias.contract_id = tids.contract
-      and token_medias.chain = tids.chain
-      and token_medias.active = true
-      and token_medias.deleted = false
-    )
-)
-, tms as (
-  select
-    array_agg(media_id) as media_id
-  from
-    limited_tms
-  where
-    row_num = 1
-)
 insert into tokens
 (
   id
@@ -96,7 +68,15 @@ insert into tokens
     , is_provider_marked_spam
     , last_synced
     , token_uri
-    , media_id
+    , (select tm.id
+       from token_medias tm
+       where tm.token_id = bulk_upsert.token_id
+         and tm.contract_id = bulk_upsert.contract
+         and tm.chain = bulk_upsert.chain
+         and tm.active = true
+         and tm.deleted = false
+        limit 1
+      ) as token_media_id
   from (
     select
       unnest($1::varchar[]) as id
@@ -128,8 +108,6 @@ insert into tokens
       , unnest($27::varchar[]) as token_id
       , unnest($28::varchar[]) as contract
       , unnest($29::int[]) as chain
-      , unnest(tms.media_id) as media_id 
-      from tms
   ) bulk_upsert
 )
 on conflict (token_id, contract, chain, owner_user_id) where deleted = false

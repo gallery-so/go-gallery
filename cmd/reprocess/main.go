@@ -70,7 +70,7 @@ func main() {
 	} else {
 		logrus.Infof("running as local job")
 		limit = 1000
-		offset = 120000
+		offset = 0
 		rows, err = clients.Queries.GetAllTokensWithContracts(ctx, coredb.GetAllTokensWithContractsParams{
 			Limit:  int32(limit),
 			Offset: int32(offset),
@@ -82,7 +82,7 @@ func main() {
 		panic(err)
 	}
 
-	wp := pool.New().WithMaxGoroutines(100).WithContext(ctx)
+	wp := pool.New().WithMaxGoroutines(25).WithContext(ctx)
 
 	logrus.Infof("processing (%d) tokens...", totalTokenCount)
 
@@ -202,7 +202,7 @@ func setDefaults() {
 		if len(os.Args) > 1 {
 			fi = os.Args[1]
 		}
-		envFile := util.ResolveEnvFile("backend", fi)
+		envFile := util.ResolveEnvFile("tokenprocessing", fi)
 		util.LoadEncryptedEnvFile(envFile)
 	}
 }

@@ -4080,39 +4080,6 @@ func (q *Queries) InsertSpamContracts(ctx context.Context, arg InsertSpamContrac
 	return err
 }
 
-const insertTokenMedia = `-- name: InsertTokenMedia :exec
-insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-`
-
-type InsertTokenMediaParams struct {
-	ID              persist.DBID
-	ContractID      persist.DBID
-	TokenID         persist.TokenID
-	Chain           persist.Chain
-	Metadata        persist.TokenMetadata
-	Media           persist.Media
-	Name            string
-	Description     string
-	ProcessingJobID persist.DBID
-	Active          bool
-}
-
-func (q *Queries) InsertTokenMedia(ctx context.Context, arg InsertTokenMediaParams) error {
-	_, err := q.db.Exec(ctx, insertTokenMedia,
-		arg.ID,
-		arg.ContractID,
-		arg.TokenID,
-		arg.Chain,
-		arg.Metadata,
-		arg.Media,
-		arg.Name,
-		arg.Description,
-		arg.ProcessingJobID,
-		arg.Active,
-	)
-	return err
-}
-
 const insertTokenProcessingJob = `-- name: InsertTokenProcessingJob :exec
 insert into token_processing_jobs (id, token_properties, pipeline_metadata, processing_cause, processor_version) values ($1, $2, $3, $4, $5)
 `
@@ -4454,39 +4421,6 @@ UPDATE feed_blocklist SET deleted = true WHERE user_id = $1
 
 func (q *Queries) UnblockUserFromFeed(ctx context.Context, userID persist.DBID) error {
 	_, err := q.db.Exec(ctx, unblockUserFromFeed, userID)
-	return err
-}
-
-const updateActiveTokenMediaByTokenIdentifiers = `-- name: UpdateActiveTokenMediaByTokenIdentifiers :exec
-with old as (
-  insert into token_medias (id, contract, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated) (select $1, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, last_updated from token_medias where token_medias.contract_id = $2 and token_medias.token_id = $3 and token_medias.chain = $4 and active = true and deleted = false)
-) update token_medias set metadata = $5, media = $6, name = $7, description = $8, processing_job_id = $9 where token_medias.contract_id = $2 and token_medias.token_id = $3 and token_medias.chain = $4 and active = true and deleted = false
-`
-
-type UpdateActiveTokenMediaByTokenIdentifiersParams struct {
-	ID              persist.DBID
-	ContractID      persist.DBID
-	TokenID         persist.TokenID
-	Chain           persist.Chain
-	Metadata        persist.TokenMetadata
-	Media           persist.Media
-	Name            string
-	Description     string
-	ProcessingJobID persist.DBID
-}
-
-func (q *Queries) UpdateActiveTokenMediaByTokenIdentifiers(ctx context.Context, arg UpdateActiveTokenMediaByTokenIdentifiersParams) error {
-	_, err := q.db.Exec(ctx, updateActiveTokenMediaByTokenIdentifiers,
-		arg.ID,
-		arg.ContractID,
-		arg.TokenID,
-		arg.Chain,
-		arg.Metadata,
-		arg.Media,
-		arg.Name,
-		arg.Description,
-		arg.ProcessingJobID,
-	)
 	return err
 }
 
@@ -4880,7 +4814,7 @@ func (q *Queries) UpsertSocialOAuth(ctx context.Context, arg UpsertSocialOAuthPa
 	return err
 }
 
-const upsertTokenMedia = `-- name: UpsertTokenMedia :exec
+const upsertTokenMedia = `-- name: UpsertTokenMedia :one
 with copy_on_overwrite as (
     insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
     (
@@ -4905,7 +4839,7 @@ insert into token_medias (id, contract_id, token_id, chain, metadata, media, nam
             name = excluded.name,
             description = excluded.description,
             processing_job_id = excluded.processing_job_id,
-            last_updated = now()
+            last_updated = now() returning id
 `
 
 type UpsertTokenMediaParams struct {
@@ -4926,8 +4860,8 @@ type UpsertTokenMediaParams struct {
 	ProcessorVersion string
 }
 
-func (q *Queries) UpsertTokenMedia(ctx context.Context, arg UpsertTokenMediaParams) error {
-	_, err := q.db.Exec(ctx, upsertTokenMedia,
+func (q *Queries) UpsertTokenMedia(ctx context.Context, arg UpsertTokenMediaParams) (persist.DBID, error) {
+	row := q.db.QueryRow(ctx, upsertTokenMedia,
 		arg.AnotherNewID,
 		arg.ContractID,
 		arg.TokenID,
@@ -4944,7 +4878,9 @@ func (q *Queries) UpsertTokenMedia(ctx context.Context, arg UpsertTokenMediaPara
 		arg.ProcessingCause,
 		arg.ProcessorVersion,
 	)
-	return err
+	var id persist.DBID
+	err := row.Scan(&id)
+	return id, err
 }
 
 const userHasDuplicateGalleryPositions = `-- name: UserHasDuplicateGalleryPositions :one

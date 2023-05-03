@@ -80,7 +80,7 @@ func (tp *tokenProcessor) ProcessTokenPipeline(c context.Context, t persist.Toke
 		"runID":           runID,
 	})
 
-	ctx, cancel := context.WithTimeout(loggerCtx, time.Minute*10)
+	ctx, cancel := context.WithTimeout(loggerCtx, time.Minute*5)
 	defer cancel()
 
 	totalTime := time.Now()
@@ -218,7 +218,7 @@ func (tpj *tokenProcessingJob) createRawMedia(ctx context.Context, mediaType per
 
 func (tpj *tokenProcessingJob) isNewMediaPreferable(ctx context.Context, media persist.Media) bool {
 	defer persist.TrackStepStatus(&tpj.pipelineMetadata.MediaResultComparison)()
-	return !tpj.token.Media.IsServable() && media.IsServable()
+	return media.IsServable() || !tpj.token.Media.IsServable()
 }
 
 func (tpj *tokenProcessingJob) persistResults(ctx context.Context, tmetadata coredb.TokenMedia) error {
@@ -242,9 +242,10 @@ func (tpj *tokenProcessingJob) upsertDB(ctx context.Context, tmetadata coredb.To
 		HasDescription:  tmetadata.Description != "",
 	}
 
-	return tpj.tp.queries.UpsertTokenMedia(ctx, coredb.UpsertTokenMediaParams{
+	anotherNew := persist.GenerateID()
+	id, err := tpj.tp.queries.UpsertTokenMedia(ctx, coredb.UpsertTokenMediaParams{
 		NewID:            persist.GenerateID(),
-		AnotherNewID:     persist.GenerateID(),
+		AnotherNewID:     anotherNew,
 		ContractID:       tpj.token.Contract,
 		TokenID:          tpj.token.TokenID,
 		Chain:            tpj.token.Chain,
@@ -259,4 +260,18 @@ func (tpj *tokenProcessingJob) upsertDB(ctx context.Context, tmetadata coredb.To
 		ProcessingCause:  tpj.cause,
 		ProcessorVersion: "",
 	})
+	if err != nil {
+		logger.For(ctx).Errorf("error upserting token media: %s", err)
+		return err
+	}
+	logger.For(ctx).Infof("upserted token media: %s", id)
+	if tmetadata.Active && anotherNew == id {
+		return tpj.tp.queries.UpdateTokenTokenMediaByTokenIdentifiers(ctx, coredb.UpdateTokenTokenMediaByTokenIdentifiersParams{
+			TokenMediaID: id,
+			Contract:     tpj.token.Contract,
+			TokenID:      tpj.token.TokenID,
+			Chain:        tpj.token.Chain,
+		})
+	}
+	return nil
 }
