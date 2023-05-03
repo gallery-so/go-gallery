@@ -31,9 +31,6 @@ DOCKER_CONTEXT       := .
 DOCKER_REGISTRY      := us-east1-docker.pkg.dev
 FFMPEG_VERSION       = 7:4.3.6-0+deb11u1
 
-# Helper function to add optional flags to a command
-OPTIONAL_FLAG = $(if $(1),$(eval $(2) += $(3)))
-
 # Environments
 DEV     := dev
 PROD    := prod
@@ -213,8 +210,7 @@ $(DEPLOY)-%-check-push-tickets         : CRON_LOCATION  := $(DEPLOY_REGION)
 $(DEPLOY)-%-check-push-tickets         : CRON_SCHEDULE  := '*/5 * * * *'
 $(DEPLOY)-%-check-push-tickets         : CRON_URI       = $(shell gcloud run services describe $(URI_NAME) --region $(DEPLOY_REGION) --format 'value(status.url)')/jobs/check-push-tickets
 $(DEPLOY)-%-check-push-tickets         : CRON_METHOD    := POST
-$(DEPLOY)-%-check-push-tickets         : CRON_PASSWORD  = $(PUSH_NOTIFICATIONS_SECRET)
-$(DEPLOY)-%-check-push-tickets         : CRON_DEADLINE  := 10m
+$(DEPLOY)-%-check-push-tickets         : CRON_FLAGS     = --headers='Authorization=Basic $(shell printf ":$(PUSH_NOTIFICATIONS_SECRET)" | base64)' --attempt-deadline=10m
 $(DEPLOY)-$(DEV)-check-push-tickets    : URI_NAME       := pushnotifications-dev
 $(DEPLOY)-$(PROD)-check-push-tickets   : URI_NAME       := pushnotifications
 
@@ -302,9 +298,7 @@ _$(DOCKER)-$(DEPLOY)-%:
 	@if [ $$? -eq 0 ] && echo $(DEPLOY_FLAGS) | grep -e "--no-traffic" > /dev/null; then echo "\n\tVERSION: '$(CURRENT_COMMIT_HASH)' was deployed but is not currently receiving traffic.\n\tRun 'make promote-$(ENV)-$* version=$(CURRENT_COMMIT_HASH)' to promote it!\n"; else echo "\n\tVERSION: '$(CURRENT_COMMIT_HASH)' was deployed!\n"; fi
 
 _$(CRON)-$(DEPLOY)-%:
-	$(call OPTIONAL_FLAG, $(CRON_PASSWORD), FLAGS, --headers='Authorization=Basic $(shell printf ":$(CRON_PASSWORD)" | base64)')
-	$(call OPTIONAL_FLAG, $(CRON_DEADLINE), FLAGS, --attempt-deadline=$(CRON_DEADLINE))
-	@$(SCHEDULER_DEPLOY) $(FLAGS)
+	@$(SCHEDULER_DEPLOY) $(CRON_FLAGS)
 	@echo Deployed job $(CRON_NAME) to $(ENV)
 
 # Pauses jobs besides the version being deployed
