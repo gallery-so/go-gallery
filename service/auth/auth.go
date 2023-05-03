@@ -75,9 +75,6 @@ var ErrInvalidJWT = errors.New("invalid or expired auth token")
 // ErrNoCookie is returned when there is no JWT in the request
 var ErrNoCookie = errors.New("no jwt passed as cookie")
 
-// ErrInvalidAuthHeader is returned when the auth header is invalid
-var ErrInvalidAuthHeader = errors.New("invalid auth header format")
-
 // ErrSignatureInvalid is returned when the signed nonce's signature is invalid
 var ErrSignatureInvalid = errors.New("signature invalid")
 
@@ -283,10 +280,10 @@ func NewMagicLinkClient() *magicclient.API {
 }
 
 // Login logs in a user with a given authentication scheme
-func Login(pCtx context.Context, authenticator Authenticator) (persist.DBID, error) {
-	gc := util.MustGetGinContext(pCtx)
+func Login(ctx context.Context, authenticator Authenticator) (persist.DBID, error) {
+	gc := util.MustGetGinContext(ctx)
 
-	authResult, err := authenticator.Authenticate(pCtx)
+	authResult, err := authenticator.Authenticate(ctx)
 	if err != nil {
 		return "", ErrAuthenticationFailed{WrappedErr: err}
 	}
@@ -295,13 +292,13 @@ func Login(pCtx context.Context, authenticator Authenticator) (persist.DBID, err
 		return "", persist.ErrUserNotFound{Authenticator: authenticator.GetDescription()}
 	}
 
-	jwtTokenStr, err := JWTGeneratePipeline(pCtx, authResult.User.ID)
+	authToken, err := GenerateAuthToken(ctx, authResult.User.ID)
 	if err != nil {
 		return "", err
 	}
 
 	SetAuthStateForCtx(gc, authResult.User.ID, nil)
-	SetJWTCookie(gc, jwtTokenStr)
+	SetAuthCookie(gc, authToken)
 
 	return authResult.User.ID, nil
 }
@@ -309,7 +306,7 @@ func Login(pCtx context.Context, authenticator Authenticator) (persist.DBID, err
 func Logout(pCtx context.Context) {
 	gc := util.MustGetGinContext(pCtx)
 	SetAuthStateForCtx(gc, "", ErrNoCookie)
-	SetJWTCookie(gc, "")
+	SetAuthCookie(gc, "")
 }
 
 // GetAuthNonce will determine whether a user is permitted to log in, and if so, generate a nonce to be signed
@@ -409,8 +406,8 @@ func SetAuthStateForCtx(c *gin.Context, userID persist.DBID, err error) {
 	c.Set(userAuthedContextKey, userID != "" && err == nil)
 }
 
-// SetJWTCookie sets the cookie for auth on the response
-func SetJWTCookie(c *gin.Context, token string) {
+// SetAuthCookie sets the cookie for auth on the response
+func SetAuthCookie(c *gin.Context, token string) {
 	mode := http.SameSiteStrictMode
 	domain := ".gallery.so"
 	httpOnly := true

@@ -120,7 +120,7 @@ func setDefaults() {
 		util.VarNotSetTo("SENTRY_DSN", "")
 		util.VarNotSetTo("VERSION", "")
 		util.VarNotSetTo("SENDGRID_API_KEY", "")
-		util.VarNotSetTo("JWT_SECRET", "")
+		util.VarNotSetTo("EMAIL_VERIFICATION_JWT_SECRET", "")
 		util.VarNotSetTo("FROM_EMAIL", "")
 	}
 }

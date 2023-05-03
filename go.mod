@@ -65,6 +65,7 @@ require (
 require (
 	cloud.google.com/go/storage v1.30.1
 	github.com/ertan/go-farcaster v1.0.0-beta
+	github.com/golang-jwt/jwt/v5 v5.0.0
 	github.com/jinzhu/copier v0.3.5
 	github.com/sourcegraph/conc v0.3.0
 	go.mozilla.org/sops/v3 v3.7.3

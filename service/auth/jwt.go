@@ -2,88 +2,121 @@ package auth
 
 import (
 	"context"
-	"net/http"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
-	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-type jwtClaims struct {
+type authClaims struct {
 	UserID persist.DBID `json:"user_id"`
-	jwt.StandardClaims
+	jwt.RegisteredClaims
 }
 
-// JWTValidateResponse is the response for the jwt validation endpoint
-type JWTValidateResponse struct {
-	IsValid bool         `json:"valid"`
-	UserID  persist.DBID `json:"user_id"`
+// TODO: Add a source to this, and maybe add a type to all tokens?
+type oneTimeLoginClaims struct {
+	UserID persist.DBID `json:"user_id"`
+	jwt.RegisteredClaims
 }
 
-// ValidateJWT is a handler that validates the JWT token and returns the user ID
-func ValidateJWT() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		auth := GetUserAuthedFromCtx(c)
-		userID := GetUserIDFromCtx(c)
+type emailVerificationClaims struct {
+	UserID persist.DBID `json:"user_id"`
+	Email  string       `json:"email"`
+	jwt.RegisteredClaims
+}
 
-		c.JSON(http.StatusOK, JWTValidateResponse{
-			IsValid: auth,
-			UserID:  userID,
-		})
+func GenerateAuthToken(ctx context.Context, userID persist.DBID) (string, error) {
+	secret := env.GetString("AUTH_JWT_SECRET")
+	validFor := time.Duration(env.GetInt64("AUTH_JWT_TTL")) * time.Second
+
+	claims := authClaims{
+		UserID:           userID,
+		RegisteredClaims: newRegisteredClaims(validFor),
 	}
+
+	return generateJWT(claims, secret)
 }
 
-// JWTParse parses the JWT token from the request and returns the user ID associated with it
-func JWTParse(pJWTtokenStr string, pJWTsecretKeyStr string) (persist.DBID, error) {
+func ParseAuthToken(ctx context.Context, token string) (persist.DBID, error) {
+	claims := authClaims{}
+	parsedToken, err := jwt.ParseWithClaims(token, &claims, keyFunc(env.GetString("AUTH_JWT_SECRET")))
 
-	claims := jwtClaims{}
-	JWTtoken, err := jwt.ParseWithClaims(pJWTtokenStr,
-		&claims,
-		func(pJWTtoken *jwt.Token) (interface{}, error) {
-			return []byte(pJWTsecretKeyStr), nil
-		})
-
-	if err != nil || !JWTtoken.Valid {
+	if err != nil || !parsedToken.Valid {
 		return "", ErrInvalidJWT
 	}
 
 	return claims.UserID, nil
 }
 
-// JWTGeneratePipeline generates a new JWT token for the user
-func JWTGeneratePipeline(pCtx context.Context, pUserID persist.DBID) (string, error) {
+func GenerateOneTimeLoginToken(ctx context.Context, userID persist.DBID, validFor time.Duration) (string, error) {
+	secret := env.GetString("ONE_TIME_LOGIN_JWT_SECRET")
 
-	issuer := "gallery"
-	jwtTokenStr, err := jwtGenerate(issuer, pUserID)
-	if err != nil {
-		return "", err
+	claims := oneTimeLoginClaims{
+		UserID:           userID,
+		RegisteredClaims: newRegisteredClaims(validFor),
 	}
 
-	return jwtTokenStr, nil
+	return generateJWT(claims, secret)
 }
 
-func jwtGenerate(pIssuerStr string, pUserID persist.DBID) (string, error) {
+func ParseOneTimeLoginToken(ctx context.Context, token string) (persist.DBID, error) {
+	claims := oneTimeLoginClaims{}
+	parsedToken, err := jwt.ParseWithClaims(token, &claims, keyFunc(env.GetString("ONE_TIME_LOGIN_JWT_SECRET")))
 
-	signingKeyBytesLst := []byte(env.GetString("JWT_SECRET"))
-
-	creationTimeUNIXint := time.Now().UnixNano() / 1000000000
-	expiresAtUNIXint := creationTimeUNIXint + env.GetInt64("JWT_TTL") // expire N number of secs from now
-	claims := jwtClaims{
-		pUserID,
-		jwt.StandardClaims{
-			ExpiresAt: expiresAtUNIXint,
-			Issuer:    pIssuerStr,
-		},
+	if err != nil || !parsedToken.Valid {
+		return "", ErrInvalidJWT
 	}
 
+	return claims.UserID, nil
+}
+
+func GenerateEmailVerificationToken(ctx context.Context, userID persist.DBID, email string) (string, error) {
+	secret := env.GetString("EMAIL_VERIFICATION_JWT_SECRET")
+	validFor := time.Duration(env.GetInt64("EMAIL_VERIFICATION_JWT_TTL")) * time.Second
+
+	claims := emailVerificationClaims{
+		UserID:           userID,
+		Email:            email,
+		RegisteredClaims: newRegisteredClaims(validFor),
+	}
+
+	return generateJWT(claims, secret)
+}
+
+func ParseEmailVerificationToken(ctx context.Context, token string) (persist.DBID, string, error) {
+	claims := emailVerificationClaims{}
+	parsedToken, err := jwt.ParseWithClaims(token, &claims, keyFunc(env.GetString("ONE_TIME_LOGIN_JWT_SECRET")))
+
+	if err != nil || !parsedToken.Valid {
+		return "", "", ErrInvalidJWT
+	}
+
+	return claims.UserID, claims.Email, nil
+}
+
+func newRegisteredClaims(validFor time.Duration) jwt.RegisteredClaims {
+	claims := jwt.RegisteredClaims{
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(validFor)),
+		Issuer:    "gallery",
+	}
+
+	return claims
+}
+
+func generateJWT(claims jwt.Claims, jwtSecret string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	jwtTokenStr, err := token.SignedString(signingKeyBytesLst)
+	jwtToken, err := token.SignedString(jwtSecret)
 	if err != nil {
 		return "", err
 	}
 
-	return jwtTokenStr, nil
+	return jwtToken, nil
+}
+
+func keyFunc(secret string) jwt.Keyfunc {
+	return func(*jwt.Token) (interface{}, error) {
+		return []byte(secret), nil
+	}
 }

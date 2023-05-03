@@ -85,11 +85,11 @@ type MergeUsersInput struct {
 }
 
 // CreateUser creates a new user
-func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username string, email *persist.Email, bio, galleryName, galleryDesc, galleryPos string, userRepo *postgres.UserRepository,
+func CreateUser(ctx context.Context, authenticator auth.Authenticator, username string, email *persist.Email, bio, galleryName, galleryDesc, galleryPos string, userRepo *postgres.UserRepository,
 	queries *coredb.Queries, mp *multichain.Provider) (userID persist.DBID, galleryID persist.DBID, err error) {
-	gc := util.MustGetGinContext(pCtx)
+	gc := util.MustGetGinContext(ctx)
 
-	authResult, err := authenticator.Authenticate(pCtx)
+	authResult, err := authenticator.Authenticate(ctx)
 	if err != nil {
 		return "", "", auth.ErrAuthenticationFailed{WrappedErr: err}
 	}
@@ -113,17 +113,17 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username
 		WalletType:   wallet.WalletType,
 	}
 
-	userID, err = userRepo.Create(pCtx, user, queries)
+	userID, err = userRepo.Create(ctx, user, queries)
 	if err != nil {
 		return "", "", err
 	}
 
-	jwtTokenStr, err := auth.JWTGeneratePipeline(pCtx, userID)
+	authToken, err := auth.GenerateAuthToken(ctx, userID)
 	if err != nil {
 		return "", "", err
 	}
 
-	gallery, err := queries.GalleryRepoCreate(pCtx, coredb.GalleryRepoCreateParams{
+	gallery, err := queries.GalleryRepoCreate(ctx, coredb.GalleryRepoCreateParams{
 		GalleryID:   persist.GenerateID(),
 		OwnerUserID: userID,
 		Name:        galleryName,
@@ -137,7 +137,7 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username
 	galleryID = gallery.ID
 
 	auth.SetAuthStateForCtx(gc, userID, nil)
-	auth.SetJWTCookie(gc, jwtTokenStr)
+	auth.SetAuthCookie(gc, authToken)
 
 	return userID, galleryID, nil
 }
