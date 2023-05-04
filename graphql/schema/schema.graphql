@@ -1405,6 +1405,7 @@ input AuthMechanism {
   gnosisSafe: GnosisSafeAuth
   debug: DebugAuth
   magicLink: MagicLinkAuth
+  oneTimeLoginToken: OneTimeLoginTokenAuth
 }
 
 input EoaAuth {
@@ -1441,6 +1442,10 @@ input GnosisSafeAuth {
 }
 
 input MagicLinkAuth {
+  token: String!
+}
+
+input OneTimeLoginTokenAuth {
   token: String!
 }
 
@@ -2052,6 +2057,12 @@ union FollowAllSocialConnectionsPayloadOrError =
   | ErrNotAuthorized
   | ErrNeedsToReconnectSocial
 
+type GenerateQRCodeLoginTokenPayload {
+  token: String!
+}
+
+union GenerateQRCodeLoginTokenPayloadOrError = GenerateQRCodeLoginTokenPayload | ErrNotAuthorized
+
 type Mutation {
   # User Mutations
   addUserWallet(
@@ -2176,6 +2187,8 @@ type Mutation {
   moveCollectionToGallery(
     input: MoveCollectionToGalleryInput
   ): MoveCollectionToGalleryPayloadOrError @authRequired
+
+  generateQRCodeLoginToken: GenerateQRCodeLoginTokenPayloadOrError @authRequired
 }
 
 type Subscription {

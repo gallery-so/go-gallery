@@ -1543,6 +1543,17 @@ func (r *mutationResolver) MoveCollectionToGallery(ctx context.Context, input *m
 	}, nil
 }
 
+// GenerateQRCodeLoginToken is the resolver for the generateQRCodeLoginToken field.
+func (r *mutationResolver) GenerateQRCodeLoginToken(ctx context.Context) (model.GenerateQRCodeLoginTokenPayloadOrError, error) {
+	token, err := publicapi.For(ctx).Auth.GenerateQRCodeLoginToken(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return model.GenerateQRCodeLoginTokenPayload{
+		Token: token,
+	}, nil
+}
+
 // Owner is the resolver for the owner field.
 func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error) {
 	panic(fmt.Errorf("not implemented"))

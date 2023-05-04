@@ -1206,7 +1206,7 @@ func newUser(t *testing.T, ctx context.Context, c graphql.Client, w wallet) (use
 
 // newJWT generates a JWT
 func newJWT(t *testing.T, ctx context.Context, userID persist.DBID) string {
-	jwt, err := auth.JWTGeneratePipeline(ctx, userID)
+	jwt, err := auth.GenerateAuthToken(ctx, userID)
 	require.NoError(t, err)
 	return jwt
 }
@@ -1377,9 +1377,9 @@ func customServerClient(t *testing.T, host string, opts ...func(*http.Request)) 
 	return &serverClient{url: host + "/glry/graphql/query", opts: opts}
 }
 
-// withJWTOpt ddds a JWT cookie to the request headers
+// withJWTOpt adds a JWT cookie to the request headers
 func withJWTOpt(t *testing.T, userID persist.DBID) func(*http.Request) {
-	jwt, err := auth.JWTGeneratePipeline(context.Background(), userID)
+	jwt, err := auth.GenerateAuthToken(context.Background(), userID)
 	require.NoError(t, err)
 	return func(r *http.Request) {
 		r.AddCookie(&http.Cookie{Name: auth.JWTCookieKey, Value: jwt})

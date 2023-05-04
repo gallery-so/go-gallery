@@ -23,10 +23,11 @@ const (
 )
 
 type AuthMechanism struct {
-	Eoa        *EoaAuth        `json:"eoa"`
-	GnosisSafe *GnosisSafeAuth `json:"gnosisSafe"`
-	Debug      *DebugAuth      `json:"debug"`
-	MagicLink  *MagicLinkAuth  `json:"magicLink"`
+	Eoa               *EoaAuth               `json:"eoa"`
+	GnosisSafe        *GnosisSafeAuth        `json:"gnosisSafe"`
+	Debug             *DebugAuth             `json:"debug"`
+	MagicLink         *MagicLinkAuth         `json:"magicLink"`
+	OneTimeLoginToken *OneTimeLoginTokenAuth `json:"oneTimeLoginToken"`
 }
 
 // GetEoa returns AuthMechanism.Eoa, and is useful for accessing the field via an interface.
@@ -40,6 +41,9 @@ func (v *AuthMechanism) GetDebug() *DebugAuth { return v.Debug }
 
 // GetMagicLink returns AuthMechanism.MagicLink, and is useful for accessing the field via an interface.
 func (v *AuthMechanism) GetMagicLink() *MagicLinkAuth { return v.MagicLink }
+
+// GetOneTimeLoginToken returns AuthMechanism.OneTimeLoginToken, and is useful for accessing the field via an interface.
+func (v *AuthMechanism) GetOneTimeLoginToken() *OneTimeLoginTokenAuth { return v.OneTimeLoginToken }
 
 type Chain string
 
@@ -300,6 +304,13 @@ func (v *MoveCollectionToGalleryInput) GetSourceCollectionId() persist.DBID {
 
 // GetTargetGalleryId returns MoveCollectionToGalleryInput.TargetGalleryId, and is useful for accessing the field via an interface.
 func (v *MoveCollectionToGalleryInput) GetTargetGalleryId() persist.DBID { return v.TargetGalleryId }
+
+type OneTimeLoginTokenAuth struct {
+	Token string `json:"token"`
+}
+
+// GetToken returns OneTimeLoginTokenAuth.Token, and is useful for accessing the field via an interface.
+func (v *OneTimeLoginTokenAuth) GetToken() string { return v.Token }
 
 type PublishGalleryInput struct {
 	GalleryId persist.DBID `json:"galleryId"`

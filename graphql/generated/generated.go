@@ -576,6 +576,10 @@ type ComplexityRoot struct {
 		Wallets             func(childComplexity int) int
 	}
 
+	GenerateQRCodeLoginTokenPayload struct {
+		Token func(childComplexity int) int
+	}
+
 	GltfMedia struct {
 		ContentRenderURL func(childComplexity int) int
 		Dimensions       func(childComplexity int) int
@@ -699,6 +703,7 @@ type ComplexityRoot struct {
 		DisconnectSocialAccount         func(childComplexity int, accountType persist.SocialProvider) int
 		FollowAllSocialConnections      func(childComplexity int, accountType persist.SocialProvider) int
 		FollowUser                      func(childComplexity int, userID persist.DBID) int
+		GenerateQRCodeLoginToken        func(childComplexity int) int
 		GetAuthNonce                    func(childComplexity int, chainAddress persist.ChainAddress) int
 		Login                           func(childComplexity int, authMechanism model.AuthMechanism) int
 		Logout                          func(childComplexity int) int
@@ -1437,6 +1442,7 @@ type MutationResolver interface {
 	UpdatePrimaryWallet(ctx context.Context, walletID persist.DBID) (model.UpdatePrimaryWalletPayloadOrError, error)
 	UpdateUserExperience(ctx context.Context, input model.UpdateUserExperienceInput) (model.UpdateUserExperiencePayloadOrError, error)
 	MoveCollectionToGallery(ctx context.Context, input *model.MoveCollectionToGalleryInput) (model.MoveCollectionToGalleryPayloadOrError, error)
+	GenerateQRCodeLoginToken(ctx context.Context) (model.GenerateQRCodeLoginTokenPayloadOrError, error)
 }
 type OwnerAtBlockResolver interface {
 	Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error)
@@ -3306,6 +3312,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.GalleryUser.Wallets(childComplexity), true
 
+	case "GenerateQRCodeLoginTokenPayload.token":
+		if e.complexity.GenerateQRCodeLoginTokenPayload.Token == nil {
+			break
+		}
+
+		return e.complexity.GenerateQRCodeLoginTokenPayload.Token(childComplexity), true
+
 	case "GltfMedia.contentRenderURL":
 		if e.complexity.GltfMedia.ContentRenderURL == nil {
 			break
@@ -3903,6 +3916,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.FollowUser(childComplexity, args["userId"].(persist.DBID)), true
+
+	case "Mutation.generateQRCodeLoginToken":
+		if e.complexity.Mutation.GenerateQRCodeLoginToken == nil {
+			break
+		}
+
+		return e.complexity.Mutation.GenerateQRCodeLoginToken(childComplexity), true
 
 	case "Mutation.getAuthNonce":
 		if e.complexity.Mutation.GetAuthNonce == nil {
@@ -6515,6 +6535,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputMintPremiumCardToWalletInput,
 		ec.unmarshalInputMoveCollectionToGalleryInput,
 		ec.unmarshalInputNotificationSettingsInput,
+		ec.unmarshalInputOneTimeLoginTokenAuth,
 		ec.unmarshalInputPreverifyEmailInput,
 		ec.unmarshalInputPublishGalleryInput,
 		ec.unmarshalInputRedeemMerchInput,
@@ -8024,6 +8045,7 @@ input AuthMechanism {
   gnosisSafe: GnosisSafeAuth
   debug: DebugAuth
   magicLink: MagicLinkAuth
+  oneTimeLoginToken: OneTimeLoginTokenAuth
 }
 
 input EoaAuth {
@@ -8060,6 +8082,10 @@ input GnosisSafeAuth {
 }
 
 input MagicLinkAuth {
+  token: String!
+}
+
+input OneTimeLoginTokenAuth {
   token: String!
 }
 
@@ -8671,6 +8697,14 @@ union FollowAllSocialConnectionsPayloadOrError =
   | ErrNotAuthorized
   | ErrNeedsToReconnectSocial
 
+type GenerateQRCodeLoginTokenPayload {
+  token: String!
+}
+
+union GenerateQRCodeLoginTokenPayloadOrError =
+  GenerateQRCodeLoginTokenPayload
+  | ErrNotAuthorized
+
 type Mutation {
   # User Mutations
   addUserWallet(
@@ -8795,6 +8829,8 @@ type Mutation {
   moveCollectionToGallery(
     input: MoveCollectionToGalleryInput
   ): MoveCollectionToGalleryPayloadOrError @authRequired
+
+  generateQRCodeLoginToken: GenerateQRCodeLoginTokenPayloadOrError @authRequired
 }
 
 type Subscription {
@@ -23333,6 +23369,50 @@ func (ec *executionContext) fieldContext_GalleryUser_sharedCommunities(ctx conte
 	return fc, nil
 }
 
+func (ec *executionContext) _GenerateQRCodeLoginTokenPayload_token(ctx context.Context, field graphql.CollectedField, obj *model.GenerateQRCodeLoginTokenPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_GenerateQRCodeLoginTokenPayload_token(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Token, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_GenerateQRCodeLoginTokenPayload_token(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GenerateQRCodeLoginTokenPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _GltfMedia_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.GltfMedia) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_GltfMedia_previewURLs(ctx, field)
 	if err != nil {
@@ -30096,6 +30176,66 @@ func (ec *executionContext) fieldContext_Mutation_moveCollectionToGallery(ctx co
 	if fc.Args, err = ec.field_Mutation_moveCollectionToGallery_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_generateQRCodeLoginToken(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_generateQRCodeLoginToken(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().GenerateQRCodeLoginToken(rctx)
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.GenerateQRCodeLoginTokenPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.GenerateQRCodeLoginTokenPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.GenerateQRCodeLoginTokenPayloadOrError)
+	fc.Result = res
+	return ec.marshalOGenerateQRCodeLoginTokenPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGenerateQRCodeLoginTokenPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_generateQRCodeLoginToken(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type GenerateQRCodeLoginTokenPayloadOrError does not have child fields")
+		},
 	}
 	return fc, nil
 }
@@ -45987,7 +46127,7 @@ func (ec *executionContext) unmarshalInputAuthMechanism(ctx context.Context, obj
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"eoa", "gnosisSafe", "debug", "magicLink"}
+	fieldsInOrder := [...]string{"eoa", "gnosisSafe", "debug", "magicLink", "oneTimeLoginToken"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -46045,6 +46185,14 @@ func (ec *executionContext) unmarshalInputAuthMechanism(ctx context.Context, obj
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("magicLink"))
 			it.MagicLink, err = ec.unmarshalOMagicLinkAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMagicLinkAuth(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "oneTimeLoginToken":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("oneTimeLoginToken"))
+			it.OneTimeLoginToken, err = ec.unmarshalOOneTimeLoginTokenAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐOneTimeLoginTokenAuth(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -47061,6 +47209,34 @@ func (ec *executionContext) unmarshalInputNotificationSettingsInput(ctx context.
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("someoneViewedYourGallery"))
 			it.SomeoneViewedYourGallery, err = ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputOneTimeLoginTokenAuth(ctx context.Context, obj interface{}) (model.OneTimeLoginTokenAuth, error) {
+	var it model.OneTimeLoginTokenAuth
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"token"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "token":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("token"))
+			it.Token, err = ec.unmarshalNString2string(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -49135,6 +49311,29 @@ func (ec *executionContext) _GalleryUserOrWallet(ctx context.Context, sel ast.Se
 			return graphql.Null
 		}
 		return ec._Wallet(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _GenerateQRCodeLoginTokenPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.GenerateQRCodeLoginTokenPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.GenerateQRCodeLoginTokenPayload:
+		return ec._GenerateQRCodeLoginTokenPayload(ctx, sel, &obj)
+	case *model.GenerateQRCodeLoginTokenPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._GenerateQRCodeLoginTokenPayload(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -53357,7 +53556,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "SocialQueriesOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "SyncTokensPayloadOrError", "Error", "DeepRefreshPayloadOrError", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "UnbanUserFromFeedPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "SocialQueriesOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "SyncTokensPayloadOrError", "Error", "DeepRefreshPayloadOrError", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "UnbanUserFromFeedPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "GenerateQRCodeLoginTokenPayloadOrError"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
@@ -54734,6 +54933,34 @@ func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
+var generateQRCodeLoginTokenPayloadImplementors = []string{"GenerateQRCodeLoginTokenPayload", "GenerateQRCodeLoginTokenPayloadOrError"}
+
+func (ec *executionContext) _GenerateQRCodeLoginTokenPayload(ctx context.Context, sel ast.SelectionSet, obj *model.GenerateQRCodeLoginTokenPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, generateQRCodeLoginTokenPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("GenerateQRCodeLoginTokenPayload")
+		case "token":
+
+			out.Values[i] = ec._GenerateQRCodeLoginTokenPayload_token(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var gltfMediaImplementors = []string{"GltfMedia", "MediaSubtype", "Media"}
 
 func (ec *executionContext) _GltfMedia(ctx context.Context, sel ast.SelectionSet, obj *model.GltfMedia) graphql.Marshaler {
@@ -55704,6 +55931,12 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_moveCollectionToGallery(ctx, field)
+			})
+
+		case "generateQRCodeLoginToken":
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_generateQRCodeLoginToken(ctx, field)
 			})
 
 		default:
@@ -62571,6 +62804,13 @@ func (ec *executionContext) marshalOGalleryUserOrAddress2githubᚗcomᚋmikeydub
 	return ec._GalleryUserOrAddress(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalOGenerateQRCodeLoginTokenPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGenerateQRCodeLoginTokenPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.GenerateQRCodeLoginTokenPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._GenerateQRCodeLoginTokenPayloadOrError(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOGetAuthNoncePayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGetAuthNoncePayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.GetAuthNoncePayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -63094,6 +63334,14 @@ func (ec *executionContext) marshalONotificationsConnection2ᚖgithubᚗcomᚋmi
 		return graphql.Null
 	}
 	return ec._NotificationsConnection(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOOneTimeLoginTokenAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐOneTimeLoginTokenAuth(ctx context.Context, v interface{}) (*model.OneTimeLoginTokenAuth, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputOneTimeLoginTokenAuth(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalOOwnerAtBlock2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐOwnerAtBlock(ctx context.Context, sel ast.SelectionSet, v []*model.OwnerAtBlock) graphql.Marshaler {

@@ -206,6 +206,10 @@ func (r *Resolver) authMechanismToAuthenticator(ctx context.Context, m model.Aut
 		return authApi.NewMagicLinkAuthenticator(*t), nil
 	}
 
+	if m.OneTimeLoginToken != nil && m.OneTimeLoginToken.Token != "" {
+		return authApi.NewOneTimeLoginTokenAuthenticator(m.OneTimeLoginToken.Token), nil
+	}
+
 	return nil, errNoAuthMechanismFound
 }
 

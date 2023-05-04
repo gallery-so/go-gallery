@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/mikeydub/go-gallery/util"
+	"time"
 
 	magicclient "github.com/magiclabs/magic-admin-go/client"
 	"github.com/magiclabs/magic-admin-go/token"
@@ -107,6 +108,14 @@ func (api AuthAPI) NewMagicLinkAuthenticator(token token.Token) auth.Authenticat
 	return authenticator
 }
 
+func (api AuthAPI) NewOneTimeLoginTokenAuthenticator(loginToken string) auth.Authenticator {
+	authenticator := auth.OneTimeLoginTokenAuthenticator{
+		UserRepo:   api.repos.UserRepository,
+		LoginToken: loginToken,
+	}
+	return authenticator
+}
+
 func chainAddressPointersToChainAddresses(chainAddresses []*persist.ChainAddress) []persist.ChainAddress {
 	addresses := make([]persist.ChainAddress, 0, len(chainAddresses))
 
@@ -131,4 +140,15 @@ func (api AuthAPI) Login(ctx context.Context, authenticator auth.Authenticator) 
 func (api AuthAPI) Logout(ctx context.Context) {
 	// Nothing to validate
 	auth.Logout(ctx)
+}
+
+func (api AuthAPI) GenerateQRCodeLoginToken(ctx context.Context) (string, error) {
+	// Nothing to validate
+
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	return auth.GenerateOneTimeLoginToken(ctx, userID, "qr_code", 5*time.Minute)
 }
