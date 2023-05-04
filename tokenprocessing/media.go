@@ -333,6 +333,18 @@ func asyncCacheObjectsForURL(ctx context.Context, tids persist.TokenIdentifiers,
 
 		switch caught := err.(type) {
 		case *googleapi.Error:
+			if caught.Code == http.StatusTooManyRequests {
+				logger.For(ctx).Infof("rate limited by google, retrying in 30 seconds")
+				time.Sleep(time.Second * 30)
+				cachedObjects, err = cacheObjectsFromURL(ctx, tids, mediaURL, defaultObjectType, ipfsClient, arweaveClient, storageClient, bucket, subMeta, true)
+				if err == nil {
+					resultCh <- cacheResult{cachedObjects, err}
+					return
+				}
+				if _, ok := err.(*googleapi.Error); !ok {
+					resultCh <- cacheResult{cachedObjects, err}
+				}
+			}
 			panic(fmt.Errorf("googleAPI error %s: %s", caught, err))
 		default:
 			resultCh <- cacheResult{cachedObjects, err}
@@ -1057,7 +1069,7 @@ func thumbnailVideoToWriter(ctx context.Context, url string, writer io.Writer) e
 }
 
 func createLiveRenderPreviewVideo(ctx context.Context, videoURL string, writer io.Writer) error {
-	c := exec.CommandContext(ctx, "ffmpeg", "-hide_banner", "-loglevel", "error", "-i", videoURL, "-ss", "00:00:00.000", "-t", "00:00:05.000", "-filter:v", "scale=trunc(720/2)*2:trunc(ow/a/2)*2", "-movflags", "frag_keyframe+empty_moov", "-c:a", "copy", "-f", "mp4", "pipe:1")
+	c := exec.CommandContext(ctx, "ffmpeg", "-hide_banner", "-loglevel", "error", "-i", videoURL, "-ss", "00:00:00.000", "-t", "00:00:05.000", "-filter:v", "scale=720:trunc(ow/a/2)*2", "-c:a", "aac", "-shortest", "-movflags", "frag_keyframe+empty_moov", "-f", "mp4", "pipe:1")
 	c.Stderr = os.Stderr
 	c.Stdout = writer
 	return c.Run()
