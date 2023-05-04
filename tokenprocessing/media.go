@@ -1057,7 +1057,7 @@ func thumbnailVideoToWriter(ctx context.Context, url string, writer io.Writer) e
 }
 
 func createLiveRenderPreviewVideo(ctx context.Context, videoURL string, writer io.Writer) error {
-	c := exec.CommandContext(ctx, "ffmpeg", "-hide_banner", "-loglevel", "error", "-i", videoURL, "-ss", "00:00:00.000", "-t", "00:00:05.000", "-filter:v", "scale=720:-1", "-movflags", "frag_keyframe+empty_moov", "-c:a", "copy", "-f", "mp4", "pipe:1")
+	c := exec.CommandContext(ctx, "ffmpeg", "-hide_banner", "-loglevel", "error", "-i", videoURL, "-ss", "00:00:00.000", "-t", "00:00:05.000", "-filter:v", "scale=trunc(720/2)*2:trunc(ow/a/2)*2", "-movflags", "frag_keyframe+empty_moov", "-c:a", "copy", "-f", "mp4", "pipe:1")
 	c.Stderr = os.Stderr
 	c.Stdout = writer
 	return c.Run()
