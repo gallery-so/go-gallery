@@ -1863,10 +1863,7 @@ func getUrlExtension(url string) string {
 func getMediaForToken(ctx context.Context, token db.Token) model.MediaSubtype {
 	med := token.Media
 
-	var fallbackMedia *model.FallbackMedia
-	if !med.IsServable() && token.FallbackMedia.IsServable() {
-		fallbackMedia = getFallbackMedia(ctx, token.FallbackMedia)
-	}
+	fallbackMedia := getFallbackMedia(ctx, token.FallbackMedia)
 
 	switch med.MediaType {
 	case persist.MediaTypeImage, persist.MediaTypeSVG:
