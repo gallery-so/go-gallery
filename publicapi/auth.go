@@ -108,6 +108,14 @@ func (api AuthAPI) NewMagicLinkAuthenticator(token token.Token) auth.Authenticat
 	return authenticator
 }
 
+func (api AuthAPI) NewOneTimeLoginTokenAuthenticator(loginToken string) auth.Authenticator {
+	authenticator := auth.OneTimeLoginTokenAuthenticator{
+		UserRepo:   api.repos.UserRepository,
+		LoginToken: loginToken,
+	}
+	return authenticator
+}
+
 func chainAddressPointersToChainAddresses(chainAddresses []*persist.ChainAddress) []persist.ChainAddress {
 	addresses := make([]persist.ChainAddress, 0, len(chainAddresses))
 

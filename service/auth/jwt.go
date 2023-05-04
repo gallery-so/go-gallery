@@ -107,7 +107,7 @@ func newRegisteredClaims(validFor time.Duration) jwt.RegisteredClaims {
 func generateJWT(claims jwt.Claims, jwtSecret string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	jwtToken, err := token.SignedString(jwtSecret)
+	jwtToken, err := token.SignedString([]byte(jwtSecret))
 	if err != nil {
 		return "", err
 	}

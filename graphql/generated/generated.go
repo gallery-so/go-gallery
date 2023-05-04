@@ -6535,6 +6535,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputMintPremiumCardToWalletInput,
 		ec.unmarshalInputMoveCollectionToGalleryInput,
 		ec.unmarshalInputNotificationSettingsInput,
+		ec.unmarshalInputOneTimeLoginTokenAuth,
 		ec.unmarshalInputPreverifyEmailInput,
 		ec.unmarshalInputPublishGalleryInput,
 		ec.unmarshalInputRedeemMerchInput,
@@ -8044,6 +8045,7 @@ input AuthMechanism {
   gnosisSafe: GnosisSafeAuth
   debug: DebugAuth
   magicLink: MagicLinkAuth
+  oneTimeLoginToken: OneTimeLoginTokenAuth
 }
 
 input EoaAuth {
@@ -8080,6 +8082,10 @@ input GnosisSafeAuth {
 }
 
 input MagicLinkAuth {
+  token: String!
+}
+
+input OneTimeLoginTokenAuth {
   token: String!
 }
 
@@ -46121,7 +46127,7 @@ func (ec *executionContext) unmarshalInputAuthMechanism(ctx context.Context, obj
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"eoa", "gnosisSafe", "debug", "magicLink"}
+	fieldsInOrder := [...]string{"eoa", "gnosisSafe", "debug", "magicLink", "oneTimeLoginToken"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -46179,6 +46185,14 @@ func (ec *executionContext) unmarshalInputAuthMechanism(ctx context.Context, obj
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("magicLink"))
 			it.MagicLink, err = ec.unmarshalOMagicLinkAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMagicLinkAuth(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "oneTimeLoginToken":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("oneTimeLoginToken"))
+			it.OneTimeLoginToken, err = ec.unmarshalOOneTimeLoginTokenAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐOneTimeLoginTokenAuth(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -47195,6 +47209,34 @@ func (ec *executionContext) unmarshalInputNotificationSettingsInput(ctx context.
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("someoneViewedYourGallery"))
 			it.SomeoneViewedYourGallery, err = ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputOneTimeLoginTokenAuth(ctx context.Context, obj interface{}) (model.OneTimeLoginTokenAuth, error) {
+	var it model.OneTimeLoginTokenAuth
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"token"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "token":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("token"))
+			it.Token, err = ec.unmarshalNString2string(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -63292,6 +63334,14 @@ func (ec *executionContext) marshalONotificationsConnection2ᚖgithubᚗcomᚋmi
 		return graphql.Null
 	}
 	return ec._NotificationsConnection(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOOneTimeLoginTokenAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐOneTimeLoginTokenAuth(ctx context.Context, v interface{}) (*model.OneTimeLoginTokenAuth, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputOneTimeLoginTokenAuth(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalOOwnerAtBlock2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐOwnerAtBlock(ctx context.Context, sel ast.SelectionSet, v []*model.OwnerAtBlock) graphql.Marshaler {

@@ -423,10 +423,11 @@ func (AudioMedia) IsMediaSubtype() {}
 func (AudioMedia) IsMedia()        {}
 
 type AuthMechanism struct {
-	Eoa        *EoaAuth        `json:"eoa"`
-	GnosisSafe *GnosisSafeAuth `json:"gnosisSafe"`
-	Debug      *DebugAuth      `json:"debug"`
-	MagicLink  *MagicLinkAuth  `json:"magicLink"`
+	Eoa               *EoaAuth               `json:"eoa"`
+	GnosisSafe        *GnosisSafeAuth        `json:"gnosisSafe"`
+	Debug             *DebugAuth             `json:"debug"`
+	MagicLink         *MagicLinkAuth         `json:"magicLink"`
+	OneTimeLoginToken *OneTimeLoginTokenAuth `json:"oneTimeLoginToken"`
 }
 
 type AuthNonce struct {
@@ -1392,6 +1393,10 @@ type NotificationsConnection struct {
 	Edges       []*NotificationEdge `json:"edges"`
 	UnseenCount *int                `json:"unseenCount"`
 	PageInfo    *PageInfo           `json:"pageInfo"`
+}
+
+type OneTimeLoginTokenAuth struct {
+	Token string `json:"token"`
 }
 
 type OwnerAtBlock struct {

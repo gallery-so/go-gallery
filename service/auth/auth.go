@@ -23,13 +23,6 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
-// TODO: ExternalWallet? Something to denote "wallet, but not part of our ecosystem"
-// Or do we call it something like "AccountInfo" or "AddressInfo" or something?
-// Would also be nice to have a method on AuthResult that searches by ChainAddress
-// for a result. Maybe instead of a map from address+chain+type to existing wallets
-// (where they exist), we just have a wallet pointer field on our results that points
-// to a user's wallet if one exists? OwnedWallet? WalletInput? RawWallet?
-
 // AuthenticatedAddress contains address information that has been successfully verified
 // by an authenticator.
 type AuthenticatedAddress struct {
@@ -277,6 +270,34 @@ func (e MagicLinkAuthenticator) Authenticate(pCtx context.Context) (*AuthResult,
 
 func NewMagicLinkClient() *magicclient.API {
 	return magicclient.New(env.GetString("MAGIC_LINK_SECRET_KEY"), magic.NewDefaultClient())
+}
+
+type OneTimeLoginTokenAuthenticator struct {
+	UserRepo   *postgres.UserRepository
+	LoginToken string
+}
+
+func (a OneTimeLoginTokenAuthenticator) GetDescription() string {
+	return fmt.Sprintf("OneTimeLoginTokenAuthenticator")
+}
+
+func (a OneTimeLoginTokenAuthenticator) Authenticate(ctx context.Context) (*AuthResult, error) {
+	userID, _, err := ParseOneTimeLoginToken(ctx, a.LoginToken)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := a.UserRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	authResult := AuthResult{
+		Addresses: []AuthenticatedAddress{},
+		User:      &user,
+	}
+
+	return &authResult, nil
 }
 
 // Login logs in a user with a given authentication scheme
