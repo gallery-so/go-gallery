@@ -1543,13 +1543,13 @@ func (r *mutationResolver) MoveCollectionToGallery(ctx context.Context, input *m
 	}, nil
 }
 
-// GenerateOneTimeLoginToken is the resolver for the generateOneTimeLoginToken field.
-func (r *mutationResolver) GenerateOneTimeLoginToken(ctx context.Context) (model.GenerateOneTimeLoginTokenPayloadOrError, error) {
-	token, err := publicapi.For(ctx).Auth.GenerateOneTimeLoginToken(ctx)
+// GenerateQRCodeLoginToken is the resolver for the generateQRCodeLoginToken field.
+func (r *mutationResolver) GenerateQRCodeLoginToken(ctx context.Context) (model.GenerateQRCodeLoginTokenPayloadOrError, error) {
+	token, err := publicapi.For(ctx).Auth.GenerateQRCodeLoginToken(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return model.GenerateOneTimeLoginTokenPayload{
+	return model.GenerateQRCodeLoginTokenPayload{
 		Token: token,
 	}, nil
 }

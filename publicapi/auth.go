@@ -142,7 +142,7 @@ func (api AuthAPI) Logout(ctx context.Context) {
 	auth.Logout(ctx)
 }
 
-func (api AuthAPI) GenerateOneTimeLoginToken(ctx context.Context) (string, error) {
+func (api AuthAPI) GenerateQRCodeLoginToken(ctx context.Context) (string, error) {
 	// Nothing to validate
 
 	userID, err := getAuthenticatedUserID(ctx)
@@ -150,5 +150,5 @@ func (api AuthAPI) GenerateOneTimeLoginToken(ctx context.Context) (string, error
 		return "", err
 	}
 
-	return auth.GenerateOneTimeLoginToken(ctx, userID, 5*time.Minute)
+	return auth.GenerateOneTimeLoginToken(ctx, userID, "qr_code", 5*time.Minute)
 }

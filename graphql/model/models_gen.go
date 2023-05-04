@@ -119,8 +119,8 @@ type GalleryUserOrWallet interface {
 	IsGalleryUserOrWallet()
 }
 
-type GenerateOneTimeLoginTokenPayloadOrError interface {
-	IsGenerateOneTimeLoginTokenPayloadOrError()
+type GenerateQRCodeLoginTokenPayloadOrError interface {
+	IsGenerateQRCodeLoginTokenPayloadOrError()
 }
 
 type GetAuthNoncePayloadOrError interface {
@@ -974,7 +974,7 @@ func (ErrNotAuthorized) IsUpdateSocialAccountDisplayedPayloadOrError() {}
 func (ErrNotAuthorized) IsMintPremiumCardToWalletPayloadOrError()      {}
 func (ErrNotAuthorized) IsDisconnectSocialAccountPayloadOrError()      {}
 func (ErrNotAuthorized) IsFollowAllSocialConnectionsPayloadOrError()   {}
-func (ErrNotAuthorized) IsGenerateOneTimeLoginTokenPayloadOrError()    {}
+func (ErrNotAuthorized) IsGenerateQRCodeLoginTokenPayloadOrError()     {}
 
 type ErrPushTokenBelongsToAnotherUser struct {
 	Message string `json:"message"`
@@ -1213,11 +1213,11 @@ func (GalleryUser) IsUserByAddressOrError()              {}
 func (GalleryUser) IsAddRolesToUserPayloadOrError()      {}
 func (GalleryUser) IsRevokeRolesFromUserPayloadOrError() {}
 
-type GenerateOneTimeLoginTokenPayload struct {
+type GenerateQRCodeLoginTokenPayload struct {
 	Token string `json:"token"`
 }
 
-func (GenerateOneTimeLoginTokenPayload) IsGenerateOneTimeLoginTokenPayloadOrError() {}
+func (GenerateQRCodeLoginTokenPayload) IsGenerateQRCodeLoginTokenPayloadOrError() {}
 
 type GltfMedia struct {
 	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`

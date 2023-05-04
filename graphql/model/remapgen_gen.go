@@ -138,8 +138,8 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
-	"GenerateOneTimeLoginTokenPayloadOrError": func(object interface{}) (interface{}, bool) {
-		obj, ok := object.(GenerateOneTimeLoginTokenPayloadOrError)
+	"GenerateQRCodeLoginTokenPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(GenerateQRCodeLoginTokenPayloadOrError)
 		return obj, ok
 	},
 

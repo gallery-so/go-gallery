@@ -576,7 +576,7 @@ type ComplexityRoot struct {
 		Wallets             func(childComplexity int) int
 	}
 
-	GenerateOneTimeLoginTokenPayload struct {
+	GenerateQRCodeLoginTokenPayload struct {
 		Token func(childComplexity int) int
 	}
 
@@ -703,7 +703,7 @@ type ComplexityRoot struct {
 		DisconnectSocialAccount         func(childComplexity int, accountType persist.SocialProvider) int
 		FollowAllSocialConnections      func(childComplexity int, accountType persist.SocialProvider) int
 		FollowUser                      func(childComplexity int, userID persist.DBID) int
-		GenerateOneTimeLoginToken       func(childComplexity int) int
+		GenerateQRCodeLoginToken        func(childComplexity int) int
 		GetAuthNonce                    func(childComplexity int, chainAddress persist.ChainAddress) int
 		Login                           func(childComplexity int, authMechanism model.AuthMechanism) int
 		Logout                          func(childComplexity int) int
@@ -1442,7 +1442,7 @@ type MutationResolver interface {
 	UpdatePrimaryWallet(ctx context.Context, walletID persist.DBID) (model.UpdatePrimaryWalletPayloadOrError, error)
 	UpdateUserExperience(ctx context.Context, input model.UpdateUserExperienceInput) (model.UpdateUserExperiencePayloadOrError, error)
 	MoveCollectionToGallery(ctx context.Context, input *model.MoveCollectionToGalleryInput) (model.MoveCollectionToGalleryPayloadOrError, error)
-	GenerateOneTimeLoginToken(ctx context.Context) (model.GenerateOneTimeLoginTokenPayloadOrError, error)
+	GenerateQRCodeLoginToken(ctx context.Context) (model.GenerateQRCodeLoginTokenPayloadOrError, error)
 }
 type OwnerAtBlockResolver interface {
 	Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error)
@@ -3312,12 +3312,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.GalleryUser.Wallets(childComplexity), true
 
-	case "GenerateOneTimeLoginTokenPayload.token":
-		if e.complexity.GenerateOneTimeLoginTokenPayload.Token == nil {
+	case "GenerateQRCodeLoginTokenPayload.token":
+		if e.complexity.GenerateQRCodeLoginTokenPayload.Token == nil {
 			break
 		}
 
-		return e.complexity.GenerateOneTimeLoginTokenPayload.Token(childComplexity), true
+		return e.complexity.GenerateQRCodeLoginTokenPayload.Token(childComplexity), true
 
 	case "GltfMedia.contentRenderURL":
 		if e.complexity.GltfMedia.ContentRenderURL == nil {
@@ -3917,12 +3917,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.FollowUser(childComplexity, args["userId"].(persist.DBID)), true
 
-	case "Mutation.generateOneTimeLoginToken":
-		if e.complexity.Mutation.GenerateOneTimeLoginToken == nil {
+	case "Mutation.generateQRCodeLoginToken":
+		if e.complexity.Mutation.GenerateQRCodeLoginToken == nil {
 			break
 		}
 
-		return e.complexity.Mutation.GenerateOneTimeLoginToken(childComplexity), true
+		return e.complexity.Mutation.GenerateQRCodeLoginToken(childComplexity), true
 
 	case "Mutation.getAuthNonce":
 		if e.complexity.Mutation.GetAuthNonce == nil {
@@ -8697,12 +8697,12 @@ union FollowAllSocialConnectionsPayloadOrError =
   | ErrNotAuthorized
   | ErrNeedsToReconnectSocial
 
-type GenerateOneTimeLoginTokenPayload {
+type GenerateQRCodeLoginTokenPayload {
   token: String!
 }
 
-union GenerateOneTimeLoginTokenPayloadOrError =
-  GenerateOneTimeLoginTokenPayload
+union GenerateQRCodeLoginTokenPayloadOrError =
+  GenerateQRCodeLoginTokenPayload
   | ErrNotAuthorized
 
 type Mutation {
@@ -8830,7 +8830,7 @@ type Mutation {
     input: MoveCollectionToGalleryInput
   ): MoveCollectionToGalleryPayloadOrError @authRequired
 
-  generateOneTimeLoginToken: GenerateOneTimeLoginTokenPayloadOrError @authRequired
+  generateQRCodeLoginToken: GenerateQRCodeLoginTokenPayloadOrError @authRequired
 }
 
 type Subscription {
@@ -23369,8 +23369,8 @@ func (ec *executionContext) fieldContext_GalleryUser_sharedCommunities(ctx conte
 	return fc, nil
 }
 
-func (ec *executionContext) _GenerateOneTimeLoginTokenPayload_token(ctx context.Context, field graphql.CollectedField, obj *model.GenerateOneTimeLoginTokenPayload) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_GenerateOneTimeLoginTokenPayload_token(ctx, field)
+func (ec *executionContext) _GenerateQRCodeLoginTokenPayload_token(ctx context.Context, field graphql.CollectedField, obj *model.GenerateQRCodeLoginTokenPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_GenerateQRCodeLoginTokenPayload_token(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -23400,9 +23400,9 @@ func (ec *executionContext) _GenerateOneTimeLoginTokenPayload_token(ctx context.
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_GenerateOneTimeLoginTokenPayload_token(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_GenerateQRCodeLoginTokenPayload_token(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "GenerateOneTimeLoginTokenPayload",
+		Object:     "GenerateQRCodeLoginTokenPayload",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -30180,8 +30180,8 @@ func (ec *executionContext) fieldContext_Mutation_moveCollectionToGallery(ctx co
 	return fc, nil
 }
 
-func (ec *executionContext) _Mutation_generateOneTimeLoginToken(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Mutation_generateOneTimeLoginToken(ctx, field)
+func (ec *executionContext) _Mutation_generateQRCodeLoginToken(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_generateQRCodeLoginToken(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -30195,7 +30195,7 @@ func (ec *executionContext) _Mutation_generateOneTimeLoginToken(ctx context.Cont
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().GenerateOneTimeLoginToken(rctx)
+			return ec.resolvers.Mutation().GenerateQRCodeLoginToken(rctx)
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.AuthRequired == nil {
@@ -30211,10 +30211,10 @@ func (ec *executionContext) _Mutation_generateOneTimeLoginToken(ctx context.Cont
 		if tmp == nil {
 			return nil, nil
 		}
-		if data, ok := tmp.(model.GenerateOneTimeLoginTokenPayloadOrError); ok {
+		if data, ok := tmp.(model.GenerateQRCodeLoginTokenPayloadOrError); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.GenerateOneTimeLoginTokenPayloadOrError`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.GenerateQRCodeLoginTokenPayloadOrError`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -30222,19 +30222,19 @@ func (ec *executionContext) _Mutation_generateOneTimeLoginToken(ctx context.Cont
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(model.GenerateOneTimeLoginTokenPayloadOrError)
+	res := resTmp.(model.GenerateQRCodeLoginTokenPayloadOrError)
 	fc.Result = res
-	return ec.marshalOGenerateOneTimeLoginTokenPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGenerateOneTimeLoginTokenPayloadOrError(ctx, field.Selections, res)
+	return ec.marshalOGenerateQRCodeLoginTokenPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGenerateQRCodeLoginTokenPayloadOrError(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Mutation_generateOneTimeLoginToken(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Mutation_generateQRCodeLoginToken(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Mutation",
 		Field:      field,
 		IsMethod:   true,
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type GenerateOneTimeLoginTokenPayloadOrError does not have child fields")
+			return nil, errors.New("field of type GenerateQRCodeLoginTokenPayloadOrError does not have child fields")
 		},
 	}
 	return fc, nil
@@ -49316,17 +49316,17 @@ func (ec *executionContext) _GalleryUserOrWallet(ctx context.Context, sel ast.Se
 	}
 }
 
-func (ec *executionContext) _GenerateOneTimeLoginTokenPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.GenerateOneTimeLoginTokenPayloadOrError) graphql.Marshaler {
+func (ec *executionContext) _GenerateQRCodeLoginTokenPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.GenerateQRCodeLoginTokenPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
-	case model.GenerateOneTimeLoginTokenPayload:
-		return ec._GenerateOneTimeLoginTokenPayload(ctx, sel, &obj)
-	case *model.GenerateOneTimeLoginTokenPayload:
+	case model.GenerateQRCodeLoginTokenPayload:
+		return ec._GenerateQRCodeLoginTokenPayload(ctx, sel, &obj)
+	case *model.GenerateQRCodeLoginTokenPayload:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._GenerateOneTimeLoginTokenPayload(ctx, sel, obj)
+		return ec._GenerateQRCodeLoginTokenPayload(ctx, sel, obj)
 	case model.ErrNotAuthorized:
 		return ec._ErrNotAuthorized(ctx, sel, &obj)
 	case *model.ErrNotAuthorized:
@@ -53556,7 +53556,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "SocialQueriesOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "SyncTokensPayloadOrError", "Error", "DeepRefreshPayloadOrError", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "UnbanUserFromFeedPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "GenerateOneTimeLoginTokenPayloadOrError"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "SocialQueriesOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "SyncTokensPayloadOrError", "Error", "DeepRefreshPayloadOrError", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "UnbanUserFromFeedPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "GenerateQRCodeLoginTokenPayloadOrError"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
@@ -54933,19 +54933,19 @@ func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var generateOneTimeLoginTokenPayloadImplementors = []string{"GenerateOneTimeLoginTokenPayload", "GenerateOneTimeLoginTokenPayloadOrError"}
+var generateQRCodeLoginTokenPayloadImplementors = []string{"GenerateQRCodeLoginTokenPayload", "GenerateQRCodeLoginTokenPayloadOrError"}
 
-func (ec *executionContext) _GenerateOneTimeLoginTokenPayload(ctx context.Context, sel ast.SelectionSet, obj *model.GenerateOneTimeLoginTokenPayload) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, generateOneTimeLoginTokenPayloadImplementors)
+func (ec *executionContext) _GenerateQRCodeLoginTokenPayload(ctx context.Context, sel ast.SelectionSet, obj *model.GenerateQRCodeLoginTokenPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, generateQRCodeLoginTokenPayloadImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("GenerateOneTimeLoginTokenPayload")
+			out.Values[i] = graphql.MarshalString("GenerateQRCodeLoginTokenPayload")
 		case "token":
 
-			out.Values[i] = ec._GenerateOneTimeLoginTokenPayload_token(ctx, field, obj)
+			out.Values[i] = ec._GenerateQRCodeLoginTokenPayload_token(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
 				invalids++
@@ -55933,10 +55933,10 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 				return ec._Mutation_moveCollectionToGallery(ctx, field)
 			})
 
-		case "generateOneTimeLoginToken":
+		case "generateQRCodeLoginToken":
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_generateOneTimeLoginToken(ctx, field)
+				return ec._Mutation_generateQRCodeLoginToken(ctx, field)
 			})
 
 		default:
@@ -62804,11 +62804,11 @@ func (ec *executionContext) marshalOGalleryUserOrAddress2githubᚗcomᚋmikeydub
 	return ec._GalleryUserOrAddress(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalOGenerateOneTimeLoginTokenPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGenerateOneTimeLoginTokenPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.GenerateOneTimeLoginTokenPayloadOrError) graphql.Marshaler {
+func (ec *executionContext) marshalOGenerateQRCodeLoginTokenPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGenerateQRCodeLoginTokenPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.GenerateQRCodeLoginTokenPayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	return ec._GenerateOneTimeLoginTokenPayloadOrError(ctx, sel, v)
+	return ec._GenerateQRCodeLoginTokenPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOGetAuthNoncePayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGetAuthNoncePayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.GetAuthNoncePayloadOrError) graphql.Marshaler {

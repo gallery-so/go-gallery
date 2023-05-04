@@ -2057,12 +2057,12 @@ union FollowAllSocialConnectionsPayloadOrError =
   | ErrNotAuthorized
   | ErrNeedsToReconnectSocial
 
-type GenerateOneTimeLoginTokenPayload {
+type GenerateQRCodeLoginTokenPayload {
   token: String!
 }
 
-union GenerateOneTimeLoginTokenPayloadOrError =
-  GenerateOneTimeLoginTokenPayload
+union GenerateQRCodeLoginTokenPayloadOrError =
+  GenerateQRCodeLoginTokenPayload
   | ErrNotAuthorized
 
 type Mutation {
@@ -2190,7 +2190,7 @@ type Mutation {
     input: MoveCollectionToGalleryInput
   ): MoveCollectionToGalleryPayloadOrError @authRequired
 
-  generateOneTimeLoginToken: GenerateOneTimeLoginTokenPayloadOrError @authRequired
+  generateQRCodeLoginToken: GenerateQRCodeLoginTokenPayloadOrError @authRequired
 }
 
 type Subscription {
