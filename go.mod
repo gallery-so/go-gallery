@@ -16,7 +16,6 @@ require (
 	github.com/benny-conn/limiters v0.0.2
 	github.com/bits-and-blooms/bloom v2.0.3+incompatible
 	github.com/bsm/redislock v0.7.2
-	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/ethereum/go-ethereum v1.10.26
 	github.com/everFinance/goar v1.4.0
 	github.com/gallery-so/dataloaden v0.0.0-20221214221404-9d30d4c39aa7

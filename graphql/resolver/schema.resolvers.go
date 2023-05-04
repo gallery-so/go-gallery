@@ -1543,6 +1543,17 @@ func (r *mutationResolver) MoveCollectionToGallery(ctx context.Context, input *m
 	}, nil
 }
 
+// GenerateOneTimeLoginToken is the resolver for the generateOneTimeLoginToken field.
+func (r *mutationResolver) GenerateOneTimeLoginToken(ctx context.Context) (model.GenerateOneTimeLoginTokenPayloadOrError, error) {
+	token, err := publicapi.For(ctx).Auth.GenerateOneTimeLoginToken(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return model.GenerateOneTimeLoginTokenPayload{
+		Token: token,
+	}, nil
+}
+
 // Owner is the resolver for the owner field.
 func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error) {
 	panic(fmt.Errorf("not implemented"))

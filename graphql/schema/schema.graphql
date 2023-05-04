@@ -2052,6 +2052,14 @@ union FollowAllSocialConnectionsPayloadOrError =
   | ErrNotAuthorized
   | ErrNeedsToReconnectSocial
 
+type GenerateOneTimeLoginTokenPayload {
+  token: String!
+}
+
+union GenerateOneTimeLoginTokenPayloadOrError =
+  GenerateOneTimeLoginTokenPayload
+  | ErrNotAuthorized
+
 type Mutation {
   # User Mutations
   addUserWallet(
@@ -2176,6 +2184,8 @@ type Mutation {
   moveCollectionToGallery(
     input: MoveCollectionToGalleryInput
   ): MoveCollectionToGalleryPayloadOrError @authRequired
+
+  generateOneTimeLoginToken: GenerateOneTimeLoginTokenPayloadOrError @authRequired
 }
 
 type Subscription {

@@ -138,6 +138,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"GenerateOneTimeLoginTokenPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(GenerateOneTimeLoginTokenPayloadOrError)
+		return obj, ok
+	},
+
 	"GetAuthNoncePayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(GetAuthNoncePayloadOrError)
 		return obj, ok

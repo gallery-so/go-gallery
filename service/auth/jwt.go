@@ -60,15 +60,15 @@ func GenerateOneTimeLoginToken(ctx context.Context, userID persist.DBID, validFo
 	return generateJWT(claims, secret)
 }
 
-func ParseOneTimeLoginToken(ctx context.Context, token string) (persist.DBID, error) {
+func ParseOneTimeLoginToken(ctx context.Context, token string) (persist.DBID, time.Time, error) {
 	claims := oneTimeLoginClaims{}
 	parsedToken, err := jwt.ParseWithClaims(token, &claims, keyFunc(env.GetString("ONE_TIME_LOGIN_JWT_SECRET")))
 
 	if err != nil || !parsedToken.Valid {
-		return "", ErrInvalidJWT
+		return "", time.Time{}, ErrInvalidJWT
 	}
 
-	return claims.UserID, nil
+	return claims.UserID, claims.ExpiresAt.Time, nil
 }
 
 func GenerateEmailVerificationToken(ctx context.Context, userID persist.DBID, email string) (string, error) {

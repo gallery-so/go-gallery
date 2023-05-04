@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/mikeydub/go-gallery/util"
+	"time"
 
 	magicclient "github.com/magiclabs/magic-admin-go/client"
 	"github.com/magiclabs/magic-admin-go/token"
@@ -131,4 +132,15 @@ func (api AuthAPI) Login(ctx context.Context, authenticator auth.Authenticator) 
 func (api AuthAPI) Logout(ctx context.Context) {
 	// Nothing to validate
 	auth.Logout(ctx)
+}
+
+func (api AuthAPI) GenerateOneTimeLoginToken(ctx context.Context) (string, error) {
+	// Nothing to validate
+
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	return auth.GenerateOneTimeLoginToken(ctx, userID, 5*time.Minute)
 }

@@ -119,6 +119,10 @@ type GalleryUserOrWallet interface {
 	IsGalleryUserOrWallet()
 }
 
+type GenerateOneTimeLoginTokenPayloadOrError interface {
+	IsGenerateOneTimeLoginTokenPayloadOrError()
+}
+
 type GetAuthNoncePayloadOrError interface {
 	IsGetAuthNoncePayloadOrError()
 }
@@ -969,6 +973,7 @@ func (ErrNotAuthorized) IsUpdateSocialAccountDisplayedPayloadOrError() {}
 func (ErrNotAuthorized) IsMintPremiumCardToWalletPayloadOrError()      {}
 func (ErrNotAuthorized) IsDisconnectSocialAccountPayloadOrError()      {}
 func (ErrNotAuthorized) IsFollowAllSocialConnectionsPayloadOrError()   {}
+func (ErrNotAuthorized) IsGenerateOneTimeLoginTokenPayloadOrError()    {}
 
 type ErrPushTokenBelongsToAnotherUser struct {
 	Message string `json:"message"`
@@ -1206,6 +1211,12 @@ func (GalleryUser) IsUserByIDOrError()                   {}
 func (GalleryUser) IsUserByAddressOrError()              {}
 func (GalleryUser) IsAddRolesToUserPayloadOrError()      {}
 func (GalleryUser) IsRevokeRolesFromUserPayloadOrError() {}
+
+type GenerateOneTimeLoginTokenPayload struct {
+	Token string `json:"token"`
+}
+
+func (GenerateOneTimeLoginTokenPayload) IsGenerateOneTimeLoginTokenPayloadOrError() {}
 
 type GltfMedia struct {
 	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`
