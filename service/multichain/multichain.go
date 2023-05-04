@@ -683,6 +683,9 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contr
 
 	metadataFetchers := getChainProvidersForTask[tokenMetadataFetcher](d.Chains[chain])
 
+	if len(metadataFetchers) == 0 {
+		return nil, fmt.Errorf("no metadata fetchers for chain %d", chain)
+	}
 	wp := pool.New().WithMaxGoroutines(len(metadataFetchers)).WithContext(ctx)
 	metadatas := make(chan persist.TokenMetadata)
 	for i, metadataFetcher := range metadataFetchers {
