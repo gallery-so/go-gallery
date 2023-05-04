@@ -2,6 +2,7 @@ package tokenprocessing
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -123,10 +124,18 @@ func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (coredb.
 			// this error is returned for media types that we can not properly render if we cache, but it does not mean that we cached nothing
 			// we could have cached a thumbnail or something else alongside the other media.
 
-			first, _ := util.FindFirst(cachedObjects, func(c cachedMediaObject) bool {
+			first, ok := util.FindFirst(cachedObjects, func(c cachedMediaObject) bool {
+				if c.ObjectType == 0 || c.MediaType == "" || c.TokenID == "" || c.ContractAddress == "" {
+					return false
+				}
 				return c.storageURL(tpj.tp.tokenBucket) != "" && (c.ObjectType == objectTypeImage || c.ObjectType == objectTypeSVG || c.ObjectType == objectTypeThumbnail)
 			})
-			result.Media = tpj.createRawMedia(ctx, err.MediaType, err.URL, first.storageURL(tpj.tp.tokenBucket), cachedObjects)
+			if ok {
+				result.Media = tpj.createRawMedia(ctx, err.MediaType, err.URL, first.storageURL(tpj.tp.tokenBucket), cachedObjects)
+			} else {
+				logger.For(ctx).Errorf("error caching media: %s", err)
+				result.Media = persist.Media{MediaType: err.MediaType, MediaURL: persist.NullString(err.URL)}
+			}
 		case MediaProcessingError:
 
 			if err.AnimationError != nil {
@@ -218,7 +227,13 @@ func (tpj *tokenProcessingJob) createRawMedia(ctx context.Context, mediaType per
 
 func (tpj *tokenProcessingJob) isNewMediaPreferable(ctx context.Context, media persist.Media) bool {
 	defer persist.TrackStepStatus(&tpj.pipelineMetadata.MediaResultComparison)()
-	return media.IsServable() || !tpj.token.Media.IsServable()
+	if media.IsServable() || (!media.IsServable() && !tpj.token.Media.IsServable()) {
+		// if the media is good, it is active
+		// if the media is bad but the old media is also bad, it is active
+		return true
+	}
+	// any other case, the media is not active
+	return false
 }
 
 func (tpj *tokenProcessingJob) persistResults(ctx context.Context, tmetadata coredb.TokenMedia) error {
@@ -242,36 +257,48 @@ func (tpj *tokenProcessingJob) upsertDB(ctx context.Context, tmetadata coredb.To
 		HasDescription:  tmetadata.Description != "",
 	}
 
-	anotherNew := persist.GenerateID()
-	id, err := tpj.tp.queries.UpsertTokenMedia(ctx, coredb.UpsertTokenMediaParams{
-		NewID:            persist.GenerateID(),
-		AnotherNewID:     anotherNew,
-		ContractID:       tpj.token.Contract,
-		TokenID:          tpj.token.TokenID,
-		Chain:            tpj.token.Chain,
-		Metadata:         tmetadata.Metadata,
-		Media:            tmetadata.Media,
-		Name:             tmetadata.Name,
-		Description:      tmetadata.Description,
-		ProcessingJobID:  tmetadata.ProcessingJobID,
-		Active:           tmetadata.Active,
+	job, err := tpj.tp.queries.InsertJob(ctx, coredb.InsertJobParams{
+		ProcessingJobID:  tpj.id,
 		TokenProperties:  p,
 		PipelineMetadata: *tpj.pipelineMetadata,
 		ProcessingCause:  tpj.cause,
 		ProcessorVersion: "",
 	})
 	if err != nil {
-		logger.For(ctx).Errorf("error upserting token media: %s", err)
-		return err
+		logger.For(ctx).Errorf("error inserting job: %s", err)
+		return fmt.Errorf("error inserting job: %w", err)
 	}
-	logger.For(ctx).Infof("upserted token media: %s", id)
-	if tmetadata.Active && anotherNew == id {
-		return tpj.tp.queries.UpdateTokenTokenMediaByTokenIdentifiers(ctx, coredb.UpdateTokenTokenMediaByTokenIdentifiersParams{
-			TokenMediaID: id,
+
+	newID := persist.GenerateID()
+	med, err := tpj.tp.queries.UpsertTokenMedia(ctx, coredb.UpsertTokenMediaParams{
+		CopyID:          persist.GenerateID(),
+		NewID:           newID,
+		ContractID:      tpj.token.Contract,
+		TokenID:         tpj.token.TokenID,
+		Chain:           tpj.token.Chain,
+		Metadata:        tmetadata.Metadata,
+		Media:           tmetadata.Media,
+		Name:            tmetadata.Name,
+		Description:     tmetadata.Description,
+		ProcessingJobID: job.ID,
+		Active:          tmetadata.Active,
+	})
+	if err != nil {
+		logger.For(ctx).Errorf("error upserting token media: %s", err)
+		return fmt.Errorf("error upserting token media: %w", err)
+	}
+	logger.For(ctx).Infof("upserted token media: %s", med.ID)
+	if med.Active && newID == med.ID {
+		err := tpj.tp.queries.UpdateTokenTokenMediaByTokenIdentifiers(ctx, coredb.UpdateTokenTokenMediaByTokenIdentifiersParams{
+			TokenMediaID: med.ID,
 			Contract:     tpj.token.Contract,
 			TokenID:      tpj.token.TokenID,
 			Chain:        tpj.token.Chain,
 		})
+		if err != nil {
+			logger.For(ctx).Errorf("error updating token token_media: %s", err)
+			return fmt.Errorf("error updating token token_media: %w", err)
+		}
 	}
 	return nil
 }

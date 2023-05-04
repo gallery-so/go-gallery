@@ -919,20 +919,20 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 			case rpc.ErrHTTP:
 				if caught.Status == http.StatusNotFound || caught.Status == http.StatusInternalServerError {
 					persist.FailStep(subMeta.ReaderRetrieval)
-					return nil, false, errInvalidMedia{URL: mediaURL, err: err}
+					return reader, false, errInvalidMedia{URL: mediaURL, err: err}
 				}
 			case *net.DNSError, *url.Error:
 				persist.FailStep(subMeta.ReaderRetrieval)
-				return nil, false, errInvalidMedia{URL: mediaURL, err: err}
+				return reader, false, errInvalidMedia{URL: mediaURL, err: err}
 			}
 
 			// if we're not already recursive, try opensea for ethereum tokens
 			if !isRecursive && tids.Chain == persist.ChainETH {
-				return nil, true, nil
+				return reader, true, nil
 			}
 
 			persist.FailStep(subMeta.ReaderRetrieval)
-			return nil, false, errNoDataFromReader{err: err, url: mediaURL}
+			return reader, false, errNoDataFromReader{err: err, url: mediaURL}
 		}
 		return reader, false, nil
 	}()
@@ -969,6 +969,8 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 
 			return cacheObjectsFromURL(pCtx, tids, firstNonEmptyURL, defaultObjectType, ipfsClient, arweaveClient, storageClient, bucket, subMeta, true)
 		}
+
+		return nil, errNoDataFromOpensea{errNoDataFromReader: errNoDataFromReader{err: err, url: mediaURL}}
 	}
 
 	logger.For(pCtx).Infof("got reader for %s in %s", tids, time.Since(timeBeforeDataReader))
@@ -1211,7 +1213,7 @@ func newObjectWriter(ctx context.Context, client *storage.Client, bucket, fileNa
 	writer.ObjectAttrs.Metadata = objMetadata
 	writer.ObjectAttrs.CacheControl = "no-cache, no-store"
 	writer.ChunkSize = 4 * 1024 * 1024 // 4MB
-	writer.ChunkRetryDeadline = 2 * time.Minute
+	writer.ChunkRetryDeadline = 5 * time.Minute
 	if contentLength != nil && env.GetString("ENV") != "local" {
 		cl := *contentLength
 		if cl < 4*1024*1024 {

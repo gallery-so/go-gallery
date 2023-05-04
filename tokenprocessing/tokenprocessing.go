@@ -82,6 +82,11 @@ func setDefaults() {
 	viper.SetDefault("IMGIX_API_KEY", "")
 	viper.SetDefault("VERSION", "")
 	viper.SetDefault("ALCHEMY_API_URL", "")
+	viper.SetDefault("ALCHEMY_OPTIMISM_API_URL", "")
+	viper.SetDefault("ALCHEMY_POLYGON_API_URL", "")
+	viper.SetDefault("ALCHEMY_NFT_API_URL", "")
+	viper.SetDefault("POAP_API_KEY", "")
+	viper.SetDefault("POAP_AUTH_TOKEN", "")
 
 	viper.AutomaticEnv()
 

@@ -1086,7 +1086,7 @@ func (q *Queries) GetAllTimeTrendingUserIDs(ctx context.Context, limit int32) ([
 }
 
 const getAllTokensWithContracts = `-- name: GetAllTokensWithContracts :many
-select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id, contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam from tokens join contracts on contracts.id = tokens.contract where tokens.deleted = false order by tokens.last_updated desc limit $1 offset $2
+select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id, contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam from tokens join contracts on (contracts.id = tokens.contract) where tokens.deleted = false order by tokens.last_updated desc limit $1 offset $2
 `
 
 type GetAllTokensWithContractsParams struct {
@@ -4047,6 +4047,39 @@ func (q *Queries) HasLaterGroupedEvent(ctx context.Context, arg HasLaterGroupedE
 	return exists, err
 }
 
+const insertJob = `-- name: InsertJob :one
+insert into token_processing_jobs (id, token_properties, pipeline_metadata, processing_cause, processor_version) values ($1, $2, $3, $4, $5) returning id, created_at, token_properties, pipeline_metadata, processing_cause, processor_version, deleted
+`
+
+type InsertJobParams struct {
+	ProcessingJobID  persist.DBID
+	TokenProperties  persist.TokenProperties
+	PipelineMetadata persist.PipelineMetadata
+	ProcessingCause  persist.ProcessingCause
+	ProcessorVersion string
+}
+
+func (q *Queries) InsertJob(ctx context.Context, arg InsertJobParams) (TokenProcessingJob, error) {
+	row := q.db.QueryRow(ctx, insertJob,
+		arg.ProcessingJobID,
+		arg.TokenProperties,
+		arg.PipelineMetadata,
+		arg.ProcessingCause,
+		arg.ProcessorVersion,
+	)
+	var i TokenProcessingJob
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.TokenProperties,
+		&i.PipelineMetadata,
+		&i.ProcessingCause,
+		&i.ProcessorVersion,
+		&i.Deleted,
+	)
+	return i, err
+}
+
 const insertSpamContracts = `-- name: InsertSpamContracts :exec
 with insert_spam_contracts as (
     insert into alchemy_spam_contracts (id, chain, address, created_at, is_spam) (
@@ -4818,51 +4851,45 @@ const upsertTokenMedia = `-- name: UpsertTokenMedia :one
 with copy_on_overwrite as (
     insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
     (
-        select $10, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, last_updated
+        select $11, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, last_updated
         from token_medias
         where contract_id = $2
           and token_id = $3
           and chain = $4
           and active = true
+          and $10 = true
           and deleted = false
         limit 1
     )
-)
-, job as (
-  insert into token_processing_jobs (id, token_properties, pipeline_metadata, processing_cause, processor_version) values ($11, $12, $13, $14, $15) returning id, created_at, token_properties, pipeline_metadata, processing_cause, processor_version, deleted
-)
-insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated) 
-    (select $1, $2, $3, $4, $5, $6, $7, $8, job.id, $9, now(), now() from job)
+) 
+insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated) values
+    ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now(), now())
     on conflict (contract_id, token_id, chain) where active = true and deleted = false do update
         set metadata = excluded.metadata,
             media = excluded.media,
             name = excluded.name,
             description = excluded.description,
             processing_job_id = excluded.processing_job_id,
-            last_updated = now() returning id
+            last_updated = now() returning id, created_at, last_updated, version, contract_id, token_id, chain, active, metadata, media, name, description, processing_job_id, deleted
 `
 
 type UpsertTokenMediaParams struct {
-	AnotherNewID     persist.DBID
-	ContractID       persist.DBID
-	TokenID          persist.TokenID
-	Chain            persist.Chain
-	Metadata         persist.TokenMetadata
-	Media            persist.Media
-	Name             string
-	Description      string
-	Active           bool
-	NewID            persist.DBID
-	ProcessingJobID  persist.DBID
-	TokenProperties  persist.TokenProperties
-	PipelineMetadata persist.PipelineMetadata
-	ProcessingCause  persist.ProcessingCause
-	ProcessorVersion string
+	NewID           persist.DBID
+	ContractID      persist.DBID
+	TokenID         persist.TokenID
+	Chain           persist.Chain
+	Metadata        persist.TokenMetadata
+	Media           persist.Media
+	Name            string
+	Description     string
+	ProcessingJobID persist.DBID
+	Active          bool
+	CopyID          persist.DBID
 }
 
-func (q *Queries) UpsertTokenMedia(ctx context.Context, arg UpsertTokenMediaParams) (persist.DBID, error) {
+func (q *Queries) UpsertTokenMedia(ctx context.Context, arg UpsertTokenMediaParams) (TokenMedia, error) {
 	row := q.db.QueryRow(ctx, upsertTokenMedia,
-		arg.AnotherNewID,
+		arg.NewID,
 		arg.ContractID,
 		arg.TokenID,
 		arg.Chain,
@@ -4870,17 +4897,28 @@ func (q *Queries) UpsertTokenMedia(ctx context.Context, arg UpsertTokenMediaPara
 		arg.Media,
 		arg.Name,
 		arg.Description,
-		arg.Active,
-		arg.NewID,
 		arg.ProcessingJobID,
-		arg.TokenProperties,
-		arg.PipelineMetadata,
-		arg.ProcessingCause,
-		arg.ProcessorVersion,
+		arg.Active,
+		arg.CopyID,
 	)
-	var id persist.DBID
-	err := row.Scan(&id)
-	return id, err
+	var i TokenMedia
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.LastUpdated,
+		&i.Version,
+		&i.ContractID,
+		&i.TokenID,
+		&i.Chain,
+		&i.Active,
+		&i.Metadata,
+		&i.Media,
+		&i.Name,
+		&i.Description,
+		&i.ProcessingJobID,
+		&i.Deleted,
+	)
+	return i, err
 }
 
 const userHasDuplicateGalleryPositions = `-- name: UserHasDuplicateGalleryPositions :one
