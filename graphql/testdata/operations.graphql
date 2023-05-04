@@ -276,51 +276,51 @@ mutation syncTokensMutation($chains: [Chain!]) {
             dbid
             tokenId
             media {
-              ...on ImageMedia {
+              ... on ImageMedia {
                 mediaURL
                 mediaType
               }
-              ...on GIFMedia {
+              ... on GIFMedia {
                 mediaURL
                 mediaType
               }
-              ...on VideoMedia {
+              ... on VideoMedia {
                 mediaURL
                 mediaType
               }
-              ...on AudioMedia {
+              ... on AudioMedia {
                 mediaURL
                 mediaType
               }
-              ...on TextMedia {
+              ... on TextMedia {
                 mediaURL
                 mediaType
               }
-              ...on PdfMedia {
+              ... on PdfMedia {
                 mediaURL
                 mediaType
               }
-              ...on HtmlMedia {
+              ... on HtmlMedia {
                 mediaURL
                 mediaType
               }
-              ...on JsonMedia {
+              ... on JsonMedia {
                 mediaURL
                 mediaType
               }
-              ...on GltfMedia {
+              ... on GltfMedia {
                 mediaURL
                 mediaType
               }
-              ...on UnknownMedia {
+              ... on UnknownMedia {
                 mediaURL
                 mediaType
               }
-              ...on SyncingMedia {
+              ... on SyncingMedia {
                 mediaURL
                 mediaType
               }
-              ...on InvalidMedia {
+              ... on InvalidMedia {
                 mediaURL
                 mediaType
               }

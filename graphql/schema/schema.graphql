@@ -2061,9 +2061,7 @@ type GenerateQRCodeLoginTokenPayload {
   token: String!
 }
 
-union GenerateQRCodeLoginTokenPayloadOrError =
-  GenerateQRCodeLoginTokenPayload
-  | ErrNotAuthorized
+union GenerateQRCodeLoginTokenPayloadOrError = GenerateQRCodeLoginTokenPayload | ErrNotAuthorized
 
 type Mutation {
   # User Mutations
