@@ -3,6 +3,9 @@ package persist
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"time"
+
+	"github.com/mikeydub/go-gallery/service/logger"
 )
 
 type ProcessingCause string
@@ -126,12 +129,24 @@ func (p *PipelineMetadata) Scan(value interface{}) error {
 	return json.Unmarshal(value.([]byte), p)
 }
 
-func TrackStepStatus(status *PipelineStepStatus) func() {
+func TrackStepStatus(status *PipelineStepStatus, name string) func() {
+
 	if status == nil {
 		started := PipelineStepStatusStarted
 		status = &started
 	}
 	*status = PipelineStepStatusStarted
+
+	go func() {
+		for {
+			<-time.After(5 * time.Second)
+			if status == nil || *status == PipelineStepStatusSuccess || *status == PipelineStepStatusError {
+				return
+			}
+			logger.For(nil).Infof("still %s", name)
+		}
+	}()
+
 	return func() {
 		if *status == PipelineStepStatusError {
 			return

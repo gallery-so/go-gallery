@@ -3,7 +3,6 @@ package indexer
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math/big"
 	"net/http"
 	"time"
@@ -74,16 +73,10 @@ func getTokenMetadata(ipfsClient *shell.Shell, ethClient *ethclient.Client, arwe
 		ctx, cancel := context.WithTimeout(ctx, time.Minute*10)
 		defer cancel()
 
-		tokenType, err := getTokenType(c, input.TokenID, input.ContractAddress, input.OwnerAddress, ethClient)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-
 		asEthAddress := persist.EthereumAddress(input.ContractAddress.String())
 		handler, hasCustomHandler := uniqueMetadataHandlers[asEthAddress]
 
-		newURI, err := rpc.GetTokenURI(ctx, tokenType, input.ContractAddress, input.TokenID, ethClient)
+		newURI, err := rpc.GetTokenURI(ctx, "", input.ContractAddress, input.TokenID, ethClient)
 		// It's possible to fetch metadata for some contracts even if URI data is missing.
 		if !hasCustomHandler && (err != nil || newURI == "") {
 			util.ErrResponse(c, http.StatusInternalServerError, errNoMetadataFound{Contract: input.ContractAddress, TokenID: input.TokenID})
@@ -116,36 +109,4 @@ func getTokenMetadata(ipfsClient *shell.Shell, ethClient *ethclient.Client, arwe
 
 		c.JSON(http.StatusOK, GetTokenMetadataOutput{Metadata: newMetadata})
 	}
-}
-
-func getTokenType(pCtx context.Context, tokenID persist.TokenID, contractAddress, ownerAddress persist.EthereumAddress, ec *ethclient.Client) (t persist.TokenType, err error) {
-
-	if handler, ok := customManualIndex[persist.EthereumAddress(contractAddress.String())]; ok {
-		handledToken, err := handler(pCtx, tokenID, ownerAddress, ec)
-		if err != nil {
-			return t, err
-		}
-		return handledToken.TokenType, nil
-	}
-
-	e721, err := contracts.NewIERC721Caller(contractAddress.Address(), ec)
-	if err != nil {
-		return "", err
-	}
-	e1155, err := contracts.NewIERC1155Caller(contractAddress.Address(), ec)
-	if err != nil {
-		return "", err
-	}
-	e721Exists, err := e721.SupportsInterface(&bind.CallOpts{Context: pCtx}, [4]byte{0x80, 0x41, 0x67, 0x35})
-	if err == nil && e721Exists {
-		return persist.TokenTypeERC721, nil
-	}
-
-	e1155Exists, err := e1155.SupportsInterface(&bind.CallOpts{Context: pCtx}, [4]byte{0xd9, 0x5a, 0x49, 0x81})
-	if err == nil && e1155Exists {
-		return persist.TokenTypeERC1155, nil
-	}
-
-	return "", fmt.Errorf("failed to get token type for token %s-%s: %s", contractAddress, tokenID, err)
-
 }

@@ -686,6 +686,9 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contr
 	if len(metadataFetchers) == 0 {
 		return nil, fmt.Errorf("no metadata fetchers for chain %d", chain)
 	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	wp := pool.New().WithMaxGoroutines(len(metadataFetchers)).WithContext(ctx)
 	metadatas := make(chan persist.TokenMetadata)
 	for i, metadataFetcher := range metadataFetchers {
@@ -693,7 +696,7 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contr
 		metadataFetcher := metadataFetcher
 		wp.Go(func(ctx context.Context) error {
 			metadata, err := metadataFetcher.GetTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: contractAddress, TokenID: tokenID}, ownerAddress)
-			if err != nil {
+			if err != nil && err != context.Canceled {
 				logger.For(ctx).Errorf("error fetching token metadata %s for provider %d (%T)", err, i, metadataFetcher)
 			}
 			metadatas <- metadata
@@ -704,7 +707,7 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contr
 	go func() {
 		defer close(metadatas)
 		err := wp.Wait()
-		if err != nil {
+		if err != nil && err != context.Canceled {
 			logger.For(ctx).Errorf("error fetching token metadata after wait: %s", err)
 		}
 	}()
