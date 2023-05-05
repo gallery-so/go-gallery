@@ -206,12 +206,6 @@ func (api UserAPI) GetUsersWithTrait(ctx context.Context, trait string) ([]db.Us
 }
 
 func (api *UserAPI) GetUserRolesByUserID(ctx context.Context, userID persist.DBID) ([]persist.Role, error) {
-	gc := util.MustGetGinContext(ctx)
-
-	if auth.GetUserRolesExistFromCtx(gc) {
-		return auth.GetRolesFromCtx(gc), nil
-	}
-
 	return auth.RolesByUserID(ctx, api.queries, userID)
 }
 
