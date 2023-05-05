@@ -39,6 +39,7 @@
 //go:generate go run github.com/gallery-so/dataloaden AdmireLoaderByActorAndFeedEvent github.com/mikeydub/go-gallery/db/gen/coredb.GetAdmireByActorIDAndFeedEventIDParams github.com/mikeydub/go-gallery/db/gen/coredb.Admire
 //go:generate go run github.com/gallery-so/dataloaden SharedFollowersLoaderByIDs github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedFollowersBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedFollowersBatchPaginateRow
 //go:generate go run github.com/gallery-so/dataloaden SharedContractsLoaderByIDs github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedContractsBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedContractsBatchPaginateRow
+//go:generate go run github.com/gallery-so/dataloaden MediaLoaderByTokenID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.TokenMedia
 
 package dataloader
 
@@ -117,6 +118,7 @@ type Loaders struct {
 	InteractionCountByFeedEventID    *FeedEventInteractionCountLoader
 	InteractionsByFeedEventID        *FeedEventInteractionsLoader
 	AdmireByActorIDAndFeedEventID    *AdmireLoaderByActorAndFeedEvent
+	MediaByTokenID                   *MediaLoaderByTokenID
 }
 
 func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loaders {
@@ -303,6 +305,10 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 
 	loaders.NotificationByID = NewNotificationLoaderByID(defaults, loadNotificationById(q), NotificationLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(notification db.Notification) persist.DBID { return notification.ID },
+	})
+
+	loaders.MediaByTokenID = NewMediaLoaderByTokenID(defaults, loadMediaByTokenID(q), MediaLoaderByTokenIDCacheSubscriptions{
+		AutoCacheWithKey: func(media db.TokenMedia) persist.DBID { return media.ID },
 	})
 
 	return loaders
@@ -1204,6 +1210,25 @@ func loadAdmireByActorIDAndFeedEventID(q *db.Queries) func(context.Context, []db
 				err = persist.ErrAdmireNotFound{ActorID: params[i].ActorID, FeedEventID: params[i].FeedEventID}
 			}
 			results[i], errors[i] = admire, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadMediaByTokenID(q *db.Queries) func(context.Context, []persist.DBID) ([]db.TokenMedia, []error) {
+	return func(ctx context.Context, tokenIDs []persist.DBID) ([]db.TokenMedia, []error) {
+		results := make([]db.TokenMedia, len(tokenIDs))
+		errors := make([]error, len(tokenIDs))
+
+		b := q.GetMediaByTokenID(ctx, tokenIDs)
+		defer b.Close()
+
+		b.QueryRow(func(i int, media db.TokenMedia, err error) {
+			if err == pgx.ErrNoRows {
+				err = persist.ErrMediaNotFound{TokenID: tokenIDs[i]}
+			}
+			results[i], errors[i] = media, err
 		})
 
 		return results, errors

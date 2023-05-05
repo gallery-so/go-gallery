@@ -706,21 +706,20 @@ on conflict (user_id, role) do update set deleted = false, last_updated = now();
 update user_roles set deleted = true, last_updated = now() where user_id = $1 and role = any(@roles);
 
 -- name: GetUserRolesByUserId :many
-select role from user_roles where user_id = $1 and deleted = false
+with membership_roles(role) as (
+    select (case when exists(
+        select 1
+        from tokens
+        where owner_user_id = @user_id
+            and token_id = any(@membership_token_ids::varchar[])
+            and contract = (select id from contracts where address = @membership_address and contracts.chain = @chain and contracts.deleted = false)
+            and exists(select 1 from users where id = @user_id and email_verified = 1 and deleted = false)
+            and deleted = false
+    ) then @granted_membership_role else null end)::varchar
+)
+select role from user_roles where user_id = @user_id and deleted = false
 union
-select role from (
-  select
-    case when exists(
-      select 1
-      from tokens
-      where owner_user_id = $1
-        and token_id = any(@membership_token_ids::varchar[])
-        and contract = (select id from contracts where address = @membership_address and contracts.chain = @chain and contracts.deleted = false)
-        and exists(select 1 from users where id = $1 and email_verified = 1 and deleted = false)
-        and deleted = false
-      )
-      then @granted_membership_role else null end as role
-) r where role is not null;
+select role from membership_roles where role is not null;
 
 -- name: RedeemMerch :one
 update merch set redeemed = true, token_id = @token_hex, last_updated = now() where id = (select m.id from merch m where m.object_type = @object_type and m.token_id is null and m.redeemed = false and m.deleted = false order by m.id limit 1) and token_id is null and redeemed = false returning discount_code;
@@ -1097,3 +1096,9 @@ select * from push_notification_tickets where check_after <= now() and deleted =
 
 -- name: GetAllTokensWithContracts :many
 select tokens.*, contracts.* from tokens join contracts on (contracts.id = tokens.contract) where tokens.deleted = false order by tokens.last_updated desc limit $1 offset $2;
+
+-- name: GetMediaByTokenID :batchone
+select m.*
+from tokens t
+join token_medias m on t.chain = m.chain and t.contract = m.contract_id and t.token_id = m.token_id
+where t.id = $1 and m.active and not m.deleted;

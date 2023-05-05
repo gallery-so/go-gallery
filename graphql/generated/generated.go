@@ -1512,6 +1512,8 @@ type SubscriptionResolver interface {
 	NotificationUpdated(ctx context.Context) (<-chan model.Notification, error)
 }
 type TokenResolver interface {
+	Media(ctx context.Context, obj *model.Token) (model.MediaSubtype, error)
+
 	Owner(ctx context.Context, obj *model.Token) (*model.GalleryUser, error)
 	OwnedByWallets(ctx context.Context, obj *model.Token) ([]*model.Wallet, error)
 
@@ -6985,13 +6987,13 @@ enum InteractionType {
   Comment
 }
 
-type Token implements Node {
+type Token implements Node @goEmbedHelper {
   id: ID!
   dbid: DBID!
   creationTime: Time
   lastUpdated: Time
   collectorsNote: String
-  media: MediaSubtype
+  media: MediaSubtype @goField(forceResolver: true)
   tokenType: TokenType
   chain: Chain
   name: String
@@ -37795,7 +37797,7 @@ func (ec *executionContext) _Token_media(ctx context.Context, field graphql.Coll
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Media, nil
+		return ec.resolvers.Token().Media(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -37813,8 +37815,8 @@ func (ec *executionContext) fieldContext_Token_media(ctx context.Context, field 
 	fc = &graphql.FieldContext{
 		Object:     "Token",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type MediaSubtype does not have child fields")
 		},
@@ -57884,9 +57886,22 @@ func (ec *executionContext) _Token(ctx context.Context, sel ast.SelectionSet, ob
 			out.Values[i] = ec._Token_collectorsNote(ctx, field, obj)
 
 		case "media":
+			field := field
 
-			out.Values[i] = ec._Token_media(ctx, field, obj)
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Token_media(ctx, field, obj)
+				return res
+			}
 
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "tokenType":
 
 			out.Values[i] = ec._Token_tokenType(ctx, field, obj)
