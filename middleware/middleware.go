@@ -8,7 +8,6 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	sentrygin "github.com/getsentry/sentry-go/gin"
-	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
