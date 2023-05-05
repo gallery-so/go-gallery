@@ -29,3 +29,6 @@ create unique index if not exists token_media_contract_token_id_chain_idx on tok
 
 alter table tokens add column if not exists token_media_id varchar(255) references token_medias(id);
 
+alter table tokens add constraint fk_tokens_contracts foreign key (contract) references contracts (id) on delete cascade on update cascade;
+
+

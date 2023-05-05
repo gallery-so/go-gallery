@@ -1,4 +1,4 @@
-package role
+package auth
 
 import (
 	"context"
@@ -8,13 +8,9 @@ import (
 	"strings"
 )
 
-type RoleFinder struct {
-	Queries *db.Queries
-}
-
-func (r RoleFinder) RolesByUserID(ctx context.Context, userID persist.DBID) ([]persist.Role, error) {
+func RolesByUserID(ctx context.Context, queries *db.Queries, userID persist.DBID) ([]persist.Role, error) {
 	membershipAddress, memberTokens := parseAddressTokens(env.GetString("PREMIUM_CONTRACT_ADDRESS"))
-	return r.Queries.GetUserRolesByUserId(ctx, db.GetUserRolesByUserIdParams{
+	return queries.GetUserRolesByUserId(ctx, db.GetUserRolesByUserIdParams{
 		UserID:                userID,
 		MembershipAddress:     persist.Address(membershipAddress),
 		MembershipTokenIds:    memberTokens,

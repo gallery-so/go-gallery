@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"fmt"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/auth/basicauth"
 	"net/http"
 
@@ -15,7 +16,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/role"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/util"
 )
@@ -108,7 +108,7 @@ func TaskRequired() gin.HandlerFunc {
 }
 
 // AddAuthToContext is a middleware that validates auth data and stores the results in the context
-func AddAuthToContext(rf *role.RoleFinder) gin.HandlerFunc {
+func AddAuthToContext(queries *db.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		jwt, err := c.Cookie(auth.JWTCookieKey)
 
@@ -131,7 +131,7 @@ func AddAuthToContext(rf *role.RoleFinder) gin.HandlerFunc {
 		userID, err := auth.JWTParse(jwt, env.GetString("JWT_SECRET"))
 		auth.SetAuthStateForCtx(c, userID, err)
 
-		roles, err := rf.RolesByUserID(c, userID)
+		roles, err := auth.RolesByUserID(c, queries, userID)
 		auth.SetRolesForCtx(c, roles, err)
 
 		// If we have a successfully authenticated user, add their ID to all subsequent logging

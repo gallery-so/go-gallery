@@ -93,7 +93,7 @@ func ClientInit(ctx context.Context) *Clients {
 	return &Clients{
 		Repos:           postgres.NewRepositories(pq, pgx),
 		Queries:         db.New(pgx),
-		HTTPClient:      &http.Client{Timeout: 10 * time.Minute},
+		HTTPClient:      &http.Client{Timeout: 0},
 		EthClient:       rpc.NewEthClient(),
 		IPFSClient:      rpc.NewIPFSShell(),
 		ArweaveClient:   rpc.NewArweaveClient(),
@@ -197,8 +197,6 @@ func SetDefaults() {
 	viper.SetDefault("GCLOUD_FEED_BUFFER_SECS", 20)
 	viper.SetDefault("FEED_SECRET", "feed-secret")
 	viper.SetDefault("TOKEN_PROCESSING_URL", "http://localhost:6500")
-	// TODO remove
-	viper.SetDefault("NEW_TOKEN_PROCESSING_URL", "")
 	viper.SetDefault("TEZOS_API_URL", "https://api.tzkt.io")
 	viper.SetDefault("POAP_API_KEY", "")
 	viper.SetDefault("POAP_AUTH_TOKEN", "")
@@ -223,6 +221,9 @@ func SetDefaults() {
 	viper.SetDefault("FEEDBOT_URL", "")
 	viper.SetDefault("GCLOUD_FEEDBOT_TASK_QUEUE", "projects/gallery-local/locations/here/queues/feedbot")
 	viper.SetDefault("ALCHEMY_API_URL", "")
+	viper.SetDefault("ALCHEMY_OPTIMISM_API_URL", "")
+	viper.SetDefault("ALCHEMY_POLYGON_API_URL", "")
+	viper.SetDefault("ALCHEMY_NFT_API_URL", "")
 	viper.SetDefault("INFURA_API_KEY", "")
 	viper.SetDefault("INFURA_API_SECRET", "")
 	viper.SetDefault("PUSH_NOTIFICATIONS_SECRET", "push-notifications-secret")

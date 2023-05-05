@@ -17,7 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/gammazero/workerpool"
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/auth"
@@ -27,7 +26,10 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
 	"github.com/sirupsen/logrus"
+	"github.com/sourcegraph/conc/pool"
 )
+
+var client = http.DefaultClient
 
 func init() {
 	env.RegisterValidation("OPENSEA_API_KEY", "required")
@@ -144,6 +146,7 @@ type ErrNoAssetsForWallets struct {
 
 // NewProvider creates a new provider for opensea
 func NewProvider(ethClient *ethclient.Client, httpClient *http.Client) *Provider {
+	client = httpClient
 	return &Provider{
 		httpClient: httpClient,
 		ethClient:  ethClient,
@@ -568,7 +571,7 @@ func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsCha
 	tokensChan := make(chan multichain.ChainAgnosticToken)
 	contractsChan := make(chan multichain.ChainAgnosticContract)
 	errChan := make(chan error)
-	wp := workerpool.New(10)
+	wp := pool.New().WithMaxGoroutines(10).WithContext(ctx)
 
 	go func() {
 		defer close(tokensChan)
@@ -580,7 +583,7 @@ func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsCha
 			}
 			for _, n := range assetsReceived.assets {
 				nft := n
-				wp.Submit(func() {
+				wp.Go(func(ctx context.Context) error {
 					var tokenType persist.TokenType
 					switch nft.Contract.ContractSchemaName {
 					case "ERC721", "CRYPTOPUNKS":
@@ -589,7 +592,7 @@ func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsCha
 						tokenType = persist.TokenTypeERC1155
 					default:
 						logger.For(ctx).Warnf("unknown token type: %s", nft.Contract.ContractSchemaName)
-						return
+						return nil
 					}
 
 					metadata := persist.TokenMetadata{
@@ -640,10 +643,14 @@ func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsCha
 						Quantity:        "1",
 						IsSpam:          util.ToPointer(false), // OpenSea filters spam on their side
 					}
+					return nil
 				})
 			}
 		}
-		wp.StopWait()
+		err := wp.Wait()
+		if err != nil {
+			errChan <- err
+		}
 	}()
 
 	for {
@@ -653,7 +660,10 @@ func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsCha
 				return resultTokens, resultContracts, nil
 			}
 			resultTokens = append(resultTokens, token)
-		case contract := <-contractsChan:
+		case contract, ok := <-contractsChan:
+			if !ok {
+				return resultTokens, resultContracts, nil
+			}
 			if contract.Address.String() != "" {
 				resultContracts = append(resultContracts, contract)
 			}
@@ -720,9 +730,9 @@ func authRequest(ctx context.Context, url string) (*http.Request, error) {
 }
 
 func paginateAssets(req *http.Request) ([]Asset, error) {
-	result := make([]Asset, 0)
+	result := []Asset{}
 	for {
-		resp, err := retry.RetryRequest(http.DefaultClient, req)
+		resp, err := retry.RetryRequest(client, req)
 		if err != nil {
 			return nil, err
 		}

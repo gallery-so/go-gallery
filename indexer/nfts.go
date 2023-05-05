@@ -58,7 +58,7 @@ type GetTokenMetadataOutput struct {
 	Metadata persist.TokenMetadata `json:"metadata"`
 }
 
-func getTokenMetadata(nftRepository persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client, arweaveClient *goar.Client) gin.HandlerFunc {
+func getTokenMetadata(ipfsClient *shell.Shell, ethClient *ethclient.Client, arweaveClient *goar.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &getTokenMetadataInput{}
 
@@ -74,48 +74,23 @@ func getTokenMetadata(nftRepository persist.TokenRepository, ipfsClient *shell.S
 		ctx, cancel := context.WithTimeout(ctx, time.Minute*10)
 		defer cancel()
 
-		curTokens, err := nftRepository.GetByTokenIdentifiers(ctx, input.TokenID, input.ContractAddress, -1, 0)
+		tokenType, err := getTokenType(c, input.TokenID, input.ContractAddress, input.OwnerAddress, ethClient)
 		if err != nil {
-			if _, ok := err.(persist.ErrTokenNotFoundByTokenIdentifiers); !ok {
-				util.ErrResponse(c, http.StatusInternalServerError, err)
-				return
-			}
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
 		}
-
-		if len(curTokens) == 0 && input.OwnerAddress != "" {
-			t, err := manuallyIndexToken(c, input.TokenID, input.ContractAddress, input.OwnerAddress, ethClient, nftRepository)
-			if err != nil {
-				logger.For(ctx).Error("error manually indexing token", err)
-			} else {
-				logger.For(ctx).Infof("manually indexed token: %s-%s (token type: %s)", input.ContractAddress, input.TokenID, t.TokenType)
-				curTokens = []persist.Token{t}
-			}
-		}
-
-		firstWithValidTokenURI, _ := util.FindFirst(curTokens, func(t persist.Token) bool {
-			return t.TokenURI != ""
-		})
-
-		firstWithValidTokenType, _ := util.FindFirst(curTokens, func(t persist.Token) bool {
-			return t.TokenType != ""
-		})
 
 		asEthAddress := persist.EthereumAddress(input.ContractAddress.String())
 		handler, hasCustomHandler := uniqueMetadataHandlers[asEthAddress]
 
-		newURI, err := rpc.GetTokenURI(ctx, firstWithValidTokenType.TokenType, input.ContractAddress, input.TokenID, ethClient)
+		newURI, err := rpc.GetTokenURI(ctx, tokenType, input.ContractAddress, input.TokenID, ethClient)
 		// It's possible to fetch metadata for some contracts even if URI data is missing.
 		if !hasCustomHandler && (err != nil || newURI == "") {
 			util.ErrResponse(c, http.StatusInternalServerError, errNoMetadataFound{Contract: input.ContractAddress, TokenID: input.TokenID})
 			return
 		}
 
-		if newURI == "" {
-			newURI = firstWithValidTokenURI.TokenURI
-		}
-
-		newMetadata := firstWithValidTokenURI.TokenMetadata
-
+		var newMetadata persist.TokenMetadata
 		if hasCustomHandler {
 			logger.For(ctx).Infof("Using %v metadata handler for %s", handler, input.ContractAddress)
 			u, md, err := handler(ctx, newURI, asEthAddress, input.TokenID, ethClient, ipfsClient, arweaveClient)
@@ -139,69 +114,38 @@ func getTokenMetadata(nftRepository persist.TokenRepository, ipfsClient *shell.S
 			return
 		}
 
-		if err := nftRepository.UpdateByTokenIdentifiers(ctx, input.TokenID, input.ContractAddress, persist.TokenUpdateMetadataFieldsInput{
-			Metadata: newMetadata,
-			TokenURI: newURI,
-		}); err != nil {
-			logger.For(ctx).Errorf("Error updating token metadata: %s (uri: %s)", err, newURI)
-		}
-
 		c.JSON(http.StatusOK, GetTokenMetadataOutput{Metadata: newMetadata})
 	}
 }
 
-func manuallyIndexToken(pCtx context.Context, tokenID persist.TokenID, contractAddress, ownerAddress persist.EthereumAddress, ec *ethclient.Client, tokenRepo persist.TokenRepository) (t persist.Token, err error) {
-
-	var startingToken persist.Token
-	startingTokens, err := tokenRepo.GetByTokenIdentifiers(pCtx, tokenID, contractAddress, 1, 0)
-	if err == nil && len(startingTokens) > 0 {
-		startingToken = startingTokens[0]
-	}
+func getTokenType(pCtx context.Context, tokenID persist.TokenID, contractAddress, ownerAddress persist.EthereumAddress, ec *ethclient.Client) (t persist.TokenType, err error) {
 
 	if handler, ok := customManualIndex[persist.EthereumAddress(contractAddress.String())]; ok {
 		handledToken, err := handler(pCtx, tokenID, ownerAddress, ec)
 		if err != nil {
 			return t, err
 		}
-		t = handledToken
-	} else {
-
-		startingToken.TokenID = tokenID
-		startingToken.ContractAddress = contractAddress
-		startingToken.OwnerAddress = ownerAddress
-
-		var e721 *contracts.IERC721Caller
-		var e1155 *contracts.IERC1155Caller
-
-		e721, err = contracts.NewIERC721Caller(contractAddress.Address(), ec)
-		if err != nil {
-			return
-		}
-		e1155, err = contracts.NewIERC1155Caller(contractAddress.Address(), ec)
-		if err != nil {
-			return
-		}
-		owner, err := e721.OwnerOf(&bind.CallOpts{Context: pCtx}, tokenID.BigInt())
-		isERC721 := err == nil
-		if isERC721 {
-			startingToken.TokenType = persist.TokenTypeERC721
-			startingToken.OwnerAddress = persist.EthereumAddress(owner.String())
-		} else {
-			bal, err := e1155.BalanceOf(&bind.CallOpts{Context: pCtx}, ownerAddress.Address(), tokenID.BigInt())
-			if err != nil {
-				return persist.Token{}, fmt.Errorf("failed to get balance or owner for token %s-%s: %s", contractAddress, tokenID, err)
-			}
-			startingToken.TokenType = persist.TokenTypeERC1155
-			startingToken.Quantity = persist.HexString(bal.Text(16))
-			startingToken.OwnerAddress = ownerAddress
-		}
-
-		t = startingToken
-	}
-	if err := tokenRepo.Upsert(pCtx, t); err != nil {
-		return persist.Token{}, fmt.Errorf("failed to upsert token %s-%s: %s", contractAddress, tokenID, err)
+		return handledToken.TokenType, nil
 	}
 
-	return t, nil
+	e721, err := contracts.NewIERC721Caller(contractAddress.Address(), ec)
+	if err != nil {
+		return "", err
+	}
+	e1155, err := contracts.NewIERC1155Caller(contractAddress.Address(), ec)
+	if err != nil {
+		return "", err
+	}
+	e721Exists, err := e721.SupportsInterface(&bind.CallOpts{Context: pCtx}, [4]byte{0x80, 0x41, 0x67, 0x35})
+	if err == nil && e721Exists {
+		return persist.TokenTypeERC721, nil
+	}
+
+	e1155Exists, err := e1155.SupportsInterface(&bind.CallOpts{Context: pCtx}, [4]byte{0xd9, 0x5a, 0x49, 0x81})
+	if err == nil && e1155Exists {
+		return persist.TokenTypeERC1155, nil
+	}
+
+	return "", fmt.Errorf("failed to get token type for token %s-%s: %s", contractAddress, tokenID, err)
 
 }

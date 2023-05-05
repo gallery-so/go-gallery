@@ -16,6 +16,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/sourcegraph/conc"
+	"github.com/sourcegraph/conc/pool"
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/gammazero/workerpool"
@@ -481,7 +482,7 @@ func (p *Provider) prepTokensForTokenProcessing(ctx context.Context, tokensFromP
 			providerTokens[i].Media = persist.Media{MediaType: persist.MediaTypeSyncing}
 		}
 
-		if !exists {
+		if !exists || token.TokenMedia == "" {
 			newTokens[token.TokenIdentifiers()] = true
 		}
 	}
@@ -680,22 +681,42 @@ func (p *Provider) GetTokensOfContractForWallet(ctx context.Context, contractAdd
 // GetTokenMetadataByTokenIdentifiers will get the metadata for a given token identifier
 func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contractAddress persist.Address, tokenID persist.TokenID, ownerAddress persist.Address, chain persist.Chain) (persist.TokenMetadata, error) {
 
-	var metadata persist.TokenMetadata
-	var err error
-
 	metadataFetchers := getChainProvidersForTask[tokenMetadataFetcher](d.Chains[chain])
 
-	for _, metadataFetcher := range metadataFetchers {
-		metadata, err = metadataFetcher.GetTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: contractAddress, TokenID: tokenID}, ownerAddress)
+	if len(metadataFetchers) == 0 {
+		return nil, fmt.Errorf("no metadata fetchers for chain %d", chain)
+	}
+	wp := pool.New().WithMaxGoroutines(len(metadataFetchers)).WithContext(ctx)
+	metadatas := make(chan persist.TokenMetadata)
+	for i, metadataFetcher := range metadataFetchers {
+		i := i
+		metadataFetcher := metadataFetcher
+		wp.Go(func(ctx context.Context) error {
+			metadata, err := metadataFetcher.GetTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: contractAddress, TokenID: tokenID}, ownerAddress)
+			if err != nil {
+				logger.For(ctx).Errorf("error fetching token metadata %s for provider %d (%T)", err, i, metadataFetcher)
+			}
+			metadatas <- metadata
+			return err
+		})
+	}
+
+	go func() {
+		defer close(metadatas)
+		err := wp.Wait()
 		if err != nil {
-			logger.For(ctx).Errorf("error fetching token metadata %s", err)
+			logger.For(ctx).Errorf("error fetching token metadata after wait: %s", err)
 		}
-		if err == nil && len(metadata) > 0 {
+	}()
+
+	for metadata := range metadatas {
+		if metadata != nil {
+			logger.For(ctx).Infof("got metadata %+v", metadata)
 			return metadata, nil
 		}
 	}
 
-	return metadata, err
+	return nil, fmt.Errorf("no metadata found for token %s-%s-%s-%d", tokenID, contractAddress, ownerAddress, chain)
 }
 
 // DeepRefresh re-indexes a user's wallets.

@@ -24,7 +24,6 @@ import (
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
-	"github.com/mikeydub/go-gallery/role"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/emails"
 	"github.com/mikeydub/go-gallery/service/membership"
@@ -213,8 +212,7 @@ func (api *UserAPI) GetUserRolesByUserID(ctx context.Context, userID persist.DBI
 		return auth.GetRolesFromCtx(gc), nil
 	}
 
-	roleFinder := role.RoleFinder{Queries: api.queries}
-	return roleFinder.RolesByUserID(ctx, userID)
+	return auth.RolesByUserID(ctx, api.queries, userID)
 }
 
 func (api *UserAPI) UserIsAdmin(ctx context.Context) bool {

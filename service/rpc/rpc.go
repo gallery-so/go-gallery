@@ -716,7 +716,13 @@ func DecodeMetadataFromURI(ctx context.Context, turi persist.TokenURI, into *per
 		}
 		resp, err := defaultHTTPClient.Do(req)
 		if err != nil {
-			return fmt.Errorf("error getting metadata from http: %s", err)
+			if dnsErr, ok := err.(*net.DNSError); ok {
+				return dnsErr
+			}
+			if urlErr, ok := err.(*url.Error); ok {
+				return urlErr
+			}
+			return fmt.Errorf("error decoding metadatadata from http: %s <%T>", err, err)
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode > 399 || resp.StatusCode < 200 {

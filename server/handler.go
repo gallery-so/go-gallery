@@ -38,7 +38,6 @@ import (
 	graphql "github.com/mikeydub/go-gallery/graphql/resolver"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/publicapi"
-	"github.com/mikeydub/go-gallery/role"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/notifications"
@@ -58,10 +57,9 @@ func handlersInit(router *gin.Engine, repos *postgres.Repositories, queries *db.
 }
 
 func graphqlHandlersInit(parent *gin.RouterGroup, repos *postgres.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, mcProvider *multichain.Provider, throttler *throttle.Locker, taskClient *cloudtasks.Client, pub *pubsub.Client, lock *redislock.Client, secrets *secretmanager.Client, graphqlAPQCache *redis.Cache, feedCache *redis.Cache, socialCache *redis.Cache, magicClient *magicclient.API, recommender *recommend.Recommender) {
-	rf := &role.RoleFinder{Queries: queries}
 	handler := graphqlHandler(repos, queries, ethClient, ipfsClient, arweaveClient, storageClient, mcProvider, throttler, taskClient, pub, lock, secrets, graphqlAPQCache, feedCache, socialCache, magicClient, recommender)
-	parent.Any("/query", middleware.AddAuthToContext(rf), handler)
-	parent.Any("/query/:operationName", middleware.AddAuthToContext(rf), handler)
+	parent.Any("/query", middleware.AddAuthToContext(queries), handler)
+	parent.Any("/query/:operationName", middleware.AddAuthToContext(queries), handler)
 	parent.GET("/playground", graphqlPlaygroundHandler())
 }
 

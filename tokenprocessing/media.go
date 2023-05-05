@@ -333,6 +333,18 @@ func asyncCacheObjectsForURL(ctx context.Context, tids persist.TokenIdentifiers,
 
 		switch caught := err.(type) {
 		case *googleapi.Error:
+			if caught.Code == http.StatusTooManyRequests {
+				logger.For(ctx).Infof("rate limited by google, retrying in 30 seconds")
+				time.Sleep(time.Second * 30)
+				cachedObjects, err = cacheObjectsFromURL(ctx, tids, mediaURL, defaultObjectType, ipfsClient, arweaveClient, storageClient, bucket, subMeta, true)
+				if err == nil {
+					resultCh <- cacheResult{cachedObjects, err}
+					return
+				}
+				if _, ok := err.(*googleapi.Error); !ok {
+					resultCh <- cacheResult{cachedObjects, err}
+				}
+			}
 			panic(fmt.Errorf("googleAPI error %s: %s", caught, err))
 		default:
 			resultCh <- cacheResult{cachedObjects, err}
@@ -919,20 +931,20 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 			case rpc.ErrHTTP:
 				if caught.Status == http.StatusNotFound || caught.Status == http.StatusInternalServerError {
 					persist.FailStep(subMeta.ReaderRetrieval)
-					return nil, false, errInvalidMedia{URL: mediaURL, err: err}
+					return reader, false, errInvalidMedia{URL: mediaURL, err: err}
 				}
 			case *net.DNSError, *url.Error:
 				persist.FailStep(subMeta.ReaderRetrieval)
-				return nil, false, errInvalidMedia{URL: mediaURL, err: err}
+				return reader, false, errInvalidMedia{URL: mediaURL, err: err}
 			}
 
 			// if we're not already recursive, try opensea for ethereum tokens
 			if !isRecursive && tids.Chain == persist.ChainETH {
-				return nil, true, nil
+				return reader, true, nil
 			}
 
 			persist.FailStep(subMeta.ReaderRetrieval)
-			return nil, false, errNoDataFromReader{err: err, url: mediaURL}
+			return reader, false, errNoDataFromReader{err: err, url: mediaURL}
 		}
 		return reader, false, nil
 	}()
@@ -969,6 +981,8 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 
 			return cacheObjectsFromURL(pCtx, tids, firstNonEmptyURL, defaultObjectType, ipfsClient, arweaveClient, storageClient, bucket, subMeta, true)
 		}
+
+		return nil, errNoDataFromOpensea{errNoDataFromReader: errNoDataFromReader{err: err, url: mediaURL}}
 	}
 
 	logger.For(pCtx).Infof("got reader for %s in %s", tids, time.Since(timeBeforeDataReader))
@@ -1055,7 +1069,7 @@ func thumbnailVideoToWriter(ctx context.Context, url string, writer io.Writer) e
 }
 
 func createLiveRenderPreviewVideo(ctx context.Context, videoURL string, writer io.Writer) error {
-	c := exec.CommandContext(ctx, "ffmpeg", "-hide_banner", "-loglevel", "error", "-i", videoURL, "-ss", "00:00:00.000", "-t", "00:00:05.000", "-filter:v", "scale=720:-1", "-movflags", "frag_keyframe+empty_moov", "-c:a", "copy", "-f", "mp4", "pipe:1")
+	c := exec.CommandContext(ctx, "ffmpeg", "-hide_banner", "-loglevel", "error", "-i", videoURL, "-ss", "00:00:00.000", "-t", "00:00:05.000", "-filter:v", "scale=720:trunc(ow/a/2)*2", "-c:a", "aac", "-shortest", "-movflags", "frag_keyframe+empty_moov", "-f", "mp4", "pipe:1")
 	c.Stderr = os.Stderr
 	c.Stdout = writer
 	return c.Run()
@@ -1211,7 +1225,7 @@ func newObjectWriter(ctx context.Context, client *storage.Client, bucket, fileNa
 	writer.ObjectAttrs.Metadata = objMetadata
 	writer.ObjectAttrs.CacheControl = "no-cache, no-store"
 	writer.ChunkSize = 4 * 1024 * 1024 // 4MB
-	writer.ChunkRetryDeadline = 2 * time.Minute
+	writer.ChunkRetryDeadline = 5 * time.Minute
 	if contentLength != nil && env.GetString("ENV") != "local" {
 		cl := *contentLength
 		if cl < 4*1024*1024 {

@@ -1017,32 +1017,33 @@ update tokens set token_media_id = $1 where tokens.contract = $2 and tokens.toke
 -- name: IsExistsActiveTokenMediaByTokenIdentifers :one
 select exists(select 1 from token_medias where token_medias.contract_id = $1 and token_medias.token_id = $2 and token_medias.chain = $3 and active = true and deleted = false);
 
+-- name: InsertJob :one
+insert into token_processing_jobs (id, token_properties, pipeline_metadata, processing_cause, processor_version) values (@processing_job_id, @token_properties, @pipeline_metadata, @processing_cause, @processor_version) returning *;
+
 -- name: UpsertTokenMedia :one
 with copy_on_overwrite as (
     insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
     (
-        select @new_id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, last_updated
+        select @copy_id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, last_updated
         from token_medias
         where contract_id = @contract_id
           and token_id = @token_id
           and chain = @chain
           and active = true
+          and @active = true
           and deleted = false
         limit 1
     )
-)
-, job as (
-  insert into token_processing_jobs (id, token_properties, pipeline_metadata, processing_cause, processor_version) values (@processing_job_id, @token_properties, @pipeline_metadata, @processing_cause, @processor_version) returning *
-)
-insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated) 
-    (select @another_new_id, @contract_id, @token_id, @chain, @metadata, @media, @name, @description, job.id, @active, now(), now() from job)
+) 
+insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated) values
+    (@new_id, @contract_id, @token_id, @chain, @metadata, @media, @name, @description, @processing_job_id, @active, now(), now())
     on conflict (contract_id, token_id, chain) where active = true and deleted = false do update
         set metadata = excluded.metadata,
             media = excluded.media,
             name = excluded.name,
             description = excluded.description,
             processing_job_id = excluded.processing_job_id,
-            last_updated = now() returning id;
+            last_updated = now() returning *;
 
 -- name: InsertSpamContracts :exec
 with insert_spam_contracts as (
@@ -1094,7 +1095,7 @@ update push_notification_tickets t set check_after = updates.check_after, num_ch
 select * from push_notification_tickets where check_after <= now() and deleted = false limit sqlc.arg('limit');
 
 -- name: GetAllTokensWithContracts :many
-select tokens.*, contracts.* from tokens join contracts on contracts.id = tokens.contract where tokens.deleted = false order by tokens.last_updated desc limit $1 offset $2;
+select tokens.*, contracts.* from tokens join contracts on (contracts.id = tokens.contract) where tokens.deleted = false order by tokens.last_updated desc limit $1 offset $2;
 
 -- name: GetMediaByTokenID :batchone
 select m.*
