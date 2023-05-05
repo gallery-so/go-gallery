@@ -75,7 +75,7 @@ func withTokens(tokens []multichain.ChainAgnosticToken) providerOpt {
 }
 
 // withContractTokens will generate n dummy tokens from the provided contract
-func withContractTokens(contract multichain.ChainAgnosticContract, address string, n int) providerOpt {
+func withContractTokens(contract multichain.ChainAgnosticContract, ownerAddress string, n int) providerOpt {
 	return func(p *stubProvider) {
 		tokens := []multichain.ChainAgnosticToken{}
 		for i := 0; i < n; i++ {
@@ -84,7 +84,7 @@ func withContractTokens(contract multichain.ChainAgnosticContract, address strin
 				TokenID:         persist.TokenID(fmt.Sprintf("%X", i)),
 				Quantity:        "1",
 				ContractAddress: contract.Address,
-				OwnerAddress:    persist.Address(address),
+				OwnerAddress:    persist.Address(ownerAddress),
 			})
 		}
 		withContracts([]multichain.ChainAgnosticContract{contract})(p)
