@@ -3,6 +3,7 @@ package persist
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"fmt"
 )
 
 // Media represents a token's media content with processed images from metadata
@@ -31,4 +32,12 @@ func (m *Media) Scan(src interface{}) error {
 		return nil
 	}
 	return json.Unmarshal(src.([]byte), &m)
+}
+
+type ErrMediaNotFound struct {
+	TokenID DBID
+}
+
+func (e ErrMediaNotFound) Error() string {
+	return fmt.Sprintf("no media found for tokenID %s", e.TokenID)
 }

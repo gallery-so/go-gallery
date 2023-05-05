@@ -45,9 +45,12 @@ type AuthenticatedAddress struct {
 
 const (
 	// Context keys for auth data
-	userIDContextKey     = "auth.user_id"
-	userAuthedContextKey = "auth.authenticated"
-	authErrorContextKey  = "auth.auth_error"
+	userIDContextKey         = "auth.user_id"
+	userAuthedContextKey     = "auth.authenticated"
+	authErrorContextKey      = "auth.auth_error"
+	userRolesContextKey      = "auth.roles"
+	userRolesExistContextKey = "auth.roles_exist"
+	roleErrorContextKey      = "auth.roles_error"
 )
 
 // We don't want our cookies to expire, so their max age is arbitrarily set to 10 years.
@@ -310,6 +313,7 @@ func Logout(pCtx context.Context) {
 	gc := util.MustGetGinContext(pCtx)
 	SetAuthStateForCtx(gc, "", ErrNoCookie)
 	SetJWTCookie(gc, "")
+	SetRolesForCtx(gc, []persist.Role{}, nil)
 }
 
 // GetAuthNonce will determine whether a user is permitted to log in, and if so, generate a nonce to be signed
@@ -407,6 +411,30 @@ func SetAuthStateForCtx(c *gin.Context, userID persist.DBID, err error) {
 	c.Set(userIDContextKey, userID)
 	c.Set(authErrorContextKey, err)
 	c.Set(userAuthedContextKey, userID != "" && err == nil)
+}
+
+func SetRolesForCtx(c *gin.Context, roles []persist.Role, err error) {
+	c.Set(userRolesContextKey, roles)
+	c.Set(roleErrorContextKey, err)
+	c.Set(userRolesExistContextKey, len(roles) > 0 && err == nil)
+}
+
+func GetRolesFromCtx(c *gin.Context) []persist.Role {
+	return c.MustGet(userRolesContextKey).([]persist.Role)
+}
+
+func GetUserRolesExistFromCtx(c *gin.Context) bool {
+	return c.GetBool(userRolesExistContextKey)
+}
+
+func GetRolesErrorFromCtx(c *gin.Context) error {
+	err := c.MustGet(roleErrorContextKey)
+
+	if err != nil {
+		return nil
+	}
+
+	return err.(error)
 }
 
 // SetJWTCookie sets the cookie for auth on the response

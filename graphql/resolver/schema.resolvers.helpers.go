@@ -1765,6 +1765,7 @@ func tokenToModel(ctx context.Context, token db.Token) *model.Token {
 	}
 
 	return &model.Token{
+		HelperTokenData:  model.HelperTokenData{Token: token},
 		Dbid:             token.ID,
 		CreationTime:     &token.CreatedAt,
 		LastUpdated:      &token.LastUpdated,
@@ -1860,41 +1861,43 @@ func getUrlExtension(url string) string {
 	return strings.ToLower(strings.TrimPrefix(filepath.Ext(url), "."))
 }
 
-func getMediaForToken(ctx context.Context, token db.Token) model.MediaSubtype {
-	med := token.Media
-
+func mediaToModel(ctx context.Context, media persist.Media, fallback persist.FallbackMedia) model.MediaSubtype {
 	var fallbackMedia *model.FallbackMedia
-	if !med.IsServable() && token.FallbackMedia.IsServable() {
-		fallbackMedia = getFallbackMedia(ctx, token.FallbackMedia)
+
+	if !media.IsServable() && fallback.IsServable() {
+		fallbackMedia = getFallbackMedia(ctx, fallback)
 	}
 
-	switch med.MediaType {
+	switch media.MediaType {
 	case persist.MediaTypeImage, persist.MediaTypeSVG:
-		return getImageMedia(ctx, med, fallbackMedia)
+		return getImageMedia(ctx, media, fallbackMedia)
 	case persist.MediaTypeGIF:
-		return getGIFMedia(ctx, med, fallbackMedia)
+		return getGIFMedia(ctx, media, fallbackMedia)
 	case persist.MediaTypeVideo:
-		return getVideoMedia(ctx, med, fallbackMedia)
+		return getVideoMedia(ctx, media, fallbackMedia)
 	case persist.MediaTypeAudio:
-		return getAudioMedia(ctx, med, fallbackMedia)
+		return getAudioMedia(ctx, media, fallbackMedia)
 	case persist.MediaTypeHTML:
-		return getHtmlMedia(ctx, med, fallbackMedia)
+		return getHtmlMedia(ctx, media, fallbackMedia)
 	case persist.MediaTypeAnimation:
-		return getGltfMedia(ctx, med, fallbackMedia)
+		return getGltfMedia(ctx, media, fallbackMedia)
 	case persist.MediaTypeJSON:
-		return getJsonMedia(ctx, med, fallbackMedia)
+		return getJsonMedia(ctx, media, fallbackMedia)
 	case persist.MediaTypeText, persist.MediaTypeBase64Text:
-		return getTextMedia(ctx, med, fallbackMedia)
+		return getTextMedia(ctx, media, fallbackMedia)
 	case persist.MediaTypePDF:
-		return getPdfMedia(ctx, med, fallbackMedia)
+		return getPdfMedia(ctx, media, fallbackMedia)
 	case persist.MediaTypeUnknown:
-		return getUnknownMedia(ctx, med, fallbackMedia)
+		return getUnknownMedia(ctx, media, fallbackMedia)
 	case persist.MediaTypeSyncing:
-		return getSyncingMedia(ctx, med, fallbackMedia)
+		return getSyncingMedia(ctx, media, fallbackMedia)
 	default:
-		return getInvalidMedia(ctx, med, fallbackMedia)
+		return getInvalidMedia(ctx, media, fallbackMedia)
 	}
+}
 
+func getMediaForToken(ctx context.Context, token db.Token) model.MediaSubtype {
+	return mediaToModel(ctx, token.Media, token.FallbackMedia)
 }
 
 func getPreviewUrls(ctx context.Context, media persist.Media, options ...mediamapper.Option) *model.PreviewURLSet {

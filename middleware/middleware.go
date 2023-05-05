@@ -8,6 +8,7 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	sentrygin "github.com/getsentry/sentry-go/gin"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
@@ -15,6 +16,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/role"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/util"
 )
@@ -107,7 +109,8 @@ func TaskRequired() gin.HandlerFunc {
 }
 
 // AddAuthToContext is a middleware that validates auth data and stores the results in the context
-func AddAuthToContext() gin.HandlerFunc {
+func AddAuthToContext(queries *db.Queries) gin.HandlerFunc {
+	roleFinder := role.RoleFinder{Queries: queries}
 	return func(c *gin.Context) {
 		jwt, err := c.Cookie(auth.JWTCookieKey)
 
@@ -129,6 +132,9 @@ func AddAuthToContext() gin.HandlerFunc {
 
 		userID, err := auth.JWTParse(jwt, env.GetString("JWT_SECRET"))
 		auth.SetAuthStateForCtx(c, userID, err)
+
+		roles, err := roleFinder.RolesByUserID(c, userID)
+		auth.SetRolesForCtx(c, roles, err)
 
 		// If we have a successfully authenticated user, add their ID to all subsequent logging
 		if err == nil {

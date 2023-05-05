@@ -1961,6 +1961,20 @@ func (r *subscriptionResolver) NotificationUpdated(ctx context.Context) (<-chan 
 	return resolveUpdatedNotificationSubscription(ctx), nil
 }
 
+// Media is the resolver for the media field.
+func (r *tokenResolver) Media(ctx context.Context, obj *model.Token) (model.MediaSubtype, error) {
+	if !publicapi.For(ctx).User.UserIsAdmin(ctx) {
+		return obj.Media, nil
+	}
+
+	tokenMedia, err := publicapi.For(ctx).Token.MediaByTokenID(ctx, obj.Dbid)
+	if err != nil {
+		return nil, err
+	}
+
+	return mediaToModel(ctx, tokenMedia.Media, obj.HelperTokenData.Token.FallbackMedia), nil
+}
+
 // Owner is the resolver for the owner field.
 func (r *tokenResolver) Owner(ctx context.Context, obj *model.Token) (*model.GalleryUser, error) {
 	return resolveTokenOwnerByTokenID(ctx, obj.Dbid)

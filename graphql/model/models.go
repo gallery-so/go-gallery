@@ -5,6 +5,7 @@ import (
 	"io"
 	"time"
 
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -123,6 +124,10 @@ type HelperUserEmailData struct {
 type HelperSocialConnectionData struct {
 	UserID        persist.DBID
 	UserCreatedAt persist.CreationTime
+}
+
+type HelperTokenData struct {
+	Token db.Token
 }
 
 type ErrInvalidIDFormat struct {
