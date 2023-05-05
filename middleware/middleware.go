@@ -109,8 +109,7 @@ func TaskRequired() gin.HandlerFunc {
 }
 
 // AddAuthToContext is a middleware that validates auth data and stores the results in the context
-func AddAuthToContext(queries *db.Queries) gin.HandlerFunc {
-	roleFinder := role.RoleFinder{Queries: queries}
+func AddAuthToContext(rf *role.RoleFinder) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		jwt, err := c.Cookie(auth.JWTCookieKey)
 
@@ -133,7 +132,7 @@ func AddAuthToContext(queries *db.Queries) gin.HandlerFunc {
 		userID, err := auth.JWTParse(jwt, env.GetString("JWT_SECRET"))
 		auth.SetAuthStateForCtx(c, userID, err)
 
-		roles, err := roleFinder.RolesByUserID(c, userID)
+		roles, err := rf.RolesByUserID(c, userID)
 		auth.SetRolesForCtx(c, roles, err)
 
 		// If we have a successfully authenticated user, add their ID to all subsequent logging

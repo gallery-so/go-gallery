@@ -1969,6 +1969,8 @@ func (r *tokenResolver) Media(ctx context.Context, obj *model.Token) (model.Medi
 
 	tokenMedia, err := publicapi.For(ctx).Token.MediaByTokenID(ctx, obj.Dbid)
 	if err != nil {
+		// In the future, we probably want to include the fallback media.
+		// For now, we'll return nil so that we surface migration bugs.
 		return nil, err
 	}
 

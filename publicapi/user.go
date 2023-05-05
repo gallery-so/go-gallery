@@ -217,7 +217,6 @@ func (api *UserAPI) GetUserRolesByUserID(ctx context.Context, userID persist.DBI
 	return roleFinder.RolesByUserID(ctx, userID)
 }
 
-// TokenProcessingMigration: Remove this function after token processing migration is complete
 func (api *UserAPI) UserIsAdmin(ctx context.Context) bool {
 	for _, role := range getUserRoles(ctx) {
 		if role == persist.RoleAdmin {
