@@ -451,7 +451,10 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 			if urlErr, ok := err.(*url.Error); ok {
 				return nil, urlErr
 			}
-			return nil, fmt.Errorf("error getting data from http: %s", err)
+			if resp != nil {
+				return nil, util.ErrHTTP{Err: err, Status: resp.StatusCode, URL: asString}
+			}
+			return nil, util.ErrHTTP{Err: err, URL: asString}
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode > 399 || resp.StatusCode < 200 {

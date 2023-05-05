@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"math/big"
+	"net"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -109,6 +111,8 @@ func getTokenMetadata(ipfsClient *shell.Shell, ethClient *ethclient.Client, arwe
 					if caught.Status == http.StatusNotFound {
 						status = http.StatusNotFound
 					}
+				case *url.Error, *net.DNSError, *shell.Error:
+					status = http.StatusNotFound
 				}
 			}
 			util.ErrResponse(c, status, errNoMetadataFound{Contract: input.ContractAddress, TokenID: input.TokenID})
