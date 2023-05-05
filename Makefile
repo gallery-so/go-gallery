@@ -205,6 +205,14 @@ $(DEPLOY)-%-alchemy-spam               : CRON_URI       = $(shell gcloud run ser
 $(DEPLOY)-%-alchemy-spam               : CRON_METHOD    := POST
 $(DEPLOY)-$(DEV)-alchemy-spam          : URI_NAME       := tokenprocessing-dev
 $(DEPLOY)-$(PROD)-alchemy-spam         : URI_NAME       := tokenprocessing-v2
+$(DEPLOY)-%-check-push-tickets         : CRON_PREFIX    := check-push-tickets
+$(DEPLOY)-%-check-push-tickets         : CRON_LOCATION  := $(DEPLOY_REGION)
+$(DEPLOY)-%-check-push-tickets         : CRON_SCHEDULE  := '*/5 * * * *'
+$(DEPLOY)-%-check-push-tickets         : CRON_URI       = $(shell gcloud run services describe $(URI_NAME) --region $(DEPLOY_REGION) --format 'value(status.url)')/jobs/check-push-tickets
+$(DEPLOY)-%-check-push-tickets         : CRON_METHOD    := POST
+$(DEPLOY)-%-check-push-tickets         : CRON_FLAGS     = --headers='Authorization=Basic $(shell printf ":$(PUSH_NOTIFICATIONS_SECRET)" | base64)' --attempt-deadline=10m
+$(DEPLOY)-$(DEV)-check-push-tickets    : URI_NAME       := pushnotifications-dev
+$(DEPLOY)-$(PROD)-check-push-tickets   : URI_NAME       := pushnotifications
 
 # Service name mappings
 $(PROMOTE)-%-backend                   : SERVICE := default
@@ -290,7 +298,7 @@ _$(DOCKER)-$(DEPLOY)-%:
 	@if [ $$? -eq 0 ] && echo $(DEPLOY_FLAGS) | grep -e "--no-traffic" > /dev/null; then echo "\n\tVERSION: '$(CURRENT_COMMIT_HASH)' was deployed but is not currently receiving traffic.\n\tRun 'make promote-$(ENV)-$* version=$(CURRENT_COMMIT_HASH)' to promote it!\n"; else echo "\n\tVERSION: '$(CURRENT_COMMIT_HASH)' was deployed!\n"; fi
 
 _$(CRON)-$(DEPLOY)-%:
-	@$(SCHEDULER_DEPLOY)
+	@$(SCHEDULER_DEPLOY) $(CRON_FLAGS)
 	@echo Deployed job $(CRON_NAME) to $(ENV)
 
 # Pauses jobs besides the version being deployed
@@ -339,24 +347,26 @@ $(DEPLOY)-$(DEV)-feedbot            : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-f
 $(DEPLOY)-$(DEV)-routing-rules      : _set-project-$(ENV) _$(DEPLOY)-routing-rules
 $(DEPLOY)-$(DEV)-graphql-gateway    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-graphql-gateway
 $(DEPLOY)-$(DEV)-alchemy-spam       : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-alchemy-spam _$(CRON)-$(PAUSE)-alchemy-spam
+$(DEPLOY)-$(DEV)-check-push-tickets : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-check-push-tickets _$(CRON)-$(PAUSE)-check-push-tickets
 
 # SANDBOX deployments
 $(DEPLOY)-$(SANDBOX)-backend      : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend # go server that uses dev upstream services
 
 # PROD deployments
-$(DEPLOY)-$(PROD)-backend           : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend
-$(DEPLOY)-$(PROD)-indexer           : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer _$(RELEASE)-indexer
-$(DEPLOY)-$(PROD)-indexer-server    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer-server _$(RELEASE)-indexer-server
-$(DEPLOY)-$(PROD)-tokenprocessing   : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-tokenprocessing _$(RELEASE)-tokenprocessing
-$(DEPLOY)-$(PROD)-pushnotifications : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-pushnotifications _$(RELEASE)-pushnotifications
-$(DEPLOY)-$(PROD)-dummymetadata     : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-dummymetadata _$(RELEASE)-dummymetadata
-$(DEPLOY)-$(PROD)-emails            : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-emails _$(RELEASE)-emails
-$(DEPLOY)-$(PROD)-feed              : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feed _$(RELEASE)-feed
-$(DEPLOY)-$(PROD)-feedbot           : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feedbot _$(RELEASE)-feedbot
-$(DEPLOY)-$(PROD)-admin             : _set-project-$(ENV) _$(DEPLOY)-admin
-$(DEPLOY)-$(PROD)-routing-rules     : _set-project-$(ENV) _$(DEPLOY)-routing-rules
-$(DEPLOY)-$(PROD)-graphql-gateway   : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-graphql-gateway
-$(DEPLOY)-$(PROD)-alchemy-spam      : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-alchemy-spam _$(CRON)-$(PAUSE)-alchemy-spam
+$(DEPLOY)-$(PROD)-backend            : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend
+$(DEPLOY)-$(PROD)-indexer            : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer _$(RELEASE)-indexer
+$(DEPLOY)-$(PROD)-indexer-server     : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer-server _$(RELEASE)-indexer-server
+$(DEPLOY)-$(PROD)-tokenprocessing    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-tokenprocessing _$(RELEASE)-tokenprocessing
+$(DEPLOY)-$(PROD)-pushnotifications  : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-pushnotifications _$(RELEASE)-pushnotifications
+$(DEPLOY)-$(PROD)-dummymetadata      : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-dummymetadata _$(RELEASE)-dummymetadata
+$(DEPLOY)-$(PROD)-emails             : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-emails _$(RELEASE)-emails
+$(DEPLOY)-$(PROD)-feed               : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feed _$(RELEASE)-feed
+$(DEPLOY)-$(PROD)-feedbot            : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feedbot _$(RELEASE)-feedbot
+$(DEPLOY)-$(PROD)-admin              : _set-project-$(ENV) _$(DEPLOY)-admin
+$(DEPLOY)-$(PROD)-routing-rules      : _set-project-$(ENV) _$(DEPLOY)-routing-rules
+$(DEPLOY)-$(PROD)-graphql-gateway    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-graphql-gateway
+$(DEPLOY)-$(PROD)-alchemy-spam       : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-alchemy-spam _$(CRON)-$(PAUSE)-alchemy-spam
+$(DEPLOY)-$(PROD)-check-push-tickets : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-check-push-tickets _$(CRON)-$(PAUSE)-check-push-tickets
 
 # PROD promotions. Running these targets will migrate traffic to the specified version.
 # Example usage:

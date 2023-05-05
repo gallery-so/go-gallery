@@ -23,13 +23,6 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
-// TODO: ExternalWallet? Something to denote "wallet, but not part of our ecosystem"
-// Or do we call it something like "AccountInfo" or "AddressInfo" or something?
-// Would also be nice to have a method on AuthResult that searches by ChainAddress
-// for a result. Maybe instead of a map from address+chain+type to existing wallets
-// (where they exist), we just have a wallet pointer field on our results that points
-// to a user's wallet if one exists? OwnedWallet? WalletInput? RawWallet?
-
 // AuthenticatedAddress contains address information that has been successfully verified
 // by an authenticator.
 type AuthenticatedAddress struct {
@@ -78,15 +71,10 @@ var ErrInvalidJWT = errors.New("invalid or expired auth token")
 // ErrNoCookie is returned when there is no JWT in the request
 var ErrNoCookie = errors.New("no jwt passed as cookie")
 
-// ErrInvalidAuthHeader is returned when the auth header is invalid
-var ErrInvalidAuthHeader = errors.New("invalid auth header format")
-
 // ErrSignatureInvalid is returned when the signed nonce's signature is invalid
 var ErrSignatureInvalid = errors.New("signature invalid")
 
 var ErrInvalidMagicLink = errors.New("invalid magic link")
-
-var ErrUserNotFound = errors.New("no user found")
 
 // LoginInput is the input to the login pipeline
 type LoginInput struct {
@@ -268,11 +256,7 @@ func (e MagicLinkAuthenticator) Authenticate(pCtx context.Context) (*AuthResult,
 
 	user, err := e.UserRepo.GetByEmail(pCtx, persist.Email(info.Email))
 	if err != nil {
-		if _, ok := err.(persist.ErrUserNotFound); !ok {
-			return nil, err
-		}
-		return nil, ErrUserNotFound
-
+		return nil, err
 	}
 
 	return &AuthResult{
@@ -285,11 +269,39 @@ func NewMagicLinkClient() *magicclient.API {
 	return magicclient.New(env.GetString("MAGIC_LINK_SECRET_KEY"), magic.NewDefaultClient())
 }
 
-// Login logs in a user with a given authentication scheme
-func Login(pCtx context.Context, authenticator Authenticator) (persist.DBID, error) {
-	gc := util.MustGetGinContext(pCtx)
+type OneTimeLoginTokenAuthenticator struct {
+	UserRepo   *postgres.UserRepository
+	LoginToken string
+}
 
-	authResult, err := authenticator.Authenticate(pCtx)
+func (a OneTimeLoginTokenAuthenticator) GetDescription() string {
+	return fmt.Sprintf("OneTimeLoginTokenAuthenticator")
+}
+
+func (a OneTimeLoginTokenAuthenticator) Authenticate(ctx context.Context) (*AuthResult, error) {
+	userID, _, err := ParseOneTimeLoginToken(ctx, a.LoginToken)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := a.UserRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	authResult := AuthResult{
+		Addresses: []AuthenticatedAddress{},
+		User:      &user,
+	}
+
+	return &authResult, nil
+}
+
+// Login logs in a user with a given authentication scheme
+func Login(ctx context.Context, authenticator Authenticator) (persist.DBID, error) {
+	gc := util.MustGetGinContext(ctx)
+
+	authResult, err := authenticator.Authenticate(ctx)
 	if err != nil {
 		return "", ErrAuthenticationFailed{WrappedErr: err}
 	}
@@ -298,13 +310,13 @@ func Login(pCtx context.Context, authenticator Authenticator) (persist.DBID, err
 		return "", persist.ErrUserNotFound{Authenticator: authenticator.GetDescription()}
 	}
 
-	jwtTokenStr, err := JWTGeneratePipeline(pCtx, authResult.User.ID)
+	authToken, err := GenerateAuthToken(ctx, authResult.User.ID)
 	if err != nil {
 		return "", err
 	}
 
 	SetAuthStateForCtx(gc, authResult.User.ID, nil)
-	SetJWTCookie(gc, jwtTokenStr)
+	SetAuthCookie(gc, authToken)
 
 	return authResult.User.ID, nil
 }
@@ -312,7 +324,7 @@ func Login(pCtx context.Context, authenticator Authenticator) (persist.DBID, err
 func Logout(pCtx context.Context) {
 	gc := util.MustGetGinContext(pCtx)
 	SetAuthStateForCtx(gc, "", ErrNoCookie)
-	SetJWTCookie(gc, "")
+	SetAuthCookie(gc, "")
 	SetRolesForCtx(gc, []persist.Role{}, nil)
 }
 
@@ -438,7 +450,7 @@ func GetRolesErrorFromCtx(c *gin.Context) error {
 }
 
 // SetJWTCookie sets the cookie for auth on the response
-func SetJWTCookie(c *gin.Context, token string) {
+func SetAuthCookie(c *gin.Context, token string) {
 	mode := http.SameSiteStrictMode
 	domain := ".gallery.so"
 	httpOnly := true

@@ -16,7 +16,6 @@ require (
 	github.com/benny-conn/limiters v0.0.2
 	github.com/bits-and-blooms/bloom v2.0.3+incompatible
 	github.com/bsm/redislock v0.7.2
-	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/ethereum/go-ethereum v1.10.26
 	github.com/everFinance/goar v1.4.0
 	github.com/gallery-so/dataloaden v0.0.0-20221214221404-9d30d4c39aa7
@@ -65,6 +64,7 @@ require (
 require (
 	cloud.google.com/go/storage v1.30.1
 	github.com/ertan/go-farcaster v1.0.0-beta
+	github.com/golang-jwt/jwt/v5 v5.0.0
 	github.com/jinzhu/copier v0.3.5
 	github.com/sourcegraph/conc v0.3.0
 	go.mozilla.org/sops/v3 v3.7.3

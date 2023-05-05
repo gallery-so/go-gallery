@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/auth"
 	"net/http"
 	"sync/atomic"
 	"time"
@@ -75,7 +76,7 @@ func sendVerificationEmail(dataloaders *dataloader.Loaders, queries *coredb.Quer
 		}
 
 		emailAddress := userWithPII.PiiEmailAddress.String()
-		j, err := jwtGenerate(input.UserID, emailAddress)
+		j, err := auth.GenerateEmailVerificationToken(c, input.UserID, emailAddress)
 		if err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
@@ -196,7 +197,7 @@ func sendNotificationEmailToUser(c context.Context, u coredb.PiiUserView, emailR
 		return nil, fmt.Errorf("failed to get notifications for user %s: %w", u.ID, err)
 	}
 
-	j, err := jwtGenerate(u.ID, u.PiiEmailAddress.String())
+	j, err := auth.GenerateEmailVerificationToken(c, u.ID, u.PiiEmailAddress.String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate jwt for user %s: %w", u.ID, err)
 	}

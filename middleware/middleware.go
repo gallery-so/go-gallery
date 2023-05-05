@@ -110,11 +110,11 @@ func TaskRequired() gin.HandlerFunc {
 // AddAuthToContext is a middleware that validates auth data and stores the results in the context
 func AddAuthToContext(queries *db.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		jwt, err := c.Cookie(auth.JWTCookieKey)
+		authToken, err := c.Cookie(auth.JWTCookieKey)
 
 		// Treat empty cookies the same way we treat missing cookies, since setting a cookie to the empty
 		// string is how we "delete" them.
-		if err == nil && jwt == "" {
+		if err == nil && authToken == "" {
 			err = http.ErrNoCookie
 		}
 
@@ -128,7 +128,7 @@ func AddAuthToContext(queries *db.Queries) gin.HandlerFunc {
 			return
 		}
 
-		userID, err := auth.JWTParse(jwt, env.GetString("JWT_SECRET"))
+		userID, err := auth.ParseAuthToken(c, authToken)
 		auth.SetAuthStateForCtx(c, userID, err)
 
 		roles, err := auth.RolesByUserID(c, queries, userID)

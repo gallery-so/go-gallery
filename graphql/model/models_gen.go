@@ -119,6 +119,10 @@ type GalleryUserOrWallet interface {
 	IsGalleryUserOrWallet()
 }
 
+type GenerateQRCodeLoginTokenPayloadOrError interface {
+	IsGenerateQRCodeLoginTokenPayloadOrError()
+}
+
 type GetAuthNoncePayloadOrError interface {
 	IsGetAuthNoncePayloadOrError()
 }
@@ -419,10 +423,11 @@ func (AudioMedia) IsMediaSubtype() {}
 func (AudioMedia) IsMedia()        {}
 
 type AuthMechanism struct {
-	Eoa        *EoaAuth        `json:"eoa"`
-	GnosisSafe *GnosisSafeAuth `json:"gnosisSafe"`
-	Debug      *DebugAuth      `json:"debug"`
-	MagicLink  *MagicLinkAuth  `json:"magicLink"`
+	Eoa               *EoaAuth               `json:"eoa"`
+	GnosisSafe        *GnosisSafeAuth        `json:"gnosisSafe"`
+	Debug             *DebugAuth             `json:"debug"`
+	MagicLink         *MagicLinkAuth         `json:"magicLink"`
+	OneTimeLoginToken *OneTimeLoginTokenAuth `json:"oneTimeLoginToken"`
 }
 
 type AuthNonce struct {
@@ -969,6 +974,7 @@ func (ErrNotAuthorized) IsUpdateSocialAccountDisplayedPayloadOrError() {}
 func (ErrNotAuthorized) IsMintPremiumCardToWalletPayloadOrError()      {}
 func (ErrNotAuthorized) IsDisconnectSocialAccountPayloadOrError()      {}
 func (ErrNotAuthorized) IsFollowAllSocialConnectionsPayloadOrError()   {}
+func (ErrNotAuthorized) IsGenerateQRCodeLoginTokenPayloadOrError()     {}
 
 type ErrPushTokenBelongsToAnotherUser struct {
 	Message string `json:"message"`
@@ -1207,6 +1213,12 @@ func (GalleryUser) IsUserByAddressOrError()              {}
 func (GalleryUser) IsAddRolesToUserPayloadOrError()      {}
 func (GalleryUser) IsRevokeRolesFromUserPayloadOrError() {}
 
+type GenerateQRCodeLoginTokenPayload struct {
+	Token string `json:"token"`
+}
+
+func (GenerateQRCodeLoginTokenPayload) IsGenerateQRCodeLoginTokenPayloadOrError() {}
+
 type GltfMedia struct {
 	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`
 	MediaURL         *string          `json:"mediaURL"`
@@ -1381,6 +1393,10 @@ type NotificationsConnection struct {
 	Edges       []*NotificationEdge `json:"edges"`
 	UnseenCount *int                `json:"unseenCount"`
 	PageInfo    *PageInfo           `json:"pageInfo"`
+}
+
+type OneTimeLoginTokenAuth struct {
+	Token string `json:"token"`
 }
 
 type OwnerAtBlock struct {
