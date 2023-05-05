@@ -1,0 +1,21 @@
+# Default genqlient config; for full documentation see:
+# https://github.com/Khan/genqlient/blob/main/docs/genqlient.yaml
+schema:
+  - schema/schema.graphql
+  - schema/federation.graphql
+package: graphql_test
+optional: pointer
+bindings:
+  Email:
+    type: string
+  DBID:
+    type: github.com/mikeydub/go-gallery/service/persist.DBID
+  Address:
+    type: string
+  PubKey:
+    type: string
+  Time:
+    type: string
+operations:
+- testdata/*.graphql
+generated: generated_test.go

@@ -1,0 +1,33 @@
+##########################################################################
+# KEEP THIS FILE IN SYNC WITH .gcloudignore
+##########################################################################
+# If you add something here, it needs to be added to .gcloudignore too.
+# Otherwise, it'll get uploaded when we deploy to Google Cloud.
+##########################################################################
+
+# IDE
+.idea
+.graphqlconfig
+
+# Misc
+.DS_Store
+*.csv
+scripts/csv_export/
+.env
+
+stats.json
+
+node_modules/
+yarn.lock
+
+# SECRITS
+_deploy*
+_local*
+
+
+refresh.json
+
+bin/*
+_origindeploy*
+_originlocal*
+discount_codes.json

@@ -1,0 +1,115 @@
+# Where are all the schema files located? globs are supported eg  src/**/*.graphqls
+schema:
+  - graphql/schema/schema.graphql
+
+# Where should the generated server code go?
+exec:
+  filename: graphql/generated/generated.go
+  package: generated
+
+federation:
+ filename: graphql/generated/federation.go
+ package: generated
+ version: 2
+
+# Where should any generated models go?
+model:
+  filename: graphql/model/models_gen.go
+  package: model
+
+# Where should the resolver implementations go?
+resolver:
+  layout: follow-schema
+  dir: graphql/resolver
+  package: graphql
+
+# Optional: turn on use `gqlgen:"fieldName"` tags in your models
+# struct_tag: json
+
+# Optional: turn on to use []Thing instead of []*Thing
+# omit_slice_element_pointers: false
+
+# Optional: set to speed up generation time by not performing a final validation pass.
+# skip_validation: true
+
+# gqlgen will search for any type names in the schema in these go packages
+# if they match it will use them, otherwise it will generate them.
+autobind:
+  - "github.com/mikeydub/go-gallery/graphql/model"
+
+# This section declares type mapping between the GraphQL and go type systems
+#
+# The first line in each type will be used as defaults for resolver arguments and
+# modelgen, the others will be allowed when binding to fields. Configure them to
+# your liking
+models:
+  Address:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.Address
+  PubKey:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.PubKey
+  Chain:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.Chain
+  EmailVerificationStatus:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.EmailVerificationStatus
+  Email:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.Email
+  ChainAddress:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.ChainAddress
+  ChainAddressInput:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.ChainAddress
+  ChainPubKey:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.ChainPubKey
+  ChainPubKeyInput:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.ChainPubKey
+  DBID:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.DBID
+  WalletType:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.WalletType
+  EthereumAddress:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.EthereumAddress
+  InteractionType:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.InteractionType
+  SocialAccountType:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.SocialProvider
+  ID:
+    model:
+      - github.com/mikeydub/go-gallery/graphql/model.GqlID
+      - github.com/99designs/gqlgen/graphql.ID
+      - github.com/99designs/gqlgen/graphql.Int
+      - github.com/99designs/gqlgen/graphql.Int64
+      - github.com/99designs/gqlgen/graphql.Int32
+  Int:
+    model:
+      - github.com/99designs/gqlgen/graphql.Int
+      - github.com/99designs/gqlgen/graphql.Int64
+      - github.com/99designs/gqlgen/graphql.Int32
+  Action:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.Action
+  Role:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.Role
+  ReportWindow:
+    model:
+      - github.com/mikeydub/go-gallery/graphql/model.Window
+directives:
+  goGqlId:
+    skip_runtime: true
+  goEmbedHelper:
+    skip_runtime: true
+  scrub:
+    skip_runtime: true

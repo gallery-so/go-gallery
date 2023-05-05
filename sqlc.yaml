@@ -1,0 +1,222 @@
+version: 2
+sql:
+  # Indexer model gen
+  - schema: "db/migrations/indexer"
+    queries: "db/queries/indexer"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "indexerdb"
+        out: "db/gen/indexerdb"
+        sql_package: "pgx/v4"
+        output_db_file_name: "db_gen.go"
+        output_models_file_name: "models_gen.go"
+        overrides:
+          # Overrides are prioritized from top to bottom, so if we need to override one of the * entries (like *.id),
+          # the override should come _before_ the * entry
+
+          # Wildcards
+          # Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above
+          - column: "*.id"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+          - column: "*.block_start"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.BlockNumber"
+          - column: "*.block_end"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.BlockNumber"
+
+  # Backend model gen
+  - schema:
+    - "db/migrations/core"
+    - "db/migrations/sqlc/core"
+    queries: "db/queries/core"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "coredb"
+        out: "db/gen/coredb"
+        sql_package: "pgx/v4"
+        output_db_file_name: "db_gen.go"
+        output_models_file_name: "models_gen.go"
+        overrides:
+          # Overrides are prioritized from top to bottom, so if we need to override one of the * entries (like *.id),
+          # the override should come _before_ the * entry
+          # Users (and pii.user_view)
+          # "*.user*" wildcards are so these mappings will also apply to the "pii.user_view" view
+          - column: "*.user*.wallets"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.WalletList"
+          - column: "*.user*.email_unsubscriptions"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.EmailUnsubscriptions"
+          - column: "*.user*.notification_settings"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.UserNotificationSettings"
+          - column: "*.user*.email_verified"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.EmailVerificationStatus"
+          - column: "*.user*.featured_gallery"
+            go_type: "*github.com/mikeydub/go-gallery/service/persist.DBID"
+          - column: "*.user*.pii_socials"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Socials"
+          # Galleries
+          - column: "galleries.collections"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
+
+          # Socials
+          - column: "pii.socials_auth.provider"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.SocialProvider"
+
+          # Collections
+          - column: "collections.nfts"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
+          - column: "collections.layout"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.TokenLayout"
+          - column: "collections.token_settings"
+            go_type:
+              { "type": "map[persist.DBID]persist.CollectionTokenSettings" }
+
+          # Nfts
+          - column: "nfts.contract"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.NFTContract"
+
+          # Tokens
+          - column: "tokens.owned_by_wallets"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
+          - column: "tokens.contract"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+          - column: "tokens.token_id"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.TokenID"
+          - column: "tokens.media"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Media"
+          - column: "tokens.fallback_media"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.FallbackMedia"
+          - column: "tokens.ownership_history"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.AddressAtBlockList"
+          - column: "tokens.token_metadata"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.TokenMetadata"
+          
+          # TokenMedias
+          - column: "token_medias.metadata"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.TokenMetadata"
+          - column: "token_medias.token_id"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.TokenID"
+          - column: "token_medias.chain"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Chain"
+          - column: "token_medias.media"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Media"
+
+          # TokenProcessingJobs
+          - column: "token_processing_jobs.pipeline_metadata"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.PipelineMetadata"
+          - column: "token_processing_jobs.token_properties"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.TokenProperties"
+          - column: "token_processing_jobs.processing_cause"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.ProcessingCause"
+
+          # Membership
+          - column: "membership.owners"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.TokenHolderList"
+
+          # Wallet
+          - column: "wallets.wallet_type"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.WalletType"
+
+          # Follows
+          - column: "follows.followee"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+          - column: "follows.follower"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+
+          # Events
+          - column: "events.resource_type_id"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.ResourceType"
+          - column: "events.data"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.EventData"
+          - column: "events.feed_window_size"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.NullInt"
+          - column: "events.external_id"
+            go_type: "database/sql.NullString"
+          - column: "events.actor_id"
+            go_type: "database/sql.NullString"
+          - column: "events.group_id"
+            go_type: "database/sql.NullString"
+
+          # Comments
+          - column: "comments.reply_to"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+
+          # Feed Events
+          - column: "feed_events.owner_id"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+          - column: "feed_events.event_ids"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
+          - column: "feed_events.data"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.FeedEventData"
+          - column: "feed_events.group_id"
+            go_type: "database/sql.NullString"
+
+          # Feed Blocklist
+          - column: "feed_blocklist.user_id"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+
+          # Notifications
+          - column: "notifications.data"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.NotificationData"
+
+          # Merch
+          - column: "merch.token_id"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.TokenID"
+
+          # pii.AccountCreationInfo
+          - column: pii.account_creation_info.ip_address
+            go_type: "string"
+
+          # Push Notification Tokens
+          - column: "push_notification_tickets.ticket_id"
+            go_type: "string"
+
+          # Wildcards
+          # Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above.
+          # Format is schema.table.column; where *.*.<column> applies to all schemas and tables.
+          - column: "*.*.id"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+          - column: "*.*.*_id"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+          - column: "*.*.ids"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
+          - column: "*.*.*_ids"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
+          - column: "*.*.email_address"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Email"
+          - column: "*.*.*_email_address"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Email"
+          - column: "*.*.address"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Address"
+          - column: "*.*.*_address"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Address"
+          - column: "*.*.chain"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Chain"
+          - column: "*.*.action"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Action"
+          - column: "*.*.thumbnail_url"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.NullString"
+          - column: "*.*.media_url"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.NullString"
+          - column: "*.*.chain"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Chain"
+          - column: "*.*.email_type"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.EmailType"
+          - column: "*.*.actions"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.ActionList"
+          - column: "*.*.collection_id"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+          - column: "*.*.role"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Role"
+          - column: "*.*.roles"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.RoleList"
+          - column: "*.*.tokens_hex"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.TokenIDList"
+          - column: "*.*.token_hex"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.TokenID"
+          - column: "*.previews"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.NullString"
+          - column: "*.*.*socials"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Socials"
+          - column: "*.*.pii_socials"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Socials"

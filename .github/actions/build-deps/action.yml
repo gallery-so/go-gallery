@@ -1,0 +1,43 @@
+name: install-build-deps
+
+inputs:
+  sentry-auth-token:
+    required: true
+  gcp-credentials-json:
+    required: true
+
+env:
+  CLOUDSDK_CORE_DISABLE_PROMPTS: 1
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Set Sentry Auth"
+      run: echo "SENTRY_AUTH_TOKEN=${{ inputs.sentry-auth-token }}" >> $GITHUB_ENV
+      shell: bash
+    - name: "Dump GitHub context"
+      run: echo "$GITHUB_CONTEXT"
+      shell: bash
+      env:
+        GITHUB_CONTEXT: ${{ toJson(github) }}
+    - name: "Update apt"
+      run: sudo apt-get update
+      shell: bash
+    - name: "Install Sentry CLI"
+      run: curl -sL https://sentry.io/get-cli/ | bash
+      shell: bash
+    - name: "Download sops"
+      run: curl -L https://github.com/mozilla/sops/releases/download/v3.7.3/sops_3.7.3_amd64.deb > sops.deb
+      shell: bash
+    - name: "Install sops"
+      run: sudo apt-get install ./sops.deb
+      shell: bash
+    - id: "auth"
+      uses: "google-github-actions/auth@v0"
+      with:
+        credentials_json: ${{ inputs.gcp-credentials-json }}
+    - name: "Install gcloud cli"
+      uses: google-github-actions/setup-gcloud@v0
+    - name: "Docker auth"
+      run: gcloud auth configure-docker us-east1-docker.pkg.dev
+      shell: bash

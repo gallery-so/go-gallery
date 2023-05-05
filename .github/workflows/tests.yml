@@ -1,0 +1,61 @@
+name: ci
+on: [push]
+jobs:
+  core-tests:
+    runs-on: ubuntu-latest
+    env:
+      GOOGLE_CREDENTIALS: ${{ secrets.GCP_DEV_CREDENTIALS }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: "Install build deps"
+        uses: ./.github/actions/build-deps
+        with:
+          sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          gcp-credentials-json: ${{ secrets.GCP_DEV_CREDENTIALS }}
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.19
+      - name: "Install Dependencies"
+        run: |
+          go mod download
+          go install gotest.tools/gotestsum@v1.8.2
+      - name: Test
+        run: |
+          mkdir -p /tmp/test-reports
+          gotestsum --junitfile /tmp/test-reports/unit-tests.xml -- -tags debug_tools -run TestMain/test_GraphQL ./graphql
+  syncing-tests:
+    runs-on: ubuntu-latest
+    env:
+      GOOGLE_CREDENTIALS: ${{ secrets.GCP_DEV_CREDENTIALS }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: "Install build deps"
+        uses: ./.github/actions/build-deps
+        with:
+          sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          gcp-credentials-json: ${{ secrets.GCP_DEV_CREDENTIALS }}
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.19
+      - name: "Install Dependencies"
+        run: |
+          go mod download
+          go install gotest.tools/gotestsum@v1.8.2
+      - name: Test
+        run: |
+          mkdir -p /tmp/test-reports
+          gotestsum --junitfile /tmp/test-reports/unit-tests.xml -- -run TestMain/test_syncing_tokens ./graphql
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.x
+      - name: Install Dependencies
+        run: yarn install
+      - name: Enforce GraphQL Format
+        run: yarn prettier --check graphql/schema/schema.graphql

@@ -1,0 +1,108 @@
+version: "3.9"
+services:
+  redis:
+    image: "redis:6"
+    ports:
+      - "6379:6379"
+  postgres:
+    build:
+      context: "docker/postgres"
+      dockerfile: "DOCKERFILE"
+      args:
+        - PGHOST=${PGHOST}
+        - PGPORT=${PGPORT}
+        - PGUSER=${PGUSER}
+        - PGPASSWORD=${PGPASSWORD}
+        - PGDATABASE=${PGDATABASE}
+        - PGTESTUSER=${PGTESTUSER}
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_HOST_AUTH_METHOD=trust
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=postgres
+    volumes:
+      - "${PWD}/docker/postgres/postgres.conf:/etc/postgresql/postgresql.conf"
+    command: ["-c", "config-file=/etc/postgresql/postgresql.conf"]
+  postgres_indexer:
+    build:
+      context: "."
+      dockerfile: "docker/postgres_indexer/DOCKERFILE"
+      args:
+        - PGHOST=${PGHOST}
+        - PGPORT=${PGPORT}
+        - PGUSER=${PGUSER}
+        - PGPASSWORD=${PGPASSWORD}
+        - PGDATABASE=${PGDATABASE}
+        - PGTESTUSER=${PGTESTUSER}
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_HOST_AUTH_METHOD=trust
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=postgres
+  task-emulator:
+    image: ghcr.io/aertje/cloud-tasks-emulator:latest
+    ports:
+      - "8123:8123"
+    expose:
+      - "8123"
+    command: [
+      "-host", "0.0.0.0",
+      "-port", "8123",
+      "-queue", "projects/gallery-local/locations/here/queues/feedbot",
+      "-queue", "projects/gallery-local/locations/here/queues/feed-event",
+      "-queue", "projects/gallery-local/locations/here/queues/token-processing",
+      "-queue", "projects/gallery-local/locations/here/queues/indexer-refreshes",
+      "-queue", "projects/gallery-local/locations/here/queues/wallet-validate",
+      "-queue", "projects/gallery-local/locations/here/queues/push-notifications",
+    ]
+  pubsub-emulator:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    expose:
+      - "8085"
+    ports:
+      - "8085:8085"
+    command: [
+      "/bin/bash",
+      "-c",
+      "gcloud beta emulators pubsub start --host-port=0.0.0.0:8085 --project=gallery-local"
+    ]
+
+  # Uncomment if you want to run tokenprocessing locally as a container
+  # tokenprocessing:
+  #   build:
+  #     context: "."
+  #     dockerfile: "docker/tokenprocessing/Dockerfile"
+  #   ports:
+  #     - "6500:6500"
+  #   volumes:
+  #     - ${PWD}/_local:/app/_local
+  #     - ${PWD}/_deploy:/app/_deploy
+  #   depends_on:
+  #     - postgres
+  #     - redis
+  # Uncomment if you want to run indexer-api locally as a container
+  # indexer-api:
+  #   build:
+  #     context: "."
+  #     dockerfile: "docker/indexer_api/Dockerfile"
+  #   ports:
+  #     - "6000:6000"
+  #   volumes:
+  #     - ${PWD}/_local:/app/_local
+  #     - ${PWD}/_deploy:/app/_deploy
+  #   depends_on:
+  #     - postgres
+  #     - postgres_indexer
+  #     - redis
+  # Uncomment if you want to run pushnotifications locally as a container
+  # pushnotifications:
+  #   build:
+  #     context: "."
+  #     dockerfile: "docker/pushnotifications/Dockerfile"
+  #   ports:
+  #     - "6600:6600"
+  #   depends_on:
+  #     - postgres
+  #     - redis
