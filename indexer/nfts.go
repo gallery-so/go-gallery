@@ -76,10 +76,10 @@ func getTokenMetadata(ipfsClient *shell.Shell, ethClient *ethclient.Client, arwe
 		asEthAddress := persist.EthereumAddress(input.ContractAddress.String())
 		handler, hasCustomHandler := uniqueMetadataHandlers[asEthAddress]
 
-		newURI, err := rpc.GetTokenURI(ctx, "", input.ContractAddress, input.TokenID, ethClient)
+		newURI, err := rpc.RetryGetTokenURI(ctx, "", input.ContractAddress, input.TokenID, ethClient)
 		// It's possible to fetch metadata for some contracts even if URI data is missing.
 		if !hasCustomHandler && (err != nil || newURI == "") {
-			util.ErrResponse(c, http.StatusInternalServerError, errNoMetadataFound{Contract: input.ContractAddress, TokenID: input.TokenID})
+			util.ErrResponse(c, http.StatusNotFound, errNoMetadataFound{Contract: input.ContractAddress, TokenID: input.TokenID})
 			return
 		}
 
@@ -103,7 +103,7 @@ func getTokenMetadata(ipfsClient *shell.Shell, ethClient *ethclient.Client, arwe
 		}
 
 		if newMetadata == nil || len(newMetadata) == 0 {
-			util.ErrResponse(c, http.StatusInternalServerError, errNoMetadataFound{Contract: input.ContractAddress, TokenID: input.TokenID})
+			util.ErrResponse(c, http.StatusNotFound, errNoMetadataFound{Contract: input.ContractAddress, TokenID: input.TokenID})
 			return
 		}
 

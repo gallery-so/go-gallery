@@ -93,12 +93,6 @@ type TokenContractMetadata struct {
 	Symbol string
 }
 
-// ErrHTTP represents an error returned from an HTTP request
-type ErrHTTP struct {
-	URL    string
-	Status int
-}
-
 // NewEthClient returns an ethclient.Client
 func NewEthClient() *ethclient.Client {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -444,7 +438,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode > 399 || resp.StatusCode < 200 {
-			return nil, ErrHTTP{Status: resp.StatusCode, URL: asString}
+			return nil, util.ErrHTTP{Status: resp.StatusCode, URL: asString}
 		}
 		buf := &bytes.Buffer{}
 		err = util.CopyMax(buf, resp.Body, 1024*1024*1024)
@@ -583,7 +577,7 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 			return nil, fmt.Errorf("error getting data from http: %s <%T>", err, err)
 		}
 		if resp.StatusCode > 399 || resp.StatusCode < 200 {
-			return nil, ErrHTTP{Status: resp.StatusCode, URL: asString}
+			return nil, util.ErrHTTP{Status: resp.StatusCode, URL: asString}
 		}
 		return util.NewFileHeaderReader(resp.Body), nil
 	case persist.URITypeIPFSAPI:
@@ -726,7 +720,7 @@ func DecodeMetadataFromURI(ctx context.Context, turi persist.TokenURI, into *per
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode > 399 || resp.StatusCode < 200 {
-			return ErrHTTP{Status: resp.StatusCode, URL: asString}
+			return util.ErrHTTP{Status: resp.StatusCode, URL: asString}
 		}
 		return json.NewDecoder(resp.Body).Decode(into)
 	case persist.URITypeIPFSAPI:
@@ -779,7 +773,7 @@ func getHeaders(ctx context.Context, method, url string) (http.Header, error) {
 	}
 
 	if resp.StatusCode > 399 || resp.StatusCode < 200 {
-		return nil, ErrHTTP{Status: resp.StatusCode, URL: url}
+		return nil, util.ErrHTTP{Status: resp.StatusCode, URL: url}
 	}
 
 	defer resp.Body.Close()
@@ -904,7 +898,7 @@ func GetIPFSResponse(pCtx context.Context, ipfsClient *shell.Shell, path string)
 				return ipfsResult{err: err}
 			}
 			if resp.StatusCode > 399 || resp.StatusCode < 200 {
-				return ipfsResult{err: ErrHTTP{Status: resp.StatusCode, URL: url}}
+				return ipfsResult{err: util.ErrHTTP{Status: resp.StatusCode, URL: url}}
 			}
 			logger.For(ctx).Infof("IPFS HTTP fallback fallback successful %s", path)
 		}
@@ -933,7 +927,7 @@ func GetIPFSResponse(pCtx context.Context, ipfsClient *shell.Shell, path string)
 		}
 
 		if resp.StatusCode > 399 || resp.StatusCode < 200 {
-			return ipfsResult{err: ErrHTTP{Status: resp.StatusCode, URL: url}}
+			return ipfsResult{err: util.ErrHTTP{Status: resp.StatusCode, URL: url}}
 		}
 
 		logger.For(ctx).Infof("IPFS API fallback successful %s", path)
@@ -960,9 +954,7 @@ func GetHTTPHeaders(ctx context.Context, url string) (contentType string, conten
 // GetTokenURI returns metadata URI for a given token address.
 func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAddress persist.EthereumAddress, pTokenID persist.TokenID, ethClient *ethclient.Client) (persist.TokenURI, error) {
 
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
-	defer cancel()
-	contract := common.HexToAddress(string(pContractAddress))
+	contract := pContractAddress.Address()
 	switch pTokenType {
 	case persist.TokenTypeERC721:
 
@@ -977,6 +969,7 @@ func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAdd
 			Context: ctx,
 		}, pTokenID.BigInt())
 		if err != nil {
+			logger.For(ctx).Errorf("Error getting token URI: %s (%T)", err, err)
 			return "", err
 		}
 
@@ -994,21 +987,24 @@ func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAdd
 			Context: ctx,
 		}, pTokenID.BigInt())
 		if err != nil {
+			logger.For(ctx).Errorf("Error getting token URI: %s (%T)", err, err)
 			return "", err
 		}
 
 		return persist.TokenURI(strings.ReplaceAll(turi, "\x00", "")), nil
 
 	default:
-		if tokenURI, err := GetTokenURI(ctx, persist.TokenTypeERC721, pContractAddress, pTokenID, ethClient); err == nil {
+		tokenURI, err := GetTokenURI(ctx, persist.TokenTypeERC721, pContractAddress, pTokenID, ethClient)
+		if err == nil {
 			return tokenURI, nil
 		}
 
-		if tokenURI, err := GetTokenURI(ctx, persist.TokenTypeERC1155, pContractAddress, pTokenID, ethClient); err == nil {
+		tokenURI, err = GetTokenURI(ctx, persist.TokenTypeERC1155, pContractAddress, pTokenID, ethClient)
+		if err == nil {
 			return tokenURI, nil
 		}
 
-		return "", fmt.Errorf("unsupported token type: %s", pTokenType)
+		return "", fmt.Errorf("unsupported token type: %s (last error: %s)", pTokenType, err)
 	}
 }
 
@@ -1298,10 +1294,6 @@ func padHex(pHex string, pLength int) string {
 		pHex = "0" + pHex
 	}
 	return pHex
-}
-
-func (h ErrHTTP) Error() string {
-	return fmt.Sprintf("HTTP Error Status - %d | URL - %s", h.Status, h.URL)
 }
 
 // valFromSlice returns the value from a slice formatted as [key val key val ...]

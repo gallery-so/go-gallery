@@ -202,7 +202,7 @@ func cacheObjectsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	// neither download worked, unexpectedly
 	if (animCh == nil || (animResult.err != nil && len(animResult.cachedObjects) == 0)) && (imgCh == nil || (imgResult.err != nil && len(imgResult.cachedObjects) == 0)) {
-		defer persist.TrackStepStatus(&pMeta.NothingCachedWithErrors, "NothingCachedWithErrors")()
+		defer persist.TrackStepStatus(pCtx, &pMeta.NothingCachedWithErrors, "NothingCachedWithErrors")()
 		if animCh != nil {
 			if _, ok := animResult.err.(errInvalidMedia); ok {
 				return nil, MediaProcessingError{
@@ -231,7 +231,7 @@ func cacheObjectsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	// this should never be true, something is wrong if this is true
 	if len(objects) == 0 {
-		defer persist.TrackStepStatus(&pMeta.NothingCachedWithoutErrors, "NothingCachedWithoutErrors")()
+		defer persist.TrackStepStatus(pCtx, &pMeta.NothingCachedWithoutErrors, "NothingCachedWithoutErrors")()
 		return nil, errNoCachedObjects{tids: tids}
 	}
 
@@ -528,7 +528,7 @@ func remapMedia(media persist.Media) persist.Media {
 
 func findImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, metadata persist.TokenMetadata, tokenURI persist.TokenURI, predict bool, pMeta *persist.PipelineMetadata) (imgURL string, vURL string, err error) {
 
-	defer persist.TrackStepStatus(&pMeta.MediaURLsRetrieval, "MediaURLsRetrieval")()
+	defer persist.TrackStepStatus(ctx, &pMeta.MediaURLsRetrieval, "MediaURLsRetrieval")()
 
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"tokenID": tokenID, "contractAddress": contractAddress})
 	if metaMedia, ok := metadata["media"].(map[string]any); ok {
@@ -725,7 +725,7 @@ func (m cachedMediaObject) storageURL(tokenBucket string) string {
 }
 
 func cacheRawMedia(ctx context.Context, reader io.Reader, tids persist.TokenIdentifiers, mediaType persist.MediaType, contentLength *int64, contentType *string, defaultObjectType objectType, bucket, ogURL string, client *storage.Client, subMeta *cachePipelineMetadata) (cachedMediaObject, error) {
-	defer persist.TrackStepStatus(subMeta.StoreGCP, "StoreGCP")()
+	defer persist.TrackStepStatus(ctx, subMeta.StoreGCP, "StoreGCP")()
 
 	var objectType objectType
 	switch mediaType {
@@ -762,7 +762,7 @@ func cacheRawMedia(ctx context.Context, reader io.Reader, tids persist.TokenIden
 }
 
 func cacheRawAnimationMedia(ctx context.Context, reader io.Reader, tids persist.TokenIdentifiers, mediaType persist.MediaType, bucket, ogURL string, client *storage.Client, subMeta *cachePipelineMetadata) (cachedMediaObject, error) {
-	defer persist.TrackStepStatus(subMeta.AnimationGzip, "AnimationGzip")()
+	defer persist.TrackStepStatus(ctx, subMeta.AnimationGzip, "AnimationGzip")()
 
 	object := cachedMediaObject{
 		MediaType:       mediaType,
@@ -799,7 +799,7 @@ func cacheRawAnimationMedia(ctx context.Context, reader io.Reader, tids persist.
 }
 
 func thumbnailAndCache(ctx context.Context, tids persist.TokenIdentifiers, videoURL, bucket string, client *storage.Client, subMeta *cachePipelineMetadata) (cachedMediaObject, error) {
-	defer persist.TrackStepStatus(subMeta.ThumbnailGCP, "ThumbnailGCP")()
+	defer persist.TrackStepStatus(ctx, subMeta.ThumbnailGCP, "ThumbnailGCP")()
 	obj := cachedMediaObject{
 		ObjectType:      objectTypeThumbnail,
 		MediaType:       persist.MediaTypeImage,
@@ -837,7 +837,7 @@ func thumbnailAndCache(ctx context.Context, tids persist.TokenIdentifiers, video
 
 func createLiveRenderAndCache(ctx context.Context, tids persist.TokenIdentifiers, videoURL, bucket string, client *storage.Client, subMeta *cachePipelineMetadata) (cachedMediaObject, error) {
 
-	defer persist.TrackStepStatus(subMeta.LiveRenderGCP, "LiveRenderGCP")()
+	defer persist.TrackStepStatus(ctx, subMeta.LiveRenderGCP, "LiveRenderGCP")()
 
 	obj := cachedMediaObject{
 		ObjectType:      objectTypeLiveRender,
@@ -891,11 +891,11 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 	asURI := persist.TokenURI(mediaURL)
 	timeBeforePredict := time.Now()
 	mediaType, contentType, contentLength := func() (persist.MediaType, *string, *int64) {
-		defer persist.TrackStepStatus(subMeta.ContentHeaderValueRetrieval, "ContentHeaderValueRetrieval")()
+		defer persist.TrackStepStatus(pCtx, subMeta.ContentHeaderValueRetrieval, "ContentHeaderValueRetrieval")()
 		mediaType, contentType, contentLength, _ := media.PredictMediaType(pCtx, asURI.String())
 		pCtx = logger.NewContextWithFields(pCtx, logrus.Fields{
 			"predictedMediaType":   mediaType,
-			"predictedContentType": contentType,
+			"predictedContentType": util.FromPointer(contentType),
 		})
 
 		contentLengthStr := "nil"
@@ -903,7 +903,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 			contentLengthStr = util.InByteSizeFormat(uint64(util.FromPointer(contentLength)))
 		}
 		pCtx = logger.NewContextWithFields(pCtx, logrus.Fields{
-			"contentLength": contentLength,
+			"contentLength": contentLengthStr,
 		})
 		logger.For(pCtx).Infof("predicted media type from '%s' as '%s' with length %s in %s", mediaURL, mediaType, contentLengthStr, time.Since(timeBeforePredict))
 		return mediaType, contentType, contentLength
@@ -915,13 +915,13 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 
 	timeBeforeDataReader := time.Now()
 	reader, retryOpensea, err := func() (*util.FileHeaderReader, bool, error) {
-		defer persist.TrackStepStatus(subMeta.ReaderRetrieval, "ReaderRetrieval")()
+		defer persist.TrackStepStatus(pCtx, subMeta.ReaderRetrieval, "ReaderRetrieval")()
 		reader, err := rpc.GetDataFromURIAsReader(pCtx, asURI, ipfsClient, arweaveClient)
 		if err != nil {
 
 			// the reader is and always will be invalid
 			switch caught := err.(type) {
-			case rpc.ErrHTTP:
+			case util.ErrHTTP:
 				if caught.Status == http.StatusNotFound || caught.Status == http.StatusInternalServerError {
 					persist.FailStep(subMeta.ReaderRetrieval)
 					return reader, false, errInvalidMedia{URL: mediaURL, err: err}
@@ -947,7 +947,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 	}
 
 	if retryOpensea {
-		defer persist.TrackStepStatus(subMeta.OpenseaFallback, "OpenseaFallback")()
+		defer persist.TrackStepStatus(pCtx, subMeta.OpenseaFallback, "OpenseaFallback")()
 		logger.For(pCtx).Infof("failed to get data from uri '%s' for '%s' because of (err: %s <%T>), trying opensea", mediaURL, tids, err, err)
 		// if token is ETH, backup to asking opensea
 		assets, err := opensea.FetchAssetsForTokenIdentifiers(pCtx, persist.EthereumAddress(tids.ContractAddress), opensea.TokenID(tids.TokenID.Base10String()))
@@ -984,7 +984,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 
 	if !mediaType.IsValid() {
 		func() {
-			defer persist.TrackStepStatus(subMeta.DetermineMediaTypeWithReader, "DetermineMediaTypeWithReader")()
+			defer persist.TrackStepStatus(pCtx, subMeta.DetermineMediaTypeWithReader, "DetermineMediaTypeWithReader")()
 			timeBeforeSniff := time.Now()
 			bytesToSniff, err := reader.Headers()
 			if err != nil {

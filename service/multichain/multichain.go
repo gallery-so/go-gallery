@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"net/http"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -678,8 +679,60 @@ func (p *Provider) GetTokensOfContractForWallet(ctx context.Context, contractAdd
 	return p.processTokensForUser(ctx, tokensFromProviders, addressToContract, user, []persist.Chain{wallet.Chain()}, true)
 }
 
+type FieldRequirementLevel int
+
+const (
+	FieldRequirementLevelNone FieldRequirementLevel = iota
+	FieldRequirementLevelAllOptional
+	FieldRequirementLevelAllRequired
+	FieldRequirementLevelOneRequired
+)
+
+type FieldRequest[T any] struct {
+	FieldNames []string
+	Level      FieldRequirementLevel
+}
+
+func (f FieldRequest[T]) MatchesFilter(filter persist.TokenMetadata) bool {
+	switch f.Level {
+	case FieldRequirementLevelAllRequired:
+		for _, fieldName := range f.FieldNames {
+			it, ok := util.GetValueFromMapUnsafe(filter, fieldName, util.DefaultSearchDepth).(T)
+			if !ok || util.IsEmpty(&it) {
+				return false
+			}
+		}
+	case FieldRequirementLevelOneRequired:
+		found := false
+		for _, fieldName := range f.FieldNames {
+			it, ok := util.GetValueFromMapUnsafe(filter, fieldName, util.DefaultSearchDepth).(T)
+			if ok && !util.IsEmpty(&it) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	case FieldRequirementLevelAllOptional:
+		hasNone := true
+		for _, fieldName := range f.FieldNames {
+			it, ok := util.GetValueFromMapUnsafe(filter, fieldName, util.DefaultSearchDepth).(T)
+			if ok && !util.IsEmpty(&it) {
+				hasNone = false
+				break
+			}
+		}
+		if hasNone {
+			return false
+		}
+	}
+
+	return true
+}
+
 // GetTokenMetadataByTokenIdentifiers will get the metadata for a given token identifier
-func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contractAddress persist.Address, tokenID persist.TokenID, ownerAddress persist.Address, chain persist.Chain) (persist.TokenMetadata, error) {
+func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contractAddress persist.Address, tokenID persist.TokenID, ownerAddress persist.Address, chain persist.Chain, requestedFields []FieldRequest[string]) (persist.TokenMetadata, error) {
 
 	metadataFetchers := getChainProvidersForTask[tokenMetadataFetcher](d.Chains[chain])
 
@@ -689,36 +742,56 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contr
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	wp := pool.New().WithMaxGoroutines(len(metadataFetchers)).WithContext(ctx)
+	wp := pool.New().WithMaxGoroutines(len(metadataFetchers)).WithContext(ctx).WithCancelOnError()
 	metadatas := make(chan persist.TokenMetadata)
 	for i, metadataFetcher := range metadataFetchers {
 		i := i
 		metadataFetcher := metadataFetcher
 		wp.Go(func(ctx context.Context) error {
 			metadata, err := metadataFetcher.GetTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: contractAddress, TokenID: tokenID}, ownerAddress)
-			if err != nil && err != context.Canceled {
-				logger.For(ctx).Errorf("error fetching token metadata %s for provider %d (%T)", err, i, metadataFetcher)
+			if err != nil {
+				if err != context.Canceled || strings.Contains(err.Error(), context.Canceled.Error()) {
+					logger.For(ctx).Errorf("error fetching token metadata %s for provider %d (%T)", err, i, metadataFetcher)
+				}
+				switch caught := err.(type) {
+				case util.ErrHTTP:
+					if caught.Status == http.StatusNotFound {
+						return err
+					}
+				}
 			}
 			metadatas <- metadata
-			return err
+			return nil
 		})
 	}
 
 	go func() {
 		defer close(metadatas)
 		err := wp.Wait()
-		if err != nil && err != context.Canceled {
+		if err != nil && (err != context.Canceled || strings.Contains(err.Error(), context.Canceled.Error())) {
 			logger.For(ctx).Errorf("error fetching token metadata after wait: %s", err)
 		}
 	}()
 
+	var betterThanNothing persist.TokenMetadata
+metadatas:
 	for metadata := range metadatas {
 		if metadata != nil {
+			betterThanNothing = metadata
+			for _, fieldRequest := range requestedFields {
+				if !fieldRequest.MatchesFilter(metadata) {
+					logger.For(ctx).Infof("metadata %+v does not match field request %+v", metadata, fieldRequest)
+					continue metadatas
+				}
+			}
 			logger.For(ctx).Infof("got metadata %+v", metadata)
 			return metadata, nil
 		}
 	}
 
+	if betterThanNothing != nil {
+		return betterThanNothing, nil
+	}
 	return nil, fmt.Errorf("no metadata found for token %s-%s-%s-%d", tokenID, contractAddress, ownerAddress, chain)
 }
 

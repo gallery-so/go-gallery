@@ -3,8 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"time"
+
+	"net/http"
+	_ "net/http/pprof"
 
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
@@ -31,6 +35,14 @@ func main() {
 	ctx := context.Background()
 	pg := postgres.NewPgxClient()
 	clients := server.ClientInit(ctx)
+
+	logger.SetLoggerOptions(func(logger *logrus.Logger) {
+		fi, err := os.Create(fmt.Sprintf("reprocess-%s.log", time.Now().Format("2006-01-02T15-04-05")))
+		if err != nil {
+			panic(err)
+		}
+		logger.SetOutput(io.MultiWriter(fi, os.Stdout))
+	})
 
 	tp := tokenprocessing.NewTokenProcessor(clients.Queries, clients.EthClient, server.NewMultichainProvider(clients), clients.IPFSClient, clients.ArweaveClient, clients.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), clients.Repos.TokenRepository)
 
@@ -151,15 +163,19 @@ func main() {
 			BadgeURL:             persist.NullString(row.BadgeUrl.String),
 			IsProviderMarkedSpam: row.IsProviderMarkedSpam_2,
 		}
+
+		anOwner := row.WalletAddress
 		wp.Go(func(ctx context.Context) error {
 			logrus.Infof("processing %s", token.ID)
 			defer func() {
 				logger.For(ctx).Infof("finished processing %s", token.ID)
 			}()
-			return tp.ProcessTokenPipeline(ctx, token, contract, "", persist.ProcessingCauseRefresh)
+			return tp.ProcessTokenPipeline(ctx, token, contract, anOwner, persist.ProcessingCauseRefresh)
 		})
 	}
-
+	go func() {
+		http.ListenAndServe(":6060", nil)
+	}()
 	err = wp.Wait()
 	logrus.Infof("finished processes for %d tokens with err: %s", totalTokens, err)
 

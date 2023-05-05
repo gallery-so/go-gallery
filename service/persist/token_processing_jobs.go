@@ -1,6 +1,7 @@
 package persist
 
 import (
+	"context"
 	"database/sql/driver"
 	"encoding/json"
 	"time"
@@ -129,7 +130,9 @@ func (p *PipelineMetadata) Scan(value interface{}) error {
 	return json.Unmarshal(value.([]byte), p)
 }
 
-func TrackStepStatus(status *PipelineStepStatus, name string) func() {
+func TrackStepStatus(ctx context.Context, status *PipelineStepStatus, name string) func() {
+
+	startTime := time.Now()
 
 	if status == nil {
 		started := PipelineStepStatusStarted
@@ -143,7 +146,7 @@ func TrackStepStatus(status *PipelineStepStatus, name string) func() {
 			if status == nil || *status == PipelineStepStatusSuccess || *status == PipelineStepStatusError {
 				return
 			}
-			logger.For(nil).Infof("still %s", name)
+			logger.For(ctx).Infof("still %s (taken: %s)", name, time.Since(startTime))
 		}
 	}()
 
@@ -152,6 +155,7 @@ func TrackStepStatus(status *PipelineStepStatus, name string) func() {
 			return
 		}
 		*status = PipelineStepStatusSuccess
+		logger.For(ctx).Infof("finished %s (took: %s)", name, time.Since(startTime))
 	}
 
 }

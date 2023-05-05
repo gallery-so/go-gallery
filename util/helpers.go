@@ -342,6 +342,10 @@ func FromPointer[T comparable](s *T) T {
 	return *s
 }
 
+func IsEmpty[T any](s *T) bool {
+	return s == nil || any(*s) == reflect.Zero(reflect.TypeOf(s).Elem()).Interface()
+}
+
 func ToPointer[T any](s T) *T {
 	return &s
 }
@@ -618,7 +622,7 @@ func TruncateWithEllipsis(s string, length int) string {
 	return s[:length] + "..."
 }
 
-func IsNullOrEmpty(s sql.NullString) bool {
+func SqlStringIsNullOrEmpty(s sql.NullString) bool {
 	return !s.Valid || s.String == ""
 }
 
