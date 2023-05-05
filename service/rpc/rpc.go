@@ -72,6 +72,22 @@ var (
 // rateLimited is the content returned from an RPC call when rate limited.
 var rateLimited = "429 Too Many Requests"
 
+type ErrEthClient struct {
+	Err error
+}
+
+type ErrTokenURINotFound struct {
+	Err error
+}
+
+func (e ErrEthClient) Error() string {
+	return e.Err.Error()
+}
+
+func (e ErrTokenURINotFound) Error() string {
+	return e.Err.Error()
+}
+
 // Transfer represents a Transfer from the RPC response
 type Transfer struct {
 	BlockNumber     persist.BlockNumber
@@ -203,6 +219,7 @@ func NewIPFSShell() *shell.Shell {
 // newHTTPClientForIPFS returns an http.Client configured with default settings intended for IPFS calls.
 func newClientForIPFS(projectID, projectSecret string, continueOnly bool) *http.Client {
 	return &http.Client{
+
 		Timeout: defaultHTTPTimeout * time.Second,
 		Transport: authTransport{
 			RoundTripper:  tracing.NewTracingTransport(http.DefaultTransport, continueOnly),
@@ -874,6 +891,8 @@ func getContentHeaders(ctx context.Context, url string) (contentType string, con
 }
 
 func GetIPFSResponse(pCtx context.Context, ipfsClient *shell.Shell, path string) (io.ReadCloser, error) {
+	ctx, cancel := context.WithCancel(pCtx)
+	defer cancel()
 	fromHTTP := func(ctx context.Context) fetchResulter {
 		url := fmt.Sprintf("%s/ipfs/%s", env.GetString("IPFS_URL"), path)
 		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -935,7 +954,7 @@ func GetIPFSResponse(pCtx context.Context, ipfsClient *shell.Shell, path string)
 		return ipfsResult{resp: resp.Body}
 	}
 
-	result := firstNonError(pCtx, fromHTTP, fromIPFS, fromIPFSAPI)
+	result := firstNonError(ctx, fromHTTP, fromIPFS, fromIPFSAPI)
 	response := result.(ipfsResult)
 	return response.resp, response.Error()
 }
@@ -960,7 +979,7 @@ func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAdd
 
 		instance, err := contracts.NewIERC721MetadataCaller(contract, ethClient)
 		if err != nil {
-			return "", err
+			return "", ErrEthClient{err}
 		}
 
 		logger.For(ctx).Debugf("Token ID: %s\tToken Address: %s", pTokenID.String(), contract.Hex())
@@ -970,7 +989,7 @@ func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAdd
 		}, pTokenID.BigInt())
 		if err != nil {
 			logger.For(ctx).Errorf("Error getting token URI: %s (%T)", err, err)
-			return "", err
+			return "", ErrTokenURINotFound{err}
 		}
 
 		return persist.TokenURI(strings.ReplaceAll(turi, "\x00", "")), nil
@@ -978,7 +997,7 @@ func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAdd
 
 		instance, err := contracts.NewIERC1155MetadataURICaller(contract, ethClient)
 		if err != nil {
-			return "", err
+			return "", ErrEthClient{err}
 		}
 
 		logger.For(ctx).Debugf("Token ID: %d\tToken Address: %s", pTokenID.BigInt().Uint64(), contract.Hex())
@@ -988,7 +1007,7 @@ func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAdd
 		}, pTokenID.BigInt())
 		if err != nil {
 			logger.For(ctx).Errorf("Error getting token URI: %s (%T)", err, err)
-			return "", err
+			return "", ErrTokenURINotFound{err}
 		}
 
 		return persist.TokenURI(strings.ReplaceAll(turi, "\x00", "")), nil
@@ -1004,7 +1023,9 @@ func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAdd
 			return tokenURI, nil
 		}
 
-		return "", fmt.Errorf("unsupported token type: %s (last error: %s)", pTokenType, err)
+		logger.For(ctx).Errorf("Error getting token URI: %s (%T) (token type: %s)", err, err, pTokenType)
+
+		return "", err
 	}
 }
 
@@ -1248,7 +1269,7 @@ func GetArweaveDataHTTPReader(ctx context.Context, id string) (io.ReadCloser, er
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error getting data: %s", err.Error())
+		return nil, util.ErrHTTP{Err: err, URL: req.URL.String(), Status: resp.StatusCode}
 	}
 	return resp.Body, nil
 }

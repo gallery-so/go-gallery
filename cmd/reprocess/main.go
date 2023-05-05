@@ -36,14 +36,6 @@ func main() {
 	pg := postgres.NewPgxClient()
 	clients := server.ClientInit(ctx)
 
-	logger.SetLoggerOptions(func(logger *logrus.Logger) {
-		fi, err := os.Create(fmt.Sprintf("reprocess-%s.log", time.Now().Format("2006-01-02T15-04-05")))
-		if err != nil {
-			panic(err)
-		}
-		logger.SetOutput(io.MultiWriter(fi, os.Stdout))
-	})
-
 	tp := tokenprocessing.NewTokenProcessor(clients.Queries, clients.EthClient, server.NewMultichainProvider(clients), clients.IPFSClient, clients.ArweaveClient, clients.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), clients.Repos.TokenRepository)
 
 	var totalTokenCount int
@@ -80,7 +72,15 @@ func main() {
 			Offset: int32(offset),
 		})
 	} else {
+
 		logrus.Infof("running as local job")
+		logger.SetLoggerOptions(func(logger *logrus.Logger) {
+			fi, err := os.Create(fmt.Sprintf("reprocess-%s.log", time.Now().Format("2006-01-02T15-04-05")))
+			if err != nil {
+				panic(err)
+			}
+			logger.SetOutput(io.MultiWriter(fi, os.Stdout))
+		})
 		limit = 1000
 		offset = 0
 		rows, err = clients.Queries.GetAllTokensWithContracts(ctx, coredb.GetAllTokensWithContractsParams{

@@ -70,7 +70,7 @@ func getTokenMetadata(ipfsClient *shell.Shell, ethClient *ethclient.Client, arwe
 			"contractAddress": input.ContractAddress,
 		})
 
-		ctx, cancel := context.WithTimeout(ctx, time.Minute*10)
+		ctx, cancel := context.WithTimeout(ctx, time.Minute*2)
 		defer cancel()
 
 		asEthAddress := persist.EthereumAddress(input.ContractAddress.String())
@@ -79,31 +79,39 @@ func getTokenMetadata(ipfsClient *shell.Shell, ethClient *ethclient.Client, arwe
 		newURI, err := rpc.RetryGetTokenURI(ctx, "", input.ContractAddress, input.TokenID, ethClient)
 		// It's possible to fetch metadata for some contracts even if URI data is missing.
 		if !hasCustomHandler && (err != nil || newURI == "") {
-			util.ErrResponse(c, http.StatusNotFound, errNoMetadataFound{Contract: input.ContractAddress, TokenID: input.TokenID})
+			var status int
+			if err != nil {
+				switch err.(type) {
+				case rpc.ErrTokenURINotFound:
+					status = http.StatusNotFound
+				default:
+					status = http.StatusInternalServerError
+				}
+			}
+			util.ErrResponse(c, status, errNoMetadataFound{Contract: input.ContractAddress, TokenID: input.TokenID})
 			return
 		}
 
 		var newMetadata persist.TokenMetadata
 		if hasCustomHandler {
 			logger.For(ctx).Infof("Using %v metadata handler for %s", handler, input.ContractAddress)
-			u, md, err := handler(ctx, newURI, asEthAddress, input.TokenID, ethClient, ipfsClient, arweaveClient)
-			if err != nil {
-				logger.For(ctx).Errorf("Error getting metadata from handler: %s", err)
-			} else {
-				newMetadata = md
-				newURI = u
-			}
+			newURI, newMetadata, err = handler(ctx, newURI, asEthAddress, input.TokenID, ethClient, ipfsClient, arweaveClient)
 		} else if newURI != "" {
-			md, err := rpc.GetMetadataFromURI(ctx, newURI, ipfsClient, arweaveClient)
-			if err != nil {
-				logger.For(ctx).Errorf("Error getting metadata from URI: %s (%s)", err, newURI)
-			} else {
-				newMetadata = md
-			}
+			newMetadata, err = rpc.GetMetadataFromURI(ctx, newURI, ipfsClient, arweaveClient)
 		}
 
-		if newMetadata == nil || len(newMetadata) == 0 {
-			util.ErrResponse(c, http.StatusNotFound, errNoMetadataFound{Contract: input.ContractAddress, TokenID: input.TokenID})
+		if err != nil || (newMetadata == nil || len(newMetadata) == 0) {
+			logger.For(ctx).Errorf("Error getting metadata from URI: %s (%s)", err, newURI)
+			status := http.StatusInternalServerError
+			if err != nil {
+				switch caught := err.(type) {
+				case util.ErrHTTP:
+					if caught.Status == http.StatusNotFound {
+						status = http.StatusNotFound
+					}
+				}
+			}
+			util.ErrResponse(c, status, errNoMetadataFound{Contract: input.ContractAddress, TokenID: input.TokenID})
 			return
 		}
 
