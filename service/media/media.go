@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -56,7 +57,10 @@ func RawFormatToMediaType(format string) persist.MediaType {
 }
 
 // PredictMediaType guesses the media type of the given URL.
-func PredictMediaType(pCtx context.Context, url string) (persist.MediaType, *string, *int64, error) {
+func PredictMediaType(ctx context.Context, url string) (persist.MediaType, *string, *int64, error) {
+	// predicting is not critical, so we can afford to give it a timeout
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
 
 	spl := strings.Split(url, ".")
 	if len(spl) > 1 {
@@ -69,7 +73,7 @@ func PredictMediaType(pCtx context.Context, url string) (persist.MediaType, *str
 	asURI := persist.TokenURI(url)
 	lenURI := int64(len(asURI.String()))
 	uriType := asURI.Type()
-	logger.For(pCtx).Debugf("predicting media type for %s with URI type %s", url, uriType)
+	logger.For(ctx).Debugf("predicting media type for %s with URI type %s", url, uriType)
 	switch uriType {
 	case persist.URITypeBase64JSON, persist.URITypeJSON:
 		return persist.MediaTypeJSON, util.ToPointer("application/json"), &lenURI, nil
@@ -80,21 +84,21 @@ func PredictMediaType(pCtx context.Context, url string) (persist.MediaType, *str
 	case persist.URITypeBase64PNG:
 		return persist.MediaTypeBase64PNG, util.ToPointer("image/png"), &lenURI, nil
 	case persist.URITypeIPFS:
-		contentType, contentLength, err := rpc.GetIPFSHeaders(pCtx, strings.TrimPrefix(asURI.String(), "ipfs://"))
+		contentType, contentLength, err := rpc.GetIPFSHeaders(ctx, strings.TrimPrefix(asURI.String(), "ipfs://"))
 		if err != nil {
 			return persist.MediaTypeUnknown, nil, nil, err
 		}
 		return MediaFromContentType(contentType), &contentType, &contentLength, nil
 	case persist.URITypeIPFSGateway:
-		contentType, contentLength, err := rpc.GetIPFSHeaders(pCtx, util.GetURIPath(asURI.String(), false))
+		contentType, contentLength, err := rpc.GetIPFSHeaders(ctx, util.GetURIPath(asURI.String(), false))
 		if err == nil {
 			return MediaFromContentType(contentType), &contentType, &contentLength, nil
 		} else if err != nil {
-			logger.For(pCtx).Errorf("could not get IPFS headers for %s: %s", url, err)
+			logger.For(ctx).Errorf("could not get IPFS headers for %s: %s", url, err)
 		}
 		fallthrough
 	case persist.URITypeHTTP, persist.URITypeIPFSAPI:
-		contentType, contentLength, err := rpc.GetHTTPHeaders(pCtx, url)
+		contentType, contentLength, err := rpc.GetHTTPHeaders(ctx, url)
 		if err != nil {
 			return persist.MediaTypeUnknown, nil, nil, err
 		}

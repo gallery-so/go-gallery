@@ -426,15 +426,12 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		}
 
 		return util.RemoveBOM(bs), nil
-	case persist.URITypeArweave:
+	case persist.URITypeArweave, persist.URITypeArweaveGateway:
 		path := util.GetURIPath(asString, true)
 
-		bs, err := GetArweaveData(arweaveClient, path)
+		bs, err := util.FirstNonErrorWithValue(ctx, func() ([]byte, error) { return GetArweaveData(arweaveClient, path) }, func() ([]byte, error) { return GetArweaveDataHTTP(ctx, path) })
 		if err != nil {
-			bs, err = GetArweaveDataHTTP(ctx, path)
-			if err != nil {
-				return nil, err
-			}
+			return nil, err
 		}
 		return util.RemoveBOM(bs), nil
 	case persist.URITypeHTTP:
@@ -559,7 +556,7 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 		}
 
 		return util.NewFileHeaderReader(resp), nil
-	case persist.URITypeArweave:
+	case persist.URITypeArweave, persist.URITypeArweaveGateway:
 		path := util.GetURIPath(asString, true)
 
 		bs, err := GetArweaveData(arweaveClient, path)
@@ -711,7 +708,7 @@ func DecodeMetadataFromURI(ctx context.Context, turi persist.TokenURI, into *per
 			return err
 		}
 		return json.Unmarshal(util.RemoveBOM(bs), into)
-	case persist.URITypeArweave:
+	case persist.URITypeArweave, persist.URITypeArweaveGateway:
 		path := strings.ReplaceAll(asString, "arweave://", "")
 		path = strings.ReplaceAll(path, "ar://", "")
 		result, err := GetArweaveData(arweaveClient, path)
@@ -822,6 +819,7 @@ func parseContentType(contentType string) string {
 
 type fetchResulter interface {
 	Error() error
+	ErrIsForceClose(error) bool
 }
 
 type headerResult struct {
@@ -834,6 +832,15 @@ func (r headerResult) Error() error {
 	return r.err
 }
 
+func (r headerResult) ErrIsForceClose(err error) bool {
+	if err != nil {
+		if it, ok := err.(util.ErrHTTP); ok && it.Status == http.StatusNotFound {
+			return true
+		}
+	}
+	return false
+}
+
 type ipfsResult struct {
 	resp io.ReadCloser
 	err  error
@@ -843,7 +850,19 @@ func (r ipfsResult) Error() error {
 	return r.err
 }
 
+func (r ipfsResult) ErrIsForceClose(err error) bool {
+	if err != nil {
+		if it, ok := err.(util.ErrHTTP); ok && it.Status == http.StatusNotFound {
+			return true
+		}
+	}
+	return false
+}
+
 func firstNonError(ctx context.Context, fetches ...func(context.Context) fetchResulter) fetchResulter {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	c := make(chan fetchResulter)
 	done := make(chan bool)
 
@@ -868,6 +887,10 @@ func firstNonError(ctx context.Context, fetches ...func(context.Context) fetchRe
 			return r
 		}
 		lastError = r
+		if r.ErrIsForceClose(r.Error()) {
+			close(done)
+			return r
+		}
 		i++
 	}
 
@@ -893,9 +916,7 @@ func getContentHeaders(ctx context.Context, url string) (contentType string, con
 	return headers.contentType, headers.contentLength, headers.Error()
 }
 
-func GetIPFSResponse(pCtx context.Context, ipfsClient *shell.Shell, path string) (io.ReadCloser, error) {
-	ctx, cancel := context.WithCancel(pCtx)
-	defer cancel()
+func GetIPFSResponse(ctx context.Context, ipfsClient *shell.Shell, path string) (io.ReadCloser, error) {
 	fromHTTP := func(ctx context.Context) fetchResulter {
 		url := fmt.Sprintf("%s/ipfs/%s", env.GetString("IPFS_URL"), path)
 		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -909,6 +930,9 @@ func GetIPFSResponse(pCtx context.Context, ipfsClient *shell.Shell, path string)
 		}
 
 		if resp.StatusCode > 399 || resp.StatusCode < 200 {
+			if resp.StatusCode == http.StatusNotFound {
+				return ipfsResult{err: util.ErrHTTP{Status: resp.StatusCode, URL: url}}
+			}
 			url := fmt.Sprintf("%s/ipfs/%s", env.GetString("FALLBACK_IPFS_URL"), path)
 			req, err = http.NewRequestWithContext(ctx, "GET", url, nil)
 			if err != nil {
@@ -931,6 +955,10 @@ func GetIPFSResponse(pCtx context.Context, ipfsClient *shell.Shell, path string)
 	}
 
 	fromIPFS := func(ctx context.Context) fetchResulter {
+		_, _, err := ipfsClient.BlockStat(path)
+		if err != nil {
+			return ipfsResult{err: err}
+		}
 		reader, err := ipfsClient.Cat(path)
 		logger.For(ctx).Infof("IPFS cat fallback successful %s", path)
 		return ipfsResult{reader, err}

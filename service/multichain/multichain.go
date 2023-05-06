@@ -750,7 +750,7 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contr
 		wp.Go(func(ctx context.Context) error {
 			metadata, err := metadataFetcher.GetTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: contractAddress, TokenID: tokenID}, ownerAddress)
 			if err != nil {
-				if err != context.Canceled || strings.Contains(err.Error(), context.Canceled.Error()) {
+				if err != context.Canceled && !strings.Contains(err.Error(), context.Canceled.Error()) {
 					logger.For(ctx).Errorf("error fetching token metadata %s for provider %d (%T)", err, i, metadataFetcher)
 				}
 				switch caught := err.(type) {

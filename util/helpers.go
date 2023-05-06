@@ -17,6 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgtype"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/sourcegraph/conc/pool"
 	"github.com/spf13/viper"
 	"go.mozilla.org/sops/v3/decrypt"
 )
@@ -647,4 +648,40 @@ func GetOptionalValue[T any](optional *T, fallback T) T {
 	}
 
 	return fallback
+}
+
+func FirstNonErrorWithValue[T any](ctx context.Context, runs ...func() (T, error)) (T, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	if len(runs) == 0 {
+		return *new(T), nil
+	}
+	wp := pool.New().WithMaxGoroutines(len(runs)).WithContext(ctx)
+	result := make(chan T)
+	errChan := make(chan error)
+	for _, run := range runs {
+		run := run
+		wp.Go(func(ctx context.Context) error {
+			val, err := run()
+			if err != nil {
+				return err
+			}
+			result <- val
+			return nil
+		})
+	}
+
+	go func() {
+		errChan <- wp.Wait()
+	}()
+
+	select {
+	case <-ctx.Done():
+		return *new(T), ctx.Err()
+	case err := <-errChan:
+		return *new(T), err
+	case val := <-result:
+		return val, nil
+	}
 }

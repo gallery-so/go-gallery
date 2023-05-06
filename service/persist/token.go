@@ -94,6 +94,8 @@ const (
 	URITypeIPFSAPI URIType = "ipfs-api"
 	// URITypeIPFSGateway represents an IPFS Gateway URI
 	URITypeIPFSGateway URIType = "ipfs-gateway"
+	// URITypeArweaveGateway represents an Arweave Gateway URI
+	URITypeArweaveGateway URIType = "arweave-gateway"
 	// URITypeBase64JSON represents a base64 encoded JSON document
 	URITypeBase64JSON URIType = "base64json"
 	// URITypeJSON represents a JSON document
@@ -519,6 +521,8 @@ func (uri TokenURI) Type() URIType {
 		return URITypeIPFSAPI
 	case strings.Contains(asString, "/ipfs/"):
 		return URITypeIPFSGateway
+	case strings.HasPrefix(asString, "https://arweave.net/"):
+		return URITypeArweaveGateway
 	case strings.HasPrefix(asString, "http"), strings.HasPrefix(asString, "https"):
 		return URITypeHTTP
 	case strings.HasPrefix(asString, "{"), strings.HasPrefix(asString, "["), strings.HasPrefix(asString, "data:application/json"), strings.HasPrefix(asString, "data:text/plain,{"):

@@ -104,15 +104,17 @@ func getTokenMetadata(ipfsClient *shell.Shell, ethClient *ethclient.Client, arwe
 
 		if err != nil || (newMetadata == nil || len(newMetadata) == 0) {
 			logger.For(ctx).Errorf("Error getting metadata from URI: %s (%s)", err, newURI)
-			status := http.StatusInternalServerError
+			status := http.StatusNotFound
 			if err != nil {
 				switch caught := err.(type) {
 				case util.ErrHTTP:
-					if caught.Status == http.StatusNotFound {
-						status = http.StatusNotFound
+					if caught.Status != http.StatusNotFound {
+						status = http.StatusInternalServerError
 					}
 				case *url.Error, *net.DNSError, *shell.Error:
-					status = http.StatusNotFound
+					// do nothing
+				default:
+					status = http.StatusInternalServerError
 				}
 			}
 			util.ErrResponse(c, status, errNoMetadataFound{Contract: input.ContractAddress, TokenID: input.TokenID})

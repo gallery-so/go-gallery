@@ -180,6 +180,10 @@ func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (coredb.
 func (tpj *tokenProcessingJob) retrieveMetadata(ctx context.Context) persist.TokenMetadata {
 	defer persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.MetadataRetrieval, "MetadataRetrieval")()
 
+	// metadata is a string, it should not take more than a minute to retrieve
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
+
 	newMetadata := tpj.token.TokenMetadata
 
 	if len(newMetadata) == 0 || tpj.cause == persist.ProcessingCauseRefresh {
