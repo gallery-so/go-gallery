@@ -285,12 +285,13 @@ func createRawMedia(pCtx context.Context, tids persist.TokenIdentifiers, mediaTy
 
 func createMediaFromCachedObjects(ctx context.Context, tokenBucket string, objects []cachedMediaObject) persist.Media {
 	var primaryObject cachedMediaObject
+outer:
 	for _, obj := range objects {
 		switch obj.objectType {
 		case ObjectTypeAnimation:
 			// if we receive an animation, that takes top priority and will be the primary object
 			primaryObject = obj
-			break
+			break outer
 		case ObjectTypeImage, ObjectTypeSVG:
 			// if we don't have an animation, an image like object will be the primary object
 			primaryObject = obj
