@@ -100,6 +100,19 @@ func (c *Cache) Set(pCtx context.Context, key string, value []byte, expiration t
 	return c.client.Set(pCtx, c.getPrefixedKey(key), value, expiration).Err()
 }
 
+// SetNX sets a value in the redis cache if it doesn't already exist. Returns true if the key did not
+// already exist and was set, false if the key did exist and therefore was not set.
+func (c *Cache) SetNX(pCtx context.Context, key string, value []byte, expiration time.Duration) (bool, error) {
+	cmd := c.client.SetNX(pCtx, c.getPrefixedKey(key), value, expiration)
+
+	err := cmd.Err()
+	if err != nil {
+		return false, err
+	}
+
+	return cmd.Val(), nil
+}
+
 // Get gets a value from the redis cache
 func (c *Cache) Get(pCtx context.Context, key string) ([]byte, error) {
 	bs, err := c.client.Get(pCtx, c.getPrefixedKey(key)).Bytes()
