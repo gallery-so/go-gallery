@@ -56,6 +56,11 @@ func RawFormatToMediaType(format string) persist.MediaType {
 	}
 }
 
+type contentTypeLengthTuple struct {
+	contentType string
+	length      int64
+}
+
 // PredictMediaType guesses the media type of the given URL.
 func PredictMediaType(ctx context.Context, url string) (persist.MediaType, *string, *int64, error) {
 	// predicting is not critical, so we can afford to give it a timeout
@@ -90,13 +95,26 @@ func PredictMediaType(ctx context.Context, url string) (persist.MediaType, *stri
 		}
 		return MediaFromContentType(contentType), &contentType, &contentLength, nil
 	case persist.URITypeIPFSGateway:
-		contentType, contentLength, err := rpc.GetIPFSHeaders(ctx, util.GetURIPath(asURI.String(), false))
-		if err == nil {
-			return MediaFromContentType(contentType), &contentType, &contentLength, nil
-		} else if err != nil {
-			logger.For(ctx).Errorf("could not get IPFS headers for %s: %s", url, err)
+
+		ctl, err := util.FirstNonErrorWithValue(ctx, true, func(ctx context.Context) (contentTypeLengthTuple, error) {
+			contentType, contentLength, err := rpc.GetIPFSHeaders(ctx, util.GetURIPath(asURI.String(), false))
+			if err != nil {
+				return contentTypeLengthTuple{}, err
+			}
+			return contentTypeLengthTuple{contentType: contentType, length: contentLength}, nil
+		}, func(ctx context.Context) (contentTypeLengthTuple, error) {
+			contentType, contentLength, err := rpc.GetHTTPHeaders(ctx, url)
+			if err != nil {
+				return contentTypeLengthTuple{}, err
+			}
+			return contentTypeLengthTuple{contentType: contentType, length: contentLength}, nil
+		})
+
+		if err != nil {
+			return persist.MediaTypeUnknown, nil, nil, err
 		}
-		fallthrough
+
+		return MediaFromContentType(ctl.contentType), &ctl.contentType, &ctl.length, nil
 	case persist.URITypeHTTP, persist.URITypeIPFSAPI:
 		contentType, contentLength, err := rpc.GetHTTPHeaders(ctx, url)
 		if err != nil {

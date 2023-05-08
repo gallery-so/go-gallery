@@ -919,6 +919,9 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 
 		reader, err := rpc.GetDataFromURIAsReader(pCtx, asURI, ipfsClient, arweaveClient, time.Second*30)
 		if err != nil {
+			if strings.Contains(err.Error(), context.Canceled.Error()) || strings.Contains(err.Error(), context.DeadlineExceeded.Error()) {
+				return reader, false, err
+			}
 			// the reader is and always will be invalid
 			switch caught := err.(type) {
 			case util.ErrHTTP:
