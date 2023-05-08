@@ -103,7 +103,7 @@ func getTokenMetadata(ipfsClient *shell.Shell, ethClient *ethclient.Client, arwe
 		}
 
 		if err != nil || (newMetadata == nil || len(newMetadata) == 0) {
-			logger.For(ctx).Errorf("Error getting metadata from URI: %s (%s)", err, newURI)
+			logger.For(ctx).Errorf("Error getting metadata from URI: %s (%s)", err, util.TruncateWithEllipsis(newURI.String(), 50))
 			status := http.StatusNotFound
 			if err != nil {
 				switch caught := err.(type) {

@@ -1095,7 +1095,21 @@ update push_notification_tickets t set check_after = updates.check_after, num_ch
 select * from push_notification_tickets where check_after <= now() and deleted = false limit sqlc.arg('limit');
 
 -- name: GetAllTokensWithContracts :many
-select tokens.*, contracts.*, wallets.address as wallet_address from tokens join contracts on (contracts.id = tokens.contract) join wallets on (wallets.id = any(tokens.owned_by_wallets)) where tokens.deleted = false group by (tokens.id,contracts.id,wallets.address) order by tokens.last_updated desc limit $1 offset $2;
+SELECT
+    tokens.*,
+    contracts.*,
+    (
+        SELECT wallets.address
+        FROM wallets
+        WHERE wallets.id = ANY(tokens.owned_by_wallets)
+        LIMIT 1
+    ) AS wallet_address
+FROM tokens
+JOIN contracts ON contracts.id = tokens.contract
+WHERE tokens.deleted = false
+ORDER BY tokens.last_updated DESC
+LIMIT $1 OFFSET $2;
+
 
 -- name: GetMediaByTokenID :batchone
 select m.*

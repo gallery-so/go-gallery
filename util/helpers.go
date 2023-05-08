@@ -650,9 +650,12 @@ func GetOptionalValue[T any](optional *T, fallback T) T {
 	return fallback
 }
 
-func FirstNonErrorWithValue[T any](ctx context.Context, runs ...func() (T, error)) (T, error) {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+func FirstNonErrorWithValue[T any](ctx context.Context, autoCancel bool, runs ...func(context.Context) (T, error)) (T, error) {
+	var cancel context.CancelFunc
+	if autoCancel {
+		ctx, cancel = context.WithCancel(ctx)
+		defer cancel()
+	}
 
 	if len(runs) == 0 {
 		return *new(T), nil
@@ -663,7 +666,7 @@ func FirstNonErrorWithValue[T any](ctx context.Context, runs ...func() (T, error
 	for _, run := range runs {
 		run := run
 		wp.Go(func(ctx context.Context) error {
-			val, err := run()
+			val, err := run(ctx)
 			if err != nil {
 				return err
 			}
@@ -677,11 +680,11 @@ func FirstNonErrorWithValue[T any](ctx context.Context, runs ...func() (T, error
 	}()
 
 	select {
-	case <-ctx.Done():
-		return *new(T), ctx.Err()
-	case err := <-errChan:
-		return *new(T), err
 	case val := <-result:
 		return val, nil
+	case err := <-errChan:
+		return *new(T), err
+	case <-ctx.Done():
+		return *new(T), ctx.Err()
 	}
 }

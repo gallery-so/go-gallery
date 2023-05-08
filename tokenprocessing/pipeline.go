@@ -75,6 +75,7 @@ func (tp *tokenProcessor) ProcessTokenPipeline(c context.Context, t persist.Toke
 	loggerCtx := logger.NewContextWithFields(c, logrus.Fields{
 		"tokenDBID":       t.ID,
 		"tokenID":         t.TokenID,
+		"tokenID_base10":  t.TokenID.Base10String(),
 		"contractDBID":    t.Contract,
 		"contractAddress": contract.Address,
 		"chain":           t.Chain,
@@ -97,7 +98,14 @@ func (tp *tokenProcessor) ProcessTokenPipeline(c context.Context, t persist.Toke
 		}
 	}()
 
-	return job.run(ctx)
+	result := make(chan error, 1)
+
+	select {
+	case result <- job.run(ctx):
+		return <-result
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func (tpj *tokenProcessingJob) run(ctx context.Context) error {

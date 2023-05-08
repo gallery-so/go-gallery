@@ -31,4 +31,4 @@ alter table tokens add column if not exists token_media_id varchar(255) referenc
 
 alter table tokens add constraint fk_tokens_contracts foreign key (contract) references contracts (id) on delete cascade on update cascade;
 
-
+create index if not exists token_last_updated_idx on tokens (last_updated) where deleted = false;

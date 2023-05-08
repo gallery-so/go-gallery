@@ -102,6 +102,11 @@ func main() {
 
 	for _, row := range rows {
 
+		if row.IsProviderMarkedSpam.Bool || row.IsUserMarkedSpam.Bool || row.IsProviderMarkedSpam_2 {
+			logrus.Infof("skipping token %s because it is marked as spam", row.ID)
+			continue
+		}
+
 		wallets := []persist.Wallet{}
 		for _, w := range row.OwnedByWallets {
 			wallets = append(wallets, persist.Wallet{ID: w})

@@ -140,7 +140,7 @@ func cacheObjectsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	})
 	tids := persist.NewTokenIdentifiers(contractAddress, tokenID, chain)
 
-	imgURL, animURL, err := findImageAndAnimationURLs(pCtx, tokenID, contractAddress, chain, metadata, tokenURI, true, pMeta)
+	imgURL, animURL, err := findImageAndAnimationURLs(pCtx, tokenID, contractAddress, chain, metadata, tokenURI, chain != persist.ChainETH, pMeta)
 	if err != nil {
 		return nil, err
 	}
@@ -548,7 +548,7 @@ func findImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, con
 		}
 	}
 
-	image, anim := KeywordsForToken(tokenID, contractAddress, chain)
+	image, anim := keywordsForToken(tokenID, contractAddress, chain)
 	for _, keyword := range image {
 		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && it != "" {
 			logger.For(ctx).Debugf("found initial animation url from '%s': %s", keyword, it)
@@ -916,9 +916,9 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 	timeBeforeDataReader := time.Now()
 	reader, retryOpensea, err := func() (*util.FileHeaderReader, bool, error) {
 		defer persist.TrackStepStatus(pCtx, subMeta.ReaderRetrieval, "ReaderRetrieval")()
-		reader, err := rpc.GetDataFromURIAsReader(pCtx, asURI, ipfsClient, arweaveClient)
-		if err != nil {
 
+		reader, err := rpc.GetDataFromURIAsReader(pCtx, asURI, ipfsClient, arweaveClient, time.Second*30)
+		if err != nil {
 			// the reader is and always will be invalid
 			switch caught := err.(type) {
 			case util.ErrHTTP:
@@ -933,7 +933,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 
 			// if we're not already recursive, try opensea for ethereum tokens
 			if !isRecursive && tids.Chain == persist.ChainETH {
-				return reader, true, nil
+				return reader, true, err
 			}
 
 			persist.FailStep(subMeta.ReaderRetrieval)
@@ -942,7 +942,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 		return reader, false, nil
 	}()
 
-	if err != nil {
+	if err != nil && !retryOpensea {
 		return nil, err
 	}
 
@@ -965,7 +965,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 				continue
 			}
 
-			reader, err = rpc.GetDataFromURIAsReader(pCtx, persist.TokenURI(firstNonEmptyURL), ipfsClient, arweaveClient)
+			reader, err = rpc.GetDataFromURIAsReader(pCtx, persist.TokenURI(firstNonEmptyURL), ipfsClient, arweaveClient, time.Second*15)
 			if err != nil {
 				continue
 			}
@@ -1187,7 +1187,7 @@ func truncateString(s string, i int) string {
 	return s
 }
 
-func KeywordsForToken(tokenID persist.TokenID, contract persist.Address, chain persist.Chain) ([]string, []string) {
+func keywordsForToken(tokenID persist.TokenID, contract persist.Address, chain persist.Chain) ([]string, []string) {
 	switch {
 	case tezos.IsHicEtNunc(contract):
 		_, anim := chain.BaseKeywords()
