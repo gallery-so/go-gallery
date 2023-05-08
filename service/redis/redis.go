@@ -17,45 +17,46 @@ type ErrKeyNotFound struct {
 	Key string
 }
 
-const (
-	GalleriesDB               = 0
-	GalleriesTokenDB          = 1
-	CommunitiesDB             = 2
-	RequireNftsDB             = 3
-	TestSuiteDB               = 5
-	IndexerServerThrottleDB   = 6
-	RefreshNFTsThrottleDB     = 7
-	TokenProcessingThrottleDB = 8
-	EmailThrottleDB           = 9
-	NotificationLockDB        = 10
-	EmailRateLimiterDB        = 11
-	GraphQLAPQ                = 12
-	FeedDB                    = 13
-	SocialDB                  = 14
-)
+type redisDB int
 
-// GetNameForDatabase returns a name for the given database ID, if available.
-// This is useful for adding debug information to Redis calls (like tracing).
-func GetNameForDatabase(databaseId int) string {
-	switch databaseId {
-	case GalleriesDB:
-		return "GalleriesDB"
-	case GalleriesTokenDB:
-		return "GalleriesTokenDB"
-	case CommunitiesDB:
-		return "CommunitiesDB"
-	case RequireNftsDB:
-		return "RequireNftsDB"
-	case TestSuiteDB:
-		return "TestSuiteDB"
-	case FeedDB:
-		return "FeedDB"
-	}
-
-	return fmt.Sprintf("db %d", databaseId)
+type CacheConfig struct {
+	database    redisDB
+	displayName string
+	keyPrefix   string
 }
 
-func NewClient(db int) *redis.Client {
+const (
+	locks                   redisDB = 0
+	rateLimiters            redisDB = 1
+	communities             redisDB = 2
+	misc                    redisDB = 3
+	indexerServerThrottle   redisDB = 6
+	refreshNFTsThrottle     redisDB = 7
+	tokenProcessingThrottle redisDB = 8
+	emailThrottle           redisDB = 9
+	graphQLAPQ              redisDB = 12
+	feed                    redisDB = 13
+	social                  redisDB = 14
+)
+
+// Every cache is uniquely defined by its database and key prefix. Display names are used for tracing.
+
+var (
+	NotificationLockCache        = CacheConfig{database: locks, keyPrefix: "notif", displayName: "notificationLock"}
+	EmailRateLimitersCache       = CacheConfig{database: rateLimiters, keyPrefix: "email", displayName: "emailRateLimiters"}
+	OneTimeLoginCache            = CacheConfig{database: misc, keyPrefix: "otl", displayName: "oneTimeLogin"}
+	CommunitiesCache             = CacheConfig{database: communities, keyPrefix: "", displayName: "communities"}
+	IndexerServerThrottleCache   = CacheConfig{database: indexerServerThrottle, keyPrefix: "", displayName: "indexerServerThrottle"}
+	RefreshNFTsThrottleCache     = CacheConfig{database: refreshNFTsThrottle, keyPrefix: "", displayName: "refreshNFTsThrottle"}
+	TokenProcessingThrottleCache = CacheConfig{database: tokenProcessingThrottle, keyPrefix: "", displayName: "tokenProcessingThrottle"}
+	EmailThrottleCache           = CacheConfig{database: emailThrottle, keyPrefix: "", displayName: "emailThrottle"}
+	GraphQLAPQCache              = CacheConfig{database: graphQLAPQ, keyPrefix: "", displayName: "graphQLAPQ"}
+	FeedCache                    = CacheConfig{database: feed, keyPrefix: "", displayName: "feed"}
+	SocialCache                  = CacheConfig{database: social, keyPrefix: "", displayName: "social"}
+)
+
+func newClient(db redisDB, traceName string) *redis.Client {
+	databaseID := int(db)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 	redisURL := env.GetString("REDIS_URL")
@@ -63,41 +64,45 @@ func NewClient(db int) *redis.Client {
 	client := redis.NewClient(&redis.Options{
 		Addr:     redisURL,
 		Password: redisPass,
-		DB:       db,
+		DB:       databaseID,
 	})
-	client.AddHook(tracing.NewRedisHook(db, GetNameForDatabase(db), true))
+	client.AddHook(tracing.NewRedisHook(databaseID, traceName, true))
 	if err := client.Ping(ctx).Err(); err != nil {
 		panic(err)
 	}
 	return client
 }
 
-// Cache represents an abstraction over a redist client
+// Cache represents an abstraction over a redis client
 type Cache struct {
-	client *redis.Client
+	client    *redis.Client
+	keyPrefix string
+}
+
+func (c *Cache) Client() *redis.Client {
+	return c.client
+}
+
+func (c *Cache) Prefix() string {
+	return c.keyPrefix
 }
 
 // NewCache creates a new redis cache
-func NewCache(db int) *Cache {
-	return &Cache{client: NewClient(db)}
-}
-
-// ClearCache deletes the entire cache
-func ClearCache(db int) error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
-	client := NewClient(db)
-	return client.FlushDB(ctx).Err()
+func NewCache(config CacheConfig) *Cache {
+	return &Cache{
+		client:    newClient(config.database, config.displayName),
+		keyPrefix: config.keyPrefix,
+	}
 }
 
 // Set sets a value in the redis cache
 func (c *Cache) Set(pCtx context.Context, key string, value []byte, expiration time.Duration) error {
-	return c.client.Set(pCtx, key, value, expiration).Err()
+	return c.client.Set(pCtx, c.getPrefixedKey(key), value, expiration).Err()
 }
 
 // Get gets a value from the redis cache
 func (c *Cache) Get(pCtx context.Context, key string) ([]byte, error) {
-	bs, err := c.client.Get(pCtx, key).Bytes()
+	bs, err := c.client.Get(pCtx, c.getPrefixedKey(key)).Bytes()
 	if err != nil {
 		if err == redis.Nil {
 			return nil, ErrKeyNotFound{Key: key}
@@ -109,49 +114,63 @@ func (c *Cache) Get(pCtx context.Context, key string) ([]byte, error) {
 
 // Delete deletes a value from the redis cache
 func (c *Cache) Delete(pCtx context.Context, key string) error {
-	return c.client.Del(pCtx, key).Err()
+	return c.client.Del(pCtx, c.getPrefixedKey(key)).Err()
 }
 
-// Close closes the redis client and optionally deletes the cache
-func (c *Cache) Close(clear bool) error {
-	if clear {
-		if err := c.client.FlushDB(context.Background()).Err(); err != nil {
-			return err
-		}
-	}
+// Close closes the underlying redis client
+func (c *Cache) Close() error {
 	return c.client.Close()
 }
 
-func NewLockClient(db int) *redislock.Client {
-	return redislock.New(NewClient(db))
-}
-
-// GlobalLock is a distributed lock that does not depend on a key.
-// It can store its own context and lock because we can assume that there never be more than one global lock in use at a time
-// and therefore no concurrency issues with overwriting the context and lock.
-type GlobalLock struct {
-	client *redislock.Client
-	ttl    time.Duration
-	lock   *redislock.Lock
-}
-
-func NewGlobalLock(client *redislock.Client, ttl time.Duration) *GlobalLock {
-	return &GlobalLock{client: client, ttl: ttl}
-}
-
-func (l *GlobalLock) Lock(ctx context.Context) error {
-	lock, err := l.client.Obtain(ctx, "lock", l.ttl, &redislock.Options{RetryStrategy: redislock.LimitRetry(redislock.LinearBackoff(time.Second), 10)})
-	if err != nil {
-		return err
+func (c *Cache) getPrefixedKey(key string) string {
+	if c.keyPrefix == "" {
+		return key
 	}
-	l.lock = lock
-	return nil
+
+	return c.keyPrefix + ":" + key
 }
 
-func (l *GlobalLock) Unlock(ctx context.Context) error {
-	return l.lock.Release(ctx)
+func (c *Cache) getPrefixedKeys(keys []string) []string {
+	if c.keyPrefix == "" {
+		return keys
+	}
+
+	prefixedKeys := make([]string, len(keys))
+	for i, key := range keys {
+		prefixedKeys[i] = c.keyPrefix + ":" + key
+	}
+	return prefixedKeys
 }
 
 func (e ErrKeyNotFound) Error() string {
 	return fmt.Sprintf("key %s not found", e.Key)
+}
+
+func NewLockClient(cache *Cache) *redislock.Client {
+	return redislock.New(&redislockCacheClient{cache: cache})
+}
+
+// redislockCacheClient is a minimal implementation of redislock.RedisClient that uses a Cache to namespace its keys
+type redislockCacheClient struct {
+	cache *Cache
+}
+
+func (r *redislockCacheClient) SetNX(ctx context.Context, key string, value interface{}, expiration time.Duration) *redis.BoolCmd {
+	return r.cache.client.SetNX(ctx, r.cache.getPrefixedKey(key), value, expiration)
+}
+
+func (r *redislockCacheClient) Eval(ctx context.Context, script string, keys []string, args ...interface{}) *redis.Cmd {
+	return r.cache.client.Eval(ctx, script, r.cache.getPrefixedKeys(keys), args...)
+}
+
+func (r *redislockCacheClient) EvalSha(ctx context.Context, sha1 string, keys []string, args ...interface{}) *redis.Cmd {
+	return r.cache.client.EvalSha(ctx, sha1, r.cache.getPrefixedKeys(keys), args...)
+}
+
+func (r *redislockCacheClient) ScriptExists(ctx context.Context, scripts ...string) *redis.BoolSliceCmd {
+	return r.cache.client.ScriptExists(ctx, scripts...)
+}
+
+func (r *redislockCacheClient) ScriptLoad(ctx context.Context, script string) *redis.StringCmd {
+	return r.cache.client.ScriptLoad(ctx, script)
 }
