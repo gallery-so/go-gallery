@@ -361,11 +361,6 @@ enum WalletType {
   GnosisSafe
 }
 
-enum InteractionType {
-  Admire
-  Comment
-}
-
 type Token implements Node {
   id: ID!
   dbid: DBID!
@@ -770,14 +765,11 @@ type FeedEvent implements Node @key(fields: "dbid") {
     @goField(forceResolver: true)
   caption: String
 
-  # If supplied, typeFilter will only query for the requested interaction types.
-  # If typeFilter is omitted, all interaction types will be queried.
   interactions(
     before: String
     after: String
     first: Int
     last: Int
-    typeFilter: [InteractionType!]
   ): FeedEventInteractionsConnection @goField(forceResolver: true)
 
   viewerAdmire: Admire @goField(forceResolver: true)
