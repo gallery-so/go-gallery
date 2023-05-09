@@ -652,6 +652,7 @@ enum UserExperienceType {
   TwitterConnectionOnboardingUpsell
   UpsellMintMemento4
   UpsellGallerySelects1
+  MobileUpsell1
 }
 
 type UserExperience {
