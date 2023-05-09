@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgtype"
@@ -51,43 +52,6 @@ func (m MultiErr) Error() string {
 		}
 	}
 	return fmt.Sprint("Multiple errors: [", errStr, "]")
-}
-
-// FileHeaderReader is a struct that wraps an io.Reader and pre-reads the first 512 bytes of the reader
-// When the reader is read, the first 512 bytes are returned first, then the rest of the reader is read,
-// so that the first 512 bytes are not lost
-type FileHeaderReader struct {
-	*bufio.Reader
-	headers   []byte
-	subreader io.Reader
-}
-
-// NewFileHeaderReader returns a new FileHeaderReader
-func NewFileHeaderReader(reader io.Reader) *FileHeaderReader {
-	return &FileHeaderReader{bufio.NewReader(reader), nil, reader}
-}
-
-// Close closes the given io.Reader if it is also a closer
-func (f FileHeaderReader) Close() error {
-	if closer, ok := f.subreader.(io.Closer); ok {
-		return closer.Close()
-	}
-	return nil
-}
-
-// Headers returns the first 512 bytes of the reader
-func (f FileHeaderReader) Headers() ([]byte, error) {
-	if f.headers != nil {
-		return f.headers, nil
-	}
-
-	byt, err := f.Peek(512)
-	if err != nil && err != io.EOF {
-		return nil, err
-	}
-
-	f.headers = byt
-	return f.headers, nil
 }
 
 // RemoveBOM removes the byte order mark from a byte array
@@ -650,16 +614,22 @@ func GetOptionalValue[T any](optional *T, fallback T) T {
 	return fallback
 }
 
-func FirstNonErrorWithValue[T any](ctx context.Context, autoCancel bool, runs ...func(context.Context) (T, error)) (T, error) {
+func FirstNonErrorWithValue[T any](ctx context.Context, autoCancel bool, returnOnError func(error) bool, runs ...func(context.Context) (T, error)) (T, error) {
+
+	if len(runs) == 0 {
+		return *new(T), nil
+	}
+
+	if returnOnError == nil {
+		returnOnError = DefaultReturnOnError
+	}
+
 	var cancel context.CancelFunc
 	if autoCancel {
 		ctx, cancel = context.WithCancel(ctx)
 		defer cancel()
 	}
 
-	if len(runs) == 0 {
-		return *new(T), nil
-	}
 	wp := pool.New().WithMaxGoroutines(len(runs)).WithContext(ctx)
 	result := make(chan T)
 	errChan := make(chan error)
@@ -668,6 +638,10 @@ func FirstNonErrorWithValue[T any](ctx context.Context, autoCancel bool, runs ..
 		wp.Go(func(ctx context.Context) error {
 			val, err := run(ctx)
 			if err != nil {
+				if returnOnError(err) {
+					errChan <- err
+					return err
+				}
 				return err
 			}
 			result <- val
@@ -686,5 +660,107 @@ func FirstNonErrorWithValue[T any](ctx context.Context, autoCancel bool, runs ..
 		return *new(T), err
 	case <-ctx.Done():
 		return *new(T), ctx.Err()
+	}
+}
+
+func DefaultReturnOnError(error) bool {
+	return false
+}
+
+// FileHeaderReader is a struct that wraps an io.Reader and pre-reads the first 512 bytes of the reader
+// When the reader is read, the first 512 bytes are returned first, then the rest of the reader is read,
+// so that the first 512 bytes are not lost
+type FileHeaderReader struct {
+	*bufio.Reader
+	headers   []byte
+	subreader io.Reader
+}
+
+// NewFileHeaderReader returns a new FileHeaderReader
+func NewFileHeaderReader(reader io.Reader, bufSize int) *FileHeaderReader {
+	return &FileHeaderReader{bufio.NewReaderSize(reader, bufSize), nil, reader}
+}
+
+// Close closes the given io.Reader if it is also a closer
+func (f FileHeaderReader) Close() error {
+	if closer, ok := f.subreader.(io.Closer); ok {
+		return closer.Close()
+	}
+	return nil
+}
+
+// Headers returns the first 512 bytes of the reader
+func (f FileHeaderReader) Headers() ([]byte, error) {
+	if f.headers != nil {
+		return f.headers, nil
+	}
+
+	byt, err := f.Peek(512)
+	if err != nil && err != io.EOF {
+		return nil, err
+	}
+
+	f.headers = byt
+	return f.headers, nil
+}
+
+type ResettableTimer struct {
+	Duration time.Duration
+	C        <-chan time.Time
+	timer    *time.Timer
+}
+
+func NewResettableTimer(duration time.Duration) *ResettableTimer {
+	timer := time.NewTimer(duration)
+	return &ResettableTimer{
+		Duration: duration,
+		C:        timer.C,
+		timer:    timer,
+	}
+}
+
+func (rt *ResettableTimer) Reset() {
+	rt.timer.Stop()
+	rt.timer.Reset(rt.Duration)
+}
+
+type ReaderWriterTo interface {
+	io.Reader
+	io.WriterTo
+}
+
+type TimeoutReader struct {
+	ReaderWriterTo
+	timer *ResettableTimer
+}
+
+func NewTimeoutReader(reader ReaderWriterTo, timeout time.Duration) *TimeoutReader {
+	timer := NewResettableTimer(timeout)
+	return &TimeoutReader{
+		ReaderWriterTo: reader,
+		timer:          timer,
+	}
+}
+
+func (tr *TimeoutReader) WriteTo(w io.Writer) (n int64, err error) {
+	result := make(chan int64, 1)
+	errs := make(chan error, 1)
+	go func() {
+		n, err := tr.ReaderWriterTo.WriteTo(w)
+		result <- n
+		errs <- err
+		close(result)
+		close(errs)
+	}()
+	select {
+	case n := <-result:
+		err := <-errs
+		if err != nil {
+			return n, err
+		}
+		tr.timer.Reset()
+		return n, nil
+	case <-tr.timer.C:
+		return 0, context.DeadlineExceeded
 	}
 }

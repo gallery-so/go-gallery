@@ -39,7 +39,7 @@ func InitServer() {
 }
 
 func CoreInitServer(c *server.Clients, mc *multichain.Provider) *gin.Engine {
-	initSentry()
+	InitSentry()
 	logger.InitWithGCPDefaults()
 
 	http.DefaultClient = &http.Client{Transport: tracing.NewTracingTransport(http.DefaultTransport, false)}
@@ -111,7 +111,7 @@ func newThrottler() *throttle.Locker {
 	return throttle.NewThrottleLocker(redis.NewCache(redis.TokenProcessingTempThrottleDB), time.Minute*30)
 }
 
-func initSentry() {
+func InitSentry() {
 	if env.GetString("ENV") == "local" {
 		logger.For(nil).Info("skipping sentry init")
 		return

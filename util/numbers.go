@@ -1,6 +1,7 @@
 package util
 
 import (
+	"encoding/base64"
 	"math/big"
 	"strings"
 )
@@ -56,4 +57,27 @@ func RemoveLeftPaddedZeros(hex string) string {
 		}
 	}
 	return hex
+}
+
+func Base64StdDecode(s string) ([]byte, error) {
+	bs, err := base64.StdEncoding.DecodeString(s)
+	if err != nil {
+		bs, err = base64.RawStdEncoding.DecodeString(s)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return bs, nil
+}
+
+func Base64Decode(s string, encodings ...*base64.Encoding) ([]byte, error) {
+	var lastError error
+	for _, encoding := range encodings {
+		bs, err := encoding.DecodeString(s)
+		if err == nil {
+			return bs, nil
+		}
+		lastError = err
+	}
+	return nil, lastError
 }

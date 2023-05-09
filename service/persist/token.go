@@ -98,6 +98,8 @@ const (
 	URITypeArweaveGateway URIType = "arweave-gateway"
 	// URITypeBase64JSON represents a base64 encoded JSON document
 	URITypeBase64JSON URIType = "base64json"
+	// URITypeBase64HTML represents a base64 encoded HTML document
+	URITypeBase64HTML URIType = "base64html"
 	// URITypeJSON represents a JSON document
 	URITypeJSON URIType = "json"
 	// URITypeBase64SVG represents a base64 encoded SVG
@@ -509,6 +511,8 @@ func (uri TokenURI) Type() URIType {
 		return URITypeIPFS
 	case strings.HasPrefix(asString, "ar://"), strings.HasPrefix(asString, "arweave://"):
 		return URITypeArweave
+	case strings.HasPrefix(asString, "data:text/html;base64,"):
+		return URITypeBase64HTML
 	case strings.HasPrefix(asString, "data:application/json;base64,"):
 		return URITypeBase64JSON
 	case strings.HasPrefix(asString, "data:image/svg+xml;base64,"), strings.HasPrefix(asString, "data:image/svg xml;base64,"):

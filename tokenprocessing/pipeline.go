@@ -82,7 +82,7 @@ func (tp *tokenProcessor) ProcessTokenPipeline(c context.Context, t persist.Toke
 		"runID":           runID,
 	})
 
-	ctx, cancel := context.WithTimeout(loggerCtx, time.Minute*5)
+	ctx, cancel := context.WithTimeout(loggerCtx, time.Minute*10)
 	defer cancel()
 
 	totalTime := time.Now()
@@ -246,6 +246,12 @@ func (tpj *tokenProcessingJob) createMediaFromCachedObjects(ctx context.Context,
 	defer persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.CreateMediaFromCachedObjects, "CreateMediaFromCachedObjects")()
 	in := map[objectType]cachedMediaObject{}
 	for _, obj := range objects {
+		if it, ok := in[obj.ObjectType]; ok {
+			if it.MediaType.IsMorePriorityThan(obj.MediaType) {
+				in[obj.ObjectType] = obj
+			}
+			continue
+		}
 		in[obj.ObjectType] = obj
 	}
 	return createMediaFromCachedObjects(ctx, tpj.tp.tokenBucket, in)

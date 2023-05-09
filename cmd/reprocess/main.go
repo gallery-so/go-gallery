@@ -36,6 +36,9 @@ func main() {
 	pg := postgres.NewPgxClient()
 	clients := server.ClientInit(ctx)
 
+	tokenprocessing.InitSentry()
+	logger.InitWithGCPDefaults()
+
 	tp := tokenprocessing.NewTokenProcessor(clients.Queries, clients.EthClient, server.NewMultichainProvider(clients), clients.IPFSClient, clients.ArweaveClient, clients.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), clients.Repos.TokenRepository)
 
 	var totalTokenCount int
@@ -107,66 +110,55 @@ func main() {
 			continue
 		}
 
+		totalTokens++
+
 		wallets := []persist.Wallet{}
 		for _, w := range row.OwnedByWallets {
 			wallets = append(wallets, persist.Wallet{ID: w})
 		}
-		var userSpam *bool
-		if row.IsUserMarkedSpam.Valid {
-			b := row.IsUserMarkedSpam.Bool
-			userSpam = &b
-		}
-		var provierSpam *bool
-		if row.IsProviderMarkedSpam.Valid {
-			b := row.IsProviderMarkedSpam.Bool
-			provierSpam = &b
-		}
 
 		token := persist.TokenGallery{
-			Version:              persist.NullInt32(row.Version.Int32),
-			ID:                   row.ID,
-			CreationTime:         persist.CreationTime(row.CreatedAt),
-			Deleted:              persist.NullBool(row.Deleted),
-			LastUpdated:          persist.LastUpdatedTime(row.LastUpdated),
-			LastSynced:           persist.LastUpdatedTime(row.LastSynced),
-			CollectorsNote:       persist.NullString(row.CollectorsNote.String),
-			Media:                row.Media,
-			TokenMedia:           row.TokenMediaID,
-			FallbackMedia:        row.FallbackMedia,
-			TokenType:            persist.TokenType(row.TokenType.String),
-			Chain:                row.Chain,
-			Name:                 persist.NullString(row.Name.String),
-			Description:          persist.NullString(row.Description.String),
-			TokenURI:             persist.TokenURI(row.TokenUri.String),
-			TokenID:              row.TokenID,
-			Quantity:             persist.HexString(row.Quantity.String),
-			OwnerUserID:          row.OwnerUserID,
-			OwnedByWallets:       wallets,
-			OwnershipHistory:     row.OwnershipHistory,
-			TokenMetadata:        row.TokenMetadata,
-			Contract:             row.Contract,
-			ExternalURL:          persist.NullString(row.ExternalUrl.String),
-			BlockNumber:          persist.BlockNumber(row.BlockNumber.Int64),
-			IsUserMarkedSpam:     userSpam,
-			IsProviderMarkedSpam: provierSpam,
+			Version:          persist.NullInt32(row.Version.Int32),
+			ID:               row.ID,
+			CreationTime:     persist.CreationTime(row.CreatedAt),
+			Deleted:          persist.NullBool(row.Deleted),
+			LastUpdated:      persist.LastUpdatedTime(row.LastUpdated),
+			LastSynced:       persist.LastUpdatedTime(row.LastSynced),
+			CollectorsNote:   persist.NullString(row.CollectorsNote.String),
+			Media:            row.Media,
+			TokenMedia:       row.TokenMediaID,
+			FallbackMedia:    row.FallbackMedia,
+			TokenType:        persist.TokenType(row.TokenType.String),
+			Chain:            row.Chain,
+			Name:             persist.NullString(row.Name.String),
+			Description:      persist.NullString(row.Description.String),
+			TokenURI:         persist.TokenURI(row.TokenUri.String),
+			TokenID:          row.TokenID,
+			Quantity:         persist.HexString(row.Quantity.String),
+			OwnerUserID:      row.OwnerUserID,
+			OwnedByWallets:   wallets,
+			OwnershipHistory: row.OwnershipHistory,
+			TokenMetadata:    row.TokenMetadata,
+			Contract:         row.Contract,
+			ExternalURL:      persist.NullString(row.ExternalUrl.String),
+			BlockNumber:      persist.BlockNumber(row.BlockNumber.Int64),
 		}
 		contract := persist.ContractGallery{
-			Version:              persist.NullInt32(row.Version_2.Int32),
-			ID:                   row.ID_2,
-			CreationTime:         persist.CreationTime(row.CreatedAt_2),
-			Deleted:              persist.NullBool(row.Deleted_2),
-			LastUpdated:          persist.LastUpdatedTime(row.LastUpdated_2),
-			Chain:                row.Chain_2,
-			Address:              row.Address,
-			Symbol:               persist.NullString(row.Symbol.String),
-			Name:                 util.ToNullString(row.Name_2.String, true),
-			Description:          persist.NullString(row.Description_2.String),
-			OwnerAddress:         row.OwnerAddress,
-			CreatorAddress:       row.CreatorAddress,
-			ProfileImageURL:      persist.NullString(row.ProfileImageUrl.String),
-			ProfileBannerURL:     persist.NullString(row.ProfileBannerUrl.String),
-			BadgeURL:             persist.NullString(row.BadgeUrl.String),
-			IsProviderMarkedSpam: row.IsProviderMarkedSpam_2,
+			Version:          persist.NullInt32(row.Version_2.Int32),
+			ID:               row.ID_2,
+			CreationTime:     persist.CreationTime(row.CreatedAt_2),
+			Deleted:          persist.NullBool(row.Deleted_2),
+			LastUpdated:      persist.LastUpdatedTime(row.LastUpdated_2),
+			Chain:            row.Chain_2,
+			Address:          row.Address,
+			Symbol:           persist.NullString(row.Symbol.String),
+			Name:             util.ToNullString(row.Name_2.String, true),
+			Description:      persist.NullString(row.Description_2.String),
+			OwnerAddress:     row.OwnerAddress,
+			CreatorAddress:   row.CreatorAddress,
+			ProfileImageURL:  persist.NullString(row.ProfileImageUrl.String),
+			ProfileBannerURL: persist.NullString(row.ProfileBannerUrl.String),
+			BadgeURL:         persist.NullString(row.BadgeUrl.String),
 		}
 
 		anOwner := row.WalletAddress
@@ -216,6 +208,9 @@ func setDefaults() {
 	viper.SetDefault("CLOUD_RUN_JOB", "")
 	viper.SetDefault("CLOUD_RUN_TASK_INDEX", 0)
 	viper.SetDefault("CLOUD_RUN_TASK_COUNT", 1)
+	viper.SetDefault("SENTRY_DSN", "")
+	viper.SetDefault("SENTRY_TRACES_SAMPLE_RATE", 0.2)
+	viper.SetDefault("VERSION", "0")
 
 	viper.AutomaticEnv()
 
