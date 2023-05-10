@@ -3550,15 +3550,15 @@ func (b *PaginateGlobalFeedBatchResults) Close() error {
 const paginateInteractionsByFeedEventIDBatch = `-- name: PaginateInteractionsByFeedEventIDBatch :batchmany
 SELECT interactions.created_At, interactions.id, interactions.tag FROM (
     SELECT t.created_at, t.id, $1::int as tag FROM admires t WHERE $1 != 0 AND t.feed_event_id = $2 AND t.deleted = false
-        AND (t.created_at, t.id) < ($3, $4) AND (t.created_at, t.id) > ($5, $6)
+        AND ($1, t.created_at, t.id) < ($3::int, $4, $5) AND ($1, t.created_at, t.id) > ($6::int, $7, $8)
                                                                     UNION
-    SELECT t.created_at, t.id, $7::int as tag FROM comments t WHERE $7 != 0 AND t.feed_event_id = $2 AND t.deleted = false
-        AND (t.created_at, t.id) < ($3, $4) AND (t.created_at, t.id) > ($5, $6)
+    SELECT t.created_at, t.id, $9::int as tag FROM comments t WHERE $9 != 0 AND t.feed_event_id = $2 AND t.deleted = false
+        AND ($9, t.created_at, t.id) < ($3::int, $4, $5) AND ($9, t.created_at, t.id) > ($6::int, $7, $8)
 ) as interactions
 
-ORDER BY CASE WHEN $8::bool THEN (created_at, id) END ASC,
-         CASE WHEN NOT $8::bool THEN (created_at, id) END DESC
-LIMIT $9
+ORDER BY CASE WHEN $10::bool THEN (tag, created_at, id) END ASC,
+         CASE WHEN NOT $10::bool THEN (tag, created_at, id) END DESC
+LIMIT $11
 `
 
 type PaginateInteractionsByFeedEventIDBatchBatchResults struct {
@@ -3570,8 +3570,10 @@ type PaginateInteractionsByFeedEventIDBatchBatchResults struct {
 type PaginateInteractionsByFeedEventIDBatchParams struct {
 	AdmireTag     int32
 	FeedEventID   persist.DBID
+	CurBeforeTag  int32
 	CurBeforeTime time.Time
 	CurBeforeID   persist.DBID
+	CurAfterTag   int32
 	CurAfterTime  time.Time
 	CurAfterID    persist.DBID
 	CommentTag    int32
@@ -3591,8 +3593,10 @@ func (q *Queries) PaginateInteractionsByFeedEventIDBatch(ctx context.Context, ar
 		vals := []interface{}{
 			a.AdmireTag,
 			a.FeedEventID,
+			a.CurBeforeTag,
 			a.CurBeforeTime,
 			a.CurBeforeID,
+			a.CurAfterTag,
 			a.CurAfterTime,
 			a.CurAfterID,
 			a.CommentTag,

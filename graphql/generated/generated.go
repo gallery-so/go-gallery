@@ -457,7 +457,7 @@ type ComplexityRoot struct {
 		EventData             func(childComplexity int) int
 		HasViewerAdmiredEvent func(childComplexity int) int
 		ID                    func(childComplexity int) int
-		Interactions          func(childComplexity int, before *string, after *string, first *int, last *int, typeFilter []persist.InteractionType) int
+		Interactions          func(childComplexity int, before *string, after *string, first *int, last *int) int
 		ViewerAdmire          func(childComplexity int) int
 	}
 
@@ -1339,7 +1339,7 @@ type FeedEventResolver interface {
 	Admires(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.FeedEventAdmiresConnection, error)
 	Comments(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.FeedEventCommentsConnection, error)
 
-	Interactions(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int, typeFilter []persist.InteractionType) (*model.FeedEventInteractionsConnection, error)
+	Interactions(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.FeedEventInteractionsConnection, error)
 	ViewerAdmire(ctx context.Context, obj *model.FeedEvent) (*model.Admire, error)
 	HasViewerAdmiredEvent(ctx context.Context, obj *model.FeedEvent) (*bool, error)
 }
@@ -2795,7 +2795,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.FeedEvent.Interactions(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int), args["typeFilter"].([]persist.InteractionType)), true
+		return e.complexity.FeedEvent.Interactions(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
 	case "FeedEvent.viewerAdmire":
 		if e.complexity.FeedEvent.ViewerAdmire == nil {
@@ -7413,14 +7413,11 @@ type FeedEvent implements Node @key(fields: "dbid") {
     @goField(forceResolver: true)
   caption: String
 
-  # If supplied, typeFilter will only query for the requested interaction types.
-  # If typeFilter is omitted, all interaction types will be queried.
   interactions(
     before: String
     after: String
     first: Int
     last: Int
-    typeFilter: [InteractionType!]
   ): FeedEventInteractionsConnection @goField(forceResolver: true)
 
   viewerAdmire: Admire @goField(forceResolver: true)
@@ -9150,15 +9147,6 @@ func (ec *executionContext) field_FeedEvent_interactions_args(ctx context.Contex
 		}
 	}
 	args["last"] = arg3
-	var arg4 []persist.InteractionType
-	if tmp, ok := rawArgs["typeFilter"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("typeFilter"))
-		arg4, err = ec.unmarshalOInteractionType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐInteractionTypeᚄ(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["typeFilter"] = arg4
 	return args, nil
 }
 
@@ -19469,7 +19457,7 @@ func (ec *executionContext) _FeedEvent_interactions(ctx context.Context, field g
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.FeedEvent().Interactions(rctx, obj, fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int), fc.Args["typeFilter"].([]persist.InteractionType))
+		return ec.resolvers.FeedEvent().Interactions(rctx, obj, fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -60877,16 +60865,6 @@ func (ec *executionContext) marshalNInt2ᚕintᚄ(ctx context.Context, sel ast.S
 	return ret
 }
 
-func (ec *executionContext) unmarshalNInteractionType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐInteractionType(ctx context.Context, v interface{}) (persist.InteractionType, error) {
-	var res persist.InteractionType
-	err := res.UnmarshalGQL(v)
-	return res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalNInteractionType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐInteractionType(ctx context.Context, sel ast.SelectionSet, v persist.InteractionType) graphql.Marshaler {
-	return v
-}
-
 func (ec *executionContext) marshalNMerchToken2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMerchToken(ctx context.Context, sel ast.SelectionSet, v *model.MerchToken) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
@@ -63181,73 +63159,6 @@ func (ec *executionContext) marshalOInteraction2githubᚗcomᚋmikeydubᚋgoᚑg
 		return graphql.Null
 	}
 	return ec._Interaction(ctx, sel, v)
-}
-
-func (ec *executionContext) unmarshalOInteractionType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐInteractionTypeᚄ(ctx context.Context, v interface{}) ([]persist.InteractionType, error) {
-	if v == nil {
-		return nil, nil
-	}
-	var vSlice []interface{}
-	if v != nil {
-		vSlice = graphql.CoerceList(v)
-	}
-	var err error
-	res := make([]persist.InteractionType, len(vSlice))
-	for i := range vSlice {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
-		res[i], err = ec.unmarshalNInteractionType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐInteractionType(ctx, vSlice[i])
-		if err != nil {
-			return nil, err
-		}
-	}
-	return res, nil
-}
-
-func (ec *executionContext) marshalOInteractionType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐInteractionTypeᚄ(ctx context.Context, sel ast.SelectionSet, v []persist.InteractionType) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalNInteractionType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐInteractionType(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
-
-	for _, e := range ret {
-		if e == graphql.Null {
-			return graphql.Null
-		}
-	}
-
-	return ret
 }
 
 func (ec *executionContext) marshalOLoginPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐLoginPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.LoginPayloadOrError) graphql.Marshaler {
