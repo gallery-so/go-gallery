@@ -34,16 +34,10 @@ const (
 	MediaTypeGIF MediaType = "gif"
 	// MediaTypeSVG represents an SVG
 	MediaTypeSVG MediaType = "svg"
-	// MediaTypeBase64BMP represents a base64 encoded bmp file
-	MediaTypeBase64BMP MediaType = "base64bmp"
-	// MediaTypeBase64PNG represents a base64 encoded png file
-	MediaTypeBase64PNG MediaType = "base64png"
 	// MediaTypeText represents plain text
 	MediaTypeText MediaType = "text"
 	// MediaTypeHTML represents html
 	MediaTypeHTML MediaType = "html"
-	// MediaTypeBase64Text represents a base64 encoded plain text
-	MediaTypeBase64Text MediaType = "base64text"
 	// MediaTypeAudio represents audio
 	MediaTypeAudio MediaType = "audio"
 	// MediaTypeJSON represents json metadata
@@ -62,7 +56,7 @@ const (
 	MediaTypeFallback MediaType = "fallback"
 )
 
-var mediaTypePriorities = []MediaType{MediaTypeHTML, MediaTypeAudio, MediaTypeAnimation, MediaTypeVideo, MediaTypeBase64BMP, MediaTypeBase64PNG, MediaTypeGIF, MediaTypeSVG, MediaTypeImage, MediaTypeJSON, MediaTypeBase64Text, MediaTypeText, MediaTypeSyncing, MediaTypeUnknown, MediaTypeInvalid}
+var mediaTypePriorities = []MediaType{MediaTypeHTML, MediaTypeAudio, MediaTypeAnimation, MediaTypeVideo, MediaTypeGIF, MediaTypeSVG, MediaTypeImage, MediaTypeJSON, MediaTypeText, MediaTypeSyncing, MediaTypeUnknown, MediaTypeInvalid}
 
 const (
 	// ChainETH represents the Ethereum blockchain
@@ -108,6 +102,12 @@ const (
 	URITypeBase64BMP URIType = "base64bmp"
 	// URITypeBase64PNG represents a base64 encoded PNG
 	URITypeBase64PNG URIType = "base64png"
+	// URITypeBase64JPEG represents a base64 encoded JPEG
+	URITypeBase64JPEG URIType = "base64jpeg"
+	// URITypeBase64WAV represents a base64 encoded WAV
+	URITypeBase64WAV URIType = "base64wav"
+	// URITypeBase64MP3 represents a base64 encoded MP3
+	URITypeBase64MP3 URIType = "base64mp3"
 	// URITypeSVG represents an SVG
 	URITypeSVG URIType = "svg"
 	// URITypeENS represents an ENS domain
@@ -366,7 +366,7 @@ func (c Chain) BaseKeywords() (image []string, anim []string) {
 	case ChainTezos:
 		return []string{"displayUri", "image", "thumbnailUri", "artifactUri", "uri"}, []string{"artifactUri", "displayUri", "uri", "image"}
 	default:
-		return []string{"image"}, []string{"animation", "video"}
+		return []string{"image_url", "image"}, []string{"animation_url", "animation", "video"}
 	}
 }
 
@@ -511,16 +511,22 @@ func (uri TokenURI) Type() URIType {
 		return URITypeIPFS
 	case strings.HasPrefix(asString, "ar://"), strings.HasPrefix(asString, "arweave://"):
 		return URITypeArweave
-	case strings.HasPrefix(asString, "data:text/html;base64,"):
+	case strings.HasPrefix(asString, "data:text/html;base64,"), strings.HasPrefix(asString, "data:text/html;charset=utf-8;base64,"), strings.HasPrefix(asString, "data:text/html") && strings.Contains(asString, ";base64,"):
 		return URITypeBase64HTML
-	case strings.HasPrefix(asString, "data:application/json;base64,"):
+	case strings.HasPrefix(asString, "data:application/json;base64,"), strings.HasPrefix(asString, "data:application/json;charset=utf-8;base64,"), strings.HasPrefix(asString, "data:application/json") && strings.Contains(asString, ";base64,"):
 		return URITypeBase64JSON
-	case strings.HasPrefix(asString, "data:image/svg+xml;base64,"), strings.HasPrefix(asString, "data:image/svg xml;base64,"):
+	case strings.HasPrefix(asString, "data:image/svg+xml;base64,"), strings.HasPrefix(asString, "data:image/svg xml;base64,"), strings.HasPrefix(asString, "data:image/svg+xml") && strings.Contains(asString, ";base64,"), strings.HasPrefix(asString, "data:image/svg xml") && strings.Contains(asString, ";base64,"):
 		return URITypeBase64SVG
-	case strings.HasPrefix(asString, "data:image/bmp;base64,"):
+	case strings.HasPrefix(asString, "data:image/bmp;base64,"), strings.HasPrefix(asString, "data:image/bmp;charset=utf-8;base64,"), strings.HasPrefix(asString, "data:image/bmp") && strings.Contains(asString, ";base64,"):
 		return URITypeBase64BMP
-	case strings.HasPrefix(asString, "data:image/png;base64,"):
+	case strings.HasPrefix(asString, "data:image/png;base64,"), strings.HasPrefix(asString, "data:image/png;charset=utf-8;base64,"), strings.HasPrefix(asString, "data:image/png") && strings.Contains(asString, ";base64,"):
 		return URITypeBase64PNG
+	case strings.HasPrefix(asString, "data:image/jpeg;base64,"), strings.HasPrefix(asString, "data:image/jpeg;charset=utf-8;base64,"), strings.HasPrefix(asString, "data:image/jpeg") && strings.Contains(asString, ";base64,"):
+		return URITypeBase64JPEG
+	case strings.HasPrefix(asString, "data:audio/wav;base64,"), strings.HasPrefix(asString, "data:audio/wav;charset=utf-8;base64,"), strings.HasPrefix(asString, "data:audio/wav") && strings.Contains(asString, ";base64,"):
+		return URITypeBase64WAV
+	case strings.HasPrefix(asString, "data:audio/mpeg;base64,"), strings.HasPrefix(asString, "data:audio/mpeg;charset=utf-8;base64,"), strings.HasPrefix(asString, "data:audio/mpeg") && strings.Contains(asString, ";base64,"):
+		return URITypeBase64MP3
 	case strings.Contains(asString, "ipfs.io/api"):
 		return URITypeIPFSAPI
 	case strings.Contains(asString, "/ipfs/"):
@@ -788,7 +794,7 @@ func (m MediaType) IsValid() bool {
 
 // IsImageLike returns true if the media type is a type that is expected to be like an image and not live render
 func (m MediaType) IsImageLike() bool {
-	return m == MediaTypeImage || m == MediaTypeGIF || m == MediaTypeBase64BMP || m == MediaTypeSVG || m == MediaTypeBase64PNG
+	return m == MediaTypeImage || m == MediaTypeGIF || m == MediaTypeSVG
 }
 
 // IsAnimationLike returns true if the media type is a type that is expected to be like an animation and live render

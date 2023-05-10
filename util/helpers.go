@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgtype"
@@ -702,65 +701,4 @@ func (f FileHeaderReader) Headers() ([]byte, error) {
 
 	f.headers = byt
 	return f.headers, nil
-}
-
-type ResettableTimer struct {
-	Duration time.Duration
-	C        <-chan time.Time
-	timer    *time.Timer
-}
-
-func NewResettableTimer(duration time.Duration) *ResettableTimer {
-	timer := time.NewTimer(duration)
-	return &ResettableTimer{
-		Duration: duration,
-		C:        timer.C,
-		timer:    timer,
-	}
-}
-
-func (rt *ResettableTimer) Reset() {
-	rt.timer.Stop()
-	rt.timer.Reset(rt.Duration)
-}
-
-type ReaderWriterTo interface {
-	io.Reader
-	io.WriterTo
-}
-
-type TimeoutReader struct {
-	ReaderWriterTo
-	timer *ResettableTimer
-}
-
-func NewTimeoutReader(reader ReaderWriterTo, timeout time.Duration) *TimeoutReader {
-	timer := NewResettableTimer(timeout)
-	return &TimeoutReader{
-		ReaderWriterTo: reader,
-		timer:          timer,
-	}
-}
-
-func (tr *TimeoutReader) WriteTo(w io.Writer) (n int64, err error) {
-	result := make(chan int64, 1)
-	errs := make(chan error, 1)
-	go func() {
-		n, err := tr.ReaderWriterTo.WriteTo(w)
-		result <- n
-		errs <- err
-		close(result)
-		close(errs)
-	}()
-	select {
-	case n := <-result:
-		err := <-errs
-		if err != nil {
-			return n, err
-		}
-		tr.timer.Reset()
-		return n, nil
-	case <-tr.timer.C:
-		return 0, context.DeadlineExceeded
-	}
 }

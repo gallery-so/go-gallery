@@ -417,7 +417,7 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 		asString := turi.String()
 
 		switch turi.Type() {
-		case persist.URITypeBase64JSON, persist.URITypeBase64SVG, persist.URITypeBase64HTML:
+		case persist.URITypeBase64JSON, persist.URITypeBase64SVG, persist.URITypeBase64HTML, persist.URITypeBase64WAV, persist.URITypeBase64MP3:
 			// decode the base64 encoded json
 			b64data := asString[strings.IndexByte(asString, ',')+1:]
 			decoded, err := util.Base64Decode(b64data, base64.RawStdEncoding, base64.StdEncoding, base64.RawURLEncoding, base64.URLEncoding)
@@ -429,6 +429,63 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 			buf := bytes.NewBuffer(util.RemoveBOM(decoded))
 
 			readerChan <- util.NewFileHeaderReader(buf, bufSize)
+		case persist.URITypeBase64BMP:
+			b64data := asString[strings.IndexByte(asString, ',')+1:]
+			decoded, err := util.Base64Decode(b64data, base64.RawStdEncoding, base64.StdEncoding, base64.RawURLEncoding, base64.URLEncoding)
+			if err != nil {
+				errChan <- fmt.Errorf("error decoding base64 bmp data: %s \n\n%s", err, b64data)
+				return
+			}
+			img, err := bmp.Decode(bytes.NewReader(decoded))
+			if err != nil {
+				errChan <- fmt.Errorf("error decoding bmp data: %s \n\n%s", err, b64data)
+				return
+			}
+			newImage := bytes.NewBuffer(nil)
+			err = jpeg.Encode(newImage, img, nil)
+			if err != nil {
+				errChan <- fmt.Errorf("error encoding jpeg data: %s \n\n%s", err, b64data)
+				return
+			}
+			readerChan <- util.NewFileHeaderReader(newImage, bufSize)
+		case persist.URITypeBase64PNG:
+			b64data := asString[strings.IndexByte(asString, ',')+1:]
+			decoded, err := util.Base64Decode(b64data, base64.RawStdEncoding, base64.StdEncoding, base64.RawURLEncoding, base64.URLEncoding)
+			if err != nil {
+				errChan <- fmt.Errorf("error decoding base64 png data: %s \n\n%s", err, b64data)
+				return
+			}
+			img, err := png.Decode(bytes.NewReader(decoded))
+			if err != nil {
+				errChan <- fmt.Errorf("error decoding png data: %s \n\n%s", err, b64data)
+				return
+			}
+			newImage := bytes.NewBuffer(nil)
+			err = png.Encode(newImage, img)
+			if err != nil {
+				errChan <- fmt.Errorf("error encoding jpeg data: %s \n\n%s", err, b64data)
+				return
+			}
+			readerChan <- util.NewFileHeaderReader(newImage, bufSize)
+		case persist.URITypeBase64JPEG:
+			b64data := asString[strings.IndexByte(asString, ',')+1:]
+			decoded, err := util.Base64Decode(b64data, base64.RawStdEncoding, base64.StdEncoding, base64.RawURLEncoding, base64.URLEncoding)
+			if err != nil {
+				errChan <- fmt.Errorf("error decoding base64 jpeg data: %s \n\n%s", err, b64data)
+				return
+			}
+			img, err := jpeg.Decode(bytes.NewReader(decoded))
+			if err != nil {
+				errChan <- fmt.Errorf("error decoding jpeg data: %s \n\n%s", err, b64data)
+				return
+			}
+			newImage := bytes.NewBuffer(nil)
+			err = jpeg.Encode(newImage, img, nil)
+			if err != nil {
+				errChan <- fmt.Errorf("error encoding jpeg data: %s \n\n%s", err, b64data)
+				return
+			}
+			readerChan <- util.NewFileHeaderReader(newImage, bufSize)
 		case persist.URITypeArweave, persist.URITypeArweaveGateway:
 			path := util.GetURIPath(asString, true)
 
@@ -519,44 +576,6 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 			}
 			buf := bytes.NewBuffer(util.RemoveBOM([]byte(asString[idx+1:])))
 			readerChan <- util.NewFileHeaderReader(buf, bufSize)
-		case persist.URITypeBase64BMP:
-			b64data := asString[strings.IndexByte(asString, ',')+1:]
-			decoded, err := util.Base64Decode(b64data, base64.RawStdEncoding, base64.StdEncoding, base64.RawURLEncoding, base64.URLEncoding)
-			if err != nil {
-				errChan <- fmt.Errorf("error decoding base64 bmp data: %s \n\n%s", err, b64data)
-				return
-			}
-			img, err := bmp.Decode(bytes.NewReader(decoded))
-			if err != nil {
-				errChan <- fmt.Errorf("error decoding bmp data: %s \n\n%s", err, b64data)
-				return
-			}
-			newImage := bytes.NewBuffer(nil)
-			err = jpeg.Encode(newImage, img, nil)
-			if err != nil {
-				errChan <- fmt.Errorf("error encoding jpeg data: %s \n\n%s", err, b64data)
-				return
-			}
-			readerChan <- util.NewFileHeaderReader(newImage, bufSize)
-		case persist.URITypeBase64PNG:
-			b64data := asString[strings.IndexByte(asString, ',')+1:]
-			decoded, err := util.Base64Decode(b64data, base64.RawStdEncoding, base64.StdEncoding, base64.RawURLEncoding, base64.URLEncoding)
-			if err != nil {
-				errChan <- fmt.Errorf("error decoding base64 png data: %s \n\n%s", err, b64data)
-				return
-			}
-			img, err := png.Decode(bytes.NewReader(decoded))
-			if err != nil {
-				errChan <- fmt.Errorf("error decoding png data: %s \n\n%s", err, b64data)
-				return
-			}
-			newImage := bytes.NewBuffer(nil)
-			err = png.Encode(newImage, img)
-			if err != nil {
-				errChan <- fmt.Errorf("error encoding jpeg data: %s \n\n%s", err, b64data)
-				return
-			}
-			readerChan <- util.NewFileHeaderReader(newImage, bufSize)
 		default:
 			buf := bytes.NewBuffer([]byte(turi))
 			readerChan <- util.NewFileHeaderReader(buf, bufSize)

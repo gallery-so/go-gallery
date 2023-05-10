@@ -1885,7 +1885,7 @@ func mediaToModel(ctx context.Context, media persist.Media, fallback persist.Fal
 		return getGltfMedia(ctx, media, fallbackMedia)
 	case persist.MediaTypeJSON:
 		return getJsonMedia(ctx, media, fallbackMedia)
-	case persist.MediaTypeText, persist.MediaTypeBase64Text:
+	case persist.MediaTypeText:
 		return getTextMedia(ctx, media, fallbackMedia)
 	case persist.MediaTypePDF:
 		return getPdfMedia(ctx, media, fallbackMedia)

@@ -226,7 +226,17 @@ func cacheObjectsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 			}
 		}
 
+		logger.For(pCtx).Errorf("failed to cache animation and image urls: %s, %s", animResult.err, imgResult.err)
+
 		return nil, util.MultiErr{animResult.err, imgResult.err}
+	}
+
+	// if one of them failed, log the error but continue
+	if animResult.err != nil {
+		logger.For(pCtx).WithError(animResult.err).Errorf("failed to cache animation url")
+	}
+	if imgResult.err != nil {
+		logger.For(pCtx).WithError(imgResult.err).Errorf("failed to cache image url")
 	}
 
 	// this should never be true, something is wrong if this is true
@@ -740,10 +750,8 @@ func cacheRawMedia(ctx context.Context, reader *util.FileHeaderReader, tids pers
 		ContentLength:   contentLength,
 		ObjectType:      oType,
 	}
-	// this will ensure that when any amount of bytes are read, the timer will reset, but if we idle for 2 minutes,
-	// the timer will fire and the reader will return an error
-	timerReader := util.NewTimeoutReader(reader, 2*time.Minute)
-	err := persistToStorage(ctx, client, timerReader, bucket, object.fileName(), object.ContentType, object.ContentLength,
+
+	err := persistToStorage(ctx, client, reader, bucket, object.fileName(), object.ContentType, object.ContentLength,
 		map[string]string{
 			"originalURL": truncateString(ogURL, 100),
 			"mediaType":   mediaType.String(),
@@ -774,9 +782,7 @@ func cacheRawAnimationMedia(ctx context.Context, reader *util.FileHeaderReader, 
 	})
 	writer := gzip.NewWriter(sw)
 
-	timeoutReader := util.NewTimeoutReader(reader, 2*time.Minute)
-
-	err := retryWriteToCloudStorage(ctx, writer, timeoutReader)
+	err := retryWriteToCloudStorage(ctx, writer, reader)
 	if err != nil {
 		persist.FailStep(subMeta.AnimationGzip)
 		return cachedMediaObject{}, fmt.Errorf("could not write to bucket %s for %s: %s", bucket, object.fileName(), err)
@@ -918,7 +924,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 	reader, retryOpensea, err := func() (*util.FileHeaderReader, bool, error) {
 		defer persist.TrackStepStatus(pCtx, subMeta.ReaderRetrieval, "ReaderRetrieval")()
 
-		reader, err := rpc.GetDataFromURIAsReader(pCtx, asURI, ipfsClient, arweaveClient, contentLengthToChunkSize(contentLength)/1024, time.Minute)
+		reader, err := rpc.GetDataFromURIAsReader(pCtx, asURI, ipfsClient, arweaveClient, util.MB, time.Minute)
 		if err != nil {
 			persist.FailStep(subMeta.ReaderRetrieval)
 			if strings.Contains(err.Error(), context.Canceled.Error()) || strings.Contains(err.Error(), context.DeadlineExceeded.Error()) {
@@ -963,7 +969,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 				continue
 			}
 
-			reader, err = rpc.GetDataFromURIAsReader(pCtx, persist.TokenURI(firstNonEmptyURL), ipfsClient, arweaveClient, contentLengthToChunkSize(contentLength)/1024, time.Second*30)
+			reader, err = rpc.GetDataFromURIAsReader(pCtx, persist.TokenURI(firstNonEmptyURL), ipfsClient, arweaveClient, util.MB, time.Second*30)
 			if err != nil {
 				continue
 			}
@@ -1015,12 +1021,13 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 		"mb":               asMb,
 	})
 
-	logger.For(pCtx).Infof("caching %.2f mb of raw media with type '%s' for '%s' at '%s-%s'", asMb, mediaType, mediaURL, oType, tids)
+	logger.For(pCtx).Infof("caching %.2f mb of raw media with type '%s' for '%s' at '%s-%s'", asMb, mediaType, mediaURL, tids, oType)
 
 	if mediaType == persist.MediaTypeAnimation {
 		timeBeforeCache := time.Now()
 		obj, err := cacheRawAnimationMedia(pCtx, reader, tids, mediaType, oType, bucket, mediaURL, storageClient, subMeta)
 		if err != nil {
+			logger.For(pCtx).WithError(err).Error("could not cache animation")
 			return nil, err
 		}
 		logger.For(pCtx).Infof("cached animation for %s in %s", tids, time.Since(timeBeforeCache))

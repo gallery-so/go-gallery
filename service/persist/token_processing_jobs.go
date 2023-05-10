@@ -152,10 +152,11 @@ func TrackStepStatus(ctx context.Context, status *PipelineStepStatus, name strin
 
 	return func() {
 		if *status == PipelineStepStatusError {
+			logger.For(ctx).Infof("failed %s (took: %s)", name, time.Since(startTime))
 			return
 		}
 		*status = PipelineStepStatusSuccess
-		logger.For(ctx).Infof("finished %s (took: %s)", name, time.Since(startTime))
+		logger.For(ctx).Infof("succeeded %s (took: %s)", name, time.Since(startTime))
 	}
 
 }

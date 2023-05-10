@@ -36,9 +36,6 @@ func main() {
 	pg := postgres.NewPgxClient()
 	clients := server.ClientInit(ctx)
 
-	tokenprocessing.InitSentry()
-	logger.InitWithGCPDefaults()
-
 	tp := tokenprocessing.NewTokenProcessor(clients.Queries, clients.EthClient, server.NewMultichainProvider(clients), clients.IPFSClient, clients.ArweaveClient, clients.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), clients.Repos.TokenRepository)
 
 	var totalTokenCount int
@@ -56,6 +53,9 @@ func main() {
 
 	if env.GetString("CLOUD_RUN_JOB") != "" {
 		logrus.Infof("running as cloud run job")
+
+		tokenprocessing.InitSentry()
+		logger.InitWithGCPDefaults()
 
 		jobIndex := env.GetInt("CLOUD_RUN_TASK_INDEX")
 		jobCount := env.GetInt("CLOUD_RUN_TASK_COUNT")

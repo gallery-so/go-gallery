@@ -93,11 +93,17 @@ func PredictMediaType(ctx context.Context, url string) (persist.MediaType, *stri
 		case persist.URITypeBase64SVG, persist.URITypeSVG:
 			return persist.MediaTypeSVG, util.ToPointer("image/svg+xml"), &lenURI, nil
 		case persist.URITypeBase64BMP:
-			return persist.MediaTypeBase64BMP, util.ToPointer("image/bmp"), &lenURI, nil
+			return persist.MediaTypeImage, util.ToPointer("image/bmp"), &lenURI, nil
 		case persist.URITypeBase64PNG:
-			return persist.MediaTypeBase64PNG, util.ToPointer("image/png"), &lenURI, nil
+			return persist.MediaTypeImage, util.ToPointer("image/png"), &lenURI, nil
 		case persist.URITypeBase64HTML:
 			return persist.MediaTypeHTML, util.ToPointer("text/html"), &lenURI, nil
+		case persist.URITypeBase64JPEG:
+			return persist.MediaTypeImage, util.ToPointer("image/jpeg"), &lenURI, nil
+		case persist.URITypeBase64MP3:
+			return persist.MediaTypeAudio, util.ToPointer("audio/mpeg"), &lenURI, nil
+		case persist.URITypeBase64WAV:
+			return persist.MediaTypeAudio, util.ToPointer("audio/wav"), &lenURI, nil
 		case persist.URITypeIPFS:
 			contentType, contentLength, err := rpc.GetIPFSHeaders(ctx, strings.TrimPrefix(asURI.String(), "ipfs://"))
 			if err != nil {
