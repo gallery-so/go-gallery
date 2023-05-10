@@ -711,7 +711,7 @@ func (q *Queries) CreateGalleryEvent(ctx context.Context, arg CreateGalleryEvent
 }
 
 const createPushTickets = `-- name: CreatePushTickets :exec
-insert into push_notification_tickets (id, push_token_id, ticket_id, created_at, check_after, num_check_attempts, deleted) values
+insert into push_notification_tickets (id, push_token_id, ticket_id, created_at, check_after, num_check_attempts, status, deleted) values
   (
    unnest($1::text[]),
    unnest($2::text[]),
@@ -719,6 +719,7 @@ insert into push_notification_tickets (id, push_token_id, ticket_id, created_at,
    now(),
    now() + interval '15 minutes',
    0,
+   'pending',
    false
   )
 `
@@ -1086,7 +1087,7 @@ func (q *Queries) GetAllTimeTrendingUserIDs(ctx context.Context, limit int32) ([
 }
 
 const getCheckablePushTickets = `-- name: GetCheckablePushTickets :many
-select id, push_token_id, ticket_id, created_at, check_after, num_check_attempts, deleted from push_notification_tickets where check_after <= now() and deleted = false limit $1
+select id, push_token_id, ticket_id, created_at, check_after, num_check_attempts, deleted, status from push_notification_tickets where check_after <= now() and deleted = false limit $1
 `
 
 func (q *Queries) GetCheckablePushTickets(ctx context.Context, limit int32) ([]PushNotificationTicket, error) {
@@ -1106,6 +1107,7 @@ func (q *Queries) GetCheckablePushTickets(ctx context.Context, limit int32) ([]P
 			&i.CheckAfter,
 			&i.NumCheckAttempts,
 			&i.Deleted,
+			&i.Status,
 		); err != nil {
 			return nil, err
 		}
@@ -4472,15 +4474,16 @@ func (q *Queries) UpdateNotificationSettingsByID(ctx context.Context, arg Update
 
 const updatePushTickets = `-- name: UpdatePushTickets :exec
 with updates as (
-    select unnest($1::text[]) as id, unnest($2::timestamptz[]) as check_after, unnest($3::int[]) as num_check_attempts, unnest($4::bool[]) as deleted
+    select unnest($1::text[]) as id, unnest($2::timestamptz[]) as check_after, unnest($3::int[]) as num_check_attempts, unnest($4::text[]) as status, unnest($5::bool[]) as deleted
 )
-update push_notification_tickets t set check_after = updates.check_after, num_check_attempts = updates.num_check_attempts, deleted = updates.deleted from updates where t.id = updates.id and t.deleted = false
+update push_notification_tickets t set check_after = updates.check_after, num_check_attempts = updates.num_check_attempts, status = updates.status, deleted = updates.deleted from updates where t.id = updates.id and t.deleted = false
 `
 
 type UpdatePushTicketsParams struct {
 	Ids              []string
 	CheckAfter       []time.Time
 	NumCheckAttempts []int32
+	Status           []string
 	Deleted          []bool
 }
 
@@ -4489,6 +4492,7 @@ func (q *Queries) UpdatePushTickets(ctx context.Context, arg UpdatePushTicketsPa
 		arg.Ids,
 		arg.CheckAfter,
 		arg.NumCheckAttempts,
+		arg.Status,
 		arg.Deleted,
 	)
 	return err
