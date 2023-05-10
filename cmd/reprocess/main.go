@@ -40,7 +40,7 @@ func main() {
 
 	var totalTokenCount int
 
-	err := pg.QueryRow(ctx, `select count(*) from tokens where tokens.deleted = false;`).Scan(&totalTokenCount)
+	err := pg.QueryRow(ctx, `select count(*) from tokens left join token_medias on tokens.token_media_id = token_medias.id where tokens.deleted = false and (tokens.token_media_id is null or token_medias.active = false);`).Scan(&totalTokenCount)
 	if err != nil {
 		logrus.Errorf("error getting total token count: %v", err)
 		panic(err)

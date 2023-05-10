@@ -1097,7 +1097,9 @@ SELECT
     ) AS wallet_address
 FROM tokens
 JOIN contracts ON contracts.id = tokens.contract
+LEFT JOIN token_medias on token_medias.id = tokens.token_media_id
 WHERE tokens.deleted = false
+AND (tokens.token_media_id IS NULL or token_medias.active = false)
 ORDER BY tokens.last_updated DESC
 LIMIT $1 OFFSET $2
 `
