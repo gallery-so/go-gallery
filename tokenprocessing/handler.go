@@ -16,7 +16,7 @@ func handlersInitServer(router *gin.Engine, tp *tokenProcessor, mc *multichain.P
 		if hub := sentryutil.SentryHubFromContext(c); hub != nil {
 			hub.Scope().AddEventProcessor(sentryutil.SpanFilterEventProcessor(c, 1000, 1*time.Millisecond, 8, true))
 		}
-		processMediaForUsersTokens(tp, repos.TokenRepository, repos.ContractRepository, throttler)
+		processMediaForUsersTokens(tp, repos.TokenRepository, repos.ContractRepository, throttler)(c)
 	})
 	mediaGroup.POST("/process/token", processMediaForToken(tp, repos.TokenRepository, repos.ContractRepository, repos.UserRepository, repos.WalletRepository, throttler))
 	ownersGroup := router.Group("/owners")

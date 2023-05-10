@@ -202,7 +202,8 @@ func cacheObjectsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	// neither download worked, unexpectedly
 	if (animCh == nil || (animResult.err != nil && len(animResult.cachedObjects) == 0)) && (imgCh == nil || (imgResult.err != nil && len(imgResult.cachedObjects) == 0)) {
-		persist.TrackStepStatus(pCtx, &pMeta.NothingCachedWithErrors, "NothingCachedWithErrors")
+		traceCallback, _ := persist.TrackStepStatus(pCtx, &pMeta.NothingCachedWithErrors, "NothingCachedWithErrors")
+		defer traceCallback()
 
 		if animCh != nil {
 			if _, ok := animResult.err.(errInvalidMedia); ok {
@@ -242,7 +243,8 @@ func cacheObjectsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	// this should never be true, something is wrong if this is true
 	if len(objects) == 0 {
-		persist.TrackStepStatus(pCtx, &pMeta.NothingCachedWithoutErrors, "NothingCachedWithoutErrors")
+		traceCallback, _ := persist.TrackStepStatus(pCtx, &pMeta.NothingCachedWithoutErrors, "NothingCachedWithoutErrors")
+		defer traceCallback()
 		return nil, errNoCachedObjects{tids: tids}
 	}
 
