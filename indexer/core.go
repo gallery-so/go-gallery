@@ -162,7 +162,7 @@ func newRepos(storageClient *storage.Client) (persist.TokenRepository, persist.C
 }
 
 func newThrottler() *throttle.Locker {
-	return throttle.NewThrottleLocker(redis.NewCache(redis.IndexerServerThrottleDB), time.Minute*5)
+	return throttle.NewThrottleLocker(redis.NewCache(redis.IndexerServerThrottleCache), time.Minute*5)
 }
 
 func initSentry() {
