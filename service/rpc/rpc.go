@@ -489,20 +489,12 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 		case persist.URITypeArweave, persist.URITypeArweaveGateway:
 			path := util.GetURIPath(asString, true)
 
-			resp, err := util.FirstNonErrorWithValue(ctx, false, HTTPErrIsForceClose, func(ctx context.Context) (io.Reader, error) {
-				bs, err := GetArweaveData(ctx, arweaveClient, path)
-				if err != nil {
-					return nil, err
-				}
-				return bytes.NewBuffer(util.RemoveBOM(bs)), nil
-			}, func(ctx context.Context) (io.Reader, error) {
-				return GetArweaveDataHTTPReader(ctx, path)
-			})
-
+			resp, err := GetArweaveDataHTTPReader(ctx, path)
 			if err != nil {
 				errChan <- err
 				return
 			}
+
 			readerChan <- util.NewFileHeaderReader(resp, bufSize)
 		case persist.URITypeIPFS:
 			path := util.GetURIPath(asString, true)
