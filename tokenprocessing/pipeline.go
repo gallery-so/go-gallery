@@ -14,6 +14,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 )
@@ -109,6 +110,9 @@ func (tp *tokenProcessor) ProcessTokenPipeline(c context.Context, t persist.Toke
 }
 
 func (tpj *tokenProcessingJob) run(ctx context.Context) error {
+	span, ctx := tracing.StartSpan(ctx, "pipeline.run", fmt.Sprintf("run %s", tpj.id))
+	defer tracing.FinishSpan(span)
+
 	tmedia, err := tpj.createMediaForToken(ctx)
 	if err != nil {
 		logger.For(ctx).Errorf("error creating media for token: %s", err)
@@ -168,7 +172,8 @@ func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (coredb.
 			result.Media = persist.Media{MediaType: persist.MediaTypeInvalid, MediaURL: persist.NullString(err.URL)}
 			reportTokenError(ctx, err, tpj.id, tpj.token.Chain, tpj.contract.Address, tpj.token.TokenID, isSpam)
 		default:
-			defer persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.SetUnknownMediaType, "SetUnknownMediaType")()
+			traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.SetUnknownMediaType, "SetUnknownMediaType")
+			defer traceCallback()
 			result.Media = persist.Media{MediaType: persist.MediaTypeUnknown}
 			reportTokenError(ctx, err, tpj.id, tpj.token.Chain, tpj.contract.Address, tpj.token.TokenID, isSpam)
 		}
@@ -186,7 +191,8 @@ func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (coredb.
 }
 
 func (tpj *tokenProcessingJob) retrieveMetadata(ctx context.Context) persist.TokenMetadata {
-	defer persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.MetadataRetrieval, "MetadataRetrieval")()
+	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.MetadataRetrieval, "MetadataRetrieval")
+	defer traceCallback()
 
 	// metadata is a string, it should not take more than a minute to retrieve
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
@@ -224,7 +230,8 @@ func (tpj *tokenProcessingJob) retrieveMetadata(ctx context.Context) persist.Tok
 }
 
 func (tpj *tokenProcessingJob) retrieveTokenInfo(ctx context.Context, metadata persist.TokenMetadata) (string, string) {
-	defer persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.TokenInfoRetrieval, "TokenInfoRetrieval")()
+	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.TokenInfoRetrieval, "TokenInfoRetrieval")
+	defer traceCallback()
 
 	name, description := findNameAndDescription(ctx, metadata)
 
@@ -243,7 +250,9 @@ func (tpj *tokenProcessingJob) cacheMediaObjects(ctx context.Context, metadata p
 }
 
 func (tpj *tokenProcessingJob) createMediaFromCachedObjects(ctx context.Context, objects []cachedMediaObject) persist.Media {
-	defer persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.CreateMediaFromCachedObjects, "CreateMediaFromCachedObjects")()
+	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.CreateMediaFromCachedObjects, "CreateMediaFromCachedObjects")
+	defer traceCallback()
+
 	in := map[objectType]cachedMediaObject{}
 	for _, obj := range objects {
 		if it, ok := in[obj.ObjectType]; ok {
@@ -258,12 +267,16 @@ func (tpj *tokenProcessingJob) createMediaFromCachedObjects(ctx context.Context,
 }
 
 func (tpj *tokenProcessingJob) createRawMedia(ctx context.Context, mediaType persist.MediaType, animURL, imgURL string, objects []cachedMediaObject) persist.Media {
-	defer persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.CreateRawMedia, "CreateRawMedia")()
+	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.CreateRawMedia, "CreateRawMedia")
+	defer traceCallback()
+
 	return createRawMedia(ctx, persist.NewTokenIdentifiers(tpj.contract.Address, tpj.token.TokenID, tpj.token.Chain), mediaType, tpj.tp.tokenBucket, animURL, imgURL, objects)
 }
 
 func (tpj *tokenProcessingJob) isNewMediaPreferable(ctx context.Context, media persist.Media) bool {
-	defer persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.MediaResultComparison, "MediaResultComparison")()
+	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.MediaResultComparison, "MediaResultComparison")
+	defer traceCallback()
+
 	if media.IsServable() || (!media.IsServable() && !tpj.token.Media.IsServable()) {
 		// if the media is good, it is active
 		// if the media is bad but the old media is also bad, it is active
