@@ -608,14 +608,14 @@ UPDATE notifications SET seen = true WHERE owner_id = $1 AND seen = false RETURN
 -- name: PaginateInteractionsByFeedEventIDBatch :batchmany
 SELECT interactions.created_At, interactions.id, interactions.tag FROM (
     SELECT t.created_at, t.id, sqlc.arg('admire_tag')::int as tag FROM admires t WHERE sqlc.arg('admire_tag') != 0 AND t.feed_event_id = sqlc.arg('feed_event_id') AND t.deleted = false
-        AND (t.created_at, t.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (t.created_at, t.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+        AND (sqlc.arg('admire_tag'), t.created_at, t.id) < (sqlc.arg('cur_before_tag')::int, sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (sqlc.arg('admire_tag'), t.created_at, t.id) > (sqlc.arg('cur_after_tag')::int, sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
                                                                     UNION
     SELECT t.created_at, t.id, sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.arg('comment_tag') != 0 AND t.feed_event_id = sqlc.arg('feed_event_id') AND t.deleted = false
-        AND (t.created_at, t.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (t.created_at, t.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+        AND (sqlc.arg('comment_tag'), t.created_at, t.id) < (sqlc.arg('cur_before_tag')::int, sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (sqlc.arg('comment_tag'), t.created_at, t.id) > (sqlc.arg('cur_after_tag')::int, sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
 ) as interactions
 
-ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
-         CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
+ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (tag, created_at, id) END ASC,
+         CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (tag, created_at, id) END DESC
 LIMIT sqlc.arg('limit');
 
 -- name: CountInteractionsByFeedEventIDBatch :batchmany
