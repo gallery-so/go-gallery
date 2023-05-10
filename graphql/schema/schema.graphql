@@ -2110,7 +2110,7 @@ type Mutation {
     input: UnsubscribeFromEmailTypeInput!
   ): UnsubscribeFromEmailTypePayloadOrError
   login(authMechanism: AuthMechanism!): LoginPayloadOrError
-  logout: LogoutPayload
+  logout(pushTokenToUnregister: String): LogoutPayload
 
   connectSocialAccount(
     input: SocialAuthMechanism!

@@ -706,7 +706,7 @@ type ComplexityRoot struct {
 		GenerateQRCodeLoginToken        func(childComplexity int) int
 		GetAuthNonce                    func(childComplexity int, chainAddress persist.ChainAddress) int
 		Login                           func(childComplexity int, authMechanism model.AuthMechanism) int
-		Logout                          func(childComplexity int) int
+		Logout                          func(childComplexity int, pushTokenToUnregister *string) int
 		MintPremiumCardToWallet         func(childComplexity int, input model.MintPremiumCardToWalletInput) int
 		MoveCollectionToGallery         func(childComplexity int, input *model.MoveCollectionToGalleryInput) int
 		PreverifyEmail                  func(childComplexity int, input model.PreverifyEmailInput) int
@@ -1406,7 +1406,7 @@ type MutationResolver interface {
 	UpdateEmailNotificationSettings(ctx context.Context, input model.UpdateEmailNotificationSettingsInput) (model.UpdateEmailNotificationSettingsPayloadOrError, error)
 	UnsubscribeFromEmailType(ctx context.Context, input model.UnsubscribeFromEmailTypeInput) (model.UnsubscribeFromEmailTypePayloadOrError, error)
 	Login(ctx context.Context, authMechanism model.AuthMechanism) (model.LoginPayloadOrError, error)
-	Logout(ctx context.Context) (*model.LogoutPayload, error)
+	Logout(ctx context.Context, pushTokenToUnregister *string) (*model.LogoutPayload, error)
 	ConnectSocialAccount(ctx context.Context, input model.SocialAuthMechanism, display bool) (model.ConnectSocialAccountPayloadOrError, error)
 	DisconnectSocialAccount(ctx context.Context, accountType persist.SocialProvider) (model.DisconnectSocialAccountPayloadOrError, error)
 	UpdateSocialAccountDisplayed(ctx context.Context, input model.UpdateSocialAccountDisplayedInput) (model.UpdateSocialAccountDisplayedPayloadOrError, error)
@@ -3955,7 +3955,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		return e.complexity.Mutation.Logout(childComplexity), true
+		args, err := ec.field_Mutation_logout_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.Logout(childComplexity, args["pushTokenToUnregister"].(*string)), true
 
 	case "Mutation.mintPremiumCardToWallet":
 		if e.complexity.Mutation.MintPremiumCardToWallet == nil {
@@ -8752,7 +8757,7 @@ type Mutation {
     input: UnsubscribeFromEmailTypeInput!
   ): UnsubscribeFromEmailTypePayloadOrError
   login(authMechanism: AuthMechanism!): LoginPayloadOrError
-  logout: LogoutPayload
+  logout(pushTokenToUnregister: String): LogoutPayload
 
   connectSocialAccount(
     input: SocialAuthMechanism!
@@ -9621,6 +9626,21 @@ func (ec *executionContext) field_Mutation_login_args(ctx context.Context, rawAr
 		}
 	}
 	args["authMechanism"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_logout_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *string
+	if tmp, ok := rawArgs["pushTokenToUnregister"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("pushTokenToUnregister"))
+		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["pushTokenToUnregister"] = arg0
 	return args, nil
 }
 
@@ -27756,7 +27776,7 @@ func (ec *executionContext) _Mutation_logout(ctx context.Context, field graphql.
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().Logout(rctx)
+		return ec.resolvers.Mutation().Logout(rctx, fc.Args["pushTokenToUnregister"].(*string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -27783,6 +27803,17 @@ func (ec *executionContext) fieldContext_Mutation_logout(ctx context.Context, fi
 			}
 			return nil, fmt.Errorf("no field named %q was found under type LogoutPayload", field.Name)
 		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_logout_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
 	}
 	return fc, nil
 }

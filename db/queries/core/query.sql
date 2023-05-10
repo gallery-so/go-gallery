@@ -1074,7 +1074,7 @@ select * from push_notification_tokens where user_id = @user_id and deleted = fa
 select t.* from unnest(@ids::text[]) ids join push_notification_tokens t on t.id = ids and t.deleted = false;
 
 -- name: CreatePushTickets :exec
-insert into push_notification_tickets (id, push_token_id, ticket_id, created_at, check_after, num_check_attempts, deleted) values
+insert into push_notification_tickets (id, push_token_id, ticket_id, created_at, check_after, num_check_attempts, status, deleted) values
   (
    unnest(@ids::text[]),
    unnest(@push_token_ids::text[]),
@@ -1082,14 +1082,15 @@ insert into push_notification_tickets (id, push_token_id, ticket_id, created_at,
    now(),
    now() + interval '15 minutes',
    0,
+   'pending',
    false
   );
 
 -- name: UpdatePushTickets :exec
 with updates as (
-    select unnest(@ids::text[]) as id, unnest(@check_after::timestamptz[]) as check_after, unnest(@num_check_attempts::int[]) as num_check_attempts, unnest(@deleted::bool[]) as deleted
+    select unnest(@ids::text[]) as id, unnest(@check_after::timestamptz[]) as check_after, unnest(@num_check_attempts::int[]) as num_check_attempts, unnest(@status::text[]) as status, unnest(@deleted::bool[]) as deleted
 )
-update push_notification_tickets t set check_after = updates.check_after, num_check_attempts = updates.num_check_attempts, deleted = updates.deleted from updates where t.id = updates.id and t.deleted = false;
+update push_notification_tickets t set check_after = updates.check_after, num_check_attempts = updates.num_check_attempts, status = updates.status, deleted = updates.deleted from updates where t.id = updates.id and t.deleted = false;
 
 -- name: GetCheckablePushTickets :many
 select * from push_notification_tickets where check_after <= now() and deleted = false limit sqlc.arg('limit');
