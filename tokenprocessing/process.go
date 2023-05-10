@@ -1,7 +1,6 @@
 package tokenprocessing
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -17,6 +16,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/util"
@@ -39,33 +39,35 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 			return
 		}
 
-		ctx := logger.NewContextWithFields(c, logrus.Fields{"userID": input.UserID})
+		reqCtx := logger.NewContextWithFields(c.Request.Context(), logrus.Fields{"userID": input.UserID})
 
-		if err := throttler.Lock(ctx, input.UserID.String()); err != nil {
+		if err := throttler.Lock(reqCtx, input.UserID.String()); err != nil {
 			// Reply with a non-200 status so that the message is tried again later on
 			util.ErrResponse(c, http.StatusTooManyRequests, err)
 			return
 		}
-		defer throttler.Unlock(ctx, input.UserID.String())
+		defer throttler.Unlock(reqCtx, input.UserID.String())
 
-		wp := pool.New().WithMaxGoroutines(50).WithContext(ctx)
+		wp := pool.New().WithMaxGoroutines(50).WithErrors()
+
 		for _, tokenID := range input.TokenIDs {
-			t, err := tokenRepo.GetByID(ctx, tokenID)
+			t, err := tokenRepo.GetByID(reqCtx, tokenID)
 			if err != nil {
-				logger.For(ctx).Errorf("failed to fetch tokenID=%s: %s", tokenID, err)
+				logger.For(reqCtx).Errorf("failed to fetch tokenID=%s: %s", tokenID, err)
 				continue
 			}
 
-			contract, err := contractRepo.GetByID(ctx, t.Contract)
+			contract, err := contractRepo.GetByID(reqCtx, t.Contract)
 			if err != nil {
-				logger.For(ctx).Errorf("Error getting contract: %s", err)
+				logger.For(reqCtx).Errorf("Error getting contract: %s", err)
 			}
 
-			wp.Go(func(ctx context.Context) error {
-				err := tp.ProcessTokenPipeline(ctx, t, contract, "", persist.ProcessingCauseSync)
+			wp.Go(func() error {
+				ctx := sentryutil.NewSentryHubContext(reqCtx)
+				err := tp.ProcessTokenPipeline(reqCtx, t, contract, "", persist.ProcessingCauseSync)
 				if err != nil {
 
-					logger.For(c).Errorf("Error processing token: %s", err)
+					logger.For(ctx).Errorf("Error processing token: %s", err)
 
 					return err
 				}
@@ -74,7 +76,7 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 		}
 
 		wp.Wait()
-		logger.For(ctx).Infof("Processing Media: %s - Finished", input.UserID)
+		logger.For(reqCtx).Infof("Processing Media: %s - Finished", input.UserID)
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
@@ -87,40 +89,43 @@ func processMediaForToken(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRe
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
+
+		reqCtx := c.Request.Context()
+
 		lockerKey := fmt.Sprintf("%s-%s-%d", input.TokenID, input.ContractAddress, input.Chain)
-		if err := throttler.Lock(c, lockerKey); err != nil {
+		if err := throttler.Lock(reqCtx, lockerKey); err != nil {
 			util.ErrResponse(c, http.StatusTooManyRequests, err)
 			return
 		}
-		defer throttler.Unlock(c, lockerKey)
+		defer throttler.Unlock(reqCtx, lockerKey)
 
-		wallet, err := walletRepo.GetByChainAddress(c, persist.NewChainAddress(input.OwnerAddress, input.Chain))
+		wallet, err := walletRepo.GetByChainAddress(reqCtx, persist.NewChainAddress(input.OwnerAddress, input.Chain))
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
-		user, err := userRepo.GetByWalletID(c, wallet.ID)
+		user, err := userRepo.GetByWalletID(reqCtx, wallet.ID)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
-		ctx := logger.NewContextWithFields(c, logrus.Fields{"userID": user.ID})
+		reqCtx = logger.NewContextWithFields(reqCtx, logrus.Fields{"userID": user.ID})
 
-		t, err := tokenRepo.GetByFullIdentifiers(ctx, input.TokenID, input.ContractAddress, input.Chain, user.ID)
+		t, err := tokenRepo.GetByFullIdentifiers(reqCtx, input.TokenID, input.ContractAddress, input.Chain, user.ID)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
-		contract, err := contractRepo.GetByID(ctx, t.Contract)
+		contract, err := contractRepo.GetByID(reqCtx, t.Contract)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
-		err = tp.ProcessTokenPipeline(ctx, t, contract, input.OwnerAddress, persist.ProcessingCauseRefresh)
+		err = tp.ProcessTokenPipeline(reqCtx, t, contract, input.OwnerAddress, persist.ProcessingCauseRefresh)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
