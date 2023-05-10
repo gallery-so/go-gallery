@@ -128,15 +128,10 @@ func CoreInit(c *Clients, provider *multichain.Provider, recommender *recommend.
 		validate.RegisterCustomValidators(v)
 	}
 
-	err := redis.ClearCache(redis.GalleriesDB)
-	if err != nil {
-		panic(err)
-	}
-
-	lock := redis.NewLockClient(redis.NotificationLockDB)
-	graphqlAPQCache := redis.NewCache(redis.GraphQLAPQ)
-	feedCache := redis.NewCache(redis.FeedDB)
-	socialCache := redis.NewCache(redis.SocialDB)
+	lock := redis.NewLockClient(redis.NewCache(redis.NotificationLockCache))
+	graphqlAPQCache := redis.NewCache(redis.GraphQLAPQCache)
+	feedCache := redis.NewCache(redis.FeedCache)
+	socialCache := redis.NewCache(redis.SocialCache)
 
 	recommender.Run(context.Background(), time.NewTicker(time.Hour))
 
@@ -300,7 +295,7 @@ func NewMultichainProvider(c *Clients) *multichain.Provider {
 		},
 	}
 	poapProvider := poap.NewProvider(c.HTTPClient, env.GetString("POAP_API_KEY"), env.GetString("POAP_AUTH_TOKEN"))
-	cache := redis.NewCache(redis.CommunitiesDB)
+	cache := redis.NewCache(redis.CommunitiesCache)
 	return multichain.NewProvider(context.Background(), c.Repos, c.Queries, cache, c.TaskClient,
 		overrides,
 		failureEthProvider,
@@ -314,5 +309,5 @@ func NewMultichainProvider(c *Clients) *multichain.Provider {
 }
 
 func newThrottler() *throttle.Locker {
-	return throttle.NewThrottleLocker(redis.NewCache(redis.RefreshNFTsThrottleDB), time.Minute*5)
+	return throttle.NewThrottleLocker(redis.NewCache(redis.RefreshNFTsThrottleCache), time.Minute*5)
 }

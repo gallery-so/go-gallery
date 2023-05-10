@@ -76,9 +76,7 @@ func coreInitServer() *gin.Engine {
 
 	go autoSendNotificationEmails(queries, sendgridClient, pub)
 
-	redisClient := redis.NewClient(redis.EmailRateLimiterDB)
-
-	return handlersInitServer(router, loaders, queries, sendgridClient, redisClient)
+	return handlersInitServer(router, loaders, queries, sendgridClient)
 }
 
 func setDefaults() {
@@ -126,7 +124,7 @@ func setDefaults() {
 }
 
 func newThrottler() *throttle.Locker {
-	return throttle.NewThrottleLocker(redis.NewCache(redis.EmailThrottleDB), time.Minute*5)
+	return throttle.NewThrottleLocker(redis.NewCache(redis.EmailThrottleCache), time.Minute*5)
 }
 
 func initSentry() {

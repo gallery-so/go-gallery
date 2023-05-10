@@ -142,8 +142,8 @@ func AddAuthToContext() gin.HandlerFunc {
 	}
 }
 
-// RateLimited is a middleware that rate limits requests by IP address
-func RateLimited(lim *KeyRateLimiter) gin.HandlerFunc {
+// IPRateLimited is a middleware that rate limits requests by IP address
+func IPRateLimited(lim *KeyRateLimiter) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		canContinue, tryAgainAfter, err := lim.ForKey(c, c.ClientIP())
 		if err != nil {

@@ -3,6 +3,7 @@ package publicapi
 import (
 	"context"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/util"
 	"time"
 
@@ -29,6 +30,7 @@ type AuthAPI struct {
 	ethClient          *ethclient.Client
 	multiChainProvider *multichain.Provider
 	magicLinkClient    *magicclient.API
+	oneTimeLoginCache  *redis.Cache
 }
 
 func (api AuthAPI) NewNonceAuthenticator(chainAddress persist.ChainPubKey, nonce string, signature string, walletType persist.WalletType) auth.Authenticator {
@@ -110,8 +112,9 @@ func (api AuthAPI) NewMagicLinkAuthenticator(token token.Token) auth.Authenticat
 
 func (api AuthAPI) NewOneTimeLoginTokenAuthenticator(loginToken string) auth.Authenticator {
 	authenticator := auth.OneTimeLoginTokenAuthenticator{
-		UserRepo:   api.repos.UserRepository,
-		LoginToken: loginToken,
+		ConsumedTokenCache: api.oneTimeLoginCache,
+		UserRepo:           api.repos.UserRepository,
+		LoginToken:         loginToken,
 	}
 	return authenticator
 }
