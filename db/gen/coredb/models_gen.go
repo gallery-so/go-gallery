@@ -318,6 +318,12 @@ type RecommendationResult struct {
 	Deleted           bool
 }
 
+type ReprocessJob struct {
+	ID           int
+	TokenStartID persist.DBID
+	TokenEndID   persist.DBID
+}
+
 type ScrubbedPiiAccountCreationInfo struct {
 	UserID    persist.DBID
 	IpAddress persist.Address

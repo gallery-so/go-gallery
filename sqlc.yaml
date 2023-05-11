@@ -170,6 +170,9 @@ sql:
           # Push Notification Tokens
           - column: "push_notification_tickets.ticket_id"
             go_type: "string"
+          
+          - column: "reprocess_jobs.id"
+            go_type: "int"
 
           # Wildcards
           # Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above.

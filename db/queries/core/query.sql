@@ -1094,7 +1094,7 @@ update push_notification_tickets t set check_after = updates.check_after, num_ch
 -- name: GetCheckablePushTickets :many
 select * from push_notification_tickets where check_after <= now() and deleted = false limit sqlc.arg('limit');
 
--- name: GetAllTokensWithContracts :many
+-- name: GetAllTokensWithContractsByIDs :many
 SELECT
     tokens.*,
     contracts.*,
@@ -1109,8 +1109,11 @@ JOIN contracts ON contracts.id = tokens.contract
 LEFT JOIN token_medias on token_medias.id = tokens.token_media_id
 WHERE tokens.deleted = false
 AND (tokens.token_media_id IS NULL or token_medias.active = false)
-ORDER BY tokens.last_updated DESC
-LIMIT $1 OFFSET $2;
+AND tokens.id > @start_id AND tokens.id < @end_id
+ORDER BY tokens.id;
+
+-- name: GetReprocessJobRangeByID :one
+select * from reprocess_jobs where id = $1;
 
 
 -- name: GetMediaByTokenID :batchone

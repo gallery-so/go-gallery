@@ -1085,7 +1085,7 @@ func (q *Queries) GetAllTimeTrendingUserIDs(ctx context.Context, limit int32) ([
 	return items, nil
 }
 
-const getAllTokensWithContracts = `-- name: GetAllTokensWithContracts :many
+const getAllTokensWithContractsByIDs = `-- name: GetAllTokensWithContractsByIDs :many
 SELECT
     tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id,
     contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam,
@@ -1100,16 +1100,16 @@ JOIN contracts ON contracts.id = tokens.contract
 LEFT JOIN token_medias on token_medias.id = tokens.token_media_id
 WHERE tokens.deleted = false
 AND (tokens.token_media_id IS NULL or token_medias.active = false)
-ORDER BY tokens.last_updated DESC
-LIMIT $1 OFFSET $2
+AND tokens.id > $1 AND tokens.id < $2
+ORDER BY tokens.id
 `
 
-type GetAllTokensWithContractsParams struct {
-	Limit  int32
-	Offset int32
+type GetAllTokensWithContractsByIDsParams struct {
+	StartID persist.DBID
+	EndID   persist.DBID
 }
 
-type GetAllTokensWithContractsRow struct {
+type GetAllTokensWithContractsByIDsRow struct {
 	ID                     persist.DBID
 	Deleted                bool
 	Version                sql.NullInt32
@@ -1155,15 +1155,15 @@ type GetAllTokensWithContractsRow struct {
 	WalletAddress          persist.Address
 }
 
-func (q *Queries) GetAllTokensWithContracts(ctx context.Context, arg GetAllTokensWithContractsParams) ([]GetAllTokensWithContractsRow, error) {
-	rows, err := q.db.Query(ctx, getAllTokensWithContracts, arg.Limit, arg.Offset)
+func (q *Queries) GetAllTokensWithContractsByIDs(ctx context.Context, arg GetAllTokensWithContractsByIDsParams) ([]GetAllTokensWithContractsByIDsRow, error) {
+	rows, err := q.db.Query(ctx, getAllTokensWithContractsByIDs, arg.StartID, arg.EndID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetAllTokensWithContractsRow
+	var items []GetAllTokensWithContractsByIDsRow
 	for rows.Next() {
-		var i GetAllTokensWithContractsRow
+		var i GetAllTokensWithContractsByIDsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Deleted,
@@ -2343,6 +2343,17 @@ func (q *Queries) GetRecentUnseenNotifications(ctx context.Context, arg GetRecen
 		return nil, err
 	}
 	return items, nil
+}
+
+const getReprocessJobRangeByID = `-- name: GetReprocessJobRangeByID :one
+select id, token_start_id, token_end_id from reprocess_jobs where id = $1
+`
+
+func (q *Queries) GetReprocessJobRangeByID(ctx context.Context, id int) (ReprocessJob, error) {
+	row := q.db.QueryRow(ctx, getReprocessJobRangeByID, id)
+	var i ReprocessJob
+	err := row.Scan(&i.ID, &i.TokenStartID, &i.TokenEndID)
+	return i, err
 }
 
 const getSocialAuthByUserID = `-- name: GetSocialAuthByUserID :one

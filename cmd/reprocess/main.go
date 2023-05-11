@@ -46,10 +46,7 @@ func main() {
 		panic(err)
 	}
 
-	var limit int
-	var offset int
-
-	var rows []coredb.GetAllTokensWithContractsRow
+	var rows []coredb.GetAllTokensWithContractsByIDsRow
 
 	if env.GetString("CLOUD_RUN_JOB") != "" {
 		logrus.Infof("running as cloud run job")
@@ -65,14 +62,17 @@ func main() {
 		// so we can calculate the limit by dividing the totalTokenCount by the jobCount
 		// and the offset by multiplying the jobIndex by the limit
 
-		limit = totalTokenCount / jobCount
-		offset = jobIndex * limit
+		logrus.Infof("jobIndex: %d, jobCount: %d, totalTokenCount: %d", jobIndex, jobCount, totalTokenCount)
 
-		logrus.Infof("jobIndex: %d, jobCount: %d, totalTokenCount: %d, limit: %d, offset: %d", jobIndex, jobCount, totalTokenCount, limit, offset)
+		r, err := clients.Queries.GetReprocessJobRangeByID(ctx, jobIndex)
+		if err != nil {
+			logrus.Errorf("error getting job range: %v", err)
+			panic(err)
+		}
 
-		rows, err = clients.Queries.GetAllTokensWithContracts(ctx, coredb.GetAllTokensWithContractsParams{
-			Limit:  int32(limit),
-			Offset: int32(offset),
+		rows, err = clients.Queries.GetAllTokensWithContractsByIDs(ctx, coredb.GetAllTokensWithContractsByIDsParams{
+			StartID: r.TokenStartID,
+			EndID:   r.TokenEndID,
 		})
 	} else {
 
@@ -84,11 +84,15 @@ func main() {
 			}
 			logger.SetOutput(io.MultiWriter(fi, os.Stdout))
 		})
-		limit = 1000
-		offset = 0
-		rows, err = clients.Queries.GetAllTokensWithContracts(ctx, coredb.GetAllTokensWithContractsParams{
-			Limit:  int32(limit),
-			Offset: int32(offset),
+
+		r, err := clients.Queries.GetReprocessJobRangeByID(ctx, 0)
+		if err != nil {
+			logrus.Errorf("error getting job range: %v", err)
+			panic(err)
+		}
+		rows, err = clients.Queries.GetAllTokensWithContractsByIDs(ctx, coredb.GetAllTokensWithContractsByIDsParams{
+			StartID: r.TokenStartID,
+			EndID:   r.TokenEndID,
 		})
 	}
 

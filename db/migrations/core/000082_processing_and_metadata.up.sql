@@ -25,6 +25,12 @@ create table if not exists token_medias (
     deleted bool not null default false
 );
 
+create table if not exists reprocess_jobs (
+    id int primary key,
+    token_start_id varchar(255) not null,
+    token_end_id varchar(255) not null
+);
+
 create unique index if not exists token_media_contract_token_id_chain_idx on token_medias (contract_id, token_id, chain) where active = true and deleted = false;
 
 alter table tokens add column if not exists token_media_id varchar(255) references token_medias(id);
