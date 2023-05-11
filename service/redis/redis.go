@@ -42,18 +42,17 @@ const (
 // Every cache is uniquely defined by its database and key prefix. Display names are used for tracing.
 
 var (
-	NotificationLockCache            = CacheConfig{database: locks, keyPrefix: "notif", displayName: "notificationLock"}
-	EmailRateLimitersCache           = CacheConfig{database: rateLimiters, keyPrefix: "email", displayName: "emailRateLimiters"}
-	OneTimeLoginCache                = CacheConfig{database: misc, keyPrefix: "otl", displayName: "oneTimeLogin"}
-	CommunitiesCache                 = CacheConfig{database: communities, keyPrefix: "", displayName: "communities"}
-	IndexerServerThrottleCache       = CacheConfig{database: indexerServerThrottle, keyPrefix: "", displayName: "indexerServerThrottle"}
-	RefreshNFTsThrottleCache         = CacheConfig{database: refreshNFTsThrottle, keyPrefix: "", displayName: "refreshNFTsThrottle"}
-	TokenProcessingThrottleCache     = CacheConfig{database: tokenProcessingThrottle, keyPrefix: "", displayName: "tokenProcessingThrottle"}
-	EmailThrottleCache               = CacheConfig{database: emailThrottle, keyPrefix: "", displayName: "emailThrottle"}
-	GraphQLAPQCache                  = CacheConfig{database: graphQLAPQ, keyPrefix: "", displayName: "graphQLAPQ"}
-	FeedCache                        = CacheConfig{database: feed, keyPrefix: "", displayName: "feed"}
-	SocialCache                      = CacheConfig{database: social, keyPrefix: "", displayName: "social"}
-	TokenProcessingThrottleTempCache = CacheConfig{database: tokenProcessingThrottle, keyPrefix: "temp", displayName: "tokenProcessingThrottleTemp"}
+	NotificationLockCache        = CacheConfig{database: locks, keyPrefix: "notif", displayName: "notificationLock"}
+	EmailRateLimitersCache       = CacheConfig{database: rateLimiters, keyPrefix: "email", displayName: "emailRateLimiters"}
+	OneTimeLoginCache            = CacheConfig{database: misc, keyPrefix: "otl", displayName: "oneTimeLogin"}
+	CommunitiesCache             = CacheConfig{database: communities, keyPrefix: "", displayName: "communities"}
+	IndexerServerThrottleCache   = CacheConfig{database: indexerServerThrottle, keyPrefix: "", displayName: "indexerServerThrottle"}
+	RefreshNFTsThrottleCache     = CacheConfig{database: refreshNFTsThrottle, keyPrefix: "", displayName: "refreshNFTsThrottle"}
+	TokenProcessingThrottleCache = CacheConfig{database: tokenProcessingThrottle, keyPrefix: "", displayName: "tokenProcessingThrottle"}
+	EmailThrottleCache           = CacheConfig{database: emailThrottle, keyPrefix: "", displayName: "emailThrottle"}
+	GraphQLAPQCache              = CacheConfig{database: graphQLAPQ, keyPrefix: "", displayName: "graphQLAPQ"}
+	FeedCache                    = CacheConfig{database: feed, keyPrefix: "", displayName: "feed"}
+	SocialCache                  = CacheConfig{database: social, keyPrefix: "", displayName: "social"}
 )
 
 func newClient(db redisDB, traceName string) *redis.Client {

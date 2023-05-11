@@ -7,7 +7,6 @@ package graphql
 import (
 	"context"
 	"fmt"
-
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	emailService "github.com/mikeydub/go-gallery/emails"
