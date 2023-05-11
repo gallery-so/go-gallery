@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/tracing"
 )
 
 type ProcessingCause string
@@ -130,7 +131,8 @@ func (p *PipelineMetadata) Scan(value interface{}) error {
 	return json.Unmarshal(value.([]byte), p)
 }
 
-func TrackStepStatus(ctx context.Context, status *PipelineStepStatus, name string) func() {
+func TrackStepStatus(ctx context.Context, status *PipelineStepStatus, name string) (func(), context.Context) {
+	span, ctx := tracing.StartSpan(ctx, "pipeline.step", name)
 
 	startTime := time.Now()
 
@@ -151,13 +153,14 @@ func TrackStepStatus(ctx context.Context, status *PipelineStepStatus, name strin
 	}()
 
 	return func() {
+		defer tracing.FinishSpan(span)
 		if *status == PipelineStepStatusError {
 			logger.For(ctx).Infof("failed %s (took: %s)", name, time.Since(startTime))
 			return
 		}
 		*status = PipelineStepStatusSuccess
 		logger.For(ctx).Infof("succeeded %s (took: %s)", name, time.Since(startTime))
-	}
+	}, ctx
 
 }
 
