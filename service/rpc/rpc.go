@@ -682,7 +682,7 @@ func GetIPFSResponse(ctx context.Context, ipfsClient *shell.Shell, path string) 
 		}
 
 		if resp.StatusCode > 399 || resp.StatusCode < 200 {
-			if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusForbidden {
+			if resp.StatusCode == http.StatusNotFound {
 				return nil, util.ErrHTTP{Status: resp.StatusCode, URL: url}
 			}
 			url := fmt.Sprintf("%s/ipfs/%s", env.GetString("FALLBACK_IPFS_URL"), path)
@@ -1160,7 +1160,7 @@ func isRateLimitedError(err error) bool {
 
 func HTTPErrIsForceClose(err error) bool {
 	if err != nil {
-		if it, ok := err.(util.ErrHTTP); ok && (it.Status == http.StatusNotFound || it.Status == http.StatusForbidden) {
+		if it, ok := err.(util.ErrHTTP); ok && it.Status == http.StatusNotFound {
 			return true
 		}
 	}

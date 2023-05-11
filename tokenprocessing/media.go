@@ -942,13 +942,14 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 		reader, err := rpc.GetDataFromURIAsReader(pCtx, asURI, ipfsClient, arweaveClient, util.MB, time.Minute)
 		if err != nil {
 			persist.FailStep(subMeta.ReaderRetrieval)
+			logger.For(pCtx).Errorf("failed to get reader for '%s': %s <%T>", mediaURL, err, err)
 			if strings.Contains(err.Error(), context.Canceled.Error()) || strings.Contains(err.Error(), context.DeadlineExceeded.Error()) {
 				return reader, false, err
 			}
 			// the reader is and always will be invalid
 			switch caught := err.(type) {
 			case util.ErrHTTP:
-				if caught.Status == http.StatusNotFound || caught.Status == http.StatusInternalServerError || caught.Status == http.StatusForbidden {
+				if caught.Status == http.StatusNotFound || caught.Status == http.StatusInternalServerError {
 					return reader, false, errInvalidMedia{URL: mediaURL, err: err}
 				}
 			case *net.DNSError, *url.Error:

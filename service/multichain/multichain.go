@@ -755,7 +755,7 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contr
 				}
 				switch caught := err.(type) {
 				case util.ErrHTTP:
-					if caught.Status == http.StatusNotFound || caught.Status == http.StatusForbidden {
+					if caught.Status == http.StatusNotFound {
 						return err
 					}
 				}
