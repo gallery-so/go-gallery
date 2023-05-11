@@ -13,6 +13,7 @@ type TokenType string
 
 const (
 	TokenTypeAuth              TokenType = "auth"
+	TokenTypeRefresh           TokenType = "refresh"
 	TokenTypeOneTimeLogin      TokenType = "one_time_login"
 	TokenTypeEmailVerification TokenType = "email_verification"
 )
@@ -23,7 +24,14 @@ type GalleryClaims struct {
 }
 
 type authClaims struct {
-	UserID persist.DBID `json:"user_id"`
+	UserID    persist.DBID `json:"user_id"`
+	SessionID string       `json:"session_id"`
+	GalleryClaims
+}
+
+type refreshClaims struct {
+	UserID    persist.DBID `json:"user_id"`
+	SessionID string       `json:"session_id"`
 	GalleryClaims
 }
 
@@ -39,27 +47,52 @@ type emailVerificationClaims struct {
 	GalleryClaims
 }
 
-func GenerateAuthToken(ctx context.Context, userID persist.DBID) (string, error) {
+func GenerateAuthToken(ctx context.Context, userID persist.DBID, sessionID string) (string, error) {
 	secret := env.GetString("AUTH_JWT_SECRET")
 	validFor := time.Duration(env.GetInt64("AUTH_JWT_TTL")) * time.Second
 
 	claims := authClaims{
 		UserID:        userID,
+		SessionID:     sessionID,
 		GalleryClaims: newGalleryClaims(TokenTypeAuth, validFor),
 	}
 
 	return generateJWT(claims, secret)
 }
 
-func ParseAuthToken(ctx context.Context, token string) (persist.DBID, error) {
+func ParseAuthToken(ctx context.Context, token string) (persist.DBID, string, error) {
 	claims := authClaims{}
 	parsedToken, err := jwt.ParseWithClaims(token, &claims, keyFunc(env.GetString("AUTH_JWT_SECRET")))
 
 	if err != nil || !parsedToken.Valid {
-		return "", ErrInvalidJWT
+		return "", "", ErrInvalidJWT
 	}
 
-	return claims.UserID, nil
+	return claims.UserID, claims.SessionID, nil
+}
+
+func GenerateRefreshToken(ctx context.Context, userID persist.DBID, sessionID string) (string, error) {
+	secret := env.GetString("REFRESH_JWT_SECRET")
+	validFor := time.Duration(env.GetInt64("REFRESH_JWT_TTL")) * time.Second
+
+	claims := refreshClaims{
+		UserID:        userID,
+		SessionID:     sessionID,
+		GalleryClaims: newGalleryClaims(TokenTypeRefresh, validFor),
+	}
+
+	return generateJWT(claims, secret)
+}
+
+func ParseRefreshToken(ctx context.Context, token string) (persist.DBID, string, error) {
+	claims := refreshClaims{}
+	parsedToken, err := jwt.ParseWithClaims(token, &claims, keyFunc(env.GetString("REFRESH_JWT_SECRET")))
+
+	if err != nil || !parsedToken.Valid {
+		return "", "", ErrInvalidJWT
+	}
+
+	return claims.UserID, claims.SessionID, nil
 }
 
 func GenerateOneTimeLoginToken(ctx context.Context, userID persist.DBID, source string, validFor time.Duration) (string, error) {

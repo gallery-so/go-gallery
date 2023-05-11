@@ -137,7 +137,7 @@ func (api AuthAPI) GetAuthNonce(ctx context.Context, chainAddress persist.ChainA
 
 func (api AuthAPI) Login(ctx context.Context, authenticator auth.Authenticator) (persist.DBID, error) {
 	// Nothing to validate
-	return auth.Login(ctx, authenticator)
+	return auth.Login(ctx, api.queries, authenticator)
 }
 
 func (api AuthAPI) Logout(ctx context.Context) {

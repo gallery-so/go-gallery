@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"math/rand"
 	"net/http"
@@ -39,8 +40,9 @@ type AuthenticatedAddress struct {
 
 const (
 	// Context keys for auth data
-	userIDContextKey     = "auth.user_id"
 	userAuthedContextKey = "auth.authenticated"
+	userIDContextKey     = "auth.user_id"
+	sessionIDContextKey  = "auth.session_id"
 	authErrorContextKey  = "auth.auth_error"
 )
 
@@ -54,8 +56,11 @@ const NoncePrepend = "Gallery uses this cryptographic signature in place of a pa
 // NewNoncePrepend is what will now be prepended to every nonce
 const NewNoncePrepend = "Gallery uses this cryptographic signature in place of a password: "
 
-// JWTCookieKey is the key used to store the JWT token in the cookie
-const JWTCookieKey = "GLRY_JWT"
+// AuthCookieKey is the key used to store the auth token in the cookie
+const AuthCookieKey = "GLRY_JWT"
+
+// RefreshCookieKey is the key used to store the refresh token in the cookie
+const RefreshCookieKey = "GLRY_REFRESH_JWT"
 
 // ErrAddressSignatureMismatch is returned when the address signature does not match the address cryptographically
 var ErrAddressSignatureMismatch = errors.New("address does not match signature")
@@ -73,33 +78,6 @@ var ErrNoCookie = errors.New("no jwt passed as cookie")
 var ErrSignatureInvalid = errors.New("signature invalid")
 
 var ErrInvalidMagicLink = errors.New("invalid magic link")
-
-// LoginInput is the input to the login pipeline
-type LoginInput struct {
-	Signature  string             `json:"signature" binding:"signature"`
-	Address    persist.Address    `json:"address"   binding:"required"`
-	Chain      persist.Chain      `json:"chain"`
-	WalletType persist.WalletType `json:"wallet_type"`
-	Nonce      string             `json:"nonce"`
-}
-
-// LoginOutput is the output of the login pipeline
-type LoginOutput struct {
-	SignatureValid bool         `json:"signature_valid"`
-	UserID         persist.DBID `json:"user_id"`
-}
-
-// GetPreflightInput is the input to the preflight pipeline
-type GetPreflightInput struct {
-	Address persist.Address `json:"address" form:"address" binding:"required"`
-	Chain   persist.Chain
-}
-
-// GetPreflightOutput is the output of the preflight pipeline
-type GetPreflightOutput struct {
-	Nonce      string `json:"nonce"`
-	UserExists bool   `json:"user_exists"`
-}
 
 type Authenticator interface {
 	// GetDescription returns information about the authenticator for error and logging purposes.
@@ -308,7 +286,7 @@ func (a OneTimeLoginTokenAuthenticator) Authenticate(ctx context.Context) (*Auth
 }
 
 // Login logs in a user with a given authentication scheme
-func Login(ctx context.Context, authenticator Authenticator) (persist.DBID, error) {
+func Login(ctx context.Context, queries *db.Queries, authenticator Authenticator) (persist.DBID, error) {
 	gc := util.MustGetGinContext(ctx)
 
 	authResult, err := authenticator.Authenticate(ctx)
@@ -320,21 +298,19 @@ func Login(ctx context.Context, authenticator Authenticator) (persist.DBID, erro
 		return "", persist.ErrUserNotFound{Authenticator: authenticator.GetDescription()}
 	}
 
-	authToken, err := GenerateAuthToken(ctx, authResult.User.ID)
+	userID := authResult.User.ID
+
+	err = StartSession(gc, queries, userID)
 	if err != nil {
 		return "", err
 	}
 
-	SetAuthStateForCtx(gc, authResult.User.ID, nil)
-	SetAuthCookie(gc, authToken)
-
 	return authResult.User.ID, nil
 }
 
-func Logout(pCtx context.Context) {
-	gc := util.MustGetGinContext(pCtx)
-	SetAuthStateForCtx(gc, "", ErrNoCookie)
-	SetAuthCookie(gc, "")
+func Logout(ctx context.Context) {
+	gc := util.MustGetGinContext(ctx)
+	EndSession(gc)
 }
 
 // GetAuthNonce will determine whether a user is permitted to log in, and if so, generate a nonce to be signed
@@ -408,6 +384,11 @@ func GetUserWithNonce(pCtx context.Context, pChainAddress persist.ChainAddress, 
 	return nonceValue, user, nil
 }
 
+// GetSessionIDFromCtx returns the session ID from the context
+func GetSessionIDFromCtx(c *gin.Context) string {
+	return c.MustGet(sessionIDContextKey).(string)
+}
+
 // GetUserIDFromCtx returns the user ID from the context
 func GetUserIDFromCtx(c *gin.Context) persist.DBID {
 	return c.MustGet(userIDContextKey).(persist.DBID)
@@ -428,14 +409,164 @@ func GetAuthErrorFromCtx(c *gin.Context) error {
 	return err.(error)
 }
 
-func SetAuthStateForCtx(c *gin.Context, userID persist.DBID, err error) {
+func setSessionStateForCtx(c *gin.Context, userID persist.DBID, sessionID string) {
+	if userID == "" || sessionID == "" {
+		logger.For(c).Errorf("attempted to set session state with missing values. userID: %s, sessionID: %s", userID, sessionID)
+		err := errors.New("attempted to set session state with missing values")
+		clearSessionStateForCtx(c, err)
+		return
+	}
+
 	c.Set(userIDContextKey, userID)
-	c.Set(authErrorContextKey, err)
-	c.Set(userAuthedContextKey, userID != "" && err == nil)
+	c.Set(sessionIDContextKey, sessionID)
+	c.Set(authErrorContextKey, nil)
+	c.Set(userAuthedContextKey, true)
 }
 
-// SetAuthCookie sets the cookie for auth on the response
-func SetAuthCookie(c *gin.Context, token string) {
+func clearSessionStateForCtx(c *gin.Context, err error) {
+	c.Set(userIDContextKey, "")
+	c.Set(sessionIDContextKey, "")
+	c.Set(authErrorContextKey, err)
+	c.Set(userAuthedContextKey, false)
+}
+
+func StartSession(c *gin.Context, queries *db.Queries, userID persist.DBID) error {
+	sessionID := persist.GenerateID().String()
+
+	err := issueSessionTokens(c, userID, sessionID, queries)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func ContinueSession(c *gin.Context, queries *db.Queries) error {
+	// If the user has a valid auth cookie, we can set their auth state and be done
+	userID, sessionID, err := getAuthToken(c)
+	if err == nil {
+		// ----------------------------------------------------------------------------
+		// Temporary handling for existing auth tokens that don't have session IDs.
+		// Where it would normally be an error for an auth token to not have a session ID,
+		// it's expected for tokens that were issued prior to the introduction of session IDs.
+		// Can be removed in a month when all existing auth tokens will have expired.
+		if sessionID == "" {
+			sessionID = persist.GenerateID().String()
+			err = issueSessionTokens(c, userID, sessionID, queries)
+			if err != nil {
+				return err
+			}
+
+			return nil
+		}
+		// End of temporary handling
+		// ----------------------------------------------------------------------------
+		logger.For(c).Info("found valid auth cookie")
+		setSessionStateForCtx(c, userID, sessionID)
+		return nil
+	}
+
+	// If the user doesn't have a valid auth cookie or a valid refresh cookie, they can't be
+	// authenticated and they'll have to log in again.
+	userID, sessionID, err = getRefreshToken(c)
+	if err != nil {
+		logger.For(c).Info("no valid auth or refresh cookies found")
+		clearSessionStateForCtx(c, err)
+		return err
+	}
+
+	// At this point, the user has a valid refresh cookie, but not a valid auth cookie.
+	// Give them new cookies to continue their existing session.
+	err = issueSessionTokens(c, userID, sessionID, queries)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// EndSession clears the state and cookies for the current session. Note that it does not
+// actually invalidate the session, so the session could still be continued in the future
+// if a client continued to use the tokens. We may add this functionality in the future, though;
+// all it would take is a database table of ended session IDs and a cron job to delete entries
+// from the table after the expiration date of the session's last issued refresh token.
+func EndSession(c *gin.Context) {
+	clearCookie(c, RefreshCookieKey)
+	clearCookie(c, AuthCookieKey)
+	clearSessionStateForCtx(c, ErrNoCookie)
+}
+
+func issueSessionTokens(c *gin.Context, userID persist.DBID, sessionID string, queries *db.Queries) error {
+	newRefreshToken, err := GenerateRefreshToken(c, userID, sessionID)
+	if err != nil {
+		clearSessionStateForCtx(c, err)
+		return err
+	}
+
+	newAuthToken, err := GenerateAuthToken(c, userID, sessionID)
+	if err != nil {
+		clearSessionStateForCtx(c, err)
+		return err
+	}
+
+	// TODO: Update the sessions table here
+
+	setSessionStateForCtx(c, userID, sessionID)
+	setCookie(c, RefreshCookieKey, newRefreshToken)
+	setCookie(c, AuthCookieKey, newAuthToken)
+
+	return nil
+}
+
+func getAuthToken(c *gin.Context) (persist.DBID, string, error) {
+	authToken, err := getCookie(c, AuthCookieKey)
+	if err != nil {
+		return "", "", err
+	}
+
+	userID, sessionID, err := ParseAuthToken(c, authToken)
+	if err != nil {
+		return "", "", err
+	}
+
+	return userID, sessionID, nil
+}
+
+func getRefreshToken(c *gin.Context) (persist.DBID, string, error) {
+	refreshToken, err := getCookie(c, RefreshCookieKey)
+	if err != nil {
+		return "", "", err
+	}
+
+	userID, sessionID, err := ParseRefreshToken(c, refreshToken)
+	if err != nil {
+		return "", "", err
+	}
+
+	return userID, sessionID, nil
+}
+
+func getCookie(c *gin.Context, cookieName string) (string, error) {
+	cookie, err := c.Cookie(cookieName)
+
+	// Treat empty cookies the same way we treat missing cookies, since setting a cookie to the empty
+	// string is how we "delete" them.
+	if err == nil && cookie == "" {
+		err = http.ErrNoCookie
+	}
+
+	if err != nil {
+		if err == http.ErrNoCookie {
+			err = ErrNoCookie
+		}
+
+		return "", err
+	}
+
+	return cookie, nil
+}
+
+func setCookie(c *gin.Context, cookieName string, value string) {
 	mode := http.SameSiteStrictMode
 	domain := ".gallery.so"
 	httpOnly := true
@@ -450,8 +581,8 @@ func SetAuthCookie(c *gin.Context, token string) {
 	}
 
 	http.SetCookie(c.Writer, &http.Cookie{
-		Name:     JWTCookieKey,
-		Value:    token,
+		Name:     cookieName,
+		Value:    value,
 		MaxAge:   cookieMaxAge,
 		Path:     "/",
 		Secure:   secure,
@@ -461,23 +592,6 @@ func SetAuthCookie(c *gin.Context, token string) {
 	})
 }
 
-func toAuthWallets(pWallets []persist.Wallet) []AuthenticatedAddress {
-	res := make([]AuthenticatedAddress, len(pWallets))
-	for i, w := range pWallets {
-		res[i] = AuthenticatedAddress{
-			ChainAddress: persist.NewChainAddress(w.Address, w.Chain),
-			WalletType:   w.WalletType,
-		}
-	}
-	return res
-}
-
-// ContainsAuthWallet checks whether an auth.Wallet is in a slice of perist.Wallet
-func ContainsWallet(pWallets []AuthenticatedAddress, pWallet AuthenticatedAddress) bool {
-	for _, w := range pWallets {
-		if w.ChainAddress == pWallet.ChainAddress {
-			return true
-		}
-	}
-	return false
+func clearCookie(c *gin.Context, cookieName string) {
+	setCookie(c, cookieName, "")
 }

@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"fmt"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/auth/basicauth"
 	"net/http"
 
@@ -106,34 +107,14 @@ func TaskRequired() gin.HandlerFunc {
 	}
 }
 
-// AddAuthToContext is a middleware that validates auth data and stores the results in the context
-func AddAuthToContext() gin.HandlerFunc {
+// ContinueSession is a middleware that manages session cookies
+func ContinueSession(queries *db.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authToken, err := c.Cookie(auth.JWTCookieKey)
-
-		// Treat empty cookies the same way we treat missing cookies, since setting a cookie to the empty
-		// string is how we "delete" them.
-		if err == nil && authToken == "" {
-			err = http.ErrNoCookie
-		}
-
-		if err != nil {
-			if err == http.ErrNoCookie {
-				err = auth.ErrNoCookie
-			}
-
-			auth.SetAuthStateForCtx(c, "", err)
-			c.Next()
-			return
-		}
-
-		userID, err := auth.ParseAuthToken(c, authToken)
-		auth.SetAuthStateForCtx(c, userID, err)
-
-		// If we have a successfully authenticated user, add their ID to all subsequent logging
+		err := auth.ContinueSession(c, queries)
 		if err == nil {
 			loggerCtx := logger.NewContextWithFields(c.Request.Context(), logrus.Fields{
-				"authedUserId": userID,
+				"authedUserId": auth.GetUserIDFromCtx(c),
+				"sessionId":    auth.GetSessionIDFromCtx(c),
 			})
 			c.Request = c.Request.WithContext(loggerCtx)
 		}

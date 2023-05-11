@@ -58,8 +58,8 @@ func handlersInit(router *gin.Engine, repos *postgres.Repositories, queries *db.
 
 func graphqlHandlersInit(parent *gin.RouterGroup, repos *postgres.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, mcProvider *multichain.Provider, throttler *throttle.Locker, taskClient *cloudtasks.Client, pub *pubsub.Client, lock *redislock.Client, secrets *secretmanager.Client, graphqlAPQCache *redis.Cache, feedCache *redis.Cache, socialCache *redis.Cache, magicClient *magicclient.API, recommender *recommend.Recommender) {
 	handler := graphqlHandler(repos, queries, ethClient, ipfsClient, arweaveClient, storageClient, mcProvider, throttler, taskClient, pub, lock, secrets, graphqlAPQCache, feedCache, socialCache, magicClient, recommender)
-	parent.Any("/query", middleware.AddAuthToContext(), handler)
-	parent.Any("/query/:operationName", middleware.AddAuthToContext(), handler)
+	parent.Any("/query", middleware.ContinueSession(queries), handler)
+	parent.Any("/query/:operationName", middleware.ContinueSession(queries), handler)
 	parent.GET("/playground", graphqlPlaygroundHandler())
 }
 
