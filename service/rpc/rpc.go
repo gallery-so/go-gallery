@@ -1160,7 +1160,7 @@ func isRateLimitedError(err error) bool {
 
 func HTTPErrIsForceClose(err error) bool {
 	if err != nil {
-		if it, ok := err.(util.ErrHTTP); ok && (it.Status == http.StatusNotFound || it.Status == http.StatusForbidden) {
+		if it, ok := err.(util.ErrHTTP); ok && it.Status == http.StatusNotFound {
 			return true
 		}
 	}
