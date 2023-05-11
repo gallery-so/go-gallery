@@ -15,7 +15,6 @@ import (
 	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/tokenprocessing"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
@@ -33,20 +32,12 @@ func main() {
 		fmt.Printf("Took %s", elapsed)
 	}()
 	ctx := context.Background()
-	pg := postgres.NewPgxClient()
 	clients := server.ClientInit(ctx)
 
 	tp := tokenprocessing.NewTokenProcessor(clients.Queries, clients.EthClient, server.NewMultichainProvider(clients), clients.IPFSClient, clients.ArweaveClient, clients.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), clients.Repos.TokenRepository)
 
-	var totalTokenCount int
-
-	err := pg.QueryRow(ctx, `select count(*) from tokens left join token_medias on tokens.token_media_id = token_medias.id where tokens.deleted = false and (tokens.token_media_id is null or token_medias.active = false);`).Scan(&totalTokenCount)
-	if err != nil {
-		logrus.Errorf("error getting total token count: %v", err)
-		panic(err)
-	}
-
 	var rows []coredb.GetAllTokensWithContractsByIDsRow
+	var err error
 
 	if env.GetString("CLOUD_RUN_JOB") != "" {
 		logrus.Infof("running as cloud run job")
@@ -62,7 +53,7 @@ func main() {
 		// so we can calculate the limit by dividing the totalTokenCount by the jobCount
 		// and the offset by multiplying the jobIndex by the limit
 
-		logrus.Infof("jobIndex: %d, jobCount: %d, totalTokenCount: %d", jobIndex, jobCount, totalTokenCount)
+		logrus.Infof("jobIndex: %d, jobCount: %d", jobIndex, jobCount)
 
 		r, err := clients.Queries.GetReprocessJobRangeByID(ctx, jobIndex)
 		if err != nil {
@@ -103,7 +94,7 @@ func main() {
 
 	wp := pool.New().WithMaxGoroutines(25).WithContext(ctx)
 
-	logrus.Infof("processing (%d) tokens...", totalTokenCount)
+	logrus.Infof("processing (%d) tokens...", len(rows))
 
 	totalTokens := 0
 
