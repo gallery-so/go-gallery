@@ -19,6 +19,56 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	// Metrics emitted by the pipeline
+	metricPipelineCompleted = "pipeline_completed"
+	metricPipelineDuration  = "pipeline_duration"
+	metricPipelineErrored   = "pipeline_errored"
+	metricPipelineTimedOut  = "pipeline_timed_out"
+)
+
+func pipelineDurationMetric(d time.Duration) metric {
+	return metric{Name: metricPipelineDuration, Value: d.Seconds()}
+}
+
+func pipelineTimedOutMetric() metric {
+	return metric{Name: metricPipelineTimedOut}
+}
+
+func pipelineCompletedMetric() metric {
+	return metric{Name: metricPipelineCompleted}
+}
+
+type metric struct {
+	Name  string
+	Value float64
+}
+
+type metricReporter struct {
+	Emit func(ctx context.Context, m metric, logMsg ...string)
+}
+
+func newGCPLogMetricReporter() metricReporter {
+	return metricReporter{Emit: gcpLogMetricReporter{}.Emit}
+}
+
+type gcpLogMetricReporter struct{}
+
+func (l gcpLogMetricReporter) Emit(ctx context.Context, metric metric, logMsg ...string) {
+	metricPayload := logrus.Fields{
+		"metricName":  metric.Name,
+		"metricValue": metric.Value,
+	}
+
+	logLine := fmt.Sprintf("reporting metric %s(%f)", metric.Name, metric.Value)
+
+	if len(logMsg) > 0 {
+		logLine = ": " + logMsg[0]
+	}
+
+	logger.For(ctx).WithFields(metricPayload).Infof(logLine)
+}
+
 type tokenProcessor struct {
 	queries       *coredb.Queries
 	ethClient     *ethclient.Client
@@ -28,9 +78,10 @@ type tokenProcessor struct {
 	stg           *storage.Client
 	tokenBucket   string
 	tokenRepo     *postgres.TokenGalleryRepository
+	mr            metricReporter
 }
 
-func NewTokenProcessor(queries *coredb.Queries, ethClient *ethclient.Client, mc *multichain.Provider, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, tokenRepo *postgres.TokenGalleryRepository) *tokenProcessor {
+func NewTokenProcessor(queries *coredb.Queries, ethClient *ethclient.Client, mc *multichain.Provider, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, tokenRepo *postgres.TokenGalleryRepository, mr metricReporter) *tokenProcessor {
 	return &tokenProcessor{
 		queries:       queries,
 		ethClient:     ethClient,
@@ -40,6 +91,7 @@ func NewTokenProcessor(queries *coredb.Queries, ethClient *ethclient.Client, mc 
 		stg:           stg,
 		tokenBucket:   tokenBucket,
 		tokenRepo:     tokenRepo,
+		mr:            mr,
 	}
 }
 
@@ -88,24 +140,21 @@ func (tp *tokenProcessor) ProcessTokenPipeline(c context.Context, t persist.Toke
 
 	totalTime := time.Now()
 	defer func() {
-		logger.For(ctx).Infof("token processing job complete: total time for token processing job: %s", time.Since(totalTime))
-	}()
-
-	go func() {
-		// log the current pipeline metadata if the context deadline is reached
-		<-ctx.Done()
-		if ctx.Err() == context.DeadlineExceeded {
-			logger.For(ctx).Infof("token processing job context deadline reached: (%+v)", *job.pipelineMetadata)
-		}
+		dur := time.Since(totalTime)
+		tp.mr.Emit(ctx, pipelineDurationMetric(dur), fmt.Sprintf("token processing job complete: total time for token processing job: %s", dur))
 	}()
 
 	result := make(chan error, 1)
 
 	select {
 	case result <- job.run(ctx):
-		return <-result
+		err := <-result
+		emitPipelineEndState(ctx, tp.mr, err)
+		return err
 	case <-ctx.Done():
-		return ctx.Err()
+		err := ctx.Err()
+		emitPipelineEndState(ctx, tp.mr, err)
+		return err
 	}
 }
 
@@ -118,7 +167,8 @@ func (tpj *tokenProcessingJob) run(ctx context.Context) error {
 		logger.For(ctx).Errorf("error creating media for token: %s", err)
 	}
 
-	return tpj.persistResults(ctx, tmedia)
+	err = tpj.persistResults(ctx, tmedia)
+	return err
 }
 
 func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (coredb.TokenMedia, error) {
