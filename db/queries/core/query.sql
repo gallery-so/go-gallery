@@ -608,14 +608,14 @@ UPDATE notifications SET seen = true WHERE owner_id = $1 AND seen = false RETURN
 -- name: PaginateInteractionsByFeedEventIDBatch :batchmany
 SELECT interactions.created_At, interactions.id, interactions.tag FROM (
     SELECT t.created_at, t.id, sqlc.arg('admire_tag')::int as tag FROM admires t WHERE sqlc.arg('admire_tag') != 0 AND t.feed_event_id = sqlc.arg('feed_event_id') AND t.deleted = false
-        AND (t.created_at, t.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (t.created_at, t.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+        AND (sqlc.arg('admire_tag'), t.created_at, t.id) < (sqlc.arg('cur_before_tag')::int, sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (sqlc.arg('admire_tag'), t.created_at, t.id) > (sqlc.arg('cur_after_tag')::int, sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
                                                                     UNION
     SELECT t.created_at, t.id, sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.arg('comment_tag') != 0 AND t.feed_event_id = sqlc.arg('feed_event_id') AND t.deleted = false
-        AND (t.created_at, t.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (t.created_at, t.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+        AND (sqlc.arg('comment_tag'), t.created_at, t.id) < (sqlc.arg('cur_before_tag')::int, sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (sqlc.arg('comment_tag'), t.created_at, t.id) > (sqlc.arg('cur_after_tag')::int, sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
 ) as interactions
 
-ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
-         CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
+ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (tag, created_at, id) END ASC,
+         CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (tag, created_at, id) END DESC
 LIMIT sqlc.arg('limit');
 
 -- name: CountInteractionsByFeedEventIDBatch :batchmany
@@ -1074,7 +1074,7 @@ select * from push_notification_tokens where user_id = @user_id and deleted = fa
 select t.* from unnest(@ids::text[]) ids join push_notification_tokens t on t.id = ids and t.deleted = false;
 
 -- name: CreatePushTickets :exec
-insert into push_notification_tickets (id, push_token_id, ticket_id, created_at, check_after, num_check_attempts, deleted) values
+insert into push_notification_tickets (id, push_token_id, ticket_id, created_at, check_after, num_check_attempts, status, deleted) values
   (
    unnest(@ids::text[]),
    unnest(@push_token_ids::text[]),
@@ -1082,14 +1082,15 @@ insert into push_notification_tickets (id, push_token_id, ticket_id, created_at,
    now(),
    now() + interval '15 minutes',
    0,
+   'pending',
    false
   );
 
 -- name: UpdatePushTickets :exec
 with updates as (
-    select unnest(@ids::text[]) as id, unnest(@check_after::timestamptz[]) as check_after, unnest(@num_check_attempts::int[]) as num_check_attempts, unnest(@deleted::bool[]) as deleted
+    select unnest(@ids::text[]) as id, unnest(@check_after::timestamptz[]) as check_after, unnest(@num_check_attempts::int[]) as num_check_attempts, unnest(@status::text[]) as status, unnest(@deleted::bool[]) as deleted
 )
-update push_notification_tickets t set check_after = updates.check_after, num_check_attempts = updates.num_check_attempts, deleted = updates.deleted from updates where t.id = updates.id and t.deleted = false;
+update push_notification_tickets t set check_after = updates.check_after, num_check_attempts = updates.num_check_attempts, status = updates.status, deleted = updates.deleted from updates where t.id = updates.id and t.deleted = false;
 
 -- name: GetCheckablePushTickets :many
 select * from push_notification_tickets where check_after <= now() and deleted = false limit sqlc.arg('limit');

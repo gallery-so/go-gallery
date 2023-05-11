@@ -21,6 +21,13 @@ import (
 var ErrOnlyRemoveOwnAdmire = errors.New("only the actor who created the admire can remove it")
 var ErrOnlyRemoveOwnComment = errors.New("only the actor who created the comment can remove it")
 
+type interactionType int
+
+const (
+	interactionTypeAdmire interactionType = iota + 1
+	interactionTypeComment
+)
+
 type InteractionAPI struct {
 	repos     *postgres.Repositories
 	queries   *db.Queries
@@ -29,28 +36,11 @@ type InteractionAPI struct {
 	ethClient *ethclient.Client
 }
 
-func (api InteractionAPI) makeTagMap(typeFilter []persist.InteractionType) map[persist.InteractionType]int32 {
-	tags := make(map[persist.InteractionType]int32)
-
-	if len(typeFilter) > 0 {
-		for _, t := range typeFilter {
-			tags[t] = int32(t)
-		}
-	} else {
-		for i := int32(persist.MinInteractionTypeValue); i <= int32(persist.MaxInteractionTypeValue); i++ {
-			tags[persist.InteractionType(i)] = i
-		}
-	}
-
-	return tags
-}
-
 func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context, feedEventID persist.DBID, before *string, after *string,
-	first *int, last *int, typeFilter []persist.InteractionType) ([]interface{}, PageInfo, error) {
+	first *int, last *int) ([]interface{}, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"feedEventID": {feedEventID, "required"},
-		"typeFilter":  {typeFilter, fmt.Sprintf("omitempty,min=1,unique,dive,gte=%d,lte=%d", persist.MinInteractionTypeValue, persist.MaxInteractionTypeValue)},
 	}); err != nil {
 		return nil, PageInfo{}, err
 	}
@@ -59,19 +49,26 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 		return nil, PageInfo{}, err
 	}
 
-	tags := api.makeTagMap(typeFilter)
+	// Tags are used both to identify which type of interaction a row corresponds to, and also
+	// to specify the sort order of interaction types. Lower tag numbers are returned first.
+	tags := map[interactionType]int32{
+		interactionTypeComment: 1,
+		interactionTypeAdmire:  2,
+	}
 
-	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
+	queryFunc := func(params intTimeIDPagingParams) ([]interface{}, error) {
 		keys, err := api.loaders.InteractionsByFeedEventID.Load(db.PaginateInteractionsByFeedEventIDBatchParams{
 			FeedEventID:   feedEventID,
 			Limit:         params.Limit,
+			CurBeforeTag:  params.CursorBeforeInt,
 			CurBeforeTime: params.CursorBeforeTime,
 			CurBeforeID:   params.CursorBeforeID,
+			CurAfterTag:   params.CursorAfterInt,
 			CurAfterTime:  params.CursorAfterTime,
 			CurAfterID:    params.CursorAfterID,
 			PagingForward: params.PagingForward,
-			AdmireTag:     tags[persist.InteractionTypeAdmire],
-			CommentTag:    tags[persist.InteractionTypeComment],
+			AdmireTag:     tags[interactionTypeAdmire],
+			CommentTag:    tags[interactionTypeComment],
 		})
 
 		if err != nil {
@@ -89,8 +86,8 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 	countFunc := func() (int, error) {
 		counts, err := api.loaders.InteractionCountByFeedEventID.Load(db.CountInteractionsByFeedEventIDBatchParams{
 			FeedEventID: feedEventID,
-			AdmireTag:   tags[persist.InteractionTypeAdmire],
-			CommentTag:  tags[persist.InteractionTypeComment],
+			AdmireTag:   tags[interactionTypeAdmire],
+			CommentTag:  tags[interactionTypeComment],
 		})
 
 		total := 0
@@ -102,14 +99,14 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 		return total, err
 	}
 
-	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
+	cursorFunc := func(i interface{}) (int32, time.Time, persist.DBID, error) {
 		if row, ok := i.(db.PaginateInteractionsByFeedEventIDBatchRow); ok {
-			return row.CreatedAt, row.ID, nil
+			return row.Tag, row.CreatedAt, row.ID, nil
 		}
-		return time.Time{}, "", fmt.Errorf("interface{} is not the correct type")
+		return 0, time.Time{}, "", fmt.Errorf("interface{} is not the correct type")
 	}
 
-	paginator := timeIDPaginator{
+	paginator := intTimeIDPaginator{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,
@@ -135,8 +132,8 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 	var interactionsByIDMutex sync.Mutex
 	var wg sync.WaitGroup
 
-	admireIDs := typeToIDs[tags[persist.InteractionTypeAdmire]]
-	commentIDs := typeToIDs[tags[persist.InteractionTypeComment]]
+	admireIDs := typeToIDs[tags[interactionTypeAdmire]]
+	commentIDs := typeToIDs[tags[interactionTypeComment]]
 
 	if len(admireIDs) > 0 {
 		wg.Add(1)

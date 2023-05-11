@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/redis"
 	"math/rand"
 	"net/http"
 	"time"
@@ -270,8 +271,9 @@ func NewMagicLinkClient() *magicclient.API {
 }
 
 type OneTimeLoginTokenAuthenticator struct {
-	UserRepo   *postgres.UserRepository
-	LoginToken string
+	ConsumedTokenCache *redis.Cache
+	UserRepo           *postgres.UserRepository
+	LoginToken         string
 }
 
 func (a OneTimeLoginTokenAuthenticator) GetDescription() string {
@@ -279,9 +281,20 @@ func (a OneTimeLoginTokenAuthenticator) GetDescription() string {
 }
 
 func (a OneTimeLoginTokenAuthenticator) Authenticate(ctx context.Context) (*AuthResult, error) {
-	userID, _, err := ParseOneTimeLoginToken(ctx, a.LoginToken)
+	userID, expiresAt, err := ParseOneTimeLoginToken(ctx, a.LoginToken)
 	if err != nil {
 		return nil, err
+	}
+
+	// Use redis to stop this token from being used again (and add an extra minute to the TTL account for clock differences)
+	ttl := time.Until(expiresAt) + time.Minute
+	success, err := a.ConsumedTokenCache.SetNX(ctx, a.LoginToken, []byte{1}, ttl)
+	if err != nil {
+		return nil, err
+	}
+
+	if !success {
+		return nil, errors.New("token already used")
 	}
 
 	user, err := a.UserRepo.GetByID(ctx, userID)

@@ -297,6 +297,7 @@ type PushNotificationTicket struct {
 	CheckAfter       time.Time
 	NumCheckAttempts int32
 	Deleted          bool
+	Status           string
 }
 
 type PushNotificationToken struct {

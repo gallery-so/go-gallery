@@ -474,6 +474,7 @@ const (
 	UserExperienceTypeTwitterconnectiononboardingupsell UserExperienceType = "TwitterConnectionOnboardingUpsell"
 	UserExperienceTypeUpsellmintmemento4                UserExperienceType = "UpsellMintMemento4"
 	UserExperienceTypeUpsellgalleryselects1             UserExperienceType = "UpsellGallerySelects1"
+	UserExperienceTypeMobileupsell1                     UserExperienceType = "MobileUpsell1"
 )
 
 // __addUserWalletMutationInput is used internally by genqlient
@@ -706,10 +707,10 @@ func (v *addUserWalletMutationAddUserWalletAddUserWalletPayload) GetViewer() *ad
 //
 // addUserWalletMutationAddUserWalletAddUserWalletPayloadOrError is implemented by the following types:
 // addUserWalletMutationAddUserWalletAddUserWalletPayload
-// addUserWalletMutationAddUserWalletErrAuthenticationFailed
-// addUserWalletMutationAddUserWalletErrNotAuthorized
-// addUserWalletMutationAddUserWalletErrInvalidInput
 // addUserWalletMutationAddUserWalletErrAddressOwnedByUser
+// addUserWalletMutationAddUserWalletErrAuthenticationFailed
+// addUserWalletMutationAddUserWalletErrInvalidInput
+// addUserWalletMutationAddUserWalletErrNotAuthorized
 type addUserWalletMutationAddUserWalletAddUserWalletPayloadOrError interface {
 	implementsGraphQLInterfaceaddUserWalletMutationAddUserWalletAddUserWalletPayloadOrError()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
@@ -718,13 +719,13 @@ type addUserWalletMutationAddUserWalletAddUserWalletPayloadOrError interface {
 
 func (v *addUserWalletMutationAddUserWalletAddUserWalletPayload) implementsGraphQLInterfaceaddUserWalletMutationAddUserWalletAddUserWalletPayloadOrError() {
 }
-func (v *addUserWalletMutationAddUserWalletErrAuthenticationFailed) implementsGraphQLInterfaceaddUserWalletMutationAddUserWalletAddUserWalletPayloadOrError() {
+func (v *addUserWalletMutationAddUserWalletErrAddressOwnedByUser) implementsGraphQLInterfaceaddUserWalletMutationAddUserWalletAddUserWalletPayloadOrError() {
 }
-func (v *addUserWalletMutationAddUserWalletErrNotAuthorized) implementsGraphQLInterfaceaddUserWalletMutationAddUserWalletAddUserWalletPayloadOrError() {
+func (v *addUserWalletMutationAddUserWalletErrAuthenticationFailed) implementsGraphQLInterfaceaddUserWalletMutationAddUserWalletAddUserWalletPayloadOrError() {
 }
 func (v *addUserWalletMutationAddUserWalletErrInvalidInput) implementsGraphQLInterfaceaddUserWalletMutationAddUserWalletAddUserWalletPayloadOrError() {
 }
-func (v *addUserWalletMutationAddUserWalletErrAddressOwnedByUser) implementsGraphQLInterfaceaddUserWalletMutationAddUserWalletAddUserWalletPayloadOrError() {
+func (v *addUserWalletMutationAddUserWalletErrNotAuthorized) implementsGraphQLInterfaceaddUserWalletMutationAddUserWalletAddUserWalletPayloadOrError() {
 }
 
 func __unmarshaladdUserWalletMutationAddUserWalletAddUserWalletPayloadOrError(b []byte, v *addUserWalletMutationAddUserWalletAddUserWalletPayloadOrError) error {
@@ -744,17 +745,17 @@ func __unmarshaladdUserWalletMutationAddUserWalletAddUserWalletPayloadOrError(b 
 	case "AddUserWalletPayload":
 		*v = new(addUserWalletMutationAddUserWalletAddUserWalletPayload)
 		return json.Unmarshal(b, *v)
+	case "ErrAddressOwnedByUser":
+		*v = new(addUserWalletMutationAddUserWalletErrAddressOwnedByUser)
+		return json.Unmarshal(b, *v)
 	case "ErrAuthenticationFailed":
 		*v = new(addUserWalletMutationAddUserWalletErrAuthenticationFailed)
-		return json.Unmarshal(b, *v)
-	case "ErrNotAuthorized":
-		*v = new(addUserWalletMutationAddUserWalletErrNotAuthorized)
 		return json.Unmarshal(b, *v)
 	case "ErrInvalidInput":
 		*v = new(addUserWalletMutationAddUserWalletErrInvalidInput)
 		return json.Unmarshal(b, *v)
-	case "ErrAddressOwnedByUser":
-		*v = new(addUserWalletMutationAddUserWalletErrAddressOwnedByUser)
+	case "ErrNotAuthorized":
+		*v = new(addUserWalletMutationAddUserWalletErrNotAuthorized)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -777,20 +778,20 @@ func __marshaladdUserWalletMutationAddUserWalletAddUserWalletPayloadOrError(v *a
 			*addUserWalletMutationAddUserWalletAddUserWalletPayload
 		}{typename, v}
 		return json.Marshal(result)
+	case *addUserWalletMutationAddUserWalletErrAddressOwnedByUser:
+		typename = "ErrAddressOwnedByUser"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*addUserWalletMutationAddUserWalletErrAddressOwnedByUser
+		}{typename, v}
+		return json.Marshal(result)
 	case *addUserWalletMutationAddUserWalletErrAuthenticationFailed:
 		typename = "ErrAuthenticationFailed"
 
 		result := struct {
 			TypeName string `json:"__typename"`
 			*addUserWalletMutationAddUserWalletErrAuthenticationFailed
-		}{typename, v}
-		return json.Marshal(result)
-	case *addUserWalletMutationAddUserWalletErrNotAuthorized:
-		typename = "ErrNotAuthorized"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*addUserWalletMutationAddUserWalletErrNotAuthorized
 		}{typename, v}
 		return json.Marshal(result)
 	case *addUserWalletMutationAddUserWalletErrInvalidInput:
@@ -801,12 +802,12 @@ func __marshaladdUserWalletMutationAddUserWalletAddUserWalletPayloadOrError(v *a
 			*addUserWalletMutationAddUserWalletErrInvalidInput
 		}{typename, v}
 		return json.Marshal(result)
-	case *addUserWalletMutationAddUserWalletErrAddressOwnedByUser:
-		typename = "ErrAddressOwnedByUser"
+	case *addUserWalletMutationAddUserWalletErrNotAuthorized:
+		typename = "ErrNotAuthorized"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*addUserWalletMutationAddUserWalletErrAddressOwnedByUser
+			*addUserWalletMutationAddUserWalletErrNotAuthorized
 		}{typename, v}
 		return json.Marshal(result)
 	case nil:
@@ -962,7 +963,7 @@ func (v *addUserWalletMutationResponse) UnmarshalJSON(b []byte) error {
 				src, *dst)
 			if err != nil {
 				return fmt.Errorf(
-					"Unable to unmarshal addUserWalletMutationResponse.AddUserWallet: %w", err)
+					"unable to unmarshal addUserWalletMutationResponse.AddUserWallet: %w", err)
 			}
 		}
 	}
@@ -994,7 +995,7 @@ func (v *addUserWalletMutationResponse) __premarshalJSON() (*__premarshaladdUser
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"Unable to marshal addUserWalletMutationResponse.AddUserWallet: %w", err)
+					"unable to marshal addUserWalletMutationResponse.AddUserWallet: %w", err)
 			}
 		}
 	}
@@ -1031,10 +1032,10 @@ func (v *admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadFeedEvent) 
 //
 // admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrError is implemented by the following types:
 // admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayload
+// admireFeedEventMutationAdmireFeedEventErrAdmireAlreadyExists
 // admireFeedEventMutationAdmireFeedEventErrAuthenticationFailed
 // admireFeedEventMutationAdmireFeedEventErrFeedEventNotFound
 // admireFeedEventMutationAdmireFeedEventErrInvalidInput
-// admireFeedEventMutationAdmireFeedEventErrAdmireAlreadyExists
 type admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrError interface {
 	implementsGraphQLInterfaceadmireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrError()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
@@ -1043,13 +1044,13 @@ type admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrError interfa
 
 func (v *admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayload) implementsGraphQLInterfaceadmireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrError() {
 }
+func (v *admireFeedEventMutationAdmireFeedEventErrAdmireAlreadyExists) implementsGraphQLInterfaceadmireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrError() {
+}
 func (v *admireFeedEventMutationAdmireFeedEventErrAuthenticationFailed) implementsGraphQLInterfaceadmireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrError() {
 }
 func (v *admireFeedEventMutationAdmireFeedEventErrFeedEventNotFound) implementsGraphQLInterfaceadmireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrError() {
 }
 func (v *admireFeedEventMutationAdmireFeedEventErrInvalidInput) implementsGraphQLInterfaceadmireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrError() {
-}
-func (v *admireFeedEventMutationAdmireFeedEventErrAdmireAlreadyExists) implementsGraphQLInterfaceadmireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrError() {
 }
 
 func __unmarshaladmireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrError(b []byte, v *admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrError) error {
@@ -1069,6 +1070,9 @@ func __unmarshaladmireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrEr
 	case "AdmireFeedEventPayload":
 		*v = new(admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayload)
 		return json.Unmarshal(b, *v)
+	case "ErrAdmireAlreadyExists":
+		*v = new(admireFeedEventMutationAdmireFeedEventErrAdmireAlreadyExists)
+		return json.Unmarshal(b, *v)
 	case "ErrAuthenticationFailed":
 		*v = new(admireFeedEventMutationAdmireFeedEventErrAuthenticationFailed)
 		return json.Unmarshal(b, *v)
@@ -1077,9 +1081,6 @@ func __unmarshaladmireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrEr
 		return json.Unmarshal(b, *v)
 	case "ErrInvalidInput":
 		*v = new(admireFeedEventMutationAdmireFeedEventErrInvalidInput)
-		return json.Unmarshal(b, *v)
-	case "ErrAdmireAlreadyExists":
-		*v = new(admireFeedEventMutationAdmireFeedEventErrAdmireAlreadyExists)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -1100,6 +1101,14 @@ func __marshaladmireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrErro
 		result := struct {
 			TypeName string `json:"__typename"`
 			*admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayload
+		}{typename, v}
+		return json.Marshal(result)
+	case *admireFeedEventMutationAdmireFeedEventErrAdmireAlreadyExists:
+		typename = "ErrAdmireAlreadyExists"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*admireFeedEventMutationAdmireFeedEventErrAdmireAlreadyExists
 		}{typename, v}
 		return json.Marshal(result)
 	case *admireFeedEventMutationAdmireFeedEventErrAuthenticationFailed:
@@ -1124,14 +1133,6 @@ func __marshaladmireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrErro
 		result := struct {
 			TypeName string `json:"__typename"`
 			*admireFeedEventMutationAdmireFeedEventErrInvalidInput
-		}{typename, v}
-		return json.Marshal(result)
-	case *admireFeedEventMutationAdmireFeedEventErrAdmireAlreadyExists:
-		typename = "ErrAdmireAlreadyExists"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*admireFeedEventMutationAdmireFeedEventErrAdmireAlreadyExists
 		}{typename, v}
 		return json.Marshal(result)
 	case nil:
@@ -1241,7 +1242,7 @@ func (v *admireFeedEventMutationResponse) UnmarshalJSON(b []byte) error {
 				src, *dst)
 			if err != nil {
 				return fmt.Errorf(
-					"Unable to unmarshal admireFeedEventMutationResponse.AdmireFeedEvent: %w", err)
+					"unable to unmarshal admireFeedEventMutationResponse.AdmireFeedEvent: %w", err)
 			}
 		}
 	}
@@ -1273,7 +1274,7 @@ func (v *admireFeedEventMutationResponse) __premarshalJSON() (*__premarshaladmir
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"Unable to marshal admireFeedEventMutationResponse.AdmireFeedEvent: %w", err)
+					"unable to marshal admireFeedEventMutationResponse.AdmireFeedEvent: %w", err)
 			}
 		}
 	}
@@ -1492,7 +1493,7 @@ func (v *commentOnFeedEventMutationResponse) UnmarshalJSON(b []byte) error {
 				src, *dst)
 			if err != nil {
 				return fmt.Errorf(
-					"Unable to unmarshal commentOnFeedEventMutationResponse.CommentOnFeedEvent: %w", err)
+					"unable to unmarshal commentOnFeedEventMutationResponse.CommentOnFeedEvent: %w", err)
 			}
 		}
 	}
@@ -1524,7 +1525,7 @@ func (v *commentOnFeedEventMutationResponse) __premarshalJSON() (*__premarshalco
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"Unable to marshal commentOnFeedEventMutationResponse.CommentOnFeedEvent: %w", err)
+					"unable to marshal commentOnFeedEventMutationResponse.CommentOnFeedEvent: %w", err)
 			}
 		}
 	}
@@ -1739,7 +1740,7 @@ func (v *connectSocialAccountResponse) UnmarshalJSON(b []byte) error {
 				src, *dst)
 			if err != nil {
 				return fmt.Errorf(
-					"Unable to unmarshal connectSocialAccountResponse.ConnectSocialAccount: %w", err)
+					"unable to unmarshal connectSocialAccountResponse.ConnectSocialAccount: %w", err)
 			}
 		}
 	}
@@ -1771,7 +1772,7 @@ func (v *connectSocialAccountResponse) __premarshalJSON() (*__premarshalconnectS
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"Unable to marshal connectSocialAccountResponse.ConnectSocialAccount: %w", err)
+					"unable to marshal connectSocialAccountResponse.ConnectSocialAccount: %w", err)
 			}
 		}
 	}
@@ -1840,8 +1841,8 @@ func (v *createCollectionMutationCreateCollectionCreateCollectionPayloadCollecti
 //
 // createCollectionMutationCreateCollectionCreateCollectionPayloadOrError is implemented by the following types:
 // createCollectionMutationCreateCollectionCreateCollectionPayload
-// createCollectionMutationCreateCollectionErrNotAuthorized
 // createCollectionMutationCreateCollectionErrInvalidInput
+// createCollectionMutationCreateCollectionErrNotAuthorized
 type createCollectionMutationCreateCollectionCreateCollectionPayloadOrError interface {
 	implementsGraphQLInterfacecreateCollectionMutationCreateCollectionCreateCollectionPayloadOrError()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
@@ -1850,9 +1851,9 @@ type createCollectionMutationCreateCollectionCreateCollectionPayloadOrError inte
 
 func (v *createCollectionMutationCreateCollectionCreateCollectionPayload) implementsGraphQLInterfacecreateCollectionMutationCreateCollectionCreateCollectionPayloadOrError() {
 }
-func (v *createCollectionMutationCreateCollectionErrNotAuthorized) implementsGraphQLInterfacecreateCollectionMutationCreateCollectionCreateCollectionPayloadOrError() {
-}
 func (v *createCollectionMutationCreateCollectionErrInvalidInput) implementsGraphQLInterfacecreateCollectionMutationCreateCollectionCreateCollectionPayloadOrError() {
+}
+func (v *createCollectionMutationCreateCollectionErrNotAuthorized) implementsGraphQLInterfacecreateCollectionMutationCreateCollectionCreateCollectionPayloadOrError() {
 }
 
 func __unmarshalcreateCollectionMutationCreateCollectionCreateCollectionPayloadOrError(b []byte, v *createCollectionMutationCreateCollectionCreateCollectionPayloadOrError) error {
@@ -1872,11 +1873,11 @@ func __unmarshalcreateCollectionMutationCreateCollectionCreateCollectionPayloadO
 	case "CreateCollectionPayload":
 		*v = new(createCollectionMutationCreateCollectionCreateCollectionPayload)
 		return json.Unmarshal(b, *v)
-	case "ErrNotAuthorized":
-		*v = new(createCollectionMutationCreateCollectionErrNotAuthorized)
-		return json.Unmarshal(b, *v)
 	case "ErrInvalidInput":
 		*v = new(createCollectionMutationCreateCollectionErrInvalidInput)
+		return json.Unmarshal(b, *v)
+	case "ErrNotAuthorized":
+		*v = new(createCollectionMutationCreateCollectionErrNotAuthorized)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -1899,20 +1900,20 @@ func __marshalcreateCollectionMutationCreateCollectionCreateCollectionPayloadOrE
 			*createCollectionMutationCreateCollectionCreateCollectionPayload
 		}{typename, v}
 		return json.Marshal(result)
-	case *createCollectionMutationCreateCollectionErrNotAuthorized:
-		typename = "ErrNotAuthorized"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*createCollectionMutationCreateCollectionErrNotAuthorized
-		}{typename, v}
-		return json.Marshal(result)
 	case *createCollectionMutationCreateCollectionErrInvalidInput:
 		typename = "ErrInvalidInput"
 
 		result := struct {
 			TypeName string `json:"__typename"`
 			*createCollectionMutationCreateCollectionErrInvalidInput
+		}{typename, v}
+		return json.Marshal(result)
+	case *createCollectionMutationCreateCollectionErrNotAuthorized:
+		typename = "ErrNotAuthorized"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*createCollectionMutationCreateCollectionErrNotAuthorized
 		}{typename, v}
 		return json.Marshal(result)
 	case nil:
@@ -1992,7 +1993,7 @@ func (v *createCollectionMutationResponse) UnmarshalJSON(b []byte) error {
 				src, *dst)
 			if err != nil {
 				return fmt.Errorf(
-					"Unable to unmarshal createCollectionMutationResponse.CreateCollection: %w", err)
+					"unable to unmarshal createCollectionMutationResponse.CreateCollection: %w", err)
 			}
 		}
 	}
@@ -2024,7 +2025,7 @@ func (v *createCollectionMutationResponse) __premarshalJSON() (*__premarshalcrea
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"Unable to marshal createCollectionMutationResponse.CreateCollection: %w", err)
+					"unable to marshal createCollectionMutationResponse.CreateCollection: %w", err)
 			}
 		}
 	}
@@ -2223,7 +2224,7 @@ func (v *createGalleryMutationResponse) UnmarshalJSON(b []byte) error {
 				src, *dst)
 			if err != nil {
 				return fmt.Errorf(
-					"Unable to unmarshal createGalleryMutationResponse.CreateGallery: %w", err)
+					"unable to unmarshal createGalleryMutationResponse.CreateGallery: %w", err)
 			}
 		}
 	}
@@ -2255,7 +2256,7 @@ func (v *createGalleryMutationResponse) __premarshalJSON() (*__premarshalcreateG
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"Unable to marshal createGalleryMutationResponse.CreateGallery: %w", err)
+					"unable to marshal createGalleryMutationResponse.CreateGallery: %w", err)
 			}
 		}
 	}
@@ -2282,9 +2283,9 @@ func (v *createUserMutationCreateUserCreateUserPayload) GetViewer() *createUserM
 // createUserMutationCreateUserCreateUserPayload
 // createUserMutationCreateUserErrAuthenticationFailed
 // createUserMutationCreateUserErrDoesNotOwnRequiredToken
+// createUserMutationCreateUserErrInvalidInput
 // createUserMutationCreateUserErrUserAlreadyExists
 // createUserMutationCreateUserErrUsernameNotAvailable
-// createUserMutationCreateUserErrInvalidInput
 type createUserMutationCreateUserCreateUserPayloadOrError interface {
 	implementsGraphQLInterfacecreateUserMutationCreateUserCreateUserPayloadOrError()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
@@ -2297,11 +2298,11 @@ func (v *createUserMutationCreateUserErrAuthenticationFailed) implementsGraphQLI
 }
 func (v *createUserMutationCreateUserErrDoesNotOwnRequiredToken) implementsGraphQLInterfacecreateUserMutationCreateUserCreateUserPayloadOrError() {
 }
+func (v *createUserMutationCreateUserErrInvalidInput) implementsGraphQLInterfacecreateUserMutationCreateUserCreateUserPayloadOrError() {
+}
 func (v *createUserMutationCreateUserErrUserAlreadyExists) implementsGraphQLInterfacecreateUserMutationCreateUserCreateUserPayloadOrError() {
 }
 func (v *createUserMutationCreateUserErrUsernameNotAvailable) implementsGraphQLInterfacecreateUserMutationCreateUserCreateUserPayloadOrError() {
-}
-func (v *createUserMutationCreateUserErrInvalidInput) implementsGraphQLInterfacecreateUserMutationCreateUserCreateUserPayloadOrError() {
 }
 
 func __unmarshalcreateUserMutationCreateUserCreateUserPayloadOrError(b []byte, v *createUserMutationCreateUserCreateUserPayloadOrError) error {
@@ -2327,14 +2328,14 @@ func __unmarshalcreateUserMutationCreateUserCreateUserPayloadOrError(b []byte, v
 	case "ErrDoesNotOwnRequiredToken":
 		*v = new(createUserMutationCreateUserErrDoesNotOwnRequiredToken)
 		return json.Unmarshal(b, *v)
+	case "ErrInvalidInput":
+		*v = new(createUserMutationCreateUserErrInvalidInput)
+		return json.Unmarshal(b, *v)
 	case "ErrUserAlreadyExists":
 		*v = new(createUserMutationCreateUserErrUserAlreadyExists)
 		return json.Unmarshal(b, *v)
 	case "ErrUsernameNotAvailable":
 		*v = new(createUserMutationCreateUserErrUsernameNotAvailable)
-		return json.Unmarshal(b, *v)
-	case "ErrInvalidInput":
-		*v = new(createUserMutationCreateUserErrInvalidInput)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -2373,6 +2374,14 @@ func __marshalcreateUserMutationCreateUserCreateUserPayloadOrError(v *createUser
 			*createUserMutationCreateUserErrDoesNotOwnRequiredToken
 		}{typename, v}
 		return json.Marshal(result)
+	case *createUserMutationCreateUserErrInvalidInput:
+		typename = "ErrInvalidInput"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*createUserMutationCreateUserErrInvalidInput
+		}{typename, v}
+		return json.Marshal(result)
 	case *createUserMutationCreateUserErrUserAlreadyExists:
 		typename = "ErrUserAlreadyExists"
 
@@ -2387,14 +2396,6 @@ func __marshalcreateUserMutationCreateUserCreateUserPayloadOrError(v *createUser
 		result := struct {
 			TypeName string `json:"__typename"`
 			*createUserMutationCreateUserErrUsernameNotAvailable
-		}{typename, v}
-		return json.Marshal(result)
-	case *createUserMutationCreateUserErrInvalidInput:
-		typename = "ErrInvalidInput"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*createUserMutationCreateUserErrInvalidInput
 		}{typename, v}
 		return json.Marshal(result)
 	case nil:
@@ -2558,7 +2559,7 @@ func (v *createUserMutationResponse) UnmarshalJSON(b []byte) error {
 				src, *dst)
 			if err != nil {
 				return fmt.Errorf(
-					"Unable to unmarshal createUserMutationResponse.CreateUser: %w", err)
+					"unable to unmarshal createUserMutationResponse.CreateUser: %w", err)
 			}
 		}
 	}
@@ -2590,7 +2591,7 @@ func (v *createUserMutationResponse) __premarshalJSON() (*__premarshalcreateUser
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"Unable to marshal createUserMutationResponse.CreateUser: %w", err)
+					"unable to marshal createUserMutationResponse.CreateUser: %w", err)
 			}
 		}
 	}
@@ -2618,8 +2619,8 @@ func (v *disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPa
 // disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError is implemented by the following types:
 // disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayload
 // disconnectSocialAccountDisconnectSocialAccountErrInvalidInput
-// disconnectSocialAccountDisconnectSocialAccountErrNotAuthorized
 // disconnectSocialAccountDisconnectSocialAccountErrNeedsToReconnectSocial
+// disconnectSocialAccountDisconnectSocialAccountErrNotAuthorized
 type disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError interface {
 	implementsGraphQLInterfacedisconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
@@ -2630,9 +2631,9 @@ func (v *disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPa
 }
 func (v *disconnectSocialAccountDisconnectSocialAccountErrInvalidInput) implementsGraphQLInterfacedisconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError() {
 }
-func (v *disconnectSocialAccountDisconnectSocialAccountErrNotAuthorized) implementsGraphQLInterfacedisconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError() {
-}
 func (v *disconnectSocialAccountDisconnectSocialAccountErrNeedsToReconnectSocial) implementsGraphQLInterfacedisconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError() {
+}
+func (v *disconnectSocialAccountDisconnectSocialAccountErrNotAuthorized) implementsGraphQLInterfacedisconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError() {
 }
 
 func __unmarshaldisconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError(b []byte, v *disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError) error {
@@ -2655,11 +2656,11 @@ func __unmarshaldisconnectSocialAccountDisconnectSocialAccountDisconnectSocialAc
 	case "ErrInvalidInput":
 		*v = new(disconnectSocialAccountDisconnectSocialAccountErrInvalidInput)
 		return json.Unmarshal(b, *v)
-	case "ErrNotAuthorized":
-		*v = new(disconnectSocialAccountDisconnectSocialAccountErrNotAuthorized)
-		return json.Unmarshal(b, *v)
 	case "ErrNeedsToReconnectSocial":
 		*v = new(disconnectSocialAccountDisconnectSocialAccountErrNeedsToReconnectSocial)
+		return json.Unmarshal(b, *v)
+	case "ErrNotAuthorized":
+		*v = new(disconnectSocialAccountDisconnectSocialAccountErrNotAuthorized)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -2690,20 +2691,20 @@ func __marshaldisconnectSocialAccountDisconnectSocialAccountDisconnectSocialAcco
 			*disconnectSocialAccountDisconnectSocialAccountErrInvalidInput
 		}{typename, v}
 		return json.Marshal(result)
-	case *disconnectSocialAccountDisconnectSocialAccountErrNotAuthorized:
-		typename = "ErrNotAuthorized"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*disconnectSocialAccountDisconnectSocialAccountErrNotAuthorized
-		}{typename, v}
-		return json.Marshal(result)
 	case *disconnectSocialAccountDisconnectSocialAccountErrNeedsToReconnectSocial:
 		typename = "ErrNeedsToReconnectSocial"
 
 		result := struct {
 			TypeName string `json:"__typename"`
 			*disconnectSocialAccountDisconnectSocialAccountErrNeedsToReconnectSocial
+		}{typename, v}
+		return json.Marshal(result)
+	case *disconnectSocialAccountDisconnectSocialAccountErrNotAuthorized:
+		typename = "ErrNotAuthorized"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*disconnectSocialAccountDisconnectSocialAccountErrNotAuthorized
 		}{typename, v}
 		return json.Marshal(result)
 	case nil:
@@ -2829,7 +2830,7 @@ func (v *disconnectSocialAccountResponse) UnmarshalJSON(b []byte) error {
 				src, *dst)
 			if err != nil {
 				return fmt.Errorf(
-					"Unable to unmarshal disconnectSocialAccountResponse.DisconnectSocialAccount: %w", err)
+					"unable to unmarshal disconnectSocialAccountResponse.DisconnectSocialAccount: %w", err)
 			}
 		}
 	}
@@ -2861,7 +2862,7 @@ func (v *disconnectSocialAccountResponse) __premarshalJSON() (*__premarshaldisco
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"Unable to marshal disconnectSocialAccountResponse.DisconnectSocialAccount: %w", err)
+					"unable to marshal disconnectSocialAccountResponse.DisconnectSocialAccount: %w", err)
 			}
 		}
 	}
@@ -3010,7 +3011,7 @@ func (v *getAuthNonceMutationResponse) UnmarshalJSON(b []byte) error {
 				src, *dst)
 			if err != nil {
 				return fmt.Errorf(
-					"Unable to unmarshal getAuthNonceMutationResponse.GetAuthNonce: %w", err)
+					"unable to unmarshal getAuthNonceMutationResponse.GetAuthNonce: %w", err)
 			}
 		}
 	}
@@ -3042,7 +3043,7 @@ func (v *getAuthNonceMutationResponse) __premarshalJSON() (*__premarshalgetAuthN
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"Unable to marshal getAuthNonceMutationResponse.GetAuthNonce: %w", err)
+					"unable to marshal getAuthNonceMutationResponse.GetAuthNonce: %w", err)
 			}
 		}
 	}
@@ -3096,7 +3097,7 @@ func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdge) UnmarshalJSON(b [
 				src, *dst)
 			if err != nil {
 				return fmt.Errorf(
-					"Unable to unmarshal globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdge.Node: %w", err)
+					"unable to unmarshal globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdge.Node: %w", err)
 			}
 		}
 	}
@@ -3128,7 +3129,7 @@ func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdge) __premarshalJSON(
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"Unable to marshal globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdge.Node: %w", err)
+					"unable to marshal globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdge.Node: %w", err)
 			}
 		}
 	}
@@ -3186,20 +3187,20 @@ func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) GetD
 // globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError includes the requested fields of the GraphQL interface FeedEventOrError.
 //
 // globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError is implemented by the following types:
-// globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent
 // globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound
 // globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction
+// globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent
 type globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError interface {
 	implementsGraphQLInterfaceglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
 	GetTypename() *string
 }
 
-func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) implementsGraphQLInterfaceglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
-}
 func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound) implementsGraphQLInterfaceglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
 }
 func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction) implementsGraphQLInterfaceglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
+}
+func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) implementsGraphQLInterfaceglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
 }
 
 func __unmarshalglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError(b []byte, v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError) error {
@@ -3216,14 +3217,14 @@ func __unmarshalglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEven
 	}
 
 	switch tn.TypeName {
-	case "FeedEvent":
-		*v = new(globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent)
-		return json.Unmarshal(b, *v)
 	case "ErrFeedEventNotFound":
 		*v = new(globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound)
 		return json.Unmarshal(b, *v)
 	case "ErrUnknownAction":
 		*v = new(globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction)
+		return json.Unmarshal(b, *v)
+	case "FeedEvent":
+		*v = new(globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -3238,14 +3239,6 @@ func __marshalglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventO
 
 	var typename string
 	switch v := (*v).(type) {
-	case *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent:
-		typename = "FeedEvent"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent
-		}{typename, v}
-		return json.Marshal(result)
 	case *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound:
 		typename = "ErrFeedEventNotFound"
 
@@ -3260,6 +3253,14 @@ func __marshalglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventO
 		result := struct {
 			TypeName string `json:"__typename"`
 			*globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction
+		}{typename, v}
+		return json.Marshal(result)
+	case *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent:
+		typename = "FeedEvent"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent
 		}{typename, v}
 		return json.Marshal(result)
 	case nil:
@@ -3333,23 +3334,23 @@ func (v *loginMutationLoginLoginPayload) GetViewer() *loginMutationLoginLoginPay
 // loginMutationLoginLoginPayloadOrError includes the requested fields of the GraphQL interface LoginPayloadOrError.
 //
 // loginMutationLoginLoginPayloadOrError is implemented by the following types:
-// loginMutationLoginLoginPayload
-// loginMutationLoginErrUserNotFound
 // loginMutationLoginErrAuthenticationFailed
 // loginMutationLoginErrDoesNotOwnRequiredToken
+// loginMutationLoginErrUserNotFound
+// loginMutationLoginLoginPayload
 type loginMutationLoginLoginPayloadOrError interface {
 	implementsGraphQLInterfaceloginMutationLoginLoginPayloadOrError()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
 	GetTypename() *string
 }
 
-func (v *loginMutationLoginLoginPayload) implementsGraphQLInterfaceloginMutationLoginLoginPayloadOrError() {
-}
-func (v *loginMutationLoginErrUserNotFound) implementsGraphQLInterfaceloginMutationLoginLoginPayloadOrError() {
-}
 func (v *loginMutationLoginErrAuthenticationFailed) implementsGraphQLInterfaceloginMutationLoginLoginPayloadOrError() {
 }
 func (v *loginMutationLoginErrDoesNotOwnRequiredToken) implementsGraphQLInterfaceloginMutationLoginLoginPayloadOrError() {
+}
+func (v *loginMutationLoginErrUserNotFound) implementsGraphQLInterfaceloginMutationLoginLoginPayloadOrError() {
+}
+func (v *loginMutationLoginLoginPayload) implementsGraphQLInterfaceloginMutationLoginLoginPayloadOrError() {
 }
 
 func __unmarshalloginMutationLoginLoginPayloadOrError(b []byte, v *loginMutationLoginLoginPayloadOrError) error {
@@ -3366,17 +3367,17 @@ func __unmarshalloginMutationLoginLoginPayloadOrError(b []byte, v *loginMutation
 	}
 
 	switch tn.TypeName {
-	case "LoginPayload":
-		*v = new(loginMutationLoginLoginPayload)
-		return json.Unmarshal(b, *v)
-	case "ErrUserNotFound":
-		*v = new(loginMutationLoginErrUserNotFound)
-		return json.Unmarshal(b, *v)
 	case "ErrAuthenticationFailed":
 		*v = new(loginMutationLoginErrAuthenticationFailed)
 		return json.Unmarshal(b, *v)
 	case "ErrDoesNotOwnRequiredToken":
 		*v = new(loginMutationLoginErrDoesNotOwnRequiredToken)
+		return json.Unmarshal(b, *v)
+	case "ErrUserNotFound":
+		*v = new(loginMutationLoginErrUserNotFound)
+		return json.Unmarshal(b, *v)
+	case "LoginPayload":
+		*v = new(loginMutationLoginLoginPayload)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -3391,22 +3392,6 @@ func __marshalloginMutationLoginLoginPayloadOrError(v *loginMutationLoginLoginPa
 
 	var typename string
 	switch v := (*v).(type) {
-	case *loginMutationLoginLoginPayload:
-		typename = "LoginPayload"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*loginMutationLoginLoginPayload
-		}{typename, v}
-		return json.Marshal(result)
-	case *loginMutationLoginErrUserNotFound:
-		typename = "ErrUserNotFound"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*loginMutationLoginErrUserNotFound
-		}{typename, v}
-		return json.Marshal(result)
 	case *loginMutationLoginErrAuthenticationFailed:
 		typename = "ErrAuthenticationFailed"
 
@@ -3421,6 +3406,22 @@ func __marshalloginMutationLoginLoginPayloadOrError(v *loginMutationLoginLoginPa
 		result := struct {
 			TypeName string `json:"__typename"`
 			*loginMutationLoginErrDoesNotOwnRequiredToken
+		}{typename, v}
+		return json.Marshal(result)
+	case *loginMutationLoginErrUserNotFound:
+		typename = "ErrUserNotFound"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*loginMutationLoginErrUserNotFound
+		}{typename, v}
+		return json.Marshal(result)
+	case *loginMutationLoginLoginPayload:
+		typename = "LoginPayload"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*loginMutationLoginLoginPayload
 		}{typename, v}
 		return json.Marshal(result)
 	case nil:
@@ -3490,7 +3491,7 @@ func (v *loginMutationResponse) UnmarshalJSON(b []byte) error {
 				src, *dst)
 			if err != nil {
 				return fmt.Errorf(
-					"Unable to unmarshal loginMutationResponse.Login: %w", err)
+					"unable to unmarshal loginMutationResponse.Login: %w", err)
 			}
 		}
 	}
@@ -3522,7 +3523,7 @@ func (v *loginMutationResponse) __premarshalJSON() (*__premarshalloginMutationRe
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"Unable to marshal loginMutationResponse.Login: %w", err)
+					"unable to marshal loginMutationResponse.Login: %w", err)
 			}
 		}
 	}
@@ -3682,20 +3683,20 @@ func (v *moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPa
 // moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOrError includes the requested fields of the GraphQL interface MoveCollectionToGalleryPayloadOrError.
 //
 // moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOrError is implemented by the following types:
-// moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayload
 // moveCollectionToGalleryMoveCollectionToGalleryErrInvalidInput
 // moveCollectionToGalleryMoveCollectionToGalleryErrNotAuthorized
+// moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayload
 type moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOrError interface {
 	implementsGraphQLInterfacemoveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOrError()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
 	GetTypename() *string
 }
 
-func (v *moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayload) implementsGraphQLInterfacemoveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOrError() {
-}
 func (v *moveCollectionToGalleryMoveCollectionToGalleryErrInvalidInput) implementsGraphQLInterfacemoveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOrError() {
 }
 func (v *moveCollectionToGalleryMoveCollectionToGalleryErrNotAuthorized) implementsGraphQLInterfacemoveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOrError() {
+}
+func (v *moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayload) implementsGraphQLInterfacemoveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOrError() {
 }
 
 func __unmarshalmoveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOrError(b []byte, v *moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOrError) error {
@@ -3712,14 +3713,14 @@ func __unmarshalmoveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGa
 	}
 
 	switch tn.TypeName {
-	case "MoveCollectionToGalleryPayload":
-		*v = new(moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayload)
-		return json.Unmarshal(b, *v)
 	case "ErrInvalidInput":
 		*v = new(moveCollectionToGalleryMoveCollectionToGalleryErrInvalidInput)
 		return json.Unmarshal(b, *v)
 	case "ErrNotAuthorized":
 		*v = new(moveCollectionToGalleryMoveCollectionToGalleryErrNotAuthorized)
+		return json.Unmarshal(b, *v)
+	case "MoveCollectionToGalleryPayload":
+		*v = new(moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayload)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -3734,14 +3735,6 @@ func __marshalmoveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGall
 
 	var typename string
 	switch v := (*v).(type) {
-	case *moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayload:
-		typename = "MoveCollectionToGalleryPayload"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayload
-		}{typename, v}
-		return json.Marshal(result)
 	case *moveCollectionToGalleryMoveCollectionToGalleryErrInvalidInput:
 		typename = "ErrInvalidInput"
 
@@ -3756,6 +3749,14 @@ func __marshalmoveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGall
 		result := struct {
 			TypeName string `json:"__typename"`
 			*moveCollectionToGalleryMoveCollectionToGalleryErrNotAuthorized
+		}{typename, v}
+		return json.Marshal(result)
+	case *moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayload:
+		typename = "MoveCollectionToGalleryPayload"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayload
 		}{typename, v}
 		return json.Marshal(result)
 	case nil:
@@ -3803,7 +3804,7 @@ func (v *moveCollectionToGalleryResponse) UnmarshalJSON(b []byte) error {
 				src, *dst)
 			if err != nil {
 				return fmt.Errorf(
-					"Unable to unmarshal moveCollectionToGalleryResponse.MoveCollectionToGallery: %w", err)
+					"unable to unmarshal moveCollectionToGalleryResponse.MoveCollectionToGallery: %w", err)
 			}
 		}
 	}
@@ -3835,7 +3836,7 @@ func (v *moveCollectionToGalleryResponse) __premarshalJSON() (*__premarshalmoveC
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"Unable to marshal moveCollectionToGalleryResponse.MoveCollectionToGallery: %w", err)
+					"unable to marshal moveCollectionToGalleryResponse.MoveCollectionToGallery: %w", err)
 			}
 		}
 	}
@@ -3899,20 +3900,20 @@ func (v *publishGalleryMutationPublishGalleryPublishGalleryPayloadGallery) GetDb
 // publishGalleryMutationPublishGalleryPublishGalleryPayloadOrError includes the requested fields of the GraphQL interface PublishGalleryPayloadOrError.
 //
 // publishGalleryMutationPublishGalleryPublishGalleryPayloadOrError is implemented by the following types:
-// publishGalleryMutationPublishGalleryPublishGalleryPayload
 // publishGalleryMutationPublishGalleryErrInvalidInput
 // publishGalleryMutationPublishGalleryErrNotAuthorized
+// publishGalleryMutationPublishGalleryPublishGalleryPayload
 type publishGalleryMutationPublishGalleryPublishGalleryPayloadOrError interface {
 	implementsGraphQLInterfacepublishGalleryMutationPublishGalleryPublishGalleryPayloadOrError()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
 	GetTypename() *string
 }
 
-func (v *publishGalleryMutationPublishGalleryPublishGalleryPayload) implementsGraphQLInterfacepublishGalleryMutationPublishGalleryPublishGalleryPayloadOrError() {
-}
 func (v *publishGalleryMutationPublishGalleryErrInvalidInput) implementsGraphQLInterfacepublishGalleryMutationPublishGalleryPublishGalleryPayloadOrError() {
 }
 func (v *publishGalleryMutationPublishGalleryErrNotAuthorized) implementsGraphQLInterfacepublishGalleryMutationPublishGalleryPublishGalleryPayloadOrError() {
+}
+func (v *publishGalleryMutationPublishGalleryPublishGalleryPayload) implementsGraphQLInterfacepublishGalleryMutationPublishGalleryPublishGalleryPayloadOrError() {
 }
 
 func __unmarshalpublishGalleryMutationPublishGalleryPublishGalleryPayloadOrError(b []byte, v *publishGalleryMutationPublishGalleryPublishGalleryPayloadOrError) error {
@@ -3929,14 +3930,14 @@ func __unmarshalpublishGalleryMutationPublishGalleryPublishGalleryPayloadOrError
 	}
 
 	switch tn.TypeName {
-	case "PublishGalleryPayload":
-		*v = new(publishGalleryMutationPublishGalleryPublishGalleryPayload)
-		return json.Unmarshal(b, *v)
 	case "ErrInvalidInput":
 		*v = new(publishGalleryMutationPublishGalleryErrInvalidInput)
 		return json.Unmarshal(b, *v)
 	case "ErrNotAuthorized":
 		*v = new(publishGalleryMutationPublishGalleryErrNotAuthorized)
+		return json.Unmarshal(b, *v)
+	case "PublishGalleryPayload":
+		*v = new(publishGalleryMutationPublishGalleryPublishGalleryPayload)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -3951,14 +3952,6 @@ func __marshalpublishGalleryMutationPublishGalleryPublishGalleryPayloadOrError(v
 
 	var typename string
 	switch v := (*v).(type) {
-	case *publishGalleryMutationPublishGalleryPublishGalleryPayload:
-		typename = "PublishGalleryPayload"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*publishGalleryMutationPublishGalleryPublishGalleryPayload
-		}{typename, v}
-		return json.Marshal(result)
 	case *publishGalleryMutationPublishGalleryErrInvalidInput:
 		typename = "ErrInvalidInput"
 
@@ -3973,6 +3966,14 @@ func __marshalpublishGalleryMutationPublishGalleryPublishGalleryPayloadOrError(v
 		result := struct {
 			TypeName string `json:"__typename"`
 			*publishGalleryMutationPublishGalleryErrNotAuthorized
+		}{typename, v}
+		return json.Marshal(result)
+	case *publishGalleryMutationPublishGalleryPublishGalleryPayload:
+		typename = "PublishGalleryPayload"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*publishGalleryMutationPublishGalleryPublishGalleryPayload
 		}{typename, v}
 		return json.Marshal(result)
 	case nil:
@@ -4020,7 +4021,7 @@ func (v *publishGalleryMutationResponse) UnmarshalJSON(b []byte) error {
 				src, *dst)
 			if err != nil {
 				return fmt.Errorf(
-					"Unable to unmarshal publishGalleryMutationResponse.PublishGallery: %w", err)
+					"unable to unmarshal publishGalleryMutationResponse.PublishGallery: %w", err)
 			}
 		}
 	}
@@ -4052,7 +4053,7 @@ func (v *publishGalleryMutationResponse) __premarshalJSON() (*__premarshalpublis
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"Unable to marshal publishGalleryMutationResponse.PublishGallery: %w", err)
+					"unable to marshal publishGalleryMutationResponse.PublishGallery: %w", err)
 			}
 		}
 	}
@@ -4110,20 +4111,20 @@ func (v *removeUserWalletsMutationRemoveUserWalletsRemoveUserWalletsPayload) Get
 // removeUserWalletsMutationRemoveUserWalletsRemoveUserWalletsPayloadOrError includes the requested fields of the GraphQL interface RemoveUserWalletsPayloadOrError.
 //
 // removeUserWalletsMutationRemoveUserWalletsRemoveUserWalletsPayloadOrError is implemented by the following types:
-// removeUserWalletsMutationRemoveUserWalletsRemoveUserWalletsPayload
-// removeUserWalletsMutationRemoveUserWalletsErrNotAuthorized
 // removeUserWalletsMutationRemoveUserWalletsErrInvalidInput
+// removeUserWalletsMutationRemoveUserWalletsErrNotAuthorized
+// removeUserWalletsMutationRemoveUserWalletsRemoveUserWalletsPayload
 type removeUserWalletsMutationRemoveUserWalletsRemoveUserWalletsPayloadOrError interface {
 	implementsGraphQLInterfaceremoveUserWalletsMutationRemoveUserWalletsRemoveUserWalletsPayloadOrError()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
 	GetTypename() *string
 }
 
-func (v *removeUserWalletsMutationRemoveUserWalletsRemoveUserWalletsPayload) implementsGraphQLInterfaceremoveUserWalletsMutationRemoveUserWalletsRemoveUserWalletsPayloadOrError() {
+func (v *removeUserWalletsMutationRemoveUserWalletsErrInvalidInput) implementsGraphQLInterfaceremoveUserWalletsMutationRemoveUserWalletsRemoveUserWalletsPayloadOrError() {
 }
 func (v *removeUserWalletsMutationRemoveUserWalletsErrNotAuthorized) implementsGraphQLInterfaceremoveUserWalletsMutationRemoveUserWalletsRemoveUserWalletsPayloadOrError() {
 }
-func (v *removeUserWalletsMutationRemoveUserWalletsErrInvalidInput) implementsGraphQLInterfaceremoveUserWalletsMutationRemoveUserWalletsRemoveUserWalletsPayloadOrError() {
+func (v *removeUserWalletsMutationRemoveUserWalletsRemoveUserWalletsPayload) implementsGraphQLInterfaceremoveUserWalletsMutationRemoveUserWalletsRemoveUserWalletsPayloadOrError() {
 }
 
 func __unmarshalremoveUserWalletsMutationRemoveUserWalletsRemoveUserWalletsPayloadOrError(b []byte, v *removeUserWalletsMutationRemoveUserWalletsRemoveUserWalletsPayloadOrError) error {
@@ -4140,14 +4141,14 @@ func __unmarshalremoveUserWalletsMutationRemoveUserWalletsRemoveUserWalletsPaylo
 	}
 
 	switch tn.TypeName {
-	case "RemoveUserWalletsPayload":
-		*v = new(removeUserWalletsMutationRemoveUserWalletsRemoveUserWalletsPayload)
+	case "ErrInvalidInput":
+		*v = new(removeUserWalletsMutationRemoveUserWalletsErrInvalidInput)
 		return json.Unmarshal(b, *v)
 	case "ErrNotAuthorized":
 		*v = new(removeUserWalletsMutationRemoveUserWalletsErrNotAuthorized)
 		return json.Unmarshal(b, *v)
-	case "ErrInvalidInput":
-		*v = new(removeUserWalletsMutationRemoveUserWalletsErrInvalidInput)
+	case "RemoveUserWalletsPayload":
+		*v = new(removeUserWalletsMutationRemoveUserWalletsRemoveUserWalletsPayload)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -4162,12 +4163,12 @@ func __marshalremoveUserWalletsMutationRemoveUserWalletsRemoveUserWalletsPayload
 
 	var typename string
 	switch v := (*v).(type) {
-	case *removeUserWalletsMutationRemoveUserWalletsRemoveUserWalletsPayload:
-		typename = "RemoveUserWalletsPayload"
+	case *removeUserWalletsMutationRemoveUserWalletsErrInvalidInput:
+		typename = "ErrInvalidInput"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*removeUserWalletsMutationRemoveUserWalletsRemoveUserWalletsPayload
+			*removeUserWalletsMutationRemoveUserWalletsErrInvalidInput
 		}{typename, v}
 		return json.Marshal(result)
 	case *removeUserWalletsMutationRemoveUserWalletsErrNotAuthorized:
@@ -4178,12 +4179,12 @@ func __marshalremoveUserWalletsMutationRemoveUserWalletsRemoveUserWalletsPayload
 			*removeUserWalletsMutationRemoveUserWalletsErrNotAuthorized
 		}{typename, v}
 		return json.Marshal(result)
-	case *removeUserWalletsMutationRemoveUserWalletsErrInvalidInput:
-		typename = "ErrInvalidInput"
+	case *removeUserWalletsMutationRemoveUserWalletsRemoveUserWalletsPayload:
+		typename = "RemoveUserWalletsPayload"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*removeUserWalletsMutationRemoveUserWalletsErrInvalidInput
+			*removeUserWalletsMutationRemoveUserWalletsRemoveUserWalletsPayload
 		}{typename, v}
 		return json.Marshal(result)
 	case nil:
@@ -4283,7 +4284,7 @@ func (v *removeUserWalletsMutationResponse) UnmarshalJSON(b []byte) error {
 				src, *dst)
 			if err != nil {
 				return fmt.Errorf(
-					"Unable to unmarshal removeUserWalletsMutationResponse.RemoveUserWallets: %w", err)
+					"unable to unmarshal removeUserWalletsMutationResponse.RemoveUserWallets: %w", err)
 			}
 		}
 	}
@@ -4315,7 +4316,7 @@ func (v *removeUserWalletsMutationResponse) __premarshalJSON() (*__premarshalrem
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"Unable to marshal removeUserWalletsMutationResponse.RemoveUserWallets: %w", err)
+					"unable to marshal removeUserWalletsMutationResponse.RemoveUserWallets: %w", err)
 			}
 		}
 	}
@@ -4359,7 +4360,7 @@ func (v *syncTokensMutationResponse) UnmarshalJSON(b []byte) error {
 				src, *dst)
 			if err != nil {
 				return fmt.Errorf(
-					"Unable to unmarshal syncTokensMutationResponse.SyncTokens: %w", err)
+					"unable to unmarshal syncTokensMutationResponse.SyncTokens: %w", err)
 			}
 		}
 	}
@@ -4391,7 +4392,7 @@ func (v *syncTokensMutationResponse) __premarshalJSON() (*__premarshalsyncTokens
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"Unable to marshal syncTokensMutationResponse.SyncTokens: %w", err)
+					"unable to marshal syncTokensMutationResponse.SyncTokens: %w", err)
 			}
 		}
 	}
@@ -4439,20 +4440,20 @@ func (v *syncTokensMutationSyncTokensSyncTokensPayload) GetViewer() *syncTokensM
 // syncTokensMutationSyncTokensSyncTokensPayloadOrError includes the requested fields of the GraphQL interface SyncTokensPayloadOrError.
 //
 // syncTokensMutationSyncTokensSyncTokensPayloadOrError is implemented by the following types:
-// syncTokensMutationSyncTokensSyncTokensPayload
 // syncTokensMutationSyncTokensErrNotAuthorized
 // syncTokensMutationSyncTokensErrSyncFailed
+// syncTokensMutationSyncTokensSyncTokensPayload
 type syncTokensMutationSyncTokensSyncTokensPayloadOrError interface {
 	implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadOrError()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
 	GetTypename() *string
 }
 
-func (v *syncTokensMutationSyncTokensSyncTokensPayload) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadOrError() {
-}
 func (v *syncTokensMutationSyncTokensErrNotAuthorized) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadOrError() {
 }
 func (v *syncTokensMutationSyncTokensErrSyncFailed) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadOrError() {
+}
+func (v *syncTokensMutationSyncTokensSyncTokensPayload) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadOrError() {
 }
 
 func __unmarshalsyncTokensMutationSyncTokensSyncTokensPayloadOrError(b []byte, v *syncTokensMutationSyncTokensSyncTokensPayloadOrError) error {
@@ -4469,14 +4470,14 @@ func __unmarshalsyncTokensMutationSyncTokensSyncTokensPayloadOrError(b []byte, v
 	}
 
 	switch tn.TypeName {
-	case "SyncTokensPayload":
-		*v = new(syncTokensMutationSyncTokensSyncTokensPayload)
-		return json.Unmarshal(b, *v)
 	case "ErrNotAuthorized":
 		*v = new(syncTokensMutationSyncTokensErrNotAuthorized)
 		return json.Unmarshal(b, *v)
 	case "ErrSyncFailed":
 		*v = new(syncTokensMutationSyncTokensErrSyncFailed)
+		return json.Unmarshal(b, *v)
+	case "SyncTokensPayload":
+		*v = new(syncTokensMutationSyncTokensSyncTokensPayload)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -4491,14 +4492,6 @@ func __marshalsyncTokensMutationSyncTokensSyncTokensPayloadOrError(v *syncTokens
 
 	var typename string
 	switch v := (*v).(type) {
-	case *syncTokensMutationSyncTokensSyncTokensPayload:
-		typename = "SyncTokensPayload"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*syncTokensMutationSyncTokensSyncTokensPayload
-		}{typename, v}
-		return json.Marshal(result)
 	case *syncTokensMutationSyncTokensErrNotAuthorized:
 		typename = "ErrNotAuthorized"
 
@@ -4513,6 +4506,14 @@ func __marshalsyncTokensMutationSyncTokensSyncTokensPayloadOrError(v *syncTokens
 		result := struct {
 			TypeName string `json:"__typename"`
 			*syncTokensMutationSyncTokensErrSyncFailed
+		}{typename, v}
+		return json.Marshal(result)
+	case *syncTokensMutationSyncTokensSyncTokensPayload:
+		typename = "SyncTokensPayload"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*syncTokensMutationSyncTokensSyncTokensPayload
 		}{typename, v}
 		return json.Marshal(result)
 	case nil:
@@ -4598,7 +4599,7 @@ func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserToken
 				src, *dst)
 			if err != nil {
 				return fmt.Errorf(
-					"Unable to unmarshal syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensToken.Media: %w", err)
+					"unable to unmarshal syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensToken.Media: %w", err)
 			}
 		}
 	}
@@ -4639,7 +4640,7 @@ func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserToken
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"Unable to marshal syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensToken.Media: %w", err)
+					"unable to marshal syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensToken.Media: %w", err)
 			}
 		}
 	}
@@ -4803,47 +4804,47 @@ func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserToken
 // syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype includes the requested fields of the GraphQL interface MediaSubtype.
 //
 // syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype is implemented by the following types:
-// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia
-// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia
-// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia
 // syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaAudioMedia
-// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia
-// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia
-// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaHtmlMedia
-// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaJsonMedia
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia
 // syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia
-// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia
-// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaHtmlMedia
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia
 // syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaJsonMedia
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia
+// syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia
 type syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype interface {
 	implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
 	GetTypename() *string
 }
 
-func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaAudioMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
 }
 func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
 }
-func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
-}
-func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaAudioMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
-}
-func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
-}
-func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
 }
 func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaHtmlMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
 }
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
+}
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
+}
 func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaJsonMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
 }
-func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
-}
-func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
 }
 func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
 }
-func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
+}
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
+}
+func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia) implementsGraphQLInterfacesyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype() {
 }
 
 func __unmarshalsyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype(b []byte, v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaMediaSubtype) error {
@@ -4860,41 +4861,41 @@ func __unmarshalsyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUs
 	}
 
 	switch tn.TypeName {
-	case "ImageMedia":
-		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
+	case "AudioMedia":
+		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaAudioMedia)
 		return json.Unmarshal(b, *v)
 	case "GIFMedia":
 		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia)
 		return json.Unmarshal(b, *v)
-	case "VideoMedia":
-		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia)
-		return json.Unmarshal(b, *v)
-	case "AudioMedia":
-		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaAudioMedia)
-		return json.Unmarshal(b, *v)
-	case "TextMedia":
-		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia)
-		return json.Unmarshal(b, *v)
-	case "PdfMedia":
-		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia)
+	case "GltfMedia":
+		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia)
 		return json.Unmarshal(b, *v)
 	case "HtmlMedia":
 		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaHtmlMedia)
 		return json.Unmarshal(b, *v)
+	case "ImageMedia":
+		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
+		return json.Unmarshal(b, *v)
+	case "InvalidMedia":
+		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia)
+		return json.Unmarshal(b, *v)
 	case "JsonMedia":
 		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaJsonMedia)
 		return json.Unmarshal(b, *v)
-	case "GltfMedia":
-		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia)
-		return json.Unmarshal(b, *v)
-	case "UnknownMedia":
-		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia)
+	case "PdfMedia":
+		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia)
 		return json.Unmarshal(b, *v)
 	case "SyncingMedia":
 		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia)
 		return json.Unmarshal(b, *v)
-	case "InvalidMedia":
-		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia)
+	case "TextMedia":
+		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia)
+		return json.Unmarshal(b, *v)
+	case "UnknownMedia":
+		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia)
+		return json.Unmarshal(b, *v)
+	case "VideoMedia":
+		*v = new(syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -4909,12 +4910,12 @@ func __marshalsyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUser
 
 	var typename string
 	switch v := (*v).(type) {
-	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia:
-		typename = "ImageMedia"
+	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaAudioMedia:
+		typename = "AudioMedia"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia
+			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaAudioMedia
 		}{typename, v}
 		return json.Marshal(result)
 	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia:
@@ -4925,36 +4926,12 @@ func __marshalsyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUser
 			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia
 		}{typename, v}
 		return json.Marshal(result)
-	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia:
-		typename = "VideoMedia"
+	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia:
+		typename = "GltfMedia"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia
-		}{typename, v}
-		return json.Marshal(result)
-	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaAudioMedia:
-		typename = "AudioMedia"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaAudioMedia
-		}{typename, v}
-		return json.Marshal(result)
-	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia:
-		typename = "TextMedia"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia
-		}{typename, v}
-		return json.Marshal(result)
-	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia:
-		typename = "PdfMedia"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia
+			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia
 		}{typename, v}
 		return json.Marshal(result)
 	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaHtmlMedia:
@@ -4965,6 +4942,22 @@ func __marshalsyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUser
 			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaHtmlMedia
 		}{typename, v}
 		return json.Marshal(result)
+	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia:
+		typename = "ImageMedia"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia
+		}{typename, v}
+		return json.Marshal(result)
+	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia:
+		typename = "InvalidMedia"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia
+		}{typename, v}
+		return json.Marshal(result)
 	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaJsonMedia:
 		typename = "JsonMedia"
 
@@ -4973,20 +4966,12 @@ func __marshalsyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUser
 			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaJsonMedia
 		}{typename, v}
 		return json.Marshal(result)
-	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia:
-		typename = "GltfMedia"
+	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia:
+		typename = "PdfMedia"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia
-		}{typename, v}
-		return json.Marshal(result)
-	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia:
-		typename = "UnknownMedia"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia
+			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia
 		}{typename, v}
 		return json.Marshal(result)
 	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia:
@@ -4997,12 +4982,28 @@ func __marshalsyncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUser
 			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia
 		}{typename, v}
 		return json.Marshal(result)
-	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia:
-		typename = "InvalidMedia"
+	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia:
+		typename = "TextMedia"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia
+			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia
+		}{typename, v}
+		return json.Marshal(result)
+	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia:
+		typename = "UnknownMedia"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaUnknownMedia
+		}{typename, v}
+		return json.Marshal(result)
+	case *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia:
+		typename = "VideoMedia"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia
 		}{typename, v}
 		return json.Marshal(result)
 	case nil:
@@ -5180,7 +5181,7 @@ func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdge) UnmarshalJSON
 				src, *dst)
 			if err != nil {
 				return fmt.Errorf(
-					"Unable to unmarshal trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdge.Node: %w", err)
+					"unable to unmarshal trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdge.Node: %w", err)
 			}
 		}
 	}
@@ -5212,7 +5213,7 @@ func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdge) __premarshalJ
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"Unable to marshal trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdge.Node: %w", err)
+					"unable to marshal trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdge.Node: %w", err)
 			}
 		}
 	}
@@ -5270,20 +5271,20 @@ func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) 
 // trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError includes the requested fields of the GraphQL interface FeedEventOrError.
 //
 // trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError is implemented by the following types:
-// trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent
 // trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound
 // trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction
+// trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent
 type trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError interface {
 	implementsGraphQLInterfacetrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
 	GetTypename() *string
 }
 
-func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) implementsGraphQLInterfacetrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
-}
 func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound) implementsGraphQLInterfacetrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
 }
 func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction) implementsGraphQLInterfacetrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
+}
+func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) implementsGraphQLInterfacetrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
 }
 
 func __unmarshaltrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError(b []byte, v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError) error {
@@ -5300,14 +5301,14 @@ func __unmarshaltrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeed
 	}
 
 	switch tn.TypeName {
-	case "FeedEvent":
-		*v = new(trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent)
-		return json.Unmarshal(b, *v)
 	case "ErrFeedEventNotFound":
 		*v = new(trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound)
 		return json.Unmarshal(b, *v)
 	case "ErrUnknownAction":
 		*v = new(trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction)
+		return json.Unmarshal(b, *v)
+	case "FeedEvent":
+		*v = new(trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -5322,14 +5323,6 @@ func __marshaltrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEv
 
 	var typename string
 	switch v := (*v).(type) {
-	case *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent:
-		typename = "FeedEvent"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent
-		}{typename, v}
-		return json.Marshal(result)
 	case *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound:
 		typename = "ErrFeedEventNotFound"
 
@@ -5344,6 +5337,14 @@ func __marshaltrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEv
 		result := struct {
 			TypeName string `json:"__typename"`
 			*trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction
+		}{typename, v}
+		return json.Marshal(result)
+	case *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent:
+		typename = "FeedEvent"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent
 		}{typename, v}
 		return json.Marshal(result)
 	case nil:
@@ -5391,7 +5392,7 @@ func (v *trendingUsersQueryResponse) UnmarshalJSON(b []byte) error {
 				src, *dst)
 			if err != nil {
 				return fmt.Errorf(
-					"Unable to unmarshal trendingUsersQueryResponse.TrendingUsers: %w", err)
+					"unable to unmarshal trendingUsersQueryResponse.TrendingUsers: %w", err)
 			}
 		}
 	}
@@ -5423,7 +5424,7 @@ func (v *trendingUsersQueryResponse) __premarshalJSON() (*__premarshaltrendingUs
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"Unable to marshal trendingUsersQueryResponse.TrendingUsers: %w", err)
+					"unable to marshal trendingUsersQueryResponse.TrendingUsers: %w", err)
 			}
 		}
 	}
@@ -5552,7 +5553,7 @@ func (v *updateGalleryMutationResponse) UnmarshalJSON(b []byte) error {
 				src, *dst)
 			if err != nil {
 				return fmt.Errorf(
-					"Unable to unmarshal updateGalleryMutationResponse.UpdateGallery: %w", err)
+					"unable to unmarshal updateGalleryMutationResponse.UpdateGallery: %w", err)
 			}
 		}
 	}
@@ -5584,7 +5585,7 @@ func (v *updateGalleryMutationResponse) __premarshalJSON() (*__premarshalupdateG
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"Unable to marshal updateGalleryMutationResponse.UpdateGallery: %w", err)
+					"unable to marshal updateGalleryMutationResponse.UpdateGallery: %w", err)
 			}
 		}
 	}
@@ -5696,20 +5697,20 @@ func (v *updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGalleryCollection
 // updateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError includes the requested fields of the GraphQL interface UpdateGalleryPayloadOrError.
 //
 // updateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError is implemented by the following types:
-// updateGalleryMutationUpdateGalleryUpdateGalleryPayload
 // updateGalleryMutationUpdateGalleryErrInvalidInput
 // updateGalleryMutationUpdateGalleryErrNotAuthorized
+// updateGalleryMutationUpdateGalleryUpdateGalleryPayload
 type updateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError interface {
 	implementsGraphQLInterfaceupdateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
 	GetTypename() *string
 }
 
-func (v *updateGalleryMutationUpdateGalleryUpdateGalleryPayload) implementsGraphQLInterfaceupdateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError() {
-}
 func (v *updateGalleryMutationUpdateGalleryErrInvalidInput) implementsGraphQLInterfaceupdateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError() {
 }
 func (v *updateGalleryMutationUpdateGalleryErrNotAuthorized) implementsGraphQLInterfaceupdateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError() {
+}
+func (v *updateGalleryMutationUpdateGalleryUpdateGalleryPayload) implementsGraphQLInterfaceupdateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError() {
 }
 
 func __unmarshalupdateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError(b []byte, v *updateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError) error {
@@ -5726,14 +5727,14 @@ func __unmarshalupdateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError(b 
 	}
 
 	switch tn.TypeName {
-	case "UpdateGalleryPayload":
-		*v = new(updateGalleryMutationUpdateGalleryUpdateGalleryPayload)
-		return json.Unmarshal(b, *v)
 	case "ErrInvalidInput":
 		*v = new(updateGalleryMutationUpdateGalleryErrInvalidInput)
 		return json.Unmarshal(b, *v)
 	case "ErrNotAuthorized":
 		*v = new(updateGalleryMutationUpdateGalleryErrNotAuthorized)
+		return json.Unmarshal(b, *v)
+	case "UpdateGalleryPayload":
+		*v = new(updateGalleryMutationUpdateGalleryUpdateGalleryPayload)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -5748,14 +5749,6 @@ func __marshalupdateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError(v *u
 
 	var typename string
 	switch v := (*v).(type) {
-	case *updateGalleryMutationUpdateGalleryUpdateGalleryPayload:
-		typename = "UpdateGalleryPayload"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*updateGalleryMutationUpdateGalleryUpdateGalleryPayload
-		}{typename, v}
-		return json.Marshal(result)
 	case *updateGalleryMutationUpdateGalleryErrInvalidInput:
 		typename = "ErrInvalidInput"
 
@@ -5770,6 +5763,14 @@ func __marshalupdateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError(v *u
 		result := struct {
 			TypeName string `json:"__typename"`
 			*updateGalleryMutationUpdateGalleryErrNotAuthorized
+		}{typename, v}
+		return json.Marshal(result)
+	case *updateGalleryMutationUpdateGalleryUpdateGalleryPayload:
+		typename = "UpdateGalleryPayload"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*updateGalleryMutationUpdateGalleryUpdateGalleryPayload
 		}{typename, v}
 		return json.Marshal(result)
 	case nil:
@@ -5817,7 +5818,7 @@ func (v *updateSocialAccountDisplayedResponse) UnmarshalJSON(b []byte) error {
 				src, *dst)
 			if err != nil {
 				return fmt.Errorf(
-					"Unable to unmarshal updateSocialAccountDisplayedResponse.UpdateSocialAccountDisplayed: %w", err)
+					"unable to unmarshal updateSocialAccountDisplayedResponse.UpdateSocialAccountDisplayed: %w", err)
 			}
 		}
 	}
@@ -5849,7 +5850,7 @@ func (v *updateSocialAccountDisplayedResponse) __premarshalJSON() (*__premarshal
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"Unable to marshal updateSocialAccountDisplayedResponse.UpdateSocialAccountDisplayed: %w", err)
+					"unable to marshal updateSocialAccountDisplayedResponse.UpdateSocialAccountDisplayed: %w", err)
 			}
 		}
 	}
@@ -5923,23 +5924,23 @@ func (v *updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAcc
 // updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError includes the requested fields of the GraphQL interface UpdateSocialAccountDisplayedPayloadOrError.
 //
 // updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError is implemented by the following types:
-// updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayload
 // updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrInvalidInput
-// updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNotAuthorized
 // updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNeedsToReconnectSocial
+// updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNotAuthorized
+// updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayload
 type updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError interface {
 	implementsGraphQLInterfaceupdateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
 	GetTypename() *string
 }
 
-func (v *updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayload) implementsGraphQLInterfaceupdateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError() {
-}
 func (v *updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrInvalidInput) implementsGraphQLInterfaceupdateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError() {
+}
+func (v *updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNeedsToReconnectSocial) implementsGraphQLInterfaceupdateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError() {
 }
 func (v *updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNotAuthorized) implementsGraphQLInterfaceupdateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError() {
 }
-func (v *updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNeedsToReconnectSocial) implementsGraphQLInterfaceupdateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError() {
+func (v *updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayload) implementsGraphQLInterfaceupdateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError() {
 }
 
 func __unmarshalupdateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError(b []byte, v *updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError) error {
@@ -5956,17 +5957,17 @@ func __unmarshalupdateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSo
 	}
 
 	switch tn.TypeName {
-	case "UpdateSocialAccountDisplayedPayload":
-		*v = new(updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayload)
-		return json.Unmarshal(b, *v)
 	case "ErrInvalidInput":
 		*v = new(updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrInvalidInput)
+		return json.Unmarshal(b, *v)
+	case "ErrNeedsToReconnectSocial":
+		*v = new(updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNeedsToReconnectSocial)
 		return json.Unmarshal(b, *v)
 	case "ErrNotAuthorized":
 		*v = new(updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNotAuthorized)
 		return json.Unmarshal(b, *v)
-	case "ErrNeedsToReconnectSocial":
-		*v = new(updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNeedsToReconnectSocial)
+	case "UpdateSocialAccountDisplayedPayload":
+		*v = new(updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayload)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -5981,20 +5982,20 @@ func __marshalupdateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSoci
 
 	var typename string
 	switch v := (*v).(type) {
-	case *updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayload:
-		typename = "UpdateSocialAccountDisplayedPayload"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayload
-		}{typename, v}
-		return json.Marshal(result)
 	case *updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrInvalidInput:
 		typename = "ErrInvalidInput"
 
 		result := struct {
 			TypeName string `json:"__typename"`
 			*updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrInvalidInput
+		}{typename, v}
+		return json.Marshal(result)
+	case *updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNeedsToReconnectSocial:
+		typename = "ErrNeedsToReconnectSocial"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNeedsToReconnectSocial
 		}{typename, v}
 		return json.Marshal(result)
 	case *updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNotAuthorized:
@@ -6005,12 +6006,12 @@ func __marshalupdateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSoci
 			*updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNotAuthorized
 		}{typename, v}
 		return json.Marshal(result)
-	case *updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNeedsToReconnectSocial:
-		typename = "ErrNeedsToReconnectSocial"
+	case *updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayload:
+		typename = "UpdateSocialAccountDisplayedPayload"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNeedsToReconnectSocial
+			*updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayload
 		}{typename, v}
 		return json.Marshal(result)
 	case nil:
@@ -6094,7 +6095,7 @@ func (v *updateUserExperienceResponse) UnmarshalJSON(b []byte) error {
 				src, *dst)
 			if err != nil {
 				return fmt.Errorf(
-					"Unable to unmarshal updateUserExperienceResponse.UpdateUserExperience: %w", err)
+					"unable to unmarshal updateUserExperienceResponse.UpdateUserExperience: %w", err)
 			}
 		}
 	}
@@ -6126,7 +6127,7 @@ func (v *updateUserExperienceResponse) __premarshalJSON() (*__premarshalupdateUs
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"Unable to marshal updateUserExperienceResponse.UpdateUserExperience: %w", err)
+					"unable to marshal updateUserExperienceResponse.UpdateUserExperience: %w", err)
 			}
 		}
 	}
@@ -6184,20 +6185,20 @@ func (v *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload) Ge
 // updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError includes the requested fields of the GraphQL interface UpdateUserExperiencePayloadOrError.
 //
 // updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError is implemented by the following types:
-// updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload
 // updateUserExperienceUpdateUserExperienceErrInvalidInput
 // updateUserExperienceUpdateUserExperienceErrNotAuthorized
+// updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload
 type updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError interface {
 	implementsGraphQLInterfaceupdateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
 	GetTypename() *string
 }
 
-func (v *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload) implementsGraphQLInterfaceupdateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError() {
-}
 func (v *updateUserExperienceUpdateUserExperienceErrInvalidInput) implementsGraphQLInterfaceupdateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError() {
 }
 func (v *updateUserExperienceUpdateUserExperienceErrNotAuthorized) implementsGraphQLInterfaceupdateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError() {
+}
+func (v *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload) implementsGraphQLInterfaceupdateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError() {
 }
 
 func __unmarshalupdateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError(b []byte, v *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError) error {
@@ -6214,14 +6215,14 @@ func __unmarshalupdateUserExperienceUpdateUserExperienceUpdateUserExperiencePayl
 	}
 
 	switch tn.TypeName {
-	case "UpdateUserExperiencePayload":
-		*v = new(updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload)
-		return json.Unmarshal(b, *v)
 	case "ErrInvalidInput":
 		*v = new(updateUserExperienceUpdateUserExperienceErrInvalidInput)
 		return json.Unmarshal(b, *v)
 	case "ErrNotAuthorized":
 		*v = new(updateUserExperienceUpdateUserExperienceErrNotAuthorized)
+		return json.Unmarshal(b, *v)
+	case "UpdateUserExperiencePayload":
+		*v = new(updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -6236,14 +6237,6 @@ func __marshalupdateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloa
 
 	var typename string
 	switch v := (*v).(type) {
-	case *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload:
-		typename = "UpdateUserExperiencePayload"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload
-		}{typename, v}
-		return json.Marshal(result)
 	case *updateUserExperienceUpdateUserExperienceErrInvalidInput:
 		typename = "ErrInvalidInput"
 
@@ -6258,6 +6251,14 @@ func __marshalupdateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloa
 		result := struct {
 			TypeName string `json:"__typename"`
 			*updateUserExperienceUpdateUserExperienceErrNotAuthorized
+		}{typename, v}
+		return json.Marshal(result)
+	case *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload:
+		typename = "UpdateUserExperiencePayload"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload
 		}{typename, v}
 		return json.Marshal(result)
 	case nil:
@@ -6331,7 +6332,7 @@ func (v *userByAddressQueryResponse) UnmarshalJSON(b []byte) error {
 				src, *dst)
 			if err != nil {
 				return fmt.Errorf(
-					"Unable to unmarshal userByAddressQueryResponse.UserByAddress: %w", err)
+					"unable to unmarshal userByAddressQueryResponse.UserByAddress: %w", err)
 			}
 		}
 	}
@@ -6363,7 +6364,7 @@ func (v *userByAddressQueryResponse) __premarshalJSON() (*__premarshaluserByAddr
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"Unable to marshal userByAddressQueryResponse.UserByAddress: %w", err)
+					"unable to marshal userByAddressQueryResponse.UserByAddress: %w", err)
 			}
 		}
 	}
@@ -6413,20 +6414,20 @@ func (v *userByAddressQueryUserByAddressGalleryUser) GetDbid() persist.DBID { re
 // userByAddressQueryUserByAddressUserByAddressOrError includes the requested fields of the GraphQL interface UserByAddressOrError.
 //
 // userByAddressQueryUserByAddressUserByAddressOrError is implemented by the following types:
-// userByAddressQueryUserByAddressGalleryUser
-// userByAddressQueryUserByAddressErrUserNotFound
 // userByAddressQueryUserByAddressErrInvalidInput
+// userByAddressQueryUserByAddressErrUserNotFound
+// userByAddressQueryUserByAddressGalleryUser
 type userByAddressQueryUserByAddressUserByAddressOrError interface {
 	implementsGraphQLInterfaceuserByAddressQueryUserByAddressUserByAddressOrError()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
 	GetTypename() *string
 }
 
-func (v *userByAddressQueryUserByAddressGalleryUser) implementsGraphQLInterfaceuserByAddressQueryUserByAddressUserByAddressOrError() {
+func (v *userByAddressQueryUserByAddressErrInvalidInput) implementsGraphQLInterfaceuserByAddressQueryUserByAddressUserByAddressOrError() {
 }
 func (v *userByAddressQueryUserByAddressErrUserNotFound) implementsGraphQLInterfaceuserByAddressQueryUserByAddressUserByAddressOrError() {
 }
-func (v *userByAddressQueryUserByAddressErrInvalidInput) implementsGraphQLInterfaceuserByAddressQueryUserByAddressUserByAddressOrError() {
+func (v *userByAddressQueryUserByAddressGalleryUser) implementsGraphQLInterfaceuserByAddressQueryUserByAddressUserByAddressOrError() {
 }
 
 func __unmarshaluserByAddressQueryUserByAddressUserByAddressOrError(b []byte, v *userByAddressQueryUserByAddressUserByAddressOrError) error {
@@ -6443,14 +6444,14 @@ func __unmarshaluserByAddressQueryUserByAddressUserByAddressOrError(b []byte, v 
 	}
 
 	switch tn.TypeName {
-	case "GalleryUser":
-		*v = new(userByAddressQueryUserByAddressGalleryUser)
+	case "ErrInvalidInput":
+		*v = new(userByAddressQueryUserByAddressErrInvalidInput)
 		return json.Unmarshal(b, *v)
 	case "ErrUserNotFound":
 		*v = new(userByAddressQueryUserByAddressErrUserNotFound)
 		return json.Unmarshal(b, *v)
-	case "ErrInvalidInput":
-		*v = new(userByAddressQueryUserByAddressErrInvalidInput)
+	case "GalleryUser":
+		*v = new(userByAddressQueryUserByAddressGalleryUser)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -6465,12 +6466,12 @@ func __marshaluserByAddressQueryUserByAddressUserByAddressOrError(v *userByAddre
 
 	var typename string
 	switch v := (*v).(type) {
-	case *userByAddressQueryUserByAddressGalleryUser:
-		typename = "GalleryUser"
+	case *userByAddressQueryUserByAddressErrInvalidInput:
+		typename = "ErrInvalidInput"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*userByAddressQueryUserByAddressGalleryUser
+			*userByAddressQueryUserByAddressErrInvalidInput
 		}{typename, v}
 		return json.Marshal(result)
 	case *userByAddressQueryUserByAddressErrUserNotFound:
@@ -6481,12 +6482,12 @@ func __marshaluserByAddressQueryUserByAddressUserByAddressOrError(v *userByAddre
 			*userByAddressQueryUserByAddressErrUserNotFound
 		}{typename, v}
 		return json.Marshal(result)
-	case *userByAddressQueryUserByAddressErrInvalidInput:
-		typename = "ErrInvalidInput"
+	case *userByAddressQueryUserByAddressGalleryUser:
+		typename = "GalleryUser"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*userByAddressQueryUserByAddressErrInvalidInput
+			*userByAddressQueryUserByAddressGalleryUser
 		}{typename, v}
 		return json.Marshal(result)
 	case nil:
@@ -6534,7 +6535,7 @@ func (v *userByIdQueryResponse) UnmarshalJSON(b []byte) error {
 				src, *dst)
 			if err != nil {
 				return fmt.Errorf(
-					"Unable to unmarshal userByIdQueryResponse.UserById: %w", err)
+					"unable to unmarshal userByIdQueryResponse.UserById: %w", err)
 			}
 		}
 	}
@@ -6566,7 +6567,7 @@ func (v *userByIdQueryResponse) __premarshalJSON() (*__premarshaluserByIdQueryRe
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"Unable to marshal userByIdQueryResponse.UserById: %w", err)
+					"unable to marshal userByIdQueryResponse.UserById: %w", err)
 			}
 		}
 	}
@@ -6642,20 +6643,20 @@ func (v *userByIdQueryUserByIdGalleryUserSocialAccountsTwitterTwitterSocialAccou
 // userByIdQueryUserByIdUserByIdOrError includes the requested fields of the GraphQL interface UserByIdOrError.
 //
 // userByIdQueryUserByIdUserByIdOrError is implemented by the following types:
-// userByIdQueryUserByIdGalleryUser
-// userByIdQueryUserByIdErrUserNotFound
 // userByIdQueryUserByIdErrInvalidInput
+// userByIdQueryUserByIdErrUserNotFound
+// userByIdQueryUserByIdGalleryUser
 type userByIdQueryUserByIdUserByIdOrError interface {
 	implementsGraphQLInterfaceuserByIdQueryUserByIdUserByIdOrError()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
 	GetTypename() *string
 }
 
-func (v *userByIdQueryUserByIdGalleryUser) implementsGraphQLInterfaceuserByIdQueryUserByIdUserByIdOrError() {
+func (v *userByIdQueryUserByIdErrInvalidInput) implementsGraphQLInterfaceuserByIdQueryUserByIdUserByIdOrError() {
 }
 func (v *userByIdQueryUserByIdErrUserNotFound) implementsGraphQLInterfaceuserByIdQueryUserByIdUserByIdOrError() {
 }
-func (v *userByIdQueryUserByIdErrInvalidInput) implementsGraphQLInterfaceuserByIdQueryUserByIdUserByIdOrError() {
+func (v *userByIdQueryUserByIdGalleryUser) implementsGraphQLInterfaceuserByIdQueryUserByIdUserByIdOrError() {
 }
 
 func __unmarshaluserByIdQueryUserByIdUserByIdOrError(b []byte, v *userByIdQueryUserByIdUserByIdOrError) error {
@@ -6672,14 +6673,14 @@ func __unmarshaluserByIdQueryUserByIdUserByIdOrError(b []byte, v *userByIdQueryU
 	}
 
 	switch tn.TypeName {
-	case "GalleryUser":
-		*v = new(userByIdQueryUserByIdGalleryUser)
+	case "ErrInvalidInput":
+		*v = new(userByIdQueryUserByIdErrInvalidInput)
 		return json.Unmarshal(b, *v)
 	case "ErrUserNotFound":
 		*v = new(userByIdQueryUserByIdErrUserNotFound)
 		return json.Unmarshal(b, *v)
-	case "ErrInvalidInput":
-		*v = new(userByIdQueryUserByIdErrInvalidInput)
+	case "GalleryUser":
+		*v = new(userByIdQueryUserByIdGalleryUser)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -6694,12 +6695,12 @@ func __marshaluserByIdQueryUserByIdUserByIdOrError(v *userByIdQueryUserByIdUserB
 
 	var typename string
 	switch v := (*v).(type) {
-	case *userByIdQueryUserByIdGalleryUser:
-		typename = "GalleryUser"
+	case *userByIdQueryUserByIdErrInvalidInput:
+		typename = "ErrInvalidInput"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*userByIdQueryUserByIdGalleryUser
+			*userByIdQueryUserByIdErrInvalidInput
 		}{typename, v}
 		return json.Marshal(result)
 	case *userByIdQueryUserByIdErrUserNotFound:
@@ -6710,12 +6711,12 @@ func __marshaluserByIdQueryUserByIdUserByIdOrError(v *userByIdQueryUserByIdUserB
 			*userByIdQueryUserByIdErrUserNotFound
 		}{typename, v}
 		return json.Marshal(result)
-	case *userByIdQueryUserByIdErrInvalidInput:
-		typename = "ErrInvalidInput"
+	case *userByIdQueryUserByIdGalleryUser:
+		typename = "GalleryUser"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*userByIdQueryUserByIdErrInvalidInput
+			*userByIdQueryUserByIdGalleryUser
 		}{typename, v}
 		return json.Marshal(result)
 	case nil:
@@ -6763,7 +6764,7 @@ func (v *userByUsernameQueryResponse) UnmarshalJSON(b []byte) error {
 				src, *dst)
 			if err != nil {
 				return fmt.Errorf(
-					"Unable to unmarshal userByUsernameQueryResponse.UserByUsername: %w", err)
+					"unable to unmarshal userByUsernameQueryResponse.UserByUsername: %w", err)
 			}
 		}
 	}
@@ -6795,7 +6796,7 @@ func (v *userByUsernameQueryResponse) __premarshalJSON() (*__premarshaluserByUse
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"Unable to marshal userByUsernameQueryResponse.UserByUsername: %w", err)
+					"unable to marshal userByUsernameQueryResponse.UserByUsername: %w", err)
 			}
 		}
 	}
@@ -6845,20 +6846,20 @@ func (v *userByUsernameQueryUserByUsernameGalleryUser) GetDbid() persist.DBID { 
 // userByUsernameQueryUserByUsernameUserByUsernameOrError includes the requested fields of the GraphQL interface UserByUsernameOrError.
 //
 // userByUsernameQueryUserByUsernameUserByUsernameOrError is implemented by the following types:
-// userByUsernameQueryUserByUsernameGalleryUser
-// userByUsernameQueryUserByUsernameErrUserNotFound
 // userByUsernameQueryUserByUsernameErrInvalidInput
+// userByUsernameQueryUserByUsernameErrUserNotFound
+// userByUsernameQueryUserByUsernameGalleryUser
 type userByUsernameQueryUserByUsernameUserByUsernameOrError interface {
 	implementsGraphQLInterfaceuserByUsernameQueryUserByUsernameUserByUsernameOrError()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
 	GetTypename() *string
 }
 
-func (v *userByUsernameQueryUserByUsernameGalleryUser) implementsGraphQLInterfaceuserByUsernameQueryUserByUsernameUserByUsernameOrError() {
+func (v *userByUsernameQueryUserByUsernameErrInvalidInput) implementsGraphQLInterfaceuserByUsernameQueryUserByUsernameUserByUsernameOrError() {
 }
 func (v *userByUsernameQueryUserByUsernameErrUserNotFound) implementsGraphQLInterfaceuserByUsernameQueryUserByUsernameUserByUsernameOrError() {
 }
-func (v *userByUsernameQueryUserByUsernameErrInvalidInput) implementsGraphQLInterfaceuserByUsernameQueryUserByUsernameUserByUsernameOrError() {
+func (v *userByUsernameQueryUserByUsernameGalleryUser) implementsGraphQLInterfaceuserByUsernameQueryUserByUsernameUserByUsernameOrError() {
 }
 
 func __unmarshaluserByUsernameQueryUserByUsernameUserByUsernameOrError(b []byte, v *userByUsernameQueryUserByUsernameUserByUsernameOrError) error {
@@ -6875,14 +6876,14 @@ func __unmarshaluserByUsernameQueryUserByUsernameUserByUsernameOrError(b []byte,
 	}
 
 	switch tn.TypeName {
-	case "GalleryUser":
-		*v = new(userByUsernameQueryUserByUsernameGalleryUser)
+	case "ErrInvalidInput":
+		*v = new(userByUsernameQueryUserByUsernameErrInvalidInput)
 		return json.Unmarshal(b, *v)
 	case "ErrUserNotFound":
 		*v = new(userByUsernameQueryUserByUsernameErrUserNotFound)
 		return json.Unmarshal(b, *v)
-	case "ErrInvalidInput":
-		*v = new(userByUsernameQueryUserByUsernameErrInvalidInput)
+	case "GalleryUser":
+		*v = new(userByUsernameQueryUserByUsernameGalleryUser)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -6897,12 +6898,12 @@ func __marshaluserByUsernameQueryUserByUsernameUserByUsernameOrError(v *userByUs
 
 	var typename string
 	switch v := (*v).(type) {
-	case *userByUsernameQueryUserByUsernameGalleryUser:
-		typename = "GalleryUser"
+	case *userByUsernameQueryUserByUsernameErrInvalidInput:
+		typename = "ErrInvalidInput"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*userByUsernameQueryUserByUsernameGalleryUser
+			*userByUsernameQueryUserByUsernameErrInvalidInput
 		}{typename, v}
 		return json.Marshal(result)
 	case *userByUsernameQueryUserByUsernameErrUserNotFound:
@@ -6913,12 +6914,12 @@ func __marshaluserByUsernameQueryUserByUsernameUserByUsernameOrError(v *userByUs
 			*userByUsernameQueryUserByUsernameErrUserNotFound
 		}{typename, v}
 		return json.Marshal(result)
-	case *userByUsernameQueryUserByUsernameErrInvalidInput:
-		typename = "ErrInvalidInput"
+	case *userByUsernameQueryUserByUsernameGalleryUser:
+		typename = "GalleryUser"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*userByUsernameQueryUserByUsernameErrInvalidInput
+			*userByUsernameQueryUserByUsernameGalleryUser
 		}{typename, v}
 		return json.Marshal(result)
 	case nil:
@@ -6966,7 +6967,7 @@ func (v *viewGalleryMutationResponse) UnmarshalJSON(b []byte) error {
 				src, *dst)
 			if err != nil {
 				return fmt.Errorf(
-					"Unable to unmarshal viewGalleryMutationResponse.ViewGallery: %w", err)
+					"unable to unmarshal viewGalleryMutationResponse.ViewGallery: %w", err)
 			}
 		}
 	}
@@ -6998,7 +6999,7 @@ func (v *viewGalleryMutationResponse) __premarshalJSON() (*__premarshalviewGalle
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"Unable to marshal viewGalleryMutationResponse.ViewGallery: %w", err)
+					"unable to marshal viewGalleryMutationResponse.ViewGallery: %w", err)
 			}
 		}
 	}
@@ -7046,17 +7047,17 @@ func (v *viewGalleryMutationViewGalleryViewGalleryPayloadGallery) GetDbid() pers
 // viewGalleryMutationViewGalleryViewGalleryPayloadOrError includes the requested fields of the GraphQL interface ViewGalleryPayloadOrError.
 //
 // viewGalleryMutationViewGalleryViewGalleryPayloadOrError is implemented by the following types:
-// viewGalleryMutationViewGalleryViewGalleryPayload
 // viewGalleryMutationViewGalleryErrAuthenticationFailed
+// viewGalleryMutationViewGalleryViewGalleryPayload
 type viewGalleryMutationViewGalleryViewGalleryPayloadOrError interface {
 	implementsGraphQLInterfaceviewGalleryMutationViewGalleryViewGalleryPayloadOrError()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
 	GetTypename() *string
 }
 
-func (v *viewGalleryMutationViewGalleryViewGalleryPayload) implementsGraphQLInterfaceviewGalleryMutationViewGalleryViewGalleryPayloadOrError() {
-}
 func (v *viewGalleryMutationViewGalleryErrAuthenticationFailed) implementsGraphQLInterfaceviewGalleryMutationViewGalleryViewGalleryPayloadOrError() {
+}
+func (v *viewGalleryMutationViewGalleryViewGalleryPayload) implementsGraphQLInterfaceviewGalleryMutationViewGalleryViewGalleryPayloadOrError() {
 }
 
 func __unmarshalviewGalleryMutationViewGalleryViewGalleryPayloadOrError(b []byte, v *viewGalleryMutationViewGalleryViewGalleryPayloadOrError) error {
@@ -7073,11 +7074,11 @@ func __unmarshalviewGalleryMutationViewGalleryViewGalleryPayloadOrError(b []byte
 	}
 
 	switch tn.TypeName {
-	case "ViewGalleryPayload":
-		*v = new(viewGalleryMutationViewGalleryViewGalleryPayload)
-		return json.Unmarshal(b, *v)
 	case "ErrAuthenticationFailed":
 		*v = new(viewGalleryMutationViewGalleryErrAuthenticationFailed)
+		return json.Unmarshal(b, *v)
+	case "ViewGalleryPayload":
+		*v = new(viewGalleryMutationViewGalleryViewGalleryPayload)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -7092,20 +7093,20 @@ func __marshalviewGalleryMutationViewGalleryViewGalleryPayloadOrError(v *viewGal
 
 	var typename string
 	switch v := (*v).(type) {
-	case *viewGalleryMutationViewGalleryViewGalleryPayload:
-		typename = "ViewGalleryPayload"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*viewGalleryMutationViewGalleryViewGalleryPayload
-		}{typename, v}
-		return json.Marshal(result)
 	case *viewGalleryMutationViewGalleryErrAuthenticationFailed:
 		typename = "ErrAuthenticationFailed"
 
 		result := struct {
 			TypeName string `json:"__typename"`
 			*viewGalleryMutationViewGalleryErrAuthenticationFailed
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewGalleryMutationViewGalleryViewGalleryPayload:
+		typename = "ViewGalleryPayload"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewGalleryMutationViewGalleryViewGalleryPayload
 		}{typename, v}
 		return json.Marshal(result)
 	case nil:
@@ -7151,7 +7152,7 @@ func (v *viewerQueryResponse) UnmarshalJSON(b []byte) error {
 				src, *dst)
 			if err != nil {
 				return fmt.Errorf(
-					"Unable to unmarshal viewerQueryResponse.Viewer: %w", err)
+					"unable to unmarshal viewerQueryResponse.Viewer: %w", err)
 			}
 		}
 	}
@@ -7183,7 +7184,7 @@ func (v *viewerQueryResponse) __premarshalJSON() (*__premarshalviewerQueryRespon
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"Unable to marshal viewerQueryResponse.Viewer: %w", err)
+					"unable to marshal viewerQueryResponse.Viewer: %w", err)
 			}
 		}
 	}
@@ -7339,7 +7340,7 @@ func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdge) Unmars
 				src, *dst)
 			if err != nil {
 				return fmt.Errorf(
-					"Unable to unmarshal viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdge.Node: %w", err)
+					"unable to unmarshal viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdge.Node: %w", err)
 			}
 		}
 	}
@@ -7371,7 +7372,7 @@ func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdge) __prem
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"Unable to marshal viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdge.Node: %w", err)
+					"unable to marshal viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdge.Node: %w", err)
 			}
 		}
 	}
@@ -7465,7 +7466,7 @@ func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeed
 				src, *dst)
 			if err != nil {
 				return fmt.Errorf(
-					"Unable to unmarshal viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent.EventData: %w", err)
+					"unable to unmarshal viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent.EventData: %w", err)
 			}
 		}
 	}
@@ -7506,7 +7507,7 @@ func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeed
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"Unable to marshal viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent.EventData: %w", err)
+					"unable to marshal viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent.EventData: %w", err)
 			}
 		}
 	}
@@ -7580,15 +7581,15 @@ func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeed
 // viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData includes the requested fields of the GraphQL interface FeedEventData.
 //
 // viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData is implemented by the following types:
-// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserCreatedFeedEventData
-// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserFollowedUsersFeedEventData
-// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToTokenFeedEventData
 // viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionCreatedFeedEventData
-// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToCollectionFeedEventData
-// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataTokensAddedToCollectionFeedEventData
 // viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionUpdatedFeedEventData
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToCollectionFeedEventData
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToTokenFeedEventData
 // viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryInfoUpdatedFeedEventData
 // viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataTokensAddedToCollectionFeedEventData
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserCreatedFeedEventData
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserFollowedUsersFeedEventData
 type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData interface {
 	implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
@@ -7597,23 +7598,23 @@ type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEven
 	GetAction() *Action
 }
 
-func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserCreatedFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData() {
-}
-func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserFollowedUsersFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData() {
-}
-func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToTokenFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData() {
-}
 func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionCreatedFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData() {
+}
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionUpdatedFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData() {
 }
 func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToCollectionFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData() {
 }
-func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataTokensAddedToCollectionFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData() {
-}
-func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionUpdatedFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData() {
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToTokenFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData() {
 }
 func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryInfoUpdatedFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData() {
 }
 func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData() {
+}
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataTokensAddedToCollectionFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData() {
+}
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserCreatedFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData() {
+}
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserFollowedUsersFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData() {
 }
 
 func __unmarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData(b []byte, v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData) error {
@@ -7630,32 +7631,32 @@ func __unmarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeN
 	}
 
 	switch tn.TypeName {
-	case "UserCreatedFeedEventData":
-		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserCreatedFeedEventData)
-		return json.Unmarshal(b, *v)
-	case "UserFollowedUsersFeedEventData":
-		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserFollowedUsersFeedEventData)
-		return json.Unmarshal(b, *v)
-	case "CollectorsNoteAddedToTokenFeedEventData":
-		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToTokenFeedEventData)
-		return json.Unmarshal(b, *v)
 	case "CollectionCreatedFeedEventData":
 		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionCreatedFeedEventData)
+		return json.Unmarshal(b, *v)
+	case "CollectionUpdatedFeedEventData":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionUpdatedFeedEventData)
 		return json.Unmarshal(b, *v)
 	case "CollectorsNoteAddedToCollectionFeedEventData":
 		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToCollectionFeedEventData)
 		return json.Unmarshal(b, *v)
-	case "TokensAddedToCollectionFeedEventData":
-		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataTokensAddedToCollectionFeedEventData)
-		return json.Unmarshal(b, *v)
-	case "CollectionUpdatedFeedEventData":
-		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionUpdatedFeedEventData)
+	case "CollectorsNoteAddedToTokenFeedEventData":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToTokenFeedEventData)
 		return json.Unmarshal(b, *v)
 	case "GalleryInfoUpdatedFeedEventData":
 		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryInfoUpdatedFeedEventData)
 		return json.Unmarshal(b, *v)
 	case "GalleryUpdatedFeedEventData":
 		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData)
+		return json.Unmarshal(b, *v)
+	case "TokensAddedToCollectionFeedEventData":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataTokensAddedToCollectionFeedEventData)
+		return json.Unmarshal(b, *v)
+	case "UserCreatedFeedEventData":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserCreatedFeedEventData)
+		return json.Unmarshal(b, *v)
+	case "UserFollowedUsersFeedEventData":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserFollowedUsersFeedEventData)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -7670,36 +7671,20 @@ func __marshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNod
 
 	var typename string
 	switch v := (*v).(type) {
-	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserCreatedFeedEventData:
-		typename = "UserCreatedFeedEventData"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserCreatedFeedEventData
-		}{typename, v}
-		return json.Marshal(result)
-	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserFollowedUsersFeedEventData:
-		typename = "UserFollowedUsersFeedEventData"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserFollowedUsersFeedEventData
-		}{typename, v}
-		return json.Marshal(result)
-	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToTokenFeedEventData:
-		typename = "CollectorsNoteAddedToTokenFeedEventData"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToTokenFeedEventData
-		}{typename, v}
-		return json.Marshal(result)
 	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionCreatedFeedEventData:
 		typename = "CollectionCreatedFeedEventData"
 
 		result := struct {
 			TypeName string `json:"__typename"`
 			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionCreatedFeedEventData
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionUpdatedFeedEventData:
+		typename = "CollectionUpdatedFeedEventData"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionUpdatedFeedEventData
 		}{typename, v}
 		return json.Marshal(result)
 	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToCollectionFeedEventData:
@@ -7710,20 +7695,12 @@ func __marshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNod
 			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToCollectionFeedEventData
 		}{typename, v}
 		return json.Marshal(result)
-	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataTokensAddedToCollectionFeedEventData:
-		typename = "TokensAddedToCollectionFeedEventData"
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToTokenFeedEventData:
+		typename = "CollectorsNoteAddedToTokenFeedEventData"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataTokensAddedToCollectionFeedEventData
-		}{typename, v}
-		return json.Marshal(result)
-	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionUpdatedFeedEventData:
-		typename = "CollectionUpdatedFeedEventData"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionUpdatedFeedEventData
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToTokenFeedEventData
 		}{typename, v}
 		return json.Marshal(result)
 	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryInfoUpdatedFeedEventData:
@@ -7745,6 +7722,30 @@ func __marshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNod
 			TypeName string `json:"__typename"`
 			*__premarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData
 		}{typename, premarshaled}
+		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataTokensAddedToCollectionFeedEventData:
+		typename = "TokensAddedToCollectionFeedEventData"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataTokensAddedToCollectionFeedEventData
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserCreatedFeedEventData:
+		typename = "UserCreatedFeedEventData"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserCreatedFeedEventData
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserFollowedUsersFeedEventData:
+		typename = "UserFollowedUsersFeedEventData"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserFollowedUsersFeedEventData
+		}{typename, v}
 		return json.Marshal(result)
 	case nil:
 		return []byte("null"), nil
@@ -7823,7 +7824,7 @@ func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeed
 					src, dst)
 				if err != nil {
 					return fmt.Errorf(
-						"Unable to unmarshal viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData.SubEventDatas: %w", err)
+						"unable to unmarshal viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData.SubEventDatas: %w", err)
 				}
 			}
 		}
@@ -7866,7 +7867,7 @@ func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeed
 				&src)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"Unable to marshal viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData.SubEventDatas: %w", err)
+					"unable to marshal viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData.SubEventDatas: %w", err)
 			}
 		}
 	}
@@ -7972,15 +7973,15 @@ func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeed
 // viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData includes the requested fields of the GraphQL interface FeedEventData.
 //
 // viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData is implemented by the following types:
-// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserCreatedFeedEventData
-// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserFollowedUsersFeedEventData
-// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToTokenFeedEventData
 // viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventData
-// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToCollectionFeedEventData
-// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventData
 // viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionUpdatedFeedEventData
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToCollectionFeedEventData
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToTokenFeedEventData
 // viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryInfoUpdatedFeedEventData
 // viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryUpdatedFeedEventData
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventData
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserCreatedFeedEventData
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserFollowedUsersFeedEventData
 type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData interface {
 	implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
@@ -7989,23 +7990,23 @@ type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEven
 	GetAction() *Action
 }
 
-func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserCreatedFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData() {
-}
-func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserFollowedUsersFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData() {
-}
-func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToTokenFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData() {
-}
 func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData() {
+}
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionUpdatedFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData() {
 }
 func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToCollectionFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData() {
 }
-func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData() {
-}
-func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionUpdatedFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData() {
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToTokenFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData() {
 }
 func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryInfoUpdatedFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData() {
 }
 func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryUpdatedFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData() {
+}
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData() {
+}
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserCreatedFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData() {
+}
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserFollowedUsersFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData() {
 }
 
 func __unmarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData(b []byte, v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData) error {
@@ -8022,32 +8023,32 @@ func __unmarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeN
 	}
 
 	switch tn.TypeName {
-	case "UserCreatedFeedEventData":
-		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserCreatedFeedEventData)
-		return json.Unmarshal(b, *v)
-	case "UserFollowedUsersFeedEventData":
-		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserFollowedUsersFeedEventData)
-		return json.Unmarshal(b, *v)
-	case "CollectorsNoteAddedToTokenFeedEventData":
-		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToTokenFeedEventData)
-		return json.Unmarshal(b, *v)
 	case "CollectionCreatedFeedEventData":
 		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventData)
+		return json.Unmarshal(b, *v)
+	case "CollectionUpdatedFeedEventData":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionUpdatedFeedEventData)
 		return json.Unmarshal(b, *v)
 	case "CollectorsNoteAddedToCollectionFeedEventData":
 		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToCollectionFeedEventData)
 		return json.Unmarshal(b, *v)
-	case "TokensAddedToCollectionFeedEventData":
-		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventData)
-		return json.Unmarshal(b, *v)
-	case "CollectionUpdatedFeedEventData":
-		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionUpdatedFeedEventData)
+	case "CollectorsNoteAddedToTokenFeedEventData":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToTokenFeedEventData)
 		return json.Unmarshal(b, *v)
 	case "GalleryInfoUpdatedFeedEventData":
 		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryInfoUpdatedFeedEventData)
 		return json.Unmarshal(b, *v)
 	case "GalleryUpdatedFeedEventData":
 		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryUpdatedFeedEventData)
+		return json.Unmarshal(b, *v)
+	case "TokensAddedToCollectionFeedEventData":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventData)
+		return json.Unmarshal(b, *v)
+	case "UserCreatedFeedEventData":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserCreatedFeedEventData)
+		return json.Unmarshal(b, *v)
+	case "UserFollowedUsersFeedEventData":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserFollowedUsersFeedEventData)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -8062,36 +8063,20 @@ func __marshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNod
 
 	var typename string
 	switch v := (*v).(type) {
-	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserCreatedFeedEventData:
-		typename = "UserCreatedFeedEventData"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserCreatedFeedEventData
-		}{typename, v}
-		return json.Marshal(result)
-	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserFollowedUsersFeedEventData:
-		typename = "UserFollowedUsersFeedEventData"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserFollowedUsersFeedEventData
-		}{typename, v}
-		return json.Marshal(result)
-	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToTokenFeedEventData:
-		typename = "CollectorsNoteAddedToTokenFeedEventData"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToTokenFeedEventData
-		}{typename, v}
-		return json.Marshal(result)
 	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventData:
 		typename = "CollectionCreatedFeedEventData"
 
 		result := struct {
 			TypeName string `json:"__typename"`
 			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventData
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionUpdatedFeedEventData:
+		typename = "CollectionUpdatedFeedEventData"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionUpdatedFeedEventData
 		}{typename, v}
 		return json.Marshal(result)
 	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToCollectionFeedEventData:
@@ -8102,20 +8087,12 @@ func __marshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNod
 			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToCollectionFeedEventData
 		}{typename, v}
 		return json.Marshal(result)
-	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventData:
-		typename = "TokensAddedToCollectionFeedEventData"
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToTokenFeedEventData:
+		typename = "CollectorsNoteAddedToTokenFeedEventData"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventData
-		}{typename, v}
-		return json.Marshal(result)
-	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionUpdatedFeedEventData:
-		typename = "CollectionUpdatedFeedEventData"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionUpdatedFeedEventData
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToTokenFeedEventData
 		}{typename, v}
 		return json.Marshal(result)
 	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryInfoUpdatedFeedEventData:
@@ -8132,6 +8109,30 @@ func __marshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNod
 		result := struct {
 			TypeName string `json:"__typename"`
 			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryUpdatedFeedEventData
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventData:
+		typename = "TokensAddedToCollectionFeedEventData"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventData
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserCreatedFeedEventData:
+		typename = "UserCreatedFeedEventData"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserCreatedFeedEventData
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserFollowedUsersFeedEventData:
+		typename = "UserFollowedUsersFeedEventData"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserFollowedUsersFeedEventData
 		}{typename, v}
 		return json.Marshal(result)
 	case nil:
@@ -8317,20 +8318,20 @@ func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeed
 // viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError includes the requested fields of the GraphQL interface FeedEventOrError.
 //
 // viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError is implemented by the following types:
-// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent
 // viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound
 // viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent
 type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError interface {
 	implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
 	GetTypename() *string
 }
 
-func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
-}
 func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
 }
 func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
+}
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
 }
 
 func __unmarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError(b []byte, v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError) error {
@@ -8347,14 +8348,14 @@ func __unmarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeN
 	}
 
 	switch tn.TypeName {
-	case "FeedEvent":
-		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent)
-		return json.Unmarshal(b, *v)
 	case "ErrFeedEventNotFound":
 		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound)
 		return json.Unmarshal(b, *v)
 	case "ErrUnknownAction":
 		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction)
+		return json.Unmarshal(b, *v)
+	case "FeedEvent":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -8369,18 +8370,6 @@ func __marshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNod
 
 	var typename string
 	switch v := (*v).(type) {
-	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent:
-		typename = "FeedEvent"
-
-		premarshaled, err := v.__premarshalJSON()
-		if err != nil {
-			return nil, err
-		}
-		result := struct {
-			TypeName string `json:"__typename"`
-			*__premarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent
-		}{typename, premarshaled}
-		return json.Marshal(result)
 	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound:
 		typename = "ErrFeedEventNotFound"
 
@@ -8396,6 +8385,18 @@ func __marshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNod
 			TypeName string `json:"__typename"`
 			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction
 		}{typename, v}
+		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent:
+		typename = "FeedEvent"
+
+		premarshaled, err := v.__premarshalJSON()
+		if err != nil {
+			return nil, err
+		}
+		result := struct {
+			TypeName string `json:"__typename"`
+			*__premarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent
+		}{typename, premarshaled}
 		return json.Marshal(result)
 	case nil:
 		return []byte("null"), nil
@@ -8428,17 +8429,17 @@ func (v *viewerQueryViewerUserGalleryUserSocialAccountsTwitterTwitterSocialAccou
 // viewerQueryViewerViewerOrError includes the requested fields of the GraphQL interface ViewerOrError.
 //
 // viewerQueryViewerViewerOrError is implemented by the following types:
-// viewerQueryViewer
 // viewerQueryViewerErrNotAuthorized
+// viewerQueryViewer
 type viewerQueryViewerViewerOrError interface {
 	implementsGraphQLInterfaceviewerQueryViewerViewerOrError()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
 	GetTypename() *string
 }
 
-func (v *viewerQueryViewer) implementsGraphQLInterfaceviewerQueryViewerViewerOrError() {}
 func (v *viewerQueryViewerErrNotAuthorized) implementsGraphQLInterfaceviewerQueryViewerViewerOrError() {
 }
+func (v *viewerQueryViewer) implementsGraphQLInterfaceviewerQueryViewerViewerOrError() {}
 
 func __unmarshalviewerQueryViewerViewerOrError(b []byte, v *viewerQueryViewerViewerOrError) error {
 	if string(b) == "null" {
@@ -8454,11 +8455,11 @@ func __unmarshalviewerQueryViewerViewerOrError(b []byte, v *viewerQueryViewerVie
 	}
 
 	switch tn.TypeName {
-	case "Viewer":
-		*v = new(viewerQueryViewer)
-		return json.Unmarshal(b, *v)
 	case "ErrNotAuthorized":
 		*v = new(viewerQueryViewerErrNotAuthorized)
+		return json.Unmarshal(b, *v)
+	case "Viewer":
+		*v = new(viewerQueryViewer)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -8473,20 +8474,20 @@ func __marshalviewerQueryViewerViewerOrError(v *viewerQueryViewerViewerOrError) 
 
 	var typename string
 	switch v := (*v).(type) {
-	case *viewerQueryViewer:
-		typename = "Viewer"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*viewerQueryViewer
-		}{typename, v}
-		return json.Marshal(result)
 	case *viewerQueryViewerErrNotAuthorized:
 		typename = "ErrNotAuthorized"
 
 		result := struct {
 			TypeName string `json:"__typename"`
 			*viewerQueryViewerErrNotAuthorized
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewerQueryViewer:
+		typename = "Viewer"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewer
 		}{typename, v}
 		return json.Marshal(result)
 	case nil:
@@ -8497,15 +8498,8 @@ func __marshalviewerQueryViewerViewerOrError(v *viewerQueryViewerViewerOrError) 
 	}
 }
 
-func addUserWalletMutation(
-	ctx context.Context,
-	client graphql.Client,
-	chainAddress ChainAddressInput,
-	authMechanism AuthMechanism,
-) (*addUserWalletMutationResponse, error) {
-	req := &graphql.Request{
-		OpName: "addUserWalletMutation",
-		Query: `
+// The query or mutation executed by addUserWalletMutation.
+const addUserWalletMutation_Operation = `
 mutation addUserWalletMutation ($chainAddress: ChainAddressInput!, $authMechanism: AuthMechanism!) {
 	addUserWallet(chainAddress: $chainAddress, authMechanism: $authMechanism) {
 		__typename
@@ -8528,7 +8522,17 @@ mutation addUserWalletMutation ($chainAddress: ChainAddressInput!, $authMechanis
 		}
 	}
 }
-`,
+`
+
+func addUserWalletMutation(
+	ctx context.Context,
+	client graphql.Client,
+	chainAddress ChainAddressInput,
+	authMechanism AuthMechanism,
+) (*addUserWalletMutationResponse, error) {
+	req := &graphql.Request{
+		OpName: "addUserWalletMutation",
+		Query:  addUserWalletMutation_Operation,
 		Variables: &__addUserWalletMutationInput{
 			ChainAddress:  chainAddress,
 			AuthMechanism: authMechanism,
@@ -8548,14 +8552,8 @@ mutation addUserWalletMutation ($chainAddress: ChainAddressInput!, $authMechanis
 	return &data, err
 }
 
-func admireFeedEventMutation(
-	ctx context.Context,
-	client graphql.Client,
-	feedEventId persist.DBID,
-) (*admireFeedEventMutationResponse, error) {
-	req := &graphql.Request{
-		OpName: "admireFeedEventMutation",
-		Query: `
+// The query or mutation executed by admireFeedEventMutation.
+const admireFeedEventMutation_Operation = `
 mutation admireFeedEventMutation ($feedEventId: DBID!) {
 	admireFeedEvent(feedEventId: $feedEventId) {
 		__typename
@@ -8570,7 +8568,16 @@ mutation admireFeedEventMutation ($feedEventId: DBID!) {
 		}
 	}
 }
-`,
+`
+
+func admireFeedEventMutation(
+	ctx context.Context,
+	client graphql.Client,
+	feedEventId persist.DBID,
+) (*admireFeedEventMutationResponse, error) {
+	req := &graphql.Request{
+		OpName: "admireFeedEventMutation",
+		Query:  admireFeedEventMutation_Operation,
 		Variables: &__admireFeedEventMutationInput{
 			FeedEventId: feedEventId,
 		},
@@ -8589,15 +8596,8 @@ mutation admireFeedEventMutation ($feedEventId: DBID!) {
 	return &data, err
 }
 
-func commentOnFeedEventMutation(
-	ctx context.Context,
-	client graphql.Client,
-	feedEventId persist.DBID,
-	comment string,
-) (*commentOnFeedEventMutationResponse, error) {
-	req := &graphql.Request{
-		OpName: "commentOnFeedEventMutation",
-		Query: `
+// The query or mutation executed by commentOnFeedEventMutation.
+const commentOnFeedEventMutation_Operation = `
 mutation commentOnFeedEventMutation ($feedEventId: DBID!, $comment: String!) {
 	commentOnFeedEvent(feedEventId: $feedEventId, comment: $comment) {
 		__typename
@@ -8612,7 +8612,17 @@ mutation commentOnFeedEventMutation ($feedEventId: DBID!, $comment: String!) {
 		}
 	}
 }
-`,
+`
+
+func commentOnFeedEventMutation(
+	ctx context.Context,
+	client graphql.Client,
+	feedEventId persist.DBID,
+	comment string,
+) (*commentOnFeedEventMutationResponse, error) {
+	req := &graphql.Request{
+		OpName: "commentOnFeedEventMutation",
+		Query:  commentOnFeedEventMutation_Operation,
 		Variables: &__commentOnFeedEventMutationInput{
 			FeedEventId: feedEventId,
 			Comment:     comment,
@@ -8632,15 +8642,8 @@ mutation commentOnFeedEventMutation ($feedEventId: DBID!, $comment: String!) {
 	return &data, err
 }
 
-func connectSocialAccount(
-	ctx context.Context,
-	client graphql.Client,
-	auth SocialAuthMechanism,
-	display bool,
-) (*connectSocialAccountResponse, error) {
-	req := &graphql.Request{
-		OpName: "connectSocialAccount",
-		Query: `
+// The query or mutation executed by connectSocialAccount.
+const connectSocialAccount_Operation = `
 mutation connectSocialAccount ($auth: SocialAuthMechanism!, $display: Boolean!) {
 	connectSocialAccount(input: $auth, display: $display) {
 		__typename
@@ -8660,7 +8663,17 @@ mutation connectSocialAccount ($auth: SocialAuthMechanism!, $display: Boolean!) 
 		}
 	}
 }
-`,
+`
+
+func connectSocialAccount(
+	ctx context.Context,
+	client graphql.Client,
+	auth SocialAuthMechanism,
+	display bool,
+) (*connectSocialAccountResponse, error) {
+	req := &graphql.Request{
+		OpName: "connectSocialAccount",
+		Query:  connectSocialAccount_Operation,
 		Variables: &__connectSocialAccountInput{
 			Auth:    auth,
 			Display: display,
@@ -8680,14 +8693,8 @@ mutation connectSocialAccount ($auth: SocialAuthMechanism!, $display: Boolean!) 
 	return &data, err
 }
 
-func createCollectionMutation(
-	ctx context.Context,
-	client graphql.Client,
-	input CreateCollectionInput,
-) (*createCollectionMutationResponse, error) {
-	req := &graphql.Request{
-		OpName: "createCollectionMutation",
-		Query: `
+// The query or mutation executed by createCollectionMutation.
+const createCollectionMutation_Operation = `
 mutation createCollectionMutation ($input: CreateCollectionInput!) {
 	createCollection(input: $input) {
 		__typename
@@ -8708,7 +8715,16 @@ mutation createCollectionMutation ($input: CreateCollectionInput!) {
 		}
 	}
 }
-`,
+`
+
+func createCollectionMutation(
+	ctx context.Context,
+	client graphql.Client,
+	input CreateCollectionInput,
+) (*createCollectionMutationResponse, error) {
+	req := &graphql.Request{
+		OpName: "createCollectionMutation",
+		Query:  createCollectionMutation_Operation,
 		Variables: &__createCollectionMutationInput{
 			Input: input,
 		},
@@ -8727,14 +8743,8 @@ mutation createCollectionMutation ($input: CreateCollectionInput!) {
 	return &data, err
 }
 
-func createGalleryMutation(
-	ctx context.Context,
-	client graphql.Client,
-	input CreateGalleryInput,
-) (*createGalleryMutationResponse, error) {
-	req := &graphql.Request{
-		OpName: "createGalleryMutation",
-		Query: `
+// The query or mutation executed by createGalleryMutation.
+const createGalleryMutation_Operation = `
 mutation createGalleryMutation ($input: CreateGalleryInput!) {
 	createGallery(input: $input) {
 		__typename
@@ -8752,7 +8762,16 @@ mutation createGalleryMutation ($input: CreateGalleryInput!) {
 		}
 	}
 }
-`,
+`
+
+func createGalleryMutation(
+	ctx context.Context,
+	client graphql.Client,
+	input CreateGalleryInput,
+) (*createGalleryMutationResponse, error) {
+	req := &graphql.Request{
+		OpName: "createGalleryMutation",
+		Query:  createGalleryMutation_Operation,
 		Variables: &__createGalleryMutationInput{
 			Input: input,
 		},
@@ -8771,15 +8790,8 @@ mutation createGalleryMutation ($input: CreateGalleryInput!) {
 	return &data, err
 }
 
-func createUserMutation(
-	ctx context.Context,
-	client graphql.Client,
-	authMechanism AuthMechanism,
-	input CreateUserInput,
-) (*createUserMutationResponse, error) {
-	req := &graphql.Request{
-		OpName: "createUserMutation",
-		Query: `
+// The query or mutation executed by createUserMutation.
+const createUserMutation_Operation = `
 mutation createUserMutation ($authMechanism: AuthMechanism!, $input: CreateUserInput!) {
 	createUser(authMechanism: $authMechanism, input: $input) {
 		__typename
@@ -8801,7 +8813,17 @@ mutation createUserMutation ($authMechanism: AuthMechanism!, $input: CreateUserI
 		}
 	}
 }
-`,
+`
+
+func createUserMutation(
+	ctx context.Context,
+	client graphql.Client,
+	authMechanism AuthMechanism,
+	input CreateUserInput,
+) (*createUserMutationResponse, error) {
+	req := &graphql.Request{
+		OpName: "createUserMutation",
+		Query:  createUserMutation_Operation,
 		Variables: &__createUserMutationInput{
 			AuthMechanism: authMechanism,
 			Input:         input,
@@ -8821,14 +8843,8 @@ mutation createUserMutation ($authMechanism: AuthMechanism!, $input: CreateUserI
 	return &data, err
 }
 
-func disconnectSocialAccount(
-	ctx context.Context,
-	client graphql.Client,
-	accountType SocialAccountType,
-) (*disconnectSocialAccountResponse, error) {
-	req := &graphql.Request{
-		OpName: "disconnectSocialAccount",
-		Query: `
+// The query or mutation executed by disconnectSocialAccount.
+const disconnectSocialAccount_Operation = `
 mutation disconnectSocialAccount ($accountType: SocialAccountType!) {
 	disconnectSocialAccount(accountType: $accountType) {
 		__typename
@@ -8847,7 +8863,16 @@ mutation disconnectSocialAccount ($accountType: SocialAccountType!) {
 		}
 	}
 }
-`,
+`
+
+func disconnectSocialAccount(
+	ctx context.Context,
+	client graphql.Client,
+	accountType SocialAccountType,
+) (*disconnectSocialAccountResponse, error) {
+	req := &graphql.Request{
+		OpName: "disconnectSocialAccount",
+		Query:  disconnectSocialAccount_Operation,
 		Variables: &__disconnectSocialAccountInput{
 			AccountType: accountType,
 		},
@@ -8866,14 +8891,8 @@ mutation disconnectSocialAccount ($accountType: SocialAccountType!) {
 	return &data, err
 }
 
-func getAuthNonceMutation(
-	ctx context.Context,
-	client graphql.Client,
-	input ChainAddressInput,
-) (*getAuthNonceMutationResponse, error) {
-	req := &graphql.Request{
-		OpName: "getAuthNonceMutation",
-		Query: `
+// The query or mutation executed by getAuthNonceMutation.
+const getAuthNonceMutation_Operation = `
 mutation getAuthNonceMutation ($input: ChainAddressInput!) {
 	getAuthNonce(chainAddress: $input) {
 		__typename
@@ -8887,7 +8906,16 @@ mutation getAuthNonceMutation ($input: ChainAddressInput!) {
 		}
 	}
 }
-`,
+`
+
+func getAuthNonceMutation(
+	ctx context.Context,
+	client graphql.Client,
+	input ChainAddressInput,
+) (*getAuthNonceMutationResponse, error) {
+	req := &graphql.Request{
+		OpName: "getAuthNonceMutation",
+		Query:  getAuthNonceMutation_Operation,
 		Variables: &__getAuthNonceMutationInput{
 			Input: input,
 		},
@@ -8906,14 +8934,8 @@ mutation getAuthNonceMutation ($input: ChainAddressInput!) {
 	return &data, err
 }
 
-func globalFeedQuery(
-	ctx context.Context,
-	client graphql.Client,
-	first *int,
-) (*globalFeedQueryResponse, error) {
-	req := &graphql.Request{
-		OpName: "globalFeedQuery",
-		Query: `
+// The query or mutation executed by globalFeedQuery.
+const globalFeedQuery_Operation = `
 query globalFeedQuery ($first: Int) {
 	globalFeed(first: $first) {
 		edges {
@@ -8930,7 +8952,16 @@ query globalFeedQuery ($first: Int) {
 		}
 	}
 }
-`,
+`
+
+func globalFeedQuery(
+	ctx context.Context,
+	client graphql.Client,
+	first *int,
+) (*globalFeedQueryResponse, error) {
+	req := &graphql.Request{
+		OpName: "globalFeedQuery",
+		Query:  globalFeedQuery_Operation,
 		Variables: &__globalFeedQueryInput{
 			First: first,
 		},
@@ -8949,14 +8980,8 @@ query globalFeedQuery ($first: Int) {
 	return &data, err
 }
 
-func loginMutation(
-	ctx context.Context,
-	client graphql.Client,
-	authMechanism AuthMechanism,
-) (*loginMutationResponse, error) {
-	req := &graphql.Request{
-		OpName: "loginMutation",
-		Query: `
+// The query or mutation executed by loginMutation.
+const loginMutation_Operation = `
 mutation loginMutation ($authMechanism: AuthMechanism!) {
 	login(authMechanism: $authMechanism) {
 		__typename
@@ -8974,7 +8999,16 @@ mutation loginMutation ($authMechanism: AuthMechanism!) {
 		}
 	}
 }
-`,
+`
+
+func loginMutation(
+	ctx context.Context,
+	client graphql.Client,
+	authMechanism AuthMechanism,
+) (*loginMutationResponse, error) {
+	req := &graphql.Request{
+		OpName: "loginMutation",
+		Query:  loginMutation_Operation,
 		Variables: &__loginMutationInput{
 			AuthMechanism: authMechanism,
 		},
@@ -8993,13 +9027,8 @@ mutation loginMutation ($authMechanism: AuthMechanism!) {
 	return &data, err
 }
 
-func logoutMutation(
-	ctx context.Context,
-	client graphql.Client,
-) (*logoutMutationResponse, error) {
-	req := &graphql.Request{
-		OpName: "logoutMutation",
-		Query: `
+// The query or mutation executed by logoutMutation.
+const logoutMutation_Operation = `
 mutation logoutMutation {
 	logout {
 		viewer {
@@ -9010,7 +9039,15 @@ mutation logoutMutation {
 		}
 	}
 }
-`,
+`
+
+func logoutMutation(
+	ctx context.Context,
+	client graphql.Client,
+) (*logoutMutationResponse, error) {
+	req := &graphql.Request{
+		OpName: "logoutMutation",
+		Query:  logoutMutation_Operation,
 	}
 	var err error
 
@@ -9026,14 +9063,8 @@ mutation logoutMutation {
 	return &data, err
 }
 
-func moveCollectionToGallery(
-	ctx context.Context,
-	client graphql.Client,
-	input MoveCollectionToGalleryInput,
-) (*moveCollectionToGalleryResponse, error) {
-	req := &graphql.Request{
-		OpName: "moveCollectionToGallery",
-		Query: `
+// The query or mutation executed by moveCollectionToGallery.
+const moveCollectionToGallery_Operation = `
 mutation moveCollectionToGallery ($input: MoveCollectionToGalleryInput!) {
 	moveCollectionToGallery(input: $input) {
 		__typename
@@ -9057,7 +9088,16 @@ mutation moveCollectionToGallery ($input: MoveCollectionToGalleryInput!) {
 		}
 	}
 }
-`,
+`
+
+func moveCollectionToGallery(
+	ctx context.Context,
+	client graphql.Client,
+	input MoveCollectionToGalleryInput,
+) (*moveCollectionToGalleryResponse, error) {
+	req := &graphql.Request{
+		OpName: "moveCollectionToGallery",
+		Query:  moveCollectionToGallery_Operation,
 		Variables: &__moveCollectionToGalleryInput{
 			Input: input,
 		},
@@ -9076,14 +9116,8 @@ mutation moveCollectionToGallery ($input: MoveCollectionToGalleryInput!) {
 	return &data, err
 }
 
-func publishGalleryMutation(
-	ctx context.Context,
-	client graphql.Client,
-	input PublishGalleryInput,
-) (*publishGalleryMutationResponse, error) {
-	req := &graphql.Request{
-		OpName: "publishGalleryMutation",
-		Query: `
+// The query or mutation executed by publishGalleryMutation.
+const publishGalleryMutation_Operation = `
 mutation publishGalleryMutation ($input: PublishGalleryInput!) {
 	publishGallery(input: $input) {
 		__typename
@@ -9098,7 +9132,16 @@ mutation publishGalleryMutation ($input: PublishGalleryInput!) {
 		}
 	}
 }
-`,
+`
+
+func publishGalleryMutation(
+	ctx context.Context,
+	client graphql.Client,
+	input PublishGalleryInput,
+) (*publishGalleryMutationResponse, error) {
+	req := &graphql.Request{
+		OpName: "publishGalleryMutation",
+		Query:  publishGalleryMutation_Operation,
 		Variables: &__publishGalleryMutationInput{
 			Input: input,
 		},
@@ -9117,14 +9160,8 @@ mutation publishGalleryMutation ($input: PublishGalleryInput!) {
 	return &data, err
 }
 
-func removeUserWalletsMutation(
-	ctx context.Context,
-	client graphql.Client,
-	walletIds []persist.DBID,
-) (*removeUserWalletsMutationResponse, error) {
-	req := &graphql.Request{
-		OpName: "removeUserWalletsMutation",
-		Query: `
+// The query or mutation executed by removeUserWalletsMutation.
+const removeUserWalletsMutation_Operation = `
 mutation removeUserWalletsMutation ($walletIds: [DBID!]!) {
 	removeUserWallets(walletIds: $walletIds) {
 		__typename
@@ -9147,7 +9184,16 @@ mutation removeUserWalletsMutation ($walletIds: [DBID!]!) {
 		}
 	}
 }
-`,
+`
+
+func removeUserWalletsMutation(
+	ctx context.Context,
+	client graphql.Client,
+	walletIds []persist.DBID,
+) (*removeUserWalletsMutationResponse, error) {
+	req := &graphql.Request{
+		OpName: "removeUserWalletsMutation",
+		Query:  removeUserWalletsMutation_Operation,
 		Variables: &__removeUserWalletsMutationInput{
 			WalletIds: walletIds,
 		},
@@ -9166,14 +9212,8 @@ mutation removeUserWalletsMutation ($walletIds: [DBID!]!) {
 	return &data, err
 }
 
-func syncTokensMutation(
-	ctx context.Context,
-	client graphql.Client,
-	chains []Chain,
-) (*syncTokensMutationResponse, error) {
-	req := &graphql.Request{
-		OpName: "syncTokensMutation",
-		Query: `
+// The query or mutation executed by syncTokensMutation.
+const syncTokensMutation_Operation = `
 mutation syncTokensMutation ($chains: [Chain!]) {
 	syncTokens(chains: $chains) {
 		__typename
@@ -9245,7 +9285,16 @@ mutation syncTokensMutation ($chains: [Chain!]) {
 		}
 	}
 }
-`,
+`
+
+func syncTokensMutation(
+	ctx context.Context,
+	client graphql.Client,
+	chains []Chain,
+) (*syncTokensMutationResponse, error) {
+	req := &graphql.Request{
+		OpName: "syncTokensMutation",
+		Query:  syncTokensMutation_Operation,
 		Variables: &__syncTokensMutationInput{
 			Chains: chains,
 		},
@@ -9264,14 +9313,8 @@ mutation syncTokensMutation ($chains: [Chain!]) {
 	return &data, err
 }
 
-func trendingFeedQuery(
-	ctx context.Context,
-	client graphql.Client,
-	last *int,
-) (*trendingFeedQueryResponse, error) {
-	req := &graphql.Request{
-		OpName: "trendingFeedQuery",
-		Query: `
+// The query or mutation executed by trendingFeedQuery.
+const trendingFeedQuery_Operation = `
 query trendingFeedQuery ($last: Int) {
 	trendingFeed(last: $last) {
 		edges {
@@ -9288,7 +9331,16 @@ query trendingFeedQuery ($last: Int) {
 		}
 	}
 }
-`,
+`
+
+func trendingFeedQuery(
+	ctx context.Context,
+	client graphql.Client,
+	last *int,
+) (*trendingFeedQueryResponse, error) {
+	req := &graphql.Request{
+		OpName: "trendingFeedQuery",
+		Query:  trendingFeedQuery_Operation,
 		Variables: &__trendingFeedQueryInput{
 			Last: last,
 		},
@@ -9307,14 +9359,8 @@ query trendingFeedQuery ($last: Int) {
 	return &data, err
 }
 
-func trendingUsersQuery(
-	ctx context.Context,
-	client graphql.Client,
-	input TrendingUsersInput,
-) (*trendingUsersQueryResponse, error) {
-	req := &graphql.Request{
-		OpName: "trendingUsersQuery",
-		Query: `
+// The query or mutation executed by trendingUsersQuery.
+const trendingUsersQuery_Operation = `
 query trendingUsersQuery ($input: TrendingUsersInput!) {
 	trendingUsers(input: $input) {
 		__typename
@@ -9325,7 +9371,16 @@ query trendingUsersQuery ($input: TrendingUsersInput!) {
 		}
 	}
 }
-`,
+`
+
+func trendingUsersQuery(
+	ctx context.Context,
+	client graphql.Client,
+	input TrendingUsersInput,
+) (*trendingUsersQueryResponse, error) {
+	req := &graphql.Request{
+		OpName: "trendingUsersQuery",
+		Query:  trendingUsersQuery_Operation,
 		Variables: &__trendingUsersQueryInput{
 			Input: input,
 		},
@@ -9344,14 +9399,8 @@ query trendingUsersQuery ($input: TrendingUsersInput!) {
 	return &data, err
 }
 
-func updateGalleryMutation(
-	ctx context.Context,
-	client graphql.Client,
-	input UpdateGalleryInput,
-) (*updateGalleryMutationResponse, error) {
-	req := &graphql.Request{
-		OpName: "updateGalleryMutation",
-		Query: `
+// The query or mutation executed by updateGalleryMutation.
+const updateGalleryMutation_Operation = `
 mutation updateGalleryMutation ($input: UpdateGalleryInput!) {
 	updateGallery(input: $input) {
 		__typename
@@ -9373,7 +9422,16 @@ mutation updateGalleryMutation ($input: UpdateGalleryInput!) {
 		}
 	}
 }
-`,
+`
+
+func updateGalleryMutation(
+	ctx context.Context,
+	client graphql.Client,
+	input UpdateGalleryInput,
+) (*updateGalleryMutationResponse, error) {
+	req := &graphql.Request{
+		OpName: "updateGalleryMutation",
+		Query:  updateGalleryMutation_Operation,
 		Variables: &__updateGalleryMutationInput{
 			Input: input,
 		},
@@ -9392,14 +9450,8 @@ mutation updateGalleryMutation ($input: UpdateGalleryInput!) {
 	return &data, err
 }
 
-func updateSocialAccountDisplayed(
-	ctx context.Context,
-	client graphql.Client,
-	input UpdateSocialAccountDisplayedInput,
-) (*updateSocialAccountDisplayedResponse, error) {
-	req := &graphql.Request{
-		OpName: "updateSocialAccountDisplayed",
-		Query: `
+// The query or mutation executed by updateSocialAccountDisplayed.
+const updateSocialAccountDisplayed_Operation = `
 mutation updateSocialAccountDisplayed ($input: UpdateSocialAccountDisplayedInput!) {
 	updateSocialAccountDisplayed(input: $input) {
 		__typename
@@ -9419,7 +9471,16 @@ mutation updateSocialAccountDisplayed ($input: UpdateSocialAccountDisplayedInput
 		}
 	}
 }
-`,
+`
+
+func updateSocialAccountDisplayed(
+	ctx context.Context,
+	client graphql.Client,
+	input UpdateSocialAccountDisplayedInput,
+) (*updateSocialAccountDisplayedResponse, error) {
+	req := &graphql.Request{
+		OpName: "updateSocialAccountDisplayed",
+		Query:  updateSocialAccountDisplayed_Operation,
 		Variables: &__updateSocialAccountDisplayedInput{
 			Input: input,
 		},
@@ -9438,14 +9499,8 @@ mutation updateSocialAccountDisplayed ($input: UpdateSocialAccountDisplayedInput
 	return &data, err
 }
 
-func updateUserExperience(
-	ctx context.Context,
-	client graphql.Client,
-	input UpdateUserExperienceInput,
-) (*updateUserExperienceResponse, error) {
-	req := &graphql.Request{
-		OpName: "updateUserExperience",
-		Query: `
+// The query or mutation executed by updateUserExperience.
+const updateUserExperience_Operation = `
 mutation updateUserExperience ($input: UpdateUserExperienceInput!) {
 	updateUserExperience(input: $input) {
 		__typename
@@ -9463,7 +9518,16 @@ mutation updateUserExperience ($input: UpdateUserExperienceInput!) {
 		}
 	}
 }
-`,
+`
+
+func updateUserExperience(
+	ctx context.Context,
+	client graphql.Client,
+	input UpdateUserExperienceInput,
+) (*updateUserExperienceResponse, error) {
+	req := &graphql.Request{
+		OpName: "updateUserExperience",
+		Query:  updateUserExperience_Operation,
 		Variables: &__updateUserExperienceInput{
 			Input: input,
 		},
@@ -9482,14 +9546,8 @@ mutation updateUserExperience ($input: UpdateUserExperienceInput!) {
 	return &data, err
 }
 
-func userByAddressQuery(
-	ctx context.Context,
-	client graphql.Client,
-	input ChainAddressInput,
-) (*userByAddressQueryResponse, error) {
-	req := &graphql.Request{
-		OpName: "userByAddressQuery",
-		Query: `
+// The query or mutation executed by userByAddressQuery.
+const userByAddressQuery_Operation = `
 query userByAddressQuery ($input: ChainAddressInput!) {
 	userByAddress(chainAddress: $input) {
 		__typename
@@ -9503,7 +9561,16 @@ query userByAddressQuery ($input: ChainAddressInput!) {
 		}
 	}
 }
-`,
+`
+
+func userByAddressQuery(
+	ctx context.Context,
+	client graphql.Client,
+	input ChainAddressInput,
+) (*userByAddressQueryResponse, error) {
+	req := &graphql.Request{
+		OpName: "userByAddressQuery",
+		Query:  userByAddressQuery_Operation,
 		Variables: &__userByAddressQueryInput{
 			Input: input,
 		},
@@ -9522,14 +9589,8 @@ query userByAddressQuery ($input: ChainAddressInput!) {
 	return &data, err
 }
 
-func userByIdQuery(
-	ctx context.Context,
-	client graphql.Client,
-	id persist.DBID,
-) (*userByIdQueryResponse, error) {
-	req := &graphql.Request{
-		OpName: "userByIdQuery",
-		Query: `
+// The query or mutation executed by userByIdQuery.
+const userByIdQuery_Operation = `
 query userByIdQuery ($id: DBID!) {
 	userById(id: $id) {
 		__typename
@@ -9548,7 +9609,16 @@ query userByIdQuery ($id: DBID!) {
 		}
 	}
 }
-`,
+`
+
+func userByIdQuery(
+	ctx context.Context,
+	client graphql.Client,
+	id persist.DBID,
+) (*userByIdQueryResponse, error) {
+	req := &graphql.Request{
+		OpName: "userByIdQuery",
+		Query:  userByIdQuery_Operation,
 		Variables: &__userByIdQueryInput{
 			Id: id,
 		},
@@ -9567,14 +9637,8 @@ query userByIdQuery ($id: DBID!) {
 	return &data, err
 }
 
-func userByUsernameQuery(
-	ctx context.Context,
-	client graphql.Client,
-	user string,
-) (*userByUsernameQueryResponse, error) {
-	req := &graphql.Request{
-		OpName: "userByUsernameQuery",
-		Query: `
+// The query or mutation executed by userByUsernameQuery.
+const userByUsernameQuery_Operation = `
 query userByUsernameQuery ($user: String!) {
 	userByUsername(username: $user) {
 		__typename
@@ -9588,7 +9652,16 @@ query userByUsernameQuery ($user: String!) {
 		}
 	}
 }
-`,
+`
+
+func userByUsernameQuery(
+	ctx context.Context,
+	client graphql.Client,
+	user string,
+) (*userByUsernameQueryResponse, error) {
+	req := &graphql.Request{
+		OpName: "userByUsernameQuery",
+		Query:  userByUsernameQuery_Operation,
 		Variables: &__userByUsernameQueryInput{
 			User: user,
 		},
@@ -9607,14 +9680,8 @@ query userByUsernameQuery ($user: String!) {
 	return &data, err
 }
 
-func viewGalleryMutation(
-	ctx context.Context,
-	client graphql.Client,
-	galleryId persist.DBID,
-) (*viewGalleryMutationResponse, error) {
-	req := &graphql.Request{
-		OpName: "viewGalleryMutation",
-		Query: `
+// The query or mutation executed by viewGalleryMutation.
+const viewGalleryMutation_Operation = `
 mutation viewGalleryMutation ($galleryId: DBID!) {
 	viewGallery(galleryId: $galleryId) {
 		__typename
@@ -9629,7 +9696,16 @@ mutation viewGalleryMutation ($galleryId: DBID!) {
 		}
 	}
 }
-`,
+`
+
+func viewGalleryMutation(
+	ctx context.Context,
+	client graphql.Client,
+	galleryId persist.DBID,
+) (*viewGalleryMutationResponse, error) {
+	req := &graphql.Request{
+		OpName: "viewGalleryMutation",
+		Query:  viewGalleryMutation_Operation,
 		Variables: &__viewGalleryMutationInput{
 			GalleryId: galleryId,
 		},
@@ -9648,13 +9724,8 @@ mutation viewGalleryMutation ($galleryId: DBID!) {
 	return &data, err
 }
 
-func viewerQuery(
-	ctx context.Context,
-	client graphql.Client,
-) (*viewerQueryResponse, error) {
-	req := &graphql.Request{
-		OpName: "viewerQuery",
-		Query: `
+// The query or mutation executed by viewerQuery.
+const viewerQuery_Operation = `
 query viewerQuery {
 	viewer {
 		__typename
@@ -9730,7 +9801,15 @@ query viewerQuery {
 		}
 	}
 }
-`,
+`
+
+func viewerQuery(
+	ctx context.Context,
+	client graphql.Client,
+) (*viewerQueryResponse, error) {
+	req := &graphql.Request{
+		OpName: "viewerQuery",
+		Query:  viewerQuery_Operation,
 	}
 	var err error
 
