@@ -124,7 +124,7 @@ func graphqlHandler(repos *postgres.Repositories, queries *db.Queries, ethClient
 		return publicapi.New(ctx, disableDataloaderCaching, repos, queries, ethClient, ipfsClient, arweaveClient, storageClient, mp, taskClient, throttler, secrets, apqCache, feedCache, socialCache, magicClient)
 	}
 
-	notificationsHandler := notifications.New(queries, pub, lock)
+	notificationsHandler := notifications.New(queries, pub, taskClient, lock)
 
 	h.AroundFields(graphql.MutationCachingHandler(newPublicAPI))
 

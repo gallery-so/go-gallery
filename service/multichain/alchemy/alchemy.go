@@ -412,10 +412,14 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 }
 
 func (d *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, ownerAddress persist.Address, contractAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	url := fmt.Sprintf("%s/getNFTsForCollection?contractAddress=%s&withMetadata=true&tokenUriTimeoutInMs=20000", d.alchemyAPIURL, contractAddress)
-	tokens, err := getNFTsPaginate(ctx, url, 100, "startToken", limit, offset, "", d.httpClient, &getNFTsForCollectionWithOwnerResponse{owner: persist.EthereumAddress(ownerAddress), d: d, ctx: ctx})
+	url := fmt.Sprintf("%s/getNFTs?contractAddresses[]=%s&owner=%s&withMetadata=true&tokenUriTimeoutInMs=20000", d.alchemyAPIURL, contractAddress, ownerAddress)
+	tokens, err := getNFTsPaginate(ctx, url, 100, "startToken", limit, offset, "", d.httpClient, &getNFTsResponse{})
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
+	}
+
+	if len(tokens) == 0 {
+		return []multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, nil
 	}
 
 	cTokens, cContracts, err := d.alchemyTokensToChainAgnosticTokens(ctx, tokens)

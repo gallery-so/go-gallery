@@ -7,7 +7,6 @@ package graphql
 import (
 	"context"
 	"fmt"
-
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	emailService "github.com/mikeydub/go-gallery/emails"
@@ -15,6 +14,7 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/emails"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/persist"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
@@ -985,7 +985,15 @@ func (r *mutationResolver) Login(ctx context.Context, authMechanism model.AuthMe
 }
 
 // Logout is the resolver for the logout field.
-func (r *mutationResolver) Logout(ctx context.Context) (*model.LogoutPayload, error) {
+func (r *mutationResolver) Logout(ctx context.Context, pushTokenToUnregister *string) (*model.LogoutPayload, error) {
+	if pushTokenToUnregister != nil {
+		err := publicapi.For(ctx).User.DeletePushTokenByPushToken(ctx, *pushTokenToUnregister)
+		if err != nil {
+			logger.For(ctx).Info("failed to delete push token %s on logout: %s\n", *pushTokenToUnregister, err)
+			return nil, err
+		}
+	}
+
 	publicapi.For(ctx).Auth.Logout(ctx)
 
 	output := &model.LogoutPayload{

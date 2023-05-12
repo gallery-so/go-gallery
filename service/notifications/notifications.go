@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/service/task"
 	"time"
 
+	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"cloud.google.com/go/pubsub"
 	"github.com/bsm/redislock"
 	"github.com/gin-gonic/gin"
@@ -39,12 +42,12 @@ type NotificationHandlers struct {
 }
 
 // New registers specific notification handlers
-func New(queries *db.Queries, pub *pubsub.Client, lock *redislock.Client) *NotificationHandlers {
+func New(queries *db.Queries, pub *pubsub.Client, taskClient *cloudtasks.Client, lock *redislock.Client) *NotificationHandlers {
 	notifDispatcher := notificationDispatcher{handlers: map[persist.Action]notificationHandler{}, lock: lock}
 
-	def := defaultNotificationHandler{queries: queries, pubSub: pub}
-	group := groupedNotificationHandler{queries: queries, pubSub: pub}
-	view := viewedNotificationHandler{queries: queries, pubSub: pub}
+	def := defaultNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient}
+	group := groupedNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient}
+	view := viewedNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient}
 
 	// grouped notification actions
 	notifDispatcher.AddHandler(persist.ActionUserFollowedUsers, group)
@@ -137,17 +140,19 @@ func (d *notificationDispatcher) Dispatch(ctx context.Context, notif db.Notifica
 }
 
 type defaultNotificationHandler struct {
-	queries *coredb.Queries
-	pubSub  *pubsub.Client
+	queries    *coredb.Queries
+	pubSub     *pubsub.Client
+	taskClient *cloudtasks.Client
 }
 
 func (h defaultNotificationHandler) Handle(ctx context.Context, notif db.Notification) error {
-	return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub)
+	return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub, h.taskClient)
 }
 
 type groupedNotificationHandler struct {
-	queries *coredb.Queries
-	pubSub  *pubsub.Client
+	queries    *coredb.Queries
+	pubSub     *pubsub.Client
+	taskClient *cloudtasks.Client
 }
 
 func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notification) error {
@@ -171,16 +176,17 @@ func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notific
 
 	if time.Since(curNotif.CreatedAt) < groupedWindow {
 		logger.For(ctx).Infof("grouping notification %s: %s-%s", curNotif.ID, notif.Action, notif.OwnerID)
-		return updateAndPublishNotif(ctx, notif, curNotif, h.queries, h.pubSub)
+		return updateAndPublishNotif(ctx, notif, curNotif, h.queries, h.pubSub, h.taskClient)
 	}
 	logger.For(ctx).Infof("not grouping notification: %s-%s", notif.Action, notif.OwnerID)
-	return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub)
+	return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub, h.taskClient)
 
 }
 
 type viewedNotificationHandler struct {
-	queries *coredb.Queries
-	pubSub  *pubsub.Client
+	queries    *coredb.Queries
+	pubSub     *pubsub.Client
+	taskClient *cloudtasks.Client
 }
 
 // will return the beginning of the week (sunday) in PST
@@ -210,7 +216,7 @@ func (h viewedNotificationHandler) Handle(ctx context.Context, notif db.Notifica
 	if notifs == nil || len(notifs) == 0 {
 		// if there are no notifications this week, then we definitely are going to insert this one
 		logger.For(ctx).Debugf("no notifications this week, inserting: %s-%s", notif.Action, notif.OwnerID)
-		return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub)
+		return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub, h.taskClient)
 	}
 
 	mostRecentNotif := notifs[0]
@@ -259,10 +265,10 @@ func (h viewedNotificationHandler) Handle(ctx context.Context, notif db.Notifica
 	// if the most recent notification in the last week is within the grouping window then we will update it, if not, insert it
 	if time.Since(mostRecentNotif.CreatedAt) < viewWindow {
 		logger.For(ctx).Debugf("grouping notification %s: %s-%s", mostRecentNotif.ID, notif.Action, notif.OwnerID)
-		return updateAndPublishNotif(ctx, notif, mostRecentNotif, h.queries, h.pubSub)
+		return updateAndPublishNotif(ctx, notif, mostRecentNotif, h.queries, h.pubSub, h.taskClient)
 	}
 	logger.For(ctx).Debugf("not grouping notification: %s-%s", notif.Action, notif.OwnerID)
-	return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub)
+	return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub, h.taskClient)
 }
 
 // subscribe returns a subscription to the given topic
@@ -363,10 +369,134 @@ func (n *NotificationHandlers) receiveUpdatedNotificationsFromPubSub() {
 	}
 }
 
-func insertAndPublishNotif(ctx context.Context, notif db.Notification, queries *db.Queries, ps *pubsub.Client) error {
+func notificationToPushMessage(ctx context.Context, notif db.Notification, queries *db.Queries) (task.PushNotificationMessage, error) {
+	badgeCount, badgeErr := queries.CountUserUnseenNotifications(ctx, notif.OwnerID)
+	if badgeErr != nil {
+		return task.PushNotificationMessage{}, badgeErr
+	}
+
+	message := task.PushNotificationMessage{
+		Title: "Gallery",
+		Sound: true,
+		Badge: int(badgeCount),
+		Data: map[string]any{
+			"action":          notif.Action,
+			"notification_id": notif.ID,
+		},
+	}
+
+	if notif.Action == persist.ActionAdmiredFeedEvent {
+		admirer, err := queries.GetUserById(ctx, notif.Data.AdmirerIDs[0])
+		if err != nil {
+			return task.PushNotificationMessage{}, err
+		}
+
+		if !admirer.Username.Valid {
+			return task.PushNotificationMessage{}, fmt.Errorf("user with ID=%s has no username", admirer.ID)
+		}
+
+		message.Body = fmt.Sprintf("%s admired your activity", admirer.Username.String)
+		return message, nil
+	}
+
+	if notif.Action == persist.ActionCommentedOnFeedEvent {
+		comment, err := queries.GetCommentByCommentID(ctx, notif.CommentID)
+		if err != nil {
+			return task.PushNotificationMessage{}, err
+		}
+
+		commenter, err := queries.GetUserById(ctx, comment.ActorID)
+		if err != nil {
+			return task.PushNotificationMessage{}, err
+		}
+
+		if !commenter.Username.Valid {
+			return task.PushNotificationMessage{}, fmt.Errorf("user with ID=%s has no username", commenter.ID)
+		}
+
+		message.Body = fmt.Sprintf("%s commented on your activity", commenter.Username.String)
+		return message, nil
+	}
+
+	if notif.Action == persist.ActionUserFollowedUsers {
+		follower, err := queries.GetUserById(ctx, notif.Data.FollowerIDs[0])
+		if err != nil {
+			return task.PushNotificationMessage{}, err
+		}
+
+		if !follower.Username.Valid {
+			return task.PushNotificationMessage{}, fmt.Errorf("user with ID=%s has no username", follower.ID)
+		}
+
+		var body string
+		if notif.Data.FollowedBack {
+			body = fmt.Sprintf("%s followed you back", follower.Username.String)
+		} else {
+			body = fmt.Sprintf("%s followed you", follower.Username.String)
+		}
+
+		message.Body = body
+		return message, nil
+	}
+
+	return task.PushNotificationMessage{}, fmt.Errorf("unsupported notification action: %s", notif.Action)
+}
+
+func actionSupportsPushNotifications(action persist.Action) bool {
+	switch action {
+	case persist.ActionAdmiredFeedEvent:
+		return true
+	case persist.ActionCommentedOnFeedEvent:
+		return true
+	case persist.ActionUserFollowedUsers:
+		return true
+	default:
+		return false
+	}
+}
+
+func sendPushNotifications(ctx context.Context, notif db.Notification, queries *db.Queries, taskClient *cloudtasks.Client) error {
+	if !actionSupportsPushNotifications(notif.Action) {
+		return nil
+	}
+
+	pushTokens, err := queries.GetPushTokensByUserID(ctx, notif.OwnerID)
+	if err != nil {
+		return err
+	}
+
+	// Don't try to send anything if the user doesn't have any registered push tokens
+	if len(pushTokens) == 0 {
+		return nil
+	}
+
+	message, err := notificationToPushMessage(ctx, notif, queries)
+	if err != nil {
+		return err
+	}
+
+	for _, token := range pushTokens {
+		toSend := message
+		toSend.PushTokenID = token.ID
+		err = task.CreateTaskForPushNotification(ctx, toSend, taskClient)
+		if err != nil {
+			sentryutil.ReportError(ctx, err)
+			logger.For(ctx).Errorf("failed to create task for push notification: %s", err)
+		}
+	}
+
+	return nil
+}
+
+func insertAndPublishNotif(ctx context.Context, notif db.Notification, queries *db.Queries, ps *pubsub.Client, taskClient *cloudtasks.Client) error {
 	newNotif, err := addNotification(ctx, notif, queries)
 	if err != nil {
 		return fmt.Errorf("failed to create notification: %w", err)
+	}
+
+	err = sendPushNotifications(ctx, notif, queries, taskClient)
+	if err != nil {
+		logger.For(ctx).Errorf("failed to send push notifications for notification with DBID=%s, error: %s", notif.ID, err)
 	}
 
 	marshalled, err := json.Marshal(newNotif)
@@ -384,10 +514,11 @@ func insertAndPublishNotif(ctx context.Context, notif db.Notification, queries *
 	}
 
 	logger.For(ctx).Infof("pushed new notification to pubsub: %s", notif.OwnerID)
+
 	return nil
 }
 
-func updateAndPublishNotif(ctx context.Context, notif db.Notification, mostRecentNotif db.Notification, queries *db.Queries, ps *pubsub.Client) error {
+func updateAndPublishNotif(ctx context.Context, notif db.Notification, mostRecentNotif db.Notification, queries *db.Queries, ps *pubsub.Client, taskClient *cloudtasks.Client) error {
 	amount := notif.Amount
 	resultData := mostRecentNotif.Data.Concat(notif.Data)
 	switch notif.Action {
@@ -411,6 +542,12 @@ func updateAndPublishNotif(ctx context.Context, notif db.Notification, mostRecen
 	if err != nil {
 		return fmt.Errorf("error updating notification: %w", err)
 	}
+
+	err = sendPushNotifications(ctx, notif, queries, taskClient)
+	if err != nil {
+		logger.For(ctx).Errorf("failed to send push notifications for notification with DBID=%s, error: %s", notif.ID, err)
+	}
+
 	updatedNotif, err := queries.GetNotificationByID(ctx, mostRecentNotif.ID)
 	if err != nil {
 		return fmt.Errorf("error getting updated notification by %s: %w", mostRecentNotif.ID, err)
