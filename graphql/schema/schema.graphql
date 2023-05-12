@@ -1343,7 +1343,11 @@ type ErrCommunityNotFound implements Error {
   message: String!
 }
 
-union AuthorizationError = ErrNoCookie | ErrInvalidToken | ErrSessionInvalidated | ErrDoesNotOwnRequiredToken
+union AuthorizationError =
+    ErrNoCookie
+  | ErrInvalidToken
+  | ErrSessionInvalidated
+  | ErrDoesNotOwnRequiredToken
 
 type ErrNotAuthorized implements Error {
   message: String!
