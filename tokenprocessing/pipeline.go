@@ -106,6 +106,7 @@ func (tp *tokenProcessor) ProcessTokenPipeline(c context.Context, t persist.Toke
 
 type runResult struct {
 	MediaType persist.MediaType
+	Chain     persist.Chain
 	Err       error
 }
 
@@ -113,13 +114,17 @@ func (tpj *tokenProcessingJob) run(ctx context.Context) runResult {
 	span, ctx := tracing.StartSpan(ctx, "pipeline.run", fmt.Sprintf("run %s", tpj.id))
 	defer tracing.FinishSpan(span)
 
-	tmedia, err := tpj.createMediaForToken(ctx)
+	media, err := tpj.createMediaForToken(ctx)
 	if err != nil {
 		logger.For(ctx).Errorf("error creating media for token: %s", err)
 	}
 
-	err = tpj.persistResults(ctx, tmedia)
-	return runResult{tmedia.Media.MediaType, err}
+	err = tpj.persistResults(ctx, media)
+	return runResult{
+		Chain:     media.Chain,
+		MediaType: media.Media.MediaType,
+		Err:       err,
+	}
 }
 
 func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (coredb.TokenMedia, error) {
@@ -383,7 +388,10 @@ func recordPipelineEndState(ctx context.Context, mr metric.MetricReporter, r *ru
 	baseOpts := []any{}
 
 	if r != nil {
-		tags := map[string]string{"mediaType": r.MediaType.String()}
+		tags := map[string]string{
+			"chain":     fmt.Sprintf("%d", r.Chain),
+			"mediaType": r.MediaType.String(),
+		}
 		baseOpts = append(baseOpts, metric.LogOptions.WithTags(tags))
 	}
 

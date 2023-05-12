@@ -18,7 +18,7 @@ type MetricReporter struct {
 
 var LogOptions = LogOptionBulder{}
 
-func NewGCPLogMetricReporter() MetricReporter {
+func NewLogMetricReporter() MetricReporter {
 	return MetricReporter{Record: LogMetricReporter{}.Record}
 }
 
