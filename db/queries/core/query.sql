@@ -1057,3 +1057,20 @@ update push_notification_tickets t set check_after = updates.check_after, num_ch
 
 -- name: GetCheckablePushTickets :many
 select * from push_notification_tickets where check_after <= now() and deleted = false limit sqlc.arg('limit');
+
+-- name: UpsertSession :one
+insert into sessions (id, user_id,
+                      created_at, created_with_user_agent, created_with_platform, created_with_os,
+                      last_refreshed, last_user_agent, last_platform, last_os, active_until, invalidated, last_updated, deleted)
+    values (@id, @user_id, now(), @user_agent, @platform, @os, now(), @user_agent, @platform, @os, @active_until, false, now(), false)
+    on conflict (id) where deleted = false do update set
+        last_refreshed = case when invalidated then last_refreshed else excluded.last_refreshed end,
+        last_user_agent = case when invalidated then last_user_agent else excluded.last_user_agent end,
+        last_platform = case when invalidated then last_platform else excluded.last_platform end,
+        last_os = case when invalidated then last_os else excluded.last_os end,
+        last_updated = case when invalidated then last_updated else excluded.last_updated end,
+        active_until = case when invalidated then active_until else greatest(active_until, excluded.active_until) end
+    returning *;
+
+-- name: InvalidateSession :exec
+update sessions set invalidated = true, active_until = now(), last_updated = now() where id = @id and deleted = false and invalidated = false;

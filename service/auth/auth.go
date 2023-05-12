@@ -74,6 +74,8 @@ var ErrInvalidJWT = errors.New("invalid or expired auth token")
 // ErrNoCookie is returned when there is no JWT in the request
 var ErrNoCookie = errors.New("no jwt passed as cookie")
 
+var ErrSessionInvalidated = errors.New("session has been invalidated")
+
 // ErrSignatureInvalid is returned when the signed nonce's signature is invalid
 var ErrSignatureInvalid = errors.New("signature invalid")
 
@@ -308,9 +310,9 @@ func Login(ctx context.Context, queries *db.Queries, authenticator Authenticator
 	return authResult.User.ID, nil
 }
 
-func Logout(ctx context.Context) {
+func Logout(ctx context.Context, queries *db.Queries) {
 	gc := util.MustGetGinContext(ctx)
-	EndSession(gc)
+	EndSession(gc, queries)
 }
 
 // GetAuthNonce will determine whether a user is permitted to log in, and if so, generate a nonce to be signed
@@ -385,8 +387,8 @@ func GetUserWithNonce(pCtx context.Context, pChainAddress persist.ChainAddress, 
 }
 
 // GetSessionIDFromCtx returns the session ID from the context
-func GetSessionIDFromCtx(c *gin.Context) string {
-	return c.MustGet(sessionIDContextKey).(string)
+func GetSessionIDFromCtx(c *gin.Context) persist.DBID {
+	return c.MustGet(sessionIDContextKey).(persist.DBID)
 }
 
 // GetUserIDFromCtx returns the user ID from the context
@@ -409,11 +411,14 @@ func GetAuthErrorFromCtx(c *gin.Context) error {
 	return err.(error)
 }
 
-func setSessionStateForCtx(c *gin.Context, userID persist.DBID, sessionID string) {
+func setSessionStateForCtx(c *gin.Context, userID persist.DBID, sessionID persist.DBID) {
 	if userID == "" || sessionID == "" {
 		logger.For(c).Errorf("attempted to set session state with missing values. userID: %s, sessionID: %s", userID, sessionID)
 		err := errors.New("attempted to set session state with missing values")
+		// We should never be trying to set a session with an empty userID or sessionID. If we find
+		// ourselves here, clear the session and have the user log in again.
 		clearSessionStateForCtx(c, err)
+		clearSessionCookies(c)
 		return
 	}
 
@@ -431,10 +436,15 @@ func clearSessionStateForCtx(c *gin.Context, err error) {
 }
 
 func StartSession(c *gin.Context, queries *db.Queries, userID persist.DBID) error {
-	sessionID := persist.GenerateID().String()
+	sessionID := persist.GenerateID()
 
 	err := issueSessionTokens(c, userID, sessionID, queries)
 	if err != nil {
+		// If we fail to issue tokens to start a new session, the user will need to log in
+		// again (since we were starting a new session and the user doesn't have a valid refresh
+		// token to present during their next request). Clear the session state and cookies.
+		clearSessionStateForCtx(c, err)
+		clearSessionCookies(c)
 		return err
 	}
 
@@ -451,13 +461,7 @@ func ContinueSession(c *gin.Context, queries *db.Queries) error {
 		// it's expected for tokens that were issued prior to the introduction of session IDs.
 		// Can be removed in a month when all existing auth tokens will have expired.
 		if sessionID == "" {
-			sessionID = persist.GenerateID().String()
-			err = issueSessionTokens(c, userID, sessionID, queries)
-			if err != nil {
-				return err
-			}
-
-			return nil
+			return StartSession(c, queries, userID)
 		}
 		// End of temporary handling
 		// ----------------------------------------------------------------------------
@@ -467,83 +471,116 @@ func ContinueSession(c *gin.Context, queries *db.Queries) error {
 	}
 
 	// If the user doesn't have a valid auth cookie or a valid refresh cookie, they can't be
-	// authenticated and they'll have to log in again.
+	// authenticated and they'll have to log in again. Clear their cookies in case they have
+	// expired tokens.
 	userID, sessionID, err = getRefreshToken(c)
 	if err != nil {
 		logger.For(c).Info("no valid auth or refresh cookies found")
 		clearSessionStateForCtx(c, err)
+		clearSessionCookies(c)
 		return err
 	}
 
 	// At this point, the user has a valid refresh cookie, but not a valid auth cookie.
-	// Give them new cookies to continue their existing session.
+	// Issue new tokens to continue their existing session.
 	err = issueSessionTokens(c, userID, sessionID, queries)
 	if err != nil {
+		// If we encountered an error issuing tokens, clear the context state so the user is "unauthenticated"
+		// for the duration of this request.
+		clearSessionStateForCtx(c, err)
+
+		// Under most circumstances, we don't want to clear the user's cookies here to log them out.
+		// They still have a valid refresh cookie that can authenticate their next request, and that
+		// will be lower friction than being forced to log in again. The only exception is
+		// ErrSessionInvalidated, which indicates that the session associated with the refresh token
+		// is no longer available and the user will need to log in again.
+		if err == ErrSessionInvalidated {
+			clearSessionCookies(c)
+		}
+
 		return err
 	}
 
 	return nil
 }
 
-// EndSession clears the state and cookies for the current session. Note that it does not
-// actually invalidate the session, so the session could still be continued in the future
-// if a client continued to use the tokens. We may add this functionality in the future, though;
-// all it would take is a database table of ended session IDs and a cron job to delete entries
-// from the table after the expiration date of the session's last issued refresh token.
-func EndSession(c *gin.Context) {
-	clearCookie(c, RefreshCookieKey)
-	clearCookie(c, AuthCookieKey)
+// EndSession invalidates the current session and clears the user's cookies
+func EndSession(c *gin.Context, queries *db.Queries) {
+	if GetUserAuthedFromCtx(c) {
+		if sessionID := GetSessionIDFromCtx(c); sessionID != "" {
+			if err := queries.InvalidateSession(c, sessionID); err != nil {
+				logger.For(c).Errorf("failed to invalidate session: %s", err)
+			}
+		}
+	}
+
 	clearSessionStateForCtx(c, ErrNoCookie)
+	clearSessionCookies(c)
 }
 
-func issueSessionTokens(c *gin.Context, userID persist.DBID, sessionID string, queries *db.Queries) error {
-	newRefreshToken, err := GenerateRefreshToken(c, userID, sessionID)
+// issueSessionTokens creates new tokens, updates the session in the database, and then sets the new
+// tokens as request cookies and context state. If an error occurs, no changes are made to cookies or
+// context.
+func issueSessionTokens(c *gin.Context, userID persist.DBID, sessionID persist.DBID, queries *db.Queries) error {
+	newRefreshToken, refreshExpiresAt, err := GenerateRefreshToken(c, userID, sessionID)
 	if err != nil {
-		clearSessionStateForCtx(c, err)
 		return err
 	}
 
 	newAuthToken, err := GenerateAuthToken(c, userID, sessionID)
 	if err != nil {
-		clearSessionStateForCtx(c, err)
 		return err
 	}
 
-	// TODO: Update the sessions table here
+	session, err := queries.UpsertSession(c, db.UpsertSessionParams{
+		ID:          sessionID,
+		UserID:      userID,
+		UserAgent:   c.GetHeader("User-Agent"),
+		Platform:    c.GetHeader("X-Platform"),
+		Os:          c.GetHeader("X-OS"),
+		ActiveUntil: refreshExpiresAt,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	if session.Invalidated {
+		return ErrSessionInvalidated
+	}
 
 	setSessionStateForCtx(c, userID, sessionID)
-	setCookie(c, RefreshCookieKey, newRefreshToken)
-	setCookie(c, AuthCookieKey, newAuthToken)
+	setSessionCookies(c, newAuthToken, newRefreshToken)
 
 	return nil
 }
 
-func getAuthToken(c *gin.Context) (persist.DBID, string, error) {
+func setSessionCookies(c *gin.Context, authToken string, refreshToken string) {
+	setCookie(c, AuthCookieKey, authToken)
+	setCookie(c, RefreshCookieKey, refreshToken)
+}
+
+func clearSessionCookies(c *gin.Context) {
+	clearCookie(c, AuthCookieKey)
+	clearCookie(c, RefreshCookieKey)
+}
+
+func getAuthToken(c *gin.Context) (persist.DBID, persist.DBID, error) {
 	authToken, err := getCookie(c, AuthCookieKey)
 	if err != nil {
 		return "", "", err
 	}
 
-	userID, sessionID, err := ParseAuthToken(c, authToken)
-	if err != nil {
-		return "", "", err
-	}
-
-	return userID, sessionID, nil
+	return ParseAuthToken(c, authToken)
 }
 
-func getRefreshToken(c *gin.Context) (persist.DBID, string, error) {
+func getRefreshToken(c *gin.Context) (persist.DBID, persist.DBID, error) {
 	refreshToken, err := getCookie(c, RefreshCookieKey)
 	if err != nil {
 		return "", "", err
 	}
 
-	userID, sessionID, err := ParseRefreshToken(c, refreshToken)
-	if err != nil {
-		return "", "", err
-	}
-
-	return userID, sessionID, nil
+	return ParseRefreshToken(c, refreshToken)
 }
 
 func getCookie(c *gin.Context, cookieName string) (string, error) {

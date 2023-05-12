@@ -4004,6 +4004,15 @@ func (q *Queries) InsertWallet(ctx context.Context, arg InsertWalletParams) erro
 	return err
 }
 
+const invalidateSession = `-- name: InvalidateSession :exec
+update sessions set invalidated = true, active_until = now(), last_updated = now() where id = $1 and deleted = false and invalidated = false
+`
+
+func (q *Queries) InvalidateSession(ctx context.Context, id persist.DBID) error {
+	_, err := q.db.Exec(ctx, invalidateSession, id)
+	return err
+}
+
 const isActorActionActive = `-- name: IsActorActionActive :one
 select exists(
   select 1 from events where deleted = false
@@ -4602,6 +4611,59 @@ type UpdateUserVerificationStatusParams struct {
 func (q *Queries) UpdateUserVerificationStatus(ctx context.Context, arg UpdateUserVerificationStatusParams) error {
 	_, err := q.db.Exec(ctx, updateUserVerificationStatus, arg.ID, arg.EmailVerified)
 	return err
+}
+
+const upsertSession = `-- name: UpsertSession :one
+insert into sessions (id, user_id,
+                      created_at, created_with_user_agent, created_with_platform, created_with_os,
+                      last_refreshed, last_user_agent, last_platform, last_os, active_until, invalidated, last_updated, deleted)
+    values ($1, $2, now(), $3, $4, $5, now(), $3, $4, $5, $6, false, now(), false)
+    on conflict (id) where deleted = false do update set
+        last_refreshed = case when invalidated then last_refreshed else excluded.last_refreshed end,
+        last_user_agent = case when invalidated then last_user_agent else excluded.last_user_agent end,
+        last_platform = case when invalidated then last_platform else excluded.last_platform end,
+        last_os = case when invalidated then last_os else excluded.last_os end,
+        last_updated = case when invalidated then last_updated else excluded.last_updated end,
+        active_until = case when invalidated then active_until else greatest(active_until, excluded.active_until) end
+    returning id, user_id, created_at, created_with_user_agent, created_with_platform, created_with_os, last_refreshed, last_user_agent, last_platform, last_os, active_until, invalidated, last_updated, deleted
+`
+
+type UpsertSessionParams struct {
+	ID          persist.DBID
+	UserID      persist.DBID
+	UserAgent   string
+	Platform    string
+	Os          string
+	ActiveUntil time.Time
+}
+
+func (q *Queries) UpsertSession(ctx context.Context, arg UpsertSessionParams) (Session, error) {
+	row := q.db.QueryRow(ctx, upsertSession,
+		arg.ID,
+		arg.UserID,
+		arg.UserAgent,
+		arg.Platform,
+		arg.Os,
+		arg.ActiveUntil,
+	)
+	var i Session
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.CreatedAt,
+		&i.CreatedWithUserAgent,
+		&i.CreatedWithPlatform,
+		&i.CreatedWithOs,
+		&i.LastRefreshed,
+		&i.LastUserAgent,
+		&i.LastPlatform,
+		&i.LastOs,
+		&i.ActiveUntil,
+		&i.Invalidated,
+		&i.LastUpdated,
+		&i.Deleted,
+	)
+	return i, err
 }
 
 const upsertSocialOAuth = `-- name: UpsertSocialOAuth :exec

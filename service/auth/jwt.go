@@ -25,13 +25,13 @@ type GalleryClaims struct {
 
 type authClaims struct {
 	UserID    persist.DBID `json:"user_id"`
-	SessionID string       `json:"session_id"`
+	SessionID persist.DBID `json:"session_id"`
 	GalleryClaims
 }
 
 type refreshClaims struct {
 	UserID    persist.DBID `json:"user_id"`
-	SessionID string       `json:"session_id"`
+	SessionID persist.DBID `json:"session_id"`
 	GalleryClaims
 }
 
@@ -47,7 +47,7 @@ type emailVerificationClaims struct {
 	GalleryClaims
 }
 
-func GenerateAuthToken(ctx context.Context, userID persist.DBID, sessionID string) (string, error) {
+func GenerateAuthToken(ctx context.Context, userID persist.DBID, sessionID persist.DBID) (string, error) {
 	secret := env.GetString("AUTH_JWT_SECRET")
 	validFor := time.Duration(env.GetInt64("AUTH_JWT_TTL")) * time.Second
 
@@ -60,7 +60,7 @@ func GenerateAuthToken(ctx context.Context, userID persist.DBID, sessionID strin
 	return generateJWT(claims, secret)
 }
 
-func ParseAuthToken(ctx context.Context, token string) (persist.DBID, string, error) {
+func ParseAuthToken(ctx context.Context, token string) (persist.DBID, persist.DBID, error) {
 	claims := authClaims{}
 	parsedToken, err := jwt.ParseWithClaims(token, &claims, keyFunc(env.GetString("AUTH_JWT_SECRET")))
 
@@ -71,7 +71,7 @@ func ParseAuthToken(ctx context.Context, token string) (persist.DBID, string, er
 	return claims.UserID, claims.SessionID, nil
 }
 
-func GenerateRefreshToken(ctx context.Context, userID persist.DBID, sessionID string) (string, error) {
+func GenerateRefreshToken(ctx context.Context, userID persist.DBID, sessionID persist.DBID) (string, time.Time, error) {
 	secret := env.GetString("REFRESH_JWT_SECRET")
 	validFor := time.Duration(env.GetInt64("REFRESH_JWT_TTL")) * time.Second
 
@@ -81,10 +81,13 @@ func GenerateRefreshToken(ctx context.Context, userID persist.DBID, sessionID st
 		GalleryClaims: newGalleryClaims(TokenTypeRefresh, validFor),
 	}
 
-	return generateJWT(claims, secret)
+	jwt, err := generateJWT(claims, secret)
+	expiresAt := time.Now().Add(validFor)
+
+	return jwt, expiresAt, err
 }
 
-func ParseRefreshToken(ctx context.Context, token string) (persist.DBID, string, error) {
+func ParseRefreshToken(ctx context.Context, token string) (persist.DBID, persist.DBID, error) {
 	claims := refreshClaims{}
 	parsedToken, err := jwt.ParseWithClaims(token, &claims, keyFunc(env.GetString("REFRESH_JWT_SECRET")))
 

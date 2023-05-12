@@ -142,7 +142,7 @@ func (api AuthAPI) Login(ctx context.Context, authenticator auth.Authenticator) 
 
 func (api AuthAPI) Logout(ctx context.Context) {
 	// Nothing to validate
-	auth.Logout(ctx)
+	auth.Logout(ctx, api.queries)
 }
 
 func (api AuthAPI) GenerateQRCodeLoginToken(ctx context.Context) (string, error) {

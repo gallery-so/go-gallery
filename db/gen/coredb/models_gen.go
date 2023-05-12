@@ -331,6 +331,23 @@ type ScrubbedPiiForUser struct {
 	PiiSocials      persist.Socials
 }
 
+type Session struct {
+	ID                   persist.DBID
+	UserID               persist.DBID
+	CreatedAt            time.Time
+	CreatedWithUserAgent string
+	CreatedWithPlatform  string
+	CreatedWithOs        string
+	LastRefreshed        time.Time
+	LastUserAgent        string
+	LastPlatform         string
+	LastOs               string
+	ActiveUntil          time.Time
+	Invalidated          bool
+	LastUpdated          time.Time
+	Deleted              bool
+}
+
 type SpamUserScore struct {
 	UserID        persist.DBID
 	Score         int32
