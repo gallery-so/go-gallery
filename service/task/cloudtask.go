@@ -36,19 +36,13 @@ type FeedbotMessage struct {
 type TokenProcessingUserMessage struct {
 	UserID   persist.DBID   `json:"user_id" binding:"required"`
 	TokenIDs []persist.DBID `json:"token_ids" binding:"required"`
+	IsV3     bool           `json:"is_v3" binding:"-"` // V3Migration: Remove when migration is complete
 }
 
 type TokenProcessingContractTokensMessage struct {
 	ContractID   persist.DBID `json:"contract_id" binding:"required"`
 	ForceRefresh bool         `json:"force_refresh"`
-}
-
-// DeepRefreshMessage is the input message to the indexer-api for deep refreshes
-type DeepRefreshMessage struct {
-	OwnerAddress    persist.EthereumAddress `json:"owner_address"`
-	TokenID         persist.TokenID         `json:"token_id"`
-	ContractAddress persist.EthereumAddress `json:"contract_address"`
-	RefreshRange    persist.BlockRange      `json:"refresh_range"`
+	IsV3         bool         `json:"is_v3" binding:"-"` // V3Migration: Remove when migration is complete
 }
 
 type ValidateNFTsMessage struct {
@@ -173,12 +167,9 @@ func CreateTaskForTokenProcessing(ctx context.Context, client *gcptasks.Client, 
 
 	tracing.AddEventDataToSpan(span, map[string]interface{}{"User ID": message.UserID})
 
-	body, err := json.Marshal(message)
-	if err != nil {
-		return err
-	}
-
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
+
+	// V3Migration: Remove when migration is complete
 	task := &taskspb.Task{
 		DispatchDeadline: durationpb.New(time.Minute * 30),
 		MessageType: &taskspb.Task_HttpRequest{
@@ -193,14 +184,16 @@ func CreateTaskForTokenProcessing(ctx context.Context, client *gcptasks.Client, 
 		},
 	}
 
-	err = submitHttpTask(ctx, client, queue, task, body)
+	body, err := json.Marshal(message)
 	if err != nil {
 		return err
 	}
 
-	if env.GetString("ENV") == "local" {
-		return nil
+	err = submitHttpTask(ctx, client, queue, task, body)
+	if err != nil {
+		return err
 	}
+	// V3Migration: End remove
 
 	task = &taskspb.Task{
 		DispatchDeadline: durationpb.New(time.Minute * 30),
@@ -216,7 +209,14 @@ func CreateTaskForTokenProcessing(ctx context.Context, client *gcptasks.Client, 
 		},
 	}
 
-	return submitHttpTask(ctx, client, queue, task, body)
+	v3Message := message
+	v3Message.IsV3 = true
+	v3Body, err := json.Marshal(v3Message)
+	if err != nil {
+		return err
+	}
+
+	return submitHttpTask(ctx, client, queue, task, v3Body)
 }
 
 func CreateTaskForContractOwnerProcessing(ctx context.Context, message TokenProcessingContractTokensMessage, client *gcptasks.Client) error {
@@ -228,6 +228,8 @@ func CreateTaskForContractOwnerProcessing(ctx context.Context, message TokenProc
 	})
 
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
+
+	// V3Migration: Remove when migration is complete
 	task := &taskspb.Task{
 		MessageType: &taskspb.Task_HttpRequest{
 			HttpRequest: &taskspb.HttpRequest{
@@ -246,19 +248,17 @@ func CreateTaskForContractOwnerProcessing(ctx context.Context, message TokenProc
 		return err
 	}
 
-	return submitHttpTask(ctx, client, queue, task, body)
-}
+	err = submitHttpTask(ctx, client, queue, task, body)
+	if err != nil {
+		return err
+	}
+	// V3Migration: End remove
 
-func CreateTaskForDeepRefresh(ctx context.Context, message DeepRefreshMessage, client *gcptasks.Client) error {
-	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForDeepRefresh")
-	defer tracing.FinishSpan(span)
-
-	queue := env.GetString("GCLOUD_REFRESH_TASK_QUEUE")
-	task := &taskspb.Task{
+	task = &taskspb.Task{
 		MessageType: &taskspb.Task_HttpRequest{
 			HttpRequest: &taskspb.HttpRequest{
 				HttpMethod: taskspb.HttpMethod_POST,
-				Url:        fmt.Sprintf("%s/tasks/refresh", env.GetString("INDEXER_HOST")),
+				Url:        fmt.Sprintf("%s/owners/process/contract", env.GetString("NEW_TOKEN_PROCESSING_URL")),
 				Headers: map[string]string{
 					"Content-type": "application/json",
 					"sentry-trace": span.TraceID.String(),
@@ -267,12 +267,14 @@ func CreateTaskForDeepRefresh(ctx context.Context, message DeepRefreshMessage, c
 		},
 	}
 
-	body, err := json.Marshal(message)
+	v3Message := message
+	v3Message.IsV3 = true
+	v3Body, err := json.Marshal(v3Message)
 	if err != nil {
 		return err
 	}
 
-	return submitHttpTask(ctx, client, queue, task, body)
+	return submitHttpTask(ctx, client, queue, task, v3Body)
 }
 
 // NewClient returns a new task client with tracing enabled.

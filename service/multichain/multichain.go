@@ -571,17 +571,21 @@ func (p *Provider) sendTokensToTokenProcessing(ctx context.Context, userID persi
 	return p.SendTokens(ctx, task.TokenProcessingUserMessage{UserID: userID, TokenIDs: tokens})
 }
 
-func (p *Provider) processTokenMedia(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, ownerAddress persist.Address) error {
+func (p *Provider) processTokenMedia(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, ownerAddress persist.Address, imageKeywords, animationKeywords []string) error {
+	// V3Migration: Remove when migration is complete
 	input := map[string]any{
-		"token_id":         tokenID,
-		"contract_address": contractAddress,
-		"chain":            chain,
-		"owner_address":    ownerAddress,
+		"token_id":           tokenID,
+		"contract_address":   contractAddress,
+		"chain":              chain,
+		"owner_address":      ownerAddress,
+		"image_keywords":     imageKeywords,
+		"animation_keywords": animationKeywords,
 	}
 	asJSON, err := json.Marshal(input)
 	if err != nil {
 		return err
 	}
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/media/process/token", env.GetString("TOKEN_PROCESSING_URL")), bytes.NewBuffer(asJSON))
 	if err != nil {
 		return err
@@ -591,10 +595,40 @@ func (p *Provider) processTokenMedia(ctx context.Context, tokenID persist.TokenI
 	if err != nil {
 		return err
 	}
+
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		return util.GetErrFromResp(resp)
 	}
+	// V3Migration: End remove
+
+	v3Input := map[string]any{
+		"token_id":         tokenID,
+		"contract_address": contractAddress,
+		"chain":            chain,
+		"owner_address":    ownerAddress,
+		"is_v3":            true,
+	}
+	asJSONV3, err := json.Marshal(v3Input)
+	if err != nil {
+		return err
+	}
+
+	req, err = http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/media/process/token", env.GetString("NEW_TOKEN_PROCESSING_URL")), bytes.NewBuffer(asJSONV3))
+	if err != nil {
+		return err
+	}
+
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return util.GetErrFromResp(resp)
+	}
+
 	return nil
 }
 
@@ -875,7 +909,9 @@ outer:
 				return err
 			}
 
-			err = p.processTokenMedia(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, refreshedToken.OwnerAddress)
+			// V3Migration: Remove remove image and animation keywords when migrated
+			image, anim := ti.Chain.BaseKeywords()
+			err = p.processTokenMedia(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, refreshedToken.OwnerAddress, image, anim)
 			if err != nil {
 				return err
 			}

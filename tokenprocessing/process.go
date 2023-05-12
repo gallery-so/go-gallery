@@ -29,6 +29,7 @@ type ProcessMediaForTokenInput struct {
 	ContractAddress persist.Address `json:"contract_address" binding:"required"`
 	Chain           persist.Chain   `json:"chain"`
 	OwnerAddress    persist.Address `json:"owner_address" binding:"required"`
+	IsV3            bool            `json:"is_v3" binding:"-"` // V3Migration: Remove when migration is complete
 }
 
 func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRepository, contractRepo *postgres.ContractGalleryRepository, throttler *throttle.Locker) gin.HandlerFunc {
@@ -41,7 +42,13 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 
 		reqCtx := logger.NewContextWithFields(c.Request.Context(), logrus.Fields{"userID": input.UserID})
 
-		if err := throttler.Lock(reqCtx, input.UserID.String()); err != nil {
+		// V3Migration: Remove when migration is complete
+		lockID := input.UserID.String()
+		if input.IsV3 {
+			lockID += ":v3"
+		}
+
+		if err := throttler.Lock(reqCtx, lockID); err != nil {
 			// Reply with a non-200 status so that the message is tried again later on
 			util.ErrResponse(c, http.StatusTooManyRequests, err)
 			return
@@ -92,12 +99,17 @@ func processMediaForToken(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRe
 
 		reqCtx := c.Request.Context()
 
-		lockerKey := fmt.Sprintf("%s-%s-%d", input.TokenID, input.ContractAddress, input.Chain)
-		if err := throttler.Lock(reqCtx, lockerKey); err != nil {
+		// V3Migration: Remove when migration is complete
+		lockID := fmt.Sprintf("%s-%s-%d", input.TokenID, input.ContractAddress, input.Chain)
+		if input.IsV3 {
+			lockID += ":v3"
+		}
+
+		if err := throttler.Lock(reqCtx, lockID); err != nil {
 			util.ErrResponse(c, http.StatusTooManyRequests, err)
 			return
 		}
-		defer throttler.Unlock(reqCtx, lockerKey)
+		defer throttler.Unlock(reqCtx, lockID)
 
 		wallet, err := walletRepo.GetByChainAddress(reqCtx, persist.NewChainAddress(input.OwnerAddress, input.Chain))
 		if err != nil {
@@ -147,22 +159,27 @@ func processOwnersForContractTokens(mc *multichain.Provider, contractRepo *postg
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
-		key := fmt.Sprintf("%s-%d", contract.Address, contract.Chain)
+
+		// V3Migration: Remove when migration is complete
+		lockID := fmt.Sprintf("%s-%d", contract.Address, contract.Chain)
+		if input.IsV3 {
+			lockID += ":v3"
+		}
 
 		if !input.ForceRefresh {
-			if err := throttler.Lock(c, key); err != nil {
+			if err := throttler.Lock(c, lockID); err != nil {
 				util.ErrResponse(c, http.StatusOK, err)
 				return
 			}
 		}
 
 		// do not unlock, let expiry handle the unlock
-		logger.For(c).Infof("Processing: %s - Processing Collection Refresh", key)
+		logger.For(c).Infof("Processing: %s - Processing Collection Refresh", lockID)
 		if err := mc.RefreshTokensForContract(c, contract.ContractIdentifiers()); err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
-		logger.For(c).Infof("Processing: %s - Finished Processing Collection Refresh", key)
+		logger.For(c).Infof("Processing: %s - Finished Processing Collection Refresh", lockID)
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}

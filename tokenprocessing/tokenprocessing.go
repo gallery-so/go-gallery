@@ -224,7 +224,8 @@ func updateMediaProccessingFingerprints(event *sentry.Event, hint *sentry.EventH
 }
 
 func excludeTokenSpam(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
-	if event.Contexts[sentryTokenContextName]["IsSpam"].(bool) == true {
+	isSpam, ok := event.Contexts[sentryTokenContextName]["IsSpam"].(bool)
+	if ok && isSpam {
 		return nil
 	}
 	return event
