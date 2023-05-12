@@ -1065,12 +1065,12 @@ insert into sessions (id, user_id,
                       last_refreshed, last_user_agent, last_platform, last_os, active_until, invalidated, last_updated, deleted)
     values (@id, @user_id, now(), @user_agent, @platform, @os, now(), @user_agent, @platform, @os, @active_until, false, now(), false)
     on conflict (id) where deleted = false do update set
-        last_refreshed = case when invalidated then last_refreshed else excluded.last_refreshed end,
-        last_user_agent = case when invalidated then last_user_agent else excluded.last_user_agent end,
-        last_platform = case when invalidated then last_platform else excluded.last_platform end,
-        last_os = case when invalidated then last_os else excluded.last_os end,
-        last_updated = case when invalidated then last_updated else excluded.last_updated end,
-        active_until = case when invalidated then active_until else greatest(active_until, excluded.active_until) end
+        last_refreshed = case when sessions.invalidated then sessions.last_refreshed else excluded.last_refreshed end,
+        last_user_agent = case when sessions.invalidated then sessions.last_user_agent else excluded.last_user_agent end,
+        last_platform = case when sessions.invalidated then sessions.last_platform else excluded.last_platform end,
+        last_os = case when sessions.invalidated then sessions.last_os else excluded.last_os end,
+        last_updated = case when sessions.invalidated then sessions.last_updated else excluded.last_updated end,
+        active_until = case when sessions.invalidated then sessions.active_until else greatest(sessions.active_until, excluded.active_until) end
     returning *;
 
 -- name: InvalidateSession :exec

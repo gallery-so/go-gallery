@@ -4623,12 +4623,12 @@ insert into sessions (id, user_id,
                       last_refreshed, last_user_agent, last_platform, last_os, active_until, invalidated, last_updated, deleted)
     values ($1, $2, now(), $3, $4, $5, now(), $3, $4, $5, $6, false, now(), false)
     on conflict (id) where deleted = false do update set
-        last_refreshed = case when invalidated then last_refreshed else excluded.last_refreshed end,
-        last_user_agent = case when invalidated then last_user_agent else excluded.last_user_agent end,
-        last_platform = case when invalidated then last_platform else excluded.last_platform end,
-        last_os = case when invalidated then last_os else excluded.last_os end,
-        last_updated = case when invalidated then last_updated else excluded.last_updated end,
-        active_until = case when invalidated then active_until else greatest(active_until, excluded.active_until) end
+        last_refreshed = case when sessions.invalidated then sessions.last_refreshed else excluded.last_refreshed end,
+        last_user_agent = case when sessions.invalidated then sessions.last_user_agent else excluded.last_user_agent end,
+        last_platform = case when sessions.invalidated then sessions.last_platform else excluded.last_platform end,
+        last_os = case when sessions.invalidated then sessions.last_os else excluded.last_os end,
+        last_updated = case when sessions.invalidated then sessions.last_updated else excluded.last_updated end,
+        active_until = case when sessions.invalidated then sessions.active_until else greatest(sessions.active_until, excluded.active_until) end
     returning id, user_id, created_at, created_with_user_agent, created_with_platform, created_with_os, last_refreshed, last_user_agent, last_platform, last_os, active_until, invalidated, last_updated, deleted
 `
 
