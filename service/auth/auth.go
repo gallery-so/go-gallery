@@ -453,8 +453,8 @@ func StartSession(c *gin.Context, queries *db.Queries, userID persist.DBID) erro
 
 func ContinueSession(c *gin.Context, queries *db.Queries) error {
 	// If the user has a valid auth cookie, we can set their auth state and be done
-	userID, sessionID, err := getAuthToken(c)
-	if err == nil {
+	userID, sessionID, authTokenErr := getAuthToken(c)
+	if authTokenErr == nil {
 		// ----------------------------------------------------------------------------
 		// Temporary handling for existing auth tokens that don't have session IDs.
 		// Where it would normally be an error for an auth token to not have a session ID,
@@ -465,7 +465,6 @@ func ContinueSession(c *gin.Context, queries *db.Queries) error {
 		}
 		// End of temporary handling
 		// ----------------------------------------------------------------------------
-		logger.For(c).Info("found valid auth cookie")
 		setSessionStateForCtx(c, userID, sessionID)
 		return nil
 	}
@@ -473,18 +472,26 @@ func ContinueSession(c *gin.Context, queries *db.Queries) error {
 	// If the user doesn't have a valid auth cookie or a valid refresh cookie, they can't be
 	// authenticated and they'll have to log in again. Clear their cookies in case they have
 	// expired tokens.
-	userID, sessionID, err = getRefreshToken(c)
-	if err != nil {
-		logger.For(c).Info("no valid auth or refresh cookies found")
-		clearSessionStateForCtx(c, err)
-		clearSessionCookies(c)
-		return err
+	userID, sessionID, refreshTokenErr := getRefreshToken(c)
+	if refreshTokenErr != nil {
+		clearSessionStateForCtx(c, refreshTokenErr)
+
+		// The most common case here is that the user has no cookies at all, which is fine and expected.
+		// If we encounter any other errors, log them and clear the user's cookies.
+		if authTokenErr != ErrNoCookie || refreshTokenErr != ErrNoCookie {
+			logger.For(c).Warnf("could not continue session: authTokenErr=%s, refreshTokenErr=%s", authTokenErr, refreshTokenErr)
+			clearSessionCookies(c)
+		}
+
+		return refreshTokenErr
 	}
 
 	// At this point, the user has a valid refresh cookie, but not a valid auth cookie.
 	// Issue new tokens to continue their existing session.
-	err = issueSessionTokens(c, userID, sessionID, queries)
+	err := issueSessionTokens(c, userID, sessionID, queries)
 	if err != nil {
+		logger.For(c).Errorf("error issuing session tokens (userID=%s, sessionID=%s): %s", userID, sessionID, err)
+
 		// If we encountered an error issuing tokens, clear the context state so the user is "unauthenticated"
 		// for the duration of this request.
 		clearSessionStateForCtx(c, err)
