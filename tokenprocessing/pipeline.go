@@ -400,16 +400,16 @@ func recordPipelineEndState(ctx context.Context, mr metric.MetricReporter, r *ru
 		mr.Record(ctx, pipelineTimedOutMetric(), opts...)
 	}
 
+	recordPipelineDuration(ctx, mr, d, baseOpts)
+
 	if r != nil && r.Err != nil {
 		opts := append(baseOpts, metric.LogOptions.WithLogMessage("pipeline completed with error: "+r.Err.Error()))
 		mr.Record(ctx, pipelineErroredMetric(), opts...)
-		recordPipelineDuration(ctx, mr, d, baseOpts)
 		return
 	}
 
 	opts := append(baseOpts, metric.LogOptions.WithLogMessage("pipeline completed successfully"))
 	mr.Record(ctx, pipelineCompletedMetric(), opts...)
-	recordPipelineDuration(ctx, mr, d, baseOpts)
 }
 
 func recordPipelineDuration(ctx context.Context, mr metric.MetricReporter, d time.Duration, opts []any) {
