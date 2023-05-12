@@ -11,6 +11,7 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/metric"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -18,56 +19,6 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 )
-
-const (
-	// Metrics emitted by the pipeline
-	metricPipelineCompleted = "pipeline_completed"
-	metricPipelineDuration  = "pipeline_duration"
-	metricPipelineErrored   = "pipeline_errored"
-	metricPipelineTimedOut  = "pipeline_timed_out"
-)
-
-func pipelineDurationMetric(d time.Duration) metric {
-	return metric{Name: metricPipelineDuration, Value: d.Seconds()}
-}
-
-func pipelineTimedOutMetric() metric {
-	return metric{Name: metricPipelineTimedOut}
-}
-
-func pipelineCompletedMetric() metric {
-	return metric{Name: metricPipelineCompleted}
-}
-
-type metric struct {
-	Name  string
-	Value float64
-}
-
-type metricReporter struct {
-	Emit func(ctx context.Context, m metric, logMsg ...string)
-}
-
-func newGCPLogMetricReporter() metricReporter {
-	return metricReporter{Emit: gcpLogMetricReporter{}.Emit}
-}
-
-type gcpLogMetricReporter struct{}
-
-func (l gcpLogMetricReporter) Emit(ctx context.Context, metric metric, logMsg ...string) {
-	metricPayload := logrus.Fields{
-		"metricName":  metric.Name,
-		"metricValue": metric.Value,
-	}
-
-	logLine := fmt.Sprintf("reporting metric %s(%f)", metric.Name, metric.Value)
-
-	if len(logMsg) > 0 {
-		logLine = ": " + logMsg[0]
-	}
-
-	logger.For(ctx).WithFields(metricPayload).Infof(logLine)
-}
 
 type tokenProcessor struct {
 	queries       *coredb.Queries
@@ -78,10 +29,10 @@ type tokenProcessor struct {
 	stg           *storage.Client
 	tokenBucket   string
 	tokenRepo     *postgres.TokenGalleryRepository
-	mr            metricReporter
+	mr            metric.MetricReporter
 }
 
-func NewTokenProcessor(queries *coredb.Queries, ethClient *ethclient.Client, mc *multichain.Provider, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, tokenRepo *postgres.TokenGalleryRepository, mr metricReporter) *tokenProcessor {
+func NewTokenProcessor(queries *coredb.Queries, ethClient *ethclient.Client, mc *multichain.Provider, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, tokenRepo *postgres.TokenGalleryRepository, mr metric.MetricReporter) *tokenProcessor {
 	return &tokenProcessor{
 		queries:       queries,
 		ethClient:     ethClient,
@@ -139,26 +90,26 @@ func (tp *tokenProcessor) ProcessTokenPipeline(c context.Context, t persist.Toke
 	defer cancel()
 
 	totalTime := time.Now()
-	defer func() {
-		dur := time.Since(totalTime)
-		tp.mr.Emit(ctx, pipelineDurationMetric(dur), fmt.Sprintf("token processing job complete: total time for token processing job: %s", dur))
-	}()
 
-	result := make(chan error, 1)
+	result := make(chan runResult, 1)
 
 	select {
 	case result <- job.run(ctx):
-		err := <-result
-		emitPipelineEndState(ctx, tp.mr, err)
-		return err
+		runResult := <-result
+		recordPipelineEndState(ctx, tp.mr, &runResult, time.Since(totalTime))
+		return runResult.Err
 	case <-ctx.Done():
-		err := ctx.Err()
-		emitPipelineEndState(ctx, tp.mr, err)
-		return err
+		recordPipelineEndState(ctx, tp.mr, nil, time.Since(totalTime))
+		return ctx.Err()
 	}
 }
 
-func (tpj *tokenProcessingJob) run(ctx context.Context) error {
+type runResult struct {
+	MediaType persist.MediaType
+	Err       error
+}
+
+func (tpj *tokenProcessingJob) run(ctx context.Context) runResult {
 	span, ctx := tracing.StartSpan(ctx, "pipeline.run", fmt.Sprintf("run %s", tpj.id))
 	defer tracing.FinishSpan(span)
 
@@ -168,7 +119,7 @@ func (tpj *tokenProcessingJob) run(ctx context.Context) error {
 	}
 
 	err = tpj.persistResults(ctx, tmedia)
-	return err
+	return runResult{tmedia.Media.MediaType, err}
 }
 
 func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (coredb.TokenMedia, error) {
@@ -402,4 +353,58 @@ func (tpj *tokenProcessingJob) upsertDB(ctx context.Context, tmetadata coredb.To
 		}
 	}
 	return nil
+}
+
+const (
+	// Metrics emitted by the pipeline
+	metricPipelineCompleted = "pipeline_completed"
+	metricPipelineDuration  = "pipeline_duration"
+	metricPipelineErrored   = "pipeline_errored"
+	metricPipelineTimedOut  = "pipeline_timedout"
+)
+
+func pipelineDurationMetric(d time.Duration) metric.Measure {
+	return metric.Measure{Name: metricPipelineDuration, Value: d.Seconds()}
+}
+
+func pipelineTimedOutMetric() metric.Measure {
+	return metric.Measure{Name: metricPipelineTimedOut}
+}
+
+func pipelineCompletedMetric() metric.Measure {
+	return metric.Measure{Name: metricPipelineCompleted}
+}
+
+func pipelineErroredMetric() metric.Measure {
+	return metric.Measure{Name: metricPipelineErrored}
+}
+
+func recordPipelineEndState(ctx context.Context, mr metric.MetricReporter, r *runResult, d time.Duration) {
+	baseOpts := []any{}
+
+	if r != nil {
+		tags := map[string]string{"mediaType": r.MediaType.String()}
+		baseOpts = append(baseOpts, metric.LogOptions.WithTags(tags))
+	}
+
+	if ctx.Err() != nil {
+		opts := append(baseOpts, metric.LogOptions.WithLogMessage("pipeline timed out"))
+		mr.Record(ctx, pipelineTimedOutMetric(), opts...)
+	}
+
+	if r != nil && r.Err != nil {
+		opts := append(baseOpts, metric.LogOptions.WithLogMessage("pipeline completed with error: "+r.Err.Error()))
+		mr.Record(ctx, pipelineErroredMetric(), opts...)
+		recordPipelineDuration(ctx, mr, d, baseOpts)
+		return
+	}
+
+	opts := append(baseOpts, metric.LogOptions.WithLogMessage("pipeline completed successfully"))
+	mr.Record(ctx, pipelineCompletedMetric(), opts...)
+	recordPipelineDuration(ctx, mr, d, baseOpts)
+}
+
+func recordPipelineDuration(ctx context.Context, mr metric.MetricReporter, d time.Duration, opts []any) {
+	opts = append(opts, metric.LogOptions.WithLogMessage(fmt.Sprintf("token processing job complete: total time for token processing job: %s", d)))
+	mr.Record(ctx, pipelineDurationMetric(d), opts...)
 }
