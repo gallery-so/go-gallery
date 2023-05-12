@@ -1455,7 +1455,9 @@ func (c *serverClient) MakeRequest(ctx context.Context, req *genql.Request, resp
 // readCookie finds a cookie set in the response
 func readCookie(t *testing.T, r *http.Response, name string) string {
 	t.Helper()
-	for _, c := range r.Cookies() {
+	cookies := r.Cookies()
+	for i := len(cookies) - 1; i >= 0; i-- {
+		c := cookies[i]
 		if c.Name == name {
 			return c.Value
 		}
