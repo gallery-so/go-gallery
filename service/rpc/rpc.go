@@ -684,25 +684,21 @@ func GetIPFSResponse(ctx context.Context, ipfsClient *shell.Shell, path string) 
 		if resp.StatusCode > 399 || resp.StatusCode < 200 {
 			return nil, util.ErrHTTP{Status: resp.StatusCode, URL: url}
 		}
-		logger.For(ctx).Infof("IPFS HTTP fallback successful %s", path)
+		logger.For(ctx).Infof("IPFS HTTP successful %s", path)
 
 		return resp.Body, nil
 	}
 
 	fromIPFS := func(ctx context.Context) (io.ReadCloser, error) {
-		_, _, err := ipfsClient.BlockStat(path)
-		if err != nil {
-			return nil, err
-		}
 		reader, err := ipfsClient.Cat(path)
 		if err != nil {
 			return nil, err
 		}
-		logger.For(ctx).Infof("IPFS cat fallback successful %s", path)
+		logger.For(ctx).Infof("IPFS cat successful %s", path)
 		return reader, nil
 	}
 
-	fromIPFSAPI := func(ctx context.Context) (io.ReadCloser, error) {
+	fromFallback := func(ctx context.Context) (io.ReadCloser, error) {
 		url := fmt.Sprintf("%s/ipfs/%s", env.GetString("FALLBACK_IPFS_URL"), path)
 		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 		if err != nil {
@@ -716,11 +712,29 @@ func GetIPFSResponse(ctx context.Context, ipfsClient *shell.Shell, path string) 
 		if resp.StatusCode > 399 || resp.StatusCode < 200 {
 			return nil, util.ErrHTTP{Status: resp.StatusCode, URL: url}
 		}
-		logger.For(ctx).Infof("IPFS HTTP fallback fallback successful %s", path)
+		logger.For(ctx).Infof("IPFS HTTP fallback successful %s", path)
 		return resp.Body, nil
 	}
 
-	result, err := util.FirstNonErrorWithValue(ctx, false, HTTPErrIsForceClose, fromHTTP, fromIPFS, fromIPFSAPI)
+	fromIPFSAPI := func(ctx context.Context) (io.ReadCloser, error) {
+		url := fmt.Sprintf("https://ipfs.io/ipfs/%s", path)
+		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		resp, err := defaultHTTPClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		if resp.StatusCode > 399 || resp.StatusCode < 200 {
+			return nil, util.ErrHTTP{Status: resp.StatusCode, URL: url}
+		}
+		logger.For(ctx).Infof("IPFS API successful %s", path)
+		return resp.Body, nil
+	}
+
+	result, err := util.FirstNonErrorWithValue(ctx, false, HTTPErrIsForceClose, fromHTTP, fromIPFS, fromFallback, fromIPFSAPI)
 	if err != nil {
 		return nil, err
 	}
