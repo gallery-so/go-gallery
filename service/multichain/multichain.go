@@ -483,7 +483,7 @@ func (p *Provider) prepTokensForTokenProcessing(ctx context.Context, tokensFromP
 			providerTokens[i].Media = persist.Media{MediaType: persist.MediaTypeSyncing}
 		}
 
-		if !exists || token.TokenMedia == "" {
+		if !exists || token.TokenMediaID == "" {
 			newTokens[token.TokenIdentifiers()] = true
 		}
 	}

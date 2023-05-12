@@ -56,7 +56,8 @@ type errNoDataFromReader struct {
 }
 
 type errNoDataFromOpensea struct {
-	errNoDataFromReader
+	err error
+	url string
 }
 
 type errNotCacheable struct {
@@ -97,6 +98,10 @@ func (e errNoMediaURLs) Error() string {
 
 func (e errNoCachedObjects) Error() string {
 	return fmt.Sprintf("no cached objects found for token identifiers: %s", e.tids)
+}
+
+func (e errNoDataFromOpensea) Error() string {
+	return fmt.Sprintf("no data from opensea: %s (url: %s)", e.err, e.url)
 }
 
 // MediaProcessingError is an error that occurs when handling media processiing for a token.
@@ -974,7 +979,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 		assets, err := opensea.FetchAssetsForTokenIdentifiers(pCtx, persist.EthereumAddress(tids.ContractAddress), opensea.TokenID(tids.TokenID.Base10String()))
 		if err != nil || len(assets) == 0 {
 			// no data from opensea, return error
-			return nil, errNoDataFromOpensea{errNoDataFromReader: errNoDataFromReader{err: err, url: mediaURL}}
+			return nil, errNoDataFromOpensea{err: err, url: mediaURL}
 		}
 
 		for _, asset := range assets {
@@ -996,7 +1001,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 			return cacheObjectsFromURL(pCtx, tids, firstNonEmptyURL, oType, ipfsClient, arweaveClient, storageClient, bucket, subMeta, true)
 		}
 
-		return nil, errNoDataFromOpensea{errNoDataFromReader: errNoDataFromReader{err: err, url: mediaURL}}
+		return nil, errNoDataFromOpensea{err: err, url: mediaURL}
 	}
 
 	if err != nil {

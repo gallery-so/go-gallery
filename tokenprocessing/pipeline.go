@@ -277,7 +277,7 @@ func (tpj *tokenProcessingJob) isNewMediaPreferable(ctx context.Context, media p
 	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.MediaResultComparison, "MediaResultComparison")
 	defer traceCallback()
 
-	if media.IsServable() || (!media.IsServable() && !tpj.token.Media.IsServable()) {
+	if media.IsServable() || (!media.IsServable() && (tpj.token.TokenMediaID == "" || !tpj.token.TokenMedia.IsServable())) {
 		// if the media is good, it is active
 		// if the media is bad but the old media is also bad, it is active
 		return true
@@ -339,6 +339,7 @@ func (tpj *tokenProcessingJob) upsertDB(ctx context.Context, tmetadata coredb.To
 	}
 	logger.For(ctx).Infof("upserted token media: %s", med.ID)
 	if med.Active && newID == med.ID {
+		logger.For(ctx).Infof("token media is active and needs to be added to token: %s", med.ID)
 		err := tpj.tp.queries.UpdateTokenTokenMediaByTokenIdentifiers(ctx, coredb.UpdateTokenTokenMediaByTokenIdentifiersParams{
 			TokenMediaID: med.ID,
 			Contract:     tpj.token.Contract,

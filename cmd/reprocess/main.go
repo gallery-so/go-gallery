@@ -114,15 +114,14 @@ func main() {
 		}
 
 		token := persist.TokenGallery{
-			Version:          persist.NullInt32(row.Version.Int32),
-			ID:               row.ID,
-			CreationTime:     persist.CreationTime(row.CreatedAt),
-			Deleted:          persist.NullBool(row.Deleted),
-			LastUpdated:      persist.LastUpdatedTime(row.LastUpdated),
-			LastSynced:       persist.LastUpdatedTime(row.LastSynced),
-			CollectorsNote:   persist.NullString(row.CollectorsNote.String),
-			Media:            row.Media,
-			TokenMedia:       row.TokenMediaID,
+			Version:        persist.NullInt32(row.Version.Int32),
+			ID:             row.ID,
+			CreationTime:   persist.CreationTime(row.CreatedAt),
+			Deleted:        persist.NullBool(row.Deleted),
+			LastUpdated:    persist.LastUpdatedTime(row.LastUpdated),
+			LastSynced:     persist.LastUpdatedTime(row.LastSynced),
+			CollectorsNote: persist.NullString(row.CollectorsNote.String),
+			// Media:            row.Media,  don't include this row because we want all media to be replaced
 			FallbackMedia:    row.FallbackMedia,
 			TokenType:        persist.TokenType(row.TokenType.String),
 			Chain:            row.Chain,
