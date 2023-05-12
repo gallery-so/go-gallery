@@ -629,12 +629,13 @@ func FirstNonErrorWithValue[T any](ctx context.Context, autoCancel bool, returnO
 		defer cancel()
 	}
 
-	wp := pool.New().WithMaxGoroutines(len(runs)).WithContext(ctx)
+	wp := pool.New().WithMaxGoroutines(len(runs)).WithErrors()
+
 	result := make(chan T)
 	errChan := make(chan error)
 	for _, run := range runs {
 		run := run
-		wp.Go(func(ctx context.Context) error {
+		wp.Go(func() error {
 			val, err := run(ctx)
 			if err != nil {
 				if returnOnError(err) {

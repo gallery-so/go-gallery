@@ -59,8 +59,8 @@ func init() {
 const (
 	defaultHTTPTimeout             = 600
 	defaultHTTPKeepAlive           = 600
-	defaultHTTPMaxIdleConns        = 100
-	defaultHTTPMaxIdleConnsPerHost = 100
+	defaultHTTPMaxIdleConns        = 250
+	defaultHTTPMaxIdleConnsPerHost = 250
 	GethSocketOpName               = "geth.wss"
 )
 
@@ -682,25 +682,8 @@ func GetIPFSResponse(ctx context.Context, ipfsClient *shell.Shell, path string) 
 		}
 
 		if resp.StatusCode > 399 || resp.StatusCode < 200 {
-			if resp.StatusCode == http.StatusNotFound {
-				return nil, util.ErrHTTP{Status: resp.StatusCode, URL: url}
-			}
-			url := fmt.Sprintf("%s/ipfs/%s", env.GetString("FALLBACK_IPFS_URL"), path)
-			req, err = http.NewRequestWithContext(ctx, "GET", url, nil)
-			if err != nil {
-				return nil, err
-			}
-
-			resp, err = defaultHTTPClient.Do(req)
-			if err != nil {
-				return nil, err
-			}
-			if resp.StatusCode > 399 || resp.StatusCode < 200 {
-				return nil, util.ErrHTTP{Status: resp.StatusCode, URL: url}
-			}
-			logger.For(ctx).Infof("IPFS HTTP fallback fallback successful %s", path)
+			return nil, util.ErrHTTP{Status: resp.StatusCode, URL: url}
 		}
-
 		logger.For(ctx).Infof("IPFS HTTP fallback successful %s", path)
 
 		return resp.Body, nil
@@ -720,7 +703,7 @@ func GetIPFSResponse(ctx context.Context, ipfsClient *shell.Shell, path string) 
 	}
 
 	fromIPFSAPI := func(ctx context.Context) (io.ReadCloser, error) {
-		url := fmt.Sprintf("https://ipfs.io/ipfs/%s", path)
+		url := fmt.Sprintf("%s/ipfs/%s", env.GetString("FALLBACK_IPFS_URL"), path)
 		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 		if err != nil {
 			return nil, err
@@ -730,13 +713,10 @@ func GetIPFSResponse(ctx context.Context, ipfsClient *shell.Shell, path string) 
 		if err != nil {
 			return nil, err
 		}
-
 		if resp.StatusCode > 399 || resp.StatusCode < 200 {
 			return nil, util.ErrHTTP{Status: resp.StatusCode, URL: url}
 		}
-
-		logger.For(ctx).Infof("IPFS API fallback successful %s", path)
-
+		logger.For(ctx).Infof("IPFS HTTP fallback fallback successful %s", path)
 		return resp.Body, nil
 	}
 

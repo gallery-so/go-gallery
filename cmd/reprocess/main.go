@@ -15,6 +15,7 @@ import (
 	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/tokenprocessing"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
@@ -158,6 +159,7 @@ func main() {
 
 		anOwner := row.WalletAddress
 		wp.Go(func(ctx context.Context) error {
+			ctx = sentryutil.NewSentryHubContext(ctx)
 			logrus.Infof("processing %s", token.ID)
 			defer func() {
 				logger.For(ctx).Infof("finished processing %s", token.ID)
