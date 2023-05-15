@@ -28,7 +28,29 @@ jobs:
           gcp-credentials-json: ${{ secrets.GCP_PROD_CREDENTIALS }}
       - name: "Deploy"
         run: make deploy-prod-backend
-  deploy-dev-tokenprocessing:
+  # deploy-dev-tokenprocessing:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v2
+  #     - name: "Install build deps"
+  #       uses: ./.github/actions/build-deps
+  #       with:
+  #         sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
+  #         gcp-credentials-json: ${{ secrets.GCP_DEV_CREDENTIALS }}
+  #     - name: "Deploy"
+  #       run: make deploy-dev-tokenprocessing
+  # deploy-prod-tokenprocessing:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v2
+  #     - name: "Install build deps"
+  #       uses: ./.github/actions/build-deps
+  #       with:
+  #         sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
+  #         gcp-credentials-json: ${{ secrets.GCP_PROD_CREDENTIALS }}
+  #     - name: "Deploy"
+  #       run: make deploy-prod-tokenprocessing
+  deploy-dev-tokenprocessingV3:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -38,8 +60,8 @@ jobs:
           sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
           gcp-credentials-json: ${{ secrets.GCP_DEV_CREDENTIALS }}
       - name: "Deploy"
-        run: make deploy-dev-tokenprocessing
-  deploy-prod-tokenprocessing:
+        run: make deploy-dev-tokenprocessingV3
+  deploy-prod-tokenprocessingV3:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -47,9 +69,9 @@ jobs:
         uses: ./.github/actions/build-deps
         with:
           sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          gcp-credentials-json: ${{ secrets.GCP_PROD_CREDENTIALS }}
+          gcp-credentials-json: ${{ secrets.GCP_DEV_CREDENTIALS }}
       - name: "Deploy"
-        run: make deploy-prod-tokenprocessing
+        run: make deploy-prod-tokenprocessingV3
   deploy-prod-indexer-api:
     runs-on: ubuntu-latest
     steps:

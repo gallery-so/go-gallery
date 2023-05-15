@@ -28,6 +28,17 @@ func (e ErrInvalidInput) Error() string {
 	return fmt.Sprintf("invalid input: %s", e.Reason)
 }
 
+// ErrHTTP represents an error returned from an HTTP request
+type ErrHTTP struct {
+	URL    string
+	Status int
+	Err    error
+}
+
+func (h ErrHTTP) Error() string {
+	return fmt.Sprintf("HTTP Error Status - %d | URL - %s | Error: %s", h.Status, h.URL, h.Err)
+}
+
 // ErrResponse sends a json response for an error during endpoint execution
 func ErrResponse(c *gin.Context, code int, err error) {
 	c.Error(err)
@@ -37,7 +48,7 @@ func ErrResponse(c *gin.Context, code int, err error) {
 func GetErrFromResp(res *http.Response) error {
 	errResp := map[string]interface{}{}
 	json.NewDecoder(res.Body).Decode(&errResp)
-	return fmt.Errorf("unexpected status: %s | err: %v ", res.Status, errResp)
+	return ErrHTTP{URL: res.Request.URL.String(), Status: res.StatusCode, Err: fmt.Errorf("%+v", errResp)}
 }
 
 // BodyAsError returns the HTTP body as an error
@@ -46,7 +57,7 @@ func BodyAsError(res *http.Response) error {
 	if err != nil {
 		return err
 	}
-	return fmt.Errorf("%s", body)
+	return ErrHTTP{URL: res.Request.URL.String(), Status: res.StatusCode, Err: fmt.Errorf("%s", body)}
 }
 
 func HealthCheckHandler() gin.HandlerFunc {

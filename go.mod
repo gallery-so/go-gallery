@@ -32,8 +32,8 @@ require (
 	github.com/ipfs/go-ipfs-api v0.6.0
 	github.com/jackc/pgconn v1.14.0
 	github.com/jackc/pgtype v1.14.0
-	github.com/jackc/pgx/v4 v4.18.0
-	github.com/lib/pq v1.10.7
+	github.com/jackc/pgx/v4 v4.18.1
+	github.com/lib/pq v1.10.9
 	github.com/lucasb-eyer/go-colorful v1.2.0
 	github.com/machinebox/graphql v0.2.2
 	github.com/magiclabs/magic-admin-go v0.2.0
@@ -44,7 +44,7 @@ require (
 	github.com/sendgrid/sendgrid-go v3.12.0+incompatible
 	github.com/shurcooL/graphql v0.0.0-20200928012149-18c5c3165e3a
 	github.com/sirupsen/logrus v1.9.0
-	github.com/spf13/cobra v1.6.1
+	github.com/spf13/cobra v1.7.0
 	github.com/spf13/viper v1.14.0
 	github.com/stretchr/testify v1.8.2
 	github.com/vektah/gqlparser/v2 v2.5.1
@@ -55,8 +55,8 @@ require (
 	google.golang.org/api v0.114.0
 	google.golang.org/appengine v1.6.7
 	google.golang.org/genproto v0.0.0-20230320184635-7606e756e683
-	google.golang.org/grpc v1.53.0
-	google.golang.org/protobuf v1.29.1
+	google.golang.org/grpc v1.54.0
+	google.golang.org/protobuf v1.30.0
 	gopkg.in/yaml.v2 v2.4.0
 	roci.dev/fracdex v0.0.0-20220111221836-dbd126571100
 )

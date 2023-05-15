@@ -90,6 +90,24 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.AddressAtBlockList"
           - column: "tokens.token_metadata"
             go_type: "github.com/mikeydub/go-gallery/service/persist.TokenMetadata"
+          
+          # TokenMedias
+          - column: "token_medias.metadata"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.TokenMetadata"
+          - column: "token_medias.token_id"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.TokenID"
+          - column: "token_medias.chain"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Chain"
+          - column: "token_medias.media"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Media"
+
+          # TokenProcessingJobs
+          - column: "token_processing_jobs.pipeline_metadata"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.PipelineMetadata"
+          - column: "token_processing_jobs.token_properties"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.TokenProperties"
+          - column: "token_processing_jobs.processing_cause"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.ProcessingCause"
 
           # Membership
           - column: "membership.owners"
@@ -152,6 +170,9 @@ sql:
           # Push Notification Tokens
           - column: "push_notification_tickets.ticket_id"
             go_type: "string"
+          
+          - column: "reprocess_jobs.id"
+            go_type: "int"
 
           # Wildcards
           # Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above.

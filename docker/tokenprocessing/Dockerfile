@@ -5,8 +5,9 @@ FROM golang:1.19-bullseye
 ARG VERSION
 ARG FFMPEG_VERSION
 
-RUN apt-get update
-RUN apt-get install -y ffmpeg=$FFMPEG_VERSION && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get install -y ffmpeg=$FFMPEG_VERSION imagemagick && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install deps
 WORKDIR /app

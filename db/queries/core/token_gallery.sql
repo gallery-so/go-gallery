@@ -26,6 +26,7 @@ insert into tokens
   , is_provider_marked_spam
   , last_synced
   , token_uri
+  , token_media_id
 ) (
   select
     id
@@ -53,6 +54,15 @@ insert into tokens
     , is_provider_marked_spam
     , last_synced
     , token_uri
+    , (select tm.id
+       from token_medias tm
+       where tm.token_id = bulk_upsert.token_id
+         and tm.contract_id = bulk_upsert.contract
+         and tm.chain = bulk_upsert.chain
+         and tm.active = true
+         and tm.deleted = false
+        limit 1
+      ) as token_media_id
   from (
     select
       unnest(@id::varchar[]) as id
@@ -64,7 +74,6 @@ insert into tokens
       , unnest(@description::varchar[]) as description
       , unnest(@collectors_note::varchar[]) as collectors_note
       , unnest(@token_type::varchar[]) as token_type
-      , unnest(@token_id::varchar[]) as token_id
       , unnest(@quantity::varchar[]) as quantity
       , @ownership_history::jsonb[] as ownership_history
       , unnest(@ownership_history_start_idx::int[]) as ownership_history_start_idx
@@ -78,23 +87,22 @@ insert into tokens
       , @owned_by_wallets::varchar[] as owned_by_wallets
       , unnest(@owned_by_wallets_start_idx::int[]) as owned_by_wallets_start_idx
       , unnest(@owned_by_wallets_end_idx::int[]) as owned_by_wallets_end_idx
-      , unnest(@chain::int[]) as chain
-      , unnest(@contract::varchar[]) as contract
       , unnest(@is_user_marked_spam::bool[]) as is_user_marked_spam
       , unnest(@is_provider_marked_spam::bool[]) as is_provider_marked_spam
       , unnest(@last_synced::timestamptz[]) as last_synced
       , unnest(@token_uri::varchar[]) as token_uri
+      , unnest(@token_id::varchar[]) as token_id
+      , unnest(@contract::varchar[]) as contract
+      , unnest(@chain::int[]) as chain
   ) bulk_upsert
 )
 on conflict (token_id, contract, chain, owner_user_id) where deleted = false
 do update set
   token_type = excluded.token_type
-  , chain = excluded.chain
   , name = excluded.name
   , description = excluded.description
   , token_uri = excluded.token_uri
   , quantity = excluded.quantity
-  , owner_user_id = excluded.owner_user_id
   , owned_by_wallets = excluded.owned_by_wallets
   , ownership_history = tokens.ownership_history || excluded.ownership_history
   , fallback_media = excluded.fallback_media

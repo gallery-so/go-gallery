@@ -1700,6 +1700,7 @@ func (TextMedia) IsMediaSubtype() {}
 func (TextMedia) IsMedia()        {}
 
 type Token struct {
+	HelperTokenData
 	Dbid                  persist.DBID          `json:"dbid"`
 	CreationTime          *time.Time            `json:"creationTime"`
 	LastUpdated           *time.Time            `json:"lastUpdated"`

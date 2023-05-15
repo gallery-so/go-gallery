@@ -361,13 +361,18 @@ enum WalletType {
   GnosisSafe
 }
 
-type Token implements Node {
+enum InteractionType {
+  Admire
+  Comment
+}
+
+type Token implements Node @goEmbedHelper {
   id: ID!
   dbid: DBID!
   creationTime: Time
   lastUpdated: Time
   collectorsNote: String
-  media: MediaSubtype
+  media: MediaSubtype @goField(forceResolver: true)
   tokenType: TokenType
   chain: Chain
   name: String

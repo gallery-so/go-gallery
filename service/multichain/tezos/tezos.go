@@ -19,13 +19,26 @@ import (
 	"github.com/machinebox/graphql"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
 	"golang.org/x/crypto/blake2b"
 )
+
+const (
+	hicEtNunc = "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton"
+	fxHash    = "KT1KEa8z6vWXDJrVqtMrAeDVzsvxat3kHaCE"
+	fxHash2   = "KT1U6EHmNxJTkvaWJ4ThczG4FSDaHC21ssvi"
+)
+
+func IsHicEtNunc(contract persist.Address) bool {
+	return contract == hicEtNunc
+}
+
+func IsFxHash(contract persist.Address) bool {
+	return contract == fxHash || contract == fxHash2
+}
 
 const pageSize = 1000
 
@@ -815,7 +828,7 @@ func (b balance) ToBigInt() *big.Int {
 // (either because of tzkt failing to update the metadata, or FxHash never signing the token). If it's the former, we want to
 // fallback to an alternative provider in case there might be usable metadata elsewhere.
 func IsSigned(ctx context.Context, token multichain.ChainAgnosticToken) bool {
-	return !media.IsFxHash(token.ContractAddress) || token.Name != "[WAITING TO BE SIGNED]"
+	return !IsFxHash(token.ContractAddress) || token.Name != "[WAITING TO BE SIGNED]"
 }
 
 // ContainsTezosKeywords returns true if the token's metadata has at least one non-empty Tezos keyword.

@@ -130,9 +130,8 @@ func NewUserRepository(db *sql.DB, queries *db.Queries, pgx *pgxpool.Pool) *User
 // UpdateByID updates the user with the given ID
 func (u *UserRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUpdate interface{}) error {
 
-	switch pUpdate.(type) {
+	switch update := pUpdate.(type) {
 	case persist.UserUpdateInfoInput:
-		update := pUpdate.(persist.UserUpdateInfoInput)
 		aUser, err := u.GetByUsername(pCtx, update.Username.String())
 		if err != nil {
 			errNotFound := persist.ErrUserNotFound{}
@@ -157,7 +156,6 @@ func (u *UserRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUpd
 			return persist.ErrUserNotFound{UserID: pID}
 		}
 	case persist.UserUpdateNotificationSettings:
-		update := pUpdate.(persist.UserUpdateNotificationSettings)
 		return u.queries.UpdateNotificationSettingsByID(pCtx, coredb.UpdateNotificationSettingsByIDParams{
 			ID:                   pID,
 			NotificationSettings: update.NotificationSettings,
