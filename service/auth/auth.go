@@ -442,6 +442,9 @@ func clearSessionStateForCtx(c *gin.Context, err error) {
 	c.Set(userAuthedContextKey, false)
 }
 
+// StartSession begins a new session for the specified user. After calling StartSession,
+// the current auth state can be queried with functions like GetUserAuthedFromCtx(),
+// GetUserIDFromCtx(), etc.
 func StartSession(c *gin.Context, queries *db.Queries, userID persist.DBID) error {
 	sessionID := persist.GenerateID()
 
@@ -458,6 +461,10 @@ func StartSession(c *gin.Context, queries *db.Queries, userID persist.DBID) erro
 	return nil
 }
 
+// ContinueSession checks the request cookies for an existing auth session and continues
+// it if possible. If the request is for an expired or invalid session, the user will be
+// logged out. After calling ContinueSession, the current auth state can be queried with
+// functions like GetUserAuthedFromCtx(), GetUserIDFromCtx(), etc.
 func ContinueSession(c *gin.Context, queries *db.Queries) error {
 	// If the user has a valid auth cookie, we can set their auth state and be done
 	userID, sessionID, authTokenErr := getAuthToken(c)
