@@ -1,4 +1,4 @@
-drop materialized view migration_validation;
+drop materialized view if exists migration_validation;
 create materialized view migration_validation as (
 	select
 		t.id 
