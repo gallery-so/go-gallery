@@ -200,9 +200,9 @@ func cacheObjectsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	// the media type is not cacheable but is valid
 	if notCacheableErr, ok := animResult.err.(errNotCacheable); ok {
-		return nil, notCacheableErr
+		return objects, notCacheableErr
 	} else if notCacheableErr, ok := imgResult.err.(errNotCacheable); ok {
-		return nil, notCacheableErr
+		return objects, notCacheableErr
 	}
 
 	// neither download worked, unexpectedly
