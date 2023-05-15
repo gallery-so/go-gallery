@@ -302,9 +302,16 @@ func Login(ctx context.Context, queries *db.Queries, authenticator Authenticator
 
 	userID := authResult.User.ID
 
-	err = StartSession(gc, queries, userID)
-	if err != nil {
-		return "", err
+	// Start a new session if:
+	// - no user is currently authenticated, or
+	// - a user is authenticated, but it's not the one who just logged in
+	// Otherwise, this user is already logged in, and we don't need to do
+	// anything here. Their existing session should continue as usual.
+	if !GetUserAuthedFromCtx(gc) || GetUserIDFromCtx(gc) != userID {
+		err = StartSession(gc, queries, userID)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	return authResult.User.ID, nil
