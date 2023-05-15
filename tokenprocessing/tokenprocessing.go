@@ -15,6 +15,7 @@ import (
 	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/metric"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/redis"
@@ -57,7 +58,7 @@ func CoreInitServer(c *server.Clients, mc *multichain.Provider) *gin.Engine {
 
 	t := newThrottler()
 
-	tp := NewTokenProcessor(c.Queries, c.EthClient, mc, c.IPFSClient, c.ArweaveClient, c.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), c.Repos.TokenRepository)
+	tp := NewTokenProcessor(c.Queries, c.EthClient, mc, c.IPFSClient, c.ArweaveClient, c.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), c.Repos.TokenRepository, metric.NewLogMetricReporter())
 
 	return handlersInitServer(router, tp, mc, c.Repos, t)
 }

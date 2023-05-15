@@ -11,6 +11,7 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/metric"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -28,9 +29,10 @@ type tokenProcessor struct {
 	stg           *storage.Client
 	tokenBucket   string
 	tokenRepo     *postgres.TokenGalleryRepository
+	mr            metric.MetricReporter
 }
 
-func NewTokenProcessor(queries *coredb.Queries, ethClient *ethclient.Client, mc *multichain.Provider, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, tokenRepo *postgres.TokenGalleryRepository) *tokenProcessor {
+func NewTokenProcessor(queries *coredb.Queries, ethClient *ethclient.Client, mc *multichain.Provider, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, tokenRepo *postgres.TokenGalleryRepository, mr metric.MetricReporter) *tokenProcessor {
 	return &tokenProcessor{
 		queries:       queries,
 		ethClient:     ethClient,
@@ -40,6 +42,7 @@ func NewTokenProcessor(queries *coredb.Queries, ethClient *ethclient.Client, mc 
 		stg:           stg,
 		tokenBucket:   tokenBucket,
 		tokenRepo:     tokenRepo,
+		mr:            mr,
 	}
 }
 
@@ -87,38 +90,41 @@ func (tp *tokenProcessor) ProcessTokenPipeline(c context.Context, t persist.Toke
 	defer cancel()
 
 	totalTime := time.Now()
-	defer func() {
-		logger.For(ctx).Infof("token processing job complete: total time for token processing job: %s", time.Since(totalTime))
-	}()
 
-	go func() {
-		// log the current pipeline metadata if the context deadline is reached
-		<-ctx.Done()
-		if ctx.Err() == context.DeadlineExceeded {
-			logger.For(ctx).Infof("token processing job context deadline reached: (%+v)", *job.pipelineMetadata)
-		}
-	}()
-
-	result := make(chan error, 1)
+	result := make(chan runResult, 1)
 
 	select {
 	case result <- job.run(ctx):
-		return <-result
+		runResult := <-result
+		recordPipelineEndState(ctx, tp.mr, &runResult, time.Since(totalTime))
+		return runResult.Err
 	case <-ctx.Done():
+		recordPipelineEndState(ctx, tp.mr, nil, time.Since(totalTime))
 		return ctx.Err()
 	}
 }
 
-func (tpj *tokenProcessingJob) run(ctx context.Context) error {
+type runResult struct {
+	MediaType persist.MediaType
+	Chain     persist.Chain
+	Err       error
+}
+
+func (tpj *tokenProcessingJob) run(ctx context.Context) runResult {
 	span, ctx := tracing.StartSpan(ctx, "pipeline.run", fmt.Sprintf("run %s", tpj.id))
 	defer tracing.FinishSpan(span)
 
-	tmedia, err := tpj.createMediaForToken(ctx)
+	media, err := tpj.createMediaForToken(ctx)
 	if err != nil {
 		logger.For(ctx).Errorf("error creating media for token: %s", err)
 	}
 
-	return tpj.persistResults(ctx, tmedia)
+	err = tpj.persistResults(ctx, media)
+	return runResult{
+		Chain:     media.Chain,
+		MediaType: media.Media.MediaType,
+		Err:       err,
+	}
 }
 
 func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (coredb.TokenMedia, error) {
@@ -352,4 +358,61 @@ func (tpj *tokenProcessingJob) upsertDB(ctx context.Context, tmetadata coredb.To
 		}
 	}
 	return nil
+}
+
+const (
+	// Metrics emitted by the pipeline
+	metricPipelineCompleted = "pipeline_completed"
+	metricPipelineDuration  = "pipeline_duration"
+	metricPipelineErrored   = "pipeline_errored"
+	metricPipelineTimedOut  = "pipeline_timedout"
+)
+
+func pipelineDurationMetric(d time.Duration) metric.Measure {
+	return metric.Measure{Name: metricPipelineDuration, Value: d.Seconds()}
+}
+
+func pipelineTimedOutMetric() metric.Measure {
+	return metric.Measure{Name: metricPipelineTimedOut}
+}
+
+func pipelineCompletedMetric() metric.Measure {
+	return metric.Measure{Name: metricPipelineCompleted}
+}
+
+func pipelineErroredMetric() metric.Measure {
+	return metric.Measure{Name: metricPipelineErrored}
+}
+
+func recordPipelineEndState(ctx context.Context, mr metric.MetricReporter, r *runResult, d time.Duration) {
+	baseOpts := []any{}
+
+	if r != nil {
+		tags := map[string]string{
+			"chain":     fmt.Sprintf("%d", r.Chain),
+			"mediaType": r.MediaType.String(),
+		}
+		baseOpts = append(baseOpts, metric.LogOptions.WithTags(tags))
+	}
+
+	if ctx.Err() != nil {
+		opts := append(baseOpts, metric.LogOptions.WithLogMessage("pipeline timed out"))
+		mr.Record(ctx, pipelineTimedOutMetric(), opts...)
+	}
+
+	recordPipelineDuration(ctx, mr, d, baseOpts)
+
+	if r != nil && r.Err != nil {
+		opts := append(baseOpts, metric.LogOptions.WithLogMessage("pipeline completed with error: "+r.Err.Error()))
+		mr.Record(ctx, pipelineErroredMetric(), opts...)
+		return
+	}
+
+	opts := append(baseOpts, metric.LogOptions.WithLogMessage("pipeline completed successfully"))
+	mr.Record(ctx, pipelineCompletedMetric(), opts...)
+}
+
+func recordPipelineDuration(ctx context.Context, mr metric.MetricReporter, d time.Duration, opts []any) {
+	opts = append(opts, metric.LogOptions.WithLogMessage(fmt.Sprintf("token processing job complete: total time for token processing job: %s", d)))
+	mr.Record(ctx, pipelineDurationMetric(d), opts...)
 }
