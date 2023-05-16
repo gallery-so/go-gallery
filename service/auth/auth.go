@@ -40,10 +40,10 @@ type AuthenticatedAddress struct {
 
 const (
 	// Context keys for auth data
-	userAuthedContextKey = "auth.authenticated"
-	userIDContextKey     = "auth.user_id"
-	sessionIDContextKey  = "auth.session_id"
-	authErrorContextKey  = "auth.auth_error"
+	userAuthedContextKey     = "auth.authenticated"
+	userIDContextKey         = "auth.user_id"
+	sessionIDContextKey      = "auth.session_id"
+	authErrorContextKey      = "auth.auth_error"
 	userRolesContextKey      = "auth.roles"
 	userRolesExistContextKey = "auth.roles_exist"
 	roleErrorContextKey      = "auth.roles_error"
@@ -323,8 +323,6 @@ func Login(ctx context.Context, queries *db.Queries, authenticator Authenticator
 func Logout(ctx context.Context, queries *db.Queries) {
 	gc := util.MustGetGinContext(ctx)
 	EndSession(gc, queries)
-    // TODO: Fix merge by clearing roles in EndSession
-	SetRolesForCtx(gc, []persist.Role{}, nil)
 }
 
 // GetAuthNonce will determine whether a user is permitted to log in, and if so, generate a nonce to be signed
@@ -445,6 +443,9 @@ func clearSessionStateForCtx(c *gin.Context, err error) {
 	c.Set(sessionIDContextKey, "")
 	c.Set(authErrorContextKey, err)
 	c.Set(userAuthedContextKey, false)
+	c.Set(userRolesContextKey, []persist.Role{})
+	c.Set(roleErrorContextKey, nil)
+	c.Set(userRolesExistContextKey, false)
 }
 
 func SetRolesForCtx(c *gin.Context, roles []persist.Role, err error) {
@@ -508,7 +509,13 @@ func ContinueSession(c *gin.Context, queries *db.Queries) error {
 		}
 		// End of temporary handling
 		// ----------------------------------------------------------------------------
+
 		setSessionStateForCtx(c, userID, sessionID)
+
+		// TODO: Store these in the auth token and parse them, so we aren't hitting the database for every request
+		roles, err := RolesByUserID(c, queries, userID)
+		SetRolesForCtx(c, roles, err)
+
 		return nil
 	}
 
@@ -602,6 +609,10 @@ func issueSessionTokens(c *gin.Context, userID persist.DBID, sessionID persist.D
 	setSessionStateForCtx(c, userID, sessionID)
 	setSessionCookies(c, newAuthToken, newRefreshToken)
 
+	// TODO: Store these in the auth token and parse them, so we aren't hitting the database for every request
+	roles, err := RolesByUserID(c, queries, userID)
+	SetRolesForCtx(c, roles, err)
+
 	return nil
 }
 
@@ -653,7 +664,6 @@ func setCookie(c *gin.Context, cookieName string, value string) {
 	mode := http.SameSiteStrictMode
 	domain := ".gallery.so"
 	httpOnly := true
-	secure := true
 
 	clientIsLocalhost := c.Request.Header.Get("Origin") == "http://localhost:3000"
 
@@ -668,7 +678,7 @@ func setCookie(c *gin.Context, cookieName string, value string) {
 		Value:    value,
 		MaxAge:   cookieMaxAge,
 		Path:     "/",
-		Secure:   secure,
+		Secure:   true,
 		HttpOnly: httpOnly,
 		SameSite: mode,
 		Domain:   domain,
