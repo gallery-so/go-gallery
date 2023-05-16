@@ -3,7 +3,9 @@ package publicapi
 import (
 	"context"
 	"fmt"
+	"github.com/mikeydub/go-gallery/util"
 	"strings"
+	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/validate"
@@ -13,6 +15,7 @@ import (
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/redis"
 )
 
 const (
@@ -97,6 +100,38 @@ func (api CollectionAPI) GetCollectionsByGalleryId(ctx context.Context, galleryI
 	}
 
 	return collections, nil
+}
+
+func (api CollectionAPI) GetTopCollectionsForCommunity(ctx context.Context, chainAddress persist.ChainAddress) ([]db.Collection, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"chainAddress": {chainAddress, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	r := ranker{
+		Cache: redis.NewCache(redis.SearchCache),
+		Key:   fmt.Sprintf("top_collections_by_address:%d:%s", chainAddress.Chain(), chainAddress.Address()),
+		TTL:   time.Hour * 6,
+		CalcFunc: func(ctx context.Context) ([]persist.DBID, error) {
+			return api.queries.GetTopCollectionsForCommunity(ctx, db.GetTopCollectionsForCommunityParams{
+				Chain:   chainAddress.Chain(),
+				Address: chainAddress.Address(),
+			})
+		},
+	}
+
+	collectionIDs, err := r.loadRank(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	asStr, _ := util.Map(collectionIDs, func(id persist.DBID) (string, error) {
+		return id.String(), nil
+	})
+
+	return api.queries.GetVisibleCollectionsByIDs(ctx, asStr)
 }
 
 func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist.DBID, name string, collectorsNote string, tokens []persist.DBID, layout persist.TokenLayout, tokenSettings map[persist.DBID]persist.CollectionTokenSettings, caption *string) (*db.Collection, *db.FeedEvent, error) {

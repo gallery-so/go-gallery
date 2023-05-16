@@ -19,6 +19,7 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/util"
 )
 
 type FeedAPI struct {
@@ -298,13 +299,15 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 			return trendingIDs, nil
 		}
 
-		t := trender{
+		r := ranker{
 			Cache:    api.cache,
 			Key:      "trending.feedEvents",
 			TTL:      time.Minute * 10,
 			CalcFunc: calcFunc,
 		}
-		if err = t.load(ctx, &trendingIDs); err != nil {
+
+		trendingIDs, err = r.loadRank(ctx)
+		if err != nil {
 			return nil, PageInfo{}, err
 		}
 	}
@@ -371,24 +374,21 @@ func (api FeedAPI) TrendingUsers(ctx context.Context, report model.Window) ([]db
 		ttl *= 24
 	}
 
-	t := trender{
+	r := ranker{
 		Cache:    api.cache,
-		Key:      "trending.users." + report.Name,
+		Key:      "trending:users:" + report.Name,
 		TTL:      ttl,
 		CalcFunc: calcFunc,
 	}
 
-	var trendingIDs []persist.DBID
-
-	err := t.load(ctx, &trendingIDs)
+	trendingIDs, err := r.loadRank(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	asStr := make([]string, len(trendingIDs))
-	for i, id := range trendingIDs {
-		asStr[i] = id.String()
-	}
+	asStr, _ := util.Map(trendingIDs, func(id persist.DBID) (string, error) {
+		return id.String(), nil
+	})
 
 	return api.queries.GetTrendingUsersByIDs(ctx, asStr)
 }
@@ -400,39 +400,48 @@ func feedCursor(i interface{}) (time.Time, persist.DBID, error) {
 	return time.Time{}, "", fmt.Errorf("interface{} is not a feed event")
 }
 
-type trender struct {
-	// CalcFunc computes the results of a trend and returns record in sorted order
-	CalcFunc func(context.Context) ([]persist.DBID, error)
-	Cache    *redis.Cache  // Cache to store pre-computed trends
-	Key      string        // Key used to store and reference saved results
-	TTL      time.Duration // The length of time before a cached result is considered to be stale
+type ranker struct {
+	CalcFunc func(context.Context) ([]persist.DBID, error) // CalcFunc computes the results of a ranking and returns IDs in rank order
+	Cache    *redis.Cache                                  // Cache to store pre-computed results
+	Key      string                                        // Cache key used to store and retrieve saved results
+	TTL      time.Duration                                 // The length of time before a cached result is considered to be stale
 }
 
-// load implements a lazy filled cache where only requested data is stored in the cache.
+// loadRank implements a lazy filled cache where only requested data is stored in the cache.
 // It is possible for load to return stale data, however the staleness of data can be
 // limited by configuring a shorter TTL. The tradeoff being that a shorter TTL results in more
-// cache misses and more frequent trips to check the cache, compute the trend, and re-populate the cache.
-func (t *trender) load(ctx context.Context, into any) error {
-	byt, err := t.Cache.Get(ctx, t.Key)
+// cache misses and more frequent trips to check the cache, compute the rank, and re-populate the cache.
+func (r *ranker) loadRank(ctx context.Context) ([]persist.DBID, error) {
+	byt, err := r.Cache.Get(ctx, r.Key)
+
+	// Found an existing cache entry
+	if err == nil {
+		rank := make([]persist.DBID, 0)
+		err := json.Unmarshal(byt, &rank)
+		return rank, err
+	}
+
 	var notFoundErr redis.ErrKeyNotFound
 
-	if err != nil && !errors.As(err, &notFoundErr) {
-		return err
+	// Got an error other than a cache miss
+	if !errors.As(err, &notFoundErr) {
+		return nil, err
 	}
 
-	if errors.As(err, &notFoundErr) {
-		trend, err := t.CalcFunc(ctx)
-		if err != nil {
-			return err
-		}
+	// Cache miss, re-compute the rank and store it in the cache
+	return r.refreshRank(ctx)
+}
 
-		byt, err = json.Marshal(trend)
-		if err != nil {
-			return err
-		}
-
-		err = t.Cache.Set(ctx, t.Key, byt, t.TTL)
+func (r *ranker) refreshRank(ctx context.Context) ([]persist.DBID, error) {
+	rank, err := r.CalcFunc(ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	return json.Unmarshal(byt, &into)
+	byt, err := json.Marshal(rank)
+	if err != nil {
+		return nil, err
+	}
+
+	return rank, r.Cache.Set(ctx, r.Key, byt, r.TTL)
 }

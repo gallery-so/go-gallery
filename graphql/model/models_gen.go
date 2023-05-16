@@ -2146,6 +2146,10 @@ type Wallet struct {
 func (Wallet) IsNode()                {}
 func (Wallet) IsGalleryUserOrWallet() {}
 
+type TopCollectionsForCommunityInput struct {
+	ChainAddress *persist.ChainAddress `json:"chainAddress"`
+}
+
 type EmailUnsubscriptionType string
 
 const (

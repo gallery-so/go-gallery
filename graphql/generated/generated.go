@@ -812,35 +812,36 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		CollectionByID          func(childComplexity int, id persist.DBID) int
-		CollectionTokenByID     func(childComplexity int, tokenID persist.DBID, collectionID persist.DBID) int
-		CollectionsByIds        func(childComplexity int, ids []persist.DBID) int
-		CommunityByAddress      func(childComplexity int, communityAddress persist.ChainAddress, forceRefresh *bool) int
-		FeedEventByID           func(childComplexity int, id persist.DBID) int
-		GalleryByID             func(childComplexity int, id persist.DBID) int
-		GalleryOfTheWeekWinners func(childComplexity int) int
-		GeneralAllowlist        func(childComplexity int) int
-		GetMerchTokens          func(childComplexity int, wallet persist.Address) int
-		GlobalFeed              func(childComplexity int, before *string, after *string, first *int, last *int) int
-		MembershipTiers         func(childComplexity int, forceRefresh *bool) int
-		Node                    func(childComplexity int, id model.GqlID) int
-		SearchCommunities       func(childComplexity int, query string, limit *int, nameWeight *float64, descriptionWeight *float64, poapAddressWeight *float64) int
-		SearchGalleries         func(childComplexity int, query string, limit *int, nameWeight *float64, descriptionWeight *float64) int
-		SearchUsers             func(childComplexity int, query string, limit *int, usernameWeight *float64, bioWeight *float64) int
-		SocialConnections       func(childComplexity int, socialAccountType persist.SocialProvider, excludeAlreadyFollowing *bool, before *string, after *string, first *int, last *int) int
-		SocialQueries           func(childComplexity int) int
-		TokenByID               func(childComplexity int, id persist.DBID) int
-		TrendingFeed            func(childComplexity int, before *string, after *string, first *int, last *int) int
-		TrendingUsers           func(childComplexity int, input model.TrendingUsersInput) int
-		UserByAddress           func(childComplexity int, chainAddress persist.ChainAddress) int
-		UserByID                func(childComplexity int, id persist.DBID) int
-		UserByUsername          func(childComplexity int, username string) int
-		UsersByRole             func(childComplexity int, role persist.Role, before *string, after *string, first *int, last *int) int
-		UsersWithTrait          func(childComplexity int, trait string) int
-		Viewer                  func(childComplexity int) int
-		ViewerGalleryByID       func(childComplexity int, id persist.DBID) int
-		__resolve__service      func(childComplexity int) int
-		__resolve_entities      func(childComplexity int, representations []map[string]interface{}) int
+		CollectionByID             func(childComplexity int, id persist.DBID) int
+		CollectionTokenByID        func(childComplexity int, tokenID persist.DBID, collectionID persist.DBID) int
+		CollectionsByIds           func(childComplexity int, ids []persist.DBID) int
+		CommunityByAddress         func(childComplexity int, communityAddress persist.ChainAddress, forceRefresh *bool) int
+		FeedEventByID              func(childComplexity int, id persist.DBID) int
+		GalleryByID                func(childComplexity int, id persist.DBID) int
+		GalleryOfTheWeekWinners    func(childComplexity int) int
+		GeneralAllowlist           func(childComplexity int) int
+		GetMerchTokens             func(childComplexity int, wallet persist.Address) int
+		GlobalFeed                 func(childComplexity int, before *string, after *string, first *int, last *int) int
+		MembershipTiers            func(childComplexity int, forceRefresh *bool) int
+		Node                       func(childComplexity int, id model.GqlID) int
+		SearchCommunities          func(childComplexity int, query string, limit *int, nameWeight *float64, descriptionWeight *float64, poapAddressWeight *float64) int
+		SearchGalleries            func(childComplexity int, query string, limit *int, nameWeight *float64, descriptionWeight *float64) int
+		SearchUsers                func(childComplexity int, query string, limit *int, usernameWeight *float64, bioWeight *float64) int
+		SocialConnections          func(childComplexity int, socialAccountType persist.SocialProvider, excludeAlreadyFollowing *bool, before *string, after *string, first *int, last *int) int
+		SocialQueries              func(childComplexity int) int
+		TokenByID                  func(childComplexity int, id persist.DBID) int
+		TopCollectionsForCommunity func(childComplexity int, input model.TopCollectionsForCommunityInput) int
+		TrendingFeed               func(childComplexity int, before *string, after *string, first *int, last *int) int
+		TrendingUsers              func(childComplexity int, input model.TrendingUsersInput) int
+		UserByAddress              func(childComplexity int, chainAddress persist.ChainAddress) int
+		UserByID                   func(childComplexity int, id persist.DBID) int
+		UserByUsername             func(childComplexity int, username string) int
+		UsersByRole                func(childComplexity int, role persist.Role, before *string, after *string, first *int, last *int) int
+		UsersWithTrait             func(childComplexity int, trait string) int
+		Viewer                     func(childComplexity int) int
+		ViewerGalleryByID          func(childComplexity int, id persist.DBID) int
+		__resolve__service         func(childComplexity int) int
+		__resolve_entities         func(childComplexity int, representations []map[string]interface{}) int
 	}
 
 	RedeemMerchPayload struct {
@@ -1478,6 +1479,7 @@ type QueryResolver interface {
 	UsersByRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) (*model.UsersConnection, error)
 	SocialConnections(ctx context.Context, socialAccountType persist.SocialProvider, excludeAlreadyFollowing *bool, before *string, after *string, first *int, last *int) (*model.SocialConnectionsConnection, error)
 	SocialQueries(ctx context.Context) (model.SocialQueriesOrError, error)
+	TopCollectionsForCommunity(ctx context.Context, input model.TopCollectionsForCommunityInput) ([]*model.Collection, error)
 }
 type RemoveAdmirePayloadResolver interface {
 	FeedEvent(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.FeedEvent, error)
@@ -4888,6 +4890,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.TokenByID(childComplexity, args["id"].(persist.DBID)), true
 
+	case "Query.topCollectionsForCommunity":
+		if e.complexity.Query.TopCollectionsForCommunity == nil {
+			break
+		}
+
+		args, err := ec.field_Query_topCollectionsForCommunity_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.TopCollectionsForCommunity(childComplexity, args["input"].(model.TopCollectionsForCommunityInput)), true
+
 	case "Query.trendingFeed":
 		if e.complexity.Query.TrendingFeed == nil {
 			break
@@ -6568,6 +6582,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputUpdateUserInfoInput,
 		ec.unmarshalInputUploadPersistedQueriesInput,
 		ec.unmarshalInputVerifyEmailInput,
+		ec.unmarshalInputtopCollectionsForCommunityInput,
 	)
 	first := true
 
@@ -7743,6 +7758,7 @@ type Query {
   ): SocialConnectionsConnection @goField(forceResolver: true) @authRequired
 
   socialQueries: SocialQueriesOrError @authRequired
+  topCollectionsForCommunity(input: topCollectionsForCommunityInput!): [Collection!]
 }
 
 type SocialQueries {
@@ -7754,6 +7770,10 @@ type SocialQueries {
     first: Int
     last: Int
   ): SocialConnectionsConnection @goField(forceResolver: true) @authRequired
+}
+
+input topCollectionsForCommunityInput {
+  chainAddress: ChainAddressInput!
 }
 
 input CollectionLayoutInput {
@@ -10694,6 +10714,21 @@ func (ec *executionContext) field_Query_tokenById_args(ctx context.Context, rawA
 		}
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_topCollectionsForCommunity_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.TopCollectionsForCommunityInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNtopCollectionsForCommunityInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTopCollectionsForCommunityInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -33401,6 +33436,78 @@ func (ec *executionContext) fieldContext_Query_socialQueries(ctx context.Context
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_topCollectionsForCommunity(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_topCollectionsForCommunity(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().TopCollectionsForCommunity(rctx, fc.Args["input"].(model.TopCollectionsForCommunityInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.Collection)
+	fc.Result = res
+	return ec.marshalOCollection2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_topCollectionsForCommunity(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Collection_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Collection_dbid(ctx, field)
+			case "version":
+				return ec.fieldContext_Collection_version(ctx, field)
+			case "name":
+				return ec.fieldContext_Collection_name(ctx, field)
+			case "collectorsNote":
+				return ec.fieldContext_Collection_collectorsNote(ctx, field)
+			case "gallery":
+				return ec.fieldContext_Collection_gallery(ctx, field)
+			case "layout":
+				return ec.fieldContext_Collection_layout(ctx, field)
+			case "hidden":
+				return ec.fieldContext_Collection_hidden(ctx, field)
+			case "tokens":
+				return ec.fieldContext_Collection_tokens(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Collection", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_topCollectionsForCommunity_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query__entities(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Query__entities(ctx, field)
 	if err != nil {
@@ -48512,6 +48619,35 @@ func (ec *executionContext) unmarshalInputVerifyEmailInput(ctx context.Context, 
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputtopCollectionsForCommunityInput(ctx context.Context, obj interface{}) (model.TopCollectionsForCommunityInput, error) {
+	var it model.TopCollectionsForCommunityInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"chainAddress"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "chainAddress":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chainAddress"))
+			data, err := ec.unmarshalNChainAddressInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ChainAddress = data
+		}
+	}
+
+	return it, nil
+}
+
 // endregion **************************** input.gotpl *****************************
 
 // region    ************************** interface.gotpl ***************************
@@ -57121,6 +57257,26 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			out.Concurrently(i, func() graphql.Marshaler {
 				return rrm(innerCtx)
 			})
+		case "topCollectionsForCommunity":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_topCollectionsForCommunity(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return rrm(innerCtx)
+			})
 		case "_entities":
 			field := field
 
@@ -60614,6 +60770,16 @@ func (ec *executionContext) unmarshalNChainPubKeyInput2ᚖgithubᚗcomᚋmikeydu
 	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) marshalNCollection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollection(ctx context.Context, sel ast.SelectionSet, v *model.Collection) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._Collection(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNCollectionLayoutInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionLayoutInput(ctx context.Context, v interface{}) (*model.CollectionLayoutInput, error) {
 	res, err := ec.unmarshalInputCollectionLayoutInput(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
@@ -61553,6 +61719,11 @@ func (ec *executionContext) marshalN__TypeKind2string(ctx context.Context, sel a
 	return res
 }
 
+func (ec *executionContext) unmarshalNtopCollectionsForCommunityInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTopCollectionsForCommunityInput(ctx context.Context, v interface{}) (model.TopCollectionsForCommunityInput, error) {
+	res, err := ec.unmarshalInputtopCollectionsForCommunityInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalOAction2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAction(ctx context.Context, v interface{}) (*persist.Action, error) {
 	if v == nil {
 		return nil, nil
@@ -61953,6 +62124,53 @@ func (ec *executionContext) marshalOCollection2ᚕᚖgithubᚗcomᚋmikeydubᚋg
 
 	}
 	wg.Wait()
+
+	return ret
+}
+
+func (ec *executionContext) marshalOCollection2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Collection) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNCollection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollection(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
 
 	return ret
 }

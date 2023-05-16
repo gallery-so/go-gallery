@@ -54,6 +54,7 @@ var (
 	GraphQLAPQCache                   = CacheConfig{database: graphQLAPQ, keyPrefix: "", displayName: "graphQLAPQ"}
 	FeedCache                         = CacheConfig{database: feed, keyPrefix: "", displayName: "feed"}
 	SocialCache                       = CacheConfig{database: social, keyPrefix: "", displayName: "social"}
+	SearchCache                       = CacheConfig{keyPrefix: "search", displayName: "search"}
 )
 
 func newClient(db redisDB, traceName string) *redis.Client {

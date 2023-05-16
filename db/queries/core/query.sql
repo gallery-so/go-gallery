@@ -1122,3 +1122,27 @@ select m.*
 from tokens t
 join token_medias m on t.chain = m.chain and t.contract = m.contract_id and t.token_id = m.token_id
 where t.id = $1 and m.active and not m.deleted;
+
+-- name: GetTopCollectionsForCommunity :many
+with contract_tokens as (
+	select t.id, t.owner_user_id
+	from tokens t
+	join contracts c on t.contract = c.id
+	where not t.deleted and not c.deleted and t.contract = c.id and c.chain =$1 and c.address = $2
+),
+ranking as (
+	select col.id, rank() over (order by col.created_at desc, count(col.id) desc) score
+	from collections col
+	join contract_tokens on col.owner_user_id = contract_tokens.owner_user_id and contract_tokens.id = any(col.nfts)
+	join users on col.owner_user_id = users.id
+	where not col.deleted and not col.hidden and not users.deleted
+	group by col.id
+)
+select collections.id from collections join ranking using(id) where score <= 100 order by score asc;
+
+-- name: GetVisibleCollectionsByIDs :many
+select collections.*
+from collections, unnest(@collection_ids::varchar[]) with ordinality as x(id, ord)
+where collections.id = x.id and not deleted and not hidden
+order by x.ord asc
+limit 10;

@@ -1883,6 +1883,21 @@ func (r *queryResolver) SocialQueries(ctx context.Context) (model.SocialQueriesO
 	return &model.SocialQueries{}, nil
 }
 
+// TopCollectionsForCommunity is the resolver for the topCollectionsForCommunity field.
+func (r *queryResolver) TopCollectionsForCommunity(ctx context.Context, input model.TopCollectionsForCommunityInput) ([]*model.Collection, error) {
+	collections, err := publicapi.For(ctx).Collection.GetTopCollectionsForCommunity(ctx, *input.ChainAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	cols := make([]*model.Collection, len(collections))
+	for i, c := range collections {
+		cols[i] = collectionToModel(ctx, c)
+	}
+
+	return cols, nil
+}
+
 // FeedEvent is the resolver for the feedEvent field.
 func (r *removeAdmirePayloadResolver) FeedEvent(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.FeedEvent, error) {
 	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)

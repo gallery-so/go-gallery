@@ -1096,6 +1096,7 @@ type Query {
   ): SocialConnectionsConnection @goField(forceResolver: true) @authRequired
 
   socialQueries: SocialQueriesOrError @authRequired
+  topCollectionsForCommunity(input: topCollectionsForCommunityInput!): [Collection!]
 }
 
 type SocialQueries {
@@ -1107,6 +1108,10 @@ type SocialQueries {
     first: Int
     last: Int
   ): SocialConnectionsConnection @goField(forceResolver: true) @authRequired
+}
+
+input topCollectionsForCommunityInput {
+  chainAddress: ChainAddressInput!
 }
 
 input CollectionLayoutInput {
