@@ -108,6 +108,7 @@ type runResult struct {
 	MediaType persist.MediaType
 	Chain     persist.Chain
 	Err       error
+	Cause     persist.ProcessingCause
 }
 
 func (tpj *tokenProcessingJob) run(ctx context.Context) runResult {
@@ -124,6 +125,7 @@ func (tpj *tokenProcessingJob) run(ctx context.Context) runResult {
 		Chain:     media.Chain,
 		MediaType: media.Media.MediaType,
 		Err:       err,
+		Cause:     tpj.cause,
 	}
 }
 
@@ -391,6 +393,7 @@ func recordPipelineEndState(ctx context.Context, mr metric.MetricReporter, r *ru
 		tags := map[string]string{
 			"chain":     fmt.Sprintf("%d", r.Chain),
 			"mediaType": r.MediaType.String(),
+			"cause":     r.Cause.String(),
 		}
 		baseOpts = append(baseOpts, metric.LogOptions.WithTags(tags))
 	}
