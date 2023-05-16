@@ -4,11 +4,9 @@ import (
 	"context"
 	"database/sql/driver"
 	"encoding/json"
-	"encoding/xml"
 	"fmt"
 	"io"
 	"math/big"
-	"net/http"
 	"net/url"
 	"strings"
 
@@ -36,16 +34,10 @@ const (
 	MediaTypeGIF MediaType = "gif"
 	// MediaTypeSVG represents an SVG
 	MediaTypeSVG MediaType = "svg"
-	// MediaTypeBase64BMP represents a base64 encoded bmp file
-	MediaTypeBase64BMP MediaType = "base64bmp"
-	// MediaTypeBase64PNG represents a base64 encoded png file
-	MediaTypeBase64PNG MediaType = "base64png"
 	// MediaTypeText represents plain text
 	MediaTypeText MediaType = "text"
 	// MediaTypeHTML represents html
 	MediaTypeHTML MediaType = "html"
-	// MediaTypeBase64Text represents a base64 encoded plain text
-	MediaTypeBase64Text MediaType = "base64text"
 	// MediaTypeAudio represents audio
 	MediaTypeAudio MediaType = "audio"
 	// MediaTypeJSON represents json metadata
@@ -64,7 +56,7 @@ const (
 	MediaTypeFallback MediaType = "fallback"
 )
 
-var mediaTypePriorities = []MediaType{MediaTypeHTML, MediaTypeAudio, MediaTypeAnimation, MediaTypeVideo, MediaTypeBase64BMP, MediaTypeBase64PNG, MediaTypeGIF, MediaTypeSVG, MediaTypeImage, MediaTypeJSON, MediaTypeBase64Text, MediaTypeText, MediaTypeSyncing, MediaTypeUnknown, MediaTypeInvalid}
+var mediaTypePriorities = []MediaType{MediaTypeHTML, MediaTypeAudio, MediaTypeAnimation, MediaTypeVideo, MediaTypeGIF, MediaTypeSVG, MediaTypeImage, MediaTypeJSON, MediaTypeText, MediaTypeSyncing, MediaTypeUnknown, MediaTypeInvalid}
 
 const (
 	// ChainETH represents the Ethereum blockchain
@@ -96,8 +88,12 @@ const (
 	URITypeIPFSAPI URIType = "ipfs-api"
 	// URITypeIPFSGateway represents an IPFS Gateway URI
 	URITypeIPFSGateway URIType = "ipfs-gateway"
+	// URITypeArweaveGateway represents an Arweave Gateway URI
+	URITypeArweaveGateway URIType = "arweave-gateway"
 	// URITypeBase64JSON represents a base64 encoded JSON document
 	URITypeBase64JSON URIType = "base64json"
+	// URITypeBase64HTML represents a base64 encoded HTML document
+	URITypeBase64HTML URIType = "base64html"
 	// URITypeJSON represents a JSON document
 	URITypeJSON URIType = "json"
 	// URITypeBase64SVG represents a base64 encoded SVG
@@ -106,6 +102,12 @@ const (
 	URITypeBase64BMP URIType = "base64bmp"
 	// URITypeBase64PNG represents a base64 encoded PNG
 	URITypeBase64PNG URIType = "base64png"
+	// URITypeBase64JPEG represents a base64 encoded JPEG
+	URITypeBase64JPEG URIType = "base64jpeg"
+	// URITypeBase64WAV represents a base64 encoded WAV
+	URITypeBase64WAV URIType = "base64wav"
+	// URITypeBase64MP3 represents a base64 encoded MP3
+	URITypeBase64MP3 URIType = "base64mp3"
 	// URITypeSVG represents an SVG
 	URITypeSVG URIType = "svg"
 	// URITypeENS represents an ENS domain
@@ -134,8 +136,6 @@ const InvalidTokenURI TokenURI = "INVALID"
 
 // ZeroAddress is the all-zero Ethereum address
 const ZeroAddress EthereumAddress = "0x0000000000000000000000000000000000000000"
-
-var gltfFields = []string{"scene", "scenes", "nodes", "meshes", "accessors", "bufferViews", "buffers", "materials", "textures", "images", "samplers", "cameras", "skins", "animations", "extensions", "extras"}
 
 // EthereumAddress represents an Ethereum address
 type EthereumAddress string
@@ -242,15 +242,6 @@ func (d Dimensions) Valid() bool {
 	return d.Width > 0 && d.Height > 0
 }
 
-// Media represents a token's media content with processed images from metadata
-type Media struct {
-	ThumbnailURL   NullString `json:"thumbnail_url,omitempty"`
-	LivePreviewURL NullString `json:"live_preview_url,omitempty"`
-	MediaURL       NullString `json:"media_url,omitempty"`
-	MediaType      MediaType  `json:"media_type"`
-	Dimensions     Dimensions `json:"dimensions"`
-}
-
 type FallbackMedia struct {
 	ImageURL   NullString `json:"image_url,omitempty"`
 	Dimensions Dimensions `json:"dimensions"`
@@ -339,78 +330,6 @@ type ErrTokensNotFoundByContract struct {
 	ContractAddress EthereumAddress
 }
 
-type svgXML struct {
-	XMLName xml.Name `xml:"svg"`
-}
-
-// SniffMediaType will attempt to detect the media type for a given array of bytes
-func SniffMediaType(buf []byte) (MediaType, string) {
-
-	var asXML svgXML
-	if err := xml.Unmarshal(buf, &asXML); err == nil {
-		return MediaTypeSVG, "image/svg+xml"
-	}
-
-	contentType := http.DetectContentType(buf)
-	contentType = strings.TrimSpace(contentType)
-	whereCharset := strings.IndexByte(contentType, ';')
-	if whereCharset != -1 {
-		contentType = contentType[:whereCharset]
-	}
-	if contentType == "application/octet-stream" || contentType == "text/plain" {
-		// fallback of http.DetectContentType
-		if strings.EqualFold(string(buf[:4]), "glTF") {
-			return MediaTypeAnimation, "model/gltf+binary"
-		}
-
-		if strings.HasPrefix(strings.TrimSpace(string(buf[:20])), "{") && util.ContainsAnyString(strings.TrimSpace(string(buf)), gltfFields...) {
-			return MediaTypeAnimation, "model/gltf+json"
-		}
-	}
-	return MediaFromContentType(contentType), contentType
-}
-
-// MediaFromContentType will attempt to convert a content type to a media type
-func MediaFromContentType(contentType string) MediaType {
-	contentType = strings.TrimSpace(contentType)
-	whereCharset := strings.IndexByte(contentType, ';')
-	if whereCharset != -1 {
-		contentType = contentType[:whereCharset]
-	}
-	spl := strings.Split(contentType, "/")
-
-	switch spl[0] {
-	case "image":
-		switch spl[1] {
-		case "svg", "svg+xml":
-			return MediaTypeSVG
-		case "gif":
-			return MediaTypeGIF
-		default:
-			return MediaTypeImage
-		}
-	case "video":
-		return MediaTypeVideo
-	case "audio":
-		return MediaTypeAudio
-	case "text":
-		switch spl[1] {
-		case "html":
-			return MediaTypeHTML
-		default:
-			return MediaTypeText
-		}
-	case "application":
-		switch spl[1] {
-		case "pdf":
-			return MediaTypePDF
-		}
-		fallthrough
-	default:
-		return MediaTypeUnknown
-	}
-}
-
 func (e ErrTokenNotFoundByID) Error() string {
 	return fmt.Sprintf("token not found by ID: %s", e.ID)
 }
@@ -447,7 +366,7 @@ func (c Chain) BaseKeywords() (image []string, anim []string) {
 	case ChainTezos:
 		return []string{"displayUri", "image", "thumbnailUri", "artifactUri", "uri"}, []string{"artifactUri", "displayUri", "uri", "image"}
 	default:
-		return []string{"image"}, []string{"animation", "video"}
+		return []string{"image_url", "image"}, []string{"animation_url", "animation", "video"}
 	}
 }
 
@@ -592,18 +511,28 @@ func (uri TokenURI) Type() URIType {
 		return URITypeIPFS
 	case strings.HasPrefix(asString, "ar://"), strings.HasPrefix(asString, "arweave://"):
 		return URITypeArweave
-	case strings.HasPrefix(asString, "data:application/json;base64,"):
+	case strings.HasPrefix(asString, "data:text/html;base64,"), strings.HasPrefix(asString, "data:text/html;charset=utf-8;base64,"), strings.HasPrefix(asString, "data:text/html") && strings.Contains(asString, ";base64,"):
+		return URITypeBase64HTML
+	case strings.HasPrefix(asString, "data:application/json;base64,"), strings.HasPrefix(asString, "data:application/json;charset=utf-8;base64,"), strings.HasPrefix(asString, "data:application/json") && strings.Contains(asString, ";base64,"):
 		return URITypeBase64JSON
-	case strings.HasPrefix(asString, "data:image/svg+xml;base64,"), strings.HasPrefix(asString, "data:image/svg xml;base64,"):
+	case strings.HasPrefix(asString, "data:image/svg+xml;base64,"), strings.HasPrefix(asString, "data:image/svg xml;base64,"), strings.HasPrefix(asString, "data:image/svg+xml") && strings.Contains(asString, ";base64,"), strings.HasPrefix(asString, "data:image/svg xml") && strings.Contains(asString, ";base64,"):
 		return URITypeBase64SVG
-	case strings.HasPrefix(asString, "data:image/bmp;base64,"):
+	case strings.HasPrefix(asString, "data:image/bmp;base64,"), strings.HasPrefix(asString, "data:image/bmp;charset=utf-8;base64,"), strings.HasPrefix(asString, "data:image/bmp") && strings.Contains(asString, ";base64,"):
 		return URITypeBase64BMP
-	case strings.HasPrefix(asString, "data:image/png;base64,"):
+	case strings.HasPrefix(asString, "data:image/png;base64,"), strings.HasPrefix(asString, "data:image/png;charset=utf-8;base64,"), strings.HasPrefix(asString, "data:image/png") && strings.Contains(asString, ";base64,"):
 		return URITypeBase64PNG
+	case strings.HasPrefix(asString, "data:image/jpeg;base64,"), strings.HasPrefix(asString, "data:image/jpeg;charset=utf-8;base64,"), strings.HasPrefix(asString, "data:image/jpeg") && strings.Contains(asString, ";base64,"):
+		return URITypeBase64JPEG
+	case strings.HasPrefix(asString, "data:audio/wav;base64,"), strings.HasPrefix(asString, "data:audio/wav;charset=utf-8;base64,"), strings.HasPrefix(asString, "data:audio/wav") && strings.Contains(asString, ";base64,"):
+		return URITypeBase64WAV
+	case strings.HasPrefix(asString, "data:audio/mpeg;base64,"), strings.HasPrefix(asString, "data:audio/mpeg;charset=utf-8;base64,"), strings.HasPrefix(asString, "data:audio/mpeg") && strings.Contains(asString, ";base64,"):
+		return URITypeBase64MP3
 	case strings.Contains(asString, "ipfs.io/api"):
 		return URITypeIPFSAPI
 	case strings.Contains(asString, "/ipfs/"):
 		return URITypeIPFSGateway
+	case strings.HasPrefix(asString, "https://arweave.net/"):
+		return URITypeArweaveGateway
 	case strings.HasPrefix(asString, "http"), strings.HasPrefix(asString, "https"):
 		return URITypeHTTP
 	case strings.HasPrefix(asString, "{"), strings.HasPrefix(asString, "["), strings.HasPrefix(asString, "data:application/json"), strings.HasPrefix(asString, "data:text/plain,{"):
@@ -720,25 +649,6 @@ func (hex HexString) Add(new HexString) HexString {
 }
 
 // IsServable returns true if the token's Media has enough information to serve it's assets.
-func (m Media) IsServable() bool {
-	return m.MediaURL != "" && m.MediaType.IsValid()
-}
-
-// Value implements the driver.Valuer interface for media
-func (m Media) Value() (driver.Value, error) {
-	return json.Marshal(m)
-}
-
-// Scan implements the sql.Scanner interface for media
-func (m *Media) Scan(src interface{}) error {
-	if src == nil {
-		*m = Media{}
-		return nil
-	}
-	return json.Unmarshal(src.([]uint8), &m)
-}
-
-// IsServable returns true if the token's Media has enough information to serve it's assets.
 func (m FallbackMedia) IsServable() bool {
 	return m.ImageURL != ""
 }
@@ -754,7 +664,7 @@ func (m *FallbackMedia) Scan(src interface{}) error {
 		*m = FallbackMedia{}
 		return nil
 	}
-	return json.Unmarshal(src.([]uint8), &m)
+	return json.Unmarshal(src.([]byte), &m)
 }
 
 func (a EthereumAddress) String() string {
@@ -884,7 +794,7 @@ func (m MediaType) IsValid() bool {
 
 // IsImageLike returns true if the media type is a type that is expected to be like an image and not live render
 func (m MediaType) IsImageLike() bool {
-	return m == MediaTypeImage || m == MediaTypeGIF || m == MediaTypeBase64BMP || m == MediaTypeSVG || m == MediaTypeBase64PNG
+	return m == MediaTypeImage || m == MediaTypeGIF || m == MediaTypeSVG
 }
 
 // IsAnimationLike returns true if the media type is a type that is expected to be like an animation and live render

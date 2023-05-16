@@ -15,7 +15,7 @@ import (
 	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/media"
+	"github.com/mikeydub/go-gallery/service/metric"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/redis"
@@ -40,7 +40,7 @@ func InitServer() {
 }
 
 func CoreInitServer(c *server.Clients, mc *multichain.Provider) *gin.Engine {
-	initSentry()
+	InitSentry()
 	logger.InitWithGCPDefaults()
 
 	http.DefaultClient = &http.Client{Transport: tracing.NewTracingTransport(http.DefaultTransport, false)}
@@ -58,7 +58,9 @@ func CoreInitServer(c *server.Clients, mc *multichain.Provider) *gin.Engine {
 
 	t := newThrottler()
 
-	return handlersInitServer(router, mc, c.Repos, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
+	tp := NewTokenProcessor(c.Queries, c.EthClient, mc, c.IPFSClient, c.ArweaveClient, c.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), c.Repos.TokenRepository, metric.NewLogMetricReporter())
+
+	return handlersInitServer(router, tp, mc, c.Repos, t)
 }
 
 func setDefaults() {
@@ -81,6 +83,11 @@ func setDefaults() {
 	viper.SetDefault("IMGIX_API_KEY", "")
 	viper.SetDefault("VERSION", "")
 	viper.SetDefault("ALCHEMY_API_URL", "")
+	viper.SetDefault("ALCHEMY_OPTIMISM_API_URL", "")
+	viper.SetDefault("ALCHEMY_POLYGON_API_URL", "")
+	viper.SetDefault("ALCHEMY_NFT_API_URL", "")
+	viper.SetDefault("POAP_API_KEY", "")
+	viper.SetDefault("POAP_AUTH_TOKEN", "")
 
 	viper.AutomaticEnv()
 
@@ -105,7 +112,7 @@ func newThrottler() *throttle.Locker {
 	return throttle.NewThrottleLocker(redis.NewCache(redis.TokenProcessingThrottleCache), time.Minute*30)
 }
 
-func initSentry() {
+func InitSentry() {
 	if env.GetString("ENV") == "local" {
 		logger.For(nil).Info("skipping sentry init")
 		return
@@ -183,7 +190,7 @@ func updateMediaProccessingFingerprints(event *sentry.Event, hint *sentry.EventH
 		return event
 	}
 
-	var mediaErr media.MediaProcessingError
+	var mediaErr MediaProcessingError
 
 	if errors.As(hint.OriginalException, &mediaErr) {
 
@@ -218,7 +225,8 @@ func updateMediaProccessingFingerprints(event *sentry.Event, hint *sentry.EventH
 }
 
 func excludeTokenSpam(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
-	if event.Contexts[sentryTokenContextName]["IsSpam"].(bool) == true {
+	isSpam, ok := event.Contexts[sentryTokenContextName]["IsSpam"].(bool)
+	if ok && isSpam {
 		return nil
 	}
 	return event

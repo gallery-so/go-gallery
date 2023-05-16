@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/multichain"
@@ -305,7 +306,21 @@ type TokenMetadata struct {
 
 // GetTokenMetadataByTokenIdentifiers retrieves a token's metadata for a given contract address and token ID
 func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (persist.TokenMetadata, error) {
-	url := fmt.Sprintf("%s/nfts/%s/tokens/%s?resyncMetadata=true", baseURL, ti.ContractAddress, ti.TokenID.Base10String())
+	meta, err := p.getMetadata(ctx, ti, true)
+	if err != nil {
+		return p.getMetadata(ctx, ti, false)
+	}
+	return meta, nil
+
+}
+
+func (p *Provider) getMetadata(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, refresh bool) (persist.TokenMetadata, error) {
+	if refresh {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+	}
+	url := fmt.Sprintf("%s/nfts/%s/tokens/%s?resyncMetadata=%t", baseURL, ti.ContractAddress, ti.TokenID.Base10String(), refresh)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {

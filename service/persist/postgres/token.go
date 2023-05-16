@@ -463,12 +463,10 @@ func (t *TokenRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUp
 
 	var res sql.Result
 	var err error
-	switch pUpdate.(type) {
+	switch update := pUpdate.(type) {
 	case persist.TokenUpdateOwnerInput:
-		update := pUpdate.(persist.TokenUpdateOwnerInput)
 		res, err = t.updateOwnerUnsafeStmt.ExecContext(pCtx, update.OwnerAddress, []persist.AddressAtBlock{{Address: persist.Address(update.OwnerAddress), Block: update.BlockNumber}}, update.BlockNumber, persist.LastUpdatedTime{}, pID)
 	case persist.TokenUpdateBalanceInput:
-		update := pUpdate.(persist.TokenUpdateBalanceInput)
 		res, err = t.updateBalanceUnsafeStmt.ExecContext(pCtx, update.Quantity, update.BlockNumber, persist.LastUpdatedTime{}, pID)
 	default:
 		return fmt.Errorf("unsupported update type: %T", pUpdate)
@@ -490,16 +488,13 @@ func (t *TokenRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUp
 func (t *TokenRepository) UpdateByTokenIdentifiers(pCtx context.Context, pTokenID persist.TokenID, pContractAddress persist.EthereumAddress, pUpdate interface{}) error {
 	var res sql.Result
 	var err error
-	switch pUpdate.(type) {
+	switch update := pUpdate.(type) {
 	// this all makes me feel sticky because it is not doubled up on the UpdateByID method, but I am assuming that this will all become irrelevant soon with the sqlc refactor by ezra
 	case persist.TokenUpdateURIInput:
-		update := pUpdate.(persist.TokenUpdateURIInput)
 		res, err = t.updateURIByTokenIdentifiersStmt.ExecContext(pCtx, update.TokenURI, update.LastUpdated, pTokenID, pContractAddress)
 	case persist.TokenUpdateMetadataDerivedFieldsInput:
-		update := pUpdate.(persist.TokenUpdateMetadataDerivedFieldsInput)
 		res, err = t.updateAllMetadataDerivedFieldsByTokenIdentifiersStmt.ExecContext(pCtx, update.Name, update.Description, update.LastUpdated, pTokenID, pContractAddress)
 	case persist.TokenUpdateMetadataFieldsInput:
-		update := pUpdate.(persist.TokenUpdateMetadataFieldsInput)
 		res, err = t.updateMetadataFieldByTokenIdentifiersStmt.ExecContext(pCtx, update.TokenURI, update.Metadata, update.LastUpdated, pTokenID, pContractAddress)
 	default:
 		return fmt.Errorf("unsupported update type: %T", pUpdate)

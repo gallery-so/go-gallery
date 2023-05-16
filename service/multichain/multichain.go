@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"net/http"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/sourcegraph/conc"
+	"github.com/sourcegraph/conc/pool"
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/gammazero/workerpool"
@@ -462,9 +464,11 @@ func (p *Provider) prepTokensForTokenProcessing(ctx context.Context, tokensFromP
 
 	for i, token := range providerTokens {
 		existingToken, exists := tokenLookup[token.TokenIdentifiers()]
+
 		// Add already existing media to the provider token if it exists so that
 		// we can display media for a token while it gets handled by tokenprocessing
 		if !token.Media.IsServable() && existingToken.Media.IsServable() {
+			// TODO remove
 			providerTokens[i].Media = existingToken.Media
 		}
 
@@ -475,10 +479,11 @@ func (p *Provider) prepTokensForTokenProcessing(ctx context.Context, tokensFromP
 		// There's no available media for the token at this point, so set the state to syncing
 		// so we can show the loading state instead of a broken token while tokenprocessing handles it.
 		if !exists && !token.Media.IsServable() {
+			// TODO remove
 			providerTokens[i].Media = persist.Media{MediaType: persist.MediaTypeSyncing}
 		}
 
-		if !exists {
+		if !exists || token.TokenMediaID == "" {
 			newTokens[token.TokenIdentifiers()] = true
 		}
 	}
@@ -567,6 +572,7 @@ func (p *Provider) sendTokensToTokenProcessing(ctx context.Context, userID persi
 }
 
 func (p *Provider) processTokenMedia(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, ownerAddress persist.Address, imageKeywords, animationKeywords []string) error {
+	// V3Migration: Remove when migration is complete
 	input := map[string]any{
 		"token_id":           tokenID,
 		"contract_address":   contractAddress,
@@ -579,6 +585,7 @@ func (p *Provider) processTokenMedia(ctx context.Context, tokenID persist.TokenI
 	if err != nil {
 		return err
 	}
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/media/process/token", env.GetString("TOKEN_PROCESSING_URL")), bytes.NewBuffer(asJSON))
 	if err != nil {
 		return err
@@ -588,10 +595,40 @@ func (p *Provider) processTokenMedia(ctx context.Context, tokenID persist.TokenI
 	if err != nil {
 		return err
 	}
+
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		return util.GetErrFromResp(resp)
 	}
+	// V3Migration: End remove
+
+	v3Input := map[string]any{
+		"token_id":         tokenID,
+		"contract_address": contractAddress,
+		"chain":            chain,
+		"owner_address":    ownerAddress,
+		"is_v3":            true,
+	}
+	asJSONV3, err := json.Marshal(v3Input)
+	if err != nil {
+		return err
+	}
+
+	req, err = http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/media/process/token", env.GetString("NEW_TOKEN_PROCESSING_URL")), bytes.NewBuffer(asJSONV3))
+	if err != nil {
+		return err
+	}
+
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return util.GetErrFromResp(resp)
+	}
+
 	return nil
 }
 
@@ -676,25 +713,120 @@ func (p *Provider) GetTokensOfContractForWallet(ctx context.Context, contractAdd
 	return p.processTokensForUser(ctx, tokensFromProviders, addressToContract, user, []persist.Chain{wallet.Chain()}, true)
 }
 
-// GetTokenMetadataByTokenIdentifiers will get the metadata for a given token identifier
-func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contractAddress persist.Address, tokenID persist.TokenID, ownerAddress persist.Address, chain persist.Chain) (persist.TokenMetadata, error) {
+type FieldRequirementLevel int
 
-	var metadata persist.TokenMetadata
-	var err error
+const (
+	FieldRequirementLevelNone FieldRequirementLevel = iota
+	FieldRequirementLevelAllOptional
+	FieldRequirementLevelAllRequired
+	FieldRequirementLevelOneRequired
+)
+
+type FieldRequest[T any] struct {
+	FieldNames []string
+	Level      FieldRequirementLevel
+}
+
+func (f FieldRequest[T]) MatchesFilter(filter persist.TokenMetadata) bool {
+	switch f.Level {
+	case FieldRequirementLevelAllRequired:
+		for _, fieldName := range f.FieldNames {
+			it, ok := util.GetValueFromMapUnsafe(filter, fieldName, util.DefaultSearchDepth).(T)
+			if !ok || util.IsEmpty(&it) {
+				return false
+			}
+		}
+	case FieldRequirementLevelOneRequired:
+		found := false
+		for _, fieldName := range f.FieldNames {
+			it, ok := util.GetValueFromMapUnsafe(filter, fieldName, util.DefaultSearchDepth).(T)
+			if ok && !util.IsEmpty(&it) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	case FieldRequirementLevelAllOptional:
+		hasNone := true
+		for _, fieldName := range f.FieldNames {
+			it, ok := util.GetValueFromMapUnsafe(filter, fieldName, util.DefaultSearchDepth).(T)
+			if ok && !util.IsEmpty(&it) {
+				hasNone = false
+				break
+			}
+		}
+		if hasNone {
+			return false
+		}
+	}
+
+	return true
+}
+
+// GetTokenMetadataByTokenIdentifiers will get the metadata for a given token identifier
+func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contractAddress persist.Address, tokenID persist.TokenID, ownerAddress persist.Address, chain persist.Chain, requestedFields []FieldRequest[string]) (persist.TokenMetadata, error) {
 
 	metadataFetchers := getChainProvidersForTask[tokenMetadataFetcher](d.Chains[chain])
 
-	for _, metadataFetcher := range metadataFetchers {
-		metadata, err = metadataFetcher.GetTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: contractAddress, TokenID: tokenID}, ownerAddress)
-		if err != nil {
-			logger.For(ctx).Errorf("error fetching token metadata %s", err)
+	if len(metadataFetchers) == 0 {
+		return nil, fmt.Errorf("no metadata fetchers for chain %d", chain)
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	wp := pool.New().WithMaxGoroutines(len(metadataFetchers)).WithContext(ctx).WithCancelOnError()
+	metadatas := make(chan persist.TokenMetadata)
+	for i, metadataFetcher := range metadataFetchers {
+		i := i
+		metadataFetcher := metadataFetcher
+		wp.Go(func(ctx context.Context) error {
+			metadata, err := metadataFetcher.GetTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: contractAddress, TokenID: tokenID}, ownerAddress)
+			if err != nil {
+				if err != context.Canceled && !strings.Contains(err.Error(), context.Canceled.Error()) {
+					logger.For(ctx).Errorf("error fetching token metadata %s for provider %d (%T)", err, i, metadataFetcher)
+				}
+				switch caught := err.(type) {
+				case util.ErrHTTP:
+					if caught.Status == http.StatusNotFound {
+						return err
+					}
+				}
+			}
+			metadatas <- metadata
+			return nil
+		})
+	}
+
+	go func() {
+		defer close(metadatas)
+		err := wp.Wait()
+		if err != nil && (err != context.Canceled || strings.Contains(err.Error(), context.Canceled.Error())) {
+			logger.For(ctx).Errorf("error fetching token metadata after wait: %s", err)
 		}
-		if err == nil && len(metadata) > 0 {
+	}()
+
+	var betterThanNothing persist.TokenMetadata
+metadatas:
+	for metadata := range metadatas {
+		if metadata != nil {
+			betterThanNothing = metadata
+			for _, fieldRequest := range requestedFields {
+				if !fieldRequest.MatchesFilter(metadata) {
+					logger.For(ctx).Infof("metadata %+v does not match field request %+v", metadata, fieldRequest)
+					continue metadatas
+				}
+			}
+			logger.For(ctx).Infof("got metadata %+v", metadata)
 			return metadata, nil
 		}
 	}
 
-	return metadata, err
+	if betterThanNothing != nil {
+		return betterThanNothing, nil
+	}
+	return nil, fmt.Errorf("no metadata found for token %s-%s-%s-%d", tokenID, contractAddress, ownerAddress, chain)
 }
 
 // DeepRefresh re-indexes a user's wallets.
@@ -777,6 +909,7 @@ outer:
 				return err
 			}
 
+			// V3Migration: Remove remove image and animation keywords when migrated
 			image, anim := ti.Chain.BaseKeywords()
 			err = p.processTokenMedia(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, refreshedToken.OwnerAddress, image, anim)
 			if err != nil {

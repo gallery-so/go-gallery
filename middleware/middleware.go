@@ -111,6 +111,9 @@ func TaskRequired() gin.HandlerFunc {
 func ContinueSession(queries *db.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		err := auth.ContinueSession(c, queries)
+        // TODO: Fix merge by adding SetRolesForCtx to ContinueSession
+		roles, err := auth.RolesByUserID(c, queries, userID)
+		auth.SetRolesForCtx(c, roles, err)
 		if err == nil {
 			loggerCtx := logger.NewContextWithFields(c.Request.Context(), logrus.Fields{
 				"authedUserId": auth.GetUserIDFromCtx(c),

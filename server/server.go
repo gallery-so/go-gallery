@@ -30,7 +30,6 @@ import (
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/multichain/alchemy"
 	"github.com/mikeydub/go-gallery/service/multichain/eth"
@@ -94,11 +93,11 @@ func ClientInit(ctx context.Context) *Clients {
 	return &Clients{
 		Repos:           postgres.NewRepositories(pq, pgx),
 		Queries:         db.New(pgx),
-		HTTPClient:      &http.Client{Timeout: 10 * time.Minute},
+		HTTPClient:      &http.Client{Timeout: 0},
 		EthClient:       rpc.NewEthClient(),
 		IPFSClient:      rpc.NewIPFSShell(),
 		ArweaveClient:   rpc.NewArweaveClient(),
-		StorageClient:   media.NewStorageClient(ctx),
+		StorageClient:   rpc.NewStorageClient(ctx),
 		TaskClient:      task.NewClient(ctx),
 		SecretClient:    newSecretsClient(),
 		PubSubClient:    gcp.NewClient(ctx),
@@ -196,6 +195,7 @@ func SetDefaults() {
 	viper.SetDefault("GCLOUD_FEED_BUFFER_SECS", 20)
 	viper.SetDefault("FEED_SECRET", "feed-secret")
 	viper.SetDefault("TOKEN_PROCESSING_URL", "http://localhost:6500")
+	viper.SetDefault("NEW_TOKEN_PROCESSING_URL", "http://localhost:6500")
 	viper.SetDefault("TEZOS_API_URL", "https://api.tzkt.io")
 	viper.SetDefault("POAP_API_KEY", "")
 	viper.SetDefault("POAP_AUTH_TOKEN", "")
@@ -220,6 +220,9 @@ func SetDefaults() {
 	viper.SetDefault("FEEDBOT_URL", "")
 	viper.SetDefault("GCLOUD_FEEDBOT_TASK_QUEUE", "projects/gallery-local/locations/here/queues/feedbot")
 	viper.SetDefault("ALCHEMY_API_URL", "")
+	viper.SetDefault("ALCHEMY_OPTIMISM_API_URL", "")
+	viper.SetDefault("ALCHEMY_POLYGON_API_URL", "")
+	viper.SetDefault("ALCHEMY_NFT_API_URL", "")
 	viper.SetDefault("INFURA_API_KEY", "")
 	viper.SetDefault("INFURA_API_SECRET", "")
 	viper.SetDefault("PUSH_NOTIFICATIONS_SECRET", "push-notifications-secret")

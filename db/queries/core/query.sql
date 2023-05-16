@@ -706,21 +706,20 @@ on conflict (user_id, role) do update set deleted = false, last_updated = now();
 update user_roles set deleted = true, last_updated = now() where user_id = $1 and role = any(@roles);
 
 -- name: GetUserRolesByUserId :many
-select role from user_roles where user_id = $1 and deleted = false
+with membership_roles(role) as (
+    select (case when exists(
+        select 1
+        from tokens
+        where owner_user_id = @user_id
+            and token_id = any(@membership_token_ids::varchar[])
+            and contract = (select id from contracts where address = @membership_address and contracts.chain = @chain and contracts.deleted = false)
+            and exists(select 1 from users where id = @user_id and email_verified = 1 and deleted = false)
+            and deleted = false
+    ) then @granted_membership_role else null end)::varchar
+)
+select role from user_roles where user_id = @user_id and deleted = false
 union
-select role from (
-  select
-    case when exists(
-      select 1
-      from tokens
-      where owner_user_id = $1
-        and token_id = any(@membership_token_ids::varchar[])
-        and contract = (select id from contracts where address = @membership_address and contracts.chain = @chain and contracts.deleted = false)
-        and exists(select 1 from users where id = $1 and email_verified = 1 and deleted = false)
-        and deleted = false
-      )
-      then @granted_membership_role else null end as role
-) r where role is not null;
+select role from membership_roles where role is not null;
 
 -- name: RedeemMerch :one
 update merch set redeemed = true, token_id = @token_hex, last_updated = now() where id = (select m.id from merch m where m.object_type = @object_type and m.token_id is null and m.redeemed = false and m.deleted = false order by m.id limit 1) and token_id is null and redeemed = false returning discount_code;
@@ -1009,6 +1008,43 @@ insert into users (id, username, username_idempotent, bio, wallets, universal, e
 -- name: AddWalletToUserByID :exec
 update users set wallets = array_append(wallets, @wallet_id::varchar) where id = @user_id;
 
+-- name: InsertTokenProcessingJob :exec
+insert into token_processing_jobs (id, token_properties, pipeline_metadata, processing_cause, processor_version) values ($1, $2, $3, $4, $5);
+
+-- name: UpdateTokenTokenMediaByTokenIdentifiers :exec
+update tokens set token_media_id = $1 where tokens.contract = $2 and tokens.token_id = $3 and tokens.chain = $4 and deleted = false;
+
+-- name: IsExistsActiveTokenMediaByTokenIdentifers :one
+select exists(select 1 from token_medias where token_medias.contract_id = $1 and token_medias.token_id = $2 and token_medias.chain = $3 and active = true and deleted = false);
+
+-- name: InsertJob :one
+insert into token_processing_jobs (id, token_properties, pipeline_metadata, processing_cause, processor_version) values (@processing_job_id, @token_properties, @pipeline_metadata, @processing_cause, @processor_version) returning *;
+
+-- name: UpsertTokenMedia :one
+with copy_on_overwrite as (
+    insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
+    (
+        select @copy_id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, last_updated
+        from token_medias
+        where contract_id = @contract_id
+          and token_id = @token_id
+          and chain = @chain
+          and active = true
+          and @active = true
+          and deleted = false
+        limit 1
+    )
+) 
+insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated) values
+    (@new_id, @contract_id, @token_id, @chain, @metadata, @media, @name, @description, @processing_job_id, @active, now(), now())
+    on conflict (contract_id, token_id, chain) where active = true and deleted = false do update
+        set metadata = excluded.metadata,
+            media = excluded.media,
+            name = excluded.name,
+            description = excluded.description,
+            processing_job_id = excluded.processing_job_id,
+            last_updated = now() returning *;
+
 -- name: InsertSpamContracts :exec
 with insert_spam_contracts as (
     insert into alchemy_spam_contracts (id, chain, address, created_at, is_spam) (
@@ -1058,6 +1094,35 @@ update push_notification_tickets t set check_after = updates.check_after, num_ch
 
 -- name: GetCheckablePushTickets :many
 select * from push_notification_tickets where check_after <= now() and deleted = false limit sqlc.arg('limit');
+
+-- name: GetAllTokensWithContractsByIDs :many
+SELECT
+    tokens.*,
+    contracts.*,
+    (
+        SELECT wallets.address
+        FROM wallets
+        WHERE wallets.id = ANY(tokens.owned_by_wallets)
+        LIMIT 1
+    ) AS wallet_address
+FROM tokens
+JOIN contracts ON contracts.id = tokens.contract
+LEFT JOIN token_medias on token_medias.id = tokens.token_media_id
+WHERE tokens.deleted = false
+AND (tokens.token_media_id IS NULL or token_medias.active = false)
+AND tokens.id > @start_id AND tokens.id < @end_id
+ORDER BY tokens.id;
+
+-- name: GetReprocessJobRangeByID :one
+select * from reprocess_jobs where id = $1;
+
+
+-- name: GetMediaByTokenID :batchone
+select m.*
+from tokens t
+join token_medias m on t.chain = m.chain and t.contract = m.contract_id and t.token_id = m.token_id
+where t.id = $1 and m.active and not m.deleted;
+
 
 -- name: UpsertSession :one
 insert into sessions (id, user_id,

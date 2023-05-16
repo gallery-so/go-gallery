@@ -25,6 +25,8 @@ type TokenGallery struct {
 
 	CollectorsNote NullString    `json:"collectors_note"`
 	Media          Media         `json:"media"`
+	TokenMedia     Media         `json:"token_media"`
+	TokenMediaID   DBID          `json:"token_media_id"`
 	FallbackMedia  FallbackMedia `json:"fallback_media"`
 
 	TokenType TokenType `json:"token_type"`

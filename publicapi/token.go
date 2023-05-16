@@ -523,3 +523,14 @@ func (api TokenAPI) DeepRefreshByChain(ctx context.Context, chain persist.Chain)
 
 	return api.multichainProvider.DeepRefreshByChain(ctx, userID, chain)
 }
+
+func (api TokenAPI) MediaByTokenID(ctx context.Context, tokenID persist.DBID) (db.TokenMedia, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"tokenID": {tokenID, "required"},
+	}); err != nil {
+		return db.TokenMedia{}, err
+	}
+
+	return api.loaders.MediaByTokenID.Load(tokenID)
+}
