@@ -69,7 +69,7 @@ jobs:
         uses: ./.github/actions/build-deps
         with:
           sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          gcp-credentials-json: ${{ secrets.GCP_DEV_CREDENTIALS }}
+          gcp-credentials-json: ${{ secrets.GCP_PROD_CREDENTIALS }}
       - name: "Deploy"
         run: make deploy-prod-tokenprocessingV3
   deploy-prod-indexer-api:
