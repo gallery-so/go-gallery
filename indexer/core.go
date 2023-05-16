@@ -42,7 +42,7 @@ func InitServer(quietLogs, enableRPC bool) {
 }
 
 func coreInit(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) (*gin.Engine, *indexer) {
-	initSentry()
+	InitSentry()
 	logger.InitWithGCPDefaults()
 	logger.SetLoggerOptions(func(logger *logrus.Logger) {
 		logger.AddHook(sentryutil.SentryLoggerHook)
@@ -79,7 +79,7 @@ func coreInit(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) (*gin.Engin
 
 func coreInitServer(quietLogs, enableRPC bool) *gin.Engine {
 	ctx := sentry.SetHubOnContext(context.Background(), sentry.CurrentHub())
-	initSentry()
+	InitSentry()
 	logger.InitWithGCPDefaults()
 	logger.SetLoggerOptions(func(logger *logrus.Logger) {
 		logger.SetLevel(logrus.InfoLevel)
@@ -165,7 +165,7 @@ func newThrottler() *throttle.Locker {
 	return throttle.NewThrottleLocker(redis.NewCache(redis.IndexerServerThrottleCache), time.Minute*5)
 }
 
-func initSentry() {
+func InitSentry() {
 	if env.GetString("ENV") == "local" {
 		logger.For(nil).Info("skipping sentry init")
 		return

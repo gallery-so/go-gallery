@@ -290,6 +290,18 @@ func Filter[T any](s []T, f func(T) bool, filterInPlace bool) []T {
 	return r
 }
 
+func Chunk[T any](s []T, chunkSize int) [][]T {
+	var chunks [][]T
+	for i := 0; i < len(s); i += chunkSize {
+		end := i + chunkSize
+		if end > len(s) {
+			end = len(s)
+		}
+		chunks = append(chunks, s[i:end])
+	}
+	return chunks
+}
+
 // StringToPointerIfNotEmpty returns a pointer to the string if it is a non-empty string
 func StringToPointerIfNotEmpty(str string) *string {
 	if str == "" {
