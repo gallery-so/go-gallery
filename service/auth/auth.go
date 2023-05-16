@@ -467,7 +467,7 @@ func StartSession(c *gin.Context, queries *db.Queries, userID persist.DBID) erro
 // functions like GetUserAuthedFromCtx(), GetUserIDFromCtx(), etc.
 func ContinueSession(c *gin.Context, queries *db.Queries) error {
 	// If the user has a valid auth cookie, we can set their auth state and be done
-	userID, sessionID, authTokenErr := getAuthToken(c)
+	userID, sessionID, authTokenErr := getAndParseAuthToken(c)
 	if authTokenErr == nil {
 		// ----------------------------------------------------------------------------
 		// Temporary handling for existing auth tokens that don't have session IDs.
@@ -486,7 +486,7 @@ func ContinueSession(c *gin.Context, queries *db.Queries) error {
 	// If the user doesn't have a valid auth cookie or a valid refresh cookie, they can't be
 	// authenticated and they'll have to log in again. Clear their cookies in case they have
 	// expired tokens.
-	userID, sessionID, refreshTokenErr := getRefreshToken(c)
+	userID, sessionID, refreshTokenErr := getAndParseRefreshToken(c)
 	if refreshTokenErr != nil {
 		clearSessionStateForCtx(c, refreshTokenErr)
 
@@ -586,7 +586,7 @@ func clearSessionCookies(c *gin.Context) {
 	clearCookie(c, RefreshCookieKey)
 }
 
-func getAuthToken(c *gin.Context) (persist.DBID, persist.DBID, error) {
+func getAndParseAuthToken(c *gin.Context) (persist.DBID, persist.DBID, error) {
 	authToken, err := getCookie(c, AuthCookieKey)
 	if err != nil {
 		return "", "", err
@@ -595,7 +595,7 @@ func getAuthToken(c *gin.Context) (persist.DBID, persist.DBID, error) {
 	return ParseAuthToken(c, authToken)
 }
 
-func getRefreshToken(c *gin.Context) (persist.DBID, persist.DBID, error) {
+func getAndParseRefreshToken(c *gin.Context) (persist.DBID, persist.DBID, error) {
 	refreshToken, err := getCookie(c, RefreshCookieKey)
 	if err != nil {
 		return "", "", err
@@ -609,15 +609,11 @@ func getCookie(c *gin.Context, cookieName string) (string, error) {
 
 	// Treat empty cookies the same way we treat missing cookies, since setting a cookie to the empty
 	// string is how we "delete" them.
-	if err == nil && cookie == "" {
-		err = http.ErrNoCookie
+	if (err == nil && cookie == "") || err == http.ErrNoCookie {
+		err = ErrNoCookie
 	}
 
 	if err != nil {
-		if err == http.ErrNoCookie {
-			err = ErrNoCookie
-		}
-
 		return "", err
 	}
 

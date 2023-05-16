@@ -1074,4 +1074,4 @@ insert into sessions (id, user_id,
     returning *;
 
 -- name: InvalidateSession :exec
-update sessions set invalidated = true, active_until = now(), last_updated = now() where id = @id and deleted = false and invalidated = false;
+update sessions set invalidated = true, active_until = least(active_until, now()), last_updated = now() where id = @id and deleted = false and invalidated = false;

@@ -4007,7 +4007,7 @@ func (q *Queries) InsertWallet(ctx context.Context, arg InsertWalletParams) erro
 }
 
 const invalidateSession = `-- name: InvalidateSession :exec
-update sessions set invalidated = true, active_until = now(), last_updated = now() where id = $1 and deleted = false and invalidated = false
+update sessions set invalidated = true, active_until = least(active_until, now()), last_updated = now() where id = $1 and deleted = false and invalidated = false
 `
 
 func (q *Queries) InvalidateSession(ctx context.Context, id persist.DBID) error {
