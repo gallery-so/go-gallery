@@ -24,7 +24,7 @@ create materialized view migration_validation as (
 				then 'previously syncing now unknown'
 				else 'media type changed' end
 			else 'no change'
-		end media_type_validation
+			end::varchar media_type_validation
 		, case 
 			when (t.media is not null and m.media is null)
 			then 'no mapped media'
@@ -32,7 +32,8 @@ create materialized view migration_validation as (
 			then 'now missing dimensions'
 			when ((t.media->'dimensions'->>'width')::int = 0 and (m.media->'dimensions'->>'width')::int != 0)
 			then 'now has dimensions'
-			else 'no change' end dimensions_validation
+			else 'no change'
+			end::varchar dimensions_validation
 		, case
 			when (t.media is not null and m.media is null)
 			then 'no mapped media'
@@ -40,7 +41,8 @@ create materialized view migration_validation as (
 			then 'now missing media_url'
 			when t.media->>'media_url' is null and m.media->>'media_url' is not null
 			then 'now has media_url'
-			else 'no change' end media_url_validation
+			else 'no change'
+			end::varchar media_url_validation
 		, case
 			when (t.media is not null and m.media is null)
 			then 'no mapped media'
@@ -48,7 +50,8 @@ create materialized view migration_validation as (
 			then 'now missing thumbnail_url'
 			when t.media->>'thumbnail_url' is null and m.media->>'thumbnail_url' is not null
 			then 'now has thumbnail_url'
-			else 'no change' end thumbnail_url_validation
+			else 'no change'
+			end::varchar thumbnail_url_validation
 		, case
 			when (t.media is not null and m.media is null)
 			then 'no mapped media'
@@ -56,7 +59,8 @@ create materialized view migration_validation as (
 			then 'now missing live_preview_url'
 			when t.media->>'live_preview_url' is null and m.media->>'live_preview_url' is not null
 			then 'now has live_preview_url'
-			else 'no change' end live_preview_url_validation
+			else 'no change'
+			end::varchar live_preview_url_validation
 		, now() as last_refreshed
 	from tokens t
 	join contracts c on t.contract = c.id
