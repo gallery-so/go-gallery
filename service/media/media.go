@@ -208,6 +208,10 @@ func MediaFromContentType(contentType string) persist.MediaType {
 	}
 	spl := strings.Split(contentType, "/")
 
+	if len(spl) != 2 {
+		return persist.MediaTypeUnknown
+	}
+
 	switch spl[0] {
 	case "image":
 		switch spl[1] {

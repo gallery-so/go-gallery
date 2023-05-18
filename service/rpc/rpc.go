@@ -716,27 +716,25 @@ func GetIPFSResponse(ctx context.Context, ipfsClient *shell.Shell, path string) 
 		return resp.Body, nil
 	}
 
-	fromIPFSAPI := func(ctx context.Context) (io.ReadCloser, error) {
-		url := fmt.Sprintf("https://ipfs.io/ipfs/%s", path)
-		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-		if err != nil {
-			return nil, err
-		}
-
-		resp, err := defaultHTTPClient.Do(req)
-		if err != nil {
-			return nil, err
-		}
-		if resp.StatusCode > 399 || resp.StatusCode < 200 {
-			return nil, util.ErrHTTP{Status: resp.StatusCode, URL: url}
-		}
-		logger.For(ctx).Infof("IPFS API successful %s", path)
-		return resp.Body, nil
-	}
-
-	result, err := util.FirstNonErrorWithValue(ctx, false, HTTPErrIsForceClose, fromHTTP, fromIPFS, fromFallback, fromIPFSAPI)
+	result, err := util.FirstNonErrorWithValue(ctx, false, HTTPErrIsForceClose, fromHTTP, fromIPFS, fromFallback)
 	if err != nil {
-		return nil, err
+		return func(ctx context.Context) (io.ReadCloser, error) {
+			url := fmt.Sprintf("https://ipfs.io/ipfs/%s", path)
+			req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+			if err != nil {
+				return nil, err
+			}
+
+			resp, err := defaultHTTPClient.Do(req)
+			if err != nil {
+				return nil, err
+			}
+			if resp.StatusCode > 399 || resp.StatusCode < 200 {
+				return nil, util.ErrHTTP{Status: resp.StatusCode, URL: url}
+			}
+			logger.For(ctx).Infof("IPFS API successful %s", path)
+			return resp.Body, nil
+		}(ctx)
 	}
 	return result, nil
 }
