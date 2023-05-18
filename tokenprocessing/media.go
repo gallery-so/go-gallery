@@ -1116,7 +1116,11 @@ func cacheObjectsFromOpensea(pCtx context.Context, tids persist.TokenIdentifiers
 			continue
 		}
 
-		return cacheObjectsFromURL(pCtx, tids, firstNonEmptyURL, oType, ipfsClient, arweaveClient, storageClient, bucket, subMeta, true)
+		objects, err := cacheObjectsFromURL(pCtx, tids, firstNonEmptyURL, oType, ipfsClient, arweaveClient, storageClient, bucket, subMeta, true)
+		if err != nil {
+			continue
+		}
+		return objects, nil
 	}
 	return nil, errNoDataFromOpensea{err: err, url: mediaURL}
 }
