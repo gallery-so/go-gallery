@@ -112,6 +112,14 @@ type PipelineMetadata struct {
 	ImageStoreGCP                         PipelineStepStatus `json:"image_store_gcp,omitempty"`
 	ImageThumbnailGCP                     PipelineStepStatus `json:"image_thumbnail_gcp,omitempty"`
 	ImageLiveRenderGCP                    PipelineStepStatus `json:"image_live_render_gcp,omitempty"`
+	AlternateContentHeaderValueRetrieval  PipelineStepStatus `json:"alternate_content_header_value_retrieval,omitempty"`
+	AlternateReaderRetrieval              PipelineStepStatus `json:"alternate_reader_retrieval,omitempty"`
+	AlternateOpenseaFallback              PipelineStepStatus `json:"alternate_opensea_fallback,omitempty"`
+	AlternateDetermineMediaTypeWithReader PipelineStepStatus `json:"alternate_determine_media_type_with_reader,omitempty"`
+	AlternateAnimationGzip                PipelineStepStatus `json:"alternate_animation_gzip,omitempty"`
+	AlternateStoreGCP                     PipelineStepStatus `json:"alternate_store_gcp,omitempty"`
+	AlternateThumbnailGCP                 PipelineStepStatus `json:"alternate_thumbnail_gcp,omitempty"`
+	AlternateLiveRenderGCP                PipelineStepStatus `json:"alternate_live_render_gcp,omitempty"`
 	NothingCachedWithErrors               PipelineStepStatus `json:"nothing_cached_errors,omitempty"`
 	NothingCachedWithoutErrors            PipelineStepStatus `json:"nothing_cached_no_errors,omitempty"`
 	CreateMediaFromCachedObjects          PipelineStepStatus `json:"create_media_from_cached_objects,omitempty"`
