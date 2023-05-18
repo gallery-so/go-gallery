@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/limiters"
+	"github.com/mikeydub/go-gallery/service/redis"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
 	"time"
@@ -41,13 +43,81 @@ type NotificationHandlers struct {
 	pubSub                   *pubsub.Client
 }
 
+type pushLimiter struct {
+	comments *limiters.KeyRateLimiter
+	admires  *limiters.KeyRateLimiter
+	follows  *limiters.KeyRateLimiter
+}
+
+func newPushLimiter() *pushLimiter {
+	cache := redis.NewCache(redis.PushNotificationRateLimitersCache)
+	ctx := context.Background()
+	return &pushLimiter{
+		comments: limiters.NewKeyRateLimiter(ctx, cache, "comments", 5, time.Minute),
+		admires:  limiters.NewKeyRateLimiter(ctx, cache, "admires", 1, time.Minute*10),
+		follows:  limiters.NewKeyRateLimiter(ctx, cache, "follows", 1, time.Minute*10),
+	}
+}
+
+func (p *pushLimiter) tryComment(ctx context.Context, sendingUserID persist.DBID, receivingUserID persist.DBID, feedEventID persist.DBID) error {
+	key := fmt.Sprintf("%s:%s:%s", sendingUserID.String(), receivingUserID.String(), feedEventID.String())
+	if p.isActionAllowed(ctx, p.comments, key) {
+		return nil
+	}
+
+	return errRateLimited{
+		limiterName: p.comments.Name(),
+		senderID:    sendingUserID,
+		receiverID:  receivingUserID,
+		feedEventID: feedEventID,
+	}
+}
+
+func (p *pushLimiter) tryAdmire(ctx context.Context, sendingUserID persist.DBID, receivingUserID persist.DBID, feedEventID persist.DBID) error {
+	key := fmt.Sprintf("%s:%s:%s", sendingUserID.String(), receivingUserID.String(), feedEventID.String())
+	if p.isActionAllowed(ctx, p.admires, key) {
+		return nil
+	}
+
+	return errRateLimited{
+		limiterName: p.admires.Name(),
+		senderID:    sendingUserID,
+		receiverID:  receivingUserID,
+		feedEventID: feedEventID,
+	}
+}
+
+func (p *pushLimiter) tryFollow(ctx context.Context, sendingUserID persist.DBID, receivingUserID persist.DBID) error {
+	key := fmt.Sprintf("%s:%s", sendingUserID, receivingUserID)
+	if p.isActionAllowed(ctx, p.follows, key) {
+		return nil
+	}
+
+	return errRateLimited{
+		limiterName: p.follows.Name(),
+		senderID:    sendingUserID,
+		receiverID:  receivingUserID,
+	}
+}
+
+func (p *pushLimiter) isActionAllowed(ctx context.Context, limiter *limiters.KeyRateLimiter, key string) bool {
+	canContinue, _, err := limiter.ForKey(ctx, key)
+	if err != nil {
+		logger.For(ctx).Warnf("error getting rate limit for key %s: %s", key, err.Error())
+		return false
+	}
+
+	return canContinue
+}
+
 // New registers specific notification handlers
 func New(queries *db.Queries, pub *pubsub.Client, taskClient *cloudtasks.Client, lock *redislock.Client) *NotificationHandlers {
 	notifDispatcher := notificationDispatcher{handlers: map[persist.Action]notificationHandler{}, lock: lock}
+	limiter := newPushLimiter()
 
-	def := defaultNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient}
-	group := groupedNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient}
-	view := viewedNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient}
+	def := defaultNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
+	group := groupedNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
+	view := viewedNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
 
 	// grouped notification actions
 	notifDispatcher.AddHandler(persist.ActionUserFollowedUsers, group)
@@ -143,16 +213,18 @@ type defaultNotificationHandler struct {
 	queries    *coredb.Queries
 	pubSub     *pubsub.Client
 	taskClient *cloudtasks.Client
+	limiter    *pushLimiter
 }
 
 func (h defaultNotificationHandler) Handle(ctx context.Context, notif db.Notification) error {
-	return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub, h.taskClient)
+	return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub, h.taskClient, h.limiter)
 }
 
 type groupedNotificationHandler struct {
 	queries    *coredb.Queries
 	pubSub     *pubsub.Client
 	taskClient *cloudtasks.Client
+	limiter    *pushLimiter
 }
 
 func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notification) error {
@@ -176,10 +248,10 @@ func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notific
 
 	if time.Since(curNotif.CreatedAt) < groupedWindow {
 		logger.For(ctx).Infof("grouping notification %s: %s-%s", curNotif.ID, notif.Action, notif.OwnerID)
-		return updateAndPublishNotif(ctx, notif, curNotif, h.queries, h.pubSub, h.taskClient)
+		return updateAndPublishNotif(ctx, notif, curNotif, h.queries, h.pubSub, h.taskClient, h.limiter)
 	}
 	logger.For(ctx).Infof("not grouping notification: %s-%s", notif.Action, notif.OwnerID)
-	return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub, h.taskClient)
+	return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub, h.taskClient, h.limiter)
 
 }
 
@@ -187,6 +259,7 @@ type viewedNotificationHandler struct {
 	queries    *coredb.Queries
 	pubSub     *pubsub.Client
 	taskClient *cloudtasks.Client
+	limiter    *pushLimiter
 }
 
 // will return the beginning of the week (sunday) in PST
@@ -216,7 +289,7 @@ func (h viewedNotificationHandler) Handle(ctx context.Context, notif db.Notifica
 	if notifs == nil || len(notifs) == 0 {
 		// if there are no notifications this week, then we definitely are going to insert this one
 		logger.For(ctx).Debugf("no notifications this week, inserting: %s-%s", notif.Action, notif.OwnerID)
-		return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub, h.taskClient)
+		return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub, h.taskClient, h.limiter)
 	}
 
 	mostRecentNotif := notifs[0]
@@ -265,10 +338,10 @@ func (h viewedNotificationHandler) Handle(ctx context.Context, notif db.Notifica
 	// if the most recent notification in the last week is within the grouping window then we will update it, if not, insert it
 	if time.Since(mostRecentNotif.CreatedAt) < viewWindow {
 		logger.For(ctx).Debugf("grouping notification %s: %s-%s", mostRecentNotif.ID, notif.Action, notif.OwnerID)
-		return updateAndPublishNotif(ctx, notif, mostRecentNotif, h.queries, h.pubSub, h.taskClient)
+		return updateAndPublishNotif(ctx, notif, mostRecentNotif, h.queries, h.pubSub, h.taskClient, h.limiter)
 	}
 	logger.For(ctx).Debugf("not grouping notification: %s-%s", notif.Action, notif.OwnerID)
-	return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub, h.taskClient)
+	return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub, h.taskClient, h.limiter)
 }
 
 // subscribe returns a subscription to the given topic
@@ -369,7 +442,7 @@ func (n *NotificationHandlers) receiveUpdatedNotificationsFromPubSub() {
 	}
 }
 
-func notificationToPushMessage(ctx context.Context, notif db.Notification, queries *db.Queries) (task.PushNotificationMessage, error) {
+func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Queries, limiter *pushLimiter) (task.PushNotificationMessage, error) {
 	badgeCount, badgeErr := queries.CountUserUnseenNotifications(ctx, notif.OwnerID)
 	if badgeErr != nil {
 		return task.PushNotificationMessage{}, badgeErr
@@ -388,6 +461,10 @@ func notificationToPushMessage(ctx context.Context, notif db.Notification, queri
 	if notif.Action == persist.ActionAdmiredFeedEvent {
 		admirer, err := queries.GetUserById(ctx, notif.Data.AdmirerIDs[0])
 		if err != nil {
+			return task.PushNotificationMessage{}, err
+		}
+
+		if err = limiter.tryAdmire(ctx, admirer.ID, notif.OwnerID, notif.FeedEventID); err != nil {
 			return task.PushNotificationMessage{}, err
 		}
 
@@ -410,6 +487,10 @@ func notificationToPushMessage(ctx context.Context, notif db.Notification, queri
 			return task.PushNotificationMessage{}, err
 		}
 
+		if err = limiter.tryComment(ctx, commenter.ID, notif.OwnerID, notif.FeedEventID); err != nil {
+			return task.PushNotificationMessage{}, err
+		}
+
 		if !commenter.Username.Valid {
 			return task.PushNotificationMessage{}, fmt.Errorf("user with ID=%s has no username", commenter.ID)
 		}
@@ -421,6 +502,10 @@ func notificationToPushMessage(ctx context.Context, notif db.Notification, queri
 	if notif.Action == persist.ActionUserFollowedUsers {
 		follower, err := queries.GetUserById(ctx, notif.Data.FollowerIDs[0])
 		if err != nil {
+			return task.PushNotificationMessage{}, err
+		}
+
+		if err = limiter.tryFollow(ctx, follower.ID, notif.OwnerID); err != nil {
 			return task.PushNotificationMessage{}, err
 		}
 
@@ -455,7 +540,7 @@ func actionSupportsPushNotifications(action persist.Action) bool {
 	}
 }
 
-func sendPushNotifications(ctx context.Context, notif db.Notification, queries *db.Queries, taskClient *cloudtasks.Client) error {
+func sendPushNotifications(ctx context.Context, notif db.Notification, queries *db.Queries, taskClient *cloudtasks.Client, limiter *pushLimiter) error {
 	if !actionSupportsPushNotifications(notif.Action) {
 		return nil
 	}
@@ -470,8 +555,14 @@ func sendPushNotifications(ctx context.Context, notif db.Notification, queries *
 		return nil
 	}
 
-	message, err := notificationToPushMessage(ctx, notif, queries)
+	message, err := createPushMessage(ctx, notif, queries, limiter)
 	if err != nil {
+		if _, ok := err.(errRateLimited); ok {
+			// Rate limiting is expected and shouldn't be propagated upward as an error
+			logger.For(ctx).Infof("couldn't create push message: %s", err)
+			return nil
+		}
+
 		return err
 	}
 
@@ -488,13 +579,13 @@ func sendPushNotifications(ctx context.Context, notif db.Notification, queries *
 	return nil
 }
 
-func insertAndPublishNotif(ctx context.Context, notif db.Notification, queries *db.Queries, ps *pubsub.Client, taskClient *cloudtasks.Client) error {
+func insertAndPublishNotif(ctx context.Context, notif db.Notification, queries *db.Queries, ps *pubsub.Client, taskClient *cloudtasks.Client, limiter *pushLimiter) error {
 	newNotif, err := addNotification(ctx, notif, queries)
 	if err != nil {
 		return fmt.Errorf("failed to create notification: %w", err)
 	}
 
-	err = sendPushNotifications(ctx, notif, queries, taskClient)
+	err = sendPushNotifications(ctx, notif, queries, taskClient, limiter)
 	if err != nil {
 		logger.For(ctx).Errorf("failed to send push notifications for notification with DBID=%s, error: %s", notif.ID, err)
 	}
@@ -518,7 +609,7 @@ func insertAndPublishNotif(ctx context.Context, notif db.Notification, queries *
 	return nil
 }
 
-func updateAndPublishNotif(ctx context.Context, notif db.Notification, mostRecentNotif db.Notification, queries *db.Queries, ps *pubsub.Client, taskClient *cloudtasks.Client) error {
+func updateAndPublishNotif(ctx context.Context, notif db.Notification, mostRecentNotif db.Notification, queries *db.Queries, ps *pubsub.Client, taskClient *cloudtasks.Client, limiter *pushLimiter) error {
 	amount := notif.Amount
 	resultData := mostRecentNotif.Data.Concat(notif.Data)
 	switch notif.Action {
@@ -543,7 +634,7 @@ func updateAndPublishNotif(ctx context.Context, notif db.Notification, mostRecen
 		return fmt.Errorf("error updating notification: %w", err)
 	}
 
-	err = sendPushNotifications(ctx, notif, queries, taskClient)
+	err = sendPushNotifications(ctx, notif, queries, taskClient, limiter)
 	if err != nil {
 		logger.For(ctx).Errorf("failed to send push notifications for notification with DBID=%s, error: %s", notif.ID, err)
 	}
@@ -632,4 +723,19 @@ func createSubscription(ctx context.Context, client *pubsub.Client, topic, name 
 		Topic:            client.Topic(topic),
 		ExpirationPolicy: time.Hour * 24 * 3,
 	})
+}
+
+type errRateLimited struct {
+	limiterName string
+	senderID    persist.DBID
+	receiverID  persist.DBID
+	feedEventID persist.DBID
+}
+
+func (e errRateLimited) Error() string {
+	str := fmt.Sprintf("rate limit exceeded for limiter=%s, sender=%s, receiver=%s", e.limiterName, e.senderID, e.receiverID)
+	if e.feedEventID != "" {
+		str += fmt.Sprintf(", feedEvent=%s", e.feedEventID)
+	}
+	return str
 }

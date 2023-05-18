@@ -206,15 +206,18 @@ func MediaFromContentType(contentType string) persist.MediaType {
 	if whereCharset != -1 {
 		contentType = contentType[:whereCharset]
 	}
-	spl := strings.Split(contentType, "/")
 
-	if len(spl) != 2 {
-		return persist.MediaTypeUnknown
+	splt := strings.Split(contentType, "/")
+
+	typ, subType := splt[0], ""
+
+	if len(splt) == 2 {
+		subType = splt[1]
 	}
 
-	switch spl[0] {
+	switch typ {
 	case "image":
-		switch spl[1] {
+		switch subType {
 		case "svg", "svg+xml":
 			return persist.MediaTypeSVG
 		case "gif":
@@ -227,14 +230,14 @@ func MediaFromContentType(contentType string) persist.MediaType {
 	case "audio":
 		return persist.MediaTypeAudio
 	case "text":
-		switch spl[1] {
+		switch subType {
 		case "html":
 			return persist.MediaTypeHTML
 		default:
 			return persist.MediaTypeText
 		}
 	case "application":
-		switch spl[1] {
+		switch subType {
 		case "pdf":
 			return persist.MediaTypePDF
 		}
