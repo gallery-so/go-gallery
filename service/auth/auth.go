@@ -257,7 +257,11 @@ func (e MagicLinkAuthenticator) Authenticate(pCtx context.Context) (*AuthResult,
 
 	user, err := e.UserRepo.GetByEmail(pCtx, persist.Email(info.Email))
 	if err != nil {
-		return nil, err
+		if _, ok := err.(persist.ErrUserNotFound); !ok {
+			return nil, err
+		}
+		// TODO: Figure out a better scheme for handling user-facing errors
+		return nil, errors.New("The email address you provided is unverified. Login with QR code instead, or verify your email at gallery.so/settings.")
 	}
 
 	return &AuthResult{
