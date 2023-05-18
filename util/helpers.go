@@ -298,6 +298,15 @@ func StringToPointerIfNotEmpty(str string) *string {
 	return &str
 }
 
+func FirstNonEmptyString(strs ...string) string {
+	for _, str := range strs {
+		if str != "" {
+			return str
+		}
+	}
+	return ""
+}
+
 // FromPointer returns the value of a pointer, or the zero value of the pointer's type if the pointer is nil.
 func FromPointer[T comparable](s *T) T {
 	if s == nil {

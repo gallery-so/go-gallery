@@ -459,8 +459,15 @@ func getHTMLMedia(pCtx context.Context, tids persist.TokenIdentifiers, tokenBuck
 			if obj.ObjectType == objectTypeThumbnail {
 				res.ThumbnailURL = persist.NullString(obj.storageURL(tokenBucket))
 				break
-			} else if obj.ObjectType == objectTypeImage {
+			} else if obj.ObjectType == objectTypeImage || obj.ObjectType == objectTypeSVG {
 				res.ThumbnailURL = persist.NullString(obj.storageURL(tokenBucket))
+			}
+		}
+
+		for _, obj := range cachedObjects {
+			if obj.ObjectType == objectTypeLiveRender {
+				res.LivePreviewURL = persist.NullString(obj.storageURL(tokenBucket))
+				break
 			}
 		}
 	}
