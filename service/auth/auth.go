@@ -478,7 +478,8 @@ func GetRolesErrorFromCtx(c *gin.Context) error {
 func StartSession(c *gin.Context, queries *db.Queries, userID persist.DBID) error {
 	sessionID := persist.GenerateID()
 
-	err := issueSessionTokens(c, userID, sessionID, queries)
+	// These are the first tokens for a new session, so parentRefreshID is an empty string
+	err := issueSessionTokens(c, userID, sessionID, "", queries)
 	if err != nil {
 		// If we fail to issue tokens to start a new session, the user will need to log in
 		// again (since we were starting a new session and the user doesn't have a valid refresh
@@ -522,7 +523,7 @@ func ContinueSession(c *gin.Context, queries *db.Queries) error {
 	// If the user doesn't have a valid auth cookie or a valid refresh cookie, they can't be
 	// authenticated and they'll have to log in again. Clear their cookies in case they have
 	// expired tokens.
-	userID, sessionID, refreshTokenErr := getAndParseRefreshToken(c)
+	refreshID, _, userID, sessionID, refreshTokenErr := getAndParseRefreshToken(c)
 	if refreshTokenErr != nil {
 		clearSessionStateForCtx(c, refreshTokenErr)
 
@@ -538,7 +539,7 @@ func ContinueSession(c *gin.Context, queries *db.Queries) error {
 
 	// At this point, the user has a valid refresh cookie, but not a valid auth cookie.
 	// Issue new tokens to continue their existing session.
-	err := issueSessionTokens(c, userID, sessionID, queries)
+	err := issueSessionTokens(c, userID, sessionID, refreshID, queries)
 	if err != nil {
 		logger.For(c).Errorf("error issuing session tokens (userID=%s, sessionID=%s): %s", userID, sessionID, err)
 
@@ -576,10 +577,12 @@ func EndSession(c *gin.Context, queries *db.Queries) {
 }
 
 // issueSessionTokens creates new tokens, updates the session in the database, and then sets the new
-// tokens as request cookies and context state. If an error occurs, no changes are made to cookies or
-// context.
-func issueSessionTokens(c *gin.Context, userID persist.DBID, sessionID persist.DBID, queries *db.Queries) error {
-	newRefreshToken, refreshExpiresAt, err := GenerateRefreshToken(c, userID, sessionID)
+// tokens as request cookies and context state. parentRefreshID is the ID of the refresh token used to
+// issue the new tokens; if this is the first set of tokens for a session, it should be an empty string.
+// If an error occurs when issuing new tokens, no changes are made to cookies or context.
+func issueSessionTokens(c *gin.Context, userID persist.DBID, sessionID persist.DBID, parentRefreshID string, queries *db.Queries) error {
+	newRefreshID := persist.GenerateID().String()
+	newRefreshToken, refreshExpiresAt, err := GenerateRefreshToken(c, newRefreshID, parentRefreshID, userID, sessionID)
 	if err != nil {
 		return err
 	}
@@ -590,12 +593,13 @@ func issueSessionTokens(c *gin.Context, userID persist.DBID, sessionID persist.D
 	}
 
 	session, err := queries.UpsertSession(c, db.UpsertSessionParams{
-		ID:          sessionID,
-		UserID:      userID,
-		UserAgent:   c.GetHeader("User-Agent"),
-		Platform:    c.GetHeader("X-Platform"),
-		Os:          c.GetHeader("X-OS"),
-		ActiveUntil: refreshExpiresAt,
+		ID:               sessionID,
+		UserID:           userID,
+		UserAgent:        c.GetHeader("User-Agent"),
+		Platform:         c.GetHeader("X-Platform"),
+		Os:               c.GetHeader("X-OS"),
+		CurrentRefreshID: newRefreshID,
+		ActiveUntil:      refreshExpiresAt,
 	})
 
 	if err != nil {
@@ -635,10 +639,10 @@ func getAndParseAuthToken(c *gin.Context) (persist.DBID, persist.DBID, error) {
 	return ParseAuthToken(c, authToken)
 }
 
-func getAndParseRefreshToken(c *gin.Context) (persist.DBID, persist.DBID, error) {
+func getAndParseRefreshToken(c *gin.Context) (string, string, persist.DBID, persist.DBID, error) {
 	refreshToken, err := getCookie(c, RefreshCookieKey)
 	if err != nil {
-		return "", "", err
+		return "", "", "", "", err
 	}
 
 	return ParseRefreshToken(c, refreshToken)

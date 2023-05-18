@@ -4867,25 +4867,27 @@ func (q *Queries) UpdateUserVerificationStatus(ctx context.Context, arg UpdateUs
 const upsertSession = `-- name: UpsertSession :one
 insert into sessions (id, user_id,
                       created_at, created_with_user_agent, created_with_platform, created_with_os,
-                      last_refreshed, last_user_agent, last_platform, last_os, active_until, invalidated, last_updated, deleted)
-    values ($1, $2, now(), $3, $4, $5, now(), $3, $4, $5, $6, false, now(), false)
+                      last_refreshed, last_user_agent, last_platform, last_os, current_refresh_id, active_until, invalidated, last_updated, deleted)
+    values ($1, $2, now(), $3, $4, $5, now(), $3, $4, $5, $6, $7, false, now(), false)
     on conflict (id) where deleted = false do update set
         last_refreshed = case when sessions.invalidated then sessions.last_refreshed else excluded.last_refreshed end,
         last_user_agent = case when sessions.invalidated then sessions.last_user_agent else excluded.last_user_agent end,
         last_platform = case when sessions.invalidated then sessions.last_platform else excluded.last_platform end,
         last_os = case when sessions.invalidated then sessions.last_os else excluded.last_os end,
+        current_refresh_id = case when sessions.invalidated then sessions.current_refresh_id else excluded.current_refresh_id end,
         last_updated = case when sessions.invalidated then sessions.last_updated else excluded.last_updated end,
         active_until = case when sessions.invalidated then sessions.active_until else greatest(sessions.active_until, excluded.active_until) end
-    returning id, user_id, created_at, created_with_user_agent, created_with_platform, created_with_os, last_refreshed, last_user_agent, last_platform, last_os, active_until, invalidated, last_updated, deleted
+    returning id, user_id, created_at, created_with_user_agent, created_with_platform, created_with_os, last_refreshed, last_user_agent, last_platform, last_os, current_refresh_id, active_until, invalidated, last_updated, deleted
 `
 
 type UpsertSessionParams struct {
-	ID          persist.DBID
-	UserID      persist.DBID
-	UserAgent   string
-	Platform    string
-	Os          string
-	ActiveUntil time.Time
+	ID               persist.DBID
+	UserID           persist.DBID
+	UserAgent        string
+	Platform         string
+	Os               string
+	CurrentRefreshID string
+	ActiveUntil      time.Time
 }
 
 func (q *Queries) UpsertSession(ctx context.Context, arg UpsertSessionParams) (Session, error) {
@@ -4895,6 +4897,7 @@ func (q *Queries) UpsertSession(ctx context.Context, arg UpsertSessionParams) (S
 		arg.UserAgent,
 		arg.Platform,
 		arg.Os,
+		arg.CurrentRefreshID,
 		arg.ActiveUntil,
 	)
 	var i Session
@@ -4909,6 +4912,7 @@ func (q *Queries) UpsertSession(ctx context.Context, arg UpsertSessionParams) (S
 		&i.LastUserAgent,
 		&i.LastPlatform,
 		&i.LastOs,
+		&i.CurrentRefreshID,
 		&i.ActiveUntil,
 		&i.Invalidated,
 		&i.LastUpdated,

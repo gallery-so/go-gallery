@@ -368,6 +368,7 @@ type Session struct {
 	LastUserAgent        string
 	LastPlatform         string
 	LastOs               string
+	CurrentRefreshID     string
 	ActiveUntil          time.Time
 	Invalidated          bool
 	LastUpdated          time.Time

@@ -9,6 +9,7 @@ create table if not exists sessions (
     last_user_agent text not null,
     last_platform text not null,
     last_os text not null,
+    current_refresh_id varchar(255) not null,
     active_until timestamptz not null,
     invalidated bool not null,
     last_updated timestamptz not null,
