@@ -1,4 +1,4 @@
-package middleware
+package limiters
 
 import (
 	"context"
@@ -83,6 +83,11 @@ func (i *KeyRateLimiter) ForKey(ctx context.Context, key string) (bool, time.Dur
 	}
 
 	return true, 0, nil
+}
+
+// Name returns the name of this limiter
+func (i *KeyRateLimiter) Name() string {
+	return i.name
 }
 
 type logAdapter struct {

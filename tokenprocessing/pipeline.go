@@ -401,6 +401,7 @@ func recordPipelineEndState(ctx context.Context, mr metric.MetricReporter, r *ru
 	if ctx.Err() != nil {
 		opts := append(baseOpts, metric.LogOptions.WithLogMessage("pipeline timed out"))
 		mr.Record(ctx, pipelineTimedOutMetric(), opts...)
+		return
 	}
 
 	recordPipelineDuration(ctx, mr, d, baseOpts)
