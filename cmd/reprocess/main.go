@@ -38,7 +38,7 @@ func main() {
 
 	tp := tokenprocessing.NewTokenProcessor(clients.Queries, clients.EthClient, server.NewMultichainProvider(clients), clients.IPFSClient, clients.ArweaveClient, clients.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), clients.Repos.TokenRepository, metric.NewLogMetricReporter())
 
-	var rows []coredb.GetAllTokensWithContractsByIDsRow
+	var rows []coredb.GetMissingThumbnailTokensByIDRangeRow
 	var err error
 
 	if env.GetString("CLOUD_RUN_JOB") != "" {
@@ -63,7 +63,7 @@ func main() {
 			panic(err)
 		}
 
-		rows, err = clients.Queries.GetAllTokensWithContractsByIDs(ctx, coredb.GetAllTokensWithContractsByIDsParams{
+		rows, err = clients.Queries.GetMissingThumbnailTokensByIDRange(ctx, coredb.GetMissingThumbnailTokensByIDRangeParams{
 			StartID: r.TokenStartID,
 			EndID:   r.TokenEndID,
 		})
@@ -83,7 +83,7 @@ func main() {
 			logrus.Errorf("error getting job range: %v", err)
 			panic(err)
 		}
-		rows, err = clients.Queries.GetAllTokensWithContractsByIDs(ctx, coredb.GetAllTokensWithContractsByIDsParams{
+		rows, err = clients.Queries.GetMissingThumbnailTokensByIDRange(ctx, coredb.GetMissingThumbnailTokensByIDRangeParams{
 			StartID: r.TokenStartID,
 			EndID:   r.TokenEndID,
 		})
