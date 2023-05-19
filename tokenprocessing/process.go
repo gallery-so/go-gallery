@@ -16,7 +16,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/sentry"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/util"
@@ -56,6 +56,8 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 		defer throttler.Unlock(reqCtx, input.UserID.String())
 
 		wp := pool.New().WithMaxGoroutines(50).WithErrors()
+
+		logger.For(reqCtx).Infof("Processing Media: %s - Started (%d tokens)", input.UserID, len(input.TokenIDs))
 
 		for _, tokenID := range input.TokenIDs {
 			t, err := tokenRepo.GetByID(reqCtx, tokenID)

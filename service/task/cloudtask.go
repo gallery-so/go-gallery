@@ -189,6 +189,8 @@ func CreateTaskForTokenProcessing(ctx context.Context, client *gcptasks.Client, 
 		return err
 	}
 
+	logger.For(ctx).Infof("creating task for v2 token processing, sending to %s\nmessage: %s", task.GetHttpRequest().GetUrl(), string(body))
+
 	err = submitHttpTask(ctx, client, queue, task, body)
 	if err != nil {
 		return err
@@ -215,6 +217,8 @@ func CreateTaskForTokenProcessing(ctx context.Context, client *gcptasks.Client, 
 	if err != nil {
 		return err
 	}
+
+	logger.For(ctx).Infof("creating task for v3 token processing, sending to %s\nmessage: %s", task.GetHttpRequest().GetUrl(), string(v3Body))
 
 	return submitHttpTask(ctx, client, queue, task, v3Body)
 }
