@@ -21,6 +21,13 @@ SELECT * FROM users WHERE username_idempotent = lower(sqlc.arg('username')) AND 
 -- name: GetUserByUsernameBatch :batchone
 SELECT * FROM users WHERE username_idempotent = lower($1) AND deleted = false;
 
+-- name: GetUserByVerifiedEmailAddress :one
+select u.* from users u join pii.for_users p on u.id = p.user_id
+where p.pii_email_address = lower($1)
+  and u.email_verified != 0
+  and p.deleted = false
+  and u.deleted = false;
+
 -- name: GetUserByAddressBatch :batchone
 select users.*
 from users, wallets
@@ -1034,7 +1041,7 @@ with copy_on_overwrite as (
           and deleted = false
         limit 1
     )
-) 
+)
 insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated) values
     (@new_id, @contract_id, @token_id, @chain, @metadata, @media, @name, @description, @processing_job_id, @active, now(), now())
     on conflict (contract_id, token_id, chain) where active = true and deleted = false do update

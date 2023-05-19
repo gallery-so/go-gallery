@@ -358,6 +358,10 @@ type UserByUsernameOrError interface {
 	IsUserByUsernameOrError()
 }
 
+type VerifyEmailMagicLinkPayloadOrError interface {
+	IsVerifyEmailMagicLinkPayloadOrError()
+}
+
 type VerifyEmailPayloadOrError interface {
 	IsVerifyEmailPayloadOrError()
 }
@@ -880,6 +884,7 @@ func (ErrInvalidInput) IsCommentOnFeedEventPayloadOrError()              {}
 func (ErrInvalidInput) IsRemoveCommentPayloadOrError()                   {}
 func (ErrInvalidInput) IsVerifyEmailPayloadOrError()                     {}
 func (ErrInvalidInput) IsPreverifyEmailPayloadOrError()                  {}
+func (ErrInvalidInput) IsVerifyEmailMagicLinkPayloadOrError()            {}
 func (ErrInvalidInput) IsUpdateEmailPayloadOrError()                     {}
 func (ErrInvalidInput) IsResendVerificationEmailPayloadOrError()         {}
 func (ErrInvalidInput) IsUpdateEmailNotificationSettingsPayloadOrError() {}
@@ -2079,6 +2084,16 @@ type UsersConnection struct {
 type VerifyEmailInput struct {
 	Token string `json:"token"`
 }
+
+type VerifyEmailMagicLinkInput struct {
+	Email persist.Email `json:"email"`
+}
+
+type VerifyEmailMagicLinkPayload struct {
+	CanSend bool `json:"canSend"`
+}
+
+func (VerifyEmailMagicLinkPayload) IsVerifyEmailMagicLinkPayloadOrError() {}
 
 type VerifyEmailPayload struct {
 	Email persist.Email `json:"email"`

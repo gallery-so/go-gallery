@@ -1370,6 +1370,15 @@ func (r *mutationResolver) VerifyEmail(ctx context.Context, input model.VerifyEm
 	return verifyEmail(ctx, input.Token)
 }
 
+// VerifyEmailMagicLink is the resolver for the verifyEmailMagicLink field.
+func (r *mutationResolver) VerifyEmailMagicLink(ctx context.Context, input model.VerifyEmailMagicLinkInput) (model.VerifyEmailMagicLinkPayloadOrError, error) {
+	_, err := publicapi.For(ctx).User.GetUserByVerifiedEmailAddress(ctx, input.Email)
+
+	return model.VerifyEmailMagicLinkPayload{
+		CanSend: err == nil,
+	}, nil
+}
+
 // RedeemMerch is the resolver for the redeemMerch field.
 func (r *mutationResolver) RedeemMerch(ctx context.Context, input model.RedeemMerchInput) (model.RedeemMerchPayloadOrError, error) {
 	tokenIDList := make([]persist.TokenID, len(input.TokenIds))
