@@ -326,7 +326,7 @@ func (tpj *tokenProcessingJob) upsertDB(ctx context.Context, tmetadata coredb.To
 	}
 
 	// new context just for insert so that if the rest of the job failed because of a context cancellation, we still insert
-	insertContext, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	insertContext, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
 	job, err := tpj.tp.queries.InsertJob(insertContext, coredb.InsertJobParams{
