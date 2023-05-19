@@ -5,6 +5,7 @@ import (
 	"fmt"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/auth/basicauth"
+	"github.com/mikeydub/go-gallery/service/limiters"
 	"net/http"
 
 	"github.com/getsentry/sentry-go"
@@ -147,7 +148,7 @@ func AddAuthToContext(queries *db.Queries) gin.HandlerFunc {
 }
 
 // IPRateLimited is a middleware that rate limits requests by IP address
-func IPRateLimited(lim *KeyRateLimiter) gin.HandlerFunc {
+func IPRateLimited(lim *limiters.KeyRateLimiter) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		canContinue, tryAgainAfter, err := lim.ForKey(c, c.ClientIP())
 		if err != nil {

@@ -21,6 +21,13 @@ SELECT * FROM users WHERE username_idempotent = lower(sqlc.arg('username')) AND 
 -- name: GetUserByUsernameBatch :batchone
 SELECT * FROM users WHERE username_idempotent = lower($1) AND deleted = false;
 
+-- name: GetUserByVerifiedEmailAddress :one
+select u.* from users u join pii.for_users p on u.id = p.user_id
+where p.pii_email_address = lower($1)
+  and u.email_verified != 0
+  and p.deleted = false
+  and u.deleted = false;
+
 -- name: GetUserByAddressBatch :batchone
 select users.*
 from users, wallets
@@ -1034,7 +1041,7 @@ with copy_on_overwrite as (
           and deleted = false
         limit 1
     )
-) 
+)
 insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated) values
     (@new_id, @contract_id, @token_id, @chain, @metadata, @media, @name, @description, @processing_job_id, @active, now(), now())
     on conflict (contract_id, token_id, chain) where active = true and deleted = false do update
@@ -1110,6 +1117,22 @@ JOIN contracts ON contracts.id = tokens.contract
 LEFT JOIN token_medias on token_medias.id = tokens.token_media_id
 WHERE tokens.deleted = false
 AND (tokens.token_media_id IS NULL or token_medias.active = false)
+AND tokens.id > @start_id AND tokens.id < @end_id
+ORDER BY tokens.id;
+
+-- name: GetMissingThumbnailTokensByIDRange :many
+SELECT
+    tokens.*,
+    contracts.*,
+    (
+        SELECT wallets.address
+        FROM wallets
+        WHERE wallets.id = ANY(tokens.owned_by_wallets)
+        LIMIT 1
+    ) AS wallet_address
+FROM tokens
+JOIN contracts ON contracts.id = tokens.contract
+left join token_medias on tokens.token_media_id = token_medias.id where tokens.deleted = false and token_medias.active = true and token_medias.media->>'media_type' = 'html' and (token_medias.media->>'thumbnail_url' is null or token_medias.media->>'thumbnail_url' = '')
 AND tokens.id > @start_id AND tokens.id < @end_id
 ORDER BY tokens.id;
 

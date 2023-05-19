@@ -72,6 +72,29 @@ func (api UserAPI) GetUserById(ctx context.Context, userID persist.DBID) (*db.Us
 	return &user, nil
 }
 
+func (api UserAPI) GetUserByVerifiedEmailAddress(ctx context.Context, emailAddress persist.Email) (*db.User, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"emailAddress": {emailAddress, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	// Intentionally using queries here instead of a dataloader. Caching a user by email address is tricky
+	// because the key (email address) isn't part of the user object, and this method isn't currently invoked
+	// in a way that would benefit from dataloaders or caching anyway.
+	user, err := api.queries.GetUserByVerifiedEmailAddress(ctx, emailAddress.String())
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			err = persist.ErrUserNotFound{Email: emailAddress}
+		}
+		return nil, err
+	}
+
+	return &user, nil
+}
+
 // GetUserWithPII returns the current user and their associated personally identifiable information
 func (api UserAPI) GetUserWithPII(ctx context.Context) (*db.PiiUserView, error) {
 	// Nothing to validate

@@ -179,6 +179,14 @@ type MarketplaceContract struct {
 	ContractID persist.DBID
 }
 
+type MediaValidationRule struct {
+	ID        persist.DBID
+	CreatedAt time.Time
+	MediaType string
+	Property  string
+	Required  bool
+}
+
 type Membership struct {
 	ID          persist.DBID
 	Deleted     bool
@@ -201,6 +209,25 @@ type Merch struct {
 	ObjectType   int32
 	DiscountCode sql.NullString
 	Redeemed     bool
+}
+
+type MigrationValidation struct {
+	ID                       persist.DBID
+	MediaID                  persist.DBID
+	ProcessingJobID          persist.DBID
+	Chain                    persist.Chain
+	Contract                 sql.NullString
+	TokenID                  persist.DBID
+	MediaType                interface{}
+	RemappedTo               interface{}
+	OldMedia                 pgtype.JSONB
+	NewMedia                 pgtype.JSONB
+	MediaTypeValidation      string
+	DimensionsValidation     string
+	MediaUrlValidation       string
+	ThumbnailUrlValidation   string
+	LivePreviewUrlValidation string
+	LastRefreshed            interface{}
 }
 
 type Nonce struct {

@@ -2079,6 +2079,138 @@ func (q *Queries) GetMerchDiscountCodeByTokenID(ctx context.Context, tokenHex pe
 	return discount_code, err
 }
 
+const getMissingThumbnailTokensByIDRange = `-- name: GetMissingThumbnailTokensByIDRange :many
+SELECT
+    tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id,
+    contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam,
+    (
+        SELECT wallets.address
+        FROM wallets
+        WHERE wallets.id = ANY(tokens.owned_by_wallets)
+        LIMIT 1
+    ) AS wallet_address
+FROM tokens
+JOIN contracts ON contracts.id = tokens.contract
+left join token_medias on tokens.token_media_id = token_medias.id where tokens.deleted = false and token_medias.active = true and token_medias.media->>'media_type' = 'html' and (token_medias.media->>'thumbnail_url' is null or token_medias.media->>'thumbnail_url' = '')
+AND tokens.id > $1 AND tokens.id < $2
+ORDER BY tokens.id
+`
+
+type GetMissingThumbnailTokensByIDRangeParams struct {
+	StartID persist.DBID
+	EndID   persist.DBID
+}
+
+type GetMissingThumbnailTokensByIDRangeRow struct {
+	ID                     persist.DBID
+	Deleted                bool
+	Version                sql.NullInt32
+	CreatedAt              time.Time
+	LastUpdated            time.Time
+	Name                   sql.NullString
+	Description            sql.NullString
+	CollectorsNote         sql.NullString
+	Media                  persist.Media
+	TokenUri               sql.NullString
+	TokenType              sql.NullString
+	TokenID                persist.TokenID
+	Quantity               sql.NullString
+	OwnershipHistory       persist.AddressAtBlockList
+	TokenMetadata          persist.TokenMetadata
+	ExternalUrl            sql.NullString
+	BlockNumber            sql.NullInt64
+	OwnerUserID            persist.DBID
+	OwnedByWallets         persist.DBIDList
+	Chain                  persist.Chain
+	Contract               persist.DBID
+	IsUserMarkedSpam       sql.NullBool
+	IsProviderMarkedSpam   sql.NullBool
+	LastSynced             time.Time
+	FallbackMedia          persist.FallbackMedia
+	TokenMediaID           persist.DBID
+	ID_2                   persist.DBID
+	Deleted_2              bool
+	Version_2              sql.NullInt32
+	CreatedAt_2            time.Time
+	LastUpdated_2          time.Time
+	Name_2                 sql.NullString
+	Symbol                 sql.NullString
+	Address                persist.Address
+	CreatorAddress         persist.Address
+	Chain_2                persist.Chain
+	ProfileBannerUrl       sql.NullString
+	ProfileImageUrl        sql.NullString
+	BadgeUrl               sql.NullString
+	Description_2          sql.NullString
+	OwnerAddress           persist.Address
+	IsProviderMarkedSpam_2 bool
+	WalletAddress          persist.Address
+}
+
+func (q *Queries) GetMissingThumbnailTokensByIDRange(ctx context.Context, arg GetMissingThumbnailTokensByIDRangeParams) ([]GetMissingThumbnailTokensByIDRangeRow, error) {
+	rows, err := q.db.Query(ctx, getMissingThumbnailTokensByIDRange, arg.StartID, arg.EndID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetMissingThumbnailTokensByIDRangeRow
+	for rows.Next() {
+		var i GetMissingThumbnailTokensByIDRangeRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Name,
+			&i.Description,
+			&i.CollectorsNote,
+			&i.Media,
+			&i.TokenUri,
+			&i.TokenType,
+			&i.TokenID,
+			&i.Quantity,
+			&i.OwnershipHistory,
+			&i.TokenMetadata,
+			&i.ExternalUrl,
+			&i.BlockNumber,
+			&i.OwnerUserID,
+			&i.OwnedByWallets,
+			&i.Chain,
+			&i.Contract,
+			&i.IsUserMarkedSpam,
+			&i.IsProviderMarkedSpam,
+			&i.LastSynced,
+			&i.FallbackMedia,
+			&i.TokenMediaID,
+			&i.ID_2,
+			&i.Deleted_2,
+			&i.Version_2,
+			&i.CreatedAt_2,
+			&i.LastUpdated_2,
+			&i.Name_2,
+			&i.Symbol,
+			&i.Address,
+			&i.CreatorAddress,
+			&i.Chain_2,
+			&i.ProfileBannerUrl,
+			&i.ProfileImageUrl,
+			&i.BadgeUrl,
+			&i.Description_2,
+			&i.OwnerAddress,
+			&i.IsProviderMarkedSpam_2,
+			&i.WalletAddress,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getMostRecentNotificationByOwnerIDForAction = `-- name: GetMostRecentNotificationByOwnerIDForAction :one
 select id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount from notifications
     where owner_id = $1
@@ -3184,6 +3316,39 @@ SELECT id, deleted, version, last_updated, created_at, username, username_idempo
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
 	row := q.db.QueryRow(ctx, getUserByUsername, username)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.Version,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.Username,
+		&i.UsernameIdempotent,
+		&i.Wallets,
+		&i.Bio,
+		&i.Traits,
+		&i.Universal,
+		&i.NotificationSettings,
+		&i.EmailVerified,
+		&i.EmailUnsubscriptions,
+		&i.FeaturedGallery,
+		&i.PrimaryWalletID,
+		&i.UserExperiences,
+	)
+	return i, err
+}
+
+const getUserByVerifiedEmailAddress = `-- name: GetUserByVerifiedEmailAddress :one
+select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences from users u join pii.for_users p on u.id = p.user_id
+where p.pii_email_address = lower($1)
+  and u.email_verified != 0
+  and p.deleted = false
+  and u.deleted = false
+`
+
+func (q *Queries) GetUserByVerifiedEmailAddress(ctx context.Context, lower string) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByVerifiedEmailAddress, lower)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -4892,7 +5057,7 @@ with copy_on_overwrite as (
           and deleted = false
         limit 1
     )
-) 
+)
 insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated) values
     ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now(), now())
     on conflict (contract_id, token_id, chain) where active = true and deleted = false do update

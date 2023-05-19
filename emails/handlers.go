@@ -2,6 +2,7 @@ package emails
 
 import (
 	"context"
+	"github.com/mikeydub/go-gallery/service/limiters"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"time"
 
@@ -20,7 +21,7 @@ func handlersInitServer(router *gin.Engine, loaders *dataloader.Loaders, queries
 	limiterCtx := context.Background()
 	limiterCache := redis.NewCache(redis.EmailRateLimitersCache)
 
-	verificationLimiter := middleware.NewKeyRateLimiter(limiterCtx, limiterCache, "verification", 1, time.Second*5)
+	verificationLimiter := limiters.NewKeyRateLimiter(limiterCtx, limiterCache, "verification", 1, time.Second*5)
 	sendGroup.POST("/verification", middleware.IPRateLimited(verificationLimiter), sendVerificationEmail(loaders, queries, s))
 
 	router.POST("/subscriptions", updateSubscriptions(queries))
@@ -28,7 +29,7 @@ func handlersInitServer(router *gin.Engine, loaders *dataloader.Loaders, queries
 	router.POST("/resubscribe", resubscribe(queries))
 
 	router.POST("/verify", verifyEmail(queries))
-	preverifyLimiter := middleware.NewKeyRateLimiter(limiterCtx, limiterCache, "preverify", 1, time.Millisecond*500)
+	preverifyLimiter := limiters.NewKeyRateLimiter(limiterCtx, limiterCache, "preverify", 1, time.Millisecond*500)
 	router.GET("/preverify", middleware.IPRateLimited(preverifyLimiter), preverifyEmail())
 	return router
 }

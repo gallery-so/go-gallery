@@ -12,13 +12,14 @@ import (
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/tokenprocessing"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
 const (
-	totalJobs = 6400
+	totalJobs = 100
 )
 
 type jobRange struct {
@@ -41,7 +42,7 @@ func main() {
 
 	var totalTokenCount int
 
-	err := pg.QueryRow(ctx, `select count(*) from tokens left join token_medias on tokens.token_media_id = token_medias.id where tokens.deleted = false and (tokens.token_media_id is null or token_medias.active = false);`).Scan(&totalTokenCount)
+	err := pg.QueryRow(ctx, fmt.Sprintf(`select count(*) from tokens %s;`, tokenprocessing.FullReprocessQuery)).Scan(&totalTokenCount)
 	if err != nil {
 		logrus.Errorf("error getting total token count: %v", err)
 		panic(err)
@@ -49,7 +50,7 @@ func main() {
 
 	limit := int(math.Ceil(float64(totalTokenCount) / float64(totalJobs)))
 
-	rows, err := pg.Query(ctx, `select tokens.id from tokens left join token_medias on tokens.token_media_id = token_medias.id where tokens.deleted = false and (tokens.token_media_id is null or token_medias.active = false) order by tokens.id;`)
+	rows, err := pg.Query(ctx, fmt.Sprintf(`select tokens.id from tokens %s order by tokens.id;`, tokenprocessing.FullReprocessQuery))
 	if err != nil {
 		logrus.Errorf("error getting token ids: %v", err)
 		panic(err)

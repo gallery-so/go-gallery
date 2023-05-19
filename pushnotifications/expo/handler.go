@@ -271,11 +271,11 @@ func (h *PushNotificationHandler) checkPushTicketsRecursive(ctx context.Context,
 }
 
 func processTicketReceipts(ctx context.Context, tickets []db.PushNotificationTicket, receipts map[string]PushReceipt) (params db.UpdatePushTicketsParams, tokensToUnregister []persist.DBID) {
-	params.Ids = make([]string, len(receipts))
-	params.CheckAfter = make([]time.Time, len(receipts))
-	params.NumCheckAttempts = make([]int32, len(receipts))
-	params.Status = make([]string, len(receipts))
-	params.Deleted = make([]bool, len(receipts))
+	params.Ids = make([]string, len(tickets))
+	params.CheckAfter = make([]time.Time, len(tickets))
+	params.NumCheckAttempts = make([]int32, len(tickets))
+	params.Status = make([]string, len(tickets))
+	params.Deleted = make([]bool, len(tickets))
 
 	for i, ticket := range tickets {
 		// Start with all the ticket's existing values

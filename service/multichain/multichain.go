@@ -16,6 +16,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/task"
+	"github.com/sirupsen/logrus"
 	"github.com/sourcegraph/conc"
 	"github.com/sourcegraph/conc/pool"
 
@@ -332,6 +333,9 @@ func validateProviders(ctx context.Context, providers []any) map[persist.Chain][
 
 // SyncTokens updates the media for all tokens for a user
 func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains []persist.Chain) error {
+
+	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"user_id": userID, "chains": chains})
+
 	user, err := p.Repos.UserRepository.GetByID(ctx, userID)
 	if err != nil {
 		return err
@@ -366,7 +370,6 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 			addr := addr
 			chain := chain
 			wg.Go(func() {
-				start := time.Now()
 				providers, err := p.getProvidersForChain(chain)
 				if err != nil {
 					errChan <- err
@@ -393,7 +396,6 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 					})
 				}
 				subWg.Wait()
-				logger.For(ctx).Debugf("updated media for user %s wallet %s in %s", user.Username, addr, time.Since(start))
 			})
 		}
 	}
@@ -548,10 +550,14 @@ func (p *Provider) processTokensForUser(ctx context.Context, tokensFromProviders
 		return nil, err
 	}
 
+	logger.For(ctx).Infof("%d new tokens and %d deduped tokens for user %s", len(newTokens), len(dedupedTokens), user.ID)
+
 	persistedTokens, err := p.Repos.TokenRepository.BulkUpsertByOwnerUserID(ctx, user.ID, chains, dedupedTokens, skipDelete)
 	if err != nil {
 		return nil, err
 	}
+
+	logger.For(ctx).Infof("%d persisted tokens for user %s", len(persistedTokens), user.ID)
 
 	tokenIDs := make([]persist.DBID, 0, len(newTokens))
 	for _, token := range persistedTokens {
@@ -1254,6 +1260,9 @@ func (d *Provider) processContracts(ctx context.Context, contractsFromProviders 
 	if err != nil {
 		return nil, err
 	}
+
+	logger.For(ctx).Infof("upserting %d contracts", len(newContracts))
+
 	if err := d.Repos.ContractRepository.BulkUpsert(ctx, newContracts); err != nil {
 		return nil, fmt.Errorf("error upserting contracts: %s", err)
 	}

@@ -207,8 +207,25 @@ func cacheObjectsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	// neither download worked, unexpectedly
 	if (animCh == nil || !isCacheResultValid(animResult)) && (imgCh == nil || !isCacheResultValid(imgResult)) {
-		traceCallback, _ := persist.TrackStepStatus(pCtx, &pMeta.NothingCachedWithErrors, "NothingCachedWithErrors")
+		traceCallback, pCtx := persist.TrackStepStatus(pCtx, &pMeta.NothingCachedWithErrors, "NothingCachedWithErrors")
 		defer traceCallback()
+
+		openseaObjects, err := cacheObjectsFromOpensea(pCtx, tids, "", objectTypeImage, ipfsClient, arweaveClient, storageClient, tokenBucket, &cachePipelineMetadata{
+			ContentHeaderValueRetrieval:  &pMeta.AlternateContentHeaderValueRetrieval,
+			ReaderRetrieval:              &pMeta.AlternateReaderRetrieval,
+			OpenseaFallback:              &pMeta.AlternateOpenseaFallback,
+			DetermineMediaTypeWithReader: &pMeta.AlternateDetermineMediaTypeWithReader,
+			AnimationGzip:                &pMeta.AlternateAnimationGzip,
+			StoreGCP:                     &pMeta.AlternateStoreGCP,
+			ThumbnailGCP:                 &pMeta.AlternateThumbnailGCP,
+			LiveRenderGCP:                &pMeta.AlternateLiveRenderGCP,
+		})
+		if err == nil && len(openseaObjects) > 0 {
+			// Fail nothing cached with errors because we were able to get media from opensea
+			persist.FailStep(&pMeta.NothingCachedWithErrors)
+			return append(objects, openseaObjects...), nil
+		}
+		logger.For(pCtx).Errorf("failed to cache media from opensea: %s", err)
 
 		if animCh != nil {
 			if _, ok := animResult.err.(errInvalidMedia); ok {
@@ -250,6 +267,21 @@ func cacheObjectsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	if len(objects) == 0 {
 		traceCallback, _ := persist.TrackStepStatus(pCtx, &pMeta.NothingCachedWithoutErrors, "NothingCachedWithoutErrors")
 		defer traceCallback()
+		openseaObjects, err := cacheObjectsFromOpensea(pCtx, tids, "", objectTypeImage, ipfsClient, arweaveClient, storageClient, tokenBucket, &cachePipelineMetadata{
+			ContentHeaderValueRetrieval:  &pMeta.AlternateContentHeaderValueRetrieval,
+			ReaderRetrieval:              &pMeta.AlternateReaderRetrieval,
+			OpenseaFallback:              &pMeta.AlternateOpenseaFallback,
+			DetermineMediaTypeWithReader: &pMeta.AlternateDetermineMediaTypeWithReader,
+			AnimationGzip:                &pMeta.AlternateAnimationGzip,
+			StoreGCP:                     &pMeta.AlternateStoreGCP,
+			ThumbnailGCP:                 &pMeta.AlternateThumbnailGCP,
+			LiveRenderGCP:                &pMeta.AlternateLiveRenderGCP,
+		})
+		if err == nil && len(openseaObjects) > 0 {
+			// Fail nothing cached with errors because we were able to get media from opensea
+			persist.FailStep(&pMeta.NothingCachedWithoutErrors)
+			return append(objects, openseaObjects...), nil
+		}
 		return nil, errNoCachedObjects{tids: tids}
 	}
 
@@ -459,8 +491,15 @@ func getHTMLMedia(pCtx context.Context, tids persist.TokenIdentifiers, tokenBuck
 			if obj.ObjectType == objectTypeThumbnail {
 				res.ThumbnailURL = persist.NullString(obj.storageURL(tokenBucket))
 				break
-			} else if obj.ObjectType == objectTypeImage {
+			} else if obj.ObjectType == objectTypeImage || obj.ObjectType == objectTypeSVG {
 				res.ThumbnailURL = persist.NullString(obj.storageURL(tokenBucket))
+			}
+		}
+
+		for _, obj := range cachedObjects {
+			if obj.ObjectType == objectTypeLiveRender {
+				res.LivePreviewURL = persist.NullString(obj.storageURL(tokenBucket))
+				break
 			}
 		}
 	}
@@ -975,33 +1014,8 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 		traceCallback, pCtx := persist.TrackStepStatus(pCtx, subMeta.OpenseaFallback, "OpenseaFallback")
 		logger.For(pCtx).Infof("failed to get data from uri '%s' for '%s' because of (err: %s <%T>), trying opensea", mediaURL, tids, err, err)
 		defer traceCallback()
-		// if token is ETH, backup to asking opensea
-		assets, err := opensea.FetchAssetsForTokenIdentifiers(pCtx, persist.EthereumAddress(tids.ContractAddress), opensea.TokenID(tids.TokenID.Base10String()))
-		if err != nil || len(assets) == 0 {
-			// no data from opensea, return error
-			return nil, errNoDataFromOpensea{err: err, url: mediaURL}
-		}
 
-		for _, asset := range assets {
-			// does this asset have any valid URLs?
-			firstNonEmptyURL, ok := util.FindFirst([]string{asset.AnimationURL, asset.ImageURL, asset.ImagePreviewURL, asset.ImageOriginalURL, asset.ImageThumbnailURL}, func(s string) bool {
-				return s != ""
-			})
-			if !ok {
-				continue
-			}
-
-			reader, err = rpc.GetDataFromURIAsReader(pCtx, persist.TokenURI(firstNonEmptyURL), ipfsClient, arweaveClient, util.MB, time.Second*30)
-			if err != nil {
-				continue
-			}
-
-			logger.For(pCtx).Infof("got reader for %s from opensea in %s (%s)", tids, time.Since(timeBeforeDataReader), firstNonEmptyURL)
-
-			return cacheObjectsFromURL(pCtx, tids, firstNonEmptyURL, oType, ipfsClient, arweaveClient, storageClient, bucket, subMeta, true)
-		}
-
-		return nil, errNoDataFromOpensea{err: err, url: mediaURL}
+		return cacheObjectsFromOpensea(pCtx, tids, mediaURL, oType, ipfsClient, arweaveClient, storageClient, bucket, subMeta)
 	}
 
 	if err != nil {
@@ -1085,6 +1099,30 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 	}
 
 	return result, nil
+}
+
+func cacheObjectsFromOpensea(pCtx context.Context, tids persist.TokenIdentifiers, mediaURL string, oType objectType, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, bucket string, subMeta *cachePipelineMetadata) ([]cachedMediaObject, error) {
+	assets, err := opensea.FetchAssetsForTokenIdentifiers(pCtx, persist.EthereumAddress(tids.ContractAddress), opensea.TokenID(tids.TokenID.Base10String()))
+	if err != nil || len(assets) == 0 {
+		return nil, errNoDataFromOpensea{err: err, url: mediaURL}
+	}
+
+	for _, asset := range assets {
+
+		firstNonEmptyURL, ok := util.FindFirst([]string{asset.AnimationURL, asset.ImageURL, asset.ImagePreviewURL, asset.ImageOriginalURL, asset.ImageThumbnailURL}, func(s string) bool {
+			return s != ""
+		})
+		if !ok {
+			continue
+		}
+
+		objects, err := cacheObjectsFromURL(pCtx, tids, firstNonEmptyURL, oType, ipfsClient, arweaveClient, storageClient, bucket, subMeta, true)
+		if err != nil {
+			continue
+		}
+		return objects, nil
+	}
+	return nil, errNoDataFromOpensea{err: err, url: mediaURL}
 }
 
 func thumbnailVideoToWriter(ctx context.Context, url string, writer io.Writer) error {
