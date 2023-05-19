@@ -159,6 +159,7 @@ func newGalleryClaims(tokenType TokenType, validFor time.Duration) GalleryClaims
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(validFor)),
 			Issuer:    "gallery",
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
 

@@ -6,6 +6,7 @@ import (
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/auth/basicauth"
 	"github.com/mikeydub/go-gallery/service/limiters"
+	"github.com/mikeydub/go-gallery/service/redis"
 	"net/http"
 
 	"github.com/getsentry/sentry-go"
@@ -109,9 +110,9 @@ func TaskRequired() gin.HandlerFunc {
 }
 
 // ContinueSession is a middleware that manages session cookies
-func ContinueSession(queries *db.Queries) gin.HandlerFunc {
+func ContinueSession(queries *db.Queries, authRefreshCache *redis.Cache) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		err := auth.ContinueSession(c, queries)
+		err := auth.ContinueSession(c, queries, authRefreshCache)
 		if err == nil {
 			loggerCtx := logger.NewContextWithFields(c.Request.Context(), logrus.Fields{
 				"authedUserId": auth.GetUserIDFromCtx(c),

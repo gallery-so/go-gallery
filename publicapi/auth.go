@@ -31,6 +31,7 @@ type AuthAPI struct {
 	multiChainProvider *multichain.Provider
 	magicLinkClient    *magicclient.API
 	oneTimeLoginCache  *redis.Cache
+	authRefreshCache   *redis.Cache
 }
 
 func (api AuthAPI) NewNonceAuthenticator(chainAddress persist.ChainPubKey, nonce string, signature string, walletType persist.WalletType) auth.Authenticator {
@@ -142,7 +143,7 @@ func (api AuthAPI) Login(ctx context.Context, authenticator auth.Authenticator) 
 
 func (api AuthAPI) Logout(ctx context.Context) {
 	// Nothing to validate
-	auth.Logout(ctx, api.queries)
+	auth.Logout(ctx, api.queries, api.authRefreshCache)
 }
 
 func (api AuthAPI) GenerateQRCodeLoginToken(ctx context.Context) (string, error) {

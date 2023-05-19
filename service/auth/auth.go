@@ -318,9 +318,9 @@ func Login(ctx context.Context, queries *db.Queries, authenticator Authenticator
 	return authResult.User.ID, nil
 }
 
-func Logout(ctx context.Context, queries *db.Queries) {
+func Logout(ctx context.Context, queries *db.Queries, authRefreshCache *redis.Cache) {
 	gc := util.MustGetGinContext(ctx)
-	EndSession(gc, queries)
+	EndSession(gc, queries, authRefreshCache)
 }
 
 // GetAuthNonce will determine whether a user is permitted to log in, and if so, generate a nonce to be signed
@@ -453,6 +453,32 @@ func clearSessionStateForCtx(c *gin.Context, err error) {
 	c.Set(userRolesContextKey, []persist.Role{})
 }
 
+// ForceAuthTokenRefresh should be called whenever something happens that would result in existing auth
+// tokens being out-of-date. For example, when a user's roles are changed, or a user logs out of a session,
+// existing otherwise-valid auth tokens should be refreshed so they have the latest session state.
+func ForceAuthTokenRefresh(ctx context.Context, authRefreshCache *redis.Cache, userID persist.DBID) error {
+	// Keep the key long enough for any existing auth tokens to expire, plus an extra minute of wiggle room
+	expiration := time.Duration(env.GetInt64("AUTH_JWT_TTL"))*time.Second + time.Minute
+	return authRefreshCache.SetTime(ctx, userID.String(), time.Now(), expiration, true)
+}
+
+func mustRefreshAuthToken(ctx context.Context, authRefreshCache *redis.Cache, userID persist.DBID, issuedAt time.Time) bool {
+	forceRefreshBefore, err := authRefreshCache.GetTime(ctx, userID.String())
+	if err != nil {
+		// If there's no key for this user, we don't need to force an auth token refresh
+		var notFound redis.ErrKeyNotFound
+		if errors.As(err, &notFound) {
+			return false
+		}
+
+		// If we couldn't hit the redis cache, assume we need to refresh the auth token
+		logger.For(ctx).Errorf("error checking auth refresh cache: %s", err)
+		return true
+	}
+
+	return issuedAt.Before(forceRefreshBefore)
+}
+
 // StartSession begins a new session for the specified user. After calling StartSession,
 // the current auth state can be queried with functions like GetUserAuthedFromCtx(),
 // GetUserIDFromCtx(), etc.
@@ -477,8 +503,9 @@ func StartSession(c *gin.Context, queries *db.Queries, userID persist.DBID) erro
 // it if possible. If the request is for an expired or invalid session, the user will be
 // logged out. After calling ContinueSession, the current auth state can be queried with
 // functions like GetUserAuthedFromCtx(), GetUserIDFromCtx(), etc.
-func ContinueSession(c *gin.Context, queries *db.Queries) error {
+func ContinueSession(c *gin.Context, queries *db.Queries, authRefreshCache *redis.Cache) error {
 	// If the user has a valid auth cookie, we can set their auth state and be done
+	// (unless something like updating roles triggered a forced refresh of the auth token)
 	authClaims, authTokenErr := getAndParseAuthToken(c)
 	if authTokenErr == nil {
 		// ----------------------------------------------------------------------------
@@ -486,13 +513,17 @@ func ContinueSession(c *gin.Context, queries *db.Queries) error {
 		// Where it would normally be an error for an auth token to not have a session ID,
 		// it's expected for tokens that were issued prior to the introduction of session IDs.
 		// Can be removed in a month when all existing auth tokens will have expired.
-		if authClaims.SessionID == "" {
+		// This also applies to IssuedAt times, which are required now, but weren't present
+		// in older tokens.
+		if authClaims.SessionID == "" || authClaims.IssuedAt == nil {
 			return StartSession(c, queries, authClaims.UserID)
 		}
 		// End of temporary handling
 		// ----------------------------------------------------------------------------
-		setSessionStateForCtx(c, authClaims.UserID, authClaims.SessionID, authClaims.Roles)
-		return nil
+		if !mustRefreshAuthToken(c, authRefreshCache, authClaims.UserID, authClaims.IssuedAt.Time) {
+			setSessionStateForCtx(c, authClaims.UserID, authClaims.SessionID, authClaims.Roles)
+			return nil
+		}
 	}
 
 	// If the user doesn't have a valid auth cookie or a valid refresh cookie, they can't be
@@ -512,8 +543,9 @@ func ContinueSession(c *gin.Context, queries *db.Queries) error {
 		return refreshTokenErr
 	}
 
-	// At this point, the user has a valid refresh cookie, but not a valid auth cookie.
-	// Issue new tokens to continue their existing session.
+	// At this point, the user has a valid refresh cookie, but the auth cookie needs to be reissued
+	// (either because it's invalid or because it's being forced to refresh). Issue new tokens to continue
+	// the existing session.
 	err := issueSessionTokens(c, refreshClaims.UserID, refreshClaims.SessionID, refreshClaims.ID, queries)
 	if err != nil {
 		logger.For(c).Errorf("error issuing session tokens (userID=%s, sessionID=%s): %s", refreshClaims.UserID, refreshClaims.SessionID, err)
@@ -538,12 +570,16 @@ func ContinueSession(c *gin.Context, queries *db.Queries) error {
 }
 
 // EndSession invalidates the current session and clears the user's cookies
-func EndSession(c *gin.Context, queries *db.Queries) {
+func EndSession(c *gin.Context, queries *db.Queries, authRefreshCache *redis.Cache) {
 	if GetUserAuthedFromCtx(c) {
 		if sessionID := GetSessionIDFromCtx(c); sessionID != "" {
 			if err := queries.InvalidateSession(c, sessionID); err != nil {
 				logger.For(c).Errorf("failed to invalidate session: %s", err)
 			}
+		}
+		userID := GetUserIDFromCtx(c)
+		if err := ForceAuthTokenRefresh(c, authRefreshCache, userID); err != nil {
+			logger.For(c).Errorf("failed to force auth token refresh when ending session: %s", err)
 		}
 	}
 
