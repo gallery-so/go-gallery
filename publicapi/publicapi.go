@@ -128,12 +128,7 @@ func getAuthenticatedUserID(ctx context.Context) (persist.DBID, error) {
 
 func getUserRoles(ctx context.Context) []persist.Role {
 	gc := util.MustGetGinContext(ctx)
-
-	if auth.GetUserRolesExistFromCtx(gc) {
-		return auth.GetRolesFromCtx(gc)
-	}
-
-	return []persist.Role{}
+	return auth.GetRolesFromCtx(gc)
 }
 
 func publishEventGroup(ctx context.Context, groupID string, action persist.Action, caption *string) (*db.FeedEvent, error) {

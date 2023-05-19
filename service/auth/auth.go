@@ -40,13 +40,11 @@ type AuthenticatedAddress struct {
 
 const (
 	// Context keys for auth data
-	userAuthedContextKey     = "auth.authenticated"
-	userIDContextKey         = "auth.user_id"
-	sessionIDContextKey      = "auth.session_id"
-	authErrorContextKey      = "auth.auth_error"
-	userRolesContextKey      = "auth.roles"
-	userRolesExistContextKey = "auth.roles_exist"
-	roleErrorContextKey      = "auth.roles_error"
+	userAuthedContextKey = "auth.authenticated"
+	userIDContextKey     = "auth.user_id"
+	sessionIDContextKey  = "auth.session_id"
+	authErrorContextKey  = "auth.auth_error"
+	userRolesContextKey  = "auth.roles"
 )
 
 // We don't want our cookies to expire, so their max age is arbitrarily set to 10 years.
@@ -421,7 +419,11 @@ func GetAuthErrorFromCtx(c *gin.Context) error {
 	return err.(error)
 }
 
-func setSessionStateForCtx(c *gin.Context, userID persist.DBID, sessionID persist.DBID) {
+func GetRolesFromCtx(c *gin.Context) []persist.Role {
+	return c.MustGet(userRolesContextKey).([]persist.Role)
+}
+
+func setSessionStateForCtx(c *gin.Context, userID persist.DBID, sessionID persist.DBID, roles []persist.Role) {
 	if userID == "" || sessionID == "" {
 		logger.For(c).Errorf("attempted to set session state with missing values. userID: %s, sessionID: %s", userID, sessionID)
 		err := errors.New("attempted to set session state with missing values")
@@ -432,10 +434,15 @@ func setSessionStateForCtx(c *gin.Context, userID persist.DBID, sessionID persis
 		return
 	}
 
+	if roles == nil {
+		roles = []persist.Role{}
+	}
+
 	c.Set(userIDContextKey, userID)
 	c.Set(sessionIDContextKey, sessionID)
 	c.Set(authErrorContextKey, nil)
 	c.Set(userAuthedContextKey, true)
+	c.Set(userRolesContextKey, roles)
 }
 
 func clearSessionStateForCtx(c *gin.Context, err error) {
@@ -444,32 +451,6 @@ func clearSessionStateForCtx(c *gin.Context, err error) {
 	c.Set(authErrorContextKey, err)
 	c.Set(userAuthedContextKey, false)
 	c.Set(userRolesContextKey, []persist.Role{})
-	c.Set(roleErrorContextKey, nil)
-	c.Set(userRolesExistContextKey, false)
-}
-
-func SetRolesForCtx(c *gin.Context, roles []persist.Role, err error) {
-	c.Set(userRolesContextKey, roles)
-	c.Set(roleErrorContextKey, err)
-	c.Set(userRolesExistContextKey, len(roles) > 0 && err == nil)
-}
-
-func GetRolesFromCtx(c *gin.Context) []persist.Role {
-	return c.MustGet(userRolesContextKey).([]persist.Role)
-}
-
-func GetUserRolesExistFromCtx(c *gin.Context) bool {
-	return c.GetBool(userRolesExistContextKey)
-}
-
-func GetRolesErrorFromCtx(c *gin.Context) error {
-	err := c.MustGet(roleErrorContextKey)
-
-	if err != nil {
-		return nil
-	}
-
-	return err.(error)
 }
 
 // StartSession begins a new session for the specified user. After calling StartSession,
@@ -498,32 +479,26 @@ func StartSession(c *gin.Context, queries *db.Queries, userID persist.DBID) erro
 // functions like GetUserAuthedFromCtx(), GetUserIDFromCtx(), etc.
 func ContinueSession(c *gin.Context, queries *db.Queries) error {
 	// If the user has a valid auth cookie, we can set their auth state and be done
-	userID, sessionID, authTokenErr := getAndParseAuthToken(c)
+	authClaims, authTokenErr := getAndParseAuthToken(c)
 	if authTokenErr == nil {
 		// ----------------------------------------------------------------------------
 		// Temporary handling for existing auth tokens that don't have session IDs.
 		// Where it would normally be an error for an auth token to not have a session ID,
 		// it's expected for tokens that were issued prior to the introduction of session IDs.
 		// Can be removed in a month when all existing auth tokens will have expired.
-		if sessionID == "" {
-			return StartSession(c, queries, userID)
+		if authClaims.SessionID == "" {
+			return StartSession(c, queries, authClaims.UserID)
 		}
 		// End of temporary handling
 		// ----------------------------------------------------------------------------
-
-		setSessionStateForCtx(c, userID, sessionID)
-
-		// TODO: Store these in the auth token and parse them, so we aren't hitting the database for every request
-		roles, err := RolesByUserID(c, queries, userID)
-		SetRolesForCtx(c, roles, err)
-
+		setSessionStateForCtx(c, authClaims.UserID, authClaims.SessionID, authClaims.Roles)
 		return nil
 	}
 
 	// If the user doesn't have a valid auth cookie or a valid refresh cookie, they can't be
 	// authenticated and they'll have to log in again. Clear their cookies in case they have
 	// expired tokens.
-	refreshID, _, userID, sessionID, refreshTokenErr := getAndParseRefreshToken(c)
+	refreshClaims, refreshTokenErr := getAndParseRefreshToken(c)
 	if refreshTokenErr != nil {
 		clearSessionStateForCtx(c, refreshTokenErr)
 
@@ -539,9 +514,9 @@ func ContinueSession(c *gin.Context, queries *db.Queries) error {
 
 	// At this point, the user has a valid refresh cookie, but not a valid auth cookie.
 	// Issue new tokens to continue their existing session.
-	err := issueSessionTokens(c, userID, sessionID, refreshID, queries)
+	err := issueSessionTokens(c, refreshClaims.UserID, refreshClaims.SessionID, refreshClaims.ID, queries)
 	if err != nil {
-		logger.For(c).Errorf("error issuing session tokens (userID=%s, sessionID=%s): %s", userID, sessionID, err)
+		logger.For(c).Errorf("error issuing session tokens (userID=%s, sessionID=%s): %s", refreshClaims.UserID, refreshClaims.SessionID, err)
 
 		// If we encountered an error issuing tokens, clear the context state so the user is "unauthenticated"
 		// for the duration of this request.
@@ -584,11 +559,19 @@ func issueSessionTokens(c *gin.Context, userID persist.DBID, sessionID persist.D
 	newRefreshID := persist.GenerateID().String()
 	newRefreshToken, refreshExpiresAt, err := GenerateRefreshToken(c, newRefreshID, parentRefreshID, userID, sessionID)
 	if err != nil {
+		logger.For(c).Errorf("error generating refresh token for userID=%s, sessionID=%s: %s", userID, sessionID, err)
 		return err
 	}
 
-	newAuthToken, err := GenerateAuthToken(c, userID, sessionID)
+	roles, err := RolesByUserID(c, queries, userID)
 	if err != nil {
+		logger.For(c).Errorf("error getting roles for userID=%s, sessionID=%s: %s", userID, sessionID, err)
+		return err
+	}
+
+	newAuthToken, err := GenerateAuthToken(c, userID, sessionID, parentRefreshID, roles)
+	if err != nil {
+		logger.For(c).Errorf("error generating auth token for userID=%s, sessionID=%s: %s", userID, sessionID, err)
 		return err
 	}
 
@@ -603,6 +586,7 @@ func issueSessionTokens(c *gin.Context, userID persist.DBID, sessionID persist.D
 	})
 
 	if err != nil {
+		logger.For(c).Errorf("error upserting session data for userID=%s, sessionID=%s: %s", userID, sessionID, err)
 		return err
 	}
 
@@ -610,12 +594,8 @@ func issueSessionTokens(c *gin.Context, userID persist.DBID, sessionID persist.D
 		return ErrSessionInvalidated
 	}
 
-	setSessionStateForCtx(c, userID, sessionID)
+	setSessionStateForCtx(c, userID, sessionID, roles)
 	setSessionCookies(c, newAuthToken, newRefreshToken)
-
-	// TODO: Store these in the auth token and parse them, so we aren't hitting the database for every request
-	roles, err := RolesByUserID(c, queries, userID)
-	SetRolesForCtx(c, roles, err)
 
 	return nil
 }
@@ -630,19 +610,19 @@ func clearSessionCookies(c *gin.Context) {
 	clearCookie(c, RefreshCookieKey)
 }
 
-func getAndParseAuthToken(c *gin.Context) (persist.DBID, persist.DBID, error) {
+func getAndParseAuthToken(c *gin.Context) (AuthTokenClaims, error) {
 	authToken, err := getCookie(c, AuthCookieKey)
 	if err != nil {
-		return "", "", err
+		return AuthTokenClaims{}, err
 	}
 
 	return ParseAuthToken(c, authToken)
 }
 
-func getAndParseRefreshToken(c *gin.Context) (string, string, persist.DBID, persist.DBID, error) {
+func getAndParseRefreshToken(c *gin.Context) (RefreshTokenClaims, error) {
 	refreshToken, err := getCookie(c, RefreshCookieKey)
 	if err != nil {
-		return "", "", "", "", err
+		return RefreshTokenClaims{}, err
 	}
 
 	return ParseRefreshToken(c, refreshToken)
