@@ -16,10 +16,10 @@ func getStatus(i *indexer, tokenRepository persist.TokenRepository) gin.HandlerF
 
 		mostRecent, _ := tokenRepository.MostRecentBlock(ctx)
 
-		readableSyncMap := make(map[ContractOwnerMethod]int)
+		readableSyncMap := make(map[persist.ContractOwnerMethod]int)
 
 		i.contractOwnerStats.Range(func(key, value interface{}) bool {
-			readableSyncMap[key.(ContractOwnerMethod)] = value.(int)
+			readableSyncMap[key.(persist.ContractOwnerMethod)] = value.(int)
 			return true
 		})
 

@@ -44,7 +44,7 @@ SELECT
     contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.latest_block, contracts.owner_address, contracts.owner_method
 FROM contracts
 WHERE contracts.deleted = false
-AND (contracts.owner_address IS NULL OR contracts.owner_address = '')
+AND (contracts.owner_address IS NULL OR contracts.owner_address = '' OR contracts.creator_address IS NULL OR contracts.creator_address = '') 
 AND contracts.id > $1 AND contracts.id < $2
 ORDER BY contracts.id
 `

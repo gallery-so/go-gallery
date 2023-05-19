@@ -36,7 +36,14 @@ func main() {
 	}()
 	ctx := context.Background()
 
-	queries := indexerdb.New(postgres.NewPgxClient())
+	pgx := postgres.NewPgxClient()
+
+	queries := indexerdb.New(pgx)
+
+	var c int
+	pgx.QueryRow(ctx, `select count(*) from contracts;`).Scan(&c)
+	logrus.Infof("total contracts: %d", c)
+
 	ethClient := rpc.NewEthSocketClient()
 	httpClient := &http.Client{Timeout: 10 * time.Minute, Transport: tracing.NewTracingTransport(http.DefaultTransport, false)}
 
@@ -92,13 +99,13 @@ func main() {
 	}
 
 	if err != nil {
-		logrus.Errorf("error getting tokens: %v", err)
+		logrus.Errorf("error getting contracts: %v", err)
 		panic(err)
 	}
 
 	wp := pool.New().WithMaxGoroutines(50).WithContext(ctx)
 
-	logrus.Infof("processing (%d) tokens...", len(rows))
+	logrus.Infof("processing (%d) contracts...", len(rows))
 
 	asContracts, _ := util.Map(rows, func(r indexerdb.Contract) (persist.Contract, error) {
 		return persist.Contract{
@@ -130,17 +137,19 @@ func main() {
 			defer func() {
 				logger.For(ctx).Infof("finished processing %s", i)
 			}()
-			results, err := indexer.GetContractOwners(ctx, group, httpClient, ethClient)
+			results, err := indexer.GetContractMetadatas(ctx, group, httpClient, ethClient)
 			if err != nil {
 				return err
 			}
 
 			errs := []error{}
 			for _, result := range results {
+				logger.For(ctx).Infof("updating contract %s (%s, %s, %d)", result.Contract.Address, result.Contract.OwnerAddress, result.Contract.CreatorAddress, result.OwnerMethod)
 				err = queries.UpdateContractOwnerByID(ctx, indexerdb.UpdateContractOwnerByIDParams{
 					OwnerAddress:   result.Contract.OwnerAddress,
 					CreatorAddress: result.Contract.CreatorAddress,
-					OwnerMethod:    result.Contract.OwnerMethod,
+					OwnerMethod:    result.OwnerMethod,
+					ID:             result.Contract.ID,
 				})
 				if err != nil {
 					errs = append(errs, err)
@@ -188,7 +197,7 @@ func setDefaults() {
 		if len(os.Args) > 1 {
 			fi = os.Args[1]
 		}
-		envFile := util.ResolveEnvFile("tokenprocessing", fi)
+		envFile := util.ResolveEnvFile("indexer", fi)
 		util.LoadEncryptedEnvFile(envFile)
 	}
 }

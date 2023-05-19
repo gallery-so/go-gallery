@@ -877,6 +877,11 @@ func contractsPluginReceiver(cur contractAtBlock, inc contractAtBlock) contractA
 	return inc
 }
 
+type AlchemyContract struct {
+	Address          persist.EthereumAddress `json:"address"`
+	ContractMetadata AlchemyContractMetadata `json:"contractMetadata"`
+}
+
 type AlchemyContractMetadata struct {
 	Address          persist.EthereumAddress  `json:"address"`
 	Metadata         alchemy.ContractMetadata `json:"contractMetadata"`
@@ -924,7 +929,7 @@ func fillContractFields(ctx context.Context, contracts []persist.Contract, queri
 	// process contracts in batches of 100
 	for batch := range batched {
 		// get contract metadata
-		toUp, _ := GetContractOwners(ctx, batch, httpClient, ethClient)
+		toUp, _ := GetContractMetadatas(ctx, batch, httpClient, ethClient)
 
 		for _, c := range toUp {
 			it, ok := contractOwnerStats.LoadOrStore(c.OwnerMethod, 1)
@@ -972,11 +977,11 @@ func fillContractFields(ctx context.Context, contracts []persist.Contract, queri
 }
 
 type ContractOwnerResult struct {
-	Contract    persist.Contract    `json:"contract"`
-	OwnerMethod ContractOwnerMethod `json:"ownerMethod"`
+	Contract    persist.Contract            `json:"contract"`
+	OwnerMethod persist.ContractOwnerMethod `json:"ownerMethod"`
 }
 
-func GetContractOwners(ctx context.Context, batch []persist.Contract, httpClient *http.Client, ethClient *ethclient.Client) ([]ContractOwnerResult, error) {
+func GetContractMetadatas(ctx context.Context, batch []persist.Contract, httpClient *http.Client, ethClient *ethclient.Client) ([]ContractOwnerResult, error) {
 	toUp := make([]ContractOwnerResult, 0, 100)
 
 	cToAddr := make(map[string]persist.Contract)
@@ -1016,7 +1021,7 @@ func GetContractOwners(ctx context.Context, batch []persist.Contract, httpClient
 		return nil, err
 	}
 
-	var out []AlchemyContractMetadata
+	var out []AlchemyContract
 	err = json.NewDecoder(resp.Body).Decode(&out)
 	if err != nil {
 		logger.For(ctx).WithError(err).Error("Failed to decode contract metadata response")
@@ -1024,28 +1029,29 @@ func GetContractOwners(ctx context.Context, batch []persist.Contract, httpClient
 	}
 
 	for _, c := range out {
+
 		result := ContractOwnerResult{}
 		contract := cToAddr[c.Address.String()]
-		contract.Name = persist.NullString(c.Metadata.Name)
-		contract.Symbol = persist.NullString(c.Metadata.Symbol)
+		contract.Name = persist.NullString(c.ContractMetadata.Metadata.Name)
+		contract.Symbol = persist.NullString(c.ContractMetadata.Metadata.Symbol)
 
-		var method = ContractOwnerMethodAlchemy
+		var method = persist.ContractOwnerMethodAlchemy
 		cOwner, err := rpc.GetContractOwner(ctx, c.Address, ethClient)
 		if err != nil {
 			logger.For(ctx).WithError(err).WithFields(logrus.Fields{
 				"contractAddress": c.Address,
 			}).Error("error getting contract owner")
-			contract.OwnerAddress = c.ContractDeployer
+			contract.OwnerAddress = c.ContractMetadata.ContractDeployer
 		} else {
 			contract.OwnerAddress = cOwner
-			method = ContractOwnerMethodOwnable
+			method = persist.ContractOwnerMethodOwnable
 		}
 
 		if contract.OwnerAddress == "" {
-			method = ContractOwnerMethodFailed
+			method = persist.ContractOwnerMethodFailed
 		}
 
-		contract.CreatorAddress = c.ContractDeployer
+		contract.CreatorAddress = c.ContractMetadata.ContractDeployer
 
 		result.OwnerMethod = method
 		result.Contract = contract

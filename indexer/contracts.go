@@ -123,27 +123,18 @@ func updateMetadataForContract(c context.Context, input UpdateContractMetadataIn
 	return contractsRepo.UpdateByAddress(c, input.Address, up)
 }
 
-type ContractOwnerMethod int
-
-const (
-	ContractOwnerMethodFailed ContractOwnerMethod = iota
-	ContractOwnerMethodOwnable
-	ContractOwnerMethodAlchemy
-	ContractOwnerBinarySearch
-)
-
-func GetContractOwner(ctx context.Context, address persist.EthereumAddress, ethClient *ethclient.Client, httpClient *http.Client) (persist.EthereumAddress, ContractOwnerMethod, error) {
+func GetContractOwner(ctx context.Context, address persist.EthereumAddress, ethClient *ethclient.Client, httpClient *http.Client) (persist.EthereumAddress, persist.ContractOwnerMethod, error) {
 
 	owner, err := rpc.GetContractOwner(ctx, address, ethClient)
 	if err == nil {
-		return owner, ContractOwnerMethodOwnable, nil
+		return owner, persist.ContractOwnerMethodOwnable, nil
 	}
 	logger.For(ctx).WithError(err).Error("error finding owner address through ownable interface")
 
 	creator, err := rpc.GetContractCreator(ctx, address, ethClient)
 	if err != nil {
 		logger.For(ctx).WithError(err).Error("error finding creator address with binary search")
-		return "", ContractOwnerMethodFailed, err
+		return "", persist.ContractOwnerMethodFailed, err
 	}
-	return creator, ContractOwnerBinarySearch, nil
+	return creator, persist.ContractOwnerBinarySearch, nil
 }

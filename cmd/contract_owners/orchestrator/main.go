@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	totalJobs = 1000
+	totalJobs = 1
 )
 
 type jobRange struct {
