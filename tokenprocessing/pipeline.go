@@ -86,22 +86,11 @@ func (tp *tokenProcessor) ProcessTokenPipeline(c context.Context, t persist.Toke
 		"runID":           runID,
 	})
 
-	ctx, cancel := context.WithTimeout(loggerCtx, time.Minute*10)
-	defer cancel()
-
 	totalTime := time.Now()
 
-	result := make(chan runResult, 1)
-
-	select {
-	case result <- job.run(ctx):
-		runResult := <-result
-		recordPipelineEndState(ctx, tp.mr, &runResult, time.Since(totalTime))
-		return runResult.Err
-	case <-ctx.Done():
-		recordPipelineEndState(ctx, tp.mr, nil, time.Since(totalTime))
-		return ctx.Err()
-	}
+	runResult := job.run(loggerCtx)
+	recordPipelineEndState(loggerCtx, tp.mr, &runResult, time.Since(totalTime))
+	return runResult.Err
 }
 
 type runResult struct {
@@ -115,12 +104,41 @@ func (tpj *tokenProcessingJob) run(ctx context.Context) runResult {
 	span, ctx := tracing.StartSpan(ctx, "pipeline.run", fmt.Sprintf("run %s", tpj.id))
 	defer tracing.FinishSpan(span)
 
-	media, err := tpj.createMediaForToken(ctx)
-	if err != nil {
-		logger.For(ctx).Errorf("error creating media for token: %s", err)
+	logger.For(ctx).Info("starting token processing pipeline for token %s", tpj.key)
+
+	var media coredb.TokenMedia
+	var mediaErr error
+
+	func() {
+		mediaCtx, cancel := context.WithTimeout(ctx, time.Minute*10)
+		defer cancel()
+		result := make(chan mediaResult, 1)
+		select {
+		case result <- tpj.createMediaForToken(mediaCtx):
+			r := <-result
+			media, mediaErr = r.media, r.err
+		case <-mediaCtx.Done():
+			mediaErr = mediaCtx.Err()
+		}
+	}()
+
+	if mediaErr != nil {
+		logger.For(ctx).Error("failed to create media for token %s", tpj.key)
 	}
 
-	err = tpj.persistResults(ctx, media)
+	persistCtx, cancel := context.WithTimeout(ctx, time.Minute*10)
+	defer cancel()
+
+	persistErr := tpj.persistResults(persistCtx, media)
+
+	var err error
+	if persistErr != nil && mediaErr != nil {
+		err = util.MultiErr{persistErr, mediaErr}
+	} else if persistErr != nil {
+		err = persistErr
+	} else if mediaErr != nil {
+		err = mediaErr
+	}
 	return runResult{
 		Chain:     media.Chain,
 		MediaType: media.Media.MediaType,
@@ -129,7 +147,12 @@ func (tpj *tokenProcessingJob) run(ctx context.Context) runResult {
 	}
 }
 
-func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (coredb.TokenMedia, error) {
+type mediaResult struct {
+	media coredb.TokenMedia
+	err   error
+}
+
+func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) mediaResult {
 
 	result := coredb.TokenMedia{
 		ID:              persist.GenerateID(),
@@ -190,12 +213,12 @@ func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (coredb.
 			result.Media.MediaType = persist.MediaTypeUnknown
 		}
 
-		return result, err
+		return mediaResult{result, err}
 	}
 
 	result.Media = tpj.createMediaFromCachedObjects(ctx, cachedObjects)
 
-	return result, nil
+	return mediaResult{result, nil}
 }
 
 func (tpj *tokenProcessingJob) retrieveMetadata(ctx context.Context) persist.TokenMetadata {
