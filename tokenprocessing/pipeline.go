@@ -115,6 +115,8 @@ func (tpj *tokenProcessingJob) run(ctx context.Context) runResult {
 	span, ctx := tracing.StartSpan(ctx, "pipeline.run", fmt.Sprintf("run %s", tpj.id))
 	defer tracing.FinishSpan(span)
 
+	logger.For(ctx).Info("starting token processing pipeline for token %s", tpj.key)
+
 	media, err := tpj.createMediaForToken(ctx)
 	if err != nil {
 		logger.For(ctx).Errorf("error creating media for token: %s", err)
@@ -315,7 +317,11 @@ func (tpj *tokenProcessingJob) upsertDB(ctx context.Context, tmetadata coredb.To
 		HasDescription:  tmetadata.Description != "",
 	}
 
-	job, err := tpj.tp.queries.InsertJob(ctx, coredb.InsertJobParams{
+	// new context just for insert so that if the rest of the job failed because of a context cancellation, we still insert
+	insertContext, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+
+	job, err := tpj.tp.queries.InsertJob(insertContext, coredb.InsertJobParams{
 		ProcessingJobID:  tpj.id,
 		TokenProperties:  p,
 		PipelineMetadata: *tpj.pipelineMetadata,
@@ -328,7 +334,7 @@ func (tpj *tokenProcessingJob) upsertDB(ctx context.Context, tmetadata coredb.To
 	}
 
 	newID := persist.GenerateID()
-	med, err := tpj.tp.queries.UpsertTokenMedia(ctx, coredb.UpsertTokenMediaParams{
+	med, err := tpj.tp.queries.UpsertTokenMedia(insertContext, coredb.UpsertTokenMediaParams{
 		CopyID:          persist.GenerateID(),
 		NewID:           newID,
 		ContractID:      tpj.token.Contract,
@@ -348,7 +354,7 @@ func (tpj *tokenProcessingJob) upsertDB(ctx context.Context, tmetadata coredb.To
 	logger.For(ctx).Infof("upserted token media: %s", med.ID)
 	if med.Active && newID == med.ID {
 		logger.For(ctx).Infof("token media is active and needs to be added to token: %s", med.ID)
-		err := tpj.tp.queries.UpdateTokenTokenMediaByTokenIdentifiers(ctx, coredb.UpdateTokenTokenMediaByTokenIdentifiersParams{
+		err := tpj.tp.queries.UpdateTokenTokenMediaByTokenIdentifiers(insertContext, coredb.UpdateTokenTokenMediaByTokenIdentifiersParams{
 			TokenMediaID: med.ID,
 			Contract:     tpj.token.Contract,
 			TokenID:      tpj.token.TokenID,
