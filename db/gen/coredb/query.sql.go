@@ -3339,6 +3339,39 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 	return i, err
 }
 
+const getUserByVerifiedEmailAddress = `-- name: GetUserByVerifiedEmailAddress :one
+select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences from users u join pii.for_users p on u.id = p.user_id
+where p.pii_email_address = lower($1)
+  and u.email_verified != 0
+  and p.deleted = false
+  and u.deleted = false
+`
+
+func (q *Queries) GetUserByVerifiedEmailAddress(ctx context.Context, lower string) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByVerifiedEmailAddress, lower)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.Version,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.Username,
+		&i.UsernameIdempotent,
+		&i.Wallets,
+		&i.Bio,
+		&i.Traits,
+		&i.Universal,
+		&i.NotificationSettings,
+		&i.EmailVerified,
+		&i.EmailUnsubscriptions,
+		&i.FeaturedGallery,
+		&i.PrimaryWalletID,
+		&i.UserExperiences,
+	)
+	return i, err
+}
+
 const getUserByWalletID = `-- name: GetUserByWalletID :one
 select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences from users where array[$1::varchar]::varchar[] <@ wallets and deleted = false
 `
@@ -5024,7 +5057,7 @@ with copy_on_overwrite as (
           and deleted = false
         limit 1
     )
-) 
+)
 insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated) values
     ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now(), now())
     on conflict (contract_id, token_id, chain) where active = true and deleted = false do update

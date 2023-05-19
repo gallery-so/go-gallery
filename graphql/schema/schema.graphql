@@ -1727,6 +1727,16 @@ type PreverifyEmailPayload {
 
 union PreverifyEmailPayloadOrError = PreverifyEmailPayload | ErrInvalidInput
 
+input VerifyEmailMagicLinkInput {
+  email: Email! @scrub
+}
+
+type VerifyEmailMagicLinkPayload {
+  canSend: Boolean!
+}
+
+union VerifyEmailMagicLinkPayloadOrError = VerifyEmailMagicLinkPayload | ErrInvalidInput
+
 input UpdateEmailInput {
   email: Email! @scrub
 }
@@ -2157,6 +2167,7 @@ type Mutation {
 
   preverifyEmail(input: PreverifyEmailInput!): PreverifyEmailPayloadOrError
   verifyEmail(input: VerifyEmailInput!): VerifyEmailPayloadOrError
+  verifyEmailMagicLink(input: VerifyEmailMagicLinkInput!): VerifyEmailMagicLinkPayloadOrError
 
   redeemMerch(input: RedeemMerchInput!): RedeemMerchPayloadOrError @authRequired
 
