@@ -179,6 +179,14 @@ type MarketplaceContract struct {
 	ContractID persist.DBID
 }
 
+type MediaValidationRule struct {
+	ID        persist.DBID
+	CreatedAt time.Time
+	MediaType string
+	Property  string
+	Required  bool
+}
+
 type Membership struct {
 	ID          persist.DBID
 	Deleted     bool
