@@ -132,8 +132,12 @@ func (tpj *tokenProcessingJob) run(ctx context.Context) runResult {
 	persistErr := tpj.persistResults(persistCtx, media)
 
 	var err error
-	if persistErr != nil || mediaErr != nil {
+	if persistErr != nil && mediaErr != nil {
 		err = util.MultiErr{persistErr, mediaErr}
+	} else if persistErr != nil {
+		err = persistErr
+	} else if mediaErr != nil {
+		err = mediaErr
 	}
 	return runResult{
 		Chain:     media.Chain,
