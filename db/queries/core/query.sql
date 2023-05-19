@@ -1142,6 +1142,5 @@ select * from reprocess_jobs where id = $1;
 
 -- name: GetMediaByTokenID :batchone
 select m.*
-from tokens t
-join token_medias m on t.chain = m.chain and t.contract = m.contract_id and t.token_id = m.token_id
-where t.id = $1 and m.active and not m.deleted;
+from token_medias m
+where m.id = (select token_media_id from tokens where tokens.id = $1) and m.active and not m.deleted;
