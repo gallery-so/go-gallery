@@ -3,6 +3,7 @@ package tokenprocessing
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -57,6 +58,8 @@ type tokenProcessingJob struct {
 
 	cause            persist.ProcessingCause
 	pipelineMetadata *persist.PipelineMetadata
+
+	lock *sync.Mutex
 }
 
 func (tp *tokenProcessor) ProcessTokenPipeline(c context.Context, t persist.TokenGallery, contract persist.ContractGallery, ownerAddress persist.Address, cause persist.ProcessingCause) error {
@@ -99,6 +102,8 @@ func (tp *tokenProcessor) ProcessTokenPipeline(c context.Context, t persist.Toke
 		recordPipelineEndState(ctx, tp.mr, &runResult, time.Since(totalTime))
 		return runResult.Err
 	case <-ctx.Done():
+		job.lock.Lock()
+		defer job.lock.Unlock()
 		recordPipelineEndState(ctx, tp.mr, nil, time.Since(totalTime))
 		return ctx.Err()
 	}
@@ -112,6 +117,9 @@ type runResult struct {
 }
 
 func (tpj *tokenProcessingJob) run(ctx context.Context) runResult {
+	tpj.lock.Lock()
+	defer tpj.lock.Unlock()
+
 	span, ctx := tracing.StartSpan(ctx, "pipeline.run", fmt.Sprintf("run %s", tpj.id))
 	defer tracing.FinishSpan(span)
 
