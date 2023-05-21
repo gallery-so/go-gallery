@@ -1399,9 +1399,10 @@ func customServerClient(t *testing.T, host string, opts ...func(*http.Request)) 
 // withJWTOpt adds auth JWT cookies to the request headers
 func withJWTOpt(t *testing.T, userID persist.DBID) func(*http.Request) {
 	sessionID := persist.GenerateID()
-	authJWT, err := auth.GenerateAuthToken(context.Background(), userID, sessionID)
+	refreshID := persist.GenerateID().String()
+	authJWT, err := auth.GenerateAuthToken(context.Background(), userID, sessionID, refreshID, []persist.Role{})
 	require.NoError(t, err)
-	refreshJWT, _, err := auth.GenerateRefreshToken(context.Background(), userID, sessionID)
+	refreshJWT, _, err := auth.GenerateRefreshToken(context.Background(), refreshID, "", userID, sessionID)
 	require.NoError(t, err)
 	return func(r *http.Request) {
 		r.AddCookie(&http.Cookie{Name: auth.AuthCookieKey, Value: authJWT})
