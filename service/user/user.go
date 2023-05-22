@@ -118,11 +118,6 @@ func CreateUser(ctx context.Context, authenticator auth.Authenticator, username 
 		return "", "", err
 	}
 
-	authToken, err := auth.GenerateAuthToken(ctx, userID)
-	if err != nil {
-		return "", "", err
-	}
-
 	gallery, err := queries.GalleryRepoCreate(ctx, coredb.GalleryRepoCreateParams{
 		GalleryID:   persist.GenerateID(),
 		OwnerUserID: userID,
@@ -136,8 +131,10 @@ func CreateUser(ctx context.Context, authenticator auth.Authenticator, username 
 
 	galleryID = gallery.ID
 
-	auth.SetAuthStateForCtx(gc, userID, nil)
-	auth.SetAuthCookie(gc, authToken)
+	err = auth.StartSession(gc, queries, userID)
+	if err != nil {
+		return "", "", err
+	}
 
 	return userID, galleryID, nil
 }

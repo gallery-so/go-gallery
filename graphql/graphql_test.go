@@ -230,7 +230,8 @@ func testLogin(t *testing.T) {
 
 	require.NoError(t, err)
 	payload, _ := (*response.Login).(*loginMutationLoginLoginPayload)
-	assert.NotEmpty(t, readCookie(t, c.response, auth.JWTCookieKey))
+	assert.NotEmpty(t, readCookie(t, c.response, auth.AuthCookieKey))
+	assert.NotEmpty(t, readCookie(t, c.response, auth.RefreshCookieKey))
 	assert.Equal(t, userF.Username, *payload.Viewer.User.Username)
 	assert.Equal(t, userF.ID, payload.Viewer.User.Dbid)
 }
@@ -242,7 +243,8 @@ func testLogout(t *testing.T) {
 	response, err := logoutMutation(context.Background(), c)
 
 	require.NoError(t, err)
-	assert.Empty(t, readCookie(t, c.response, auth.JWTCookieKey))
+	assert.Empty(t, readCookie(t, c.response, auth.AuthCookieKey))
+	assert.Empty(t, readCookie(t, c.response, auth.RefreshCookieKey))
 	assert.Nil(t, response.Logout.Viewer)
 }
 
@@ -1228,13 +1230,6 @@ func newUser(t *testing.T, ctx context.Context, c graphql.Client, w wallet) (use
 	return payload.Viewer.User.Dbid, username, payload.Viewer.User.Galleries[0].Dbid
 }
 
-// newJWT generates a JWT
-func newJWT(t *testing.T, ctx context.Context, userID persist.DBID) string {
-	jwt, err := auth.GenerateAuthToken(ctx, userID)
-	require.NoError(t, err)
-	return jwt
-}
-
 // syncTokens makes a GraphQL request to sync a user's wallet
 func syncTokens(t *testing.T, ctx context.Context, c graphql.Client, userID persist.DBID) []persist.DBID {
 	t.Helper()
@@ -1401,12 +1396,17 @@ func customServerClient(t *testing.T, host string, opts ...func(*http.Request)) 
 	return &serverClient{url: host + "/glry/graphql/query", opts: opts}
 }
 
-// withJWTOpt adds a JWT cookie to the request headers
+// withJWTOpt adds auth JWT cookies to the request headers
 func withJWTOpt(t *testing.T, userID persist.DBID) func(*http.Request) {
-	jwt, err := auth.GenerateAuthToken(context.Background(), userID)
+	sessionID := persist.GenerateID()
+	refreshID := persist.GenerateID().String()
+	authJWT, err := auth.GenerateAuthToken(context.Background(), userID, sessionID, refreshID, []persist.Role{})
+	require.NoError(t, err)
+	refreshJWT, _, err := auth.GenerateRefreshToken(context.Background(), refreshID, "", userID, sessionID)
 	require.NoError(t, err)
 	return func(r *http.Request) {
-		r.AddCookie(&http.Cookie{Name: auth.JWTCookieKey, Value: jwt})
+		r.AddCookie(&http.Cookie{Name: auth.AuthCookieKey, Value: authJWT})
+		r.AddCookie(&http.Cookie{Name: auth.RefreshCookieKey, Value: refreshJWT})
 	}
 }
 
@@ -1480,7 +1480,9 @@ func (c *serverClient) MakeRequest(ctx context.Context, req *genql.Request, resp
 // readCookie finds a cookie set in the response
 func readCookie(t *testing.T, r *http.Response, name string) string {
 	t.Helper()
-	for _, c := range r.Cookies() {
+	cookies := r.Cookies()
+	for i := len(cookies) - 1; i >= 0; i-- {
+		c := cookies[i]
 		if c.Name == name {
 			return c.Value
 		}
