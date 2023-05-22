@@ -123,7 +123,7 @@ func (tpj *tokenProcessingJob) run(ctx context.Context) runResult {
 	}()
 
 	if mediaErr != nil {
-		logger.For(ctx).Error("failed to create media for token %s", tpj.key)
+		logger.For(ctx).Errorf("failed to create media for token %s", tpj.key)
 	}
 
 	persistCtx, cancel := context.WithTimeout(ctx, time.Minute*10)
