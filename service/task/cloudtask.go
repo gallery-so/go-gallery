@@ -34,9 +34,10 @@ type FeedbotMessage struct {
 }
 
 type TokenProcessingUserMessage struct {
-	UserID   persist.DBID   `json:"user_id" binding:"required"`
-	TokenIDs []persist.DBID `json:"token_ids" binding:"required"`
-	IsV3     bool           `json:"is_v3" binding:"-"` // V3Migration: Remove when migration is complete
+	UserID   persist.DBID    `json:"user_id" binding:"required"`
+	TokenIDs []persist.DBID  `json:"token_ids" binding:"required"`
+	Chains   []persist.Chain `json:"chains" binding:"required"`
+	IsV3     bool            `json:"is_v3" binding:"-"` // V3Migration: Remove when migration is complete
 }
 
 type TokenProcessingContractTokensMessage struct {

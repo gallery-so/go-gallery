@@ -104,7 +104,7 @@ func (tpj *tokenProcessingJob) run(ctx context.Context) runResult {
 	span, ctx := tracing.StartSpan(ctx, "pipeline.run", fmt.Sprintf("run %s", tpj.id))
 	defer tracing.FinishSpan(span)
 
-	logger.For(ctx).Info("starting token processing pipeline for token %s", tpj.key)
+	logger.For(ctx).Infof("starting token processing pipeline for token %s (tokenDBID: %s)", tpj.key, tpj.token.ID)
 
 	var media coredb.TokenMedia
 	var mediaErr error
