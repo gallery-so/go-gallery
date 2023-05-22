@@ -340,6 +340,11 @@ func validateProviders(ctx context.Context, providers []any) map[persist.Chain][
 			requirements.tokenMetadataFetcher = true
 		}
 
+		if hasTokenDescriptorFetcher := hasProvidersForTask[tokenDescriptorsFetcher](providers); hasTokenDescriptorFetcher {
+			hasImplementor.tokenDescriptorsFetcher = true
+			requirements.tokenDescriptorsFetcher = true
+		}
+
 		if hasImplementor != requirements {
 			panic(fmt.Sprintf("chain=%d;got=%+v;want=%+v", chain, hasImplementor, requirements))
 		}

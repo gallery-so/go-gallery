@@ -15,9 +15,12 @@ type SyncWithContractEvalFallbackProvider struct {
 		configurer
 		tokensOwnerFetcher
 		tokensContractFetcher
+		tokenDescriptorsFetcher
 	}
-	Fallback tokensOwnerFetcher
-	Eval     func(context.Context, ChainAgnosticToken) bool
+	Fallback interface {
+		tokensOwnerFetcher
+	}
+	Eval func(context.Context, ChainAgnosticToken) bool
 }
 
 // SyncFailureFallbackProvider will call its fallback if the primary Provider's token
@@ -26,8 +29,12 @@ type SyncFailureFallbackProvider struct {
 	Primary interface {
 		configurer
 		tokensOwnerFetcher
+		tokenDescriptorsFetcher
 	}
-	Fallback tokensOwnerFetcher
+	Fallback interface {
+		tokensOwnerFetcher
+		tokenDescriptorsFetcher
+	}
 }
 
 func (f SyncWithContractEvalFallbackProvider) GetBlockchainInfo(ctx context.Context) (BlockchainInfo, error) {
@@ -102,7 +109,7 @@ func (f *SyncWithContractEvalFallbackProvider) callFallback(ctx context.Context,
 	return primary
 }
 
-func (f *SyncWithContractEvalFallbackProvider) GetSubproviders() []any {
+func (f SyncWithContractEvalFallbackProvider) GetSubproviders() []any {
 	return []any{f.Primary, f.Fallback}
 }
 
@@ -125,6 +132,15 @@ func (f SyncFailureFallbackProvider) GetTokensByTokenIdentifiersAndOwner(ctx con
 	if err != nil {
 		logger.For(ctx).WithError(err).Warn("failed to get token by token identifiers and owner from primary in failure fallback")
 		return f.Fallback.GetTokensByTokenIdentifiersAndOwner(ctx, id, address)
+	}
+	return token, contract, nil
+}
+
+func (f SyncFailureFallbackProvider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, id ChainAgnosticIdentifiers) (ChainAgnosticTokenDescriptors, ChainAgnosticContractDescriptors, error) {
+	token, contract, err := f.Primary.GetTokenDescriptorsByTokenIdentifiers(ctx, id)
+	if err != nil {
+		logger.For(ctx).WithError(err).Warn("failed to get token by token identifiers and owner from primary in failure fallback")
+		return f.Fallback.GetTokenDescriptorsByTokenIdentifiers(ctx, id)
 	}
 	return token, contract, nil
 }
