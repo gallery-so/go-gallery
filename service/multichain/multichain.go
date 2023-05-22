@@ -493,7 +493,7 @@ func (p *Provider) prepTokensForTokenProcessing(ctx context.Context, tokensFromP
 	return providerTokens, newTokens, nil
 }
 
-func (p *Provider) processTokensForOwnersOfContract(ctx context.Context, contractID persist.DBID, users map[persist.DBID]persist.User, chainTokensForUsers map[persist.DBID][]chainTokens, addressToContract map[string]persist.DBID) error {
+func (p *Provider) processTokensForOwnersOfContract(ctx context.Context, contractID persist.DBID, chain persist.Chain, users map[persist.DBID]persist.User, chainTokensForUsers map[persist.DBID][]chainTokens, addressToContract map[string]persist.DBID) error {
 	tokensToUpsert := make([]persist.TokenGallery, 0, len(chainTokensForUsers)*3)
 	userTokenOffsets := make(map[persist.DBID][2]int)
 	newUserTokens := make(map[persist.DBID]map[persist.TokenIdentifiers]bool)
@@ -531,7 +531,7 @@ func (p *Provider) processTokensForOwnersOfContract(ctx context.Context, contrac
 			}
 		}
 
-		err = p.sendTokensToTokenProcessing(ctx, userID, userTokenIDs)
+		err = p.sendTokensToTokenProcessing(ctx, userID, userTokenIDs, []persist.Chain{chain})
 		if err != nil {
 			errors = append(errors, err)
 		}
@@ -566,15 +566,15 @@ func (p *Provider) processTokensForUser(ctx context.Context, tokensFromProviders
 		}
 	}
 
-	err = p.sendTokensToTokenProcessing(ctx, user.ID, tokenIDs)
+	err = p.sendTokensToTokenProcessing(ctx, user.ID, tokenIDs, chains)
 	return persistedTokens, err
 }
 
-func (p *Provider) sendTokensToTokenProcessing(ctx context.Context, userID persist.DBID, tokens []persist.DBID) error {
+func (p *Provider) sendTokensToTokenProcessing(ctx context.Context, userID persist.DBID, tokens []persist.DBID, chains []persist.Chain) error {
 	if len(tokens) == 0 {
 		return nil
 	}
-	return p.SendTokens(ctx, task.TokenProcessingUserMessage{UserID: userID, TokenIDs: tokens})
+	return p.SendTokens(ctx, task.TokenProcessingUserMessage{UserID: userID, TokenIDs: tokens, Chains: chains})
 }
 
 func (p *Provider) processTokenMedia(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, ownerAddress persist.Address, imageKeywords, animationKeywords []string) error {
@@ -1032,7 +1032,7 @@ outer:
 		return err
 	}
 
-	return p.processTokensForOwnersOfContract(ctx, contract.ID, users, chainTokensForUsers, addressToContract)
+	return p.processTokensForOwnersOfContract(ctx, contract.ID, ci.Chain, users, chainTokensForUsers, addressToContract)
 }
 
 func (d *Provider) getProvidersForChain(chain persist.Chain) ([]any, error) {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"time"
 
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -42,8 +43,15 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 
 		reqCtx := logger.NewContextWithFields(c.Request.Context(), logrus.Fields{"userID": input.UserID})
 
-		// V3Migration: Remove when migration is complete
+		sort.Slice(input.Chains, func(i, j int) bool {
+			return input.Chains[i] < input.Chains[j]
+		})
+
 		lockID := input.UserID.String()
+		for _, chain := range input.Chains {
+			lockID += fmt.Sprintf(":%d", chain)
+		}
+		// V3Migration: Remove when migration is complete
 		if input.IsV3 {
 			lockID += ":v3"
 		}
