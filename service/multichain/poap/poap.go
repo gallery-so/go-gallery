@@ -236,7 +236,7 @@ func (d *Provider) GetCommunityOwners(ctx context.Context, contractAddress persi
 // GetTokensByTokenIdentifiers retrieves tokens for a token identifiers on the Poap Blockchain
 func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	tid := tokenIdentifiers.TokenID
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/token/%s", d.apiURL, tid), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/token/0x%s", d.apiURL, tid), nil)
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
@@ -255,6 +255,19 @@ func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentif
 	}
 
 	return []multichain.ChainAgnosticToken{d.poapToToken(token)}, d.poapToContract(token), nil
+}
+
+func (d *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers) (multichain.ChainAgnosticTokenDescriptors, multichain.ChainAgnosticContractDescriptors, error) {
+	tokens, contract, err := d.GetTokensByTokenIdentifiers(ctx, tokenIdentifiers, 1, 0)
+	if err != nil {
+		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, err
+	}
+	if len(tokens) == 0 {
+		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, fmt.Errorf("no token found")
+	}
+
+	firstToken := tokens[0]
+	return firstToken.Descriptors, contract.Descriptors, nil
 }
 
 // GetTokensByTokenIdentifiersAndOwner retrieves tokens for a token identifiers and owner address
@@ -354,10 +367,12 @@ func (d *Provider) poapsToTokens(pPoap []poapToken, limit, offset int) ([]multic
 func (d *Provider) poapToToken(pPoap poapToken) multichain.ChainAgnosticToken {
 
 	return multichain.ChainAgnosticToken{
-		OwnerAddress:    persist.Address(pPoap.Owner),
-		TokenID:         persist.TokenID(pPoap.TokenID.toBase16()),
-		Name:            pPoap.Event.Name,
-		Description:     pPoap.Event.Description,
+		OwnerAddress: persist.Address(pPoap.Owner),
+		TokenID:      persist.TokenID(pPoap.TokenID.toBase16()),
+		Descriptors: multichain.ChainAgnosticTokenDescriptors{
+			Name:        pPoap.Event.Name,
+			Description: pPoap.Event.Description,
+		},
 		Quantity:        "1",
 		ExternalURL:     pPoap.Event.EventURL,
 		ContractAddress: persist.Address(pPoap.Event.FancyID),
@@ -388,14 +403,18 @@ func (d *Provider) poapToContract(pPoap poapToken) multichain.ChainAgnosticContr
 
 	return multichain.ChainAgnosticContract{
 		Address: persist.Address(pPoap.Event.FancyID),
-		Name:    pPoap.Event.Name,
+		Descriptors: multichain.ChainAgnosticContractDescriptors{
+			Name: pPoap.Event.Name,
+		},
 	}
 }
 
 func (d *Provider) eventToContract(pEvent poapEvent) multichain.ChainAgnosticContract {
 	return multichain.ChainAgnosticContract{
 		Address: persist.Address(pEvent.FancyID),
-		Name:    pEvent.Name,
+		Descriptors: multichain.ChainAgnosticContractDescriptors{
+			Name: pEvent.Name,
+		},
 	}
 }
 

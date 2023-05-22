@@ -167,12 +167,15 @@ func (p *TezosObjktProvider) GetTokensByWalletAddress(ctx context.Context, owner
 
 		if _, ok := dedupeContracts[node.Token.Fa.Contract]; !ok {
 			dedupeContracts[node.Token.Fa.Contract] = multichain.ChainAgnosticContract{
-				Address:        node.Token.Fa.Contract,
-				Symbol:         node.Token.Symbol,
-				Name:           node.Token.Fa.Name,
-				Description:    node.Token.Fa.Description,
-				CreatorAddress: node.Token.Fa.Creator_Address,
-				LatestBlock:    persist.BlockNumber(node.Token.Fa.Level),
+				Address: node.Token.Fa.Contract,
+				Descriptors: multichain.ChainAgnosticContractDescriptors{
+					Symbol:         node.Token.Symbol,
+					Name:           node.Token.Fa.Name,
+					Description:    node.Token.Fa.Description,
+					CreatorAddress: node.Token.Fa.Creator_Address,
+				},
+
+				LatestBlock: persist.BlockNumber(node.Token.Fa.Level),
 			}
 			returnContracts = append(returnContracts, dedupeContracts[node.Token.Fa.Contract])
 		}
@@ -180,10 +183,12 @@ func (p *TezosObjktProvider) GetTokensByWalletAddress(ctx context.Context, owner
 		tokenID := persist.TokenID(node.Token.Token_ID.toBase16String())
 
 		agnosticToken := multichain.ChainAgnosticToken{
-			TokenType:   persist.TokenTypeERC1155,
-			Description: node.Token.Description,
-			Name:        node.Token.Name,
-			TokenID:     tokenID,
+			TokenType: persist.TokenTypeERC1155,
+			Descriptors: multichain.ChainAgnosticTokenDescriptors{
+				Description: node.Token.Description,
+				Name:        node.Token.Name,
+			},
+			TokenID: tokenID,
 
 			ContractAddress: dedupeContracts[node.Token.Fa.Contract].Address,
 			Quantity:        persist.HexString(fmt.Sprintf("%x", node.Token.Holders[0].Quantity)),
@@ -233,20 +238,25 @@ func (p *TezosObjktProvider) GetTokensByTokenIdentifiersAndOwner(ctx context.Con
 	metadata := createMetadata(token)
 
 	agnosticContract := multichain.ChainAgnosticContract{
-		Address:        token.Fa.Contract,
-		Symbol:         token.Symbol,
-		Name:           token.Fa.Name,
-		Description:    token.Fa.Description,
-		CreatorAddress: token.Fa.Creator_Address,
-		LatestBlock:    persist.BlockNumber(token.Fa.Level),
+		Address: token.Fa.Contract,
+		Descriptors: multichain.ChainAgnosticContractDescriptors{
+			Symbol:         token.Symbol,
+			Name:           token.Fa.Name,
+			Description:    token.Fa.Description,
+			CreatorAddress: token.Fa.Creator_Address,
+		},
+
+		LatestBlock: persist.BlockNumber(token.Fa.Level),
 	}
 
 	tokenID := persist.TokenID(token.Token_ID.toBase16String())
 
 	agnosticToken := multichain.ChainAgnosticToken{
-		TokenType:       persist.TokenTypeERC1155,
-		Description:     token.Description,
-		Name:            token.Name,
+		TokenType: persist.TokenTypeERC1155,
+		Descriptors: multichain.ChainAgnosticTokenDescriptors{
+			Description: token.Description,
+			Name:        token.Name,
+		},
 		TokenID:         tokenID,
 		ContractAddress: agnosticContract.Address,
 		Quantity:        persist.HexString(fmt.Sprintf("%x", token.Holders[0].Quantity)),
@@ -285,12 +295,15 @@ func (p *TezosObjktProvider) GetTokensByTokenIdentifiers(ctx context.Context, to
 	firstToken := query.Token[0]
 
 	agnosticContract := multichain.ChainAgnosticContract{
-		Address:        firstToken.Fa.Contract,
-		Symbol:         firstToken.Symbol,
-		Name:           firstToken.Fa.Name,
-		Description:    firstToken.Fa.Description,
-		CreatorAddress: firstToken.Fa.Creator_Address,
-		LatestBlock:    persist.BlockNumber(firstToken.Fa.Level),
+		Address: firstToken.Fa.Contract,
+		Descriptors: multichain.ChainAgnosticContractDescriptors{
+			Symbol:         firstToken.Symbol,
+			Name:           firstToken.Name,
+			Description:    firstToken.Description,
+			CreatorAddress: firstToken.Fa.Creator_Address,
+		},
+
+		LatestBlock: persist.BlockNumber(firstToken.Fa.Level),
 	}
 
 	tokenID := persist.TokenID(firstToken.Token_ID.toBase16String())
@@ -301,9 +314,11 @@ func (p *TezosObjktProvider) GetTokensByTokenIdentifiers(ctx context.Context, to
 			ownerAddress = persist.Address(token.Holders[0].Holder_Address)
 		}
 		agnosticTokens[i] = multichain.ChainAgnosticToken{
-			TokenType:       persist.TokenTypeERC1155,
-			Description:     firstToken.Description,
-			Name:            firstToken.Name,
+			TokenType: persist.TokenTypeERC1155,
+			Descriptors: multichain.ChainAgnosticTokenDescriptors{
+				Description: firstToken.Description,
+				Name:        firstToken.Name,
+			},
 			TokenID:         tokenID,
 			ContractAddress: agnosticContract.Address,
 			Quantity:        persist.HexString(fmt.Sprintf("%x", firstToken.Holders[0].Quantity)),
@@ -361,12 +376,15 @@ func (p *TezosObjktProvider) GetTokensByContractAddress(ctx context.Context, con
 	}
 
 	agnosticContract := multichain.ChainAgnosticContract{
-		Address:        tokens[0].Fa.Contract,
-		Symbol:         tokens[0].Symbol,
-		Name:           tokens[0].Fa.Name,
-		Description:    tokens[0].Fa.Description,
-		CreatorAddress: tokens[0].Fa.Creator_Address,
-		LatestBlock:    persist.BlockNumber(tokens[0].Fa.Level),
+		Address: tokens[0].Fa.Contract,
+		Descriptors: multichain.ChainAgnosticContractDescriptors{
+			Symbol:         tokens[0].Symbol,
+			Name:           tokens[0].Fa.Name,
+			Description:    tokens[0].Fa.Description,
+			CreatorAddress: tokens[0].Fa.Creator_Address,
+		},
+
+		LatestBlock: persist.BlockNumber(tokens[0].Fa.Level),
 	}
 
 	returnTokens := make([]multichain.ChainAgnosticToken, 0, len(tokens))
@@ -376,9 +394,11 @@ func (p *TezosObjktProvider) GetTokensByContractAddress(ctx context.Context, con
 		// Create token per holder
 		for _, holder := range token.Holders {
 			agnosticToken := multichain.ChainAgnosticToken{
-				TokenType:       persist.TokenTypeERC1155,
-				Description:     token.Description,
-				Name:            token.Name,
+				TokenType: persist.TokenTypeERC1155,
+				Descriptors: multichain.ChainAgnosticTokenDescriptors{
+					Description: token.Description,
+					Name:        token.Name,
+				},
 				TokenID:         tokenID,
 				ContractAddress: agnosticContract.Address,
 				Quantity:        persist.HexString(fmt.Sprintf("%x", holder.Quantity)),
@@ -439,12 +459,15 @@ func (p *TezosObjktProvider) GetTokensByContractAddressAndOwner(ctx context.Cont
 	}
 
 	agnosticContract := multichain.ChainAgnosticContract{
-		Address:        tokens[0].Fa.Contract,
-		Symbol:         tokens[0].Symbol,
-		Name:           tokens[0].Fa.Name,
-		Description:    tokens[0].Fa.Description,
-		CreatorAddress: tokens[0].Fa.Creator_Address,
-		LatestBlock:    persist.BlockNumber(tokens[0].Fa.Level),
+		Address: tokens[0].Fa.Contract,
+		Descriptors: multichain.ChainAgnosticContractDescriptors{
+			Symbol:         tokens[0].Symbol,
+			Name:           tokens[0].Fa.Name,
+			Description:    tokens[0].Fa.Description,
+			CreatorAddress: tokens[0].Fa.Creator_Address,
+		},
+
+		LatestBlock: persist.BlockNumber(tokens[0].Fa.Level),
 	}
 
 	returnTokens := make([]multichain.ChainAgnosticToken, 0, len(tokens))
@@ -459,10 +482,12 @@ func (p *TezosObjktProvider) GetTokensByContractAddressAndOwner(ctx context.Cont
 		// Create token per holder
 		for _, holder := range token.Holders {
 			agnosticToken := multichain.ChainAgnosticToken{
-				TokenType:   persist.TokenTypeERC1155,
-				Description: token.Description,
-				Name:        token.Name,
-				TokenID:     tokenID,
+				TokenType: persist.TokenTypeERC1155,
+				Descriptors: multichain.ChainAgnosticTokenDescriptors{
+					Description: token.Description,
+					Name:        token.Name,
+				},
+				TokenID: tokenID,
 				FallbackMedia: persist.FallbackMedia{
 					ImageURL: persist.NullString(firstValidThumbnail),
 				},
