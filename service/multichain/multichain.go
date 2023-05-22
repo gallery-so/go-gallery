@@ -186,6 +186,10 @@ type tokenMetadataFetcher interface {
 	GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti ChainAgnosticIdentifiers, ownerAddress persist.Address) (persist.TokenMetadata, error)
 }
 
+type tokenFetcher interface {
+	GetTokensByTokenIdentifiers(ctx context.Context, ti ChainAgnosticIdentifiers) ([]ChainAgnosticToken, ChainAgnosticContract, error)
+}
+
 type providerSupplier interface {
 	GetSubproviders() []any
 }
@@ -889,36 +893,23 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 		return err
 	}
 
-	ownerFetchers := getChainProvidersForTask[tokensOwnerFetcher](providers)
-outer:
-	for _, ownerFetcher := range ownerFetchers {
+	tokenFetchers := getChainProvidersForTask[tokenFetcher](providers)
+
+	for _, tokenFetcher := range tokenFetchers {
 
 		id := ChainAgnosticIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID}
 
-		for i, ownerAddress := range ownerAddresses {
-			refreshedToken, contract, err := ownerFetcher.GetTokensByTokenIdentifiersAndOwner(ctx, id, ownerAddress)
-			if err != nil {
-				return err
-			}
-
-			if !refreshedToken.hasMetadata() && i == 0 {
-				continue outer
-			}
-
-			if err := p.Repos.TokenRepository.UpdateByTokenIdentifiersUnsafe(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, persist.TokenUpdateAllMetadataFieldsInput{
-				Metadata:    refreshedToken.TokenMetadata,
-				Name:        persist.NullString(refreshedToken.Name),
-				LastUpdated: persist.LastUpdatedTime{},
-				TokenURI:    refreshedToken.TokenURI,
-				Description: persist.NullString(refreshedToken.Description),
+		var owner persist.Address
+		tokens, contract, err := tokenFetcher.GetTokensByTokenIdentifiers(ctx, id)
+		if err == nil && len(tokens) > 0 {
+			t := tokens[0]
+			owner = t.OwnerAddress
+			if err := p.Queries.UpdateTokenMetadataFieldsByTokenIdentifiers(ctx, coredb.UpdateTokenMetadataFieldsByTokenIdentifiersParams{
+				Name:            util.ToNullString(t.Name, true),
+				Description:     util.ToNullString(t.Description, true),
+				TokenID:         ti.TokenID,
+				ContractAddress: ti.ContractAddress,
 			}); err != nil {
-				return err
-			}
-
-			// V3Migration: Remove remove image and animation keywords when migrated
-			image, anim := ti.Chain.BaseKeywords()
-			err = p.processTokenMedia(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, refreshedToken.OwnerAddress, image, anim)
-			if err != nil {
 				return err
 			}
 
@@ -933,8 +924,16 @@ outer:
 			}); err != nil {
 				return err
 			}
-
+		} else {
+			logger.For(ctx).Infof("token %s-%s-%d not found for refresh (err: %s)", ti.TokenID, ti.ContractAddress, ti.Chain, err)
 		}
+		// V3Migration: Remove remove image and animation keywords when migrated
+		image, anim := ti.Chain.BaseKeywords()
+		err = p.processTokenMedia(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, owner, image, anim)
+		if err != nil {
+			return err
+		}
+
 		return nil
 	}
 	return nil

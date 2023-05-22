@@ -452,6 +452,15 @@ func (d *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, toke
 	return token, contract, nil
 }
 
+func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	tokens, contract, err := d.getTokenWithMetadata(ctx, tokenIdentifiers, true, 0)
+	if err != nil {
+		return nil, multichain.ChainAgnosticContract{}, err
+	}
+
+	return tokens, contract, nil
+}
+
 type GetContractMetadataResponse struct {
 	Address          persist.EthereumAddress `json:"address"`
 	ContractMetadata ContractMetadata        `json:"contractMetadata"`

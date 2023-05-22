@@ -4898,6 +4898,27 @@ func (q *Queries) UpdatePushTickets(ctx context.Context, arg UpdatePushTicketsPa
 	return err
 }
 
+const updateTokenMetadataFieldsByTokenIdentifiers = `-- name: UpdateTokenMetadataFieldsByTokenIdentifiers :exec
+update tokens set name = $1, description = $2, last_updated = now() where token_id = $3 and contract = (select id from contracts where address = $4) and deleted = false
+`
+
+type UpdateTokenMetadataFieldsByTokenIdentifiersParams struct {
+	Name            sql.NullString
+	Description     sql.NullString
+	TokenID         persist.TokenID
+	ContractAddress persist.Address
+}
+
+func (q *Queries) UpdateTokenMetadataFieldsByTokenIdentifiers(ctx context.Context, arg UpdateTokenMetadataFieldsByTokenIdentifiersParams) error {
+	_, err := q.db.Exec(ctx, updateTokenMetadataFieldsByTokenIdentifiers,
+		arg.Name,
+		arg.Description,
+		arg.TokenID,
+		arg.ContractAddress,
+	)
+	return err
+}
+
 const updateTokenTokenMediaByTokenIdentifiers = `-- name: UpdateTokenTokenMediaByTokenIdentifiers :exec
 update tokens set token_media_id = $1 where tokens.contract = $2 and tokens.token_id = $3 and tokens.chain = $4 and deleted = false
 `

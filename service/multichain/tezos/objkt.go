@@ -258,6 +258,66 @@ func (p *TezosObjktProvider) GetTokensByTokenIdentifiersAndOwner(ctx context.Con
 	return agnosticToken, agnosticContract, nil
 }
 
+func (p *TezosObjktProvider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
+		"contractAddress": tokenIdentifiers.ContractAddress,
+		"tokenID":         tokenIdentifiers.TokenID,
+	})
+
+	tokenInDecimal, err := strconv.ParseInt(tokenIdentifiers.TokenID.String(), 16, 64)
+	if err != nil {
+		return nil, multichain.ChainAgnosticContract{}, err
+	}
+
+	var query tokensByIdentifiersQuery
+
+	if err := retry.RetryQuery(ctx, p.gql, &query, inputArgs{
+		"contractAddress": graphql.String(tokenIdentifiers.ContractAddress),
+		"tokenID":         graphql.String(strconv.Itoa(int(tokenInDecimal))),
+	}); err != nil {
+		return nil, multichain.ChainAgnosticContract{}, err
+	}
+
+	if len(query.Token) < 1 {
+		return nil, multichain.ChainAgnosticContract{}, ErrNoTokensFoundByIdentifiers{tokenIdentifiers}
+	}
+
+	firstToken := query.Token[0]
+
+	metadata := createMetadata(firstToken)
+
+	agnosticContract := multichain.ChainAgnosticContract{
+		Address:        firstToken.Fa.Contract,
+		Symbol:         firstToken.Symbol,
+		Name:           firstToken.Fa.Name,
+		Description:    firstToken.Fa.Description,
+		CreatorAddress: firstToken.Fa.Creator_Address,
+		LatestBlock:    persist.BlockNumber(firstToken.Fa.Level),
+	}
+
+	tokenID := persist.TokenID(firstToken.Token_ID.toBase16String())
+	agnosticTokens := make([]multichain.ChainAgnosticToken, len(query.Token))
+	for i, token := range query.Token {
+		var ownerAddress persist.Address
+		if len(token.Holders) > 0 {
+			ownerAddress = persist.Address(token.Holders[0].Holder_Address)
+		}
+		agnosticTokens[i] = multichain.ChainAgnosticToken{
+			TokenType:       persist.TokenTypeERC1155,
+			Description:     firstToken.Description,
+			Name:            firstToken.Name,
+			TokenID:         tokenID,
+			ContractAddress: agnosticContract.Address,
+			Quantity:        persist.HexString(fmt.Sprintf("%x", firstToken.Holders[0].Quantity)),
+			TokenMetadata:   metadata,
+			OwnerAddress:    ownerAddress,
+			BlockNumber:     persist.BlockNumber(firstToken.Level),
+		}
+	}
+
+	return agnosticTokens, agnosticContract, nil
+}
+
 func (p *TezosObjktProvider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address, maxLimit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"contractAddress": contractAddress})
 
