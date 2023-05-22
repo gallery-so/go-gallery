@@ -4280,10 +4280,10 @@ with insert_job(id) as (
     values ($5, $6, $7, $8, $9)
     returning id
 ),
-insert_media_move_active_record as (
+insert_media_move_active_record(last_updated) as (
     insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
     (
-        select $10, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, last_updated
+        select $10, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, now()
         from token_medias
         where contract_id = $2
             and token_id = $3
@@ -4293,10 +4293,15 @@ insert_media_move_active_record as (
             and $11 = true
         limit 1
     )
+    returning last_updated
 ),
 insert_media_add_record(insert_id, active, is_new) as (
     insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
-    values ($12, $2, $3, $1, $13, $14, $15, $16, (select id from insert_job), $11, now(), now())
+    values ($12, $2, $3, $1, $13, $14, $15, $16, (select id from insert_job), $11,
+        -- Using timestamps generated from insert_media_move_active_record ensures that the new record is only inserted after the current media is moved
+        (select coalesce((select last_updated from insert_media_move_active_record), now())),
+        (select coalesce((select last_updated from insert_media_move_active_record), now()))
+    )
     on conflict (contract_id, token_id, chain) where active and not deleted do update
         set metadata = excluded.metadata,
             media = excluded.media,
