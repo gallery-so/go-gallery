@@ -308,9 +308,8 @@ func (tpj *tokenProcessingJob) isNewMediaPreferable(ctx context.Context, media p
 	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.MediaResultComparison, "MediaResultComparison")
 	defer traceCallback()
 
-	if media.IsServable() || (!media.IsServable() && (tpj.token.TokenMediaID == "" || !tpj.token.TokenMedia.IsServable())) {
+	if media.IsServable() {
 		// if the media is good, it is active
-		// if the media is bad but the old media is also bad, it is active
 		return true
 	}
 	// any other case, the media is not active
@@ -327,7 +326,6 @@ func (tpj *tokenProcessingJob) persistResults(ctx context.Context, tmetadata cor
 }
 
 func (tpj *tokenProcessingJob) upsertDB(ctx context.Context, tmetadata coredb.TokenMedia) error {
-
 	p := persist.TokenProperties{
 		HasMetadata:     tmetadata.Metadata != nil && len(tmetadata.Metadata) > 0,
 		HasPrimaryMedia: tmetadata.Media.MediaType.IsValid() && tmetadata.Media.MediaURL != "",
@@ -337,52 +335,24 @@ func (tpj *tokenProcessingJob) upsertDB(ctx context.Context, tmetadata coredb.To
 		HasName:         tmetadata.Name != "",
 		HasDescription:  tmetadata.Description != "",
 	}
-
-	job, err := tpj.tp.queries.InsertJob(ctx, coredb.InsertJobParams{
+	return tpj.tp.queries.InsertTokenPipelineResults(ctx, coredb.InsertTokenPipelineResultsParams{
+		Chain:            tpj.token.Chain,
+		ContractID:       tpj.token.Contract,
+		TokenID:          tpj.token.TokenID,
+		TokenDbid:        tpj.token.ID.String(),
 		ProcessingJobID:  tpj.id,
 		TokenProperties:  p,
 		PipelineMetadata: *tpj.pipelineMetadata,
 		ProcessingCause:  tpj.cause,
 		ProcessorVersion: "",
+		NewMediaID:       persist.GenerateID(),
+		Metadata:         tmetadata.Metadata,
+		Media:            tmetadata.Media,
+		Name:             tmetadata.Name,
+		Description:      tmetadata.Description,
+		Active:           tmetadata.Active,
+		CopyMediaID:      persist.GenerateID(),
 	})
-	if err != nil {
-		logger.For(ctx).Errorf("error inserting job: %s", err)
-		return fmt.Errorf("error inserting job: %w", err)
-	}
-
-	newID := persist.GenerateID()
-	med, err := tpj.tp.queries.UpsertTokenMedia(ctx, coredb.UpsertTokenMediaParams{
-		CopyID:          persist.GenerateID(),
-		NewID:           newID,
-		ContractID:      tpj.token.Contract,
-		TokenID:         tpj.token.TokenID,
-		Chain:           tpj.token.Chain,
-		Metadata:        tmetadata.Metadata,
-		Media:           tmetadata.Media,
-		Name:            tmetadata.Name,
-		Description:     tmetadata.Description,
-		ProcessingJobID: job.ID,
-		Active:          tmetadata.Active,
-	})
-	if err != nil {
-		logger.For(ctx).Errorf("error upserting token media: %s", err)
-		return fmt.Errorf("error upserting token media: %w", err)
-	}
-	logger.For(ctx).Infof("upserted token media: %s", med.ID)
-	if med.Active && newID == med.ID {
-		logger.For(ctx).Infof("token media is active and needs to be added to token: %s", med.ID)
-		err := tpj.tp.queries.UpdateTokenTokenMediaByTokenIdentifiers(ctx, coredb.UpdateTokenTokenMediaByTokenIdentifiersParams{
-			TokenMediaID: med.ID,
-			Contract:     tpj.token.Contract,
-			TokenID:      tpj.token.TokenID,
-			Chain:        tpj.token.Chain,
-		})
-		if err != nil {
-			logger.For(ctx).Errorf("error updating token token_media: %s", err)
-			return fmt.Errorf("error updating token token_media: %w", err)
-		}
-	}
-	return nil
 }
 
 const (
