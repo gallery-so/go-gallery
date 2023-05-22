@@ -911,6 +911,7 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 		return err
 	}
 
+	logger.For(ctx).Infof("refreshing token %s-%s-%s-%d", ti.TokenID, ti.ContractAddress, ownerAddresses, ti.Chain)
 	// V3Migration: Remove remove image and animation keywords when migrated
 	image, anim := ti.Chain.BaseKeywords()
 	err = p.processTokenMedia(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, "", image, anim)
