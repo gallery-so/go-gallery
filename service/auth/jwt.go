@@ -144,7 +144,7 @@ func GenerateEmailVerificationToken(ctx context.Context, userID persist.DBID, em
 
 func ParseEmailVerificationToken(ctx context.Context, token string) (persist.DBID, string, error) {
 	claims := emailVerificationClaims{}
-	parsedToken, err := jwt.ParseWithClaims(token, &claims, keyFunc(env.GetString("ONE_TIME_LOGIN_JWT_SECRET")))
+	parsedToken, err := jwt.ParseWithClaims(token, &claims, keyFunc(env.GetString("EMAIL_VERIFICATION_JWT_SECRET")))
 
 	if err != nil || !parsedToken.Valid {
 		return "", "", ErrInvalidJWT
