@@ -284,8 +284,6 @@ func (p *TezosObjktProvider) GetTokensByTokenIdentifiers(ctx context.Context, to
 
 	firstToken := query.Token[0]
 
-	metadata := createMetadata(firstToken)
-
 	agnosticContract := multichain.ChainAgnosticContract{
 		Address:        firstToken.Fa.Contract,
 		Symbol:         firstToken.Symbol,
@@ -309,7 +307,7 @@ func (p *TezosObjktProvider) GetTokensByTokenIdentifiers(ctx context.Context, to
 			TokenID:         tokenID,
 			ContractAddress: agnosticContract.Address,
 			Quantity:        persist.HexString(fmt.Sprintf("%x", firstToken.Holders[0].Quantity)),
-			TokenMetadata:   metadata,
+			TokenMetadata:   createMetadata(token),
 			OwnerAddress:    ownerAddress,
 			BlockNumber:     persist.BlockNumber(firstToken.Level),
 		}
