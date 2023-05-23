@@ -225,7 +225,10 @@ func cacheObjectsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 			persist.FailStep(&pMeta.NothingCachedWithErrors)
 			return append(objects, openseaObjects...), nil
 		}
-		logger.For(pCtx).Errorf("failed to cache media from opensea: %s", err)
+
+		if err != nil {
+			logger.For(pCtx).Errorf("failed to cache media from opensea: %s", err)
+		}
 
 		if animCh != nil {
 			if _, ok := animResult.err.(errInvalidMedia); ok {
@@ -250,7 +253,12 @@ func cacheObjectsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 			}
 		}
 
-		logger.For(pCtx).Errorf("failed to cache animation and image urls: %s, %s", animResult.err, imgResult.err)
+		if animResult.err != nil {
+			logger.For(pCtx).WithError(animResult.err).Errorf("failed to cache animation url")
+		}
+		if imgResult.err != nil {
+			logger.For(pCtx).WithError(imgResult.err).Errorf("failed to cache image url")
+		}
 
 		return nil, util.MultiErr{animResult.err, imgResult.err}
 	}
