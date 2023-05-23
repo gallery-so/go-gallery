@@ -254,10 +254,10 @@ func cacheObjectsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		}
 
 		if animResult.err != nil {
-			logger.For(pCtx).WithError(animResult.err).Errorf("failed to cache animation url")
+			logger.For(pCtx).Errorf("failed to cache animation url: %s", animResult.err)
 		}
 		if imgResult.err != nil {
-			logger.For(pCtx).WithError(imgResult.err).Errorf("failed to cache image url")
+			logger.For(pCtx).Errorf("failed to cache image url: %s", imgResult.err)
 		}
 
 		return nil, util.MultiErr{animResult.err, imgResult.err}
@@ -265,10 +265,10 @@ func cacheObjectsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	// if one of them failed, log the error but continue
 	if animResult.err != nil {
-		logger.For(pCtx).WithError(animResult.err).Errorf("failed to cache animation url")
+		logger.For(pCtx).Errorf("failed to cache animation url: %s", animResult.err)
 	}
 	if imgResult.err != nil {
-		logger.For(pCtx).WithError(imgResult.err).Errorf("failed to cache image url")
+		logger.For(pCtx).Errorf("failed to cache image url: %s", imgResult.err)
 	}
 
 	// this should never be true, something is wrong if this is true
