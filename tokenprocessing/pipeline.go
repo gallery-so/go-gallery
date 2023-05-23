@@ -170,7 +170,7 @@ func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) mediaRes
 	cachedObjects, err := tpj.cacheMediaObjects(ctx, result.Metadata)
 	if err != nil {
 		isSpam := tpj.contract.IsProviderMarkedSpam || util.GetOptionalValue(tpj.token.IsProviderMarkedSpam, false) || util.GetOptionalValue(tpj.token.IsUserMarkedSpam, false)
-		switch err := err.(type) {
+		switch typ := err.(type) {
 		case errNotCacheable:
 			// this error is returned for media types that we can not properly render if we cache, but it does not mean that we cached nothing
 			// we could have cached a thumbnail or something else alongside the other media.
@@ -182,31 +182,34 @@ func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) mediaRes
 				return c.storageURL(tpj.tp.tokenBucket) != "" && (c.ObjectType == objectTypeImage || c.ObjectType == objectTypeSVG || c.ObjectType == objectTypeThumbnail)
 			})
 			if ok {
-				result.Media = tpj.createRawMedia(ctx, err.MediaType, err.URL, first.storageURL(tpj.tp.tokenBucket), cachedObjects)
+				result.Media = tpj.createRawMedia(ctx, typ.MediaType, typ.URL, first.storageURL(tpj.tp.tokenBucket), cachedObjects)
 			} else {
-				logger.For(ctx).Errorf("error caching media: %s", err)
-				result.Media = persist.Media{MediaType: err.MediaType, MediaURL: persist.NullString(err.URL)}
+				logger.For(ctx).Errorf("error caching media: %s", typ)
+				result.Media = persist.Media{MediaType: typ.MediaType, MediaURL: persist.NullString(typ.URL)}
 			}
+
+			// We don't want to report this as an error, because it's not really an error
+			err = nil
 		case MediaProcessingError:
 
-			if err.AnimationError != nil {
-				if errInvalidMedia, ok := err.AnimationError.(errInvalidMedia); ok {
+			if typ.AnimationError != nil {
+				if errInvalidMedia, ok := typ.AnimationError.(errInvalidMedia); ok {
 					result.Media = persist.Media{MediaType: persist.MediaTypeInvalid, MediaURL: persist.NullString(errInvalidMedia.URL)}
 				}
-			} else if err.ImageError != nil {
-				if errInvalidMedia, ok := err.ImageError.(errInvalidMedia); ok {
+			} else if typ.ImageError != nil {
+				if errInvalidMedia, ok := typ.ImageError.(errInvalidMedia); ok {
 					result.Media = persist.Media{MediaType: persist.MediaTypeInvalid, MediaURL: persist.NullString(errInvalidMedia.URL)}
 				}
 			}
-			reportTokenError(ctx, err, tpj.id, tpj.token.Chain, tpj.contract.Address, tpj.token.TokenID, isSpam)
+			reportTokenError(ctx, typ, tpj.id, tpj.token.Chain, tpj.contract.Address, tpj.token.TokenID, isSpam)
 		case errInvalidMedia:
-			result.Media = persist.Media{MediaType: persist.MediaTypeInvalid, MediaURL: persist.NullString(err.URL)}
-			reportTokenError(ctx, err, tpj.id, tpj.token.Chain, tpj.contract.Address, tpj.token.TokenID, isSpam)
+			result.Media = persist.Media{MediaType: persist.MediaTypeInvalid, MediaURL: persist.NullString(typ.URL)}
+			reportTokenError(ctx, typ, tpj.id, tpj.token.Chain, tpj.contract.Address, tpj.token.TokenID, isSpam)
 		default:
 			traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.SetUnknownMediaType, "SetUnknownMediaType")
 			defer traceCallback()
 			result.Media = persist.Media{MediaType: persist.MediaTypeUnknown}
-			reportTokenError(ctx, err, tpj.id, tpj.token.Chain, tpj.contract.Address, tpj.token.TokenID, isSpam)
+			reportTokenError(ctx, typ, tpj.id, tpj.token.Chain, tpj.contract.Address, tpj.token.TokenID, isSpam)
 		}
 
 		if result.Media.MediaType == "" {
