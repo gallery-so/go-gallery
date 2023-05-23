@@ -359,7 +359,7 @@ func createMediaFromCachedObjects(ctx context.Context, tokenBucket string, objec
 	}
 
 	if err != nil {
-		logger.For(ctx).WithError(err).Error("failed to get dimensions for media")
+		logger.For(ctx).Warnf("failed to get dimensions for media: %s", err)
 	}
 
 	return result
@@ -711,7 +711,7 @@ func purgeIfExists(ctx context.Context, bucket string, fileName string, client *
 	}
 	if exists {
 		if err := mediamapper.PurgeImage(ctx, fmt.Sprintf("https://storage.googleapis.com/%s/%s", bucket, fileName)); err != nil {
-			logger.For(ctx).WithError(err).Errorf("could not purge file %s", fileName)
+			logger.For(ctx).Warnf("could not purge file %s: %s", fileName, err)
 		}
 	}
 
