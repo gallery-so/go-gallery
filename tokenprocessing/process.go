@@ -47,22 +47,9 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 		logger.For(reqCtx).Infof("Processing Media: %s - Started (%d tokens)", input.UserID, len(input.TokenIDs))
 
 		for _, tokenID := range input.TokenIDs {
-			lockID := tokenID.String()
-			// V3Migration: Remove when migration is complete
-			if input.IsV3 {
-				lockID += ":v3"
-			}
-
-			if err := throttler.Lock(reqCtx, lockID); err != nil {
-				logger.For(reqCtx).Errorf("failed to lock tokenID=%s: %s", tokenID, err)
-				continue
-			}
 
 			t, err := tokenRepo.GetByID(reqCtx, tokenID)
 			if err != nil {
-				// unlock here just in case we fail to fetch the token
-				throttler.Unlock(reqCtx, lockID)
-
 				logger.For(reqCtx).Errorf("failed to fetch tokenID=%s: %s", tokenID, err)
 				continue
 			}
@@ -72,7 +59,16 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 				logger.For(reqCtx).Errorf("Error getting contract: %s", err)
 			}
 
+			lockID := tokenID.String()
+			// V3Migration: Remove when migration is complete
+			if input.IsV3 {
+				lockID += ":v3"
+			}
 			wp.Go(func() error {
+				if err := throttler.Lock(reqCtx, lockID); err != nil {
+					logger.For(reqCtx).Errorf("failed to lock tokenID=%s: %s", tokenID, err)
+					return err
+				}
 				defer throttler.Unlock(reqCtx, lockID)
 
 				ctx := sentryutil.NewSentryHubContext(reqCtx)
