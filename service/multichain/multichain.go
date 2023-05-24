@@ -250,107 +250,133 @@ func hasProvidersForTask[T any](providers []any) bool {
 	return false
 }
 
+// chainValidation is the required set of providers needed to support each chain
 var chainValidation map[persist.Chain]validation = map[persist.Chain]validation{
 	persist.ChainETH: {
-		nameResolver:            true,
-		verifier:                true,
-		tokensOwnerFetcher:      true,
-		tokensContractFetcher:   true,
-		contractRefresher:       true,
-		tokenMetadataFetcher:    true,
-		tokenDescriptorsFetcher: true,
+		NameResolver:            true,
+		Verifier:                true,
+		TokensOwnerFetcher:      true,
+		TokensContractFetcher:   true,
+		ContractRefresher:       true,
+		TokenMetadataFetcher:    true,
+		TokenDescriptorsFetcher: true,
 	},
 	persist.ChainTezos: {
-		tokensOwnerFetcher:      true,
-		tokenDescriptorsFetcher: true,
+		TokensOwnerFetcher:      true,
+		TokenDescriptorsFetcher: true,
 	},
 	persist.ChainPOAP: {
-		nameResolver:            true,
-		tokensOwnerFetcher:      true,
-		tokenDescriptorsFetcher: true,
+		NameResolver:            true,
+		TokensOwnerFetcher:      true,
+		TokenDescriptorsFetcher: true,
 	},
 	persist.ChainOptimism: {
-		tokensOwnerFetcher:    true,
-		tokensContractFetcher: true,
+		TokensOwnerFetcher:    true,
+		TokensContractFetcher: true,
 	},
 	persist.ChainPolygon: {
-		tokensOwnerFetcher:    true,
-		tokensContractFetcher: true,
+		TokensOwnerFetcher:    true,
+		TokensContractFetcher: true,
 	},
 }
 
 type validation struct {
-	nameResolver            bool
-	verifier                bool
-	tokensOwnerFetcher      bool
-	tokensContractFetcher   bool
-	tokenMetadataFetcher    bool
-	tokenDescriptorsFetcher bool
-	contractRefresher       bool
+	NameResolver            bool
+	Verifier                bool
+	TokensOwnerFetcher      bool
+	TokensContractFetcher   bool
+	TokenMetadataFetcher    bool
+	TokenDescriptorsFetcher bool
+	ContractRefresher       bool
 }
 
 func validateProviders(ctx context.Context, providers []any) map[persist.Chain][]any {
-	chains := map[persist.Chain][]any{}
+	provided := map[persist.Chain][]any{}
 
 	configurers := getChainProvidersForTask[configurer](providers)
+
 	for _, cfg := range configurers {
 		info, err := cfg.GetBlockchainInfo(ctx)
 		if err != nil {
 			panic(err)
 		}
-		chains[info.Chain] = append(chains[info.Chain], cfg)
+		provided[info.Chain] = append(provided[info.Chain], cfg)
 	}
 
-	for chain, providers := range chains {
-		requirements, ok := chainValidation[chain]
-		if !ok {
-			logger.For(ctx).Warnf("chain=%d has no provider validation", chain)
-			continue
+	validConfig := true
+
+	errorMsg := "\n[ multichain validation ]\n"
+
+	for chain, spec := range chainValidation {
+		providers := provided[chain]
+		actual := validation{}
+
+		for _, p := range providers {
+			if _, ok := p.(nameResolver); ok {
+				actual.NameResolver = true
+			}
+			if _, ok := p.(verifier); ok {
+				actual.Verifier = true
+			}
+			if _, ok := p.(tokensOwnerFetcher); ok {
+				actual.TokensOwnerFetcher = true
+			}
+			if _, ok := p.(tokensContractFetcher); ok {
+				actual.TokensContractFetcher = true
+			}
+			if _, ok := p.(tokenMetadataFetcher); ok {
+				actual.TokenMetadataFetcher = true
+			}
+			if _, ok := p.(tokenDescriptorsFetcher); ok {
+				actual.TokenDescriptorsFetcher = true
+			}
+			if _, ok := p.(contractRefresher); ok {
+				actual.ContractRefresher = true
+			}
 		}
 
-		hasImplementor := validation{}
+		// Validate the chain against the spec
+		validChain := true
+		header := fmt.Sprintf("validation results for chain: %d\n", chain)
 
-		if hasNameResolver := hasProvidersForTask[nameResolver](providers); hasNameResolver {
-			hasImplementor.nameResolver = true
-			requirements.nameResolver = true
+		markInvalid := func(typ string) {
+			if validChain {
+				validChain = false
+				errorMsg += header
+			}
+			errorMsg += fmt.Sprintf("\t* missing implementation of %s\n", typ)
 		}
 
-		if hasVerifier := hasProvidersForTask[verifier](providers); hasVerifier {
-			hasImplementor.verifier = true
-			requirements.verifier = true
+		if spec.NameResolver && !actual.NameResolver {
+			markInvalid("nameResolver")
+		}
+		if spec.Verifier && !actual.Verifier {
+			markInvalid("verifier")
+		}
+		if spec.TokensOwnerFetcher && !actual.TokensOwnerFetcher {
+			markInvalid("TokensOwnerFetcher")
+		}
+		if spec.TokensContractFetcher && !actual.TokensContractFetcher {
+			markInvalid("tokensContractFetcher")
+		}
+		if spec.TokenMetadataFetcher && !actual.TokenMetadataFetcher {
+			markInvalid("tokenMetadataFetcher")
+		}
+		if spec.TokenDescriptorsFetcher && !actual.TokenDescriptorsFetcher {
+			markInvalid("tokenDescriptorsFetcher")
+		}
+		if spec.ContractRefresher && !actual.ContractRefresher {
+			markInvalid("contractRefresher")
 		}
 
-		if hasTokensOwnerFetcher := hasProvidersForTask[tokensOwnerFetcher](providers); hasTokensOwnerFetcher {
-			hasImplementor.tokensOwnerFetcher = true
-			requirements.tokensOwnerFetcher = true
-		}
-
-		if hasTokensContractFetcher := hasProvidersForTask[tokensContractFetcher](providers); hasTokensContractFetcher {
-			hasImplementor.tokensContractFetcher = true
-			requirements.tokensContractFetcher = true
-		}
-
-		if hasContractRefresher := hasProvidersForTask[contractRefresher](providers); hasContractRefresher {
-			hasImplementor.contractRefresher = true
-			requirements.contractRefresher = true
-		}
-
-		if hasTokenMetadataFetcher := hasProvidersForTask[tokenMetadataFetcher](providers); hasTokenMetadataFetcher {
-			hasImplementor.tokenMetadataFetcher = true
-			requirements.tokenMetadataFetcher = true
-		}
-
-		if hasTokenDescriptorFetcher := hasProvidersForTask[tokenDescriptorsFetcher](providers); hasTokenDescriptorFetcher {
-			hasImplementor.tokenDescriptorsFetcher = true
-			requirements.tokenDescriptorsFetcher = true
-		}
-
-		if hasImplementor != requirements {
-			panic(fmt.Sprintf("chain=%d;got=%+v;want=%+v", chain, hasImplementor, requirements))
-		}
+		validConfig = validConfig && validChain
 	}
 
-	return chains
+	if !validConfig {
+		panic(errorMsg)
+	}
+
+	return provided
 }
 
 // SyncTokens updates the media for all tokens for a user
@@ -610,8 +636,7 @@ func (p *Provider) processTokenMedia(ctx context.Context, tokenID persist.TokenI
 		return err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/media/process/token", "http://localhost:6500"), bytes.NewBuffer(asJSON))
-	// XXX req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/media/process/token", env.GetString("TOKEN_PROCESSING_URL")), bytes.NewBuffer(asJSON))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/media/process/token", env.GetString("TOKEN_PROCESSING_URL")), bytes.NewBuffer(asJSON))
 	if err != nil {
 		return err
 	}

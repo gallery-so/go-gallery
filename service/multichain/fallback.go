@@ -109,6 +109,10 @@ func (f *SyncWithContractEvalFallbackProvider) callFallback(ctx context.Context,
 	return primary
 }
 
+func (f SyncWithContractEvalFallbackProvider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, id ChainAgnosticIdentifiers) (ChainAgnosticTokenDescriptors, ChainAgnosticContractDescriptors, error) {
+	return f.Primary.GetTokenDescriptorsByTokenIdentifiers(ctx, id)
+}
+
 func (f SyncWithContractEvalFallbackProvider) GetSubproviders() []any {
 	return []any{f.Primary, f.Fallback}
 }

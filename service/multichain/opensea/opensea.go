@@ -248,7 +248,6 @@ func (p *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, ti m
 
 // GetTokenMetadataByTokenIdentifiers retrieves a token's metadata for a given contract address and token ID
 func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
-	fmt.Println("CALLING OS!!!!")
 	tokens, _, err := p.GetTokensByTokenIdentifiers(ctx, ti, 1, 0)
 	if err != nil {
 		return nil, err
@@ -257,8 +256,6 @@ func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti mu
 	if len(tokens) == 0 {
 		return nil, fmt.Errorf("no tokens found for %s", ti)
 	}
-
-	fmt.Println("DONE CALLING OS!!!!")
 
 	return tokens[0].TokenMetadata, nil
 }
