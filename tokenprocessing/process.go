@@ -47,7 +47,7 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 		logger.For(reqCtx).Infof("Processing Media: %s - Started (%d tokens)", input.UserID, len(input.TokenIDs))
 
 		for _, tokenID := range input.TokenIDs {
-			lockID := "token_sync_lock." + tokenID.String()
+			lockID := tokenID.String()
 			// V3Migration: Remove when migration is complete
 			if input.IsV3 {
 				lockID += ":v3"
