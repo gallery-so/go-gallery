@@ -123,7 +123,7 @@ func (tpj *tokenProcessingJob) run(ctx context.Context) runResult {
 	}()
 
 	if mediaErr != nil {
-		logger.For(ctx).Error("failed to create media for token %s", tpj.key)
+		logger.For(ctx).Errorf("failed to create media for token %s", tpj.key)
 	}
 
 	persistCtx, cancel := context.WithTimeout(ctx, time.Minute*10)
@@ -170,7 +170,7 @@ func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) mediaRes
 	cachedObjects, err := tpj.cacheMediaObjects(ctx, result.Metadata)
 	if err != nil {
 		isSpam := tpj.contract.IsProviderMarkedSpam || util.GetOptionalValue(tpj.token.IsProviderMarkedSpam, false) || util.GetOptionalValue(tpj.token.IsUserMarkedSpam, false)
-		switch err := err.(type) {
+		switch typ := err.(type) {
 		case errNotCacheable:
 			// this error is returned for media types that we can not properly render if we cache, but it does not mean that we cached nothing
 			// we could have cached a thumbnail or something else alongside the other media.
@@ -182,31 +182,34 @@ func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) mediaRes
 				return c.storageURL(tpj.tp.tokenBucket) != "" && (c.ObjectType == objectTypeImage || c.ObjectType == objectTypeSVG || c.ObjectType == objectTypeThumbnail)
 			})
 			if ok {
-				result.Media = tpj.createRawMedia(ctx, err.MediaType, err.URL, first.storageURL(tpj.tp.tokenBucket), cachedObjects)
+				result.Media = tpj.createRawMedia(ctx, typ.MediaType, typ.URL, first.storageURL(tpj.tp.tokenBucket), cachedObjects)
 			} else {
-				logger.For(ctx).Errorf("error caching media: %s", err)
-				result.Media = persist.Media{MediaType: err.MediaType, MediaURL: persist.NullString(err.URL)}
+				logger.For(ctx).Errorf("error caching media: %s", typ)
+				result.Media = persist.Media{MediaType: typ.MediaType, MediaURL: persist.NullString(typ.URL)}
 			}
+
+			// We don't want to report this as an error, because it's not really an error
+			err = nil
 		case MediaProcessingError:
 
-			if err.AnimationError != nil {
-				if errInvalidMedia, ok := err.AnimationError.(errInvalidMedia); ok {
+			if typ.AnimationError != nil {
+				if errInvalidMedia, ok := typ.AnimationError.(errInvalidMedia); ok {
 					result.Media = persist.Media{MediaType: persist.MediaTypeInvalid, MediaURL: persist.NullString(errInvalidMedia.URL)}
 				}
-			} else if err.ImageError != nil {
-				if errInvalidMedia, ok := err.ImageError.(errInvalidMedia); ok {
+			} else if typ.ImageError != nil {
+				if errInvalidMedia, ok := typ.ImageError.(errInvalidMedia); ok {
 					result.Media = persist.Media{MediaType: persist.MediaTypeInvalid, MediaURL: persist.NullString(errInvalidMedia.URL)}
 				}
 			}
-			reportTokenError(ctx, err, tpj.id, tpj.token.Chain, tpj.contract.Address, tpj.token.TokenID, isSpam)
+			reportTokenError(ctx, typ, tpj.id, tpj.token.Chain, tpj.contract.Address, tpj.token.TokenID, isSpam)
 		case errInvalidMedia:
-			result.Media = persist.Media{MediaType: persist.MediaTypeInvalid, MediaURL: persist.NullString(err.URL)}
-			reportTokenError(ctx, err, tpj.id, tpj.token.Chain, tpj.contract.Address, tpj.token.TokenID, isSpam)
+			result.Media = persist.Media{MediaType: persist.MediaTypeInvalid, MediaURL: persist.NullString(typ.URL)}
+			reportTokenError(ctx, typ, tpj.id, tpj.token.Chain, tpj.contract.Address, tpj.token.TokenID, isSpam)
 		default:
 			traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.SetUnknownMediaType, "SetUnknownMediaType")
 			defer traceCallback()
 			result.Media = persist.Media{MediaType: persist.MediaTypeUnknown}
-			reportTokenError(ctx, err, tpj.id, tpj.token.Chain, tpj.contract.Address, tpj.token.TokenID, isSpam)
+			reportTokenError(ctx, typ, tpj.id, tpj.token.Chain, tpj.contract.Address, tpj.token.TokenID, isSpam)
 		}
 
 		if result.Media.MediaType == "" {
@@ -308,9 +311,8 @@ func (tpj *tokenProcessingJob) isNewMediaPreferable(ctx context.Context, media p
 	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.MediaResultComparison, "MediaResultComparison")
 	defer traceCallback()
 
-	if media.IsServable() || (!media.IsServable() && (tpj.token.TokenMediaID == "" || !tpj.token.TokenMedia.IsServable())) {
+	if media.IsServable() {
 		// if the media is good, it is active
-		// if the media is bad but the old media is also bad, it is active
 		return true
 	}
 	// any other case, the media is not active
@@ -327,7 +329,6 @@ func (tpj *tokenProcessingJob) persistResults(ctx context.Context, tmetadata cor
 }
 
 func (tpj *tokenProcessingJob) upsertDB(ctx context.Context, tmetadata coredb.TokenMedia) error {
-
 	p := persist.TokenProperties{
 		HasMetadata:     tmetadata.Metadata != nil && len(tmetadata.Metadata) > 0,
 		HasPrimaryMedia: tmetadata.Media.MediaType.IsValid() && tmetadata.Media.MediaURL != "",
@@ -337,52 +338,24 @@ func (tpj *tokenProcessingJob) upsertDB(ctx context.Context, tmetadata coredb.To
 		HasName:         tmetadata.Name != "",
 		HasDescription:  tmetadata.Description != "",
 	}
-
-	job, err := tpj.tp.queries.InsertJob(ctx, coredb.InsertJobParams{
+	return tpj.tp.queries.InsertTokenPipelineResults(ctx, coredb.InsertTokenPipelineResultsParams{
+		Chain:            tpj.token.Chain,
+		ContractID:       tpj.token.Contract,
+		TokenID:          tpj.token.TokenID,
+		TokenDbid:        tpj.token.ID.String(),
 		ProcessingJobID:  tpj.id,
 		TokenProperties:  p,
 		PipelineMetadata: *tpj.pipelineMetadata,
 		ProcessingCause:  tpj.cause,
 		ProcessorVersion: "",
+		NewMediaID:       persist.GenerateID(),
+		Metadata:         tmetadata.Metadata,
+		Media:            tmetadata.Media,
+		Name:             tmetadata.Name,
+		Description:      tmetadata.Description,
+		Active:           tmetadata.Active,
+		CopyMediaID:      persist.GenerateID(),
 	})
-	if err != nil {
-		logger.For(ctx).Errorf("error inserting job: %s", err)
-		return fmt.Errorf("error inserting job: %w", err)
-	}
-
-	newID := persist.GenerateID()
-	med, err := tpj.tp.queries.UpsertTokenMedia(ctx, coredb.UpsertTokenMediaParams{
-		CopyID:          persist.GenerateID(),
-		NewID:           newID,
-		ContractID:      tpj.token.Contract,
-		TokenID:         tpj.token.TokenID,
-		Chain:           tpj.token.Chain,
-		Metadata:        tmetadata.Metadata,
-		Media:           tmetadata.Media,
-		Name:            tmetadata.Name,
-		Description:     tmetadata.Description,
-		ProcessingJobID: job.ID,
-		Active:          tmetadata.Active,
-	})
-	if err != nil {
-		logger.For(ctx).Errorf("error upserting token media: %s", err)
-		return fmt.Errorf("error upserting token media: %w", err)
-	}
-	logger.For(ctx).Infof("upserted token media: %s", med.ID)
-	if med.Active && newID == med.ID {
-		logger.For(ctx).Infof("token media is active and needs to be added to token: %s", med.ID)
-		err := tpj.tp.queries.UpdateTokenTokenMediaByTokenIdentifiers(ctx, coredb.UpdateTokenTokenMediaByTokenIdentifiersParams{
-			TokenMediaID: med.ID,
-			Contract:     tpj.token.Contract,
-			TokenID:      tpj.token.TokenID,
-			Chain:        tpj.token.Chain,
-		})
-		if err != nil {
-			logger.For(ctx).Errorf("error updating token token_media: %s", err)
-			return fmt.Errorf("error updating token token_media: %w", err)
-		}
-	}
-	return nil
 }
 
 const (
