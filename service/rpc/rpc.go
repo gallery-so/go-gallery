@@ -790,7 +790,7 @@ func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAdd
 			return "", ErrTokenURINotFound{err}
 		}
 
-		return persist.TokenURI(strings.ReplaceAll(turi, "\x00", "")), nil
+		return persist.TokenURI(strings.ReplaceAll(turi, "\x00", "")).ReplaceID(pTokenID), nil
 
 	default:
 		tokenURI, err := GetTokenURI(ctx, persist.TokenTypeERC721, pContractAddress, pTokenID, ethClient)

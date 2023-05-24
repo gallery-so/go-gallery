@@ -83,6 +83,26 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti mu
 	return tokens.Metadata, nil
 }
 
+func (d *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (multichain.ChainAgnosticTokenDescriptors, multichain.ChainAgnosticContractDescriptors, error) {
+	metadata, err := d.GetTokenMetadataByTokenIdentifiers(ctx, ti, "")
+	if err != nil {
+		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, err
+	}
+	name, _ := metadata["name"].(string)
+	description, _ := metadata["description"].(string)
+	contractName, _ := metadata["contract_name"].(string)
+	contractDescription, _ := metadata["contract_description"].(string)
+	contractSymbol, _ := metadata["contract_symbol"].(string)
+	return multichain.ChainAgnosticTokenDescriptors{
+			Name:        name,
+			Description: description,
+		}, multichain.ChainAgnosticContractDescriptors{
+			Name:        contractName,
+			Symbol:      contractSymbol,
+			Description: contractDescription,
+		}, nil
+}
+
 // GetContractByAddress retrieves an ethereum contract by address
 func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Address) (multichain.ChainAgnosticContract, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/contracts/get?address=%s", d.indexerBaseURL, addr), nil)
@@ -282,9 +302,11 @@ func verifySignature(pSignatureStr string,
 
 func contractToChainAgnostic(contract persist.Contract) multichain.ChainAgnosticContract {
 	return multichain.ChainAgnosticContract{
-		Address:        persist.Address(contract.Address.String()),
-		Name:           contract.Name.String(),
-		Symbol:         contract.Symbol.String(),
-		CreatorAddress: persist.Address(contract.OwnerAddress.String()),
+		Address: persist.Address(contract.Address.String()),
+		Descriptors: multichain.ChainAgnosticContractDescriptors{
+			Name:           contract.Name.String(),
+			Symbol:         contract.Symbol.String(),
+			CreatorAddress: persist.Address(contract.OwnerAddress.String()),
+		},
 	}
 }

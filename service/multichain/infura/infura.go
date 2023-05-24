@@ -70,6 +70,7 @@ type Token struct {
 	Supply    string                  `json:"supply"`
 	TokenType string                  `json:"type"`
 	Metadata  Metadata                `json:"metadata"`
+	Name      string                  `json:"name"`
 }
 
 type getNFTsForOwnerResponse struct {
@@ -149,7 +150,7 @@ func (p *Provider) GetTokensByWalletAddress(ctx context.Context, address persist
 }
 
 func (p *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, tids multichain.ChainAgnosticIdentifiers, owner persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	owners, err := p.getOwnersPaginate(ctx, tids, owner, "")
+	owners, err := p.getOwnersPaginate(ctx, tids, "")
 	if err != nil {
 
 		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
@@ -171,7 +172,52 @@ func (p *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, tids
 	return tokens[0], contracts[0], nil
 }
 
-func (d *Provider) getOwnersPaginate(ctx context.Context, tids multichain.ChainAgnosticIdentifiers, owner persist.Address, pageKey string) ([]Owner, error) {
+func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tids multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	owners, err := p.getOwnersPaginate(ctx, tids, "")
+	if err != nil {
+
+		return nil, multichain.ChainAgnosticContract{}, err
+	}
+
+	if len(owners) == 0 {
+		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("no owners found for token %s", tids)
+	}
+
+	tokens, contracts, err := p.ownersToTokens(ctx, owners)
+	if err != nil {
+		return nil, multichain.ChainAgnosticContract{}, err
+	}
+
+	if len(tokens) == 0 || len(contracts) == 0 {
+		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("no tokens or contracts found for token with tids %s", tids)
+	}
+
+	return tokens, contracts[0], nil
+}
+
+func (p *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, tids multichain.ChainAgnosticIdentifiers) (multichain.ChainAgnosticTokenDescriptors, multichain.ChainAgnosticContractDescriptors, error) {
+	owners, err := p.getOwnersPaginate(ctx, tids, "")
+	if err != nil {
+		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, err
+	}
+
+	if len(owners) == 0 {
+		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, fmt.Errorf("no owners found for token %s", tids)
+	}
+
+	tokens, contracts, err := p.ownersToTokensForOwner(ctx, persist.Address(owners[0].OwnerOf), []Owner{owners[0]})
+	if err != nil {
+		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, err
+	}
+
+	if len(tokens) == 0 || len(contracts) == 0 {
+		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, fmt.Errorf("no tokens or contracts found for token with tids %s", tids)
+	}
+
+	return tokens[0].Descriptors, contracts[0].Descriptors, nil
+}
+
+func (d *Provider) getOwnersPaginate(ctx context.Context, tids multichain.ChainAgnosticIdentifiers, pageKey string) ([]Owner, error) {
 
 	owners := []Owner{}
 
@@ -208,7 +254,7 @@ func (d *Provider) getOwnersPaginate(ctx context.Context, tids multichain.ChainA
 
 	if ownersResp.Cursor != "" && ownersResp.Cursor != pageKey {
 
-		newOwners, err := d.getOwnersPaginate(ctx, tids, owner, ownersResp.Cursor)
+		newOwners, err := d.getOwnersPaginate(ctx, tids, ownersResp.Cursor)
 		if err != nil {
 			return nil, err
 		}
@@ -381,8 +427,10 @@ func (p *Provider) getContractMetadata(ctx context.Context, contract persist.Eth
 
 	chainAgnosticContract := multichain.ChainAgnosticContract{
 		Address: persist.Address(contract),
-		Symbol:  contractMetadata.Symbol,
-		Name:    contractMetadata.Name,
+		Descriptors: multichain.ChainAgnosticContractDescriptors{
+			Symbol: contractMetadata.Symbol,
+			Name:   contractMetadata.Name,
+		},
 	}
 
 	return chainAgnosticContract, nil
@@ -399,6 +447,7 @@ func (p *Provider) ownersToTokensForOwner(ctx context.Context, owner persist.Add
 				Supply:    o.Amount,
 				TokenType: o.ContractType,
 				Metadata:  o.Metadata,
+				Name:      o.Name,
 			}
 			found = true
 			break
@@ -410,6 +459,41 @@ func (p *Provider) ownersToTokensForOwner(ctx context.Context, owner persist.Add
 	}
 
 	return p.ownedTokensToChainAgnosticTokens(ctx, owner, []Token{result})
+}
+
+func (p *Provider) ownersToTokens(ctx context.Context, owners []Owner) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+	result := map[string]Token{}
+
+	for _, o := range owners {
+
+		result[o.OwnerOf.String()] = Token{
+			Contract:  o.TokenAddress,
+			TokenID:   o.TokenID,
+			Supply:    o.Amount,
+			TokenType: o.ContractType,
+			Metadata:  o.Metadata,
+			Name:      o.Name,
+		}
+
+	}
+
+	agnosticTokens := []multichain.ChainAgnosticToken{}
+	agnosticContracts := []multichain.ChainAgnosticContract{}
+	seenContracts := map[persist.Address]bool{}
+	for owner, token := range result {
+		a, c, err := p.ownedTokensToChainAgnosticTokens(ctx, persist.Address(strings.ToLower(owner)), []Token{token})
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, contract := range c {
+			if !seenContracts[contract.Address] {
+				agnosticContracts = append(agnosticContracts, contract)
+				seenContracts[contract.Address] = true
+			}
+		}
+		agnosticTokens = append(agnosticTokens, a...)
+	}
+	return agnosticTokens, agnosticContracts, nil
 }
 
 func (p *Provider) ownedTokensToChainAgnosticTokens(ctx context.Context, owner persist.Address, tokens []Token) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
@@ -460,6 +544,9 @@ func ownedTokenToChainAgnosticToken(owner persist.Address, token Token) multicha
 		OwnerAddress:    owner,
 		ContractAddress: persist.Address(token.Contract),
 		Quantity:        persist.HexString(b.Text(16)),
+		Descriptors: multichain.ChainAgnosticTokenDescriptors{
+			Name: token.Name,
+		},
 	}
 
 	return chainAgnosticToken

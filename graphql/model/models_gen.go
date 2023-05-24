@@ -989,6 +989,13 @@ func (ErrPushTokenBelongsToAnotherUser) IsRegisterUserPushTokenPayloadOrError() 
 func (ErrPushTokenBelongsToAnotherUser) IsUnregisterUserPushTokenPayloadOrError() {}
 func (ErrPushTokenBelongsToAnotherUser) IsError()                                 {}
 
+type ErrSessionInvalidated struct {
+	Message string `json:"message"`
+}
+
+func (ErrSessionInvalidated) IsAuthorizationError() {}
+func (ErrSessionInvalidated) IsError()              {}
+
 type ErrSyncFailed struct {
 	Message string `json:"message"`
 }

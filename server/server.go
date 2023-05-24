@@ -131,10 +131,11 @@ func CoreInit(c *Clients, provider *multichain.Provider, recommender *recommend.
 	graphqlAPQCache := redis.NewCache(redis.GraphQLAPQCache)
 	feedCache := redis.NewCache(redis.FeedCache)
 	socialCache := redis.NewCache(redis.SocialCache)
+	authRefreshCache := redis.NewCache(redis.AuthTokenForceRefreshCache)
 
 	recommender.Run(context.Background(), time.NewTicker(time.Hour))
 
-	return handlersInit(router, c.Repos, c.Queries, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, socialCache, c.MagicLinkClient, recommender)
+	return handlersInit(router, c.Repos, c.Queries, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, socialCache, authRefreshCache, c.MagicLinkClient, recommender)
 }
 
 func newSecretsClient() *secretmanager.Client {
@@ -160,8 +161,10 @@ func newSecretsClient() *secretmanager.Client {
 func SetDefaults() {
 	viper.SetDefault("ENV", "local")
 	viper.SetDefault("ALLOWED_ORIGINS", "http://localhost:3000")
+	viper.SetDefault("REFRESH_JWT_SECRET", "Refresh-Test-Secret")
+	viper.SetDefault("REFRESH_JWT_TTL", 60*60*24*7*4)
 	viper.SetDefault("AUTH_JWT_SECRET", "Test-Secret")
-	viper.SetDefault("AUTH_JWT_TTL", 60*60*24*14)
+	viper.SetDefault("AUTH_JWT_TTL", 60*5)
 	viper.SetDefault("ONE_TIME_LOGIN_JWT_SECRET", "One-Time-Login-Test-Secret")
 	viper.SetDefault("PORT", 4000)
 	viper.SetDefault("POSTGRES_HOST", "0.0.0.0")
@@ -247,6 +250,7 @@ func SetDefaults() {
 		util.VarNotSetTo("RETOOL_AUTH_TOKEN", "TEST_TOKEN")
 		util.VarNotSetTo("BACKEND_SECRET", "BACKEND_SECRET")
 		util.VarNotSetTo("PUSH_NOTIFICATIONS_SECRET", "push-notifications-secret")
+		util.VarNotSetTo("REFRESH_JWT_SECRET", "Refresh-Test-Secret")
 		util.VarNotSetTo("AUTH_JWT_SECRET", "Test-Secret")
 		util.VarNotSetTo("ONE_TIME_LOGIN_JWT_SECRET", "One-Time-Login-Test-Secret")
 	}
