@@ -405,6 +405,42 @@ func (d *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, toke
 	return token, contract, nil
 }
 
+func (d *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers) (multichain.ChainAgnosticTokenDescriptors, multichain.ChainAgnosticContractDescriptors, error) {
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/tokens/balances?token.standard=fa2&token.tokenId=%s&token.contract=%s&limit=1", d.apiURL, tokenIdentifiers.TokenID.Base10String(), tokenIdentifiers.ContractAddress), nil)
+	if err != nil {
+		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, err
+	}
+	resp, err := retry.RetryRequest(d.httpClient, req)
+	if err != nil {
+		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, util.GetErrFromResp(resp)
+	}
+	var tzktBalances []tzktBalanceToken
+	if err := json.NewDecoder(resp.Body).Decode(&tzktBalances); err != nil {
+		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, err
+	}
+
+	tokens, contracts, err := d.tzBalanceTokensToTokens(ctx, tzktBalances, tokenIdentifiers.String())
+	if err != nil {
+		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, err
+	}
+	contract := multichain.ChainAgnosticContract{}
+	if len(contracts) > 0 {
+		contract = contracts[0]
+	}
+	token := multichain.ChainAgnosticToken{}
+	if len(tokens) > 0 {
+		token = tokens[0]
+	} else {
+		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, ErrNoTokensFoundByIdentifiers{tokenIdentifiers}
+	}
+
+	return token.Descriptors, contract.Descriptors, nil
+}
+
 // GetContractByAddress retrieves an Tezos contract by address
 func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Address) (multichain.ChainAgnosticContract, error) {
 	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/contracts/%s?type=contract", d.apiURL, addr.String()), nil)
@@ -675,10 +711,12 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 			tid := persist.TokenID(tzToken.Token.TokenID.toBase16String())
 
 			agnostic := multichain.ChainAgnosticToken{
-				TokenType:   persist.TokenTypeERC1155,
-				Description: tzToken.Token.Metadata.Description,
-				Name:        tzToken.Token.Metadata.Name,
-				TokenID:     tid,
+				TokenType: persist.TokenTypeERC1155,
+				Descriptors: multichain.ChainAgnosticTokenDescriptors{
+					Description: tzToken.Token.Metadata.Description,
+					Name:        tzToken.Token.Metadata.Name,
+				},
+				TokenID: tid,
 				FallbackMedia: persist.FallbackMedia{
 					ImageURL: persist.NullString(tzToken.Token.Metadata.Image),
 				},
@@ -699,7 +737,7 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 					errChan <- err
 					return
 				}
-				contract.Symbol = tzToken.Token.Metadata.Symbol
+				contract.Descriptors.Symbol = tzToken.Token.Metadata.Symbol
 				contractChan <- contract
 			} else {
 				contractsLock.Unlock()
@@ -774,10 +812,13 @@ func (d *Provider) getPublicKeyFromAddress(ctx context.Context, address persist.
 
 func (d *Provider) tzContractToContract(ctx context.Context, tzContract tzktContract) multichain.ChainAgnosticContract {
 	return multichain.ChainAgnosticContract{
-		Address:        persist.Address(tzContract.Address),
-		CreatorAddress: persist.Address(tzContract.Creator.Address),
-		LatestBlock:    persist.BlockNumber(tzContract.LastActivity),
-		Name:           tzContract.Alias,
+		Address: persist.Address(tzContract.Address),
+
+		LatestBlock: persist.BlockNumber(tzContract.LastActivity),
+		Descriptors: multichain.ChainAgnosticContractDescriptors{
+			Name:           tzContract.Alias,
+			CreatorAddress: persist.Address(tzContract.Creator.Address),
+		},
 	}
 }
 
@@ -828,7 +869,7 @@ func (b balance) ToBigInt() *big.Int {
 // (either because of tzkt failing to update the metadata, or FxHash never signing the token). If it's the former, we want to
 // fallback to an alternative provider in case there might be usable metadata elsewhere.
 func IsSigned(ctx context.Context, token multichain.ChainAgnosticToken) bool {
-	return !IsFxHash(token.ContractAddress) || token.Name != "[WAITING TO BE SIGNED]"
+	return !IsFxHash(token.ContractAddress) || token.Descriptors.Name != "[WAITING TO BE SIGNED]"
 }
 
 // ContainsTezosKeywords returns true if the token's metadata has at least one non-empty Tezos keyword.

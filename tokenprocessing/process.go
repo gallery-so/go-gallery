@@ -29,7 +29,7 @@ type ProcessMediaForTokenInput struct {
 	TokenID         persist.TokenID `json:"token_id" binding:"required"`
 	ContractAddress persist.Address `json:"contract_address" binding:"required"`
 	Chain           persist.Chain   `json:"chain"`
-	OwnerAddress    persist.Address `json:"owner_address" binding:"required"`
+	OwnerAddress    persist.Address `json:"owner_address"`
 	IsV3            bool            `json:"is_v3" binding:"-"` // V3Migration: Remove when migration is complete
 }
 
@@ -121,33 +121,45 @@ func processMediaForToken(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRe
 		}
 		defer throttler.Unlock(reqCtx, lockID)
 
-		wallet, err := walletRepo.GetByChainAddress(reqCtx, persist.NewChainAddress(input.OwnerAddress, input.Chain))
+		var token persist.TokenGallery
+		if input.OwnerAddress != "" {
+			wallet, err := walletRepo.GetByChainAddress(reqCtx, persist.NewChainAddress(input.OwnerAddress, input.Chain))
+			if err != nil {
+				util.ErrResponse(c, http.StatusInternalServerError, err)
+				return
+			}
+
+			user, err := userRepo.GetByWalletID(reqCtx, wallet.ID)
+			if err != nil {
+				util.ErrResponse(c, http.StatusInternalServerError, err)
+				return
+			}
+			reqCtx = logger.NewContextWithFields(reqCtx, logrus.Fields{"userID": user.ID})
+			token, err = tokenRepo.GetByFullIdentifiers(reqCtx, input.TokenID, input.ContractAddress, input.Chain, user.ID)
+			if err != nil {
+				util.ErrResponse(c, http.StatusInternalServerError, err)
+				return
+			}
+		} else {
+			tokens, err := tokenRepo.GetByTokenIdentifiers(reqCtx, input.TokenID, input.ContractAddress, input.Chain, 1, 0)
+			if err != nil {
+				util.ErrResponse(c, http.StatusInternalServerError, err)
+				return
+			}
+			if len(tokens) == 0 {
+				util.ErrResponse(c, http.StatusNotFound, fmt.Errorf("token not found by identifiers"))
+				return
+			}
+			token = tokens[0]
+		}
+
+		contract, err := contractRepo.GetByID(reqCtx, token.Contract)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
-		user, err := userRepo.GetByWalletID(reqCtx, wallet.ID)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-
-		reqCtx = logger.NewContextWithFields(reqCtx, logrus.Fields{"userID": user.ID})
-
-		t, err := tokenRepo.GetByFullIdentifiers(reqCtx, input.TokenID, input.ContractAddress, input.Chain, user.ID)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-
-		contract, err := contractRepo.GetByID(reqCtx, t.Contract)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-
-		err = tp.ProcessTokenPipeline(reqCtx, t, contract, input.OwnerAddress, persist.ProcessingCauseRefresh)
+		err = tp.ProcessTokenPipeline(reqCtx, token, contract, input.OwnerAddress, persist.ProcessingCauseRefresh)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return

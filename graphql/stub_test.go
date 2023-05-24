@@ -80,7 +80,9 @@ func withContractTokens(contract multichain.ChainAgnosticContract, ownerAddress 
 		tokens := []multichain.ChainAgnosticToken{}
 		for i := 0; i < n; i++ {
 			tokens = append(tokens, multichain.ChainAgnosticToken{
-				Name:            fmt.Sprintf("%s_testToken%d", contract.Name, i),
+				Descriptors: multichain.ChainAgnosticTokenDescriptors{
+					Name: fmt.Sprintf("%s_testToken%d", contract.Descriptors.Name, i),
+				},
 				TokenID:         persist.TokenID(fmt.Sprintf("%X", i)),
 				Quantity:        "1",
 				ContractAddress: contract.Address,
@@ -101,7 +103,7 @@ func withFetchMetadata(f func() (persist.TokenMetadata, error)) providerOpt {
 
 // defaultStubProvider returns a stubProvider that returns dummy tokens
 func defaultStubProvider(address string) stubProvider {
-	contract := multichain.ChainAgnosticContract{Address: "0x123", Name: "testContract"}
+	contract := multichain.ChainAgnosticContract{Address: "0x123", Descriptors: multichain.ChainAgnosticContractDescriptors{Name: "testContract"}}
 	return newStubProvider(withContractTokens(contract, address, 10))
 }
 

@@ -797,7 +797,9 @@ func testSyncDeletesOldTokens(t *testing.T) {
 	userF := newUserWithTokensFixture(t)
 	provider := newStubProvider(withContractTokens(multichain.ChainAgnosticContract{
 		Address: "0x1337",
-		Name:    "someContract",
+		Descriptors: multichain.ChainAgnosticContractDescriptors{
+			Name: "someContract",
+		},
 	}, userF.Wallet.Address, 4))
 	h := handlerWithProviders(t, sendTokensNOOP, provider)
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
@@ -811,11 +813,15 @@ func testSyncShouldCombineProviders(t *testing.T) {
 	userF := newUserFixture(t)
 	providerA := newStubProvider(withContractTokens(multichain.ChainAgnosticContract{
 		Address: "0x1337",
-		Name:    "someContract",
+		Descriptors: multichain.ChainAgnosticContractDescriptors{
+			Name: "someContract",
+		},
 	}, userF.Wallet.Address, 4))
 	providerB := newStubProvider(withContractTokens(multichain.ChainAgnosticContract{
 		Address: "0x1234",
-		Name:    "anotherContract",
+		Descriptors: multichain.ChainAgnosticContractDescriptors{
+			Name: "anotherContract",
+		},
 	}, userF.Wallet.Address, 2))
 	h := handlerWithProviders(t, sendTokensNOOP, providerA, providerB)
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
@@ -828,7 +834,9 @@ func testSyncShouldCombineProviders(t *testing.T) {
 func testSyncShouldMergeDuplicatesInProvider(t *testing.T) {
 	userF := newUserFixture(t)
 	token := defaultToken(userF.Wallet.Address)
-	contract := multichain.ChainAgnosticContract{Address: token.ContractAddress, Name: "someContract"}
+	contract := multichain.ChainAgnosticContract{Address: token.ContractAddress, Descriptors: multichain.ChainAgnosticContractDescriptors{
+		Name: "someContract",
+	}}
 	provider := newStubProvider(
 		withContracts([]multichain.ChainAgnosticContract{contract}),
 		withTokens([]multichain.ChainAgnosticToken{token, token}),
@@ -844,7 +852,9 @@ func testSyncShouldMergeDuplicatesInProvider(t *testing.T) {
 func testSyncShouldMergeDuplicatesAcrossProviders(t *testing.T) {
 	userF := newUserFixture(t)
 	token := defaultToken(userF.Wallet.Address)
-	contract := multichain.ChainAgnosticContract{Address: token.ContractAddress, Name: "someContract"}
+	contract := multichain.ChainAgnosticContract{Address: token.ContractAddress, Descriptors: multichain.ChainAgnosticContractDescriptors{
+		Name: "someContract",
+	}}
 	providerA := newStubProvider(withContracts([]multichain.ChainAgnosticContract{contract}), withTokens([]multichain.ChainAgnosticToken{token}))
 	providerB := newStubProvider(withContracts([]multichain.ChainAgnosticContract{contract}), withTokens([]multichain.ChainAgnosticToken{token}))
 	h := handlerWithProviders(t, sendTokensNOOP, providerA, providerB)
@@ -859,7 +869,9 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	metadataServer := newMetadataServerFixture(t)
 
 	patchMetadata := func(t *testing.T, ctx context.Context, address, endpoint string) http.Handler {
-		contract := multichain.ChainAgnosticContract{Address: "0x123", Name: "testContract"}
+		contract := multichain.ChainAgnosticContract{Address: "0x123", Descriptors: multichain.ChainAgnosticContractDescriptors{
+			Name: "testContract",
+		}}
 		clients := server.ClientInit(ctx)
 		provider := newStubProvider(
 			withContractTokens(contract, address, 1),
@@ -1320,7 +1332,9 @@ func defaultLayout() CollectionLayoutInput {
 // defaultToken returns a dummy token owned by the provided address
 func defaultToken(address string) multichain.ChainAgnosticToken {
 	return multichain.ChainAgnosticToken{
-		Name:            "testToken1",
+		Descriptors: multichain.ChainAgnosticTokenDescriptors{
+			Name: "testToken1",
+		},
 		TokenID:         "1",
 		Quantity:        "1",
 		ContractAddress: "0x123",

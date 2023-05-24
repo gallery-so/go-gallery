@@ -4968,6 +4968,27 @@ func (q *Queries) UpdatePushTickets(ctx context.Context, arg UpdatePushTicketsPa
 	return err
 }
 
+const updateTokenMetadataFieldsByTokenIdentifiers = `-- name: UpdateTokenMetadataFieldsByTokenIdentifiers :exec
+update tokens set name = $1, description = $2, last_updated = now() where token_id = $3 and contract = (select id from contracts where address = $4) and deleted = false
+`
+
+type UpdateTokenMetadataFieldsByTokenIdentifiersParams struct {
+	Name            sql.NullString
+	Description     sql.NullString
+	TokenID         persist.TokenID
+	ContractAddress persist.Address
+}
+
+func (q *Queries) UpdateTokenMetadataFieldsByTokenIdentifiers(ctx context.Context, arg UpdateTokenMetadataFieldsByTokenIdentifiersParams) error {
+	_, err := q.db.Exec(ctx, updateTokenMetadataFieldsByTokenIdentifiers,
+		arg.Name,
+		arg.Description,
+		arg.TokenID,
+		arg.ContractAddress,
+	)
+	return err
+}
+
 const updateUserEmail = `-- name: UpdateUserEmail :exec
 with upsert_pii as (
     insert into pii.for_users (user_id, pii_email_address) values ($1, $2)

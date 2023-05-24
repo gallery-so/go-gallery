@@ -452,6 +452,22 @@ func (d *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, toke
 	return token, contract, nil
 }
 
+func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	return d.getTokenWithMetadata(ctx, tokenIdentifiers, true, 0)
+}
+
+func (d *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (multichain.ChainAgnosticTokenDescriptors, multichain.ChainAgnosticContractDescriptors, error) {
+	tokens, contract, err := d.getTokenWithMetadata(ctx, ti, true, 0)
+	if err != nil {
+		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, err
+	}
+	if len(tokens) == 0 {
+		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, fmt.Errorf("no token found for contract address %s and token ID %s", ti.ContractAddress, ti.TokenID)
+	}
+	firstToken := tokens[0]
+	return firstToken.Descriptors, contract.Descriptors, nil
+}
+
 type GetContractMetadataResponse struct {
 	Address          persist.EthereumAddress `json:"address"`
 	ContractMetadata ContractMetadata        `json:"contractMetadata"`
@@ -482,10 +498,12 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 	}
 
 	return multichain.ChainAgnosticContract{
-		Address:        persist.Address(contractMetadataResponse.Address),
-		Symbol:         contractMetadataResponse.ContractMetadata.Symbol,
-		Name:           contractMetadataResponse.ContractMetadata.Name,
-		CreatorAddress: persist.Address(contractMetadataResponse.ContractMetadata.ContractDeployer),
+		Address: persist.Address(contractMetadataResponse.Address),
+		Descriptors: multichain.ChainAgnosticContractDescriptors{
+			Symbol:         contractMetadataResponse.ContractMetadata.Symbol,
+			Name:           contractMetadataResponse.ContractMetadata.Name,
+			CreatorAddress: persist.Address(contractMetadataResponse.ContractMetadata.ContractDeployer),
+		},
 	}, nil
 
 }
@@ -662,9 +680,11 @@ func alchemyTokenToChainAgnosticToken(owner persist.EthereumAddress, token Token
 	}
 
 	t := multichain.ChainAgnosticToken{
-		TokenType:       tokenType,
-		Name:            token.Title,
-		Description:     token.Description,
+		TokenType: tokenType,
+		Descriptors: multichain.ChainAgnosticTokenDescriptors{
+			Name:        token.Title,
+			Description: token.Description,
+		},
 		TokenURI:        persist.TokenURI(token.TokenURI.Raw),
 		TokenMetadata:   alchemyTokenToMetadata(token),
 		TokenID:         token.ID.TokenID.ToTokenID(),
@@ -680,10 +700,12 @@ func alchemyTokenToChainAgnosticToken(owner persist.EthereumAddress, token Token
 	}
 
 	return t, multichain.ChainAgnosticContract{
-		Address:        persist.Address(token.Contract.Address),
-		Symbol:         token.ContractMetadata.Symbol,
-		Name:           token.ContractMetadata.Name,
-		CreatorAddress: persist.Address(token.ContractMetadata.ContractDeployer),
+		Address: persist.Address(token.Contract.Address),
+		Descriptors: multichain.ChainAgnosticContractDescriptors{
+			Symbol:         token.ContractMetadata.Symbol,
+			Name:           token.ContractMetadata.Name,
+			CreatorAddress: persist.Address(token.ContractMetadata.ContractDeployer),
+		},
 	}
 }
 
