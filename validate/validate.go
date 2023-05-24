@@ -139,10 +139,10 @@ func RegisterCustomValidators(v *validator.Validate) {
 	v.RegisterValidation("created_collections", CreatedCollectionsValidator)
 	v.RegisterValidation("http", HTTPValidator)
 	v.RegisterAlias("collection_name", "max=200")
-	v.RegisterAlias("collection_note", "max=600")
+	v.RegisterAlias("collection_note", "max=1200")
 	v.RegisterAlias("token_note", "max=1200")
-	v.RegisterAlias("bio", "max=600")
-	v.RegisterAlias("caption", "max=600")
+	v.RegisterAlias("bio", "max=1200")
+	v.RegisterAlias("caption", "max=1200")
 
 	v.RegisterStructValidation(ChainAddressValidator, persist.ChainAddress{})
 	v.RegisterStructValidation(ConnectionPaginationParamsValidator, ConnectionPaginationParams{})
