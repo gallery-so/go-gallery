@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -43,11 +44,23 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 
 		reqCtx := logger.NewContextWithFields(c.Request.Context(), logrus.Fields{"userID": input.UserID})
 
+		// sort chain and token IDs so we can use them as a unique key for locking
 		sort.Slice(input.Chains, func(i, j int) bool {
 			return input.Chains[i] < input.Chains[j]
 		})
 
+		sort.Slice(input.TokenIDs, func(i, j int) bool {
+			return input.TokenIDs[i] < input.TokenIDs[j]
+		})
+
+		asStrings, _ := util.Map(input.TokenIDs, func(id persist.DBID) (string, error) {
+			return id.String(), nil
+		})
+
+		uniqueTokenLockKey := util.HashFNV(strings.Join(asStrings, ","))
+
 		lockID := input.UserID.String()
+		lockID += fmt.Sprintf(":%s", uniqueTokenLockKey)
 		for _, chain := range input.Chains {
 			lockID += fmt.Sprintf(":%d", chain)
 		}

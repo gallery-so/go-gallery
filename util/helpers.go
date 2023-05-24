@@ -8,10 +8,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -305,6 +307,13 @@ func FirstNonEmptyString(strs ...string) string {
 		}
 	}
 	return ""
+}
+
+func HashFNV(s string) string {
+	hash := fnv.New64a() // or New32a() if you want a smaller hash
+	hash.Write([]byte(s))
+	hashed := hash.Sum64() // or Sum32() if you used New32a()
+	return strconv.FormatUint(hashed, 16)
 }
 
 // FromPointer returns the value of a pointer, or the zero value of the pointer's type if the pointer is nil.
