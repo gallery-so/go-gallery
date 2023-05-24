@@ -904,7 +904,6 @@ from (select unnest(@social_ids::varchar[]) as social_id, unnest(@social_usernam
 where case when @only_unfollowing::bool then f.id is null else true end
 order by (f.id is not null,user_view.created_at,user_view.id);
 
-
 -- name: CountSocialConnections :one
 select count(*)
 from (select unnest(@social_ids::varchar[]) as social_id) as s
@@ -1191,9 +1190,8 @@ select * from reprocess_jobs where id = $1;
 
 -- name: GetMediaByTokenID :batchone
 select m.*
-from tokens t
-join token_medias m on t.chain = m.chain and t.contract = m.contract_id and t.token_id = m.token_id
-where t.id = $1 and m.active and not m.deleted;
+from token_medias m
+where m.id = (select token_media_id from tokens where tokens.id = $1) and m.active and not m.deleted;
 
 -- name: UpsertSession :one
 insert into sessions (id, user_id,
@@ -1212,7 +1210,6 @@ insert into sessions (id, user_id,
 
 -- name: InvalidateSession :exec
 update sessions set invalidated = true, active_until = least(active_until, now()), last_updated = now() where id = @id and deleted = false and invalidated = false;
-
 
 -- name: UpdateTokenMetadataFieldsByTokenIdentifiers :exec
 update tokens set name = @name, description = @description, last_updated = now() where token_id = @token_id and contract = (select id from contracts where address = @contract_address) and deleted = false;

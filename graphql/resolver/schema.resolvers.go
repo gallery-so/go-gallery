@@ -6,6 +6,7 @@ package graphql
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/99designs/gqlgen/graphql"
@@ -1992,17 +1993,15 @@ func (r *subscriptionResolver) NotificationUpdated(ctx context.Context) (<-chan 
 
 // Media is the resolver for the media field.
 func (r *tokenResolver) Media(ctx context.Context, obj *model.Token) (model.MediaSubtype, error) {
-	if !publicapi.For(ctx).User.UserIsAdmin(ctx) {
-		return obj.Media, nil
-	}
-
 	tokenMedia, err := publicapi.For(ctx).Token.MediaByTokenID(ctx, obj.Dbid)
 	if err != nil {
-		// In the future, we probably want to include the fallback media.
-		// For now, we'll return nil so that we surface migration bugs.
+		// If we have no media, just return the fallback media
+		var noMediaErr persist.ErrMediaNotFound
+		if errors.As(err, &noMediaErr) {
+			return mediaToModel(ctx, persist.Media{}, obj.HelperTokenData.Token.FallbackMedia), nil
+		}
 		return nil, err
 	}
-
 	return mediaToModel(ctx, tokenMedia.Media, obj.HelperTokenData.Token.FallbackMedia), nil
 }
 
