@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"sort"
 	"time"
 
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -43,33 +42,27 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 
 		reqCtx := logger.NewContextWithFields(c.Request.Context(), logrus.Fields{"userID": input.UserID})
 
-		sort.Slice(input.Chains, func(i, j int) bool {
-			return input.Chains[i] < input.Chains[j]
-		})
-
-		lockID := input.UserID.String()
-		for _, chain := range input.Chains {
-			lockID += fmt.Sprintf(":%d", chain)
-		}
-		// V3Migration: Remove when migration is complete
-		if input.IsV3 {
-			lockID += ":v3"
-		}
-
-		if err := throttler.Lock(reqCtx, lockID); err != nil {
-			// Reply with a non-200 status so that the message is tried again later on
-			util.ErrResponse(c, http.StatusTooManyRequests, err)
-			return
-		}
-		defer throttler.Unlock(reqCtx, input.UserID.String())
-
 		wp := pool.New().WithMaxGoroutines(50).WithErrors()
 
 		logger.For(reqCtx).Infof("Processing Media: %s - Started (%d tokens)", input.UserID, len(input.TokenIDs))
 
 		for _, tokenID := range input.TokenIDs {
+			lockID := "token_sync_lock." + tokenID.String()
+			// V3Migration: Remove when migration is complete
+			if input.IsV3 {
+				lockID += ":v3"
+			}
+
+			if err := throttler.Lock(reqCtx, lockID); err != nil {
+				logger.For(reqCtx).Errorf("failed to lock tokenID=%s: %s", tokenID, err)
+				continue
+			}
+
 			t, err := tokenRepo.GetByID(reqCtx, tokenID)
 			if err != nil {
+				// unlock here just in case we fail to fetch the token
+				throttler.Unlock(reqCtx, lockID)
+
 				logger.For(reqCtx).Errorf("failed to fetch tokenID=%s: %s", tokenID, err)
 				continue
 			}
@@ -80,6 +73,8 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 			}
 
 			wp.Go(func() error {
+				defer throttler.Unlock(reqCtx, lockID)
+
 				ctx := sentryutil.NewSentryHubContext(reqCtx)
 				err := tp.ProcessTokenPipeline(reqCtx, t, contract, "", persist.ProcessingCauseSync)
 				if err != nil {
