@@ -39,7 +39,7 @@ func (api GalleryAPI) CreateGallery(ctx context.Context, name, description *stri
 
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"name":        {name, "max=200"},
-		"description": {description, "max=600"},
+		"description": {description, "max=1200"},
 		"position":    {position, "required"},
 	}); err != nil {
 		return db.Gallery{}, err
@@ -69,7 +69,7 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"galleryID":           {update.GalleryID, "required"},
 		"name":                {update.Name, "omitempty,max=200"},
-		"description":         {update.Description, "omitempty,max=600"},
+		"description":         {update.Description, "omitempty,max=1200"},
 		"deleted_collections": {update.DeletedCollections, "omitempty,unique"},
 		"created_collections": {update.CreatedCollections, "omitempty,created_collections"},
 	}); err != nil {
@@ -513,7 +513,7 @@ func (api GalleryAPI) UpdateGalleryInfo(ctx context.Context, galleryID persist.D
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"galleryID":   {galleryID, "required"},
 		"name":        {name, "max=200"},
-		"description": {description, "max=600"},
+		"description": {description, "max=1200"},
 	}); err != nil {
 		return err
 	}
