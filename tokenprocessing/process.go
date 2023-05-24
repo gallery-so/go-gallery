@@ -28,7 +28,6 @@ type ProcessMediaForTokenInput struct {
 	TokenID         persist.TokenID `json:"token_id" binding:"required"`
 	ContractAddress persist.Address `json:"contract_address" binding:"required"`
 	Chain           persist.Chain   `json:"chain"`
-	OwnerAddress    persist.Address `json:"owner_address"`
 }
 
 func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRepository, contractRepo *postgres.ContractGalleryRepository, throttler *throttle.Locker) gin.HandlerFunc {
@@ -68,7 +67,7 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 				defer throttler.Unlock(reqCtx, lockID)
 
 				ctx := sentryutil.NewSentryHubContext(reqCtx)
-				err := tp.ProcessTokenPipeline(reqCtx, t, contract, "", persist.ProcessingCauseSync)
+				err := tp.ProcessTokenPipeline(reqCtx, t, contract, persist.ProcessingCauseSync)
 				if err != nil {
 
 					logger.For(ctx).Errorf("Error processing token: %s", err)
@@ -105,36 +104,16 @@ func processMediaForToken(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRe
 		defer throttler.Unlock(reqCtx, lockID)
 
 		var token persist.TokenGallery
-		if input.OwnerAddress != "" {
-			wallet, err := walletRepo.GetByChainAddress(reqCtx, persist.NewChainAddress(input.OwnerAddress, input.Chain))
-			if err != nil {
-				util.ErrResponse(c, http.StatusInternalServerError, err)
-				return
-			}
-
-			user, err := userRepo.GetByWalletID(reqCtx, wallet.ID)
-			if err != nil {
-				util.ErrResponse(c, http.StatusInternalServerError, err)
-				return
-			}
-			reqCtx = logger.NewContextWithFields(reqCtx, logrus.Fields{"userID": user.ID})
-			token, err = tokenRepo.GetByFullIdentifiers(reqCtx, input.TokenID, input.ContractAddress, input.Chain, user.ID)
-			if err != nil {
-				util.ErrResponse(c, http.StatusInternalServerError, err)
-				return
-			}
-		} else {
-			tokens, err := tokenRepo.GetByTokenIdentifiers(reqCtx, input.TokenID, input.ContractAddress, input.Chain, 1, 0)
-			if err != nil {
-				util.ErrResponse(c, http.StatusInternalServerError, err)
-				return
-			}
-			if len(tokens) == 0 {
-				util.ErrResponse(c, http.StatusNotFound, fmt.Errorf("token not found by identifiers"))
-				return
-			}
-			token = tokens[0]
+		tokens, err := tokenRepo.GetByTokenIdentifiers(reqCtx, input.TokenID, input.ContractAddress, input.Chain, 1, 0)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
 		}
+		if len(tokens) == 0 {
+			util.ErrResponse(c, http.StatusNotFound, fmt.Errorf("token not found by identifiers"))
+			return
+		}
+		token = tokens[0]
 
 		contract, err := contractRepo.GetByID(reqCtx, token.Contract)
 		if err != nil {
@@ -142,7 +121,7 @@ func processMediaForToken(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRe
 			return
 		}
 
-		err = tp.ProcessTokenPipeline(reqCtx, token, contract, input.OwnerAddress, persist.ProcessingCauseRefresh)
+		err = tp.ProcessTokenPipeline(reqCtx, token, contract, persist.ProcessingCauseRefresh)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return

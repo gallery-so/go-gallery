@@ -49,28 +49,26 @@ func NewTokenProcessor(queries *coredb.Queries, ethClient *ethclient.Client, mc 
 type tokenProcessingJob struct {
 	tp *tokenProcessor
 
-	id           persist.DBID
-	key          string
-	token        persist.TokenGallery
-	contract     persist.ContractGallery
-	ownerAddress persist.Address
+	id       persist.DBID
+	key      string
+	token    persist.TokenGallery
+	contract persist.ContractGallery
 
 	cause            persist.ProcessingCause
 	pipelineMetadata *persist.PipelineMetadata
 }
 
-func (tp *tokenProcessor) ProcessTokenPipeline(c context.Context, t persist.TokenGallery, contract persist.ContractGallery, ownerAddress persist.Address, cause persist.ProcessingCause) error {
+func (tp *tokenProcessor) ProcessTokenPipeline(c context.Context, t persist.TokenGallery, contract persist.ContractGallery, cause persist.ProcessingCause) error {
 
 	runID := persist.GenerateID()
 
 	job := &tokenProcessingJob{
 		id: runID,
 
-		tp:           tp,
-		key:          persist.NewTokenIdentifiers(contract.Address, t.TokenID, t.Chain).String(),
-		token:        t,
-		contract:     contract,
-		ownerAddress: ownerAddress,
+		tp:       tp,
+		key:      persist.NewTokenIdentifiers(contract.Address, t.TokenID, t.Chain).String(),
+		token:    t,
+		contract: contract,
 
 		cause:            cause,
 		pipelineMetadata: new(persist.PipelineMetadata),
@@ -246,7 +244,7 @@ func (tpj *tokenProcessingJob) retrieveMetadata(ctx context.Context) persist.Tok
 				Level:      multichain.FieldRequirementLevelAllOptional,
 			},
 		}
-		mcMetadata, err := tpj.tp.mc.GetTokenMetadataByTokenIdentifiers(ctx, tpj.contract.Address, tpj.token.TokenID, tpj.ownerAddress, tpj.token.Chain, fieldRequests)
+		mcMetadata, err := tpj.tp.mc.GetTokenMetadataByTokenIdentifiers(ctx, tpj.contract.Address, tpj.token.TokenID, tpj.token.Chain, fieldRequests)
 		if err != nil {
 			logger.For(ctx).Errorf("error getting metadata from chain: %s", err)
 			persist.FailStep(&tpj.pipelineMetadata.MetadataRetrieval)

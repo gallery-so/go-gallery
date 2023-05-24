@@ -192,7 +192,7 @@ type deepRefresher interface {
 
 // tokenMetadataFetcher supports fetching token metadata
 type tokenMetadataFetcher interface {
-	GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti ChainAgnosticIdentifiers, ownerAddress persist.Address) (persist.TokenMetadata, error)
+	GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti ChainAgnosticIdentifiers) (persist.TokenMetadata, error)
 }
 
 type tokenDescriptorsFetcher interface {
@@ -599,19 +599,19 @@ func (p *Provider) sendTokensToTokenProcessing(ctx context.Context, userID persi
 	return p.SendTokens(ctx, task.TokenProcessingUserMessage{UserID: userID, TokenIDs: tokens, Chains: chains})
 }
 
-func (p *Provider) processTokenMedia(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, ownerAddress persist.Address) error {
-	v3Input := map[string]any{
+func (p *Provider) processTokenMedia(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain) error {
+	input := map[string]any{
 		"token_id":         tokenID,
 		"contract_address": contractAddress,
 		"chain":            chain,
-		"owner_address":    ownerAddress,
 	}
-	asJSON, err := json.Marshal(v3Input)
+	asJSON, err := json.Marshal(input)
 	if err != nil {
 		return err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/media/process/token", env.GetString("TOKEN_PROCESSING_URL")), bytes.NewBuffer(asJSON))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/media/process/token", "http://localhost:6500"), bytes.NewBuffer(asJSON))
+	// XXX req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/media/process/token", env.GetString("TOKEN_PROCESSING_URL")), bytes.NewBuffer(asJSON))
 	if err != nil {
 		return err
 	}
@@ -763,7 +763,7 @@ func (f FieldRequest[T]) MatchesFilter(filter persist.TokenMetadata) bool {
 }
 
 // GetTokenMetadataByTokenIdentifiers will get the metadata for a given token identifier
-func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contractAddress persist.Address, tokenID persist.TokenID, ownerAddress persist.Address, chain persist.Chain, requestedFields []FieldRequest[string]) (persist.TokenMetadata, error) {
+func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contractAddress persist.Address, tokenID persist.TokenID, chain persist.Chain, requestedFields []FieldRequest[string]) (persist.TokenMetadata, error) {
 
 	metadataFetchers := getChainProvidersForTask[tokenMetadataFetcher](d.Chains[chain])
 
@@ -779,7 +779,7 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contr
 		i := i
 		metadataFetcher := metadataFetcher
 		wp.Go(func(ctx context.Context) error {
-			metadata, err := metadataFetcher.GetTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: contractAddress, TokenID: tokenID}, ownerAddress)
+			metadata, err := metadataFetcher.GetTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: contractAddress, TokenID: tokenID})
 			if err != nil {
 				if err != context.Canceled && !strings.Contains(err.Error(), context.Canceled.Error()) {
 					logger.For(ctx).Errorf("error fetching token metadata %s for provider %d (%T)", err, i, metadataFetcher)
@@ -823,7 +823,7 @@ metadatas:
 	if betterThanNothing != nil {
 		return betterThanNothing, nil
 	}
-	return nil, fmt.Errorf("no metadata found for token %s-%s-%s-%d", tokenID, contractAddress, ownerAddress, chain)
+	return nil, fmt.Errorf("no metadata found for token %s-%s-%d", tokenID, contractAddress, chain)
 }
 
 // DeepRefresh re-indexes a user's wallets.
@@ -874,21 +874,15 @@ func (p *Provider) VerifySignature(ctx context.Context, pSig string, pNonce stri
 }
 
 // RefreshToken refreshes a token on the given chain using the chain provider for that chain
-func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers, ownerAddresses []persist.Address) error {
+func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers) error {
 	providers, err := p.getProvidersForChain(ti.Chain)
 	if err != nil {
 		return err
 	}
 
-	logger.For(ctx).Infof("refreshing token %s-%s-%s-%d", ti.TokenID, ti.ContractAddress, ownerAddresses, ti.Chain)
+	logger.For(ctx).Infof("refreshing token %s-%s-%d", ti.TokenID, ti.ContractAddress, ti.Chain)
 
-	// V3Migration: Remove when migration is complete
-	var tempAddress persist.Address
-	if len(ownerAddresses) > 0 {
-		tempAddress = ownerAddresses[0]
-	}
-
-	err = p.processTokenMedia(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, tempAddress)
+	err = p.processTokenMedia(ctx, ti.TokenID, ti.ContractAddress, ti.Chain)
 	if err != nil {
 		return err
 	}

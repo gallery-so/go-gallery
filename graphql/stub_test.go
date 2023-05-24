@@ -34,7 +34,7 @@ func (p stubProvider) GetTokensByWalletAddress(ctx context.Context, address pers
 	return p.Tokens, p.Contracts, nil
 }
 
-func (p stubProvider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (persist.TokenMetadata, error) {
+func (p stubProvider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
 	return p.FetchMetadata()
 }
 
