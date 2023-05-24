@@ -599,17 +599,14 @@ func (p *Provider) sendTokensToTokenProcessing(ctx context.Context, userID persi
 	return p.SendTokens(ctx, task.TokenProcessingUserMessage{UserID: userID, TokenIDs: tokens, Chains: chains})
 }
 
-func (p *Provider) processTokenMedia(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, ownerAddress persist.Address, imageKeywords, animationKeywords []string) error {
-	// V3Migration: Remove when migration is complete
-	input := map[string]any{
-		"token_id":           tokenID,
-		"contract_address":   contractAddress,
-		"chain":              chain,
-		"owner_address":      ownerAddress,
-		"image_keywords":     imageKeywords,
-		"animation_keywords": animationKeywords,
+func (p *Provider) processTokenMedia(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, ownerAddress persist.Address) error {
+	v3Input := map[string]any{
+		"token_id":         tokenID,
+		"contract_address": contractAddress,
+		"chain":            chain,
+		"owner_address":    ownerAddress,
 	}
-	asJSON, err := json.Marshal(input)
+	asJSON, err := json.Marshal(v3Input)
 	if err != nil {
 		return err
 	}
@@ -620,34 +617,6 @@ func (p *Provider) processTokenMedia(ctx context.Context, tokenID persist.TokenI
 	}
 
 	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return util.GetErrFromResp(resp)
-	}
-	// V3Migration: End remove
-
-	v3Input := map[string]any{
-		"token_id":         tokenID,
-		"contract_address": contractAddress,
-		"chain":            chain,
-		"owner_address":    ownerAddress,
-		"is_v3":            true,
-	}
-	asJSONV3, err := json.Marshal(v3Input)
-	if err != nil {
-		return err
-	}
-
-	req, err = http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/media/process/token", env.GetString("NEW_TOKEN_PROCESSING_URL")), bytes.NewBuffer(asJSONV3))
-	if err != nil {
-		return err
-	}
-
-	resp, err = http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -912,8 +881,6 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 	}
 
 	logger.For(ctx).Infof("refreshing token %s-%s-%s-%d", ti.TokenID, ti.ContractAddress, ownerAddresses, ti.Chain)
-	// V3Migration: Remove remove image and animation keywords when migrated
-	image, anim := ti.Chain.BaseKeywords()
 
 	// V3Migration: Remove when migration is complete
 	var tempAddress persist.Address
@@ -921,7 +888,7 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 		tempAddress = ownerAddresses[0]
 	}
 
-	err = p.processTokenMedia(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, tempAddress, image, anim)
+	err = p.processTokenMedia(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, tempAddress)
 	if err != nil {
 		return err
 	}

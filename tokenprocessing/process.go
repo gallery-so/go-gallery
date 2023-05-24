@@ -29,7 +29,6 @@ type ProcessMediaForTokenInput struct {
 	ContractAddress persist.Address `json:"contract_address" binding:"required"`
 	Chain           persist.Chain   `json:"chain"`
 	OwnerAddress    persist.Address `json:"owner_address"`
-	IsV3            bool            `json:"is_v3" binding:"-"` // V3Migration: Remove when migration is complete
 }
 
 func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRepository, contractRepo *postgres.ContractGalleryRepository, throttler *throttle.Locker) gin.HandlerFunc {
@@ -60,10 +59,7 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 			}
 
 			lockID := tokenID.String()
-			// V3Migration: Remove when migration is complete
-			if input.IsV3 {
-				lockID += ":v3"
-			}
+
 			wp.Go(func() error {
 				if err := throttler.Lock(reqCtx, lockID); err != nil {
 					logger.For(reqCtx).Errorf("failed to lock tokenID=%s: %s", tokenID, err)
@@ -100,11 +96,7 @@ func processMediaForToken(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRe
 
 		reqCtx := c.Request.Context()
 
-		// V3Migration: Remove when migration is complete
 		lockID := fmt.Sprintf("%s-%s-%d", input.TokenID, input.ContractAddress, input.Chain)
-		if input.IsV3 {
-			lockID += ":v3"
-		}
 
 		if err := throttler.Lock(reqCtx, lockID); err != nil {
 			util.ErrResponse(c, http.StatusTooManyRequests, err)
@@ -173,11 +165,7 @@ func processOwnersForContractTokens(mc *multichain.Provider, contractRepo *postg
 			return
 		}
 
-		// V3Migration: Remove when migration is complete
 		lockID := fmt.Sprintf("%s-%d", contract.Address, contract.Chain)
-		if input.IsV3 {
-			lockID += ":v3"
-		}
 
 		if !input.ForceRefresh {
 			if err := throttler.Lock(c, lockID); err != nil {
