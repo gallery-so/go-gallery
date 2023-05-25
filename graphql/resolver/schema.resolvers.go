@@ -990,7 +990,7 @@ func (r *mutationResolver) Logout(ctx context.Context, pushTokenToUnregister *st
 	if pushTokenToUnregister != nil {
 		err := publicapi.For(ctx).User.DeletePushTokenByPushToken(ctx, *pushTokenToUnregister)
 		if err != nil {
-			logger.For(ctx).Info("failed to delete push token %s on logout: %s\n", *pushTokenToUnregister, err)
+			logger.For(ctx).Infof("failed to delete push token %s on logout: %s\n", *pushTokenToUnregister, err)
 			return nil, err
 		}
 	}
