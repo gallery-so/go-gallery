@@ -287,11 +287,11 @@ type delayedHandler interface {
 }
 
 type immediateHandler interface {
-	handleImmediate(context.Context, db.Event) (interface{}, error)
+	handleImmediate(context.Context, db.Event) (*db.FeedEvent, error)
 }
 
 type groupHandler interface {
-	handleGroup(context.Context, string, persist.Action) (interface{}, error)
+	handleGroup(context.Context, string, persist.Action) (*db.FeedEvent, error)
 }
 
 // feedHandler handles events for consumption as feed events.
@@ -324,19 +324,23 @@ func (h feedHandler) handleDelayed(ctx context.Context, persistedEvent db.Event)
 }
 
 // handledImmediate sidesteps the Feed service so that an event is immediately available as a feed event.
-func (h feedHandler) handleImmediate(ctx context.Context, persistedEvent db.Event) (interface{}, error) {
+func (h feedHandler) handleImmediate(ctx context.Context, persistedEvent db.Event) (*db.FeedEvent, error) {
 	return h.eventBuilder.NewFeedEventFromEvent(ctx, persistedEvent)
 }
 
 // handleGrouped processes a group of events into a single feed event.
-func (h feedHandler) handleGroup(ctx context.Context, groupID string, action persist.Action) (interface{}, error) {
+func (h feedHandler) handleGroup(ctx context.Context, groupID string, action persist.Action) (*db.FeedEvent, error) {
 
 	existsForGroup, err := h.queries.IsFeedEventExistsForGroup(ctx, persist.StrPtrToNullStr(&groupID))
 	if err != nil {
 		return nil, err
 	}
 	if existsForGroup {
-		return h.queries.UpdateFeedEventCaptionByGroup(ctx, persist.StrPtrToNullStr(&groupID))
+		feedEvent, err := h.queries.UpdateFeedEventCaptionByGroup(ctx, persist.StrPtrToNullStr(&groupID))
+		if err != nil {
+			return nil, err
+		}
+		return &feedEvent, nil
 	}
 
 	feedEvent, err := h.eventBuilder.NewFeedEventFromGroup(ctx, groupID, action)
