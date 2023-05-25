@@ -1270,7 +1270,7 @@ func keywordsForToken(tokenID persist.TokenID, contract persist.Address, chain p
 	switch {
 	case tezos.IsHicEtNunc(contract):
 		_, anim := chain.BaseKeywords()
-		return []string{"artifactUri", "displayUri", "image"}, anim
+		return []string{"artifactUri", "displayUri", "image", "thumbnailUri"}, anim
 	case tezos.IsFxHash(contract):
 		return []string{"displayUri", "artifactUri", "image", "uri"}, []string{"artifactUri", "displayUri"}
 	default:
