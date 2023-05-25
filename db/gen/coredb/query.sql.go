@@ -1101,7 +1101,7 @@ JOIN contracts ON contracts.id = tokens.contract
 LEFT JOIN token_medias on token_medias.id = tokens.token_media_id
 WHERE tokens.deleted = false
 AND (tokens.token_media_id IS NULL or token_medias.active = false)
-AND tokens.id > $1 AND tokens.id < $2
+AND tokens.id >= $1 AND tokens.id < $2
 ORDER BY tokens.id
 `
 
@@ -2092,7 +2092,7 @@ SELECT
 FROM tokens
 JOIN contracts ON contracts.id = tokens.contract
 left join token_medias on tokens.token_media_id = token_medias.id where tokens.deleted = false and token_medias.active = true and token_medias.media->>'media_type' = 'html' and (token_medias.media->>'thumbnail_url' is null or token_medias.media->>'thumbnail_url' = '')
-AND tokens.id > $1 AND tokens.id < $2
+AND tokens.id >= $1 AND tokens.id < $2
 ORDER BY tokens.id
 `
 

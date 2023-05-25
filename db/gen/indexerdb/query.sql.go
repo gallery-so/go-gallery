@@ -45,7 +45,7 @@ SELECT
 FROM contracts
 WHERE contracts.deleted = false
 AND (contracts.owner_address IS NULL OR contracts.owner_address = '' OR contracts.creator_address IS NULL OR contracts.creator_address = '') 
-AND contracts.id > $1 AND contracts.id < $2
+AND contracts.id >= $1 AND contracts.id < $2
 ORDER BY contracts.id
 `
 

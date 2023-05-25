@@ -1166,7 +1166,7 @@ JOIN contracts ON contracts.id = tokens.contract
 LEFT JOIN token_medias on token_medias.id = tokens.token_media_id
 WHERE tokens.deleted = false
 AND (tokens.token_media_id IS NULL or token_medias.active = false)
-AND tokens.id > @start_id AND tokens.id < @end_id
+AND tokens.id >= @start_id AND tokens.id < @end_id
 ORDER BY tokens.id;
 
 -- name: GetMissingThumbnailTokensByIDRange :many
@@ -1182,7 +1182,7 @@ SELECT
 FROM tokens
 JOIN contracts ON contracts.id = tokens.contract
 left join token_medias on tokens.token_media_id = token_medias.id where tokens.deleted = false and token_medias.active = true and token_medias.media->>'media_type' = 'html' and (token_medias.media->>'thumbnail_url' is null or token_medias.media->>'thumbnail_url' = '')
-AND tokens.id > @start_id AND tokens.id < @end_id
+AND tokens.id >= @start_id AND tokens.id < @end_id
 ORDER BY tokens.id;
 
 -- name: GetReprocessJobRangeByID :one

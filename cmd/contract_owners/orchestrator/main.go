@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	totalJobs = 1
+	totalJobs = 1000
 )
 
 type jobRange struct {
@@ -43,7 +43,7 @@ func main() {
 
 	err := pg.QueryRow(ctx, `select count(*) from contracts where contracts.deleted = false and (contracts.owner_address is null or contracts.owner_address = '' OR contracts.creator_address IS NULL OR contracts.creator_address = '');`).Scan(&totalContractCount)
 	if err != nil {
-		logrus.Errorf("error getting total token count: %v", err)
+		logrus.Errorf("error getting total contract count: %v", err)
 		panic(err)
 	}
 
@@ -51,7 +51,7 @@ func main() {
 
 	rows, err := pg.Query(ctx, `select contracts.id from contracts where contracts.deleted = false and (contracts.owner_address is null or contracts.owner_address = '' OR contracts.creator_address IS NULL OR contracts.creator_address = '') order by contracts.id;`)
 	if err != nil {
-		logrus.Errorf("error getting token ids: %v", err)
+		logrus.Errorf("error getting contract ids: %v", err)
 		panic(err)
 	}
 
@@ -85,7 +85,7 @@ func main() {
 		}
 	}
 
-	fmt.Printf("Inserted %d jobs with a limit of %d and %d total tokens\n", curRange.id, limit, totalContractCount)
+	fmt.Printf("Inserted %d jobs with a limit of %d and %d total contracts\n", curRange.id, limit, totalContractCount)
 }
 
 func setDefaults() {
