@@ -225,7 +225,10 @@ func cacheObjectsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 			persist.FailStep(&pMeta.NothingCachedWithErrors)
 			return append(objects, openseaObjects...), nil
 		}
-		logger.For(pCtx).Errorf("failed to cache media from opensea: %s", err)
+
+		if err != nil {
+			logger.For(pCtx).Errorf("failed to cache media from opensea: %s", err)
+		}
 
 		if animCh != nil {
 			if _, ok := animResult.err.(errInvalidMedia); ok {
@@ -250,17 +253,22 @@ func cacheObjectsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 			}
 		}
 
-		logger.For(pCtx).Errorf("failed to cache animation and image urls: %s, %s", animResult.err, imgResult.err)
+		if animResult.err != nil {
+			logger.For(pCtx).Errorf("failed to cache animation url: %s", animResult.err)
+		}
+		if imgResult.err != nil {
+			logger.For(pCtx).Errorf("failed to cache image url: %s", imgResult.err)
+		}
 
 		return nil, util.MultiErr{animResult.err, imgResult.err}
 	}
 
 	// if one of them failed, log the error but continue
 	if animResult.err != nil {
-		logger.For(pCtx).WithError(animResult.err).Errorf("failed to cache animation url")
+		logger.For(pCtx).Errorf("failed to cache animation url: %s", animResult.err)
 	}
 	if imgResult.err != nil {
-		logger.For(pCtx).WithError(imgResult.err).Errorf("failed to cache image url")
+		logger.For(pCtx).Errorf("failed to cache image url: %s", imgResult.err)
 	}
 
 	// this should never be true, something is wrong if this is true
@@ -359,7 +367,7 @@ func createMediaFromCachedObjects(ctx context.Context, tokenBucket string, objec
 	}
 
 	if err != nil {
-		logger.For(ctx).WithError(err).Error("failed to get dimensions for media")
+		logger.For(ctx).Warnf("failed to get dimensions for media: %s", err)
 	}
 
 	return result
@@ -711,7 +719,7 @@ func purgeIfExists(ctx context.Context, bucket string, fileName string, client *
 	}
 	if exists {
 		if err := mediamapper.PurgeImage(ctx, fmt.Sprintf("https://storage.googleapis.com/%s/%s", bucket, fileName)); err != nil {
-			logger.For(ctx).WithError(err).Errorf("could not purge file %s", fileName)
+			logger.For(ctx).Warnf("could not purge file %s: %s", fileName, err)
 		}
 	}
 
@@ -1262,7 +1270,7 @@ func keywordsForToken(tokenID persist.TokenID, contract persist.Address, chain p
 	switch {
 	case tezos.IsHicEtNunc(contract):
 		_, anim := chain.BaseKeywords()
-		return []string{"artifactUri", "displayUri", "image"}, anim
+		return []string{"artifactUri", "displayUri", "image", "thumbnailUri"}, anim
 	case tezos.IsFxHash(contract):
 		return []string{"displayUri", "artifactUri", "image", "uri"}, []string{"artifactUri", "displayUri"}
 	default:

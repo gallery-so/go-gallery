@@ -207,22 +207,16 @@ func AuthRequiredDirectiveHandler() func(ctx context.Context, obj interface{}, n
 		}
 
 		if authError := auth.GetAuthErrorFromCtx(gc); authError != nil {
-			if authError != auth.ErrNoCookie {
-				// Clear the user's cookie on any auth error (except for ErrNoCookie, since there is no cookie set)
-				auth.Logout(ctx)
-			}
-
 			var gqlModel model.AuthorizationError
 			errorMsg := authError.Error()
 
 			switch authError {
 			case auth.ErrNoCookie:
-				// Don't report this error -- it just means the user isn't logged in
 				gqlModel = model.ErrNoCookie{Message: errorMsg}
 			case auth.ErrInvalidJWT:
-				// Report this error for now, since there may be value in knowing whose token expired when
 				gqlModel = model.ErrInvalidToken{Message: errorMsg}
-				sentryutil.ReportRemappedError(ctx, authError, gqlModel)
+			case auth.ErrSessionInvalidated:
+				gqlModel = model.ErrSessionInvalidated{Message: errorMsg}
 			default:
 				return nil, authError
 			}

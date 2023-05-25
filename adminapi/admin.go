@@ -2,6 +2,8 @@ package adminapi
 
 import (
 	"context"
+	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/redis"
 
 	"github.com/go-playground/validator/v10"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -14,14 +16,15 @@ import (
 )
 
 type AdminAPI struct {
-	repos      *postgres.Repositories
-	queries    *db.Queries
-	validator  *validator.Validate
-	multichain *multichain.Provider
+	repos            *postgres.Repositories
+	queries          *db.Queries
+	authRefreshCache *redis.Cache
+	validator        *validator.Validate
+	multichain       *multichain.Provider
 }
 
-func NewAPI(repos *postgres.Repositories, queries *db.Queries, validator *validator.Validate, mp *multichain.Provider) *AdminAPI {
-	return &AdminAPI{repos, queries, validator, mp}
+func NewAPI(repos *postgres.Repositories, queries *db.Queries, authRefreshCache *redis.Cache, validator *validator.Validate, mp *multichain.Provider) *AdminAPI {
+	return &AdminAPI{repos, queries, authRefreshCache, validator, mp}
 }
 
 func (api *AdminAPI) AddRolesToUser(ctx context.Context, username string, roles []*persist.Role) (*db.User, error) {
@@ -55,6 +58,15 @@ func (api *AdminAPI) AddRolesToUser(ctx context.Context, username string, roles 
 		Roles:  newRoles,
 	})
 
+	if err != nil {
+		return nil, err
+	}
+
+	err = auth.ForceAuthTokenRefresh(ctx, api.authRefreshCache, user.ID)
+	if err != nil {
+		logger.For(ctx).Errorf("error forcing auth token refresh for user %s: %s", user.ID, err)
+	}
+
 	return &user, err
 }
 
@@ -82,6 +94,15 @@ func (api *AdminAPI) RemoveRolesFromUser(ctx context.Context, username string, r
 		Roles:  deleteRoles,
 		UserID: user.ID,
 	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = auth.ForceAuthTokenRefresh(ctx, api.authRefreshCache, user.ID)
+	if err != nil {
+		logger.For(ctx).Errorf("error forcing auth token refresh for user %s: %s", user.ID, err)
+	}
 
 	return &user, err
 }

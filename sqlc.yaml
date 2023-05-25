@@ -178,6 +178,10 @@ sql:
           # Push Notification Tokens
           - column: "push_notification_tickets.ticket_id"
             go_type: "string"
+
+          # Sessions
+          - column: "sessions.current_refresh_id"
+            go_type: "string"
           
           - column: "reprocess_jobs.id"
             go_type: "int"

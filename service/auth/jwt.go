@@ -13,6 +13,7 @@ type TokenType string
 
 const (
 	TokenTypeAuth              TokenType = "auth"
+	TokenTypeRefresh           TokenType = "refresh"
 	TokenTypeOneTimeLogin      TokenType = "one_time_login"
 	TokenTypeEmailVerification TokenType = "email_verification"
 )
@@ -22,8 +23,19 @@ type GalleryClaims struct {
 	jwt.RegisteredClaims
 }
 
-type authClaims struct {
-	UserID persist.DBID `json:"user_id"`
+type AuthTokenClaims struct {
+	UserID    persist.DBID   `json:"user_id"`
+	SessionID persist.DBID   `json:"session_id"` // The session this auth token belongs to
+	RefreshID string         `json:"refresh_id"` // The refresh token this auth token was generated from
+	Roles     []persist.Role `json:"roles"`
+	GalleryClaims
+}
+
+type RefreshTokenClaims struct {
+	ID        string       `json:"id"`        // The refresh token's ID
+	ParentID  string       `json:"parent_id"` // The parent refresh token this child refresh token was generated from
+	UserID    persist.DBID `json:"user_id"`
+	SessionID persist.DBID `json:"session_id"` // The session this refresh token belongs to
 	GalleryClaims
 }
 
@@ -39,27 +51,59 @@ type emailVerificationClaims struct {
 	GalleryClaims
 }
 
-func GenerateAuthToken(ctx context.Context, userID persist.DBID) (string, error) {
+func GenerateAuthToken(ctx context.Context, userID persist.DBID, sessionID persist.DBID, refreshID string, roles []persist.Role) (string, error) {
 	secret := env.GetString("AUTH_JWT_SECRET")
 	validFor := time.Duration(env.GetInt64("AUTH_JWT_TTL")) * time.Second
 
-	claims := authClaims{
+	claims := AuthTokenClaims{
 		UserID:        userID,
+		SessionID:     sessionID,
+		RefreshID:     refreshID,
+		Roles:         roles,
 		GalleryClaims: newGalleryClaims(TokenTypeAuth, validFor),
 	}
 
 	return generateJWT(claims, secret)
 }
 
-func ParseAuthToken(ctx context.Context, token string) (persist.DBID, error) {
-	claims := authClaims{}
+func ParseAuthToken(ctx context.Context, token string) (AuthTokenClaims, error) {
+	claims := AuthTokenClaims{}
 	parsedToken, err := jwt.ParseWithClaims(token, &claims, keyFunc(env.GetString("AUTH_JWT_SECRET")))
 
 	if err != nil || !parsedToken.Valid {
-		return "", ErrInvalidJWT
+		return AuthTokenClaims{}, ErrInvalidJWT
 	}
 
-	return claims.UserID, nil
+	return claims, nil
+}
+
+func GenerateRefreshToken(ctx context.Context, ID string, parentID string, userID persist.DBID, sessionID persist.DBID) (string, time.Time, error) {
+	secret := env.GetString("REFRESH_JWT_SECRET")
+	validFor := time.Duration(env.GetInt64("REFRESH_JWT_TTL")) * time.Second
+
+	claims := RefreshTokenClaims{
+		ID:            ID,
+		ParentID:      parentID,
+		UserID:        userID,
+		SessionID:     sessionID,
+		GalleryClaims: newGalleryClaims(TokenTypeRefresh, validFor),
+	}
+
+	jwt, err := generateJWT(claims, secret)
+	expiresAt := time.Now().Add(validFor)
+
+	return jwt, expiresAt, err
+}
+
+func ParseRefreshToken(ctx context.Context, token string) (RefreshTokenClaims, error) {
+	claims := RefreshTokenClaims{}
+	parsedToken, err := jwt.ParseWithClaims(token, &claims, keyFunc(env.GetString("REFRESH_JWT_SECRET")))
+
+	if err != nil || !parsedToken.Valid {
+		return RefreshTokenClaims{}, ErrInvalidJWT
+	}
+
+	return claims, nil
 }
 
 func GenerateOneTimeLoginToken(ctx context.Context, userID persist.DBID, source string, validFor time.Duration) (string, error) {
@@ -100,7 +144,7 @@ func GenerateEmailVerificationToken(ctx context.Context, userID persist.DBID, em
 
 func ParseEmailVerificationToken(ctx context.Context, token string) (persist.DBID, string, error) {
 	claims := emailVerificationClaims{}
-	parsedToken, err := jwt.ParseWithClaims(token, &claims, keyFunc(env.GetString("ONE_TIME_LOGIN_JWT_SECRET")))
+	parsedToken, err := jwt.ParseWithClaims(token, &claims, keyFunc(env.GetString("EMAIL_VERIFICATION_JWT_SECRET")))
 
 	if err != nil || !parsedToken.Valid {
 		return "", "", ErrInvalidJWT
@@ -115,6 +159,7 @@ func newGalleryClaims(tokenType TokenType, validFor time.Duration) GalleryClaims
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(validFor)),
 			Issuer:    "gallery",
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
 

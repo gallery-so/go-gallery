@@ -67,8 +67,6 @@ func (m *Plugin) MutateConfig(cfg *config.Config) error {
 		GeneratedHeader: true,
 		Packages:        cfg.Packages,
 	})
-
-	return nil
 }
 
 type ConfigMutateTemplateData struct {

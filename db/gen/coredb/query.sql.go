@@ -4241,39 +4241,6 @@ func (q *Queries) HasLaterGroupedEvent(ctx context.Context, arg HasLaterGroupedE
 	return exists, err
 }
 
-const insertJob = `-- name: InsertJob :one
-insert into token_processing_jobs (id, token_properties, pipeline_metadata, processing_cause, processor_version) values ($1, $2, $3, $4, $5) returning id, created_at, token_properties, pipeline_metadata, processing_cause, processor_version, deleted
-`
-
-type InsertJobParams struct {
-	ProcessingJobID  persist.DBID
-	TokenProperties  persist.TokenProperties
-	PipelineMetadata persist.PipelineMetadata
-	ProcessingCause  persist.ProcessingCause
-	ProcessorVersion string
-}
-
-func (q *Queries) InsertJob(ctx context.Context, arg InsertJobParams) (TokenProcessingJob, error) {
-	row := q.db.QueryRow(ctx, insertJob,
-		arg.ProcessingJobID,
-		arg.TokenProperties,
-		arg.PipelineMetadata,
-		arg.ProcessingCause,
-		arg.ProcessorVersion,
-	)
-	var i TokenProcessingJob
-	err := row.Scan(
-		&i.ID,
-		&i.CreatedAt,
-		&i.TokenProperties,
-		&i.PipelineMetadata,
-		&i.ProcessingCause,
-		&i.ProcessorVersion,
-		&i.Deleted,
-	)
-	return i, err
-}
-
 const insertSpamContracts = `-- name: InsertSpamContracts :exec
 with insert_spam_contracts as (
     insert into alchemy_spam_contracts (id, chain, address, created_at, is_spam) (
@@ -4307,25 +4274,128 @@ func (q *Queries) InsertSpamContracts(ctx context.Context, arg InsertSpamContrac
 	return err
 }
 
-const insertTokenProcessingJob = `-- name: InsertTokenProcessingJob :exec
-insert into token_processing_jobs (id, token_properties, pipeline_metadata, processing_cause, processor_version) values ($1, $2, $3, $4, $5)
+const insertTokenPipelineResults = `-- name: InsertTokenPipelineResults :exec
+with insert_job(id) as (
+    insert into token_processing_jobs (id, token_properties, pipeline_metadata, processing_cause, processor_version)
+    values ($5, $6, $7, $8, $9)
+    returning id
+),
+insert_media_move_active_record(last_updated) as (
+    insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
+    (
+        select $10, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, now()
+        from token_medias
+        where contract_id = $2
+            and token_id = $3
+            and chain = $1
+            and active
+            and not deleted
+            and $11 = true
+        limit 1
+    )
+    returning last_updated
+),
+insert_media_add_record(insert_id, active, is_new) as (
+    insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
+    values ($12, $2, $3, $1, $13, $14, $15, $16, (select id from insert_job), $11,
+        -- Using timestamps generated from insert_media_move_active_record ensures that the new record is only inserted after the current media is moved
+        (select coalesce((select last_updated from insert_media_move_active_record), now())),
+        (select coalesce((select last_updated from insert_media_move_active_record), now()))
+    )
+    on conflict (contract_id, token_id, chain) where active and not deleted do update
+        set metadata = excluded.metadata,
+            media = excluded.media,
+            name = excluded.name,
+            description = excluded.description,
+            processing_job_id = excluded.processing_job_id,
+            last_updated = now()
+    returning id as insert_id, active, id = $12 is_new
+),
+existing_active(id) as (
+    select id
+    from token_medias
+    where chain = $1 and contract_id = $2 and token_id = $3 and active and not deleted
+    limit 1
+)
+update tokens
+set token_media_id = (
+    case
+        -- The pipeline didn't produce active media, but one already exists so use that one
+        when not insert_medias.active and (select id from existing_active) is not null
+        then (select id from existing_active)
+
+        -- The pipeline produced active media, or didn't produce active media but no active media existed before
+        else insert_medias.insert_id
+    end
+)
+from insert_media_add_record insert_medias
+where
+    tokens.chain = $1
+    and tokens.contract = $2
+    and tokens.token_id = $3
+    and not tokens.deleted
+    and (
+        -- The case statement below handles which token instances get updated:
+        case
+            -- If the active media already existed, update tokens that have no media (new tokens that haven't been processed before) or tokens that don't use this media yet
+            when insert_medias.active and not insert_medias.is_new
+            then (tokens.token_media_id is null or tokens.token_media_id != insert_medias.insert_id)
+
+            -- Brand new active media, update all tokens in the filter to use this media
+            when insert_medias.active and insert_medias.is_new
+            then 1 = 1
+
+            -- The pipeline run produced inactive media, only update the token instance (since it may have not been processed before)
+            -- Since there is no db constraint on inactive media, all inactive media is new
+            when not insert_medias.active
+            then tokens.id = $4
+
+            else 1 = 1
+        end
+    )
 `
 
-type InsertTokenProcessingJobParams struct {
-	ID               persist.DBID
+type InsertTokenPipelineResultsParams struct {
+	Chain            persist.Chain
+	ContractID       persist.DBID
+	TokenID          persist.TokenID
+	TokenDbid        string
+	ProcessingJobID  persist.DBID
 	TokenProperties  persist.TokenProperties
 	PipelineMetadata persist.PipelineMetadata
 	ProcessingCause  persist.ProcessingCause
 	ProcessorVersion string
+	CopyMediaID      persist.DBID
+	Active           interface{}
+	NewMediaID       persist.DBID
+	Metadata         persist.TokenMetadata
+	Media            persist.Media
+	Name             string
+	Description      string
 }
 
-func (q *Queries) InsertTokenProcessingJob(ctx context.Context, arg InsertTokenProcessingJobParams) error {
-	_, err := q.db.Exec(ctx, insertTokenProcessingJob,
-		arg.ID,
+// Optionally create an inactive record of the existing active record if the new media is also active
+// Update the existing active record with the new media data
+// This will return the existing active record if it exists. If the incoming record is active,
+// this will still return the active record before the update, and not the new record.
+func (q *Queries) InsertTokenPipelineResults(ctx context.Context, arg InsertTokenPipelineResultsParams) error {
+	_, err := q.db.Exec(ctx, insertTokenPipelineResults,
+		arg.Chain,
+		arg.ContractID,
+		arg.TokenID,
+		arg.TokenDbid,
+		arg.ProcessingJobID,
 		arg.TokenProperties,
 		arg.PipelineMetadata,
 		arg.ProcessingCause,
 		arg.ProcessorVersion,
+		arg.CopyMediaID,
+		arg.Active,
+		arg.NewMediaID,
+		arg.Metadata,
+		arg.Media,
+		arg.Name,
+		arg.Description,
 	)
 	return err
 }
@@ -4377,6 +4447,15 @@ func (q *Queries) InsertWallet(ctx context.Context, arg InsertWalletParams) erro
 		arg.Chain,
 		arg.WalletType,
 	)
+	return err
+}
+
+const invalidateSession = `-- name: InvalidateSession :exec
+update sessions set invalidated = true, active_until = least(active_until, now()), last_updated = now() where id = $1 and deleted = false and invalidated = false
+`
+
+func (q *Queries) InvalidateSession(ctx context.Context, id persist.DBID) error {
+	_, err := q.db.Exec(ctx, invalidateSession, id)
 	return err
 }
 
@@ -4889,23 +4968,23 @@ func (q *Queries) UpdatePushTickets(ctx context.Context, arg UpdatePushTicketsPa
 	return err
 }
 
-const updateTokenTokenMediaByTokenIdentifiers = `-- name: UpdateTokenTokenMediaByTokenIdentifiers :exec
-update tokens set token_media_id = $1 where tokens.contract = $2 and tokens.token_id = $3 and tokens.chain = $4 and deleted = false
+const updateTokenMetadataFieldsByTokenIdentifiers = `-- name: UpdateTokenMetadataFieldsByTokenIdentifiers :exec
+update tokens set name = $1, description = $2, last_updated = now() where token_id = $3 and contract = (select id from contracts where address = $4) and deleted = false
 `
 
-type UpdateTokenTokenMediaByTokenIdentifiersParams struct {
-	TokenMediaID persist.DBID
-	Contract     persist.DBID
-	TokenID      persist.TokenID
-	Chain        persist.Chain
+type UpdateTokenMetadataFieldsByTokenIdentifiersParams struct {
+	Name            sql.NullString
+	Description     sql.NullString
+	TokenID         persist.TokenID
+	ContractAddress persist.Address
 }
 
-func (q *Queries) UpdateTokenTokenMediaByTokenIdentifiers(ctx context.Context, arg UpdateTokenTokenMediaByTokenIdentifiersParams) error {
-	_, err := q.db.Exec(ctx, updateTokenTokenMediaByTokenIdentifiers,
-		arg.TokenMediaID,
-		arg.Contract,
+func (q *Queries) UpdateTokenMetadataFieldsByTokenIdentifiers(ctx context.Context, arg UpdateTokenMetadataFieldsByTokenIdentifiersParams) error {
+	_, err := q.db.Exec(ctx, updateTokenMetadataFieldsByTokenIdentifiers,
+		arg.Name,
+		arg.Description,
 		arg.TokenID,
-		arg.Chain,
+		arg.ContractAddress,
 	)
 	return err
 }
@@ -5020,6 +5099,63 @@ func (q *Queries) UpdateUserVerificationStatus(ctx context.Context, arg UpdateUs
 	return err
 }
 
+const upsertSession = `-- name: UpsertSession :one
+insert into sessions (id, user_id,
+                      created_at, created_with_user_agent, created_with_platform, created_with_os,
+                      last_refreshed, last_user_agent, last_platform, last_os, current_refresh_id, active_until, invalidated, last_updated, deleted)
+    values ($1, $2, now(), $3, $4, $5, now(), $3, $4, $5, $6, $7, false, now(), false)
+    on conflict (id) where deleted = false do update set
+        last_refreshed = case when sessions.invalidated then sessions.last_refreshed else excluded.last_refreshed end,
+        last_user_agent = case when sessions.invalidated then sessions.last_user_agent else excluded.last_user_agent end,
+        last_platform = case when sessions.invalidated then sessions.last_platform else excluded.last_platform end,
+        last_os = case when sessions.invalidated then sessions.last_os else excluded.last_os end,
+        current_refresh_id = case when sessions.invalidated then sessions.current_refresh_id else excluded.current_refresh_id end,
+        last_updated = case when sessions.invalidated then sessions.last_updated else excluded.last_updated end,
+        active_until = case when sessions.invalidated then sessions.active_until else greatest(sessions.active_until, excluded.active_until) end
+    returning id, user_id, created_at, created_with_user_agent, created_with_platform, created_with_os, last_refreshed, last_user_agent, last_platform, last_os, current_refresh_id, active_until, invalidated, last_updated, deleted
+`
+
+type UpsertSessionParams struct {
+	ID               persist.DBID
+	UserID           persist.DBID
+	UserAgent        string
+	Platform         string
+	Os               string
+	CurrentRefreshID string
+	ActiveUntil      time.Time
+}
+
+func (q *Queries) UpsertSession(ctx context.Context, arg UpsertSessionParams) (Session, error) {
+	row := q.db.QueryRow(ctx, upsertSession,
+		arg.ID,
+		arg.UserID,
+		arg.UserAgent,
+		arg.Platform,
+		arg.Os,
+		arg.CurrentRefreshID,
+		arg.ActiveUntil,
+	)
+	var i Session
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.CreatedAt,
+		&i.CreatedWithUserAgent,
+		&i.CreatedWithPlatform,
+		&i.CreatedWithOs,
+		&i.LastRefreshed,
+		&i.LastUserAgent,
+		&i.LastPlatform,
+		&i.LastOs,
+		&i.CurrentRefreshID,
+		&i.ActiveUntil,
+		&i.Invalidated,
+		&i.LastUpdated,
+		&i.Deleted,
+	)
+	return i, err
+}
+
 const upsertSocialOAuth = `-- name: UpsertSocialOAuth :exec
 insert into pii.socials_auth (id, user_id, provider, access_token, refresh_token) values ($1, $2, $3, $4, $5) on conflict (user_id, provider) where deleted = false do update set access_token = $4, refresh_token = $5, last_updated = now()
 `
@@ -5041,80 +5177,6 @@ func (q *Queries) UpsertSocialOAuth(ctx context.Context, arg UpsertSocialOAuthPa
 		arg.RefreshToken,
 	)
 	return err
-}
-
-const upsertTokenMedia = `-- name: UpsertTokenMedia :one
-with copy_on_overwrite as (
-    insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
-    (
-        select $11, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, last_updated
-        from token_medias
-        where contract_id = $2
-          and token_id = $3
-          and chain = $4
-          and active = true
-          and $10 = true
-          and deleted = false
-        limit 1
-    )
-)
-insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated) values
-    ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now(), now())
-    on conflict (contract_id, token_id, chain) where active = true and deleted = false do update
-        set metadata = excluded.metadata,
-            media = excluded.media,
-            name = excluded.name,
-            description = excluded.description,
-            processing_job_id = excluded.processing_job_id,
-            last_updated = now() returning id, created_at, last_updated, version, contract_id, token_id, chain, active, metadata, media, name, description, processing_job_id, deleted
-`
-
-type UpsertTokenMediaParams struct {
-	NewID           persist.DBID
-	ContractID      persist.DBID
-	TokenID         persist.TokenID
-	Chain           persist.Chain
-	Metadata        persist.TokenMetadata
-	Media           persist.Media
-	Name            string
-	Description     string
-	ProcessingJobID persist.DBID
-	Active          bool
-	CopyID          persist.DBID
-}
-
-func (q *Queries) UpsertTokenMedia(ctx context.Context, arg UpsertTokenMediaParams) (TokenMedia, error) {
-	row := q.db.QueryRow(ctx, upsertTokenMedia,
-		arg.NewID,
-		arg.ContractID,
-		arg.TokenID,
-		arg.Chain,
-		arg.Metadata,
-		arg.Media,
-		arg.Name,
-		arg.Description,
-		arg.ProcessingJobID,
-		arg.Active,
-		arg.CopyID,
-	)
-	var i TokenMedia
-	err := row.Scan(
-		&i.ID,
-		&i.CreatedAt,
-		&i.LastUpdated,
-		&i.Version,
-		&i.ContractID,
-		&i.TokenID,
-		&i.Chain,
-		&i.Active,
-		&i.Metadata,
-		&i.Media,
-		&i.Name,
-		&i.Description,
-		&i.ProcessingJobID,
-		&i.Deleted,
-	)
-	return i, err
 }
 
 const userHasDuplicateGalleryPositions = `-- name: UserHasDuplicateGalleryPositions :one
