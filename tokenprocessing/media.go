@@ -315,9 +315,9 @@ func createMediaFromCachedObjects(ctx context.Context, tokenBucket string, objec
 
 	if obj, ok := objects[objectTypeAnimation]; ok {
 		primaryObject = obj
-	} else if obj, ok := objects[objectTypeImage]; ok {
-		primaryObject = obj
 	} else if obj, ok := objects[objectTypeSVG]; ok {
+		primaryObject = obj
+	} else if obj, ok := objects[objectTypeImage]; ok {
 		primaryObject = obj
 	} else {
 		logger.For(ctx).Errorf("no primary object found for cached objects: %+v", objects)
@@ -326,7 +326,7 @@ func createMediaFromCachedObjects(ctx context.Context, tokenBucket string, objec
 	var thumbnailObject *cachedMediaObject
 	var liveRenderObject = util.MapFindOrNil(objects, objectTypeLiveRender)
 
-	if primaryObject.ObjectType == objectTypeAnimation {
+	if primaryObject.ObjectType == objectTypeAnimation || primaryObject.ObjectType == objectTypeSVG {
 		// animations should have a thumbnail that could be an image or svg or thumbnail
 		// thumbnail take top priority, then the other image types that could have been cached
 
@@ -334,7 +334,7 @@ func createMediaFromCachedObjects(ctx context.Context, tokenBucket string, objec
 			thumbnailObject = &obj
 		} else if obj, ok := objects[objectTypeImage]; ok {
 			thumbnailObject = &obj
-		} else if obj, ok := objects[objectTypeSVG]; ok {
+		} else if obj, ok := objects[objectTypeSVG]; ok && primaryObject.ObjectType != objectTypeSVG {
 			thumbnailObject = &obj
 		}
 
