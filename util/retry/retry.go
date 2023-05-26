@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/shurcooL/graphql"
 )
 
@@ -99,4 +100,13 @@ func RetryFunc(ctx context.Context, f func(ctx context.Context) error, shouldRet
 		r.Sleep(i)
 	}
 	return ErrOutOfRetries{err, r}
+}
+
+func HTTPErrIsForceClose(err error) bool {
+	if err != nil {
+		if it, ok := err.(util.ErrHTTP); ok && it.Status == http.StatusNotFound {
+			return true
+		}
+	}
+	return false
 }

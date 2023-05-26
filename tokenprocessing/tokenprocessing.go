@@ -129,7 +129,8 @@ func InitSentry() {
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			event = auth.ScrubEventCookies(event, hint)
 			event = updateMediaProccessingFingerprints(event, hint)
-			event = excludeTokenSpam(event, hint)
+			event = excludeTokenSpamEvents(event, hint)
+			event = excludeBrokenTokenEvents(event, hint)
 			return event
 		},
 	})
@@ -139,19 +140,20 @@ func InitSentry() {
 	}
 }
 
-// reportTokenError reports an error that occurred while processing a token.
-func reportTokenError(ctx context.Context, err error, runID persist.DBID, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID, isSpam bool) {
+// reportJobError reports an error that occurred while processing a token.
+func reportJobError(ctx context.Context, err error, job tokenProcessingJob) {
 	sentryutil.ReportError(ctx, err, func(scope *sentry.Scope) {
-		setRunTags(scope, runID)
-		setTokenTags(scope, chain, contractAddress, tokenID)
-		setTokenContext(scope, chain, contractAddress, tokenID, isSpam)
+		setRunTags(scope, job.id)
+		setTokenTags(scope, job.token.Chain, job.contract.Address, job.token.TokenID, job.token.ID)
+		setTokenContext(scope, job.token.Chain, job.contract.Address, job.token.TokenID, isSpamToken(job))
 	})
 }
 
-func setTokenTags(scope *sentry.Scope, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) {
+func setTokenTags(scope *sentry.Scope, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID, id persist.DBID) {
 	scope.SetTag("chain", fmt.Sprintf("%d", chain))
 	scope.SetTag("contractAddress", contractAddress.String())
 	scope.SetTag("nftID", string(tokenID))
+	scope.SetTag("tokenDBID", string(id))
 	assetPage := assetURL(chain, contractAddress, tokenID)
 	if len(assetPage) > 200 {
 		assetPage = "assetURL too long, see token context"
@@ -162,7 +164,9 @@ func setTokenTags(scope *sentry.Scope, chain persist.Chain, contractAddress pers
 func assetURL(chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) string {
 	switch chain {
 	case persist.ChainETH:
-		return fmt.Sprintf("https://opensea.io/assets/%s/%d", contractAddress.String(), tokenID.ToInt())
+		return fmt.Sprintf("https://opensea.io/assets/ethereum/%s/%d", contractAddress.String(), tokenID.ToInt())
+	case persist.ChainPolygon:
+		return fmt.Sprintf("https://opensea.io/assets/matic/%s/%d", contractAddress.String(), tokenID.ToInt())
 	case persist.ChainTezos:
 		return fmt.Sprintf("https://objkt.com/asset/%s/%d", contractAddress.String(), tokenID.ToInt())
 	default:
@@ -217,16 +221,43 @@ func updateMediaProccessingFingerprints(event *sentry.Event, hint *sentry.EventH
 	// Group by the chain and contract
 	if event.Tags["chain"] != "" && event.Tags["contractAddress"] != "" {
 		event.Fingerprint = []string{event.Tags["chain"], event.Tags["contractAddress"]}
-		title := fmt.Sprintf("failed on chain=%s address=%s", event.Tags["chain"], event.Tags["contractAddress"])
-		event.Exception[len(event.Exception)-1].Type = title
 	}
 
 	return event
 }
 
-func excludeTokenSpam(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+// isSpamToken returns true if the token is marked as spam.
+func isSpamToken(job tokenProcessingJob) bool {
+	isSpam := job.contract.IsProviderMarkedSpam
+	isSpam = isSpam || util.GetOptionalValue(job.token.IsProviderMarkedSpam, false)
+	isSpam = isSpam || util.GetOptionalValue(job.token.IsUserMarkedSpam, false)
+	return isSpam
+}
+
+// excludeTokenSpamEvents excludes events for tokens marked as spam.
+func excludeTokenSpamEvents(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 	isSpam, ok := event.Contexts[sentryTokenContextName]["IsSpam"].(bool)
 	if ok && isSpam {
+		return nil
+	}
+	return event
+}
+
+// isBrokenTokenError returns true if the error is related to issues with the metadata or URIs of a token itself
+func isBrokenTokenError(err error) bool {
+	switch typ := err.(type) {
+	case MediaProcessingError:
+		return isBrokenTokenError(typ.AnimationError) || isBrokenTokenError(typ.ImageError)
+	case nil, errNoMediaURLs, errInvalidMedia:
+		return false
+	default:
+		return true
+	}
+}
+
+// excludeBrokenTokenEvents excludes events for broken tokens.
+func excludeBrokenTokenEvents(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+	if isBrokenTokenError(hint.OriginalException) {
 		return nil
 	}
 	return event

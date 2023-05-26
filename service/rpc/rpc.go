@@ -45,6 +45,7 @@ import (
 	goartypes "github.com/everFinance/goar/types"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/contracts"
+	"github.com/mikeydub/go-gallery/service/ipfs"
 	"github.com/mikeydub/go-gallery/service/persist"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
@@ -57,7 +58,6 @@ func init() {
 }
 
 const (
-	defaultHTTPTimeout             = 600
 	defaultHTTPKeepAlive           = 600
 	defaultHTTPMaxIdleConns        = 250
 	defaultHTTPMaxIdleConnsPerHost = 250
@@ -209,26 +209,6 @@ func (h metricsHandler) Log(r *log.Record) error {
 	return nil
 }
 
-// NewIPFSShell returns an IPFS shell
-func NewIPFSShell() *shell.Shell {
-	sh := shell.NewShellWithClient(env.GetString("IPFS_API_URL"), newClientForIPFS(env.GetString("IPFS_PROJECT_ID"), env.GetString("IPFS_PROJECT_SECRET"), false))
-	sh.SetTimeout(defaultHTTPTimeout * time.Second)
-	return sh
-}
-
-// newHTTPClientForIPFS returns an http.Client configured with default settings intended for IPFS calls.
-func newClientForIPFS(projectID, projectSecret string, continueOnly bool) *http.Client {
-	return &http.Client{
-
-		Timeout: defaultHTTPTimeout * time.Second,
-		Transport: authTransport{
-			RoundTripper:  tracing.NewTracingTransport(http.DefaultTransport, continueOnly),
-			ProjectID:     projectID,
-			ProjectSecret: projectSecret,
-		},
-	}
-}
-
 // newHTTPClientForRPC returns an http.Client configured with default settings intended for RPC calls.
 func newHTTPClientForRPC(continueTrace bool, spanOptions ...sentry.SpanOption) *http.Client {
 	// get x509 cert pool
@@ -269,18 +249,6 @@ func newHTTPClientForRPC(continueTrace bool, spanOptions ...sentry.SpanOption) *
 			MaxIdleConnsPerHost: defaultHTTPMaxIdleConnsPerHost,
 		}, continueTrace, spanOptions...),
 	}
-}
-
-// authTransport decorates each request with a basic auth header.
-type authTransport struct {
-	http.RoundTripper
-	ProjectID     string
-	ProjectSecret string
-}
-
-func (t authTransport) RoundTrip(r *http.Request) (*http.Response, error) {
-	r.SetBasicAuth(t.ProjectID, t.ProjectSecret)
-	return t.RoundTripper.RoundTrip(r)
 }
 
 // NewArweaveClient returns an Arweave client
@@ -498,7 +466,7 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 			readerChan <- util.NewFileHeaderReader(resp, bufSize)
 		case persist.URITypeIPFS:
 			path := util.GetURIPath(asString, true)
-			resp, err := GetIPFSResponse(ctx, ipfsClient, path)
+			resp, err := ipfs.GetIPFSResponse(ctx, *defaultHTTPClient, ipfsClient, path)
 			if err != nil {
 				errChan <- err
 				return
@@ -507,7 +475,7 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 			readerChan <- util.NewFileHeaderReader(resp, bufSize)
 		case persist.URITypeIPFSGateway:
 			path := util.GetURIPath(asString, false)
-			resp, err := GetIPFSResponse(ctx, ipfsClient, path)
+			resp, err := ipfs.GetIPFSResponse(ctx, *defaultHTTPClient, ipfsClient, path)
 			if err != nil {
 				logger.For(ctx).Errorf("Error getting data from IPFS: %s", err)
 			} else {
@@ -546,7 +514,7 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 				return
 			}
 			path := parsedURL.Query().Get("arg")
-			resp, err := GetIPFSResponse(ctx, ipfsClient, path)
+			resp, err := ipfs.GetIPFSResponse(ctx, *defaultHTTPClient, ipfsClient, path)
 			if err != nil {
 				errChan <- err
 				return
@@ -584,19 +552,6 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 	case <-time.After(retrieveTimeout):
 		return nil, fmt.Errorf("%s: timeout retrieving data from uri: %s", context.DeadlineExceeded.Error(), turi.String())
 	}
-}
-
-func GetIPFSData(pCtx context.Context, ipfsClient *shell.Shell, path string) ([]byte, error) {
-	response, err := GetIPFSResponse(pCtx, ipfsClient, path)
-	if err != nil {
-		return nil, err
-	}
-	defer response.Close()
-	buf := bytes.NewBuffer(nil)
-	if err := util.CopyMax(buf, response, 1024*1024*1024); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
 }
 
 func getHeaders(ctx context.Context, method, url string) (http.Header, error) {
@@ -660,83 +615,12 @@ func getContentHeaders(ctx context.Context, url string) (contentType string, con
 	}
 	fromHEAD := contentHeader(http.MethodHead, url)
 	fromGET := contentHeader(http.MethodGet, url)
-	result, err := util.FirstNonErrorWithValue(ctx, true, HTTPErrIsForceClose, fromHEAD, fromGET)
+	result, err := util.FirstNonErrorWithValue(ctx, true, retry.HTTPErrIsForceClose, fromHEAD, fromGET)
 	if err != nil {
 		return "", 0, err
 	}
 
 	return result.contentType, result.contentLength, nil
-}
-
-func GetIPFSResponse(ctx context.Context, ipfsClient *shell.Shell, path string) (io.ReadCloser, error) {
-	fromHTTP := func(ctx context.Context) (io.ReadCloser, error) {
-		url := fmt.Sprintf("%s/ipfs/%s", env.GetString("IPFS_URL"), path)
-		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-		if err != nil {
-			return nil, err
-		}
-
-		resp, err := defaultHTTPClient.Do(req)
-		if err != nil {
-			return nil, err
-		}
-
-		if resp.StatusCode > 399 || resp.StatusCode < 200 {
-			return nil, util.ErrHTTP{Status: resp.StatusCode, URL: url}
-		}
-		logger.For(ctx).Infof("IPFS HTTP successful %s", path)
-
-		return resp.Body, nil
-	}
-
-	fromIPFS := func(ctx context.Context) (io.ReadCloser, error) {
-		reader, err := ipfsClient.Cat(path)
-		if err != nil {
-			return nil, err
-		}
-		logger.For(ctx).Infof("IPFS cat successful %s", path)
-		return reader, nil
-	}
-
-	fromFallback := func(ctx context.Context) (io.ReadCloser, error) {
-		url := fmt.Sprintf("%s/ipfs/%s", env.GetString("FALLBACK_IPFS_URL"), path)
-		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-		if err != nil {
-			return nil, err
-		}
-
-		resp, err := defaultHTTPClient.Do(req)
-		if err != nil {
-			return nil, err
-		}
-		if resp.StatusCode > 399 || resp.StatusCode < 200 {
-			return nil, util.ErrHTTP{Status: resp.StatusCode, URL: url}
-		}
-		logger.For(ctx).Infof("IPFS HTTP fallback successful %s", path)
-		return resp.Body, nil
-	}
-
-	result, err := util.FirstNonErrorWithValue(ctx, false, HTTPErrIsForceClose, fromHTTP, fromIPFS, fromFallback)
-	if err != nil {
-		return func(ctx context.Context) (io.ReadCloser, error) {
-			url := fmt.Sprintf("https://ipfs.io/ipfs/%s", path)
-			req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-			if err != nil {
-				return nil, err
-			}
-
-			resp, err := defaultHTTPClient.Do(req)
-			if err != nil {
-				return nil, err
-			}
-			if resp.StatusCode > 399 || resp.StatusCode < 200 {
-				return nil, util.ErrHTTP{Status: resp.StatusCode, URL: url}
-			}
-			logger.For(ctx).Infof("IPFS API successful %s", path)
-			return resp.Body, nil
-		}(ctx)
-	}
-	return result, nil
 }
 
 // GetIPFSHeaders returns the headers for the given IPFS hash
@@ -1146,15 +1030,6 @@ func valFromSlice(s []interface{}, keyName string) interface{} {
 func isRateLimitedError(err error) bool {
 	if err != nil && strings.Contains(err.Error(), rateLimited) {
 		return true
-	}
-	return false
-}
-
-func HTTPErrIsForceClose(err error) bool {
-	if err != nil {
-		if it, ok := err.(util.ErrHTTP); ok && it.Status == http.StatusNotFound {
-			return true
-		}
 	}
 	return false
 }

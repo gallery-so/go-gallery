@@ -29,6 +29,7 @@ import (
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/ipfs"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/multichain/alchemy"
@@ -95,7 +96,7 @@ func ClientInit(ctx context.Context) *Clients {
 		Queries:         db.New(pgx),
 		HTTPClient:      &http.Client{Timeout: 0},
 		EthClient:       rpc.NewEthClient(),
-		IPFSClient:      rpc.NewIPFSShell(),
+		IPFSClient:      ipfs.NewShell(),
 		ArweaveClient:   rpc.NewArweaveClient(),
 		StorageClient:   rpc.NewStorageClient(ctx),
 		TaskClient:      task.NewClient(ctx),

@@ -12,6 +12,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/util/retry"
 )
 
 var postfixesToMediaTypes = map[string]mediaWithContentType{
@@ -112,7 +113,7 @@ func PredictMediaType(ctx context.Context, url string) (persist.MediaType, *stri
 			return MediaFromContentType(contentType), &contentType, &contentLength, nil
 		case persist.URITypeIPFSGateway:
 
-			ctl, err := util.FirstNonErrorWithValue(ctx, true, rpc.HTTPErrIsForceClose, func(ctx context.Context) (contentTypeLengthTuple, error) {
+			ctl, err := util.FirstNonErrorWithValue(ctx, true, retry.HTTPErrIsForceClose, func(ctx context.Context) (contentTypeLengthTuple, error) {
 				contentType, contentLength, err := rpc.GetIPFSHeaders(ctx, util.GetURIPath(asURI.String(), false))
 				if err != nil {
 					return contentTypeLengthTuple{}, err
