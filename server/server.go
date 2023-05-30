@@ -304,9 +304,9 @@ func NewMultichainProvider(c *Clients) *multichain.Provider {
 	cache := redis.NewCache(redis.CommunitiesCache)
 	return multichain.NewProvider(context.Background(), c.Repos, c.Queries, cache, c.TaskClient,
 		overrides,
-		failureEthProvider,
 		ethProvider,
 		openseaProvider,
+		failureEthProvider,
 		tezosProvider,
 		poapProvider,
 		alchemyOptimismProvider,

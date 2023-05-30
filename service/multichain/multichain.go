@@ -923,10 +923,10 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 		token, contract, err := tokenFetcher.GetTokenDescriptorsByTokenIdentifiers(ctx, id)
 		if err == nil {
 			// token
-			if token.Name != "" && finalContractDescriptors.Name == "" {
+			if token.Name != "" && finalTokenDescriptors.Name == "" {
 				finalTokenDescriptors.Name = token.Name
 			}
-			if token.Description != "" && finalContractDescriptors.Description == "" {
+			if token.Description != "" && finalTokenDescriptors.Description == "" {
 				finalTokenDescriptors.Description = token.Description
 			}
 
