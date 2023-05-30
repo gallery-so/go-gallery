@@ -113,7 +113,7 @@ func PredictMediaType(ctx context.Context, url string) (persist.MediaType, *stri
 			return MediaFromContentType(contentType), &contentType, &contentLength, nil
 		case persist.URITypeIPFSGateway:
 
-			ctl, err := util.FirstNonErrorWithValue(ctx, true, retry.HTTPErrIsForceClose, func(ctx context.Context) (contentTypeLengthTuple, error) {
+			ctl, err := util.FirstNonErrorWithValue(ctx, true, retry.HTTPErrNotFound, func(ctx context.Context) (contentTypeLengthTuple, error) {
 				contentType, contentLength, err := rpc.GetIPFSHeaders(ctx, util.GetURIPath(asURI.String(), false))
 				if err != nil {
 					return contentTypeLengthTuple{}, err

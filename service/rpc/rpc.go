@@ -615,7 +615,7 @@ func getContentHeaders(ctx context.Context, url string) (contentType string, con
 	}
 	fromHEAD := contentHeader(http.MethodHead, url)
 	fromGET := contentHeader(http.MethodGet, url)
-	result, err := util.FirstNonErrorWithValue(ctx, true, retry.HTTPErrIsForceClose, fromHEAD, fromGET)
+	result, err := util.FirstNonErrorWithValue(ctx, true, retry.HTTPErrNotFound, fromHEAD, fromGET)
 	if err != nil {
 		return "", 0, err
 	}

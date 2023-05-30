@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/service/ipfs"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
 )
@@ -16,7 +17,7 @@ func TestGetTokensForWallet_Success(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*45)
 	defer cancel()
 
-	ipfsClient := rpc.NewIPFSShell()
+	ipfsClient := ipfs.NewShell()
 	arweaveClient := rpc.NewArweaveClient()
 	storage := newStorageClient(ctx)
 	p := NewProvider(env.GetString("TEZOS_API_URL"), env.GetString("TOKEN_PROCESSING_URL"), env.GetString("IPFS_GATEWAY_URL"), http.DefaultClient, ipfsClient, arweaveClient, storage, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"))
