@@ -329,11 +329,11 @@ func createMediaFromCachedObjects(ctx context.Context, tokenBucket string, objec
 		// animations should have a thumbnail that could be an image or svg or thumbnail
 		// thumbnail take top priority, then the other image types that could have been cached
 
-		if obj, ok := objects[objectTypeThumbnail]; ok {
-			thumbnailObject = &obj
-		} else if obj, ok := objects[objectTypeImage]; ok {
+		if obj, ok := objects[objectTypeImage]; ok {
 			thumbnailObject = &obj
 		} else if obj, ok := objects[objectTypeSVG]; ok && primaryObject.ObjectType != objectTypeSVG {
+			thumbnailObject = &obj
+		} else if obj, ok := objects[objectTypeThumbnail]; ok {
 			thumbnailObject = &obj
 		}
 
