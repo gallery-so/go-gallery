@@ -483,22 +483,22 @@ func recordPipelineEndState(ctx context.Context, mr metric.MetricReporter, r *To
 	if ctx.Err() != nil {
 		mr.Record(ctx, pipelineTimedOutMetric(), append(baseOpts,
 			metric.LogOptions.WithLogMessage("pipeline timed out"),
-		))
+		)...)
 		return
 	}
 
 	mr.Record(ctx, pipelineDurationMetric(d), append(baseOpts,
-		metric.LogOptions.WithLogMessage(fmt.Sprintf("token processing job complete: total time for token processing job: %s", d))),
-	)
+		metric.LogOptions.WithLogMessage(fmt.Sprintf("pipeline finished (took: %s)", d)),
+	)...)
 
 	if r != nil && r.Err != nil {
 		mr.Record(ctx, pipelineErroredMetric(), append(baseOpts,
 			metric.LogOptions.WithLogMessage("pipeline completed with error: "+r.Err.Error()),
-		))
+		)...)
 		return
 	}
 
 	mr.Record(ctx, pipelineCompletedMetric(), append(baseOpts,
 		metric.LogOptions.WithLogMessage("pipeline completed successfully"),
-	))
+	)...)
 }

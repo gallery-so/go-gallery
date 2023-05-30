@@ -115,29 +115,29 @@ func GetIPFSResponse(ctx context.Context, httpClient http.Client, ipfsClient *sh
 		if err == nil {
 			logger.For(ctx).Infof("read %s using %s", path, readerName)
 		} else {
-			logger.For(ctx).Warnf("failed to read %s using %s: %s", path, readerName, err)
+			logger.For(ctx).Warnf("failed to read CID %s with %s: %s", path, readerName, err)
 		}
 	}
 
 	return util.FirstNonErrorWithValue(ctx, false, retry.HTTPErrNotFound,
 		func(ctx context.Context) (io.ReadCloser, error) {
 			r, err := infuraReader.Do(ctx, path)
-			logStatus("infura", path, err)
+			logStatus("infuraNode", path, err)
 			return r, err
 		},
 		func(ctx context.Context) (io.ReadCloser, error) {
 			r, err := galleryReader.Do(ctx, path)
-			logStatus("gallery", path, err)
+			logStatus("galleryNode", path, err)
 			return r, err
 		},
 		func(ctx context.Context) (io.ReadCloser, error) {
 			r, err := ipfsReader.Do(ctx, path)
-			logStatus("ipfs", path, err)
+			logStatus("ipfsNode", path, err)
 			return r, err
 		},
 		func(ctx context.Context) (io.ReadCloser, error) {
 			r, err := fallbackReader.Do(ctx, path)
-			logStatus("fallback", path, err)
+			logStatus("fallbackNode", path, err)
 			return r, err
 		},
 	)
