@@ -335,7 +335,7 @@ func getNFTsPaginate[T tokensPaginated](ctx context.Context, baseURL string, def
 }
 
 // // GetTokenMetadataByTokenIdentifiers retrieves a token's metadata for a given contract address and token ID
-// func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (persist.TokenMetadata, error) {
+// func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
 // 	tokens, _, err := d.getTokenWithMetadata(ctx, ti, false, 0)
 // 	if err != nil {
 // 		return persist.TokenMetadata{}, err
