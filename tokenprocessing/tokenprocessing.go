@@ -128,7 +128,7 @@ func InitSentry() {
 		AttachStacktrace: true,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			event = auth.ScrubEventCookies(event, hint)
-			event = updateMediaProccessingFingerprints(event, hint)
+			event = updateFingerPrints(event, hint)
 			event = excludeTokenSpamEvents(event, hint)
 			event = excludeBrokenTokenEvents(event, hint)
 			return event
@@ -189,40 +189,22 @@ func setRunTags(scope *sentry.Scope, runID persist.DBID) {
 	scope.SetTag("log", "go/tp-runs/"+runID.String())
 }
 
-func updateMediaProccessingFingerprints(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+func updateFingerPrints(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 	if event == nil || event.Exception == nil || hint == nil {
 		return event
 	}
-
-	var mediaErr MediaProcessingError
-
+	var mediaErr ErrMediaProcessing
 	if errors.As(hint.OriginalException, &mediaErr) {
-
-		if mediaErr.AnimationError != nil {
-			event.Exception = append(event.Exception, sentry.Exception{
-				Type:  fmt.Sprintf("%T", mediaErr.AnimationError),
-				Value: mediaErr.AnimationError.Error(),
-			})
-		}
-
-		if mediaErr.ImageError != nil {
-			event.Exception = append(event.Exception, sentry.Exception{
-				Type:  fmt.Sprintf("%T", mediaErr.ImageError),
-				Value: mediaErr.ImageError.Error(),
-			})
-		}
-
-		// Move the original error to the end of the stack since the latest error is used as the title in Sentry
-		if len(event.Exception) > 1 {
-			event.Exception = append(event.Exception[1:], event.Exception[0])
+		var multiErr util.MultiErr
+		if errors.As(mediaErr, &multiErr) {
+			for _, err := range multiErr {
+				event.Exception = append(event.Exception, sentry.Exception{
+					Type:  fmt.Sprintf("%T", err),
+					Value: err.Error(),
+				})
+			}
 		}
 	}
-
-	// Group by the chain and contract
-	if event.Tags["chain"] != "" && event.Tags["contractAddress"] != "" {
-		event.Fingerprint = []string{event.Tags["chain"], event.Tags["contractAddress"]}
-	}
-
 	return event
 }
 
@@ -246,8 +228,15 @@ func excludeTokenSpamEvents(event *sentry.Event, hint *sentry.EventHint) *sentry
 // isBrokenTokenError returns true if the error is related to issues with the metadata or URIs of a token itself
 func isBrokenTokenError(err error) bool {
 	switch typ := err.(type) {
-	case MediaProcessingError:
-		return isBrokenTokenError(typ.AnimationError) || isBrokenTokenError(typ.ImageError)
+	case util.MultiErr:
+		for _, err := range typ {
+			if isBrokenTokenError(err) {
+				return true
+			}
+		}
+		return false
+	case ErrMediaProcessing:
+		return isBrokenTokenError(typ.Unwrap())
 	case nil, errNoMediaURLs, errInvalidMedia:
 		return false
 	default:

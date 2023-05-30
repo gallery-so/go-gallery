@@ -66,7 +66,7 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 				}
 				defer throttler.Unlock(reqCtx, lockID)
 				ctx := sentryutil.NewSentryHubContext(reqCtx)
-				return tp.ProcessTokenPipeline(reqCtx, t, contract, persist.ProcessingCauseSync)
+				return tp.ProcessTokenPipeline(ctx, t, contract, persist.ProcessingCauseSync)
 			})
 		}
 
@@ -113,9 +113,9 @@ func processMediaForToken(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRe
 			return
 		}
 
-		err = tp.ProcessTokenPipeline(reqCtx, token, contract, persist.ProcessingCauseRefresh)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
+		_, pipelineErr := tp.ProcessTokenPipeline(reqCtx, token, contract, persist.ProcessingCauseRefresh)
+		if pipelineErr != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, pipelineErr)
 			return
 		}
 
