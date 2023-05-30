@@ -24,7 +24,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/mikeydub/go-gallery/service/multichain/tezos"
-	"github.com/mikeydub/go-gallery/util/retry"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/googleapi"
 
@@ -315,9 +314,9 @@ func createMediaFromCachedObjects(ctx context.Context, tokenBucket string, objec
 
 	if obj, ok := objects[objectTypeAnimation]; ok {
 		primaryObject = obj
-	} else if obj, ok := objects[objectTypeImage]; ok {
-		primaryObject = obj
 	} else if obj, ok := objects[objectTypeSVG]; ok {
+		primaryObject = obj
+	} else if obj, ok := objects[objectTypeImage]; ok {
 		primaryObject = obj
 	} else {
 		logger.For(ctx).Errorf("no primary object found for cached objects: %+v", objects)
@@ -326,7 +325,7 @@ func createMediaFromCachedObjects(ctx context.Context, tokenBucket string, objec
 	var thumbnailObject *cachedMediaObject
 	var liveRenderObject = util.MapFindOrNil(objects, objectTypeLiveRender)
 
-	if primaryObject.ObjectType == objectTypeAnimation {
+	if primaryObject.ObjectType == objectTypeAnimation || primaryObject.ObjectType == objectTypeSVG {
 		// animations should have a thumbnail that could be an image or svg or thumbnail
 		// thumbnail take top priority, then the other image types that could have been cached
 
@@ -334,7 +333,7 @@ func createMediaFromCachedObjects(ctx context.Context, tokenBucket string, objec
 			thumbnailObject = &obj
 		} else if obj, ok := objects[objectTypeImage]; ok {
 			thumbnailObject = &obj
-		} else if obj, ok := objects[objectTypeSVG]; ok {
+		} else if obj, ok := objects[objectTypeSVG]; ok && primaryObject.ObjectType != objectTypeSVG {
 			thumbnailObject = &obj
 		}
 
@@ -728,19 +727,10 @@ func purgeIfExists(ctx context.Context, bucket string, fileName string, client *
 
 func persistToStorage(ctx context.Context, client *storage.Client, reader io.Reader, bucket, fileName string, contentType *string, contentLength *int64, metadata map[string]string) error {
 	writer := newObjectWriter(ctx, client, bucket, fileName, contentType, contentLength, metadata)
-	if err := retryWriteToCloudStorage(ctx, writer, reader); err != nil {
+	if _, err := io.Copy(writer, reader); err != nil {
 		return fmt.Errorf("could not write to bucket %s for %s: %s", bucket, fileName, err)
 	}
 	return writer.Close()
-}
-
-func retryWriteToCloudStorage(ctx context.Context, writer io.Writer, reader io.Reader) error {
-	return retry.RetryFunc(ctx, func(ctx context.Context) error {
-		if _, err := io.Copy(writer, reader); err != nil {
-			return err
-		}
-		return nil
-	}, storage.ShouldRetry, retry.DefaultRetry)
 }
 
 type objectType int
@@ -844,7 +834,7 @@ func cacheRawAnimationMedia(ctx context.Context, reader *util.FileHeaderReader, 
 	})
 	writer := gzip.NewWriter(sw)
 
-	err := retryWriteToCloudStorage(ctx, writer, reader)
+	_, err := io.Copy(writer, reader)
 	if err != nil {
 		persist.FailStep(subMeta.AnimationGzip)
 		return cachedMediaObject{}, fmt.Errorf("could not write to bucket %s for %s: %s", bucket, object.fileName(), err)
