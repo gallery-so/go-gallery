@@ -313,14 +313,33 @@ func (tpj *tokenProcessingJob) cacheMediaObjects(ctx context.Context, metadata p
 	}
 
 	// At this point even OpenSea failed, so we need to return invalid media
+
 	if invalidErr, ok := animResult.err.(errInvalidMedia); ok {
 		return persist.Media{MediaType: persist.MediaTypeInvalid, MediaURL: persist.NullString(invalidErr.URL)}, invalidErr
 	}
+
 	if invalidErr, ok := imgResult.err.(errInvalidMedia); ok {
 		return persist.Media{MediaType: persist.MediaTypeInvalid, MediaURL: persist.NullString(invalidErr.URL)}, invalidErr
 	}
 
-	// TODO: panic check thing?
+	// We somehow failed to cache media without getting an error anywhere
+	if animResult.err == nil && imgResult.err == nil {
+		traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.NothingCachedWithoutErrors, "NothingCachedWithoutErrors")
+		defer traceCallback()
+
+		logger.For(ctx).Fatal("failed to cache media, but no error was returned")
+
+		openseaObjects, err := cacheOpenSeaObjects(ctx, tpj)
+
+		if isCacheResultValid(err, len(openseaObjects)) {
+			// Fail nothing cached with errors because we were able to get media from opensea
+			persist.FailStep(&tpj.pipelineMetadata.NothingCachedWithoutErrors)
+			logger.For(ctx).Warn("using media from OpenSea instead")
+			return tpj.createMediaFromCachedObjects(ctx, openseaObjects), nil
+		}
+
+		return persist.Media{MediaType: persist.MediaTypeUnknown}, errNoCachedObjects{persist.NewTokenIdentifiers(tpj.contract.Address, tpj.token.TokenID, tpj.token.Chain)}
+	}
 
 	return persist.Media{MediaType: persist.MediaTypeUnknown}, util.MultiErr{animResult.err, imgResult.err}
 }

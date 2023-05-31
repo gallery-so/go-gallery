@@ -120,7 +120,7 @@ func cacheImageObjects(ctx context.Context, imageURL string, metadata persist.To
 		ThumbnailGCP:                 &job.pipelineMetadata.ImageThumbnailGCP,
 		LiveRenderGCP:                &job.pipelineMetadata.ImageLiveRenderGCP,
 	}
-	return asyncCacheObjectsFromURL(ctx, tids, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, objectTypeAnimation, imageURL, job.tp.tokenBucket, runMetadata)
+	return asyncCacheObjectsForURL(ctx, tids, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, objectTypeAnimation, imageURL, job.tp.tokenBucket, runMetadata)
 }
 
 func cacheAnimationObjects(ctx context.Context, animationURL string, metadata persist.TokenMetadata, job *tokenProcessingJob) chan cacheResult {
@@ -135,7 +135,7 @@ func cacheAnimationObjects(ctx context.Context, animationURL string, metadata pe
 		ThumbnailGCP:                 &job.pipelineMetadata.AnimationThumbnailGCP,
 		LiveRenderGCP:                &job.pipelineMetadata.AnimationLiveRenderGCP,
 	}
-	return asyncCacheObjectsFromURL(ctx, tids, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, objectTypeAnimation, animationURL, job.tp.tokenBucket, runMetadata)
+	return asyncCacheObjectsForURL(ctx, tids, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, objectTypeAnimation, animationURL, job.tp.tokenBucket, runMetadata)
 }
 
 func cacheOpenSeaObjects(ctx context.Context, job *tokenProcessingJob) ([]cachedMediaObject, error) {
@@ -269,7 +269,7 @@ type cacheResult struct {
 	err           error
 }
 
-func asyncCacheObjectsFromURL(ctx context.Context, tids persist.TokenIdentifiers, storageClient *storage.Client, arweaveClient *goar.Client, ipfsClient *shell.Shell, defaultObjectType objectType, mediaURL, bucket string, subMeta *cachePipelineMetadata) chan cacheResult {
+func asyncCacheObjectsForURL(ctx context.Context, tids persist.TokenIdentifiers, storageClient *storage.Client, arweaveClient *goar.Client, ipfsClient *shell.Shell, defaultObjectType objectType, mediaURL, bucket string, subMeta *cachePipelineMetadata) chan cacheResult {
 	resultCh := make(chan cacheResult)
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
 		"tokenURIType":      persist.TokenURI(mediaURL).Type(),
@@ -728,7 +728,7 @@ func cacheRawAnimationMedia(ctx context.Context, reader *util.FileHeaderReader, 
 	_, err := io.Copy(writer, reader)
 	if err != nil {
 		persist.FailStep(subMeta.AnimationGzip)
-		return cachedMediaObject{}, fmt.Errorf("could not write to bucket %s for %s: %w", bucket, object.fileName(), err)
+		return cachedMediaObject{}, fmt.Errorf("could not write to bucket %s for %s: %s", bucket, object.fileName(), err)
 	}
 
 	if err := writer.Close(); err != nil {
