@@ -232,7 +232,7 @@ func (tpj *tokenProcessingJob) retrieveTokenInfo(ctx context.Context, metadata p
 func (tpj *tokenProcessingJob) cacheMediaObjects(ctx context.Context, metadata persist.TokenMetadata) (persist.Media, error) {
 	imgURL, animURL, err := findImageAndAnimationURLs(ctx, tpj.token.TokenID, tpj.contract.Address, tpj.token.Chain, tpj.token.TokenMetadata, tpj.token.TokenURI, tpj.token.Chain != persist.ChainETH, tpj.pipelineMetadata)
 	if err != nil {
-		return persist.Media{}, err
+		return persist.Media{MediaType: persist.MediaTypeUnknown}, err
 	}
 
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
