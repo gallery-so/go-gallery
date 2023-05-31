@@ -37,7 +37,7 @@ type Reader interface {
 	Do(ctx context.Context, path string) (io.ReadCloser, error)
 }
 
-// HTTPReader is a reader that uses HTTP to read from IPFS via a gateway
+// HTTPReader is a reader that uses a HTTP gateway to read from
 type HTTPReader struct {
 	Host   string
 	Client http.Client

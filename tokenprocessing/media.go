@@ -406,7 +406,7 @@ func getHTMLMedia(pCtx context.Context, tids persist.TokenIdentifiers, tokenBuck
 
 	dimensions, err := getHTMLDimensions(pCtx, res.MediaURL.String())
 	if err != nil {
-		logger.For(pCtx).Warnf("failed to get dimensions for %s: %v", tids, err)
+		logger.For(pCtx).Errorf("failed to get dimensions for %s: %v", tids, err)
 	}
 
 	res.Dimensions = dimensions
@@ -488,7 +488,7 @@ func remapMedia(media persist.Media) persist.Media {
 
 func findImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, metadata persist.TokenMetadata, tokenURI persist.TokenURI, predict bool, pMeta *persist.PipelineMetadata) (imgURL string, vURL string, err error) {
 
-	traceCallback, ctx := trackStepStatus(ctx, &pMeta.MediaURLsRetrieval, "MediaURLsRetrieval")
+	traceCallback, ctx := persist.TrackStepStatus(ctx, &pMeta.MediaURLsRetrieval, "MediaURLsRetrieval")
 	defer traceCallback()
 
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"tokenID": tokenID, "contractAddress": contractAddress})
@@ -527,7 +527,7 @@ func findImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, con
 	}
 
 	if imgURL == "" && vURL == "" {
-		failStep(&pMeta.MediaURLsRetrieval)
+		persist.FailStep(&pMeta.MediaURLsRetrieval)
 		return "", "", errNoMediaURLs{metadata: metadata, tokenURI: tokenURI, tids: persist.NewTokenIdentifiers(contractAddress, tokenID, chain)}
 	}
 
@@ -677,7 +677,7 @@ func (m cachedMediaObject) storageURL(tokenBucket string) string {
 }
 
 func cacheRawMedia(ctx context.Context, reader *util.FileHeaderReader, tids persist.TokenIdentifiers, mediaType persist.MediaType, contentLength *int64, contentType *string, oType objectType, bucket, ogURL string, client *storage.Client, subMeta *cachePipelineMetadata) (cachedMediaObject, error) {
-	traceCallback, ctx := trackStepStatus(ctx, subMeta.StoreGCP, "StoreGCP")
+	traceCallback, ctx := persist.TrackStepStatus(ctx, subMeta.StoreGCP, "StoreGCP")
 	defer traceCallback()
 
 	if mediaType == persist.MediaTypeSVG {
@@ -700,7 +700,7 @@ func cacheRawMedia(ctx context.Context, reader *util.FileHeaderReader, tids pers
 			"mediaType":   mediaType.String(),
 		})
 	if err != nil {
-		failStep(subMeta.StoreGCP)
+		persist.FailStep(subMeta.StoreGCP)
 		return cachedMediaObject{}, err
 	}
 	purgeIfExists(ctx, bucket, object.fileName(), client)
@@ -708,7 +708,7 @@ func cacheRawMedia(ctx context.Context, reader *util.FileHeaderReader, tids pers
 }
 
 func cacheRawAnimationMedia(ctx context.Context, reader *util.FileHeaderReader, tids persist.TokenIdentifiers, mediaType persist.MediaType, oType objectType, bucket, ogURL string, client *storage.Client, subMeta *cachePipelineMetadata) (cachedMediaObject, error) {
-	traceCallback, ctx := trackStepStatus(ctx, subMeta.AnimationGzip, "AnimationGzip")
+	traceCallback, ctx := persist.TrackStepStatus(ctx, subMeta.AnimationGzip, "AnimationGzip")
 	defer traceCallback()
 
 	object := cachedMediaObject{
@@ -727,17 +727,17 @@ func cacheRawAnimationMedia(ctx context.Context, reader *util.FileHeaderReader, 
 
 	_, err := io.Copy(writer, reader)
 	if err != nil {
-		failStep(subMeta.AnimationGzip)
+		persist.FailStep(subMeta.AnimationGzip)
 		return cachedMediaObject{}, fmt.Errorf("could not write to bucket %s for %s: %w", bucket, object.fileName(), err)
 	}
 
 	if err := writer.Close(); err != nil {
-		failStep(subMeta.AnimationGzip)
+		persist.FailStep(subMeta.AnimationGzip)
 		return cachedMediaObject{}, err
 	}
 
 	if err := sw.Close(); err != nil {
-		failStep(subMeta.AnimationGzip)
+		persist.FailStep(subMeta.AnimationGzip)
 		return cachedMediaObject{}, err
 	}
 
@@ -746,7 +746,7 @@ func cacheRawAnimationMedia(ctx context.Context, reader *util.FileHeaderReader, 
 }
 
 func thumbnailAndCache(ctx context.Context, tids persist.TokenIdentifiers, videoURL, bucket string, client *storage.Client, subMeta *cachePipelineMetadata) (cachedMediaObject, error) {
-	traceCallback, ctx := trackStepStatus(ctx, subMeta.ThumbnailGCP, "ThumbnailGCP")
+	traceCallback, ctx := persist.TrackStepStatus(ctx, subMeta.ThumbnailGCP, "ThumbnailGCP")
 	defer traceCallback()
 
 	obj := cachedMediaObject{
@@ -768,12 +768,12 @@ func thumbnailAndCache(ctx context.Context, tids persist.TokenIdentifiers, video
 
 	logger.For(ctx).Infof("thumbnailing %s", videoURL)
 	if err := thumbnailVideoToWriter(ctx, videoURL, sw); err != nil {
-		failStep(subMeta.ThumbnailGCP)
+		persist.FailStep(subMeta.ThumbnailGCP)
 		return cachedMediaObject{}, fmt.Errorf("could not thumbnail to bucket %s for '%s': %s", bucket, obj.fileName(), err)
 	}
 
 	if err := sw.Close(); err != nil {
-		failStep(subMeta.ThumbnailGCP)
+		persist.FailStep(subMeta.ThumbnailGCP)
 		return cachedMediaObject{}, err
 	}
 
@@ -786,7 +786,7 @@ func thumbnailAndCache(ctx context.Context, tids persist.TokenIdentifiers, video
 
 func createLiveRenderAndCache(ctx context.Context, tids persist.TokenIdentifiers, videoURL, bucket string, client *storage.Client, subMeta *cachePipelineMetadata) (cachedMediaObject, error) {
 
-	traceCallback, ctx := trackStepStatus(ctx, subMeta.LiveRenderGCP, "LiveRenderGCP")
+	traceCallback, ctx := persist.TrackStepStatus(ctx, subMeta.LiveRenderGCP, "LiveRenderGCP")
 	defer traceCallback()
 
 	obj := cachedMediaObject{
@@ -808,12 +808,12 @@ func createLiveRenderAndCache(ctx context.Context, tids persist.TokenIdentifiers
 
 	logger.For(ctx).Infof("creating live render for %s", videoURL)
 	if err := createLiveRenderPreviewVideo(ctx, videoURL, sw); err != nil {
-		failStep(subMeta.LiveRenderGCP)
+		persist.FailStep(subMeta.LiveRenderGCP)
 		return cachedMediaObject{}, fmt.Errorf("could not live render to bucket %s for '%s': %s", bucket, obj.fileName(), err)
 	}
 
 	if err := sw.Close(); err != nil {
-		failStep(subMeta.LiveRenderGCP)
+		persist.FailStep(subMeta.LiveRenderGCP)
 		return cachedMediaObject{}, err
 	}
 
@@ -841,11 +841,11 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 	asURI := persist.TokenURI(mediaURL)
 	timeBeforePredict := time.Now()
 	mediaType, contentType, contentLength := func() (persist.MediaType, *string, *int64) {
-		traceCallback, pCtx := trackStepStatus(pCtx, subMeta.ContentHeaderValueRetrieval, "ContentHeaderValueRetrieval")
+		traceCallback, pCtx := persist.TrackStepStatus(pCtx, subMeta.ContentHeaderValueRetrieval, "ContentHeaderValueRetrieval")
 		defer traceCallback()
 		mediaType, contentType, contentLength, err := media.PredictMediaType(pCtx, asURI.String())
 		if err != nil {
-			failStep(subMeta.ContentHeaderValueRetrieval)
+			persist.FailStep(subMeta.ContentHeaderValueRetrieval)
 		}
 		pCtx = logger.NewContextWithFields(pCtx, logrus.Fields{
 			"predictedMediaType":   mediaType,
@@ -869,12 +869,12 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 
 	timeBeforeDataReader := time.Now()
 	reader, retryOpensea, err := func() (*util.FileHeaderReader, bool, error) {
-		traceCallback, pCtx := trackStepStatus(pCtx, subMeta.ReaderRetrieval, "ReaderRetrieval")
+		traceCallback, pCtx := persist.TrackStepStatus(pCtx, subMeta.ReaderRetrieval, "ReaderRetrieval")
 		defer traceCallback()
 
 		reader, err := rpc.GetDataFromURIAsReader(pCtx, asURI, ipfsClient, arweaveClient, util.MB, time.Minute)
 		if err != nil {
-			failStep(subMeta.ReaderRetrieval)
+			persist.FailStep(subMeta.ReaderRetrieval)
 			logger.For(pCtx).Errorf("failed to get reader for '%s': %s <%T>", mediaURL, err, err)
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return reader, false, err
@@ -900,7 +900,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 	}()
 
 	if retryOpensea {
-		traceCallback, pCtx := trackStepStatus(pCtx, subMeta.OpenseaFallback, "OpenseaFallback")
+		traceCallback, pCtx := persist.TrackStepStatus(pCtx, subMeta.OpenseaFallback, "OpenseaFallback")
 		logger.For(pCtx).Infof("failed to get data from uri '%s' for '%s' because of (err: %s <%T>), trying opensea", mediaURL, tids, err, err)
 		defer traceCallback()
 
@@ -917,13 +917,13 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 
 	if !mediaType.IsValid() {
 		func() {
-			traceCallback, pCtx := trackStepStatus(pCtx, subMeta.DetermineMediaTypeWithReader, "DetermineMediaTypeWithReader")
+			traceCallback, pCtx := persist.TrackStepStatus(pCtx, subMeta.DetermineMediaTypeWithReader, "DetermineMediaTypeWithReader")
 			defer traceCallback()
 
 			timeBeforeSniff := time.Now()
 			bytesToSniff, err := reader.Headers()
 			if err != nil {
-				failStep(subMeta.DetermineMediaTypeWithReader)
+				persist.FailStep(subMeta.DetermineMediaTypeWithReader)
 				logger.For(pCtx).Errorf("could not get headers for %s: %s", mediaURL, err)
 				return
 			}
@@ -1051,7 +1051,7 @@ func getMediaDimensions(ctx context.Context, url string) (persist.Dimensions, er
 	c.Stdout = outBuf
 	err := c.Run()
 	if err != nil {
-		logger.For(ctx).Warnf("failed to get dimensions for %s: %s", url, err)
+		logger.For(ctx).Errorf("failed to get dimensions for %s: %s", url, err)
 		return getMediaDimensionsBackup(ctx, url)
 	}
 

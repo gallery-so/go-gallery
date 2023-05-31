@@ -201,7 +201,7 @@ func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) mediaRes
 }
 
 func (tpj *tokenProcessingJob) retrieveMetadata(ctx context.Context) persist.TokenMetadata {
-	traceCallback, ctx := trackStepStatus(ctx, &tpj.pipelineMetadata.MetadataRetrieval, "MetadataRetrieval")
+	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.MetadataRetrieval, "MetadataRetrieval")
 	defer traceCallback()
 
 	// metadata is a string, it should not take more than a minute to retrieve
@@ -225,7 +225,7 @@ func (tpj *tokenProcessingJob) retrieveMetadata(ctx context.Context) persist.Tok
 		mcMetadata, err := tpj.tp.mc.GetTokenMetadataByTokenIdentifiers(ctx, tpj.contract.Address, tpj.token.TokenID, tpj.token.Chain, fieldRequests)
 		if err != nil {
 			logger.For(ctx).Warnf("error getting metadata from chain: %s", err)
-			failStep(&tpj.pipelineMetadata.MetadataRetrieval)
+			persist.FailStep(&tpj.pipelineMetadata.MetadataRetrieval)
 		} else if mcMetadata != nil && len(mcMetadata) > 0 {
 			logger.For(ctx).Infof("got metadata from chain: %v", mcMetadata)
 			newMetadata = mcMetadata
@@ -233,14 +233,14 @@ func (tpj *tokenProcessingJob) retrieveMetadata(ctx context.Context) persist.Tok
 	}
 
 	if len(newMetadata) == 0 {
-		failStep(&tpj.pipelineMetadata.MetadataRetrieval)
+		persist.FailStep(&tpj.pipelineMetadata.MetadataRetrieval)
 	}
 
 	return newMetadata
 }
 
 func (tpj *tokenProcessingJob) retrieveTokenInfo(ctx context.Context, metadata persist.TokenMetadata) (string, string) {
-	traceCallback, ctx := trackStepStatus(ctx, &tpj.pipelineMetadata.TokenInfoRetrieval, "TokenInfoRetrieval")
+	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.TokenInfoRetrieval, "TokenInfoRetrieval")
 	defer traceCallback()
 
 	name, description := findNameAndDescription(ctx, metadata)
@@ -297,14 +297,14 @@ func (tpj *tokenProcessingJob) cacheMediaObjects(ctx context.Context, metadata p
 	if downloadSuccess {
 		return createMediaFromResults(ctx, tpj, animResult, imgResult), nil
 	} else {
-		traceCallback, ctx := trackStepStatus(ctx, &tpj.pipelineMetadata.NothingCachedWithErrors, "NothingCachedWithErrors")
+		traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.NothingCachedWithErrors, "NothingCachedWithErrors")
 		defer traceCallback()
 
 		openseaObjects, err := cacheOpenSeaObjects(ctx, tpj)
 
 		if isCacheResultValid(err, len(openseaObjects)) {
 			// Fail nothing cached with errors because we were able to get media from opensea
-			failStep(&tpj.pipelineMetadata.NothingCachedWithErrors)
+			persist.FailStep(&tpj.pipelineMetadata.NothingCachedWithErrors)
 			logger.For(ctx).Warn("using media from OpenSea instead")
 			return tpj.createMediaFromCachedObjects(ctx, openseaObjects), nil
 		}
@@ -326,7 +326,7 @@ func (tpj *tokenProcessingJob) cacheMediaObjects(ctx context.Context, metadata p
 }
 
 func (tpj *tokenProcessingJob) createMediaFromCachedObjects(ctx context.Context, objects []cachedMediaObject) persist.Media {
-	traceCallback, ctx := trackStepStatus(ctx, &tpj.pipelineMetadata.CreateMediaFromCachedObjects, "CreateMediaFromCachedObjects")
+	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.CreateMediaFromCachedObjects, "CreateMediaFromCachedObjects")
 	defer traceCallback()
 
 	in := map[objectType]cachedMediaObject{}
@@ -343,14 +343,14 @@ func (tpj *tokenProcessingJob) createMediaFromCachedObjects(ctx context.Context,
 }
 
 func (tpj *tokenProcessingJob) createRawMedia(ctx context.Context, mediaType persist.MediaType, animURL, imgURL string, objects []cachedMediaObject) persist.Media {
-	traceCallback, ctx := trackStepStatus(ctx, &tpj.pipelineMetadata.CreateRawMedia, "CreateRawMedia")
+	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.CreateRawMedia, "CreateRawMedia")
 	defer traceCallback()
 
 	return createRawMedia(ctx, persist.NewTokenIdentifiers(tpj.contract.Address, tpj.token.TokenID, tpj.token.Chain), mediaType, tpj.tp.tokenBucket, animURL, imgURL, objects)
 }
 
 func (tpj *tokenProcessingJob) isNewMediaPreferable(ctx context.Context, media persist.Media) bool {
-	traceCallback, ctx := trackStepStatus(ctx, &tpj.pipelineMetadata.MediaResultComparison, "MediaResultComparison")
+	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.MediaResultComparison, "MediaResultComparison")
 	defer traceCallback()
 
 	if media.IsServable() {
@@ -398,51 +398,6 @@ func (tpj *tokenProcessingJob) upsertDB(ctx context.Context, tmetadata coredb.To
 		Active:           tmetadata.Active,
 		CopyMediaID:      persist.GenerateID(),
 	})
-}
-
-func trackStepStatus(ctx context.Context, status *persist.PipelineStepStatus, name string) (func(), context.Context) {
-	span, ctx := tracing.StartSpan(ctx, "pipeline.step", name)
-
-	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
-		"pipelineStep": name,
-	})
-
-	startTime := time.Now()
-
-	if status == nil {
-		started := persist.PipelineStepStatusStarted
-		status = &started
-	}
-	*status = persist.PipelineStepStatusStarted
-
-	go func() {
-		for {
-			<-time.After(5 * time.Second)
-			if status == nil || *status == persist.PipelineStepStatusSuccess || *status == persist.PipelineStepStatusError {
-				return
-			}
-			logger.For(ctx).Infof("still on [%s] (taken: %s)", name, time.Since(startTime))
-		}
-	}()
-
-	return func() {
-		defer tracing.FinishSpan(span)
-		if *status == persist.PipelineStepStatusError {
-			logger.For(ctx).Infof("failed [%s] (took: %s)", name, time.Since(startTime))
-			return
-		}
-		*status = persist.PipelineStepStatusSuccess
-		logger.For(ctx).Infof("succeeded [%s] (took: %s)", name, time.Since(startTime))
-	}, ctx
-
-}
-
-func failStep(status *persist.PipelineStepStatus) {
-	if status == nil {
-		errored := persist.PipelineStepStatusError
-		status = &errored
-	}
-	*status = persist.PipelineStepStatusError
 }
 
 const (

@@ -1,8 +1,15 @@
 package persist
 
 import (
+	"context"
 	"database/sql/driver"
 	"encoding/json"
+	"time"
+
+	"github.com/sirupsen/logrus"
+
+	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/tracing"
 )
 
 type ProcessingCause string
@@ -132,4 +139,49 @@ func (p *PipelineMetadata) Scan(value interface{}) error {
 		return nil
 	}
 	return json.Unmarshal(value.([]byte), p)
+}
+
+func TrackStepStatus(ctx context.Context, status *PipelineStepStatus, name string) (func(), context.Context) {
+	span, ctx := tracing.StartSpan(ctx, "pipeline.step", name)
+
+	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
+		"pipelineStep": name,
+	})
+
+	startTime := time.Now()
+
+	if status == nil {
+		started := PipelineStepStatusStarted
+		status = &started
+	}
+	*status = PipelineStepStatusStarted
+
+	go func() {
+		for {
+			<-time.After(5 * time.Second)
+			if status == nil || *status == PipelineStepStatusSuccess || *status == PipelineStepStatusError {
+				return
+			}
+			logger.For(ctx).Infof("still on [%s] (taken: %s)", name, time.Since(startTime))
+		}
+	}()
+
+	return func() {
+		defer tracing.FinishSpan(span)
+		if *status == PipelineStepStatusError {
+			logger.For(ctx).Infof("failed [%s] (took: %s)", name, time.Since(startTime))
+			return
+		}
+		*status = PipelineStepStatusSuccess
+		logger.For(ctx).Infof("succeeded [%s] (took: %s)", name, time.Since(startTime))
+	}, ctx
+
+}
+
+func FailStep(status *PipelineStepStatus) {
+	if status == nil {
+		errored := PipelineStepStatusError
+		status = &errored
+	}
+	*status = PipelineStepStatusError
 }
