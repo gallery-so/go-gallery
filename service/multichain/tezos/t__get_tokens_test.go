@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/env"
-	"github.com/mikeydub/go-gallery/service/ipfs"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
+	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
 )
 
 func TestGetTokensForWallet_Success(t *testing.T) {
