@@ -128,9 +128,8 @@ func InitSentry() {
 		AttachStacktrace: true,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			event = auth.ScrubEventCookies(event, hint)
-			event = updateFingerPrints(event, hint)
 			event = excludeTokenSpamEvents(event, hint)
-			event = excludeBrokenTokenEvents(event, hint)
+			event = excludeBadTokenEvents(event, hint)
 			return event
 		},
 	})
@@ -189,31 +188,21 @@ func setRunTags(scope *sentry.Scope, runID persist.DBID) {
 	scope.SetTag("log", "go/tp-runs/"+runID.String())
 }
 
-func updateFingerPrints(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
-	if event == nil || event.Exception == nil || hint == nil {
-		return event
-	}
-	var mediaErr ErrMediaProcessing
-	if errors.As(hint.OriginalException, &mediaErr) {
-		var multiErr util.MultiErr
-		if errors.As(mediaErr, &multiErr) {
-			for _, err := range multiErr {
-				event.Exception = append(event.Exception, sentry.Exception{
-					Type:  fmt.Sprintf("%T", err),
-					Value: err.Error(),
-				})
-			}
-		}
-	}
-	return event
-}
-
 // isSpamToken returns true if the token is marked as spam.
 func isSpamToken(job tokenProcessingJob) bool {
 	isSpam := job.contract.IsProviderMarkedSpam
 	isSpam = isSpam || util.GetOptionalValue(job.token.IsProviderMarkedSpam, false)
 	isSpam = isSpam || util.GetOptionalValue(job.token.IsUserMarkedSpam, false)
 	return isSpam
+}
+
+// isBadTokenErr returns true if the error is a bad token error.
+func isBadTokenErr(err error) bool {
+	var badTokenErr ErrBadToken
+	if errors.As(err, &badTokenErr) {
+		return true
+	}
+	return false
 }
 
 // excludeTokenSpamEvents excludes events for tokens marked as spam.
@@ -225,28 +214,9 @@ func excludeTokenSpamEvents(event *sentry.Event, hint *sentry.EventHint) *sentry
 	return event
 }
 
-// isBrokenTokenError returns true if the error is related to issues with the metadata or URIs of a token itself
-func isBrokenTokenError(err error) bool {
-	switch typ := err.(type) {
-	case util.MultiErr:
-		for _, err := range typ {
-			if isBrokenTokenError(err) {
-				return true
-			}
-		}
-		return false
-	case ErrMediaProcessing:
-		return isBrokenTokenError(typ.Unwrap())
-	case nil, errNoMediaURLs, errInvalidMedia:
-		return false
-	default:
-		return true
-	}
-}
-
-// excludeBrokenTokenEvents excludes events for broken tokens.
-func excludeBrokenTokenEvents(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
-	if isBrokenTokenError(hint.OriginalException) {
+// excludeBadTokenEvents excludes events for bad tokens.
+func excludeBadTokenEvents(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+	if isBadTokenErr(hint.OriginalException) {
 		return nil
 	}
 	return event

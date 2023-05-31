@@ -113,9 +113,9 @@ func GetIPFSResponse(ctx context.Context, httpClient http.Client, ipfsClient *sh
 
 	logStatus := func(readerName, path string, err error) {
 		if err == nil {
-			logger.For(ctx).Infof("read %s using %s", path, readerName)
+			logger.For(ctx).Infof("read CID: %s using [%s]", path, readerName)
 		} else {
-			logger.For(ctx).Warnf("failed to read CID %s with %s: %s", path, readerName, err)
+			logger.For(ctx).Warnf("failed to read CID: %s with [%s]: %s", path, readerName, err)
 		}
 	}
 
