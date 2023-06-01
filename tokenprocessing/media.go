@@ -1166,8 +1166,9 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 		timeBeforeCache := time.Now()
 		obj, err := rasterizeAndCacheSVGMedia(pCtx, obj.storageURL(bucket), tids, mediaType, oType, bucket, mediaURL, storageClient, subMeta)
 		if err != nil {
-			logger.For(pCtx).WithError(err).Error("could not cache animation")
-			return nil, err
+			logger.For(pCtx).WithError(err).Error("could not cache svg rasterization")
+			// still return the original object as svg
+			return result, nil
 		}
 		logger.For(pCtx).Infof("cached animation for %s in %s", tids, time.Since(timeBeforeCache))
 		return []cachedMediaObject{obj}, nil
