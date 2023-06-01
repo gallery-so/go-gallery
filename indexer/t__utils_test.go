@@ -17,7 +17,6 @@ import (
 	"github.com/mikeydub/go-gallery/db/gen/indexerdb"
 	"github.com/mikeydub/go-gallery/docker"
 	"github.com/mikeydub/go-gallery/env"
-	"github.com/mikeydub/go-gallery/indexer/refresh"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
@@ -78,11 +77,9 @@ func newMockIndexer(db *sql.DB, pool *pgxpool.Pool) *indexer {
 	end := uint64(testBlockTo)
 	rpcEnabled = true
 	ethClient := rpc.NewEthSocketClient()
-	storageClient := newStorageClient(context.Background())
-	bucket := storageClient.Bucket(env.GetString("GCLOUD_TOKEN_LOGS_BUCKET"))
 	queries := indexerdb.New(pool)
 
-	i := newIndexer(ethClient, &http.Client{Timeout: 10 * time.Minute}, nil, nil, nil, queries, postgres.NewTokenRepository(db), postgres.NewContractRepository(db), refresh.AddressFilterRepository{Bucket: bucket}, persist.ChainETH, defaultTransferEvents, func(ctx context.Context, curBlock, nextBlock *big.Int, topics [][]common.Hash) ([]types.Log, error) {
+	i := newIndexer(ethClient, &http.Client{Timeout: 10 * time.Minute}, nil, nil, nil, queries, postgres.NewTokenRepository(db), postgres.NewContractRepository(db), persist.ChainETH, defaultTransferEvents, func(ctx context.Context, curBlock, nextBlock *big.Int, topics [][]common.Hash) ([]types.Log, error) {
 		transferAgainLogs := []types.Log{{
 			Address:     common.HexToAddress("0x0c2ee19b2a89943066c2dc7f1bddcc907f614033"),
 			Topics:      []common.Hash{common.HexToHash("0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"), common.HexToHash(testAddress), common.HexToHash("0x0000000000000000000000008914496dc01efcc49a2fa340331fb90969b6f1d2"), common.HexToHash("0x00000000000000000000000000000000000000000000000000000000000000d9")},
