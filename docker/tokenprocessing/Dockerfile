@@ -6,18 +6,27 @@ ARG VERSION
 ARG FFMPEG_VERSION
 
 RUN apt-get update && \
-    apt-get install -y ffmpeg=$FFMPEG_VERSION imagemagick && \
+    apt-get install -y ffmpeg=$FFMPEG_VERSION imagemagick curl xz-utils && \
     rm -rf /var/lib/apt/lists/*
 
-# Install deps
-WORKDIR /app
-COPY go.mod go.sum /app/
-RUN go mod download
+# Install Node.js and npm
+RUN curl -fsSL https://deb.nodesource.com/setup_16.x | bash - && \
+    apt-get install -y nodejs
 
 # Install certs
 ADD root-certs /usr/local/share/ca-certificates/
 RUN update-ca-certificates
 
+# Install Go deps
+WORKDIR /app
+COPY go.mod go.sum /app/
+RUN go mod download
+
+# Install Node.js deps
+COPY package.json package-lock.json /app/
+RUN npm ci
+
+# Copy the rest of the application
 COPY . /app
 RUN go build -o ./bin/tokenprocessing ./cmd/tokenprocessing/main.go
 
