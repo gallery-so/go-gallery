@@ -32,8 +32,9 @@ const sentryTokenContextName = "NFT context" // Sentry excludes contexts that co
 // InitServer initializes the mediaprocessing server
 func InitServer() {
 	setDefaults()
-	c := server.ClientInit(context.Background())
-	provider := server.NewMultichainProvider(c)
+	ctx := context.Background()
+	c := server.ClientInit(ctx)
+	provider := server.NewMultichainProvider(ctx)
 	router := CoreInitServer(c, provider)
 	logger.For(nil).Info("Starting tokenprocessing server...")
 	http.Handle("/", router)

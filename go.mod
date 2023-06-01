@@ -65,6 +65,7 @@ require (
 	cloud.google.com/go/storage v1.30.1
 	github.com/ertan/go-farcaster v1.0.0-beta
 	github.com/golang-jwt/jwt/v5 v5.0.0
+	github.com/google/wire v0.5.0
 	github.com/jinzhu/copier v0.3.5
 	github.com/sourcegraph/conc v0.3.0
 	go.mozilla.org/sops/v3 v3.7.3
@@ -139,7 +140,6 @@ require (
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/pprof v0.0.0-20221203041831-ce31453925ec // indirect
 	github.com/google/uuid v1.3.0 // indirect
-	github.com/google/wire v0.5.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.2.3 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
 	github.com/goware/prefixer v0.0.0-20160118172347-395022866408 // indirect

@@ -29,7 +29,11 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
-type SetEnv struct{}
+// envInit is a type returned after setting up the environment
+// Adding envInit as a dependency to a provider will ensure that the environment is set up prior
+// to calling the provider
+type envInit struct{}
+
 type ethProviderList []any
 type tezosProviderList []any
 type optimismProviderList []any
@@ -41,44 +45,64 @@ type polygonProvider struct{ *alchemy.Provider }
 // NewMultichainProvider is a wire injector that sets up a multichain provider instance
 func NewMultichainProvider(ctx context.Context) *multichain.Provider {
 	wire.Build(
+		setEnv,
+		wire.Value(&http.Client{Timeout: 0}), // HTTP client shared between providers
 		defaultChainOverrides,
 		task.NewClient,
-		rpc.NewEthClient,
-		newCache,
-		newIndexerProvider,
-		newOptimismProvider,
-		opensea.NewProvider,
-		ethFallbackProvider,
-		tezosFallbackProvider,
-		newPoapProvider,
-		newPolygonProvider,
-		multichain.NewProvider,
-		postgres.MustCreateClient,
+		newCommunitiesCache,
 		postgres.NewRepositories,
-		postgres.NewPgxClient,
-		db.New,
-		newMultichain,
-		ethProvidersConfig,
-		tezosProvidersConfig,
-		optimismProvidersConfig,
-		poapProvidersConfig,
-		polygonProvidersConfig,
-		wire.Value([]postgres.ConnectionOption{}),
-		wire.Value(&http.Client{Timeout: 0}),
-		wire.Bind(new(db.DBTX), util.ToPointer(NewPgxClient(setEnv()))),
+		dbConnSet,
+		multichainSet,
 	)
 	return nil
 }
 
-func NewPgxClient(SetEnv) *pgxpool.Pool {
+// multichainSet is a wire provider set for initializing a multichain provider
+var multichainSet = wire.NewSet(
+	multichain.NewProvider,
+	newMultichain,
+	// Add additional chains here
+	ethProviderSet,
+	tezosProviderSet,
+	optimismProviderSet,
+	poapProviderSet,
+	polygonProviderSet,
+)
+
+// dbConnSet is a wire provider set for initializing a postgres connection
+var dbConnSet = wire.NewSet(
+	// Connection options are typically set via environment variables and are parsed
+	// in client initialization so we don't need to pass them here
+	wire.Value([]postgres.ConnectionOption{}),
+	postgres.MustCreateClient,
+	postgres.NewPgxClient,
+	db.New,
+	wire.Bind(new(db.DBTX), util.ToPointer(newPgxClient(setEnv()))),
+)
+
+func newPgxClient(envInit) *pgxpool.Pool {
 	return postgres.NewPgxClient()
 }
 
-func setEnv() SetEnv {
+func setEnv() envInit {
 	SetDefaults()
-	return SetEnv{}
+	return envInit{}
 }
 
+// ethProviderSet is a wire injector that creates the set of Ethereum providers
+func ethProviderSet(envInit, *cloudtasks.Client, *http.Client) ethProviderList {
+	wire.Build(
+		rpc.NewEthClient,
+		ethProvidersConfig,
+		// Add providers for Ethereum here
+		newIndexerProvider,
+		ethFallbackProvider,
+		opensea.NewProvider,
+	)
+	return ethProviderList{}
+}
+
+// ethProvidersConfig is a wire injector that binds multichain interfaces to their concrete Ethereum implementations
 func ethProvidersConfig(indexerProvider *eth.Provider, openseaProvider *opensea.Provider, fallbackProvider multichain.SyncFailureFallbackProvider) ethProviderList {
 	wire.Build(
 		wire.Bind(new(multichain.NameResolver), util.ToPointer(indexerProvider)),
@@ -88,12 +112,13 @@ func ethProvidersConfig(indexerProvider *eth.Provider, openseaProvider *opensea.
 		wire.Bind(new(multichain.ContractRefresher), util.ToPointer(indexerProvider)),
 		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(indexerProvider)),
 		wire.Bind(new(multichain.TokenDescriptorsFetcher), util.ToPointer(indexerProvider)),
-		ethProviders,
+		ethRequirements,
 	)
 	return nil
 }
 
-func ethProviders(
+// ethRequirements is the set of provider interfaces required for Ethereum
+func ethRequirements(
 	nr multichain.NameResolver,
 	v multichain.Verifier,
 	tof multichain.TokensOwnerFetcher,
@@ -105,49 +130,87 @@ func ethProviders(
 	return ethProviderList{nr, v, tof, toc, cr, tmf, tdf}
 }
 
+// tezosProviderSet is a wire injector that creates the set of Tezos providers
+func tezosProviderSet(envInit, *http.Client) tezosProviderList {
+	wire.Build(
+		tezosProvidersConfig,
+		newTzktProvider,
+		newObjktProvider,
+		// Add providers for Tezos here
+		tezosFallbackProvider,
+	)
+	return tezosProviderList{}
+}
+
+// tezosProvidersConfig is a wire injector that binds multichain interfaces to their concrete Tezos implementations
 func tezosProvidersConfig(tezosProvider multichain.SyncWithContractEvalFallbackProvider) tezosProviderList {
 	wire.Build(
 		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(tezosProvider)),
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(tezosProvider)),
-		tezosProviders,
+		tezosRequirements,
 	)
 	return nil
 }
 
-func tezosProviders(
+// tezosRequirements is the set of provider interfaces required for Tezos
+func tezosRequirements(
 	tof multichain.TokensOwnerFetcher,
 	toc multichain.TokensContractFetcher,
 ) tezosProviderList {
 	return tezosProviderList{tof, toc}
 }
 
+// optimismProviderSet is a wire injector that creates the set of Optimism providers
+func optimismProviderSet(*http.Client) optimismProviderList {
+	wire.Build(
+		optimismProvidersConfig,
+		// Add providers for Optimism here
+		newOptimismProvider,
+	)
+	return optimismProviderList{}
+}
+
+// optimismProvidersConfig is a wire injector that binds multichain interfaces to their concrete Optimism implementations
 func optimismProvidersConfig(optimismProvider *optimismProvider) optimismProviderList {
 	wire.Build(
 		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(optimismProvider)),
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(optimismProvider)),
-		optimismProviders,
+		optimismRequirements,
 	)
 	return nil
 }
 
-func optimismProviders(
+// optimismRequirements is the set of provider interfaces required for Optimism
+func optimismRequirements(
 	tof multichain.TokensOwnerFetcher,
 	toc multichain.TokensContractFetcher,
 ) optimismProviderList {
 	return optimismProviderList{tof, toc}
 }
 
+// poapProviderSet is a wire injector that creates the set of POAP providers
+func poapProviderSet(envInit, *http.Client) poapProviderList {
+	wire.Build(
+		poapProvidersConfig,
+		// Add providers for POAP here
+		newPoapProvider,
+	)
+	return poapProviderList{}
+}
+
+// poapProvidersConfig is a wire injector that binds multichain interfaces to their concrete POAP implementations
 func poapProvidersConfig(poapProvider *poap.Provider) poapProviderList {
 	wire.Build(
 		wire.Bind(new(multichain.NameResolver), util.ToPointer(poapProvider)),
 		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(poapProvider)),
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(poapProvider)),
-		poapProviders,
+		poapRequirements,
 	)
 	return nil
 }
 
-func poapProviders(
+// poapRequirements is the set of provider interfaces required for POAP
+func poapRequirements(
 	nr multichain.NameResolver,
 	tof multichain.TokensOwnerFetcher,
 	toc multichain.TokensContractFetcher,
@@ -155,16 +218,28 @@ func poapProviders(
 	return poapProviderList{nr, tof, toc}
 }
 
+// polygonProviderSet is a wire injector that creates the set of polygon providers
+func polygonProviderSet(*http.Client) polygonProviderList {
+	wire.Build(
+		polygonProvidersConfig,
+		// Add providers for POAP here
+		newPolygonProvider,
+	)
+	return polygonProviderList{}
+}
+
+// polygonProvidersConfig is a wire injector that binds multichain interfaces to their concrete Polygon implementations
 func polygonProvidersConfig(polygonProvider *polygonProvider) polygonProviderList {
 	wire.Build(
 		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(polygonProvider)),
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(polygonProvider)),
-		polygonProviders,
+		polygonRequirements,
 	)
 	return nil
 }
 
-func polygonProviders(
+// polygonRequirements is the set of provider interfaces required for Polygon
+func polygonRequirements(
 	tof multichain.TokensOwnerFetcher,
 	toc multichain.TokensContractFetcher,
 ) polygonProviderList {
@@ -210,27 +285,25 @@ func ethFallbackProvider(httpClient *http.Client) multichain.SyncFailureFallback
 	return multichain.SyncFailureFallbackProvider{}
 }
 
-func tezosFallbackProvider(httpClient *http.Client) multichain.SyncWithContractEvalFallbackProvider {
+func tezosFallbackProvider(httpClient *http.Client, tzktProvider *tezos.Provider, objktProvider *tezos.TezosObjktProvider) multichain.SyncWithContractEvalFallbackProvider {
 	wire.Build(
-		newTzktProvider,
-		newObjktProvider,
 		tezosTokenEvalFunc,
-		wire.Bind(new(multichain.SyncWithContractEvalPrimary), util.ToPointer(newTzktProvider(httpClient))),
-		wire.Bind(new(multichain.SyncWithContractEvalSecondary), util.ToPointer(newObjktProvider())),
+		wire.Bind(new(multichain.SyncWithContractEvalPrimary), util.ToPointer(tzktProvider)),
+		wire.Bind(new(multichain.SyncWithContractEvalSecondary), util.ToPointer(objktProvider)),
 		wire.Struct(new(multichain.SyncWithContractEvalFallbackProvider), "*"),
 	)
 	return multichain.SyncWithContractEvalFallbackProvider{}
 }
 
-func newIndexerProvider(httpClient *http.Client, ethClient *ethclient.Client, taskClient *cloudtasks.Client) *eth.Provider {
+func newIndexerProvider(e envInit, httpClient *http.Client, ethClient *ethclient.Client, taskClient *cloudtasks.Client) *eth.Provider {
 	return eth.NewProvider(env.GetString("INDEXER_HOST"), httpClient, ethClient, taskClient)
 }
 
-func newTzktProvider(httpClient *http.Client) *tezos.Provider {
+func newTzktProvider(e envInit, httpClient *http.Client) *tezos.Provider {
 	return tezos.NewProvider(env.GetString("TEZOS_API_URL"), httpClient)
 }
 
-func newObjktProvider() *tezos.TezosObjktProvider {
+func newObjktProvider(e envInit) *tezos.TezosObjktProvider {
 	return tezos.NewObjktProvider(env.GetString("IPFS_URL"))
 }
 
@@ -240,7 +313,7 @@ func tezosTokenEvalFunc() func(context.Context, multichain.ChainAgnosticToken) b
 	}
 }
 
-func newPoapProvider(c *http.Client) *poap.Provider {
+func newPoapProvider(e envInit, c *http.Client) *poap.Provider {
 	return poap.NewProvider(c, env.GetString("POAP_API_KEY"), env.GetString("POAP_AUTH_TOKEN"))
 }
 
@@ -252,7 +325,6 @@ func newPolygonProvider(c *http.Client) *polygonProvider {
 	return &polygonProvider{alchemy.NewProvider(persist.ChainPolygon, c)}
 }
 
-// TODO: CHANGE THIS
-func newCache() *redis.Cache {
+func newCommunitiesCache() *redis.Cache {
 	return redis.NewCache(redis.CommunitiesCache)
 }

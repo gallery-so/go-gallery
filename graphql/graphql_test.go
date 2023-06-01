@@ -166,7 +166,7 @@ func testSuggestedUsersForViewer(t *testing.T) {
 	userC := newUserFixture(t)
 	ctx := context.Background()
 	clients := server.ClientInit(ctx)
-	provider := server.NewMultichainProvider(clients)
+	provider := server.NewMultichainProvider(ctx)
 	recommender := newStubRecommender(t, []persist.DBID{
 		userA.ID,
 		userB.ID,
@@ -1353,8 +1353,9 @@ func defaultTokenSettings(tokens []persist.DBID) []CollectionTokenSettingsInput 
 
 // defaultHandler returns a backend GraphQL http.Handler
 func defaultHandler(t *testing.T) http.Handler {
-	c := server.ClientInit(context.Background())
-	p := server.NewMultichainProvider(c)
+	ctx := context.Background()
+	c := server.ClientInit(ctx)
+	p := server.NewMultichainProvider(ctx)
 	r := newStubRecommender(t, []persist.DBID{})
 	handler := server.CoreInit(c, p, r)
 	t.Cleanup(c.Close)
