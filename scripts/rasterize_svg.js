@@ -43,6 +43,7 @@ async function createAnimation() {
   if (isStatic) {
     // If all frames are identical, save as PNG
     const pngBuffer = PNG.sync.write(frames[0]);
+    console.log('PNG');
     console.log(Buffer.from(pngBuffer).toString('base64'));
   } else {
     // If frames are different, save as GIF
@@ -51,7 +52,10 @@ async function createAnimation() {
 
     let gifBuffer = Buffer.alloc(0);
     stream.on('data', (chunk) => (gifBuffer = Buffer.concat([gifBuffer, chunk])));
-    stream.on('end', () => console.log(gifBuffer.toString('base64')));
+    stream.on('end', () => {
+      console.log('GIF');
+      console.log(gifBuffer.toString('base64'));
+    });
 
     encoder.start();
     encoder.setRepeat(0); // 0 for repeat, -1 for no-repeat

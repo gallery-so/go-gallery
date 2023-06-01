@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -870,19 +871,38 @@ func cacheSVGMedia(ctx context.Context, reader *util.FileHeaderReader, tids pers
 		ObjectType:      oType,
 	}
 
-	cmd := exec.Command("node", "scripts/svg_rasterize.js")
-	base64data, err := cmd.Output()
+	cmd := exec.Command("node", "scripts/rasterize_svg.js")
+	output, err := cmd.Output()
 	if err != nil {
 		persist.FailStep(subMeta.SVGRasterize)
 		return cachedMediaObject{}, fmt.Errorf("could not rasterize svg: %s", err)
 	}
+
+	lines := strings.Split(string(output), "\n")
+	if len(lines) < 2 {
+		log.Fatal("Not enough output from script")
+	}
+	dataType := lines[0]
+	base64data := lines[1]
+
 	data, err := base64.StdEncoding.DecodeString(string(base64data))
 	if err != nil {
 		persist.FailStep(subMeta.SVGRasterize)
 		return cachedMediaObject{}, fmt.Errorf("could not decode base64 data: %s", err)
 	}
 
-	sw := newObjectWriter(ctx, client, bucket, object.fileName(), nil, nil, map[string]string{
+	var contentType string
+	switch dataType {
+	case "PNG":
+		contentType = "image/png"
+	case "GIF":
+		contentType = "image/gif"
+	default:
+		persist.FailStep(subMeta.SVGRasterize)
+		return cachedMediaObject{}, fmt.Errorf("unknown data type: %s", dataType)
+	}
+
+	sw := newObjectWriter(ctx, client, bucket, object.fileName(), &contentType, nil, map[string]string{
 		"originalURL": truncateString(ogURL, 100),
 		"mediaType":   mediaType.String(),
 	})
