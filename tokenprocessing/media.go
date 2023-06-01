@@ -895,14 +895,18 @@ func rasterizeAndCacheSVGMedia(ctx context.Context, svgURL string, tids persist.
 	switch dataType {
 	case "PNG":
 		contentType = "image/png"
+		object.ContentType = &contentType
+		object.MediaType = persist.MediaTypeImage
 	case "GIF":
 		contentType = "image/gif"
+		object.ContentType = &contentType
+		object.MediaType = persist.MediaTypeGIF
 	default:
 		persist.FailStep(subMeta.SVGRasterize)
 		return cachedMediaObject{}, fmt.Errorf("unknown data type: %s", dataType)
 	}
 
-	sw := newObjectWriter(ctx, client, bucket, object.fileName(), &contentType, nil, map[string]string{
+	sw := newObjectWriter(ctx, client, bucket, object.fileName(), object.ContentType, nil, map[string]string{
 		"originalURL": truncateString(ogURL, 100),
 		"mediaType":   mediaType.String(),
 	})

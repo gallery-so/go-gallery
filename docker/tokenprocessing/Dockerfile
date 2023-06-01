@@ -22,12 +22,9 @@ WORKDIR /app
 COPY go.mod go.sum /app/
 RUN go mod download
 
-# Install Node.js deps
-COPY package.json package-lock.json /app/
-RUN npm ci
-
 # Copy the rest of the application
 COPY . /app
+RUN npm ci
 RUN go build -o ./bin/tokenprocessing ./cmd/tokenprocessing/main.go
 
 ENV VERSION=$VERSION

@@ -1185,6 +1185,25 @@ left join token_medias on tokens.token_media_id = token_medias.id where tokens.d
 AND tokens.id >= @start_id AND tokens.id < @end_id
 ORDER BY tokens.id;
 
+-- name: GetSVGTokensWithContractsByIDs :many
+SELECT
+    tokens.*,
+    contracts.*,
+    (
+        SELECT wallets.address
+        FROM wallets
+        WHERE wallets.id = ANY(tokens.owned_by_wallets)
+        LIMIT 1
+    ) AS wallet_address
+FROM tokens
+JOIN contracts ON contracts.id = tokens.contract
+LEFT JOIN token_medias on token_medias.id = tokens.token_media_id
+WHERE tokens.deleted = false
+AND token_medias.active = true
+AND token_medias.media->>'media_type' = 'svg'
+AND tokens.id >= @start_id AND tokens.id < @end_id
+ORDER BY tokens.id;
+
 -- name: GetReprocessJobRangeByID :one
 select * from reprocess_jobs where id = $1;
 

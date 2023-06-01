@@ -38,7 +38,7 @@ func main() {
 
 	tp := tokenprocessing.NewTokenProcessor(clients.Queries, clients.EthClient, server.NewMultichainProvider(clients), clients.IPFSClient, clients.ArweaveClient, clients.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), clients.Repos.TokenRepository, metric.NewLogMetricReporter())
 
-	var rows []coredb.GetAllTokensWithContractsByIDsRow
+	var rows []coredb.GetSVGTokensWithContractsByIDsRow
 	var err error
 
 	if env.GetString("CLOUD_RUN_JOB") != "" {
@@ -63,7 +63,7 @@ func main() {
 			panic(err)
 		}
 
-		rows, err = clients.Queries.GetAllTokensWithContractsByIDs(ctx, coredb.GetAllTokensWithContractsByIDsParams{
+		rows, err = clients.Queries.GetSVGTokensWithContractsByIDs(ctx, coredb.GetSVGTokensWithContractsByIDsParams{
 			StartID: r.TokenStartID,
 			EndID:   r.TokenEndID,
 		})
@@ -83,7 +83,7 @@ func main() {
 			logrus.Errorf("error getting job range: %v", err)
 			panic(err)
 		}
-		rows, err = clients.Queries.GetAllTokensWithContractsByIDs(ctx, coredb.GetAllTokensWithContractsByIDsParams{
+		rows, err = clients.Queries.GetSVGTokensWithContractsByIDs(ctx, coredb.GetSVGTokensWithContractsByIDsParams{
 			StartID: r.TokenStartID,
 			EndID:   r.TokenEndID,
 		})
@@ -157,14 +157,13 @@ func main() {
 			BadgeURL:         persist.NullString(row.BadgeUrl.String),
 		}
 
-		anOwner := row.WalletAddress
 		wp.Go(func(ctx context.Context) error {
 			ctx = sentryutil.NewSentryHubContext(ctx)
 			logrus.Infof("processing %s", token.ID)
 			defer func() {
 				logger.For(ctx).Infof("finished processing %s", token.ID)
 			}()
-			return tp.ProcessTokenPipeline(ctx, token, contract, anOwner, persist.ProcessingCauseRefresh)
+			return tp.ProcessTokenPipeline(ctx, token, contract, persist.ProcessingCauseRefresh)
 		})
 	}
 	go func() {
