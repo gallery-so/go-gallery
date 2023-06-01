@@ -877,7 +877,12 @@ func contractsPluginReceiver(cur contractAtBlock, inc contractAtBlock) contractA
 	return inc
 }
 
-type alchemyContractMetadata struct {
+type AlchemyContract struct {
+	Address          persist.EthereumAddress `json:"address"`
+	ContractMetadata AlchemyContractMetadata `json:"contractMetadata"`
+}
+
+type AlchemyContractMetadata struct {
 	Address          persist.EthereumAddress  `json:"address"`
 	Metadata         alchemy.ContractMetadata `json:"contractMetadata"`
 	ContractDeployer persist.EthereumAddress  `json:"contractDeployer"`
@@ -923,99 +928,33 @@ func fillContractFields(ctx context.Context, contracts []persist.Contract, queri
 
 	// process contracts in batches of 100
 	for batch := range batched {
-		toUp := make([]persist.Contract, 0, 100)
-
-		cToAddr := make(map[string]persist.Contract)
-		for _, c := range batch {
-			cToAddr[c.Address.String()] = c
-		}
-
-		addresses := util.MapKeys(cToAddr)
-
 		// get contract metadata
+		toUp, _ := GetContractMetadatas(ctx, batch, httpClient, ethClient)
 
-		u := fmt.Sprintf("%s/getContractMetadataBatch", env.GetString("ALCHEMY_API_URL"))
-
-		in := map[string][]string{"contractAddresses": addresses}
-		inAsJSON, err := json.Marshal(in)
-		if err != nil {
-			logger.For(ctx).WithError(err).Error("Failed to marshal contract metadata request")
-			continue
-		}
-
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewBuffer(inAsJSON))
-		if err != nil {
-			logger.For(ctx).WithError(err).Error("Failed to create contract metadata request")
-			continue
-		}
-
-		req.Header.Add("accept", "application/json")
-		req.Header.Add("content-type", "application/json")
-
-		resp, err := httpClient.Do(req)
-		if err != nil {
-			logger.For(ctx).WithError(err).Error("Failed to execute contract metadata request")
-			continue
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			bodyAsBytes, _ := ioutil.ReadAll(resp.Body)
-			logger.For(ctx).Errorf("Failed to execute contract metadata request: %s status: %s (url: %s) (input: %s) ", string(bodyAsBytes), resp.Status, u, string(inAsJSON))
-			continue
-		}
-
-		var out []alchemyContractMetadata
-		err = json.NewDecoder(resp.Body).Decode(&out)
-		if err != nil {
-			logger.For(ctx).WithError(err).Error("Failed to decode contract metadata response")
-			continue
-		}
-
-		for _, c := range out {
-			contract := cToAddr[c.Address.String()]
-			contract.Name = persist.NullString(c.Metadata.Name)
-			contract.Symbol = persist.NullString(c.Metadata.Symbol)
-
-			var method = contractOwnerMethodAlchemy
-			cOwner, err := rpc.GetContractOwner(ctx, c.Address, ethClient)
-			if err != nil {
-				logger.For(ctx).WithError(err).WithFields(logrus.Fields{
-					"contractAddress": c.Address,
-				}).Error("error getting contract owner")
-				contract.OwnerAddress = c.ContractDeployer
-			} else {
-				contract.OwnerAddress = cOwner
-				method = contractOwnerMethodOwnable
-			}
-
-			if contract.OwnerAddress == "" {
-				method = contractOwnerMethodFailed
-			}
-
-			contract.CreatorAddress = c.ContractDeployer
-
-			it, ok := contractOwnerStats.LoadOrStore(method, 1)
+		for _, c := range toUp {
+			it, ok := contractOwnerStats.LoadOrStore(c.OwnerMethod, 1)
 			if ok {
 				total := it.(int)
 				total++
-				contractOwnerStats.Store(method, total)
+				contractOwnerStats.Store(c.OwnerMethod, total)
 			}
 
-			it, ok = innerPipelineStats[method]
+			it, ok = innerPipelineStats[c.OwnerMethod]
 			if ok {
 				total := it.(int)
 				total++
-				innerPipelineStats[method] = total
+				innerPipelineStats[c.OwnerMethod] = total
 			} else {
-				innerPipelineStats[method] = 1
+				innerPipelineStats[c.OwnerMethod] = 1
 			}
-
-			toUp = append(toUp, contract)
 		}
 
 		logger.For(ctx).Infof("Fetched metadata for %d contracts", len(toUp))
 
-		upChan <- toUp
+		asContracts, _ := util.Map(toUp, func(c ContractOwnerResult) (persist.Contract, error) {
+			return c.Contract, nil
+		})
+		upChan <- asContracts
 	}
 
 	marshalled, err := json.Marshal(innerPipelineStats)
@@ -1035,6 +974,91 @@ func fillContractFields(ctx context.Context, contracts []persist.Contract, queri
 
 	logger.For(ctx).Infof("Fetched metadata for total %d contracts", len(contracts))
 
+}
+
+type ContractOwnerResult struct {
+	Contract    persist.Contract            `json:"contract"`
+	OwnerMethod persist.ContractOwnerMethod `json:"ownerMethod"`
+}
+
+func GetContractMetadatas(ctx context.Context, batch []persist.Contract, httpClient *http.Client, ethClient *ethclient.Client) ([]ContractOwnerResult, error) {
+	toUp := make([]ContractOwnerResult, 0, 100)
+
+	cToAddr := make(map[string]persist.Contract)
+	for _, c := range batch {
+		cToAddr[c.Address.String()] = c
+	}
+
+	addresses := util.MapKeys(cToAddr)
+
+	u := fmt.Sprintf("%s/getContractMetadataBatch", env.GetString("ALCHEMY_API_URL"))
+
+	in := map[string][]string{"contractAddresses": addresses}
+	inAsJSON, err := json.Marshal(in)
+	if err != nil {
+		logger.For(ctx).WithError(err).Error("Failed to marshal contract metadata request")
+		return nil, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewBuffer(inAsJSON))
+	if err != nil {
+		logger.For(ctx).WithError(err).Error("Failed to create contract metadata request")
+		return nil, err
+	}
+
+	req.Header.Add("accept", "application/json")
+	req.Header.Add("content-type", "application/json")
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		logger.For(ctx).WithError(err).Error("Failed to execute contract metadata request")
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		bodyAsBytes, _ := ioutil.ReadAll(resp.Body)
+		logger.For(ctx).Errorf("Failed to execute contract metadata request: %s status: %s (url: %s) (input: %s) ", string(bodyAsBytes), resp.Status, u, string(inAsJSON))
+		return nil, err
+	}
+
+	var out []AlchemyContract
+	err = json.NewDecoder(resp.Body).Decode(&out)
+	if err != nil {
+		logger.For(ctx).WithError(err).Error("Failed to decode contract metadata response")
+		return nil, err
+	}
+
+	for _, c := range out {
+
+		result := ContractOwnerResult{}
+		contract := cToAddr[c.Address.String()]
+		contract.Name = persist.NullString(c.ContractMetadata.Metadata.Name)
+		contract.Symbol = persist.NullString(c.ContractMetadata.Metadata.Symbol)
+
+		var method = persist.ContractOwnerMethodAlchemy
+		cOwner, err := rpc.GetContractOwner(ctx, c.Address, ethClient)
+		if err != nil {
+			logger.For(ctx).WithError(err).WithFields(logrus.Fields{
+				"contractAddress": c.Address,
+			}).Error("error getting contract owner")
+			contract.OwnerAddress = c.ContractMetadata.ContractDeployer
+		} else {
+			contract.OwnerAddress = cOwner
+			method = persist.ContractOwnerMethodOwnable
+		}
+
+		if contract.OwnerAddress == "" {
+			method = persist.ContractOwnerMethodFailed
+		}
+
+		contract.CreatorAddress = c.ContractMetadata.ContractDeployer
+
+		result.OwnerMethod = method
+		result.Contract = contract
+
+		toUp = append(toUp, result)
+	}
+	return toUp, nil
 }
 
 // HELPER FUNCS ---------------------------------------------------------------
