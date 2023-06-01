@@ -859,7 +859,7 @@ func cacheRawAnimationMedia(ctx context.Context, reader *util.FileHeaderReader, 
 	return object, nil
 }
 
-func cacheSVGMedia(ctx context.Context, reader *util.FileHeaderReader, tids persist.TokenIdentifiers, mediaType persist.MediaType, oType objectType, bucket, ogURL string, client *storage.Client, subMeta *cachePipelineMetadata) (cachedMediaObject, error) {
+func rasterizeAndCacheSVGMedia(ctx context.Context, svgURL string, tids persist.TokenIdentifiers, mediaType persist.MediaType, oType objectType, bucket, ogURL string, client *storage.Client, subMeta *cachePipelineMetadata) (cachedMediaObject, error) {
 	traceCallback, ctx := persist.TrackStepStatus(ctx, subMeta.SVGRasterize, "SVGRasterize")
 	defer traceCallback()
 
@@ -871,7 +871,7 @@ func cacheSVGMedia(ctx context.Context, reader *util.FileHeaderReader, tids pers
 		ObjectType:      oType,
 	}
 
-	cmd := exec.Command("node", "scripts/rasterize_svg.js")
+	cmd := exec.Command("node", "scripts/rasterize_svg.js", svgURL)
 	output, err := cmd.Output()
 	if err != nil {
 		persist.FailStep(subMeta.SVGRasterize)
@@ -1136,15 +1136,6 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 		}
 		logger.For(pCtx).Infof("cached animation for %s in %s", tids, time.Since(timeBeforeCache))
 		return []cachedMediaObject{obj}, nil
-	} else if mediaType == persist.MediaTypeSVG {
-		timeBeforeCache := time.Now()
-		obj, err := cacheSVGMedia(pCtx, reader, tids, mediaType, oType, bucket, mediaURL, storageClient, subMeta)
-		if err != nil {
-			logger.For(pCtx).WithError(err).Error("could not cache animation")
-			return nil, err
-		}
-		logger.For(pCtx).Infof("cached animation for %s in %s", tids, time.Since(timeBeforeCache))
-		return []cachedMediaObject{obj}, nil
 	}
 
 	timeBeforeCache := time.Now()
@@ -1171,6 +1162,15 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 			result = append(result, liveObj)
 		}
 
+	} else if mediaType == persist.MediaTypeSVG {
+		timeBeforeCache := time.Now()
+		obj, err := rasterizeAndCacheSVGMedia(pCtx, obj.storageURL(bucket), tids, mediaType, oType, bucket, mediaURL, storageClient, subMeta)
+		if err != nil {
+			logger.For(pCtx).WithError(err).Error("could not cache animation")
+			return nil, err
+		}
+		logger.For(pCtx).Infof("cached animation for %s in %s", tids, time.Since(timeBeforeCache))
+		return []cachedMediaObject{obj}, nil
 	}
 
 	return result, nil

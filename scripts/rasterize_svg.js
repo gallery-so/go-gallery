@@ -14,7 +14,16 @@ async function createAnimation() {
   const url = process.argv[2];
   const browser = await puppeteer.launch();
   const page = await browser.newPage();
+  await page.setViewport();
   await page.goto(url);
+
+  await page.evaluate(() => {
+    let svg = document.querySelector('svg');
+    if (svg) {
+      svg.style.width = '100%';
+      svg.style.height = '100%';
+    }
+  });
 
   const frames = [];
   for (let i = 0; i < totalFrames; i++) {
