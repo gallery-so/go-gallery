@@ -20,7 +20,6 @@ import (
 	"github.com/sourcegraph/conc"
 	"github.com/sourcegraph/conc/pool"
 
-	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/gammazero/workerpool"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -199,30 +198,6 @@ type ProviderSupplier interface {
 }
 
 type ChainOverrideMap = map[persist.Chain]*persist.Chain
-
-// NewProvider creates a new MultiChainDataRetriever
-func NewProvider(ctx context.Context, repos *postgres.Repositories, queries *coredb.Queries, cache *redis.Cache, taskClient *cloudtasks.Client, chainOverrides ChainOverrideMap, providers ...any) *Provider {
-	chainToProviders := make(map[persist.Chain][]any)
-
-	for _, cfg := range getChainProvidersForTask[Configurer](providers) {
-		info, err := cfg.GetBlockchainInfo(ctx)
-		if err != nil {
-			panic(err)
-		}
-		chainToProviders[info.Chain] = append(chainToProviders[info.Chain], cfg)
-	}
-
-	return &Provider{
-		Repos:                 repos,
-		Cache:                 cache,
-		Queries:               queries,
-		Chains:                chainToProviders,
-		ChainAddressOverrides: chainOverrides,
-		SendTokens: func(ctx context.Context, t task.TokenProcessingUserMessage) error {
-			return task.CreateTaskForTokenProcessing(ctx, taskClient, t)
-		},
-	}
-}
 
 func getChainProvidersForTask[T any](providers []any) []T {
 	result := make([]T, 0, len(providers))

@@ -9,6 +9,7 @@ package server
 import (
 	"cloud.google.com/go/cloudtasks/apiv2"
 	"context"
+	"database/sql"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/google/wire"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -40,17 +41,25 @@ func NewMultichainProvider(ctx context.Context) *multichain.Provider {
 	repositories := postgres.NewRepositories(db, pool)
 	queries := coredb.New(pool)
 	cache := newCommunitiesCache()
-	client := task.NewClient(ctx)
-	v2 := defaultChainOverrides()
 	serverEnvInit := setEnv()
+	client := task.NewClient(ctx)
 	httpClient := _wireClientValue
 	serverEthProviderList := ethProviderSet(serverEnvInit, client, httpClient)
 	serverOptimismProviderList := optimismProviderSet(httpClient)
 	serverTezosProviderList := tezosProviderSet(serverEnvInit, httpClient)
 	serverPoapProviderList := poapProviderSet(serverEnvInit, httpClient)
 	serverPolygonProviderList := polygonProviderSet(httpClient)
-	v3 := newMultichain(serverEthProviderList, serverOptimismProviderList, serverTezosProviderList, serverPoapProviderList, serverPolygonProviderList)
-	provider := multichain.NewProvider(ctx, repositories, queries, cache, client, v2, v3...)
+	v2 := newMultichainSet(serverEthProviderList, serverOptimismProviderList, serverTezosProviderList, serverPoapProviderList, serverPolygonProviderList)
+	v3 := defaultChainOverrides()
+	sendTokens := newSendTokensFunc(ctx, client)
+	provider := &multichain.Provider{
+		Repos:                 repositories,
+		Queries:               queries,
+		Cache:                 cache,
+		Chains:                v2,
+		ChainAddressOverrides: v3,
+		SendTokens:            sendTokens,
+	}
 	return provider
 }
 
@@ -175,18 +184,13 @@ type optimismProvider struct{ *alchemy.Provider }
 
 type polygonProvider struct{ *alchemy.Provider }
 
-// multichainSet is a wire provider set for initializing a multichain provider
-var multichainSet = wire.NewSet(multichain.NewProvider, newMultichain,
-
-	ethProviderSet,
-	tezosProviderSet,
-	optimismProviderSet,
-	poapProviderSet,
-	polygonProviderSet,
-)
-
 // dbConnSet is a wire provider set for initializing a postgres connection
 var dbConnSet = wire.NewSet(wire.Value([]postgres.ConnectionOption{}), postgres.MustCreateClient, postgres.NewPgxClient, coredb.New, wire.Bind(new(coredb.DBTX), util.ToPointer(newPgxClient(setEnv()))))
+
+func newPqClient(e envInit, opts []postgres.ConnectionOption) (*sql.DB, func(), error) {
+	pq := postgres.MustCreateClient(opts...)
+	return pq, func() { pq.Close() }, nil
+}
 
 func newPgxClient(envInit) *pgxpool.Pool {
 	return postgres.NewPgxClient()
@@ -244,20 +248,20 @@ func polygonRequirements(
 }
 
 // newMultichain is a wire provider that creates a multichain provider
-func newMultichain(
+func newMultichainSet(
 	ethProviders ethProviderList,
 	optimismProviders optimismProviderList,
 	tezosProviders tezosProviderList,
 	poapProviders poapProviderList,
 	polygonProviders polygonProviderList,
-) []any {
-	providers := []any{}
-	providers = append(providers, ethProviders...)
-	providers = append(providers, optimismProviders...)
-	providers = append(providers, tezosProviders...)
-	providers = append(providers, poapProviders...)
-	providers = append(providers, polygonProviders...)
-	return providers
+) map[persist.Chain][]any {
+	chainToProviders := map[persist.Chain][]any{}
+	chainToProviders[persist.ChainETH] = ethProviders
+	chainToProviders[persist.ChainOptimism] = optimismProviders
+	chainToProviders[persist.ChainTezos] = tezosProviders
+	chainToProviders[persist.ChainPOAP] = poapProviders
+	chainToProviders[persist.ChainPolygon] = polygonProviders
+	return chainToProviders
 }
 
 // defaultChainOverrides is a wire provider for chain overrides
@@ -298,4 +302,10 @@ func newPolygonProvider(c *http.Client) *polygonProvider {
 
 func newCommunitiesCache() *redis.Cache {
 	return redis.NewCache(redis.CommunitiesCache)
+}
+
+func newSendTokensFunc(ctx context.Context, taskClient *cloudtasks.Client) multichain.SendTokens {
+	return func(ctx context.Context, t task.TokenProcessingUserMessage) error {
+		return task.CreateTaskForTokenProcessing(ctx, taskClient, t)
+	}
 }
