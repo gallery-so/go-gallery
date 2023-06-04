@@ -142,12 +142,13 @@ func useTokenProcessing(t *testing.T) {
 	t.Helper()
 	ctx := context.Background()
 	c := server.ClientInit(ctx)
-	p := server.NewMultichainProvider(ctx)
+	p, cleanup := server.NewMultichainProvider(ctx)
 	server := httptest.NewServer(tokenprocessing.CoreInitServer(c, p))
 	t.Setenv("TOKEN_PROCESSING_URL", server.URL)
 	t.Cleanup(func() {
 		server.Close()
 		c.Close()
+		cleanup()
 	})
 }
 

@@ -44,7 +44,7 @@ type optimismProvider struct{ *alchemy.Provider }
 type polygonProvider struct{ *alchemy.Provider }
 
 // NewMultichainProvider is a wire injector that sets up a multichain provider instance
-func NewMultichainProvider(ctx context.Context) *multichain.Provider {
+func NewMultichainProvider(ctx context.Context) (*multichain.Provider, func()) {
 	wire.Build(
 		setEnv,
 		wire.Value(&http.Client{Timeout: 0}), // HTTP client shared between providers
@@ -64,32 +64,33 @@ func NewMultichainProvider(ctx context.Context) *multichain.Provider {
 		// Initialize the multichain provider
 		wire.Struct(new(multichain.Provider), "*"),
 	)
-	return nil
+	return nil, nil
 }
 
 // dbConnSet is a wire provider set for initializing a postgres connection
 var dbConnSet = wire.NewSet(
-	// Connection options are typically set via environment variables and are parsed
-	// in client initialization so we don't need to pass them here
-	wire.Value([]postgres.ConnectionOption{}),
-	postgres.MustCreateClient,
-	postgres.NewPgxClient,
-	db.New,
-	wire.Bind(new(db.DBTX), util.ToPointer(newPgxClient(setEnv()))),
+	newPqClient,
+	newPgxClient,
+	newQueries,
 )
-
-func newPqClient(e envInit, opts []postgres.ConnectionOption) (*sql.DB, func(), error) {
-	pq := postgres.MustCreateClient(opts...)
-	return pq, func() { pq.Close() }, nil
-}
-
-func newPgxClient(envInit) *pgxpool.Pool {
-	return postgres.NewPgxClient()
-}
 
 func setEnv() envInit {
 	SetDefaults()
 	return envInit{}
+}
+
+func newPqClient(e envInit) (*sql.DB, func()) {
+	pq := postgres.MustCreateClient()
+	return pq, func() { pq.Close() }
+}
+
+func newPgxClient(envInit) (*pgxpool.Pool, func()) {
+	pgx := postgres.NewPgxClient()
+	return pgx, func() { pgx.Close() }
+}
+
+func newQueries(p *pgxpool.Pool) *db.Queries {
+	return db.New(p)
 }
 
 // ethProviderSet is a wire injector that creates the set of Ethereum providers
@@ -137,9 +138,9 @@ func ethRequirements(
 func tezosProviderSet(envInit, *http.Client) tezosProviderList {
 	wire.Build(
 		tezosProvidersConfig,
+		// Add providers for Tezos here
 		newTzktProvider,
 		newObjktProvider,
-		// Add providers for Tezos here
 		tezosFallbackProvider,
 	)
 	return tezosProviderList{}

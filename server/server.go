@@ -56,7 +56,7 @@ func Init() {
 
 	ctx := context.Background()
 	c := ClientInit(ctx)
-	provider := NewMultichainProvider(ctx)
+	provider, _ := NewMultichainProvider(ctx)
 	recommender := recommend.NewRecommender(c.Queries)
 	router := CoreInit(c, provider, recommender)
 	http.Handle("/", router)

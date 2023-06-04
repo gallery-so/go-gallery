@@ -215,21 +215,6 @@ func getChainProvidersForTask[T any](providers []any) []T {
 	return result
 }
 
-func hasProvidersForTask[T any](providers []any) bool {
-	for _, p := range providers {
-		if _, ok := p.(T); ok {
-			return true
-		} else if subproviders, ok := p.(ProviderSupplier); ok {
-			for _, subprovider := range subproviders.GetSubproviders() {
-				if _, ok := subprovider.(T); ok {
-					return true
-				}
-			}
-		}
-	}
-	return false
-}
-
 // SyncTokens updates the media for all tokens for a user
 func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains []persist.Chain) error {
 

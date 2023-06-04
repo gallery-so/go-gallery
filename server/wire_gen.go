@@ -27,21 +27,19 @@ import (
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/service/task"
-	"github.com/mikeydub/go-gallery/util"
 	"net/http"
 )
 
 // Injectors from inject.go:
 
 // NewMultichainProvider is a wire injector that sets up a multichain provider instance
-func NewMultichainProvider(ctx context.Context) *multichain.Provider {
-	v := _wireValue
-	db := postgres.MustCreateClient(v...)
-	pool := postgres.NewPgxClient(v...)
-	repositories := postgres.NewRepositories(db, pool)
-	queries := coredb.New(pool)
-	cache := newCommunitiesCache()
+func NewMultichainProvider(ctx context.Context) (*multichain.Provider, func()) {
 	serverEnvInit := setEnv()
+	db, cleanup := newPqClient(serverEnvInit)
+	pool, cleanup2 := newPgxClient(serverEnvInit)
+	repositories := postgres.NewRepositories(db, pool)
+	queries := newQueries(pool)
+	cache := newCommunitiesCache()
 	client := task.NewClient(ctx)
 	httpClient := _wireClientValue
 	serverEthProviderList := ethProviderSet(serverEnvInit, client, httpClient)
@@ -49,22 +47,24 @@ func NewMultichainProvider(ctx context.Context) *multichain.Provider {
 	serverTezosProviderList := tezosProviderSet(serverEnvInit, httpClient)
 	serverPoapProviderList := poapProviderSet(serverEnvInit, httpClient)
 	serverPolygonProviderList := polygonProviderSet(httpClient)
-	v2 := newMultichainSet(serverEthProviderList, serverOptimismProviderList, serverTezosProviderList, serverPoapProviderList, serverPolygonProviderList)
-	v3 := defaultChainOverrides()
+	v := newMultichainSet(serverEthProviderList, serverOptimismProviderList, serverTezosProviderList, serverPoapProviderList, serverPolygonProviderList)
+	v2 := defaultChainOverrides()
 	sendTokens := newSendTokensFunc(ctx, client)
 	provider := &multichain.Provider{
 		Repos:                 repositories,
 		Queries:               queries,
 		Cache:                 cache,
-		Chains:                v2,
-		ChainAddressOverrides: v3,
+		Chains:                v,
+		ChainAddressOverrides: v2,
 		SendTokens:            sendTokens,
 	}
-	return provider
+	return provider, func() {
+		cleanup2()
+		cleanup()
+	}
 }
 
 var (
-	_wireValue       = []postgres.ConnectionOption{}
 	_wireClientValue = &http.Client{Timeout: 0}
 )
 
@@ -185,20 +185,29 @@ type optimismProvider struct{ *alchemy.Provider }
 type polygonProvider struct{ *alchemy.Provider }
 
 // dbConnSet is a wire provider set for initializing a postgres connection
-var dbConnSet = wire.NewSet(wire.Value([]postgres.ConnectionOption{}), postgres.MustCreateClient, postgres.NewPgxClient, coredb.New, wire.Bind(new(coredb.DBTX), util.ToPointer(newPgxClient(setEnv()))))
-
-func newPqClient(e envInit, opts []postgres.ConnectionOption) (*sql.DB, func(), error) {
-	pq := postgres.MustCreateClient(opts...)
-	return pq, func() { pq.Close() }, nil
-}
-
-func newPgxClient(envInit) *pgxpool.Pool {
-	return postgres.NewPgxClient()
-}
+var dbConnSet = wire.NewSet(
+	newPqClient,
+	newPgxClient,
+	newQueries,
+)
 
 func setEnv() envInit {
 	SetDefaults()
 	return envInit{}
+}
+
+func newPqClient(e envInit) (*sql.DB, func()) {
+	pq := postgres.MustCreateClient()
+	return pq, func() { pq.Close() }
+}
+
+func newPgxClient(envInit) (*pgxpool.Pool, func()) {
+	pgx := postgres.NewPgxClient()
+	return pgx, func() { pgx.Close() }
+}
+
+func newQueries(p *pgxpool.Pool) *coredb.Queries {
+	return coredb.New(p)
 }
 
 // ethRequirements is the set of provider interfaces required for Ethereum
