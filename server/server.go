@@ -43,6 +43,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/recommend"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/rpc"
+	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/throttle"
@@ -95,7 +96,7 @@ func ClientInit(ctx context.Context) *Clients {
 		Queries:         db.New(pgx),
 		HTTPClient:      &http.Client{Timeout: 0},
 		EthClient:       rpc.NewEthClient(),
-		IPFSClient:      rpc.NewIPFSShell(),
+		IPFSClient:      ipfs.NewShell(),
 		ArweaveClient:   rpc.NewArweaveClient(),
 		StorageClient:   rpc.NewStorageClient(ctx),
 		TaskClient:      task.NewClient(ctx),

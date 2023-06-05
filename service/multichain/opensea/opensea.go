@@ -31,6 +31,8 @@ import (
 
 var client = http.DefaultClient
 
+var ErrAPIKeyExpired = errors.New("opensea api key expired")
+
 func init() {
 	env.RegisterValidation("OPENSEA_API_KEY", "required")
 }
@@ -750,6 +752,10 @@ func paginateAssets(req *http.Request) ([]Asset, error) {
 		}
 
 		defer resp.Body.Close()
+
+		if resp.StatusCode == http.StatusUnauthorized {
+			return nil, ErrAPIKeyExpired
+		}
 
 		if resp.StatusCode != http.StatusOK {
 			return nil, util.BodyAsError(resp)

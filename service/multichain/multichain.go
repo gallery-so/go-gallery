@@ -807,7 +807,7 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contr
 			metadata, err := metadataFetcher.GetTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: contractAddress, TokenID: tokenID})
 			if err != nil {
 				if err != context.Canceled && !strings.Contains(err.Error(), context.Canceled.Error()) {
-					logger.For(ctx).Errorf("error fetching token metadata %s for provider %d (%T)", err, i, metadataFetcher)
+					logger.For(ctx).Warnf("error fetching token metadata from provider %d (%T): %s", i, metadataFetcher, err)
 				}
 				switch caught := err.(type) {
 				case util.ErrHTTP:
@@ -825,7 +825,7 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contr
 		defer close(metadatas)
 		err := wp.Wait()
 		if err != nil && (err != context.Canceled || strings.Contains(err.Error(), context.Canceled.Error())) {
-			logger.For(ctx).Errorf("error fetching token metadata after wait: %s", err)
+			logger.For(ctx).Warnf("error fetching token metadata after wait: %s", err)
 		}
 	}()
 
