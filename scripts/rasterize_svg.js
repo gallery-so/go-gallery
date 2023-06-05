@@ -4,6 +4,7 @@ const GIFEncoder = require('gifencoder');
 const pixelmatch = require('pixelmatch');
 
 const totalFrames = 30;
+const delay = 33; // 30fps
 
 async function captureFrame(page, delay) {
   await page.waitForTimeout(delay);
@@ -30,7 +31,7 @@ async function createAnimation() {
 
   const frames = [];
   for (let i = 0; i < totalFrames; i++) {
-    const frame = await captureFrame(page, 30); // Capture frame every 100ms
+    const frame = await captureFrame(page, delay); // Capture frame every 30ms
     frames.push(PNG.sync.read(frame));
   }
 
@@ -70,8 +71,8 @@ async function createAnimation() {
     });
 
     encoder.start();
-    encoder.setRepeat(0); // 0 for repeat, -1 for no-repeat
-    encoder.setDelay(500); // frame delay in ms
+    encoder.setRepeat(0);
+    encoder.setDelay(delay); // frame delay in ms
     encoder.setQuality(10); // image quality. 20 is default.
 
     frames.forEach((frame) => {

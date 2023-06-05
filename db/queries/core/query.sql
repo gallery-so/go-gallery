@@ -1158,7 +1158,7 @@ SELECT
     (
         SELECT wallets.address
         FROM wallets
-        WHERE wallets.id = ANY(tokens.owned_by_wallets)
+        WHERE wallets.id = ANY(tokens.owned_by_wallets) and wallets.deleted = false
         LIMIT 1
     ) AS wallet_address
 FROM tokens
@@ -1176,7 +1176,7 @@ SELECT
     (
         SELECT wallets.address
         FROM wallets
-        WHERE wallets.id = ANY(tokens.owned_by_wallets)
+        WHERE wallets.id = ANY(tokens.owned_by_wallets) and wallets.deleted = false
         LIMIT 1
     ) AS wallet_address
 FROM tokens
@@ -1192,7 +1192,7 @@ SELECT
     (
         SELECT wallets.address
         FROM wallets
-        WHERE wallets.id = ANY(tokens.owned_by_wallets)
+        WHERE wallets.id = ANY(tokens.owned_by_wallets) and wallets.deleted = false
         LIMIT 1
     ) AS wallet_address
 FROM tokens
