@@ -103,10 +103,6 @@ func GetIPFSResponse(ctx context.Context, httpClient http.Client, ipfsClient *sh
 		Host:   env.GetString("FALLBACK_IPFS_URL"),
 		Client: httpClient,
 	}
-	fallbackReader := HTTPReader{
-		Host:   "https://ipfs.io",
-		Client: httpClient,
-	}
 	ipfsReader := IPFSReader{
 		Client: ipfsClient,
 	}
@@ -119,7 +115,7 @@ func GetIPFSResponse(ctx context.Context, httpClient http.Client, ipfsClient *sh
 		}
 	}
 
-	return util.FirstNonErrorWithValue(ctx, false, retry.HTTPErrNotFound,
+	r, err := util.FirstNonErrorWithValue(ctx, false, retry.HTTPErrNotFound,
 		func(ctx context.Context) (io.ReadCloser, error) {
 			r, err := infuraReader.Do(ctx, path)
 			logStatus("infuraNode", path, err)
@@ -135,12 +131,14 @@ func GetIPFSResponse(ctx context.Context, httpClient http.Client, ipfsClient *sh
 			logStatus("ipfsNode", path, err)
 			return r, err
 		},
-		func(ctx context.Context) (io.ReadCloser, error) {
-			r, err := fallbackReader.Do(ctx, path)
-			logStatus("fallbackNode", path, err)
-			return r, err
-		},
 	)
+
+	if err == nil {
+		return r, nil
+	}
+
+	logger.For(ctx).Warnf("failed to read CID: %s from any node, using fallback: %s", path, err)
+	return HTTPReader{Host: "https://ipfs.io", Client: httpClient}.Do(ctx, path)
 }
 
 // defaultHTTPClient returns an http.Client configured with default settings intended for IPFS calls.
