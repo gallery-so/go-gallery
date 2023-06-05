@@ -54,7 +54,7 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 
 			contract, err := contractRepo.GetByID(reqCtx, t.Contract)
 			if err != nil {
-				logger.For(reqCtx).Errorf("Error getting contract: %s", err)
+				logger.For(reqCtx).Errorf("error getting contract: %s", err)
 			}
 
 			lockID := tokenID.String()

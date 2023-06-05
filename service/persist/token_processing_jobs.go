@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql/driver"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -124,6 +125,7 @@ type PipelineMetadata struct {
 	AlternateLiveRenderGCP                PipelineStepStatus `json:"alternate_live_render_gcp,omitempty"`
 	NothingCachedWithErrors               PipelineStepStatus `json:"nothing_cached_errors,omitempty"`
 	NothingCachedWithoutErrors            PipelineStepStatus `json:"nothing_cached_no_errors,omitempty"`
+	CreateMedia                           PipelineStepStatus `json:"create_media,omitempty"`
 	CreateMediaFromCachedObjects          PipelineStepStatus `json:"create_media_from_cached_objects,omitempty"`
 	CreateRawMedia                        PipelineStepStatus `json:"create_raw_media,omitempty"`
 	SetUnknownMediaType                   PipelineStepStatus `json:"set_default_media_type,omitempty"`
@@ -142,6 +144,13 @@ func (p *PipelineMetadata) Scan(value interface{}) error {
 }
 
 func TrackStepStatus(ctx context.Context, status *PipelineStepStatus, name string) (func(), context.Context) {
+	// Keep track of the parent step name
+	if log := logger.For(ctx); log != nil {
+		if parent, ok := log.Data["pipelineStep"].(string); ok && parent != "" {
+			name = fmt.Sprintf("%s.%s", parent, name)
+		}
+	}
+
 	span, ctx := tracing.StartSpan(ctx, "pipeline.step", name)
 
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
@@ -175,7 +184,6 @@ func TrackStepStatus(ctx context.Context, status *PipelineStepStatus, name strin
 		*status = PipelineStepStatusSuccess
 		logger.For(ctx).Infof("succeeded [%s] (took: %s)", name, time.Since(startTime))
 	}, ctx
-
 }
 
 func FailStep(status *PipelineStepStatus) {
