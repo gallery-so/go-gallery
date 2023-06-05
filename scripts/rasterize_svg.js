@@ -2,6 +2,7 @@ const puppeteer = require('puppeteer');
 const PNG = require('pngjs').PNG;
 const GIFEncoder = require('gifencoder');
 const pixelmatch = require('pixelmatch');
+const sharp = require('sharp');
 
 const totalFrames = 30;
 const delay = 33; // 30fps
@@ -30,9 +31,31 @@ async function createAnimation() {
   await page.goto(url);
 
   const frames = [];
+  const idealDelay = 33.3; // Delay in milliseconds for ~30 FPS
+  let previousTimestamp = Date.now();
+  let accumulatedDelay = 0;
+
   for (let i = 0; i < totalFrames; i++) {
-    const frame = await captureFrame(page, delay); // Capture frame every 30ms
-    frames.push(PNG.sync.read(frame));
+    const frame = await page.screenshot({ fullPage: true });
+    frames.push(frame);
+
+    // Calculate the elapsed time and update the accumulated delay
+    let currentTimestamp = Date.now();
+    let actualDelay = currentTimestamp - previousTimestamp;
+    previousTimestamp = currentTimestamp;
+    accumulatedDelay += actualDelay - idealDelay;
+
+    if (accumulatedDelay > idealDelay) {
+      // Skip the next frame
+      accumulatedDelay -= idealDelay;
+      continue;
+    }
+
+    // Wait for the remaining time to achieve the ideal delay
+    let remainingDelay = idealDelay - actualDelay;
+    if (remainingDelay > 0) {
+      await new Promise((resolve) => setTimeout(resolve, remainingDelay));
+    }
   }
 
   // Compare all frames to the first one
@@ -61,25 +84,29 @@ async function createAnimation() {
   } else {
     // If frames are different, save as GIF
     const encoder = new GIFEncoder(frames[0].width, frames[0].height);
-    const stream = encoder.createReadStream();
-
-    let gifBuffer = Buffer.alloc(0);
-    stream.on('data', (chunk) => (gifBuffer = Buffer.concat([gifBuffer, chunk])));
-    stream.on('end', () => {
-      console.log('GIF');
-      console.log(gifBuffer.toString('base64'));
-    });
 
     encoder.start();
     encoder.setRepeat(0);
     encoder.setDelay(delay); // frame delay in ms
     encoder.setQuality(10); // image quality. 20 is default.
 
-    frames.forEach((frame) => {
-      encoder.addFrame(frame.data);
-    });
+    for (let frame of frames) {
+      const rgba = await sharp(frame, {
+        raw: { width: svgDimensions.width, height: svgDimensions.height, channels: 4 },
+      })
+        .ensureAlpha()
+        .raw()
+        .toBuffer();
+      encoder.addFrame(rgba);
+    }
 
     encoder.finish();
+
+    const gifBuffer = encoder.out.getData();
+
+    console.log('GIF');
+
+    console.log(gifBuffer.toString('base64'));
   }
 
   await browser.close();
