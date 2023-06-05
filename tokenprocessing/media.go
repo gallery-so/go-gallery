@@ -69,6 +69,12 @@ type errNoMediaURLs struct {
 	tids     persist.TokenIdentifiers
 }
 
+type errStoreObjectFailed struct {
+	bucket string
+	object cachedMediaObject
+	err    error
+}
+
 func (e errNoDataFromReader) Error() string {
 	return fmt.Sprintf("no data from reader: %s (url: %s)", e.err, e.url)
 }
@@ -85,6 +91,10 @@ func (e errInvalidMedia) Error() string {
 	return fmt.Sprintf("invalid media: %s (url: %s)", e.err, e.URL)
 }
 
+func (e errInvalidMedia) Unwrap() error {
+	return e.err
+}
+
 func (e errNoMediaURLs) Error() string {
 	return fmt.Sprintf("no media URLs found in metadata: %s (metadata: %+v, tokenURI: %s)", e.tids, e.metadata, e.tokenURI)
 }
@@ -95,6 +105,18 @@ func (e errNoCachedObjects) Error() string {
 
 func (e errNoDataFromOpensea) Error() string {
 	return fmt.Sprintf("no data from opensea: %s (url: %s)", e.err, e.url)
+}
+
+func (e errNoDataFromOpensea) Unwrap() error {
+	return e.err
+}
+
+func (e errStoreObjectFailed) Error() string {
+	return fmt.Sprintf("failed to write object to key: %s/%s: %s", e.bucket, e.object.fileName(), e.err)
+}
+
+func (e errStoreObjectFailed) Unwrap() error {
+	return e.err
 }
 
 type cachePipelineMetadata struct {
@@ -249,7 +271,7 @@ func createMediaFromCachedObjects(ctx context.Context, tokenBucket string, objec
 	}
 
 	if err != nil {
-		logger.For(ctx).Errorf("failed to get dimensions for media: %s", err)
+		logger.For(ctx).Warnf("failed to get dimensions for media: %s", err)
 	}
 
 	return result
@@ -406,7 +428,7 @@ func getHTMLMedia(pCtx context.Context, tids persist.TokenIdentifiers, tokenBuck
 
 	dimensions, err := getHTMLDimensions(pCtx, res.MediaURL.String())
 	if err != nil {
-		logger.For(pCtx).Errorf("failed to get dimensions for %s: %v", tids, err)
+		logger.For(pCtx).Warnf("failed to get dimensions for %s: %v", tids, err)
 	}
 
 	res.Dimensions = dimensions
@@ -617,10 +639,10 @@ func purgeIfExists(ctx context.Context, bucket string, fileName string, client *
 	return nil
 }
 
-func persistToStorage(ctx context.Context, client *storage.Client, reader io.Reader, bucket, fileName string, contentType *string, contentLength *int64, metadata map[string]string) error {
-	writer := newObjectWriter(ctx, client, bucket, fileName, contentType, contentLength, metadata)
+func persistToStorage(ctx context.Context, client *storage.Client, reader io.Reader, bucket string, object cachedMediaObject, metadata map[string]string) error {
+	writer := newObjectWriter(ctx, client, bucket, object.fileName(), object.ContentType, object.ContentLength, metadata)
 	if _, err := io.Copy(writer, reader); err != nil {
-		return fmt.Errorf("could not write to bucket %s for %s: %s", bucket, fileName, err)
+		return errStoreObjectFailed{err: err, bucket: bucket, object: object}
 	}
 	return writer.Close()
 }
@@ -694,11 +716,10 @@ func cacheRawMedia(ctx context.Context, reader *util.FileHeaderReader, tids pers
 		ObjectType:      oType,
 	}
 
-	err := persistToStorage(ctx, client, reader, bucket, object.fileName(), object.ContentType, object.ContentLength,
-		map[string]string{
-			"originalURL": truncateString(ogURL, 100),
-			"mediaType":   mediaType.String(),
-		})
+	err := persistToStorage(ctx, client, reader, bucket, object, map[string]string{
+		"originalURL": truncateString(ogURL, 100),
+		"mediaType":   mediaType.String(),
+	})
 	if err != nil {
 		persist.FailStep(subMeta.StoreGCP)
 		return cachedMediaObject{}, err
@@ -728,7 +749,7 @@ func cacheRawAnimationMedia(ctx context.Context, reader *util.FileHeaderReader, 
 	_, err := io.Copy(writer, reader)
 	if err != nil {
 		persist.FailStep(subMeta.AnimationGzip)
-		return cachedMediaObject{}, fmt.Errorf("could not write to bucket %s for %s: %s", bucket, object.fileName(), err)
+		return cachedMediaObject{}, errStoreObjectFailed{err: err, bucket: bucket, object: object}
 	}
 
 	if err := writer.Close(); err != nil {
@@ -769,7 +790,7 @@ func thumbnailAndCache(ctx context.Context, tids persist.TokenIdentifiers, video
 	logger.For(ctx).Infof("thumbnailing %s", videoURL)
 	if err := thumbnailVideoToWriter(ctx, videoURL, sw); err != nil {
 		persist.FailStep(subMeta.ThumbnailGCP)
-		return cachedMediaObject{}, fmt.Errorf("could not thumbnail to bucket %s for '%s': %s", bucket, obj.fileName(), err)
+		return cachedMediaObject{}, errStoreObjectFailed{err: err, bucket: bucket, object: obj}
 	}
 
 	if err := sw.Close(); err != nil {
@@ -809,7 +830,7 @@ func createLiveRenderAndCache(ctx context.Context, tids persist.TokenIdentifiers
 	logger.For(ctx).Infof("creating live render for %s", videoURL)
 	if err := createLiveRenderPreviewVideo(ctx, videoURL, sw); err != nil {
 		persist.FailStep(subMeta.LiveRenderGCP)
-		return cachedMediaObject{}, fmt.Errorf("could not live render to bucket %s for '%s': %s", bucket, obj.fileName(), err)
+		return cachedMediaObject{}, errStoreObjectFailed{err: err, bucket: bucket, object: obj}
 	}
 
 	if err := sw.Close(); err != nil {
@@ -875,7 +896,6 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 		reader, err := rpc.GetDataFromURIAsReader(pCtx, asURI, ipfsClient, arweaveClient, util.MB, time.Minute)
 		if err != nil {
 			persist.FailStep(subMeta.ReaderRetrieval)
-			logger.For(pCtx).Errorf("failed to get reader for '%s': %s <%T>", mediaURL, err, err)
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return reader, false, err
 			}
@@ -894,6 +914,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 				return reader, true, err
 			}
 
+			logger.For(pCtx).Errorf("failed to get reader for '%s': %s <%T>", mediaURL, err, err)
 			return reader, false, errNoDataFromReader{err: err, url: mediaURL}
 		}
 		return reader, false, nil
@@ -1051,7 +1072,7 @@ func getMediaDimensions(ctx context.Context, url string) (persist.Dimensions, er
 	c.Stdout = outBuf
 	err := c.Run()
 	if err != nil {
-		logger.For(ctx).Errorf("failed to get dimensions for %s: %s", url, err)
+		logger.For(ctx).Warnf("failed to get dimensions for %s: %s", url, err)
 		return getMediaDimensionsBackup(ctx, url)
 	}
 

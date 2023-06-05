@@ -39,6 +39,10 @@ func (h ErrHTTP) Error() string {
 	return fmt.Sprintf("HTTP Error Status - %d | URL - %s | Error: %s", h.Status, h.URL, h.Err)
 }
 
+func (h ErrHTTP) Unwrap() error {
+	return h.Err
+}
+
 // ErrResponse sends a json response for an error during endpoint execution
 func ErrResponse(c *gin.Context, code int, err error) {
 	c.Error(err)
