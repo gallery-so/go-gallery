@@ -10,6 +10,7 @@ import (
 	"cloud.google.com/go/cloudtasks/apiv2"
 	"context"
 	"database/sql"
+	"fmt"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/google/wire"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -264,12 +265,25 @@ func newMultichainSet(
 	poapProviders poapProviderList,
 	polygonProviders polygonProviderList,
 ) map[persist.Chain][]any {
+
+	dedupe := func(providers []any) []any {
+		seen := map[string]bool{}
+		deduped := []any{}
+		for _, p := range providers {
+			if addr := fmt.Sprintf("%p", p); !seen[addr] {
+				seen[addr] = true
+				deduped = append(deduped, p)
+			}
+		}
+		return deduped
+	}
+
 	chainToProviders := map[persist.Chain][]any{}
-	chainToProviders[persist.ChainETH] = ethProviders
-	chainToProviders[persist.ChainOptimism] = optimismProviders
-	chainToProviders[persist.ChainTezos] = tezosProviders
-	chainToProviders[persist.ChainPOAP] = poapProviders
-	chainToProviders[persist.ChainPolygon] = polygonProviders
+	chainToProviders[persist.ChainETH] = dedupe(ethProviders)
+	chainToProviders[persist.ChainOptimism] = dedupe(optimismProviders)
+	chainToProviders[persist.ChainTezos] = dedupe(tezosProviders)
+	chainToProviders[persist.ChainPOAP] = dedupe(poapProviders)
+	chainToProviders[persist.ChainPolygon] = dedupe(polygonProviders)
 	return chainToProviders
 }
 

@@ -6,6 +6,7 @@ package server
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"net/http"
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
@@ -54,6 +55,7 @@ func NewMultichainProvider(ctx context.Context) (*multichain.Provider, func()) {
 		postgres.NewRepositories,
 		dbConnSet,
 		newSendTokensFunc,
+		wire.Struct(new(multichain.Provider), "*"),
 		// Add additional chains here
 		newMultichainSet,
 		ethProviderSet,
@@ -61,8 +63,6 @@ func NewMultichainProvider(ctx context.Context) (*multichain.Provider, func()) {
 		optimismProviderSet,
 		poapProviderSet,
 		polygonProviderSet,
-		// Initialize the multichain provider
-		wire.Struct(new(multichain.Provider), "*"),
 	)
 	return nil, nil
 }
@@ -258,12 +258,26 @@ func newMultichainSet(
 	poapProviders poapProviderList,
 	polygonProviders polygonProviderList,
 ) map[persist.Chain][]any {
+	// Dedupes providers by pointer address because
+	// providers may not be hashable
+	dedupe := func(providers []any) []any {
+		seen := map[string]bool{}
+		deduped := []any{}
+		for _, p := range providers {
+			if addr := fmt.Sprintf("%p", p); !seen[addr] {
+				seen[addr] = true
+				deduped = append(deduped, p)
+			}
+		}
+		return deduped
+	}
+
 	chainToProviders := map[persist.Chain][]any{}
-	chainToProviders[persist.ChainETH] = ethProviders
-	chainToProviders[persist.ChainOptimism] = optimismProviders
-	chainToProviders[persist.ChainTezos] = tezosProviders
-	chainToProviders[persist.ChainPOAP] = poapProviders
-	chainToProviders[persist.ChainPolygon] = polygonProviders
+	chainToProviders[persist.ChainETH] = dedupe(ethProviders)
+	chainToProviders[persist.ChainOptimism] = dedupe(optimismProviders)
+	chainToProviders[persist.ChainTezos] = dedupe(tezosProviders)
+	chainToProviders[persist.ChainPOAP] = dedupe(poapProviders)
+	chainToProviders[persist.ChainPolygon] = dedupe(polygonProviders)
 	return chainToProviders
 }
 
