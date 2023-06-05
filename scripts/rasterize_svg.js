@@ -3,7 +3,7 @@ const PNG = require('pngjs').PNG;
 const GIFEncoder = require('gifencoder');
 const pixelmatch = require('pixelmatch');
 
-const totalFrames = 10;
+const totalFrames = 30;
 
 async function captureFrame(page, delay) {
   await page.waitForTimeout(delay);
@@ -30,7 +30,7 @@ async function createAnimation() {
 
   const frames = [];
   for (let i = 0; i < totalFrames; i++) {
-    const frame = await captureFrame(page, 100); // Capture frame every 100ms
+    const frame = await captureFrame(page, 30); // Capture frame every 100ms
     frames.push(PNG.sync.read(frame));
   }
 
