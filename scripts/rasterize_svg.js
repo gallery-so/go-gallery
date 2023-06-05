@@ -7,11 +7,6 @@ const sharp = require('sharp');
 const totalFrames = 30;
 const delay = 33; // 30fps
 
-async function captureFrame(page, delay) {
-  await page.waitForTimeout(delay);
-  return await page.screenshot({ fullPage: true });
-}
-
 async function createAnimation() {
   const url = process.argv[2];
   const browser = await puppeteer.launch();
