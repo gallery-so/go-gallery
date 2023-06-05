@@ -61,7 +61,7 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 
 			wp.Go(func() error {
 				if err := throttler.Lock(reqCtx, lockID); err != nil {
-					logger.For(reqCtx).Errorf("failed to lock tokenID=%s: %s", tokenID, err)
+					logger.For(reqCtx).Warnf("failed to lock tokenID=%s: %s", tokenID, err)
 					return err
 				}
 				defer throttler.Unlock(reqCtx, lockID)
