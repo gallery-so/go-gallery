@@ -147,6 +147,9 @@ type mediaResult struct {
 }
 
 func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) mediaResult {
+	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.CreateMedia, "CreateMedia")
+	defer traceCallback()
+
 	result := coredb.TokenMedia{
 		ID:              persist.GenerateID(),
 		ContractID:      tpj.token.Contract,
@@ -239,8 +242,6 @@ func (tpj *tokenProcessingJob) cacheMediaObjects(ctx context.Context, metadata p
 		"imgURL":  imgURL,
 		"animURL": animURL,
 	})
-
-	logger.For(ctx).Infof("found media URLs")
 
 	var (
 		imgCh, animCh         chan cacheResult
