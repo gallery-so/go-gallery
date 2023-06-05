@@ -18,6 +18,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/rpc"
+	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/service/tracing"
@@ -56,7 +57,7 @@ func coreInit(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) (*gin.Engin
 	tokenRepo, contractRepo, addressFilterRepo := newRepos(s)
 	queries := indexerdb.New(postgres.NewPgxClient())
 	ethClient := rpc.NewEthSocketClient()
-	ipfsClient := rpc.NewIPFSShell()
+	ipfsClient := ipfs.NewShell()
 	arweaveClient := rpc.NewArweaveClient()
 
 	if env.GetString("ENV") == "production" || enableRPC {
@@ -92,7 +93,7 @@ func coreInitServer(quietLogs, enableRPC bool) *gin.Engine {
 	tokenRepo, contractRepo, addressFilterRepo := newRepos(s)
 	queries := indexerdb.New(postgres.NewPgxClient())
 	ethClient := rpc.NewEthSocketClient()
-	ipfsClient := rpc.NewIPFSShell()
+	ipfsClient := ipfs.NewShell()
 	arweaveClient := rpc.NewArweaveClient()
 
 	if env.GetString("ENV") == "production" || enableRPC {

@@ -16,7 +16,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
-	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/util"
@@ -65,16 +65,9 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 					return err
 				}
 				defer throttler.Unlock(reqCtx, lockID)
-
 				ctx := sentryutil.NewSentryHubContext(reqCtx)
-				err := tp.ProcessTokenPipeline(reqCtx, t, contract, persist.ProcessingCauseSync)
-				if err != nil {
-
-					logger.For(ctx).Errorf("Error processing token: %s", err)
-
-					return err
-				}
-				return nil
+				_, err := tp.ProcessTokenPipeline(ctx, t, contract, persist.ProcessingCauseSync)
+				return err
 			})
 		}
 
@@ -121,7 +114,7 @@ func processMediaForToken(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRe
 			return
 		}
 
-		err = tp.ProcessTokenPipeline(reqCtx, token, contract, persist.ProcessingCauseRefresh)
+		_, err = tp.ProcessTokenPipeline(reqCtx, token, contract, persist.ProcessingCauseRefresh)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return

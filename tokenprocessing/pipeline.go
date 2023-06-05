@@ -2,6 +2,7 @@ package tokenprocessing
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -16,7 +17,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/tracing"
-	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 )
 
@@ -58,7 +58,7 @@ type tokenProcessingJob struct {
 	pipelineMetadata *persist.PipelineMetadata
 }
 
-func (tp *tokenProcessor) ProcessTokenPipeline(c context.Context, t persist.TokenGallery, contract persist.ContractGallery, cause persist.ProcessingCause) error {
+func (tp *tokenProcessor) ProcessTokenPipeline(c context.Context, t persist.TokenGallery, contract persist.ContractGallery, cause persist.ProcessingCause) (coredb.TokenMedia, error) {
 
 	runID := persist.GenerateID()
 
@@ -86,19 +86,30 @@ func (tp *tokenProcessor) ProcessTokenPipeline(c context.Context, t persist.Toke
 
 	totalTime := time.Now()
 
-	runResult := job.run(loggerCtx)
-	recordPipelineEndState(loggerCtx, tp.mr, &runResult, time.Since(totalTime))
-	return runResult.Err
+	media, err := job.run(loggerCtx)
+	recordPipelineEndState(loggerCtx, tp.mr, media, err, time.Since(totalTime), cause)
+
+	if err != nil {
+		reportJobError(c, err, *job)
+	}
+
+	return media, err
 }
 
-type runResult struct {
-	MediaType persist.MediaType
-	Chain     persist.Chain
-	Err       error
-	Cause     persist.ProcessingCause
+// ErrBadToken is an error indicating that there is an issue with the token itself
+type ErrBadToken struct {
+	Err error
 }
 
-func (tpj *tokenProcessingJob) run(ctx context.Context) runResult {
+func (m ErrBadToken) Error() string {
+	return fmt.Sprintf("issue with token: %s", m.Err)
+}
+
+func (e ErrBadToken) Unwrap() error {
+	return e.Err
+}
+
+func (tpj *tokenProcessingJob) run(ctx context.Context) (coredb.TokenMedia, error) {
 	span, ctx := tracing.StartSpan(ctx, "pipeline.run", fmt.Sprintf("run %s", tpj.id))
 	defer tracing.FinishSpan(span)
 
@@ -120,29 +131,14 @@ func (tpj *tokenProcessingJob) run(ctx context.Context) runResult {
 		}
 	}()
 
-	if mediaErr != nil {
-		logger.For(ctx).Errorf("failed to create media for token %s", tpj.key)
-	}
-
 	persistCtx, cancel := context.WithTimeout(ctx, time.Minute*10)
 	defer cancel()
 
-	persistErr := tpj.persistResults(persistCtx, media)
+	if err := tpj.persistResults(persistCtx, media); err != nil {
+		return media, err
+	}
 
-	var err error
-	if persistErr != nil && mediaErr != nil {
-		err = util.MultiErr{persistErr, mediaErr}
-	} else if persistErr != nil {
-		err = persistErr
-	} else if mediaErr != nil {
-		err = mediaErr
-	}
-	return runResult{
-		Chain:     media.Chain,
-		MediaType: media.Media.MediaType,
-		Err:       err,
-		Cause:     tpj.cause,
-	}
+	return media, mediaErr
 }
 
 type mediaResult struct {
@@ -151,7 +147,6 @@ type mediaResult struct {
 }
 
 func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) mediaResult {
-
 	result := coredb.TokenMedia{
 		ID:              persist.GenerateID(),
 		ContractID:      tpj.token.Contract,
@@ -165,61 +160,18 @@ func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) mediaRes
 
 	result.Name, result.Description = tpj.retrieveTokenInfo(ctx, result.Metadata)
 
-	cachedObjects, err := tpj.cacheMediaObjects(ctx, result.Metadata)
-	if err != nil {
-		isSpam := tpj.contract.IsProviderMarkedSpam || util.GetOptionalValue(tpj.token.IsProviderMarkedSpam, false) || util.GetOptionalValue(tpj.token.IsUserMarkedSpam, false)
-		switch typ := err.(type) {
-		case errNotCacheable:
-			// this error is returned for media types that we can not properly render if we cache, but it does not mean that we cached nothing
-			// we could have cached a thumbnail or something else alongside the other media.
+	tokenMedia, err := tpj.cacheMediaObjects(ctx, result.Metadata)
+	result.Media = tokenMedia
 
-			first, ok := util.FindFirst(cachedObjects, func(c cachedMediaObject) bool {
-				if c.ObjectType == 0 || c.MediaType == "" || c.TokenID == "" || c.ContractAddress == "" {
-					return false
-				}
-				return c.storageURL(tpj.tp.tokenBucket) != "" && (c.ObjectType == objectTypeImage || c.ObjectType == objectTypeSVG || c.ObjectType == objectTypeThumbnail)
-			})
-			if ok {
-				result.Media = tpj.createRawMedia(ctx, typ.MediaType, typ.URL, first.storageURL(tpj.tp.tokenBucket), cachedObjects)
-			} else {
-				logger.For(ctx).Errorf("error caching media: %s", typ)
-				result.Media = persist.Media{MediaType: typ.MediaType, MediaURL: persist.NullString(typ.URL)}
-			}
+	var noURLErr errNoMediaURLs
+	var invalidErr errInvalidMedia
 
-			// We don't want to report this as an error, because it's not really an error
-			err = nil
-		case MediaProcessingError:
-
-			if typ.AnimationError != nil {
-				if errInvalidMedia, ok := typ.AnimationError.(errInvalidMedia); ok {
-					result.Media = persist.Media{MediaType: persist.MediaTypeInvalid, MediaURL: persist.NullString(errInvalidMedia.URL)}
-				}
-			} else if typ.ImageError != nil {
-				if errInvalidMedia, ok := typ.ImageError.(errInvalidMedia); ok {
-					result.Media = persist.Media{MediaType: persist.MediaTypeInvalid, MediaURL: persist.NullString(errInvalidMedia.URL)}
-				}
-			}
-			reportTokenError(ctx, typ, tpj.id, tpj.token.Chain, tpj.contract.Address, tpj.token.TokenID, isSpam)
-		case errInvalidMedia:
-			result.Media = persist.Media{MediaType: persist.MediaTypeInvalid, MediaURL: persist.NullString(typ.URL)}
-			reportTokenError(ctx, typ, tpj.id, tpj.token.Chain, tpj.contract.Address, tpj.token.TokenID, isSpam)
-		default:
-			traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.SetUnknownMediaType, "SetUnknownMediaType")
-			defer traceCallback()
-			result.Media = persist.Media{MediaType: persist.MediaTypeUnknown}
-			reportTokenError(ctx, typ, tpj.id, tpj.token.Chain, tpj.contract.Address, tpj.token.TokenID, isSpam)
-		}
-
-		if result.Media.MediaType == "" {
-			result.Media.MediaType = persist.MediaTypeUnknown
-		}
-
-		return mediaResult{result, err}
+	// Wrap the error to indicate that the token is bad to callers
+	if errors.As(err, &noURLErr) || errors.As(err, &invalidErr) {
+		err = ErrBadToken{err}
 	}
 
-	result.Media = tpj.createMediaFromCachedObjects(ctx, cachedObjects)
-
-	return mediaResult{result, nil}
+	return mediaResult{result, err}
 }
 
 func (tpj *tokenProcessingJob) retrieveMetadata(ctx context.Context) persist.TokenMetadata {
@@ -246,7 +198,7 @@ func (tpj *tokenProcessingJob) retrieveMetadata(ctx context.Context) persist.Tok
 		}
 		mcMetadata, err := tpj.tp.mc.GetTokenMetadataByTokenIdentifiers(ctx, tpj.contract.Address, tpj.token.TokenID, tpj.token.Chain, fieldRequests)
 		if err != nil {
-			logger.For(ctx).Errorf("error getting metadata from chain: %s", err)
+			logger.For(ctx).Warnf("error getting metadata from chain: %s", err)
 			persist.FailStep(&tpj.pipelineMetadata.MetadataRetrieval)
 		} else if mcMetadata != nil && len(mcMetadata) > 0 {
 			logger.For(ctx).Infof("got metadata from chain: %v", mcMetadata)
@@ -277,8 +229,86 @@ func (tpj *tokenProcessingJob) retrieveTokenInfo(ctx context.Context, metadata p
 	return name, description
 }
 
-func (tpj *tokenProcessingJob) cacheMediaObjects(ctx context.Context, metadata persist.TokenMetadata) ([]cachedMediaObject, error) {
-	return cacheObjectsForMetadata(ctx, metadata, tpj.contract.Address, persist.TokenID(tpj.token.TokenID.String()), tpj.token.TokenURI, tpj.token.Chain, tpj.tp.ipfsClient, tpj.tp.arweaveClient, tpj.tp.stg, tpj.tp.tokenBucket, tpj.pipelineMetadata)
+func (tpj *tokenProcessingJob) cacheMediaObjects(ctx context.Context, metadata persist.TokenMetadata) (persist.Media, error) {
+	imgURL, animURL, err := findImageAndAnimationURLs(ctx, tpj.token.TokenID, tpj.contract.Address, tpj.token.Chain, tpj.token.TokenMetadata, tpj.token.TokenURI, tpj.token.Chain != persist.ChainETH, tpj.pipelineMetadata)
+	if err != nil {
+		return persist.Media{MediaType: persist.MediaTypeUnknown}, err
+	}
+
+	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
+		"imgURL":  imgURL,
+		"animURL": animURL,
+	})
+
+	logger.For(ctx).Infof("found media URLs")
+
+	var (
+		imgCh, animCh         chan cacheResult
+		imgResult, animResult cacheResult
+		downloadSuccess       bool
+	)
+
+	if animURL != "" {
+		animCh = cacheAnimationObjects(ctx, imgURL, metadata, tpj)
+	}
+	if imgURL != "" {
+		imgCh = cacheImageObjects(ctx, imgURL, metadata, tpj)
+	}
+
+	if animCh != nil {
+		animResult = <-animCh
+		if isCacheResultValid(animResult.err, len(animResult.cachedObjects)) {
+			downloadSuccess = true
+		}
+	}
+	if imgCh != nil {
+		imgResult = <-imgCh
+		if isCacheResultValid(imgResult.err, len(imgResult.cachedObjects)) {
+			downloadSuccess = true
+		}
+	}
+
+	// If we have at least one successful download, we can create media from it
+	if downloadSuccess {
+		return createMediaFromResults(ctx, tpj, animResult, imgResult), nil
+	}
+
+	// Try to use OpenSea as a fallback
+	if imgResult.err != nil || animResult.err != nil {
+		traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.NothingCachedWithErrors, "NothingCachedWithErrors")
+		defer traceCallback()
+
+		openseaObjects, err := cacheOpenSeaObjects(ctx, tpj)
+
+		if isCacheResultValid(err, len(openseaObjects)) {
+			// Fail nothing cached with errors because we were able to get media from opensea
+			persist.FailStep(&tpj.pipelineMetadata.NothingCachedWithErrors)
+			logger.For(ctx).Warn("using media from OpenSea instead")
+			return tpj.createMediaFromCachedObjects(ctx, openseaObjects), nil
+		}
+	}
+
+	// At this point even OpenSea failed, so we need to return invalid media
+	if invalidErr, ok := animResult.err.(errInvalidMedia); ok {
+		return persist.Media{MediaType: persist.MediaTypeInvalid, MediaURL: persist.NullString(invalidErr.URL)}, invalidErr
+	}
+	if invalidErr, ok := imgResult.err.(errInvalidMedia); ok {
+		return persist.Media{MediaType: persist.MediaTypeInvalid, MediaURL: persist.NullString(invalidErr.URL)}, invalidErr
+	}
+	if animResult.err != nil {
+		return persist.Media{MediaType: persist.MediaTypeUnknown}, animResult.err
+	}
+	if imgResult.err != nil {
+		return persist.Media{MediaType: persist.MediaTypeUnknown}, imgResult.err
+	}
+
+	// We somehow didn't cache media without getting an error anywhere
+	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.NothingCachedWithoutErrors, "NothingCachedWithoutErrors")
+	defer traceCallback()
+	logger.For(ctx).Fatal("failed to cache media, and no error occurred in the process")
+
+	tid := persist.NewTokenIdentifiers(tpj.contract.Address, tpj.token.TokenID, tpj.token.Chain)
+	return persist.Media{MediaType: persist.MediaTypeUnknown}, errNoCachedObjects{tid}
 }
 
 func (tpj *tokenProcessingJob) createMediaFromCachedObjects(ctx context.Context, objects []cachedMediaObject) persist.Media {
@@ -380,37 +410,33 @@ func pipelineErroredMetric() metric.Measure {
 	return metric.Measure{Name: metricPipelineErrored}
 }
 
-func recordPipelineEndState(ctx context.Context, mr metric.MetricReporter, r *runResult, d time.Duration) {
-	baseOpts := []any{}
-
-	if r != nil {
-		tags := map[string]string{
-			"chain":     fmt.Sprintf("%d", r.Chain),
-			"mediaType": r.MediaType.String(),
-			"cause":     r.Cause.String(),
-		}
-		baseOpts = append(baseOpts, metric.LogOptions.WithTags(tags))
-	}
+func recordPipelineEndState(ctx context.Context, mr metric.MetricReporter, tokenMedia coredb.TokenMedia, err error, d time.Duration, cause persist.ProcessingCause) {
+	baseOpts := append([]any{}, metric.LogOptions.WithTags(map[string]string{
+		"chain":      fmt.Sprintf("%d", tokenMedia.Chain),
+		"mediaType":  tokenMedia.Media.MediaType.String(),
+		"cause":      cause.String(),
+		"isBadToken": fmt.Sprintf("%t", isBadTokenErr(err)),
+	}))
 
 	if ctx.Err() != nil {
-		opts := append(baseOpts, metric.LogOptions.WithLogMessage("pipeline timed out"))
-		mr.Record(ctx, pipelineTimedOutMetric(), opts...)
+		mr.Record(ctx, pipelineTimedOutMetric(), append(baseOpts,
+			metric.LogOptions.WithLogMessage("pipeline timed out"),
+		)...)
 		return
 	}
 
-	recordPipelineDuration(ctx, mr, d, baseOpts)
+	mr.Record(ctx, pipelineDurationMetric(d), append(baseOpts,
+		metric.LogOptions.WithLogMessage(fmt.Sprintf("pipeline finished (took: %s)", d)),
+	)...)
 
-	if r != nil && r.Err != nil {
-		opts := append(baseOpts, metric.LogOptions.WithLogMessage("pipeline completed with error: "+r.Err.Error()))
-		mr.Record(ctx, pipelineErroredMetric(), opts...)
+	if err != nil {
+		mr.Record(ctx, pipelineErroredMetric(), append(baseOpts,
+			metric.LogOptions.WithLogMessage("pipeline completed with error: "+err.Error()),
+		)...)
 		return
 	}
 
-	opts := append(baseOpts, metric.LogOptions.WithLogMessage("pipeline completed successfully"))
-	mr.Record(ctx, pipelineCompletedMetric(), opts...)
-}
-
-func recordPipelineDuration(ctx context.Context, mr metric.MetricReporter, d time.Duration, opts []any) {
-	opts = append(opts, metric.LogOptions.WithLogMessage(fmt.Sprintf("token processing job complete: total time for token processing job: %s", d)))
-	mr.Record(ctx, pipelineDurationMetric(d), opts...)
+	mr.Record(ctx, pipelineCompletedMetric(), append(baseOpts,
+		metric.LogOptions.WithLogMessage("pipeline completed successfully"),
+	)...)
 }
