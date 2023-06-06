@@ -34,8 +34,8 @@ import (
 // Injectors from inject.go:
 
 // NewMultichainProvider is a wire injector that sets up a multichain provider instance
-func NewMultichainProvider(ctx context.Context) (*multichain.Provider, func()) {
-	serverEnvInit := setEnv()
+func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Provider, func()) {
+	serverEnvInit := setEnv(envFunc)
 	db, cleanup := newPqClient(serverEnvInit)
 	pool, cleanup2 := newPgxClient(serverEnvInit)
 	repositories := postgres.NewRepositories(db, pool)
@@ -192,8 +192,8 @@ var dbConnSet = wire.NewSet(
 	newQueries,
 )
 
-func setEnv() envInit {
-	SetDefaults()
+func setEnv(f func()) envInit {
+	f()
 	return envInit{}
 }
 
