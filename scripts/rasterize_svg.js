@@ -2,15 +2,12 @@ const puppeteer = require('puppeteer');
 const PNG = require('pngjs').PNG;
 const GIFEncoder = require('gifencoder');
 const pixelmatch = require('pixelmatch');
-const sharp = require('sharp');
 const fs = require('fs');
 
-const totalFrames = 30;
-const delay = 33; // 30fps
-
+const idealDelay = 40;
 async function createAnimation() {
   const url = process.argv[2];
-  const browser = await puppeteer.launch();
+  const browser = await puppeteer.launch({ headless: 'new' });
   const page = await browser.newPage();
 
   await page.goto(url);
@@ -38,8 +35,33 @@ async function createAnimation() {
 
   await page.setViewport(svgDimensions);
 
+  let animationDuration = await page.evaluate(() => {
+    let svg = document.querySelector('svg');
+    if (svg) {
+      let animations = svg.getAnimations();
+      if (animations.length > 0) {
+        return animations[0].effect.getTiming().duration;
+      } else {
+        // Check for CSS animations and transitions
+        let styles = window.getComputedStyle(svg);
+        let animationDuration = parseFloat(styles.getPropertyValue('animation-duration'));
+        let transitionDuration = parseFloat(styles.getPropertyValue('transition-duration'));
+        if (animationDuration) {
+          return animationDuration * 1000; // convert to milliseconds
+        } else if (transitionDuration) {
+          return transitionDuration * 1000; // convert to milliseconds
+        }
+      }
+    }
+    // If no animations are found, return a default value
+    return 3000;
+  });
+
+  const totalFrames = animationDuration / idealDelay;
+  const delay = animationDuration / totalFrames;
+
   const frames = [];
-  const idealDelay = 33.3; // Delay in milliseconds for ~30 FPS
+
   let previousTimestamp = Date.now();
   let accumulatedDelay = 0;
 
