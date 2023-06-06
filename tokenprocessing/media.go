@@ -171,7 +171,7 @@ func cacheOpenSeaObjects(ctx context.Context, job *tokenProcessingJob) ([]cached
 		ThumbnailGCP:                 &job.pipelineMetadata.AlternateThumbnailGCP,
 		LiveRenderGCP:                &job.pipelineMetadata.AlternateLiveRenderGCP,
 	}
-	return cacheObjectsFromOpensea(ctx, tids, "", objectTypeImage, job.tp.ipfsClient, job.tp.arweaveClient, job.tp.stg, job.tp.tokenBucket, runMetadata)
+	return cacheObjectsFromOpensea(ctx, tids, objectTypeImage, job.tp.ipfsClient, job.tp.arweaveClient, job.tp.stg, job.tp.tokenBucket, runMetadata)
 }
 
 func isCacheResultValid(err error, numObjects int) bool {
@@ -924,7 +924,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 		logger.For(pCtx).Infof("failed to get data from uri '%s' for '%s' because of (err: %s <%T>), trying opensea", mediaURL, tids, err, err)
 		defer traceCallback()
 
-		return cacheObjectsFromOpensea(pCtx, tids, mediaURL, oType, ipfsClient, arweaveClient, storageClient, bucket, subMeta)
+		return cacheObjectsFromOpensea(pCtx, tids, oType, ipfsClient, arweaveClient, storageClient, bucket, subMeta)
 	}
 
 	if err != nil {
@@ -1010,7 +1010,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 	return result, nil
 }
 
-func cacheObjectsFromOpensea(pCtx context.Context, tids persist.TokenIdentifiers, mediaURL string, oType objectType, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, bucket string, subMeta *cachePipelineMetadata) ([]cachedMediaObject, error) {
+func cacheObjectsFromOpensea(pCtx context.Context, tids persist.TokenIdentifiers, oType objectType, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, bucket string, subMeta *cachePipelineMetadata) ([]cachedMediaObject, error) {
 	assets, err := opensea.FetchAssetsForTokenIdentifiers(pCtx, persist.EthereumAddress(tids.ContractAddress), opensea.TokenID(tids.TokenID.Base10String()))
 	if err != nil || len(assets) == 0 {
 		return nil, errNoDataFromOpensea{err: err}
@@ -1113,7 +1113,7 @@ func getMediaDimensions(ctx context.Context, url string) (persist.Dimensions, er
 }
 
 func getMediaDimensionsBackup(ctx context.Context, url string) (persist.Dimensions, error) {
-	outBuf := new(bytes.Buffer)
+	outBuf := bytes.NewBuffer(nil)
 	curlCmd := exec.CommandContext(ctx, "curl", "-s", url)
 	identifyCmd := exec.CommandContext(ctx, "identify", "-format", "%wx%h", "-")
 	identifyCmd.Stderr = os.Stderr

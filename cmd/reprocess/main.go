@@ -166,7 +166,8 @@ func main() {
 			defer func() {
 				logger.For(ctx).Infof("finished processing %s", token.ID)
 			}()
-			return tp.ProcessTokenPipeline(ctx, token, contract, persist.ProcessingCauseRefresh)
+			_, err = tp.ProcessTokenPipeline(ctx, token, contract, persist.ProcessingCauseRefresh)
+			return err
 		})
 	}
 	go func() {
