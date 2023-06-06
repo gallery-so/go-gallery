@@ -11,30 +11,38 @@ import (
 // SyncWithContractEvalFallbackProvider will call its fallback if the primary Provider's token
 // response is unsuitable based on Eval
 type SyncWithContractEvalFallbackProvider struct {
-	Primary interface {
-		configurer
-		tokensOwnerFetcher
-		tokensContractFetcher
-		tokenDescriptorsFetcher
-	}
-	Fallback interface {
-		tokensOwnerFetcher
-	}
-	Eval func(context.Context, ChainAgnosticToken) bool
+	Primary  SyncWithContractEvalPrimary
+	Fallback SyncWithContractEvalSecondary
+	Eval     func(context.Context, ChainAgnosticToken) bool
+}
+
+type SyncWithContractEvalPrimary interface {
+	Configurer
+	TokensOwnerFetcher
+	TokensContractFetcher
+	TokenDescriptorsFetcher
+}
+
+type SyncWithContractEvalSecondary interface {
+	TokensOwnerFetcher
 }
 
 // SyncFailureFallbackProvider will call its fallback if the primary Provider's token
 // response fails (returns an error)
 type SyncFailureFallbackProvider struct {
-	Primary interface {
-		configurer
-		tokensOwnerFetcher
-		tokenDescriptorsFetcher
-	}
-	Fallback interface {
-		tokensOwnerFetcher
-		tokenDescriptorsFetcher
-	}
+	Primary  SyncFailurePrimary
+	Fallback SyncFailureSecondary
+}
+
+type SyncFailurePrimary interface {
+	Configurer
+	TokensOwnerFetcher
+	TokenDescriptorsFetcher
+}
+
+type SyncFailureSecondary interface {
+	TokensOwnerFetcher
+	TokenDescriptorsFetcher
 }
 
 func (f SyncWithContractEvalFallbackProvider) GetBlockchainInfo(ctx context.Context) (BlockchainInfo, error) {

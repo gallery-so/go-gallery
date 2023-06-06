@@ -166,7 +166,7 @@ func testSuggestedUsersForViewer(t *testing.T) {
 	userC := newUserFixture(t)
 	ctx := context.Background()
 	clients := server.ClientInit(ctx)
-	provider := server.NewMultichainProvider(clients)
+	provider, cleanup := server.NewMultichainProvider(ctx)
 	recommender := newStubRecommender(t, []persist.DBID{
 		userA.ID,
 		userB.ID,
@@ -181,6 +181,10 @@ func testSuggestedUsersForViewer(t *testing.T) {
 	payload, _ := (*response.Viewer).(*viewerQueryViewer)
 	suggested := payload.GetSuggestedUsers().GetEdges()
 	assert.Len(t, suggested, 3)
+	t.Cleanup(func() {
+		clients.Close()
+		cleanup()
+	})
 }
 
 func testAddWallet(t *testing.T) {
@@ -1353,11 +1357,15 @@ func defaultTokenSettings(tokens []persist.DBID) []CollectionTokenSettingsInput 
 
 // defaultHandler returns a backend GraphQL http.Handler
 func defaultHandler(t *testing.T) http.Handler {
-	c := server.ClientInit(context.Background())
-	p := server.NewMultichainProvider(c)
+	ctx := context.Background()
+	c := server.ClientInit(ctx)
+	p, cleanup := server.NewMultichainProvider(ctx)
 	r := newStubRecommender(t, []persist.DBID{})
 	handler := server.CoreInit(c, p, r)
-	t.Cleanup(c.Close)
+	t.Cleanup(func() {
+		c.Close()
+		cleanup()
+	})
 	return handler
 }
 

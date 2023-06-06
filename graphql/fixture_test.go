@@ -140,13 +140,15 @@ func usePubSub(t *testing.T) {
 // useTokenProcessing starts a HTTP server for tokenprocessing
 func useTokenProcessing(t *testing.T) {
 	t.Helper()
-	c := server.ClientInit(context.Background())
-	p := server.NewMultichainProvider(c)
+	ctx := context.Background()
+	c := server.ClientInit(ctx)
+	p, cleanup := server.NewMultichainProvider(ctx)
 	server := httptest.NewServer(tokenprocessing.CoreInitServer(c, p))
 	t.Setenv("TOKEN_PROCESSING_URL", server.URL)
 	t.Cleanup(func() {
 		server.Close()
 		c.Close()
+		cleanup()
 	})
 }
 
