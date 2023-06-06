@@ -250,10 +250,10 @@ func (tpj *tokenProcessingJob) cacheMediaObjects(ctx context.Context, metadata p
 	)
 
 	if animURL != "" {
-		animCh = cacheAnimationObjects(ctx, imgURL, metadata, tpj)
+		animCh = cacheAnimationObjects(ctx, animURL, metadata, tpj)
 	}
 	if imgURL != "" {
-		imgCh = cacheImageObjects(ctx, animURL, metadata, tpj)
+		imgCh = cacheImageObjects(ctx, imgURL, metadata, tpj)
 	}
 
 	if animCh != nil {
