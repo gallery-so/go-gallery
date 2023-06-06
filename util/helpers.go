@@ -724,3 +724,28 @@ func (f FileHeaderReader) Headers() ([]byte, error) {
 	f.headers = byt
 	return f.headers, nil
 }
+
+type LoggingReader struct {
+	r   io.Reader
+	w   io.WriterTo
+	ctx context.Context
+}
+
+func NewLoggingReader(ctx context.Context, r io.Reader, w io.WriterTo) *LoggingReader {
+	return &LoggingReader{r, w, ctx}
+}
+
+func (lr *LoggingReader) Read(p []byte) (n int, err error) {
+	n, err = lr.r.Read(p)
+	logger.For(lr.ctx).Infof("Read %d bytes", n)
+	return n, err
+}
+
+func (lr *LoggingReader) WriteTo(w io.Writer) (n int64, err error) {
+	if lr.w != nil {
+		n, err = lr.w.WriteTo(w)
+		logger.For(lr.ctx).Infof("Wrote %d bytes", n)
+		return n, err
+	}
+	return 0, fmt.Errorf("No WriterTo provided")
+}
