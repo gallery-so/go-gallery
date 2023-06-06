@@ -3,7 +3,7 @@
 SELECT * FROM contracts LIMIT 1;
 
 -- name: InsertStatistic :one
-insert into blockchain_statistics (block_start, block_end) values ($1, $2) returning id;
+insert into blockchain_statistics (id, block_start, block_end) values ($1, $2, $3) on conflict do nothing returning id;
 
 -- name: UpdateStatisticTotalLogs :exec
 update blockchain_statistics set total_logs = $1 where id = $2;
