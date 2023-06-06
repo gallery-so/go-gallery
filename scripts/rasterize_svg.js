@@ -3,6 +3,7 @@ const PNG = require('pngjs').PNG;
 const GIFEncoder = require('gifencoder');
 const pixelmatch = require('pixelmatch');
 const sharp = require('sharp');
+const fs = require('fs');
 
 const totalFrames = 30;
 const delay = 33; // 30fps
@@ -12,18 +13,30 @@ async function createAnimation() {
   const browser = await puppeteer.launch();
   const page = await browser.newPage();
 
-  await page.evaluate(async () => {
+  await page.goto(url);
+
+  let svgDimensions = await page.evaluate(() => {
     let svg = document.querySelector('svg');
 
     if (svg) {
-      svg.style.width = '100%';
-      svg.style.height = '100%';
-      let viewport = svg.getBoundingClientRect();
-      await page.setViewport({ width: viewport.width, height: viewport.height });
+      // If viewBox is available, use it
+      if (svg.viewBox && svg.viewBox.baseVal) {
+        return { width: svg.viewBox.baseVal.width, height: svg.viewBox.baseVal.height };
+      }
+      // If width and height are available, use them
+      else if (svg.width && svg.height) {
+        return { width: svg.width.baseVal.value, height: svg.height.baseVal.value };
+      }
+      // If none are available, throw error
+      else {
+        throw new Error('SVG found but no viewBox, width, or height attributes available');
+      }
+    } else {
+      throw new Error('No SVG found');
     }
   });
 
-  await page.goto(url);
+  await page.setViewport(svgDimensions);
 
   const frames = [];
   const idealDelay = 33.3; // Delay in milliseconds for ~30 FPS
@@ -31,8 +44,9 @@ async function createAnimation() {
   let accumulatedDelay = 0;
 
   for (let i = 0; i < totalFrames; i++) {
-    const frame = await page.screenshot({ fullPage: true });
-    frames.push(frame);
+    const frame = await page.screenshot();
+    const img = PNG.sync.read(frame);
+    frames.push(img);
 
     // Calculate the elapsed time and update the accumulated delay
     let currentTimestamp = Date.now();
@@ -55,17 +69,15 @@ async function createAnimation() {
 
   // Compare all frames to the first one
   let isStatic = true;
-  const diff = new PNG({ width: frames[0].width, height: frames[0].height });
+  const img1 = frames[0];
+
   for (let i = 1; i < frames.length; i++) {
-    const pixels = pixelmatch(
-      frames[0].data,
-      frames[i].data,
-      diff.data,
-      frames[0].width,
-      frames[0].height,
-      { threshold: 0.1 }
-    );
-    if (pixels != 0) {
+    const img2 = frames[i];
+    const diff = new PNG({ width: img1.width, height: img1.height });
+    const pixels = pixelmatch(img1.data, img2.data, diff.data, img1.width, img1.height, {
+      threshold: 0.1,
+    });
+    if (pixels > 0) {
       isStatic = false;
       break;
     }
@@ -76,9 +88,18 @@ async function createAnimation() {
     const pngBuffer = PNG.sync.write(frames[0]);
     console.log('PNG');
     console.log(Buffer.from(pngBuffer).toString('base64'));
+    fs.writeFileSync('test.png', pngBuffer);
   } else {
     // If frames are different, save as GIF
     const encoder = new GIFEncoder(frames[0].width, frames[0].height);
+    const stream = encoder.createReadStream();
+    let gifBuffer = Buffer.alloc(0);
+    stream.on('data', (chunk) => (gifBuffer = Buffer.concat([gifBuffer, chunk])));
+    stream.on('end', () => {
+      console.log('GIF');
+      console.log(gifBuffer.toString('base64'));
+      fs.writeFileSync('test.gif', gifBuffer);
+    });
 
     encoder.start();
     encoder.setRepeat(0);
@@ -86,22 +107,10 @@ async function createAnimation() {
     encoder.setQuality(10); // image quality. 20 is default.
 
     for (let frame of frames) {
-      const rgba = await sharp(frame, {
-        raw: { width: svgDimensions.width, height: svgDimensions.height, channels: 4 },
-      })
-        .ensureAlpha()
-        .raw()
-        .toBuffer();
-      encoder.addFrame(rgba);
+      encoder.addFrame(frame.data);
     }
 
     encoder.finish();
-
-    const gifBuffer = encoder.out.getData();
-
-    console.log('GIF');
-
-    console.log(gifBuffer.toString('base64'));
   }
 
   await browser.close();
