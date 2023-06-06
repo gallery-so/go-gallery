@@ -45,7 +45,7 @@ type optimismProvider struct{ *alchemy.Provider }
 type polygonProvider struct{ *alchemy.Provider }
 
 // NewMultichainProvider is a wire injector that sets up a multichain provider instance
-func NewMultichainProvider(ctx context.Context) (*multichain.Provider, func()) {
+func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Provider, func()) {
 	wire.Build(
 		setEnv,
 		wire.Value(&http.Client{Timeout: 0}), // HTTP client shared between providers
@@ -74,8 +74,8 @@ var dbConnSet = wire.NewSet(
 	newQueries,
 )
 
-func setEnv() envInit {
-	SetDefaults()
+func setEnv(f func()) envInit {
+	f()
 	return envInit{}
 }
 
