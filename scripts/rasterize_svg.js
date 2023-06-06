@@ -4,13 +4,58 @@ const GIFEncoder = require('gifencoder');
 const pixelmatch = require('pixelmatch');
 const fs = require('fs');
 
-const idealDelay = 40;
+const totalFrames = 30;
+const idealDelay = 30;
+
+const args = [
+  '--autoplay-policy=user-gesture-required',
+  '--disable-background-networking',
+  '--disable-background-timer-throttling',
+  '--disable-backgrounding-occluded-windows',
+  '--disable-breakpad',
+  '--disable-client-side-phishing-detection',
+  '--disable-component-update',
+  '--disable-default-apps',
+  '--disable-dev-shm-usage',
+  '--disable-domain-reliability',
+  '--disable-extensions',
+  '--disable-features=AudioServiceOutOfProcess',
+  '--disable-hang-monitor',
+  '--disable-ipc-flooding-protection',
+  '--disable-notifications',
+  '--disable-offer-store-unmasked-wallet-cards',
+  '--disable-popup-blocking',
+  '--disable-print-preview',
+  '--disable-prompt-on-repost',
+  '--disable-renderer-backgrounding',
+  '--disable-setuid-sandbox',
+  '--disable-speech-api',
+  '--disable-sync',
+  '--hide-scrollbars',
+  '--ignore-gpu-blacklist',
+  '--metrics-recording-only',
+  '--mute-audio',
+  '--no-default-browser-check',
+  '--no-first-run',
+  '--no-pings',
+  '--no-sandbox',
+  '--no-zygote',
+  '--password-store=basic',
+  '--use-gl=swiftshader',
+  '--use-mock-keychain',
+  '--disable-software-rasterizer',
+  '--disable-gpu',
+  '--disable-gpu-compositing',
+];
+
 async function createAnimation() {
   const url = process.argv[2];
-  const browser = await puppeteer.launch({ headless: 'new' });
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: args,
+  });
   const page = await browser.newPage();
-
-  await page.goto(url);
+  await page.goto(url, { waitUntil: 'networkidle2' });
 
   let svgDimensions = await page.evaluate(() => {
     let svg = document.querySelector('svg');
@@ -35,38 +80,13 @@ async function createAnimation() {
 
   await page.setViewport(svgDimensions);
 
-  let animationDuration = await page.evaluate(() => {
-    let svg = document.querySelector('svg');
-    if (svg) {
-      let animations = svg.getAnimations();
-      if (animations.length > 0) {
-        return animations[0].effect.getTiming().duration;
-      } else {
-        // Check for CSS animations and transitions
-        let styles = window.getComputedStyle(svg);
-        let animationDuration = parseFloat(styles.getPropertyValue('animation-duration'));
-        let transitionDuration = parseFloat(styles.getPropertyValue('transition-duration'));
-        if (animationDuration) {
-          return animationDuration * 1000; // convert to milliseconds
-        } else if (transitionDuration) {
-          return transitionDuration * 1000; // convert to milliseconds
-        }
-      }
-    }
-    // If no animations are found, return a default value
-    return 3000;
-  });
-
-  const totalFrames = animationDuration / idealDelay;
-  const delay = animationDuration / totalFrames;
-
   const frames = [];
 
   let previousTimestamp = Date.now();
   let accumulatedDelay = 0;
 
   for (let i = 0; i < totalFrames; i++) {
-    const frame = await page.screenshot();
+    const frame = await page.screenshot({ fullPage: true });
     const img = PNG.sync.read(frame);
     frames.push(img);
 
@@ -125,7 +145,7 @@ async function createAnimation() {
 
     encoder.start();
     encoder.setRepeat(0);
-    encoder.setDelay(delay); // frame delay in ms
+    encoder.setDelay(100); // frame delay in ms
     encoder.setQuality(10); // image quality. 20 is default.
 
     for (let frame of frames) {
