@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"net/http"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -806,7 +806,7 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contr
 		wp.Go(func(ctx context.Context) error {
 			metadata, err := metadataFetcher.GetTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: contractAddress, TokenID: tokenID})
 			if err != nil {
-				if err != context.Canceled && !strings.Contains(err.Error(), context.Canceled.Error()) {
+				if !errors.Is(err, context.Canceled) {
 					logger.For(ctx).Warnf("error fetching token metadata from provider %d (%T): %s", i, metadataFetcher, err)
 				}
 				switch caught := err.(type) {
@@ -824,7 +824,7 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contr
 	go func() {
 		defer close(metadatas)
 		err := wp.Wait()
-		if err != nil && (err != context.Canceled || strings.Contains(err.Error(), context.Canceled.Error())) {
+		if err != nil && !errors.Is(err, context.Canceled) {
 			logger.For(ctx).Warnf("error fetching token metadata after wait: %s", err)
 		}
 	}()
