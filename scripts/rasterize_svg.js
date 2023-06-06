@@ -110,7 +110,7 @@ async function createAnimation() {
     const pngBuffer = PNG.sync.write(frames[0]);
     console.log('PNG');
     console.log(Buffer.from(pngBuffer).toString('base64'));
-    fs.writeFileSync('test.png', pngBuffer);
+    if (process.argv.length > 3 && process.argv[3]) fs.writeFileSync('test.png', pngBuffer);
   } else {
     // If frames are different, save as GIF
     const encoder = new GIFEncoder(frames[0].width, frames[0].height);
@@ -120,7 +120,7 @@ async function createAnimation() {
     stream.on('end', () => {
       console.log('GIF');
       console.log(gifBuffer.toString('base64'));
-      fs.writeFileSync('test.gif', gifBuffer);
+      if (process.argv.length > 3 && process.argv[3]) fs.writeFileSync('test.gif', gifBuffer);
     });
 
     encoder.start();
