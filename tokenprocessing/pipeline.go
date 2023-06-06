@@ -432,6 +432,7 @@ func recordPipelineEndState(ctx context.Context, mr metric.MetricReporter, token
 
 	if err != nil {
 		mr.Record(ctx, pipelineErroredMetric(), append(baseOpts,
+			metric.LogOptions.WithLevel(logrus.ErrorLevel),
 			metric.LogOptions.WithLogMessage("pipeline completed with error: "+err.Error()),
 		)...)
 		return
