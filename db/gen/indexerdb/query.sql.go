@@ -99,6 +99,38 @@ func (q *Queries) GetReprocessJobRangeByID(ctx context.Context, id int) (Reproce
 	return i, err
 }
 
+const getStatisticByBlockRange = `-- name: GetStatisticByBlockRange :one
+select id, deleted, version, created_at, last_updated, block_start, block_end, total_logs, total_transfers, total_tokens, total_contracts, success, contract_stats, token_stats, processing_time_seconds from blockchain_statistics where block_start <= $1 and block_end >= $2
+`
+
+type GetStatisticByBlockRangeParams struct {
+	BlockStart persist.BlockNumber
+	BlockEnd   persist.BlockNumber
+}
+
+func (q *Queries) GetStatisticByBlockRange(ctx context.Context, arg GetStatisticByBlockRangeParams) (BlockchainStatistic, error) {
+	row := q.db.QueryRow(ctx, getStatisticByBlockRange, arg.BlockStart, arg.BlockEnd)
+	var i BlockchainStatistic
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.Version,
+		&i.CreatedAt,
+		&i.LastUpdated,
+		&i.BlockStart,
+		&i.BlockEnd,
+		&i.TotalLogs,
+		&i.TotalTransfers,
+		&i.TotalTokens,
+		&i.TotalContracts,
+		&i.Success,
+		&i.ContractStats,
+		&i.TokenStats,
+		&i.ProcessingTimeSeconds,
+	)
+	return i, err
+}
+
 const insertStatistic = `-- name: InsertStatistic :one
 insert into blockchain_statistics (id, block_start, block_end) values ($1, $2, $3) on conflict do nothing returning id
 `

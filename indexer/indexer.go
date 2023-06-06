@@ -319,7 +319,10 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 
 	statsID, err := i.queries.InsertStatistic(ctx, indexerdb.InsertStatisticParams{ID: persist.GenerateID(), BlockStart: start, BlockEnd: start + blocksPerLogsCall})
 	if err != nil {
-		panic(err)
+		logger.For(ctx).Infof("failed to insert statistic: %s", err)
+		stat, _ := i.queries.GetStatisticByBlockRange(ctx, indexerdb.GetStatisticByBlockRangeParams{BlockStart: start, BlockEnd: start + blocksPerLogsCall})
+		statsID = stat.ID
+
 	}
 
 	go func() {
@@ -361,7 +364,9 @@ func (i *indexer) startNewBlocksPipeline(ctx context.Context, topics [][]common.
 
 	statsID, err := i.queries.InsertStatistic(ctx, indexerdb.InsertStatisticParams{ID: persist.GenerateID(), BlockStart: persist.BlockNumber(i.lastSyncedChunk), BlockEnd: persist.BlockNumber(mostRecentBlock - (i.mostRecentBlock % blocksPerLogsCall))})
 	if err != nil {
-		panic(err)
+		logger.For(ctx).Infof("failed to insert statistic: %s", err)
+		stat, _ := i.queries.GetStatisticByBlockRange(ctx, indexerdb.GetStatisticByBlockRangeParams{BlockStart: persist.BlockNumber(i.lastSyncedChunk), BlockEnd: persist.BlockNumber(mostRecentBlock - (i.mostRecentBlock % blocksPerLogsCall))})
+		statsID = stat.ID
 	}
 
 	go i.pollNewLogs(sentryutil.NewSentryHubContext(ctx), transfers, topics, mostRecentBlock, statsID)
@@ -891,7 +896,7 @@ type AlchemyContractMetadata struct {
 func fillContractFields(ctx context.Context, contracts []persist.Contract, queries *indexerdb.Queries, contractRepo persist.ContractRepository, httpClient *http.Client, ethClient *ethclient.Client, contractOwnerStats *sync.Map, upChan chan<- []persist.Contract, statsID persist.DBID) {
 	defer close(upChan)
 
-	innerPipelineStats := map[any]any{}
+	innerPipelineStats := map[persist.ContractOwnerMethod]interface{}{}
 
 	contractsNotInDB := make(chan persist.Contract)
 
