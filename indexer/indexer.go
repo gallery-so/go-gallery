@@ -317,7 +317,7 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 	plugins := NewTransferPlugins(ctx)
 	enabledPlugins := []chan<- TransferPluginMsg{plugins.contracts.in}
 
-	statsID, err := i.queries.InsertStatistic(ctx, indexerdb.InsertStatisticParams{BlockStart: start, BlockEnd: start + blocksPerLogsCall})
+	statsID, err := i.queries.InsertStatistic(ctx, indexerdb.InsertStatisticParams{ID: persist.GenerateID(), BlockStart: start, BlockEnd: start + blocksPerLogsCall})
 	if err != nil {
 		panic(err)
 	}
@@ -359,7 +359,7 @@ func (i *indexer) startNewBlocksPipeline(ctx context.Context, topics [][]common.
 		return
 	}
 
-	statsID, err := i.queries.InsertStatistic(ctx, indexerdb.InsertStatisticParams{BlockStart: persist.BlockNumber(i.lastSyncedChunk), BlockEnd: persist.BlockNumber(mostRecentBlock - (i.mostRecentBlock % blocksPerLogsCall))})
+	statsID, err := i.queries.InsertStatistic(ctx, indexerdb.InsertStatisticParams{ID: persist.GenerateID(), BlockStart: persist.BlockNumber(i.lastSyncedChunk), BlockEnd: persist.BlockNumber(mostRecentBlock - (i.mostRecentBlock % blocksPerLogsCall))})
 	if err != nil {
 		panic(err)
 	}

@@ -100,16 +100,17 @@ func (q *Queries) GetReprocessJobRangeByID(ctx context.Context, id int) (Reproce
 }
 
 const insertStatistic = `-- name: InsertStatistic :one
-insert into blockchain_statistics (block_start, block_end) values ($1, $2) returning id
+insert into blockchain_statistics (id, block_start, block_end) values ($1, $2, $3) on conflict do nothing returning id
 `
 
 type InsertStatisticParams struct {
+	ID         persist.DBID
 	BlockStart persist.BlockNumber
 	BlockEnd   persist.BlockNumber
 }
 
 func (q *Queries) InsertStatistic(ctx context.Context, arg InsertStatisticParams) (persist.DBID, error) {
-	row := q.db.QueryRow(ctx, insertStatistic, arg.BlockStart, arg.BlockEnd)
+	row := q.db.QueryRow(ctx, insertStatistic, arg.ID, arg.BlockStart, arg.BlockEnd)
 	var id persist.DBID
 	err := row.Scan(&id)
 	return id, err
