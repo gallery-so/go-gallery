@@ -46,7 +46,6 @@ type errNoDataFromReader struct {
 
 type errNoDataFromOpensea struct {
 	err error
-	url string
 }
 
 type errNotCacheable struct {
@@ -104,7 +103,7 @@ func (e errNoCachedObjects) Error() string {
 }
 
 func (e errNoDataFromOpensea) Error() string {
-	return fmt.Sprintf("no data from opensea: %s (url: %s)", e.err, e.url)
+	return fmt.Sprintf("no data from opensea: %s", e.err)
 }
 
 func (e errNoDataFromOpensea) Unwrap() error {
@@ -1014,7 +1013,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 func cacheObjectsFromOpensea(pCtx context.Context, tids persist.TokenIdentifiers, mediaURL string, oType objectType, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, bucket string, subMeta *cachePipelineMetadata) ([]cachedMediaObject, error) {
 	assets, err := opensea.FetchAssetsForTokenIdentifiers(pCtx, persist.EthereumAddress(tids.ContractAddress), opensea.TokenID(tids.TokenID.Base10String()))
 	if err != nil || len(assets) == 0 {
-		return nil, errNoDataFromOpensea{err: err, url: mediaURL}
+		return nil, errNoDataFromOpensea{err: err}
 	}
 
 	for _, asset := range assets {
@@ -1032,7 +1031,7 @@ func cacheObjectsFromOpensea(pCtx context.Context, tids persist.TokenIdentifiers
 		}
 		return objects, nil
 	}
-	return nil, errNoDataFromOpensea{err: err, url: mediaURL}
+	return nil, errNoDataFromOpensea{err: err}
 }
 
 func thumbnailVideoToWriter(ctx context.Context, url string, writer io.Writer) error {
@@ -1066,13 +1065,19 @@ func (e errNoStreams) Error() string {
 }
 
 func getMediaDimensions(ctx context.Context, url string) (persist.Dimensions, error) {
-	outBuf := bytes.NewBuffer(nil)
+	outBuf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
 	c := exec.CommandContext(ctx, "ffprobe", "-hide_banner", "-loglevel", "error", "-show_streams", url, "-print_format", "json")
-	c.Stderr = os.Stderr
+	c.Stderr = errBuf
 	c.Stdout = outBuf
 	err := c.Run()
 	if err != nil {
-		logger.For(ctx).Warnf("failed to get dimensions for %s: %s", url, err)
+		errMsg := err.Error()
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			errMsg = errBuf.String()
+		}
+		logger.For(ctx).Warnf("failed to get dimensions for %s: %s", url, errMsg)
 		return getMediaDimensionsBackup(ctx, url)
 	}
 
@@ -1108,7 +1113,7 @@ func getMediaDimensions(ctx context.Context, url string) (persist.Dimensions, er
 }
 
 func getMediaDimensionsBackup(ctx context.Context, url string) (persist.Dimensions, error) {
-	outBuf := bytes.NewBuffer(nil)
+	outBuf := new(bytes.Buffer)
 	curlCmd := exec.CommandContext(ctx, "curl", "-s", url)
 	identifyCmd := exec.CommandContext(ctx, "identify", "-format", "%wx%h", "-")
 	identifyCmd.Stderr = os.Stderr
