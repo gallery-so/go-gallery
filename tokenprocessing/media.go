@@ -142,7 +142,7 @@ func cacheImageObjects(ctx context.Context, imageURL string, metadata persist.To
 		ThumbnailGCP:                 &job.pipelineMetadata.ImageThumbnailGCP,
 		LiveRenderGCP:                &job.pipelineMetadata.ImageLiveRenderGCP,
 	}
-	return asyncCacheObjectsForURL(ctx, tids, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, objectTypeAnimation, imageURL, job.tp.tokenBucket, runMetadata)
+	return asyncCacheObjectsForURL(ctx, tids, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, objectTypeImage, imageURL, job.tp.tokenBucket, runMetadata)
 }
 
 func cacheAnimationObjects(ctx context.Context, animationURL string, metadata persist.TokenMetadata, job *tokenProcessingJob) chan cacheResult {
