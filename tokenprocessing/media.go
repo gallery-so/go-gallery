@@ -640,7 +640,7 @@ func purgeIfExists(ctx context.Context, bucket string, fileName string, client *
 
 func persistToStorage(ctx context.Context, client *storage.Client, reader io.Reader, bucket string, object cachedMediaObject, metadata map[string]string) error {
 	writer := newObjectWriter(ctx, client, bucket, object.fileName(), object.ContentType, object.ContentLength, metadata)
-	if _, err := io.Copy(writer, reader); err != nil {
+	if _, err := io.Copy(writer, util.NewLoggingReader(ctx, reader, reader.(io.WriterTo))); err != nil {
 		return errStoreObjectFailed{err: err, bucket: bucket, object: object}
 	}
 	return writer.Close()
@@ -723,6 +723,7 @@ func cacheRawMedia(ctx context.Context, reader *util.FileHeaderReader, tids pers
 		persist.FailStep(subMeta.StoreGCP)
 		return cachedMediaObject{}, err
 	}
+
 	purgeIfExists(ctx, bucket, object.fileName(), client)
 	return object, err
 }
@@ -1191,7 +1192,7 @@ func newObjectWriter(ctx context.Context, client *storage.Client, bucket, fileNa
 		writer.ObjectAttrs.ContentType = *contentType
 	}
 	writer.ProgressFunc = func(written int64) {
-		logger.For(ctx).Debugf("wrote %s to %s", util.InByteSizeFormat(uint64(written)), fileName)
+		logger.For(ctx).Infof("wrote %s to %s", util.InByteSizeFormat(uint64(written)), fileName)
 	}
 	writer.ObjectAttrs.Metadata = objMetadata
 	writer.ObjectAttrs.CacheControl = "no-cache, no-store"
