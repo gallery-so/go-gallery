@@ -490,7 +490,6 @@ func testUpdateUserExperiences(t *testing.T) {
 func testConnectSocialAccount(t *testing.T) {
 	userF := newUserFixture(t)
 	c := authedHandlerClient(t, userF.ID)
-	dc := defaultHandlerClient(t)
 
 	connectResp, err := connectSocialAccount(context.Background(), c, SocialAuthMechanism{
 		Debug: &DebugSocialAuth{
@@ -521,10 +520,13 @@ func testConnectSocialAccount(t *testing.T) {
 	assert.Equal(t, updateDisplayedPayload.Viewer.SocialAccounts.Twitter.Username, "test")
 	assert.False(t, updateDisplayedPayload.Viewer.SocialAccounts.Twitter.Display)
 
-	userResp, err := userByIdQuery(context.Background(), dc, userF.ID)
-	require.NoError(t, err)
-	userPayload := (*userResp.UserById).(*userByIdQueryUserByIdGalleryUser)
-	assert.Nil(t, userPayload.SocialAccounts.Twitter)
+	// For now, we're always returning the user's social accounts despite preference setting.
+	// If there's community significant pushback about this then we can reinstate the feature.
+	// dc := defaultHandlerClient(t)
+	// userResp, err := userByIdQuery(context.Background(), dc, userF.ID)
+	// require.NoError(t, err)
+	// userPayload := (*userResp.UserById).(*userByIdQueryUserByIdGalleryUser)
+	// assert.Nil(t, userPayload.SocialAccounts.Twitter)
 
 	disconnectResp, err := disconnectSocialAccount(context.Background(), c, SocialAccountTypeTwitter)
 	require.NoError(t, err)
