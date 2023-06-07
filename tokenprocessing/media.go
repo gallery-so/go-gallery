@@ -14,7 +14,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -120,6 +119,9 @@ func (e errStoreObjectFailed) Unwrap() error {
 	return e.err
 }
 
+type animationURL string
+type imageURL string
+
 type cachePipelineMetadata struct {
 	ContentHeaderValueRetrieval  *persist.PipelineStepStatus
 	ReaderRetrieval              *persist.PipelineStepStatus
@@ -132,7 +134,7 @@ type cachePipelineMetadata struct {
 	LiveRenderGCP                *persist.PipelineStepStatus
 }
 
-func cacheImageObjects(ctx context.Context, imageURL string, metadata persist.TokenMetadata, job *tokenProcessingJob) chan cacheResult {
+func cacheImageObjects(ctx context.Context, imageURL imageURL, metadata persist.TokenMetadata, job *tokenProcessingJob) chan cacheResult {
 	tids := persist.NewTokenIdentifiers(job.contract.Address, job.token.TokenID, job.token.Chain)
 	runMetadata := &cachePipelineMetadata{
 		ContentHeaderValueRetrieval:  &job.pipelineMetadata.ImageContentHeaderValueRetrieval,
@@ -145,10 +147,10 @@ func cacheImageObjects(ctx context.Context, imageURL string, metadata persist.To
 		ThumbnailGCP:                 &job.pipelineMetadata.ImageThumbnailGCP,
 		LiveRenderGCP:                &job.pipelineMetadata.ImageLiveRenderGCP,
 	}
-	return asyncCacheObjectsForURL(ctx, tids, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, objectTypeImage, imageURL, job.tp.tokenBucket, runMetadata)
+	return asyncCacheObjectsForURL(ctx, tids, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, objectTypeImage, string(imageURL), job.tp.tokenBucket, runMetadata)
 }
 
-func cacheAnimationObjects(ctx context.Context, animationURL string, metadata persist.TokenMetadata, job *tokenProcessingJob) chan cacheResult {
+func cacheAnimationObjects(ctx context.Context, animationURL animationURL, metadata persist.TokenMetadata, job *tokenProcessingJob) chan cacheResult {
 	tids := persist.NewTokenIdentifiers(job.contract.Address, job.token.TokenID, job.token.Chain)
 	runMetadata := &cachePipelineMetadata{
 		ContentHeaderValueRetrieval:  &job.pipelineMetadata.AnimationContentHeaderValueRetrieval,
@@ -161,7 +163,7 @@ func cacheAnimationObjects(ctx context.Context, animationURL string, metadata pe
 		ThumbnailGCP:                 &job.pipelineMetadata.AnimationThumbnailGCP,
 		LiveRenderGCP:                &job.pipelineMetadata.AnimationLiveRenderGCP,
 	}
-	return asyncCacheObjectsForURL(ctx, tids, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, objectTypeAnimation, animationURL, job.tp.tokenBucket, runMetadata)
+	return asyncCacheObjectsForURL(ctx, tids, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, objectTypeAnimation, string(animationURL), job.tp.tokenBucket, runMetadata)
 }
 
 func cacheOpenSeaObjects(ctx context.Context, job *tokenProcessingJob) ([]cachedMediaObject, error) {
@@ -513,7 +515,7 @@ func remapMedia(media persist.Media) persist.Media {
 	return media
 }
 
-func findImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, metadata persist.TokenMetadata, tokenURI persist.TokenURI, predict bool, pMeta *persist.PipelineMetadata) (imgURL string, vURL string, err error) {
+func findImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, metadata persist.TokenMetadata, tokenURI persist.TokenURI, predict bool, pMeta *persist.PipelineMetadata) (imgURL imageURL, vURL animationURL, err error) {
 
 	traceCallback, ctx := persist.TrackStepStatus(ctx, &pMeta.MediaURLsRetrieval, "MediaURLsRetrieval")
 	defer traceCallback()
@@ -529,9 +531,9 @@ func findImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, con
 		if uri, ok := metaMedia["uri"].(string); ok {
 			switch mediaType {
 			case persist.MediaTypeImage, persist.MediaTypeSVG, persist.MediaTypeGIF:
-				imgURL = uri
+				imgURL = imageURL(uri)
 			default:
-				vURL = uri
+				vURL = animationURL(uri)
 			}
 		}
 	}
@@ -540,15 +542,15 @@ func findImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, con
 	for _, keyword := range anim {
 		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && it != "" {
 			logger.For(ctx).Debugf("found initial animation url from '%s': %s", keyword, it)
-			vURL = it
+			vURL = animationURL(it)
 			break
 		}
 	}
 
 	for _, keyword := range image {
-		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && it != "" && it != vURL {
+		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && string(it) != "" && animationURL(it) != vURL {
 			logger.For(ctx).Debugf("found initial image url from '%s': %s", keyword, it)
-			imgURL = it
+			imgURL = imageURL(it)
 			break
 		}
 	}
@@ -579,18 +581,18 @@ func findNameAndDescription(ctx context.Context, metadata persist.TokenMetadata)
 	return name, description
 }
 
-func predictTrueURLs(ctx context.Context, curImg, curV string) (string, string) {
-	imgMediaType, _, _, err := media.PredictMediaType(ctx, curImg)
+func predictTrueURLs(ctx context.Context, curImg imageURL, curV animationURL) (imageURL, animationURL) {
+	imgMediaType, _, _, err := media.PredictMediaType(ctx, string(curImg))
 	if err != nil {
 		return curImg, curV
 	}
-	vMediaType, _, _, err := media.PredictMediaType(ctx, curV)
+	vMediaType, _, _, err := media.PredictMediaType(ctx, string(curV))
 	if err != nil {
 		return curImg, curV
 	}
 
 	if imgMediaType.IsAnimationLike() && !vMediaType.IsAnimationLike() {
-		return curV, curImg
+		return imageURL(curV), animationURL(curImg)
 	}
 
 	if !imgMediaType.IsValid() || !vMediaType.IsValid() {
@@ -598,27 +600,10 @@ func predictTrueURLs(ctx context.Context, curImg, curV string) (string, string) 
 	}
 
 	if imgMediaType.IsMorePriorityThan(vMediaType) {
-		return curV, curImg
+		return imageURL(curV), animationURL(curImg)
 	}
 
 	return curImg, curV
-}
-
-func getThumbnailURL(pCtx context.Context, tokenBucket string, name string, imgURL string, storageClient *storage.Client) string {
-	if storageImageURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("image-%s", name), storageClient); err == nil {
-		logger.For(pCtx).Infof("found imageURL for thumbnail %s: %s", name, storageImageURL)
-		return storageImageURL
-	} else if storageImageURL, err = getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("svg-%s", name), storageClient); err == nil {
-		logger.For(pCtx).Infof("found svg for thumbnail %s: %s", name, storageImageURL)
-		return storageImageURL
-	} else if imgURL != "" && persist.TokenURI(imgURL).IsRenderable() {
-		logger.For(pCtx).Infof("using imgURL for thumbnail %s: %s", name, imgURL)
-		return imgURL
-	} else if storageImageURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("thumbnail-%s", name), storageClient); err == nil {
-		logger.For(pCtx).Infof("found thumbnailURL for %s: %s", name, storageImageURL)
-		return storageImageURL
-	}
-	return ""
 }
 
 func objectExists(ctx context.Context, client *storage.Client, bucket, fileName string) (bool, error) {
@@ -646,7 +631,12 @@ func purgeIfExists(ctx context.Context, bucket string, fileName string, client *
 
 func persistToStorage(ctx context.Context, client *storage.Client, reader io.Reader, bucket string, object cachedMediaObject, metadata map[string]string) error {
 	writer := newObjectWriter(ctx, client, bucket, object.fileName(), object.ContentType, object.ContentLength, metadata)
-	if _, err := io.Copy(writer, util.NewLoggingReader(ctx, reader, reader.(io.WriterTo))); err != nil {
+	if written, err := io.Copy(writer, util.NewLoggingReader(ctx, reader, reader.(io.WriterTo))); err != nil {
+		if object.ContentLength != nil {
+			logger.For(ctx).Error("wrote %d out of %d bytes before error: %s", written, *object.ContentLength, err)
+		} else {
+			logger.For(ctx).Error("wrote %d out of an unknown number of bytes before error: %s", written, err)
+		}
 		return errStoreObjectFailed{err: err, bucket: bucket, object: object}
 	}
 	return writer.Close()
@@ -752,8 +742,13 @@ func cacheRawAnimationMedia(ctx context.Context, reader *util.FileHeaderReader, 
 	})
 	writer := gzip.NewWriter(sw)
 
-	_, err := io.Copy(writer, util.NewLoggingReader(ctx, reader, reader))
+	written, err := io.Copy(writer, util.NewLoggingReader(ctx, reader, reader))
 	if err != nil {
+		if object.ContentLength != nil {
+			logger.For(ctx).Error("wrote %d out of %d bytes before error: %s", written, *object.ContentLength, err)
+		} else {
+			logger.For(ctx).Error("wrote %d out of an unknown number of bytes before error: %s", written, err)
+		}
 		persist.FailStep(subMeta.AnimationGzip)
 		return cachedMediaObject{}, errStoreObjectFailed{err: err, bucket: bucket, object: object}
 	}
@@ -1161,16 +1156,26 @@ func cacheObjectsFromOpensea(pCtx context.Context, tids persist.TokenIdentifiers
 
 func thumbnailVideoToWriter(ctx context.Context, url string, writer io.Writer) error {
 	c := exec.CommandContext(ctx, "ffmpeg", "-hide_banner", "-loglevel", "error", "-i", url, "-ss", "00:00:00.000", "-vframes", "1", "-f", "mjpeg", "pipe:1")
-	c.Stderr = os.Stderr
+	errBuf := new(bytes.Buffer)
+	c.Stderr = errBuf
 	c.Stdout = writer
-	return c.Run()
+	err := c.Run()
+	if _, ok := isExitErr(err); ok {
+		return errors.New(errBuf.String())
+	}
+	return err
 }
 
 func createLiveRenderPreviewVideo(ctx context.Context, videoURL string, writer io.Writer) error {
 	c := exec.CommandContext(ctx, "ffmpeg", "-hide_banner", "-loglevel", "error", "-i", videoURL, "-ss", "00:00:00.000", "-t", "00:00:05.000", "-filter:v", "scale=720:trunc(ow/a/2)*2", "-c:a", "aac", "-shortest", "-movflags", "frag_keyframe+empty_moov", "-f", "mp4", "pipe:1")
-	c.Stderr = os.Stderr
+	errBuf := new(bytes.Buffer)
+	c.Stderr = errBuf
 	c.Stdout = writer
-	return c.Run()
+	err := c.Run()
+	if _, ok := isExitErr(err); ok {
+		return errors.New(errBuf.String())
+	}
+	return nil
 }
 
 type dimensions struct {
@@ -1190,24 +1195,16 @@ func (e errNoStreams) Error() string {
 }
 
 func getMediaDimensions(ctx context.Context, url string) (persist.Dimensions, error) {
-	outBuf := new(bytes.Buffer)
-	errBuf := new(bytes.Buffer)
 	c := exec.CommandContext(ctx, "ffprobe", "-hide_banner", "-loglevel", "error", "-show_streams", url, "-print_format", "json")
-	c.Stderr = errBuf
-	c.Stdout = outBuf
-	err := c.Run()
+	outBuf, err := c.Output()
 	if err != nil {
-		errMsg := err.Error()
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			errMsg = errBuf.String()
-		}
-		logger.For(ctx).Warnf("failed to get dimensions for %s: %s", url, errMsg)
+		err = errFromExitErr(err)
+		logger.For(ctx).Warnf("failed to get dimensions for %s: %s", url, err)
 		return getMediaDimensionsBackup(ctx, url)
 	}
 
 	var d dimensions
-	err = json.Unmarshal(outBuf.Bytes(), &d)
+	err = json.Unmarshal(outBuf, &d)
 	if err != nil {
 		return persist.Dimensions{}, fmt.Errorf("failed to unmarshal ffprobe output: %w", err)
 	}
@@ -1238,11 +1235,8 @@ func getMediaDimensions(ctx context.Context, url string) (persist.Dimensions, er
 }
 
 func getMediaDimensionsBackup(ctx context.Context, url string) (persist.Dimensions, error) {
-	outBuf := bytes.NewBuffer(nil)
 	curlCmd := exec.CommandContext(ctx, "curl", "-s", url)
 	identifyCmd := exec.CommandContext(ctx, "identify", "-format", "%wx%h", "-")
-	identifyCmd.Stderr = os.Stderr
-	identifyCmd.Stdout = outBuf
 
 	curlCmdStdout, err := curlCmd.StdoutPipe()
 	if err != nil {
@@ -1256,9 +1250,9 @@ func getMediaDimensionsBackup(ctx context.Context, url string) (persist.Dimensio
 		return persist.Dimensions{}, fmt.Errorf("failed to start curl command: %w", err)
 	}
 
-	err = identifyCmd.Run()
+	outBuf, err := identifyCmd.Output()
 	if err != nil {
-		return persist.Dimensions{}, err
+		return persist.Dimensions{}, errFromExitErr(err)
 	}
 
 	err = curlCmd.Wait()
@@ -1266,7 +1260,7 @@ func getMediaDimensionsBackup(ctx context.Context, url string) (persist.Dimensio
 		return persist.Dimensions{}, fmt.Errorf("curl command exited with error: %w", err)
 	}
 
-	dimensionsStr := outBuf.String()
+	dimensionsStr := string(outBuf)
 	dimensionsSplit := strings.Split(dimensionsStr, "x")
 	if len(dimensionsSplit) != 2 {
 		return persist.Dimensions{}, fmt.Errorf("unexpected output format from identify: %s", dimensionsStr)
@@ -1338,4 +1332,19 @@ func contentLengthToChunkSize(contentLength *int64) int {
 		return 16 * 1024 * 1024
 	}
 	return 4 * 1024 * 1024
+}
+
+func errFromExitErr(err error) error {
+	if exitErr, ok := isExitErr(err); ok {
+		return errors.New(string(exitErr.Stderr))
+	}
+	return err
+}
+
+func isExitErr(err error) (*exec.ExitError, bool) {
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		return exitErr, true
+	}
+	return nil, false
 }
