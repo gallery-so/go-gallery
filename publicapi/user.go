@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/jackc/pgx/v4"
 	"time"
+
+	"github.com/jackc/pgx/v4"
 
 	"github.com/jackc/pgtype"
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -993,12 +994,6 @@ func (api UserAPI) GetDisplayedSocials(ctx context.Context, userID persist.DBID)
 	socials, err := api.queries.GetSocialsByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
-	}
-
-	for prov, social := range socials {
-		if !social.Display {
-			delete(socials, prov)
-		}
 	}
 
 	result := &model.SocialAccounts{}
