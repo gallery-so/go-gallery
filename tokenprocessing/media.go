@@ -633,7 +633,7 @@ func persistToStorage(ctx context.Context, client *storage.Client, reader io.Rea
 	writer := newObjectWriter(ctx, client, bucket, object.fileName(), object.ContentType, object.ContentLength, metadata)
 	if written, err := io.Copy(writer, util.NewLoggingReader(ctx, reader, reader.(io.WriterTo))); err != nil {
 		if object.ContentLength != nil {
-			logger.For(ctx).Error("wrote %d out of %d bytes before error: %s", written, object.ContentLength, err)
+			logger.For(ctx).Error("wrote %d out of %d bytes before error: %s", written, *object.ContentLength, err)
 		} else {
 			logger.For(ctx).Error("wrote %d out of an unknown number of bytes before error: %s", written, err)
 		}
@@ -745,7 +745,7 @@ func cacheRawAnimationMedia(ctx context.Context, reader *util.FileHeaderReader, 
 	written, err := io.Copy(writer, util.NewLoggingReader(ctx, reader, reader))
 	if err != nil {
 		if object.ContentLength != nil {
-			logger.For(ctx).Error("wrote %d out of %d bytes before error: %s", written, object.ContentLength, err)
+			logger.For(ctx).Error("wrote %d out of %d bytes before error: %s", written, *object.ContentLength, err)
 		} else {
 			logger.For(ctx).Error("wrote %d out of an unknown number of bytes before error: %s", written, err)
 		}
@@ -1115,14 +1115,26 @@ func cacheObjectsFromOpensea(pCtx context.Context, tids persist.TokenIdentifiers
 
 func thumbnailVideoToWriter(ctx context.Context, url string, writer io.Writer) error {
 	c := exec.CommandContext(ctx, "ffmpeg", "-hide_banner", "-loglevel", "error", "-i", url, "-ss", "00:00:00.000", "-vframes", "1", "-f", "mjpeg", "pipe:1")
-	_, err := c.Output()
-	return errFromExitErr(err)
+	errBuf := new(bytes.Buffer)
+	c.Stderr = errBuf
+	c.Stdout = writer
+	err := c.Run()
+	if _, ok := isExitErr(err); ok {
+		return errors.New(errBuf.String())
+	}
+	return err
 }
 
 func createLiveRenderPreviewVideo(ctx context.Context, videoURL string, writer io.Writer) error {
 	c := exec.CommandContext(ctx, "ffmpeg", "-hide_banner", "-loglevel", "error", "-i", videoURL, "-ss", "00:00:00.000", "-t", "00:00:05.000", "-filter:v", "scale=720:trunc(ow/a/2)*2", "-c:a", "aac", "-shortest", "-movflags", "frag_keyframe+empty_moov", "-f", "mp4", "pipe:1")
-	_, err := c.Output()
-	return errFromExitErr(err)
+	errBuf := new(bytes.Buffer)
+	c.Stderr = errBuf
+	c.Stdout = writer
+	err := c.Run()
+	if _, ok := isExitErr(err); ok {
+		return errors.New(errBuf.String())
+	}
+	return nil
 }
 
 type dimensions struct {
@@ -1282,9 +1294,16 @@ func contentLengthToChunkSize(contentLength *int64) int {
 }
 
 func errFromExitErr(err error) error {
-	var exitErr *exec.ExitError
-	if errors.As(err, &exitErr) {
+	if exitErr, ok := isExitErr(err); ok {
 		return errors.New(string(exitErr.Stderr))
 	}
 	return err
+}
+
+func isExitErr(err error) (*exec.ExitError, bool) {
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		return exitErr, true
+	}
+	return nil, false
 }
