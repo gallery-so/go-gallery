@@ -607,23 +607,6 @@ func predictTrueURLs(ctx context.Context, curImg imageURL, curV animationURL) (i
 	return curImg, curV
 }
 
-func getThumbnailURL(pCtx context.Context, tokenBucket string, name string, imgURL string, storageClient *storage.Client) string {
-	if storageImageURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("image-%s", name), storageClient); err == nil {
-		logger.For(pCtx).Infof("found imageURL for thumbnail %s: %s", name, storageImageURL)
-		return storageImageURL
-	} else if storageImageURL, err = getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("svg-%s", name), storageClient); err == nil {
-		logger.For(pCtx).Infof("found svg for thumbnail %s: %s", name, storageImageURL)
-		return storageImageURL
-	} else if imgURL != "" && persist.TokenURI(imgURL).IsRenderable() {
-		logger.For(pCtx).Infof("using imgURL for thumbnail %s: %s", name, imgURL)
-		return imgURL
-	} else if storageImageURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("thumbnail-%s", name), storageClient); err == nil {
-		logger.For(pCtx).Infof("found thumbnailURL for %s: %s", name, storageImageURL)
-		return storageImageURL
-	}
-	return ""
-}
-
 func objectExists(ctx context.Context, client *storage.Client, bucket, fileName string) (bool, error) {
 	objHandle := client.Bucket(bucket).Object(fileName)
 	_, err := objHandle.Attrs(ctx)
