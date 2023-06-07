@@ -631,7 +631,12 @@ func purgeIfExists(ctx context.Context, bucket string, fileName string, client *
 
 func persistToStorage(ctx context.Context, client *storage.Client, reader io.Reader, bucket string, object cachedMediaObject, metadata map[string]string) error {
 	writer := newObjectWriter(ctx, client, bucket, object.fileName(), object.ContentType, object.ContentLength, metadata)
-	if _, err := io.Copy(writer, util.NewLoggingReader(ctx, reader, reader.(io.WriterTo))); err != nil {
+	if written, err := io.Copy(writer, util.NewLoggingReader(ctx, reader, reader.(io.WriterTo))); err != nil {
+		if object.ContentLength != nil {
+			logger.For(ctx).Error("wrote %d out of %d bytes before error: %s", written, object.ContentLength, err)
+		} else {
+			logger.For(ctx).Error("wrote %d out of an unknown number of bytes before error: %s", written, err)
+		}
 		return errStoreObjectFailed{err: err, bucket: bucket, object: object}
 	}
 	return writer.Close()
@@ -737,8 +742,13 @@ func cacheRawAnimationMedia(ctx context.Context, reader *util.FileHeaderReader, 
 	})
 	writer := gzip.NewWriter(sw)
 
-	_, err := io.Copy(writer, util.NewLoggingReader(ctx, reader, reader))
+	written, err := io.Copy(writer, util.NewLoggingReader(ctx, reader, reader))
 	if err != nil {
+		if object.ContentLength != nil {
+			logger.For(ctx).Error("wrote %d out of %d bytes before error: %s", written, object.ContentLength, err)
+		} else {
+			logger.For(ctx).Error("wrote %d out of an unknown number of bytes before error: %s", written, err)
+		}
 		persist.FailStep(subMeta.AnimationGzip)
 		return cachedMediaObject{}, errStoreObjectFailed{err: err, bucket: bucket, object: object}
 	}
