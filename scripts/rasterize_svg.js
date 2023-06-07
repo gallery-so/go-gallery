@@ -55,7 +55,7 @@ async function createAnimation() {
     args: args,
   });
   const page = await browser.newPage();
-  await page.goto(url, { waitUntil: 'networkidle2' });
+  await page.goto(url);
 
   let svgDimensions = await page.evaluate(() => {
     let svg = document.querySelector('svg');
