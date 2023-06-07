@@ -125,13 +125,13 @@ async function createAnimation() {
     }
   }
 
-  // If all frames are identical, save as PNG
   const pngBuffer = PNG.sync.write(frames[0]);
   console.log('PNG');
   console.log(Buffer.from(pngBuffer).toString('base64'));
   if (process.argv.length > 3 && process.argv[3]) fs.writeFileSync('test.png', pngBuffer);
+
   if (!isStatic) {
-    // If frames are different, save as GIF
+    // If frames are different, save a gif as well
     const encoder = new GIFEncoder(frames[0].width, frames[0].height);
     const stream = encoder.createReadStream();
     let gifBuffer = Buffer.alloc(0);
