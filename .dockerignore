@@ -29,3 +29,6 @@
 !tests
 !static
 !env
+!scripts
+!package.json
+!package-lock.json

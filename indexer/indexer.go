@@ -888,7 +888,7 @@ type AlchemyContractMetadata struct {
 func fillContractFields(ctx context.Context, contracts []persist.Contract, queries *indexerdb.Queries, contractRepo persist.ContractRepository, httpClient *http.Client, ethClient *ethclient.Client, contractOwnerStats *sync.Map, upChan chan<- []persist.Contract, statsID persist.DBID) {
 	defer close(upChan)
 
-	innerPipelineStats := map[any]any{}
+	innerPipelineStats := map[persist.ContractOwnerMethod]any{}
 
 	contractsNotInDB := make(chan persist.Contract)
 

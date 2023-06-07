@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -124,6 +126,7 @@ type cachePipelineMetadata struct {
 	OpenseaFallback              *persist.PipelineStepStatus
 	DetermineMediaTypeWithReader *persist.PipelineStepStatus
 	AnimationGzip                *persist.PipelineStepStatus
+	SVGRasterize                 *persist.PipelineStepStatus
 	StoreGCP                     *persist.PipelineStepStatus
 	ThumbnailGCP                 *persist.PipelineStepStatus
 	LiveRenderGCP                *persist.PipelineStepStatus
@@ -137,6 +140,7 @@ func cacheImageObjects(ctx context.Context, imageURL string, metadata persist.To
 		OpenseaFallback:              &job.pipelineMetadata.ImageOpenseaFallback,
 		DetermineMediaTypeWithReader: &job.pipelineMetadata.ImageDetermineMediaTypeWithReader,
 		AnimationGzip:                &job.pipelineMetadata.ImageAnimationGzip,
+		SVGRasterize:                 &job.pipelineMetadata.ImageSVGRasterize,
 		StoreGCP:                     &job.pipelineMetadata.ImageStoreGCP,
 		ThumbnailGCP:                 &job.pipelineMetadata.ImageThumbnailGCP,
 		LiveRenderGCP:                &job.pipelineMetadata.ImageLiveRenderGCP,
@@ -152,6 +156,7 @@ func cacheAnimationObjects(ctx context.Context, animationURL string, metadata pe
 		OpenseaFallback:              &job.pipelineMetadata.AnimationOpenseaFallback,
 		DetermineMediaTypeWithReader: &job.pipelineMetadata.AnimationDetermineMediaTypeWithReader,
 		AnimationGzip:                &job.pipelineMetadata.AnimationAnimationGzip,
+		SVGRasterize:                 &job.pipelineMetadata.AnimationSVGRasterize,
 		StoreGCP:                     &job.pipelineMetadata.AnimationStoreGCP,
 		ThumbnailGCP:                 &job.pipelineMetadata.AnimationThumbnailGCP,
 		LiveRenderGCP:                &job.pipelineMetadata.AnimationLiveRenderGCP,
@@ -167,6 +172,7 @@ func cacheOpenSeaObjects(ctx context.Context, job *tokenProcessingJob) ([]cached
 		OpenseaFallback:              &job.pipelineMetadata.AlternateOpenseaFallback,
 		DetermineMediaTypeWithReader: &job.pipelineMetadata.AlternateDetermineMediaTypeWithReader,
 		AnimationGzip:                &job.pipelineMetadata.AlternateAnimationGzip,
+		SVGRasterize:                 &job.pipelineMetadata.AlternateSVGRasterize,
 		StoreGCP:                     &job.pipelineMetadata.AlternateStoreGCP,
 		ThumbnailGCP:                 &job.pipelineMetadata.AlternateThumbnailGCP,
 		LiveRenderGCP:                &job.pipelineMetadata.AlternateLiveRenderGCP,
@@ -746,7 +752,7 @@ func cacheRawAnimationMedia(ctx context.Context, reader *util.FileHeaderReader, 
 	})
 	writer := gzip.NewWriter(sw)
 
-	_, err := io.Copy(writer, reader)
+	_, err := io.Copy(writer, util.NewLoggingReader(ctx, reader, reader))
 	if err != nil {
 		persist.FailStep(subMeta.AnimationGzip)
 		return cachedMediaObject{}, errStoreObjectFailed{err: err, bucket: bucket, object: object}
@@ -755,6 +761,73 @@ func cacheRawAnimationMedia(ctx context.Context, reader *util.FileHeaderReader, 
 	if err := writer.Close(); err != nil {
 		persist.FailStep(subMeta.AnimationGzip)
 		return cachedMediaObject{}, err
+	}
+
+	if err := sw.Close(); err != nil {
+		persist.FailStep(subMeta.AnimationGzip)
+		return cachedMediaObject{}, err
+	}
+
+	purgeIfExists(ctx, bucket, object.fileName(), client)
+	return object, nil
+}
+
+func rasterizeAndCacheSVGMedia(ctx context.Context, svgURL string, tids persist.TokenIdentifiers, mediaType persist.MediaType, oType objectType, bucket, ogURL string, client *storage.Client, subMeta *cachePipelineMetadata) (cachedMediaObject, error) {
+	traceCallback, ctx := persist.TrackStepStatus(ctx, subMeta.SVGRasterize, "SVGRasterize")
+	defer traceCallback()
+
+	object := cachedMediaObject{
+		MediaType:       mediaType,
+		TokenID:         tids.TokenID,
+		ContractAddress: tids.ContractAddress,
+		Chain:           tids.Chain,
+		ObjectType:      oType,
+	}
+
+	cmd := exec.Command("node", "scripts/rasterize_svg.js", svgURL)
+	output, err := cmd.Output()
+	if err != nil {
+		persist.FailStep(subMeta.SVGRasterize)
+		return cachedMediaObject{}, fmt.Errorf("could not rasterize svg: %s", err)
+	}
+
+	lines := strings.Split(string(output), "\n")
+	if len(lines) < 2 {
+		log.Fatal("Not enough output from script")
+	}
+	dataType := lines[0]
+	base64data := lines[1]
+
+	data, err := base64.StdEncoding.DecodeString(string(base64data))
+	if err != nil {
+		persist.FailStep(subMeta.SVGRasterize)
+		return cachedMediaObject{}, fmt.Errorf("could not decode base64 data: %s", err)
+	}
+
+	var contentType string
+	switch dataType {
+	case "PNG":
+		contentType = "image/png"
+		object.ContentType = &contentType
+		object.MediaType = persist.MediaTypeImage
+	case "GIF":
+		contentType = "image/gif"
+		object.ContentType = &contentType
+		object.MediaType = persist.MediaTypeGIF
+	default:
+		persist.FailStep(subMeta.SVGRasterize)
+		return cachedMediaObject{}, fmt.Errorf("unknown data type: %s", dataType)
+	}
+
+	sw := newObjectWriter(ctx, client, bucket, object.fileName(), object.ContentType, nil, map[string]string{
+		"originalURL": truncateString(ogURL, 100),
+		"mediaType":   mediaType.String(),
+	})
+
+	_, err = sw.Write(data)
+	if err != nil {
+		persist.FailStep(subMeta.AnimationGzip)
+		return cachedMediaObject{}, fmt.Errorf("could not write to bucket %s for %s: %s", bucket, object.fileName(), err)
 	}
 
 	if err := sw.Close(); err != nil {
@@ -1006,6 +1079,16 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 			result = append(result, liveObj)
 		}
 
+	} else if mediaType == persist.MediaTypeSVG {
+		timeBeforeCache := time.Now()
+		obj, err := rasterizeAndCacheSVGMedia(pCtx, obj.storageURL(bucket), tids, mediaType, oType, bucket, mediaURL, storageClient, subMeta)
+		if err != nil {
+			logger.For(pCtx).WithError(err).Error("could not cache svg rasterization")
+			// still return the original object as svg
+			return result, nil
+		}
+		logger.For(pCtx).Infof("cached animation for %s in %s", tids, time.Since(timeBeforeCache))
+		return []cachedMediaObject{obj}, nil
 	}
 
 	return result, nil
