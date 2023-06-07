@@ -772,71 +772,112 @@ func cacheRawAnimationMedia(ctx context.Context, reader *util.FileHeaderReader, 
 	return object, nil
 }
 
-func rasterizeAndCacheSVGMedia(ctx context.Context, svgURL string, tids persist.TokenIdentifiers, mediaType persist.MediaType, oType objectType, bucket, ogURL string, client *storage.Client, subMeta *cachePipelineMetadata) (cachedMediaObject, error) {
+func rasterizeAndCacheSVGMedia(ctx context.Context, svgURL string, tids persist.TokenIdentifiers, bucket, ogURL string, client *storage.Client, subMeta *cachePipelineMetadata) ([]cachedMediaObject, error) {
 	traceCallback, ctx := persist.TrackStepStatus(ctx, subMeta.SVGRasterize, "SVGRasterize")
 	defer traceCallback()
-
-	object := cachedMediaObject{
-		MediaType:       mediaType,
-		TokenID:         tids.TokenID,
-		ContractAddress: tids.ContractAddress,
-		Chain:           tids.Chain,
-		ObjectType:      oType,
-	}
 
 	cmd := exec.Command("node", "scripts/rasterize_svg.js", svgURL)
 	output, err := cmd.Output()
 	if err != nil {
 		persist.FailStep(subMeta.SVGRasterize)
-		return cachedMediaObject{}, fmt.Errorf("could not rasterize svg: %s", err)
+		return nil, fmt.Errorf("could not rasterize svg: %s", err)
 	}
+
+	objects := make([]cachedMediaObject, 0, 2)
 
 	lines := strings.Split(string(output), "\n")
 	if len(lines) < 2 {
 		log.Fatal("Not enough output from script")
 	}
-	dataType := lines[0]
-	base64data := lines[1]
 
-	data, err := base64.StdEncoding.DecodeString(string(base64data))
+	if lines[0] != "PNG" {
+		persist.FailStep(subMeta.SVGRasterize)
+		return nil, fmt.Errorf("could not rasterize svg: %s", lines[0])
+	}
+	pngData := lines[1]
+
+	data, err := base64.StdEncoding.DecodeString(string(pngData))
 	if err != nil {
 		persist.FailStep(subMeta.SVGRasterize)
-		return cachedMediaObject{}, fmt.Errorf("could not decode base64 data: %s", err)
+		return nil, fmt.Errorf("could not decode base64 data: %s", err)
 	}
 
-	var contentType string
-	switch dataType {
-	case "PNG":
-		contentType = "image/png"
-		object.ContentType = &contentType
-		object.MediaType = persist.MediaTypeImage
-	case "GIF":
-		contentType = "image/gif"
-		object.ContentType = &contentType
-		object.MediaType = persist.MediaTypeGIF
-	default:
-		persist.FailStep(subMeta.SVGRasterize)
-		return cachedMediaObject{}, fmt.Errorf("unknown data type: %s", dataType)
+	pngObject := cachedMediaObject{
+		MediaType:       persist.MediaTypeImage,
+		ContentType:     util.ToPointer("image/png"),
+		TokenID:         tids.TokenID,
+		ContractAddress: tids.ContractAddress,
+		Chain:           tids.Chain,
+		ContentLength:   util.ToPointer(int64(len(data))),
+		ObjectType:      objectTypeThumbnail,
 	}
 
-	sw := newObjectWriter(ctx, client, bucket, object.fileName(), object.ContentType, nil, map[string]string{
+	sw := newObjectWriter(ctx, client, bucket, pngObject.fileName(), pngObject.ContentType, pngObject.ContentLength, map[string]string{
 		"originalURL": truncateString(ogURL, 100),
-		"mediaType":   mediaType.String(),
+		"mediaType":   persist.MediaTypeImage.String(),
 	})
 
 	_, err = sw.Write(data)
 	if err != nil {
-		persist.FailStep(subMeta.AnimationGzip)
-		return cachedMediaObject{}, fmt.Errorf("could not write to bucket %s for %s: %s", bucket, object.fileName(), err)
+		persist.FailStep(subMeta.SVGRasterize)
+		return nil, fmt.Errorf("could not write to bucket %s for %s: %s", bucket, pngObject.fileName(), err)
 	}
 
 	if err := sw.Close(); err != nil {
-		persist.FailStep(subMeta.AnimationGzip)
-		return cachedMediaObject{}, err
+		persist.FailStep(subMeta.SVGRasterize)
+		return nil, err
 	}
 
-	purgeIfExists(ctx, bucket, object.fileName(), client)
-	return object, nil
+	purgeIfExists(ctx, bucket, pngObject.fileName(), client)
+
+	objects = append(objects, pngObject)
+
+	if len(lines) == 4 {
+		if lines[2] != "GIF" {
+			persist.FailStep(subMeta.SVGRasterize)
+			return nil, fmt.Errorf("could not rasterize svg: %s", lines[2])
+		}
+		gifData := lines[3]
+
+		data, err := base64.StdEncoding.DecodeString(string(gifData))
+		if err != nil {
+			persist.FailStep(subMeta.SVGRasterize)
+			return nil, fmt.Errorf("could not decode base64 data: %s", err)
+		}
+
+		gifObject := cachedMediaObject{
+			MediaType:       persist.MediaTypeGIF,
+			TokenID:         tids.TokenID,
+			ContractAddress: tids.ContractAddress,
+			Chain:           tids.Chain,
+			ContentType:     util.ToPointer("image/gif"),
+			ContentLength:   util.ToPointer(int64(len(data))),
+			ObjectType:      objectTypeLiveRender,
+		}
+
+		sw := newObjectWriter(ctx, client, bucket, gifObject.fileName(), gifObject.ContentType, gifObject.ContentLength, map[string]string{
+			"originalURL": truncateString(ogURL, 100),
+			"mediaType":   persist.MediaTypeGIF.String(),
+		})
+
+		_, err = sw.Write(data)
+		if err != nil {
+			persist.FailStep(subMeta.SVGRasterize)
+			return nil, fmt.Errorf("could not write to bucket %s for %s: %s", bucket, gifObject.fileName(), err)
+		}
+
+		if err := sw.Close(); err != nil {
+			persist.FailStep(subMeta.AnimationGzip)
+			return nil, err
+		}
+
+		purgeIfExists(ctx, bucket, gifObject.fileName(), client)
+
+		objects = append(objects, gifObject)
+
+	}
+
+	return objects, nil
 }
 
 func thumbnailAndCache(ctx context.Context, tids persist.TokenIdentifiers, videoURL, bucket string, client *storage.Client, subMeta *cachePipelineMetadata) (cachedMediaObject, error) {
@@ -1081,14 +1122,14 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 
 	} else if mediaType == persist.MediaTypeSVG {
 		timeBeforeCache := time.Now()
-		obj, err := rasterizeAndCacheSVGMedia(pCtx, obj.storageURL(bucket), tids, mediaType, oType, bucket, mediaURL, storageClient, subMeta)
+		obj, err := rasterizeAndCacheSVGMedia(pCtx, obj.storageURL(bucket), tids, bucket, mediaURL, storageClient, subMeta)
 		if err != nil {
 			logger.For(pCtx).WithError(err).Error("could not cache svg rasterization")
 			// still return the original object as svg
 			return result, nil
 		}
 		logger.For(pCtx).Infof("cached animation for %s in %s", tids, time.Since(timeBeforeCache))
-		return []cachedMediaObject{obj}, nil
+		return append(result, obj...), nil
 	}
 
 	return result, nil
