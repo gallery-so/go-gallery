@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 )
 
@@ -27,6 +28,7 @@ type LogMetricReporter struct{}
 type LogArgs struct {
 	Tags   map[string]string
 	LogMsg string
+	Level  *logrus.Level
 }
 
 type LogOptionBulder struct{}
@@ -40,6 +42,12 @@ func (LogOptionBulder) WithLogMessage(msg string) func(*LogArgs) {
 func (LogOptionBulder) WithTags(tags map[string]string) func(*LogArgs) {
 	return func(a *LogArgs) {
 		a.Tags = tags
+	}
+}
+
+func (LogOptionBulder) WithLevel(l logrus.Level) func(*LogArgs) {
+	return func(a *LogArgs) {
+		a.Level = &l
 	}
 }
 
@@ -61,5 +69,9 @@ func (l LogMetricReporter) Record(ctx context.Context, metric Measure, opts ...a
 		logLine += ": " + args.LogMsg
 	}
 
-	logger.For(ctx).WithFields(metricPayload).Infof(logLine)
+	if args.Level == nil {
+		args.Level = util.ToPointer(logrus.InfoLevel)
+	}
+
+	logger.For(ctx).WithFields(metricPayload).Log(*args.Level, logLine)
 }

@@ -873,18 +873,6 @@ func (r *mutationResolver) RefreshContract(ctx context.Context, contractID persi
 	return output, nil
 }
 
-// DeepRefresh is the resolver for the deepRefresh field.
-func (r *mutationResolver) DeepRefresh(ctx context.Context, input model.DeepRefreshInput) (model.DeepRefreshPayloadOrError, error) {
-	err := publicapi.For(ctx).Token.DeepRefreshByChain(ctx, input.Chain)
-	if err != nil {
-		return nil, err
-	}
-	return model.DeepRefreshPayload{
-		Chain:     &input.Chain,
-		Submitted: util.ToPointer(true),
-	}, nil
-}
-
 // GetAuthNonce is the resolver for the getAuthNonce field.
 func (r *mutationResolver) GetAuthNonce(ctx context.Context, chainAddress persist.ChainAddress) (model.GetAuthNoncePayloadOrError, error) {
 	nonce, userExists, err := publicapi.For(ctx).Auth.GetAuthNonce(ctx, chainAddress)

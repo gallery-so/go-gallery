@@ -35,8 +35,11 @@ func main() {
 	}()
 	ctx := context.Background()
 	clients := server.ClientInit(ctx)
+	defer clients.Close()
 
-	tp := tokenprocessing.NewTokenProcessor(clients.Queries, clients.EthClient, server.NewMultichainProvider(clients), clients.IPFSClient, clients.ArweaveClient, clients.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), clients.Repos.TokenRepository, metric.NewLogMetricReporter())
+	provider, cleanup := server.NewMultichainProvider(ctx, server.SetDefaults)
+	defer cleanup()
+	tp := tokenprocessing.NewTokenProcessor(clients.Queries, clients.EthClient, provider, clients.IPFSClient, clients.ArweaveClient, clients.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), clients.Repos.TokenRepository, metric.NewLogMetricReporter())
 
 	var rows []coredb.GetSVGTokensWithContractsByIDsRow
 	var err error
@@ -163,7 +166,8 @@ func main() {
 			defer func() {
 				logger.For(ctx).Infof("finished processing %s", token.ID)
 			}()
-			return tp.ProcessTokenPipeline(ctx, token, contract, persist.ProcessingCauseRefresh)
+			_, err = tp.ProcessTokenPipeline(ctx, token, contract, persist.ProcessingCauseRefresh)
+			return err
 		})
 	}
 	go func() {

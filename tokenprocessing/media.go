@@ -48,7 +48,6 @@ type errNoDataFromReader struct {
 
 type errNoDataFromOpensea struct {
 	err error
-	url string
 }
 
 type errNotCacheable struct {
@@ -71,6 +70,12 @@ type errNoMediaURLs struct {
 	tids     persist.TokenIdentifiers
 }
 
+type errStoreObjectFailed struct {
+	bucket string
+	object cachedMediaObject
+	err    error
+}
+
 func (e errNoDataFromReader) Error() string {
 	return fmt.Sprintf("no data from reader: %s (url: %s)", e.err, e.url)
 }
@@ -87,6 +92,10 @@ func (e errInvalidMedia) Error() string {
 	return fmt.Sprintf("invalid media: %s (url: %s)", e.err, e.URL)
 }
 
+func (e errInvalidMedia) Unwrap() error {
+	return e.err
+}
+
 func (e errNoMediaURLs) Error() string {
 	return fmt.Sprintf("no media URLs found in metadata: %s (metadata: %+v, tokenURI: %s)", e.tids, e.metadata, e.tokenURI)
 }
@@ -96,7 +105,19 @@ func (e errNoCachedObjects) Error() string {
 }
 
 func (e errNoDataFromOpensea) Error() string {
-	return fmt.Sprintf("no data from opensea: %s (url: %s)", e.err, e.url)
+	return fmt.Sprintf("no data from opensea: %s", e.err)
+}
+
+func (e errNoDataFromOpensea) Unwrap() error {
+	return e.err
+}
+
+func (e errStoreObjectFailed) Error() string {
+	return fmt.Sprintf("failed to write object to key: %s/%s: %s", e.bucket, e.object.fileName(), e.err)
+}
+
+func (e errStoreObjectFailed) Unwrap() error {
+	return e.err
 }
 
 type cachePipelineMetadata struct {
@@ -124,7 +145,7 @@ func cacheImageObjects(ctx context.Context, imageURL string, metadata persist.To
 		ThumbnailGCP:                 &job.pipelineMetadata.ImageThumbnailGCP,
 		LiveRenderGCP:                &job.pipelineMetadata.ImageLiveRenderGCP,
 	}
-	return asyncCacheObjectsForURL(ctx, tids, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, objectTypeAnimation, imageURL, job.tp.tokenBucket, runMetadata)
+	return asyncCacheObjectsForURL(ctx, tids, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, objectTypeImage, imageURL, job.tp.tokenBucket, runMetadata)
 }
 
 func cacheAnimationObjects(ctx context.Context, animationURL string, metadata persist.TokenMetadata, job *tokenProcessingJob) chan cacheResult {
@@ -156,7 +177,7 @@ func cacheOpenSeaObjects(ctx context.Context, job *tokenProcessingJob) ([]cached
 		ThumbnailGCP:                 &job.pipelineMetadata.AlternateThumbnailGCP,
 		LiveRenderGCP:                &job.pipelineMetadata.AlternateLiveRenderGCP,
 	}
-	return cacheObjectsFromOpensea(ctx, tids, "", objectTypeImage, job.tp.ipfsClient, job.tp.arweaveClient, job.tp.stg, job.tp.tokenBucket, runMetadata)
+	return cacheObjectsFromOpensea(ctx, tids, objectTypeImage, job.tp.ipfsClient, job.tp.arweaveClient, job.tp.stg, job.tp.tokenBucket, runMetadata)
 }
 
 func isCacheResultValid(err error, numObjects int) bool {
@@ -255,7 +276,7 @@ func createMediaFromCachedObjects(ctx context.Context, tokenBucket string, objec
 	}
 
 	if err != nil {
-		logger.For(ctx).Errorf("failed to get dimensions for media: %s", err)
+		logger.For(ctx).Warnf("failed to get dimensions for media: %s", err)
 	}
 
 	return result
@@ -412,7 +433,7 @@ func getHTMLMedia(pCtx context.Context, tids persist.TokenIdentifiers, tokenBuck
 
 	dimensions, err := getHTMLDimensions(pCtx, res.MediaURL.String())
 	if err != nil {
-		logger.For(pCtx).Errorf("failed to get dimensions for %s: %v", tids, err)
+		logger.For(pCtx).Warnf("failed to get dimensions for %s: %v", tids, err)
 	}
 
 	res.Dimensions = dimensions
@@ -623,10 +644,10 @@ func purgeIfExists(ctx context.Context, bucket string, fileName string, client *
 	return nil
 }
 
-func persistToStorage(ctx context.Context, client *storage.Client, reader io.Reader, bucket, fileName string, contentType *string, contentLength *int64, metadata map[string]string) error {
-	writer := newObjectWriter(ctx, client, bucket, fileName, contentType, contentLength, metadata)
-	if _, err := io.Copy(writer, reader); err != nil {
-		return fmt.Errorf("could not write to bucket %s for %s: %s", bucket, fileName, err)
+func persistToStorage(ctx context.Context, client *storage.Client, reader io.Reader, bucket string, object cachedMediaObject, metadata map[string]string) error {
+	writer := newObjectWriter(ctx, client, bucket, object.fileName(), object.ContentType, object.ContentLength, metadata)
+	if _, err := io.Copy(writer, util.NewLoggingReader(ctx, reader, reader.(io.WriterTo))); err != nil {
+		return errStoreObjectFailed{err: err, bucket: bucket, object: object}
 	}
 	return writer.Close()
 }
@@ -700,15 +721,15 @@ func cacheRawMedia(ctx context.Context, reader *util.FileHeaderReader, tids pers
 		ObjectType:      oType,
 	}
 
-	err := persistToStorage(ctx, client, reader, bucket, object.fileName(), object.ContentType, object.ContentLength,
-		map[string]string{
-			"originalURL": truncateString(ogURL, 100),
-			"mediaType":   mediaType.String(),
-		})
+	err := persistToStorage(ctx, client, reader, bucket, object, map[string]string{
+		"originalURL": truncateString(ogURL, 100),
+		"mediaType":   mediaType.String(),
+	})
 	if err != nil {
 		persist.FailStep(subMeta.StoreGCP)
 		return cachedMediaObject{}, err
 	}
+
 	purgeIfExists(ctx, bucket, object.fileName(), client)
 	return object, err
 }
@@ -734,7 +755,7 @@ func cacheRawAnimationMedia(ctx context.Context, reader *util.FileHeaderReader, 
 	_, err := io.Copy(writer, reader)
 	if err != nil {
 		persist.FailStep(subMeta.AnimationGzip)
-		return cachedMediaObject{}, fmt.Errorf("could not write to bucket %s for %s: %s", bucket, object.fileName(), err)
+		return cachedMediaObject{}, errStoreObjectFailed{err: err, bucket: bucket, object: object}
 	}
 
 	if err := writer.Close(); err != nil {
@@ -842,7 +863,7 @@ func thumbnailAndCache(ctx context.Context, tids persist.TokenIdentifiers, video
 	logger.For(ctx).Infof("thumbnailing %s", videoURL)
 	if err := thumbnailVideoToWriter(ctx, videoURL, sw); err != nil {
 		persist.FailStep(subMeta.ThumbnailGCP)
-		return cachedMediaObject{}, fmt.Errorf("could not thumbnail to bucket %s for '%s': %s", bucket, obj.fileName(), err)
+		return cachedMediaObject{}, errStoreObjectFailed{err: err, bucket: bucket, object: obj}
 	}
 
 	if err := sw.Close(); err != nil {
@@ -882,7 +903,7 @@ func createLiveRenderAndCache(ctx context.Context, tids persist.TokenIdentifiers
 	logger.For(ctx).Infof("creating live render for %s", videoURL)
 	if err := createLiveRenderPreviewVideo(ctx, videoURL, sw); err != nil {
 		persist.FailStep(subMeta.LiveRenderGCP)
-		return cachedMediaObject{}, fmt.Errorf("could not live render to bucket %s for '%s': %s", bucket, obj.fileName(), err)
+		return cachedMediaObject{}, errStoreObjectFailed{err: err, bucket: bucket, object: obj}
 	}
 
 	if err := sw.Close(); err != nil {
@@ -948,7 +969,6 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 		reader, err := rpc.GetDataFromURIAsReader(pCtx, asURI, ipfsClient, arweaveClient, util.MB, time.Minute)
 		if err != nil {
 			persist.FailStep(subMeta.ReaderRetrieval)
-			logger.For(pCtx).Errorf("failed to get reader for '%s': %s <%T>", mediaURL, err, err)
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return reader, false, err
 			}
@@ -967,6 +987,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 				return reader, true, err
 			}
 
+			logger.For(pCtx).Errorf("failed to get reader for '%s': %s <%T>", mediaURL, err, err)
 			return reader, false, errNoDataFromReader{err: err, url: mediaURL}
 		}
 		return reader, false, nil
@@ -977,7 +998,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 		logger.For(pCtx).Infof("failed to get data from uri '%s' for '%s' because of (err: %s <%T>), trying opensea", mediaURL, tids, err, err)
 		defer traceCallback()
 
-		return cacheObjectsFromOpensea(pCtx, tids, mediaURL, oType, ipfsClient, arweaveClient, storageClient, bucket, subMeta)
+		return cacheObjectsFromOpensea(pCtx, tids, oType, ipfsClient, arweaveClient, storageClient, bucket, subMeta)
 	}
 
 	if err != nil {
@@ -1073,10 +1094,10 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 	return result, nil
 }
 
-func cacheObjectsFromOpensea(pCtx context.Context, tids persist.TokenIdentifiers, mediaURL string, oType objectType, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, bucket string, subMeta *cachePipelineMetadata) ([]cachedMediaObject, error) {
+func cacheObjectsFromOpensea(pCtx context.Context, tids persist.TokenIdentifiers, oType objectType, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, bucket string, subMeta *cachePipelineMetadata) ([]cachedMediaObject, error) {
 	assets, err := opensea.FetchAssetsForTokenIdentifiers(pCtx, persist.EthereumAddress(tids.ContractAddress), opensea.TokenID(tids.TokenID.Base10String()))
 	if err != nil || len(assets) == 0 {
-		return nil, errNoDataFromOpensea{err: err, url: mediaURL}
+		return nil, errNoDataFromOpensea{err: err}
 	}
 
 	for _, asset := range assets {
@@ -1094,7 +1115,7 @@ func cacheObjectsFromOpensea(pCtx context.Context, tids persist.TokenIdentifiers
 		}
 		return objects, nil
 	}
-	return nil, errNoDataFromOpensea{err: err, url: mediaURL}
+	return nil, errNoDataFromOpensea{err: err}
 }
 
 func thumbnailVideoToWriter(ctx context.Context, url string, writer io.Writer) error {
@@ -1128,13 +1149,19 @@ func (e errNoStreams) Error() string {
 }
 
 func getMediaDimensions(ctx context.Context, url string) (persist.Dimensions, error) {
-	outBuf := bytes.NewBuffer(nil)
+	outBuf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
 	c := exec.CommandContext(ctx, "ffprobe", "-hide_banner", "-loglevel", "error", "-show_streams", url, "-print_format", "json")
-	c.Stderr = os.Stderr
+	c.Stderr = errBuf
 	c.Stdout = outBuf
 	err := c.Run()
 	if err != nil {
-		logger.For(ctx).Errorf("failed to get dimensions for %s: %s", url, err)
+		errMsg := err.Error()
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			errMsg = errBuf.String()
+		}
+		logger.For(ctx).Warnf("failed to get dimensions for %s: %s", url, errMsg)
 		return getMediaDimensionsBackup(ctx, url)
 	}
 
@@ -1248,7 +1275,7 @@ func newObjectWriter(ctx context.Context, client *storage.Client, bucket, fileNa
 		writer.ObjectAttrs.ContentType = *contentType
 	}
 	writer.ProgressFunc = func(written int64) {
-		logger.For(ctx).Debugf("wrote %s to %s", util.InByteSizeFormat(uint64(written)), fileName)
+		logger.For(ctx).Infof("wrote %s to %s", util.InByteSizeFormat(uint64(written)), fileName)
 	}
 	writer.ObjectAttrs.Metadata = objMetadata
 	writer.ObjectAttrs.CacheControl = "no-cache, no-store"

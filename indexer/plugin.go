@@ -17,10 +17,8 @@ import (
 )
 
 const (
-	pluginPoolSize    = 32
-	pluginTimeout     = 2 * time.Minute
-	bloomFilterSize   = 100000
-	falsePositiveRate = 0.01
+	pluginPoolSize = 32
+	pluginTimeout  = 2 * time.Minute
 )
 
 // TransferPluginMsg is used to communicate to a plugin.
