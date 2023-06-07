@@ -120,6 +120,9 @@ func (e errStoreObjectFailed) Unwrap() error {
 	return e.err
 }
 
+type animationURL string
+type imageURL string
+
 type cachePipelineMetadata struct {
 	ContentHeaderValueRetrieval  *persist.PipelineStepStatus
 	ReaderRetrieval              *persist.PipelineStepStatus
@@ -132,7 +135,7 @@ type cachePipelineMetadata struct {
 	LiveRenderGCP                *persist.PipelineStepStatus
 }
 
-func cacheImageObjects(ctx context.Context, imageURL string, metadata persist.TokenMetadata, job *tokenProcessingJob) chan cacheResult {
+func cacheImageObjects(ctx context.Context, imageURL imageURL, metadata persist.TokenMetadata, job *tokenProcessingJob) chan cacheResult {
 	tids := persist.NewTokenIdentifiers(job.contract.Address, job.token.TokenID, job.token.Chain)
 	runMetadata := &cachePipelineMetadata{
 		ContentHeaderValueRetrieval:  &job.pipelineMetadata.ImageContentHeaderValueRetrieval,
@@ -145,10 +148,10 @@ func cacheImageObjects(ctx context.Context, imageURL string, metadata persist.To
 		ThumbnailGCP:                 &job.pipelineMetadata.ImageThumbnailGCP,
 		LiveRenderGCP:                &job.pipelineMetadata.ImageLiveRenderGCP,
 	}
-	return asyncCacheObjectsForURL(ctx, tids, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, objectTypeImage, imageURL, job.tp.tokenBucket, runMetadata)
+	return asyncCacheObjectsForURL(ctx, tids, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, objectTypeImage, string(imageURL), job.tp.tokenBucket, runMetadata)
 }
 
-func cacheAnimationObjects(ctx context.Context, animationURL string, metadata persist.TokenMetadata, job *tokenProcessingJob) chan cacheResult {
+func cacheAnimationObjects(ctx context.Context, animationURL animationURL, metadata persist.TokenMetadata, job *tokenProcessingJob) chan cacheResult {
 	tids := persist.NewTokenIdentifiers(job.contract.Address, job.token.TokenID, job.token.Chain)
 	runMetadata := &cachePipelineMetadata{
 		ContentHeaderValueRetrieval:  &job.pipelineMetadata.AnimationContentHeaderValueRetrieval,
@@ -161,7 +164,7 @@ func cacheAnimationObjects(ctx context.Context, animationURL string, metadata pe
 		ThumbnailGCP:                 &job.pipelineMetadata.AnimationThumbnailGCP,
 		LiveRenderGCP:                &job.pipelineMetadata.AnimationLiveRenderGCP,
 	}
-	return asyncCacheObjectsForURL(ctx, tids, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, objectTypeAnimation, animationURL, job.tp.tokenBucket, runMetadata)
+	return asyncCacheObjectsForURL(ctx, tids, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, objectTypeAnimation, string(animationURL), job.tp.tokenBucket, runMetadata)
 }
 
 func cacheOpenSeaObjects(ctx context.Context, job *tokenProcessingJob) ([]cachedMediaObject, error) {
@@ -513,7 +516,7 @@ func remapMedia(media persist.Media) persist.Media {
 	return media
 }
 
-func findImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, metadata persist.TokenMetadata, tokenURI persist.TokenURI, predict bool, pMeta *persist.PipelineMetadata) (imgURL string, vURL string, err error) {
+func findImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, metadata persist.TokenMetadata, tokenURI persist.TokenURI, predict bool, pMeta *persist.PipelineMetadata) (imgURL imageURL, vURL animationURL, err error) {
 
 	traceCallback, ctx := persist.TrackStepStatus(ctx, &pMeta.MediaURLsRetrieval, "MediaURLsRetrieval")
 	defer traceCallback()
@@ -529,9 +532,9 @@ func findImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, con
 		if uri, ok := metaMedia["uri"].(string); ok {
 			switch mediaType {
 			case persist.MediaTypeImage, persist.MediaTypeSVG, persist.MediaTypeGIF:
-				imgURL = uri
+				imgURL = imageURL(uri)
 			default:
-				vURL = uri
+				vURL = animationURL(uri)
 			}
 		}
 	}
@@ -540,15 +543,15 @@ func findImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, con
 	for _, keyword := range anim {
 		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && it != "" {
 			logger.For(ctx).Debugf("found initial animation url from '%s': %s", keyword, it)
-			vURL = it
+			vURL = animationURL(it)
 			break
 		}
 	}
 
 	for _, keyword := range image {
-		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && it != "" && it != vURL {
+		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && string(it) != "" && animationURL(it) != vURL {
 			logger.For(ctx).Debugf("found initial image url from '%s': %s", keyword, it)
-			imgURL = it
+			imgURL = imageURL(it)
 			break
 		}
 	}
@@ -579,18 +582,18 @@ func findNameAndDescription(ctx context.Context, metadata persist.TokenMetadata)
 	return name, description
 }
 
-func predictTrueURLs(ctx context.Context, curImg, curV string) (string, string) {
-	imgMediaType, _, _, err := media.PredictMediaType(ctx, curImg)
+func predictTrueURLs(ctx context.Context, curImg imageURL, curV animationURL) (imageURL, animationURL) {
+	imgMediaType, _, _, err := media.PredictMediaType(ctx, string(curImg))
 	if err != nil {
 		return curImg, curV
 	}
-	vMediaType, _, _, err := media.PredictMediaType(ctx, curV)
+	vMediaType, _, _, err := media.PredictMediaType(ctx, string(curV))
 	if err != nil {
 		return curImg, curV
 	}
 
 	if imgMediaType.IsAnimationLike() && !vMediaType.IsAnimationLike() {
-		return curV, curImg
+		return imageURL(curV), animationURL(curImg)
 	}
 
 	if !imgMediaType.IsValid() || !vMediaType.IsValid() {
@@ -598,7 +601,7 @@ func predictTrueURLs(ctx context.Context, curImg, curV string) (string, string) 
 	}
 
 	if imgMediaType.IsMorePriorityThan(vMediaType) {
-		return curV, curImg
+		return imageURL(curV), animationURL(curImg)
 	}
 
 	return curImg, curV
@@ -1270,6 +1273,11 @@ func keywordsForToken(tokenID persist.TokenID, contract persist.Address, chain p
 }
 
 func newObjectWriter(ctx context.Context, client *storage.Client, bucket, fileName string, contentType *string, contentLength *int64, objMetadata map[string]string) *storage.Writer {
+	if contentLength != nil {
+		fmt.Println("CONTENT LENGTH: ", *contentLength)
+	} else {
+		fmt.Println("CONTENT LENGTH nil")
+	}
 	writer := client.Bucket(bucket).Object(fileName).NewWriter(ctx)
 	if contentType != nil {
 		writer.ObjectAttrs.ContentType = *contentType
