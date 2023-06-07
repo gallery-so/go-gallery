@@ -140,7 +140,7 @@ func cacheImageObjects(ctx context.Context, imageURL string, metadata persist.To
 		OpenseaFallback:              &job.pipelineMetadata.ImageOpenseaFallback,
 		DetermineMediaTypeWithReader: &job.pipelineMetadata.ImageDetermineMediaTypeWithReader,
 		AnimationGzip:                &job.pipelineMetadata.ImageAnimationGzip,
-    SVGRasterize:                 &job.pipelineMetadata.ImageSVGRasterize,
+		SVGRasterize:                 &job.pipelineMetadata.ImageSVGRasterize,
 		StoreGCP:                     &job.pipelineMetadata.ImageStoreGCP,
 		ThumbnailGCP:                 &job.pipelineMetadata.ImageThumbnailGCP,
 		LiveRenderGCP:                &job.pipelineMetadata.ImageLiveRenderGCP,
@@ -156,7 +156,7 @@ func cacheAnimationObjects(ctx context.Context, animationURL string, metadata pe
 		OpenseaFallback:              &job.pipelineMetadata.AnimationOpenseaFallback,
 		DetermineMediaTypeWithReader: &job.pipelineMetadata.AnimationDetermineMediaTypeWithReader,
 		AnimationGzip:                &job.pipelineMetadata.AnimationAnimationGzip,
-    SVGRasterize:                 &job.pipelineMetadata.AnimationSVGRasterize,
+		SVGRasterize:                 &job.pipelineMetadata.AnimationSVGRasterize,
 		StoreGCP:                     &job.pipelineMetadata.AnimationStoreGCP,
 		ThumbnailGCP:                 &job.pipelineMetadata.AnimationThumbnailGCP,
 		LiveRenderGCP:                &job.pipelineMetadata.AnimationLiveRenderGCP,
@@ -172,7 +172,7 @@ func cacheOpenSeaObjects(ctx context.Context, job *tokenProcessingJob) ([]cached
 		OpenseaFallback:              &job.pipelineMetadata.AlternateOpenseaFallback,
 		DetermineMediaTypeWithReader: &job.pipelineMetadata.AlternateDetermineMediaTypeWithReader,
 		AnimationGzip:                &job.pipelineMetadata.AlternateAnimationGzip,
-    SVGRasterize:                 &job.pipelineMetadata.AlternateSVGRasterize,
+		SVGRasterize:                 &job.pipelineMetadata.AlternateSVGRasterize,
 		StoreGCP:                     &job.pipelineMetadata.AlternateStoreGCP,
 		ThumbnailGCP:                 &job.pipelineMetadata.AlternateThumbnailGCP,
 		LiveRenderGCP:                &job.pipelineMetadata.AlternateLiveRenderGCP,
@@ -752,7 +752,7 @@ func cacheRawAnimationMedia(ctx context.Context, reader *util.FileHeaderReader, 
 	})
 	writer := gzip.NewWriter(sw)
 
-	_, err := io.Copy(writer, reader)
+	_, err := io.Copy(writer, util.NewLoggingReader(ctx, reader, reader))
 	if err != nil {
 		persist.FailStep(subMeta.AnimationGzip)
 		return cachedMediaObject{}, errStoreObjectFailed{err: err, bucket: bucket, object: object}
