@@ -55,7 +55,7 @@ async function createAnimation() {
     args: args,
   });
   const page = await browser.newPage();
-  await page.goto(url, { waitUntil: 'networkidle2' });
+  await page.goto(url);
 
   let svgDimensions = await page.evaluate(() => {
     let svg = document.querySelector('svg');
@@ -125,14 +125,13 @@ async function createAnimation() {
     }
   }
 
-  if (isStatic) {
-    // If all frames are identical, save as PNG
-    const pngBuffer = PNG.sync.write(frames[0]);
-    console.log('PNG');
-    console.log(Buffer.from(pngBuffer).toString('base64'));
-    if (process.argv.length > 3 && process.argv[3]) fs.writeFileSync('test.png', pngBuffer);
-  } else {
-    // If frames are different, save as GIF
+  const pngBuffer = PNG.sync.write(frames[0]);
+  console.log('PNG');
+  console.log(Buffer.from(pngBuffer).toString('base64'));
+  if (process.argv.length > 3 && process.argv[3]) fs.writeFileSync('test.png', pngBuffer);
+
+  if (!isStatic) {
+    // If frames are different, save a gif as well
     const encoder = new GIFEncoder(frames[0].width, frames[0].height);
     const stream = encoder.createReadStream();
     let gifBuffer = Buffer.alloc(0);
