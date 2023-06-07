@@ -633,9 +633,9 @@ func persistToStorage(ctx context.Context, client *storage.Client, reader io.Rea
 	writer := newObjectWriter(ctx, client, bucket, object.fileName(), object.ContentType, object.ContentLength, metadata)
 	if written, err := io.Copy(writer, util.NewLoggingReader(ctx, reader, reader.(io.WriterTo))); err != nil {
 		if object.ContentLength != nil {
-			logger.For(ctx).Error("wrote %d out of %d bytes before error: %s", written, *object.ContentLength, err)
+			logger.For(ctx).Errorf("wrote %d out of %d bytes before error: %s", written, *object.ContentLength, err)
 		} else {
-			logger.For(ctx).Error("wrote %d out of an unknown number of bytes before error: %s", written, err)
+			logger.For(ctx).Errorf("wrote %d out of an unknown number of bytes before error: %s", written, err)
 		}
 		return errStoreObjectFailed{err: err, bucket: bucket, object: object}
 	}
@@ -745,9 +745,9 @@ func cacheRawAnimationMedia(ctx context.Context, reader *util.FileHeaderReader, 
 	written, err := io.Copy(writer, util.NewLoggingReader(ctx, reader, reader))
 	if err != nil {
 		if object.ContentLength != nil {
-			logger.For(ctx).Error("wrote %d out of %d bytes before error: %s", written, *object.ContentLength, err)
+			logger.For(ctx).Errorf("wrote %d out of %d bytes before error: %s", written, *object.ContentLength, err)
 		} else {
-			logger.For(ctx).Error("wrote %d out of an unknown number of bytes before error: %s", written, err)
+			logger.For(ctx).Errorf("wrote %d out of an unknown number of bytes before error: %s", written, err)
 		}
 		persist.FailStep(subMeta.AnimationGzip)
 		return cachedMediaObject{}, errStoreObjectFailed{err: err, bucket: bucket, object: object}
@@ -1119,7 +1119,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 		timeBeforeCache := time.Now()
 		obj, err := rasterizeAndCacheSVGMedia(pCtx, obj.storageURL(bucket), tids, bucket, mediaURL, storageClient, subMeta)
 		if err != nil {
-			logger.For(pCtx).WithError(err).Error("could not cache svg rasterization")
+			logger.For(pCtx).Errorf("could not cache svg rasterization: %s", err)
 			// still return the original object as svg
 			return result, nil
 		}
