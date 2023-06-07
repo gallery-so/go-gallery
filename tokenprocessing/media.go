@@ -14,7 +14,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -1106,16 +1105,14 @@ func cacheObjectsFromOpensea(pCtx context.Context, tids persist.TokenIdentifiers
 
 func thumbnailVideoToWriter(ctx context.Context, url string, writer io.Writer) error {
 	c := exec.CommandContext(ctx, "ffmpeg", "-hide_banner", "-loglevel", "error", "-i", url, "-ss", "00:00:00.000", "-vframes", "1", "-f", "mjpeg", "pipe:1")
-	c.Stderr = os.Stderr
-	c.Stdout = writer
-	return c.Run()
+	_, err := c.Output()
+	return errFromExitErr(err)
 }
 
 func createLiveRenderPreviewVideo(ctx context.Context, videoURL string, writer io.Writer) error {
 	c := exec.CommandContext(ctx, "ffmpeg", "-hide_banner", "-loglevel", "error", "-i", videoURL, "-ss", "00:00:00.000", "-t", "00:00:05.000", "-filter:v", "scale=720:trunc(ow/a/2)*2", "-c:a", "aac", "-shortest", "-movflags", "frag_keyframe+empty_moov", "-f", "mp4", "pipe:1")
-	c.Stderr = os.Stderr
-	c.Stdout = writer
-	return c.Run()
+	_, err := c.Output()
+	return errFromExitErr(err)
 }
 
 type dimensions struct {
@@ -1135,24 +1132,16 @@ func (e errNoStreams) Error() string {
 }
 
 func getMediaDimensions(ctx context.Context, url string) (persist.Dimensions, error) {
-	outBuf := new(bytes.Buffer)
-	errBuf := new(bytes.Buffer)
 	c := exec.CommandContext(ctx, "ffprobe", "-hide_banner", "-loglevel", "error", "-show_streams", url, "-print_format", "json")
-	c.Stderr = errBuf
-	c.Stdout = outBuf
-	err := c.Run()
+	outBuf, err := c.Output()
 	if err != nil {
-		errMsg := err.Error()
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			errMsg = errBuf.String()
-		}
-		logger.For(ctx).Warnf("failed to get dimensions for %s: %s", url, errMsg)
+		err = errFromExitErr(err)
+		logger.For(ctx).Warnf("failed to get dimensions for %s: %s", url, err)
 		return getMediaDimensionsBackup(ctx, url)
 	}
 
 	var d dimensions
-	err = json.Unmarshal(outBuf.Bytes(), &d)
+	err = json.Unmarshal(outBuf, &d)
 	if err != nil {
 		return persist.Dimensions{}, fmt.Errorf("failed to unmarshal ffprobe output: %w", err)
 	}
@@ -1183,11 +1172,8 @@ func getMediaDimensions(ctx context.Context, url string) (persist.Dimensions, er
 }
 
 func getMediaDimensionsBackup(ctx context.Context, url string) (persist.Dimensions, error) {
-	outBuf := bytes.NewBuffer(nil)
 	curlCmd := exec.CommandContext(ctx, "curl", "-s", url)
 	identifyCmd := exec.CommandContext(ctx, "identify", "-format", "%wx%h", "-")
-	identifyCmd.Stderr = os.Stderr
-	identifyCmd.Stdout = outBuf
 
 	curlCmdStdout, err := curlCmd.StdoutPipe()
 	if err != nil {
@@ -1201,9 +1187,9 @@ func getMediaDimensionsBackup(ctx context.Context, url string) (persist.Dimensio
 		return persist.Dimensions{}, fmt.Errorf("failed to start curl command: %w", err)
 	}
 
-	err = identifyCmd.Run()
+	outBuf, err := identifyCmd.Output()
 	if err != nil {
-		return persist.Dimensions{}, err
+		return persist.Dimensions{}, errFromExitErr(err)
 	}
 
 	err = curlCmd.Wait()
@@ -1211,7 +1197,7 @@ func getMediaDimensionsBackup(ctx context.Context, url string) (persist.Dimensio
 		return persist.Dimensions{}, fmt.Errorf("curl command exited with error: %w", err)
 	}
 
-	dimensionsStr := outBuf.String()
+	dimensionsStr := string(outBuf)
 	dimensionsSplit := strings.Split(dimensionsStr, "x")
 	if len(dimensionsSplit) != 2 {
 		return persist.Dimensions{}, fmt.Errorf("unexpected output format from identify: %s", dimensionsStr)
@@ -1256,11 +1242,6 @@ func keywordsForToken(tokenID persist.TokenID, contract persist.Address, chain p
 }
 
 func newObjectWriter(ctx context.Context, client *storage.Client, bucket, fileName string, contentType *string, contentLength *int64, objMetadata map[string]string) *storage.Writer {
-	if contentLength != nil {
-		fmt.Println("CONTENT LENGTH: ", *contentLength)
-	} else {
-		fmt.Println("CONTENT LENGTH nil")
-	}
 	writer := client.Bucket(bucket).Object(fileName).NewWriter(ctx)
 	if contentType != nil {
 		writer.ObjectAttrs.ContentType = *contentType
@@ -1288,4 +1269,12 @@ func contentLengthToChunkSize(contentLength *int64) int {
 		return 16 * 1024 * 1024
 	}
 	return 4 * 1024 * 1024
+}
+
+func errFromExitErr(err error) error {
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		return errors.New(string(exitErr.Stderr))
+	}
+	return err
 }
