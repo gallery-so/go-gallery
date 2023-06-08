@@ -419,7 +419,7 @@ func recordPipelineEndState(ctx context.Context, mr metric.MetricReporter, token
 		"isBadToken": fmt.Sprintf("%t", isBadTokenErr(err)),
 	}))
 
-	if ctx.Err() != nil {
+	if ctx.Err() != nil || errors.Is(err, context.DeadlineExceeded) {
 		mr.Record(ctx, pipelineTimedOutMetric(), append(baseOpts,
 			metric.LogOptions.WithLogMessage("pipeline timed out"),
 		)...)
