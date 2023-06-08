@@ -1482,7 +1482,7 @@ type QueryResolver interface {
 	UsersByRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) (*model.UsersConnection, error)
 	SocialConnections(ctx context.Context, socialAccountType persist.SocialProvider, excludeAlreadyFollowing *bool, before *string, after *string, first *int, last *int) (*model.SocialConnectionsConnection, error)
 	SocialQueries(ctx context.Context) (model.SocialQueriesOrError, error)
-	TopCollectionsForCommunity(ctx context.Context, input model.TopCollectionsForCommunityInput) ([]*model.Collection, error)
+	TopCollectionsForCommunity(ctx context.Context, input model.TopCollectionsForCommunityInput) (*model.CommunitiesConnection, error)
 }
 type RemoveAdmirePayloadResolver interface {
 	FeedEvent(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.FeedEvent, error)
@@ -7149,6 +7149,16 @@ type TokenHoldersConnection {
   pageInfo: PageInfo!
 }
 
+type CommunityEdge {
+  node: Community
+  cursor: String
+}
+
+type CommunitiesConnection {
+  edges: [CommunityEdge]
+  pageInfo: PageInfo!
+}
+
 type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) @goEmbedHelper {
   dbid: DBID!
   id: ID!
@@ -7590,16 +7600,6 @@ type UsersConnection {
   pageInfo: PageInfo!
 }
 
-type CommunityEdge {
-  node: Community
-  cursor: String
-}
-
-type CommunitiesConnection {
-  edges: [CommunityEdge]
-  pageInfo: PageInfo!
-}
-
 enum Role {
   ADMIN
   BETA_TESTER
@@ -7761,7 +7761,7 @@ type Query {
   ): SocialConnectionsConnection @goField(forceResolver: true) @authRequired
 
   socialQueries: SocialQueriesOrError @authRequired
-  topCollectionsForCommunity(input: topCollectionsForCommunityInput!): [Collection!]
+  topCollectionsForCommunity(input: topCollectionsForCommunityInput!): CommunitiesConnection
 }
 
 type SocialQueries {
@@ -33411,9 +33411,9 @@ func (ec *executionContext) _Query_topCollectionsForCommunity(ctx context.Contex
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.([]*model.Collection)
+	res := resTmp.(*model.CommunitiesConnection)
 	fc.Result = res
-	return ec.marshalOCollection2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionᚄ(ctx, field.Selections, res)
+	return ec.marshalOCommunitiesConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunitiesConnection(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Query_topCollectionsForCommunity(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -33424,26 +33424,12 @@ func (ec *executionContext) fieldContext_Query_topCollectionsForCommunity(ctx co
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "id":
-				return ec.fieldContext_Collection_id(ctx, field)
-			case "dbid":
-				return ec.fieldContext_Collection_dbid(ctx, field)
-			case "version":
-				return ec.fieldContext_Collection_version(ctx, field)
-			case "name":
-				return ec.fieldContext_Collection_name(ctx, field)
-			case "collectorsNote":
-				return ec.fieldContext_Collection_collectorsNote(ctx, field)
-			case "gallery":
-				return ec.fieldContext_Collection_gallery(ctx, field)
-			case "layout":
-				return ec.fieldContext_Collection_layout(ctx, field)
-			case "hidden":
-				return ec.fieldContext_Collection_hidden(ctx, field)
-			case "tokens":
-				return ec.fieldContext_Collection_tokens(ctx, field)
+			case "edges":
+				return ec.fieldContext_CommunitiesConnection_edges(ctx, field)
+			case "pageInfo":
+				return ec.fieldContext_CommunitiesConnection_pageInfo(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type Collection", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type CommunitiesConnection", field.Name)
 		},
 	}
 	defer func() {
@@ -60807,16 +60793,6 @@ func (ec *executionContext) unmarshalNChainPubKeyInput2ᚖgithubᚗcomᚋmikeydu
 	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNCollection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollection(ctx context.Context, sel ast.SelectionSet, v *model.Collection) graphql.Marshaler {
-	if v == nil {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
-		}
-		return graphql.Null
-	}
-	return ec._Collection(ctx, sel, v)
-}
-
 func (ec *executionContext) unmarshalNCollectionLayoutInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionLayoutInput(ctx context.Context, v interface{}) (*model.CollectionLayoutInput, error) {
 	res, err := ec.unmarshalInputCollectionLayoutInput(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
@@ -62161,53 +62137,6 @@ func (ec *executionContext) marshalOCollection2ᚕᚖgithubᚗcomᚋmikeydubᚋg
 
 	}
 	wg.Wait()
-
-	return ret
-}
-
-func (ec *executionContext) marshalOCollection2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Collection) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalNCollection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollection(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
-
-	for _, e := range ret {
-		if e == graphql.Null {
-			return graphql.Null
-		}
-	}
 
 	return ret
 }

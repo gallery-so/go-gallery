@@ -1882,7 +1882,7 @@ func (r *queryResolver) SocialQueries(ctx context.Context) (model.SocialQueriesO
 }
 
 // TopCollectionsForCommunity is the resolver for the topCollectionsForCommunity field.
-func (r *queryResolver) TopCollectionsForCommunity(ctx context.Context, input model.TopCollectionsForCommunityInput) ([]*model.Collection, error) {
+func (r *queryResolver) TopCollectionsForCommunity(ctx context.Context, input model.TopCollectionsForCommunityInput) (*model.CommunitiesConnection, error) {
 	collections, err := publicapi.For(ctx).Collection.GetTopCollectionsForCommunity(ctx, *input.ChainAddress)
 	if err != nil {
 		return nil, err

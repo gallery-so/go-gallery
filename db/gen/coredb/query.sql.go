@@ -3346,10 +3346,10 @@ with contract_tokens as (
 	select t.id, t.owner_user_id
 	from tokens t
 	join contracts c on t.contract = c.id
-	where not t.deleted and not c.deleted and t.contract = c.id and c.chain =$1 and c.address = $2
+	where not t.deleted and not c.deleted and t.contract = c.id and c.chain = $1 and c.address = $2
 ),
 ranking as (
-	select col.id, rank() over (order by col.created_at desc, count(col.id) desc) score
+	select col.id, rank() over (order by count(col.id) desc, col.created_at desc) score
 	from collections col
 	join contract_tokens on col.owner_user_id = contract_tokens.owner_user_id and contract_tokens.id = any(col.nfts)
 	join users on col.owner_user_id = users.id
