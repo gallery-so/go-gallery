@@ -290,12 +290,33 @@ func Filter[T any](s []T, f func(T) bool, filterInPlace bool) []T {
 	return r
 }
 
+func Chunk[T any](s []T, chunkSize int) [][]T {
+	var chunks [][]T
+	for i := 0; i < len(s); i += chunkSize {
+		end := i + chunkSize
+		if end > len(s) {
+			end = len(s)
+		}
+		chunks = append(chunks, s[i:end])
+	}
+	return chunks
+}
+
 // StringToPointerIfNotEmpty returns a pointer to the string if it is a non-empty string
 func StringToPointerIfNotEmpty(str string) *string {
 	if str == "" {
 		return nil
 	}
 	return &str
+}
+
+func FirstNonEmptyString(strs ...string) string {
+	for _, str := range strs {
+		if str != "" {
+			return str
+		}
+	}
+	return ""
 }
 
 // FromPointer returns the value of a pointer, or the zero value of the pointer's type if the pointer is nil.
@@ -702,4 +723,29 @@ func (f FileHeaderReader) Headers() ([]byte, error) {
 
 	f.headers = byt
 	return f.headers, nil
+}
+
+type LoggingReader struct {
+	r   io.Reader
+	w   io.WriterTo
+	ctx context.Context
+}
+
+func NewLoggingReader(ctx context.Context, r io.Reader, w io.WriterTo) *LoggingReader {
+	return &LoggingReader{r, w, ctx}
+}
+
+func (lr *LoggingReader) Read(p []byte) (n int, err error) {
+	n, err = lr.r.Read(p)
+	logger.For(lr.ctx).Infof("Read %d bytes", n)
+	return n, err
+}
+
+func (lr *LoggingReader) WriteTo(w io.Writer) (n int64, err error) {
+	if lr.w != nil {
+		n, err = lr.w.WriteTo(w)
+		logger.For(lr.ctx).Infof("Wrote %d bytes", n)
+		return n, err
+	}
+	return 0, fmt.Errorf("No WriterTo provided")
 }

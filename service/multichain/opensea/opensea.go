@@ -31,6 +31,8 @@ import (
 
 var client = http.DefaultClient
 
+var ErrAPIKeyExpired = errors.New("opensea api key expired")
+
 func init() {
 	env.RegisterValidation("OPENSEA_API_KEY", "required")
 }
@@ -247,12 +249,17 @@ func (p *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, ti m
 }
 
 // GetTokenMetadataByTokenIdentifiers retrieves a token's metadata for a given contract address and token ID
-func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (persist.TokenMetadata, error) {
-	token, _, err := p.GetTokensByTokenIdentifiersAndOwner(ctx, ti, ownerAddress)
+func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
+	tokens, _, err := p.GetTokensByTokenIdentifiers(ctx, ti, 1, 0)
 	if err != nil {
 		return nil, err
 	}
-	return token.TokenMetadata, nil
+
+	if len(tokens) == 0 {
+		return nil, fmt.Errorf("no tokens found for %s", ti)
+	}
+
+	return tokens[0].TokenMetadata, nil
 }
 
 // GetContractByAddress returns a contract for a contract address
@@ -607,11 +614,13 @@ func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsCha
 					}
 
 					contract, ok := seenContracts.LoadOrStore(nft.Contract.ContractAddress.String(), multichain.ChainAgnosticContract{
-						Address:        persist.Address(nft.Contract.ContractAddress.String()),
-						Symbol:         nft.Contract.ContractSymbol.String(),
-						Name:           nft.Contract.ContractName.String(),
-						CreatorAddress: persist.Address(nft.Creator.Address),
-						LatestBlock:    persist.BlockNumber(block),
+						Address: persist.Address(nft.Contract.ContractAddress.String()),
+						Descriptors: multichain.ChainAgnosticContractDescriptors{
+							Symbol:         nft.Contract.ContractSymbol.String(),
+							Name:           nft.Contract.ContractName.String(),
+							CreatorAddress: persist.Address(nft.Creator.Address),
+						},
+						LatestBlock: persist.BlockNumber(block),
 					})
 					if !ok {
 						contractsChan <- contract.(multichain.ChainAgnosticContract)
@@ -629,9 +638,11 @@ func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsCha
 					}
 
 					tokensChan <- multichain.ChainAgnosticToken{
-						TokenType:       tokenType,
-						Name:            nft.Name,
-						Description:     nft.Description,
+						TokenType: tokenType,
+						Descriptors: multichain.ChainAgnosticTokenDescriptors{
+							Name:        nft.Name,
+							Description: nft.Description,
+						},
 						TokenURI:        persist.TokenURI(nft.TokenMetadataURL),
 						TokenID:         persist.TokenID(nft.TokenID.ToBase16()),
 						OwnerAddress:    tokenOwner,
@@ -681,11 +692,14 @@ func contractToContract(ctx context.Context, openseaContract Contract, ethClient
 		return multichain.ChainAgnosticContract{}, err
 	}
 	return multichain.ChainAgnosticContract{
-		Address:        persist.Address(openseaContract.Address.String()),
-		Symbol:         openseaContract.Symbol,
-		Name:           openseaContract.Collection.Name,
-		CreatorAddress: persist.Address(openseaContract.Collection.PayoutAddress),
-		LatestBlock:    persist.BlockNumber(block),
+		Address: persist.Address(openseaContract.Address.String()),
+		Descriptors: multichain.ChainAgnosticContractDescriptors{
+			Symbol:         openseaContract.Symbol,
+			Name:           openseaContract.Collection.Name,
+			CreatorAddress: persist.Address(openseaContract.Collection.PayoutAddress),
+		},
+
+		LatestBlock: persist.BlockNumber(block),
 	}, nil
 }
 
@@ -738,6 +752,10 @@ func paginateAssets(req *http.Request) ([]Asset, error) {
 		}
 
 		defer resp.Body.Close()
+
+		if resp.StatusCode == http.StatusUnauthorized {
+			return nil, ErrAPIKeyExpired
+		}
 
 		if resp.StatusCode != http.StatusOK {
 			return nil, util.BodyAsError(resp)

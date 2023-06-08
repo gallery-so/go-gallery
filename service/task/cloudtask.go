@@ -34,15 +34,14 @@ type FeedbotMessage struct {
 }
 
 type TokenProcessingUserMessage struct {
-	UserID   persist.DBID   `json:"user_id" binding:"required"`
-	TokenIDs []persist.DBID `json:"token_ids" binding:"required"`
-	IsV3     bool           `json:"is_v3" binding:"-"` // V3Migration: Remove when migration is complete
+	UserID   persist.DBID    `json:"user_id" binding:"required"`
+	TokenIDs []persist.DBID  `json:"token_ids" binding:"required"`
+	Chains   []persist.Chain `json:"chains" binding:"required"`
 }
 
 type TokenProcessingContractTokensMessage struct {
 	ContractID   persist.DBID `json:"contract_id" binding:"required"`
 	ForceRefresh bool         `json:"force_refresh"`
-	IsV3         bool         `json:"is_v3" binding:"-"` // V3Migration: Remove when migration is complete
 }
 
 type ValidateNFTsMessage struct {
@@ -169,7 +168,6 @@ func CreateTaskForTokenProcessing(ctx context.Context, client *gcptasks.Client, 
 
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
 
-	// V3Migration: Remove when migration is complete
 	task := &taskspb.Task{
 		DispatchDeadline: durationpb.New(time.Minute * 30),
 		MessageType: &taskspb.Task_HttpRequest{
@@ -189,34 +187,7 @@ func CreateTaskForTokenProcessing(ctx context.Context, client *gcptasks.Client, 
 		return err
 	}
 
-	err = submitHttpTask(ctx, client, queue, task, body)
-	if err != nil {
-		return err
-	}
-	// V3Migration: End remove
-
-	task = &taskspb.Task{
-		DispatchDeadline: durationpb.New(time.Minute * 30),
-		MessageType: &taskspb.Task_HttpRequest{
-			HttpRequest: &taskspb.HttpRequest{
-				HttpMethod: taskspb.HttpMethod_POST,
-				Url:        fmt.Sprintf("%s/media/process", env.GetString("NEW_TOKEN_PROCESSING_URL")),
-				Headers: map[string]string{
-					"Content-type": "application/json",
-					"sentry-trace": span.TraceID.String(),
-				},
-			},
-		},
-	}
-
-	v3Message := message
-	v3Message.IsV3 = true
-	v3Body, err := json.Marshal(v3Message)
-	if err != nil {
-		return err
-	}
-
-	return submitHttpTask(ctx, client, queue, task, v3Body)
+	return submitHttpTask(ctx, client, queue, task, body)
 }
 
 func CreateTaskForContractOwnerProcessing(ctx context.Context, message TokenProcessingContractTokensMessage, client *gcptasks.Client) error {
@@ -229,7 +200,6 @@ func CreateTaskForContractOwnerProcessing(ctx context.Context, message TokenProc
 
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
 
-	// V3Migration: Remove when migration is complete
 	task := &taskspb.Task{
 		MessageType: &taskspb.Task_HttpRequest{
 			HttpRequest: &taskspb.HttpRequest{
@@ -248,33 +218,7 @@ func CreateTaskForContractOwnerProcessing(ctx context.Context, message TokenProc
 		return err
 	}
 
-	err = submitHttpTask(ctx, client, queue, task, body)
-	if err != nil {
-		return err
-	}
-	// V3Migration: End remove
-
-	task = &taskspb.Task{
-		MessageType: &taskspb.Task_HttpRequest{
-			HttpRequest: &taskspb.HttpRequest{
-				HttpMethod: taskspb.HttpMethod_POST,
-				Url:        fmt.Sprintf("%s/owners/process/contract", env.GetString("NEW_TOKEN_PROCESSING_URL")),
-				Headers: map[string]string{
-					"Content-type": "application/json",
-					"sentry-trace": span.TraceID.String(),
-				},
-			},
-		},
-	}
-
-	v3Message := message
-	v3Message.IsV3 = true
-	v3Body, err := json.Marshal(v3Message)
-	if err != nil {
-		return err
-	}
-
-	return submitHttpTask(ctx, client, queue, task, v3Body)
+	return submitHttpTask(ctx, client, queue, task, body)
 }
 
 // NewClient returns a new task client with tracing enabled.

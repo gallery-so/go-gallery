@@ -28,8 +28,6 @@ type ProcessMediaForTokenInput struct {
 	TokenID         persist.TokenID `json:"token_id" binding:"required"`
 	ContractAddress persist.Address `json:"contract_address" binding:"required"`
 	Chain           persist.Chain   `json:"chain"`
-	OwnerAddress    persist.Address `json:"owner_address" binding:"required"`
-	IsV3            bool            `json:"is_v3" binding:"-"` // V3Migration: Remove when migration is complete
 }
 
 func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRepository, contractRepo *postgres.ContractGalleryRepository, throttler *throttle.Locker) gin.HandlerFunc {
@@ -42,22 +40,12 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 
 		reqCtx := logger.NewContextWithFields(c.Request.Context(), logrus.Fields{"userID": input.UserID})
 
-		// V3Migration: Remove when migration is complete
-		lockID := input.UserID.String()
-		if input.IsV3 {
-			lockID += ":v3"
-		}
-
-		if err := throttler.Lock(reqCtx, lockID); err != nil {
-			// Reply with a non-200 status so that the message is tried again later on
-			util.ErrResponse(c, http.StatusTooManyRequests, err)
-			return
-		}
-		defer throttler.Unlock(reqCtx, input.UserID.String())
-
 		wp := pool.New().WithMaxGoroutines(50).WithErrors()
 
+		logger.For(reqCtx).Infof("Processing Media: %s - Started (%d tokens)", input.UserID, len(input.TokenIDs))
+
 		for _, tokenID := range input.TokenIDs {
+
 			t, err := tokenRepo.GetByID(reqCtx, tokenID)
 			if err != nil {
 				logger.For(reqCtx).Errorf("failed to fetch tokenID=%s: %s", tokenID, err)
@@ -66,19 +54,20 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 
 			contract, err := contractRepo.GetByID(reqCtx, t.Contract)
 			if err != nil {
-				logger.For(reqCtx).Errorf("Error getting contract: %s", err)
+				logger.For(reqCtx).Errorf("error getting contract: %s", err)
 			}
 
+			lockID := tokenID.String()
+
 			wp.Go(func() error {
-				ctx := sentryutil.NewSentryHubContext(reqCtx)
-				err := tp.ProcessTokenPipeline(reqCtx, t, contract, "", persist.ProcessingCauseSync)
-				if err != nil {
-
-					logger.For(ctx).Errorf("Error processing token: %s", err)
-
+				if err := throttler.Lock(reqCtx, lockID); err != nil {
+					logger.For(reqCtx).Warnf("failed to lock tokenID=%s: %s", tokenID, err)
 					return err
 				}
-				return nil
+				defer throttler.Unlock(reqCtx, lockID)
+				ctx := sentryutil.NewSentryHubContext(reqCtx)
+				_, err := tp.ProcessTokenPipeline(ctx, t, contract, persist.ProcessingCauseSync)
+				return err
 			})
 		}
 
@@ -99,11 +88,7 @@ func processMediaForToken(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRe
 
 		reqCtx := c.Request.Context()
 
-		// V3Migration: Remove when migration is complete
 		lockID := fmt.Sprintf("%s-%s-%d", input.TokenID, input.ContractAddress, input.Chain)
-		if input.IsV3 {
-			lockID += ":v3"
-		}
 
 		if err := throttler.Lock(reqCtx, lockID); err != nil {
 			util.ErrResponse(c, http.StatusTooManyRequests, err)
@@ -111,33 +96,25 @@ func processMediaForToken(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRe
 		}
 		defer throttler.Unlock(reqCtx, lockID)
 
-		wallet, err := walletRepo.GetByChainAddress(reqCtx, persist.NewChainAddress(input.OwnerAddress, input.Chain))
+		var token persist.TokenGallery
+		tokens, err := tokenRepo.GetByTokenIdentifiers(reqCtx, input.TokenID, input.ContractAddress, input.Chain, 1, 0)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+		if len(tokens) == 0 {
+			util.ErrResponse(c, http.StatusNotFound, fmt.Errorf("token not found by identifiers"))
+			return
+		}
+		token = tokens[0]
+
+		contract, err := contractRepo.GetByID(reqCtx, token.Contract)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
-		user, err := userRepo.GetByWalletID(reqCtx, wallet.ID)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-
-		reqCtx = logger.NewContextWithFields(reqCtx, logrus.Fields{"userID": user.ID})
-
-		t, err := tokenRepo.GetByFullIdentifiers(reqCtx, input.TokenID, input.ContractAddress, input.Chain, user.ID)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-
-		contract, err := contractRepo.GetByID(reqCtx, t.Contract)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-
-		err = tp.ProcessTokenPipeline(reqCtx, t, contract, input.OwnerAddress, persist.ProcessingCauseRefresh)
+		_, err = tp.ProcessTokenPipeline(reqCtx, token, contract, persist.ProcessingCauseRefresh)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -160,11 +137,7 @@ func processOwnersForContractTokens(mc *multichain.Provider, contractRepo *postg
 			return
 		}
 
-		// V3Migration: Remove when migration is complete
 		lockID := fmt.Sprintf("%s-%d", contract.Address, contract.Chain)
-		if input.IsV3 {
-			lockID += ":v3"
-		}
 
 		if !input.ForceRefresh {
 			if err := throttler.Lock(c, lockID); err != nil {

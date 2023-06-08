@@ -1353,7 +1353,11 @@ type ErrCommunityNotFound implements Error {
   message: String!
 }
 
-union AuthorizationError = ErrNoCookie | ErrInvalidToken | ErrDoesNotOwnRequiredToken
+union AuthorizationError =
+    ErrNoCookie
+  | ErrInvalidToken
+  | ErrSessionInvalidated
+  | ErrDoesNotOwnRequiredToken
 
 type ErrNotAuthorized implements Error {
   message: String!
@@ -1371,6 +1375,10 @@ type ErrNoCookie implements Error {
 }
 
 type ErrInvalidToken implements Error {
+  message: String!
+}
+
+type ErrSessionInvalidated implements Error {
   message: String!
 }
 
@@ -1469,17 +1477,6 @@ input DebugSocialAuth @restrictEnvironment(allowed: ["local", "development", "sa
   # A password required to use debug tools. Typically empty in local environments.
   debugToolsPassword: String
 }
-
-input DeepRefreshInput {
-  chain: Chain!
-}
-
-type DeepRefreshPayload {
-  chain: Chain
-  submitted: Boolean
-}
-
-union DeepRefreshPayloadOrError = DeepRefreshPayload | ErrNotAuthorized
 
 union LoginPayloadOrError =
     LoginPayload
@@ -1731,6 +1728,16 @@ type PreverifyEmailPayload {
 }
 
 union PreverifyEmailPayloadOrError = PreverifyEmailPayload | ErrInvalidInput
+
+input VerifyEmailMagicLinkInput {
+  email: Email! @scrub
+}
+
+type VerifyEmailMagicLinkPayload {
+  canSend: Boolean!
+}
+
+union VerifyEmailMagicLinkPayloadOrError = VerifyEmailMagicLinkPayload | ErrInvalidInput
 
 input UpdateEmailInput {
   email: Email! @scrub
@@ -2101,7 +2108,6 @@ type Mutation {
   refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
   refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
   refreshContract(contractId: DBID!): RefreshContractPayloadOrError
-  deepRefresh(input: DeepRefreshInput!): DeepRefreshPayloadOrError @authRequired
 
   getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
 
@@ -2162,6 +2168,7 @@ type Mutation {
 
   preverifyEmail(input: PreverifyEmailInput!): PreverifyEmailPayloadOrError
   verifyEmail(input: VerifyEmailInput!): VerifyEmailPayloadOrError
+  verifyEmailMagicLink(input: VerifyEmailMagicLinkInput!): VerifyEmailMagicLinkPayloadOrError
 
   redeemMerch(input: RedeemMerchInput!): RedeemMerchPayloadOrError @authRequired
 

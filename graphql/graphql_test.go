@@ -166,7 +166,7 @@ func testSuggestedUsersForViewer(t *testing.T) {
 	userC := newUserFixture(t)
 	ctx := context.Background()
 	clients := server.ClientInit(ctx)
-	provider := server.NewMultichainProvider(clients)
+	provider, cleanup := server.NewMultichainProvider(ctx, server.SetDefaults)
 	recommender := newStubRecommender(t, []persist.DBID{
 		userA.ID,
 		userB.ID,
@@ -181,6 +181,10 @@ func testSuggestedUsersForViewer(t *testing.T) {
 	payload, _ := (*response.Viewer).(*viewerQueryViewer)
 	suggested := payload.GetSuggestedUsers().GetEdges()
 	assert.Len(t, suggested, 3)
+	t.Cleanup(func() {
+		clients.Close()
+		cleanup()
+	})
 }
 
 func testAddWallet(t *testing.T) {
@@ -230,7 +234,8 @@ func testLogin(t *testing.T) {
 
 	require.NoError(t, err)
 	payload, _ := (*response.Login).(*loginMutationLoginLoginPayload)
-	assert.NotEmpty(t, readCookie(t, c.response, auth.JWTCookieKey))
+	assert.NotEmpty(t, readCookie(t, c.response, auth.AuthCookieKey))
+	assert.NotEmpty(t, readCookie(t, c.response, auth.RefreshCookieKey))
 	assert.Equal(t, userF.Username, *payload.Viewer.User.Username)
 	assert.Equal(t, userF.ID, payload.Viewer.User.Dbid)
 }
@@ -242,7 +247,8 @@ func testLogout(t *testing.T) {
 	response, err := logoutMutation(context.Background(), c)
 
 	require.NoError(t, err)
-	assert.Empty(t, readCookie(t, c.response, auth.JWTCookieKey))
+	assert.Empty(t, readCookie(t, c.response, auth.AuthCookieKey))
+	assert.Empty(t, readCookie(t, c.response, auth.RefreshCookieKey))
 	assert.Nil(t, response.Logout.Viewer)
 }
 
@@ -484,7 +490,6 @@ func testUpdateUserExperiences(t *testing.T) {
 func testConnectSocialAccount(t *testing.T) {
 	userF := newUserFixture(t)
 	c := authedHandlerClient(t, userF.ID)
-	dc := defaultHandlerClient(t)
 
 	connectResp, err := connectSocialAccount(context.Background(), c, SocialAuthMechanism{
 		Debug: &DebugSocialAuth{
@@ -515,10 +520,13 @@ func testConnectSocialAccount(t *testing.T) {
 	assert.Equal(t, updateDisplayedPayload.Viewer.SocialAccounts.Twitter.Username, "test")
 	assert.False(t, updateDisplayedPayload.Viewer.SocialAccounts.Twitter.Display)
 
-	userResp, err := userByIdQuery(context.Background(), dc, userF.ID)
-	require.NoError(t, err)
-	userPayload := (*userResp.UserById).(*userByIdQueryUserByIdGalleryUser)
-	assert.Nil(t, userPayload.SocialAccounts.Twitter)
+	// For now, we're always returning the user's social accounts despite preference setting.
+	// If there's community significant pushback about this then we can reinstate the feature.
+	// dc := defaultHandlerClient(t)
+	// userResp, err := userByIdQuery(context.Background(), dc, userF.ID)
+	// require.NoError(t, err)
+	// userPayload := (*userResp.UserById).(*userByIdQueryUserByIdGalleryUser)
+	// assert.Nil(t, userPayload.SocialAccounts.Twitter)
 
 	disconnectResp, err := disconnectSocialAccount(context.Background(), c, SocialAccountTypeTwitter)
 	require.NoError(t, err)
@@ -795,7 +803,9 @@ func testSyncDeletesOldTokens(t *testing.T) {
 	userF := newUserWithTokensFixture(t)
 	provider := newStubProvider(withContractTokens(multichain.ChainAgnosticContract{
 		Address: "0x1337",
-		Name:    "someContract",
+		Descriptors: multichain.ChainAgnosticContractDescriptors{
+			Name: "someContract",
+		},
 	}, userF.Wallet.Address, 4))
 	h := handlerWithProviders(t, sendTokensNOOP, provider)
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
@@ -809,11 +819,15 @@ func testSyncShouldCombineProviders(t *testing.T) {
 	userF := newUserFixture(t)
 	providerA := newStubProvider(withContractTokens(multichain.ChainAgnosticContract{
 		Address: "0x1337",
-		Name:    "someContract",
+		Descriptors: multichain.ChainAgnosticContractDescriptors{
+			Name: "someContract",
+		},
 	}, userF.Wallet.Address, 4))
 	providerB := newStubProvider(withContractTokens(multichain.ChainAgnosticContract{
 		Address: "0x1234",
-		Name:    "anotherContract",
+		Descriptors: multichain.ChainAgnosticContractDescriptors{
+			Name: "anotherContract",
+		},
 	}, userF.Wallet.Address, 2))
 	h := handlerWithProviders(t, sendTokensNOOP, providerA, providerB)
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
@@ -826,7 +840,9 @@ func testSyncShouldCombineProviders(t *testing.T) {
 func testSyncShouldMergeDuplicatesInProvider(t *testing.T) {
 	userF := newUserFixture(t)
 	token := defaultToken(userF.Wallet.Address)
-	contract := multichain.ChainAgnosticContract{Address: token.ContractAddress, Name: "someContract"}
+	contract := multichain.ChainAgnosticContract{Address: token.ContractAddress, Descriptors: multichain.ChainAgnosticContractDescriptors{
+		Name: "someContract",
+	}}
 	provider := newStubProvider(
 		withContracts([]multichain.ChainAgnosticContract{contract}),
 		withTokens([]multichain.ChainAgnosticToken{token, token}),
@@ -842,7 +858,9 @@ func testSyncShouldMergeDuplicatesInProvider(t *testing.T) {
 func testSyncShouldMergeDuplicatesAcrossProviders(t *testing.T) {
 	userF := newUserFixture(t)
 	token := defaultToken(userF.Wallet.Address)
-	contract := multichain.ChainAgnosticContract{Address: token.ContractAddress, Name: "someContract"}
+	contract := multichain.ChainAgnosticContract{Address: token.ContractAddress, Descriptors: multichain.ChainAgnosticContractDescriptors{
+		Name: "someContract",
+	}}
 	providerA := newStubProvider(withContracts([]multichain.ChainAgnosticContract{contract}), withTokens([]multichain.ChainAgnosticToken{token}))
 	providerB := newStubProvider(withContracts([]multichain.ChainAgnosticContract{contract}), withTokens([]multichain.ChainAgnosticToken{token}))
 	h := handlerWithProviders(t, sendTokensNOOP, providerA, providerB)
@@ -857,7 +875,9 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	metadataServer := newMetadataServerFixture(t)
 
 	patchMetadata := func(t *testing.T, ctx context.Context, address, endpoint string) http.Handler {
-		contract := multichain.ChainAgnosticContract{Address: "0x123", Name: "testContract"}
+		contract := multichain.ChainAgnosticContract{Address: "0x123", Descriptors: multichain.ChainAgnosticContractDescriptors{
+			Name: "testContract",
+		}}
 		clients := server.ClientInit(ctx)
 		provider := newStubProvider(
 			withContractTokens(contract, address, 1),
@@ -1228,13 +1248,6 @@ func newUser(t *testing.T, ctx context.Context, c graphql.Client, w wallet) (use
 	return payload.Viewer.User.Dbid, username, payload.Viewer.User.Galleries[0].Dbid
 }
 
-// newJWT generates a JWT
-func newJWT(t *testing.T, ctx context.Context, userID persist.DBID) string {
-	jwt, err := auth.GenerateAuthToken(ctx, userID)
-	require.NoError(t, err)
-	return jwt
-}
-
 // syncTokens makes a GraphQL request to sync a user's wallet
 func syncTokens(t *testing.T, ctx context.Context, c graphql.Client, userID persist.DBID) []persist.DBID {
 	t.Helper()
@@ -1325,7 +1338,9 @@ func defaultLayout() CollectionLayoutInput {
 // defaultToken returns a dummy token owned by the provided address
 func defaultToken(address string) multichain.ChainAgnosticToken {
 	return multichain.ChainAgnosticToken{
-		Name:            "testToken1",
+		Descriptors: multichain.ChainAgnosticTokenDescriptors{
+			Name: "testToken1",
+		},
 		TokenID:         "1",
 		Quantity:        "1",
 		ContractAddress: "0x123",
@@ -1344,11 +1359,15 @@ func defaultTokenSettings(tokens []persist.DBID) []CollectionTokenSettingsInput 
 
 // defaultHandler returns a backend GraphQL http.Handler
 func defaultHandler(t *testing.T) http.Handler {
-	c := server.ClientInit(context.Background())
-	p := server.NewMultichainProvider(c)
+	ctx := context.Background()
+	c := server.ClientInit(ctx)
+	p, cleanup := server.NewMultichainProvider(ctx, server.SetDefaults)
 	r := newStubRecommender(t, []persist.DBID{})
 	handler := server.CoreInit(c, p, r)
-	t.Cleanup(c.Close)
+	t.Cleanup(func() {
+		c.Close()
+		cleanup()
+	})
 	return handler
 }
 
@@ -1401,12 +1420,17 @@ func customServerClient(t *testing.T, host string, opts ...func(*http.Request)) 
 	return &serverClient{url: host + "/glry/graphql/query", opts: opts}
 }
 
-// withJWTOpt adds a JWT cookie to the request headers
+// withJWTOpt adds auth JWT cookies to the request headers
 func withJWTOpt(t *testing.T, userID persist.DBID) func(*http.Request) {
-	jwt, err := auth.GenerateAuthToken(context.Background(), userID)
+	sessionID := persist.GenerateID()
+	refreshID := persist.GenerateID().String()
+	authJWT, err := auth.GenerateAuthToken(context.Background(), userID, sessionID, refreshID, []persist.Role{})
+	require.NoError(t, err)
+	refreshJWT, _, err := auth.GenerateRefreshToken(context.Background(), refreshID, "", userID, sessionID)
 	require.NoError(t, err)
 	return func(r *http.Request) {
-		r.AddCookie(&http.Cookie{Name: auth.JWTCookieKey, Value: jwt})
+		r.AddCookie(&http.Cookie{Name: auth.AuthCookieKey, Value: authJWT})
+		r.AddCookie(&http.Cookie{Name: auth.RefreshCookieKey, Value: refreshJWT})
 	}
 }
 
@@ -1480,7 +1504,9 @@ func (c *serverClient) MakeRequest(ctx context.Context, req *genql.Request, resp
 // readCookie finds a cookie set in the response
 func readCookie(t *testing.T, r *http.Response, name string) string {
 	t.Helper()
-	for _, c := range r.Cookies() {
+	cookies := r.Cookies()
+	for i := len(cookies) - 1; i >= 0; i-- {
+		c := cookies[i]
 		if c.Name == name {
 			return c.Value
 		}

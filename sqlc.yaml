@@ -15,6 +15,12 @@ sql:
           # Overrides are prioritized from top to bottom, so if we need to override one of the * entries (like *.id),
           # the override should come _before_ the * entry
 
+          - column: "reprocess_jobs.id"
+            go_type: "int"
+          - column: "contracts.owner_method"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.ContractOwnerMethod"
+          - column: "contracts.*address"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.EthereumAddress"
           # Wildcards
           # Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above
           - column: "*.id"
@@ -23,6 +29,8 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.BlockNumber"
           - column: "*.block_end"
             go_type: "github.com/mikeydub/go-gallery/service/persist.BlockNumber"
+          - column: "*.chain"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Chain"
 
   # Backend model gen
   - schema:
@@ -169,6 +177,10 @@ sql:
 
           # Push Notification Tokens
           - column: "push_notification_tickets.ticket_id"
+            go_type: "string"
+
+          # Sessions
+          - column: "sessions.current_refresh_id"
             go_type: "string"
           
           - column: "reprocess_jobs.id"

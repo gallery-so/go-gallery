@@ -72,7 +72,6 @@ $(DEPLOY)-$(DEV)-indexer-server     : SERVICE_FILE := indexer-server-env.yaml
 $(DEPLOY)-$(DEV)-admin              : SERVICE_FILE := app-dev-admin.yaml
 $(DEPLOY)-$(DEV)-feed               : SERVICE_FILE := feed-env.yaml
 $(DEPLOY)-$(DEV)-tokenprocessing    : SERVICE_FILE := tokenprocessing-env.yaml
-$(DEPLOY)-$(DEV)-tokenprocessingV3  : SERVICE_FILE := tokenprocessing-env.yaml
 $(DEPLOY)-$(DEV)-pushnotifications  : SERVICE_FILE := pushnotifications-env.yaml
 $(DEPLOY)-$(DEV)-emails             : SERVICE_FILE := emails-server-env.yaml
 $(DEPLOY)-$(DEV)-feedbot            : SERVICE_FILE := feedbot-env.yaml
@@ -85,7 +84,6 @@ $(DEPLOY)-$(PROD)-admin             : SERVICE_FILE := app-prod-admin.yaml
 $(DEPLOY)-$(PROD)-feed              : SERVICE_FILE := feed-env.yaml
 $(DEPLOY)-$(PROD)-feedbot           : SERVICE_FILE := feedbot-env.yaml
 $(DEPLOY)-$(PROD)-tokenprocessing   : SERVICE_FILE := tokenprocessing-env.yaml
-$(DEPLOY)-$(PROD)-tokenprocessingV3 : SERVICE_FILE := tokenprocessing-env.yaml
 $(DEPLOY)-$(PROD)-pushnotifications : SERVICE_FILE := pushnotifications-env.yaml
 $(DEPLOY)-$(PROD)-dummymetadata     : SERVICE_FILE := dummymetadata-env.yaml
 $(DEPLOY)-$(PROD)-emails            : SERVICE_FILE := emails-server-env.yaml
@@ -98,7 +96,6 @@ $(DEPLOY)-%-backend               : SENTRY_PROJECT := gallery-backend
 $(DEPLOY)-%-indexer               : SENTRY_PROJECT := indexer
 $(DEPLOY)-%-indexer-server        : SENTRY_PROJECT := indexer-api
 $(DEPLOY)-%-tokenprocessing       : SENTRY_PROJECT := tokenprocessing
-$(DEPLOY)-%-tokenprocessingV3     : SENTRY_PROJECT := tokenprocessing
 $(DEPLOY)-%-pushnotifications     : SENTRY_PROJECT := pushnotifications
 $(DEPLOY)-%-dummymetadata         : SENTRY_PROJECT := dummymetadata
 $(DEPLOY)-%-feed                  : SENTRY_PROJECT := feed
@@ -106,24 +103,15 @@ $(DEPLOY)-%-feedbot               : SENTRY_PROJECT := feedbot
 $(DEPLOY)-%-emails                : SENTRY_PROJECT := emails
 
 # Docker builds
-$(DEPLOY)-%-tokenprocessing            : REPO           := tokenprocessing
+$(DEPLOY)-%-tokenprocessing            : REPO           := tokenprocessing-v3
 $(DEPLOY)-%-tokenprocessing            : DOCKER_FILE    := $(DOCKER_DIR)/tokenprocessing/Dockerfile
 $(DEPLOY)-%-tokenprocessing            : PORT           := 6500
 $(DEPLOY)-%-tokenprocessing            : TIMEOUT        := $(TOKENPROCESSING_TIMEOUT)
 $(DEPLOY)-%-tokenprocessing            : CPU            := $(TOKENPROCESSING_CPU)
 $(DEPLOY)-%-tokenprocessing            : MEMORY         := $(TOKENPROCESSING_MEMORY)
 $(DEPLOY)-%-tokenprocessing            : CONCURRENCY    := $(TOKENPROCESSING_CONCURRENCY)
-$(DEPLOY)-$(DEV)-tokenprocessing       : SERVICE        := tokenprocessing-dev
-$(DEPLOY)-$(PROD)-tokenprocessing      : SERVICE        := tokenprocessing-v2
-$(DEPLOY)-%-tokenprocessingV3          : REPO           := tokenprocessing-v3
-$(DEPLOY)-%-tokenprocessingV3          : DOCKER_FILE    := $(DOCKER_DIR)/tokenprocessing/Dockerfile
-$(DEPLOY)-%-tokenprocessingV3          : PORT           := 6500
-$(DEPLOY)-%-tokenprocessingV3          : TIMEOUT        := $(TOKENPROCESSING_TIMEOUT)
-$(DEPLOY)-%-tokenprocessingV3          : CPU            := $(TOKENPROCESSING_CPU)
-$(DEPLOY)-%-tokenprocessingV3          : MEMORY         := $(TOKENPROCESSING_MEMORY)
-$(DEPLOY)-%-tokenprocessingV3          : CONCURRENCY    := $(TOKENPROCESSING_CONCURRENCY)
-$(DEPLOY)-$(DEV)-tokenprocessingV3     : SERVICE        := tokenprocessing-v3
-$(DEPLOY)-$(PROD)-tokenprocessingV3    : SERVICE        := tokenprocessing-v3
+$(DEPLOY)-$(DEV)-tokenprocessing       : SERVICE        := tokenprocessing-v3
+$(DEPLOY)-$(PROD)-tokenprocessing      : SERVICE        := tokenprocessing-v3
 $(DEPLOY)-%-pushnotifications          : REPO           := pushnotifications
 $(DEPLOY)-%-pushnotifications          : DOCKER_FILE    := $(DOCKER_DIR)/pushnotifications/Dockerfile
 $(DEPLOY)-%-pushnotifications          : PORT           := 6600
@@ -232,7 +220,7 @@ $(PROMOTE)-%-indexer                   : SERVICE := indexer
 $(PROMOTE)-%-indexer-server            : SERVICE := indexer-api
 $(PROMOTE)-%-emails                    : SERVICE := emails
 $(PROMOTE)-%-tokenprocessing           : SERVICE := tokenprocessing
-$(PROMOTE)-%-tokenprocessingV3         : SERVICE := tokenprocessing-v3
+$(PROMOTE)-%-tokenprocessing           : SERVICE := tokenprocessing-v3
 $(PROMOTE)-%-pushnotifications         : SERVICE := pushnotifications
 $(PROMOTE)-%-dummymetadata             : SERVICE := dummymetadata
 $(PROMOTE)-%-feed                      : SERVICE := feed
@@ -352,7 +340,6 @@ _$(RELEASE)-%:
 $(DEPLOY)-$(DEV)-backend            : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend
 $(DEPLOY)-$(DEV)-indexer-server     : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer-server _$(RELEASE)-indexer-server
 $(DEPLOY)-$(DEV)-tokenprocessing    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-tokenprocessing _$(RELEASE)-tokenprocessing
-$(DEPLOY)-$(DEV)-tokenprocessingV3  : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-tokenprocessingV3 _$(RELEASE)-tokenprocessingV3
 $(DEPLOY)-$(DEV)-pushnotifications  : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-pushnotifications _$(RELEASE)-pushnotifications
 $(DEPLOY)-$(DEV)-emails             : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-emails _$(RELEASE)-emails
 $(DEPLOY)-$(DEV)-admin              : _set-project-$(ENV) _$(DEPLOY)-admin
@@ -371,7 +358,6 @@ $(DEPLOY)-$(PROD)-backend            : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-
 $(DEPLOY)-$(PROD)-indexer            : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer _$(RELEASE)-indexer
 $(DEPLOY)-$(PROD)-indexer-server     : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer-server _$(RELEASE)-indexer-server
 $(DEPLOY)-$(PROD)-tokenprocessing    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-tokenprocessing _$(RELEASE)-tokenprocessing
-$(DEPLOY)-$(PROD)-tokenprocessingV3  : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-tokenprocessingV3 _$(RELEASE)-tokenprocessingV3
 $(DEPLOY)-$(PROD)-pushnotifications  : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-pushnotifications _$(RELEASE)-pushnotifications
 $(DEPLOY)-$(PROD)-dummymetadata      : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-dummymetadata _$(RELEASE)-dummymetadata
 $(DEPLOY)-$(PROD)-emails             : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-emails _$(RELEASE)-emails
@@ -392,7 +378,6 @@ $(PROMOTE)-$(PROD)-backend            : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE
 $(PROMOTE)-$(PROD)-indexer            : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-indexer
 $(PROMOTE)-$(PROD)-indexer-server     : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-indexer-server
 $(PROMOTE)-$(PROD)-tokenprocessing    : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-tokenprocessing
-$(PROMOTE)-$(PROD)-tokenprocessingV3  : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-tokenprocessingV3
 $(PROMOTE)-$(PROD)-pushnotifications  : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-pushnotifications
 $(PROMOTE)-$(PROD)-dummymetadata      : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-dummymetadata
 $(PROMOTE)-$(PROD)-emails             : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-emails
@@ -465,13 +450,13 @@ format-graphql:
 	yarn prettier --write graphql/testdata/operations.graphql;
 
 start-local-graphql-gateway:
-	docker-compose -f docker/graphql-gateway/docker-compose.yml up -d graphql-gateway-local
+	docker-compose -f docker/graphql-gateway/docker-compose.yml up --build -d graphql-gateway-local
 
 start-dev-graphql-gateway:
-	docker-compose -f docker/graphql-gateway/docker-compose.yml up -d graphql-gateway-dev
+	docker-compose -f docker/graphql-gateway/docker-compose.yml up --build -d graphql-gateway-dev
 
 start-prod-graphql-gateway:
-	docker-compose -f docker/graphql-gateway/docker-compose.yml up -d graphql-gateway-prod
+	docker-compose -f docker/graphql-gateway/docker-compose.yml up --build -d graphql-gateway-prod
 
 # Listing targets as dependencies doesn't pull in target-specific secrets, so we need to
 # invoke $(MAKE) here to read appropriate secrets for each target.

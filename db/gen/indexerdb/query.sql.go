@@ -14,7 +14,7 @@ import (
 )
 
 const firstContract = `-- name: FirstContract :one
-SELECT id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, latest_block, owner_address FROM contracts LIMIT 1
+SELECT id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, latest_block, owner_address, owner_method FROM contracts LIMIT 1
 `
 
 // sqlc needs at least one query in order to generate the models.
@@ -34,24 +34,107 @@ func (q *Queries) FirstContract(ctx context.Context) (Contract, error) {
 		&i.Chain,
 		&i.LatestBlock,
 		&i.OwnerAddress,
+		&i.OwnerMethod,
 	)
 	return i, err
 }
 
+const getContractsByIDRange = `-- name: GetContractsByIDRange :many
+SELECT
+    contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.latest_block, contracts.owner_address, contracts.owner_method
+FROM contracts
+WHERE contracts.deleted = false
+AND (contracts.owner_address IS NULL OR contracts.owner_address = '' OR contracts.creator_address IS NULL OR contracts.creator_address = '') 
+AND contracts.id >= $1 AND contracts.id < $2
+ORDER BY contracts.id
+`
+
+type GetContractsByIDRangeParams struct {
+	StartID string
+	EndID   string
+}
+
+func (q *Queries) GetContractsByIDRange(ctx context.Context, arg GetContractsByIDRangeParams) ([]Contract, error) {
+	rows, err := q.db.Query(ctx, getContractsByIDRange, arg.StartID, arg.EndID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Contract
+	for rows.Next() {
+		var i Contract
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Name,
+			&i.Symbol,
+			&i.Address,
+			&i.CreatorAddress,
+			&i.Chain,
+			&i.LatestBlock,
+			&i.OwnerAddress,
+			&i.OwnerMethod,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getReprocessJobRangeByID = `-- name: GetReprocessJobRangeByID :one
+select id, start_id, end_id from reprocess_jobs where id = $1
+`
+
+func (q *Queries) GetReprocessJobRangeByID(ctx context.Context, id int) (ReprocessJob, error) {
+	row := q.db.QueryRow(ctx, getReprocessJobRangeByID, id)
+	var i ReprocessJob
+	err := row.Scan(&i.ID, &i.StartID, &i.EndID)
+	return i, err
+}
+
 const insertStatistic = `-- name: InsertStatistic :one
-insert into blockchain_statistics (block_start, block_end) values ($1, $2) returning id
+insert into blockchain_statistics (id, block_start, block_end) values ($1, $2, $3) on conflict do nothing returning id
 `
 
 type InsertStatisticParams struct {
+	ID         persist.DBID
 	BlockStart persist.BlockNumber
 	BlockEnd   persist.BlockNumber
 }
 
 func (q *Queries) InsertStatistic(ctx context.Context, arg InsertStatisticParams) (persist.DBID, error) {
-	row := q.db.QueryRow(ctx, insertStatistic, arg.BlockStart, arg.BlockEnd)
+	row := q.db.QueryRow(ctx, insertStatistic, arg.ID, arg.BlockStart, arg.BlockEnd)
 	var id persist.DBID
 	err := row.Scan(&id)
 	return id, err
+}
+
+const updateContractOwnerByID = `-- name: UpdateContractOwnerByID :exec
+update contracts set owner_address = $1, creator_address = $2, owner_method = $3 where id = $4 and deleted = false
+`
+
+type UpdateContractOwnerByIDParams struct {
+	OwnerAddress   persist.EthereumAddress
+	CreatorAddress persist.EthereumAddress
+	OwnerMethod    persist.ContractOwnerMethod
+	ID             persist.DBID
+}
+
+func (q *Queries) UpdateContractOwnerByID(ctx context.Context, arg UpdateContractOwnerByIDParams) error {
+	_, err := q.db.Exec(ctx, updateContractOwnerByID,
+		arg.OwnerAddress,
+		arg.CreatorAddress,
+		arg.OwnerMethod,
+		arg.ID,
+	)
+	return err
 }
 
 const updateStatisticContractStats = `-- name: UpdateStatisticContractStats :exec

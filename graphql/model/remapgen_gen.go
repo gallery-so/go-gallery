@@ -73,11 +73,6 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
-	"DeepRefreshPayloadOrError": func(object interface{}) (interface{}, bool) {
-		obj, ok := object.(DeepRefreshPayloadOrError)
-		return obj, ok
-	},
-
 	"DeleteCollectionPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(DeleteCollectionPayloadOrError)
 		return obj, ok
@@ -430,6 +425,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 
 	"UserByUsernameOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(UserByUsernameOrError)
+		return obj, ok
+	},
+
+	"VerifyEmailMagicLinkPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(VerifyEmailMagicLinkPayloadOrError)
 		return obj, ok
 	},
 

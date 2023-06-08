@@ -4,7 +4,10 @@ import (
 	"context"
 	"database/sql/driver"
 	"encoding/json"
+	"fmt"
 	"time"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/tracing"
@@ -101,6 +104,7 @@ type PipelineMetadata struct {
 	AnimationOpenseaFallback              PipelineStepStatus `json:"animation_opensea_fallback,omitempty"`
 	AnimationDetermineMediaTypeWithReader PipelineStepStatus `json:"animation_determine_media_type_with_reader,omitempty"`
 	AnimationAnimationGzip                PipelineStepStatus `json:"animation_animation_gzip,omitempty"`
+	AnimationSVGRasterize                 PipelineStepStatus `json:"animation_svg_rasterize,omitempty"`
 	AnimationStoreGCP                     PipelineStepStatus `json:"animation_store_gcp,omitempty"`
 	AnimationThumbnailGCP                 PipelineStepStatus `json:"animation_thumbnail_gcp,omitempty"`
 	AnimationLiveRenderGCP                PipelineStepStatus `json:"animation_live_render_gcp,omitempty"`
@@ -109,11 +113,22 @@ type PipelineMetadata struct {
 	ImageOpenseaFallback                  PipelineStepStatus `json:"image_opensea_fallback,omitempty"`
 	ImageDetermineMediaTypeWithReader     PipelineStepStatus `json:"image_determine_media_type_with_reader,omitempty"`
 	ImageAnimationGzip                    PipelineStepStatus `json:"image_animation_gzip,omitempty"`
+	ImageSVGRasterize                     PipelineStepStatus `json:"image_svg_rasterize,omitempty"`
 	ImageStoreGCP                         PipelineStepStatus `json:"image_store_gcp,omitempty"`
 	ImageThumbnailGCP                     PipelineStepStatus `json:"image_thumbnail_gcp,omitempty"`
 	ImageLiveRenderGCP                    PipelineStepStatus `json:"image_live_render_gcp,omitempty"`
+	AlternateContentHeaderValueRetrieval  PipelineStepStatus `json:"alternate_content_header_value_retrieval,omitempty"`
+	AlternateReaderRetrieval              PipelineStepStatus `json:"alternate_reader_retrieval,omitempty"`
+	AlternateOpenseaFallback              PipelineStepStatus `json:"alternate_opensea_fallback,omitempty"`
+	AlternateDetermineMediaTypeWithReader PipelineStepStatus `json:"alternate_determine_media_type_with_reader,omitempty"`
+	AlternateAnimationGzip                PipelineStepStatus `json:"alternate_animation_gzip,omitempty"`
+	AlternateSVGRasterize                 PipelineStepStatus `json:"alternate_svg_rasterize,omitempty"`
+	AlternateStoreGCP                     PipelineStepStatus `json:"alternate_store_gcp,omitempty"`
+	AlternateThumbnailGCP                 PipelineStepStatus `json:"alternate_thumbnail_gcp,omitempty"`
+	AlternateLiveRenderGCP                PipelineStepStatus `json:"alternate_live_render_gcp,omitempty"`
 	NothingCachedWithErrors               PipelineStepStatus `json:"nothing_cached_errors,omitempty"`
 	NothingCachedWithoutErrors            PipelineStepStatus `json:"nothing_cached_no_errors,omitempty"`
+	CreateMedia                           PipelineStepStatus `json:"create_media,omitempty"`
 	CreateMediaFromCachedObjects          PipelineStepStatus `json:"create_media_from_cached_objects,omitempty"`
 	CreateRawMedia                        PipelineStepStatus `json:"create_raw_media,omitempty"`
 	SetUnknownMediaType                   PipelineStepStatus `json:"set_default_media_type,omitempty"`
@@ -132,7 +147,18 @@ func (p *PipelineMetadata) Scan(value interface{}) error {
 }
 
 func TrackStepStatus(ctx context.Context, status *PipelineStepStatus, name string) (func(), context.Context) {
+	// Keep track of the parent step name
+	if log := logger.For(ctx); log != nil {
+		if parent, ok := log.Data["pipelineStep"].(string); ok && parent != "" {
+			name = fmt.Sprintf("%s.%s", parent, name)
+		}
+	}
+
 	span, ctx := tracing.StartSpan(ctx, "pipeline.step", name)
+
+	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
+		"pipelineStep": name,
+	})
 
 	startTime := time.Now()
 
@@ -148,20 +174,19 @@ func TrackStepStatus(ctx context.Context, status *PipelineStepStatus, name strin
 			if status == nil || *status == PipelineStepStatusSuccess || *status == PipelineStepStatusError {
 				return
 			}
-			logger.For(ctx).Infof("still %s (taken: %s)", name, time.Since(startTime))
+			logger.For(ctx).Infof("still on [%s] (taken: %s)", name, time.Since(startTime))
 		}
 	}()
 
 	return func() {
 		defer tracing.FinishSpan(span)
 		if *status == PipelineStepStatusError {
-			logger.For(ctx).Infof("failed %s (took: %s)", name, time.Since(startTime))
+			logger.For(ctx).Infof("failed [%s] (took: %s)", name, time.Since(startTime))
 			return
 		}
 		*status = PipelineStepStatusSuccess
-		logger.For(ctx).Infof("succeeded %s (took: %s)", name, time.Since(startTime))
+		logger.For(ctx).Infof("succeeded [%s] (took: %s)", name, time.Since(startTime))
 	}, ctx
-
 }
 
 func FailStep(status *PipelineStepStatus) {

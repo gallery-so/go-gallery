@@ -67,10 +67,6 @@ type CreateUserPayloadOrError interface {
 	IsCreateUserPayloadOrError()
 }
 
-type DeepRefreshPayloadOrError interface {
-	IsDeepRefreshPayloadOrError()
-}
-
 type DeleteCollectionPayloadOrError interface {
 	IsDeleteCollectionPayloadOrError()
 }
@@ -356,6 +352,10 @@ type UserByIDOrError interface {
 
 type UserByUsernameOrError interface {
 	IsUserByUsernameOrError()
+}
+
+type VerifyEmailMagicLinkPayloadOrError interface {
+	IsVerifyEmailMagicLinkPayloadOrError()
 }
 
 type VerifyEmailPayloadOrError interface {
@@ -702,17 +702,6 @@ type DebugSocialAuth struct {
 	DebugToolsPassword *string                `json:"debugToolsPassword"`
 }
 
-type DeepRefreshInput struct {
-	Chain persist.Chain `json:"chain"`
-}
-
-type DeepRefreshPayload struct {
-	Chain     *persist.Chain `json:"chain"`
-	Submitted *bool          `json:"submitted"`
-}
-
-func (DeepRefreshPayload) IsDeepRefreshPayloadOrError() {}
-
 type DeleteCollectionPayload struct {
 	Gallery *Gallery `json:"gallery"`
 }
@@ -880,6 +869,7 @@ func (ErrInvalidInput) IsCommentOnFeedEventPayloadOrError()              {}
 func (ErrInvalidInput) IsRemoveCommentPayloadOrError()                   {}
 func (ErrInvalidInput) IsVerifyEmailPayloadOrError()                     {}
 func (ErrInvalidInput) IsPreverifyEmailPayloadOrError()                  {}
+func (ErrInvalidInput) IsVerifyEmailMagicLinkPayloadOrError()            {}
 func (ErrInvalidInput) IsUpdateEmailPayloadOrError()                     {}
 func (ErrInvalidInput) IsResendVerificationEmailPayloadOrError()         {}
 func (ErrInvalidInput) IsUpdateEmailNotificationSettingsPayloadOrError() {}
@@ -950,7 +940,6 @@ func (ErrNotAuthorized) IsRegisterUserPushTokenPayloadOrError()        {}
 func (ErrNotAuthorized) IsUnregisterUserPushTokenPayloadOrError()      {}
 func (ErrNotAuthorized) IsSyncTokensPayloadOrError()                   {}
 func (ErrNotAuthorized) IsError()                                      {}
-func (ErrNotAuthorized) IsDeepRefreshPayloadOrError()                  {}
 func (ErrNotAuthorized) IsAddRolesToUserPayloadOrError()               {}
 func (ErrNotAuthorized) IsRevokeRolesFromUserPayloadOrError()          {}
 func (ErrNotAuthorized) IsUploadPersistedQueriesPayloadOrError()       {}
@@ -983,6 +972,13 @@ type ErrPushTokenBelongsToAnotherUser struct {
 func (ErrPushTokenBelongsToAnotherUser) IsRegisterUserPushTokenPayloadOrError()   {}
 func (ErrPushTokenBelongsToAnotherUser) IsUnregisterUserPushTokenPayloadOrError() {}
 func (ErrPushTokenBelongsToAnotherUser) IsError()                                 {}
+
+type ErrSessionInvalidated struct {
+	Message string `json:"message"`
+}
+
+func (ErrSessionInvalidated) IsAuthorizationError() {}
+func (ErrSessionInvalidated) IsError()              {}
 
 type ErrSyncFailed struct {
 	Message string `json:"message"`
@@ -2079,6 +2075,16 @@ type UsersConnection struct {
 type VerifyEmailInput struct {
 	Token string `json:"token"`
 }
+
+type VerifyEmailMagicLinkInput struct {
+	Email persist.Email `json:"email"`
+}
+
+type VerifyEmailMagicLinkPayload struct {
+	CanSend bool `json:"canSend"`
+}
+
+func (VerifyEmailMagicLinkPayload) IsVerifyEmailMagicLinkPayloadOrError() {}
 
 type VerifyEmailPayload struct {
 	Email persist.Email `json:"email"`

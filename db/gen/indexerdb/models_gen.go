@@ -38,11 +38,18 @@ type Contract struct {
 	LastUpdated    time.Time
 	Name           sql.NullString
 	Symbol         sql.NullString
-	Address        sql.NullString
-	CreatorAddress sql.NullString
-	Chain          sql.NullInt32
+	Address        persist.EthereumAddress
+	CreatorAddress persist.EthereumAddress
+	Chain          persist.Chain
 	LatestBlock    sql.NullInt64
-	OwnerAddress   sql.NullString
+	OwnerAddress   persist.EthereumAddress
+	OwnerMethod    persist.ContractOwnerMethod
+}
+
+type ReprocessJob struct {
+	ID      int
+	StartID string
+	EndID   string
 }
 
 type Token struct {
@@ -64,6 +71,6 @@ type Token struct {
 	TokenMetadata    pgtype.JSONB
 	ExternalUrl      sql.NullString
 	BlockNumber      sql.NullInt64
-	Chain            sql.NullInt32
+	Chain            persist.Chain
 	IsSpam           sql.NullBool
 }

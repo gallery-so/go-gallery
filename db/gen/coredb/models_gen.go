@@ -179,6 +179,14 @@ type MarketplaceContract struct {
 	ContractID persist.DBID
 }
 
+type MediaValidationRule struct {
+	ID        persist.DBID
+	CreatedAt time.Time
+	MediaType string
+	Property  string
+	Required  bool
+}
+
 type Membership struct {
 	ID          persist.DBID
 	Deleted     bool
@@ -357,6 +365,24 @@ type ScrubbedPiiForUser struct {
 	PiiSocials      persist.Socials
 }
 
+type Session struct {
+	ID                   persist.DBID
+	UserID               persist.DBID
+	CreatedAt            time.Time
+	CreatedWithUserAgent string
+	CreatedWithPlatform  string
+	CreatedWithOs        string
+	LastRefreshed        time.Time
+	LastUserAgent        string
+	LastPlatform         string
+	LastOs               string
+	CurrentRefreshID     string
+	ActiveUntil          time.Time
+	Invalidated          bool
+	LastUpdated          time.Time
+	Deleted              bool
+}
+
 type SpamUserScore struct {
 	UserID        persist.DBID
 	Score         int32
@@ -410,6 +436,31 @@ type TokenMedia struct {
 	Description     string
 	ProcessingJobID persist.DBID
 	Deleted         bool
+}
+
+type TokenMediasActive struct {
+	ID               persist.DBID
+	LastUpdated      time.Time
+	MediaType        interface{}
+	JobID            persist.DBID
+	TokenProperties  pgtype.JSONB
+	PipelineMetadata pgtype.JSONB
+}
+
+type TokenMediasMissingProperty struct {
+	ID          persist.DBID
+	MediaType   interface{}
+	LastUpdated time.Time
+	IsValid     bool
+	Reason      []byte
+}
+
+type TokenMediasNoValidationRule struct {
+	ID          persist.DBID
+	MediaType   interface{}
+	LastUpdated time.Time
+	IsValid     bool
+	Reason      string
 }
 
 type TokenProcessingJob struct {

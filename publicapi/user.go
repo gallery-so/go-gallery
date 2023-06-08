@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/jackc/pgx/v4"
 	"time"
+
+	"github.com/jackc/pgx/v4"
 
 	"github.com/jackc/pgtype"
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -66,6 +67,29 @@ func (api UserAPI) GetUserById(ctx context.Context, userID persist.DBID) (*db.Us
 
 	user, err := api.loaders.UserByUserID.Load(userID)
 	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+func (api UserAPI) GetUserByVerifiedEmailAddress(ctx context.Context, emailAddress persist.Email) (*db.User, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"emailAddress": {emailAddress, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	// Intentionally using queries here instead of a dataloader. Caching a user by email address is tricky
+	// because the key (email address) isn't part of the user object, and this method isn't currently invoked
+	// in a way that would benefit from dataloaders or caching anyway.
+	user, err := api.queries.GetUserByVerifiedEmailAddress(ctx, emailAddress.String())
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			err = persist.ErrUserNotFound{Email: emailAddress}
+		}
 		return nil, err
 	}
 
@@ -970,12 +994,6 @@ func (api UserAPI) GetDisplayedSocials(ctx context.Context, userID persist.DBID)
 	socials, err := api.queries.GetSocialsByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
-	}
-
-	for prov, social := range socials {
-		if !social.Display {
-			delete(socials, prov)
-		}
 	}
 
 	result := &model.SocialAccounts{}

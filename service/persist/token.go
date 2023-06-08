@@ -537,7 +537,7 @@ func (uri TokenURI) Type() URIType {
 		return URITypeHTTP
 	case strings.HasPrefix(asString, "{"), strings.HasPrefix(asString, "["), strings.HasPrefix(asString, "data:application/json"), strings.HasPrefix(asString, "data:text/plain,{"):
 		return URITypeJSON
-	case strings.HasPrefix(asString, "<svg"), strings.HasPrefix(asString, "data:image/svg+xml;utf8,"), strings.HasPrefix(asString, "data:image/svg+xml,"), strings.HasPrefix(asString, "data:image/svg xml,"):
+	case strings.HasPrefix(asString, "<svg"), strings.HasPrefix(asString, "data:image/svg+xml"), strings.HasPrefix(asString, "data:image/svg xml"):
 		return URITypeSVG
 	case strings.HasSuffix(asString, ".ens"):
 		return URITypeENS

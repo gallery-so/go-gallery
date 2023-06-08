@@ -311,11 +311,6 @@ type ComplexityRoot struct {
 		Viewer    func(childComplexity int) int
 	}
 
-	DeepRefreshPayload struct {
-		Chain     func(childComplexity int) int
-		Submitted func(childComplexity int) int
-	}
-
 	DeleteCollectionPayload struct {
 		Gallery func(childComplexity int) int
 	}
@@ -407,6 +402,10 @@ type ComplexityRoot struct {
 	}
 
 	ErrPushTokenBelongsToAnotherUser struct {
+		Message func(childComplexity int) int
+	}
+
+	ErrSessionInvalidated struct {
 		Message func(childComplexity int) int
 	}
 
@@ -697,7 +696,6 @@ type ComplexityRoot struct {
 		CreateCollection                func(childComplexity int, input model.CreateCollectionInput) int
 		CreateGallery                   func(childComplexity int, input model.CreateGalleryInput) int
 		CreateUser                      func(childComplexity int, authMechanism model.AuthMechanism, input model.CreateUserInput) int
-		DeepRefresh                     func(childComplexity int, input model.DeepRefreshInput) int
 		DeleteCollection                func(childComplexity int, collectionID persist.DBID) int
 		DeleteGallery                   func(childComplexity int, galleryID persist.DBID) int
 		DisconnectSocialAccount         func(childComplexity int, accountType persist.SocialProvider) int
@@ -747,6 +745,7 @@ type ComplexityRoot struct {
 		UpdateUserInfo                  func(childComplexity int, input model.UpdateUserInfoInput) int
 		UploadPersistedQueries          func(childComplexity int, input *model.UploadPersistedQueriesInput) int
 		VerifyEmail                     func(childComplexity int, input model.VerifyEmailInput) int
+		VerifyEmailMagicLink            func(childComplexity int, input model.VerifyEmailMagicLinkInput) int
 		ViewGallery                     func(childComplexity int, galleryID persist.DBID) int
 	}
 
@@ -1221,6 +1220,10 @@ type ComplexityRoot struct {
 		PageInfo func(childComplexity int) int
 	}
 
+	VerifyEmailMagicLinkPayload struct {
+		CanSend func(childComplexity int) int
+	}
+
 	VerifyEmailPayload struct {
 		Email func(childComplexity int) int
 	}
@@ -1399,7 +1402,6 @@ type MutationResolver interface {
 	RefreshToken(ctx context.Context, tokenID persist.DBID) (model.RefreshTokenPayloadOrError, error)
 	RefreshCollection(ctx context.Context, collectionID persist.DBID) (model.RefreshCollectionPayloadOrError, error)
 	RefreshContract(ctx context.Context, contractID persist.DBID) (model.RefreshContractPayloadOrError, error)
-	DeepRefresh(ctx context.Context, input model.DeepRefreshInput) (model.DeepRefreshPayloadOrError, error)
 	GetAuthNonce(ctx context.Context, chainAddress persist.ChainAddress) (model.GetAuthNoncePayloadOrError, error)
 	CreateUser(ctx context.Context, authMechanism model.AuthMechanism, input model.CreateUserInput) (model.CreateUserPayloadOrError, error)
 	UpdateEmail(ctx context.Context, input model.UpdateEmailInput) (model.UpdateEmailPayloadOrError, error)
@@ -1431,6 +1433,7 @@ type MutationResolver interface {
 	UpdateNotificationSettings(ctx context.Context, settings *model.NotificationSettingsInput) (*model.NotificationSettings, error)
 	PreverifyEmail(ctx context.Context, input model.PreverifyEmailInput) (model.PreverifyEmailPayloadOrError, error)
 	VerifyEmail(ctx context.Context, input model.VerifyEmailInput) (model.VerifyEmailPayloadOrError, error)
+	VerifyEmailMagicLink(ctx context.Context, input model.VerifyEmailMagicLinkInput) (model.VerifyEmailMagicLinkPayloadOrError, error)
 	RedeemMerch(ctx context.Context, input model.RedeemMerchInput) (model.RedeemMerchPayloadOrError, error)
 	AddRolesToUser(ctx context.Context, username string, roles []*persist.Role) (model.AddRolesToUserPayloadOrError, error)
 	AddWalletToUserUnchecked(ctx context.Context, input model.AdminAddWalletInput) (model.AdminAddWalletPayloadOrError, error)
@@ -2429,20 +2432,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.CreateUserPayload.Viewer(childComplexity), true
 
-	case "DeepRefreshPayload.chain":
-		if e.complexity.DeepRefreshPayload.Chain == nil {
-			break
-		}
-
-		return e.complexity.DeepRefreshPayload.Chain(childComplexity), true
-
-	case "DeepRefreshPayload.submitted":
-		if e.complexity.DeepRefreshPayload.Submitted == nil {
-			break
-		}
-
-		return e.complexity.DeepRefreshPayload.Submitted(childComplexity), true
-
 	case "DeleteCollectionPayload.gallery":
 		if e.complexity.DeleteCollectionPayload.Gallery == nil {
 			break
@@ -2643,6 +2632,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ErrPushTokenBelongsToAnotherUser.Message(childComplexity), true
+
+	case "ErrSessionInvalidated.message":
+		if e.complexity.ErrSessionInvalidated.Message == nil {
+			break
+		}
+
+		return e.complexity.ErrSessionInvalidated.Message(childComplexity), true
 
 	case "ErrSyncFailed.message":
 		if e.complexity.ErrSyncFailed.Message == nil {
@@ -3849,18 +3845,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.CreateUser(childComplexity, args["authMechanism"].(model.AuthMechanism), args["input"].(model.CreateUserInput)), true
 
-	case "Mutation.deepRefresh":
-		if e.complexity.Mutation.DeepRefresh == nil {
-			break
-		}
-
-		args, err := ec.field_Mutation_deepRefresh_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Mutation.DeepRefresh(childComplexity, args["input"].(model.DeepRefreshInput)), true
-
 	case "Mutation.deleteCollection":
 		if e.complexity.Mutation.DeleteCollection == nil {
 			break
@@ -4438,6 +4422,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.VerifyEmail(childComplexity, args["input"].(model.VerifyEmailInput)), true
+
+	case "Mutation.verifyEmailMagicLink":
+		if e.complexity.Mutation.VerifyEmailMagicLink == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_verifyEmailMagicLink_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.VerifyEmailMagicLink(childComplexity, args["input"].(model.VerifyEmailMagicLinkInput)), true
 
 	case "Mutation.viewGallery":
 		if e.complexity.Mutation.ViewGallery == nil {
@@ -6302,6 +6298,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.UsersConnection.PageInfo(childComplexity), true
 
+	case "VerifyEmailMagicLinkPayload.canSend":
+		if e.complexity.VerifyEmailMagicLinkPayload.CanSend == nil {
+			break
+		}
+
+		return e.complexity.VerifyEmailMagicLinkPayload.CanSend(childComplexity), true
+
 	case "VerifyEmailPayload.email":
 		if e.complexity.VerifyEmailPayload.Email == nil {
 			break
@@ -6548,7 +6551,6 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputCreateUserInput,
 		ec.unmarshalInputDebugAuth,
 		ec.unmarshalInputDebugSocialAuth,
-		ec.unmarshalInputDeepRefreshInput,
 		ec.unmarshalInputEoaAuth,
 		ec.unmarshalInputGalleryPositionInput,
 		ec.unmarshalInputGnosisSafeAuth,
@@ -6582,6 +6584,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputUpdateUserInfoInput,
 		ec.unmarshalInputUploadPersistedQueriesInput,
 		ec.unmarshalInputVerifyEmailInput,
+		ec.unmarshalInputVerifyEmailMagicLinkInput,
 		ec.unmarshalInputtopCollectionsForCommunityInput,
 	)
 	first := true
@@ -8015,7 +8018,11 @@ type ErrCommunityNotFound implements Error {
   message: String!
 }
 
-union AuthorizationError = ErrNoCookie | ErrInvalidToken | ErrDoesNotOwnRequiredToken
+union AuthorizationError =
+    ErrNoCookie
+  | ErrInvalidToken
+  | ErrSessionInvalidated
+  | ErrDoesNotOwnRequiredToken
 
 type ErrNotAuthorized implements Error {
   message: String!
@@ -8033,6 +8040,10 @@ type ErrNoCookie implements Error {
 }
 
 type ErrInvalidToken implements Error {
+  message: String!
+}
+
+type ErrSessionInvalidated implements Error {
   message: String!
 }
 
@@ -8131,17 +8142,6 @@ input DebugSocialAuth @restrictEnvironment(allowed: ["local", "development", "sa
   # A password required to use debug tools. Typically empty in local environments.
   debugToolsPassword: String
 }
-
-input DeepRefreshInput {
-  chain: Chain!
-}
-
-type DeepRefreshPayload {
-  chain: Chain
-  submitted: Boolean
-}
-
-union DeepRefreshPayloadOrError = DeepRefreshPayload | ErrNotAuthorized
 
 union LoginPayloadOrError =
     LoginPayload
@@ -8393,6 +8393,16 @@ type PreverifyEmailPayload {
 }
 
 union PreverifyEmailPayloadOrError = PreverifyEmailPayload | ErrInvalidInput
+
+input VerifyEmailMagicLinkInput {
+  email: Email! @scrub
+}
+
+type VerifyEmailMagicLinkPayload {
+  canSend: Boolean!
+}
+
+union VerifyEmailMagicLinkPayloadOrError = VerifyEmailMagicLinkPayload | ErrInvalidInput
 
 input UpdateEmailInput {
   email: Email! @scrub
@@ -8763,7 +8773,6 @@ type Mutation {
   refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
   refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
   refreshContract(contractId: DBID!): RefreshContractPayloadOrError
-  deepRefresh(input: DeepRefreshInput!): DeepRefreshPayloadOrError @authRequired
 
   getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
 
@@ -8824,6 +8833,7 @@ type Mutation {
 
   preverifyEmail(input: PreverifyEmailInput!): PreverifyEmailPayloadOrError
   verifyEmail(input: VerifyEmailInput!): VerifyEmailPayloadOrError
+  verifyEmailMagicLink(input: VerifyEmailMagicLinkInput!): VerifyEmailMagicLinkPayloadOrError
 
   redeemMerch(input: RedeemMerchInput!): RedeemMerchPayloadOrError @authRequired
 
@@ -9529,21 +9539,6 @@ func (ec *executionContext) field_Mutation_createUser_args(ctx context.Context, 
 	return args, nil
 }
 
-func (ec *executionContext) field_Mutation_deepRefresh_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 model.DeepRefreshInput
-	if tmp, ok := rawArgs["input"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
-		arg0, err = ec.unmarshalNDeepRefreshInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐDeepRefreshInput(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["input"] = arg0
-	return args, nil
-}
-
 func (ec *executionContext) field_Mutation_deleteCollection_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -10244,6 +10239,21 @@ func (ec *executionContext) field_Mutation_uploadPersistedQueries_args(ctx conte
 	if tmp, ok := rawArgs["input"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
 		arg0, err = ec.unmarshalOUploadPersistedQueriesInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUploadPersistedQueriesInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_verifyEmailMagicLink_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.VerifyEmailMagicLinkInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNVerifyEmailMagicLinkInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐVerifyEmailMagicLinkInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -17295,88 +17305,6 @@ func (ec *executionContext) fieldContext_CreateUserPayload_viewer(ctx context.Co
 	return fc, nil
 }
 
-func (ec *executionContext) _DeepRefreshPayload_chain(ctx context.Context, field graphql.CollectedField, obj *model.DeepRefreshPayload) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_DeepRefreshPayload_chain(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Chain, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*persist.Chain)
-	fc.Result = res
-	return ec.marshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_DeepRefreshPayload_chain(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "DeepRefreshPayload",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Chain does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _DeepRefreshPayload_submitted(ctx context.Context, field graphql.CollectedField, obj *model.DeepRefreshPayload) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_DeepRefreshPayload_submitted(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Submitted, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*bool)
-	fc.Result = res
-	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_DeepRefreshPayload_submitted(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "DeepRefreshPayload",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Boolean does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _DeleteCollectionPayload_gallery(ctx context.Context, field graphql.CollectedField, obj *model.DeleteCollectionPayload) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_DeleteCollectionPayload_gallery(ctx, field)
 	if err != nil {
@@ -18669,6 +18597,50 @@ func (ec *executionContext) _ErrPushTokenBelongsToAnotherUser_message(ctx contex
 func (ec *executionContext) fieldContext_ErrPushTokenBelongsToAnotherUser_message(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "ErrPushTokenBelongsToAnotherUser",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ErrSessionInvalidated_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrSessionInvalidated) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ErrSessionInvalidated_message(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ErrSessionInvalidated_message(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ErrSessionInvalidated",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -27312,78 +27284,6 @@ func (ec *executionContext) fieldContext_Mutation_refreshContract(ctx context.Co
 	return fc, nil
 }
 
-func (ec *executionContext) _Mutation_deepRefresh(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Mutation_deepRefresh(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		directive0 := func(rctx context.Context) (interface{}, error) {
-			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().DeepRefresh(rctx, fc.Args["input"].(model.DeepRefreshInput))
-		}
-		directive1 := func(ctx context.Context) (interface{}, error) {
-			if ec.directives.AuthRequired == nil {
-				return nil, errors.New("directive authRequired is not implemented")
-			}
-			return ec.directives.AuthRequired(ctx, nil, directive0)
-		}
-
-		tmp, err := directive1(rctx)
-		if err != nil {
-			return nil, graphql.ErrorOnPath(ctx, err)
-		}
-		if tmp == nil {
-			return nil, nil
-		}
-		if data, ok := tmp.(model.DeepRefreshPayloadOrError); ok {
-			return data, nil
-		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.DeepRefreshPayloadOrError`, tmp)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(model.DeepRefreshPayloadOrError)
-	fc.Result = res
-	return ec.marshalODeepRefreshPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐDeepRefreshPayloadOrError(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Mutation_deepRefresh(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Mutation",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type DeepRefreshPayloadOrError does not have child fields")
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_deepRefresh_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _Mutation_getAuthNonce(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Mutation_getAuthNonce(ctx, field)
 	if err != nil {
@@ -29426,6 +29326,58 @@ func (ec *executionContext) fieldContext_Mutation_verifyEmail(ctx context.Contex
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_verifyEmail_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_verifyEmailMagicLink(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_verifyEmailMagicLink(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().VerifyEmailMagicLink(rctx, fc.Args["input"].(model.VerifyEmailMagicLinkInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.VerifyEmailMagicLinkPayloadOrError)
+	fc.Result = res
+	return ec.marshalOVerifyEmailMagicLinkPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐVerifyEmailMagicLinkPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_verifyEmailMagicLink(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type VerifyEmailMagicLinkPayloadOrError does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_verifyEmailMagicLink_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return
 	}
@@ -43016,6 +42968,50 @@ func (ec *executionContext) fieldContext_UsersConnection_pageInfo(ctx context.Co
 	return fc, nil
 }
 
+func (ec *executionContext) _VerifyEmailMagicLinkPayload_canSend(ctx context.Context, field graphql.CollectedField, obj *model.VerifyEmailMagicLinkPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_VerifyEmailMagicLinkPayload_canSend(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CanSend, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_VerifyEmailMagicLinkPayload_canSend(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "VerifyEmailMagicLinkPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _VerifyEmailPayload_email(ctx context.Context, field graphql.CollectedField, obj *model.VerifyEmailPayload) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_VerifyEmailPayload_email(ctx, field)
 	if err != nil {
@@ -47180,35 +47176,6 @@ func (ec *executionContext) unmarshalInputDebugSocialAuth(ctx context.Context, o
 	return it, nil
 }
 
-func (ec *executionContext) unmarshalInputDeepRefreshInput(ctx context.Context, obj interface{}) (model.DeepRefreshInput, error) {
-	var it model.DeepRefreshInput
-	asMap := map[string]interface{}{}
-	for k, v := range obj.(map[string]interface{}) {
-		asMap[k] = v
-	}
-
-	fieldsInOrder := [...]string{"chain"}
-	for _, k := range fieldsInOrder {
-		v, ok := asMap[k]
-		if !ok {
-			continue
-		}
-		switch k {
-		case "chain":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chain"))
-			data, err := ec.unmarshalNChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.Chain = data
-		}
-	}
-
-	return it, nil
-}
-
 func (ec *executionContext) unmarshalInputEoaAuth(ctx context.Context, obj interface{}) (model.EoaAuth, error) {
 	var it model.EoaAuth
 	asMap := map[string]interface{}{}
@@ -48619,6 +48586,35 @@ func (ec *executionContext) unmarshalInputVerifyEmailInput(ctx context.Context, 
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputVerifyEmailMagicLinkInput(ctx context.Context, obj interface{}) (model.VerifyEmailMagicLinkInput, error) {
+	var it model.VerifyEmailMagicLinkInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"email"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "email":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("email"))
+			data, err := ec.unmarshalNEmail2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐEmail(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Email = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputtopCollectionsForCommunityInput(ctx context.Context, obj interface{}) (model.TopCollectionsForCommunityInput, error) {
 	var it model.TopCollectionsForCommunityInput
 	asMap := map[string]interface{}{}
@@ -48818,6 +48814,13 @@ func (ec *executionContext) _AuthorizationError(ctx context.Context, sel ast.Sel
 			return graphql.Null
 		}
 		return ec._ErrInvalidToken(ctx, sel, obj)
+	case model.ErrSessionInvalidated:
+		return ec._ErrSessionInvalidated(ctx, sel, &obj)
+	case *model.ErrSessionInvalidated:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrSessionInvalidated(ctx, sel, obj)
 	case model.ErrDoesNotOwnRequiredToken:
 		return ec._ErrDoesNotOwnRequiredToken(ctx, sel, &obj)
 	case *model.ErrDoesNotOwnRequiredToken:
@@ -49121,29 +49124,6 @@ func (ec *executionContext) _CreateUserPayloadOrError(ctx context.Context, sel a
 	}
 }
 
-func (ec *executionContext) _DeepRefreshPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.DeepRefreshPayloadOrError) graphql.Marshaler {
-	switch obj := (obj).(type) {
-	case nil:
-		return graphql.Null
-	case model.DeepRefreshPayload:
-		return ec._DeepRefreshPayload(ctx, sel, &obj)
-	case *model.DeepRefreshPayload:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._DeepRefreshPayload(ctx, sel, obj)
-	case model.ErrNotAuthorized:
-		return ec._ErrNotAuthorized(ctx, sel, &obj)
-	case *model.ErrNotAuthorized:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrNotAuthorized(ctx, sel, obj)
-	default:
-		panic(fmt.Errorf("unexpected type %T", obj))
-	}
-}
-
 func (ec *executionContext) _DeleteCollectionPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.DeleteCollectionPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -49357,6 +49337,13 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 			return graphql.Null
 		}
 		return ec._ErrInvalidToken(ctx, sel, obj)
+	case model.ErrSessionInvalidated:
+		return ec._ErrSessionInvalidated(ctx, sel, &obj)
+	case *model.ErrSessionInvalidated:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrSessionInvalidated(ctx, sel, obj)
 	case model.ErrNeedsToReconnectSocial:
 		return ec._ErrNeedsToReconnectSocial(ctx, sel, &obj)
 	case *model.ErrNeedsToReconnectSocial:
@@ -51658,6 +51645,29 @@ func (ec *executionContext) _UserByUsernameOrError(ctx context.Context, sel ast.
 	}
 }
 
+func (ec *executionContext) _VerifyEmailMagicLinkPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.VerifyEmailMagicLinkPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.VerifyEmailMagicLinkPayload:
+		return ec._VerifyEmailMagicLinkPayload(ctx, sel, &obj)
+	case *model.VerifyEmailMagicLinkPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._VerifyEmailMagicLinkPayload(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _VerifyEmailPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.VerifyEmailPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -53291,35 +53301,6 @@ func (ec *executionContext) _CreateUserPayload(ctx context.Context, sel ast.Sele
 	return out
 }
 
-var deepRefreshPayloadImplementors = []string{"DeepRefreshPayload", "DeepRefreshPayloadOrError"}
-
-func (ec *executionContext) _DeepRefreshPayload(ctx context.Context, sel ast.SelectionSet, obj *model.DeepRefreshPayload) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, deepRefreshPayloadImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("DeepRefreshPayload")
-		case "chain":
-
-			out.Values[i] = ec._DeepRefreshPayload_chain(ctx, field, obj)
-
-		case "submitted":
-
-			out.Values[i] = ec._DeepRefreshPayload_submitted(ctx, field, obj)
-
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
 var deleteCollectionPayloadImplementors = []string{"DeleteCollectionPayload", "DeleteCollectionPayloadOrError"}
 
 func (ec *executionContext) _DeleteCollectionPayload(ctx context.Context, sel ast.SelectionSet, obj *model.DeleteCollectionPayload) graphql.Marshaler {
@@ -53798,7 +53779,7 @@ func (ec *executionContext) _ErrGalleryNotFound(ctx context.Context, sel ast.Sel
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "SocialConnectionsOrError", "MerchTokensPayloadOrError", "SearchUsersPayloadOrError", "SearchGalleriesPayloadOrError", "SearchCommunitiesPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "RedeemMerchPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "SocialConnectionsOrError", "MerchTokensPayloadOrError", "SearchUsersPayloadOrError", "SearchGalleriesPayloadOrError", "SearchCommunitiesPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "VerifyEmailMagicLinkPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "RedeemMerchPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -53931,7 +53912,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "SocialQueriesOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "SyncTokensPayloadOrError", "Error", "DeepRefreshPayloadOrError", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "UnbanUserFromFeedPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "GenerateQRCodeLoginTokenPayloadOrError"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "SocialQueriesOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "SyncTokensPayloadOrError", "Error", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "UnbanUserFromFeedPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "GenerateQRCodeLoginTokenPayloadOrError"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
@@ -53979,6 +53960,34 @@ func (ec *executionContext) _ErrPushTokenBelongsToAnotherUser(ctx context.Contex
 		case "message":
 
 			out.Values[i] = ec._ErrPushTokenBelongsToAnotherUser_message(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var errSessionInvalidatedImplementors = []string{"ErrSessionInvalidated", "AuthorizationError", "Error"}
+
+func (ec *executionContext) _ErrSessionInvalidated(ctx context.Context, sel ast.SelectionSet, obj *model.ErrSessionInvalidated) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, errSessionInvalidatedImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ErrSessionInvalidated")
+		case "message":
+
+			out.Values[i] = ec._ErrSessionInvalidated_message(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
 				invalids++
@@ -56045,12 +56054,6 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 				return ec._Mutation_refreshContract(ctx, field)
 			})
 
-		case "deepRefresh":
-
-			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_deepRefresh(ctx, field)
-			})
-
 		case "getAuthNonce":
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
@@ -56235,6 +56238,12 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_verifyEmail(ctx, field)
+			})
+
+		case "verifyEmailMagicLink":
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_verifyEmailMagicLink(ctx, field)
 			})
 
 		case "redeemMerch":
@@ -59875,6 +59884,34 @@ func (ec *executionContext) _UsersConnection(ctx context.Context, sel ast.Select
 	return out
 }
 
+var verifyEmailMagicLinkPayloadImplementors = []string{"VerifyEmailMagicLinkPayload", "VerifyEmailMagicLinkPayloadOrError"}
+
+func (ec *executionContext) _VerifyEmailMagicLinkPayload(ctx context.Context, sel ast.SelectionSet, obj *model.VerifyEmailMagicLinkPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, verifyEmailMagicLinkPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("VerifyEmailMagicLinkPayload")
+		case "canSend":
+
+			out.Values[i] = ec._VerifyEmailMagicLinkPayload_canSend(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var verifyEmailPayloadImplementors = []string{"VerifyEmailPayload", "VerifyEmailPayloadOrError"}
 
 func (ec *executionContext) _VerifyEmailPayload(ctx context.Context, sel ast.SelectionSet, obj *model.VerifyEmailPayload) graphql.Marshaler {
@@ -60902,11 +60939,6 @@ func (ec *executionContext) marshalNDBID2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalle
 	return ret
 }
 
-func (ec *executionContext) unmarshalNDeepRefreshInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐDeepRefreshInput(ctx context.Context, v interface{}) (model.DeepRefreshInput, error) {
-	res, err := ec.unmarshalInputDeepRefreshInput(ctx, v)
-	return res, graphql.ErrorOnPath(ctx, err)
-}
-
 func (ec *executionContext) unmarshalNEmail2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐEmail(ctx context.Context, v interface{}) (persist.Email, error) {
 	tmp, err := graphql.UnmarshalString(v)
 	res := persist.Email(tmp)
@@ -61343,6 +61375,11 @@ func (ec *executionContext) marshalNUserSearchResult2ᚖgithubᚗcomᚋmikeydub�
 
 func (ec *executionContext) unmarshalNVerifyEmailInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐVerifyEmailInput(ctx context.Context, v interface{}) (model.VerifyEmailInput, error) {
 	res, err := ec.unmarshalInputVerifyEmailInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNVerifyEmailMagicLinkInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐVerifyEmailMagicLinkInput(ctx context.Context, v interface{}) (model.VerifyEmailMagicLinkInput, error) {
+	res, err := ec.unmarshalInputVerifyEmailMagicLinkInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
@@ -62609,13 +62646,6 @@ func (ec *executionContext) unmarshalODebugSocialAuth2ᚖgithubᚗcomᚋmikeydub
 	}
 	res, err := ec.unmarshalInputDebugSocialAuth(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalODeepRefreshPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐDeepRefreshPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.DeepRefreshPayloadOrError) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._DeepRefreshPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalODeleteCollectionPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐDeleteCollectionPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.DeleteCollectionPayloadOrError) graphql.Marshaler {
@@ -64865,6 +64895,13 @@ func (ec *executionContext) marshalOUsersConnection2ᚖgithubᚗcomᚋmikeydub�
 		return graphql.Null
 	}
 	return ec._UsersConnection(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOVerifyEmailMagicLinkPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐVerifyEmailMagicLinkPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.VerifyEmailMagicLinkPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._VerifyEmailMagicLinkPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOVerifyEmailPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐVerifyEmailPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.VerifyEmailPayloadOrError) graphql.Marshaler {

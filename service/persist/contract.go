@@ -2,6 +2,7 @@ package persist
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 )
 
@@ -15,11 +16,12 @@ type Contract struct {
 
 	Chain Chain `json:"chain"`
 
-	Address        EthereumAddress `json:"address"`
-	Symbol         NullString      `json:"symbol"`
-	Name           NullString      `json:"name"`
-	OwnerAddress   EthereumAddress `json:"owner_address"`
-	CreatorAddress EthereumAddress `json:"creator_address"`
+	Address        EthereumAddress     `json:"address"`
+	Symbol         NullString          `json:"symbol"`
+	Name           NullString          `json:"name"`
+	OwnerAddress   EthereumAddress     `json:"owner_address"`
+	CreatorAddress EthereumAddress     `json:"creator_address"`
+	OwnerMethod    ContractOwnerMethod `json:"owner_method"`
 
 	LatestBlock BlockNumber `json:"latest_block"`
 }
@@ -32,6 +34,30 @@ type ContractUpdateInput struct {
 	CreatorAddress EthereumAddress `json:"creator_address"`
 
 	LatestBlock BlockNumber `json:"latest_block"`
+}
+
+type ContractOwnerMethod int
+
+const (
+	ContractOwnerMethodFailed ContractOwnerMethod = iota
+	ContractOwnerMethodOwnable
+	ContractOwnerMethodAlchemy
+	ContractOwnerBinarySearch
+)
+
+// Value implements the driver.Valuer interface for the Chain type
+func (c ContractOwnerMethod) Value() (driver.Value, error) {
+	return c, nil
+}
+
+// Scan implements the sql.Scanner interface for the Chain type
+func (c *ContractOwnerMethod) Scan(src interface{}) error {
+	if src == nil {
+		*c = ContractOwnerMethod(0)
+		return nil
+	}
+	*c = ContractOwnerMethod(src.(int64))
+	return nil
 }
 
 // ContractRepository represents a repository for interacting with persisted contracts

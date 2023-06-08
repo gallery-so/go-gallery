@@ -4,15 +4,16 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -24,7 +25,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/mikeydub/go-gallery/service/multichain/tezos"
-	"github.com/mikeydub/go-gallery/util/retry"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/googleapi"
 
@@ -40,16 +40,6 @@ func init() {
 	env.RegisterValidation("IPFS_URL", "required")
 }
 
-var errAlreadyHasMedia = errors.New("token already has preview and thumbnail URLs")
-
-type errUnsupportedURL struct {
-	url string
-}
-
-type errUnsupportedMediaType struct {
-	mediaType persist.MediaType
-}
-
 type errNoDataFromReader struct {
 	err error
 	url string
@@ -57,7 +47,6 @@ type errNoDataFromReader struct {
 
 type errNoDataFromOpensea struct {
 	err error
-	url string
 }
 
 type errNotCacheable struct {
@@ -80,8 +69,18 @@ type errNoMediaURLs struct {
 	tids     persist.TokenIdentifiers
 }
 
+type errStoreObjectFailed struct {
+	bucket string
+	object cachedMediaObject
+	err    error
+}
+
 func (e errNoDataFromReader) Error() string {
 	return fmt.Sprintf("no data from reader: %s (url: %s)", e.err, e.url)
+}
+
+func (e errNoDataFromReader) Unwrap() error {
+	return e.err
 }
 
 func (e errNotCacheable) Error() string {
@@ -90,6 +89,10 @@ func (e errNotCacheable) Error() string {
 
 func (e errInvalidMedia) Error() string {
 	return fmt.Sprintf("invalid media: %s (url: %s)", e.err, e.URL)
+}
+
+func (e errInvalidMedia) Unwrap() error {
+	return e.err
 }
 
 func (e errNoMediaURLs) Error() string {
@@ -101,28 +104,23 @@ func (e errNoCachedObjects) Error() string {
 }
 
 func (e errNoDataFromOpensea) Error() string {
-	return fmt.Sprintf("no data from opensea: %s (url: %s)", e.err, e.url)
+	return fmt.Sprintf("no data from opensea: %s", e.err)
 }
 
-// MediaProcessingError is an error that occurs when handling media processiing for a token.
-type MediaProcessingError struct {
-	Chain           persist.Chain
-	ContractAddress persist.Address
-	TokenID         persist.TokenID
-	AnimationError  error
-	ImageError      error
+func (e errNoDataFromOpensea) Unwrap() error {
+	return e.err
 }
 
-func (m MediaProcessingError) Error() string {
-	mErr := fmt.Sprintf("issue with media for token(chain=%d, address=%s, id=%s)", m.Chain, m.ContractAddress, m.TokenID)
-	if m.AnimationError != nil {
-		mErr += fmt.Sprintf("; animation error = %s", m.AnimationError)
-	}
-	if m.ImageError != nil {
-		mErr += fmt.Sprintf("; image error = %s", m.ImageError)
-	}
-	return mErr
+func (e errStoreObjectFailed) Error() string {
+	return fmt.Sprintf("failed to write object to key: %s/%s: %s", e.bucket, e.object.fileName(), e.err)
 }
+
+func (e errStoreObjectFailed) Unwrap() error {
+	return e.err
+}
+
+type animationURL string
+type imageURL string
 
 type cachePipelineMetadata struct {
 	ContentHeaderValueRetrieval  *persist.PipelineStepStatus
@@ -130,134 +128,66 @@ type cachePipelineMetadata struct {
 	OpenseaFallback              *persist.PipelineStepStatus
 	DetermineMediaTypeWithReader *persist.PipelineStepStatus
 	AnimationGzip                *persist.PipelineStepStatus
+	SVGRasterize                 *persist.PipelineStepStatus
 	StoreGCP                     *persist.PipelineStepStatus
 	ThumbnailGCP                 *persist.PipelineStepStatus
 	LiveRenderGCP                *persist.PipelineStepStatus
 }
 
-// cacheObjectsForMetadata uses a metadata map to generate media content and cache resized versions of the media content.
-func cacheObjectsForMetadata(pCtx context.Context, metadata persist.TokenMetadata, contractAddress persist.Address, tokenID persist.TokenID, tokenURI persist.TokenURI, chain persist.Chain, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, pMeta *persist.PipelineMetadata) ([]cachedMediaObject, error) {
-
-	pCtx = logger.NewContextWithFields(pCtx, logrus.Fields{
-		"contractAddress": contractAddress,
-		"tokenID":         tokenID,
-		"chain":           chain,
-	})
-	tids := persist.NewTokenIdentifiers(contractAddress, tokenID, chain)
-
-	imgURL, animURL, err := findImageAndAnimationURLs(pCtx, tokenID, contractAddress, chain, metadata, tokenURI, chain != persist.ChainETH, pMeta)
-	if err != nil {
-		return nil, err
+func cacheImageObjects(ctx context.Context, imageURL imageURL, metadata persist.TokenMetadata, job *tokenProcessingJob) chan cacheResult {
+	tids := persist.NewTokenIdentifiers(job.contract.Address, job.token.TokenID, job.token.Chain)
+	runMetadata := &cachePipelineMetadata{
+		ContentHeaderValueRetrieval:  &job.pipelineMetadata.ImageContentHeaderValueRetrieval,
+		ReaderRetrieval:              &job.pipelineMetadata.ImageReaderRetrieval,
+		OpenseaFallback:              &job.pipelineMetadata.ImageOpenseaFallback,
+		DetermineMediaTypeWithReader: &job.pipelineMetadata.ImageDetermineMediaTypeWithReader,
+		AnimationGzip:                &job.pipelineMetadata.ImageAnimationGzip,
+		SVGRasterize:                 &job.pipelineMetadata.ImageSVGRasterize,
+		StoreGCP:                     &job.pipelineMetadata.ImageStoreGCP,
+		ThumbnailGCP:                 &job.pipelineMetadata.ImageThumbnailGCP,
+		LiveRenderGCP:                &job.pipelineMetadata.ImageLiveRenderGCP,
 	}
-
-	pCtx = logger.NewContextWithFields(pCtx, logrus.Fields{
-		"imgURL":  imgURL,
-		"animURL": animURL,
-	})
-
-	logger.For(pCtx).Infof("found media URLs")
-
-	var (
-		imgCh, animCh         chan cacheResult
-		imgResult, animResult cacheResult
-	)
-
-	if animURL != "" {
-		subMeta := &cachePipelineMetadata{
-			ContentHeaderValueRetrieval:  &pMeta.AnimationContentHeaderValueRetrieval,
-			ReaderRetrieval:              &pMeta.AnimationReaderRetrieval,
-			OpenseaFallback:              &pMeta.AnimationOpenseaFallback,
-			DetermineMediaTypeWithReader: &pMeta.AnimationDetermineMediaTypeWithReader,
-			AnimationGzip:                &pMeta.AnimationAnimationGzip,
-			StoreGCP:                     &pMeta.AnimationStoreGCP,
-			ThumbnailGCP:                 &pMeta.AnimationThumbnailGCP,
-			LiveRenderGCP:                &pMeta.AnimationLiveRenderGCP,
-		}
-		animCh = asyncCacheObjectsForURL(pCtx, tids, storageClient, arweaveClient, ipfsClient, objectTypeAnimation, animURL, tokenBucket, subMeta)
-	}
-	if imgURL != "" {
-		subMeta := &cachePipelineMetadata{
-			ContentHeaderValueRetrieval:  &pMeta.ImageContentHeaderValueRetrieval,
-			ReaderRetrieval:              &pMeta.ImageReaderRetrieval,
-			OpenseaFallback:              &pMeta.ImageOpenseaFallback,
-			DetermineMediaTypeWithReader: &pMeta.ImageDetermineMediaTypeWithReader,
-			AnimationGzip:                &pMeta.ImageAnimationGzip,
-			StoreGCP:                     &pMeta.ImageStoreGCP,
-			ThumbnailGCP:                 &pMeta.ImageThumbnailGCP,
-			LiveRenderGCP:                &pMeta.ImageLiveRenderGCP,
-		}
-		imgCh = asyncCacheObjectsForURL(pCtx, tids, storageClient, arweaveClient, ipfsClient, objectTypeImage, imgURL, tokenBucket, subMeta)
-	}
-
-	if animCh != nil {
-		animResult = <-animCh
-	}
-	if imgCh != nil {
-		imgResult = <-imgCh
-	}
-
-	objects := append(animResult.cachedObjects, imgResult.cachedObjects...)
-
-	// the media type is not cacheable but is valid
-	if notCacheableErr, ok := animResult.err.(errNotCacheable); ok {
-		return objects, notCacheableErr
-	} else if notCacheableErr, ok := imgResult.err.(errNotCacheable); ok {
-		return objects, notCacheableErr
-	}
-
-	// neither download worked, unexpectedly
-	if (animCh == nil || !isCacheResultValid(animResult)) && (imgCh == nil || !isCacheResultValid(imgResult)) {
-		traceCallback, _ := persist.TrackStepStatus(pCtx, &pMeta.NothingCachedWithErrors, "NothingCachedWithErrors")
-		defer traceCallback()
-
-		if animCh != nil {
-			if _, ok := animResult.err.(errInvalidMedia); ok {
-				return nil, MediaProcessingError{
-					Chain:           chain,
-					ContractAddress: contractAddress,
-					TokenID:         tokenID,
-					AnimationError:  animResult.err,
-					ImageError:      imgResult.err,
-				}
-			}
-		}
-		if imgCh != nil {
-			if _, ok := imgResult.err.(errInvalidMedia); ok {
-				return nil, MediaProcessingError{
-					Chain:           chain,
-					ContractAddress: contractAddress,
-					TokenID:         tokenID,
-					AnimationError:  animResult.err,
-					ImageError:      imgResult.err,
-				}
-			}
-		}
-
-		logger.For(pCtx).Errorf("failed to cache animation and image urls: %s, %s", animResult.err, imgResult.err)
-
-		return nil, util.MultiErr{animResult.err, imgResult.err}
-	}
-
-	// if one of them failed, log the error but continue
-	if animResult.err != nil {
-		logger.For(pCtx).WithError(animResult.err).Errorf("failed to cache animation url")
-	}
-	if imgResult.err != nil {
-		logger.For(pCtx).WithError(imgResult.err).Errorf("failed to cache image url")
-	}
-
-	// this should never be true, something is wrong if this is true
-	if len(objects) == 0 {
-		traceCallback, _ := persist.TrackStepStatus(pCtx, &pMeta.NothingCachedWithoutErrors, "NothingCachedWithoutErrors")
-		defer traceCallback()
-		return nil, errNoCachedObjects{tids: tids}
-	}
-
-	return objects, nil
+	return asyncCacheObjectsForURL(ctx, tids, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, objectTypeImage, string(imageURL), job.tp.tokenBucket, runMetadata)
 }
 
-func isCacheResultValid(r cacheResult) bool {
-	return r.err == nil && len(r.cachedObjects) > 0
+func cacheAnimationObjects(ctx context.Context, animationURL animationURL, metadata persist.TokenMetadata, job *tokenProcessingJob) chan cacheResult {
+	tids := persist.NewTokenIdentifiers(job.contract.Address, job.token.TokenID, job.token.Chain)
+	runMetadata := &cachePipelineMetadata{
+		ContentHeaderValueRetrieval:  &job.pipelineMetadata.AnimationContentHeaderValueRetrieval,
+		ReaderRetrieval:              &job.pipelineMetadata.AnimationReaderRetrieval,
+		OpenseaFallback:              &job.pipelineMetadata.AnimationOpenseaFallback,
+		DetermineMediaTypeWithReader: &job.pipelineMetadata.AnimationDetermineMediaTypeWithReader,
+		AnimationGzip:                &job.pipelineMetadata.AnimationAnimationGzip,
+		SVGRasterize:                 &job.pipelineMetadata.AnimationSVGRasterize,
+		StoreGCP:                     &job.pipelineMetadata.AnimationStoreGCP,
+		ThumbnailGCP:                 &job.pipelineMetadata.AnimationThumbnailGCP,
+		LiveRenderGCP:                &job.pipelineMetadata.AnimationLiveRenderGCP,
+	}
+	return asyncCacheObjectsForURL(ctx, tids, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, objectTypeAnimation, string(animationURL), job.tp.tokenBucket, runMetadata)
+}
+
+func cacheOpenSeaObjects(ctx context.Context, job *tokenProcessingJob) ([]cachedMediaObject, error) {
+	tids := persist.NewTokenIdentifiers(job.contract.Address, job.token.TokenID, job.token.Chain)
+	runMetadata := &cachePipelineMetadata{
+		ContentHeaderValueRetrieval:  &job.pipelineMetadata.AlternateContentHeaderValueRetrieval,
+		ReaderRetrieval:              &job.pipelineMetadata.AlternateReaderRetrieval,
+		OpenseaFallback:              &job.pipelineMetadata.AlternateOpenseaFallback,
+		DetermineMediaTypeWithReader: &job.pipelineMetadata.AlternateDetermineMediaTypeWithReader,
+		AnimationGzip:                &job.pipelineMetadata.AlternateAnimationGzip,
+		SVGRasterize:                 &job.pipelineMetadata.AlternateSVGRasterize,
+		StoreGCP:                     &job.pipelineMetadata.AlternateStoreGCP,
+		ThumbnailGCP:                 &job.pipelineMetadata.AlternateThumbnailGCP,
+		LiveRenderGCP:                &job.pipelineMetadata.AlternateLiveRenderGCP,
+	}
+	return cacheObjectsFromOpensea(ctx, tids, objectTypeImage, job.tp.ipfsClient, job.tp.arweaveClient, job.tp.stg, job.tp.tokenBucket, runMetadata)
+}
+
+func isCacheResultValid(err error, numObjects int) bool {
+	var notCacheableErr errNotCacheable
+	if errors.As(err, &notCacheableErr) {
+		return true
+	}
+	return err == nil && numObjects > 0
 }
 
 func createRawMedia(pCtx context.Context, tids persist.TokenIdentifiers, mediaType persist.MediaType, tokenBucket, animURL, imgURL string, objects []cachedMediaObject) persist.Media {
@@ -267,7 +197,28 @@ func createRawMedia(pCtx context.Context, tids persist.TokenIdentifiers, mediaTy
 	default:
 		panic(fmt.Sprintf("media type %s should be cached", mediaType))
 	}
+}
 
+func createUncachedMedia(ctx context.Context, job *tokenProcessingJob, url string, mediaType persist.MediaType, objects []cachedMediaObject) persist.Media {
+	first, ok := findFirstImageObject(objects)
+	if ok {
+		return job.createRawMedia(ctx, mediaType, url, first.storageURL(job.tp.tokenBucket), objects)
+	}
+	return persist.Media{MediaType: mediaType, MediaURL: persist.NullString(url)}
+}
+
+func createMediaFromResults(ctx context.Context, job *tokenProcessingJob, animResult, imgResult cacheResult) persist.Media {
+	objects := append(animResult.cachedObjects, imgResult.cachedObjects...)
+
+	if notCacheableErr, ok := animResult.err.(errNotCacheable); ok {
+		return createUncachedMedia(ctx, job, notCacheableErr.URL, notCacheableErr.MediaType, objects)
+	}
+
+	if notCacheableErr, ok := imgResult.err.(errNotCacheable); ok {
+		return createUncachedMedia(ctx, job, notCacheableErr.URL, notCacheableErr.MediaType, objects)
+	}
+
+	return job.createMediaFromCachedObjects(ctx, objects)
 }
 
 func createMediaFromCachedObjects(ctx context.Context, tokenBucket string, objects map[objectType]cachedMediaObject) persist.Media {
@@ -275,9 +226,9 @@ func createMediaFromCachedObjects(ctx context.Context, tokenBucket string, objec
 
 	if obj, ok := objects[objectTypeAnimation]; ok {
 		primaryObject = obj
-	} else if obj, ok := objects[objectTypeImage]; ok {
-		primaryObject = obj
 	} else if obj, ok := objects[objectTypeSVG]; ok {
+		primaryObject = obj
+	} else if obj, ok := objects[objectTypeImage]; ok {
 		primaryObject = obj
 	} else {
 		logger.For(ctx).Errorf("no primary object found for cached objects: %+v", objects)
@@ -286,15 +237,15 @@ func createMediaFromCachedObjects(ctx context.Context, tokenBucket string, objec
 	var thumbnailObject *cachedMediaObject
 	var liveRenderObject = util.MapFindOrNil(objects, objectTypeLiveRender)
 
-	if primaryObject.ObjectType == objectTypeAnimation {
+	if primaryObject.ObjectType == objectTypeAnimation || primaryObject.ObjectType == objectTypeSVG {
 		// animations should have a thumbnail that could be an image or svg or thumbnail
 		// thumbnail take top priority, then the other image types that could have been cached
 
-		if obj, ok := objects[objectTypeThumbnail]; ok {
+		if obj, ok := objects[objectTypeImage]; ok {
 			thumbnailObject = &obj
-		} else if obj, ok := objects[objectTypeImage]; ok {
+		} else if obj, ok := objects[objectTypeSVG]; ok && primaryObject.ObjectType != objectTypeSVG {
 			thumbnailObject = &obj
-		} else if obj, ok := objects[objectTypeSVG]; ok {
+		} else if obj, ok := objects[objectTypeThumbnail]; ok {
 			thumbnailObject = &obj
 		}
 
@@ -327,10 +278,19 @@ func createMediaFromCachedObjects(ctx context.Context, tokenBucket string, objec
 	}
 
 	if err != nil {
-		logger.For(ctx).WithError(err).Error("failed to get dimensions for media")
+		logger.For(ctx).Warnf("failed to get dimensions for media: %s", err)
 	}
 
 	return result
+}
+
+func findFirstImageObject(objects []cachedMediaObject) (cachedMediaObject, bool) {
+	return util.FindFirst(objects, func(c cachedMediaObject) bool {
+		if c.ObjectType == 0 || c.MediaType == "" || c.TokenID == "" || c.ContractAddress == "" {
+			return false
+		}
+		return c.ObjectType == objectTypeImage || c.ObjectType == objectTypeSVG || c.ObjectType == objectTypeThumbnail
+	})
 }
 
 type cacheResult struct {
@@ -459,8 +419,15 @@ func getHTMLMedia(pCtx context.Context, tids persist.TokenIdentifiers, tokenBuck
 			if obj.ObjectType == objectTypeThumbnail {
 				res.ThumbnailURL = persist.NullString(obj.storageURL(tokenBucket))
 				break
-			} else if obj.ObjectType == objectTypeImage {
+			} else if obj.ObjectType == objectTypeImage || obj.ObjectType == objectTypeSVG {
 				res.ThumbnailURL = persist.NullString(obj.storageURL(tokenBucket))
+			}
+		}
+
+		for _, obj := range cachedObjects {
+			if obj.ObjectType == objectTypeLiveRender {
+				res.LivePreviewURL = persist.NullString(obj.storageURL(tokenBucket))
+				break
 			}
 		}
 	}
@@ -468,7 +435,7 @@ func getHTMLMedia(pCtx context.Context, tids persist.TokenIdentifiers, tokenBuck
 
 	dimensions, err := getHTMLDimensions(pCtx, res.MediaURL.String())
 	if err != nil {
-		logger.For(pCtx).Errorf("failed to get dimensions for %s: %v", tids, err)
+		logger.For(pCtx).Warnf("failed to get dimensions for %s: %v", tids, err)
 	}
 
 	res.Dimensions = dimensions
@@ -548,7 +515,7 @@ func remapMedia(media persist.Media) persist.Media {
 	return media
 }
 
-func findImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, metadata persist.TokenMetadata, tokenURI persist.TokenURI, predict bool, pMeta *persist.PipelineMetadata) (imgURL string, vURL string, err error) {
+func findImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, metadata persist.TokenMetadata, tokenURI persist.TokenURI, predict bool, pMeta *persist.PipelineMetadata) (imgURL imageURL, vURL animationURL, err error) {
 
 	traceCallback, ctx := persist.TrackStepStatus(ctx, &pMeta.MediaURLsRetrieval, "MediaURLsRetrieval")
 	defer traceCallback()
@@ -564,9 +531,9 @@ func findImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, con
 		if uri, ok := metaMedia["uri"].(string); ok {
 			switch mediaType {
 			case persist.MediaTypeImage, persist.MediaTypeSVG, persist.MediaTypeGIF:
-				imgURL = uri
+				imgURL = imageURL(uri)
 			default:
-				vURL = uri
+				vURL = animationURL(uri)
 			}
 		}
 	}
@@ -575,15 +542,15 @@ func findImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, con
 	for _, keyword := range anim {
 		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && it != "" {
 			logger.For(ctx).Debugf("found initial animation url from '%s': %s", keyword, it)
-			vURL = it
+			vURL = animationURL(it)
 			break
 		}
 	}
 
 	for _, keyword := range image {
-		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && it != "" && it != vURL {
+		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && string(it) != "" && animationURL(it) != vURL {
 			logger.For(ctx).Debugf("found initial image url from '%s': %s", keyword, it)
-			imgURL = it
+			imgURL = imageURL(it)
 			break
 		}
 	}
@@ -614,18 +581,18 @@ func findNameAndDescription(ctx context.Context, metadata persist.TokenMetadata)
 	return name, description
 }
 
-func predictTrueURLs(ctx context.Context, curImg, curV string) (string, string) {
-	imgMediaType, _, _, err := media.PredictMediaType(ctx, curImg)
+func predictTrueURLs(ctx context.Context, curImg imageURL, curV animationURL) (imageURL, animationURL) {
+	imgMediaType, _, _, err := media.PredictMediaType(ctx, string(curImg))
 	if err != nil {
 		return curImg, curV
 	}
-	vMediaType, _, _, err := media.PredictMediaType(ctx, curV)
+	vMediaType, _, _, err := media.PredictMediaType(ctx, string(curV))
 	if err != nil {
 		return curImg, curV
 	}
 
 	if imgMediaType.IsAnimationLike() && !vMediaType.IsAnimationLike() {
-		return curV, curImg
+		return imageURL(curV), animationURL(curImg)
 	}
 
 	if !imgMediaType.IsValid() || !vMediaType.IsValid() {
@@ -633,27 +600,10 @@ func predictTrueURLs(ctx context.Context, curImg, curV string) (string, string) 
 	}
 
 	if imgMediaType.IsMorePriorityThan(vMediaType) {
-		return curV, curImg
+		return imageURL(curV), animationURL(curImg)
 	}
 
 	return curImg, curV
-}
-
-func getThumbnailURL(pCtx context.Context, tokenBucket string, name string, imgURL string, storageClient *storage.Client) string {
-	if storageImageURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("image-%s", name), storageClient); err == nil {
-		logger.For(pCtx).Infof("found imageURL for thumbnail %s: %s", name, storageImageURL)
-		return storageImageURL
-	} else if storageImageURL, err = getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("svg-%s", name), storageClient); err == nil {
-		logger.For(pCtx).Infof("found svg for thumbnail %s: %s", name, storageImageURL)
-		return storageImageURL
-	} else if imgURL != "" && persist.TokenURI(imgURL).IsRenderable() {
-		logger.For(pCtx).Infof("using imgURL for thumbnail %s: %s", name, imgURL)
-		return imgURL
-	} else if storageImageURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("thumbnail-%s", name), storageClient); err == nil {
-		logger.For(pCtx).Infof("found thumbnailURL for %s: %s", name, storageImageURL)
-		return storageImageURL
-	}
-	return ""
 }
 
 func objectExists(ctx context.Context, client *storage.Client, bucket, fileName string) (bool, error) {
@@ -672,28 +622,24 @@ func purgeIfExists(ctx context.Context, bucket string, fileName string, client *
 	}
 	if exists {
 		if err := mediamapper.PurgeImage(ctx, fmt.Sprintf("https://storage.googleapis.com/%s/%s", bucket, fileName)); err != nil {
-			logger.For(ctx).WithError(err).Errorf("could not purge file %s", fileName)
+			logger.For(ctx).Warnf("could not purge file %s: %s", fileName, err)
 		}
 	}
 
 	return nil
 }
 
-func persistToStorage(ctx context.Context, client *storage.Client, reader io.Reader, bucket, fileName string, contentType *string, contentLength *int64, metadata map[string]string) error {
-	writer := newObjectWriter(ctx, client, bucket, fileName, contentType, contentLength, metadata)
-	if err := retryWriteToCloudStorage(ctx, writer, reader); err != nil {
-		return fmt.Errorf("could not write to bucket %s for %s: %s", bucket, fileName, err)
+func persistToStorage(ctx context.Context, client *storage.Client, reader io.Reader, bucket string, object cachedMediaObject, metadata map[string]string) error {
+	writer := newObjectWriter(ctx, client, bucket, object.fileName(), object.ContentType, object.ContentLength, metadata)
+	if written, err := io.Copy(writer, util.NewLoggingReader(ctx, reader, reader.(io.WriterTo))); err != nil {
+		if object.ContentLength != nil {
+			logger.For(ctx).Errorf("wrote %d out of %d bytes before error: %s", written, *object.ContentLength, err)
+		} else {
+			logger.For(ctx).Errorf("wrote %d out of an unknown number of bytes before error: %s", written, err)
+		}
+		return errStoreObjectFailed{err: err, bucket: bucket, object: object}
 	}
 	return writer.Close()
-}
-
-func retryWriteToCloudStorage(ctx context.Context, writer io.Writer, reader io.Reader) error {
-	return retry.RetryFunc(ctx, func(ctx context.Context) error {
-		if _, err := io.Copy(writer, reader); err != nil {
-			return err
-		}
-		return nil
-	}, storage.ShouldRetry, retry.DefaultRetry)
 }
 
 type objectType int
@@ -765,16 +711,15 @@ func cacheRawMedia(ctx context.Context, reader *util.FileHeaderReader, tids pers
 		ObjectType:      oType,
 	}
 
-	err := persistToStorage(ctx, client, reader, bucket, object.fileName(), object.ContentType, object.ContentLength,
-		map[string]string{
-			"originalURL": truncateString(ogURL, 100),
-			"mediaType":   mediaType.String(),
-		})
+	err := persistToStorage(ctx, client, reader, bucket, object, map[string]string{
+		"originalURL": truncateString(ogURL, 100),
+		"mediaType":   mediaType.String(),
+	})
 	if err != nil {
 		persist.FailStep(subMeta.StoreGCP)
-		logger.For(ctx).WithError(err).Errorf("could not persist media to storage")
 		return cachedMediaObject{}, err
 	}
+
 	purgeIfExists(ctx, bucket, object.fileName(), client)
 	return object, err
 }
@@ -797,10 +742,15 @@ func cacheRawAnimationMedia(ctx context.Context, reader *util.FileHeaderReader, 
 	})
 	writer := gzip.NewWriter(sw)
 
-	err := retryWriteToCloudStorage(ctx, writer, reader)
+	written, err := io.Copy(writer, util.NewLoggingReader(ctx, reader, reader))
 	if err != nil {
+		if object.ContentLength != nil {
+			logger.For(ctx).Errorf("wrote %d out of %d bytes before error: %s", written, *object.ContentLength, err)
+		} else {
+			logger.For(ctx).Errorf("wrote %d out of an unknown number of bytes before error: %s", written, err)
+		}
 		persist.FailStep(subMeta.AnimationGzip)
-		return cachedMediaObject{}, fmt.Errorf("could not write to bucket %s for %s: %s", bucket, object.fileName(), err)
+		return cachedMediaObject{}, errStoreObjectFailed{err: err, bucket: bucket, object: object}
 	}
 
 	if err := writer.Close(); err != nil {
@@ -815,6 +765,114 @@ func cacheRawAnimationMedia(ctx context.Context, reader *util.FileHeaderReader, 
 
 	purgeIfExists(ctx, bucket, object.fileName(), client)
 	return object, nil
+}
+
+func rasterizeAndCacheSVGMedia(ctx context.Context, svgURL string, tids persist.TokenIdentifiers, bucket, ogURL string, client *storage.Client, subMeta *cachePipelineMetadata) ([]cachedMediaObject, error) {
+	traceCallback, ctx := persist.TrackStepStatus(ctx, subMeta.SVGRasterize, "SVGRasterize")
+	defer traceCallback()
+
+	cmd := exec.Command("node", "scripts/rasterize_svg.js", svgURL)
+	output, err := cmd.Output()
+	if err != nil {
+		persist.FailStep(subMeta.SVGRasterize)
+		return nil, fmt.Errorf("could not rasterize svg: %s", err)
+	}
+
+	objects := make([]cachedMediaObject, 0, 2)
+
+	lines := strings.Split(string(output), "\n")
+	if len(lines) < 2 {
+		log.Fatal("Not enough output from script")
+	}
+
+	if lines[0] != "PNG" {
+		persist.FailStep(subMeta.SVGRasterize)
+		return nil, fmt.Errorf("could not rasterize svg: %s", lines[0])
+	}
+	pngData := lines[1]
+
+	data, err := base64.StdEncoding.DecodeString(string(pngData))
+	if err != nil {
+		persist.FailStep(subMeta.SVGRasterize)
+		return nil, fmt.Errorf("could not decode base64 data: %s", err)
+	}
+
+	pngObject := cachedMediaObject{
+		MediaType:       persist.MediaTypeImage,
+		ContentType:     util.ToPointer("image/png"),
+		TokenID:         tids.TokenID,
+		ContractAddress: tids.ContractAddress,
+		Chain:           tids.Chain,
+		ContentLength:   util.ToPointer(int64(len(data))),
+		ObjectType:      objectTypeThumbnail,
+	}
+
+	sw := newObjectWriter(ctx, client, bucket, pngObject.fileName(), pngObject.ContentType, pngObject.ContentLength, map[string]string{
+		"originalURL": truncateString(ogURL, 100),
+		"mediaType":   persist.MediaTypeImage.String(),
+	})
+
+	_, err = sw.Write(data)
+	if err != nil {
+		persist.FailStep(subMeta.SVGRasterize)
+		return nil, fmt.Errorf("could not write to bucket %s for %s: %s", bucket, pngObject.fileName(), err)
+	}
+
+	if err := sw.Close(); err != nil {
+		persist.FailStep(subMeta.SVGRasterize)
+		return nil, err
+	}
+
+	purgeIfExists(ctx, bucket, pngObject.fileName(), client)
+
+	objects = append(objects, pngObject)
+
+	if len(lines) == 4 {
+		if lines[2] != "GIF" {
+			persist.FailStep(subMeta.SVGRasterize)
+			return nil, fmt.Errorf("could not rasterize svg: %s", lines[2])
+		}
+		gifData := lines[3]
+
+		data, err := base64.StdEncoding.DecodeString(string(gifData))
+		if err != nil {
+			persist.FailStep(subMeta.SVGRasterize)
+			return nil, fmt.Errorf("could not decode base64 data: %s", err)
+		}
+
+		gifObject := cachedMediaObject{
+			MediaType:       persist.MediaTypeGIF,
+			TokenID:         tids.TokenID,
+			ContractAddress: tids.ContractAddress,
+			Chain:           tids.Chain,
+			ContentType:     util.ToPointer("image/gif"),
+			ContentLength:   util.ToPointer(int64(len(data))),
+			ObjectType:      objectTypeLiveRender,
+		}
+
+		sw := newObjectWriter(ctx, client, bucket, gifObject.fileName(), gifObject.ContentType, gifObject.ContentLength, map[string]string{
+			"originalURL": truncateString(ogURL, 100),
+			"mediaType":   persist.MediaTypeGIF.String(),
+		})
+
+		_, err = sw.Write(data)
+		if err != nil {
+			persist.FailStep(subMeta.SVGRasterize)
+			return nil, fmt.Errorf("could not write to bucket %s for %s: %s", bucket, gifObject.fileName(), err)
+		}
+
+		if err := sw.Close(); err != nil {
+			persist.FailStep(subMeta.AnimationGzip)
+			return nil, err
+		}
+
+		purgeIfExists(ctx, bucket, gifObject.fileName(), client)
+
+		objects = append(objects, gifObject)
+
+	}
+
+	return objects, nil
 }
 
 func thumbnailAndCache(ctx context.Context, tids persist.TokenIdentifiers, videoURL, bucket string, client *storage.Client, subMeta *cachePipelineMetadata) (cachedMediaObject, error) {
@@ -841,7 +899,7 @@ func thumbnailAndCache(ctx context.Context, tids persist.TokenIdentifiers, video
 	logger.For(ctx).Infof("thumbnailing %s", videoURL)
 	if err := thumbnailVideoToWriter(ctx, videoURL, sw); err != nil {
 		persist.FailStep(subMeta.ThumbnailGCP)
-		return cachedMediaObject{}, fmt.Errorf("could not thumbnail to bucket %s for '%s': %s", bucket, obj.fileName(), err)
+		return cachedMediaObject{}, errStoreObjectFailed{err: err, bucket: bucket, object: obj}
 	}
 
 	if err := sw.Close(); err != nil {
@@ -881,7 +939,7 @@ func createLiveRenderAndCache(ctx context.Context, tids persist.TokenIdentifiers
 	logger.For(ctx).Infof("creating live render for %s", videoURL)
 	if err := createLiveRenderPreviewVideo(ctx, videoURL, sw); err != nil {
 		persist.FailStep(subMeta.LiveRenderGCP)
-		return cachedMediaObject{}, fmt.Errorf("could not live render to bucket %s for '%s': %s", bucket, obj.fileName(), err)
+		return cachedMediaObject{}, errStoreObjectFailed{err: err, bucket: bucket, object: obj}
 	}
 
 	if err := sw.Close(); err != nil {
@@ -947,8 +1005,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 		reader, err := rpc.GetDataFromURIAsReader(pCtx, asURI, ipfsClient, arweaveClient, util.MB, time.Minute)
 		if err != nil {
 			persist.FailStep(subMeta.ReaderRetrieval)
-			logger.For(pCtx).Errorf("failed to get reader for '%s': %s <%T>", mediaURL, err, err)
-			if strings.Contains(err.Error(), context.Canceled.Error()) || strings.Contains(err.Error(), context.DeadlineExceeded.Error()) {
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return reader, false, err
 			}
 			// the reader is and always will be invalid
@@ -966,6 +1023,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 				return reader, true, err
 			}
 
+			logger.For(pCtx).Errorf("failed to get reader for '%s': %s <%T>", mediaURL, err, err)
 			return reader, false, errNoDataFromReader{err: err, url: mediaURL}
 		}
 		return reader, false, nil
@@ -975,33 +1033,8 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 		traceCallback, pCtx := persist.TrackStepStatus(pCtx, subMeta.OpenseaFallback, "OpenseaFallback")
 		logger.For(pCtx).Infof("failed to get data from uri '%s' for '%s' because of (err: %s <%T>), trying opensea", mediaURL, tids, err, err)
 		defer traceCallback()
-		// if token is ETH, backup to asking opensea
-		assets, err := opensea.FetchAssetsForTokenIdentifiers(pCtx, persist.EthereumAddress(tids.ContractAddress), opensea.TokenID(tids.TokenID.Base10String()))
-		if err != nil || len(assets) == 0 {
-			// no data from opensea, return error
-			return nil, errNoDataFromOpensea{err: err, url: mediaURL}
-		}
 
-		for _, asset := range assets {
-			// does this asset have any valid URLs?
-			firstNonEmptyURL, ok := util.FindFirst([]string{asset.AnimationURL, asset.ImageURL, asset.ImagePreviewURL, asset.ImageOriginalURL, asset.ImageThumbnailURL}, func(s string) bool {
-				return s != ""
-			})
-			if !ok {
-				continue
-			}
-
-			reader, err = rpc.GetDataFromURIAsReader(pCtx, persist.TokenURI(firstNonEmptyURL), ipfsClient, arweaveClient, util.MB, time.Second*30)
-			if err != nil {
-				continue
-			}
-
-			logger.For(pCtx).Infof("got reader for %s from opensea in %s (%s)", tids, time.Since(timeBeforeDataReader), firstNonEmptyURL)
-
-			return cacheObjectsFromURL(pCtx, tids, firstNonEmptyURL, oType, ipfsClient, arweaveClient, storageClient, bucket, subMeta, true)
-		}
-
-		return nil, errNoDataFromOpensea{err: err, url: mediaURL}
+		return cacheObjectsFromOpensea(pCtx, tids, oType, ipfsClient, arweaveClient, storageClient, bucket, subMeta)
 	}
 
 	if err != nil {
@@ -1021,7 +1054,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 			bytesToSniff, err := reader.Headers()
 			if err != nil {
 				persist.FailStep(subMeta.DetermineMediaTypeWithReader)
-				logger.For(pCtx).WithError(err).Errorf("could not get headers for %s", mediaURL)
+				logger.For(pCtx).Errorf("could not get headers for %s: %s", mediaURL, err)
 				return
 			}
 			contentType = util.ToPointer("")
@@ -1051,7 +1084,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 		timeBeforeCache := time.Now()
 		obj, err := cacheRawAnimationMedia(pCtx, reader, tids, mediaType, oType, bucket, mediaURL, storageClient, subMeta)
 		if err != nil {
-			logger.For(pCtx).WithError(err).Error("could not cache animation")
+			logger.For(pCtx).Errorf("could not cache animation: %s", err)
 			return nil, err
 		}
 		logger.For(pCtx).Infof("cached animation for %s in %s", tids, time.Since(timeBeforeCache))
@@ -1082,23 +1115,67 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 			result = append(result, liveObj)
 		}
 
+	} else if mediaType == persist.MediaTypeSVG {
+		timeBeforeCache := time.Now()
+		obj, err := rasterizeAndCacheSVGMedia(pCtx, obj.storageURL(bucket), tids, bucket, mediaURL, storageClient, subMeta)
+		if err != nil {
+			logger.For(pCtx).Errorf("could not cache svg rasterization: %s", err)
+			// still return the original object as svg
+			return result, nil
+		}
+		logger.For(pCtx).Infof("cached animation for %s in %s", tids, time.Since(timeBeforeCache))
+		return append(result, obj...), nil
 	}
 
 	return result, nil
 }
 
+func cacheObjectsFromOpensea(pCtx context.Context, tids persist.TokenIdentifiers, oType objectType, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, bucket string, subMeta *cachePipelineMetadata) ([]cachedMediaObject, error) {
+	assets, err := opensea.FetchAssetsForTokenIdentifiers(pCtx, persist.EthereumAddress(tids.ContractAddress), opensea.TokenID(tids.TokenID.Base10String()))
+	if err != nil || len(assets) == 0 {
+		return nil, errNoDataFromOpensea{err: err}
+	}
+
+	for _, asset := range assets {
+
+		firstNonEmptyURL, ok := util.FindFirst([]string{asset.AnimationURL, asset.ImageURL, asset.ImagePreviewURL, asset.ImageOriginalURL, asset.ImageThumbnailURL}, func(s string) bool {
+			return s != ""
+		})
+		if !ok {
+			continue
+		}
+
+		objects, err := cacheObjectsFromURL(pCtx, tids, firstNonEmptyURL, oType, ipfsClient, arweaveClient, storageClient, bucket, subMeta, true)
+		if err != nil {
+			continue
+		}
+		return objects, nil
+	}
+	return nil, errNoDataFromOpensea{err: err}
+}
+
 func thumbnailVideoToWriter(ctx context.Context, url string, writer io.Writer) error {
 	c := exec.CommandContext(ctx, "ffmpeg", "-hide_banner", "-loglevel", "error", "-i", url, "-ss", "00:00:00.000", "-vframes", "1", "-f", "mjpeg", "pipe:1")
-	c.Stderr = os.Stderr
+	errBuf := new(bytes.Buffer)
+	c.Stderr = errBuf
 	c.Stdout = writer
-	return c.Run()
+	err := c.Run()
+	if _, ok := isExitErr(err); ok {
+		return errors.New(errBuf.String())
+	}
+	return err
 }
 
 func createLiveRenderPreviewVideo(ctx context.Context, videoURL string, writer io.Writer) error {
 	c := exec.CommandContext(ctx, "ffmpeg", "-hide_banner", "-loglevel", "error", "-i", videoURL, "-ss", "00:00:00.000", "-t", "00:00:05.000", "-filter:v", "scale=720:trunc(ow/a/2)*2", "-c:a", "aac", "-shortest", "-movflags", "frag_keyframe+empty_moov", "-f", "mp4", "pipe:1")
-	c.Stderr = os.Stderr
+	errBuf := new(bytes.Buffer)
+	c.Stderr = errBuf
 	c.Stdout = writer
-	return c.Run()
+	err := c.Run()
+	if _, ok := isExitErr(err); ok {
+		return errors.New(errBuf.String())
+	}
+	return nil
 }
 
 type dimensions struct {
@@ -1118,18 +1195,16 @@ func (e errNoStreams) Error() string {
 }
 
 func getMediaDimensions(ctx context.Context, url string) (persist.Dimensions, error) {
-	outBuf := bytes.NewBuffer(nil)
 	c := exec.CommandContext(ctx, "ffprobe", "-hide_banner", "-loglevel", "error", "-show_streams", url, "-print_format", "json")
-	c.Stderr = os.Stderr
-	c.Stdout = outBuf
-	err := c.Run()
+	outBuf, err := c.Output()
 	if err != nil {
-		logger.For(ctx).WithError(err).Errorf("failed to get dimensions for %s", url)
+		err = errFromExitErr(err)
+		logger.For(ctx).Warnf("failed to get dimensions for %s: %s", url, err)
 		return getMediaDimensionsBackup(ctx, url)
 	}
 
 	var d dimensions
-	err = json.Unmarshal(outBuf.Bytes(), &d)
+	err = json.Unmarshal(outBuf, &d)
 	if err != nil {
 		return persist.Dimensions{}, fmt.Errorf("failed to unmarshal ffprobe output: %w", err)
 	}
@@ -1160,11 +1235,8 @@ func getMediaDimensions(ctx context.Context, url string) (persist.Dimensions, er
 }
 
 func getMediaDimensionsBackup(ctx context.Context, url string) (persist.Dimensions, error) {
-	outBuf := bytes.NewBuffer(nil)
 	curlCmd := exec.CommandContext(ctx, "curl", "-s", url)
 	identifyCmd := exec.CommandContext(ctx, "identify", "-format", "%wx%h", "-")
-	identifyCmd.Stderr = os.Stderr
-	identifyCmd.Stdout = outBuf
 
 	curlCmdStdout, err := curlCmd.StdoutPipe()
 	if err != nil {
@@ -1178,9 +1250,9 @@ func getMediaDimensionsBackup(ctx context.Context, url string) (persist.Dimensio
 		return persist.Dimensions{}, fmt.Errorf("failed to start curl command: %w", err)
 	}
 
-	err = identifyCmd.Run()
+	outBuf, err := identifyCmd.Output()
 	if err != nil {
-		return persist.Dimensions{}, err
+		return persist.Dimensions{}, errFromExitErr(err)
 	}
 
 	err = curlCmd.Wait()
@@ -1188,7 +1260,7 @@ func getMediaDimensionsBackup(ctx context.Context, url string) (persist.Dimensio
 		return persist.Dimensions{}, fmt.Errorf("curl command exited with error: %w", err)
 	}
 
-	dimensionsStr := outBuf.String()
+	dimensionsStr := string(outBuf)
 	dimensionsSplit := strings.Split(dimensionsStr, "x")
 	if len(dimensionsSplit) != 2 {
 		return persist.Dimensions{}, fmt.Errorf("unexpected output format from identify: %s", dimensionsStr)
@@ -1232,21 +1304,13 @@ func keywordsForToken(tokenID persist.TokenID, contract persist.Address, chain p
 	}
 }
 
-func (e errUnsupportedURL) Error() string {
-	return fmt.Sprintf("unsupported url %s", e.url)
-}
-
-func (e errUnsupportedMediaType) Error() string {
-	return fmt.Sprintf("unsupported media type %s", e.mediaType)
-}
-
 func newObjectWriter(ctx context.Context, client *storage.Client, bucket, fileName string, contentType *string, contentLength *int64, objMetadata map[string]string) *storage.Writer {
 	writer := client.Bucket(bucket).Object(fileName).NewWriter(ctx)
 	if contentType != nil {
 		writer.ObjectAttrs.ContentType = *contentType
 	}
 	writer.ProgressFunc = func(written int64) {
-		logger.For(ctx).Debugf("wrote %s to %s", util.InByteSizeFormat(uint64(written)), fileName)
+		logger.For(ctx).Infof("wrote %s to %s", util.InByteSizeFormat(uint64(written)), fileName)
 	}
 	writer.ObjectAttrs.Metadata = objMetadata
 	writer.ObjectAttrs.CacheControl = "no-cache, no-store"
@@ -1268,4 +1332,19 @@ func contentLengthToChunkSize(contentLength *int64) int {
 		return 16 * 1024 * 1024
 	}
 	return 4 * 1024 * 1024
+}
+
+func errFromExitErr(err error) error {
+	if exitErr, ok := isExitErr(err); ok {
+		return errors.New(string(exitErr.Stderr))
+	}
+	return err
+}
+
+func isExitErr(err error) (*exec.ExitError, bool) {
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		return exitErr, true
+	}
+	return nil, false
 }

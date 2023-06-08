@@ -10,7 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/db/gen/indexerdb"
 	"github.com/mikeydub/go-gallery/env"
-	"github.com/mikeydub/go-gallery/indexer/refresh"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -18,6 +17,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/rpc"
+	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/service/tracing"
@@ -42,7 +42,7 @@ func InitServer(quietLogs, enableRPC bool) {
 }
 
 func coreInit(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) (*gin.Engine, *indexer) {
-	initSentry()
+	InitSentry()
 	logger.InitWithGCPDefaults()
 	logger.SetLoggerOptions(func(logger *logrus.Logger) {
 		logger.AddHook(sentryutil.SentryLoggerHook)
@@ -53,17 +53,17 @@ func coreInit(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) (*gin.Engin
 	})
 
 	s := rpc.NewStorageClient(context.Background())
-	tokenRepo, contractRepo, addressFilterRepo := newRepos(s)
+	tokenRepo, contractRepo := newRepos(s)
 	queries := indexerdb.New(postgres.NewPgxClient())
 	ethClient := rpc.NewEthSocketClient()
-	ipfsClient := rpc.NewIPFSShell()
+	ipfsClient := ipfs.NewShell()
 	arweaveClient := rpc.NewArweaveClient()
 
 	if env.GetString("ENV") == "production" || enableRPC {
 		rpcEnabled = true
 	}
 
-	i := newIndexer(ethClient, &http.Client{Timeout: 10 * time.Minute}, ipfsClient, arweaveClient, s, queries, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(env.GetInt("CHAIN")), defaultTransferEvents, nil, fromBlock, toBlock)
+	i := newIndexer(ethClient, &http.Client{Timeout: 10 * time.Minute}, ipfsClient, arweaveClient, s, queries, tokenRepo, contractRepo, persist.Chain(env.GetInt("CHAIN")), defaultTransferEvents, nil, fromBlock, toBlock)
 
 	router := gin.Default()
 
@@ -79,7 +79,7 @@ func coreInit(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) (*gin.Engin
 
 func coreInitServer(quietLogs, enableRPC bool) *gin.Engine {
 	ctx := sentry.SetHubOnContext(context.Background(), sentry.CurrentHub())
-	initSentry()
+	InitSentry()
 	logger.InitWithGCPDefaults()
 	logger.SetLoggerOptions(func(logger *logrus.Logger) {
 		logger.SetLevel(logrus.InfoLevel)
@@ -89,10 +89,10 @@ func coreInitServer(quietLogs, enableRPC bool) *gin.Engine {
 	})
 
 	s := rpc.NewStorageClient(context.Background())
-	tokenRepo, contractRepo, addressFilterRepo := newRepos(s)
+	tokenRepo, contractRepo := newRepos(s)
 	queries := indexerdb.New(postgres.NewPgxClient())
 	ethClient := rpc.NewEthSocketClient()
-	ipfsClient := rpc.NewIPFSShell()
+	ipfsClient := ipfs.NewShell()
 	arweaveClient := rpc.NewArweaveClient()
 
 	if env.GetString("ENV") == "production" || enableRPC {
@@ -112,7 +112,7 @@ func coreInitServer(quietLogs, enableRPC bool) *gin.Engine {
 
 	httpClient := &http.Client{Timeout: 10 * time.Minute, Transport: tracing.NewTracingTransport(http.DefaultTransport, false)}
 
-	i := newIndexer(ethClient, httpClient, ipfsClient, arweaveClient, s, queries, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(env.GetInt("CHAIN")), defaultTransferEvents, nil, nil, nil)
+	i := newIndexer(ethClient, httpClient, ipfsClient, arweaveClient, s, queries, tokenRepo, contractRepo, persist.Chain(env.GetInt("CHAIN")), defaultTransferEvents, nil, nil, nil)
 	return handlersInitServer(router, tokenRepo, contractRepo, ethClient, httpClient, ipfsClient, arweaveClient, s, i)
 }
 
@@ -138,6 +138,7 @@ func SetDefaults() {
 	viper.SetDefault("IMGIX_API_KEY", "")
 	viper.SetDefault("VERSION", "")
 	viper.SetDefault("ALCHEMY_API_URL", "")
+	viper.SetDefault("ALCHEMY_NFT_API_URL", "")
 	viper.AutomaticEnv()
 }
 
@@ -156,16 +157,16 @@ func ValidateEnv() {
 	}
 }
 
-func newRepos(storageClient *storage.Client) (persist.TokenRepository, persist.ContractRepository, refresh.AddressFilterRepository) {
+func newRepos(storageClient *storage.Client) (persist.TokenRepository, persist.ContractRepository) {
 	pgClient := postgres.MustCreateClient()
-	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), refresh.AddressFilterRepository{Bucket: storageClient.Bucket(env.GetString("GCLOUD_TOKEN_LOGS_BUCKET"))}
+	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient)
 }
 
 func newThrottler() *throttle.Locker {
 	return throttle.NewThrottleLocker(redis.NewCache(redis.IndexerServerThrottleCache), time.Minute*5)
 }
 
-func initSentry() {
+func InitSentry() {
 	if env.GetString("ENV") == "local" {
 		logger.For(nil).Info("skipping sentry init")
 		return

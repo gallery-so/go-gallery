@@ -55,11 +55,8 @@ func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.Blockchain
 }
 
 // GetTokenMetadataByTokenIdentifiers retrieves a token's metadata for a given contract address and token ID
-func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (persist.TokenMetadata, error) {
+func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
 	url := fmt.Sprintf("%s/nfts/get/metadata?contract_address=%s&token_id=%s", d.indexerBaseURL, ti.ContractAddress, ti.TokenID)
-	if ownerAddress != "" {
-		url = fmt.Sprintf("%s&address=%s", url, ownerAddress)
-	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -81,6 +78,26 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti mu
 	}
 
 	return tokens.Metadata, nil
+}
+
+func (d *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (multichain.ChainAgnosticTokenDescriptors, multichain.ChainAgnosticContractDescriptors, error) {
+	metadata, err := d.GetTokenMetadataByTokenIdentifiers(ctx, ti)
+	if err != nil {
+		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, err
+	}
+	name, _ := metadata["name"].(string)
+	description, _ := metadata["description"].(string)
+	contractName, _ := metadata["contract_name"].(string)
+	contractDescription, _ := metadata["contract_description"].(string)
+	contractSymbol, _ := metadata["contract_symbol"].(string)
+	return multichain.ChainAgnosticTokenDescriptors{
+			Name:        name,
+			Description: description,
+		}, multichain.ChainAgnosticContractDescriptors{
+			Name:        contractName,
+			Symbol:      contractSymbol,
+			Description: contractDescription,
+		}, nil
 }
 
 // GetContractByAddress retrieves an ethereum contract by address
@@ -282,9 +299,11 @@ func verifySignature(pSignatureStr string,
 
 func contractToChainAgnostic(contract persist.Contract) multichain.ChainAgnosticContract {
 	return multichain.ChainAgnosticContract{
-		Address:        persist.Address(contract.Address.String()),
-		Name:           contract.Name.String(),
-		Symbol:         contract.Symbol.String(),
-		CreatorAddress: persist.Address(contract.OwnerAddress.String()),
+		Address: persist.Address(contract.Address.String()),
+		Descriptors: multichain.ChainAgnosticContractDescriptors{
+			Name:           contract.Name.String(),
+			Symbol:         contract.Symbol.String(),
+			CreatorAddress: persist.Address(contract.OwnerAddress.String()),
+		},
 	}
 }

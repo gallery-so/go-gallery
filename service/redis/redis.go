@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/bsm/redislock"
@@ -46,6 +47,7 @@ var (
 	EmailRateLimitersCache            = CacheConfig{database: rateLimiters, keyPrefix: "email", displayName: "emailRateLimiters"}
 	PushNotificationRateLimitersCache = CacheConfig{database: rateLimiters, keyPrefix: "push", displayName: "pushNotificationLimiters"}
 	OneTimeLoginCache                 = CacheConfig{database: misc, keyPrefix: "otl", displayName: "oneTimeLogin"}
+	AuthTokenForceRefreshCache        = CacheConfig{database: misc, keyPrefix: "authRefresh", displayName: "authTokenForceRefresh"}
 	CommunitiesCache                  = CacheConfig{database: communities, keyPrefix: "", displayName: "communities"}
 	IndexerServerThrottleCache        = CacheConfig{database: indexerServerThrottle, keyPrefix: "", displayName: "indexerServerThrottle"}
 	RefreshNFTsThrottleCache          = CacheConfig{database: refreshNFTsThrottle, keyPrefix: "", displayName: "refreshNFTsThrottle"}
@@ -79,6 +81,7 @@ func newClient(db redisDB, traceName string) *redis.Client {
 type Cache struct {
 	client    *redis.Client
 	keyPrefix string
+	scripter  *scripter
 }
 
 func (c *Cache) Client() *redis.Client {
@@ -89,12 +92,21 @@ func (c *Cache) Prefix() string {
 	return c.keyPrefix
 }
 
+// Scripter returns an implementation of the redis.Scripter interface using this Cache
+func (c *Cache) Scripter() redis.Scripter {
+	return c.scripter
+}
+
 // NewCache creates a new redis cache
 func NewCache(config CacheConfig) *Cache {
-	return &Cache{
+	cache := &Cache{
 		client:    newClient(config.database, config.displayName),
 		keyPrefix: config.keyPrefix,
 	}
+
+	cache.scripter = &scripter{cache: cache}
+
+	return cache
 }
 
 // Set sets a value in the redis cache
@@ -113,6 +125,43 @@ func (c *Cache) SetNX(pCtx context.Context, key string, value []byte, expiration
 	}
 
 	return cmd.Val(), nil
+}
+
+// SetTime sets a time in the redis cache. If onlyIfLater is true, the value will only be set if the
+// key doesn't exist, or if the existing key's value is an earlier time than the one being set.
+func (c *Cache) SetTime(ctx context.Context, key string, value time.Time, expiration time.Duration, onlyIfLater bool) error {
+	unixTimestamp := value.Unix()
+
+	if !onlyIfLater {
+		return c.client.Set(ctx, c.getPrefixedKey(key), unixTimestamp, expiration).Err()
+	}
+
+	unixExpiration := time.Now().Add(expiration).Unix()
+
+	// scripter already handled key prefixing, so we need to pass the raw key here
+	err := setTimeScript.Run(ctx, c.scripter, []string{key}, unixTimestamp, unixExpiration).Err()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *Cache) GetTime(ctx context.Context, key string) (time.Time, error) {
+	result, err := c.client.Get(ctx, c.getPrefixedKey(key)).Result()
+	if err != nil {
+		if err == redis.Nil {
+			return time.Time{}, ErrKeyNotFound{Key: key}
+		}
+		return time.Time{}, err
+	}
+
+	timestamp, err := strconv.ParseInt(result, 10, 64)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	return time.Unix(timestamp, 0), nil
 }
 
 // Get gets a value from the redis cache
@@ -161,31 +210,55 @@ func (e ErrKeyNotFound) Error() string {
 	return fmt.Sprintf("key %s not found", e.Key)
 }
 
-func NewLockClient(cache *Cache) *redislock.Client {
-	return redislock.New(&redislockCacheClient{cache: cache})
+// scripter is an implementation of the redis.Scripter interface that uses a Cache to namespace keys
+type scripter struct {
+	cache *Cache
 }
 
-// redislockCacheClient is a minimal implementation of redislock.RedisClient that uses a Cache to namespace its keys
+func (s scripter) Eval(ctx context.Context, script string, keys []string, args ...interface{}) *redis.Cmd {
+	return s.cache.client.Eval(ctx, script, s.cache.getPrefixedKeys(keys), args...)
+}
+
+func (s scripter) EvalSha(ctx context.Context, sha1 string, keys []string, args ...interface{}) *redis.Cmd {
+	return s.cache.client.EvalSha(ctx, sha1, s.cache.getPrefixedKeys(keys), args...)
+}
+
+func (s scripter) ScriptExists(ctx context.Context, scripts ...string) *redis.BoolSliceCmd {
+	return s.cache.client.ScriptExists(ctx, scripts...)
+}
+
+func (s scripter) ScriptLoad(ctx context.Context, script string) *redis.StringCmd {
+	return s.cache.client.ScriptLoad(ctx, script)
+}
+
+func NewLockClient(cache *Cache) *redislock.Client {
+	return redislock.New(&redislockCacheClient{
+		scripter: *cache.scripter,
+	})
+}
+
+// redislockCacheClient is a minimal implementation of redislock.RedisClient that uses a Cache to namespace its keys.
 type redislockCacheClient struct {
-	cache *Cache
+	scripter
 }
 
 func (r *redislockCacheClient) SetNX(ctx context.Context, key string, value interface{}, expiration time.Duration) *redis.BoolCmd {
 	return r.cache.client.SetNX(ctx, r.cache.getPrefixedKey(key), value, expiration)
 }
 
-func (r *redislockCacheClient) Eval(ctx context.Context, script string, keys []string, args ...interface{}) *redis.Cmd {
-	return r.cache.client.Eval(ctx, script, r.cache.getPrefixedKeys(keys), args...)
-}
+// Scripts
+var setTimeScript = redis.NewScript(`
+local key = KEYS[1]
+local newTimestamp = ARGV[1]
+local expirationTime = ARGV[2]
 
-func (r *redislockCacheClient) EvalSha(ctx context.Context, sha1 string, keys []string, args ...interface{}) *redis.Cmd {
-	return r.cache.client.EvalSha(ctx, sha1, r.cache.getPrefixedKeys(keys), args...)
-}
+local currentTimestamp = redis.call('GET', key)
 
-func (r *redislockCacheClient) ScriptExists(ctx context.Context, scripts ...string) *redis.BoolSliceCmd {
-	return r.cache.client.ScriptExists(ctx, scripts...)
-}
+if currentTimestamp == false or tonumber(currentTimestamp) < tonumber(newTimestamp) then
+	redis.call('SET', key, newTimestamp)
+	redis.call('EXPIREAT', key, expirationTime)
+    return 1
+end
 
-func (r *redislockCacheClient) ScriptLoad(ctx context.Context, script string) *redis.StringCmd {
-	return r.cache.client.ScriptLoad(ctx, script)
-}
+return 0
+`)
