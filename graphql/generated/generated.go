@@ -7197,16 +7197,6 @@ type TokenHoldersConnection {
   pageInfo: PageInfo!
 }
 
-type CommunityEdge {
-  node: Community
-  cursor: String
-}
-
-type CommunitiesConnection {
-  edges: [CommunityEdge]
-  pageInfo: PageInfo!
-}
-
 type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) @goEmbedHelper {
   dbid: DBID!
   id: ID!
@@ -7645,6 +7635,16 @@ type UserEdge {
 
 type UsersConnection {
   edges: [UserEdge]
+  pageInfo: PageInfo!
+}
+
+type CommunityEdge {
+  node: Community
+  cursor: String
+}
+
+type CommunitiesConnection {
+  edges: [CommunityEdge]
   pageInfo: PageInfo!
 }
 

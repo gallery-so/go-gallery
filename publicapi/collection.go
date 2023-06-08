@@ -126,8 +126,8 @@ func (api CollectionAPI) GetTopCollectionsForCommunity(ctx context.Context, chai
 		if _, collectionIDs, err = paginator.decodeCursor(*after); err != nil {
 			return nil, pageInfo, err
 		}
-		// No cursor provided, need to access the cache
 	} else {
+		// No cursor provided, need to access the cache
 		r := ranker{
 			Cache: redis.NewCache(redis.SearchCache),
 			Key:   fmt.Sprintf("top_collections_by_address:%d:%s", chainAddress.Chain(), chainAddress.Address()),
