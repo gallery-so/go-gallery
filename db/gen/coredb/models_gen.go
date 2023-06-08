@@ -446,6 +446,31 @@ type TokenMedia struct {
 	Deleted         bool
 }
 
+type TokenMediasActive struct {
+	ID               persist.DBID
+	LastUpdated      time.Time
+	MediaType        interface{}
+	JobID            persist.DBID
+	TokenProperties  pgtype.JSONB
+	PipelineMetadata pgtype.JSONB
+}
+
+type TokenMediasMissingProperty struct {
+	ID          persist.DBID
+	MediaType   interface{}
+	LastUpdated time.Time
+	IsValid     bool
+	Reason      []byte
+}
+
+type TokenMediasNoValidationRule struct {
+	ID          persist.DBID
+	MediaType   interface{}
+	LastUpdated time.Time
+	IsValid     bool
+	Reason      string
+}
+
 type TokenOwner struct {
 	TokenID        persist.DBID
 	OwnerUserID    persist.DBID

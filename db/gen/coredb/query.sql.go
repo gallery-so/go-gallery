@@ -1093,7 +1093,7 @@ SELECT
     (
         SELECT wallets.address
         FROM wallets
-        WHERE wallets.id = ANY(tokens.owned_by_wallets)
+        WHERE wallets.id = ANY(tokens.owned_by_wallets) and wallets.deleted = false
         LIMIT 1
     ) AS wallet_address
 FROM tokens
@@ -2092,7 +2092,7 @@ SELECT
     (
         SELECT wallets.address
         FROM wallets
-        WHERE wallets.id = ANY(tokens.owned_by_wallets)
+        WHERE wallets.id = ANY(tokens.owned_by_wallets) and wallets.deleted = false
         LIMIT 1
     ) AS wallet_address
 FROM tokens
@@ -2501,11 +2501,11 @@ func (q *Queries) GetReprocessJobRangeByID(ctx context.Context, id int) (Reproce
 const getSVGTokensWithContractsByIDs = `-- name: GetSVGTokensWithContractsByIDs :many
 SELECT
     tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id,
-    contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam,
+    contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.override_owner_user_id,
     (
         SELECT wallets.address
         FROM wallets
-        WHERE wallets.id = ANY(tokens.owned_by_wallets)
+        WHERE wallets.id = ANY(tokens.owned_by_wallets) and wallets.deleted = false
         LIMIT 1
     ) AS wallet_address
 FROM tokens
@@ -2566,6 +2566,7 @@ type GetSVGTokensWithContractsByIDsRow struct {
 	Description_2          sql.NullString
 	OwnerAddress           persist.Address
 	IsProviderMarkedSpam_2 bool
+	OverrideOwnerUserID    persist.DBID
 	WalletAddress          persist.Address
 }
 
@@ -2621,6 +2622,7 @@ func (q *Queries) GetSVGTokensWithContractsByIDs(ctx context.Context, arg GetSVG
 			&i.Description_2,
 			&i.OwnerAddress,
 			&i.IsProviderMarkedSpam_2,
+			&i.OverrideOwnerUserID,
 			&i.WalletAddress,
 		); err != nil {
 			return nil, err
