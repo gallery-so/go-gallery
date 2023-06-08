@@ -85,19 +85,18 @@ SELECT * FROM tokens WHERE id = $1 AND deleted = false;
 -- name: GetTokenByIdBatch :batchone
 SELECT * FROM tokens WHERE id = $1 AND deleted = false;
 
--- name: GetTokensByCollectionId :many
-SELECT t.* FROM users u, collections c, unnest(c.nfts)
-    WITH ORDINALITY AS x(nft_id, nft_ord)
-    INNER JOIN tokens t ON t.id = x.nft_id
-    WHERE u.id = t.owner_user_id AND t.owned_by_wallets && u.wallets
-    AND c.id = sqlc.arg('collection_id') AND u.deleted = false AND c.deleted = false AND t.deleted = false ORDER BY x.nft_ord LIMIT sqlc.narg('limit');
-
 -- name: GetTokensByCollectionIdBatch :batchmany
-SELECT t.* FROM users u, collections c, unnest(c.nfts)
-    WITH ORDINALITY AS x(nft_id, nft_ord)
-    INNER JOIN tokens t ON t.id = x.nft_id
-    WHERE u.id = t.owner_user_id AND t.owned_by_wallets && u.wallets
-    AND c.id = sqlc.arg('collection_id') AND u.deleted = false AND c.deleted = false AND t.deleted = false ORDER BY x.nft_ord LIMIT sqlc.narg('limit');
+select t.* from collections c,
+    unnest(c.nfts) with ordinality as u(nft_id, nft_ord)
+    join tokens t on t.id = u.nft_id
+    join token_owners o on o.token_id = u.nft_id
+    where c.id = sqlc.arg('collection_id')
+      and c.owner_user_id = t.owner_user_id
+      and c.owner_user_id = o.owner_user_id
+      and c.deleted = false
+      and t.deleted = false
+    order by u.nft_ord
+    limit sqlc.narg('limit');
 
 -- name: GetNewTokensByFeedEventIdBatch :batchmany
 WITH new_tokens AS (
@@ -189,10 +188,6 @@ SELECT u.* FROM follows f
     WHERE f.follower = $1 AND f.deleted = false
     ORDER BY f.last_updated DESC;
 
--- name: GetTokensByWalletIds :many
-SELECT * FROM tokens WHERE owned_by_wallets && $1 AND deleted = false
-    ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
-
 -- name: GetTokensByWalletIdsBatch :batchmany
 SELECT * FROM tokens WHERE owned_by_wallets && $1 AND deleted = false
     ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
@@ -267,43 +262,28 @@ SELECT u.* FROM tokens t
 -- name: GetPreviewURLsByContractIdAndUserId :many
 SELECT (MEDIA->>'thumbnail_url')::varchar as thumbnail_url FROM tokens WHERE CONTRACT = $1 AND DELETED = false AND OWNER_USER_ID = $2 AND LENGTH(MEDIA->>'thumbnail_url'::varchar) > 0 ORDER BY ID LIMIT 3;
 
--- name: GetTokensByUserId :many
-SELECT tokens.* FROM tokens, users
-    WHERE tokens.owner_user_id = $1 AND users.id = $1
-      AND tokens.owned_by_wallets && users.wallets
-      AND tokens.deleted = false AND users.deleted = false
-    ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
-
 -- name: GetTokensByUserIdBatch :batchmany
-SELECT tokens.* FROM tokens, users
-    WHERE tokens.owner_user_id = $1 AND users.id = $1
-      AND tokens.owned_by_wallets && users.wallets
-      AND tokens.deleted = false AND users.deleted = false
-    ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
-
--- name: GetTokensByUserIdAndContractID :many
-SELECT tokens.* FROM tokens, users
-    WHERE tokens.owner_user_id = $1 AND users.id = $1
-      AND tokens.owned_by_wallets && users.wallets
-      AND tokens.contract = $2
-      AND tokens.deleted = false AND users.deleted = false
-    ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
+select t.* from tokens t
+    join token_owners o on t.id = o.token_id and t.owner_user_id = o.owner_user_id
+    where t.owner_user_id = $1
+      and t.deleted = false
+    order by t.created_at desc, t.name desc, t.id desc;
 
 -- name: GetTokensByUserIdAndContractIDBatch :batchmany
-SELECT tokens.* FROM tokens, users
-    WHERE tokens.owner_user_id = $1 AND users.id = $1
-      AND tokens.owned_by_wallets && users.wallets
-      AND tokens.contract = $2
-      AND tokens.deleted = false AND users.deleted = false
-    ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
+select t.* from tokens t
+    join token_owners o on t.id = o.token_id and t.owner_user_id = o.owner_user_id
+    where t.owner_user_id = $1
+      and t.contract = $2
+      and t.deleted = false
+    order by t.created_at desc, t.name desc, t.id desc;
 
 -- name: GetTokensByUserIdAndChainBatch :batchmany
-SELECT tokens.* FROM tokens, users
-WHERE tokens.owner_user_id = $1 AND users.id = $1
-  AND tokens.owned_by_wallets && users.wallets
-  AND tokens.deleted = false AND users.deleted = false
-  AND tokens.chain = $2
-ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
+select t.* from tokens t
+    join token_owners o on t.id = o.token_id and t.owner_user_id = o.owner_user_id
+    where t.owner_user_id = $1
+      and t.chain = $2
+      and t.deleted = false
+    order by t.created_at desc, t.name desc, t.id desc;
 
 -- name: CreateUserEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8) RETURNING *;

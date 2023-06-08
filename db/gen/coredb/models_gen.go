@@ -75,6 +75,14 @@ type Contract struct {
 	Description          sql.NullString
 	OwnerAddress         persist.Address
 	IsProviderMarkedSpam bool
+	OverrideOwnerUserID  persist.DBID
+}
+
+type ContractOwner struct {
+	ContractID   persist.DBID
+	OwnerUserID  persist.DBID
+	Chain        persist.Chain
+	OwnerAddress persist.Address
 }
 
 type ContractRelevance struct {
@@ -436,6 +444,13 @@ type TokenMedia struct {
 	Description     string
 	ProcessingJobID persist.DBID
 	Deleted         bool
+}
+
+type TokenOwner struct {
+	TokenID        persist.DBID
+	OwnerUserID    persist.DBID
+	OwnerIsHolder  interface{}
+	OwnerIsCreator sql.NullBool
 }
 
 type TokenProcessingJob struct {
