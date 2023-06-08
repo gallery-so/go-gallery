@@ -31,13 +31,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
-	"github.com/mikeydub/go-gallery/service/multichain/alchemy"
-	"github.com/mikeydub/go-gallery/service/multichain/eth"
-	"github.com/mikeydub/go-gallery/service/multichain/infura"
-	"github.com/mikeydub/go-gallery/service/multichain/opensea"
-	"github.com/mikeydub/go-gallery/service/multichain/poap"
-	"github.com/mikeydub/go-gallery/service/multichain/tezos"
-	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
 	"github.com/mikeydub/go-gallery/service/recommend"
@@ -62,8 +55,9 @@ func Init() {
 	logger.InitWithGCPDefaults()
 	initSentry()
 
-	c := ClientInit(context.Background())
-	provider := NewMultichainProvider(c)
+	ctx := context.Background()
+	c := ClientInit(ctx)
+	provider, _ := NewMultichainProvider(ctx, SetDefaults)
 	recommender := recommend.NewRecommender(c.Queries)
 	router := CoreInit(c, provider, recommender)
 	http.Handle("/", router)
@@ -281,38 +275,6 @@ func initSentry() {
 	if err != nil {
 		logger.For(nil).Fatalf("failed to start sentry: %s", err)
 	}
-}
-
-func NewMultichainProvider(c *Clients) *multichain.Provider {
-	ethChain := persist.ChainETH
-	overrides := multichain.ChainOverrideMap{persist.ChainPOAP: &ethChain, persist.ChainOptimism: &ethChain, persist.ChainPolygon: &ethChain}
-	alchemyMainnetProvider := alchemy.NewProvider(persist.ChainETH, c.HTTPClient)
-	infuraProvider := infura.NewProvider(c.HTTPClient)
-	failureEthProvider := multichain.SyncFailureFallbackProvider{Primary: infuraProvider, Fallback: alchemyMainnetProvider}
-
-	ethProvider := eth.NewProvider(env.GetString("INDEXER_HOST"), c.HTTPClient, c.EthClient, c.TaskClient)
-	alchemyOptimismProvider := alchemy.NewProvider(persist.ChainOptimism, c.HTTPClient)
-	alchemyPolygonProvider := alchemy.NewProvider(persist.ChainPolygon, c.HTTPClient)
-	openseaProvider := opensea.NewProvider(c.EthClient, c.HTTPClient)
-	tezosProvider := multichain.SyncWithContractEvalFallbackProvider{
-		Primary:  tezos.NewProvider(env.GetString("TEZOS_API_URL"), env.GetString("TOKEN_PROCESSING_URL"), env.GetString("IPFS_URL"), c.HTTPClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET")),
-		Fallback: tezos.NewObjktProvider(env.GetString("IPFS_URL")),
-		Eval: func(ctx context.Context, token multichain.ChainAgnosticToken) bool {
-			return tezos.IsSigned(ctx, token) && tezos.ContainsTezosKeywords(ctx, token)
-		},
-	}
-	poapProvider := poap.NewProvider(c.HTTPClient, env.GetString("POAP_API_KEY"), env.GetString("POAP_AUTH_TOKEN"))
-	cache := redis.NewCache(redis.CommunitiesCache)
-	return multichain.NewProvider(context.Background(), c.Repos, c.Queries, cache, c.TaskClient,
-		overrides,
-		ethProvider,
-		openseaProvider,
-		failureEthProvider,
-		tezosProvider,
-		poapProvider,
-		alchemyOptimismProvider,
-		alchemyPolygonProvider,
-	)
 }
 
 func newThrottler() *throttle.Locker {

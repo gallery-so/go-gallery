@@ -12,10 +12,7 @@ import (
 	"sync"
 
 	"blockwatch.cc/tzgo/tezos"
-	"cloud.google.com/go/storage"
-	"github.com/everFinance/goar"
 	"github.com/gammazero/workerpool"
-	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/machinebox/graphql"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -125,29 +122,17 @@ type tzktContract struct {
 
 // Provider is an the struct for retrieving data from the Tezos blockchain
 type Provider struct {
-	apiURL         string
-	mediaURL       string
-	ipfsGatewayURL string
-	httpClient     *http.Client
-	ipfsClient     *shell.Shell
-	arweaveClient  *goar.Client
-	storageClient  *storage.Client
-	graphQL        *graphql.Client
-	tokenBucket    string
+	apiURL     string
+	httpClient *http.Client
+	graphQL    *graphql.Client
 }
 
 // NewProvider creates a new Tezos Provider
-func NewProvider(tezosAPIUrl, mediaURL, ipfsGatewayURL string, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string) *Provider {
+func NewProvider(tezosAPIUrl string, httpClient *http.Client) *Provider {
 	return &Provider{
-		apiURL:         tezosAPIUrl,
-		mediaURL:       mediaURL,
-		ipfsGatewayURL: ipfsGatewayURL,
-		httpClient:     httpClient,
-		ipfsClient:     ipfsClient,
-		arweaveClient:  arweaveClient,
-		graphQL:        graphql.NewClient(tezDomainsApiURL, graphql.WithHTTPClient(httpClient)),
-		storageClient:  storageClient,
-		tokenBucket:    tokenBucket,
+		apiURL:     tezosAPIUrl,
+		httpClient: httpClient,
+		graphQL:    graphql.NewClient(tezDomainsApiURL, graphql.WithHTTPClient(httpClient)),
 	}
 }
 

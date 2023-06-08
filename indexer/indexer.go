@@ -31,7 +31,6 @@ import (
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/db/gen/indexerdb"
 	"github.com/mikeydub/go-gallery/env"
-	"github.com/mikeydub/go-gallery/indexer/refresh"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain/alchemy"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -116,18 +115,17 @@ type getLogsFunc func(ctx context.Context, curBlock, nextBlock *big.Int, topics 
 // indexer is the indexer for the blockchain that uses JSON RPC to scan through logs and process them
 // into a format used by the application
 type indexer struct {
-	ethClient         *ethclient.Client
-	httpClient        *http.Client
-	ipfsClient        *shell.Shell
-	arweaveClient     *goar.Client
-	storageClient     *storage.Client
-	queries           *indexerdb.Queries
-	tokenRepo         persist.TokenRepository
-	contractRepo      persist.ContractRepository
-	addressFilterRepo refresh.AddressFilterRepository
-	dbMu              *sync.Mutex // Manages writes to the db
-	stateMu           *sync.Mutex // Manages updates to the indexer's state
-	memoryMu          *sync.Mutex // Manages large memory operations
+	ethClient     *ethclient.Client
+	httpClient    *http.Client
+	ipfsClient    *shell.Shell
+	arweaveClient *goar.Client
+	storageClient *storage.Client
+	queries       *indexerdb.Queries
+	tokenRepo     persist.TokenRepository
+	contractRepo  persist.ContractRepository
+	dbMu          *sync.Mutex // Manages writes to the db
+	stateMu       *sync.Mutex // Manages updates to the indexer's state
+	memoryMu      *sync.Mutex // Manages large memory operations
 
 	tokenBucket string
 
@@ -150,7 +148,7 @@ type indexer struct {
 }
 
 // newIndexer sets up an indexer for retrieving the specified events that will process tokens
-func newIndexer(ethClient *ethclient.Client, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, queries *indexerdb.Queries, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, addressFilterRepo refresh.AddressFilterRepository, pChain persist.Chain, pEvents []eventHash, getLogsFunc getLogsFunc, startingBlock, maxBlock *uint64) *indexer {
+func newIndexer(ethClient *ethclient.Client, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, queries *indexerdb.Queries, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, pChain persist.Chain, pEvents []eventHash, getLogsFunc getLogsFunc, startingBlock, maxBlock *uint64) *indexer {
 	if rpcEnabled && ethClient == nil {
 		panic("RPC is enabled but an ethClient wasn't provided!")
 	}
@@ -158,18 +156,17 @@ func newIndexer(ethClient *ethclient.Client, httpClient *http.Client, ipfsClient
 	ownerStats := &sync.Map{}
 
 	i := &indexer{
-		ethClient:         ethClient,
-		httpClient:        httpClient,
-		ipfsClient:        ipfsClient,
-		arweaveClient:     arweaveClient,
-		storageClient:     storageClient,
-		tokenRepo:         tokenRepo,
-		contractRepo:      contractRepo,
-		queries:           queries,
-		addressFilterRepo: addressFilterRepo,
-		dbMu:              &sync.Mutex{},
-		stateMu:           &sync.Mutex{},
-		memoryMu:          &sync.Mutex{},
+		ethClient:     ethClient,
+		httpClient:    httpClient,
+		ipfsClient:    ipfsClient,
+		arweaveClient: arweaveClient,
+		storageClient: storageClient,
+		tokenRepo:     tokenRepo,
+		contractRepo:  contractRepo,
+		queries:       queries,
+		dbMu:          &sync.Mutex{},
+		stateMu:       &sync.Mutex{},
+		memoryMu:      &sync.Mutex{},
 
 		tokenBucket: env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"),
 
@@ -317,7 +314,7 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 	plugins := NewTransferPlugins(ctx)
 	enabledPlugins := []chan<- TransferPluginMsg{plugins.contracts.in}
 
-	statsID, err := i.queries.InsertStatistic(ctx, indexerdb.InsertStatisticParams{BlockStart: start, BlockEnd: start + blocksPerLogsCall})
+	statsID, err := i.queries.InsertStatistic(ctx, indexerdb.InsertStatisticParams{ID: persist.GenerateID(), BlockStart: start, BlockEnd: start + blocksPerLogsCall})
 	if err != nil {
 		panic(err)
 	}
@@ -359,7 +356,7 @@ func (i *indexer) startNewBlocksPipeline(ctx context.Context, topics [][]common.
 		return
 	}
 
-	statsID, err := i.queries.InsertStatistic(ctx, indexerdb.InsertStatisticParams{BlockStart: persist.BlockNumber(i.lastSyncedChunk), BlockEnd: persist.BlockNumber(mostRecentBlock - (i.mostRecentBlock % blocksPerLogsCall))})
+	statsID, err := i.queries.InsertStatistic(ctx, indexerdb.InsertStatisticParams{ID: persist.GenerateID(), BlockStart: persist.BlockNumber(i.lastSyncedChunk), BlockEnd: persist.BlockNumber(mostRecentBlock - (i.mostRecentBlock % blocksPerLogsCall))})
 	if err != nil {
 		panic(err)
 	}
@@ -891,7 +888,7 @@ type AlchemyContractMetadata struct {
 func fillContractFields(ctx context.Context, contracts []persist.Contract, queries *indexerdb.Queries, contractRepo persist.ContractRepository, httpClient *http.Client, ethClient *ethclient.Client, contractOwnerStats *sync.Map, upChan chan<- []persist.Contract, statsID persist.DBID) {
 	defer close(upChan)
 
-	innerPipelineStats := map[any]any{}
+	innerPipelineStats := map[persist.ContractOwnerMethod]any{}
 
 	contractsNotInDB := make(chan persist.Contract)
 

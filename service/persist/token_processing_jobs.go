@@ -104,6 +104,7 @@ type PipelineMetadata struct {
 	AnimationOpenseaFallback              PipelineStepStatus `json:"animation_opensea_fallback,omitempty"`
 	AnimationDetermineMediaTypeWithReader PipelineStepStatus `json:"animation_determine_media_type_with_reader,omitempty"`
 	AnimationAnimationGzip                PipelineStepStatus `json:"animation_animation_gzip,omitempty"`
+	AnimationSVGRasterize                 PipelineStepStatus `json:"animation_svg_rasterize,omitempty"`
 	AnimationStoreGCP                     PipelineStepStatus `json:"animation_store_gcp,omitempty"`
 	AnimationThumbnailGCP                 PipelineStepStatus `json:"animation_thumbnail_gcp,omitempty"`
 	AnimationLiveRenderGCP                PipelineStepStatus `json:"animation_live_render_gcp,omitempty"`
@@ -112,6 +113,7 @@ type PipelineMetadata struct {
 	ImageOpenseaFallback                  PipelineStepStatus `json:"image_opensea_fallback,omitempty"`
 	ImageDetermineMediaTypeWithReader     PipelineStepStatus `json:"image_determine_media_type_with_reader,omitempty"`
 	ImageAnimationGzip                    PipelineStepStatus `json:"image_animation_gzip,omitempty"`
+	ImageSVGRasterize                     PipelineStepStatus `json:"image_svg_rasterize,omitempty"`
 	ImageStoreGCP                         PipelineStepStatus `json:"image_store_gcp,omitempty"`
 	ImageThumbnailGCP                     PipelineStepStatus `json:"image_thumbnail_gcp,omitempty"`
 	ImageLiveRenderGCP                    PipelineStepStatus `json:"image_live_render_gcp,omitempty"`
@@ -120,6 +122,7 @@ type PipelineMetadata struct {
 	AlternateOpenseaFallback              PipelineStepStatus `json:"alternate_opensea_fallback,omitempty"`
 	AlternateDetermineMediaTypeWithReader PipelineStepStatus `json:"alternate_determine_media_type_with_reader,omitempty"`
 	AlternateAnimationGzip                PipelineStepStatus `json:"alternate_animation_gzip,omitempty"`
+	AlternateSVGRasterize                 PipelineStepStatus `json:"alternate_svg_rasterize,omitempty"`
 	AlternateStoreGCP                     PipelineStepStatus `json:"alternate_store_gcp,omitempty"`
 	AlternateThumbnailGCP                 PipelineStepStatus `json:"alternate_thumbnail_gcp,omitempty"`
 	AlternateLiveRenderGCP                PipelineStepStatus `json:"alternate_live_render_gcp,omitempty"`

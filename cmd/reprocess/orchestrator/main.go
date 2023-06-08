@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	totalJobs = 100
+	totalJobs = 1000
 )
 
 type jobRange struct {
@@ -42,7 +42,7 @@ func main() {
 
 	var totalTokenCount int
 
-	err := pg.QueryRow(ctx, fmt.Sprintf(`select count(*) from tokens %s;`, tokenprocessing.FullReprocessQuery)).Scan(&totalTokenCount)
+	err := pg.QueryRow(ctx, fmt.Sprintf(`select count(*) from tokens %s;`, tokenprocessing.SVGQuery)).Scan(&totalTokenCount)
 	if err != nil {
 		logrus.Errorf("error getting total token count: %v", err)
 		panic(err)
@@ -50,7 +50,7 @@ func main() {
 
 	limit := int(math.Ceil(float64(totalTokenCount) / float64(totalJobs)))
 
-	rows, err := pg.Query(ctx, fmt.Sprintf(`select tokens.id from tokens %s order by tokens.id;`, tokenprocessing.FullReprocessQuery))
+	rows, err := pg.Query(ctx, fmt.Sprintf(`select tokens.id from tokens %s order by tokens.id;`, tokenprocessing.SVGQuery))
 	if err != nil {
 		logrus.Errorf("error getting token ids: %v", err)
 		panic(err)

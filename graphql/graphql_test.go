@@ -166,7 +166,7 @@ func testSuggestedUsersForViewer(t *testing.T) {
 	userC := newUserFixture(t)
 	ctx := context.Background()
 	clients := server.ClientInit(ctx)
-	provider := server.NewMultichainProvider(clients)
+	provider, cleanup := server.NewMultichainProvider(ctx, server.SetDefaults)
 	recommender := newStubRecommender(t, []persist.DBID{
 		userA.ID,
 		userB.ID,
@@ -181,6 +181,10 @@ func testSuggestedUsersForViewer(t *testing.T) {
 	payload, _ := (*response.Viewer).(*viewerQueryViewer)
 	suggested := payload.GetSuggestedUsers().GetEdges()
 	assert.Len(t, suggested, 3)
+	t.Cleanup(func() {
+		clients.Close()
+		cleanup()
+	})
 }
 
 func testAddWallet(t *testing.T) {
@@ -486,7 +490,6 @@ func testUpdateUserExperiences(t *testing.T) {
 func testConnectSocialAccount(t *testing.T) {
 	userF := newUserFixture(t)
 	c := authedHandlerClient(t, userF.ID)
-	dc := defaultHandlerClient(t)
 
 	connectResp, err := connectSocialAccount(context.Background(), c, SocialAuthMechanism{
 		Debug: &DebugSocialAuth{
@@ -517,10 +520,13 @@ func testConnectSocialAccount(t *testing.T) {
 	assert.Equal(t, updateDisplayedPayload.Viewer.SocialAccounts.Twitter.Username, "test")
 	assert.False(t, updateDisplayedPayload.Viewer.SocialAccounts.Twitter.Display)
 
-	userResp, err := userByIdQuery(context.Background(), dc, userF.ID)
-	require.NoError(t, err)
-	userPayload := (*userResp.UserById).(*userByIdQueryUserByIdGalleryUser)
-	assert.Nil(t, userPayload.SocialAccounts.Twitter)
+	// For now, we're always returning the user's social accounts despite preference setting.
+	// If there's community significant pushback about this then we can reinstate the feature.
+	// dc := defaultHandlerClient(t)
+	// userResp, err := userByIdQuery(context.Background(), dc, userF.ID)
+	// require.NoError(t, err)
+	// userPayload := (*userResp.UserById).(*userByIdQueryUserByIdGalleryUser)
+	// assert.Nil(t, userPayload.SocialAccounts.Twitter)
 
 	disconnectResp, err := disconnectSocialAccount(context.Background(), c, SocialAccountTypeTwitter)
 	require.NoError(t, err)
@@ -1353,11 +1359,15 @@ func defaultTokenSettings(tokens []persist.DBID) []CollectionTokenSettingsInput 
 
 // defaultHandler returns a backend GraphQL http.Handler
 func defaultHandler(t *testing.T) http.Handler {
-	c := server.ClientInit(context.Background())
-	p := server.NewMultichainProvider(c)
+	ctx := context.Background()
+	c := server.ClientInit(ctx)
+	p, cleanup := server.NewMultichainProvider(ctx, server.SetDefaults)
 	r := newStubRecommender(t, []persist.DBID{})
 	handler := server.CoreInit(c, p, r)
-	t.Cleanup(c.Close)
+	t.Cleanup(func() {
+		c.Close()
+		cleanup()
+	})
 	return handler
 }
 
