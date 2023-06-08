@@ -484,6 +484,11 @@ type CollectionCreatedFeedEventData struct {
 
 func (CollectionCreatedFeedEventData) IsFeedEventData() {}
 
+type CollectionEdge struct {
+	Node   *Collection `json:"node"`
+	Cursor *string     `json:"cursor"`
+}
+
 type CollectionLayout struct {
 	Sections      []*int                     `json:"sections"`
 	SectionLayout []*CollectionSectionLayout `json:"sectionLayout"`
@@ -534,6 +539,11 @@ type CollectionUpdatedFeedEventData struct {
 }
 
 func (CollectionUpdatedFeedEventData) IsFeedEventData() {}
+
+type CollectionsConnection struct {
+	Edges    []*CollectionEdge `json:"edges"`
+	PageInfo *PageInfo         `json:"pageInfo"`
+}
 
 type CollectorsNoteAddedToCollectionFeedEventData struct {
 	EventTime         *time.Time      `json:"eventTime"`

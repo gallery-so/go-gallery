@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/mikeydub/go-gallery/util"
+	"math"
 	"strings"
 	"time"
 
@@ -102,36 +103,83 @@ func (api CollectionAPI) GetCollectionsByGalleryId(ctx context.Context, galleryI
 	return collections, nil
 }
 
-func (api CollectionAPI) GetTopCollectionsForCommunity(ctx context.Context, chainAddress persist.ChainAddress) ([]db.Collection, error) {
+func (api CollectionAPI) GetTopCollectionsForCommunity(ctx context.Context, chainAddress persist.ChainAddress, before, after *string, first, last *int) (c []db.Collection, pageInfo PageInfo, err error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"chainAddress": {chainAddress, "required"},
 	}); err != nil {
-		return nil, err
+		return nil, pageInfo, err
+	}
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
+		return nil, pageInfo, err
 	}
 
-	r := ranker{
-		Cache: redis.NewCache(redis.SearchCache),
-		Key:   fmt.Sprintf("top_collections_by_address:%d:%s", chainAddress.Chain(), chainAddress.Address()),
-		TTL:   time.Hour * 6,
-		CalcFunc: func(ctx context.Context) ([]persist.DBID, error) {
-			return api.queries.GetTopCollectionsForCommunity(ctx, db.GetTopCollectionsForCommunityParams{
-				Chain:   chainAddress.Chain(),
-				Address: chainAddress.Address(),
-			})
-		},
+	var collectionIDs []persist.DBID
+	var paginator positionPaginator
+
+	// If a cursor is provided, we can skip querying the cache
+	if before != nil {
+		if _, collectionIDs, err = paginator.decodeCursor(*before); err != nil {
+			return nil, pageInfo, err
+		}
+	} else if after != nil {
+		if _, collectionIDs, err = paginator.decodeCursor(*after); err != nil {
+			return nil, pageInfo, err
+		}
+		// No cursor provided, need to access the cache
+	} else {
+		r := ranker{
+			Cache: redis.NewCache(redis.SearchCache),
+			Key:   fmt.Sprintf("top_collections_by_address:%d:%s", chainAddress.Chain(), chainAddress.Address()),
+			TTL:   time.Hour * 6,
+			CalcFunc: func(ctx context.Context) ([]persist.DBID, error) {
+				return api.queries.GetTopCollectionsForCommunity(ctx, db.GetTopCollectionsForCommunityParams{
+					Chain:   chainAddress.Chain(),
+					Address: chainAddress.Address(),
+				})
+			},
+		}
+		if collectionIDs, err = r.loadRank(ctx); err != nil {
+			return nil, pageInfo, err
+		}
 	}
 
-	collectionIDs, err := r.loadRank(ctx)
-	if err != nil {
-		return nil, err
+	paginator.QueryFunc = func(params positionPagingParams) ([]any, error) {
+		cIDs, _ := util.Map(collectionIDs, func(id persist.DBID) (string, error) {
+			return id.String(), nil
+		})
+		c, err := api.queries.GetVisibleCollectionsByIDsPaginate(ctx, db.GetVisibleCollectionsByIDsPaginateParams{
+			CollectionIds: cIDs,
+			CurBeforePos:  params.CursorBeforePos,
+			CurAfterPos:   params.CursorAfterPos,
+			PagingForward: params.PagingForward,
+			Limit:         params.Limit,
+		})
+		a, _ := util.Map(c, func(c db.Collection) (any, error) {
+			return c, nil
+		})
+		return a, err
 	}
 
-	asStr, _ := util.Map(collectionIDs, func(id persist.DBID) (string, error) {
-		return id.String(), nil
+	posLookup := make(map[persist.DBID]int)
+	for i, id := range collectionIDs {
+		posLookup[id] = i + 1 // Postgres uses 1-based indexing
+	}
+
+	paginator.CursorFunc = func(node any) (int, []persist.DBID, error) {
+		return posLookup[node.(db.Collection).ID], collectionIDs, nil
+	}
+
+	// The collections are sorted by ascending rank so we need to switch the cursor positions
+	// so that the default before position (posiiton that comes after any other position) has the largest idx
+	// and the default after position (position that comes before any other position) has the smallest idx
+	results, pageInfo, err := paginator.paginate(before, after, first, last, positionOpts.WithStartingCursors(math.MaxInt32, -1))
+
+	c, _ = util.Map(results, func(r any) (db.Collection, error) {
+		return r.(db.Collection), nil
 	})
 
-	return api.queries.GetVisibleCollectionsByIDs(ctx, asStr)
+	return c, pageInfo, err
 }
 
 func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist.DBID, name string, collectorsNote string, tokens []persist.DBID, layout persist.TokenLayout, tokenSettings map[persist.DBID]persist.CollectionTokenSettings, caption *string) (*db.Collection, *db.FeedEvent, error) {

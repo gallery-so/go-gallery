@@ -1882,18 +1882,23 @@ func (r *queryResolver) SocialQueries(ctx context.Context) (model.SocialQueriesO
 }
 
 // TopCollectionsForCommunity is the resolver for the topCollectionsForCommunity field.
-func (r *queryResolver) TopCollectionsForCommunity(ctx context.Context, input model.TopCollectionsForCommunityInput) (*model.CommunitiesConnection, error) {
-	collections, err := publicapi.For(ctx).Collection.GetTopCollectionsForCommunity(ctx, *input.ChainAddress)
+func (r *queryResolver) TopCollectionsForCommunity(ctx context.Context, input model.TopCollectionsForCommunityInput, before *string, after *string, first *int, last *int) (*model.CollectionsConnection, error) {
+	collections, pageInfo, err := publicapi.For(ctx).Collection.GetTopCollectionsForCommunity(ctx, *input.ChainAddress, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}
 
-	cols := make([]*model.Collection, len(collections))
-	for i, c := range collections {
-		cols[i] = collectionToModel(ctx, c)
-	}
+	edges, _ := util.Map(collections, func(c coredb.Collection) (*model.CollectionEdge, error) {
+		return &model.CollectionEdge{
+			Node:   collectionToModel(ctx, c),
+			Cursor: nil,
+		}, nil
+	})
 
-	return cols, nil
+	return &model.CollectionsConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
 }
 
 // FeedEvent is the resolver for the feedEvent field.

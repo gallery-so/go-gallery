@@ -183,6 +183,11 @@ type ComplexityRoot struct {
 		Owner             func(childComplexity int) int
 	}
 
+	CollectionEdge struct {
+		Cursor func(childComplexity int) int
+		Node   func(childComplexity int) int
+	}
+
 	CollectionLayout struct {
 		SectionLayout func(childComplexity int) int
 		Sections      func(childComplexity int) int
@@ -211,6 +216,11 @@ type ComplexityRoot struct {
 		NewCollectorsNote func(childComplexity int) int
 		NewTokens         func(childComplexity int) int
 		Owner             func(childComplexity int) int
+	}
+
+	CollectionsConnection struct {
+		Edges    func(childComplexity int) int
+		PageInfo func(childComplexity int) int
 	}
 
 	CollectorsNoteAddedToCollectionFeedEventData struct {
@@ -829,7 +839,7 @@ type ComplexityRoot struct {
 		SocialConnections          func(childComplexity int, socialAccountType persist.SocialProvider, excludeAlreadyFollowing *bool, before *string, after *string, first *int, last *int) int
 		SocialQueries              func(childComplexity int) int
 		TokenByID                  func(childComplexity int, id persist.DBID) int
-		TopCollectionsForCommunity func(childComplexity int, input model.TopCollectionsForCommunityInput) int
+		TopCollectionsForCommunity func(childComplexity int, input model.TopCollectionsForCommunityInput, before *string, after *string, first *int, last *int) int
 		TrendingFeed               func(childComplexity int, before *string, after *string, first *int, last *int) int
 		TrendingUsers              func(childComplexity int, input model.TrendingUsersInput) int
 		UserByAddress              func(childComplexity int, chainAddress persist.ChainAddress) int
@@ -1482,7 +1492,7 @@ type QueryResolver interface {
 	UsersByRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) (*model.UsersConnection, error)
 	SocialConnections(ctx context.Context, socialAccountType persist.SocialProvider, excludeAlreadyFollowing *bool, before *string, after *string, first *int, last *int) (*model.SocialConnectionsConnection, error)
 	SocialQueries(ctx context.Context) (model.SocialQueriesOrError, error)
-	TopCollectionsForCommunity(ctx context.Context, input model.TopCollectionsForCommunityInput) (*model.CommunitiesConnection, error)
+	TopCollectionsForCommunity(ctx context.Context, input model.TopCollectionsForCommunityInput, before *string, after *string, first *int, last *int) (*model.CollectionsConnection, error)
 }
 type RemoveAdmirePayloadResolver interface {
 	FeedEvent(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.FeedEvent, error)
@@ -1904,6 +1914,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.CollectionCreatedFeedEventData.Owner(childComplexity), true
 
+	case "CollectionEdge.cursor":
+		if e.complexity.CollectionEdge.Cursor == nil {
+			break
+		}
+
+		return e.complexity.CollectionEdge.Cursor(childComplexity), true
+
+	case "CollectionEdge.node":
+		if e.complexity.CollectionEdge.Node == nil {
+			break
+		}
+
+		return e.complexity.CollectionEdge.Node(childComplexity), true
+
 	case "CollectionLayout.sectionLayout":
 		if e.complexity.CollectionLayout.SectionLayout == nil {
 			break
@@ -2008,6 +2032,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.CollectionUpdatedFeedEventData.Owner(childComplexity), true
+
+	case "CollectionsConnection.edges":
+		if e.complexity.CollectionsConnection.Edges == nil {
+			break
+		}
+
+		return e.complexity.CollectionsConnection.Edges(childComplexity), true
+
+	case "CollectionsConnection.pageInfo":
+		if e.complexity.CollectionsConnection.PageInfo == nil {
+			break
+		}
+
+		return e.complexity.CollectionsConnection.PageInfo(childComplexity), true
 
 	case "CollectorsNoteAddedToCollectionFeedEventData.action":
 		if e.complexity.CollectorsNoteAddedToCollectionFeedEventData.Action == nil {
@@ -4896,7 +4934,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.TopCollectionsForCommunity(childComplexity, args["input"].(model.TopCollectionsForCommunityInput)), true
+		return e.complexity.Query.TopCollectionsForCommunity(childComplexity, args["input"].(model.TopCollectionsForCommunityInput), args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
 	case "Query.trendingFeed":
 		if e.complexity.Query.TrendingFeed == nil {
@@ -7089,6 +7127,16 @@ type CollectionTokenSettings {
   renderLive: Boolean
 }
 
+type CollectionEdge {
+  node: Collection
+  cursor: String
+}
+
+type CollectionsConnection {
+  edges: [CollectionEdge]
+  pageInfo: PageInfo!
+}
+
 type Collection implements Node {
   id: ID!
   dbid: DBID!
@@ -7761,7 +7809,7 @@ type Query {
   ): SocialConnectionsConnection @goField(forceResolver: true) @authRequired
 
   socialQueries: SocialQueriesOrError @authRequired
-  topCollectionsForCommunity(input: topCollectionsForCommunityInput!): CommunitiesConnection
+  topCollectionsForCommunity(input: topCollectionsForCommunityInput!, before: String, after: String, first: Int, last:Int): CollectionsConnection
 }
 
 type SocialQueries {
@@ -10739,6 +10787,42 @@ func (ec *executionContext) field_Query_topCollectionsForCommunity_args(ctx cont
 		}
 	}
 	args["input"] = arg0
+	var arg1 *string
+	if tmp, ok := rawArgs["before"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
+		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["before"] = arg1
+	var arg2 *string
+	if tmp, ok := rawArgs["after"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
+		arg2, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["after"] = arg2
+	var arg3 *int
+	if tmp, ok := rawArgs["first"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
+		arg3, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["first"] = arg3
+	var arg4 *int
+	if tmp, ok := rawArgs["last"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("last"))
+		arg4, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["last"] = arg4
 	return args, nil
 }
 
@@ -13571,6 +13655,108 @@ func (ec *executionContext) fieldContext_CollectionCreatedFeedEventData_newColle
 	return fc, nil
 }
 
+func (ec *executionContext) _CollectionEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.CollectionEdge) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CollectionEdge_node(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Node, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Collection)
+	fc.Result = res
+	return ec.marshalOCollection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollection(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CollectionEdge_node(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CollectionEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Collection_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Collection_dbid(ctx, field)
+			case "version":
+				return ec.fieldContext_Collection_version(ctx, field)
+			case "name":
+				return ec.fieldContext_Collection_name(ctx, field)
+			case "collectorsNote":
+				return ec.fieldContext_Collection_collectorsNote(ctx, field)
+			case "gallery":
+				return ec.fieldContext_Collection_gallery(ctx, field)
+			case "layout":
+				return ec.fieldContext_Collection_layout(ctx, field)
+			case "hidden":
+				return ec.fieldContext_Collection_hidden(ctx, field)
+			case "tokens":
+				return ec.fieldContext_Collection_tokens(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Collection", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CollectionEdge_cursor(ctx context.Context, field graphql.CollectedField, obj *model.CollectionEdge) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CollectionEdge_cursor(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Cursor, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CollectionEdge_cursor(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CollectionEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _CollectionLayout_sections(ctx context.Context, field graphql.CollectedField, obj *model.CollectionLayout) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_CollectionLayout_sections(ctx, field)
 	if err != nil {
@@ -14338,6 +14524,111 @@ func (ec *executionContext) fieldContext_CollectionUpdatedFeedEventData_newToken
 				return ec.fieldContext_CollectionToken_tokenSettings(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type CollectionToken", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CollectionsConnection_edges(ctx context.Context, field graphql.CollectedField, obj *model.CollectionsConnection) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CollectionsConnection_edges(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Edges, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.CollectionEdge)
+	fc.Result = res
+	return ec.marshalOCollectionEdge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionEdge(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CollectionsConnection_edges(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CollectionsConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "node":
+				return ec.fieldContext_CollectionEdge_node(ctx, field)
+			case "cursor":
+				return ec.fieldContext_CollectionEdge_cursor(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type CollectionEdge", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CollectionsConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *model.CollectionsConnection) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CollectionsConnection_pageInfo(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PageInfo, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.PageInfo)
+	fc.Result = res
+	return ec.marshalNPageInfo2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPageInfo(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CollectionsConnection_pageInfo(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CollectionsConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "total":
+				return ec.fieldContext_PageInfo_total(ctx, field)
+			case "size":
+				return ec.fieldContext_PageInfo_size(ctx, field)
+			case "hasPreviousPage":
+				return ec.fieldContext_PageInfo_hasPreviousPage(ctx, field)
+			case "hasNextPage":
+				return ec.fieldContext_PageInfo_hasNextPage(ctx, field)
+			case "startCursor":
+				return ec.fieldContext_PageInfo_startCursor(ctx, field)
+			case "endCursor":
+				return ec.fieldContext_PageInfo_endCursor(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PageInfo", field.Name)
 		},
 	}
 	return fc, nil
@@ -33402,7 +33693,7 @@ func (ec *executionContext) _Query_topCollectionsForCommunity(ctx context.Contex
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().TopCollectionsForCommunity(rctx, fc.Args["input"].(model.TopCollectionsForCommunityInput))
+		return ec.resolvers.Query().TopCollectionsForCommunity(rctx, fc.Args["input"].(model.TopCollectionsForCommunityInput), fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -33411,9 +33702,9 @@ func (ec *executionContext) _Query_topCollectionsForCommunity(ctx context.Contex
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*model.CommunitiesConnection)
+	res := resTmp.(*model.CollectionsConnection)
 	fc.Result = res
-	return ec.marshalOCommunitiesConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunitiesConnection(ctx, field.Selections, res)
+	return ec.marshalOCollectionsConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionsConnection(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Query_topCollectionsForCommunity(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -33425,11 +33716,11 @@ func (ec *executionContext) fieldContext_Query_topCollectionsForCommunity(ctx co
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "edges":
-				return ec.fieldContext_CommunitiesConnection_edges(ctx, field)
+				return ec.fieldContext_CollectionsConnection_edges(ctx, field)
 			case "pageInfo":
-				return ec.fieldContext_CommunitiesConnection_pageInfo(ctx, field)
+				return ec.fieldContext_CollectionsConnection_pageInfo(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type CommunitiesConnection", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type CollectionsConnection", field.Name)
 		},
 	}
 	defer func() {
@@ -52355,6 +52646,35 @@ func (ec *executionContext) _CollectionCreatedFeedEventData(ctx context.Context,
 	return out
 }
 
+var collectionEdgeImplementors = []string{"CollectionEdge"}
+
+func (ec *executionContext) _CollectionEdge(ctx context.Context, sel ast.SelectionSet, obj *model.CollectionEdge) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, collectionEdgeImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CollectionEdge")
+		case "node":
+
+			out.Values[i] = ec._CollectionEdge_node(ctx, field, obj)
+
+		case "cursor":
+
+			out.Values[i] = ec._CollectionEdge_cursor(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var collectionLayoutImplementors = []string{"CollectionLayout"}
 
 func (ec *executionContext) _CollectionLayout(ctx context.Context, sel ast.SelectionSet, obj *model.CollectionLayout) graphql.Marshaler {
@@ -52590,6 +52910,38 @@ func (ec *executionContext) _CollectionUpdatedFeedEventData(ctx context.Context,
 				return innerFunc(ctx)
 
 			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var collectionsConnectionImplementors = []string{"CollectionsConnection"}
+
+func (ec *executionContext) _CollectionsConnection(ctx context.Context, sel ast.SelectionSet, obj *model.CollectionsConnection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, collectionsConnectionImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CollectionsConnection")
+		case "edges":
+
+			out.Values[i] = ec._CollectionsConnection_edges(ctx, field, obj)
+
+		case "pageInfo":
+
+			out.Values[i] = ec._CollectionsConnection_pageInfo(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -62196,6 +62548,54 @@ func (ec *executionContext) marshalOCollectionByIdOrError2ᚕgithubᚗcomᚋmike
 	return ret
 }
 
+func (ec *executionContext) marshalOCollectionEdge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionEdge(ctx context.Context, sel ast.SelectionSet, v []*model.CollectionEdge) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalOCollectionEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionEdge(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	return ret
+}
+
+func (ec *executionContext) marshalOCollectionEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionEdge(ctx context.Context, sel ast.SelectionSet, v *model.CollectionEdge) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._CollectionEdge(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOCollectionLayout2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionLayout(ctx context.Context, sel ast.SelectionSet, v *model.CollectionLayout) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -62311,6 +62711,13 @@ func (ec *executionContext) marshalOCollectionTokenSettings2ᚖgithubᚗcomᚋmi
 		return graphql.Null
 	}
 	return ec._CollectionTokenSettings(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOCollectionsConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionsConnection(ctx context.Context, sel ast.SelectionSet, v *model.CollectionsConnection) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._CollectionsConnection(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOComment2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐComment(ctx context.Context, sel ast.SelectionSet, v *model.Comment) graphql.Marshaler {

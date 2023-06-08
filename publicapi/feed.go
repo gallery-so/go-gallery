@@ -327,16 +327,12 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 			PagingForward: params.PagingForward,
 			Limit:         params.Limit,
 		})
-		if err != nil {
-			return nil, err
-		}
 
-		results := make([]interface{}, len(keys))
-		for i, key := range keys {
-			results[i] = key
-		}
+		results, _ := util.Map(keys, func(k db.FeedEvent) (any, error) {
+			return k, nil
+		})
 
-		return results, nil
+		return results, err
 	}
 
 	cursorFunc := func(node any) (int, []persist.DBID, error) {
@@ -348,10 +344,9 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 	paginator.CursorFunc = cursorFunc
 	results, pageInfo, err := paginator.paginate(before, after, first, last)
 
-	feedEvents := make([]db.FeedEvent, len(results))
-	for i, result := range results {
-		feedEvents[i] = result.(db.FeedEvent)
-	}
+	feedEvents, _ := util.Map(results, func(r any) (db.FeedEvent, error) {
+		return r.(db.FeedEvent), nil
+	})
 
 	return feedEvents, pageInfo, err
 }
@@ -402,7 +397,7 @@ func feedCursor(i interface{}) (time.Time, persist.DBID, error) {
 
 type ranker struct {
 	CalcFunc func(context.Context) ([]persist.DBID, error) // CalcFunc computes the results of a ranking and returns IDs in rank order
-	Cache    *redis.Cache                                  // Cache to store pre-computed results
+	Cache    *redis.Cache                                  // Cache to store pre-computed result
 	Key      string                                        // Cache key used to store and retrieve saved results
 	TTL      time.Duration                                 // The length of time before a cached result is considered to be stale
 }

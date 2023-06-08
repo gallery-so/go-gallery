@@ -1250,9 +1250,9 @@ ranking as (
 )
 select collections.id from collections join ranking using(id) where score <= 100 order by score asc;
 
--- name: GetVisibleCollectionsByIDs :many
+-- name: GetVisibleCollectionsByIDsPaginate :many
 select collections.*
-from collections, unnest(@collection_ids::varchar[]) with ordinality as x(id, ord)
-where collections.id = x.id and not deleted and not hidden
-order by x.ord asc
-limit 10;
+from collections, unnest(@collection_ids::varchar[]) with ordinality as t(id, pos)
+where collections.id = t.id and not deleted and not hidden and t.pos < @cur_before_pos::int and t.pos > @cur_after_pos::int
+order by case when @paging_forward::bool then t.pos end asc, case when not @paging_forward::bool then t.pos end desc
+limit $1;

@@ -4265,16 +4265,30 @@ func (q *Queries) GetUsersWithTrait(ctx context.Context, dollar_1 string) ([]Use
 	return items, nil
 }
 
-const getVisibleCollectionsByIDs = `-- name: GetVisibleCollectionsByIDs :many
+const getVisibleCollectionsByIDsPaginate = `-- name: GetVisibleCollectionsByIDsPaginate :many
 select collections.id, collections.deleted, collections.owner_user_id, collections.nfts, collections.version, collections.last_updated, collections.created_at, collections.hidden, collections.collectors_note, collections.name, collections.layout, collections.token_settings, collections.gallery_id
-from collections, unnest($1::varchar[]) with ordinality as x(id, ord)
-where collections.id = x.id and not deleted and not hidden
-order by x.ord asc
-limit 10
+from collections, unnest($2::varchar[]) with ordinality as t(id, pos)
+where collections.id = t.id and not deleted and not hidden and t.pos < $3::int and t.pos > $4::int
+order by case when $5::bool then t.pos end asc, case when not $5::bool then t.pos end desc
+limit $1
 `
 
-func (q *Queries) GetVisibleCollectionsByIDs(ctx context.Context, collectionIds []string) ([]Collection, error) {
-	rows, err := q.db.Query(ctx, getVisibleCollectionsByIDs, collectionIds)
+type GetVisibleCollectionsByIDsPaginateParams struct {
+	Limit         int32
+	CollectionIds []string
+	CurBeforePos  int32
+	CurAfterPos   int32
+	PagingForward bool
+}
+
+func (q *Queries) GetVisibleCollectionsByIDsPaginate(ctx context.Context, arg GetVisibleCollectionsByIDsPaginateParams) ([]Collection, error) {
+	rows, err := q.db.Query(ctx, getVisibleCollectionsByIDsPaginate,
+		arg.Limit,
+		arg.CollectionIds,
+		arg.CurBeforePos,
+		arg.CurAfterPos,
+		arg.PagingForward,
+	)
 	if err != nil {
 		return nil, err
 	}

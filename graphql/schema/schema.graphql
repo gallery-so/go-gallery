@@ -424,6 +424,16 @@ type CollectionTokenSettings {
   renderLive: Boolean
 }
 
+type CollectionEdge {
+  node: Collection
+  cursor: String
+}
+
+type CollectionsConnection {
+  edges: [CollectionEdge]
+  pageInfo: PageInfo!
+}
+
 type Collection implements Node {
   id: ID!
   dbid: DBID!
@@ -1096,7 +1106,7 @@ type Query {
   ): SocialConnectionsConnection @goField(forceResolver: true) @authRequired
 
   socialQueries: SocialQueriesOrError @authRequired
-  topCollectionsForCommunity(input: topCollectionsForCommunityInput!): CommunitiesConnection
+  topCollectionsForCommunity(input: topCollectionsForCommunityInput!, before: String, after: String, first: Int, last:Int): CollectionsConnection
 }
 
 type SocialQueries {
