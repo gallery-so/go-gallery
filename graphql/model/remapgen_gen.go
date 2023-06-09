@@ -133,6 +133,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"GenerateQRCodeLoginTokenPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(GenerateQRCodeLoginTokenPayloadOrError)
+		return obj, ok
+	},
+
 	"GetAuthNoncePayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(GetAuthNoncePayloadOrError)
 		return obj, ok
@@ -425,6 +430,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 
 	"UserByUsernameOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(UserByUsernameOrError)
+		return obj, ok
+	},
+
+	"VerifyEmailMagicLinkPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(VerifyEmailMagicLinkPayloadOrError)
 		return obj, ok
 	},
 

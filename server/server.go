@@ -30,20 +30,13 @@ import (
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain"
-	"github.com/mikeydub/go-gallery/service/multichain/alchemy"
-	"github.com/mikeydub/go-gallery/service/multichain/eth"
-	"github.com/mikeydub/go-gallery/service/multichain/infura"
-	"github.com/mikeydub/go-gallery/service/multichain/opensea"
-	"github.com/mikeydub/go-gallery/service/multichain/poap"
-	"github.com/mikeydub/go-gallery/service/multichain/tezos"
-	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
 	"github.com/mikeydub/go-gallery/service/recommend"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/rpc"
+	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/throttle"
@@ -62,8 +55,9 @@ func Init() {
 	logger.InitWithGCPDefaults()
 	initSentry()
 
-	c := ClientInit(context.Background())
-	provider := NewMultichainProvider(c)
+	ctx := context.Background()
+	c := ClientInit(ctx)
+	provider, _ := NewMultichainProvider(ctx, SetDefaults)
 	recommender := recommend.NewRecommender(c.Queries)
 	router := CoreInit(c, provider, recommender)
 	http.Handle("/", router)
@@ -94,11 +88,11 @@ func ClientInit(ctx context.Context) *Clients {
 	return &Clients{
 		Repos:           postgres.NewRepositories(pq, pgx),
 		Queries:         db.New(pgx),
-		HTTPClient:      &http.Client{Timeout: 10 * time.Minute},
+		HTTPClient:      &http.Client{Timeout: 0},
 		EthClient:       rpc.NewEthClient(),
-		IPFSClient:      rpc.NewIPFSShell(),
+		IPFSClient:      ipfs.NewShell(),
 		ArweaveClient:   rpc.NewArweaveClient(),
-		StorageClient:   media.NewStorageClient(ctx),
+		StorageClient:   rpc.NewStorageClient(ctx),
 		TaskClient:      task.NewClient(ctx),
 		SecretClient:    newSecretsClient(),
 		PubSubClient:    gcp.NewClient(ctx),
@@ -128,19 +122,15 @@ func CoreInit(c *Clients, provider *multichain.Provider, recommender *recommend.
 		validate.RegisterCustomValidators(v)
 	}
 
-	err := redis.ClearCache(redis.GalleriesDB)
-	if err != nil {
-		panic(err)
-	}
-
-	lock := redis.NewLockClient(redis.NotificationLockDB)
-	graphqlAPQCache := redis.NewCache(redis.GraphQLAPQ)
-	feedCache := redis.NewCache(redis.FeedDB)
-	socialCache := redis.NewCache(redis.SocialDB)
+	lock := redis.NewLockClient(redis.NewCache(redis.NotificationLockCache))
+	graphqlAPQCache := redis.NewCache(redis.GraphQLAPQCache)
+	feedCache := redis.NewCache(redis.FeedCache)
+	socialCache := redis.NewCache(redis.SocialCache)
+	authRefreshCache := redis.NewCache(redis.AuthTokenForceRefreshCache)
 
 	recommender.Run(context.Background(), time.NewTicker(time.Hour))
 
-	return handlersInit(router, c.Repos, c.Queries, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, socialCache, c.MagicLinkClient, recommender)
+	return handlersInit(router, c.Repos, c.Queries, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, socialCache, authRefreshCache, c.MagicLinkClient, recommender)
 }
 
 func newSecretsClient() *secretmanager.Client {
@@ -166,8 +156,11 @@ func newSecretsClient() *secretmanager.Client {
 func SetDefaults() {
 	viper.SetDefault("ENV", "local")
 	viper.SetDefault("ALLOWED_ORIGINS", "http://localhost:3000")
-	viper.SetDefault("JWT_SECRET", "Test-Secret")
-	viper.SetDefault("JWT_TTL", 60*60*24*14)
+	viper.SetDefault("REFRESH_JWT_SECRET", "Refresh-Test-Secret")
+	viper.SetDefault("REFRESH_JWT_TTL", 60*60*24*7*4)
+	viper.SetDefault("AUTH_JWT_SECRET", "Test-Secret")
+	viper.SetDefault("AUTH_JWT_TTL", 60*5)
+	viper.SetDefault("ONE_TIME_LOGIN_JWT_SECRET", "One-Time-Login-Test-Secret")
 	viper.SetDefault("PORT", 4000)
 	viper.SetDefault("POSTGRES_HOST", "0.0.0.0")
 	viper.SetDefault("POSTGRES_PORT", 5432)
@@ -222,6 +215,9 @@ func SetDefaults() {
 	viper.SetDefault("FEEDBOT_URL", "")
 	viper.SetDefault("GCLOUD_FEEDBOT_TASK_QUEUE", "projects/gallery-local/locations/here/queues/feedbot")
 	viper.SetDefault("ALCHEMY_API_URL", "")
+	viper.SetDefault("ALCHEMY_OPTIMISM_API_URL", "")
+	viper.SetDefault("ALCHEMY_POLYGON_API_URL", "")
+	viper.SetDefault("ALCHEMY_NFT_API_URL", "")
 	viper.SetDefault("INFURA_API_KEY", "")
 	viper.SetDefault("INFURA_API_SECRET", "")
 	viper.SetDefault("PUSH_NOTIFICATIONS_SECRET", "push-notifications-secret")
@@ -248,6 +244,9 @@ func SetDefaults() {
 		util.VarNotSetTo("RETOOL_AUTH_TOKEN", "TEST_TOKEN")
 		util.VarNotSetTo("BACKEND_SECRET", "BACKEND_SECRET")
 		util.VarNotSetTo("PUSH_NOTIFICATIONS_SECRET", "push-notifications-secret")
+		util.VarNotSetTo("REFRESH_JWT_SECRET", "Refresh-Test-Secret")
+		util.VarNotSetTo("AUTH_JWT_SECRET", "Test-Secret")
+		util.VarNotSetTo("ONE_TIME_LOGIN_JWT_SECRET", "One-Time-Login-Test-Secret")
 	}
 }
 
@@ -278,38 +277,6 @@ func initSentry() {
 	}
 }
 
-func NewMultichainProvider(c *Clients) *multichain.Provider {
-	ethChain := persist.ChainETH
-	overrides := multichain.ChainOverrideMap{persist.ChainPOAP: &ethChain, persist.ChainOptimism: &ethChain, persist.ChainPolygon: &ethChain}
-	alchemyMainnetProvider := alchemy.NewProvider(persist.ChainETH, c.HTTPClient)
-	infuraProvider := infura.NewProvider(c.HTTPClient)
-	failureEthProvider := multichain.SyncFailureFallbackProvider{Primary: infuraProvider, Fallback: alchemyMainnetProvider}
-
-	ethProvider := eth.NewProvider(env.GetString("INDEXER_HOST"), c.HTTPClient, c.EthClient, c.TaskClient)
-	alchemyOptimismProvider := alchemy.NewProvider(persist.ChainOptimism, c.HTTPClient)
-	alchemyPolygonProvider := alchemy.NewProvider(persist.ChainPolygon, c.HTTPClient)
-	openseaProvider := opensea.NewProvider(c.EthClient, c.HTTPClient)
-	tezosProvider := multichain.SyncWithContractEvalFallbackProvider{
-		Primary:  tezos.NewProvider(env.GetString("TEZOS_API_URL"), env.GetString("TOKEN_PROCESSING_URL"), env.GetString("IPFS_URL"), c.HTTPClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET")),
-		Fallback: tezos.NewObjktProvider(env.GetString("IPFS_URL")),
-		Eval: func(ctx context.Context, token multichain.ChainAgnosticToken) bool {
-			return tezos.IsSigned(ctx, token) && tezos.ContainsTezosKeywords(ctx, token)
-		},
-	}
-	poapProvider := poap.NewProvider(c.HTTPClient, env.GetString("POAP_API_KEY"), env.GetString("POAP_AUTH_TOKEN"))
-	cache := redis.NewCache(redis.CommunitiesDB)
-	return multichain.NewProvider(context.Background(), c.Repos, c.Queries, cache, c.TaskClient,
-		overrides,
-		failureEthProvider,
-		ethProvider,
-		openseaProvider,
-		tezosProvider,
-		poapProvider,
-		alchemyOptimismProvider,
-		alchemyPolygonProvider,
-	)
-}
-
 func newThrottler() *throttle.Locker {
-	return throttle.NewThrottleLocker(redis.NewCache(redis.RefreshNFTsThrottleDB), time.Minute*5)
+	return throttle.NewThrottleLocker(redis.NewCache(redis.RefreshNFTsThrottleCache), time.Minute*5)
 }

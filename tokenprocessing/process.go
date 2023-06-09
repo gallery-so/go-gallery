@@ -1,27 +1,22 @@
 package tokenprocessing
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
 	"time"
 
-	"github.com/ethereum/go-ethereum/ethclient"
-	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/sourcegraph/conc/pool"
 
-	"cloud.google.com/go/storage"
-	"github.com/everFinance/goar"
 	"github.com/gin-gonic/gin"
-	shell "github.com/ipfs/go-ipfs-api"
-	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/util"
@@ -30,15 +25,12 @@ import (
 )
 
 type ProcessMediaForTokenInput struct {
-	TokenID           persist.TokenID `json:"token_id" binding:"required"`
-	ContractAddress   persist.Address `json:"contract_address" binding:"required"`
-	Chain             persist.Chain   `json:"chain"`
-	OwnerAddress      persist.Address `json:"owner_address" binding:"required"`
-	ImageKeywords     []string        `json:"image_keywords" binding:"required"`
-	AnimationKeywords []string        `json:"animation_keywords" binding:"required"`
+	TokenID         persist.TokenID `json:"token_id" binding:"required"`
+	ContractAddress persist.Address `json:"contract_address" binding:"required"`
+	Chain           persist.Chain   `json:"chain"`
 }
 
-func processMediaForUsersTokensOfChain(mc *multichain.Provider, tokenRepo *postgres.TokenGalleryRepository, contractRepo *postgres.ContractGalleryRepository, walletRepo persist.WalletRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, throttler *throttle.Locker) gin.HandlerFunc {
+func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRepository, contractRepo *postgres.ContractGalleryRepository, throttler *throttle.Locker) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input task.TokenProcessingUserMessage
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -46,89 +38,83 @@ func processMediaForUsersTokensOfChain(mc *multichain.Provider, tokenRepo *postg
 			return
 		}
 
-		ctx := logger.NewContextWithFields(c, logrus.Fields{"userID": input.UserID})
+		reqCtx := logger.NewContextWithFields(c.Request.Context(), logrus.Fields{"userID": input.UserID})
 
-		if err := throttler.Lock(ctx, input.UserID.String()); err != nil {
-			// Reply with a non-200 status so that the message is tried again later on
-			util.ErrResponse(c, http.StatusTooManyRequests, err)
-			return
-		}
-		defer throttler.Unlock(ctx, input.UserID.String())
+		wp := pool.New().WithMaxGoroutines(50).WithErrors()
 
-		wp := pool.New().WithMaxGoroutines(50).WithContext(ctx)
+		logger.For(reqCtx).Infof("Processing Media: %s - Started (%d tokens)", input.UserID, len(input.TokenIDs))
+
 		for _, tokenID := range input.TokenIDs {
-			t, err := tokenRepo.GetByID(ctx, tokenID)
+
+			t, err := tokenRepo.GetByID(reqCtx, tokenID)
 			if err != nil {
-				logger.For(ctx).Errorf("failed to fetch tokenID=%s: %s", tokenID, err)
+				logger.For(reqCtx).Errorf("failed to fetch tokenID=%s: %s", tokenID, err)
 				continue
 			}
 
-			contract, err := contractRepo.GetByID(ctx, t.Contract)
+			contract, err := contractRepo.GetByID(reqCtx, t.Contract)
 			if err != nil {
-				logger.For(ctx).Errorf("Error getting contract: %s", err)
+				logger.For(reqCtx).Errorf("error getting contract: %s", err)
 			}
 
-			wp.Go(func(ctx context.Context) error {
-				key := fmt.Sprintf("%s-%s-%d", t.TokenID, contract.Address, t.Chain)
-				imageKeywords, animationKeywords := t.Chain.BaseKeywords()
-				err := processToken(ctx, key, t, contract, "", mc, ethClient, ipfsClient, arweaveClient, stg, tokenBucket, tokenRepo, imageKeywords, animationKeywords, false)
-				if err != nil {
+			lockID := tokenID.String()
 
-					logger.For(c).Errorf("Error processing token: %s", err)
-
+			wp.Go(func() error {
+				if err := throttler.Lock(reqCtx, lockID); err != nil {
+					logger.For(reqCtx).Warnf("failed to lock tokenID=%s: %s", tokenID, err)
 					return err
 				}
-				return nil
+				defer throttler.Unlock(reqCtx, lockID)
+				ctx := sentryutil.NewSentryHubContext(reqCtx)
+				_, err := tp.ProcessTokenPipeline(ctx, t, contract, persist.ProcessingCauseSync)
+				return err
 			})
 		}
 
 		wp.Wait()
-		logger.For(ctx).Infof("Processing Media: %s - Finished", input.UserID)
+		logger.For(reqCtx).Infof("Processing Media: %s - Finished", input.UserID)
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
 
-func processMediaForToken(mc *multichain.Provider, tokenRepo *postgres.TokenGalleryRepository, contractRepo *postgres.ContractGalleryRepository, userRepo *postgres.UserRepository, walletRepo *postgres.WalletRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, throttler *throttle.Locker) gin.HandlerFunc {
+func processMediaForToken(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRepository, contractRepo persist.ContractGalleryRepository, userRepo *postgres.UserRepository, walletRepo *postgres.WalletRepository, throttler *throttle.Locker) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input ProcessMediaForTokenInput
 		if err := c.ShouldBindJSON(&input); err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
-		key := fmt.Sprintf("%s-%s-%d", input.TokenID, input.ContractAddress, input.Chain)
-		if err := throttler.Lock(c, key); err != nil {
+
+		reqCtx := c.Request.Context()
+
+		lockID := fmt.Sprintf("%s-%s-%d", input.TokenID, input.ContractAddress, input.Chain)
+
+		if err := throttler.Lock(reqCtx, lockID); err != nil {
 			util.ErrResponse(c, http.StatusTooManyRequests, err)
 			return
 		}
-		defer throttler.Unlock(c, key)
+		defer throttler.Unlock(reqCtx, lockID)
 
-		wallet, err := walletRepo.GetByChainAddress(c, persist.NewChainAddress(input.OwnerAddress, input.Chain))
+		var token persist.TokenGallery
+		tokens, err := tokenRepo.GetByTokenIdentifiers(reqCtx, input.TokenID, input.ContractAddress, input.Chain, 1, 0)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+		if len(tokens) == 0 {
+			util.ErrResponse(c, http.StatusNotFound, fmt.Errorf("token not found by identifiers"))
+			return
+		}
+		token = tokens[0]
+
+		contract, err := contractRepo.GetByID(reqCtx, token.Contract)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
-		user, err := userRepo.GetByWalletID(c, wallet.ID)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-
-		ctx := logger.NewContextWithFields(c, logrus.Fields{"userID": user.ID})
-
-		t, err := tokenRepo.GetByFullIdentifiers(ctx, input.TokenID, input.ContractAddress, input.Chain, user.ID)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-
-		contract, err := contractRepo.GetByID(ctx, t.Contract)
-		if err != nil {
-			logger.For(ctx).Errorf("Error getting contract: %s", err)
-		}
-
-		err = processToken(ctx, key, t, contract, input.OwnerAddress, mc, ethClient, ipfsClient, arweaveClient, stg, tokenBucket, tokenRepo, input.ImageKeywords, input.AnimationKeywords, true)
+		_, err = tp.ProcessTokenPipeline(reqCtx, token, contract, persist.ProcessingCauseRefresh)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -136,83 +122,6 @@ func processMediaForToken(mc *multichain.Provider, tokenRepo *postgres.TokenGall
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
-}
-
-func processToken(c context.Context, key string, t persist.TokenGallery, contract persist.ContractGallery, ownerAddress persist.Address, mc *multichain.Provider, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, tokenRepo *postgres.TokenGalleryRepository, imageKeywords, animationKeywords []string, forceRefresh bool) error {
-	// runID is a unique ID for this run of the pipeline
-	runID := persist.GenerateID()
-
-	loggerCtx := logger.NewContextWithFields(c, logrus.Fields{
-		"tokenDBID":       t.ID,
-		"tokenID":         t.TokenID,
-		"contractDBID":    t.Contract,
-		"contractAddress": contract.Address,
-		"chain":           t.Chain,
-		"runID":           runID,
-	})
-	totalTime := time.Now()
-	ctx, cancel := context.WithTimeout(loggerCtx, time.Minute*10)
-	defer cancel()
-
-	newMetadata := t.TokenMetadata
-
-	if len(newMetadata) == 0 || forceRefresh {
-		mcMetadata, err := mc.GetTokenMetadataByTokenIdentifiers(ctx, contract.Address, t.TokenID, ownerAddress, t.Chain)
-		if err != nil {
-			logger.For(ctx).Errorf("error getting metadata from chain: %s", err)
-		} else if mcMetadata != nil && len(mcMetadata) > 0 {
-			logger.For(ctx).Infof("got metadata from chain: %v", mcMetadata)
-			newMetadata = mcMetadata
-		}
-	}
-
-	image, animation := media.KeywordsForChain(t.Chain, imageKeywords, animationKeywords)
-
-	name, description := media.FindNameAndDescription(ctx, newMetadata)
-
-	if name == "" {
-		name = t.Name.String()
-	}
-
-	if description == "" {
-		description = t.Description.String()
-	}
-
-	totalTimeOfMedia := time.Now()
-	newMedia, err := media.MakePreviewsForMetadata(ctx, newMetadata, contract.Address, persist.TokenID(t.TokenID.String()), t.TokenURI, t.Chain, ipfsClient, arweaveClient, stg, tokenBucket, image, animation)
-	if err != nil {
-		logger.For(ctx).Errorf("error processing media for %s: %s", key, err)
-		isSpam := contract.IsProviderMarkedSpam || util.GetOptionalValue(t.IsProviderMarkedSpam, false) || util.GetOptionalValue(t.IsUserMarkedSpam, false)
-		reportTokenError(ctx, err, runID, t.Chain, contract.Address, t.TokenID, isSpam)
-		if newMedia.MediaType != persist.MediaTypeInvalid {
-			newMedia = persist.Media{
-				MediaType: persist.MediaTypeUnknown,
-			}
-		}
-	}
-	logger.For(ctx).Infof("processing media took %s", time.Since(totalTimeOfMedia))
-
-	// Don't replace existing usable media if tokenprocessing failed to get new media
-	// In the near future we will establish this state explicitly in the DB or in logs
-	if t.Media.IsServable() && !newMedia.IsServable() {
-		logger.For(ctx).Debugf("not replacing existing media for %s: cur %v new %v", key, t.Media.IsServable(), newMedia.IsServable())
-		return nil
-	}
-
-	up := persist.TokenUpdateAllURIDerivedFieldsInput{
-		Media:       newMedia,
-		Metadata:    newMetadata,
-		Name:        persist.NullString(name),
-		Description: persist.NullString(description),
-		LastUpdated: persist.LastUpdatedTime{},
-	}
-	if err := tokenRepo.UpdateByTokenIdentifiersUnsafe(ctx, t.TokenID, contract.Address, t.Chain, up); err != nil {
-		logger.For(ctx).Errorf("error updating media for %s-%s-%d: %s", t.TokenID, contract.Address, t.Chain, err)
-		return err
-	}
-
-	logger.For(ctx).Infof("total processing took %s", time.Since(totalTime))
-	return nil
 }
 
 func processOwnersForContractTokens(mc *multichain.Provider, contractRepo *postgres.ContractGalleryRepository, throttler *throttle.Locker) gin.HandlerFunc {
@@ -227,29 +136,30 @@ func processOwnersForContractTokens(mc *multichain.Provider, contractRepo *postg
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
-		key := fmt.Sprintf("%s-%d", contract.Address, contract.Chain)
+
+		lockID := fmt.Sprintf("%s-%d", contract.Address, contract.Chain)
 
 		if !input.ForceRefresh {
-			if err := throttler.Lock(c, key); err != nil {
+			if err := throttler.Lock(c, lockID); err != nil {
 				util.ErrResponse(c, http.StatusOK, err)
 				return
 			}
 		}
 
 		// do not unlock, let expiry handle the unlock
-		logger.For(c).Infof("Processing: %s - Processing Collection Refresh", key)
+		logger.For(c).Infof("Processing: %s - Processing Collection Refresh", lockID)
 		if err := mc.RefreshTokensForContract(c, contract.ContractIdentifiers()); err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
-		logger.For(c).Infof("Processing: %s - Finished Processing Collection Refresh", key)
+		logger.For(c).Infof("Processing: %s - Finished Processing Collection Refresh", lockID)
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
 
 // detectSpamContracts refreshes the alchemy_spam_contracts table with marked contracts from Alchemy
-func detectSpamContracts(queries *db.Queries) gin.HandlerFunc {
+func detectSpamContracts(queries *coredb.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		alchemyURL, err := url.Parse(env.GetString("ALCHEMY_NFT_API_URL"))
 		if err != nil {
@@ -289,7 +199,7 @@ func detectSpamContracts(queries *db.Queries) gin.HandlerFunc {
 			return
 		}
 
-		params := db.InsertSpamContractsParams{}
+		params := coredb.InsertSpamContractsParams{}
 
 		now := time.Now()
 

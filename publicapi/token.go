@@ -3,7 +3,6 @@ package publicapi
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -329,19 +328,7 @@ func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) er
 		return fmt.Errorf("failed to load contract for token: %w", err)
 	}
 
-	addresses := []persist.Address{}
-	for _, walletID := range token.OwnedByWallets {
-		wa, err := api.loaders.WalletByWalletID.Load(walletID)
-		if err != nil {
-			if strings.Contains(err.Error(), "no rows in result set") {
-				continue
-			}
-			return fmt.Errorf("failed to load wallet %s: %w", walletID, err)
-		}
-		addresses = append(addresses, wa.Address)
-	}
-
-	err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(contract.Address, token.TokenID, contract.Chain), addresses)
+	err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(contract.Address, token.TokenID, contract.Chain))
 	if err != nil {
 		return ErrTokenRefreshFailed{Message: err.Error()}
 	}
@@ -388,17 +375,7 @@ func (api TokenAPI) RefreshCollection(ctx context.Context, collectionDBID persis
 				return
 			}
 
-			addresses := []persist.Address{}
-			for _, walletID := range token.OwnedByWallets {
-				wa, err := api.loaders.WalletByWalletID.Load(walletID)
-				if err != nil {
-					errChan <- err
-					return
-				}
-				addresses = append(addresses, wa.Address)
-			}
-
-			err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(contract.Address, token.TokenID, contract.Chain), addresses)
+			err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(contract.Address, token.TokenID, contract.Chain))
 			if err != nil {
 				errChan <- ErrTokenRefreshFailed{Message: err.Error()}
 				return
@@ -484,4 +461,15 @@ func (api TokenAPI) SetSpamPreference(ctx context.Context, tokens []persist.DBID
 	}
 
 	return api.repos.TokenRepository.FlagTokensAsUserMarkedSpam(ctx, userID, tokens, isSpam)
+}
+
+func (api TokenAPI) MediaByTokenID(ctx context.Context, tokenID persist.DBID) (db.TokenMedia, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"tokenID": {tokenID, "required"},
+	}); err != nil {
+		return db.TokenMedia{}, err
+	}
+
+	return api.loaders.MediaByTokenID.Load(tokenID)
 }

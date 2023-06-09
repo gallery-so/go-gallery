@@ -21,6 +21,13 @@ SELECT * FROM users WHERE username_idempotent = lower(sqlc.arg('username')) AND 
 -- name: GetUserByUsernameBatch :batchone
 SELECT * FROM users WHERE username_idempotent = lower($1) AND deleted = false;
 
+-- name: GetUserByVerifiedEmailAddress :one
+select u.* from users u join pii.for_users p on u.id = p.user_id
+where p.pii_email_address = lower($1)
+  and u.email_verified != 0
+  and p.deleted = false
+  and u.deleted = false;
+
 -- name: GetUserByAddressBatch :batchone
 select users.*
 from users, wallets
@@ -581,14 +588,14 @@ UPDATE notifications SET seen = true WHERE owner_id = $1 AND seen = false RETURN
 -- name: PaginateInteractionsByFeedEventIDBatch :batchmany
 SELECT interactions.created_At, interactions.id, interactions.tag FROM (
     SELECT t.created_at, t.id, sqlc.arg('admire_tag')::int as tag FROM admires t WHERE sqlc.arg('admire_tag') != 0 AND t.feed_event_id = sqlc.arg('feed_event_id') AND t.deleted = false
-        AND (t.created_at, t.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (t.created_at, t.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+        AND (sqlc.arg('admire_tag'), t.created_at, t.id) < (sqlc.arg('cur_before_tag')::int, sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (sqlc.arg('admire_tag'), t.created_at, t.id) > (sqlc.arg('cur_after_tag')::int, sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
                                                                     UNION
     SELECT t.created_at, t.id, sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.arg('comment_tag') != 0 AND t.feed_event_id = sqlc.arg('feed_event_id') AND t.deleted = false
-        AND (t.created_at, t.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (t.created_at, t.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+        AND (sqlc.arg('comment_tag'), t.created_at, t.id) < (sqlc.arg('cur_before_tag')::int, sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (sqlc.arg('comment_tag'), t.created_at, t.id) > (sqlc.arg('cur_after_tag')::int, sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
 ) as interactions
 
-ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
-         CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
+ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (tag, created_at, id) END ASC,
+         CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (tag, created_at, id) END DESC
 LIMIT sqlc.arg('limit');
 
 -- name: CountInteractionsByFeedEventIDBatch :batchmany
@@ -679,21 +686,20 @@ on conflict (user_id, role) do update set deleted = false, last_updated = now();
 update user_roles set deleted = true, last_updated = now() where user_id = $1 and role = any(@roles);
 
 -- name: GetUserRolesByUserId :many
-select role from user_roles where user_id = $1 and deleted = false
+with membership_roles(role) as (
+    select (case when exists(
+        select 1
+        from tokens
+        where owner_user_id = @user_id
+            and token_id = any(@membership_token_ids::varchar[])
+            and contract = (select id from contracts where address = @membership_address and contracts.chain = @chain and contracts.deleted = false)
+            and exists(select 1 from users where id = @user_id and email_verified = 1 and deleted = false)
+            and deleted = false
+    ) then @granted_membership_role else null end)::varchar
+)
+select role from user_roles where user_id = @user_id and deleted = false
 union
-select role from (
-  select
-    case when exists(
-      select 1
-      from tokens
-      where owner_user_id = $1
-        and token_id = any(@membership_token_ids::varchar[])
-        and contract = (select id from contracts where address = @membership_address and contracts.chain = @chain and contracts.deleted = false)
-        and exists(select 1 from users where id = $1 and email_verified = 1 and deleted = false)
-        and deleted = false
-      )
-      then @granted_membership_role else null end as role
-) r where role is not null;
+select role from membership_roles where role is not null;
 
 -- name: RedeemMerch :one
 update merch set redeemed = true, token_id = @token_hex, last_updated = now() where id = (select m.id from merch m where m.object_type = @object_type and m.token_id is null and m.redeemed = false and m.deleted = false order by m.id limit 1) and token_id is null and redeemed = false returning discount_code;
@@ -726,7 +732,7 @@ update galleries set collections = @collections, last_updated = now() where gall
 update users set featured_gallery = @gallery_id, last_updated = now() from galleries where users.id = @user_id and galleries.id = @gallery_id and galleries.owner_user_id = @user_id and galleries.deleted = false;
 
 -- name: GetGalleryTokenMediasByGalleryID :many
-select t.media from tokens t, collections c, galleries g where g.id = $1 and c.id = any(g.collections) and t.id = any(c.nfts) and t.deleted = false and g.deleted = false and c.deleted = false and (length(t.media->>'thumbnail_url'::varchar) > 0 or length(t.media->>'media_url'::varchar) > 0) order by array_position(g.collections, c.id),array_position(c.nfts, t.id) limit $2;
+select m.media from tokens t, collections c, galleries g, token_medias m where g.id = $1 and c.id = any(g.collections) and t.id = any(c.nfts) and t.deleted = false and g.deleted = false and c.deleted = false and (length(t.media->>'thumbnail_url'::varchar) > 0 or length(t.media->>'media_url'::varchar) > 0) and t.token_media_id = m.id and m.deleted = false and m.active order by array_position(g.collections, c.id),array_position(c.nfts, t.id) limit $2;
 
 -- name: GetTokenByTokenIdentifiers :one
 select * from tokens where tokens.token_id = @token_hex and contract = (select contracts.id from contracts where contracts.address = @contract_address) and tokens.chain = @chain and tokens.deleted = false;
@@ -871,7 +877,6 @@ from (select unnest(@social_ids::varchar[]) as social_id, unnest(@social_usernam
 where case when @only_unfollowing::bool then f.id is null else true end
 order by (f.id is not null,user_view.created_at,user_view.id);
 
-
 -- name: CountSocialConnections :one
 select count(*)
 from (select unnest(@social_ids::varchar[]) as social_id) as s
@@ -1010,6 +1015,93 @@ insert into users (id, username, username_idempotent, bio, wallets, universal, e
 -- name: AddWalletToUserByID :exec
 update users set wallets = array_append(wallets, @wallet_id::varchar) where id = @user_id;
 
+-- name: IsExistsActiveTokenMediaByTokenIdentifers :one
+select exists(select 1 from token_medias where token_medias.contract_id = $1 and token_medias.token_id = $2 and token_medias.chain = $3 and active = true and deleted = false);
+
+-- name: InsertTokenPipelineResults :exec
+with insert_job(id) as (
+    insert into token_processing_jobs (id, token_properties, pipeline_metadata, processing_cause, processor_version)
+    values (@processing_job_id, @token_properties, @pipeline_metadata, @processing_cause, @processor_version)
+    returning id
+),
+-- Optionally create an inactive record of the existing active record if the new media is also active
+insert_media_move_active_record(last_updated) as (
+    insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
+    (
+        select @copy_media_id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, now()
+        from token_medias
+        where contract_id = @contract_id
+            and token_id = @token_id
+            and chain = @chain
+            and active
+            and not deleted
+            and @active = true
+        limit 1
+    )
+    returning last_updated
+),
+-- Update the existing active record with the new media data
+insert_media_add_record(insert_id, active, is_new) as (
+    insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
+    values (@new_media_id, @contract_id, @token_id, @chain, @metadata, @media, @name, @description, (select id from insert_job), @active,
+        -- Using timestamps generated from insert_media_move_active_record ensures that the new record is only inserted after the current media is moved
+        (select coalesce((select last_updated from insert_media_move_active_record), now())),
+        (select coalesce((select last_updated from insert_media_move_active_record), now()))
+    )
+    on conflict (contract_id, token_id, chain) where active and not deleted do update
+        set metadata = excluded.metadata,
+            media = excluded.media,
+            name = excluded.name,
+            description = excluded.description,
+            processing_job_id = excluded.processing_job_id,
+            last_updated = now()
+    returning id as insert_id, active, id = @new_media_id is_new
+),
+-- This will return the existing active record if it exists. If the incoming record is active,
+-- this will still return the active record before the update, and not the new record.
+existing_active(id) as (
+    select id
+    from token_medias
+    where chain = @chain and contract_id = @contract_id and token_id = @token_id and active and not deleted
+    limit 1
+)
+update tokens
+set token_media_id = (
+    case
+        -- The pipeline didn't produce active media, but one already exists so use that one
+        when not insert_medias.active and (select id from existing_active) is not null
+        then (select id from existing_active)
+
+        -- The pipeline produced active media, or didn't produce active media but no active media existed before
+        else insert_medias.insert_id
+    end
+)
+from insert_media_add_record insert_medias
+where
+    tokens.chain = @chain
+    and tokens.contract = @contract_id
+    and tokens.token_id = @token_id
+    and not tokens.deleted
+    and (
+        -- The case statement below handles which token instances get updated:
+        case
+            -- If the active media already existed, update tokens that have no media (new tokens that haven't been processed before) or tokens that don't use this media yet
+            when insert_medias.active and not insert_medias.is_new
+            then (tokens.token_media_id is null or tokens.token_media_id != insert_medias.insert_id)
+
+            -- Brand new active media, update all tokens in the filter to use this media
+            when insert_medias.active and insert_medias.is_new
+            then 1 = 1
+
+            -- The pipeline run produced inactive media, only update the token instance (since it may have not been processed before)
+            -- Since there is no db constraint on inactive media, all inactive media is new
+            when not insert_medias.active
+            then tokens.id = @token_dbid
+
+            else 1 = 1
+        end
+    );
+
 -- name: InsertSpamContracts :exec
 with insert_spam_contracts as (
     insert into alchemy_spam_contracts (id, chain, address, created_at, is_spam) (
@@ -1039,7 +1131,7 @@ select * from push_notification_tokens where user_id = @user_id and deleted = fa
 select t.* from unnest(@ids::text[]) ids join push_notification_tokens t on t.id = ids and t.deleted = false;
 
 -- name: CreatePushTickets :exec
-insert into push_notification_tickets (id, push_token_id, ticket_id, created_at, check_after, num_check_attempts, deleted) values
+insert into push_notification_tickets (id, push_token_id, ticket_id, created_at, check_after, num_check_attempts, status, deleted) values
   (
    unnest(@ids::text[]),
    unnest(@push_token_ids::text[]),
@@ -1047,14 +1139,121 @@ insert into push_notification_tickets (id, push_token_id, ticket_id, created_at,
    now(),
    now() + interval '15 minutes',
    0,
+   'pending',
    false
   );
 
 -- name: UpdatePushTickets :exec
 with updates as (
-    select unnest(@ids::text[]) as id, unnest(@check_after::timestamptz[]) as check_after, unnest(@num_check_attempts::int[]) as num_check_attempts, unnest(@deleted::bool[]) as deleted
+    select unnest(@ids::text[]) as id, unnest(@check_after::timestamptz[]) as check_after, unnest(@num_check_attempts::int[]) as num_check_attempts, unnest(@status::text[]) as status, unnest(@deleted::bool[]) as deleted
 )
-update push_notification_tickets t set check_after = updates.check_after, num_check_attempts = updates.num_check_attempts, deleted = updates.deleted from updates where t.id = updates.id and t.deleted = false;
+update push_notification_tickets t set check_after = updates.check_after, num_check_attempts = updates.num_check_attempts, status = updates.status, deleted = updates.deleted from updates where t.id = updates.id and t.deleted = false;
 
 -- name: GetCheckablePushTickets :many
 select * from push_notification_tickets where check_after <= now() and deleted = false limit sqlc.arg('limit');
+
+-- name: GetAllTokensWithContractsByIDs :many
+SELECT
+    tokens.*,
+    contracts.*,
+    (
+        SELECT wallets.address
+        FROM wallets
+        WHERE wallets.id = ANY(tokens.owned_by_wallets) and wallets.deleted = false
+        LIMIT 1
+    ) AS wallet_address
+FROM tokens
+JOIN contracts ON contracts.id = tokens.contract
+LEFT JOIN token_medias on token_medias.id = tokens.token_media_id
+WHERE tokens.deleted = false
+AND (tokens.token_media_id IS NULL or token_medias.active = false)
+AND tokens.id >= @start_id AND tokens.id < @end_id
+ORDER BY tokens.id;
+
+-- name: GetMissingThumbnailTokensByIDRange :many
+SELECT
+    tokens.*,
+    contracts.*,
+    (
+        SELECT wallets.address
+        FROM wallets
+        WHERE wallets.id = ANY(tokens.owned_by_wallets) and wallets.deleted = false
+        LIMIT 1
+    ) AS wallet_address
+FROM tokens
+JOIN contracts ON contracts.id = tokens.contract
+left join token_medias on tokens.token_media_id = token_medias.id where tokens.deleted = false and token_medias.active = true and token_medias.media->>'media_type' = 'html' and (token_medias.media->>'thumbnail_url' is null or token_medias.media->>'thumbnail_url' = '')
+AND tokens.id >= @start_id AND tokens.id < @end_id
+ORDER BY tokens.id;
+
+-- name: GetSVGTokensWithContractsByIDs :many
+SELECT
+    tokens.*,
+    contracts.*,
+    (
+        SELECT wallets.address
+        FROM wallets
+        WHERE wallets.id = ANY(tokens.owned_by_wallets) and wallets.deleted = false
+        LIMIT 1
+    ) AS wallet_address
+FROM tokens
+JOIN contracts ON contracts.id = tokens.contract
+LEFT JOIN token_medias on token_medias.id = tokens.token_media_id
+WHERE tokens.deleted = false
+AND token_medias.active = true
+AND token_medias.media->>'media_type' = 'svg'
+AND tokens.id >= @start_id AND tokens.id < @end_id
+ORDER BY tokens.id;
+
+-- name: GetReprocessJobRangeByID :one
+select * from reprocess_jobs where id = $1;
+
+-- name: GetMediaByTokenID :batchone
+select m.*
+from token_medias m
+where m.id = (select token_media_id from tokens where tokens.id = $1) and m.active and not m.deleted;
+
+-- name: UpsertSession :one
+insert into sessions (id, user_id,
+                      created_at, created_with_user_agent, created_with_platform, created_with_os,
+                      last_refreshed, last_user_agent, last_platform, last_os, current_refresh_id, active_until, invalidated, last_updated, deleted)
+    values (@id, @user_id, now(), @user_agent, @platform, @os, now(), @user_agent, @platform, @os, @current_refresh_id, @active_until, false, now(), false)
+    on conflict (id) where deleted = false do update set
+        last_refreshed = case when sessions.invalidated then sessions.last_refreshed else excluded.last_refreshed end,
+        last_user_agent = case when sessions.invalidated then sessions.last_user_agent else excluded.last_user_agent end,
+        last_platform = case when sessions.invalidated then sessions.last_platform else excluded.last_platform end,
+        last_os = case when sessions.invalidated then sessions.last_os else excluded.last_os end,
+        current_refresh_id = case when sessions.invalidated then sessions.current_refresh_id else excluded.current_refresh_id end,
+        last_updated = case when sessions.invalidated then sessions.last_updated else excluded.last_updated end,
+        active_until = case when sessions.invalidated then sessions.active_until else greatest(sessions.active_until, excluded.active_until) end
+    returning *;
+
+-- name: InvalidateSession :exec
+update sessions set invalidated = true, active_until = least(active_until, now()), last_updated = now() where id = @id and deleted = false and invalidated = false;
+
+-- name: UpdateTokenMetadataFieldsByTokenIdentifiers :exec
+update tokens set name = @name, description = @description, last_updated = now() where token_id = @token_id and contract = (select id from contracts where address = @contract_address) and deleted = false;
+
+-- name: GetTopCollectionsForCommunity :many
+with contract_tokens as (
+	select t.id, t.owner_user_id
+	from tokens t
+	join contracts c on t.contract = c.id
+	where not t.deleted and not c.deleted and t.contract = c.id and c.chain = $1 and c.address = $2
+),
+ranking as (
+	select col.id, rank() over (order by count(col.id) desc, col.created_at desc) score
+	from collections col
+	join contract_tokens on col.owner_user_id = contract_tokens.owner_user_id and contract_tokens.id = any(col.nfts)
+	join users on col.owner_user_id = users.id
+	where not col.deleted and not col.hidden and not users.deleted
+	group by col.id
+)
+select collections.id from collections join ranking using(id) where score <= 100 order by score asc;
+
+-- name: GetVisibleCollectionsByIDsPaginate :many
+select collections.*
+from collections, unnest(@collection_ids::varchar[]) with ordinality as t(id, pos)
+where collections.id = t.id and not deleted and not hidden and t.pos < @cur_before_pos::int and t.pos > @cur_after_pos::int
+order by case when @paging_forward::bool then t.pos end asc, case when not @paging_forward::bool then t.pos end desc
+limit $1;

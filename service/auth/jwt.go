@@ -2,88 +2,183 @@ package auth
 
 import (
 	"context"
-	"net/http"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
-	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-type jwtClaims struct {
+type TokenType string
+
+const (
+	TokenTypeAuth              TokenType = "auth"
+	TokenTypeRefresh           TokenType = "refresh"
+	TokenTypeOneTimeLogin      TokenType = "one_time_login"
+	TokenTypeEmailVerification TokenType = "email_verification"
+)
+
+type GalleryClaims struct {
+	TokenType TokenType `json:"token_type"`
+	jwt.RegisteredClaims
+}
+
+type AuthTokenClaims struct {
+	UserID    persist.DBID   `json:"user_id"`
+	SessionID persist.DBID   `json:"session_id"` // The session this auth token belongs to
+	RefreshID string         `json:"refresh_id"` // The refresh token this auth token was generated from
+	Roles     []persist.Role `json:"roles"`
+	GalleryClaims
+}
+
+type RefreshTokenClaims struct {
+	ID        string       `json:"id"`        // The refresh token's ID
+	ParentID  string       `json:"parent_id"` // The parent refresh token this child refresh token was generated from
+	UserID    persist.DBID `json:"user_id"`
+	SessionID persist.DBID `json:"session_id"` // The session this refresh token belongs to
+	GalleryClaims
+}
+
+type oneTimeLoginClaims struct {
 	UserID persist.DBID `json:"user_id"`
-	jwt.StandardClaims
+	Source string       `json:"source"`
+	GalleryClaims
 }
 
-// JWTValidateResponse is the response for the jwt validation endpoint
-type JWTValidateResponse struct {
-	IsValid bool         `json:"valid"`
-	UserID  persist.DBID `json:"user_id"`
+type emailVerificationClaims struct {
+	UserID persist.DBID `json:"user_id"`
+	Email  string       `json:"email"`
+	GalleryClaims
 }
 
-// ValidateJWT is a handler that validates the JWT token and returns the user ID
-func ValidateJWT() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		auth := GetUserAuthedFromCtx(c)
-		userID := GetUserIDFromCtx(c)
+func GenerateAuthToken(ctx context.Context, userID persist.DBID, sessionID persist.DBID, refreshID string, roles []persist.Role) (string, error) {
+	secret := env.GetString("AUTH_JWT_SECRET")
+	validFor := time.Duration(env.GetInt64("AUTH_JWT_TTL")) * time.Second
 
-		c.JSON(http.StatusOK, JWTValidateResponse{
-			IsValid: auth,
-			UserID:  userID,
-		})
-	}
-}
-
-// JWTParse parses the JWT token from the request and returns the user ID associated with it
-func JWTParse(pJWTtokenStr string, pJWTsecretKeyStr string) (persist.DBID, error) {
-
-	claims := jwtClaims{}
-	JWTtoken, err := jwt.ParseWithClaims(pJWTtokenStr,
-		&claims,
-		func(pJWTtoken *jwt.Token) (interface{}, error) {
-			return []byte(pJWTsecretKeyStr), nil
-		})
-
-	if err != nil || !JWTtoken.Valid {
-		return "", ErrInvalidJWT
+	claims := AuthTokenClaims{
+		UserID:        userID,
+		SessionID:     sessionID,
+		RefreshID:     refreshID,
+		Roles:         roles,
+		GalleryClaims: newGalleryClaims(TokenTypeAuth, validFor),
 	}
 
-	return claims.UserID, nil
+	return generateJWT(claims, secret)
 }
 
-// JWTGeneratePipeline generates a new JWT token for the user
-func JWTGeneratePipeline(pCtx context.Context, pUserID persist.DBID) (string, error) {
+func ParseAuthToken(ctx context.Context, token string) (AuthTokenClaims, error) {
+	claims := AuthTokenClaims{}
+	parsedToken, err := jwt.ParseWithClaims(token, &claims, keyFunc(env.GetString("AUTH_JWT_SECRET")))
 
-	issuer := "gallery"
-	jwtTokenStr, err := jwtGenerate(issuer, pUserID)
-	if err != nil {
-		return "", err
+	if err != nil || !parsedToken.Valid {
+		return AuthTokenClaims{}, ErrInvalidJWT
 	}
 
-	return jwtTokenStr, nil
+	return claims, nil
 }
 
-func jwtGenerate(pIssuerStr string, pUserID persist.DBID) (string, error) {
+func GenerateRefreshToken(ctx context.Context, ID string, parentID string, userID persist.DBID, sessionID persist.DBID) (string, time.Time, error) {
+	secret := env.GetString("REFRESH_JWT_SECRET")
+	validFor := time.Duration(env.GetInt64("REFRESH_JWT_TTL")) * time.Second
 
-	signingKeyBytesLst := []byte(env.GetString("JWT_SECRET"))
+	claims := RefreshTokenClaims{
+		ID:            ID,
+		ParentID:      parentID,
+		UserID:        userID,
+		SessionID:     sessionID,
+		GalleryClaims: newGalleryClaims(TokenTypeRefresh, validFor),
+	}
 
-	creationTimeUNIXint := time.Now().UnixNano() / 1000000000
-	expiresAtUNIXint := creationTimeUNIXint + env.GetInt64("JWT_TTL") // expire N number of secs from now
-	claims := jwtClaims{
-		pUserID,
-		jwt.StandardClaims{
-			ExpiresAt: expiresAtUNIXint,
-			Issuer:    pIssuerStr,
+	jwt, err := generateJWT(claims, secret)
+	expiresAt := time.Now().Add(validFor)
+
+	return jwt, expiresAt, err
+}
+
+func ParseRefreshToken(ctx context.Context, token string) (RefreshTokenClaims, error) {
+	claims := RefreshTokenClaims{}
+	parsedToken, err := jwt.ParseWithClaims(token, &claims, keyFunc(env.GetString("REFRESH_JWT_SECRET")))
+
+	if err != nil || !parsedToken.Valid {
+		return RefreshTokenClaims{}, ErrInvalidJWT
+	}
+
+	return claims, nil
+}
+
+func GenerateOneTimeLoginToken(ctx context.Context, userID persist.DBID, source string, validFor time.Duration) (string, error) {
+	secret := env.GetString("ONE_TIME_LOGIN_JWT_SECRET")
+
+	claims := oneTimeLoginClaims{
+		UserID:        userID,
+		Source:        source,
+		GalleryClaims: newGalleryClaims(TokenTypeOneTimeLogin, validFor),
+	}
+
+	return generateJWT(claims, secret)
+}
+
+func ParseOneTimeLoginToken(ctx context.Context, token string) (persist.DBID, time.Time, error) {
+	claims := oneTimeLoginClaims{}
+	parsedToken, err := jwt.ParseWithClaims(token, &claims, keyFunc(env.GetString("ONE_TIME_LOGIN_JWT_SECRET")))
+
+	if err != nil || !parsedToken.Valid {
+		return "", time.Time{}, ErrInvalidJWT
+	}
+
+	return claims.UserID, claims.ExpiresAt.Time, nil
+}
+
+func GenerateEmailVerificationToken(ctx context.Context, userID persist.DBID, email string) (string, error) {
+	secret := env.GetString("EMAIL_VERIFICATION_JWT_SECRET")
+	validFor := time.Duration(env.GetInt64("EMAIL_VERIFICATION_JWT_TTL")) * time.Second
+
+	claims := emailVerificationClaims{
+		UserID:        userID,
+		Email:         email,
+		GalleryClaims: newGalleryClaims(TokenTypeEmailVerification, validFor),
+	}
+
+	return generateJWT(claims, secret)
+}
+
+func ParseEmailVerificationToken(ctx context.Context, token string) (persist.DBID, string, error) {
+	claims := emailVerificationClaims{}
+	parsedToken, err := jwt.ParseWithClaims(token, &claims, keyFunc(env.GetString("EMAIL_VERIFICATION_JWT_SECRET")))
+
+	if err != nil || !parsedToken.Valid {
+		return "", "", ErrInvalidJWT
+	}
+
+	return claims.UserID, claims.Email, nil
+}
+
+func newGalleryClaims(tokenType TokenType, validFor time.Duration) GalleryClaims {
+	claims := GalleryClaims{
+		TokenType: tokenType,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(validFor)),
+			Issuer:    "gallery",
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
 
+	return claims
+}
+
+func generateJWT(claims jwt.Claims, jwtSecret string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	jwtTokenStr, err := token.SignedString(signingKeyBytesLst)
+	jwtToken, err := token.SignedString([]byte(jwtSecret))
 	if err != nil {
 		return "", err
 	}
 
-	return jwtTokenStr, nil
+	return jwtToken, nil
+}
+
+func keyFunc(secret string) jwt.Keyfunc {
+	return func(*jwt.Token) (interface{}, error) {
+		return []byte(secret), nil
+	}
 }

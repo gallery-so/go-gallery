@@ -271,16 +271,18 @@ func (h *PushNotificationHandler) checkPushTicketsRecursive(ctx context.Context,
 }
 
 func processTicketReceipts(ctx context.Context, tickets []db.PushNotificationTicket, receipts map[string]PushReceipt) (params db.UpdatePushTicketsParams, tokensToUnregister []persist.DBID) {
-	params.Ids = make([]string, len(receipts))
-	params.CheckAfter = make([]time.Time, len(receipts))
-	params.NumCheckAttempts = make([]int32, len(receipts))
-	params.Deleted = make([]bool, len(receipts))
+	params.Ids = make([]string, len(tickets))
+	params.CheckAfter = make([]time.Time, len(tickets))
+	params.NumCheckAttempts = make([]int32, len(tickets))
+	params.Status = make([]string, len(tickets))
+	params.Deleted = make([]bool, len(tickets))
 
 	for i, ticket := range tickets {
 		// Start with all the ticket's existing values
 		params.Ids[i] = ticket.ID.String()
 		params.CheckAfter[i] = ticket.CheckAfter
 		params.NumCheckAttempts[i] = ticket.NumCheckAttempts
+		params.Status[i] = ticket.Status
 		params.Deleted[i] = ticket.Deleted
 
 		ctx := logger.NewContextWithFields(ctx, logrus.Fields{
@@ -293,6 +295,7 @@ func processTicketReceipts(ctx context.Context, tickets []db.PushNotificationTic
 		receipt, ok := receipts[ticket.TicketID]
 		if !ok {
 			// If the receipt wasn't found, delete the associated ticket. Expo deletes receipts after 24 hours.
+			params.Status[i] = "receipt not found"
 			params.Deleted[i] = true
 			logger.For(ctx).Info("Deleting push ticket (no receipt found)")
 			continue
@@ -301,6 +304,7 @@ func processTicketReceipts(ctx context.Context, tickets []db.PushNotificationTic
 		err := receipt.GetError()
 		if err == nil {
 			// If we got a receipt and there wasn't an error, the message was delivered, and we don't need to check again.
+			params.Status[i] = "delivered"
 			params.Deleted[i] = true
 			continue
 		}
@@ -309,6 +313,7 @@ func processTicketReceipts(ctx context.Context, tickets []db.PushNotificationTic
 			// If the device is no longer registered, we need to delete the associated push token
 			logger.For(ctx).WithError(err).Info("Deleting push ticket (device not registered)")
 			tokensToUnregister = append(tokensToUnregister, ticket.PushTokenID)
+			params.Status[i] = "device not registered"
 			params.Deleted[i] = true
 			continue
 		}
@@ -317,6 +322,7 @@ func processTicketReceipts(ctx context.Context, tickets []db.PushNotificationTic
 			// Delete the push ticket -- no amount of retrying will fix ErrMessageTooBig
 			logger.For(ctx).WithError(err).Error("Deleting push ticket (message too big)")
 			reportTicketError(ctx, err, ticket)
+			params.Status[i] = "message too big"
 			params.Deleted[i] = true
 			continue
 		}
@@ -324,6 +330,7 @@ func processTicketReceipts(ctx context.Context, tickets []db.PushNotificationTic
 		// In all other cases, we should retry with exponential backoff
 		params.NumCheckAttempts[i]++
 		params.CheckAfter[i] = getNextCheckAfter(params.NumCheckAttempts[i])
+		params.Status[i] = "retrying"
 
 		logger.For(ctx).WithError(err).Infof("Rechecking ticket receipt after %v due to error", params.CheckAfter[i])
 	}

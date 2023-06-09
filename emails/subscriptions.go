@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/auth"
 	"net/http"
 	"strings"
 
@@ -118,7 +119,7 @@ func unsubscribe(queries *coredb.Queries) gin.HandlerFunc {
 			return
 		}
 
-		userID, emailFromToken, err := jwtParse(input.JWT)
+		userID, emailFromToken, err := auth.ParseEmailVerificationToken(c, input.JWT)
 		if err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
@@ -193,7 +194,7 @@ func resubscribe(queries *coredb.Queries) gin.HandlerFunc {
 			return
 		}
 
-		userID, emailFromToken, err := jwtParse(input.JWT)
+		userID, emailFromToken, err := auth.ParseEmailVerificationToken(c, input.JWT)
 		if err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return

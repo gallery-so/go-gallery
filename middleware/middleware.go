@@ -3,7 +3,10 @@ package middleware
 import (
 	"context"
 	"fmt"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/auth/basicauth"
+	"github.com/mikeydub/go-gallery/service/limiters"
+	"github.com/mikeydub/go-gallery/service/redis"
 	"net/http"
 
 	"github.com/getsentry/sentry-go"
@@ -106,34 +109,14 @@ func TaskRequired() gin.HandlerFunc {
 	}
 }
 
-// AddAuthToContext is a middleware that validates auth data and stores the results in the context
-func AddAuthToContext() gin.HandlerFunc {
+// ContinueSession is a middleware that manages session cookies
+func ContinueSession(queries *db.Queries, authRefreshCache *redis.Cache) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		jwt, err := c.Cookie(auth.JWTCookieKey)
-
-		// Treat empty cookies the same way we treat missing cookies, since setting a cookie to the empty
-		// string is how we "delete" them.
-		if err == nil && jwt == "" {
-			err = http.ErrNoCookie
-		}
-
-		if err != nil {
-			if err == http.ErrNoCookie {
-				err = auth.ErrNoCookie
-			}
-
-			auth.SetAuthStateForCtx(c, "", err)
-			c.Next()
-			return
-		}
-
-		userID, err := auth.JWTParse(jwt, env.GetString("JWT_SECRET"))
-		auth.SetAuthStateForCtx(c, userID, err)
-
-		// If we have a successfully authenticated user, add their ID to all subsequent logging
+		err := auth.ContinueSession(c, queries, authRefreshCache)
 		if err == nil {
 			loggerCtx := logger.NewContextWithFields(c.Request.Context(), logrus.Fields{
-				"authedUserId": userID,
+				"authedUserId": auth.GetUserIDFromCtx(c),
+				"sessionId":    auth.GetSessionIDFromCtx(c),
 			})
 			c.Request = c.Request.WithContext(loggerCtx)
 		}
@@ -142,8 +125,8 @@ func AddAuthToContext() gin.HandlerFunc {
 	}
 }
 
-// RateLimited is a middleware that rate limits requests by IP address
-func RateLimited(lim *KeyRateLimiter) gin.HandlerFunc {
+// IPRateLimited is a middleware that rate limits requests by IP address
+func IPRateLimited(lim *limiters.KeyRateLimiter) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		canContinue, tryAgainAfter, err := lim.ForKey(c, c.ClientIP())
 		if err != nil {
@@ -168,7 +151,7 @@ func HandleCORS() gin.HandlerFunc {
 		}
 
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With, Set-Cookie, sentry-trace, baggage")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With, Set-Cookie, sentry-trace, baggage, X-Platform, X-OS")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
 		c.Writer.Header().Set("Access-Control-Expose-Headers", "Content-Length, Access-Control-Allow-Origin, Access-Control-Allow-Headers, Content-Type, Set-Cookie")
 

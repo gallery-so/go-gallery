@@ -4,13 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/jackc/pgx/v4"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/jackc/pgtype"
-	"github.com/mikeydub/go-gallery/env"
+	"github.com/jackc/pgx/v4"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -69,6 +68,29 @@ func (api UserAPI) GetUserById(ctx context.Context, userID persist.DBID) (*db.Us
 
 	user, err := api.loaders.UserByUserID.Load(userID)
 	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+func (api UserAPI) GetUserByVerifiedEmailAddress(ctx context.Context, emailAddress persist.Email) (*db.User, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"emailAddress": {emailAddress, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	// Intentionally using queries here instead of a dataloader. Caching a user by email address is tricky
+	// because the key (email address) isn't part of the user object, and this method isn't currently invoked
+	// in a way that would benefit from dataloaders or caching anyway.
+	user, err := api.queries.GetUserByVerifiedEmailAddress(ctx, emailAddress.String())
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			err = persist.ErrUserNotFound{Email: emailAddress}
+		}
 		return nil, err
 	}
 
@@ -209,27 +231,16 @@ func (api UserAPI) GetUsersWithTrait(ctx context.Context, trait string) ([]db.Us
 }
 
 func (api *UserAPI) GetUserRolesByUserID(ctx context.Context, userID persist.DBID) ([]persist.Role, error) {
-	address, tokenIDs := parseAddressTokens(env.GetString("PREMIUM_CONTRACT_ADDRESS"))
-	return api.queries.GetUserRolesByUserId(ctx, db.GetUserRolesByUserIdParams{
-		UserID:                userID,
-		MembershipAddress:     persist.Address(address),
-		MembershipTokenIds:    tokenIDs,
-		GrantedMembershipRole: persist.RoleEarlyAccess, // Role granted if user carries a matching token
-		Chain:                 persist.ChainETH,
-	})
+	return auth.RolesByUserID(ctx, api.queries, userID)
 }
 
-// parseAddressTokens returns a contract and tokens from a string encoded as '<address>=[<tokenID>,<tokenID>,...<tokenID>]'.
-// It's helpful for parsing contract and tokens passed as environment variables.
-func parseAddressTokens(s string) (string, []string) {
-	addressTokens := strings.Split(s, "=")
-	if len(addressTokens) != 2 {
-		panic("invalid address tokens format")
+func (api *UserAPI) UserIsAdmin(ctx context.Context) bool {
+	for _, role := range getUserRoles(ctx) {
+		if role == persist.RoleAdmin {
+			return true
+		}
 	}
-	address, tokens := addressTokens[0], addressTokens[1]
-	tokens = strings.TrimLeft(tokens, "[")
-	tokens = strings.TrimRight(tokens, "]")
-	return address, strings.Split(tokens, ",")
+	return false
 }
 
 func (api UserAPI) PaginateUsersWithRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) ([]db.User, PageInfo, error) {
@@ -1048,12 +1059,6 @@ func (api UserAPI) GetDisplayedSocials(ctx context.Context, userID persist.DBID)
 	socials, err := api.queries.GetSocialsByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
-	}
-
-	for prov, social := range socials {
-		if !social.Display {
-			delete(socials, prov)
-		}
 	}
 
 	result := &model.SocialAccounts{}

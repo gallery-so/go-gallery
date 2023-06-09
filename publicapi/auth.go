@@ -3,7 +3,9 @@ package publicapi
 import (
 	"context"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/util"
+	"time"
 
 	magicclient "github.com/magiclabs/magic-admin-go/client"
 	"github.com/magiclabs/magic-admin-go/token"
@@ -28,6 +30,8 @@ type AuthAPI struct {
 	ethClient          *ethclient.Client
 	multiChainProvider *multichain.Provider
 	magicLinkClient    *magicclient.API
+	oneTimeLoginCache  *redis.Cache
+	authRefreshCache   *redis.Cache
 }
 
 func (api AuthAPI) NewNonceAuthenticator(chainAddress persist.ChainPubKey, nonce string, signature string, walletType persist.WalletType) auth.Authenticator {
@@ -107,6 +111,15 @@ func (api AuthAPI) NewMagicLinkAuthenticator(token token.Token) auth.Authenticat
 	return authenticator
 }
 
+func (api AuthAPI) NewOneTimeLoginTokenAuthenticator(loginToken string) auth.Authenticator {
+	authenticator := auth.OneTimeLoginTokenAuthenticator{
+		ConsumedTokenCache: api.oneTimeLoginCache,
+		UserRepo:           api.repos.UserRepository,
+		LoginToken:         loginToken,
+	}
+	return authenticator
+}
+
 func chainAddressPointersToChainAddresses(chainAddresses []*persist.ChainAddress) []persist.ChainAddress {
 	addresses := make([]persist.ChainAddress, 0, len(chainAddresses))
 
@@ -125,10 +138,21 @@ func (api AuthAPI) GetAuthNonce(ctx context.Context, chainAddress persist.ChainA
 
 func (api AuthAPI) Login(ctx context.Context, authenticator auth.Authenticator) (persist.DBID, error) {
 	// Nothing to validate
-	return auth.Login(ctx, authenticator)
+	return auth.Login(ctx, api.queries, authenticator)
 }
 
 func (api AuthAPI) Logout(ctx context.Context) {
 	// Nothing to validate
-	auth.Logout(ctx)
+	auth.Logout(ctx, api.queries, api.authRefreshCache)
+}
+
+func (api AuthAPI) GenerateQRCodeLoginToken(ctx context.Context) (string, error) {
+	// Nothing to validate
+
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	return auth.GenerateOneTimeLoginToken(ctx, userID, "qr_code", 5*time.Minute)
 }

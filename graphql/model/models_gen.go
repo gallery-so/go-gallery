@@ -115,6 +115,10 @@ type GalleryUserOrWallet interface {
 	IsGalleryUserOrWallet()
 }
 
+type GenerateQRCodeLoginTokenPayloadOrError interface {
+	IsGenerateQRCodeLoginTokenPayloadOrError()
+}
+
 type GetAuthNoncePayloadOrError interface {
 	IsGetAuthNoncePayloadOrError()
 }
@@ -354,6 +358,10 @@ type UserByUsernameOrError interface {
 	IsUserByUsernameOrError()
 }
 
+type VerifyEmailMagicLinkPayloadOrError interface {
+	IsVerifyEmailMagicLinkPayloadOrError()
+}
+
 type VerifyEmailPayloadOrError interface {
 	IsVerifyEmailPayloadOrError()
 }
@@ -419,10 +427,11 @@ func (AudioMedia) IsMediaSubtype() {}
 func (AudioMedia) IsMedia()        {}
 
 type AuthMechanism struct {
-	Eoa        *EoaAuth        `json:"eoa"`
-	GnosisSafe *GnosisSafeAuth `json:"gnosisSafe"`
-	Debug      *DebugAuth      `json:"debug"`
-	MagicLink  *MagicLinkAuth  `json:"magicLink"`
+	Eoa               *EoaAuth               `json:"eoa"`
+	GnosisSafe        *GnosisSafeAuth        `json:"gnosisSafe"`
+	Debug             *DebugAuth             `json:"debug"`
+	MagicLink         *MagicLinkAuth         `json:"magicLink"`
+	OneTimeLoginToken *OneTimeLoginTokenAuth `json:"oneTimeLoginToken"`
 }
 
 type AuthNonce struct {
@@ -479,6 +488,11 @@ type CollectionCreatedFeedEventData struct {
 
 func (CollectionCreatedFeedEventData) IsFeedEventData() {}
 
+type CollectionEdge struct {
+	Node   *Collection `json:"node"`
+	Cursor *string     `json:"cursor"`
+}
+
 type CollectionLayout struct {
 	Sections      []*int                     `json:"sections"`
 	SectionLayout []*CollectionSectionLayout `json:"sectionLayout"`
@@ -529,6 +543,11 @@ type CollectionUpdatedFeedEventData struct {
 }
 
 func (CollectionUpdatedFeedEventData) IsFeedEventData() {}
+
+type CollectionsConnection struct {
+	Edges    []*CollectionEdge `json:"edges"`
+	PageInfo *PageInfo         `json:"pageInfo"`
+}
 
 type CollectorsNoteAddedToCollectionFeedEventData struct {
 	EventTime         *time.Time      `json:"eventTime"`
@@ -872,6 +891,7 @@ func (ErrInvalidInput) IsCommentOnFeedEventPayloadOrError()              {}
 func (ErrInvalidInput) IsRemoveCommentPayloadOrError()                   {}
 func (ErrInvalidInput) IsVerifyEmailPayloadOrError()                     {}
 func (ErrInvalidInput) IsPreverifyEmailPayloadOrError()                  {}
+func (ErrInvalidInput) IsVerifyEmailMagicLinkPayloadOrError()            {}
 func (ErrInvalidInput) IsUpdateEmailPayloadOrError()                     {}
 func (ErrInvalidInput) IsResendVerificationEmailPayloadOrError()         {}
 func (ErrInvalidInput) IsUpdateEmailNotificationSettingsPayloadOrError() {}
@@ -966,6 +986,7 @@ func (ErrNotAuthorized) IsUpdateSocialAccountDisplayedPayloadOrError() {}
 func (ErrNotAuthorized) IsMintPremiumCardToWalletPayloadOrError()      {}
 func (ErrNotAuthorized) IsDisconnectSocialAccountPayloadOrError()      {}
 func (ErrNotAuthorized) IsFollowAllSocialConnectionsPayloadOrError()   {}
+func (ErrNotAuthorized) IsGenerateQRCodeLoginTokenPayloadOrError()     {}
 
 type ErrPushTokenBelongsToAnotherUser struct {
 	Message string `json:"message"`
@@ -974,6 +995,13 @@ type ErrPushTokenBelongsToAnotherUser struct {
 func (ErrPushTokenBelongsToAnotherUser) IsRegisterUserPushTokenPayloadOrError()   {}
 func (ErrPushTokenBelongsToAnotherUser) IsUnregisterUserPushTokenPayloadOrError() {}
 func (ErrPushTokenBelongsToAnotherUser) IsError()                                 {}
+
+type ErrSessionInvalidated struct {
+	Message string `json:"message"`
+}
+
+func (ErrSessionInvalidated) IsAuthorizationError() {}
+func (ErrSessionInvalidated) IsError()              {}
 
 type ErrSyncFailed struct {
 	Message string `json:"message"`
@@ -1206,6 +1234,12 @@ func (GalleryUser) IsUserByAddressOrError()              {}
 func (GalleryUser) IsAddRolesToUserPayloadOrError()      {}
 func (GalleryUser) IsRevokeRolesFromUserPayloadOrError() {}
 
+type GenerateQRCodeLoginTokenPayload struct {
+	Token string `json:"token"`
+}
+
+func (GenerateQRCodeLoginTokenPayload) IsGenerateQRCodeLoginTokenPayloadOrError() {}
+
 type GltfMedia struct {
 	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`
 	MediaURL         *string          `json:"mediaURL"`
@@ -1380,6 +1414,10 @@ type NotificationsConnection struct {
 	Edges       []*NotificationEdge `json:"edges"`
 	UnseenCount *int                `json:"unseenCount"`
 	PageInfo    *PageInfo           `json:"pageInfo"`
+}
+
+type OneTimeLoginTokenAuth struct {
+	Token string `json:"token"`
 }
 
 type OwnerAtBlock struct {
@@ -1694,6 +1732,7 @@ func (TextMedia) IsMediaSubtype() {}
 func (TextMedia) IsMedia()        {}
 
 type Token struct {
+	HelperTokenData
 	Dbid                  persist.DBID          `json:"dbid"`
 	CreationTime          *time.Time            `json:"creationTime"`
 	LastUpdated           *time.Time            `json:"lastUpdated"`
@@ -2073,6 +2112,16 @@ type VerifyEmailInput struct {
 	Token string `json:"token"`
 }
 
+type VerifyEmailMagicLinkInput struct {
+	Email persist.Email `json:"email"`
+}
+
+type VerifyEmailMagicLinkPayload struct {
+	CanSend bool `json:"canSend"`
+}
+
+func (VerifyEmailMagicLinkPayload) IsVerifyEmailMagicLinkPayloadOrError() {}
+
 type VerifyEmailPayload struct {
 	Email persist.Email `json:"email"`
 }
@@ -2138,6 +2187,10 @@ type Wallet struct {
 
 func (Wallet) IsNode()                {}
 func (Wallet) IsGalleryUserOrWallet() {}
+
+type TopCollectionsForCommunityInput struct {
+	ChainAddress *persist.ChainAddress `json:"chainAddress"`
+}
 
 type EmailUnsubscriptionType string
 
@@ -2319,6 +2372,7 @@ const (
 	UserExperienceTypeTwitterConnectionOnboardingUpsell UserExperienceType = "TwitterConnectionOnboardingUpsell"
 	UserExperienceTypeUpsellMintMemento4                UserExperienceType = "UpsellMintMemento4"
 	UserExperienceTypeUpsellGallerySelects1             UserExperienceType = "UpsellGallerySelects1"
+	UserExperienceTypeMobileUpsell1                     UserExperienceType = "MobileUpsell1"
 )
 
 var AllUserExperienceType = []UserExperienceType{
@@ -2329,11 +2383,12 @@ var AllUserExperienceType = []UserExperienceType{
 	UserExperienceTypeTwitterConnectionOnboardingUpsell,
 	UserExperienceTypeUpsellMintMemento4,
 	UserExperienceTypeUpsellGallerySelects1,
+	UserExperienceTypeMobileUpsell1,
 }
 
 func (e UserExperienceType) IsValid() bool {
 	switch e {
-	case UserExperienceTypeMultiGalleryAnnouncement, UserExperienceTypeEmailUpsell, UserExperienceTypeMerchStoreUpsell, UserExperienceTypeMaintenanceFeb2023, UserExperienceTypeTwitterConnectionOnboardingUpsell, UserExperienceTypeUpsellMintMemento4, UserExperienceTypeUpsellGallerySelects1:
+	case UserExperienceTypeMultiGalleryAnnouncement, UserExperienceTypeEmailUpsell, UserExperienceTypeMerchStoreUpsell, UserExperienceTypeMaintenanceFeb2023, UserExperienceTypeTwitterConnectionOnboardingUpsell, UserExperienceTypeUpsellMintMemento4, UserExperienceTypeUpsellGallerySelects1, UserExperienceTypeMobileUpsell1:
 		return true
 	}
 	return false

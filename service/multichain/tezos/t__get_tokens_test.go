@@ -8,7 +8,6 @@ import (
 
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/rpc"
 )
 
 func TestGetTokensForWallet_Success(t *testing.T) {
@@ -16,10 +15,7 @@ func TestGetTokensForWallet_Success(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*45)
 	defer cancel()
 
-	ipfsClient := rpc.NewIPFSShell()
-	arweaveClient := rpc.NewArweaveClient()
-	storage := newStorageClient(ctx)
-	p := NewProvider(env.GetString("TEZOS_API_URL"), env.GetString("TOKEN_PROCESSING_URL"), env.GetString("IPFS_GATEWAY_URL"), http.DefaultClient, ipfsClient, arweaveClient, storage, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"))
+	p := NewProvider(env.GetString("TEZOS_API_URL"), http.DefaultClient)
 
 	powerUsers := []persist.Address{"tz1hyNv7RBzNPGLpKfdwHRc6NhLW6VbzXP3N", "tz1YHsinBJHMj1YFN7UrCsVAgTcaJCH86PjK", "tz1bPMztWzs449CuEmVTY3BprhHMtm4NUQPJ"}
 

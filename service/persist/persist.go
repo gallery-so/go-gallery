@@ -4,7 +4,6 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
-	"io"
 	"strings"
 	"time"
 	"unicode"
@@ -282,46 +281,6 @@ func (n *NullBool) Scan(value interface{}) error {
 	}
 	*n = NullBool(value.(bool))
 	return nil
-}
-
-type InteractionType int
-
-const (
-	InteractionTypeAdmire InteractionType = iota + 1
-	InteractionTypeComment
-
-	// MaxInteractionTypeValue is the highest valid InteractionType value, and should always
-	// be updated to point to the most recently added interaction type.
-	MaxInteractionTypeValue = InteractionTypeComment
-
-	// MinInteractionTypeValue is the lowest valid InteractionType value
-	MinInteractionTypeValue = InteractionTypeAdmire
-)
-
-// UnmarshalGQL implements the graphql.Unmarshaler interface
-func (i *InteractionType) UnmarshalGQL(v interface{}) error {
-	n, ok := v.(string)
-	if !ok {
-		return fmt.Errorf("InteractionType must be an string")
-	}
-
-	switch strings.ToLower(n) {
-	case "admire":
-		*i = InteractionTypeAdmire
-	case "comment":
-		*i = InteractionTypeComment
-	}
-	return nil
-}
-
-// MarshalGQL implements the graphql.Marshaler interface
-func (i InteractionType) MarshalGQL(w io.Writer) {
-	switch i {
-	case InteractionTypeAdmire:
-		w.Write([]byte(`"Admire"`))
-	case InteractionTypeComment:
-		w.Write([]byte(`"Comment"`))
-	}
 }
 
 // RemoveDuplicateDBIDs ensures that an array of DBIDs has no repeat items

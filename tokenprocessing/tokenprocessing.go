@@ -15,7 +15,7 @@ import (
 	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/media"
+	"github.com/mikeydub/go-gallery/service/metric"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/redis"
@@ -32,15 +32,16 @@ const sentryTokenContextName = "NFT context" // Sentry excludes contexts that co
 // InitServer initializes the mediaprocessing server
 func InitServer() {
 	setDefaults()
-	c := server.ClientInit(context.Background())
-	provider := server.NewMultichainProvider(c)
+	ctx := context.Background()
+	c := server.ClientInit(ctx)
+	provider, _ := server.NewMultichainProvider(ctx, setDefaults)
 	router := CoreInitServer(c, provider)
 	logger.For(nil).Info("Starting tokenprocessing server...")
 	http.Handle("/", router)
 }
 
 func CoreInitServer(c *server.Clients, mc *multichain.Provider) *gin.Engine {
-	initSentry()
+	InitSentry()
 	logger.InitWithGCPDefaults()
 
 	http.DefaultClient = &http.Client{Transport: tracing.NewTracingTransport(http.DefaultTransport, false)}
@@ -58,7 +59,9 @@ func CoreInitServer(c *server.Clients, mc *multichain.Provider) *gin.Engine {
 
 	t := newThrottler()
 
-	return handlersInitServer(router, mc, c.Repos, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
+	tp := NewTokenProcessor(c.Queries, c.EthClient, mc, c.IPFSClient, c.ArweaveClient, c.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), c.Repos.TokenRepository, metric.NewLogMetricReporter())
+
+	return handlersInitServer(router, tp, mc, c.Repos, t)
 }
 
 func setDefaults() {
@@ -81,6 +84,11 @@ func setDefaults() {
 	viper.SetDefault("IMGIX_API_KEY", "")
 	viper.SetDefault("VERSION", "")
 	viper.SetDefault("ALCHEMY_API_URL", "")
+	viper.SetDefault("ALCHEMY_OPTIMISM_API_URL", "")
+	viper.SetDefault("ALCHEMY_POLYGON_API_URL", "")
+	viper.SetDefault("ALCHEMY_NFT_API_URL", "")
+	viper.SetDefault("POAP_API_KEY", "")
+	viper.SetDefault("POAP_AUTH_TOKEN", "")
 
 	viper.AutomaticEnv()
 
@@ -102,10 +110,10 @@ func setDefaults() {
 }
 
 func newThrottler() *throttle.Locker {
-	return throttle.NewThrottleLocker(redis.NewCache(redis.TokenProcessingThrottleDB), time.Minute*30)
+	return throttle.NewThrottleLocker(redis.NewCache(redis.TokenProcessingThrottleCache), time.Minute*30)
 }
 
-func initSentry() {
+func InitSentry() {
 	if env.GetString("ENV") == "local" {
 		logger.For(nil).Info("skipping sentry init")
 		return
@@ -121,8 +129,8 @@ func initSentry() {
 		AttachStacktrace: true,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			event = auth.ScrubEventCookies(event, hint)
-			event = updateMediaProccessingFingerprints(event, hint)
-			event = excludeTokenSpam(event, hint)
+			event = excludeTokenSpamEvents(event, hint)
+			event = excludeBadTokenEvents(event, hint)
 			return event
 		},
 	})
@@ -132,19 +140,20 @@ func initSentry() {
 	}
 }
 
-// reportTokenError reports an error that occurred while processing a token.
-func reportTokenError(ctx context.Context, err error, runID persist.DBID, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID, isSpam bool) {
+// reportJobError reports an error that occurred while processing a token.
+func reportJobError(ctx context.Context, err error, job tokenProcessingJob) {
 	sentryutil.ReportError(ctx, err, func(scope *sentry.Scope) {
-		setRunTags(scope, runID)
-		setTokenTags(scope, chain, contractAddress, tokenID)
-		setTokenContext(scope, chain, contractAddress, tokenID, isSpam)
+		setRunTags(scope, job.id)
+		setTokenTags(scope, job.token.Chain, job.contract.Address, job.token.TokenID, job.token.ID)
+		setTokenContext(scope, job.token.Chain, job.contract.Address, job.token.TokenID, isSpamToken(job))
 	})
 }
 
-func setTokenTags(scope *sentry.Scope, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) {
+func setTokenTags(scope *sentry.Scope, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID, id persist.DBID) {
 	scope.SetTag("chain", fmt.Sprintf("%d", chain))
 	scope.SetTag("contractAddress", contractAddress.String())
 	scope.SetTag("nftID", string(tokenID))
+	scope.SetTag("tokenDBID", string(id))
 	assetPage := assetURL(chain, contractAddress, tokenID)
 	if len(assetPage) > 200 {
 		assetPage = "assetURL too long, see token context"
@@ -155,7 +164,9 @@ func setTokenTags(scope *sentry.Scope, chain persist.Chain, contractAddress pers
 func assetURL(chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) string {
 	switch chain {
 	case persist.ChainETH:
-		return fmt.Sprintf("https://opensea.io/assets/%s/%d", contractAddress.String(), tokenID.ToInt())
+		return fmt.Sprintf("https://opensea.io/assets/ethereum/%s/%d", contractAddress.String(), tokenID.ToInt())
+	case persist.ChainPolygon:
+		return fmt.Sprintf("https://opensea.io/assets/matic/%s/%d", contractAddress.String(), tokenID.ToInt())
 	case persist.ChainTezos:
 		return fmt.Sprintf("https://objkt.com/asset/%s/%d", contractAddress.String(), tokenID.ToInt())
 	default:
@@ -175,50 +186,38 @@ func setTokenContext(scope *sentry.Scope, chain persist.Chain, contractAddress p
 
 func setRunTags(scope *sentry.Scope, runID persist.DBID) {
 	scope.SetTag("runID", runID.String())
-	scope.SetTag("log", "go/tp-runs/"+runID.String())
+	scope.SetTag("log", "go/tokenruns/"+runID.String())
 }
 
-func updateMediaProccessingFingerprints(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
-	if event == nil || event.Exception == nil || hint == nil {
-		return event
+// isSpamToken returns true if the token is marked as spam.
+func isSpamToken(job tokenProcessingJob) bool {
+	isSpam := job.contract.IsProviderMarkedSpam
+	isSpam = isSpam || util.GetOptionalValue(job.token.IsProviderMarkedSpam, false)
+	isSpam = isSpam || util.GetOptionalValue(job.token.IsUserMarkedSpam, false)
+	return isSpam
+}
+
+// isBadTokenErr returns true if the error is a bad token error.
+func isBadTokenErr(err error) bool {
+	var badTokenErr ErrBadToken
+	if errors.As(err, &badTokenErr) {
+		return true
 	}
+	return false
+}
 
-	var mediaErr media.MediaProcessingError
-
-	if errors.As(hint.OriginalException, &mediaErr) {
-
-		if mediaErr.AnimationError != nil {
-			event.Exception = append(event.Exception, sentry.Exception{
-				Type:  fmt.Sprintf("%T", mediaErr.AnimationError),
-				Value: mediaErr.AnimationError.Error(),
-			})
-		}
-
-		if mediaErr.ImageError != nil {
-			event.Exception = append(event.Exception, sentry.Exception{
-				Type:  fmt.Sprintf("%T", mediaErr.ImageError),
-				Value: mediaErr.ImageError.Error(),
-			})
-		}
-
-		// Move the original error to the end of the stack since the latest error is used as the title in Sentry
-		if len(event.Exception) > 1 {
-			event.Exception = append(event.Exception[1:], event.Exception[0])
-		}
+// excludeTokenSpamEvents excludes events for tokens marked as spam.
+func excludeTokenSpamEvents(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+	isSpam, ok := event.Contexts[sentryTokenContextName]["IsSpam"].(bool)
+	if ok && isSpam {
+		return nil
 	}
-
-	// Group by the chain and contract
-	if event.Tags["chain"] != "" && event.Tags["contractAddress"] != "" {
-		event.Fingerprint = []string{event.Tags["chain"], event.Tags["contractAddress"]}
-		title := fmt.Sprintf("failed on chain=%s address=%s", event.Tags["chain"], event.Tags["contractAddress"])
-		event.Exception[len(event.Exception)-1].Type = title
-	}
-
 	return event
 }
 
-func excludeTokenSpam(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
-	if event.Contexts[sentryTokenContextName]["IsSpam"].(bool) == true {
+// excludeBadTokenEvents excludes events for bad tokens.
+func excludeBadTokenEvents(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+	if isBadTokenErr(hint.OriginalException) {
 		return nil
 	}
 	return event

@@ -122,12 +122,10 @@ func (c *CollectionTokenRepository) Create(pCtx context.Context, pColl persist.C
 func (c *CollectionTokenRepository) Update(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate interface{}) error {
 	var res sql.Result
 	var err error
-	switch pUpdate.(type) {
+	switch update := pUpdate.(type) {
 	case persist.CollectionUpdateInfoInput:
-		update := pUpdate.(persist.CollectionUpdateInfoInput)
 		res, err = c.updateInfoStmt.ExecContext(pCtx, update.CollectorsNote, update.Name, time.Now(), pID, pUserID)
 	case persist.CollectionUpdateHiddenInput:
-		update := pUpdate.(persist.CollectionUpdateHiddenInput)
 		res, err = c.updateHiddenStmt.ExecContext(pCtx, update.Hidden, time.Now(), pID, pUserID)
 	default:
 		return fmt.Errorf("unsupported update type: %T", pUpdate)

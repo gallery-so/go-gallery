@@ -21,6 +21,7 @@ import (
 	colorful "github.com/lucasb-eyer/go-colorful"
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/service/media"
+	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/util"
@@ -409,13 +410,30 @@ func ens(ctx context.Context, turi persist.TokenURI, addr persist.EthereumAddres
 
 	domain := gr.Data.Domains[0]
 
+	result := domain.LabelName + ".eth"
+
+	assets, err := opensea.FetchAssetsForTokenIdentifiers(ctx, addr, opensea.TokenID(tid.Base10String()))
+	if err != nil {
+		return persist.TokenURI(result), nil, err
+	}
+	withImage, ok := util.FindFirst(assets, func(asset opensea.Asset) bool {
+		return asset.ImageURL != "" || asset.ImagePreviewURL != "" || asset.ImageOriginalURL != "" || asset.ImageThumbnailURL != ""
+	})
+
+	if ok {
+		return persist.TokenURI(withImage.ImageURL), persist.TokenMetadata{
+			"name":        fmt.Sprintf("ENS: %s", result),
+			"description": "ENS names are used to resolve domain names to Ethereum addresses.",
+			"image":       util.FirstNonEmptyString(withImage.ImageURL, withImage.ImagePreviewURL, withImage.ImageOriginalURL, withImage.ImageThumbnailURL),
+		}, nil
+	}
+
 	width := 240
 	height := 240
 	buf := &bytes.Buffer{}
 	canvas := svg.New(buf)
 	canvas.Start(width, height)
 	canvas.Square(0, 0, width, canvas.RGB(255, 255, 255))
-	result := domain.LabelName + ".eth"
 
 	canvas.Text(width/2, height/2, result, `font-size="16px"`, `text-anchor="middle"`, `alignment-baseline="middle"`, `font-family="Helvetica Neue"`)
 
@@ -449,6 +467,7 @@ func cryptopunks(ctx context.Context, turi persist.TokenURI, addr persist.Ethere
 	removedPrefix := strings.TrimPrefix(punkSVG, "data:image/svg+xml;utf8,")
 	asBase64 := base64.RawStdEncoding.EncodeToString([]byte(removedPrefix))
 	withBase64Prefix := fmt.Sprintf("data:image/svg+xml;base64,%s", asBase64)
+
 	return persist.TokenURI(withBase64Prefix), persist.TokenMetadata{
 		"name":        fmt.Sprintf("Cryptopunks: %s", tid.Base10String()),
 		"description": "CryptoPunks launched as a fixed set of 10,000 items in mid-2017 and became one of the inspirations for the ERC-721 standard. They have been featured in places like The New York Times, Christie’s of London, Art|Basel Miami, and The PBS NewsHour.",
@@ -481,12 +500,12 @@ func zora(ctx context.Context, turi persist.TokenURI, addr persist.EthereumAddre
 	contentType, ok := util.FindFirstFieldFromMap(tokenMetadata, "mimeType", "contentType", "content-type", "type").(string)
 	var mediaType persist.MediaType
 	if ok {
-		mediaType = persist.MediaFromContentType(contentType)
+		mediaType = media.MediaFromContentType(contentType)
 	} else {
 		mediaType, _, _, err = media.PredictMediaType(ctx, mediaURI)
 	}
 	switch mediaType {
-	case persist.MediaTypeImage, persist.MediaTypeGIF, persist.MediaTypeSVG, persist.MediaTypeBase64BMP:
+	case persist.MediaTypeImage, persist.MediaTypeGIF, persist.MediaTypeSVG:
 		resultMetadata["image"] = mediaURI
 	default:
 		resultMetadata["animation_url"] = mediaURI

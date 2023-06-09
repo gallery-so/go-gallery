@@ -29,7 +29,7 @@ var (
 	defaultCursorAfterKey = ""
 
 	// Some position that comes after any other position
-	defaultCursorBeforePositon = -1
+	defaultCursorBeforePosition = -1
 	// Some position that comes before any other position
 	defaultCursorAfterPosition = math.MaxInt32
 )
@@ -662,6 +662,23 @@ type positionPaginator struct {
 	CountFunc func() (count int, err error)
 }
 
+type positionPaginatorArgs struct {
+	CurBeforePos int
+	CurAfterPos  int
+}
+
+type positionPaginatorOpts struct{}
+
+var positionOpts positionPaginatorOpts
+
+// WithDefaultCursors configures the starting cursors to use when none are provided
+func (positionPaginatorOpts) WithStartingCursors(before, after int) func(a *positionPaginatorArgs) {
+	return func(a *positionPaginatorArgs) {
+		a.CurBeforePos = before
+		a.CurAfterPos = after
+	}
+}
+
 type positionPagingParams struct {
 	Limit           int32
 	CursorBeforePos int32
@@ -708,19 +725,27 @@ func (p *positionPaginator) decodeCursor(cursor string) (int, []persist.DBID, er
 	return int(position), ids, nil
 }
 
-func (p *positionPaginator) paginate(before *string, after *string, first *int, last *int) ([]interface{}, PageInfo, error) {
+func (p *positionPaginator) paginate(before *string, after *string, first *int, last *int, opts ...func(*positionPaginatorArgs)) ([]interface{}, PageInfo, error) {
 	queryFunc := func(limit int32, pagingForward bool) ([]interface{}, error) {
-		curBeforePos := defaultCursorBeforePositon
-		curAfterPos := defaultCursorAfterPosition
-
 		var err error
 		var ids []persist.DBID
+		var curBeforePos int
+		var curAfterPos int
+
+		args := positionPaginatorArgs{}
+		args.CurBeforePos = defaultCursorBeforePosition
+		args.CurAfterPos = defaultCursorAfterPosition
+
+		for _, opt := range opts {
+			opt(&args)
+		}
 
 		if before != nil {
 			curBeforePos, ids, err = p.decodeCursor(*before)
 			if err != nil {
 				return nil, err
 			}
+			args.CurBeforePos = curBeforePos
 		}
 
 		if after != nil {
@@ -728,12 +753,13 @@ func (p *positionPaginator) paginate(before *string, after *string, first *int, 
 			if err != nil {
 				return nil, err
 			}
+			args.CurAfterPos = curAfterPos
 		}
 
 		queryParams := positionPagingParams{
 			Limit:           limit,
-			CursorBeforePos: int32(curBeforePos),
-			CursorAfterPos:  int32(curAfterPos),
+			CursorBeforePos: int32(args.CurBeforePos),
+			CursorAfterPos:  int32(args.CurAfterPos),
 			PagingForward:   pagingForward,
 			IDs:             ids,
 		}
@@ -747,6 +773,118 @@ func (p *positionPaginator) paginate(before *string, after *string, first *int, 
 			return "", err
 		}
 		return p.encodeCursor(pos, nodeID)
+	}
+
+	paginator := keysetPaginator{
+		QueryFunc:  queryFunc,
+		CursorFunc: cursorFunc,
+		CountFunc:  p.CountFunc,
+	}
+
+	return paginator.paginate(before, after, first, last)
+}
+
+type intTimeIDPaginator struct {
+	QueryFunc func(params intTimeIDPagingParams) ([]interface{}, error)
+
+	CursorFunc func(node interface{}) (int32, time.Time, persist.DBID, error)
+
+	// CountFunc returns the total number of items that can be paginated. May be nil, in which
+	// case the resulting PageInfo will omit the total field.
+	CountFunc func() (count int, err error)
+}
+
+// intTimeIDPaginator are the parameters used to paginate with an int+time+DBID cursor
+type intTimeIDPagingParams struct {
+	Limit            int32
+	CursorBeforeInt  int32
+	CursorBeforeTime time.Time
+	CursorBeforeID   persist.DBID
+	CursorAfterInt   int32
+	CursorAfterTime  time.Time
+	CursorAfterID    persist.DBID
+	PagingForward    bool
+}
+
+func (p *intTimeIDPaginator) encodeCursor(i int32, t time.Time, id persist.DBID) (string, error) {
+	encoder := newCursorEncoder()
+	encoder.appendInt64(int64(i))
+	if err := encoder.appendTime(t); err != nil {
+		return "", err
+	}
+	encoder.appendDBID(id)
+	return encoder.AsBase64(), nil
+}
+
+func (p *intTimeIDPaginator) decodeCursor(cursor string) (int32, time.Time, persist.DBID, error) {
+	decoder, err := newCursorDecoder(cursor)
+	if err != nil {
+		return 0, time.Time{}, "", err
+	}
+
+	i, err := decoder.readInt64()
+	if err != nil {
+		return 0, time.Time{}, "", err
+	}
+
+	t, err := decoder.readTime()
+	if err != nil {
+		return 0, time.Time{}, "", err
+	}
+
+	id, err := decoder.readDBID()
+	if err != nil {
+		return 0, time.Time{}, "", err
+	}
+
+	return int32(i), t, id, nil
+}
+
+func (p *intTimeIDPaginator) paginate(before *string, after *string, first *int, last *int) ([]interface{}, PageInfo, error) {
+	queryFunc := func(limit int32, pagingForward bool) ([]interface{}, error) {
+		curBeforeInt := int32(math.MaxInt32)
+		curBeforeTime := defaultCursorBeforeTime
+		curBeforeID := persist.DBID("")
+		curAfterInt := int32(0)
+		curAfterTime := defaultCursorAfterTime
+		curAfterID := persist.DBID("")
+
+		var err error
+		if before != nil {
+			curBeforeInt, curBeforeTime, curBeforeID, err = p.decodeCursor(*before)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		if after != nil {
+			curAfterInt, curAfterTime, curAfterID, err = p.decodeCursor(*after)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		queryParams := intTimeIDPagingParams{
+			Limit:            limit,
+			CursorBeforeInt:  curBeforeInt,
+			CursorBeforeTime: curBeforeTime,
+			CursorBeforeID:   curBeforeID,
+			CursorAfterInt:   curAfterInt,
+			CursorAfterTime:  curAfterTime,
+			CursorAfterID:    curAfterID,
+			PagingForward:    pagingForward,
+		}
+
+		return p.QueryFunc(queryParams)
+	}
+
+	cursorFunc := func(node interface{}) (string, error) {
+		nodeInt, nodeTime, nodeID, err := p.CursorFunc(node)
+		if err != nil {
+			return "", err
+		}
+
+		return p.encodeCursor(nodeInt, nodeTime, nodeID)
 	}
 
 	paginator := keysetPaginator{

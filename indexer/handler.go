@@ -22,7 +22,7 @@ func handlersInit(router *gin.Engine, i *indexer, tokenRepository persist.TokenR
 func handlersInitServer(router *gin.Engine, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethClient *ethclient.Client, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, idxer *indexer) *gin.Engine {
 
 	nftsGroup := router.Group("/nfts")
-	nftsGroup.GET("/get/metadata", getTokenMetadata(tokenRepository, ipfsClient, ethClient, arweaveClient))
+	nftsGroup.GET("/get/metadata", getTokenMetadata(ipfsClient, ethClient, arweaveClient))
 
 	contractsGroup := router.Group("/contracts")
 	contractsGroup.GET("/get", getContract(contractRepository))

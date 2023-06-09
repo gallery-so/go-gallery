@@ -17,7 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/gammazero/workerpool"
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/auth"
@@ -27,7 +26,12 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
 	"github.com/sirupsen/logrus"
+	"github.com/sourcegraph/conc/pool"
 )
+
+var client = http.DefaultClient
+
+var ErrAPIKeyExpired = errors.New("opensea api key expired")
 
 func init() {
 	env.RegisterValidation("OPENSEA_API_KEY", "required")
@@ -157,6 +161,7 @@ type ErrNoAssetsForWallets struct {
 
 // NewProvider creates a new provider for opensea
 func NewProvider(ethClient *ethclient.Client, httpClient *http.Client) *Provider {
+	client = httpClient
 	return &Provider{
 		httpClient: httpClient,
 		ethClient:  ethClient,
@@ -257,12 +262,17 @@ func (p *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, ti m
 }
 
 // GetTokenMetadataByTokenIdentifiers retrieves a token's metadata for a given contract address and token ID
-func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (persist.TokenMetadata, error) {
-	token, _, err := p.GetTokensByTokenIdentifiersAndOwner(ctx, ti, ownerAddress)
+func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
+	tokens, _, err := p.GetTokensByTokenIdentifiers(ctx, ti, 1, 0)
 	if err != nil {
 		return nil, err
 	}
-	return token.TokenMetadata, nil
+
+	if len(tokens) == 0 {
+		return nil, fmt.Errorf("no tokens found for %s", ti)
+	}
+
+	return tokens[0].TokenMetadata, nil
 }
 
 // GetContractByAddress returns a contract for a contract address
@@ -479,21 +489,21 @@ func streamAssetsForToken(ctx context.Context, address persist.EthereumAddress, 
 	setPagingParams(url)
 	setContractAddress(url, address)
 	setTokenID(url, tokenID)
-	paginateAssets(ctx, authRequest(ctx, url.String()), out)
+	paginateAssets(authRequest(ctx, url.String()), out)
 }
 
 func streamAssetsForWallet(ctx context.Context, address persist.EthereumAddress, out chan assetsReceieved) {
 	url := baseURL.JoinPath("assets")
 	setPagingParams(url)
 	setOwner(url, address)
-	paginateAssets(ctx, authRequest(ctx, url.String()), out)
+	paginateAssets(authRequest(ctx, url.String()), out)
 }
 
 func streamAssetsForContract(ctx context.Context, address persist.EthereumAddress, out chan assetsReceieved) {
 	url := baseURL.JoinPath("assets")
 	setPagingParams(url)
 	setContractAddress(url, address)
-	paginateAssets(ctx, authRequest(ctx, url.String()), out)
+	paginateAssets(authRequest(ctx, url.String()), out)
 }
 
 func streamAssetsForContractAddressAndOwner(ctx context.Context, ownerAddress, contractAddress persist.EthereumAddress, out chan assetsReceieved) {
@@ -501,7 +511,7 @@ func streamAssetsForContractAddressAndOwner(ctx context.Context, ownerAddress, c
 	setPagingParams(url)
 	setOwner(url, ownerAddress)
 	setContractAddress(url, contractAddress)
-	paginateAssets(ctx, authRequest(ctx, url.String()), out)
+	paginateAssets(authRequest(ctx, url.String()), out)
 }
 
 func streamAssetsForTokenIdentifiers(ctx context.Context, contractAddress persist.EthereumAddress, tokenID TokenID, out chan assetsReceieved) {
@@ -509,7 +519,7 @@ func streamAssetsForTokenIdentifiers(ctx context.Context, contractAddress persis
 	setPagingParams(url)
 	setContractAddress(url, contractAddress)
 	setTokenID(url, tokenID)
-	paginateAssets(ctx, authRequest(ctx, url.String()), out)
+	paginateAssets(authRequest(ctx, url.String()), out)
 }
 
 func streamAssetsForTokenIdentifiersAndOwner(ctx context.Context, ownerAddress, contractAddress persist.EthereumAddress, tokenID TokenID, out chan assetsReceieved) {
@@ -520,7 +530,7 @@ func streamAssetsForTokenIdentifiersAndOwner(ctx context.Context, ownerAddress, 
 	if ownerAddress != "" {
 		setOwner(url, ownerAddress)
 	}
-	paginateAssets(ctx, authRequest(ctx, url.String()), out)
+	paginateAssets(authRequest(ctx, url.String()), out)
 }
 
 func streamAssetsForSharedContract(ctx context.Context, editorAddress persist.EthereumAddress, out chan assetsReceieved) {
@@ -530,7 +540,7 @@ func streamAssetsForSharedContract(ctx context.Context, editorAddress persist.Et
 	for _, address := range sharedStoreFrontAddresses {
 		addContractAddresses(url, address)
 	}
-	paginateAssets(ctx, authRequest(ctx, url.String()), out)
+	paginateAssets(authRequest(ctx, url.String()), out)
 }
 
 // assetsByChildContract converts a channel of assets to a slice of sub-contract groups
@@ -626,9 +636,11 @@ func assetToToken(asset Asset, block persist.BlockNumber, tokenOwner persist.Add
 		return multichain.ChainAgnosticToken{}, err
 	}
 	return multichain.ChainAgnosticToken{
-		TokenType:    tokenType,
-		Name:         asset.Name,
-		Description:  asset.Description,
+		TokenType: tokenType,
+		Descriptors: multichain.ChainAgnosticTokenDescriptors{
+			Name:        asset.Name,
+			Description: asset.Description,
+		},
 		TokenURI:     persist.TokenURI(asset.TokenMetadataURL),
 		TokenID:      persist.TokenID(asset.TokenID.ToBase16()),
 		OwnerAddress: tokenOwner,
@@ -651,11 +663,13 @@ func assetToToken(asset Asset, block persist.BlockNumber, tokenOwner persist.Add
 
 func contractFromAsset(asset Asset, block persist.BlockNumber) multichain.ChainAgnosticContract {
 	return multichain.ChainAgnosticContract{
-		Address:        persist.Address(asset.Contract.ContractAddress.String()),
-		Symbol:         asset.Contract.ContractSymbol.String(),
-		Name:           asset.Contract.ContractName.String(),
-		CreatorAddress: persist.Address(asset.Creator.Address),
-		LatestBlock:    block,
+		Address: persist.Address(asset.Contract.ContractAddress.String()),
+		Descriptors: multichain.ChainAgnosticContractDescriptors{
+			Symbol:         asset.Contract.ContractSymbol.String(),
+			Name:           asset.Contract.ContractName.String(),
+			CreatorAddress: persist.Address(asset.Collection.PayoutAddress),
+		},
+		LatestBlock: block,
 	}
 }
 
@@ -670,7 +684,7 @@ func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsCha
 	tokensChan := make(chan multichain.ChainAgnosticToken)
 	contractsChan := make(chan multichain.ChainAgnosticContract)
 	errChan := make(chan error)
-	wp := workerpool.New(10)
+	wp := pool.New().WithMaxGoroutines(10).WithContext(ctx)
 
 	go func() {
 		defer close(tokensChan)
@@ -682,7 +696,7 @@ func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsCha
 			}
 			for _, n := range assetsReceived.assets {
 				nft := n
-				wp.Submit(func() {
+				wp.Go(func(ctx context.Context) error {
 					contract, ok := seenContracts.LoadOrStore(nft.Contract.ContractAddress.String(), contractFromAsset(nft, persist.BlockNumber(block)))
 					if !ok {
 						contractsChan <- contract.(multichain.ChainAgnosticContract)
@@ -701,19 +715,22 @@ func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsCha
 
 					if errors.As(err, &unknownSchemaErr) {
 						logger.For(ctx).Error(err)
-						return
+						return nil
 					}
 
 					if err != nil {
-						errChan <- err
-						return
+						return err
 					}
 
 					tokensChan <- token
+					return nil
 				})
 			}
 		}
-		wp.StopWait()
+		err := wp.Wait()
+		if err != nil {
+			errChan <- err
+		}
 	}()
 
 	for {
@@ -723,7 +740,10 @@ func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsCha
 				return resultTokens, resultContracts, nil
 			}
 			resultTokens = append(resultTokens, token)
-		case contract := <-contractsChan:
+		case contract, ok := <-contractsChan:
+			if !ok {
+				return resultTokens, resultContracts, nil
+			}
 			if contract.Address.String() != "" {
 				resultContracts = append(resultContracts, contract)
 			}
@@ -741,11 +761,14 @@ func contractToContract(ctx context.Context, openseaContract Contract, ethClient
 		return multichain.ChainAgnosticContract{}, err
 	}
 	return multichain.ChainAgnosticContract{
-		Address:        persist.Address(openseaContract.Address.String()),
-		Symbol:         openseaContract.Symbol,
-		Name:           openseaContract.Collection.Name,
-		CreatorAddress: persist.Address(openseaContract.Collection.PayoutAddress),
-		LatestBlock:    persist.BlockNumber(block),
+		Address: persist.Address(openseaContract.Address.String()),
+		Descriptors: multichain.ChainAgnosticContractDescriptors{
+			Symbol:         openseaContract.Symbol,
+			Name:           openseaContract.Collection.Name,
+			CreatorAddress: persist.Address(openseaContract.Collection.PayoutAddress),
+		},
+
+		LatestBlock: persist.BlockNumber(block),
 	}, nil
 }
 
@@ -789,15 +812,20 @@ func authRequest(ctx context.Context, url string) *http.Request {
 	return req
 }
 
-func paginateAssets(ctx context.Context, req *http.Request, outCh chan assetsReceieved) {
+func paginateAssets(req *http.Request, outCh chan assetsReceieved) {
 	for {
-		resp, err := retry.RetryRequest(http.DefaultClient, req)
+		resp, err := retry.RetryRequest(client, req)
 		if err != nil {
 			outCh <- assetsReceieved{err: err}
 			return
 		}
 
 		defer resp.Body.Close()
+
+		if resp.StatusCode == http.StatusUnauthorized {
+			outCh <- assetsReceieved{err: ErrAPIKeyExpired}
+			return
+		}
 
 		if resp.StatusCode != http.StatusOK {
 			outCh <- assetsReceieved{err: util.BodyAsError(resp)}

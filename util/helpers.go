@@ -17,6 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgtype"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/sourcegraph/conc/pool"
 	"github.com/spf13/viper"
 	"go.mozilla.org/sops/v3/decrypt"
 )
@@ -50,43 +51,6 @@ func (m MultiErr) Error() string {
 		}
 	}
 	return fmt.Sprint("Multiple errors: [", errStr, "]")
-}
-
-// FileHeaderReader is a struct that wraps an io.Reader and pre-reads the first 512 bytes of the reader
-// When the reader is read, the first 512 bytes are returned first, then the rest of the reader is read,
-// so that the first 512 bytes are not lost
-type FileHeaderReader struct {
-	*bufio.Reader
-	headers   []byte
-	subreader io.Reader
-}
-
-// NewFileHeaderReader returns a new FileHeaderReader
-func NewFileHeaderReader(reader io.Reader) *FileHeaderReader {
-	return &FileHeaderReader{bufio.NewReader(reader), nil, reader}
-}
-
-// Close closes the given io.Reader if it is also a closer
-func (f FileHeaderReader) Close() error {
-	if closer, ok := f.subreader.(io.Closer); ok {
-		return closer.Close()
-	}
-	return nil
-}
-
-// Headers returns the first 512 bytes of the reader
-func (f FileHeaderReader) Headers() ([]byte, error) {
-	if f.headers != nil {
-		return f.headers, nil
-	}
-
-	byt, err := f.Peek(512)
-	if err != nil && err != io.EOF {
-		return nil, err
-	}
-
-	f.headers = byt
-	return f.headers, nil
 }
 
 // RemoveBOM removes the byte order mark from a byte array
@@ -304,6 +268,13 @@ func FindFirst[T any](s []T, f func(T) bool) (T, bool) {
 	return *new(T), false
 }
 
+func MapFindOrNil[K comparable, T any](s map[K]T, key K) *T {
+	if val, ok := s[key]; ok {
+		return &val
+	}
+	return nil
+}
+
 func Filter[T any](s []T, f func(T) bool, filterInPlace bool) []T {
 	var r []T
 	if filterInPlace {
@@ -319,6 +290,18 @@ func Filter[T any](s []T, f func(T) bool, filterInPlace bool) []T {
 	return r
 }
 
+func Chunk[T any](s []T, chunkSize int) [][]T {
+	var chunks [][]T
+	for i := 0; i < len(s); i += chunkSize {
+		end := i + chunkSize
+		if end > len(s) {
+			end = len(s)
+		}
+		chunks = append(chunks, s[i:end])
+	}
+	return chunks
+}
+
 // StringToPointerIfNotEmpty returns a pointer to the string if it is a non-empty string
 func StringToPointerIfNotEmpty(str string) *string {
 	if str == "" {
@@ -327,12 +310,25 @@ func StringToPointerIfNotEmpty(str string) *string {
 	return &str
 }
 
+func FirstNonEmptyString(strs ...string) string {
+	for _, str := range strs {
+		if str != "" {
+			return str
+		}
+	}
+	return ""
+}
+
 // FromPointer returns the value of a pointer, or the zero value of the pointer's type if the pointer is nil.
 func FromPointer[T comparable](s *T) T {
 	if s == nil {
 		return reflect.Zero(reflect.TypeOf(s).Elem()).Interface().(T)
 	}
 	return *s
+}
+
+func IsEmpty[T any](s *T) bool {
+	return s == nil || any(*s) == reflect.Zero(reflect.TypeOf(s).Elem()).Interface()
 }
 
 func ToPointer[T any](s T) *T {
@@ -611,7 +607,7 @@ func TruncateWithEllipsis(s string, length int) string {
 	return s[:length] + "..."
 }
 
-func IsNullOrEmpty(s sql.NullString) bool {
+func SqlStringIsNullOrEmpty(s sql.NullString) bool {
 	return !s.Valid || s.String == ""
 }
 
@@ -636,4 +632,120 @@ func GetOptionalValue[T any](optional *T, fallback T) T {
 	}
 
 	return fallback
+}
+
+func FirstNonErrorWithValue[T any](ctx context.Context, autoCancel bool, returnOnError func(error) bool, runs ...func(context.Context) (T, error)) (T, error) {
+
+	if len(runs) == 0 {
+		return *new(T), nil
+	}
+
+	if returnOnError == nil {
+		returnOnError = DefaultReturnOnError
+	}
+
+	var cancel context.CancelFunc
+	if autoCancel {
+		ctx, cancel = context.WithCancel(ctx)
+		defer cancel()
+	}
+
+	wp := pool.New().WithMaxGoroutines(len(runs)).WithErrors()
+
+	result := make(chan T)
+	errChan := make(chan error)
+	for _, run := range runs {
+		run := run
+		wp.Go(func() error {
+			val, err := run(ctx)
+			if err != nil {
+				if returnOnError(err) {
+					errChan <- err
+					return err
+				}
+				return err
+			}
+			result <- val
+			return nil
+		})
+	}
+
+	go func() {
+		errChan <- wp.Wait()
+	}()
+
+	select {
+	case val := <-result:
+		return val, nil
+	case err := <-errChan:
+		return *new(T), err
+	case <-ctx.Done():
+		return *new(T), ctx.Err()
+	}
+}
+
+func DefaultReturnOnError(error) bool {
+	return false
+}
+
+// FileHeaderReader is a struct that wraps an io.Reader and pre-reads the first 512 bytes of the reader
+// When the reader is read, the first 512 bytes are returned first, then the rest of the reader is read,
+// so that the first 512 bytes are not lost
+type FileHeaderReader struct {
+	*bufio.Reader
+	headers   []byte
+	subreader io.Reader
+}
+
+// NewFileHeaderReader returns a new FileHeaderReader
+func NewFileHeaderReader(reader io.Reader, bufSize int) *FileHeaderReader {
+	return &FileHeaderReader{bufio.NewReaderSize(reader, bufSize), nil, reader}
+}
+
+// Close closes the given io.Reader if it is also a closer
+func (f FileHeaderReader) Close() error {
+	if closer, ok := f.subreader.(io.Closer); ok {
+		return closer.Close()
+	}
+	return nil
+}
+
+// Headers returns the first 512 bytes of the reader
+func (f FileHeaderReader) Headers() ([]byte, error) {
+	if f.headers != nil {
+		return f.headers, nil
+	}
+
+	byt, err := f.Peek(512)
+	if err != nil && err != io.EOF {
+		return nil, err
+	}
+
+	f.headers = byt
+	return f.headers, nil
+}
+
+type LoggingReader struct {
+	r   io.Reader
+	w   io.WriterTo
+	ctx context.Context
+}
+
+func NewLoggingReader(ctx context.Context, r io.Reader, w io.WriterTo) *LoggingReader {
+	return &LoggingReader{r, w, ctx}
+}
+
+func (lr *LoggingReader) Read(p []byte) (n int, err error) {
+	n, err = lr.r.Read(p)
+	logger.For(lr.ctx).Infof("Read %d bytes", n)
+	return n, err
+}
+
+func (lr *LoggingReader) WriteTo(w io.Writer) (n int64, err error) {
+	if lr.w != nil {
+		n, err = lr.w.WriteTo(w)
+		logger.For(lr.ctx).Infof("Wrote %d bytes", n)
+		return n, err
+	}
+	return 0, fmt.Errorf("No WriterTo provided")
 }

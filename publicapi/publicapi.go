@@ -3,6 +3,7 @@ package publicapi
 import (
 	"context"
 	"errors"
+	"time"
 
 	magicclient "github.com/magiclabs/magic-admin-go/client"
 	admin "github.com/mikeydub/go-gallery/adminapi"
@@ -63,7 +64,7 @@ type PublicAPI struct {
 }
 
 func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell,
-	arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider, taskClient *gcptasks.Client, throttler *throttle.Locker, secrets *secretmanager.Client, apq *apq.APQCache, feedCache *redis.Cache, socialCache *redis.Cache, magicClient *magicclient.API) *PublicAPI {
+	arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider, taskClient *gcptasks.Client, throttler *throttle.Locker, secrets *secretmanager.Client, apq *apq.APQCache, feedCache *redis.Cache, socialCache *redis.Cache, authRefreshCache *redis.Cache, magicClient *magicclient.API) *PublicAPI {
 	loaders := dataloader.NewLoaders(ctx, queries, disableDataloaderCaching)
 	validator := validate.WithCustomValidators()
 
@@ -74,7 +75,7 @@ func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Rep
 		validator: validator,
 		APQ:       apq,
 
-		Auth:          &AuthAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multiChainProvider: multichainProvider, magicLinkClient: magicClient},
+		Auth:          &AuthAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multiChainProvider: multichainProvider, magicLinkClient: magicClient, oneTimeLoginCache: redis.NewCache(redis.OneTimeLoginCache), authRefreshCache: authRefreshCache},
 		Collection:    &CollectionAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Gallery:       &GalleryAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		User:          &UserAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, ipfsClient: ipfsClient, arweaveClient: arweaveClient, storageClient: storageClient, multichainProvider: multichainProvider},
@@ -85,7 +86,7 @@ func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Rep
 		Feed:          &FeedAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, cache: feedCache},
 		Interaction:   &InteractionAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Notifications: &NotificationsAPI{queries: queries, loaders: loaders, validator: validator},
-		Admin:         admin.NewAPI(repos, queries, validator, multichainProvider),
+		Admin:         admin.NewAPI(repos, queries, authRefreshCache, validator, multichainProvider),
 		Merch:         &MerchAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, secrets: secrets},
 		Social:        &SocialAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, redis: socialCache},
 		Card:          &CardAPI{validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, secrets: secrets},
@@ -124,6 +125,11 @@ func getAuthenticatedUserID(ctx context.Context) (persist.DBID, error) {
 
 	userID := auth.GetUserIDFromCtx(gc)
 	return userID, nil
+}
+
+func getUserRoles(ctx context.Context) []persist.Role {
+	gc := util.MustGetGinContext(ctx)
+	return auth.GetRolesFromCtx(gc)
 }
 
 func publishEventGroup(ctx context.Context, groupID string, action persist.Action, caption *string) (*db.FeedEvent, error) {
@@ -182,4 +188,36 @@ func pushEvent(ctx context.Context, evt db.Event) {
 		logger.For(ctx).Error(err)
 		sentryutil.ReportError(ctx, err)
 	}
+}
+
+// dbidCache is a lazy cache that stores DBIDs from expensive queries
+type dbidCache struct {
+	*redis.LazyCache
+	CalcFunc func(context.Context) ([]persist.DBID, error)
+}
+
+func newDBIDCache(cache *redis.Cache, key string, ttl time.Duration, f func(context.Context) ([]persist.DBID, error)) dbidCache {
+	return dbidCache{
+		LazyCache: &redis.LazyCache{
+			Cache: cache,
+			Key:   key,
+			TTL:   ttl,
+			CalcFunc: func(ctx context.Context) ([]byte, error) {
+				ids, err := f(ctx)
+				var p positionPaginator
+				b, err := p.encodeCursor(0, ids)
+				return []byte(b), err
+			},
+		},
+	}
+}
+
+func (d dbidCache) Load(ctx context.Context) ([]persist.DBID, error) {
+	b, err := d.LazyCache.Load(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var p positionPaginator
+	_, ids, err := p.decodeCursor(string(b))
+	return ids, err
 }

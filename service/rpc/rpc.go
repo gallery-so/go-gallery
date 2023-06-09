@@ -23,9 +23,12 @@ import (
 	"strings"
 	"time"
 
+	"cloud.google.com/go/storage"
 	"golang.org/x/image/bmp"
+	"google.golang.org/api/option"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/googleapis/gax-go/v2"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/tracing"
@@ -43,8 +46,10 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
+	htransport "google.golang.org/api/transport/http"
 )
 
 func init() {
@@ -53,10 +58,9 @@ func init() {
 }
 
 const (
-	defaultHTTPTimeout             = 600
 	defaultHTTPKeepAlive           = 600
-	defaultHTTPMaxIdleConns        = 100
-	defaultHTTPMaxIdleConnsPerHost = 100
+	defaultHTTPMaxIdleConns        = 250
+	defaultHTTPMaxIdleConnsPerHost = 250
 	GethSocketOpName               = "geth.wss"
 )
 
@@ -67,6 +71,22 @@ var (
 
 // rateLimited is the content returned from an RPC call when rate limited.
 var rateLimited = "429 Too Many Requests"
+
+type ErrEthClient struct {
+	Err error
+}
+
+type ErrTokenURINotFound struct {
+	Err error
+}
+
+func (e ErrEthClient) Error() string {
+	return e.Err.Error()
+}
+
+func (e ErrTokenURINotFound) Error() string {
+	return e.Err.Error()
+}
 
 // Transfer represents a Transfer from the RPC response
 type Transfer struct {
@@ -87,12 +107,6 @@ type Transfer struct {
 type TokenContractMetadata struct {
 	Name   string
 	Symbol string
-}
-
-// ErrHTTP represents an error returned from an HTTP request
-type ErrHTTP struct {
-	URL    string
-	Status int
 }
 
 // NewEthClient returns an ethclient.Client
@@ -140,6 +154,39 @@ func NewEthSocketClient() *ethclient.Client {
 	return NewEthClient()
 }
 
+func NewStorageClient(ctx context.Context) *storage.Client {
+	opts := append([]option.ClientOption{}, option.WithScopes([]string{storage.ScopeFullControl}...))
+
+	if env.GetString("ENV") == "local" {
+		fi, err := util.LoadEncryptedServiceKeyOrError("./secrets/dev/service-key-dev.json")
+		if err != nil {
+			logger.For(ctx).WithError(err).Error("failed to find service key file (local), running without storage client")
+			return nil
+		}
+		opts = append(opts, option.WithCredentialsJSON(fi))
+	}
+
+	transport, err := htransport.NewTransport(ctx, tracing.NewTracingTransport(http.DefaultTransport, false), opts...)
+	if err != nil {
+		panic(err)
+	}
+
+	client, _, err := htransport.NewClient(ctx)
+	if err != nil {
+		panic(err)
+	}
+	client.Transport = transport
+
+	storageClient, err := storage.NewClient(ctx, option.WithHTTPClient(client))
+	if err != nil {
+		panic(err)
+	}
+
+	storageClient.SetRetry(storage.WithPolicy(storage.RetryAlways), storage.WithBackoff(gax.Backoff{Initial: 100 * time.Millisecond, Max: 2 * time.Minute, Multiplier: 1.3}), storage.WithErrorFunc(storage.ShouldRetry))
+
+	return storageClient
+}
+
 // metricsHandler traces RPC records that get logged by the RPC client
 type metricsHandler struct{}
 
@@ -160,25 +207,6 @@ func (h metricsHandler) Log(r *log.Record) error {
 	span.StartTime = r.Time.Add(time.Millisecond * -100)
 
 	return nil
-}
-
-// NewIPFSShell returns an IPFS shell
-func NewIPFSShell() *shell.Shell {
-	sh := shell.NewShellWithClient(env.GetString("IPFS_API_URL"), newClientForIPFS(env.GetString("IPFS_PROJECT_ID"), env.GetString("IPFS_PROJECT_SECRET"), false))
-	sh.SetTimeout(defaultHTTPTimeout * time.Second)
-	return sh
-}
-
-// newHTTPClientForIPFS returns an http.Client configured with default settings intended for IPFS calls.
-func newClientForIPFS(projectID, projectSecret string, continueOnly bool) *http.Client {
-	return &http.Client{
-		Timeout: defaultHTTPTimeout * time.Second,
-		Transport: authTransport{
-			RoundTripper:  tracing.NewTracingTransport(http.DefaultTransport, continueOnly),
-			ProjectID:     projectID,
-			ProjectSecret: projectSecret,
-		},
-	}
 }
 
 // newHTTPClientForRPC returns an http.Client configured with default settings intended for RPC calls.
@@ -221,18 +249,6 @@ func newHTTPClientForRPC(continueTrace bool, spanOptions ...sentry.SpanOption) *
 			MaxIdleConnsPerHost: defaultHTTPMaxIdleConnsPerHost,
 		}, continueTrace, spanOptions...),
 	}
-}
-
-// authTransport decorates each request with a basic auth header.
-type authTransport struct {
-	http.RoundTripper
-	ProjectID     string
-	ProjectSecret string
-}
-
-func (t authTransport) RoundTrip(r *http.Request) (*http.Response, error) {
-	r.SetBasicAuth(t.ProjectID, t.ProjectSecret)
-	return t.RoundTripper.RoundTrip(r)
 }
 
 // NewArweaveClient returns an Arweave client
@@ -340,388 +356,202 @@ func RetryGetTokenContractMetadata(ctx context.Context, contractAddress persist.
 func GetMetadataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shell.Shell, arweaveClient *goar.Client) (persist.TokenMetadata, error) {
 
 	var meta persist.TokenMetadata
-	err := DecodeMetadataFromURI(ctx, turi, &meta, ipfsClient, arweaveClient)
+	r, err := GetDataFromURIAsReader(ctx, turi, ipfsClient, arweaveClient, 1024, time.Minute)
 	if err != nil {
-		return nil, err
+		return meta, err
+	}
+	defer r.Close()
+
+	// decode the json
+	err = json.NewDecoder(r).Decode(&meta)
+	if err != nil {
+		return meta, err
 	}
 
 	return meta, nil
 
 }
 
-// GetDataFromURI calls URI and returns the data
-func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shell.Shell, arweaveClient *goar.Client) ([]byte, error) {
+// GetDataFromURIAsReader calls URI and returns the data as an unread reader with the headers pre-read.
+// retrieveTimeout is the timeout for just the retrieval of the reader, not the reading of the reader which will be handled by the context
+func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClient *shell.Shell, arweaveClient *goar.Client, bufSize int, retrieveTimeout time.Duration) (*util.FileHeaderReader, error) {
 
-	d, _ := ctx.Deadline()
-	logger.For(ctx).Infof("Getting data from URI: %s -timeout: %s -type: %s", turi.String(), time.Until(d), turi.Type())
-	asString := turi.String()
+	errChan := make(chan error)
+	readerChan := make(chan *util.FileHeaderReader)
 
-	switch turi.Type() {
-	case persist.URITypeBase64JSON, persist.URITypeBase64SVG:
-		// decode the base64 encoded json
-		b64data := asString[strings.IndexByte(asString, ',')+1:]
-		decoded, err := base64.RawStdEncoding.DecodeString(string(b64data))
-		if err != nil {
-			decoded, err = base64.StdEncoding.DecodeString(string(b64data))
+	go func() {
+		d, _ := ctx.Deadline()
+		logger.For(ctx).Infof("Getting data from URI: %s -timeout: %s -type: %s", turi.String(), time.Until(d), turi.Type())
+		asString := turi.String()
+
+		switch turi.Type() {
+		case persist.URITypeBase64JSON, persist.URITypeBase64SVG, persist.URITypeBase64HTML, persist.URITypeBase64WAV, persist.URITypeBase64MP3:
+			// decode the base64 encoded json
+			b64data := asString[strings.IndexByte(asString, ',')+1:]
+			decoded, err := util.Base64Decode(b64data, base64.RawStdEncoding, base64.StdEncoding, base64.RawURLEncoding, base64.URLEncoding)
 			if err != nil {
-				return nil, fmt.Errorf("error decoding base64 data: %s \n\n%s", err, b64data)
+				errChan <- fmt.Errorf("error decoding base64 data: %s \n\n%s", err, b64data)
+				return
 			}
-		}
 
-		return util.RemoveBOM(decoded), nil
-	case persist.URITypeIPFS, persist.URITypeIPFSGateway:
-		path := util.GetURIPath(asString, true)
+			buf := bytes.NewBuffer(util.RemoveBOM(decoded))
 
-		bs, err := GetIPFSData(ctx, ipfsClient, path)
-		if err != nil {
-			return nil, err
-		}
-
-		return util.RemoveBOM(bs), nil
-	case persist.URITypeArweave:
-		path := util.GetURIPath(asString, true)
-
-		bs, err := GetArweaveData(arweaveClient, path)
-		if err != nil {
-			bs, err = GetArweaveDataHTTP(ctx, path)
+			readerChan <- util.NewFileHeaderReader(buf, bufSize)
+		case persist.URITypeBase64BMP:
+			b64data := asString[strings.IndexByte(asString, ',')+1:]
+			decoded, err := util.Base64Decode(b64data, base64.RawStdEncoding, base64.StdEncoding, base64.RawURLEncoding, base64.URLEncoding)
 			if err != nil {
-				return nil, err
+				errChan <- fmt.Errorf("error decoding base64 bmp data: %s \n\n%s", err, b64data)
+				return
 			}
-		}
-		return util.RemoveBOM(bs), nil
-	case persist.URITypeHTTP:
-
-		req, err := http.NewRequestWithContext(ctx, "GET", asString, nil)
-		if err != nil {
-			return nil, fmt.Errorf("error creating request: %s", err)
-		}
-		resp, err := defaultHTTPClient.Do(req)
-		if err != nil {
-			if dnsErr, ok := err.(*net.DNSError); ok {
-				return nil, dnsErr
-			}
-			if urlErr, ok := err.(*url.Error); ok {
-				return nil, urlErr
-			}
-			return nil, fmt.Errorf("error getting data from http: %s", err)
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode > 399 || resp.StatusCode < 200 {
-			return nil, ErrHTTP{Status: resp.StatusCode, URL: asString}
-		}
-		buf := &bytes.Buffer{}
-		err = util.CopyMax(buf, resp.Body, 1024*1024*1024)
-		if err != nil {
-			return nil, fmt.Errorf("error getting data from http: %s - %s", err, asString)
-		}
-
-		return util.RemoveBOM(buf.Bytes()), nil
-	case persist.URITypeIPFSAPI:
-		parsedURL, err := url.Parse(asString)
-		if err != nil {
-			return nil, err
-		}
-		path := parsedURL.Query().Get("arg")
-		bs, err := GetIPFSData(ctx, ipfsClient, path)
-		if err != nil {
-			return nil, err
-		}
-
-		return util.RemoveBOM(bs), nil
-	case persist.URITypeJSON, persist.URITypeSVG:
-		idx := strings.IndexByte(asString, ',')
-		if idx == -1 {
-			return util.RemoveBOM([]byte(asString)), nil
-		}
-		return util.RemoveBOM([]byte(asString[idx+1:])), nil
-	case persist.URITypeBase64BMP:
-		b64data := asString[strings.IndexByte(asString, ',')+1:]
-		decoded, err := base64.RawStdEncoding.DecodeString(string(b64data))
-		if err != nil {
-			decoded, err = base64.StdEncoding.DecodeString(string(b64data))
+			img, err := bmp.Decode(bytes.NewReader(decoded))
 			if err != nil {
-				return nil, fmt.Errorf("error decoding base64 bmp data: %s \n\n%s", err, b64data)
+				errChan <- fmt.Errorf("error decoding bmp data: %s \n\n%s", err, b64data)
+				return
 			}
-		}
-		img, err := bmp.Decode(bytes.NewReader(decoded))
-		if err != nil {
-			return nil, fmt.Errorf("error decoding bmp data: %s \n\n%s", err, b64data)
-		}
-		newImage := &bytes.Buffer{}
-		err = jpeg.Encode(newImage, img, nil)
-		if err != nil {
-			return nil, fmt.Errorf("error encoding jpeg data: %s \n\n%s", err, b64data)
-		}
-		return util.RemoveBOM(newImage.Bytes()), nil
-	case persist.URITypeBase64PNG:
-		b64data := asString[strings.IndexByte(asString, ',')+1:]
-		decoded, err := base64.RawStdEncoding.DecodeString(string(b64data))
-		if err != nil {
-			decoded, err = base64.StdEncoding.DecodeString(string(b64data))
+			newImage := bytes.NewBuffer(nil)
+			err = jpeg.Encode(newImage, img, nil)
 			if err != nil {
-				return nil, fmt.Errorf("error decoding base64 png data: %s \n\n%s", err, b64data)
+				errChan <- fmt.Errorf("error encoding jpeg data: %s \n\n%s", err, b64data)
+				return
 			}
-		}
-		img, err := png.Decode(bytes.NewReader(decoded))
-		if err != nil {
-			return nil, fmt.Errorf("error decoding png data: %s \n\n%s", err, b64data)
-		}
-		newImage := &bytes.Buffer{}
-		err = png.Encode(newImage, img)
-		if err != nil {
-			return nil, fmt.Errorf("error encoding jpeg data: %s \n\n%s", err, b64data)
-		}
-		return util.RemoveBOM(newImage.Bytes()), nil
-	default:
-		return []byte(turi), nil
-	}
-
-}
-
-// GetDataFromURIAsReader calls URI and returns the data as an unread reader with the headers pre-read
-func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClient *shell.Shell, arweaveClient *goar.Client) (*util.FileHeaderReader, error) {
-
-	d, _ := ctx.Deadline()
-	logger.For(ctx).Infof("Getting data from URI: %s -timeout: %s -type: %s", turi.String(), time.Until(d), turi.Type())
-	asString := turi.String()
-
-	switch turi.Type() {
-	case persist.URITypeBase64JSON, persist.URITypeBase64SVG:
-		// decode the base64 encoded json
-		b64data := asString[strings.IndexByte(asString, ',')+1:]
-		decoded, err := base64.RawStdEncoding.DecodeString(string(b64data))
-		if err != nil {
-			decoded, err = base64.StdEncoding.DecodeString(string(b64data))
+			readerChan <- util.NewFileHeaderReader(newImage, bufSize)
+		case persist.URITypeBase64PNG:
+			b64data := asString[strings.IndexByte(asString, ',')+1:]
+			decoded, err := util.Base64Decode(b64data, base64.RawStdEncoding, base64.StdEncoding, base64.RawURLEncoding, base64.URLEncoding)
 			if err != nil {
-				return nil, fmt.Errorf("error decoding base64 data: %s \n\n%s", err, b64data)
+				errChan <- fmt.Errorf("error decoding base64 png data: %s \n\n%s", err, b64data)
+				return
 			}
-		}
+			img, err := png.Decode(bytes.NewReader(decoded))
+			if err != nil {
+				errChan <- fmt.Errorf("error decoding png data: %s \n\n%s", err, b64data)
+				return
+			}
+			newImage := bytes.NewBuffer(nil)
+			err = png.Encode(newImage, img)
+			if err != nil {
+				errChan <- fmt.Errorf("error encoding jpeg data: %s \n\n%s", err, b64data)
+				return
+			}
+			readerChan <- util.NewFileHeaderReader(newImage, bufSize)
+		case persist.URITypeBase64JPEG:
+			b64data := asString[strings.IndexByte(asString, ',')+1:]
+			decoded, err := util.Base64Decode(b64data, base64.RawStdEncoding, base64.StdEncoding, base64.RawURLEncoding, base64.URLEncoding)
+			if err != nil {
+				errChan <- fmt.Errorf("error decoding base64 jpeg data: %s \n\n%s", err, b64data)
+				return
+			}
+			img, err := jpeg.Decode(bytes.NewReader(decoded))
+			if err != nil {
+				errChan <- fmt.Errorf("error decoding jpeg data: %s \n\n%s", err, b64data)
+				return
+			}
+			newImage := bytes.NewBuffer(nil)
+			err = jpeg.Encode(newImage, img, nil)
+			if err != nil {
+				errChan <- fmt.Errorf("error encoding jpeg data: %s \n\n%s", err, b64data)
+				return
+			}
+			readerChan <- util.NewFileHeaderReader(newImage, bufSize)
+		case persist.URITypeArweave, persist.URITypeArweaveGateway:
+			path := util.GetURIPath(asString, true)
 
-		buf := bytes.NewBuffer(util.RemoveBOM(decoded))
-
-		return util.NewFileHeaderReader(buf), nil
-	case persist.URITypeIPFS:
-		path := util.GetURIPath(asString, true)
-		resp, err := GetIPFSResponse(ctx, ipfsClient, path)
-		if err != nil {
-			return nil, err
-		}
-
-		return util.NewFileHeaderReader(resp), nil
-	case persist.URITypeArweave:
-		path := util.GetURIPath(asString, true)
-
-		bs, err := GetArweaveData(arweaveClient, path)
-		if err != nil {
 			resp, err := GetArweaveDataHTTPReader(ctx, path)
 			if err != nil {
-				return nil, err
+				errChan <- err
+				return
 			}
-			return util.NewFileHeaderReader(resp), nil
-		}
-		buf := bytes.NewBuffer(util.RemoveBOM(bs))
-		return util.NewFileHeaderReader(buf), nil
-	case persist.URITypeIPFSGateway:
-		path := util.GetURIPath(asString, false)
-		resp, err := GetIPFSResponse(ctx, ipfsClient, path)
-		if err != nil {
-			logger.For(ctx).Errorf("Error getting data from IPFS: %s", err)
-		} else {
-			return util.NewFileHeaderReader(resp), nil
-		}
-		fallthrough
-	case persist.URITypeHTTP:
-		req, err := http.NewRequestWithContext(ctx, "GET", asString, nil)
-		if err != nil {
-			return nil, fmt.Errorf("error creating request: %s", err)
-		}
-		resp, err := defaultHTTPClient.Do(req)
-		if err != nil {
-			if dnsErr, ok := err.(*net.DNSError); ok {
-				return nil, dnsErr
-			}
-			if urlErr, ok := err.(*url.Error); ok {
-				return nil, urlErr
-			}
-			return nil, fmt.Errorf("error getting data from http: %s <%T>", err, err)
-		}
-		if resp.StatusCode > 399 || resp.StatusCode < 200 {
-			return nil, ErrHTTP{Status: resp.StatusCode, URL: asString}
-		}
-		return util.NewFileHeaderReader(resp.Body), nil
-	case persist.URITypeIPFSAPI:
-		parsedURL, err := url.Parse(asString)
-		if err != nil {
-			return nil, err
-		}
-		path := parsedURL.Query().Get("arg")
-		resp, err := GetIPFSResponse(ctx, ipfsClient, path)
-		if err != nil {
-			return nil, err
-		}
 
-		return util.NewFileHeaderReader(resp), nil
-	case persist.URITypeJSON, persist.URITypeSVG:
-		// query unescape asString first
-		asString, err := url.QueryUnescape(asString)
-		if err != nil {
-			logger.For(ctx).Errorf("error unescaping uri: %s", err)
-			asString = turi.String()
-		}
-		idx := strings.IndexByte(asString, ',')
-		if idx == -1 {
-			buf := bytes.NewBuffer(util.RemoveBOM([]byte(asString)))
-			return util.NewFileHeaderReader(buf), nil
-		}
-		buf := bytes.NewBuffer(util.RemoveBOM([]byte(asString[idx+1:])))
-		return util.NewFileHeaderReader(buf), nil
-	case persist.URITypeBase64BMP:
-		b64data := asString[strings.IndexByte(asString, ',')+1:]
-		decoded, err := base64.RawStdEncoding.DecodeString(string(b64data))
-		if err != nil {
-			decoded, err = base64.StdEncoding.DecodeString(string(b64data))
+			readerChan <- util.NewFileHeaderReader(resp, bufSize)
+		case persist.URITypeIPFS:
+			path := util.GetURIPath(asString, true)
+			resp, err := ipfs.GetIPFSResponse(ctx, *defaultHTTPClient, ipfsClient, path)
 			if err != nil {
-				return nil, fmt.Errorf("error decoding base64 bmp data: %s \n\n%s", err, b64data)
+				errChan <- err
+				return
 			}
-		}
-		img, err := bmp.Decode(bytes.NewReader(decoded))
-		if err != nil {
-			return nil, fmt.Errorf("error decoding bmp data: %s \n\n%s", err, b64data)
-		}
-		newImage := &bytes.Buffer{}
-		err = jpeg.Encode(newImage, img, nil)
-		if err != nil {
-			return nil, fmt.Errorf("error encoding jpeg data: %s \n\n%s", err, b64data)
-		}
-		return util.NewFileHeaderReader(newImage), nil
-	case persist.URITypeBase64PNG:
-		b64data := asString[strings.IndexByte(asString, ',')+1:]
-		decoded, err := base64.RawStdEncoding.DecodeString(string(b64data))
-		if err != nil {
-			decoded, err = base64.StdEncoding.DecodeString(string(b64data))
+
+			readerChan <- util.NewFileHeaderReader(resp, bufSize)
+		case persist.URITypeIPFSGateway:
+			path := util.GetURIPath(asString, false)
+			resp, err := ipfs.GetIPFSResponse(ctx, *defaultHTTPClient, ipfsClient, path)
 			if err != nil {
-				return nil, fmt.Errorf("error decoding base64 png data: %s \n\n%s", err, b64data)
+				logger.For(ctx).Errorf("Error getting data from IPFS: %s", err)
+			} else {
+				readerChan <- util.NewFileHeaderReader(resp, bufSize)
+				return
 			}
-		}
-		img, err := png.Decode(bytes.NewReader(decoded))
-		if err != nil {
-			return nil, fmt.Errorf("error decoding png data: %s \n\n%s", err, b64data)
-		}
-		newImage := &bytes.Buffer{}
-		err = png.Encode(newImage, img)
-		if err != nil {
-			return nil, fmt.Errorf("error encoding jpeg data: %s \n\n%s", err, b64data)
-		}
-		return util.NewFileHeaderReader(newImage), nil
-	default:
-		buf := bytes.NewBuffer([]byte(turi))
-		return util.NewFileHeaderReader(buf), nil
-	}
-
-}
-
-// DecodeMetadataFromURI calls URI and decodes the data into a metadata map
-func DecodeMetadataFromURI(ctx context.Context, turi persist.TokenURI, into *persist.TokenMetadata, ipfsClient *shell.Shell, arweaveClient *goar.Client) error {
-
-	d, _ := ctx.Deadline()
-	logger.For(ctx).Debugf("Getting metadata from URI: %s -timeout: %s", turi.String(), time.Until(d))
-	asString := turi.String()
-
-	logger.For(ctx).Debugf("Getting metadata from %s with type %s", asString, turi.Type())
-
-	switch turi.Type() {
-	case persist.URITypeBase64JSON:
-		// decode the base64 encoded json
-		b64data := asString[strings.IndexByte(asString, ',')+1:]
-		decoded, err := base64.RawStdEncoding.DecodeString(string(b64data))
-		if err != nil {
-			decoded, err = base64.StdEncoding.DecodeString(string(b64data))
+			fallthrough
+		case persist.URITypeHTTP:
+			req, err := http.NewRequestWithContext(ctx, "GET", asString, nil)
 			if err != nil {
-				return fmt.Errorf("error decoding base64 data: %s \n\n%s", err, b64data)
+				errChan <- fmt.Errorf("error creating request: %s", err)
+				return
 			}
-		}
-
-		return json.Unmarshal(util.RemoveBOM(decoded), into)
-	case persist.URITypeBase64SVG:
-		b64data := asString[strings.IndexByte(asString, ',')+1:]
-		decoded, err := base64.RawStdEncoding.DecodeString(string(b64data))
-		if err != nil {
-			decoded, err = base64.StdEncoding.DecodeString(string(b64data))
+			resp, err := defaultHTTPClient.Do(req)
 			if err != nil {
-				return fmt.Errorf("error decoding base64 data: %s \n\n%s", err, b64data)
+				if dnsErr, ok := err.(*net.DNSError); ok {
+					errChan <- dnsErr
+					return
+				}
+				if urlErr, ok := err.(*url.Error); ok {
+					errChan <- urlErr
+					return
+				}
+				errChan <- fmt.Errorf("error getting data from http: %s <%T>", err, err)
+				return
 			}
-		}
-		*into = persist.TokenMetadata{"image": string(decoded)}
-		return nil
-	case persist.URITypeIPFS, persist.URITypeIPFSGateway:
-
-		bs, err := GetIPFSData(ctx, ipfsClient, util.GetURIPath(asString, false))
-		if err != nil {
-			return err
-		}
-		return json.Unmarshal(util.RemoveBOM(bs), into)
-	case persist.URITypeArweave:
-		path := strings.ReplaceAll(asString, "arweave://", "")
-		path = strings.ReplaceAll(path, "ar://", "")
-		result, err := GetArweaveData(arweaveClient, path)
-		if err != nil {
-			result, err = GetArweaveDataHTTP(ctx, path)
+			if resp.StatusCode > 399 || resp.StatusCode < 200 {
+				errChan <- util.ErrHTTP{Status: resp.StatusCode, URL: asString}
+				return
+			}
+			readerChan <- util.NewFileHeaderReader(resp.Body, bufSize)
+		case persist.URITypeIPFSAPI:
+			parsedURL, err := url.Parse(asString)
 			if err != nil {
-				return err
+				errChan <- err
+				return
 			}
-		}
-		return json.Unmarshal(result, into)
-	case persist.URITypeHTTP:
+			path := parsedURL.Query().Get("arg")
+			resp, err := ipfs.GetIPFSResponse(ctx, *defaultHTTPClient, ipfsClient, path)
+			if err != nil {
+				errChan <- err
+				return
+			}
 
-		req, err := http.NewRequestWithContext(ctx, "GET", asString, nil)
-		if err != nil {
-			return fmt.Errorf("error creating request: %s", err)
+			readerChan <- util.NewFileHeaderReader(resp, bufSize)
+		case persist.URITypeJSON, persist.URITypeSVG:
+			// query unescape asString first
+			asString, err := url.QueryUnescape(asString)
+			if err != nil {
+				logger.For(ctx).Errorf("error unescaping uri: %s", err)
+				asString = turi.String()
+			}
+			idx := strings.IndexByte(asString, ',')
+			if idx == -1 {
+				buf := bytes.NewBuffer(util.RemoveBOM([]byte(asString)))
+				readerChan <- util.NewFileHeaderReader(buf, bufSize)
+				return
+			}
+			buf := bytes.NewBuffer(util.RemoveBOM([]byte(asString[idx+1:])))
+			readerChan <- util.NewFileHeaderReader(buf, bufSize)
+		default:
+			buf := bytes.NewBuffer([]byte(turi))
+			readerChan <- util.NewFileHeaderReader(buf, bufSize)
 		}
-		resp, err := defaultHTTPClient.Do(req)
-		if err != nil {
-			return fmt.Errorf("error getting metadata from http: %s", err)
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode > 399 || resp.StatusCode < 200 {
-			return ErrHTTP{Status: resp.StatusCode, URL: asString}
-		}
-		return json.NewDecoder(resp.Body).Decode(into)
-	case persist.URITypeIPFSAPI:
-		parsedURL, err := url.Parse(asString)
-		if err != nil {
-			return err
-		}
-		query := parsedURL.Query().Get("arg")
-		it, err := ipfsClient.Cat(query)
-		if err != nil {
-			return err
-		}
-		defer it.Close()
-		return json.NewDecoder(it).Decode(into)
-	case persist.URITypeJSON, persist.URITypeSVG:
-		idx := strings.IndexByte(asString, '{')
-		if idx == -1 {
-			return json.Unmarshal(util.RemoveBOM([]byte(asString)), into)
-		}
-		return json.Unmarshal(util.RemoveBOM([]byte(asString[idx:])), into)
+	}()
 
-	default:
-		return fmt.Errorf("unknown token URI type for metadata: %s", turi.Type())
-	}
-
-}
-
-func GetIPFSData(pCtx context.Context, ipfsClient *shell.Shell, path string) ([]byte, error) {
-	response, err := GetIPFSResponse(pCtx, ipfsClient, path)
-	if err != nil {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case err := <-errChan:
 		return nil, err
+	case reader := <-readerChan:
+		return reader, nil
+	case <-time.After(retrieveTimeout):
+		return nil, fmt.Errorf("%s: timeout retrieving data from uri: %s", context.DeadlineExceeded.Error(), turi.String())
 	}
-	defer response.Close()
-	buf := &bytes.Buffer{}
-	if err := util.CopyMax(buf, response, 1024*1024*1024); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
 }
 
 func getHeaders(ctx context.Context, method, url string) (http.Header, error) {
@@ -736,7 +566,7 @@ func getHeaders(ctx context.Context, method, url string) (http.Header, error) {
 	}
 
 	if resp.StatusCode > 399 || resp.StatusCode < 200 {
-		return nil, ErrHTTP{Status: resp.StatusCode, URL: url}
+		return nil, util.ErrHTTP{Status: resp.StatusCode, URL: url}
 	}
 
 	defer resp.Body.Close()
@@ -763,144 +593,34 @@ func parseContentType(contentType string) string {
 	return contentType
 }
 
-type fetchResulter interface {
-	Error() error
-}
-
 type headerResult struct {
 	contentType   string
 	contentLength int64
-	err           error
-}
-
-func (r headerResult) Error() error {
-	return r.err
-}
-
-type ipfsResult struct {
-	resp io.ReadCloser
-	err  error
-}
-
-func (r ipfsResult) Error() error {
-	return r.err
-}
-
-func firstNonError(ctx context.Context, fetches ...func(context.Context) fetchResulter) fetchResulter {
-	c := make(chan fetchResulter)
-	done := make(chan bool)
-
-	for i := range fetches {
-		go func(i int) {
-			select {
-			case <-ctx.Done():
-				return
-			case <-done:
-				return
-			case c <- fetches[i](ctx):
-			}
-		}(i)
-	}
-
-	var lastError fetchResulter
-
-	for i := 0; i < len(fetches); i++ {
-		r := <-c
-		if r.Error() == nil {
-			close(done)
-			return r
-		}
-		lastError = r
-		i++
-	}
-
-	return lastError
 }
 
 func getContentHeaders(ctx context.Context, url string) (contentType string, contentLength int64, err error) {
-	contentHeader := func(method, url string) func(ctx context.Context) fetchResulter {
-		return func(ctx context.Context) fetchResulter {
+	contentHeader := func(method, url string) func(ctx context.Context) (headerResult, error) {
+		return func(ctx context.Context) (headerResult, error) {
 			headers, err := getHeaders(ctx, method, url)
 			if err != nil {
-				return headerResult{err: err}
+				return headerResult{}, err
 			}
 			contentType := parseContentType(headers.Get("Content-Type"))
 			contentLength, err := parseContentLength(headers.Get("Content-Length"))
-			return headerResult{contentType, contentLength, err}
+			if err != nil {
+				return headerResult{}, err
+			}
+			return headerResult{contentType, contentLength}, nil
 		}
 	}
 	fromHEAD := contentHeader(http.MethodHead, url)
 	fromGET := contentHeader(http.MethodGet, url)
-	result := firstNonError(ctx, fromHEAD, fromGET)
-	headers := result.(headerResult)
-	return headers.contentType, headers.contentLength, headers.Error()
-}
-
-func GetIPFSResponse(pCtx context.Context, ipfsClient *shell.Shell, path string) (io.ReadCloser, error) {
-	fromHTTP := func(ctx context.Context) fetchResulter {
-		url := fmt.Sprintf("%s/ipfs/%s", env.GetString("IPFS_URL"), path)
-		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-		if err != nil {
-			return ipfsResult{err: err}
-		}
-
-		resp, err := defaultHTTPClient.Do(req)
-		if err != nil {
-			return ipfsResult{err: err}
-		}
-
-		if resp.StatusCode > 399 || resp.StatusCode < 200 {
-			url := fmt.Sprintf("%s/ipfs/%s", env.GetString("FALLBACK_IPFS_URL"), path)
-			req, err = http.NewRequestWithContext(ctx, "GET", url, nil)
-			if err != nil {
-				return ipfsResult{err: err}
-			}
-
-			resp, err = defaultHTTPClient.Do(req)
-			if err != nil {
-				return ipfsResult{err: err}
-			}
-			if resp.StatusCode > 399 || resp.StatusCode < 200 {
-				return ipfsResult{err: ErrHTTP{Status: resp.StatusCode, URL: url}}
-			}
-			logger.For(ctx).Infof("IPFS HTTP fallback fallback successful %s", path)
-		}
-
-		logger.For(ctx).Infof("IPFS HTTP fallback successful %s", path)
-
-		return ipfsResult{resp: resp.Body}
+	result, err := util.FirstNonErrorWithValue(ctx, true, retry.HTTPErrNotFound, fromHEAD, fromGET)
+	if err != nil {
+		return "", 0, err
 	}
 
-	fromIPFS := func(ctx context.Context) fetchResulter {
-		reader, err := ipfsClient.Cat(path)
-		logger.For(ctx).Infof("IPFS cat fallback successful %s", path)
-		return ipfsResult{reader, err}
-	}
-
-	fromIPFSAPI := func(ctx context.Context) fetchResulter {
-		url := fmt.Sprintf("https://ipfs.io/ipfs/%s", path)
-		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-		if err != nil {
-			return ipfsResult{err: err}
-		}
-
-		resp, err := defaultHTTPClient.Do(req)
-		if err != nil {
-			return ipfsResult{err: err}
-		}
-
-		if resp.StatusCode > 399 || resp.StatusCode < 200 {
-			return ipfsResult{err: ErrHTTP{Status: resp.StatusCode, URL: url}}
-		}
-
-		logger.For(ctx).Infof("IPFS API fallback successful %s", path)
-
-		return ipfsResult{resp: resp.Body}
-	}
-
-	result := firstNonError(pCtx, fromHTTP, fromIPFS, fromIPFSAPI)
-	response := result.(ipfsResult)
-	return response.resp, response.Error()
+	return result.contentType, result.contentLength, nil
 }
 
 // GetIPFSHeaders returns the headers for the given IPFS hash
@@ -917,15 +637,13 @@ func GetHTTPHeaders(ctx context.Context, url string) (contentType string, conten
 // GetTokenURI returns metadata URI for a given token address.
 func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAddress persist.EthereumAddress, pTokenID persist.TokenID, ethClient *ethclient.Client) (persist.TokenURI, error) {
 
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
-	defer cancel()
-	contract := common.HexToAddress(string(pContractAddress))
+	contract := pContractAddress.Address()
 	switch pTokenType {
 	case persist.TokenTypeERC721:
 
 		instance, err := contracts.NewIERC721MetadataCaller(contract, ethClient)
 		if err != nil {
-			return "", err
+			return "", ErrEthClient{err}
 		}
 
 		logger.For(ctx).Debugf("Token ID: %s\tToken Address: %s", pTokenID.String(), contract.Hex())
@@ -934,7 +652,8 @@ func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAdd
 			Context: ctx,
 		}, pTokenID.BigInt())
 		if err != nil {
-			return "", err
+			logger.For(ctx).Errorf("Error getting token URI: %s (%T)", err, err)
+			return "", ErrTokenURINotFound{err}
 		}
 
 		return persist.TokenURI(strings.ReplaceAll(turi, "\x00", "")), nil
@@ -942,7 +661,7 @@ func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAdd
 
 		instance, err := contracts.NewIERC1155MetadataURICaller(contract, ethClient)
 		if err != nil {
-			return "", err
+			return "", ErrEthClient{err}
 		}
 
 		logger.For(ctx).Debugf("Token ID: %d\tToken Address: %s", pTokenID.BigInt().Uint64(), contract.Hex())
@@ -951,21 +670,26 @@ func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAdd
 			Context: ctx,
 		}, pTokenID.BigInt())
 		if err != nil {
-			return "", err
+			logger.For(ctx).Errorf("Error getting token URI: %s (%T)", err, err)
+			return "", ErrTokenURINotFound{err}
 		}
 
-		return persist.TokenURI(strings.ReplaceAll(turi, "\x00", "")), nil
+		return persist.TokenURI(strings.ReplaceAll(turi, "\x00", "")).ReplaceID(pTokenID), nil
 
 	default:
-		if tokenURI, err := GetTokenURI(ctx, persist.TokenTypeERC721, pContractAddress, pTokenID, ethClient); err == nil {
+		tokenURI, err := GetTokenURI(ctx, persist.TokenTypeERC721, pContractAddress, pTokenID, ethClient)
+		if err == nil {
 			return tokenURI, nil
 		}
 
-		if tokenURI, err := GetTokenURI(ctx, persist.TokenTypeERC1155, pContractAddress, pTokenID, ethClient); err == nil {
+		tokenURI, err = GetTokenURI(ctx, persist.TokenTypeERC1155, pContractAddress, pTokenID, ethClient)
+		if err == nil {
 			return tokenURI, nil
 		}
 
-		return "", fmt.Errorf("unsupported token type: %s", pTokenType)
+		logger.For(ctx).Errorf("Error getting token URI: %s (%T) (token type: %s)", err, err, pTokenType)
+
+		return "", err
 	}
 }
 
@@ -1144,62 +868,90 @@ type arweaveManifest struct {
 }
 
 // GetArweaveData returns the data from an Arweave transaction
-func GetArweaveData(client *goar.Client, id string) ([]byte, error) {
-	splitPath := strings.Split(id, "/")
-	var data []byte
-	var tx *goartypes.Transaction
-	currentID := splitPath[0]
-	for i := range splitPath {
-		t, err := client.GetTransactionByID(currentID)
-		if err != nil {
-			return nil, fmt.Errorf("error getting transaction: %s", err.Error())
-		}
-		tx = t
-		data, err = client.GetTransactionData(currentID)
-		if err != nil {
-			return nil, fmt.Errorf("error getting transaction data: %s", err.Error())
-		}
-		if i < len(splitPath)-1 {
-			decoded, err := base64.RawStdEncoding.DecodeString(string(data))
-			var manifest arweaveManifest
-			err = json.Unmarshal(decoded, &manifest)
+func GetArweaveData(ctx context.Context, client *goar.Client, id string) ([]byte, error) {
+
+	resultChan := make(chan []byte)
+	errChan := make(chan error)
+	f := func() ([]byte, error) {
+		splitPath := strings.Split(id, "/")
+		var data []byte
+		var tx *goartypes.Transaction
+		currentID := splitPath[0]
+		for i := range splitPath {
+			t, err := client.GetTransactionByID(currentID)
 			if err != nil {
-				return nil, fmt.Errorf("error unmarshalling manifest: %s - %s", err.Error(), string(decoded))
+				return nil, fmt.Errorf("error getting transaction: %s", err.Error())
 			}
-			currentID = manifest.Paths[splitPath[i+1]].ID
+			tx = t
+			data, err = client.GetTransactionData(currentID)
+			if err != nil {
+				return nil, fmt.Errorf("error getting transaction data: %s", err.Error())
+			}
+			if i < len(splitPath)-1 {
+				decoded, err := base64.RawStdEncoding.DecodeString(string(data))
+				if err != nil {
+					return nil, fmt.Errorf("error decoding data: %s", err.Error())
+				}
+				var manifest arweaveManifest
+				err = json.Unmarshal(decoded, &manifest)
+				if err != nil {
+					return nil, fmt.Errorf("error unmarshalling manifest: %s - %s", err.Error(), string(decoded))
+				}
+				currentID = manifest.Paths[splitPath[i+1]].ID
+			}
 		}
+
+		decoded, err := base64.RawURLEncoding.DecodeString(string(data))
+		if err == nil {
+			data = decoded
+		}
+
+		for _, tag := range tx.Tags {
+			decodedName, err := base64.RawURLEncoding.DecodeString(tag.Name)
+			if err != nil {
+				return nil, fmt.Errorf("error decoding tag name: %s", err.Error())
+			}
+			if strings.EqualFold(string(decodedName), "Content-Encoding") {
+				decodedValue, err := base64.RawURLEncoding.DecodeString(tag.Value)
+				if err != nil {
+					return nil, fmt.Errorf("error decoding tag value: %s", err.Error())
+				}
+				if strings.EqualFold(string(decodedValue), "gzip") {
+					zipped, err := gzip.NewReader(bytes.NewReader(data))
+					if err != nil {
+						return nil, fmt.Errorf("error unzipping data: %s", err.Error())
+					}
+					defer zipped.Close()
+					buf := new(bytes.Buffer)
+					_, err = io.Copy(buf, zipped)
+					if err != nil {
+						return nil, fmt.Errorf("error copying data: %s", err.Error())
+					}
+					data = buf.Bytes()
+				}
+			}
+		}
+		return util.RemoveBOM(data), nil
 	}
 
-	decoded, err := base64.RawURLEncoding.DecodeString(string(data))
-	if err == nil {
-		data = decoded
+	go func() {
+		data, err := f()
+		if err != nil {
+			errChan <- err
+			return
+		}
+		resultChan <- data
+	}()
+
+	select {
+	case data := <-resultChan:
+		return data, nil
+	case err := <-errChan:
+		return nil, err
+	case <-ctx.Done():
+		return nil, ctx.Err()
 	}
 
-	for _, tag := range tx.Tags {
-		decodedName, err := base64.RawURLEncoding.DecodeString(tag.Name)
-		if err != nil {
-			return nil, fmt.Errorf("error decoding tag name: %s", err.Error())
-		}
-		if strings.EqualFold(string(decodedName), "Content-Encoding") {
-			decodedValue, err := base64.RawURLEncoding.DecodeString(tag.Value)
-			if err != nil {
-				return nil, fmt.Errorf("error decoding tag value: %s", err.Error())
-			}
-			if strings.EqualFold(string(decodedValue), "gzip") {
-				zipped, err := gzip.NewReader(bytes.NewReader(data))
-				if err != nil {
-					return nil, fmt.Errorf("error unzipping data: %s", err.Error())
-				}
-				buf := new(bytes.Buffer)
-				_, err = io.Copy(buf, zipped)
-				if err != nil {
-					return nil, fmt.Errorf("error copying data: %s", err.Error())
-				}
-				data = buf.Bytes()
-			}
-		}
-	}
-	return util.RemoveBOM(data), nil
 }
 
 func GetArweaveDataHTTPReader(ctx context.Context, id string) (io.ReadCloser, error) {
@@ -1209,7 +961,15 @@ func GetArweaveDataHTTPReader(ctx context.Context, id string) (io.ReadCloser, er
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error getting data: %s", err.Error())
+		url := ""
+		if req.URL != nil {
+			url = req.URL.String()
+		}
+		var status int
+		if resp != nil {
+			status = resp.StatusCode
+		}
+		return nil, util.ErrHTTP{Err: err, URL: url, Status: status}
 	}
 	return resp.Body, nil
 }
@@ -1255,10 +1015,6 @@ func padHex(pHex string, pLength int) string {
 		pHex = "0" + pHex
 	}
 	return pHex
-}
-
-func (h ErrHTTP) Error() string {
-	return fmt.Sprintf("HTTP Error Status - %d | URL - %s", h.Status, h.URL)
 }
 
 // valFromSlice returns the value from a slice formatted as [key val key val ...]

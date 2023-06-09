@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/auth/basicauth"
 	"time"
+
+	"github.com/mikeydub/go-gallery/service/auth/basicauth"
 
 	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
 	taskspb "cloud.google.com/go/cloudtasks/apiv2/cloudtaskspb"
@@ -33,23 +34,14 @@ type FeedbotMessage struct {
 }
 
 type TokenProcessingUserMessage struct {
-	UserID   persist.DBID   `json:"user_id" binding:"required"`
-	TokenIDs []persist.DBID `json:"token_ids" binding:"required"`
+	UserID   persist.DBID    `json:"user_id" binding:"required"`
+	TokenIDs []persist.DBID  `json:"token_ids" binding:"required"`
+	Chains   []persist.Chain `json:"chains" binding:"required"`
 }
 
 type TokenProcessingContractTokensMessage struct {
-	ContractID        persist.DBID `json:"contract_id" binding:"required"`
-	Imagekeywords     []string     `json:"image_keywords" binding:"required"`
-	Animationkeywords []string     `json:"animation_keywords" binding:"required"`
-	ForceRefresh      bool         `json:"force_refresh"`
-}
-
-// DeepRefreshMessage is the input message to the indexer-api for deep refreshes
-type DeepRefreshMessage struct {
-	OwnerAddress    persist.EthereumAddress `json:"owner_address"`
-	TokenID         persist.TokenID         `json:"token_id"`
-	ContractAddress persist.EthereumAddress `json:"contract_address"`
-	RefreshRange    persist.BlockRange      `json:"refresh_range"`
+	ContractID   persist.DBID `json:"contract_id" binding:"required"`
+	ForceRefresh bool         `json:"force_refresh"`
 }
 
 type ValidateNFTsMessage struct {
@@ -175,6 +167,7 @@ func CreateTaskForTokenProcessing(ctx context.Context, client *gcptasks.Client, 
 	tracing.AddEventDataToSpan(span, map[string]interface{}{"User ID": message.UserID})
 
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
+
 	task := &taskspb.Task{
 		DispatchDeadline: durationpb.New(time.Minute * 30),
 		MessageType: &taskspb.Task_HttpRequest{
@@ -206,37 +199,12 @@ func CreateTaskForContractOwnerProcessing(ctx context.Context, message TokenProc
 	})
 
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
+
 	task := &taskspb.Task{
 		MessageType: &taskspb.Task_HttpRequest{
 			HttpRequest: &taskspb.HttpRequest{
 				HttpMethod: taskspb.HttpMethod_POST,
 				Url:        fmt.Sprintf("%s/owners/process/contract", env.GetString("TOKEN_PROCESSING_URL")),
-				Headers: map[string]string{
-					"Content-type": "application/json",
-					"sentry-trace": span.TraceID.String(),
-				},
-			},
-		},
-	}
-
-	body, err := json.Marshal(message)
-	if err != nil {
-		return err
-	}
-
-	return submitHttpTask(ctx, client, queue, task, body)
-}
-
-func CreateTaskForDeepRefresh(ctx context.Context, message DeepRefreshMessage, client *gcptasks.Client) error {
-	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForDeepRefresh")
-	defer tracing.FinishSpan(span)
-
-	queue := env.GetString("GCLOUD_REFRESH_TASK_QUEUE")
-	task := &taskspb.Task{
-		MessageType: &taskspb.Task_HttpRequest{
-			HttpRequest: &taskspb.HttpRequest{
-				HttpMethod: taskspb.HttpMethod_POST,
-				Url:        fmt.Sprintf("%s/tasks/refresh", env.GetString("INDEXER_HOST")),
 				Headers: map[string]string{
 					"Content-type": "application/json",
 					"sentry-trace": span.TraceID.String(),

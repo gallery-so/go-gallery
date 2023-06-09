@@ -76,9 +76,7 @@ func coreInitServer() *gin.Engine {
 
 	go autoSendNotificationEmails(queries, sendgridClient, pub)
 
-	redisClient := redis.NewClient(redis.EmailRateLimiterDB)
-
-	return handlersInitServer(router, loaders, queries, sendgridClient, redisClient)
+	return handlersInitServer(router, loaders, queries, sendgridClient)
 }
 
 func setDefaults() {
@@ -120,13 +118,13 @@ func setDefaults() {
 		util.VarNotSetTo("SENTRY_DSN", "")
 		util.VarNotSetTo("VERSION", "")
 		util.VarNotSetTo("SENDGRID_API_KEY", "")
-		util.VarNotSetTo("JWT_SECRET", "")
+		util.VarNotSetTo("EMAIL_VERIFICATION_JWT_SECRET", "")
 		util.VarNotSetTo("FROM_EMAIL", "")
 	}
 }
 
 func newThrottler() *throttle.Locker {
-	return throttle.NewThrottleLocker(redis.NewCache(redis.EmailThrottleDB), time.Minute*5)
+	return throttle.NewThrottleLocker(redis.NewCache(redis.EmailThrottleCache), time.Minute*5)
 }
 
 func initSentry() {

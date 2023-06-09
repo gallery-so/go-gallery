@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/service/redis"
 	"math/rand"
 	"net/http"
 	"time"
@@ -23,13 +25,6 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
-// TODO: ExternalWallet? Something to denote "wallet, but not part of our ecosystem"
-// Or do we call it something like "AccountInfo" or "AddressInfo" or something?
-// Would also be nice to have a method on AuthResult that searches by ChainAddress
-// for a result. Maybe instead of a map from address+chain+type to existing wallets
-// (where they exist), we just have a wallet pointer field on our results that points
-// to a user's wallet if one exists? OwnedWallet? WalletInput? RawWallet?
-
 // AuthenticatedAddress contains address information that has been successfully verified
 // by an authenticator.
 type AuthenticatedAddress struct {
@@ -45,9 +40,11 @@ type AuthenticatedAddress struct {
 
 const (
 	// Context keys for auth data
-	userIDContextKey     = "auth.user_id"
 	userAuthedContextKey = "auth.authenticated"
+	userIDContextKey     = "auth.user_id"
+	sessionIDContextKey  = "auth.session_id"
 	authErrorContextKey  = "auth.auth_error"
+	userRolesContextKey  = "auth.roles"
 )
 
 // We don't want our cookies to expire, so their max age is arbitrarily set to 10 years.
@@ -60,8 +57,11 @@ const NoncePrepend = "Gallery uses this cryptographic signature in place of a pa
 // NewNoncePrepend is what will now be prepended to every nonce
 const NewNoncePrepend = "Gallery uses this cryptographic signature in place of a password: "
 
-// JWTCookieKey is the key used to store the JWT token in the cookie
-const JWTCookieKey = "GLRY_JWT"
+// AuthCookieKey is the key used to store the auth token in the cookie
+const AuthCookieKey = "GLRY_JWT"
+
+// RefreshCookieKey is the key used to store the refresh token in the cookie
+const RefreshCookieKey = "GLRY_REFRESH_JWT"
 
 // ErrAddressSignatureMismatch is returned when the address signature does not match the address cryptographically
 var ErrAddressSignatureMismatch = errors.New("address does not match signature")
@@ -75,42 +75,12 @@ var ErrInvalidJWT = errors.New("invalid or expired auth token")
 // ErrNoCookie is returned when there is no JWT in the request
 var ErrNoCookie = errors.New("no jwt passed as cookie")
 
-// ErrInvalidAuthHeader is returned when the auth header is invalid
-var ErrInvalidAuthHeader = errors.New("invalid auth header format")
+var ErrSessionInvalidated = errors.New("session has been invalidated")
 
 // ErrSignatureInvalid is returned when the signed nonce's signature is invalid
 var ErrSignatureInvalid = errors.New("signature invalid")
 
 var ErrInvalidMagicLink = errors.New("invalid magic link")
-
-var ErrUserNotFound = errors.New("no user found")
-
-// LoginInput is the input to the login pipeline
-type LoginInput struct {
-	Signature  string             `json:"signature" binding:"signature"`
-	Address    persist.Address    `json:"address"   binding:"required"`
-	Chain      persist.Chain      `json:"chain"`
-	WalletType persist.WalletType `json:"wallet_type"`
-	Nonce      string             `json:"nonce"`
-}
-
-// LoginOutput is the output of the login pipeline
-type LoginOutput struct {
-	SignatureValid bool         `json:"signature_valid"`
-	UserID         persist.DBID `json:"user_id"`
-}
-
-// GetPreflightInput is the input to the preflight pipeline
-type GetPreflightInput struct {
-	Address persist.Address `json:"address" form:"address" binding:"required"`
-	Chain   persist.Chain
-}
-
-// GetPreflightOutput is the output of the preflight pipeline
-type GetPreflightOutput struct {
-	Nonce      string `json:"nonce"`
-	UserExists bool   `json:"user_exists"`
-}
 
 type Authenticator interface {
 	// GetDescription returns information about the authenticator for error and logging purposes.
@@ -268,8 +238,8 @@ func (e MagicLinkAuthenticator) Authenticate(pCtx context.Context) (*AuthResult,
 		if _, ok := err.(persist.ErrUserNotFound); !ok {
 			return nil, err
 		}
-		return nil, ErrUserNotFound
-
+		// TODO: Figure out a better scheme for handling user-facing errors
+		return nil, errors.New("The email address you provided is unverified. Login with QR code instead, or verify your email at gallery.so/settings.")
 	}
 
 	return &AuthResult{
@@ -282,11 +252,51 @@ func NewMagicLinkClient() *magicclient.API {
 	return magicclient.New(env.GetString("MAGIC_LINK_SECRET_KEY"), magic.NewDefaultClient())
 }
 
-// Login logs in a user with a given authentication scheme
-func Login(pCtx context.Context, authenticator Authenticator) (persist.DBID, error) {
-	gc := util.MustGetGinContext(pCtx)
+type OneTimeLoginTokenAuthenticator struct {
+	ConsumedTokenCache *redis.Cache
+	UserRepo           *postgres.UserRepository
+	LoginToken         string
+}
 
-	authResult, err := authenticator.Authenticate(pCtx)
+func (a OneTimeLoginTokenAuthenticator) GetDescription() string {
+	return fmt.Sprintf("OneTimeLoginTokenAuthenticator")
+}
+
+func (a OneTimeLoginTokenAuthenticator) Authenticate(ctx context.Context) (*AuthResult, error) {
+	userID, expiresAt, err := ParseOneTimeLoginToken(ctx, a.LoginToken)
+	if err != nil {
+		return nil, err
+	}
+
+	// Use redis to stop this token from being used again (and add an extra minute to the TTL account for clock differences)
+	ttl := time.Until(expiresAt) + time.Minute
+	success, err := a.ConsumedTokenCache.SetNX(ctx, a.LoginToken, []byte{1}, ttl)
+	if err != nil {
+		return nil, err
+	}
+
+	if !success {
+		return nil, errors.New("token already used")
+	}
+
+	user, err := a.UserRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	authResult := AuthResult{
+		Addresses: []AuthenticatedAddress{},
+		User:      &user,
+	}
+
+	return &authResult, nil
+}
+
+// Login logs in a user with a given authentication scheme
+func Login(ctx context.Context, queries *db.Queries, authenticator Authenticator) (persist.DBID, error) {
+	gc := util.MustGetGinContext(ctx)
+
+	authResult, err := authenticator.Authenticate(ctx)
 	if err != nil {
 		return "", ErrAuthenticationFailed{WrappedErr: err}
 	}
@@ -295,21 +305,26 @@ func Login(pCtx context.Context, authenticator Authenticator) (persist.DBID, err
 		return "", persist.ErrUserNotFound{Authenticator: authenticator.GetDescription()}
 	}
 
-	jwtTokenStr, err := JWTGeneratePipeline(pCtx, authResult.User.ID)
-	if err != nil {
-		return "", err
-	}
+	userID := authResult.User.ID
 
-	SetAuthStateForCtx(gc, authResult.User.ID, nil)
-	SetJWTCookie(gc, jwtTokenStr)
+	// Start a new session if:
+	// - no user is currently authenticated, or
+	// - a user is authenticated, but it's not the one who just logged in
+	// Otherwise, this user is already logged in, and we don't need to do
+	// anything here. Their existing session should continue as usual.
+	if !GetUserAuthedFromCtx(gc) || GetUserIDFromCtx(gc) != userID {
+		err = StartSession(gc, queries, userID)
+		if err != nil {
+			return "", err
+		}
+	}
 
 	return authResult.User.ID, nil
 }
 
-func Logout(pCtx context.Context) {
-	gc := util.MustGetGinContext(pCtx)
-	SetAuthStateForCtx(gc, "", ErrNoCookie)
-	SetJWTCookie(gc, "")
+func Logout(ctx context.Context, queries *db.Queries, authRefreshCache *redis.Cache) {
+	gc := util.MustGetGinContext(ctx)
+	EndSession(gc, queries, authRefreshCache)
 }
 
 // GetAuthNonce will determine whether a user is permitted to log in, and if so, generate a nonce to be signed
@@ -383,6 +398,11 @@ func GetUserWithNonce(pCtx context.Context, pChainAddress persist.ChainAddress, 
 	return nonceValue, user, nil
 }
 
+// GetSessionIDFromCtx returns the session ID from the context
+func GetSessionIDFromCtx(c *gin.Context) persist.DBID {
+	return c.MustGet(sessionIDContextKey).(persist.DBID)
+}
+
 // GetUserIDFromCtx returns the user ID from the context
 func GetUserIDFromCtx(c *gin.Context) persist.DBID {
 	return c.MustGet(userIDContextKey).(persist.DBID)
@@ -403,18 +423,271 @@ func GetAuthErrorFromCtx(c *gin.Context) error {
 	return err.(error)
 }
 
-func SetAuthStateForCtx(c *gin.Context, userID persist.DBID, err error) {
-	c.Set(userIDContextKey, userID)
-	c.Set(authErrorContextKey, err)
-	c.Set(userAuthedContextKey, userID != "" && err == nil)
+func GetRolesFromCtx(c *gin.Context) []persist.Role {
+	return c.MustGet(userRolesContextKey).([]persist.Role)
 }
 
-// SetJWTCookie sets the cookie for auth on the response
-func SetJWTCookie(c *gin.Context, token string) {
+func setSessionStateForCtx(c *gin.Context, userID persist.DBID, sessionID persist.DBID, roles []persist.Role) {
+	if userID == "" || sessionID == "" {
+		logger.For(c).Errorf("attempted to set session state with missing values. userID: %s, sessionID: %s", userID, sessionID)
+		err := errors.New("attempted to set session state with missing values")
+		// We should never be trying to set a session with an empty userID or sessionID. If we find
+		// ourselves here, clear the session and have the user log in again.
+		clearSessionStateForCtx(c, err)
+		clearSessionCookies(c)
+		return
+	}
+
+	if roles == nil {
+		roles = []persist.Role{}
+	}
+
+	c.Set(userIDContextKey, userID)
+	c.Set(sessionIDContextKey, sessionID)
+	c.Set(authErrorContextKey, nil)
+	c.Set(userAuthedContextKey, true)
+	c.Set(userRolesContextKey, roles)
+}
+
+func clearSessionStateForCtx(c *gin.Context, err error) {
+	c.Set(userIDContextKey, "")
+	c.Set(sessionIDContextKey, "")
+	c.Set(authErrorContextKey, err)
+	c.Set(userAuthedContextKey, false)
+	c.Set(userRolesContextKey, []persist.Role{})
+}
+
+// ForceAuthTokenRefresh should be called whenever something happens that would result in existing auth
+// tokens being out-of-date. For example, when a user's roles are changed, or a user logs out of a session,
+// existing otherwise-valid auth tokens should be refreshed so they have the latest session state.
+func ForceAuthTokenRefresh(ctx context.Context, authRefreshCache *redis.Cache, userID persist.DBID) error {
+	// Keep the key long enough for any existing auth tokens to expire, plus an extra minute of wiggle room
+	expiration := time.Duration(env.GetInt64("AUTH_JWT_TTL"))*time.Second + time.Minute
+	return authRefreshCache.SetTime(ctx, userID.String(), time.Now(), expiration, true)
+}
+
+func mustRefreshAuthToken(ctx context.Context, authRefreshCache *redis.Cache, userID persist.DBID, issuedAt time.Time) bool {
+	forceRefreshBefore, err := authRefreshCache.GetTime(ctx, userID.String())
+	if err != nil {
+		// If there's no key for this user, we don't need to force an auth token refresh
+		var notFound redis.ErrKeyNotFound
+		if errors.As(err, &notFound) {
+			return false
+		}
+
+		// If we couldn't hit the redis cache, assume we need to refresh the auth token
+		logger.For(ctx).Errorf("error checking auth refresh cache: %s", err)
+		return true
+	}
+
+	return issuedAt.Before(forceRefreshBefore)
+}
+
+// StartSession begins a new session for the specified user. After calling StartSession,
+// the current auth state can be queried with functions like GetUserAuthedFromCtx(),
+// GetUserIDFromCtx(), etc.
+func StartSession(c *gin.Context, queries *db.Queries, userID persist.DBID) error {
+	sessionID := persist.GenerateID()
+
+	// These are the first tokens for a new session, so parentRefreshID is an empty string
+	err := issueSessionTokens(c, userID, sessionID, "", queries)
+	if err != nil {
+		// If we fail to issue tokens to start a new session, the user will need to log in
+		// again (since we were starting a new session and the user doesn't have a valid refresh
+		// token to present during their next request). Clear the session state and cookies.
+		clearSessionStateForCtx(c, err)
+		clearSessionCookies(c)
+		return err
+	}
+
+	return nil
+}
+
+// ContinueSession checks the request cookies for an existing auth session and continues
+// it if possible. If the request is for an expired or invalid session, the user will be
+// logged out. After calling ContinueSession, the current auth state can be queried with
+// functions like GetUserAuthedFromCtx(), GetUserIDFromCtx(), etc.
+func ContinueSession(c *gin.Context, queries *db.Queries, authRefreshCache *redis.Cache) error {
+	// If the user has a valid auth cookie, we can set their auth state and be done
+	// (unless something like updating roles triggered a forced refresh of the auth token)
+	authClaims, authTokenErr := getAndParseAuthToken(c)
+	if authTokenErr == nil {
+		// ----------------------------------------------------------------------------
+		// Temporary handling for existing auth tokens that don't have session IDs.
+		// Where it would normally be an error for an auth token to not have a session ID,
+		// it's expected for tokens that were issued prior to the introduction of session IDs.
+		// Can be removed in a month when all existing auth tokens will have expired.
+		// This also applies to IssuedAt times, which are required now, but weren't present
+		// in older tokens.
+		if authClaims.SessionID == "" || authClaims.IssuedAt == nil {
+			return StartSession(c, queries, authClaims.UserID)
+		}
+		// End of temporary handling
+		// ----------------------------------------------------------------------------
+		if !mustRefreshAuthToken(c, authRefreshCache, authClaims.UserID, authClaims.IssuedAt.Time) {
+			setSessionStateForCtx(c, authClaims.UserID, authClaims.SessionID, authClaims.Roles)
+			return nil
+		}
+	}
+
+	// If the user doesn't have a valid auth cookie or a valid refresh cookie, they can't be
+	// authenticated and they'll have to log in again. Clear their cookies in case they have
+	// expired tokens.
+	refreshClaims, refreshTokenErr := getAndParseRefreshToken(c)
+	if refreshTokenErr != nil {
+		clearSessionStateForCtx(c, refreshTokenErr)
+
+		// The most common case here is that the user has no cookies at all, which is fine and expected.
+		// If we encounter any other errors, log them and clear the user's cookies.
+		if authTokenErr != ErrNoCookie || refreshTokenErr != ErrNoCookie {
+			logger.For(c).Warnf("could not continue session: authTokenErr=%s, refreshTokenErr=%s", authTokenErr, refreshTokenErr)
+			clearSessionCookies(c)
+		}
+
+		return refreshTokenErr
+	}
+
+	// At this point, the user has a valid refresh cookie, but the auth cookie needs to be reissued
+	// (either because it's invalid or because it's being forced to refresh). Issue new tokens to continue
+	// the existing session.
+	err := issueSessionTokens(c, refreshClaims.UserID, refreshClaims.SessionID, refreshClaims.ID, queries)
+	if err != nil {
+		logger.For(c).Errorf("error issuing session tokens (userID=%s, sessionID=%s): %s", refreshClaims.UserID, refreshClaims.SessionID, err)
+
+		// If we encountered an error issuing tokens, clear the context state so the user is "unauthenticated"
+		// for the duration of this request.
+		clearSessionStateForCtx(c, err)
+
+		// Under most circumstances, we don't want to clear the user's cookies here to log them out.
+		// They still have a valid refresh cookie that can authenticate their next request, and that
+		// will be lower friction than being forced to log in again. The only exception is
+		// ErrSessionInvalidated, which indicates that the session associated with the refresh token
+		// is no longer available and the user will need to log in again.
+		if err == ErrSessionInvalidated {
+			clearSessionCookies(c)
+		}
+
+		return err
+	}
+
+	return nil
+}
+
+// EndSession invalidates the current session and clears the user's cookies
+func EndSession(c *gin.Context, queries *db.Queries, authRefreshCache *redis.Cache) {
+	if GetUserAuthedFromCtx(c) {
+		if sessionID := GetSessionIDFromCtx(c); sessionID != "" {
+			if err := queries.InvalidateSession(c, sessionID); err != nil {
+				logger.For(c).Errorf("failed to invalidate session: %s", err)
+			}
+		}
+		userID := GetUserIDFromCtx(c)
+		if err := ForceAuthTokenRefresh(c, authRefreshCache, userID); err != nil {
+			logger.For(c).Errorf("failed to force auth token refresh when ending session: %s", err)
+		}
+	}
+
+	clearSessionStateForCtx(c, ErrNoCookie)
+	clearSessionCookies(c)
+}
+
+// issueSessionTokens creates new tokens, updates the session in the database, and then sets the new
+// tokens as request cookies and context state. parentRefreshID is the ID of the refresh token used to
+// issue the new tokens; if this is the first set of tokens for a session, it should be an empty string.
+// If an error occurs when issuing new tokens, no changes are made to cookies or context.
+func issueSessionTokens(c *gin.Context, userID persist.DBID, sessionID persist.DBID, parentRefreshID string, queries *db.Queries) error {
+	newRefreshID := persist.GenerateID().String()
+	newRefreshToken, refreshExpiresAt, err := GenerateRefreshToken(c, newRefreshID, parentRefreshID, userID, sessionID)
+	if err != nil {
+		logger.For(c).Errorf("error generating refresh token for userID=%s, sessionID=%s: %s", userID, sessionID, err)
+		return err
+	}
+
+	roles, err := RolesByUserID(c, queries, userID)
+	if err != nil {
+		logger.For(c).Errorf("error getting roles for userID=%s, sessionID=%s: %s", userID, sessionID, err)
+		return err
+	}
+
+	newAuthToken, err := GenerateAuthToken(c, userID, sessionID, parentRefreshID, roles)
+	if err != nil {
+		logger.For(c).Errorf("error generating auth token for userID=%s, sessionID=%s: %s", userID, sessionID, err)
+		return err
+	}
+
+	session, err := queries.UpsertSession(c, db.UpsertSessionParams{
+		ID:               sessionID,
+		UserID:           userID,
+		UserAgent:        c.GetHeader("User-Agent"),
+		Platform:         c.GetHeader("X-Platform"),
+		Os:               c.GetHeader("X-OS"),
+		CurrentRefreshID: newRefreshID,
+		ActiveUntil:      refreshExpiresAt,
+	})
+
+	if err != nil {
+		logger.For(c).Errorf("error upserting session data for userID=%s, sessionID=%s: %s", userID, sessionID, err)
+		return err
+	}
+
+	if session.Invalidated {
+		return ErrSessionInvalidated
+	}
+
+	setSessionStateForCtx(c, userID, sessionID, roles)
+	setSessionCookies(c, newAuthToken, newRefreshToken)
+
+	return nil
+}
+
+func setSessionCookies(c *gin.Context, authToken string, refreshToken string) {
+	setCookie(c, AuthCookieKey, authToken)
+	setCookie(c, RefreshCookieKey, refreshToken)
+}
+
+func clearSessionCookies(c *gin.Context) {
+	clearCookie(c, AuthCookieKey)
+	clearCookie(c, RefreshCookieKey)
+}
+
+func getAndParseAuthToken(c *gin.Context) (AuthTokenClaims, error) {
+	authToken, err := getCookie(c, AuthCookieKey)
+	if err != nil {
+		return AuthTokenClaims{}, err
+	}
+
+	return ParseAuthToken(c, authToken)
+}
+
+func getAndParseRefreshToken(c *gin.Context) (RefreshTokenClaims, error) {
+	refreshToken, err := getCookie(c, RefreshCookieKey)
+	if err != nil {
+		return RefreshTokenClaims{}, err
+	}
+
+	return ParseRefreshToken(c, refreshToken)
+}
+
+func getCookie(c *gin.Context, cookieName string) (string, error) {
+	cookie, err := c.Cookie(cookieName)
+
+	// Treat empty cookies the same way we treat missing cookies, since setting a cookie to the empty
+	// string is how we "delete" them.
+	if (err == nil && cookie == "") || err == http.ErrNoCookie {
+		err = ErrNoCookie
+	}
+
+	if err != nil {
+		return "", err
+	}
+
+	return cookie, nil
+}
+
+func setCookie(c *gin.Context, cookieName string, value string) {
 	mode := http.SameSiteStrictMode
 	domain := ".gallery.so"
 	httpOnly := true
-	secure := true
 
 	clientIsLocalhost := c.Request.Header.Get("Origin") == "http://localhost:3000"
 
@@ -425,34 +698,17 @@ func SetJWTCookie(c *gin.Context, token string) {
 	}
 
 	http.SetCookie(c.Writer, &http.Cookie{
-		Name:     JWTCookieKey,
-		Value:    token,
+		Name:     cookieName,
+		Value:    value,
 		MaxAge:   cookieMaxAge,
 		Path:     "/",
-		Secure:   secure,
+		Secure:   true,
 		HttpOnly: httpOnly,
 		SameSite: mode,
 		Domain:   domain,
 	})
 }
 
-func toAuthWallets(pWallets []persist.Wallet) []AuthenticatedAddress {
-	res := make([]AuthenticatedAddress, len(pWallets))
-	for i, w := range pWallets {
-		res[i] = AuthenticatedAddress{
-			ChainAddress: persist.NewChainAddress(w.Address, w.Chain),
-			WalletType:   w.WalletType,
-		}
-	}
-	return res
-}
-
-// ContainsAuthWallet checks whether an auth.Wallet is in a slice of perist.Wallet
-func ContainsWallet(pWallets []AuthenticatedAddress, pWallet AuthenticatedAddress) bool {
-	for _, w := range pWallets {
-		if w.ChainAddress == pWallet.ChainAddress {
-			return true
-		}
-	}
-	return false
+func clearCookie(c *gin.Context, cookieName string) {
+	setCookie(c, cookieName, "")
 }
