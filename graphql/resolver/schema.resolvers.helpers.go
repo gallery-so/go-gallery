@@ -1554,10 +1554,18 @@ func userToModel(ctx context.Context, user db.User) *model.GalleryUser {
 		wallets[i] = walletToModelPersist(ctx, wallet)
 	}
 
+	profile := user.ProfileTokenID
+
+	var profileTokenID *persist.DBID
+	if profile != "" {
+		profileTokenID = &profile
+	}
+
 	return &model.GalleryUser{
 		HelperGalleryUserData: model.HelperGalleryUserData{
 			UserID:            user.ID,
 			FeaturedGalleryID: user.FeaturedGallery,
+			ProfileTokenID:    profileTokenID,
 		},
 		Dbid:      user.ID,
 		Username:  &user.Username.String,

@@ -523,6 +523,7 @@ type User struct {
 	FeaturedGallery      *persist.DBID
 	PrimaryWalletID      persist.DBID
 	UserExperiences      pgtype.JSONB
+	ProfileTokenID       persist.DBID
 	ProfileImageID       persist.DBID
 }
 
