@@ -133,11 +133,15 @@ func (api CollectionAPI) GetTopCollectionsForCommunity(ctx context.Context, chai
 			Key:   fmt.Sprintf("top_collections_by_address:%d:%s", chainAddress.Chain(), chainAddress.Address()),
 			TTL:   time.Hour * 2,
 			CalcFunc: func(ctx context.Context) ([]byte, error) {
-				c, err := api.queries.GetTopCollectionsForCommunity(ctx, db.GetTopCollectionsForCommunityParams{
+				ids, err := api.queries.GetTopCollectionsForCommunity(ctx, db.GetTopCollectionsForCommunityParams{
 					Chain:   chainAddress.Chain(),
 					Address: chainAddress.Address(),
 				})
-				return c, err
+				enc := newCursorEncoder()
+				for _, id := range ids {
+					enc.appendDBID(id)
+				}
+				return enc.buffer, err
 			},
 		}
 		if collectionIDs, err = l.Load(ctx); err != nil {
