@@ -128,22 +128,13 @@ func (api CollectionAPI) GetTopCollectionsForCommunity(ctx context.Context, chai
 		}
 	} else {
 		// No cursor provided, need to access the cache
-		l := redis.LazyCache{
-			Cache: redis.NewCache(redis.SearchCache),
-			Key:   fmt.Sprintf("top_collections_by_address:%d:%s", chainAddress.Chain(), chainAddress.Address()),
-			TTL:   time.Hour * 2,
-			CalcFunc: func(ctx context.Context) ([]byte, error) {
-				ids, err := api.queries.GetTopCollectionsForCommunity(ctx, db.GetTopCollectionsForCommunityParams{
-					Chain:   chainAddress.Chain(),
-					Address: chainAddress.Address(),
-				})
-				enc := newCursorEncoder()
-				for _, id := range ids {
-					enc.appendDBID(id)
-				}
-				return enc.buffer, err
-			},
-		}
+		key := fmt.Sprintf("top_collections_by_address:%d:%s", chainAddress.Chain(), chainAddress.Address())
+		l := newDBIDCache(redis.NewCache(redis.SearchCache), key, time.Hour*2, func(ctx context.Context) ([]persist.DBID, error) {
+			return api.queries.GetTopCollectionsForCommunity(ctx, db.GetTopCollectionsForCommunityParams{
+				Chain:   chainAddress.Chain(),
+				Address: chainAddress.Address(),
+			})
+		})
 		if collectionIDs, err = l.Load(ctx); err != nil {
 			return nil, pageInfo, err
 		}

@@ -285,7 +285,8 @@ func (l LazyCache) Load(ctx context.Context) ([]byte, error) {
 	if !errors.As(err, &errMiss) {
 		return nil, err
 	}
-	if b, err = l.CalcFunc(ctx); err != nil {
+	b, err = l.CalcFunc(ctx)
+	if err != nil {
 		return nil, err
 	}
 	err = l.Cache.Set(ctx, l.Key, b, l.TTL)

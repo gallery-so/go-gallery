@@ -290,6 +290,7 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 			})
 
 			trendingIDs := make([]persist.DBID, 0)
+
 			for i := 0; i < len(trendData) && i < reportSize; i++ {
 				trendingIDs = append(trendingIDs, trendData[i].ID)
 			}
@@ -297,14 +298,9 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 			return trendingIDs, nil
 		}
 
-		r := ranker{
-			Cache:    api.cache,
-			Key:      "trending.feedEvents",
-			TTL:      time.Minute * 10,
-			CalcFunc: calcFunc,
-		}
+		l := newDBIDCache(api.cache, "trending:feedEvents", time.Minute*10, calcFunc)
 
-		trendingIDs, err = r.loadRank(ctx)
+		trendingIDs, err = l.Load(ctx)
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
@@ -350,36 +346,34 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 }
 
 func (api FeedAPI) TrendingUsers(ctx context.Context, report model.Window) ([]db.User, error) {
-	calcFunc := func(ctx context.Context) ([]persist.DBID, error) {
-		if report.Name == "ALL_TIME" {
-			return api.queries.GetAllTimeTrendingUserIDs(ctx, 24)
-		}
-		return api.queries.GetWindowedTrendingUserIDs(ctx, db.GetWindowedTrendingUserIDsParams{
-			WindowEnd: time.Now().Add(-time.Duration(report.Duration)),
-			Limit:     24,
-		})
-	}
-
-	// Reports that calculating trending users greater than a week or more
-	// are calculated once every 24 hours rather than once an hour.
 	ttl := time.Hour
+
+	// Reports that span a week or greater are calculated once every 24 hours rather than once an hour.
 	if report.Duration > 7*24*time.Hour {
 		ttl *= 24
 	}
 
-	r := ranker{
-		Cache:    api.cache,
-		Key:      "trending:users:" + report.Name,
-		TTL:      ttl,
-		CalcFunc: calcFunc,
+	calcFunc := func(ctx context.Context) ([]persist.DBID, error) {
+		return api.queries.GetAllTimeTrendingUserIDs(ctx, 24)
 	}
 
-	trendingIDs, err := r.loadRank(ctx)
+	if report.Name != "ALL_TIME" {
+		calcFunc = func(ctx context.Context) ([]persist.DBID, error) {
+			return api.queries.GetWindowedTrendingUserIDs(ctx, db.GetWindowedTrendingUserIDsParams{
+				WindowEnd: time.Now().Add(-time.Duration(report.Duration)),
+				Limit:     24,
+			})
+		}
+	}
+
+	l := newDBIDCache(api.cache, "trending:users:"+report.Name, ttl, calcFunc)
+
+	ids, err := l.Load(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	asStr, _ := util.Map(trendingIDs, func(id persist.DBID) (string, error) {
+	asStr, _ := util.Map(ids, func(id persist.DBID) (string, error) {
 		return id.String(), nil
 	})
 
