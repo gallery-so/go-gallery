@@ -48,7 +48,8 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 	serverTezosProviderList := tezosProviderSet(serverEnvInit, httpClient)
 	serverPoapProviderList := poapProviderSet(serverEnvInit, httpClient)
 	serverPolygonProviderList := polygonProviderSet(httpClient)
-	v := newMultichainSet(serverEthProviderList, serverOptimismProviderList, serverTezosProviderList, serverPoapProviderList, serverPolygonProviderList)
+	serverArbitrumProviderList := arbitrumProviderSet(httpClient)
+	v := newMultichainSet(serverEthProviderList, serverOptimismProviderList, serverTezosProviderList, serverPoapProviderList, serverPolygonProviderList, serverArbitrumProviderList)
 	v2 := defaultChainOverrides()
 	sendTokens := newSendTokensFunc(ctx, client)
 	provider := &multichain.Provider{
@@ -111,6 +112,19 @@ func optimismProviderSet(client *http.Client) optimismProviderList {
 func optimismProvidersConfig(optimismProvider2 *optimismProvider) optimismProviderList {
 	serverOptimismProviderList := optimismRequirements(optimismProvider2, optimismProvider2)
 	return serverOptimismProviderList
+}
+
+// arbitrumProviderSet is a wire injector that creates the set of Arbitrum providers
+func arbitrumProviderSet(client *http.Client) arbitrumProviderList {
+	serverArbitrumProvider := newArbitrumProvider(client)
+	serverArbitrumProviderList := arbitrumProvidersConfig(serverArbitrumProvider)
+	return serverArbitrumProviderList
+}
+
+// optimismProvidersConfig is a wire injector that binds multichain interfaces to their concrete Optimism implementations
+func arbitrumProvidersConfig(arbitrumProvider2 *arbitrumProvider) arbitrumProviderList {
+	serverArbitrumProviderList := arbitrumRequirements(arbitrumProvider2, arbitrumProvider2)
+	return serverArbitrumProviderList
 }
 
 // poapProviderSet is a wire injector that creates the set of POAP providers
@@ -181,9 +195,13 @@ type poapProviderList []any
 
 type polygonProviderList []any
 
+type arbitrumProviderList []any
+
 type optimismProvider struct{ *alchemy.Provider }
 
 type polygonProvider struct{ *alchemy.Provider }
+
+type arbitrumProvider struct{ *alchemy.Provider }
 
 // dbConnSet is a wire provider set for initializing a postgres connection
 var dbConnSet = wire.NewSet(
@@ -240,6 +258,14 @@ func optimismRequirements(
 	return optimismProviderList{tof, toc}
 }
 
+// arbitrumRequirements is the set of provider interfaces required for Optimism
+func arbitrumRequirements(
+	tof multichain.TokensOwnerFetcher,
+	toc multichain.TokensContractFetcher,
+) arbitrumProviderList {
+	return arbitrumProviderList{tof, toc}
+}
+
 // poapRequirements is the set of provider interfaces required for POAP
 func poapRequirements(
 	nr multichain.NameResolver,
@@ -264,6 +290,7 @@ func newMultichainSet(
 	tezosProviders tezosProviderList,
 	poapProviders poapProviderList,
 	polygonProviders polygonProviderList,
+	arbitrumProviders arbitrumProviderList,
 ) map[persist.Chain][]any {
 
 	dedupe := func(providers []any) []any {
@@ -284,13 +311,14 @@ func newMultichainSet(
 	chainToProviders[persist.ChainTezos] = dedupe(tezosProviders)
 	chainToProviders[persist.ChainPOAP] = dedupe(poapProviders)
 	chainToProviders[persist.ChainPolygon] = dedupe(polygonProviders)
+	chainToProviders[persist.ChainArbitrum] = dedupe(arbitrumProviders)
 	return chainToProviders
 }
 
 // defaultChainOverrides is a wire provider for chain overrides
 func defaultChainOverrides() multichain.ChainOverrideMap {
 	var ethChain = persist.ChainETH
-	return multichain.ChainOverrideMap{persist.ChainPOAP: &ethChain, persist.ChainOptimism: &ethChain, persist.ChainPolygon: &ethChain}
+	return multichain.ChainOverrideMap{persist.ChainPOAP: &ethChain, persist.ChainOptimism: &ethChain, persist.ChainPolygon: &ethChain, persist.ChainArbitrum: &ethChain}
 }
 
 func newIndexerProvider(e envInit, httpClient *http.Client, ethClient *ethclient.Client, taskClient *cloudtasks.Client) *eth.Provider {
@@ -321,6 +349,10 @@ func newOptimismProvider(c *http.Client) *optimismProvider {
 
 func newPolygonProvider(c *http.Client) *polygonProvider {
 	return &polygonProvider{alchemy.NewProvider(persist.ChainPolygon, c)}
+}
+
+func newArbitrumProvider(c *http.Client) *arbitrumProvider {
+	return &arbitrumProvider{alchemy.NewProvider(persist.ChainArbitrum, c)}
 }
 
 func newCommunitiesCache() *redis.Cache {
