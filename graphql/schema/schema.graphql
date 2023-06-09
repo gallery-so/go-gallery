@@ -67,10 +67,27 @@ interface Error {
   message: String!
 }
 
+type NFTProfileImage {
+  urls: PreviewURLSet!
+  token: Token!
+}
+
+type ENSProfileImage {
+  urls: PreviewURLSet!
+  token: Token!
+}
+
+type NoProfileImage {
+  urls: PreviewURLSet!
+}
+
+union UserProfileImage = NFTProfileImage | ENSProfileImage | NoProfileImage
+
 type GalleryUser implements Node @goEmbedHelper {
   id: ID!
   dbid: DBID!
   username: String
+  profileImage: UserProfileImage! @goField(forceResolver: true)
   bio: String
   traits: String
   universal: Boolean

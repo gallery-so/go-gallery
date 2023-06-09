@@ -1,0 +1,1 @@
+alter table users add column profile_token_id varchar(255) references tokens(id);

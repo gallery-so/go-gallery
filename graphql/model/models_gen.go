@@ -358,6 +358,10 @@ type UserByUsernameOrError interface {
 	IsUserByUsernameOrError()
 }
 
+type UserProfileImage interface {
+	IsUserProfileImage()
+}
+
 type VerifyEmailMagicLinkPayloadOrError interface {
 	IsVerifyEmailMagicLinkPayloadOrError()
 }
@@ -750,6 +754,13 @@ type DisconnectSocialAccountPayload struct {
 }
 
 func (DisconnectSocialAccountPayload) IsDisconnectSocialAccountPayloadOrError() {}
+
+type ENSProfileImage struct {
+	Urls  *PreviewURLSet `json:"urls"`
+	Token *Token         `json:"token"`
+}
+
+func (ENSProfileImage) IsUserProfileImage() {}
 
 type EmailNotificationSettings struct {
 	UnsubscribedFromAll           bool `json:"unsubscribedFromAll"`
@@ -1207,6 +1218,7 @@ type GalleryUser struct {
 	HelperGalleryUserData
 	Dbid                persist.DBID           `json:"dbid"`
 	Username            *string                `json:"username"`
+	ProfileImage        UserProfileImage       `json:"profileImage"`
 	Bio                 *string                `json:"bio"`
 	Traits              *string                `json:"traits"`
 	Universal           *bool                  `json:"universal"`
@@ -1392,6 +1404,19 @@ type MoveCollectionToGalleryPayload struct {
 }
 
 func (MoveCollectionToGalleryPayload) IsMoveCollectionToGalleryPayloadOrError() {}
+
+type NFTProfileImage struct {
+	Urls  *PreviewURLSet `json:"urls"`
+	Token *Token         `json:"token"`
+}
+
+func (NFTProfileImage) IsUserProfileImage() {}
+
+type NoProfileImage struct {
+	Urls *PreviewURLSet `json:"urls"`
+}
+
+func (NoProfileImage) IsUserProfileImage() {}
 
 type NotificationEdge struct {
 	Node   Notification `json:"node"`

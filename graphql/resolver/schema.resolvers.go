@@ -415,6 +415,44 @@ func (r *galleryUpdatedFeedEventDataResolver) SubEventDatas(ctx context.Context,
 	return resolveSubEventDatasByFeedEventID(ctx, obj.FeedEventID)
 }
 
+// ProfileImage is the resolver for the profileImage field.
+func (r *galleryUserResolver) ProfileImage(ctx context.Context, obj *model.GalleryUser) (model.UserProfileImage, error) {
+	if obj.HelperGalleryUserData.ProfileTokenID == nil {
+		// TODO for now, no URLs
+		return model.NoProfileImage{}, nil
+	}
+	token, err := resolveTokenByTokenID(ctx, *obj.HelperGalleryUserData.ProfileTokenID)
+	if err != nil {
+		return nil, err
+	}
+	contract, err := resolveContractByTokenID(ctx, *obj.HelperGalleryUserData.ProfileTokenID)
+	if err != nil {
+		return nil, err
+	}
+
+	var previews *model.PreviewURLSet
+	tokenMedia, err := publicapi.For(ctx).Token.MediaByTokenID(ctx, token.Dbid)
+	if err != nil {
+		// If we have no media, just return the fallback media
+		var noMediaErr persist.ErrMediaNotFound
+		if errors.As(err, &noMediaErr) {
+			previews = getPreviewUrlsForURL(ctx, token.Token.FallbackMedia.ImageURL.String())
+		} else {
+			return nil, err
+		}
+	} else {
+		previews = getPreviewUrlsForMedia(ctx, tokenMedia.Media)
+	}
+
+	// is ENS?
+	if contract.ContractAddress.Address().String() == util.ENSAddress {
+		// TODO download image from ENS and return storage link because the image link might return that there is no avatar
+		return model.ENSProfileImage{Urls: getPreviewUrlsForURL(ctx, tokenMedia.Metadata["background_image"].(string)), Token: token}, nil
+	}
+
+	return model.NFTProfileImage{Urls: previews, Token: token}, nil
+}
+
 // Roles is the resolver for the roles field.
 func (r *galleryUserResolver) Roles(ctx context.Context, obj *model.GalleryUser) ([]*persist.Role, error) {
 	dbRoles, err := publicapi.For(ctx).User.GetUserRolesByUserID(ctx, obj.Dbid)

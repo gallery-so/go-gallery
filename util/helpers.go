@@ -25,6 +25,7 @@ import (
 // DefaultSearchDepth represents the maximum amount of nested maps (aka recursions) that can be searched
 const DefaultSearchDepth = 5
 const GinContextKey string = "GinContextKey"
+const ENSAddress = "0x57f1887a8bf19b14fc0df6fd9b2acc9af147ea85"
 
 const (
 	// KB is the number of bytes in a kilobyte

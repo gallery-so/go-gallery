@@ -433,6 +433,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"UserProfileImage": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(UserProfileImage)
+		return obj, ok
+	},
+
 	"VerifyEmailMagicLinkPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(VerifyEmailMagicLinkPayloadOrError)
 		return obj, ok

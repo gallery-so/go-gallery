@@ -345,6 +345,11 @@ type ComplexityRoot struct {
 		Viewer func(childComplexity int) int
 	}
 
+	ENSProfileImage struct {
+		Token func(childComplexity int) int
+		Urls  func(childComplexity int) int
+	}
+
 	EmailNotificationSettings struct {
 		UnsubscribedFromAll           func(childComplexity int) int
 		UnsubscribedFromNotifications func(childComplexity int) int
@@ -581,6 +586,7 @@ type ComplexityRoot struct {
 		ID                  func(childComplexity int) int
 		IsAuthenticatedUser func(childComplexity int) int
 		PrimaryWallet       func(childComplexity int) int
+		ProfileImage        func(childComplexity int) int
 		Roles               func(childComplexity int) int
 		SharedCommunities   func(childComplexity int, before *string, after *string, first *int, last *int) int
 		SharedFollowers     func(childComplexity int, before *string, after *string, first *int, last *int) int
@@ -766,6 +772,15 @@ type ComplexityRoot struct {
 		VerifyEmail                     func(childComplexity int, input model.VerifyEmailInput) int
 		VerifyEmailMagicLink            func(childComplexity int, input model.VerifyEmailMagicLinkInput) int
 		ViewGallery                     func(childComplexity int, galleryID persist.DBID) int
+	}
+
+	NFTProfileImage struct {
+		Token func(childComplexity int) int
+		Urls  func(childComplexity int) int
+	}
+
+	NoProfileImage struct {
+		Urls func(childComplexity int) int
 	}
 
 	NotificationEdge struct {
@@ -1395,6 +1410,8 @@ type GalleryUpdatedFeedEventDataResolver interface {
 	SubEventDatas(ctx context.Context, obj *model.GalleryUpdatedFeedEventData) ([]model.FeedEventData, error)
 }
 type GalleryUserResolver interface {
+	ProfileImage(ctx context.Context, obj *model.GalleryUser) (model.UserProfileImage, error)
+
 	Roles(ctx context.Context, obj *model.GalleryUser) ([]*persist.Role, error)
 	SocialAccounts(ctx context.Context, obj *model.GalleryUser) (*model.SocialAccounts, error)
 	Tokens(ctx context.Context, obj *model.GalleryUser) ([]*model.Token, error)
@@ -2558,6 +2575,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.DisconnectSocialAccountPayload.Viewer(childComplexity), true
 
+	case "ENSProfileImage.token":
+		if e.complexity.ENSProfileImage.Token == nil {
+			break
+		}
+
+		return e.complexity.ENSProfileImage.Token(childComplexity), true
+
+	case "ENSProfileImage.urls":
+		if e.complexity.ENSProfileImage.Urls == nil {
+			break
+		}
+
+		return e.complexity.ENSProfileImage.Urls(childComplexity), true
+
 	case "EmailNotificationSettings.unsubscribedFromAll":
 		if e.complexity.EmailNotificationSettings.UnsubscribedFromAll == nil {
 			break
@@ -3329,6 +3360,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.GalleryUser.PrimaryWallet(childComplexity), true
+
+	case "GalleryUser.profileImage":
+		if e.complexity.GalleryUser.ProfileImage == nil {
+			break
+		}
+
+		return e.complexity.GalleryUser.ProfileImage(childComplexity), true
 
 	case "GalleryUser.roles":
 		if e.complexity.GalleryUser.Roles == nil {
@@ -4561,6 +4599,27 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.ViewGallery(childComplexity, args["galleryId"].(persist.DBID)), true
+
+	case "NFTProfileImage.token":
+		if e.complexity.NFTProfileImage.Token == nil {
+			break
+		}
+
+		return e.complexity.NFTProfileImage.Token(childComplexity), true
+
+	case "NFTProfileImage.urls":
+		if e.complexity.NFTProfileImage.Urls == nil {
+			break
+		}
+
+		return e.complexity.NFTProfileImage.Urls(childComplexity), true
+
+	case "NoProfileImage.urls":
+		if e.complexity.NoProfileImage.Urls == nil {
+			break
+		}
+
+		return e.complexity.NoProfileImage.Urls(childComplexity), true
 
 	case "NotificationEdge.cursor":
 		if e.complexity.NotificationEdge.Cursor == nil {
@@ -6856,10 +6915,27 @@ interface Error {
   message: String!
 }
 
+type NFTProfileImage {
+  urls: PreviewURLSet!
+  token: Token!
+}
+
+type ENSProfileImage {
+  urls: PreviewURLSet!
+  token: Token!
+}
+
+type NoProfileImage {
+  urls: PreviewURLSet!
+}
+
+union UserProfileImage = NFTProfileImage | ENSProfileImage | NoProfileImage
+
 type GalleryUser implements Node @goEmbedHelper {
   id: ID!
   dbid: DBID!
   username: String
+  profileImage: UserProfileImage! @goField(forceResolver: true)
   bio: String
   traits: String
   universal: Boolean
@@ -8135,10 +8211,7 @@ type SyncTokensPayload {
   viewer: Viewer
 }
 
-union SyncCreatedTokensPayloadOrError =
-    SyncCreatedTokensPayload
-  | ErrNotAuthorized
-  | ErrSyncFailed
+union SyncCreatedTokensPayloadOrError = SyncCreatedTokensPayload | ErrNotAuthorized | ErrSyncFailed
 
 type SyncCreatedTokensPayload {
   viewer: Viewer
@@ -8945,9 +9018,7 @@ type Mutation {
   setSpamPreference(input: SetSpamPreferenceInput!): SetSpamPreferencePayloadOrError @authRequired
 
   syncTokens(chains: [Chain!]): SyncTokensPayloadOrError @authRequired
-  syncCreatedTokens(
-    input: SyncCreatedTokensInput!
-  ): SyncCreatedTokensPayloadOrError @authRequired
+  syncCreatedTokens(input: SyncCreatedTokensInput!): SyncCreatedTokensPayloadOrError @authRequired
   refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
   refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
   refreshContract(contractId: DBID!): RefreshContractPayloadOrError
@@ -11744,6 +11815,8 @@ func (ec *executionContext) fieldContext_AdminAddWalletPayload_user(ctx context.
 				return ec.fieldContext_GalleryUser_dbid(ctx, field)
 			case "username":
 				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -12001,6 +12074,8 @@ func (ec *executionContext) fieldContext_Admire_admirer(ctx context.Context, fie
 				return ec.fieldContext_GalleryUser_dbid(ctx, field)
 			case "username":
 				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -12775,6 +12850,8 @@ func (ec *executionContext) fieldContext_BanUserFromFeedPayload_user(ctx context
 				return ec.fieldContext_GalleryUser_dbid(ctx, field)
 			case "username":
 				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -13662,6 +13739,8 @@ func (ec *executionContext) fieldContext_CollectionCreatedFeedEventData_owner(ct
 				return ec.fieldContext_GalleryUser_dbid(ctx, field)
 			case "username":
 				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -14538,6 +14617,8 @@ func (ec *executionContext) fieldContext_CollectionUpdatedFeedEventData_owner(ct
 				return ec.fieldContext_GalleryUser_dbid(ctx, field)
 			case "username":
 				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -14965,6 +15046,8 @@ func (ec *executionContext) fieldContext_CollectorsNoteAddedToCollectionFeedEven
 				return ec.fieldContext_GalleryUser_dbid(ctx, field)
 			case "username":
 				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -15236,6 +15319,8 @@ func (ec *executionContext) fieldContext_CollectorsNoteAddedToTokenFeedEventData
 				return ec.fieldContext_GalleryUser_dbid(ctx, field)
 			case "username":
 				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -15683,6 +15768,8 @@ func (ec *executionContext) fieldContext_Comment_commenter(ctx context.Context, 
 				return ec.fieldContext_GalleryUser_dbid(ctx, field)
 			case "username":
 				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -18339,6 +18426,162 @@ func (ec *executionContext) fieldContext_DisconnectSocialAccountPayload_viewer(c
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ENSProfileImage_urls(ctx context.Context, field graphql.CollectedField, obj *model.ENSProfileImage) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ENSProfileImage_urls(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Urls, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.PreviewURLSet)
+	fc.Result = res
+	return ec.marshalNPreviewURLSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreviewURLSet(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ENSProfileImage_urls(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ENSProfileImage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "raw":
+				return ec.fieldContext_PreviewURLSet_raw(ctx, field)
+			case "thumbnail":
+				return ec.fieldContext_PreviewURLSet_thumbnail(ctx, field)
+			case "small":
+				return ec.fieldContext_PreviewURLSet_small(ctx, field)
+			case "medium":
+				return ec.fieldContext_PreviewURLSet_medium(ctx, field)
+			case "large":
+				return ec.fieldContext_PreviewURLSet_large(ctx, field)
+			case "srcSet":
+				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "liveRender":
+				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
+			case "blurhash":
+				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ENSProfileImage_token(ctx context.Context, field graphql.CollectedField, obj *model.ENSProfileImage) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ENSProfileImage_token(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Token, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.Token)
+	fc.Result = res
+	return ec.marshalNToken2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐToken(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ENSProfileImage_token(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ENSProfileImage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Token_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Token_dbid(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Token_creationTime(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Token_lastUpdated(ctx, field)
+			case "collectorsNote":
+				return ec.fieldContext_Token_collectorsNote(ctx, field)
+			case "media":
+				return ec.fieldContext_Token_media(ctx, field)
+			case "tokenType":
+				return ec.fieldContext_Token_tokenType(ctx, field)
+			case "chain":
+				return ec.fieldContext_Token_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Token_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Token_description(ctx, field)
+			case "tokenId":
+				return ec.fieldContext_Token_tokenId(ctx, field)
+			case "quantity":
+				return ec.fieldContext_Token_quantity(ctx, field)
+			case "owner":
+				return ec.fieldContext_Token_owner(ctx, field)
+			case "ownedByWallets":
+				return ec.fieldContext_Token_ownedByWallets(ctx, field)
+			case "ownershipHistory":
+				return ec.fieldContext_Token_ownershipHistory(ctx, field)
+			case "tokenMetadata":
+				return ec.fieldContext_Token_tokenMetadata(ctx, field)
+			case "contract":
+				return ec.fieldContext_Token_contract(ctx, field)
+			case "externalUrl":
+				return ec.fieldContext_Token_externalUrl(ctx, field)
+			case "blockNumber":
+				return ec.fieldContext_Token_blockNumber(ctx, field)
+			case "isSpamByUser":
+				return ec.fieldContext_Token_isSpamByUser(ctx, field)
+			case "isSpamByProvider":
+				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
+			case "creatorAddress":
+				return ec.fieldContext_Token_creatorAddress(ctx, field)
+			case "openseaCollectionName":
+				return ec.fieldContext_Token_openseaCollectionName(ctx, field)
+			case "openseaId":
+				return ec.fieldContext_Token_openseaId(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Token", field.Name)
 		},
 	}
 	return fc, nil
@@ -21285,6 +21528,8 @@ func (ec *executionContext) fieldContext_FollowInfo_user(ctx context.Context, fi
 				return ec.fieldContext_GalleryUser_dbid(ctx, field)
 			case "username":
 				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -21476,6 +21721,8 @@ func (ec *executionContext) fieldContext_FollowUserPayload_user(ctx context.Cont
 				return ec.fieldContext_GalleryUser_dbid(ctx, field)
 			case "username":
 				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -22211,6 +22458,8 @@ func (ec *executionContext) fieldContext_Gallery_owner(ctx context.Context, fiel
 				return ec.fieldContext_GalleryUser_dbid(ctx, field)
 			case "username":
 				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -22400,6 +22649,8 @@ func (ec *executionContext) fieldContext_GalleryInfoUpdatedFeedEventData_owner(c
 				return ec.fieldContext_GalleryUser_dbid(ctx, field)
 			case "username":
 				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -22712,6 +22963,8 @@ func (ec *executionContext) fieldContext_GalleryUpdatedFeedEventData_owner(ctx c
 				return ec.fieldContext_GalleryUser_dbid(ctx, field)
 			case "username":
 				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -23106,6 +23359,50 @@ func (ec *executionContext) fieldContext_GalleryUser_username(ctx context.Contex
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GalleryUser_profileImage(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_GalleryUser_profileImage(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.GalleryUser().ProfileImage(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.UserProfileImage)
+	fc.Result = res
+	return ec.marshalNUserProfileImage2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUserProfileImage(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_GalleryUser_profileImage(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GalleryUser",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type UserProfileImage does not have child fields")
 		},
 	}
 	return fc, nil
@@ -23833,6 +24130,8 @@ func (ec *executionContext) fieldContext_GalleryUser_followers(ctx context.Conte
 				return ec.fieldContext_GalleryUser_dbid(ctx, field)
 			case "username":
 				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -23920,6 +24219,8 @@ func (ec *executionContext) fieldContext_GalleryUser_following(ctx context.Conte
 				return ec.fieldContext_GalleryUser_dbid(ctx, field)
 			case "username":
 				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -24601,6 +24902,8 @@ func (ec *executionContext) fieldContext_GroupNotificationUserEdge_node(ctx cont
 				return ec.fieldContext_GalleryUser_dbid(ctx, field)
 			case "username":
 				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -31235,6 +31538,224 @@ func (ec *executionContext) fieldContext_Mutation_generateQRCodeLoginToken(ctx c
 	return fc, nil
 }
 
+func (ec *executionContext) _NFTProfileImage_urls(ctx context.Context, field graphql.CollectedField, obj *model.NFTProfileImage) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_NFTProfileImage_urls(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Urls, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.PreviewURLSet)
+	fc.Result = res
+	return ec.marshalNPreviewURLSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreviewURLSet(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_NFTProfileImage_urls(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NFTProfileImage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "raw":
+				return ec.fieldContext_PreviewURLSet_raw(ctx, field)
+			case "thumbnail":
+				return ec.fieldContext_PreviewURLSet_thumbnail(ctx, field)
+			case "small":
+				return ec.fieldContext_PreviewURLSet_small(ctx, field)
+			case "medium":
+				return ec.fieldContext_PreviewURLSet_medium(ctx, field)
+			case "large":
+				return ec.fieldContext_PreviewURLSet_large(ctx, field)
+			case "srcSet":
+				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "liveRender":
+				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
+			case "blurhash":
+				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NFTProfileImage_token(ctx context.Context, field graphql.CollectedField, obj *model.NFTProfileImage) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_NFTProfileImage_token(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Token, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.Token)
+	fc.Result = res
+	return ec.marshalNToken2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐToken(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_NFTProfileImage_token(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NFTProfileImage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Token_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Token_dbid(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Token_creationTime(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Token_lastUpdated(ctx, field)
+			case "collectorsNote":
+				return ec.fieldContext_Token_collectorsNote(ctx, field)
+			case "media":
+				return ec.fieldContext_Token_media(ctx, field)
+			case "tokenType":
+				return ec.fieldContext_Token_tokenType(ctx, field)
+			case "chain":
+				return ec.fieldContext_Token_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Token_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Token_description(ctx, field)
+			case "tokenId":
+				return ec.fieldContext_Token_tokenId(ctx, field)
+			case "quantity":
+				return ec.fieldContext_Token_quantity(ctx, field)
+			case "owner":
+				return ec.fieldContext_Token_owner(ctx, field)
+			case "ownedByWallets":
+				return ec.fieldContext_Token_ownedByWallets(ctx, field)
+			case "ownershipHistory":
+				return ec.fieldContext_Token_ownershipHistory(ctx, field)
+			case "tokenMetadata":
+				return ec.fieldContext_Token_tokenMetadata(ctx, field)
+			case "contract":
+				return ec.fieldContext_Token_contract(ctx, field)
+			case "externalUrl":
+				return ec.fieldContext_Token_externalUrl(ctx, field)
+			case "blockNumber":
+				return ec.fieldContext_Token_blockNumber(ctx, field)
+			case "isSpamByUser":
+				return ec.fieldContext_Token_isSpamByUser(ctx, field)
+			case "isSpamByProvider":
+				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
+			case "creatorAddress":
+				return ec.fieldContext_Token_creatorAddress(ctx, field)
+			case "openseaCollectionName":
+				return ec.fieldContext_Token_openseaCollectionName(ctx, field)
+			case "openseaId":
+				return ec.fieldContext_Token_openseaId(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Token", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NoProfileImage_urls(ctx context.Context, field graphql.CollectedField, obj *model.NoProfileImage) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_NoProfileImage_urls(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Urls, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.PreviewURLSet)
+	fc.Result = res
+	return ec.marshalNPreviewURLSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreviewURLSet(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_NoProfileImage_urls(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NoProfileImage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "raw":
+				return ec.fieldContext_PreviewURLSet_raw(ctx, field)
+			case "thumbnail":
+				return ec.fieldContext_PreviewURLSet_thumbnail(ctx, field)
+			case "small":
+				return ec.fieldContext_PreviewURLSet_small(ctx, field)
+			case "medium":
+				return ec.fieldContext_PreviewURLSet_medium(ctx, field)
+			case "large":
+				return ec.fieldContext_PreviewURLSet_large(ctx, field)
+			case "srcSet":
+				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "liveRender":
+				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
+			case "blurhash":
+				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _NotificationEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.NotificationEdge) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_NotificationEdge_node(ctx, field)
 	if err != nil {
@@ -33053,6 +33574,8 @@ func (ec *executionContext) fieldContext_Query_usersWithTrait(ctx context.Contex
 				return ec.fieldContext_GalleryUser_dbid(ctx, field)
 			case "username":
 				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -33524,6 +34047,8 @@ func (ec *executionContext) fieldContext_Query_galleryOfTheWeekWinners(ctx conte
 				return ec.fieldContext_GalleryUser_dbid(ctx, field)
 			case "username":
 				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -35723,6 +36248,8 @@ func (ec *executionContext) fieldContext_SocialConnection_galleryUser(ctx contex
 				return ec.fieldContext_GalleryUser_dbid(ctx, field)
 			case "username":
 				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -39405,6 +39932,8 @@ func (ec *executionContext) fieldContext_Token_owner(ctx context.Context, field 
 				return ec.fieldContext_GalleryUser_dbid(ctx, field)
 			case "username":
 				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -40221,6 +40750,8 @@ func (ec *executionContext) fieldContext_TokenHolder_user(ctx context.Context, f
 				return ec.fieldContext_GalleryUser_dbid(ctx, field)
 			case "username":
 				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -40587,6 +41118,8 @@ func (ec *executionContext) fieldContext_TokensAddedToCollectionFeedEventData_ow
 				return ec.fieldContext_GalleryUser_dbid(ctx, field)
 			case "username":
 				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -40973,6 +41506,8 @@ func (ec *executionContext) fieldContext_TrendingUsersPayload_users(ctx context.
 				return ec.fieldContext_GalleryUser_dbid(ctx, field)
 			case "username":
 				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -41324,6 +41859,8 @@ func (ec *executionContext) fieldContext_UnbanUserFromFeedPayload_user(ctx conte
 				return ec.fieldContext_GalleryUser_dbid(ctx, field)
 			case "username":
 				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -41474,6 +42011,8 @@ func (ec *executionContext) fieldContext_UnfollowUserPayload_user(ctx context.Co
 				return ec.fieldContext_GalleryUser_dbid(ctx, field)
 			case "username":
 				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -43130,6 +43669,8 @@ func (ec *executionContext) fieldContext_UserCreatedFeedEventData_owner(ctx cont
 				return ec.fieldContext_GalleryUser_dbid(ctx, field)
 			case "username":
 				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -43258,6 +43799,8 @@ func (ec *executionContext) fieldContext_UserEdge_node(ctx context.Context, fiel
 				return ec.fieldContext_GalleryUser_dbid(ctx, field)
 			case "username":
 				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -43644,6 +44187,8 @@ func (ec *executionContext) fieldContext_UserFollowedUsersFeedEventData_owner(ct
 				return ec.fieldContext_GalleryUser_dbid(ctx, field)
 			case "username":
 				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -43819,6 +44364,8 @@ func (ec *executionContext) fieldContext_UserSearchResult_user(ctx context.Conte
 				return ec.fieldContext_GalleryUser_dbid(ctx, field)
 			case "username":
 				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -44656,6 +45203,8 @@ func (ec *executionContext) fieldContext_Viewer_user(ctx context.Context, field 
 				return ec.fieldContext_GalleryUser_dbid(ctx, field)
 			case "username":
 				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -52736,6 +53285,36 @@ func (ec *executionContext) _UserByUsernameOrError(ctx context.Context, sel ast.
 	}
 }
 
+func (ec *executionContext) _UserProfileImage(ctx context.Context, sel ast.SelectionSet, obj model.UserProfileImage) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.NFTProfileImage:
+		return ec._NFTProfileImage(ctx, sel, &obj)
+	case *model.NFTProfileImage:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._NFTProfileImage(ctx, sel, obj)
+	case model.ENSProfileImage:
+		return ec._ENSProfileImage(ctx, sel, &obj)
+	case *model.ENSProfileImage:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ENSProfileImage(ctx, sel, obj)
+	case model.NoProfileImage:
+		return ec._NoProfileImage(ctx, sel, &obj)
+	case *model.NoProfileImage:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._NoProfileImage(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _VerifyEmailMagicLinkPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.VerifyEmailMagicLinkPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -54639,6 +55218,41 @@ func (ec *executionContext) _DisconnectSocialAccountPayload(ctx context.Context,
 	return out
 }
 
+var eNSProfileImageImplementors = []string{"ENSProfileImage", "UserProfileImage"}
+
+func (ec *executionContext) _ENSProfileImage(ctx context.Context, sel ast.SelectionSet, obj *model.ENSProfileImage) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, eNSProfileImageImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ENSProfileImage")
+		case "urls":
+
+			out.Values[i] = ec._ENSProfileImage_urls(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "token":
+
+			out.Values[i] = ec._ENSProfileImage_token(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var emailNotificationSettingsImplementors = []string{"EmailNotificationSettings"}
 
 func (ec *executionContext) _EmailNotificationSettings(ctx context.Context, sel ast.SelectionSet, obj *model.EmailNotificationSettings) graphql.Marshaler {
@@ -56280,6 +56894,26 @@ func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionS
 
 			out.Values[i] = ec._GalleryUser_username(ctx, field, obj)
 
+		case "profileImage":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._GalleryUser_profileImage(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "bio":
 
 			out.Values[i] = ec._GalleryUser_bio(ctx, field, obj)
@@ -57575,6 +58209,69 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 				return ec._Mutation_generateQRCodeLoginToken(ctx, field)
 			})
 
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var nFTProfileImageImplementors = []string{"NFTProfileImage", "UserProfileImage"}
+
+func (ec *executionContext) _NFTProfileImage(ctx context.Context, sel ast.SelectionSet, obj *model.NFTProfileImage) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, nFTProfileImageImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("NFTProfileImage")
+		case "urls":
+
+			out.Values[i] = ec._NFTProfileImage_urls(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "token":
+
+			out.Values[i] = ec._NFTProfileImage_token(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var noProfileImageImplementors = []string{"NoProfileImage", "UserProfileImage"}
+
+func (ec *executionContext) _NoProfileImage(ctx context.Context, sel ast.SelectionSet, obj *model.NoProfileImage) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, noProfileImageImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("NoProfileImage")
+		case "urls":
+
+			out.Values[i] = ec._NoProfileImage_urls(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -62428,6 +63125,16 @@ func (ec *executionContext) marshalNPreverifyEmailResult2githubᚗcomᚋmikeydub
 	return v
 }
 
+func (ec *executionContext) marshalNPreviewURLSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreviewURLSet(ctx context.Context, sel ast.SelectionSet, v *model.PreviewURLSet) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._PreviewURLSet(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNPubKey2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐPubKey(ctx context.Context, v interface{}) (persist.PubKey, error) {
 	tmp, err := graphql.UnmarshalString(v)
 	res := persist.PubKey(tmp)
@@ -62552,6 +63259,16 @@ func (ec *executionContext) unmarshalNSyncCreatedTokensInput2githubᚗcomᚋmike
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) marshalNToken2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐToken(ctx context.Context, sel ast.SelectionSet, v *model.Token) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._Token(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNTrendingUsersInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTrendingUsersInput(ctx context.Context, v interface{}) (model.TrendingUsersInput, error) {
 	res, err := ec.unmarshalInputTrendingUsersInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -62650,6 +63367,16 @@ func (ec *executionContext) unmarshalNUserExperienceType2githubᚗcomᚋmikeydub
 
 func (ec *executionContext) marshalNUserExperienceType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUserExperienceType(ctx context.Context, sel ast.SelectionSet, v model.UserExperienceType) graphql.Marshaler {
 	return v
+}
+
+func (ec *executionContext) marshalNUserProfileImage2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUserProfileImage(ctx context.Context, sel ast.SelectionSet, v model.UserProfileImage) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._UserProfileImage(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNUserSearchResult2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUserSearchResult(ctx context.Context, sel ast.SelectionSet, v *model.UserSearchResult) graphql.Marshaler {
