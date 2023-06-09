@@ -1093,7 +1093,7 @@ SELECT
     (
         SELECT wallets.address
         FROM wallets
-        WHERE wallets.id = ANY(tokens.owned_by_wallets)
+        WHERE wallets.id = ANY(tokens.owned_by_wallets) and wallets.deleted = false
         LIMIT 1
     ) AS wallet_address
 FROM tokens
@@ -2086,7 +2086,7 @@ SELECT
     (
         SELECT wallets.address
         FROM wallets
-        WHERE wallets.id = ANY(tokens.owned_by_wallets)
+        WHERE wallets.id = ANY(tokens.owned_by_wallets) and wallets.deleted = false
         LIMIT 1
     ) AS wallet_address
 FROM tokens
@@ -2497,7 +2497,7 @@ SELECT
     (
         SELECT wallets.address
         FROM wallets
-        WHERE wallets.id = ANY(tokens.owned_by_wallets)
+        WHERE wallets.id = ANY(tokens.owned_by_wallets) and wallets.deleted = false
         LIMIT 1
     ) AS wallet_address
 FROM tokens
@@ -3334,6 +3334,49 @@ func (q *Queries) GetTokensByWalletIds(ctx context.Context, ownedByWallets persi
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTopCollectionsForCommunity = `-- name: GetTopCollectionsForCommunity :many
+with contract_tokens as (
+	select t.id, t.owner_user_id
+	from tokens t
+	join contracts c on t.contract = c.id
+	where not t.deleted and not c.deleted and t.contract = c.id and c.chain = $1 and c.address = $2
+),
+ranking as (
+	select col.id, rank() over (order by count(col.id) desc, col.created_at desc) score
+	from collections col
+	join contract_tokens on col.owner_user_id = contract_tokens.owner_user_id and contract_tokens.id = any(col.nfts)
+	join users on col.owner_user_id = users.id
+	where not col.deleted and not col.hidden and not users.deleted
+	group by col.id
+)
+select collections.id from collections join ranking using(id) where score <= 100 order by score asc
+`
+
+type GetTopCollectionsForCommunityParams struct {
+	Chain   persist.Chain
+	Address persist.Address
+}
+
+func (q *Queries) GetTopCollectionsForCommunity(ctx context.Context, arg GetTopCollectionsForCommunityParams) ([]persist.DBID, error) {
+	rows, err := q.db.Query(ctx, getTopCollectionsForCommunity, arg.Chain, arg.Address)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []persist.DBID
+	for rows.Next() {
+		var id persist.DBID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -4211,6 +4254,62 @@ func (q *Queries) GetUsersWithTrait(ctx context.Context, dollar_1 string) ([]Use
 			&i.FeaturedGallery,
 			&i.PrimaryWalletID,
 			&i.UserExperiences,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getVisibleCollectionsByIDsPaginate = `-- name: GetVisibleCollectionsByIDsPaginate :many
+select collections.id, collections.deleted, collections.owner_user_id, collections.nfts, collections.version, collections.last_updated, collections.created_at, collections.hidden, collections.collectors_note, collections.name, collections.layout, collections.token_settings, collections.gallery_id
+from collections, unnest($2::varchar[]) with ordinality as t(id, pos)
+where collections.id = t.id and not deleted and not hidden and t.pos < $3::int and t.pos > $4::int
+order by case when $5::bool then t.pos end asc, case when not $5::bool then t.pos end desc
+limit $1
+`
+
+type GetVisibleCollectionsByIDsPaginateParams struct {
+	Limit         int32
+	CollectionIds []string
+	CurBeforePos  int32
+	CurAfterPos   int32
+	PagingForward bool
+}
+
+func (q *Queries) GetVisibleCollectionsByIDsPaginate(ctx context.Context, arg GetVisibleCollectionsByIDsPaginateParams) ([]Collection, error) {
+	rows, err := q.db.Query(ctx, getVisibleCollectionsByIDsPaginate,
+		arg.Limit,
+		arg.CollectionIds,
+		arg.CurBeforePos,
+		arg.CurAfterPos,
+		arg.PagingForward,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Collection
+	for rows.Next() {
+		var i Collection
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.OwnerUserID,
+			&i.Nfts,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Hidden,
+			&i.CollectorsNote,
+			&i.Name,
+			&i.Layout,
+			&i.TokenSettings,
+			&i.GalleryID,
 		); err != nil {
 			return nil, err
 		}
