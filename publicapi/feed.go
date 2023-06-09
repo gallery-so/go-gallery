@@ -2,8 +2,6 @@ package publicapi
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -393,50 +391,4 @@ func feedCursor(i interface{}) (time.Time, persist.DBID, error) {
 		return row.EventTime, row.ID, nil
 	}
 	return time.Time{}, "", fmt.Errorf("interface{} is not a feed event")
-}
-
-type ranker struct {
-	CalcFunc func(context.Context) ([]persist.DBID, error) // CalcFunc computes the results of a ranking and returns IDs in rank order
-	Cache    *redis.Cache                                  // Cache to store pre-computed result
-	Key      string                                        // Cache key used to store and retrieve saved results
-	TTL      time.Duration                                 // The length of time before a cached result is considered to be stale
-}
-
-// loadRank implements a lazy filled cache where only requested data is stored in the cache.
-// It is possible for load to return stale data, however the staleness of data can be
-// limited by configuring a shorter TTL. The tradeoff being that a shorter TTL results in more
-// cache misses and more frequent trips to check the cache, compute the rank, and re-populate the cache.
-func (r *ranker) loadRank(ctx context.Context) ([]persist.DBID, error) {
-	byt, err := r.Cache.Get(ctx, r.Key)
-
-	// Found an existing cache entry
-	if err == nil {
-		rank := make([]persist.DBID, 0)
-		err := json.Unmarshal(byt, &rank)
-		return rank, err
-	}
-
-	var notFoundErr redis.ErrKeyNotFound
-
-	// Got an error other than a cache miss
-	if !errors.As(err, &notFoundErr) {
-		return nil, err
-	}
-
-	// Cache miss, re-compute the rank and store it in the cache
-	return r.refreshRank(ctx)
-}
-
-func (r *ranker) refreshRank(ctx context.Context) ([]persist.DBID, error) {
-	rank, err := r.CalcFunc(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	byt, err := json.Marshal(rank)
-	if err != nil {
-		return nil, err
-	}
-
-	return rank, r.Cache.Set(ctx, r.Key, byt, r.TTL)
 }

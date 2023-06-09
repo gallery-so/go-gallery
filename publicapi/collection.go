@@ -128,18 +128,19 @@ func (api CollectionAPI) GetTopCollectionsForCommunity(ctx context.Context, chai
 		}
 	} else {
 		// No cursor provided, need to access the cache
-		r := ranker{
+		l := redis.LazyCache{
 			Cache: redis.NewCache(redis.SearchCache),
 			Key:   fmt.Sprintf("top_collections_by_address:%d:%s", chainAddress.Chain(), chainAddress.Address()),
 			TTL:   time.Hour * 2,
-			CalcFunc: func(ctx context.Context) ([]persist.DBID, error) {
-				return api.queries.GetTopCollectionsForCommunity(ctx, db.GetTopCollectionsForCommunityParams{
+			CalcFunc: func(ctx context.Context) ([]byte, error) {
+				c, err := api.queries.GetTopCollectionsForCommunity(ctx, db.GetTopCollectionsForCommunityParams{
 					Chain:   chainAddress.Chain(),
 					Address: chainAddress.Address(),
 				})
+				return c, err
 			},
 		}
-		if collectionIDs, err = r.loadRank(ctx); err != nil {
+		if collectionIDs, err = l.Load(ctx); err != nil {
 			return nil, pageInfo, err
 		}
 	}
