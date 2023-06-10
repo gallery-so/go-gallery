@@ -610,7 +610,7 @@ type Community struct {
 	ProfileImageURL   *string                 `json:"profileImageURL"`
 	ProfileBannerURL  *string                 `json:"profileBannerURL"`
 	BadgeURL          *string                 `json:"badgeURL"`
-	ParentCommunity   *CommunityEdge          `json:"parentCommunity"`
+	ParentCommunity   *CommunityLink          `json:"parentCommunity"`
 	SubCommunities    *CommunitiesConnection  `json:"subCommunities"`
 	TokensInCommunity *TokensConnection       `json:"tokensInCommunity"`
 	Owners            *TokenHoldersConnection `json:"owners"`
@@ -622,6 +622,10 @@ func (Community) IsCommunityByAddressOrError() {}
 type CommunityEdge struct {
 	Node   *Community `json:"node"`
 	Cursor *string    `json:"cursor"`
+}
+
+type CommunityLink struct {
+	Node *Community `json:"Node"`
 }
 
 type CommunitySearchResult struct {
@@ -706,8 +710,7 @@ type CreateUserPayload struct {
 func (CreateUserPayload) IsCreateUserPayloadOrError() {}
 
 type CreatedCommunitiesInput struct {
-	IncludeAllChains *bool           `json:"includeAllChains"`
-	Chains           []persist.Chain `json:"chains"`
+	IncludeChains []persist.Chain `json:"includeChains"`
 }
 
 type DebugAuth struct {
@@ -1685,8 +1688,7 @@ func (SomeoneViewedYourGalleryNotification) IsNode()                {}
 func (SomeoneViewedYourGalleryNotification) IsGroupedNotification() {}
 
 type SyncCreatedTokensInput struct {
-	IncludeAllChains *bool           `json:"includeAllChains"`
-	Chains           []persist.Chain `json:"chains"`
+	IncludeChains []persist.Chain `json:"includeChains"`
 }
 
 type SyncCreatedTokensPayload struct {

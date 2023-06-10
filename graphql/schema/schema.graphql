@@ -143,15 +143,13 @@ input ChainPubKeyInput {
 }
 
 input CreatedCommunitiesInput {
-  # When true, return all communities from all chains. Ignores the "chains" argument.
-  includeAllChains: Boolean
-  chains: [Chain!]
+  # When includeChains is empty, returns all communities from all chains.
+  includeChains: [Chain!]
 }
 
 input SyncCreatedTokensInput {
-  # When true, return all communities from all chains. Ignores the "chains" argument.
-  includeAllChains: Boolean
-  chains: [Chain!]
+  # When includeChains is empty, returns all communities from all chains.
+  includeChains: [Chain!]
 }
 
 type Badge {
@@ -513,6 +511,10 @@ type TokenHoldersConnection {
   pageInfo: PageInfo!
 }
 
+type CommunityLink {
+  Node: Community
+}
+
 type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) @goEmbedHelper {
   dbid: DBID!
   id: ID!
@@ -530,7 +532,7 @@ type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) @g
   profileImageURL: String
   profileBannerURL: String
   badgeURL: String
-  parentCommunity: CommunityEdge @goField(forceResolver: true)
+  parentCommunity: CommunityLink @goField(forceResolver: true)
   subCommunities(before: String, after: String, first: Int, last: Int): CommunitiesConnection
     @goField(forceResolver: true)
 
@@ -1064,6 +1066,7 @@ type Query {
   collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
   communityByAddress(
     communityAddress: ChainAddressInput!
+    childAddress: Address
     forceRefresh: Boolean
   ): CommunityByAddressOrError
   generalAllowlist: [ChainAddress!]

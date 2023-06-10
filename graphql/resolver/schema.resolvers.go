@@ -177,7 +177,7 @@ func (r *communityResolver) Creator(ctx context.Context, obj *model.Community) (
 }
 
 // ParentCommunity is the resolver for the parentCommunity field.
-func (r *communityResolver) ParentCommunity(ctx context.Context, obj *model.Community) (*model.CommunityEdge, error) {
+func (r *communityResolver) ParentCommunity(ctx context.Context, obj *model.Community) (*model.CommunityLink, error) {
 	if obj.ParentCommunity.Node.Dbid == "" {
 		return nil, nil
 	}
@@ -538,9 +538,7 @@ func (r *galleryUserResolver) SharedCommunities(ctx context.Context, obj *model.
 
 // CreatedCommunities is the resolver for the createdCommunities field.
 func (r *galleryUserResolver) CreatedCommunities(ctx context.Context, obj *model.GalleryUser, input model.CreatedCommunitiesInput, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error) {
-	includeAllChains := util.GetOptionalValue(input.IncludeAllChains, false)
-
-	communities, pageInfo, err := publicapi.For(ctx).User.CreatedCommunities(ctx, obj.UserID, input.Chains, includeAllChains, before, after, first, last)
+	communities, pageInfo, err := publicapi.For(ctx).User.CreatedCommunities(ctx, obj.UserID, input.IncludeChains, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}
@@ -882,9 +880,7 @@ func (r *mutationResolver) SyncTokens(ctx context.Context, chains []persist.Chai
 
 // SyncCreatedTokens is the resolver for the syncCreatedTokens field.
 func (r *mutationResolver) SyncCreatedTokens(ctx context.Context, input model.SyncCreatedTokensInput) (model.SyncCreatedTokensPayloadOrError, error) {
-	includeAllChains := util.GetOptionalValue(input.IncludeAllChains, false)
-
-	err := publicapi.For(ctx).Token.SyncTokensCreatedByUser(ctx, input.Chains, includeAllChains)
+	err := publicapi.For(ctx).Token.SyncTokensCreatedByUser(ctx, input.IncludeChains)
 	if err != nil {
 		return nil, err
 	}
@@ -1749,7 +1745,7 @@ func (r *queryResolver) CollectionTokenByID(ctx context.Context, tokenID persist
 }
 
 // CommunityByAddress is the resolver for the communityByAddress field.
-func (r *queryResolver) CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool) (model.CommunityByAddressOrError, error) {
+func (r *queryResolver) CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, childAddress *persist.Address, forceRefresh *bool) (model.CommunityByAddressOrError, error) {
 	return resolveCommunityByContractAddress(ctx, communityAddress, forceRefresh)
 }
 

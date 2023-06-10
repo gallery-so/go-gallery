@@ -377,14 +377,13 @@ func (c combinedProviderChildContractResults) ParentContracts() []persist.Contra
 }
 
 // SyncTokensCreatedOnSharedContracts queries each provider to identify contracts created by the given user.
-func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userID persist.DBID, chains []persist.Chain, includeAll bool) error {
+func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userID persist.DBID, chains []persist.Chain) error {
 	user, err := p.Repos.UserRepository.GetByID(ctx, userID)
 	if err != nil {
 		return err
 	}
 
-	if includeAll {
-		chains = make([]persist.Chain, 0)
+	if len(chains) == 0 {
 		for chain := range p.Chains {
 			chains = append(chains, chain)
 		}

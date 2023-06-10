@@ -1845,7 +1845,7 @@ func communityToModel(ctx context.Context, community db.Contract, forceRefresh *
 		BadgeURL:          util.ToPointer(community.BadgeUrl.String),
 		Owners:            nil,                                                                    // handled by dedicated resolver
 		Creator:           nil,                                                                    // handled by dedicated resolver
-		ParentCommunity:   &model.CommunityEdge{Node: &model.Community{Dbid: community.ParentID}}, // remaining fields handlded by dedicated resolver
+		ParentCommunity:   &model.CommunityLink{Node: &model.Community{Dbid: community.ParentID}}, // remaining fields handlded by dedicated resolver
 		SubCommunities:    nil,                                                                    // handled by dedicated resolver
 		TokensInCommunity: nil,                                                                    // handled by dedicated resolver
 	}

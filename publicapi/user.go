@@ -809,7 +809,7 @@ func (api UserAPI) SharedCommunities(ctx context.Context, userID persist.DBID, b
 	return contracts, pageInfo, err
 }
 
-func (api UserAPI) CreatedCommunities(ctx context.Context, userID persist.DBID, chains []persist.Chain, includeAllChains bool, before, after *string, first, last *int) ([]db.Contract, PageInfo, error) {
+func (api UserAPI) CreatedCommunities(ctx context.Context, userID persist.DBID, includeChains []persist.Chain, before, after *string, first, last *int) ([]db.Contract, PageInfo, error) {
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userID": {userID, "required"},
 	}); err != nil {
@@ -821,8 +821,8 @@ func (api UserAPI) CreatedCommunities(ctx context.Context, userID persist.DBID, 
 	}
 
 	queryFunc := func(params timeIDPagingParams) ([]any, error) {
-		serializedChains := make([]string, len(chains))
-		for i, c := range chains {
+		serializedChains := make([]string, len(includeChains))
+		for i, c := range includeChains {
 			serializedChains[i] = strconv.Itoa(int(c))
 		}
 		keys, err := api.loaders.ContractsLoaderByCreatorID.Load(db.GetCreatedContractsBatchPaginateParams{
@@ -834,7 +834,7 @@ func (api UserAPI) CreatedCommunities(ctx context.Context, userID persist.DBID, 
 			CurAfterID:       params.CursorAfterID,
 			PagingForward:    params.PagingForward,
 			Limit:            params.Limit,
-			IncludeAllChains: includeAllChains,
+			IncludeAllChains: len(includeChains) == 0,
 		})
 		if err != nil {
 			return nil, err
