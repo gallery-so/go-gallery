@@ -495,3 +495,14 @@ func (api TokenAPI) MediaByTokenID(ctx context.Context, tokenID persist.DBID) (d
 
 	return api.loaders.MediaByTokenID.Load(tokenID)
 }
+
+func (api TokenAPI) GetTokenOwnerByTokenID(ctx context.Context, tokenID persist.DBID) (db.TokenOwner, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"tokenID": {tokenID, "required"},
+	}); err != nil {
+		return db.TokenOwner{}, err
+	}
+
+	return api.loaders.TokenOwnerByTokenID.Load(tokenID)
+}

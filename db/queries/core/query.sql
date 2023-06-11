@@ -98,6 +98,16 @@ select t.* from collections c,
     order by u.nft_ord
     limit sqlc.narg('limit');
 
+-- name: GetTokenOwnersByIds :many
+select o.*
+    from unnest(@token_ids::text[]) as t(id)
+        join token_owners o on o.token_id = t.id;
+
+-- name: GetContractOwnersByIds :many
+select o.*
+    from unnest(@contract_ids::text[]) as c(id)
+        join contract_owners o on o.contract_id = c.id;
+
 -- name: GetNewTokensByFeedEventIdBatch :batchmany
 WITH new_tokens AS (
     SELECT added.id, row_number() OVER () added_order

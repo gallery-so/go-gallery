@@ -1484,6 +1484,39 @@ func (q *Queries) GetContractByID(ctx context.Context, id persist.DBID) (Contrac
 	return i, err
 }
 
+const getContractOwnersByIds = `-- name: GetContractOwnersByIds :many
+select o.contract_id, o.owner_user_id, o.owner_user_id_valid, o.chain, o.owner_address, o.owner_address_valid
+    from unnest($1::text[]) as c(id)
+        join contract_owners o on o.contract_id = c.id
+`
+
+func (q *Queries) GetContractOwnersByIds(ctx context.Context, contractIds []string) ([]ContractOwner, error) {
+	rows, err := q.db.Query(ctx, getContractOwnersByIds, contractIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ContractOwner
+	for rows.Next() {
+		var i ContractOwner
+		if err := rows.Scan(
+			&i.ContractID,
+			&i.OwnerUserID,
+			&i.OwnerUserIDValid,
+			&i.Chain,
+			&i.OwnerAddress,
+			&i.OwnerAddressValid,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getContractsByIDs = `-- name: GetContractsByIDs :many
 SELECT id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, override_owner_user_id from contracts WHERE id = ANY($1) AND deleted = false
 `
@@ -2935,6 +2968,37 @@ func (q *Queries) GetTokenOwnerByID(ctx context.Context, id persist.DBID) (User,
 		&i.UserExperiences,
 	)
 	return i, err
+}
+
+const getTokenOwnersByIds = `-- name: GetTokenOwnersByIds :many
+select o.token_id, o.owner_user_id, o.owner_is_holder, o.owner_is_creator
+    from unnest($1::text[]) as t(id)
+        join token_owners o on o.token_id = t.id
+`
+
+func (q *Queries) GetTokenOwnersByIds(ctx context.Context, tokenIds []string) ([]TokenOwner, error) {
+	rows, err := q.db.Query(ctx, getTokenOwnersByIds, tokenIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []TokenOwner
+	for rows.Next() {
+		var i TokenOwner
+		if err := rows.Scan(
+			&i.TokenID,
+			&i.OwnerUserID,
+			&i.OwnerIsHolder,
+			&i.OwnerIsCreator,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getTokensByContractId = `-- name: GetTokensByContractId :many

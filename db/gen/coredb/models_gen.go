@@ -79,10 +79,12 @@ type Contract struct {
 }
 
 type ContractOwner struct {
-	ContractID   persist.DBID
-	OwnerUserID  persist.DBID
-	Chain        persist.Chain
-	OwnerAddress persist.Address
+	ContractID        persist.DBID
+	OwnerUserID       persist.DBID
+	OwnerUserIDValid  bool
+	Chain             persist.Chain
+	OwnerAddress      persist.Address
+	OwnerAddressValid bool
 }
 
 type ContractRelevance struct {
@@ -474,8 +476,8 @@ type TokenMediasNoValidationRule struct {
 type TokenOwner struct {
 	TokenID        persist.DBID
 	OwnerUserID    persist.DBID
-	OwnerIsHolder  interface{}
-	OwnerIsCreator sql.NullBool
+	OwnerIsHolder  bool
+	OwnerIsCreator bool
 }
 
 type TokenProcessingJob struct {

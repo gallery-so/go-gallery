@@ -588,6 +588,7 @@ type Community struct {
 	Contract          *Contract               `json:"contract"`
 	ContractAddress   *persist.ChainAddress   `json:"contractAddress"`
 	CreatorAddress    *persist.ChainAddress   `json:"creatorAddress"`
+	Creator           GalleryUserOrAddress    `json:"creator"`
 	Chain             *persist.Chain          `json:"chain"`
 	Name              *string                 `json:"name"`
 	Description       *string                 `json:"description"`
@@ -1711,8 +1712,11 @@ type Token struct {
 	Owner                 *GalleryUser          `json:"owner"`
 	OwnedByWallets        []*Wallet             `json:"ownedByWallets"`
 	OwnershipHistory      []*OwnerAtBlock       `json:"ownershipHistory"`
+	OwnerIsHolder         *bool                 `json:"ownerIsHolder"`
+	OwnerIsCreator        *bool                 `json:"ownerIsCreator"`
 	TokenMetadata         *string               `json:"tokenMetadata"`
 	Contract              *Contract             `json:"contract"`
+	Community             *Community            `json:"community"`
 	ExternalURL           *string               `json:"externalUrl"`
 	BlockNumber           *string               `json:"blockNumber"`
 	IsSpamByUser          *bool                 `json:"isSpamByUser"`
