@@ -296,7 +296,7 @@ func (d *Provider) GetDisplayNameByAddress(ctx context.Context, addr persist.Add
 }
 
 // GetChildContractsCreatedOnSharedContract returns a tokens created by the address under the Shared Storefront contract
-func (p *Provider) GetChildContractsCreatedOnSharedContract(ctx context.Context, creatorAddress persist.Address) ([]multichain.ContractEdge, error) {
+func (p *Provider) GetChildContractsCreatedOnSharedContract(ctx context.Context, creatorAddress persist.Address) ([]multichain.ParentToChildEdge, error) {
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
@@ -544,14 +544,14 @@ func streamAssetsForSharedContract(ctx context.Context, editorAddress persist.Et
 }
 
 // assetsByChildContract converts a channel of assets to a slice of sub-contract groups
-func assetsByChildContract(ctx context.Context, assetsChan <-chan assetsReceieved, ethClient *ethclient.Client, creatorAddress persist.Address) ([]multichain.ContractEdge, error) {
+func assetsByChildContract(ctx context.Context, assetsChan <-chan assetsReceieved, ethClient *ethclient.Client, creatorAddress persist.Address) ([]multichain.ParentToChildEdge, error) {
 	block, err := ethClient.BlockNumber(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	childIdx := make(map[string]int)
-	parents := make(map[persist.EthereumAddress]multichain.ContractEdge)
+	parents := make(map[persist.EthereumAddress]multichain.ParentToChildEdge)
 
 	for page := range assetsChan {
 
@@ -575,7 +575,7 @@ func assetsByChildContract(ctx context.Context, assetsChan <-chan assetsReceieve
 
 			// Found a new parent
 			if _, seen := parents[parentAddress]; !seen {
-				parents[parentAddress] = multichain.ContractEdge{
+				parents[parentAddress] = multichain.ParentToChildEdge{
 					Parent:   contractFromAsset(asset, persist.BlockNumber(block)),
 					Children: make([]multichain.ChildContract, 0),
 				}
@@ -603,7 +603,7 @@ func assetsByChildContract(ctx context.Context, assetsChan <-chan assetsReceieve
 		}
 	}
 
-	edges := make([]multichain.ContractEdge, 0)
+	edges := make([]multichain.ParentToChildEdge, 0)
 	for _, edge := range parents {
 		edges = append(edges, edge)
 	}

@@ -169,7 +169,7 @@ func (r *commentOnFeedEventPayloadResolver) FeedEvent(ctx context.Context, obj *
 }
 
 // Creator is the resolver for the creator field.
-func (r *communityResolver) Creator(ctx context.Context, obj *model.Community) (*model.GalleryUser, error) {
+func (r *communityResolver) Creator(ctx context.Context, obj *model.Community) (model.GalleryUserOrAddress, error) {
 	if obj.CreatorAddress == nil {
 		return nil, nil
 	}

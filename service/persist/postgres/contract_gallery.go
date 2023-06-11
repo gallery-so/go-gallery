@@ -124,7 +124,6 @@ func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, pContracts 
 
 	contracts := removeDuplicateContractsGallery(pContracts)
 	params := db.UpsertContractsParams{}
-	now := time.Now()
 
 	// addIDIfMissing is used because sqlc was unable to bind arrays of our own custom types
 	// i.e. an array of persist.DBIDs instead of an array of strings. A zero-valued persist.DBID
@@ -135,23 +134,12 @@ func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, pContracts 
 		}
 	}
 
-	// addTimesIfMissing is required because sqlc was unable to bind arrays of our own custom types
-	// i.e. an array of persist.CreationTime instead of an array of time.Time. A zero-valued persist.CreationTime
-	// uses the current time as the column value, but instead we need to manually add a time to the struct.
-	addTimesIfMissing := func(c *persist.ContractGallery) {
-		if c.CreationTime.Time().IsZero() {
-			(*c).CreationTime = persist.CreationTime(now)
-		}
-	}
-
 	for i := range contracts {
 		c := &contracts[i]
 		addIDIfMissing(c)
-		addTimesIfMissing(c)
 		params.ID = append(params.ID, c.ID.String())
 		params.Deleted = append(params.Deleted, c.Deleted.Bool())
 		params.Version = append(params.Version, c.Version.Int32())
-		params.CreatedAt = append(params.CreatedAt, c.CreationTime.Time())
 		params.Address = append(params.Address, c.Address.String())
 		params.Symbol = append(params.Symbol, c.Symbol.String())
 		params.Name = append(params.Name, c.Name.String)

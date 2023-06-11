@@ -602,7 +602,7 @@ type Community struct {
 	Contract          *Contract               `json:"contract"`
 	ContractAddress   *persist.ChainAddress   `json:"contractAddress"`
 	CreatorAddress    *persist.ChainAddress   `json:"creatorAddress"`
-	Creator           *GalleryUser            `json:"creator"`
+	Creator           GalleryUserOrAddress    `json:"creator"`
 	Chain             *persist.Chain          `json:"chain"`
 	Name              *string                 `json:"name"`
 	Description       *string                 `json:"description"`

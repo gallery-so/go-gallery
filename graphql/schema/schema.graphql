@@ -524,7 +524,7 @@ type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) @g
   contract: Contract
   contractAddress: ChainAddress
   creatorAddress: ChainAddress
-  creator: GalleryUser @goField(forceResolver: true)
+  creator: GalleryUserOrAddress @goField(forceResolver: true)
   chain: Chain
   name: String
   description: String

@@ -175,7 +175,7 @@ type TokensContractFetcher interface {
 }
 
 type ChildContractFetcher interface {
-	GetChildContractsCreatedOnSharedContract(ctx context.Context, creatorAddress persist.Address) ([]ContractEdge, error)
+	GetChildContractsCreatedOnSharedContract(ctx context.Context, creatorAddress persist.Address) ([]ParentToChildEdge, error)
 }
 
 // ContractRefresher supports refreshes of a contract
@@ -341,10 +341,10 @@ outer:
 type ProviderChildContractResult struct {
 	Priority int
 	Chain    persist.Chain
-	Edges    []ContractEdge
+	Edges    []ParentToChildEdge
 }
 
-type ContractEdge struct {
+type ParentToChildEdge struct {
 	Parent   ChainAgnosticContract
 	Children []ChildContract
 }
@@ -424,12 +424,10 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 	combinedResult := combinedProviderChildContractResults(pResult)
 
 	params := db.UpsertCreatedTokensParams{}
-	now := time.Now()
 
 	for _, contract := range combinedResult.ParentContracts() {
 		params.ParentContractID = append(params.ParentContractID, persist.GenerateID().String())
 		params.ParentContractDeleted = append(params.ParentContractDeleted, false)
-		params.ParentContractCreatedAt = append(params.ParentContractCreatedAt, now)
 		params.ParentContractName = append(params.ParentContractName, contract.Name.String)
 		params.ParentContractSymbol = append(params.ParentContractSymbol, contract.Symbol.String())
 		params.ParentContractAddress = append(params.ParentContractAddress, contract.Address.String())
@@ -442,7 +440,6 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 			for _, child := range edge.Children {
 				params.ChildContractID = append(params.ChildContractID, persist.GenerateID().String())
 				params.ChildContractDeleted = append(params.ChildContractDeleted, false)
-				params.ChildContractCreatedAt = append(params.ChildContractCreatedAt, now)
 				params.ChildContractName = append(params.ChildContractName, child.Name)
 				params.ChildContractAddress = append(params.ChildContractAddress, child.ChildID)
 				params.ChildContractCreatorAddress = append(params.ChildContractCreatorAddress, child.CreatorAddress.String())

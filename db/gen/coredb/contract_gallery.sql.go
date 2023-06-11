@@ -7,21 +7,20 @@ package coredb
 
 import (
 	"context"
-	"time"
 )
 
 const upsertContracts = `-- name: UpsertContracts :many
-insert into contracts (id, deleted, version, created_at, address, symbol, name, owner_address, chain, description) (
+insert into contracts (id, deleted, version, address, symbol, name, owner_address, chain, description) (
   select unnest($1::varchar[])
   , unnest($2::boolean[])
   , unnest($3::int[])
-  , unnest($4::timestamptz[])
+  , now()
+  , unnest($4::varchar[])
   , unnest($5::varchar[])
   , unnest($6::varchar[])
   , unnest($7::varchar[])
-  , unnest($8::varchar[])
-  , unnest($9::int[])
-  , unnest($10::varchar[])
+  , unnest($8::int[])
+  , unnest($9::varchar[])
 )
 on conflict (chain, address) where parent_id is null
 do update set symbol = excluded.symbol
@@ -38,7 +37,6 @@ type UpsertContractsParams struct {
 	ID           []string
 	Deleted      []bool
 	Version      []int32
-	CreatedAt    []time.Time
 	Address      []string
 	Symbol       []string
 	Name         []string
@@ -52,7 +50,6 @@ func (q *Queries) UpsertContracts(ctx context.Context, arg UpsertContractsParams
 		arg.ID,
 		arg.Deleted,
 		arg.Version,
-		arg.CreatedAt,
 		arg.Address,
 		arg.Symbol,
 		arg.Name,
@@ -97,30 +94,34 @@ func (q *Queries) UpsertContracts(ctx context.Context, arg UpsertContractsParams
 }
 
 const upsertCreatedTokens = `-- name: UpsertCreatedTokens :many
-with parent_contracts_data(id, deleted, created_at, name, symbol, address, creator_address, chain, description) as (
+ -- parent_contracts_data is the parent contract data to be inserted
+with parent_contracts_data(id, deleted, name, symbol, address, creator_address, chain, description) as (
   select unnest($1::varchar[]) as id
     , unnest($2::boolean[]) as deleted
-    , unnest($3::timestamptz[]) as created_at
-    , unnest($4::varchar[]) as name
-    , unnest($5::varchar[]) as symbol
-    , unnest($6::varchar[]) as address
-    , unnest($7::varchar[]) as creator_address
-    , unnest($8::int[]) as chain
-    , unnest($9::varchar[]) as description
-), child_contracts_data(id, deleted, created_at, name, address, creator_address, chain, description, parent_address) as (
-  select unnest($10::varchar[]) as id
-    , unnest($11::boolean[]) as deleted
-    , unnest($12::timestamptz[]) as created_at
-    , unnest($13::varchar[]) as name
-    , unnest($14::varchar[]) as address
-    , unnest($15::varchar[]) as creator_address
-    , unnest($16::int[]) as chain
-    , unnest($17::varchar[]) as description
-    , unnest($18::varchar[]) as parent_address
-), insert_parent_contracts as (
+    , unnest($3::varchar[]) as name
+    , unnest($4::varchar[]) as symbol
+    , unnest($5::varchar[]) as address
+    , unnest($6::varchar[]) as creator_address
+    , unnest($7::int[]) as chain
+    , unnest($8::varchar[]) as description
+),
+
+
+child_contracts_data(id, deleted, name, address, creator_address, chain, description, parent_address) as (
+  select unnest($9::varchar[]) as id
+    , unnest($10::boolean[]) as deleted
+    , unnest($11::varchar[]) as name
+    , unnest($12::varchar[]) as address
+    , unnest($13::varchar[]) as creator_address
+    , unnest($14::int[]) as chain
+    , unnest($15::varchar[]) as description
+    , unnest($16::varchar[]) as parent_address
+),
+
+insert_parent_contracts as (
   insert into contracts(id, deleted, created_at, name, symbol, address, creator_address, chain, description)
   (
-    select id, deleted, created_at, name, symbol, address, creator_address, chain, description
+    select id, deleted, now(), name, symbol, address, creator_address, chain, description
     from parent_contracts_data
   )
   on conflict (chain, address) where parent_id is null
@@ -132,9 +133,10 @@ with parent_contracts_data(id, deleted, created_at, name, symbol, address, creat
     , last_updated = now()
   returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id
 )
+
 insert into contracts(id, deleted, created_at, name, address, creator_address, chain, description, parent_id)
 (
-  select child.id, child.deleted, child.created_at, child.name, child.address, child.creator_address, child.chain, child.description, insert_parent_contracts.id
+  select child.id, child.deleted, now(), child.name, child.address, child.creator_address, child.chain, child.description, insert_parent_contracts.id
   from child_contracts_data child
   join insert_parent_contracts on child.chain = insert_parent_contracts.chain and child.parent_address = insert_parent_contracts.address
 )
@@ -150,7 +152,6 @@ returning id, deleted, version, created_at, last_updated, name, symbol, address,
 type UpsertCreatedTokensParams struct {
 	ParentContractID             []string
 	ParentContractDeleted        []bool
-	ParentContractCreatedAt      []time.Time
 	ParentContractName           []string
 	ParentContractSymbol         []string
 	ParentContractAddress        []string
@@ -159,7 +160,6 @@ type UpsertCreatedTokensParams struct {
 	ParentContractDescription    []string
 	ChildContractID              []string
 	ChildContractDeleted         []bool
-	ChildContractCreatedAt       []time.Time
 	ChildContractName            []string
 	ChildContractAddress         []string
 	ChildContractCreatorAddress  []string
@@ -168,11 +168,13 @@ type UpsertCreatedTokensParams struct {
 	ChildContractParentAddress   []string
 }
 
+// child_contracts_data is the child contract data to be inserted
+// insert the parent contracts
+// insert the child contracts
 func (q *Queries) UpsertCreatedTokens(ctx context.Context, arg UpsertCreatedTokensParams) ([]Contract, error) {
 	rows, err := q.db.Query(ctx, upsertCreatedTokens,
 		arg.ParentContractID,
 		arg.ParentContractDeleted,
-		arg.ParentContractCreatedAt,
 		arg.ParentContractName,
 		arg.ParentContractSymbol,
 		arg.ParentContractAddress,
@@ -181,7 +183,6 @@ func (q *Queries) UpsertCreatedTokens(ctx context.Context, arg UpsertCreatedToke
 		arg.ParentContractDescription,
 		arg.ChildContractID,
 		arg.ChildContractDeleted,
-		arg.ChildContractCreatedAt,
 		arg.ChildContractName,
 		arg.ChildContractAddress,
 		arg.ChildContractCreatorAddress,
