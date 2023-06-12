@@ -1846,11 +1846,11 @@ func communityToModel(ctx context.Context, community db.Contract, forceRefresh *
 		ProfileImageURL:   util.ToPointer(community.ProfileImageUrl.String),
 		ProfileBannerURL:  util.ToPointer(community.ProfileBannerUrl.String),
 		BadgeURL:          util.ToPointer(community.BadgeUrl.String),
-		Owners:            nil,                                                                    // handled by dedicated resolver
-		Creator:           nil,                                                                    // handled by dedicated resolver
-		ParentCommunity:   &model.CommunityLink{Node: &model.Community{Dbid: community.ParentID}}, // remaining fields handlded by dedicated resolver
-		SubCommunities:    nil,                                                                    // handled by dedicated resolver
-		TokensInCommunity: nil,                                                                    // handled by dedicated resolver
+		Owners:            nil, // handled by dedicated resolver
+		Creator:           nil, // handled by dedicated resolver
+		ParentCommunity:   nil, // handled by dedicated resolver
+		SubCommunities:    nil, // handled by dedicated resolver
+		TokensInCommunity: nil, // handled by dedicated resolver
 	}
 }
 

@@ -40,6 +40,7 @@ type HelperViewerData struct {
 
 type HelperCommunityData struct {
 	ForceRefresh *bool
+	ParentID     persist.DBID
 }
 
 type HelperTokensAddedToCollectionFeedEventDataData struct {

@@ -178,7 +178,7 @@ func (r *communityResolver) Creator(ctx context.Context, obj *model.Community) (
 
 // ParentCommunity is the resolver for the parentCommunity field.
 func (r *communityResolver) ParentCommunity(ctx context.Context, obj *model.Community) (*model.CommunityLink, error) {
-	if obj.ParentCommunity.Node.Dbid == "" {
+	if obj.HelperCommunityData.ParentID == "" {
 		return nil, nil
 	}
 
