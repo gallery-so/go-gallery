@@ -210,7 +210,7 @@ func processCurrentTier(ctx context.Context, pTokenID persist.TokenID, ethClient
 func processOwners(ctx context.Context, id persist.TokenID, metadata alchemyNFTMetadata, owners []persist.EthereumAddress, ethClient *ethclient.Client, userRepository *postgres.UserRepository, galleryRepository *postgres.GalleryRepository, membershipRepository *postgres.MembershipRepository, walletRepository *postgres.WalletRepository) (persist.MembershipTier, error) {
 	tier := persist.MembershipTier{
 		TokenID:     id,
-		LastUpdated: persist.LastUpdatedTime(time.Now()),
+		LastUpdated: time.Now(),
 	}
 	logger.For(ctx).Infof("Fetching membership tier: %s", id)
 
@@ -340,7 +340,7 @@ func GetMembershipTiers(ctx context.Context, forceRefresh bool, membershipReposi
 
 		tiersToUpdate := make([]persist.TokenID, 0, len(allTiers))
 		for _, tier := range allTiers {
-			if time.Since(tier.LastUpdated.Time()) > time.Hour || forceRefresh {
+			if time.Since(tier.LastUpdated) > time.Hour || forceRefresh {
 				logger.For(ctx).Infof("Tier %s not updated in the last hour - updating membership tier", tier.TokenID)
 				tiersToUpdate = append(tiersToUpdate, tier.TokenID)
 			}

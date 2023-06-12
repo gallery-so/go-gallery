@@ -5,6 +5,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"time"
 	// "github.com/davecgh/go-spew/spew"
 )
 
@@ -14,29 +15,29 @@ type ReqHeaders map[string][]string
 // UserNonce represents a short lived nonce that holds a value to be signed
 // by a user cryptographically to prove they are the owner of a given address.
 type UserNonce struct {
-	Version      NullInt32       `json:"version"`
-	ID           DBID            `json:"id"`
-	CreationTime CreationTime    `json:"created_at"`
-	Deleted      NullBool        `json:"-"`
-	LastUpdated  LastUpdatedTime `json:"last_updated"`
-	Value        NullString      `json:"value"`
-	Address      Address         `json:"address"`
+	Version      NullInt32  `json:"version"`
+	ID           DBID       `json:"id"`
+	CreationTime time.Time  `json:"created_at"`
+	Deleted      NullBool   `json:"-"`
+	LastUpdated  time.Time  `json:"last_updated"`
+	Value        NullString `json:"value"`
+	Address      Address    `json:"address"`
 }
 
 // UserLoginAttempt represents a single attempt for a user to login despite the success
 // of the login. Can be used in debugging and logging purposes.
 type UserLoginAttempt struct {
-	Version        NullInt32    `json:"version"`
-	ID             DBID         `json:"id"`
-	CreationTime   CreationTime `json:"created_at"`
-	Deleted        NullBool     `json:"-"`
-	Address        Wallet       `json:"address"`
-	Signature      NullString   `json:"signature"`
-	NonceValue     NullString   `json:"nonce_value"`
-	UserExists     NullBool     `json:"user_exists"`
-	SignatureValid NullBool     `json:"signature_valid"`
-	ReqHostAddr    NullString   `json:"req_host_addr"`
-	ReqHeaders     ReqHeaders   `json:"req_headers"`
+	Version        NullInt32  `json:"version"`
+	ID             DBID       `json:"id"`
+	CreationTime   time.Time  `json:"created_at"`
+	Deleted        NullBool   `json:"-"`
+	Address        Wallet     `json:"address"`
+	Signature      NullString `json:"signature"`
+	NonceValue     NullString `json:"nonce_value"`
+	UserExists     NullBool   `json:"user_exists"`
+	SignatureValid NullBool   `json:"signature_valid"`
+	ReqHostAddr    NullString `json:"req_host_addr"`
+	ReqHeaders     ReqHeaders `json:"req_headers"`
 }
 
 // CreateLoginAttemptInput is a type that holds the input for creating a login attempt

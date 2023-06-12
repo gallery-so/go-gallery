@@ -2,6 +2,7 @@ package persist
 
 import (
 	"fmt"
+	"time"
 )
 
 // GalleryDB represents a group of collections of NFTs in the database.
@@ -9,11 +10,11 @@ import (
 // a join relationship in the database
 // This struct will only be used in database operations
 type GalleryDB struct {
-	Version      NullInt32       `json:"version"` // schema version for this model
-	ID           DBID            `json:"id" binding:"required"`
-	CreationTime CreationTime    `json:"created_at"`
-	Deleted      NullBool        `json:"-"`
-	LastUpdated  LastUpdatedTime `json:"last_updated"`
+	Version      NullInt32 `json:"version"` // schema version for this model
+	ID           DBID      `json:"id" binding:"required"`
+	CreationTime time.Time `json:"created_at"`
+	Deleted      NullBool  `json:"-"`
+	LastUpdated  time.Time `json:"last_updated"`
 
 	OwnerUserID DBID   `json:"owner_user_id"`
 	Collections []DBID `json:"collections"`
@@ -24,11 +25,11 @@ type GalleryDB struct {
 // This struct will be decoded from a find database operation and used throughout
 // the application where GalleryDB is not used
 type Gallery struct {
-	Version      NullInt32       `json:"version"` // schema version for this model
-	ID           DBID            `json:"id" binding:"required"`
-	CreationTime CreationTime    `json:"created_at"`
-	Deleted      NullBool        `json:"-"`
-	LastUpdated  LastUpdatedTime `json:"last_updated"`
+	Version      NullInt32 `json:"version"` // schema version for this model
+	ID           DBID      `json:"id" binding:"required"`
+	CreationTime time.Time `json:"created_at"`
+	Deleted      NullBool  `json:"-"`
+	LastUpdated  time.Time `json:"last_updated"`
 
 	OwnerUserID DBID         `json:"owner_user_id"`
 	Collections []Collection `json:"collections"`
@@ -36,7 +37,7 @@ type Gallery struct {
 
 // GalleryTokenUpdateInput represents a struct that is used to update a gallery's list of collections in the databse
 type GalleryTokenUpdateInput struct {
-	LastUpdated LastUpdatedTime `json:"last_updated"`
+	LastUpdated time.Time `json:"last_updated"`
 
 	Collections []DBID `json:"collections"`
 }

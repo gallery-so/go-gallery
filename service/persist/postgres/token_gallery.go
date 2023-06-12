@@ -359,7 +359,7 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 		params.Contract = append(params.Contract, t.Contract.String())
 		appendBool(&params.IsUserMarkedSpam, t.IsUserMarkedSpam, &errors)
 		appendBool(&params.IsProviderMarkedSpam, t.IsProviderMarkedSpam, &errors)
-		params.LastSynced = append(params.LastSynced, t.LastSynced.Time())
+		params.LastSynced = append(params.LastSynced, t.LastSynced)
 		params.TokenUri = append(params.TokenUri, "")
 
 		// Defer error checking until now to keep the code above from being
@@ -378,9 +378,9 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 	for i := range tokens {
 		t := &tokens[i]
 		(*t).ID = upserted[i].ID
-		(*t).CreationTime = persist.CreationTime(upserted[i].CreatedAt)
-		(*t).LastUpdated = persist.LastUpdatedTime(upserted[i].LastUpdated)
-		(*t).LastSynced = persist.LastUpdatedTime(upserted[i].LastSynced)
+		(*t).CreationTime = upserted[i].CreatedAt
+		(*t).LastUpdated = upserted[i].LastUpdated
+		(*t).LastSynced = upserted[i].LastSynced
 	}
 
 	return upserted[0].LastUpdated, tokens, nil

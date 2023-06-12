@@ -3,17 +3,18 @@ package persist
 import (
 	"context"
 	"fmt"
+	"time"
 )
 
 type Comment struct {
-	ID          DBID            `json:"id"`
-	CreatedAt   CreationTime    `json:"created_at"`
-	LastUpdated LastUpdatedTime `json:"last_updated"`
-	FeedEventID DBID            `json:"feed_event_id"`
-	ActorID     DBID            `json:"actor_id"`
-	ReplyTo     DBID            `json:"reply_to"`
-	Comment     string          `json:"comment"`
-	Deleted     bool            `json:"deleted"`
+	ID          DBID      `json:"id"`
+	CreatedAt   time.Time `json:"created_at"`
+	LastUpdated time.Time `json:"last_updated"`
+	FeedEventID DBID      `json:"feed_event_id"`
+	ActorID     DBID      `json:"actor_id"`
+	ReplyTo     DBID      `json:"reply_to"`
+	Comment     string    `json:"comment"`
+	Deleted     bool      `json:"deleted"`
 }
 
 type CommentRepository interface {

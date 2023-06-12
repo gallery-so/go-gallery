@@ -4,15 +4,16 @@ import (
 	"context"
 	"database/sql/driver"
 	"fmt"
+	"time"
 )
 
 // Contract represents an ethereum contract in the database
 type Contract struct {
-	Version      NullInt32       `json:"version"` // schema version for this model
-	ID           DBID            `json:"id" binding:"required"`
-	CreationTime CreationTime    `json:"created_at"`
-	Deleted      NullBool        `json:"-"`
-	LastUpdated  LastUpdatedTime `json:"last_updated"`
+	Version      NullInt32 `json:"version"` // schema version for this model
+	ID           DBID      `json:"id" binding:"required"`
+	CreationTime time.Time `json:"created_at"`
+	Deleted      NullBool  `json:"-"`
+	LastUpdated  time.Time `json:"last_updated"`
 
 	Chain Chain `json:"chain"`
 

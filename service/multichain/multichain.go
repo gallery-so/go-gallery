@@ -1033,9 +1033,9 @@ func (p *Provider) createUsersForTokens(ctx context.Context, tokens []chainToken
 		addressesToUsers[string(user.Address)] = persist.User{
 			Version:            persist.NullInt32(user.Version.Int32),
 			ID:                 user.ID,
-			CreationTime:       persist.CreationTime(user.CreatedAt),
+			CreationTime:       user.CreatedAt,
 			Deleted:            persist.NullBool(user.Deleted),
-			LastUpdated:        persist.LastUpdatedTime(user.LastUpdated),
+			LastUpdated:        user.LastUpdated,
 			Username:           persist.NullString(user.Username.String),
 			UsernameIdempotent: persist.NullString(user.UsernameIdempotent.String),
 			Wallets:            user.Wallets,

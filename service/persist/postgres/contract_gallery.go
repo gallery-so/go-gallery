@@ -148,7 +148,7 @@ func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, pContracts 
 	for i := range contracts {
 		c := &contracts[i]
 		(*c).ID = upserted[i].ID
-		(*c).CreationTime = persist.CreationTime(upserted[i].CreatedAt)
+		(*c).CreationTime = upserted[i].CreatedAt
 		(*c).ParentID = upserted[i].ParentID
 	}
 

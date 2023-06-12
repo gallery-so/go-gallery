@@ -117,7 +117,7 @@ type HelperUserEmailData struct {
 
 type HelperSocialConnectionData struct {
 	UserID        persist.DBID
-	UserCreatedAt persist.CreationTime
+	UserCreatedAt time.Time
 }
 
 type HelperTokenData struct {
