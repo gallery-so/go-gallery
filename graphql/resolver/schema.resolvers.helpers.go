@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/gammazero/workerpool"
@@ -54,12 +53,8 @@ var nodeFetcher = model.NodeFetcher{
 		return resolveCollectionTokenByID(ctx, persist.DBID(tokenId), persist.DBID(collectionId))
 	},
 
-	OnCommunity: func(ctx context.Context, contractAddress string, chain string) (*model.Community, error) {
-		if parsed, err := strconv.Atoi(chain); err == nil {
-			return resolveCommunityByContractAddress(ctx, persist.NewChainAddress(persist.Address(contractAddress), persist.Chain(parsed)), util.ToPointer(false))
-		} else {
-			return nil, err
-		}
+	OnCommunity: func(ctx context.Context, dbid persist.DBID) (*model.Community, error) {
+		return resolveCommunityByID(ctx, dbid)
 	},
 	OnSomeoneAdmiredYourFeedEventNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneAdmiredYourFeedEventNotification, error) {
 		notif, err := resolveNotificationByID(ctx, dbid)
@@ -592,6 +587,14 @@ func resolveMembershipTierByMembershipId(ctx context.Context, id persist.DBID) (
 	}
 
 	return membershipToModel(ctx, *tier), nil
+}
+
+func resolveCommunityByID(ctx context.Context, id persist.DBID) (*model.Community, error) {
+	community, err := publicapi.For(ctx).Contract.GetContractByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return communityToModel(ctx, *community, nil), nil
 }
 
 func resolveCommunityByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, forceRefresh *bool) (*model.Community, error) {

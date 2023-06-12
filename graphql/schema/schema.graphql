@@ -515,7 +515,7 @@ type CommunityLink {
   Node: Community
 }
 
-type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) @goEmbedHelper {
+type Community implements Node @goEmbedHelper {
   dbid: DBID!
   id: ID!
 
