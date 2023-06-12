@@ -295,6 +295,8 @@ func (d *Provider) GetDisplayNameByAddress(ctx context.Context, addr persist.Add
 	return addr.String()
 }
 
+func (p *Provider) IsOpenSea() {}
+
 // GetChildContractsCreatedOnSharedContract returns a tokens created by the address under the Shared Storefront contract
 func (p *Provider) GetChildContractsCreatedOnSharedContract(ctx context.Context, creatorAddress persist.Address) ([]multichain.ParentToChildEdge, error) {
 	assetsChan := make(chan assetsReceieved)

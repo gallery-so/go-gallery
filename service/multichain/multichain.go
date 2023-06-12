@@ -178,6 +178,11 @@ type ChildContractFetcher interface {
 	GetChildContractsCreatedOnSharedContract(ctx context.Context, creatorAddress persist.Address) ([]ParentToChildEdge, error)
 }
 
+type OpenSeaChildContractFetcher interface {
+	ChildContractFetcher
+	IsOpenSea()
+}
+
 // ContractRefresher supports refreshes of a contract
 type ContractRefresher interface {
 	RefreshContract(context.Context, persist.Address) error

@@ -220,9 +220,9 @@ func ethRequirements(
 	cr multichain.ContractRefresher,
 	tmf multichain.TokenMetadataFetcher,
 	tdf multichain.TokenDescriptorsFetcher,
-	ccf multichain.ChildContractFetcher,
+	osccf multichain.OpenSeaChildContractFetcher,
 ) ethProviderList {
-	return ethProviderList{nr, v, tof, toc, cr, tmf, tdf, ccf}
+	return ethProviderList{nr, v, tof, toc, cr, tmf, tdf, osccf}
 }
 
 // tezosRequirements is the set of provider interfaces required for Tezos
