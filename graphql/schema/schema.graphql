@@ -147,7 +147,7 @@ input CreatedCommunitiesInput {
   includeChains: [Chain!]
 }
 
-input SyncCreatedTokensInput {
+input SyncCreatedTokensByUserInput {
   # When includeChains is empty, returns all communities from all chains.
   includeChains: [Chain!]
 }
@@ -1346,9 +1346,9 @@ type SyncTokensPayload {
   viewer: Viewer
 }
 
-union SyncCreatedTokensPayloadOrError = SyncCreatedTokensPayload | ErrNotAuthorized | ErrSyncFailed
+union SyncCreatedTokensByUserPayloadOrError = SyncCreatedTokensByUserPayload | ErrNotAuthorized | ErrSyncFailed
 
-type SyncCreatedTokensPayload {
+type SyncCreatedTokensByUserPayload {
   viewer: Viewer
 }
 
@@ -2153,7 +2153,7 @@ type Mutation {
   setSpamPreference(input: SetSpamPreferenceInput!): SetSpamPreferencePayloadOrError @authRequired
 
   syncTokens(chains: [Chain!]): SyncTokensPayloadOrError @authRequired
-  syncCreatedTokens(input: SyncCreatedTokensInput!): SyncCreatedTokensPayloadOrError @authRequired
+  syncCreatedTokensByUser(input: SyncCreatedTokensByUserInput!): SyncCreatedTokensByUserPayloadOrError @authRequired
   refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
   refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
   refreshContract(contractId: DBID!): RefreshContractPayloadOrError

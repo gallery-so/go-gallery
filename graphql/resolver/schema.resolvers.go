@@ -878,14 +878,14 @@ func (r *mutationResolver) SyncTokens(ctx context.Context, chains []persist.Chai
 	return output, nil
 }
 
-// SyncCreatedTokens is the resolver for the syncCreatedTokens field.
-func (r *mutationResolver) SyncCreatedTokens(ctx context.Context, input model.SyncCreatedTokensInput) (model.SyncCreatedTokensPayloadOrError, error) {
+// SyncCreatedTokensByUser is the resolver for the syncCreatedTokensByUser field.
+func (r *mutationResolver) SyncCreatedTokensByUser(ctx context.Context, input model.SyncCreatedTokensByUserInput) (model.SyncCreatedTokensByUserPayloadOrError, error) {
 	err := publicapi.For(ctx).Token.SyncTokensCreatedByUser(ctx, input.IncludeChains)
 	if err != nil {
 		return nil, err
 	}
 
-	return &model.SyncCreatedTokensPayload{Viewer: resolveViewer(ctx)}, nil
+	return &model.SyncCreatedTokensByUserPayload{Viewer: resolveViewer(ctx)}, nil
 }
 
 // RefreshToken is the resolver for the refreshToken field.

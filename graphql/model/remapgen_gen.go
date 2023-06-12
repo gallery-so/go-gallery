@@ -288,8 +288,8 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
-	"SyncCreatedTokensPayloadOrError": func(object interface{}) (interface{}, bool) {
-		obj, ok := object.(SyncCreatedTokensPayloadOrError)
+	"SyncCreatedTokensByUserPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(SyncCreatedTokensByUserPayloadOrError)
 		return obj, ok
 	},
 

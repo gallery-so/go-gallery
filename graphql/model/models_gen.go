@@ -242,8 +242,8 @@ type SocialQueriesOrError interface {
 	IsSocialQueriesOrError()
 }
 
-type SyncCreatedTokensPayloadOrError interface {
-	IsSyncCreatedTokensPayloadOrError()
+type SyncCreatedTokensByUserPayloadOrError interface {
+	IsSyncCreatedTokensByUserPayloadOrError()
 }
 
 type SyncTokensForUsernamePayloadOrError interface {
@@ -964,7 +964,7 @@ func (ErrNotAuthorized) IsUpdateUserInfoPayloadOrError()               {}
 func (ErrNotAuthorized) IsRegisterUserPushTokenPayloadOrError()        {}
 func (ErrNotAuthorized) IsUnregisterUserPushTokenPayloadOrError()      {}
 func (ErrNotAuthorized) IsSyncTokensPayloadOrError()                   {}
-func (ErrNotAuthorized) IsSyncCreatedTokensPayloadOrError()            {}
+func (ErrNotAuthorized) IsSyncCreatedTokensByUserPayloadOrError()      {}
 func (ErrNotAuthorized) IsError()                                      {}
 func (ErrNotAuthorized) IsAddRolesToUserPayloadOrError()               {}
 func (ErrNotAuthorized) IsRevokeRolesFromUserPayloadOrError()          {}
@@ -1010,13 +1010,13 @@ type ErrSyncFailed struct {
 	Message string `json:"message"`
 }
 
-func (ErrSyncFailed) IsSyncTokensPayloadOrError()            {}
-func (ErrSyncFailed) IsSyncCreatedTokensPayloadOrError()     {}
-func (ErrSyncFailed) IsRefreshTokenPayloadOrError()          {}
-func (ErrSyncFailed) IsRefreshCollectionPayloadOrError()     {}
-func (ErrSyncFailed) IsRefreshContractPayloadOrError()       {}
-func (ErrSyncFailed) IsError()                               {}
-func (ErrSyncFailed) IsSyncTokensForUsernamePayloadOrError() {}
+func (ErrSyncFailed) IsSyncTokensPayloadOrError()              {}
+func (ErrSyncFailed) IsSyncCreatedTokensByUserPayloadOrError() {}
+func (ErrSyncFailed) IsRefreshTokenPayloadOrError()            {}
+func (ErrSyncFailed) IsRefreshCollectionPayloadOrError()       {}
+func (ErrSyncFailed) IsRefreshContractPayloadOrError()         {}
+func (ErrSyncFailed) IsError()                                 {}
+func (ErrSyncFailed) IsSyncTokensForUsernamePayloadOrError()   {}
 
 type ErrTokenNotFound struct {
 	Message string `json:"message"`
@@ -1687,15 +1687,15 @@ func (SomeoneViewedYourGalleryNotification) IsNotification()        {}
 func (SomeoneViewedYourGalleryNotification) IsNode()                {}
 func (SomeoneViewedYourGalleryNotification) IsGroupedNotification() {}
 
-type SyncCreatedTokensInput struct {
+type SyncCreatedTokensByUserInput struct {
 	IncludeChains []persist.Chain `json:"includeChains"`
 }
 
-type SyncCreatedTokensPayload struct {
+type SyncCreatedTokensByUserPayload struct {
 	Viewer *Viewer `json:"viewer"`
 }
 
-func (SyncCreatedTokensPayload) IsSyncCreatedTokensPayloadOrError() {}
+func (SyncCreatedTokensByUserPayload) IsSyncCreatedTokensByUserPayloadOrError() {}
 
 type SyncTokensForUsernamePayload struct {
 	Message string `json:"message"`
