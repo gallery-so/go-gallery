@@ -3,6 +3,7 @@ package publicapi
 import (
 	"context"
 	"fmt"
+	"github.com/mikeydub/go-gallery/util"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -227,7 +228,10 @@ func (api TokenAPI) GetTokensByWalletID(ctx context.Context, walletID persist.DB
 	return tokens, nil
 }
 
-func (api TokenAPI) GetTokensByUserID(ctx context.Context, userID persist.DBID) ([]db.Token, error) {
+// GetTokensByUserID returns all tokens owned by a user. ownershipFilter is optional and may be nil or empty,
+// which will cause all tokens to be returned. If filter values are provided, only the tokens matching the
+// filter will be returned.
+func (api TokenAPI) GetTokensByUserID(ctx context.Context, userID persist.DBID, ownershipFilter []persist.TokenOwnershipType) ([]db.Token, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userID": {userID, "required"},
@@ -235,7 +239,20 @@ func (api TokenAPI) GetTokensByUserID(ctx context.Context, userID persist.DBID) 
 		return nil, err
 	}
 
-	tokens, err := api.loaders.TokensByUserID.Load(userID)
+	params := db.GetTokensByUserIdBatchParams{
+		OwnerUserID: userID,
+	}
+
+	if len(ownershipFilter) > 0 {
+		params.IncludeHolder = util.Contains(ownershipFilter, persist.TokenOwnershipTypeHolder)
+		params.IncludeCreator = util.Contains(ownershipFilter, persist.TokenOwnershipTypeCreator)
+	} else {
+		// If no filters are specified, include everything
+		params.IncludeHolder = true
+		params.IncludeCreator = true
+	}
+
+	tokens, err := api.loaders.TokensByUserID.Load(params)
 	if err != nil {
 		return nil, err
 	}

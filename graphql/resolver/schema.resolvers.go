@@ -403,8 +403,14 @@ func (r *galleryUserResolver) SocialAccounts(ctx context.Context, obj *model.Gal
 }
 
 // Tokens is the resolver for the tokens field.
-func (r *galleryUserResolver) Tokens(ctx context.Context, obj *model.GalleryUser) ([]*model.Token, error) {
-	return resolveTokensByUserID(ctx, obj.Dbid)
+func (r *galleryUserResolver) Tokens(ctx context.Context, obj *model.GalleryUser, ownershipFilter []persist.TokenOwnershipType) ([]*model.Token, error) {
+	tokens, err := publicapi.For(ctx).Token.GetTokensByUserID(ctx, obj.Dbid, ownershipFilter)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return tokensToModel(ctx, tokens), nil
 }
 
 // TokensByChain is the resolver for the tokensByChain field.

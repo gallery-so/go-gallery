@@ -2570,6 +2570,7 @@ select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.descr
     join token_ownership o on t.id = o.token_id and t.owner_user_id = o.owner_user_id
     where t.owner_user_id = $1
       and t.deleted = false
+      and (($2::bool and o.is_holder) or ($3::bool and o.is_creator))
     order by t.created_at desc, t.name desc, t.id desc
 `
 
@@ -2579,16 +2580,24 @@ type GetTokensByUserIdBatchBatchResults struct {
 	closed bool
 }
 
-func (q *Queries) GetTokensByUserIdBatch(ctx context.Context, ownerUserID []persist.DBID) *GetTokensByUserIdBatchBatchResults {
+type GetTokensByUserIdBatchParams struct {
+	OwnerUserID    persist.DBID
+	IncludeHolder  bool
+	IncludeCreator bool
+}
+
+func (q *Queries) GetTokensByUserIdBatch(ctx context.Context, arg []GetTokensByUserIdBatchParams) *GetTokensByUserIdBatchBatchResults {
 	batch := &pgx.Batch{}
-	for _, a := range ownerUserID {
+	for _, a := range arg {
 		vals := []interface{}{
-			a,
+			a.OwnerUserID,
+			a.IncludeHolder,
+			a.IncludeCreator,
 		}
 		batch.Queue(getTokensByUserIdBatch, vals...)
 	}
 	br := q.db.SendBatch(ctx, batch)
-	return &GetTokensByUserIdBatchBatchResults{br, len(ownerUserID), false}
+	return &GetTokensByUserIdBatchBatchResults{br, len(arg), false}
 }
 
 func (b *GetTokensByUserIdBatchBatchResults) Query(f func(int, []Token, error)) {

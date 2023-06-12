@@ -131,6 +131,11 @@ const (
 	CountTypeERC1155 TokenCountType = "erc1155"
 )
 
+const (
+	TokenOwnershipTypeHolder  TokenOwnershipType = "holder"
+	TokenOwnershipTypeCreator TokenOwnershipType = "creator"
+)
+
 // InvalidTokenURI represents an invalid token URI
 const InvalidTokenURI TokenURI = "INVALID"
 
@@ -203,6 +208,12 @@ type EthereumAddressAtBlock struct {
 
 // EthereumTokenIdentifiers represents a unique identifier for a token on the Ethereum Blockchain
 type EthereumTokenIdentifiers string
+
+type TokenOwnershipType string
+
+func (t TokenOwnershipType) String() string {
+	return string(t)
+}
 
 // Token represents an individual Token token
 type Token struct {
@@ -928,4 +939,30 @@ func WalletsToEthereumAddresses(pWallets []Wallet) []EthereumAddress {
 		result[i] = EthereumAddress(wallet.Address)
 	}
 	return result
+}
+
+// UnmarshalGQL implements the graphql.Unmarshaler interface
+func (t *TokenOwnershipType) UnmarshalGQL(v interface{}) error {
+	n, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("TokenOwnershipType must be a string")
+	}
+
+	switch strings.ToLower(n) {
+	case "holder":
+		*t = TokenOwnershipTypeHolder
+	case "creator":
+		*t = TokenOwnershipTypeCreator
+	}
+	return nil
+}
+
+// MarshalGQL implements the graphql.Marshaler interface
+func (t TokenOwnershipType) MarshalGQL(w io.Writer) {
+	switch t {
+	case TokenOwnershipTypeHolder:
+		w.Write([]byte(`"holder"`))
+	case TokenOwnershipTypeCreator:
+		w.Write([]byte(`"creator"`))
+	}
 }

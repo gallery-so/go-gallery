@@ -275,8 +275,9 @@ SELECT (MEDIA->>'thumbnail_url')::varchar as thumbnail_url FROM tokens WHERE CON
 -- name: GetTokensByUserIdBatch :batchmany
 select t.* from tokens t
     join token_ownership o on t.id = o.token_id and t.owner_user_id = o.owner_user_id
-    where t.owner_user_id = $1
+    where t.owner_user_id = @owner_user_id
       and t.deleted = false
+      and ((@include_holder::bool and o.is_holder) or (@include_creator::bool and o.is_creator))
     order by t.created_at desc, t.name desc, t.id desc;
 
 -- name: GetTokensByUserIdAndContractIDBatch :batchmany

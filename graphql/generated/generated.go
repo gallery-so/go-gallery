@@ -568,7 +568,7 @@ type ComplexityRoot struct {
 		SharedCommunities   func(childComplexity int, before *string, after *string, first *int, last *int) int
 		SharedFollowers     func(childComplexity int, before *string, after *string, first *int, last *int) int
 		SocialAccounts      func(childComplexity int) int
-		Tokens              func(childComplexity int) int
+		Tokens              func(childComplexity int, ownershipFilter []persist.TokenOwnershipType) int
 		TokensByChain       func(childComplexity int, chain persist.Chain) int
 		Traits              func(childComplexity int) int
 		Universal           func(childComplexity int) int
@@ -1375,7 +1375,7 @@ type GalleryUpdatedFeedEventDataResolver interface {
 type GalleryUserResolver interface {
 	Roles(ctx context.Context, obj *model.GalleryUser) ([]*persist.Role, error)
 	SocialAccounts(ctx context.Context, obj *model.GalleryUser) (*model.SocialAccounts, error)
-	Tokens(ctx context.Context, obj *model.GalleryUser) ([]*model.Token, error)
+	Tokens(ctx context.Context, obj *model.GalleryUser, ownershipFilter []persist.TokenOwnershipType) ([]*model.Token, error)
 	TokensByChain(ctx context.Context, obj *model.GalleryUser, chain persist.Chain) (*model.ChainTokens, error)
 	Wallets(ctx context.Context, obj *model.GalleryUser) ([]*model.Wallet, error)
 	PrimaryWallet(ctx context.Context, obj *model.GalleryUser) (*model.Wallet, error)
@@ -3285,7 +3285,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		return e.complexity.GalleryUser.Tokens(childComplexity), true
+		args, err := ec.field_GalleryUser_tokens_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.GalleryUser.Tokens(childComplexity, args["ownershipFilter"].([]persist.TokenOwnershipType)), true
 
 	case "GalleryUser.tokensByChain":
 		if e.complexity.GalleryUser.TokensByChain == nil {
@@ -6768,7 +6773,7 @@ type GalleryUser implements Node @goEmbedHelper {
   # Returns all tokens owned by this user. Useful for retrieving all tokens without any duplicates,
   # as opposed to retrieving user -> wallets -> tokens, which would contain duplicates for any token
   # that appears in more than one of the user's wallets.
-  tokens: [Token] @goField(forceResolver: true)
+  tokens(ownershipFilter:[TokenOwnershipType!]): [Token] @goField(forceResolver: true)
   tokensByChain(chain: Chain!): ChainTokens @goField(forceResolver: true)
 
   wallets: [Wallet] @goField(forceResolver: true)
@@ -7042,6 +7047,11 @@ enum Chain {
   Optimism
   Tezos
   POAP
+}
+
+enum TokenOwnershipType {
+  Holder
+  Creator
 }
 
 enum WalletType {
@@ -9345,6 +9355,21 @@ func (ec *executionContext) field_GalleryUser_tokensByChain_args(ctx context.Con
 		}
 	}
 	args["chain"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_GalleryUser_tokens_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 []persist.TokenOwnershipType
+	if tmp, ok := rawArgs["ownershipFilter"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("ownershipFilter"))
+		arg0, err = ec.unmarshalOTokenOwnershipType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenOwnershipTypeᚄ(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["ownershipFilter"] = arg0
 	return args, nil
 }
 
@@ -22608,7 +22633,7 @@ func (ec *executionContext) _GalleryUser_tokens(ctx context.Context, field graph
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.GalleryUser().Tokens(rctx, obj)
+		return ec.resolvers.GalleryUser().Tokens(rctx, obj, fc.Args["ownershipFilter"].([]persist.TokenOwnershipType))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -22687,6 +22712,17 @@ func (ec *executionContext) fieldContext_GalleryUser_tokens(ctx context.Context,
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Token", field.Name)
 		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_GalleryUser_tokens_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
 	}
 	return fc, nil
 }
@@ -61457,6 +61493,16 @@ func (ec *executionContext) marshalNString2ᚕstringᚄ(ctx context.Context, sel
 	return ret
 }
 
+func (ec *executionContext) unmarshalNTokenOwnershipType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenOwnershipType(ctx context.Context, v interface{}) (persist.TokenOwnershipType, error) {
+	var res persist.TokenOwnershipType
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNTokenOwnershipType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenOwnershipType(ctx context.Context, sel ast.SelectionSet, v persist.TokenOwnershipType) graphql.Marshaler {
+	return v
+}
+
 func (ec *executionContext) unmarshalNTrendingUsersInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTrendingUsersInput(ctx context.Context, v interface{}) (model.TrendingUsersInput, error) {
 	res, err := ec.unmarshalInputTrendingUsersInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -64632,6 +64678,73 @@ func (ec *executionContext) marshalOTokenHoldersConnection2ᚖgithubᚗcomᚋmik
 		return graphql.Null
 	}
 	return ec._TokenHoldersConnection(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOTokenOwnershipType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenOwnershipTypeᚄ(ctx context.Context, v interface{}) ([]persist.TokenOwnershipType, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var vSlice []interface{}
+	if v != nil {
+		vSlice = graphql.CoerceList(v)
+	}
+	var err error
+	res := make([]persist.TokenOwnershipType, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNTokenOwnershipType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenOwnershipType(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalOTokenOwnershipType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenOwnershipTypeᚄ(ctx context.Context, sel ast.SelectionSet, v []persist.TokenOwnershipType) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNTokenOwnershipType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenOwnershipType(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) unmarshalOTokenType2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenType(ctx context.Context, v interface{}) (*model.TokenType, error) {

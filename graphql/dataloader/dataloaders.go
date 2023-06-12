@@ -42,6 +42,7 @@
 //go:generate go run github.com/gallery-so/dataloaden MediaLoaderByTokenID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.TokenMedia
 //go:generate go run github.com/gallery-so/dataloaden TokenOwnershipLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.TokenOwnership
 //go:generate go run github.com/gallery-so/dataloaden ContractCreatorLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.ContractCreator
+//go:generate go run github.com/gallery-so/dataloaden TokensLoaderByUserIDAndFilters github.com/mikeydub/go-gallery/db/gen/coredb.GetTokensByUserIdBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.Token
 
 package dataloader
 
@@ -90,7 +91,7 @@ type Loaders struct {
 	TokensByContractID               *TokensLoaderByID
 	TokensByCollectionID             *TokensLoaderByIDAndLimit
 	TokensByWalletID                 *TokensLoaderByID
-	TokensByUserID                   *TokensLoaderByID
+	TokensByUserID                   *TokensLoaderByUserIDAndFilters
 	TokensByUserIDAndContractID      *TokensLoaderByIDTuple
 	TokensByContractIDWithPagination *TokensLoaderByContractID
 	TokensByUserIDAndChain           *TokensLoaderByIDAndChain
@@ -242,7 +243,7 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 
 	loaders.TokensByContractIDWithPagination = NewTokensLoaderByContractID(defaults, loadTokensByContractIDWithPagination(q))
 
-	loaders.TokensByUserID = NewTokensLoaderByID(defaults, loadTokensByUserID(q))
+	loaders.TokensByUserID = NewTokensLoaderByUserIDAndFilters(defaults, loadTokensByUserID(q))
 
 	loaders.TokensByUserIDAndContractID = NewTokensLoaderByIDTuple(defaults, loadTokensByUserIDAndContractID(q))
 
@@ -796,12 +797,12 @@ func loadTokensByWalletID(q *db.Queries) func(context.Context, []persist.DBID) (
 	}
 }
 
-func loadTokensByUserID(q *db.Queries) func(context.Context, []persist.DBID) ([][]db.Token, []error) {
-	return func(ctx context.Context, userIDs []persist.DBID) ([][]db.Token, []error) {
-		tokens := make([][]db.Token, len(userIDs))
-		errors := make([]error, len(userIDs))
+func loadTokensByUserID(q *db.Queries) func(context.Context, []db.GetTokensByUserIdBatchParams) ([][]db.Token, []error) {
+	return func(ctx context.Context, params []db.GetTokensByUserIdBatchParams) ([][]db.Token, []error) {
+		tokens := make([][]db.Token, len(params))
+		errors := make([]error, len(params))
 
-		b := q.GetTokensByUserIdBatch(ctx, userIDs)
+		b := q.GetTokensByUserIdBatch(ctx, params)
 		defer b.Close()
 
 		b.Query(func(i int, t []db.Token, err error) {
