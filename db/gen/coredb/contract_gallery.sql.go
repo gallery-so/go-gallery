@@ -93,7 +93,6 @@ func (q *Queries) UpsertContracts(ctx context.Context, arg UpsertContractsParams
 }
 
 const upsertCreatedTokens = `-- name: UpsertCreatedTokens :many
- -- parent_contracts_data is the parent contract data to be inserted
 with parent_contracts_data(id, name, symbol, address, creator_address, chain, description) as (
   select unnest(id), unnest(name), unnest(symbol), unnest(address), unnest(creator_address), unnest(chain), unnest(description)
   from (select $1 as id
@@ -104,7 +103,6 @@ with parent_contracts_data(id, name, symbol, address, creator_address, chain, de
     , $6::int[] as chain
     , $7::varchar[] as description) params
 ),
-
 child_contracts_data(id, name, address, creator_address, chain, description, parent_address) as (
   select unnest(id), unnest(name), unnest(address), unnest(creator_address), unnest(chain), unnest(description), unnest(parent_address)
   from (select $8 as id
@@ -115,7 +113,6 @@ child_contracts_data(id, name, address, creator_address, chain, description, par
     , $13::varchar[] as description
     , $14::varchar[] as parent_address) params
 ),
-
 insert_parent_contracts as (
   insert into contracts(id, deleted, created_at, name, symbol, address, creator_address, chain, description)
   (select id, false, now(), name, symbol, address, creator_address, chain, description from parent_contracts_data)
@@ -128,7 +125,6 @@ insert_parent_contracts as (
     , last_updated = now()
   returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id
 )
-
 insert into contracts(id, deleted, created_at, name, address, creator_address, chain, description, parent_id)
 (select child.id, false, now(), child.name, child.address, child.creator_address, child.chain, child.description, insert_parent_contracts.id
   from child_contracts_data child
@@ -159,6 +155,7 @@ type UpsertCreatedTokensParams struct {
 	ChildContractParentAddress   []string
 }
 
+// parent_contracts_data is the parent contract data to be inserted
 // child_contracts_data is the child contract data to be inserted
 // insert the parent contracts
 // insert the child contracts

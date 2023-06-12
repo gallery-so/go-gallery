@@ -453,8 +453,8 @@ func resolveTokensByWalletID(ctx context.Context, walletID persist.DBID) ([]*mod
 	return tokensToModel(ctx, tokens), nil
 }
 
-func resolveTokensByContractIDWithPagination(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int, onlyGalleryUsers, isRootNode bool) (*model.TokensConnection, error) {
-	tokens, pageInfo, err := publicapi.For(ctx).Token.GetTokensByContractIdPaginate(ctx, contractID, before, after, first, last, onlyGalleryUsers, isRootNode)
+func resolveTokensByContractIDWithPagination(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int, onlyGalleryUsers bool) (*model.TokensConnection, error) {
+	tokens, pageInfo, err := publicapi.For(ctx).Token.GetTokensByContractIdPaginate(ctx, contractID, before, after, first, last, onlyGalleryUsers)
 	if err != nil {
 		return nil, err
 	}
@@ -607,12 +607,12 @@ func resolveCommunityByContractAddress(ctx context.Context, contractAddress pers
 	return communityToModel(ctx, *community, forceRefresh), nil
 }
 
-func resolveCommunityOwnersByContractID(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int, onlyGalleryUsers bool, isRootNode bool) (*model.TokenHoldersConnection, error) {
+func resolveCommunityOwnersByContractID(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int, onlyGalleryUsers bool) (*model.TokenHoldersConnection, error) {
 	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, contractID)
 	if err != nil {
 		return nil, err
 	}
-	owners, pageInfo, err := publicapi.For(ctx).Contract.GetCommunityOwnersByContractAddress(ctx, persist.NewChainAddress(contract.Address, contract.Chain), before, after, first, last, onlyGalleryUsers, isRootNode)
+	owners, pageInfo, err := publicapi.For(ctx).Contract.GetCommunityOwnersByContractAddress(ctx, persist.NewChainAddress(contract.Address, contract.Chain), before, after, first, last, onlyGalleryUsers)
 	if err != nil {
 		return nil, err
 	}

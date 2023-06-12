@@ -1517,7 +1517,7 @@ WITH new_tokens AS (
     SELECT added.id, row_number() OVER () added_order
     FROM (SELECT jsonb_array_elements_text(data -> 'collection_new_token_ids') id FROM feed_events f WHERE f.id = $1 AND f.deleted = false) added
 )
-SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id, t.child_contract_id FROM new_tokens a JOIN tokens t ON a.id = t.id AND t.deleted = false ORDER BY a.added_order
+SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id FROM new_tokens a JOIN tokens t ON a.id = t.id AND t.deleted = false ORDER BY a.added_order
 `
 
 type GetNewTokensByFeedEventIdBatchBatchResults struct {
@@ -1583,7 +1583,6 @@ func (b *GetNewTokensByFeedEventIdBatchBatchResults) Query(f func(int, []Token, 
 					&i.LastSynced,
 					&i.FallbackMedia,
 					&i.TokenMediaID,
-					&i.ChildContractID,
 				); err != nil {
 					return err
 				}
@@ -1664,15 +1663,15 @@ func (b *GetNotificationByIDBatchBatchResults) Close() error {
 
 const getOwnersByContractIdBatchPaginate = `-- name: GetOwnersByContractIdBatchPaginate :batchmany
 select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences from (
-    select distinct on (u.id) u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences from users u, tokens t
-        where case when $1::bool then t.contract = $2 else t.child_contract_id = $2 end
-        and (not $3::bool or u.universal = false)
-        and t.deleted = false and u.deleted = false
+    select distinct on (u.id) u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences from users u, tokens t, contracts c
+        where t.contract = c.id and (c.id = $1 or c.parent_id = $1)
+        and (not $2::bool or u.universal = false)
+        and t.deleted = false and u.deleted = false and c.deleted = false
     ) as users
-    where (users.universal,users.created_at,users.id) < ($4, $5::timestamptz, $6)
-    and (users.universal,users.created_at,users.id) > ($7, $8::timestamptz, $9)
-    order by case when $10::bool then (users.universal,users.created_at,users.id) end asc,
-         case when not $10::bool then (users.universal,users.created_at,users.id) end desc limit $11
+    where (users.universal,users.created_at,users.id) < ($3, $4::timestamptz, $5)
+    and (users.universal,users.created_at,users.id) > ($6, $7::timestamptz, $8)
+    order by case when $9::bool then (users.universal,users.created_at,users.id) end asc,
+         case when not $9::bool then (users.universal,users.created_at,users.id) end desc limit $10
 `
 
 type GetOwnersByContractIdBatchPaginateBatchResults struct {
@@ -1682,8 +1681,7 @@ type GetOwnersByContractIdBatchPaginateBatchResults struct {
 }
 
 type GetOwnersByContractIdBatchPaginateParams struct {
-	IsRootNode         bool
-	Contract           persist.DBID
+	ID                 persist.DBID
 	GalleryUsersOnly   bool
 	CurBeforeUniversal bool
 	CurBeforeTime      time.Time
@@ -1705,8 +1703,7 @@ func (q *Queries) GetOwnersByContractIdBatchPaginate(ctx context.Context, arg []
 	batch := &pgx.Batch{}
 	for _, a := range arg {
 		vals := []interface{}{
-			a.IsRootNode,
-			a.Contract,
+			a.ID,
 			a.GalleryUsersOnly,
 			a.CurBeforeUniversal,
 			a.CurBeforeTime,
@@ -2070,7 +2067,7 @@ func (b *GetSharedFollowersBatchPaginateBatchResults) Close() error {
 }
 
 const getTokenByIdBatch = `-- name: GetTokenByIdBatch :batchone
-SELECT id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id, child_contract_id FROM tokens WHERE id = $1 AND deleted = false
+SELECT id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id FROM tokens WHERE id = $1 AND deleted = false
 `
 
 type GetTokenByIdBatchBatchResults struct {
@@ -2129,7 +2126,6 @@ func (b *GetTokenByIdBatchBatchResults) QueryRow(f func(int, Token, error)) {
 			&i.LastSynced,
 			&i.FallbackMedia,
 			&i.TokenMediaID,
-			&i.ChildContractID,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -2208,7 +2204,7 @@ func (b *GetTokenOwnerByIDBatchBatchResults) Close() error {
 }
 
 const getTokensByCollectionIdBatch = `-- name: GetTokensByCollectionIdBatch :batchmany
-SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id, t.child_contract_id FROM users u, collections c, unnest(c.nfts)
+SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id FROM users u, collections c, unnest(c.nfts)
     WITH ORDINALITY AS x(nft_id, nft_ord)
     INNER JOIN tokens t ON t.id = x.nft_id
     WHERE u.id = t.owner_user_id AND t.owned_by_wallets && u.wallets
@@ -2284,7 +2280,6 @@ func (b *GetTokensByCollectionIdBatchBatchResults) Query(f func(int, []Token, er
 					&i.LastSynced,
 					&i.FallbackMedia,
 					&i.TokenMediaID,
-					&i.ChildContractID,
 				); err != nil {
 					return err
 				}
@@ -2304,16 +2299,18 @@ func (b *GetTokensByCollectionIdBatchBatchResults) Close() error {
 }
 
 const getTokensByContractIdBatchPaginate = `-- name: GetTokensByContractIdBatchPaginate :batchmany
-SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id, t.child_contract_id FROM tokens t
+SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id FROM tokens t
     JOIN users u ON u.id = t.owner_user_id
-    WHERE CASE WHEN $1::bool THEN t.contract = $2 ELSE t.child_contract_id = $2 END
+    JOIN contracts c ON t.contract = c.id
+    WHERE (c.id = $1 OR c.parent_contract_id = $1)
     AND t.deleted = false
-    AND (NOT $3::bool OR u.universal = false)
-    AND (u.universal,t.created_at,t.id) < ($4, $5::timestamptz, $6)
-    AND (u.universal,t.created_at,t.id) > ($7, $8::timestamptz, $9)
-    ORDER BY CASE WHEN $10::bool THEN (u.universal,t.created_at,t.id) END ASC,
-             CASE WHEN NOT $10::bool THEN (u.universal,t.created_at,t.id) END DESC
-    LIMIT $11
+    AND c.deleted = false
+    AND (NOT $2::bool OR u.universal = false)
+    AND (u.universal,t.created_at,t.id) < ($3, $4::timestamptz, $5)
+    AND (u.universal,t.created_at,t.id) > ($6, $7::timestamptz, $8)
+    ORDER BY CASE WHEN $9::bool THEN (u.universal,t.created_at,t.id) END ASC,
+             CASE WHEN NOT $9::bool THEN (u.universal,t.created_at,t.id) END DESC
+    LIMIT $10
 `
 
 type GetTokensByContractIdBatchPaginateBatchResults struct {
@@ -2323,8 +2320,7 @@ type GetTokensByContractIdBatchPaginateBatchResults struct {
 }
 
 type GetTokensByContractIdBatchPaginateParams struct {
-	IsRootNode         bool
-	Contract           persist.DBID
+	ID                 persist.DBID
 	GalleryUsersOnly   bool
 	CurBeforeUniversal bool
 	CurBeforeTime      time.Time
@@ -2340,8 +2336,7 @@ func (q *Queries) GetTokensByContractIdBatchPaginate(ctx context.Context, arg []
 	batch := &pgx.Batch{}
 	for _, a := range arg {
 		vals := []interface{}{
-			a.IsRootNode,
-			a.Contract,
+			a.ID,
 			a.GalleryUsersOnly,
 			a.CurBeforeUniversal,
 			a.CurBeforeTime,
@@ -2403,7 +2398,6 @@ func (b *GetTokensByContractIdBatchPaginateBatchResults) Query(f func(int, []Tok
 					&i.LastSynced,
 					&i.FallbackMedia,
 					&i.TokenMediaID,
-					&i.ChildContractID,
 				); err != nil {
 					return err
 				}
@@ -2423,7 +2417,7 @@ func (b *GetTokensByContractIdBatchPaginateBatchResults) Close() error {
 }
 
 const getTokensByUserIdAndChainBatch = `-- name: GetTokensByUserIdAndChainBatch :batchmany
-SELECT tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id, tokens.child_contract_id FROM tokens, users
+SELECT tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id FROM tokens, users
 WHERE tokens.owner_user_id = $1 AND users.id = $1
   AND tokens.owned_by_wallets && users.wallets
   AND tokens.deleted = false AND users.deleted = false
@@ -2500,7 +2494,6 @@ func (b *GetTokensByUserIdAndChainBatchBatchResults) Query(f func(int, []Token, 
 					&i.LastSynced,
 					&i.FallbackMedia,
 					&i.TokenMediaID,
-					&i.ChildContractID,
 				); err != nil {
 					return err
 				}
@@ -2520,7 +2513,7 @@ func (b *GetTokensByUserIdAndChainBatchBatchResults) Close() error {
 }
 
 const getTokensByUserIdBatch = `-- name: GetTokensByUserIdBatch :batchmany
-SELECT tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id, tokens.child_contract_id FROM tokens, users
+SELECT tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id FROM tokens, users
     WHERE tokens.owner_user_id = $1 AND users.id = $1
       AND tokens.owned_by_wallets && users.wallets
       AND tokens.deleted = false AND users.deleted = false
@@ -2590,7 +2583,6 @@ func (b *GetTokensByUserIdBatchBatchResults) Query(f func(int, []Token, error)) 
 					&i.LastSynced,
 					&i.FallbackMedia,
 					&i.TokenMediaID,
-					&i.ChildContractID,
 				); err != nil {
 					return err
 				}
@@ -2610,7 +2602,7 @@ func (b *GetTokensByUserIdBatchBatchResults) Close() error {
 }
 
 const getTokensByWalletIdsBatch = `-- name: GetTokensByWalletIdsBatch :batchmany
-SELECT id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id, child_contract_id FROM tokens WHERE owned_by_wallets && $1 AND deleted = false
+SELECT id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id FROM tokens WHERE owned_by_wallets && $1 AND deleted = false
     ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC
 `
 
@@ -2677,7 +2669,6 @@ func (b *GetTokensByWalletIdsBatchBatchResults) Query(f func(int, []Token, error
 					&i.LastSynced,
 					&i.FallbackMedia,
 					&i.TokenMediaID,
-					&i.ChildContractID,
 				); err != nil {
 					return err
 				}

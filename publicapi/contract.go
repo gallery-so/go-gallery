@@ -176,7 +176,7 @@ func (api ContractAPI) RefreshOwnersAsync(ctx context.Context, contractID persis
 	return task.CreateTaskForContractOwnerProcessing(ctx, in, api.taskClient)
 }
 
-func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, before, after *string, first, last *int, onlyGalleryUsers, isRootNode bool) ([]db.User, PageInfo, error) {
+func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, before, after *string, first, last *int, onlyGalleryUsers bool) ([]db.User, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"contractAddress": {contractAddress, "required"},
@@ -196,7 +196,7 @@ func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, 
 	boolFunc := func(params boolTimeIDPagingParams) ([]interface{}, error) {
 
 		owners, err := api.loaders.OwnersByContractID.Load(db.GetOwnersByContractIdBatchPaginateParams{
-			Contract:           contract.ID,
+			ID:                 contract.ID,
 			Limit:              sql.NullInt32{Int32: int32(params.Limit), Valid: true},
 			GalleryUsersOnly:   onlyGalleryUsers,
 			CurBeforeUniversal: params.CursorBeforeBool,
@@ -206,7 +206,6 @@ func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, 
 			CurAfterTime:       params.CursorAfterTime,
 			CurAfterID:         params.CursorAfterID,
 			PagingForward:      params.PagingForward,
-			IsRootNode:         isRootNode,
 		})
 
 		if err != nil {
@@ -224,9 +223,8 @@ func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, 
 	countFunc := func() (int, error) {
 
 		total, err := api.queries.CountOwnersByContractId(ctx, db.CountOwnersByContractIdParams{
-			Contract:         contract.ID,
+			ID:               contract.ID,
 			GalleryUsersOnly: onlyGalleryUsers,
-			IsRootNode:       isRootNode,
 		})
 
 		return int(total), err

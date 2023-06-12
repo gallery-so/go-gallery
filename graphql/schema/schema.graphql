@@ -1066,7 +1066,6 @@ type Query {
   collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
   communityByAddress(
     communityAddress: ChainAddressInput!
-    childAddress: Address
     forceRefresh: Boolean
   ): CommunityByAddressOrError
   generalAllowlist: [ChainAddress!]

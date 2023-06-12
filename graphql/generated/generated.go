@@ -833,7 +833,7 @@ type ComplexityRoot struct {
 		CollectionByID             func(childComplexity int, id persist.DBID) int
 		CollectionTokenByID        func(childComplexity int, tokenID persist.DBID, collectionID persist.DBID) int
 		CollectionsByIds           func(childComplexity int, ids []persist.DBID) int
-		CommunityByAddress         func(childComplexity int, communityAddress persist.ChainAddress, childAddress *persist.Address, forceRefresh *bool) int
+		CommunityByAddress         func(childComplexity int, communityAddress persist.ChainAddress, forceRefresh *bool) int
 		FeedEventByID              func(childComplexity int, id persist.DBID) int
 		GalleryByID                func(childComplexity int, id persist.DBID) int
 		GalleryOfTheWeekWinners    func(childComplexity int) int
@@ -1495,7 +1495,7 @@ type QueryResolver interface {
 	CollectionsByIds(ctx context.Context, ids []persist.DBID) ([]model.CollectionByIDOrError, error)
 	TokenByID(ctx context.Context, id persist.DBID) (model.TokenByIDOrError, error)
 	CollectionTokenByID(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (model.CollectionTokenByIDOrError, error)
-	CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, childAddress *persist.Address, forceRefresh *bool) (model.CommunityByAddressOrError, error)
+	CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool) (model.CommunityByAddressOrError, error)
 	GeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error)
 	GalleryOfTheWeekWinners(ctx context.Context) ([]*model.GalleryUser, error)
 	GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
@@ -4846,7 +4846,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.CommunityByAddress(childComplexity, args["communityAddress"].(persist.ChainAddress), args["childAddress"].(*persist.Address), args["forceRefresh"].(*bool)), true
+		return e.complexity.Query.CommunityByAddress(childComplexity, args["communityAddress"].(persist.ChainAddress), args["forceRefresh"].(*bool)), true
 
 	case "Query.feedEventById":
 		if e.complexity.Query.FeedEventByID == nil {
@@ -7855,7 +7855,6 @@ type Query {
   collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
   communityByAddress(
     communityAddress: ChainAddressInput!
-    childAddress: Address
     forceRefresh: Boolean
   ): CommunityByAddressOrError
   generalAllowlist: [ChainAddress!]
@@ -10669,24 +10668,15 @@ func (ec *executionContext) field_Query_communityByAddress_args(ctx context.Cont
 		}
 	}
 	args["communityAddress"] = arg0
-	var arg1 *persist.Address
-	if tmp, ok := rawArgs["childAddress"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("childAddress"))
-		arg1, err = ec.unmarshalOAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["childAddress"] = arg1
-	var arg2 *bool
+	var arg1 *bool
 	if tmp, ok := rawArgs["forceRefresh"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("forceRefresh"))
-		arg2, err = ec.unmarshalOBoolean2ᚖbool(ctx, tmp)
+		arg1, err = ec.unmarshalOBoolean2ᚖbool(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["forceRefresh"] = arg2
+	args["forceRefresh"] = arg1
 	return args, nil
 }
 
@@ -33401,7 +33391,7 @@ func (ec *executionContext) _Query_communityByAddress(ctx context.Context, field
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().CommunityByAddress(rctx, fc.Args["communityAddress"].(persist.ChainAddress), fc.Args["childAddress"].(*persist.Address), fc.Args["forceRefresh"].(*bool))
+		return ec.resolvers.Query().CommunityByAddress(rctx, fc.Args["communityAddress"].(persist.ChainAddress), fc.Args["forceRefresh"].(*bool))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -63132,23 +63122,6 @@ func (ec *executionContext) marshalOAddress2ᚕgithubᚗcomᚋmikeydubᚋgoᚑga
 	}
 
 	return ret
-}
-
-func (ec *executionContext) unmarshalOAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx context.Context, v interface{}) (*persist.Address, error) {
-	if v == nil {
-		return nil, nil
-	}
-	tmp, err := graphql.UnmarshalString(v)
-	res := persist.Address(tmp)
-	return &res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalOAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx context.Context, sel ast.SelectionSet, v *persist.Address) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	res := graphql.MarshalString(string(*v))
-	return res
 }
 
 func (ec *executionContext) marshalOAdminAddWalletPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdminAddWalletPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.AdminAddWalletPayloadOrError) graphql.Marshaler {

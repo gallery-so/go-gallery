@@ -173,7 +173,20 @@ func (r *communityResolver) Creator(ctx context.Context, obj *model.Community) (
 	if obj.CreatorAddress == nil {
 		return nil, nil
 	}
-	return resolveGalleryUserByAddress(ctx, *obj.CreatorAddress)
+
+	user, err := resolveGalleryUserByAddress(ctx, *obj.CreatorAddress)
+
+	// If the user is not found, return the address instead
+	var notFoundErr persist.ErrUserNotFound
+	if errors.As(err, &notFoundErr) {
+		return obj.CreatorAddress, nil
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
 }
 
 // ParentCommunity is the resolver for the parentCommunity field.
@@ -224,9 +237,7 @@ func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Co
 		}
 	}
 
-	isRootNode := obj.ParentCommunity.Node.Dbid == ""
-
-	return resolveTokensByContractIDWithPagination(ctx, obj.Dbid, before, after, first, last, onlyUsers, isRootNode)
+	return resolveTokensByContractIDWithPagination(ctx, obj.Dbid, before, after, first, last, onlyUsers)
 }
 
 // Owners is the resolver for the owners field.
@@ -241,9 +252,7 @@ func (r *communityResolver) Owners(ctx context.Context, obj *model.Community, be
 		}
 	}
 
-	isRootNode := obj.ParentCommunity.Node.Dbid == ""
-
-	return resolveCommunityOwnersByContractID(ctx, obj.Dbid, before, after, first, last, onlyUsers, isRootNode)
+	return resolveCommunityOwnersByContractID(ctx, obj.Dbid, before, after, first, last, onlyUsers)
 }
 
 // FeedEvent is the resolver for the feedEvent field.
@@ -1745,7 +1754,7 @@ func (r *queryResolver) CollectionTokenByID(ctx context.Context, tokenID persist
 }
 
 // CommunityByAddress is the resolver for the communityByAddress field.
-func (r *queryResolver) CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, childAddress *persist.Address, forceRefresh *bool) (model.CommunityByAddressOrError, error) {
+func (r *queryResolver) CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool) (model.CommunityByAddressOrError, error) {
 	return resolveCommunityByContractAddress(ctx, communityAddress, forceRefresh)
 }
 

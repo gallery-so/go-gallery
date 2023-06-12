@@ -420,7 +420,6 @@ type Token struct {
 	LastSynced           time.Time
 	FallbackMedia        persist.FallbackMedia
 	TokenMediaID         persist.DBID
-	ChildContractID      persist.DBID
 }
 
 type TokenMedia struct {

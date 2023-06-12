@@ -126,7 +126,7 @@ do update set
   , is_user_marked_spam = tokens.is_user_marked_spam
   , is_provider_marked_spam = excluded.is_provider_marked_spam
   , last_synced = greatest(excluded.last_synced,tokens.last_synced)
-returning id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id, child_contract_id
+returning id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id
 `
 
 type UpsertTokensParams struct {
@@ -221,7 +221,6 @@ func (q *Queries) UpsertTokens(ctx context.Context, arg UpsertTokensParams) ([]T
 			&i.LastSynced,
 			&i.FallbackMedia,
 			&i.TokenMediaID,
-			&i.ChildContractID,
 		); err != nil {
 			return nil, err
 		}
