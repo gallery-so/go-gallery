@@ -523,6 +523,24 @@ func resolveTokenOwnerByTokenID(ctx context.Context, tokenID persist.DBID) (*mod
 	return resolveGalleryUserByUserID(ctx, token.OwnerUserID)
 }
 
+func resolveCommunityByTokenID(ctx context.Context, tokenID persist.DBID) (*model.Community, error) {
+	token, err := publicapi.For(ctx).Token.GetTokenById(ctx, tokenID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, token.Contract)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: It's probably worth revisiting "forceRefresh" to see if it still makes sense as a
+	// parameter for every call to communityToModel.
+	return communityToModel(ctx, *contract, util.ToPointer(false)), nil
+}
+
 func resolveContractByTokenID(ctx context.Context, tokenID persist.DBID) (*model.Contract, error) {
 	token, err := publicapi.For(ctx).Token.GetTokenById(ctx, tokenID)
 

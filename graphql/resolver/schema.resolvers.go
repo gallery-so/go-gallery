@@ -2071,7 +2071,7 @@ func (r *tokenResolver) Contract(ctx context.Context, obj *model.Token) (*model.
 
 // Community is the resolver for the community field.
 func (r *tokenResolver) Community(ctx context.Context, obj *model.Token) (*model.Community, error) {
-	panic(fmt.Errorf("not implemented: Community - community"))
+	return resolveCommunityByTokenID(ctx, obj.Dbid)
 }
 
 // Wallets is the resolver for the wallets field.
