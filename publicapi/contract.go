@@ -88,7 +88,7 @@ func (api ContractAPI) GetContractOwnerByContractID(ctx context.Context, contrac
 		return db.ContractOwner{}, err
 	}
 
-	return api.loaders.ContractOwnerByContractID.Load(contractID)
+	return api.loaders.ContractCreatorByContractID.Load(contractID)
 }
 
 func (api ContractAPI) GetContractsDisplayedByUserID(ctx context.Context, userID persist.DBID) ([]db.Contract, error) {

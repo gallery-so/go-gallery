@@ -78,13 +78,13 @@ type Contract struct {
 	OverrideOwnerUserID  persist.DBID
 }
 
-type ContractOwner struct {
-	ContractID        persist.DBID
-	OwnerUserID       persist.DBID
-	OwnerUserIDValid  bool
-	Chain             persist.Chain
-	OwnerAddress      persist.Address
-	OwnerAddressValid bool
+type ContractCreator struct {
+	ContractID          persist.DBID
+	CreatorUserID       persist.DBID
+	CreatorUserIDValid  bool
+	Chain               persist.Chain
+	CreatorAddress      persist.Address
+	CreatorAddressValid bool
 }
 
 type ContractRelevance struct {
@@ -473,11 +473,11 @@ type TokenMediasNoValidationRule struct {
 	Reason      string
 }
 
-type TokenOwner struct {
-	TokenID        persist.DBID
-	OwnerUserID    persist.DBID
-	OwnerIsHolder  bool
-	OwnerIsCreator bool
+type TokenOwnership struct {
+	TokenID     persist.DBID
+	OwnerUserID persist.DBID
+	IsHolder    bool
+	IsCreator   bool
 }
 
 type TokenProcessingJob struct {

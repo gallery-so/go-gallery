@@ -89,7 +89,7 @@ SELECT * FROM tokens WHERE id = $1 AND deleted = false;
 select t.* from collections c,
     unnest(c.nfts) with ordinality as u(nft_id, nft_ord)
     join tokens t on t.id = u.nft_id
-    join token_owners o on o.token_id = u.nft_id
+    join token_ownership o on o.token_id = u.nft_id
     where c.id = sqlc.arg('collection_id')
       and c.owner_user_id = t.owner_user_id
       and c.owner_user_id = o.owner_user_id
@@ -98,15 +98,15 @@ select t.* from collections c,
     order by u.nft_ord
     limit sqlc.narg('limit');
 
--- name: GetTokenOwnersByIds :many
+-- name: GetTokenOwnershipByIds :many
 select o.*
     from unnest(@token_ids::text[]) as t(id)
-        join token_owners o on o.token_id = t.id;
+        join token_ownership o on o.token_id = t.id;
 
--- name: GetContractOwnersByIds :many
+-- name: GetContractCreatorsByIds :many
 select o.*
     from unnest(@contract_ids::text[]) as c(id)
-        join contract_owners o on o.contract_id = c.id;
+        join contract_creators o on o.contract_id = c.id;
 
 -- name: GetNewTokensByFeedEventIdBatch :batchmany
 WITH new_tokens AS (
@@ -274,14 +274,14 @@ SELECT (MEDIA->>'thumbnail_url')::varchar as thumbnail_url FROM tokens WHERE CON
 
 -- name: GetTokensByUserIdBatch :batchmany
 select t.* from tokens t
-    join token_owners o on t.id = o.token_id and t.owner_user_id = o.owner_user_id
+    join token_ownership o on t.id = o.token_id and t.owner_user_id = o.owner_user_id
     where t.owner_user_id = $1
       and t.deleted = false
     order by t.created_at desc, t.name desc, t.id desc;
 
 -- name: GetTokensByUserIdAndContractIDBatch :batchmany
 select t.* from tokens t
-    join token_owners o on t.id = o.token_id and t.owner_user_id = o.owner_user_id
+    join token_ownership o on t.id = o.token_id and t.owner_user_id = o.owner_user_id
     where t.owner_user_id = $1
       and t.contract = $2
       and t.deleted = false
@@ -289,7 +289,7 @@ select t.* from tokens t
 
 -- name: GetTokensByUserIdAndChainBatch :batchmany
 select t.* from tokens t
-    join token_owners o on t.id = o.token_id and t.owner_user_id = o.owner_user_id
+    join token_ownership o on t.id = o.token_id and t.owner_user_id = o.owner_user_id
     where t.owner_user_id = $1
       and t.chain = $2
       and t.deleted = false

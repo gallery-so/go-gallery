@@ -2075,7 +2075,7 @@ const getTokensByCollectionIdBatch = `-- name: GetTokensByCollectionIdBatch :bat
 select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id from collections c,
     unnest(c.nfts) with ordinality as u(nft_id, nft_ord)
     join tokens t on t.id = u.nft_id
-    join token_owners o on o.token_id = u.nft_id
+    join token_ownership o on o.token_id = u.nft_id
     where c.id = $1
       and c.owner_user_id = t.owner_user_id
       and c.owner_user_id = o.owner_user_id
@@ -2375,7 +2375,7 @@ func (b *GetTokensByContractIdBatchPaginateBatchResults) Close() error {
 
 const getTokensByUserIdAndChainBatch = `-- name: GetTokensByUserIdAndChainBatch :batchmany
 select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id from tokens t
-    join token_owners o on t.id = o.token_id and t.owner_user_id = o.owner_user_id
+    join token_ownership o on t.id = o.token_id and t.owner_user_id = o.owner_user_id
     where t.owner_user_id = $1
       and t.chain = $2
       and t.deleted = false
@@ -2471,7 +2471,7 @@ func (b *GetTokensByUserIdAndChainBatchBatchResults) Close() error {
 
 const getTokensByUserIdAndContractIDBatch = `-- name: GetTokensByUserIdAndContractIDBatch :batchmany
 select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id from tokens t
-    join token_owners o on t.id = o.token_id and t.owner_user_id = o.owner_user_id
+    join token_ownership o on t.id = o.token_id and t.owner_user_id = o.owner_user_id
     where t.owner_user_id = $1
       and t.contract = $2
       and t.deleted = false
@@ -2567,7 +2567,7 @@ func (b *GetTokensByUserIdAndContractIDBatchBatchResults) Close() error {
 
 const getTokensByUserIdBatch = `-- name: GetTokensByUserIdBatch :batchmany
 select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id from tokens t
-    join token_owners o on t.id = o.token_id and t.owner_user_id = o.owner_user_id
+    join token_ownership o on t.id = o.token_id and t.owner_user_id = o.owner_user_id
     where t.owner_user_id = $1
       and t.deleted = false
     order by t.created_at desc, t.name desc, t.id desc

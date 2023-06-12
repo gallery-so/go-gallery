@@ -504,5 +504,5 @@ func (api TokenAPI) GetTokenOwnerByTokenID(ctx context.Context, tokenID persist.
 		return db.TokenOwner{}, err
 	}
 
-	return api.loaders.TokenOwnerByTokenID.Load(tokenID)
+	return api.loaders.TokenOwnershipByTokenID.Load(tokenID)
 }

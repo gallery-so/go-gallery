@@ -40,8 +40,8 @@
 //go:generate go run github.com/gallery-so/dataloaden SharedFollowersLoaderByIDs github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedFollowersBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedFollowersBatchPaginateRow
 //go:generate go run github.com/gallery-so/dataloaden SharedContractsLoaderByIDs github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedContractsBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedContractsBatchPaginateRow
 //go:generate go run github.com/gallery-so/dataloaden MediaLoaderByTokenID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.TokenMedia
-//go:generate go run github.com/gallery-so/dataloaden TokenOwnerLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.TokenOwner
-//go:generate go run github.com/gallery-so/dataloaden ContractOwnerLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.ContractOwner
+//go:generate go run github.com/gallery-so/dataloaden TokenOwnershipLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.TokenOwnership
+//go:generate go run github.com/gallery-so/dataloaden ContractCreatorLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.ContractCreator
 
 package dataloader
 
@@ -122,8 +122,8 @@ type Loaders struct {
 	InteractionsByFeedEventID        *FeedEventInteractionsLoader
 	AdmireByActorIDAndFeedEventID    *AdmireLoaderByActorAndFeedEvent
 	MediaByTokenID                   *MediaLoaderByTokenID
-	TokenOwnerByTokenID              *TokenOwnerLoaderByID
-	ContractOwnerByContractID        *ContractOwnerLoaderByID
+	TokenOwnershipByTokenID          *TokenOwnershipLoaderByID
+	ContractCreatorByContractID      *ContractCreatorLoaderByID
 }
 
 func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loaders {
@@ -316,9 +316,9 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 		AutoCacheWithKey: func(media db.TokenMedia) persist.DBID { return media.ID },
 	})
 
-	loaders.TokenOwnerByTokenID = NewTokenOwnerLoaderByID(defaults, loadTokenOwnerByTokenID(q), TokenOwnerLoaderByIDCacheSubscriptions{})
+	loaders.TokenOwnershipByTokenID = NewTokenOwnershipLoaderByID(defaults, loadTokenOwnershipByTokenID(q), TokenOwnershipLoaderByIDCacheSubscriptions{})
 
-	loaders.ContractOwnerByContractID = NewContractOwnerLoaderByID(defaults, loadContractOwnerByContractID(q), ContractOwnerLoaderByIDCacheSubscriptions{})
+	loaders.ContractCreatorByContractID = NewContractCreatorLoaderByID(defaults, loadContractCreatorByContractID(q), ContractCreatorLoaderByIDCacheSubscriptions{})
 
 	return loaders
 }
@@ -1244,32 +1244,32 @@ func loadMediaByTokenID(q *db.Queries) func(context.Context, []persist.DBID) ([]
 	}
 }
 
-func loadTokenOwnerByTokenID(q *db.Queries) func(ctx context.Context, keys []persist.DBID) ([]db.TokenOwner, []error) {
-	return func(ctx context.Context, tokenIDs []persist.DBID) ([]db.TokenOwner, []error) {
-		rows, err := q.GetTokenOwnersByIds(ctx, util.StringersToStrings(tokenIDs))
+func loadTokenOwnershipByTokenID(q *db.Queries) func(ctx context.Context, keys []persist.DBID) ([]db.TokenOwnership, []error) {
+	return func(ctx context.Context, tokenIDs []persist.DBID) ([]db.TokenOwnership, []error) {
+		rows, err := q.GetTokenOwnershipByIds(ctx, util.StringersToStrings(tokenIDs))
 		if err != nil {
-			return emptyResultsWithError[db.TokenOwner](len(tokenIDs), err)
+			return emptyResultsWithError[db.TokenOwnership](len(tokenIDs), err)
 		}
 
-		keyFunc := func(row db.TokenOwner) persist.DBID { return row.TokenID }
-		onNotFound := func(tokenID persist.DBID) (db.TokenOwner, error) {
-			return db.TokenOwner{}, persist.ErrTokenOwnerNotFound{TokenID: tokenID}
+		keyFunc := func(row db.TokenOwnership) persist.DBID { return row.TokenID }
+		onNotFound := func(tokenID persist.DBID) (db.TokenOwnership, error) {
+			return db.TokenOwnership{}, persist.ErrTokenOwnershipNotFound{TokenID: tokenID}
 		}
 
 		return fillUnnestedJoinResults(tokenIDs, rows, keyFunc, onNotFound)
 	}
 }
 
-func loadContractOwnerByContractID(q *db.Queries) func(ctx context.Context, keys []persist.DBID) ([]db.ContractOwner, []error) {
-	return func(ctx context.Context, contractIDs []persist.DBID) ([]db.ContractOwner, []error) {
-		rows, err := q.GetContractOwnersByIds(ctx, util.StringersToStrings(contractIDs))
+func loadContractCreatorByContractID(q *db.Queries) func(ctx context.Context, keys []persist.DBID) ([]db.ContractCreator, []error) {
+	return func(ctx context.Context, contractIDs []persist.DBID) ([]db.ContractCreator, []error) {
+		rows, err := q.GetContractCreatorsByIds(ctx, util.StringersToStrings(contractIDs))
 		if err != nil {
-			return emptyResultsWithError[db.ContractOwner](len(contractIDs), err)
+			return emptyResultsWithError[db.ContractCreator](len(contractIDs), err)
 		}
 
-		keyFunc := func(row db.ContractOwner) persist.DBID { return row.ContractID }
-		onNotFound := func(contractID persist.DBID) (db.ContractOwner, error) {
-			return db.ContractOwner{}, persist.ErrContractOwnerNotFound{ContractID: contractID}
+		keyFunc := func(row db.ContractCreator) persist.DBID { return row.ContractID }
+		onNotFound := func(contractID persist.DBID) (db.ContractCreator, error) {
+			return db.ContractCreator{}, persist.ErrContractOwnerNotFound{ContractID: contractID}
 		}
 
 		return fillUnnestedJoinResults(contractIDs, rows, keyFunc, onNotFound)

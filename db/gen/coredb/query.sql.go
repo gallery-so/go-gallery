@@ -1484,28 +1484,28 @@ func (q *Queries) GetContractByID(ctx context.Context, id persist.DBID) (Contrac
 	return i, err
 }
 
-const getContractOwnersByIds = `-- name: GetContractOwnersByIds :many
-select o.contract_id, o.owner_user_id, o.owner_user_id_valid, o.chain, o.owner_address, o.owner_address_valid
+const getContractCreatorsByIds = `-- name: GetContractCreatorsByIds :many
+select o.contract_id, o.creator_user_id, o.creator_user_id_valid, o.chain, o.creator_address, o.creator_address_valid
     from unnest($1::text[]) as c(id)
-        join contract_owners o on o.contract_id = c.id
+        join contract_creators o on o.contract_id = c.id
 `
 
-func (q *Queries) GetContractOwnersByIds(ctx context.Context, contractIds []string) ([]ContractOwner, error) {
-	rows, err := q.db.Query(ctx, getContractOwnersByIds, contractIds)
+func (q *Queries) GetContractCreatorsByIds(ctx context.Context, contractIds []string) ([]ContractCreator, error) {
+	rows, err := q.db.Query(ctx, getContractCreatorsByIds, contractIds)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ContractOwner
+	var items []ContractCreator
 	for rows.Next() {
-		var i ContractOwner
+		var i ContractCreator
 		if err := rows.Scan(
 			&i.ContractID,
-			&i.OwnerUserID,
-			&i.OwnerUserIDValid,
+			&i.CreatorUserID,
+			&i.CreatorUserIDValid,
 			&i.Chain,
-			&i.OwnerAddress,
-			&i.OwnerAddressValid,
+			&i.CreatorAddress,
+			&i.CreatorAddressValid,
 		); err != nil {
 			return nil, err
 		}
@@ -2970,26 +2970,26 @@ func (q *Queries) GetTokenOwnerByID(ctx context.Context, id persist.DBID) (User,
 	return i, err
 }
 
-const getTokenOwnersByIds = `-- name: GetTokenOwnersByIds :many
-select o.token_id, o.owner_user_id, o.owner_is_holder, o.owner_is_creator
+const getTokenOwnershipByIds = `-- name: GetTokenOwnershipByIds :many
+select o.token_id, o.owner_user_id, o.is_holder, o.is_creator
     from unnest($1::text[]) as t(id)
-        join token_owners o on o.token_id = t.id
+        join token_ownership o on o.token_id = t.id
 `
 
-func (q *Queries) GetTokenOwnersByIds(ctx context.Context, tokenIds []string) ([]TokenOwner, error) {
-	rows, err := q.db.Query(ctx, getTokenOwnersByIds, tokenIds)
+func (q *Queries) GetTokenOwnershipByIds(ctx context.Context, tokenIds []string) ([]TokenOwnership, error) {
+	rows, err := q.db.Query(ctx, getTokenOwnershipByIds, tokenIds)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []TokenOwner
+	var items []TokenOwnership
 	for rows.Next() {
-		var i TokenOwner
+		var i TokenOwnership
 		if err := rows.Scan(
 			&i.TokenID,
 			&i.OwnerUserID,
-			&i.OwnerIsHolder,
-			&i.OwnerIsCreator,
+			&i.IsHolder,
+			&i.IsCreator,
 		); err != nil {
 			return nil, err
 		}

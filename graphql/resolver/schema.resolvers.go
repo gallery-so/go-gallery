@@ -2042,7 +2042,7 @@ func (r *tokenResolver) OwnedByWallets(ctx context.Context, obj *model.Token) ([
 func (r *tokenResolver) OwnerIsHolder(ctx context.Context, obj *model.Token) (*bool, error) {
 	tokenOwner, err := publicapi.For(ctx).Token.GetTokenOwnerByTokenID(ctx, obj.Dbid)
 	if err != nil {
-		if _, ok := err.(persist.ErrTokenOwnerNotFound); ok {
+		if _, ok := err.(persist.ErrTokenOwnershipNotFound); ok {
 			return util.ToPointer(false), nil
 		}
 		return nil, err
@@ -2055,7 +2055,7 @@ func (r *tokenResolver) OwnerIsHolder(ctx context.Context, obj *model.Token) (*b
 func (r *tokenResolver) OwnerIsCreator(ctx context.Context, obj *model.Token) (*bool, error) {
 	tokenOwner, err := publicapi.For(ctx).Token.GetTokenOwnerByTokenID(ctx, obj.Dbid)
 	if err != nil {
-		if _, ok := err.(persist.ErrTokenOwnerNotFound); ok {
+		if _, ok := err.(persist.ErrTokenOwnershipNotFound); ok {
 			return util.ToPointer(false), nil
 		}
 		return nil, err

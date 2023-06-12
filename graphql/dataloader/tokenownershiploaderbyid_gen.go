@@ -11,7 +11,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-type TokenOwnerLoaderByIDSettings interface {
+type TokenOwnershipLoaderByIDSettings interface {
 	getContext() context.Context
 	getWait() time.Duration
 	getMaxBatchOne() int
@@ -24,20 +24,20 @@ type TokenOwnerLoaderByIDSettings interface {
 	getMutexRegistry() *[]*sync.Mutex
 }
 
-// TokenOwnerLoaderByIDCacheSubscriptions
-type TokenOwnerLoaderByIDCacheSubscriptions struct {
-	// AutoCacheWithKey is a function that returns the persist.DBID cache key for a coredb.TokenOwner.
+// TokenOwnershipLoaderByIDCacheSubscriptions
+type TokenOwnershipLoaderByIDCacheSubscriptions struct {
+	// AutoCacheWithKey is a function that returns the persist.DBID cache key for a coredb.TokenOwnership.
 	// If AutoCacheWithKey is not nil, this loader will automatically cache published results from other loaders
-	// that return a coredb.TokenOwner. Loaders that return pointers or slices of coredb.TokenOwner
-	// will be dereferenced/iterated automatically, invoking this function with the base coredb.TokenOwner type.
-	AutoCacheWithKey func(coredb.TokenOwner) persist.DBID
+	// that return a coredb.TokenOwnership. Loaders that return pointers or slices of coredb.TokenOwnership
+	// will be dereferenced/iterated automatically, invoking this function with the base coredb.TokenOwnership type.
+	AutoCacheWithKey func(coredb.TokenOwnership) persist.DBID
 
-	// AutoCacheWithKeys is a function that returns the []persist.DBID cache keys for a coredb.TokenOwner.
+	// AutoCacheWithKeys is a function that returns the []persist.DBID cache keys for a coredb.TokenOwnership.
 	// Similar to AutoCacheWithKey, but for cases where a single value gets cached by many keys.
 	// If AutoCacheWithKeys is not nil, this loader will automatically cache published results from other loaders
-	// that return a coredb.TokenOwner. Loaders that return pointers or slices of coredb.TokenOwner
-	// will be dereferenced/iterated automatically, invoking this function with the base coredb.TokenOwner type.
-	AutoCacheWithKeys func(coredb.TokenOwner) []persist.DBID
+	// that return a coredb.TokenOwnership. Loaders that return pointers or slices of coredb.TokenOwnership
+	// will be dereferenced/iterated automatically, invoking this function with the base coredb.TokenOwnership type.
+	AutoCacheWithKeys func(coredb.TokenOwnership) []persist.DBID
 
 	// TODO: Allow custom cache functions once we're able to use generics. It could be done without generics, but
 	// would be messy and error-prone. A non-generic implementation might look something like:
@@ -49,38 +49,38 @@ type TokenOwnerLoaderByIDCacheSubscriptions struct {
 	// to prime the cache.
 }
 
-func (l *TokenOwnerLoaderByID) setContext(ctx context.Context) {
+func (l *TokenOwnershipLoaderByID) setContext(ctx context.Context) {
 	l.ctx = ctx
 }
 
-func (l *TokenOwnerLoaderByID) setWait(wait time.Duration) {
+func (l *TokenOwnershipLoaderByID) setWait(wait time.Duration) {
 	l.wait = wait
 }
 
-func (l *TokenOwnerLoaderByID) setMaxBatch(maxBatch int) {
+func (l *TokenOwnershipLoaderByID) setMaxBatch(maxBatch int) {
 	l.maxBatch = maxBatch
 }
 
-func (l *TokenOwnerLoaderByID) setDisableCaching(disableCaching bool) {
+func (l *TokenOwnershipLoaderByID) setDisableCaching(disableCaching bool) {
 	l.disableCaching = disableCaching
 }
 
-func (l *TokenOwnerLoaderByID) setPublishResults(publishResults bool) {
+func (l *TokenOwnershipLoaderByID) setPublishResults(publishResults bool) {
 	l.publishResults = publishResults
 }
 
-func (l *TokenOwnerLoaderByID) setPreFetchHook(preFetchHook func(context.Context, string) context.Context) {
+func (l *TokenOwnershipLoaderByID) setPreFetchHook(preFetchHook func(context.Context, string) context.Context) {
 	l.preFetchHook = preFetchHook
 }
 
-func (l *TokenOwnerLoaderByID) setPostFetchHook(postFetchHook func(context.Context, string)) {
+func (l *TokenOwnershipLoaderByID) setPostFetchHook(postFetchHook func(context.Context, string)) {
 	l.postFetchHook = postFetchHook
 }
 
-// NewTokenOwnerLoaderByID creates a new TokenOwnerLoaderByID with the given settings, functions, and options
-func NewTokenOwnerLoaderByID(
-	settings TokenOwnerLoaderByIDSettings, fetch func(ctx context.Context, keys []persist.DBID) ([]coredb.TokenOwner, []error),
-	funcs TokenOwnerLoaderByIDCacheSubscriptions,
+// NewTokenOwnershipLoaderByID creates a new TokenOwnershipLoaderByID with the given settings, functions, and options
+func NewTokenOwnershipLoaderByID(
+	settings TokenOwnershipLoaderByIDSettings, fetch func(ctx context.Context, keys []persist.DBID) ([]coredb.TokenOwnership, []error),
+	funcs TokenOwnershipLoaderByIDCacheSubscriptions,
 	opts ...func(interface {
 		setContext(context.Context)
 		setWait(time.Duration)
@@ -90,8 +90,8 @@ func NewTokenOwnerLoaderByID(
 		setPreFetchHook(func(context.Context, string) context.Context)
 		setPostFetchHook(func(context.Context, string))
 	}),
-) *TokenOwnerLoaderByID {
-	loader := &TokenOwnerLoaderByID{
+) *TokenOwnershipLoaderByID {
+	loader := &TokenOwnershipLoaderByID{
 		ctx:                  settings.getContext(),
 		wait:                 settings.getWait(),
 		disableCaching:       settings.getDisableCaching(),
@@ -108,18 +108,18 @@ func NewTokenOwnerLoaderByID(
 	}
 
 	// Set this after applying options, in case a different context was set via options
-	loader.fetch = func(keys []persist.DBID) ([]coredb.TokenOwner, []error) {
+	loader.fetch = func(keys []persist.DBID) ([]coredb.TokenOwnership, []error) {
 		ctx := loader.ctx
 
 		// Allow the preFetchHook to modify and return a new context
 		if loader.preFetchHook != nil {
-			ctx = loader.preFetchHook(ctx, "TokenOwnerLoaderByID")
+			ctx = loader.preFetchHook(ctx, "TokenOwnershipLoaderByID")
 		}
 
 		results, errors := fetch(ctx, keys)
 
 		if loader.postFetchHook != nil {
-			loader.postFetchHook(ctx, "TokenOwnerLoaderByID")
+			loader.postFetchHook(ctx, "TokenOwnershipLoaderByID")
 		}
 
 		return results, errors
@@ -136,7 +136,7 @@ func NewTokenOwnerLoaderByID(
 	if !loader.disableCaching {
 		// One-to-one mappings: cache one value with one key
 		if funcs.AutoCacheWithKey != nil {
-			cacheFunc := func(t coredb.TokenOwner) {
+			cacheFunc := func(t coredb.TokenOwnership) {
 				loader.unsafePrime(funcs.AutoCacheWithKey(t), t)
 			}
 			loader.registerCacheFunc(&cacheFunc, &loader.mu)
@@ -144,7 +144,7 @@ func NewTokenOwnerLoaderByID(
 
 		// One-to-many mappings: cache one value with many keys
 		if funcs.AutoCacheWithKeys != nil {
-			cacheFunc := func(t coredb.TokenOwner) {
+			cacheFunc := func(t coredb.TokenOwnership) {
 				keys := funcs.AutoCacheWithKeys(t)
 				for _, key := range keys {
 					loader.unsafePrime(key, t)
@@ -157,13 +157,13 @@ func NewTokenOwnerLoaderByID(
 	return loader
 }
 
-// TokenOwnerLoaderByID batches and caches requests
-type TokenOwnerLoaderByID struct {
+// TokenOwnershipLoaderByID batches and caches requests
+type TokenOwnershipLoaderByID struct {
 	// context passed to fetch functions
 	ctx context.Context
 
 	// this method provides the data for the loader
-	fetch func(keys []persist.DBID) ([]coredb.TokenOwner, []error)
+	fetch func(keys []persist.DBID) ([]coredb.TokenOwnership, []error)
 
 	// how long to wait before sending a batch
 	wait time.Duration
@@ -195,18 +195,18 @@ type TokenOwnerLoaderByID struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[persist.DBID]coredb.TokenOwner
+	cache map[persist.DBID]coredb.TokenOwnership
 
 	// typed cache functions
-	//subscribers []func(coredb.TokenOwner)
-	subscribers []tokenOwnerLoaderByIDSubscriber
+	//subscribers []func(coredb.TokenOwnership)
+	subscribers []tokenOwnershipLoaderByIDSubscriber
 
 	// functions used to cache published results from other dataloaders
 	cacheFuncs []interface{}
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
-	batch *tokenOwnerLoaderByIDBatch
+	batch *tokenOwnershipLoaderByIDBatch
 
 	// mutex to prevent races
 	mu sync.Mutex
@@ -215,43 +215,43 @@ type TokenOwnerLoaderByID struct {
 	once sync.Once
 }
 
-type tokenOwnerLoaderByIDBatch struct {
+type tokenOwnershipLoaderByIDBatch struct {
 	keys    []persist.DBID
-	data    []coredb.TokenOwner
+	data    []coredb.TokenOwnership
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
-// Load a TokenOwner by key, batching and caching will be applied automatically
-func (l *TokenOwnerLoaderByID) Load(key persist.DBID) (coredb.TokenOwner, error) {
+// Load a TokenOwnership by key, batching and caching will be applied automatically
+func (l *TokenOwnershipLoaderByID) Load(key persist.DBID) (coredb.TokenOwnership, error) {
 	return l.LoadThunk(key)()
 }
 
-// LoadThunk returns a function that when called will block waiting for a TokenOwner.
+// LoadThunk returns a function that when called will block waiting for a TokenOwnership.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *TokenOwnerLoaderByID) LoadThunk(key persist.DBID) func() (coredb.TokenOwner, error) {
+func (l *TokenOwnershipLoaderByID) LoadThunk(key persist.DBID) func() (coredb.TokenOwnership, error) {
 	l.mu.Lock()
 	if !l.disableCaching {
 		if it, ok := l.cache[key]; ok {
 			l.mu.Unlock()
-			return func() (coredb.TokenOwner, error) {
+			return func() (coredb.TokenOwnership, error) {
 				return it, nil
 			}
 		}
 	}
 	if l.batch == nil {
-		l.batch = &tokenOwnerLoaderByIDBatch{done: make(chan struct{})}
+		l.batch = &tokenOwnershipLoaderByIDBatch{done: make(chan struct{})}
 	}
 	batch := l.batch
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-	return func() (coredb.TokenOwner, error) {
+	return func() (coredb.TokenOwnership, error) {
 		<-batch.done
 
-		var data coredb.TokenOwner
+		var data coredb.TokenOwnership
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -282,43 +282,43 @@ func (l *TokenOwnerLoaderByID) LoadThunk(key persist.DBID) func() (coredb.TokenO
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *TokenOwnerLoaderByID) LoadAll(keys []persist.DBID) ([]coredb.TokenOwner, []error) {
-	results := make([]func() (coredb.TokenOwner, error), len(keys))
+func (l *TokenOwnershipLoaderByID) LoadAll(keys []persist.DBID) ([]coredb.TokenOwnership, []error) {
+	results := make([]func() (coredb.TokenOwnership, error), len(keys))
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-	tokenOwners := make([]coredb.TokenOwner, len(keys))
+	tokenOwnerships := make([]coredb.TokenOwnership, len(keys))
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
-		tokenOwners[i], errors[i] = thunk()
+		tokenOwnerships[i], errors[i] = thunk()
 	}
-	return tokenOwners, errors
+	return tokenOwnerships, errors
 }
 
-// LoadAllThunk returns a function that when called will block waiting for a TokenOwners.
+// LoadAllThunk returns a function that when called will block waiting for a TokenOwnerships.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *TokenOwnerLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([]coredb.TokenOwner, []error) {
-	results := make([]func() (coredb.TokenOwner, error), len(keys))
+func (l *TokenOwnershipLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([]coredb.TokenOwnership, []error) {
+	results := make([]func() (coredb.TokenOwnership, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
-	return func() ([]coredb.TokenOwner, []error) {
-		tokenOwners := make([]coredb.TokenOwner, len(keys))
+	return func() ([]coredb.TokenOwnership, []error) {
+		tokenOwnerships := make([]coredb.TokenOwnership, len(keys))
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
-			tokenOwners[i], errors[i] = thunk()
+			tokenOwnerships[i], errors[i] = thunk()
 		}
-		return tokenOwners, errors
+		return tokenOwnerships, errors
 	}
 }
 
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *TokenOwnerLoaderByID) Prime(key persist.DBID, value coredb.TokenOwner) bool {
+func (l *TokenOwnershipLoaderByID) Prime(key persist.DBID, value coredb.TokenOwnership) bool {
 	if l.disableCaching {
 		return false
 	}
@@ -332,7 +332,7 @@ func (l *TokenOwnerLoaderByID) Prime(key persist.DBID, value coredb.TokenOwner) 
 }
 
 // Prime the cache without acquiring locks. Should only be used when the lock is already held.
-func (l *TokenOwnerLoaderByID) unsafePrime(key persist.DBID, value coredb.TokenOwner) bool {
+func (l *TokenOwnershipLoaderByID) unsafePrime(key persist.DBID, value coredb.TokenOwnership) bool {
 	if l.disableCaching {
 		return false
 	}
@@ -344,7 +344,7 @@ func (l *TokenOwnerLoaderByID) unsafePrime(key persist.DBID, value coredb.TokenO
 }
 
 // Clear the value at key from the cache, if it exists
-func (l *TokenOwnerLoaderByID) Clear(key persist.DBID) {
+func (l *TokenOwnershipLoaderByID) Clear(key persist.DBID) {
 	if l.disableCaching {
 		return
 	}
@@ -353,16 +353,16 @@ func (l *TokenOwnerLoaderByID) Clear(key persist.DBID) {
 	l.mu.Unlock()
 }
 
-func (l *TokenOwnerLoaderByID) unsafeSet(key persist.DBID, value coredb.TokenOwner) {
+func (l *TokenOwnershipLoaderByID) unsafeSet(key persist.DBID, value coredb.TokenOwnership) {
 	if l.cache == nil {
-		l.cache = map[persist.DBID]coredb.TokenOwner{}
+		l.cache = map[persist.DBID]coredb.TokenOwnership{}
 	}
 	l.cache[key] = value
 }
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
-func (b *tokenOwnerLoaderByIDBatch) keyIndex(l *TokenOwnerLoaderByID, key persist.DBID) int {
+func (b *tokenOwnershipLoaderByIDBatch) keyIndex(l *TokenOwnershipLoaderByID, key persist.DBID) int {
 	for i, existingKey := range b.keys {
 		if key == existingKey {
 			return i
@@ -386,7 +386,7 @@ func (b *tokenOwnerLoaderByIDBatch) keyIndex(l *TokenOwnerLoaderByID, key persis
 	return pos
 }
 
-func (b *tokenOwnerLoaderByIDBatch) startTimer(l *TokenOwnerLoaderByID) {
+func (b *tokenOwnershipLoaderByIDBatch) startTimer(l *TokenOwnershipLoaderByID) {
 	time.Sleep(l.wait)
 	l.mu.Lock()
 
@@ -402,24 +402,24 @@ func (b *tokenOwnerLoaderByIDBatch) startTimer(l *TokenOwnerLoaderByID) {
 	b.end(l)
 }
 
-func (b *tokenOwnerLoaderByIDBatch) end(l *TokenOwnerLoaderByID) {
+func (b *tokenOwnershipLoaderByIDBatch) end(l *TokenOwnershipLoaderByID) {
 	b.data, b.error = l.fetch(b.keys)
 	close(b.done)
 }
 
-type tokenOwnerLoaderByIDSubscriber struct {
-	cacheFunc func(coredb.TokenOwner)
+type tokenOwnershipLoaderByIDSubscriber struct {
+	cacheFunc func(coredb.TokenOwnership)
 	mutex     *sync.Mutex
 }
 
-func (l *TokenOwnerLoaderByID) publishToSubscribers(value coredb.TokenOwner) {
+func (l *TokenOwnershipLoaderByID) publishToSubscribers(value coredb.TokenOwnership) {
 	// Lazy build our list of typed cache functions once
 	l.once.Do(func() {
 		for i, subscription := range *l.subscriptionRegistry {
-			if typedFunc, ok := subscription.(*func(coredb.TokenOwner)); ok {
+			if typedFunc, ok := subscription.(*func(coredb.TokenOwnership)); ok {
 				// Don't invoke our own cache function
 				if !l.ownsCacheFunc(typedFunc) {
-					l.subscribers = append(l.subscribers, tokenOwnerLoaderByIDSubscriber{cacheFunc: *typedFunc, mutex: (*l.mutexRegistry)[i]})
+					l.subscribers = append(l.subscribers, tokenOwnershipLoaderByIDSubscriber{cacheFunc: *typedFunc, mutex: (*l.mutexRegistry)[i]})
 				}
 			}
 		}
@@ -435,13 +435,13 @@ func (l *TokenOwnerLoaderByID) publishToSubscribers(value coredb.TokenOwner) {
 	}
 }
 
-func (l *TokenOwnerLoaderByID) registerCacheFunc(cacheFunc interface{}, mutex *sync.Mutex) {
+func (l *TokenOwnershipLoaderByID) registerCacheFunc(cacheFunc interface{}, mutex *sync.Mutex) {
 	l.cacheFuncs = append(l.cacheFuncs, cacheFunc)
 	*l.subscriptionRegistry = append(*l.subscriptionRegistry, cacheFunc)
 	*l.mutexRegistry = append(*l.mutexRegistry, mutex)
 }
 
-func (l *TokenOwnerLoaderByID) ownsCacheFunc(f *func(coredb.TokenOwner)) bool {
+func (l *TokenOwnershipLoaderByID) ownsCacheFunc(f *func(coredb.TokenOwnership)) bool {
 	for _, cacheFunc := range l.cacheFuncs {
 		if cacheFunc == f {
 			return true
