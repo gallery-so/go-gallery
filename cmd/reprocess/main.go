@@ -151,7 +151,7 @@ func main() {
 			Chain:            row.Chain_2,
 			Address:          row.Address,
 			Symbol:           persist.NullString(row.Symbol.String),
-			Name:             util.ToNullString(row.Name_2.String, true),
+			Name:             persist.NullString(row.Name_2.String),
 			Description:      persist.NullString(row.Description_2.String),
 			OwnerAddress:     row.OwnerAddress,
 			CreatorAddress:   row.CreatorAddress,

@@ -350,7 +350,7 @@ type ProviderChildContractResult struct {
 }
 
 type ParentToChildEdge struct {
-	Parent   ChainAgnosticContract
+	Parent   ChainAgnosticContract // Providers may optionally provide the parent if its convenient to do so
 	Children []ChildContract
 }
 
@@ -428,32 +428,36 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 
 	combinedResult := combinedProviderChildContractResults(pResult)
 
-	params := db.UpsertCreatedTokensParams{}
-
-	for _, contract := range combinedResult.ParentContracts() {
-		params.ParentContractIds = append(params.ParentContractIds, persist.GenerateID())
-		params.ParentContractName = append(params.ParentContractName, contract.Name.String)
-		params.ParentContractSymbol = append(params.ParentContractSymbol, contract.Symbol.String())
-		params.ParentContractAddress = append(params.ParentContractAddress, contract.Address.String())
-		params.ParentContractCreatorAddress = append(params.ParentContractCreatorAddress, contract.CreatorAddress.String())
-		params.ParentContractChain = append(params.ParentContractChain, int32(contract.Chain))
-		params.ParentContractDescription = append(params.ParentContractDescription, contract.Description.String())
+	parentContracts, err := p.Repos.ContractRepository.BulkUpsert(ctx, combinedResult.ParentContracts())
+	if err != nil {
+		return err
 	}
+
+	contractToDBID := make(map[persist.ContractIdentifiers]persist.DBID)
+	for _, c := range parentContracts {
+		contractToDBID[c.ContractIdentifiers()] = c.ID
+	}
+
+	childContracts := make([]persist.ContractGallery, 0)
+
 	for _, result := range combinedResult {
 		for _, edge := range result.Edges {
 			for _, child := range edge.Children {
-				params.ChildContractIds = append(params.ChildContractIds, persist.GenerateID())
-				params.ChildContractName = append(params.ChildContractName, child.Name)
-				params.ChildContractAddress = append(params.ChildContractAddress, child.ChildID)
-				params.ChildContractCreatorAddress = append(params.ChildContractCreatorAddress, child.CreatorAddress.String())
-				params.ChildContractChain = append(params.ChildContractChain, int32(result.Chain))
-				params.ChildContractDescription = append(params.ChildContractDescription, child.Description)
-				params.ChildContractParentAddress = append(params.ChildContractParentAddress, edge.Parent.Address.String())
+				childContracts = append(childContracts, persist.ContractGallery{
+					ID:             persist.GenerateID(),
+					ParentID:       contractToDBID[persist.NewContractIdentifiers(edge.Parent.Address, result.Chain)],
+					Chain:          result.Chain,
+					Address:        persist.Address(child.ChildID),
+					Name:           persist.NullString(child.Name),
+					Description:    persist.NullString(child.Description),
+					OwnerAddress:   child.CreatorAddress,
+					CreatorAddress: child.CreatorAddress,
+				})
 			}
 		}
 	}
 
-	_, err = p.Queries.UpsertCreatedTokens(ctx, params)
+	_, err = p.Repos.ContractRepository.BulkUpsert(ctx, childContracts)
 	return err
 }
 
@@ -884,7 +888,7 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 		Chain:        ti.Chain,
 		Address:      persist.Address(ti.Chain.NormalizeAddress(ti.ContractAddress)),
 		Symbol:       persist.NullString(finalContractDescriptors.Symbol),
-		Name:         util.ToNullString(finalContractDescriptors.Name, true),
+		Name:         persist.NullString(finalContractDescriptors.Name),
 		OwnerAddress: finalContractDescriptors.CreatorAddress,
 	}); err != nil {
 		return err
@@ -1313,7 +1317,7 @@ func contractsToNewDedupedContracts(contracts []chainContracts) []persist.Contra
 	for _, chainContract := range contracts {
 		for _, contract := range chainContract.contracts {
 			if it, ok := seen[persist.NewChainAddress(contract.Address, chainContract.chain)]; ok {
-				if it.Name.String != "" {
+				if it.Name.String() != "" {
 					continue
 				}
 			}
@@ -1321,7 +1325,7 @@ func contractsToNewDedupedContracts(contracts []chainContracts) []persist.Contra
 				Chain:        chainContract.chain,
 				Address:      contract.Address,
 				Symbol:       persist.NullString(contract.Descriptors.Symbol),
-				Name:         util.ToNullString(contract.Descriptors.Name, true),
+				Name:         persist.NullString(contract.Descriptors.Name),
 				OwnerAddress: contract.Descriptors.CreatorAddress,
 				Description:  persist.NullString(contract.Descriptors.Description),
 			}

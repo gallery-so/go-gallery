@@ -131,15 +131,21 @@ func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, pContracts 
 		params.Version = append(params.Version, c.Version.Int32())
 		params.Address = append(params.Address, c.Address.String())
 		params.Symbol = append(params.Symbol, c.Symbol.String())
-		params.Name = append(params.Name, c.Name.String)
+		params.Name = append(params.Name, c.Name.String())
 		params.OwnerAddress = append(params.OwnerAddress, c.OwnerAddress.String())
 		params.Chain = append(params.Chain, int32(c.Chain))
 		params.Description = append(params.Description, c.Description.String())
+		params.CreatorAddress = append(params.CreatorAddress, c.CreatorAddress.String())
+		params.ParentIds = append(params.ParentIds, c.ParentID)
 	}
 
 	upserted, err := c.queries.UpsertContracts(pCtx, params)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(contracts) != len(upserted) {
+		panic(fmt.Sprintf("expected %d upserted contracts, got %d", len(contracts), len(upserted)))
 	}
 
 	// Update contracts with the existing data if the contract already exists.
@@ -149,6 +155,7 @@ func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, pContracts 
 		c := &contracts[i]
 		(*c).ID = upserted[i].ID
 		(*c).CreationTime = upserted[i].CreatedAt
+		(*c).CreatorAddress = upserted[i].CreatorAddress
 		(*c).ParentID = upserted[i].ParentID
 	}
 

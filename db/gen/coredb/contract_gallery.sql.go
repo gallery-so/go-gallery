@@ -12,8 +12,8 @@ import (
 )
 
 const upsertContracts = `-- name: UpsertContracts :many
-insert into contracts (id, deleted, version, created_at, address, symbol, name, owner_address, chain, description) (
-  select unnest(id), false, unnest(version), now(), unnest(address), unnest(symbol), unnest(name), unnest(owner_address), unnest(chain), unnest(description)
+insert into contracts (id, deleted, version, created_at, address, symbol, name, owner_address, chain, description, creator_address, parent_contract_id) (
+  select unnest(id), false, unnest(version), now(), unnest(address), unnest(symbol), unnest(name), unnest(owner_address), unnest(chain), unnest(description), unnest(creator_address), unnest(parent_id)
   from (select $1 as id
     , $2::int[] as version
     , $3::varchar[] as address
@@ -21,7 +21,9 @@ insert into contracts (id, deleted, version, created_at, address, symbol, name, 
     , $5::varchar[] as name
     , $6::varchar[] as owner_address
     , $7::int[] as chain
-    , $8::varchar[] as description) params
+    , $8::varchar[] as description
+    , $9::varchar[] as creator_address
+    , $10 as parent_id) params
 )
 on conflict (chain, address) where parent_id is null
 do update set symbol = excluded.symbol
@@ -31,18 +33,28 @@ do update set symbol = excluded.symbol
   , description = excluded.description
   , deleted = excluded.deleted
   , last_updated = now()
+  , creator_address = case
+    when contracts.creator_address is not null and excluded.creator_address is null then contracts.creator_address
+    else excluded.creator_address
+    end
+  , parent_id = case
+    when contracts.parent_id is not null and excluded.parent_id is null then contracts.parent_id
+    else excluded.parent_id
+    end
 returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id
 `
 
 type UpsertContractsParams struct {
-	Ids          persist.DBIDList
-	Version      []int32
-	Address      []string
-	Symbol       []string
-	Name         []string
-	OwnerAddress []string
-	Chain        []int32
-	Description  []string
+	Ids            persist.DBIDList
+	Version        []int32
+	Address        []string
+	Symbol         []string
+	Name           []string
+	OwnerAddress   []string
+	Chain          []int32
+	Description    []string
+	CreatorAddress []string
+	ParentIds      persist.DBIDList
 }
 
 func (q *Queries) UpsertContracts(ctx context.Context, arg UpsertContractsParams) ([]Contract, error) {
@@ -55,126 +67,8 @@ func (q *Queries) UpsertContracts(ctx context.Context, arg UpsertContractsParams
 		arg.OwnerAddress,
 		arg.Chain,
 		arg.Description,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Contract
-	for rows.Next() {
-		var i Contract
-		if err := rows.Scan(
-			&i.ID,
-			&i.Deleted,
-			&i.Version,
-			&i.CreatedAt,
-			&i.LastUpdated,
-			&i.Name,
-			&i.Symbol,
-			&i.Address,
-			&i.CreatorAddress,
-			&i.Chain,
-			&i.ProfileBannerUrl,
-			&i.ProfileImageUrl,
-			&i.BadgeUrl,
-			&i.Description,
-			&i.OwnerAddress,
-			&i.IsProviderMarkedSpam,
-			&i.ParentID,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const upsertCreatedTokens = `-- name: UpsertCreatedTokens :many
-with parent_contracts_data(id, name, symbol, address, creator_address, chain, description) as (
-  select unnest(id), unnest(name), unnest(symbol), unnest(address), unnest(creator_address), unnest(chain), unnest(description)
-  from (select $1 as id
-    , $2::varchar[] as name
-    , $3::varchar[] as symbol
-    , $4::varchar[] as address
-    , $5::varchar[] as creator_address
-    , $6::int[] as chain
-    , $7::varchar[] as description) params
-),
-child_contracts_data(id, name, address, creator_address, chain, description, parent_address) as (
-  select unnest(id), unnest(name), unnest(address), unnest(creator_address), unnest(chain), unnest(description), unnest(parent_address)
-  from (select $8 as id
-    , $9::varchar[] as name
-    , $10::varchar[] as address
-    , $11::varchar[] as creator_address
-    , $12::int[] as chain
-    , $13::varchar[] as description
-    , $14::varchar[] as parent_address) params
-),
-insert_parent_contracts as (
-  insert into contracts(id, deleted, created_at, name, symbol, address, creator_address, chain, description)
-  (select id, false, now(), name, symbol, address, creator_address, chain, description from parent_contracts_data)
-  on conflict (chain, address) where parent_id is null
-  do update set deleted = excluded.deleted
-    , name = excluded.name
-    , symbol = excluded.symbol
-    , creator_address = excluded.creator_address
-    , description = excluded.description
-    , last_updated = now()
-  returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id
-)
-insert into contracts(id, deleted, created_at, name, address, creator_address, chain, description, parent_id)
-(select child.id, false, now(), child.name, child.address, child.creator_address, child.chain, child.description, insert_parent_contracts.id
-  from child_contracts_data child
-  join insert_parent_contracts on child.chain = insert_parent_contracts.chain and child.parent_address = insert_parent_contracts.address)
-on conflict (chain, parent_id, address) where parent_id is not null
-do update set deleted = excluded.deleted
-  , name = excluded.name
-  , creator_address = excluded.creator_address
-  , description = excluded.description
-  , last_updated = now()
-returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id
-`
-
-type UpsertCreatedTokensParams struct {
-	ParentContractIds            persist.DBIDList
-	ParentContractName           []string
-	ParentContractSymbol         []string
-	ParentContractAddress        []string
-	ParentContractCreatorAddress []string
-	ParentContractChain          []int32
-	ParentContractDescription    []string
-	ChildContractIds             persist.DBIDList
-	ChildContractName            []string
-	ChildContractAddress         []string
-	ChildContractCreatorAddress  []string
-	ChildContractChain           []int32
-	ChildContractDescription     []string
-	ChildContractParentAddress   []string
-}
-
-// parent_contracts_data is the parent contract data to be inserted
-// child_contracts_data is the child contract data to be inserted
-// insert the parent contracts
-// insert the child contracts
-func (q *Queries) UpsertCreatedTokens(ctx context.Context, arg UpsertCreatedTokensParams) ([]Contract, error) {
-	rows, err := q.db.Query(ctx, upsertCreatedTokens,
-		arg.ParentContractIds,
-		arg.ParentContractName,
-		arg.ParentContractSymbol,
-		arg.ParentContractAddress,
-		arg.ParentContractCreatorAddress,
-		arg.ParentContractChain,
-		arg.ParentContractDescription,
-		arg.ChildContractIds,
-		arg.ChildContractName,
-		arg.ChildContractAddress,
-		arg.ChildContractCreatorAddress,
-		arg.ChildContractChain,
-		arg.ChildContractDescription,
-		arg.ChildContractParentAddress,
+		arg.CreatorAddress,
+		arg.ParentIds,
 	)
 	if err != nil {
 		return nil, err
