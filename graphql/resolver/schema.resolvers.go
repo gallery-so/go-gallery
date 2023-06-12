@@ -178,12 +178,12 @@ func (r *communityResolver) Creator(ctx context.Context, obj *model.Community) (
 		return nil, err
 	}
 
-	if creator.OwnerUserIDValid {
-		return resolveGalleryUserByUserID(ctx, creator.OwnerUserID)
+	if creator.CreatorUserIDValid {
+		return resolveGalleryUserByUserID(ctx, creator.CreatorUserID)
 	}
 
-	if creator.OwnerAddressValid {
-		return util.ToPointer(persist.NewChainAddress(creator.OwnerAddress, creator.Chain)), nil
+	if creator.CreatorAddressValid {
+		return util.ToPointer(persist.NewChainAddress(creator.CreatorAddress, creator.Chain)), nil
 	}
 
 	// We should never get here: if our query returns a contract creator, there has to be an associated address or user ID.
@@ -2040,7 +2040,7 @@ func (r *tokenResolver) OwnedByWallets(ctx context.Context, obj *model.Token) ([
 
 // OwnerIsHolder is the resolver for the ownerIsHolder field.
 func (r *tokenResolver) OwnerIsHolder(ctx context.Context, obj *model.Token) (*bool, error) {
-	tokenOwner, err := publicapi.For(ctx).Token.GetTokenOwnerByTokenID(ctx, obj.Dbid)
+	ownership, err := publicapi.For(ctx).Token.GetTokenOwnershipByTokenID(ctx, obj.Dbid)
 	if err != nil {
 		if _, ok := err.(persist.ErrTokenOwnershipNotFound); ok {
 			return util.ToPointer(false), nil
@@ -2048,12 +2048,12 @@ func (r *tokenResolver) OwnerIsHolder(ctx context.Context, obj *model.Token) (*b
 		return nil, err
 	}
 
-	return util.ToPointer(tokenOwner.OwnerIsHolder), nil
+	return util.ToPointer(ownership.IsHolder), nil
 }
 
 // OwnerIsCreator is the resolver for the ownerIsCreator field.
 func (r *tokenResolver) OwnerIsCreator(ctx context.Context, obj *model.Token) (*bool, error) {
-	tokenOwner, err := publicapi.For(ctx).Token.GetTokenOwnerByTokenID(ctx, obj.Dbid)
+	ownership, err := publicapi.For(ctx).Token.GetTokenOwnershipByTokenID(ctx, obj.Dbid)
 	if err != nil {
 		if _, ok := err.(persist.ErrTokenOwnershipNotFound); ok {
 			return util.ToPointer(false), nil
@@ -2061,7 +2061,7 @@ func (r *tokenResolver) OwnerIsCreator(ctx context.Context, obj *model.Token) (*
 		return nil, err
 	}
 
-	return util.ToPointer(tokenOwner.OwnerIsCreator), nil
+	return util.ToPointer(ownership.IsCreator), nil
 }
 
 // Contract is the resolver for the contract field.
