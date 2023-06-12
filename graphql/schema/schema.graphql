@@ -1345,7 +1345,10 @@ type SyncTokensPayload {
   viewer: Viewer
 }
 
-union SyncCreatedTokensByUserPayloadOrError = SyncCreatedTokensByUserPayload | ErrNotAuthorized | ErrSyncFailed
+union SyncCreatedTokensByUserPayloadOrError =
+    SyncCreatedTokensByUserPayload
+  | ErrNotAuthorized
+  | ErrSyncFailed
 
 type SyncCreatedTokensByUserPayload {
   viewer: Viewer
@@ -2152,7 +2155,9 @@ type Mutation {
   setSpamPreference(input: SetSpamPreferenceInput!): SetSpamPreferencePayloadOrError @authRequired
 
   syncTokens(chains: [Chain!]): SyncTokensPayloadOrError @authRequired
-  syncCreatedTokensByUser(input: SyncCreatedTokensByUserInput!): SyncCreatedTokensByUserPayloadOrError @authRequired
+  syncCreatedTokensByUser(
+    input: SyncCreatedTokensByUserInput!
+  ): SyncCreatedTokensByUserPayloadOrError @authRequired
   refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
   refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
   refreshContract(contractId: DBID!): RefreshContractPayloadOrError
