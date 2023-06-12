@@ -125,20 +125,9 @@ func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, pContracts 
 	contracts := removeDuplicateContractsGallery(pContracts)
 	params := db.UpsertContractsParams{}
 
-	// addIDIfMissing is used because sqlc was unable to bind arrays of our own custom types
-	// i.e. an array of persist.DBIDs instead of an array of strings. A zero-valued persist.DBID
-	// generates a new ID on insert, but instead we need to generate an ID beforehand.
-	addIDIfMissing := func(c *persist.ContractGallery) {
-		if c.ID == persist.DBID("") {
-			(*c).ID = persist.GenerateID()
-		}
-	}
-
 	for i := range contracts {
 		c := &contracts[i]
-		addIDIfMissing(c)
-		params.ID = append(params.ID, c.ID.String())
-		params.Deleted = append(params.Deleted, c.Deleted.Bool())
+		params.Ids = append(params.Ids, c.ID)
 		params.Version = append(params.Version, c.Version.Int32())
 		params.Address = append(params.Address, c.Address.String())
 		params.Symbol = append(params.Symbol, c.Symbol.String())

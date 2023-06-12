@@ -7,20 +7,21 @@ package coredb
 
 import (
 	"context"
+
+	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 const upsertContracts = `-- name: UpsertContracts :many
-insert into contracts (id, deleted, version, address, symbol, name, owner_address, chain, description) (
-  select unnest($1::varchar[])
-  , unnest($2::boolean[])
-  , unnest($3::int[])
-  , now()
-  , unnest($4::varchar[])
-  , unnest($5::varchar[])
-  , unnest($6::varchar[])
-  , unnest($7::varchar[])
-  , unnest($8::int[])
-  , unnest($9::varchar[])
+insert into contracts (id, deleted, version, created_at, address, symbol, name, owner_address, chain, description) (
+  select unnest(id), false, unnest(version), now(), unnest(address), unnest(symbol), unnest(name), unnest(owner_address), unnest(chain), unnest(description)
+  from (select $1 as id
+    , $2::int[] as version
+    , $3::varchar[] as address
+    , $4::varchar[] as symbol
+    , $5::varchar[] as name
+    , $6::varchar[] as owner_address
+    , $7::int[] as chain
+    , $8::varchar[] as description) params
 )
 on conflict (chain, address) where parent_id is null
 do update set symbol = excluded.symbol
@@ -34,8 +35,7 @@ returning id, deleted, version, created_at, last_updated, name, symbol, address,
 `
 
 type UpsertContractsParams struct {
-	ID           []string
-	Deleted      []bool
+	Ids          persist.DBIDList
 	Version      []int32
 	Address      []string
 	Symbol       []string
@@ -47,8 +47,7 @@ type UpsertContractsParams struct {
 
 func (q *Queries) UpsertContracts(ctx context.Context, arg UpsertContractsParams) ([]Contract, error) {
 	rows, err := q.db.Query(ctx, upsertContracts,
-		arg.ID,
-		arg.Deleted,
+		arg.Ids,
 		arg.Version,
 		arg.Address,
 		arg.Symbol,
@@ -95,35 +94,31 @@ func (q *Queries) UpsertContracts(ctx context.Context, arg UpsertContractsParams
 
 const upsertCreatedTokens = `-- name: UpsertCreatedTokens :many
  -- parent_contracts_data is the parent contract data to be inserted
-with parent_contracts_data(id, deleted, name, symbol, address, creator_address, chain, description) as (
-  select unnest($1::varchar[]) as id
-    , unnest($2::boolean[]) as deleted
-    , unnest($3::varchar[]) as name
-    , unnest($4::varchar[]) as symbol
-    , unnest($5::varchar[]) as address
-    , unnest($6::varchar[]) as creator_address
-    , unnest($7::int[]) as chain
-    , unnest($8::varchar[]) as description
+with parent_contracts_data(id, name, symbol, address, creator_address, chain, description) as (
+  select unnest(id), unnest(name), unnest(symbol), unnest(address), unnest(creator_address), unnest(chain), unnest(description)
+  from (select $1 as id
+    , $2::varchar[] as name
+    , $3::varchar[] as symbol
+    , $4::varchar[] as address
+    , $5::varchar[] as creator_address
+    , $6::int[] as chain
+    , $7::varchar[] as description) params
 ),
 
-
-child_contracts_data(id, deleted, name, address, creator_address, chain, description, parent_address) as (
-  select unnest($9::varchar[]) as id
-    , unnest($10::boolean[]) as deleted
-    , unnest($11::varchar[]) as name
-    , unnest($12::varchar[]) as address
-    , unnest($13::varchar[]) as creator_address
-    , unnest($14::int[]) as chain
-    , unnest($15::varchar[]) as description
-    , unnest($16::varchar[]) as parent_address
+child_contracts_data(id, name, address, creator_address, chain, description, parent_address) as (
+  select unnest(id), unnest(name), unnest(address), unnest(creator_address), unnest(chain), unnest(description), unnest(parent_address)
+  from (select $8 as id
+    , $9::varchar[] as name
+    , $10::varchar[] as address
+    , $11::varchar[] as creator_address
+    , $12::int[] as chain
+    , $13::varchar[] as description
+    , $14::varchar[] as parent_address) params
 ),
 
 insert_parent_contracts as (
   insert into contracts(id, deleted, created_at, name, symbol, address, creator_address, chain, description)
-  (
-    select id, deleted, now(), name, symbol, address, creator_address, chain, description
-    from parent_contracts_data
-  )
+  (select id, false, now(), name, symbol, address, creator_address, chain, description from parent_contracts_data)
   on conflict (chain, address) where parent_id is null
   do update set deleted = excluded.deleted
     , name = excluded.name
@@ -135,11 +130,9 @@ insert_parent_contracts as (
 )
 
 insert into contracts(id, deleted, created_at, name, address, creator_address, chain, description, parent_id)
-(
-  select child.id, child.deleted, now(), child.name, child.address, child.creator_address, child.chain, child.description, insert_parent_contracts.id
+(select child.id, false, now(), child.name, child.address, child.creator_address, child.chain, child.description, insert_parent_contracts.id
   from child_contracts_data child
-  join insert_parent_contracts on child.chain = insert_parent_contracts.chain and child.parent_address = insert_parent_contracts.address
-)
+  join insert_parent_contracts on child.chain = insert_parent_contracts.chain and child.parent_address = insert_parent_contracts.address)
 on conflict (chain, parent_id, address) where parent_id is not null
 do update set deleted = excluded.deleted
   , name = excluded.name
@@ -150,16 +143,14 @@ returning id, deleted, version, created_at, last_updated, name, symbol, address,
 `
 
 type UpsertCreatedTokensParams struct {
-	ParentContractID             []string
-	ParentContractDeleted        []bool
+	ParentContractIds            persist.DBIDList
 	ParentContractName           []string
 	ParentContractSymbol         []string
 	ParentContractAddress        []string
 	ParentContractCreatorAddress []string
 	ParentContractChain          []int32
 	ParentContractDescription    []string
-	ChildContractID              []string
-	ChildContractDeleted         []bool
+	ChildContractIds             persist.DBIDList
 	ChildContractName            []string
 	ChildContractAddress         []string
 	ChildContractCreatorAddress  []string
@@ -173,16 +164,14 @@ type UpsertCreatedTokensParams struct {
 // insert the child contracts
 func (q *Queries) UpsertCreatedTokens(ctx context.Context, arg UpsertCreatedTokensParams) ([]Contract, error) {
 	rows, err := q.db.Query(ctx, upsertCreatedTokens,
-		arg.ParentContractID,
-		arg.ParentContractDeleted,
+		arg.ParentContractIds,
 		arg.ParentContractName,
 		arg.ParentContractSymbol,
 		arg.ParentContractAddress,
 		arg.ParentContractCreatorAddress,
 		arg.ParentContractChain,
 		arg.ParentContractDescription,
-		arg.ChildContractID,
-		arg.ChildContractDeleted,
+		arg.ChildContractIds,
 		arg.ChildContractName,
 		arg.ChildContractAddress,
 		arg.ChildContractCreatorAddress,

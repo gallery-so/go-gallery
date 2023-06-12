@@ -426,8 +426,7 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 	params := db.UpsertCreatedTokensParams{}
 
 	for _, contract := range combinedResult.ParentContracts() {
-		params.ParentContractID = append(params.ParentContractID, persist.GenerateID().String())
-		params.ParentContractDeleted = append(params.ParentContractDeleted, false)
+		params.ParentContractIds = append(params.ParentContractIds, persist.GenerateID())
 		params.ParentContractName = append(params.ParentContractName, contract.Name.String)
 		params.ParentContractSymbol = append(params.ParentContractSymbol, contract.Symbol.String())
 		params.ParentContractAddress = append(params.ParentContractAddress, contract.Address.String())
@@ -438,8 +437,7 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 	for _, result := range combinedResult {
 		for _, edge := range result.Edges {
 			for _, child := range edge.Children {
-				params.ChildContractID = append(params.ChildContractID, persist.GenerateID().String())
-				params.ChildContractDeleted = append(params.ChildContractDeleted, false)
+				params.ChildContractIds = append(params.ChildContractIds, persist.GenerateID())
 				params.ChildContractName = append(params.ChildContractName, child.Name)
 				params.ChildContractAddress = append(params.ChildContractAddress, child.ChildID)
 				params.ChildContractCreatorAddress = append(params.ChildContractCreatorAddress, child.CreatorAddress.String())

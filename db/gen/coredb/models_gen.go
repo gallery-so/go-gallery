@@ -419,8 +419,8 @@ type Token struct {
 	IsProviderMarkedSpam sql.NullBool
 	LastSynced           time.Time
 	FallbackMedia        persist.FallbackMedia
-	ChildContractID      persist.DBID
 	TokenMediaID         persist.DBID
+	ChildContractID      persist.DBID
 }
 
 type TokenMedia struct {

@@ -332,45 +332,15 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 		return time.Time{}, []persist.TokenGallery{}, nil
 	}
 
-	// addIDIfMissing is used because sqlc was unable to bind arrays of our own custom types
-	// i.e. an array of persist.DBIDs instead of an array of strings. A zero-valued persist.DBID
-	// generates a new ID on insert, but instead we need to generate an ID beforehand.
-	addIDIfMissing := func(t *persist.TokenGallery) {
-		if t.ID == persist.DBID("") {
-			(*t).ID = persist.GenerateID()
-		}
-	}
-
-	// addTimesIfMissing is required because sqlc was unable to bind arrays of our own custom types
-	// i.e. an array of persist.CreationTime instead of an array of time.Time. A zero-valued persist.CreationTime
-	// uses the current time as the column value, but instead we need to manually add a time to the struct.
-	addTimesIfMissing := func(t *persist.TokenGallery, ts time.Time) {
-		if t.CreationTime.Time().IsZero() {
-			(*t).CreationTime = persist.CreationTime(ts)
-		}
-		if t.LastSynced.Time().IsZero() {
-			(*t).LastSynced = persist.LastUpdatedTime(ts)
-		}
-		if t.LastUpdated.Time().IsZero() {
-			(*t).LastUpdated = persist.LastUpdatedTime(ts)
-		}
-	}
-
 	tokens = t.dedupeTokens(tokens)
 	params := db.UpsertTokensParams{}
-	now := time.Now()
 
 	var errors []error
 
 	for i := range tokens {
 		t := &tokens[i]
-		addIDIfMissing(t)
-		addTimesIfMissing(t, now)
-		params.ID = append(params.ID, t.ID.String())
-		params.Deleted = append(params.Deleted, t.Deleted.Bool())
+		params.Ids = append(params.Ids, t.ID)
 		params.Version = append(params.Version, t.Version.Int32())
-		params.CreatedAt = append(params.CreatedAt, t.CreationTime.Time())
-		params.LastUpdated = append(params.LastUpdated, t.LastUpdated.Time())
 		params.Name = append(params.Name, t.Name.String())
 		params.Description = append(params.Description, t.Description.String())
 		params.CollectorsNote = append(params.CollectorsNote, t.CollectorsNote.String())
@@ -413,7 +383,7 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 		(*t).LastSynced = persist.LastUpdatedTime(upserted[i].LastSynced)
 	}
 
-	return now, tokens, nil
+	return upserted[0].LastUpdated, tokens, nil
 }
 
 func (t *TokenGalleryRepository) excludeZeroQuantityTokens(pCtx context.Context, pTokens []persist.TokenGallery) ([]persist.TokenGallery, error) {

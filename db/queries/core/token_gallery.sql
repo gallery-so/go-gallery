@@ -29,11 +29,11 @@ insert into tokens
   , token_media_id
 ) (
   select
-    id
+    unnest(id)
     , deleted 
     , version
-    , created_at
-    , last_updated
+    , now()
+    , now()
     , name
     , description
     , collectors_note
@@ -56,20 +56,17 @@ insert into tokens
     , token_uri
     , (select tm.id
        from token_medias tm
-       where tm.token_id = bulk_upsert.token_id
-         and tm.contract_id = bulk_upsert.contract
-         and tm.chain = bulk_upsert.chain
+       where tm.token_id = params.token_id
+         and tm.contract_id = params.contract
+         and tm.chain = params.chain
          and tm.active = true
          and tm.deleted = false
         limit 1
       ) as token_media_id
   from (
     select
-      unnest(@id::varchar[]) as id
-      , unnest(@deleted::boolean[]) as deleted
+      @ids as id
       , unnest(@version::int[]) as version
-      , unnest(@created_at::timestamptz[]) as created_at
-      , unnest(@last_updated::timestamptz[]) as last_updated
       , unnest(@name::varchar[]) as name
       , unnest(@description::varchar[]) as description
       , unnest(@collectors_note::varchar[]) as collectors_note
@@ -94,7 +91,7 @@ insert into tokens
       , unnest(@token_id::varchar[]) as token_id
       , unnest(@contract::varchar[]) as contract
       , unnest(@chain::int[]) as chain
-  ) bulk_upsert
+  ) params
 )
 on conflict (token_id, contract, chain, owner_user_id) where deleted = false
 do update set
