@@ -1224,6 +1224,30 @@ update sessions set invalidated = true, active_until = least(active_until, now()
 -- name: UpdateTokenMetadataFieldsByTokenIdentifiers :exec
 update tokens set name = @name, description = @description, last_updated = now() where token_id = @token_id and contract = (select id from contracts where address = @contract_address) and deleted = false;
 
+-- name: GetTopCollectionsForCommunity :many
+with contract_tokens as (
+	select t.id, t.owner_user_id
+	from tokens t
+	join contracts c on t.contract = c.id
+	where not t.deleted and not c.deleted and t.contract = c.id and c.chain = $1 and c.address = $2
+),
+ranking as (
+	select col.id, rank() over (order by count(col.id) desc, col.created_at desc) score
+	from collections col
+	join contract_tokens on col.owner_user_id = contract_tokens.owner_user_id and contract_tokens.id = any(col.nfts)
+	join users on col.owner_user_id = users.id
+	where not col.deleted and not col.hidden and not users.deleted
+	group by col.id
+)
+select collections.id from collections join ranking using(id) where score <= 100 order by score asc;
+
+-- name: GetVisibleCollectionsByIDsPaginate :many
+select collections.*
+from collections, unnest(@collection_ids::varchar[]) with ordinality as t(id, pos)
+where collections.id = t.id and not deleted and not hidden and t.pos < @cur_before_pos::int and t.pos > @cur_after_pos::int
+order by case when @paging_forward::bool then t.pos end asc, case when not @paging_forward::bool then t.pos end desc
+limit $1;
+
 -- name: SetContractOverrideCreator :exec
 update contracts set override_creator_user_id = @creator_user_id where id = @contract_id and deleted = false;
 

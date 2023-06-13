@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -56,6 +57,7 @@ var (
 	GraphQLAPQCache                   = CacheConfig{database: graphQLAPQ, keyPrefix: "", displayName: "graphQLAPQ"}
 	FeedCache                         = CacheConfig{database: feed, keyPrefix: "", displayName: "feed"}
 	SocialCache                       = CacheConfig{database: social, keyPrefix: "", displayName: "social"}
+	SearchCache                       = CacheConfig{keyPrefix: "search", displayName: "search"}
 )
 
 func newClient(db redisDB, traceName string) *redis.Client {
@@ -261,3 +263,32 @@ end
 
 return 0
 `)
+
+// LazyCache implements a lazy loading cache that stores data only when it is requested
+type LazyCache struct {
+	Cache    *Cache
+	CalcFunc func(context.Context) ([]byte, error)
+	Key      string
+	TTL      time.Duration
+}
+
+// Load queries the cache for the given key, and if it is current returns the data.
+// It's possible for Load to return stale data, however the staleness of data can be
+// limited by configuring a shorter TTL. The tradeoff being that a shorter TTL results in more
+// cache misses which can have a noticeable delay in getting data.
+func (l LazyCache) Load(ctx context.Context) ([]byte, error) {
+	b, err := l.Cache.Get(ctx, l.Key)
+	if err == nil {
+		return b, nil
+	}
+	var errMiss ErrKeyNotFound
+	if !errors.As(err, &errMiss) {
+		return nil, err
+	}
+	b, err = l.CalcFunc(ctx)
+	if err != nil {
+		return nil, err
+	}
+	err = l.Cache.Set(ctx, l.Key, b, l.TTL)
+	return b, err
+}

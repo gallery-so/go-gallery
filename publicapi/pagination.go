@@ -29,7 +29,7 @@ var (
 	defaultCursorAfterKey = ""
 
 	// Some position that comes after any other position
-	defaultCursorBeforePositon = -1
+	defaultCursorBeforePosition = -1
 	// Some position that comes before any other position
 	defaultCursorAfterPosition = math.MaxInt32
 )
@@ -662,6 +662,23 @@ type positionPaginator struct {
 	CountFunc func() (count int, err error)
 }
 
+type positionPaginatorArgs struct {
+	CurBeforePos int
+	CurAfterPos  int
+}
+
+type positionPaginatorOpts struct{}
+
+var positionOpts positionPaginatorOpts
+
+// WithDefaultCursors configures the starting cursors to use when none are provided
+func (positionPaginatorOpts) WithStartingCursors(before, after int) func(a *positionPaginatorArgs) {
+	return func(a *positionPaginatorArgs) {
+		a.CurBeforePos = before
+		a.CurAfterPos = after
+	}
+}
+
 type positionPagingParams struct {
 	Limit           int32
 	CursorBeforePos int32
@@ -708,19 +725,27 @@ func (p *positionPaginator) decodeCursor(cursor string) (int, []persist.DBID, er
 	return int(position), ids, nil
 }
 
-func (p *positionPaginator) paginate(before *string, after *string, first *int, last *int) ([]interface{}, PageInfo, error) {
+func (p *positionPaginator) paginate(before *string, after *string, first *int, last *int, opts ...func(*positionPaginatorArgs)) ([]interface{}, PageInfo, error) {
 	queryFunc := func(limit int32, pagingForward bool) ([]interface{}, error) {
-		curBeforePos := defaultCursorBeforePositon
-		curAfterPos := defaultCursorAfterPosition
-
 		var err error
 		var ids []persist.DBID
+		var curBeforePos int
+		var curAfterPos int
+
+		args := positionPaginatorArgs{}
+		args.CurBeforePos = defaultCursorBeforePosition
+		args.CurAfterPos = defaultCursorAfterPosition
+
+		for _, opt := range opts {
+			opt(&args)
+		}
 
 		if before != nil {
 			curBeforePos, ids, err = p.decodeCursor(*before)
 			if err != nil {
 				return nil, err
 			}
+			args.CurBeforePos = curBeforePos
 		}
 
 		if after != nil {
@@ -728,12 +753,13 @@ func (p *positionPaginator) paginate(before *string, after *string, first *int, 
 			if err != nil {
 				return nil, err
 			}
+			args.CurAfterPos = curAfterPos
 		}
 
 		queryParams := positionPagingParams{
 			Limit:           limit,
-			CursorBeforePos: int32(curBeforePos),
-			CursorAfterPos:  int32(curAfterPos),
+			CursorBeforePos: int32(args.CurBeforePos),
+			CursorAfterPos:  int32(args.CurAfterPos),
 			PagingForward:   pagingForward,
 			IDs:             ids,
 		}
