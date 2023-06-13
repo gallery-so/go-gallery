@@ -962,14 +962,14 @@ select contracts.*
 from users, contracts, wallets
 where users.id = @user_id
   and wallets.id = any(users.wallets)
-  and contracts.creator_address = wallets.address
+  and (contracts.creator_address = wallets.address or contracts.owner_address = wallets.address)
   and contracts.chain = wallets.chain
   and (@include_all_chains::bool or contracts.chain = any(string_to_array(@chains, ',')::int[]))
   and not users.deleted
   and not contracts.deleted
   and not wallets.deleted
-  and (contracts.created_at, contracts.id) > (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-  and (contracts.created_at, contracts.id) < ( sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+  and (contracts.created_at, contracts.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+  and (contracts.created_at, contracts.id) > ( sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
 order by case when sqlc.arg('paging_forward')::bool then (contracts.created_at, contracts.id) end asc,
         case when not sqlc.arg('paging_forward')::bool then (contracts.created_at, contracts.id) end desc
 limit sqlc.arg('limit');

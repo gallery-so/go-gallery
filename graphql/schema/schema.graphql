@@ -512,7 +512,7 @@ type TokenHoldersConnection {
 }
 
 type CommunityLink {
-  Node: Community
+  node: Community
 }
 
 type Community implements Node @goEmbedHelper {

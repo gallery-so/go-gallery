@@ -7,10 +7,8 @@ package coredb
 
 import (
 	"context"
-	"time"
 
 	"github.com/jackc/pgtype"
-	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 const upsertTokens = `-- name: UpsertTokens :many
@@ -44,8 +42,8 @@ insert into tokens
   , token_media_id
 ) (
   select
-    unnest(id)
-    , deleted 
+    id
+    , false
     , version
     , now()
     , now()
@@ -67,20 +65,19 @@ insert into tokens
     , contract
     , is_user_marked_spam
     , is_provider_marked_spam
-    , last_synced
+    , now()
     , token_uri
     , (select tm.id
        from token_medias tm
-       where tm.token_id = params.token_id
-         and tm.contract_id = params.contract
-         and tm.chain = params.chain
+       where tm.token_id = bulk_upsert.token_id
+         and tm.contract_id = bulk_upsert.contract
+         and tm.chain = bulk_upsert.chain
          and tm.active = true
          and tm.deleted = false
         limit 1
       ) as token_media_id
   from (
-    select
-      $1 as id
+    select unnest($1::varchar[]) as id
       , unnest($2::int[]) as version
       , unnest($3::varchar[]) as name
       , unnest($4::varchar[]) as description
@@ -101,12 +98,11 @@ insert into tokens
       , unnest($19::int[]) as owned_by_wallets_end_idx
       , unnest($20::bool[]) as is_user_marked_spam
       , unnest($21::bool[]) as is_provider_marked_spam
-      , unnest($22::timestamptz[]) as last_synced
-      , unnest($23::varchar[]) as token_uri
-      , unnest($24::varchar[]) as token_id
-      , unnest($25::varchar[]) as contract
-      , unnest($26::int[]) as chain
-  ) params
+      , unnest($22::varchar[]) as token_uri
+      , unnest($23::varchar[]) as token_id
+      , unnest($24::varchar[]) as contract
+      , unnest($25::int[]) as chain
+  ) bulk_upsert
 )
 on conflict (token_id, contract, chain, owner_user_id) where deleted = false
 do update set
@@ -130,7 +126,7 @@ returning id, deleted, version, created_at, last_updated, name, description, col
 `
 
 type UpsertTokensParams struct {
-	Ids                      persist.DBIDList
+	ID                       []string
 	Version                  []int32
 	Name                     []string
 	Description              []string
@@ -151,7 +147,6 @@ type UpsertTokensParams struct {
 	OwnedByWalletsEndIdx     []int32
 	IsUserMarkedSpam         []bool
 	IsProviderMarkedSpam     []bool
-	LastSynced               []time.Time
 	TokenUri                 []string
 	TokenID                  []string
 	Contract                 []string
@@ -160,7 +155,7 @@ type UpsertTokensParams struct {
 
 func (q *Queries) UpsertTokens(ctx context.Context, arg UpsertTokensParams) ([]Token, error) {
 	rows, err := q.db.Query(ctx, upsertTokens,
-		arg.Ids,
+		arg.ID,
 		arg.Version,
 		arg.Name,
 		arg.Description,
@@ -181,7 +176,6 @@ func (q *Queries) UpsertTokens(ctx context.Context, arg UpsertTokensParams) ([]T
 		arg.OwnedByWalletsEndIdx,
 		arg.IsUserMarkedSpam,
 		arg.IsProviderMarkedSpam,
-		arg.LastSynced,
 		arg.TokenUri,
 		arg.TokenID,
 		arg.Contract,

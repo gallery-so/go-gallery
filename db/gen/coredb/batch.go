@@ -890,14 +890,14 @@ select contracts.id, contracts.deleted, contracts.version, contracts.created_at,
 from users, contracts, wallets
 where users.id = $1
   and wallets.id = any(users.wallets)
-  and contracts.creator_address = wallets.address
+  and (contracts.creator_address = wallets.address or contracts.owner_address = wallets.address)
   and contracts.chain = wallets.chain
   and ($2::bool or contracts.chain = any(string_to_array($3, ',')::int[]))
   and not users.deleted
   and not contracts.deleted
   and not wallets.deleted
-  and (contracts.created_at, contracts.id) > ($4, $5)
-  and (contracts.created_at, contracts.id) < ( $6, $7)
+  and (contracts.created_at, contracts.id) < ($4, $5)
+  and (contracts.created_at, contracts.id) > ( $6, $7)
 order by case when $8::bool then (contracts.created_at, contracts.id) end asc,
         case when not $8::bool then (contracts.created_at, contracts.id) end desc
 limit $9

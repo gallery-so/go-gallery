@@ -592,6 +592,7 @@ func assetsByChildContract(ctx context.Context, assetsChan <-chan assetsReceieve
 					ChildID:        childID,
 					Name:           asset.Collection.Name,
 					Description:    asset.Collection.Description,
+					OwnerAddress:   creatorAddress,
 					CreatorAddress: creatorAddress,
 					Tokens:         make([]multichain.ChainAgnosticToken, 0),
 				})

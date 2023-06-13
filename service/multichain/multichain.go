@@ -358,6 +358,7 @@ type ChildContract struct {
 	ChildID        string // Uniquely identifies a child contract within a parent contract
 	Name           string
 	Description    string
+	OwnerAddress   persist.Address
 	CreatorAddress persist.Address
 	Tokens         []ChainAgnosticToken
 }
@@ -438,26 +439,24 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 		contractToDBID[c.ContractIdentifiers()] = c.ID
 	}
 
-	childContracts := make([]persist.ContractGallery, 0)
+	params := db.UpsertChildContractsParams{}
 
 	for _, result := range combinedResult {
 		for _, edge := range result.Edges {
 			for _, child := range edge.Children {
-				childContracts = append(childContracts, persist.ContractGallery{
-					ID:             persist.GenerateID(),
-					ParentID:       contractToDBID[persist.NewContractIdentifiers(edge.Parent.Address, result.Chain)],
-					Chain:          result.Chain,
-					Address:        persist.Address(child.ChildID),
-					Name:           persist.NullString(child.Name),
-					Description:    persist.NullString(child.Description),
-					OwnerAddress:   child.CreatorAddress,
-					CreatorAddress: child.CreatorAddress,
-				})
+				params.ID = append(params.ID, persist.GenerateID().String())
+				params.Name = append(params.Name, child.Name)
+				params.Address = append(params.Address, child.ChildID)
+				params.CreatorAddress = append(params.CreatorAddress, child.CreatorAddress.String())
+				params.OwnerAddress = append(params.OwnerAddress, child.OwnerAddress.String())
+				params.Chain = append(params.Chain, int32(result.Chain))
+				params.Description = append(params.Description, child.Description)
+				params.ParentIds = append(params.ParentIds, contractToDBID[persist.NewContractIdentifiers(edge.Parent.Address, result.Chain)].String())
 			}
 		}
 	}
 
-	_, err = p.Repos.ContractRepository.BulkUpsert(ctx, childContracts)
+	_, err = p.Queries.UpsertChildContracts(ctx, params)
 	return err
 }
 
@@ -1225,7 +1224,6 @@ func tokensToNewDedupedTokens(tokens []chainTokens, contracts []persist.Contract
 			existingToken, seen := seenTokens[ti]
 
 			candidateToken := persist.TokenGallery{
-				ID:                   persist.GenerateID(),
 				TokenType:            token.TokenType,
 				Chain:                chainToken.chain,
 				Name:                 persist.NullString(token.Descriptors.Name),

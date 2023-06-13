@@ -127,7 +127,7 @@ func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, pContracts 
 
 	for i := range contracts {
 		c := &contracts[i]
-		params.Ids = append(params.Ids, c.ID)
+		params.Ids = append(params.Ids, persist.GenerateID().String())
 		params.Version = append(params.Version, c.Version.Int32())
 		params.Address = append(params.Address, c.Address.String())
 		params.Symbol = append(params.Symbol, c.Symbol.String())
@@ -135,8 +135,6 @@ func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, pContracts 
 		params.OwnerAddress = append(params.OwnerAddress, c.OwnerAddress.String())
 		params.Chain = append(params.Chain, int32(c.Chain))
 		params.Description = append(params.Description, c.Description.String())
-		params.CreatorAddress = append(params.CreatorAddress, c.CreatorAddress.String())
-		params.ParentIds = append(params.ParentIds, c.ParentID)
 	}
 
 	upserted, err := c.queries.UpsertContracts(pCtx, params)

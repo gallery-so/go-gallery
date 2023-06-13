@@ -2383,7 +2383,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.CommunityEdge.Node(childComplexity), true
 
-	case "CommunityLink.Node":
+	case "CommunityLink.node":
 		if e.complexity.CommunityLink.Node == nil {
 			break
 		}
@@ -7301,7 +7301,7 @@ type TokenHoldersConnection {
 }
 
 type CommunityLink {
-  Node: Community
+  node: Community
 }
 
 type Community implements Node @goEmbedHelper {
@@ -8134,7 +8134,10 @@ type SyncTokensPayload {
   viewer: Viewer
 }
 
-union SyncCreatedTokensByUserPayloadOrError = SyncCreatedTokensByUserPayload | ErrNotAuthorized | ErrSyncFailed
+union SyncCreatedTokensByUserPayloadOrError =
+    SyncCreatedTokensByUserPayload
+  | ErrNotAuthorized
+  | ErrSyncFailed
 
 type SyncCreatedTokensByUserPayload {
   viewer: Viewer
@@ -8941,7 +8944,9 @@ type Mutation {
   setSpamPreference(input: SetSpamPreferenceInput!): SetSpamPreferencePayloadOrError @authRequired
 
   syncTokens(chains: [Chain!]): SyncTokensPayloadOrError @authRequired
-  syncCreatedTokensByUser(input: SyncCreatedTokensByUserInput!): SyncCreatedTokensByUserPayloadOrError @authRequired
+  syncCreatedTokensByUser(
+    input: SyncCreatedTokensByUserInput!
+  ): SyncCreatedTokensByUserPayloadOrError @authRequired
   refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
   refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
   refreshContract(contractId: DBID!): RefreshContractPayloadOrError
@@ -16758,8 +16763,8 @@ func (ec *executionContext) fieldContext_Community_parentCommunity(ctx context.C
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "Node":
-				return ec.fieldContext_CommunityLink_Node(ctx, field)
+			case "node":
+				return ec.fieldContext_CommunityLink_node(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type CommunityLink", field.Name)
 		},
@@ -17061,8 +17066,8 @@ func (ec *executionContext) fieldContext_CommunityEdge_cursor(ctx context.Contex
 	return fc, nil
 }
 
-func (ec *executionContext) _CommunityLink_Node(ctx context.Context, field graphql.CollectedField, obj *model.CommunityLink) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_CommunityLink_Node(ctx, field)
+func (ec *executionContext) _CommunityLink_node(ctx context.Context, field graphql.CollectedField, obj *model.CommunityLink) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CommunityLink_node(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -17089,7 +17094,7 @@ func (ec *executionContext) _CommunityLink_Node(ctx context.Context, field graph
 	return ec.marshalOCommunity2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunity(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_CommunityLink_Node(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_CommunityLink_node(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "CommunityLink",
 		Field:      field,
@@ -54287,9 +54292,9 @@ func (ec *executionContext) _CommunityLink(ctx context.Context, sel ast.Selectio
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("CommunityLink")
-		case "Node":
+		case "node":
 
-			out.Values[i] = ec._CommunityLink_Node(ctx, field, obj)
+			out.Values[i] = ec._CommunityLink_node(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))

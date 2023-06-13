@@ -7,23 +7,102 @@ package coredb
 
 import (
 	"context"
-
-	"github.com/mikeydub/go-gallery/service/persist"
 )
 
+const upsertChildContracts = `-- name: UpsertChildContracts :many
+insert into contracts(id, deleted, version, created_at, name, address, creator_address, owner_address, chain, description, parent_id) (
+  select unnest($1::varchar[]) as id
+    , false
+    , 0
+    , now()
+    , unnest($2::varchar[])
+    , unnest($3::varchar[])
+    , unnest($4::varchar[])
+    , unnest($5::varchar[])
+    , unnest($6::int[])
+    , unnest($7::varchar[])
+    , unnest($8::varchar[])
+)
+on conflict (chain, parent_id, address) where parent_id is not null
+do update set deleted = excluded.deleted
+  , name = excluded.name
+  , creator_address = excluded.creator_address
+  , owner_address = excluded.owner_address
+  , description = excluded.description
+  , last_updated = now()
+returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id
+`
+
+type UpsertChildContractsParams struct {
+	ID             []string
+	Name           []string
+	Address        []string
+	CreatorAddress []string
+	OwnerAddress   []string
+	Chain          []int32
+	Description    []string
+	ParentIds      []string
+}
+
+func (q *Queries) UpsertChildContracts(ctx context.Context, arg UpsertChildContractsParams) ([]Contract, error) {
+	rows, err := q.db.Query(ctx, upsertChildContracts,
+		arg.ID,
+		arg.Name,
+		arg.Address,
+		arg.CreatorAddress,
+		arg.OwnerAddress,
+		arg.Chain,
+		arg.Description,
+		arg.ParentIds,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Contract
+	for rows.Next() {
+		var i Contract
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Name,
+			&i.Symbol,
+			&i.Address,
+			&i.CreatorAddress,
+			&i.Chain,
+			&i.ProfileBannerUrl,
+			&i.ProfileImageUrl,
+			&i.BadgeUrl,
+			&i.Description,
+			&i.OwnerAddress,
+			&i.IsProviderMarkedSpam,
+			&i.ParentID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const upsertContracts = `-- name: UpsertContracts :many
-insert into contracts (id, deleted, version, created_at, address, symbol, name, owner_address, chain, description, creator_address, parent_contract_id) (
-  select unnest(id), false, unnest(version), now(), unnest(address), unnest(symbol), unnest(name), unnest(owner_address), unnest(chain), unnest(description), unnest(creator_address), unnest(parent_id)
-  from (select $1 as id
-    , $2::int[] as version
-    , $3::varchar[] as address
-    , $4::varchar[] as symbol
-    , $5::varchar[] as name
-    , $6::varchar[] as owner_address
-    , $7::int[] as chain
-    , $8::varchar[] as description
-    , $9::varchar[] as creator_address
-    , $10 as parent_id) params
+insert into contracts(id, deleted, version, created_at, address, symbol, name, owner_address, chain, description) (
+  select unnest($1::varchar[])
+    , false
+    , unnest($2::int[])
+    , now()
+    , unnest($3::varchar[])
+    , unnest($4::varchar[])
+    , unnest($5::varchar[])
+    , unnest($6::varchar[])
+    , unnest($7::int[])
+    , unnest($8::varchar[])
 )
 on conflict (chain, address) where parent_id is null
 do update set symbol = excluded.symbol
@@ -33,28 +112,18 @@ do update set symbol = excluded.symbol
   , description = excluded.description
   , deleted = excluded.deleted
   , last_updated = now()
-  , creator_address = case
-    when contracts.creator_address is not null and excluded.creator_address is null then contracts.creator_address
-    else excluded.creator_address
-    end
-  , parent_id = case
-    when contracts.parent_id is not null and excluded.parent_id is null then contracts.parent_id
-    else excluded.parent_id
-    end
 returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id
 `
 
 type UpsertContractsParams struct {
-	Ids            persist.DBIDList
-	Version        []int32
-	Address        []string
-	Symbol         []string
-	Name           []string
-	OwnerAddress   []string
-	Chain          []int32
-	Description    []string
-	CreatorAddress []string
-	ParentIds      persist.DBIDList
+	Ids          []string
+	Version      []int32
+	Address      []string
+	Symbol       []string
+	Name         []string
+	OwnerAddress []string
+	Chain        []int32
+	Description  []string
 }
 
 func (q *Queries) UpsertContracts(ctx context.Context, arg UpsertContractsParams) ([]Contract, error) {
@@ -67,8 +136,6 @@ func (q *Queries) UpsertContracts(ctx context.Context, arg UpsertContractsParams
 		arg.OwnerAddress,
 		arg.Chain,
 		arg.Description,
-		arg.CreatorAddress,
-		arg.ParentIds,
 	)
 	if err != nil {
 		return nil, err

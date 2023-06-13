@@ -625,7 +625,7 @@ type CommunityEdge struct {
 }
 
 type CommunityLink struct {
-	Node *Community `json:"Node"`
+	Node *Community `json:"node"`
 }
 
 type CommunitySearchResult struct {

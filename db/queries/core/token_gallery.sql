@@ -29,8 +29,8 @@ insert into tokens
   , token_media_id
 ) (
   select
-    unnest(id)
-    , deleted 
+    id
+    , false
     , version
     , now()
     , now()
@@ -52,20 +52,19 @@ insert into tokens
     , contract
     , is_user_marked_spam
     , is_provider_marked_spam
-    , last_synced
+    , now()
     , token_uri
     , (select tm.id
        from token_medias tm
-       where tm.token_id = params.token_id
-         and tm.contract_id = params.contract
-         and tm.chain = params.chain
+       where tm.token_id = bulk_upsert.token_id
+         and tm.contract_id = bulk_upsert.contract
+         and tm.chain = bulk_upsert.chain
          and tm.active = true
          and tm.deleted = false
         limit 1
       ) as token_media_id
   from (
-    select
-      @ids as id
+    select unnest(@id::varchar[]) as id
       , unnest(@version::int[]) as version
       , unnest(@name::varchar[]) as name
       , unnest(@description::varchar[]) as description
@@ -86,12 +85,11 @@ insert into tokens
       , unnest(@owned_by_wallets_end_idx::int[]) as owned_by_wallets_end_idx
       , unnest(@is_user_marked_spam::bool[]) as is_user_marked_spam
       , unnest(@is_provider_marked_spam::bool[]) as is_provider_marked_spam
-      , unnest(@last_synced::timestamptz[]) as last_synced
       , unnest(@token_uri::varchar[]) as token_uri
       , unnest(@token_id::varchar[]) as token_id
       , unnest(@contract::varchar[]) as contract
       , unnest(@chain::int[]) as chain
-  ) params
+  ) bulk_upsert
 )
 on conflict (token_id, contract, chain, owner_user_id) where deleted = false
 do update set
