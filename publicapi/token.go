@@ -282,10 +282,10 @@ func (api TokenAPI) SyncTokens(ctx context.Context, chains []persist.Chain) erro
 		return err
 	}
 
-	// XXX if err := api.throttler.Lock(ctx, userID.String()); err != nil {
-	// XXX 	return ErrTokenRefreshFailed{Message: err.Error()}
-	// XXX }
-	// XXX defer api.throttler.Unlock(ctx, userID.String())
+	if err := api.throttler.Lock(ctx, userID.String()); err != nil {
+		return ErrTokenRefreshFailed{Message: err.Error()}
+	}
+	defer api.throttler.Unlock(ctx, userID.String())
 
 	err = api.multichainProvider.SyncTokens(ctx, userID, chains)
 	if err != nil {
