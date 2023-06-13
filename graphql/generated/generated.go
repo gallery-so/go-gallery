@@ -7366,6 +7366,7 @@ enum UserExperienceType {
   UpsellMintMemento4
   UpsellGallerySelects1
   MobileUpsell1
+  MobileBetaUpsell
 }
 
 type UserExperience {
@@ -7809,7 +7810,13 @@ type Query {
   ): SocialConnectionsConnection @goField(forceResolver: true) @authRequired
 
   socialQueries: SocialQueriesOrError @authRequired
-  topCollectionsForCommunity(input: topCollectionsForCommunityInput!, before: String, after: String, first: Int, last:Int): CollectionsConnection
+  topCollectionsForCommunity(
+    input: topCollectionsForCommunityInput!
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): CollectionsConnection
 }
 
 type SocialQueries {
