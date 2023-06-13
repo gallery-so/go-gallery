@@ -1270,7 +1270,7 @@ func loadContractCreatorByContractID(q *db.Queries) func(ctx context.Context, ke
 
 		keyFunc := func(row db.ContractCreator) persist.DBID { return row.ContractID }
 		onNotFound := func(contractID persist.DBID) (db.ContractCreator, error) {
-			return db.ContractCreator{}, persist.ErrContractOwnerNotFound{ContractID: contractID}
+			return db.ContractCreator{}, persist.ErrContractCreatorNotFound{ContractID: contractID}
 		}
 
 		return fillUnnestedJoinResults(contractIDs, rows, keyFunc, onNotFound)

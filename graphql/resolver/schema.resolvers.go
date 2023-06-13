@@ -172,7 +172,7 @@ func (r *commentOnFeedEventPayloadResolver) FeedEvent(ctx context.Context, obj *
 func (r *communityResolver) Creator(ctx context.Context, obj *model.Community) (model.GalleryUserOrAddress, error) {
 	creator, err := publicapi.For(ctx).Contract.GetContractCreatorByContractID(ctx, obj.Dbid)
 	if err != nil {
-		if _, ok := err.(persist.ErrContractOwnerNotFound); ok {
+		if _, ok := err.(persist.ErrContractCreatorNotFound); ok {
 			return nil, nil
 		}
 		return nil, err

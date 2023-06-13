@@ -41,19 +41,3 @@ type ErrMediaNotFound struct {
 func (e ErrMediaNotFound) Error() string {
 	return fmt.Sprintf("no media found for tokenID %s", e.TokenID)
 }
-
-type ErrTokenOwnershipNotFound struct {
-	TokenID DBID
-}
-
-func (e ErrTokenOwnershipNotFound) Error() string {
-	return fmt.Sprintf("TokenOwner not found for tokenID %s", e.TokenID)
-}
-
-type ErrContractOwnerNotFound struct {
-	ContractID DBID
-}
-
-func (e ErrContractOwnerNotFound) Error() string {
-	return fmt.Sprintf("ContractOwner not found for contractID %s", e.ContractID)
-}

@@ -966,3 +966,19 @@ func (t TokenOwnershipType) MarshalGQL(w io.Writer) {
 		w.Write([]byte(`"creator"`))
 	}
 }
+
+type ErrTokenOwnershipNotFound struct {
+	TokenID DBID
+}
+
+func (e ErrTokenOwnershipNotFound) Error() string {
+	return fmt.Sprintf("TokenOwnership not found for tokenID %s", e.TokenID)
+}
+
+type ErrContractCreatorNotFound struct {
+	ContractID DBID
+}
+
+func (e ErrContractCreatorNotFound) Error() string {
+	return fmt.Sprintf("ContractCreator not found for contractID %s", e.ContractID)
+}
