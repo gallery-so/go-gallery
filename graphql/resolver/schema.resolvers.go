@@ -170,7 +170,7 @@ func (r *commentOnFeedEventPayloadResolver) FeedEvent(ctx context.Context, obj *
 
 // Creator is the resolver for the creator field.
 func (r *communityResolver) Creator(ctx context.Context, obj *model.Community) (model.GalleryUserOrAddress, error) {
-	creator, err := publicapi.For(ctx).Contract.GetContractOwnerByContractID(ctx, obj.Dbid)
+	creator, err := publicapi.For(ctx).Contract.GetContractCreatorByContractID(ctx, obj.Dbid)
 	if err != nil {
 		if _, ok := err.(persist.ErrContractOwnerNotFound); ok {
 			return nil, nil
@@ -1521,6 +1521,29 @@ func (r *mutationResolver) MintPremiumCardToWallet(ctx context.Context, input mo
 	}
 
 	return model.MintPremiumCardToWalletPayload{Tx: tx}, nil
+}
+
+// SetCommunityOverrideCreator is the resolver for the setCommunityOverrideCreator field.
+func (r *mutationResolver) SetCommunityOverrideCreator(ctx context.Context, communityID persist.DBID, creatorUserID *persist.DBID) (model.SetCommunityOverrideCreatorPayloadOrError, error) {
+	if creatorUserID == nil {
+		err := publicapi.For(ctx).Admin.RemoveContractOverrideCreator(ctx, communityID)
+		if err != nil {
+			return nil, err
+		}
+		return model.SetCommunityOverrideCreatorPayload{User: nil}, nil
+	}
+
+	user, err := publicapi.For(ctx).User.GetUserById(ctx, *creatorUserID)
+	if err != nil {
+		return nil, err
+	}
+
+	err = publicapi.For(ctx).Admin.SetContractOverrideCreator(ctx, communityID, *creatorUserID)
+	if err != nil {
+		return nil, err
+	}
+
+	return model.SetCommunityOverrideCreatorPayload{User: userToModel(ctx, *user)}, nil
 }
 
 // UploadPersistedQueries is the resolver for the uploadPersistedQueries field.

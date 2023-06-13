@@ -1,4 +1,4 @@
-alter table contracts add column if not exists override_owner_user_id varchar(255);
+alter table contracts add column if not exists override_creator_user_id varchar(255);
 
 create view contract_creators as
     -- This view is essentially making its own nullable types because sqlc doesn't generate appropriate
@@ -18,9 +18,9 @@ create view contract_creators as
         left join users u on
             u.deleted = false and
             (
-                c.override_owner_user_id = u.id
+                c.override_creator_user_id = u.id
                 or
-                (c.override_owner_user_id is null and w.address is not null and coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) = w.address and array[w.id] <@ u.wallets)
+                (c.override_creator_user_id is null and w.address is not null and coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) = w.address and array[w.id] <@ u.wallets)
             )
         where c.deleted = false;
 

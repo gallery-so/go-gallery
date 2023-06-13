@@ -1223,3 +1223,9 @@ update sessions set invalidated = true, active_until = least(active_until, now()
 
 -- name: UpdateTokenMetadataFieldsByTokenIdentifiers :exec
 update tokens set name = @name, description = @description, last_updated = now() where token_id = @token_id and contract = (select id from contracts where address = @contract_address) and deleted = false;
+
+-- name: SetContractOverrideCreator :exec
+update contracts set override_creator_user_id = @creator_user_id where id = @contract_id and deleted = false;
+
+-- name: RemoveContractOverrideCreator :exec
+update contracts set override_creator_user_id = null where id = @contract_id and deleted = false;

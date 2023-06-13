@@ -59,23 +59,23 @@ type Comment struct {
 }
 
 type Contract struct {
-	ID                   persist.DBID
-	Deleted              bool
-	Version              sql.NullInt32
-	CreatedAt            time.Time
-	LastUpdated          time.Time
-	Name                 sql.NullString
-	Symbol               sql.NullString
-	Address              persist.Address
-	CreatorAddress       persist.Address
-	Chain                persist.Chain
-	ProfileBannerUrl     sql.NullString
-	ProfileImageUrl      sql.NullString
-	BadgeUrl             sql.NullString
-	Description          sql.NullString
-	OwnerAddress         persist.Address
-	IsProviderMarkedSpam bool
-	OverrideOwnerUserID  persist.DBID
+	ID                    persist.DBID
+	Deleted               bool
+	Version               sql.NullInt32
+	CreatedAt             time.Time
+	LastUpdated           time.Time
+	Name                  sql.NullString
+	Symbol                sql.NullString
+	Address               persist.Address
+	CreatorAddress        persist.Address
+	Chain                 persist.Chain
+	ProfileBannerUrl      sql.NullString
+	ProfileImageUrl       sql.NullString
+	BadgeUrl              sql.NullString
+	Description           sql.NullString
+	OwnerAddress          persist.Address
+	IsProviderMarkedSpam  bool
+	OverrideCreatorUserID persist.DBID
 }
 
 type ContractCreator struct {

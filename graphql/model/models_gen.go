@@ -226,6 +226,10 @@ type SearchUsersPayloadOrError interface {
 	IsSearchUsersPayloadOrError()
 }
 
+type SetCommunityOverrideCreatorPayloadOrError interface {
+	IsSetCommunityOverrideCreatorPayloadOrError()
+}
+
 type SetSpamPreferencePayloadOrError interface {
 	IsSetSpamPreferencePayloadOrError()
 }
@@ -947,6 +951,7 @@ func (ErrNotAuthorized) IsUploadPersistedQueriesPayloadOrError()       {}
 func (ErrNotAuthorized) IsSyncTokensForUsernamePayloadOrError()        {}
 func (ErrNotAuthorized) IsBanUserFromFeedPayloadOrError()              {}
 func (ErrNotAuthorized) IsUnbanUserFromFeedPayloadOrError()            {}
+func (ErrNotAuthorized) IsSetCommunityOverrideCreatorPayloadOrError()  {}
 func (ErrNotAuthorized) IsCreateGalleryPayloadOrError()                {}
 func (ErrNotAuthorized) IsUpdateGalleryInfoPayloadOrError()            {}
 func (ErrNotAuthorized) IsUpdateGalleryHiddenPayloadOrError()          {}
@@ -1537,6 +1542,12 @@ type SearchUsersPayload struct {
 }
 
 func (SearchUsersPayload) IsSearchUsersPayloadOrError() {}
+
+type SetCommunityOverrideCreatorPayload struct {
+	User *GalleryUser `json:"user"`
+}
+
+func (SetCommunityOverrideCreatorPayload) IsSetCommunityOverrideCreatorPayloadOrError() {}
 
 type SetSpamPreferenceInput struct {
 	Tokens []persist.DBID `json:"tokens"`

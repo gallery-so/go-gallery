@@ -80,7 +80,7 @@ func (api ContractAPI) GetContractsByUserID(ctx context.Context, userID persist.
 	return contracts, nil
 }
 
-func (api ContractAPI) GetContractOwnerByContractID(ctx context.Context, contractID persist.DBID) (db.ContractCreator, error) {
+func (api ContractAPI) GetContractCreatorByContractID(ctx context.Context, contractID persist.DBID) (db.ContractCreator, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"contractID": {contractID, "required"},
