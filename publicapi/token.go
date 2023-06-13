@@ -261,11 +261,13 @@ func isAdminUser(userID persist.DBID) bool {
 }
 
 func (api TokenAPI) SyncTokensAdmin(ctx context.Context, chains []persist.Chain, userID persist.DBID) error {
-	if err := api.throttler.Lock(ctx, userID.String()); err != nil {
+	key := fmt.Sprintf("sync:owned:%s", userID.String())
+
+	if err := api.throttler.Lock(ctx, key); err != nil {
 		return ErrTokenRefreshFailed{Message: err.Error()}
 	}
 
-	defer api.throttler.Unlock(ctx, userID.String())
+	defer api.throttler.Unlock(ctx, key)
 
 	if err := api.multichainProvider.SyncTokens(ctx, userID, chains); err != nil {
 		// Wrap all OpenSea sync failures in a generic type that can be returned to the frontend as an expected error type
@@ -282,10 +284,12 @@ func (api TokenAPI) SyncTokens(ctx context.Context, chains []persist.Chain) erro
 		return err
 	}
 
-	if err := api.throttler.Lock(ctx, userID.String()); err != nil {
+	key := fmt.Sprintf("sync:owned:%s", userID.String())
+
+	if err := api.throttler.Lock(ctx, key); err != nil {
 		return ErrTokenRefreshFailed{Message: err.Error()}
 	}
-	defer api.throttler.Unlock(ctx, userID.String())
+	defer api.throttler.Unlock(ctx, key)
 
 	err = api.multichainProvider.SyncTokens(ctx, userID, chains)
 	if err != nil {
@@ -302,10 +306,12 @@ func (api TokenAPI) SyncTokensCreatedByUser(ctx context.Context, includeChains [
 		return err
 	}
 
-	if err := api.throttler.Lock(ctx, userID.String()); err != nil {
+	key := fmt.Sprintf("sync:created:%s", userID.String())
+
+	if err := api.throttler.Lock(ctx, key); err != nil {
 		return ErrTokenRefreshFailed{Message: err.Error()}
 	}
-	defer api.throttler.Unlock(ctx, userID.String())
+	defer api.throttler.Unlock(ctx, key)
 
 	return api.multichainProvider.SyncTokensCreatedOnSharedContracts(ctx, userID, includeChains)
 }
