@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/lib/pq"
 
@@ -206,11 +207,11 @@ type EthereumTokenIdentifiers string
 
 // Token represents an individual Token token
 type Token struct {
-	Version      NullInt32       `json:"version"` // schema version for this model
-	ID           DBID            `json:"id" binding:"required"`
-	CreationTime CreationTime    `json:"created_at"`
-	Deleted      NullBool        `json:"-"`
-	LastUpdated  LastUpdatedTime `json:"last_updated"`
+	Version      NullInt32 `json:"version"` // schema version for this model
+	ID           DBID      `json:"id" binding:"required"`
+	CreationTime time.Time `json:"created_at"`
+	Deleted      NullBool  `json:"-"`
+	LastUpdated  time.Time `json:"last_updated"`
 
 	TokenType TokenType `json:"token_type"`
 

@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v4"
-
 	"github.com/jackc/pgtype"
+	"github.com/jackc/pgx/v4"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -726,7 +727,7 @@ func (api UserAPI) SharedFollowers(ctx context.Context, userID persist.DBID, bef
 		}
 	}
 
-	return users, pageInfo, nil
+	return users, pageInfo, err
 }
 
 func (api UserAPI) SharedCommunities(ctx context.Context, userID persist.DBID, before, after *string, first, last *int) ([]db.Contract, PageInfo, error) {
@@ -805,7 +806,71 @@ func (api UserAPI) SharedCommunities(ctx context.Context, userID persist.DBID, b
 		}
 	}
 
-	return contracts, pageInfo, nil
+	return contracts, pageInfo, err
+}
+
+func (api UserAPI) CreatedCommunities(ctx context.Context, userID persist.DBID, includeChains []persist.Chain, before, after *string, first, last *int) ([]db.Contract, PageInfo, error) {
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"userID": {userID, "required"},
+	}); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	queryFunc := func(params timeIDPagingParams) ([]any, error) {
+		serializedChains := make([]string, len(includeChains))
+		for i, c := range includeChains {
+			serializedChains[i] = strconv.Itoa(int(c))
+		}
+		keys, err := api.loaders.ContractsLoaderByCreatorID.Load(db.GetCreatedContractsBatchPaginateParams{
+			UserID:           userID,
+			Chains:           strings.Join(serializedChains, ","),
+			CurBeforeTime:    params.CursorBeforeTime,
+			CurBeforeID:      params.CursorBeforeID,
+			CurAfterTime:     params.CursorAfterTime,
+			CurAfterID:       params.CursorAfterID,
+			PagingForward:    params.PagingForward,
+			Limit:            params.Limit,
+			IncludeAllChains: len(includeChains) == 0,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		results := make([]any, len(keys))
+		for i, key := range keys {
+			results[i] = key
+		}
+
+		return results, nil
+	}
+
+	cursorFunc := func(node any) (time.Time, persist.DBID, error) {
+		if row, ok := node.(db.Contract); ok {
+			return row.CreatedAt, row.ID, nil
+		}
+		return time.Time{}, "", fmt.Errorf("node is not a db.Contract")
+	}
+
+	paginator := timeIDPaginator{
+		QueryFunc:  queryFunc,
+		CursorFunc: cursorFunc,
+	}
+
+	results, pageInfo, err := paginator.paginate(before, after, first, last)
+	if err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	contracts := make([]db.Contract, len(results))
+	for i, result := range results {
+		contracts[i] = result.(db.Contract)
+	}
+
+	return contracts, pageInfo, err
 }
 
 func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {

@@ -4,21 +4,22 @@ import (
 	"context"
 	"database/sql/driver"
 	"encoding/json"
+	"time"
 
 	"github.com/lib/pq"
 )
 
 // MembershipTier represents the membership tier of a user
 type MembershipTier struct {
-	Version      NullInt32       `json:"version"` // schema version for this model
-	ID           DBID            `json:"id" binding:"required"`
-	CreationTime CreationTime    `json:"created_at"`
-	Deleted      NullBool        `json:"-"`
-	LastUpdated  LastUpdatedTime `json:"last_updated"`
-	Name         NullString      `json:"name"`
-	TokenID      TokenID         `json:"token_id"`
-	AssetURL     NullString      `json:"asset_url"`
-	Owners       []TokenHolder   `json:"owners"`
+	Version      NullInt32     `json:"version"` // schema version for this model
+	ID           DBID          `json:"id" binding:"required"`
+	CreationTime time.Time     `json:"created_at"`
+	Deleted      NullBool      `json:"-"`
+	LastUpdated  time.Time     `json:"last_updated"`
+	Name         NullString    `json:"name"`
+	TokenID      TokenID       `json:"token_id"`
+	AssetURL     NullString    `json:"asset_url"`
+	Owners       []TokenHolder `json:"owners"`
 }
 
 // TokenHolder represents a user who owns a membership card

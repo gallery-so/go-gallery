@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/lib/pq"
 )
@@ -34,31 +35,31 @@ var AllSocialProviders = []SocialProvider{
 
 // User represents a user with all of their addresses
 type User struct {
-	Version            NullInt32       `json:"version"` // schema version for this model
-	ID                 DBID            `json:"id" binding:"required"`
-	CreationTime       CreationTime    `json:"created_at"`
-	Deleted            NullBool        `json:"-"`
-	LastUpdated        LastUpdatedTime `json:"last_updated"`
-	Username           NullString      `json:"username"` // mutable
-	UsernameIdempotent NullString      `json:"username_idempotent"`
-	Wallets            []Wallet        `json:"wallets"`
-	Bio                NullString      `json:"bio"`
-	Traits             Traits          `json:"traits"`
-	Universal          NullBool        `json:"universal"`
-	PrimaryWalletID    NullString      `json:"primary_wallet_id"`
+	Version            NullInt32  `json:"version"` // schema version for this model
+	ID                 DBID       `json:"id" binding:"required"`
+	CreationTime       time.Time  `json:"created_at"`
+	Deleted            NullBool   `json:"-"`
+	LastUpdated        time.Time  `json:"last_updated"`
+	Username           NullString `json:"username"` // mutable
+	UsernameIdempotent NullString `json:"username_idempotent"`
+	Wallets            []Wallet   `json:"wallets"`
+	Bio                NullString `json:"bio"`
+	Traits             Traits     `json:"traits"`
+	Universal          NullBool   `json:"universal"`
+	PrimaryWalletID    NullString `json:"primary_wallet_id"`
 }
 
 // UserUpdateInfoInput represents the data to be updated when updating a user
 type UserUpdateInfoInput struct {
-	LastUpdated        LastUpdatedTime `json:"last_updated"`
-	Username           NullString      `json:"username"`
-	UsernameIdempotent NullString      `json:"username_idempotent"`
-	Bio                NullString      `json:"bio"`
+	LastUpdated        time.Time  `json:"last_updated"`
+	Username           NullString `json:"username"`
+	UsernameIdempotent NullString `json:"username_idempotent"`
+	Bio                NullString `json:"bio"`
 }
 
 // UserUpdateNotificationSettings represents the data to be updated when updating a user's notification settings
 type UserUpdateNotificationSettings struct {
-	LastUpdated          LastUpdatedTime          `json:"last_updated"`
+	LastUpdated          time.Time                `json:"last_updated"`
 	NotificationSettings UserNotificationSettings `json:"notification_settings"`
 }
 

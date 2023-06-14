@@ -117,26 +117,47 @@ func (c *ContractGalleryRepository) UpsertByAddress(pCtx context.Context, pAddre
 }
 
 // BulkUpsert bulk upserts the contracts by address
-func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, pContracts []persist.ContractGallery) error {
+func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, pContracts []persist.ContractGallery) ([]persist.ContractGallery, error) {
 	if len(pContracts) == 0 {
-		return nil
-	}
-	pContracts = removeDuplicateContractsGallery(pContracts)
-	sqlStr := `INSERT INTO contracts (ID,VERSION,ADDRESS,SYMBOL,NAME,OWNER_ADDRESS,CHAIN) VALUES `
-	vals := make([]interface{}, 0, len(pContracts)*7)
-	for i, contract := range pContracts {
-		sqlStr += generateValuesPlaceholders(7, i*7, nil)
-		vals = append(vals, persist.GenerateID(), contract.Version, contract.Address, contract.Symbol, contract.Name, contract.OwnerAddress, contract.Chain)
-		sqlStr += ","
-	}
-	sqlStr = sqlStr[:len(sqlStr)-1]
-	sqlStr += ` ON CONFLICT (ADDRESS, CHAIN) DO UPDATE SET SYMBOL = EXCLUDED.SYMBOL,NAME = EXCLUDED.NAME,OWNER_ADDRESS = EXCLUDED.OWNER_ADDRESS,CHAIN = EXCLUDED.CHAIN;`
-	_, err := c.db.ExecContext(pCtx, sqlStr, vals...)
-	if err != nil {
-		return fmt.Errorf("error bulk upserting contracts: %v - SQL: %s -- VALS: %+v", err, sqlStr, vals)
+		return []persist.ContractGallery{}, nil
 	}
 
-	return nil
+	contracts := removeDuplicateContractsGallery(pContracts)
+	params := db.UpsertParentContractsParams{}
+
+	for i := range contracts {
+		c := &contracts[i]
+		params.Ids = append(params.Ids, persist.GenerateID().String())
+		params.Version = append(params.Version, c.Version.Int32())
+		params.Address = append(params.Address, c.Address.String())
+		params.Symbol = append(params.Symbol, c.Symbol.String())
+		params.Name = append(params.Name, c.Name.String())
+		params.OwnerAddress = append(params.OwnerAddress, c.OwnerAddress.String())
+		params.Chain = append(params.Chain, int32(c.Chain))
+		params.Description = append(params.Description, c.Description.String())
+	}
+
+	upserted, err := c.queries.UpsertParentContracts(pCtx, params)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(contracts) != len(upserted) {
+		panic(fmt.Sprintf("expected %d upserted contracts, got %d", len(contracts), len(upserted)))
+	}
+
+	// Update contracts with the existing data if the contract already exists.
+	// The remaining fields are skipped because the upsert logic ensures that the existing row is
+	// always replaced with the newer row.
+	for i := range contracts {
+		c := &contracts[i]
+		(*c).ID = upserted[i].ID
+		(*c).CreationTime = upserted[i].CreatedAt
+		(*c).CreatorAddress = upserted[i].CreatorAddress
+		(*c).ParentID = upserted[i].ParentID
+	}
+
+	return contracts, nil
 }
 
 func (c *ContractGalleryRepository) GetOwnersByAddress(ctx context.Context, contractAddr persist.Address, chain persist.Chain, limit, offset int) ([]persist.TokenHolder, error) {
@@ -233,22 +254,6 @@ func (c *ContractGalleryRepository) GetOwnersByAddress(ctx context.Context, cont
 
 	return result, nil
 
-}
-
-func removeDuplicates(pContracts []persist.Contract) []persist.Contract {
-	if len(pContracts) == 0 {
-		return pContracts
-	}
-	unique := map[persist.EthereumAddress]bool{}
-	result := make([]persist.Contract, 0, len(pContracts))
-	for _, v := range pContracts {
-		if unique[v.Address] {
-			continue
-		}
-		result = append(result, v)
-		unique[v.Address] = true
-	}
-	return result
 }
 
 func removeDuplicateContractsGallery(pContracts []persist.ContractGallery) []persist.ContractGallery {

@@ -21,7 +21,7 @@ import (
 	"github.com/sourcegraph/conc/pool"
 
 	"github.com/gammazero/workerpool"
-	"github.com/mikeydub/go-gallery/db/gen/coredb"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
@@ -40,7 +40,7 @@ type SendTokens func(context.Context, task.TokenProcessingUserMessage) error
 
 type Provider struct {
 	Repos   *postgres.Repositories
-	Queries *coredb.Queries
+	Queries *db.Queries
 	Cache   *redis.Cache
 	Chains  map[persist.Chain][]any
 	// some chains use the addresses of other chains, this will map of chain we want tokens from => chain that's address will be used for lookup
@@ -125,11 +125,6 @@ type TokenHolder struct {
 	PreviewTokens []string        `json:"preview_tokens"`
 }
 
-// ErrChainNotFound is an error that occurs when a chain provider for a given chain is not registered in the MultichainProvider
-type ErrChainNotFound struct {
-	Chain persist.Chain
-}
-
 type chainTokens struct {
 	priority int
 	chain    persist.Chain
@@ -179,6 +174,15 @@ type TokensContractFetcher interface {
 	GetTokensByContractAddressAndOwner(ctx context.Context, owner persist.Address, contract persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error)
 }
 
+type ChildContractFetcher interface {
+	GetChildContractsCreatedOnSharedContract(ctx context.Context, creatorAddress persist.Address) ([]ParentToChildEdge, error)
+}
+
+type OpenSeaChildContractFetcher interface {
+	ChildContractFetcher
+	IsOpenSea()
+}
+
 // ContractRefresher supports refreshes of a contract
 type ContractRefresher interface {
 	RefreshContract(context.Context, persist.Address) error
@@ -199,20 +203,42 @@ type ProviderSupplier interface {
 
 type ChainOverrideMap = map[persist.Chain]*persist.Chain
 
-func getChainProvidersForTask[T any](providers []any) []T {
-	result := make([]T, 0, len(providers))
+// providersMatchingInterface returns providers that adhere to the given interface
+func providersMatchingInterface[T any](providers []any) []T {
+	matches := make([]T, 0)
 	for _, p := range providers {
-		if provider, ok := p.(T); ok {
-			result = append(result, provider)
-		} else if subproviders, ok := p.(ProviderSupplier); ok {
-			for _, subprovider := range subproviders.GetSubproviders() {
-				if provider, ok := subprovider.(T); ok {
-					result = append(result, provider)
-				}
+		if it, ok := p.(T); ok {
+			matches = append(matches, it)
+		}
+	}
+	return matches
+}
+
+// matchingProvidersByChain returns providers that adhere to the given interface by chain
+func matchingProvidersByChain[T any](availableProviders map[persist.Chain][]any, requestedChains ...persist.Chain) map[persist.Chain][]T {
+	matches := make(map[persist.Chain][]T, 0)
+	for _, chain := range requestedChains {
+		matching := providersMatchingInterface[T](availableProviders[chain])
+		matches[chain] = matching
+	}
+	return matches
+}
+
+func matchingProvidersForChain[T any](availableProviders map[persist.Chain][]any, chain persist.Chain) []T {
+	return matchingProvidersByChain[T](availableProviders, chain)[chain]
+}
+
+// matchingAddresses returns wallet addresses that belong to any of the passed chains
+func matchingAddresses(wallets []persist.Wallet, chains []persist.Chain) map[persist.Chain][]persist.Address {
+	matches := make(map[persist.Chain][]persist.Address)
+	for _, chain := range chains {
+		for _, wallet := range wallets {
+			if wallet.Chain == chain {
+				matches[chain] = append(matches[chain], wallet.Address)
 			}
 		}
 	}
-	return result
+	return matches
 }
 
 // SyncTokens updates the media for all tokens for a user
@@ -223,11 +249,6 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 	user, err := p.Repos.UserRepository.GetByID(ctx, userID)
 	if err != nil {
 		return err
-	}
-
-	validChainsLookup := make(map[persist.Chain]bool)
-	for _, chain := range chains {
-		validChainsLookup[chain] = true
 	}
 
 	errChan := make(chan error)
@@ -254,13 +275,7 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 			addr := addr
 			chain := chain
 			wg.Go(func() {
-				providers, err := p.getProvidersForChain(chain)
-				if err != nil {
-					errChan <- err
-					return
-				}
-
-				tokenFetchers := getChainProvidersForTask[TokensOwnerFetcher](providers)
+				tokenFetchers := matchingProvidersForChain[TokensOwnerFetcher](p.Chains, chain)
 				subWg := &conc.WaitGroup{}
 				for i, p := range tokenFetchers {
 					fetcher := p
@@ -269,11 +284,9 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 					subWg.Go(func() {
 						tokens, contracts, err := fetcher.GetTokensByWalletAddress(ctx, addr, 0, 0)
 						if err != nil {
-							errChan <- err
+							errChan <- errWithPriority{err: err, priority: priority}
 							return
 						}
-
-						logger.For(ctx).Infof("got %d tokens and %d contracts from provider %d", len(tokens), len(contracts), priority)
 
 						incomingTokens <- chainTokens{chain: chain, tokens: tokens, priority: priority}
 						incomingContracts <- chainContracts{chain: chain, contracts: contracts, priority: priority}
@@ -321,20 +334,134 @@ outer:
 		logger.For(ctx).Debugf("discrepency: %+v", discrepencyLog)
 	}
 
-	addressToContract, err := p.processContracts(ctx, contractsFromProviders)
+	persistedContracts, err := p.processContracts(ctx, contractsFromProviders)
 	if err != nil {
 		return err
 	}
 
-	_, err = p.processTokensForUser(ctx, tokensFromProviders, addressToContract, user, chains, false)
+	_, err = p.ReplaceTokensForUser(ctx, tokensFromProviders, persistedContracts, user, chains)
 	return err
 }
 
-func (p *Provider) prepTokensForTokenProcessing(ctx context.Context, tokensFromProviders []chainTokens, addressToContract map[string]persist.DBID, user persist.User) ([]persist.TokenGallery, map[persist.TokenIdentifiers]bool, error) {
-	providerTokens, err := tokensToNewDedupedTokens(ctx, tokensFromProviders, addressToContract, user)
-	if err != nil {
-		return nil, nil, err
+type ProviderChildContractResult struct {
+	Priority int
+	Chain    persist.Chain
+	Edges    []ParentToChildEdge
+}
+
+type ParentToChildEdge struct {
+	Parent   ChainAgnosticContract // Providers may optionally provide the parent if its convenient to do so
+	Children []ChildContract
+}
+
+type ChildContract struct {
+	ChildID        string // Uniquely identifies a child contract within a parent contract
+	Name           string
+	Description    string
+	OwnerAddress   persist.Address
+	CreatorAddress persist.Address
+	Tokens         []ChainAgnosticToken
+}
+
+// combinedProviderChildContractResults is a helper for combining results from multiple providers
+type combinedProviderChildContractResults []ProviderChildContractResult
+
+func (c combinedProviderChildContractResults) ParentContracts() []persist.ContractGallery {
+	combined := make([]chainContracts, 0)
+	for _, result := range c {
+		contracts := make([]ChainAgnosticContract, 0)
+		for _, edge := range result.Edges {
+			contracts = append(contracts, edge.Parent)
+		}
+		combined = append(combined, chainContracts{
+			priority:  result.Priority,
+			chain:     result.Chain,
+			contracts: contracts,
+		})
 	}
+	return contractsToNewDedupedContracts(combined)
+}
+
+// SyncTokensCreatedOnSharedContracts queries each provider to identify contracts created by the given user.
+func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userID persist.DBID, chains []persist.Chain) error {
+	user, err := p.Repos.UserRepository.GetByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	if len(chains) == 0 {
+		for chain := range p.Chains {
+			chains = append(chains, chain)
+		}
+	}
+
+	fetchers := matchingProvidersByChain[ChildContractFetcher](p.Chains, chains...)
+	searchAddresses := matchingAddresses(user.Wallets, chains)
+	providerPool := pool.NewWithResults[ProviderChildContractResult]().WithContext(ctx).WithCancelOnError()
+
+	// Fetch all tokens created by the user
+	for chain, addresses := range searchAddresses {
+		for priority, fetcher := range fetchers[chain] {
+			for _, address := range addresses {
+				c := chain
+				p := priority
+				f := fetcher
+				a := address
+				providerPool.Go(func(ctx context.Context) (ProviderChildContractResult, error) {
+					contractEdges, err := f.GetChildContractsCreatedOnSharedContract(ctx, a)
+					if err != nil {
+						return ProviderChildContractResult{}, err
+					}
+					return ProviderChildContractResult{
+						Priority: p,
+						Chain:    c,
+						Edges:    contractEdges,
+					}, nil
+				})
+			}
+		}
+	}
+
+	pResult, err := providerPool.Wait()
+	if err != nil {
+		return err
+	}
+
+	combinedResult := combinedProviderChildContractResults(pResult)
+
+	parentContracts, err := p.Repos.ContractRepository.BulkUpsert(ctx, combinedResult.ParentContracts())
+	if err != nil {
+		return err
+	}
+
+	contractToDBID := make(map[persist.ContractIdentifiers]persist.DBID)
+	for _, c := range parentContracts {
+		contractToDBID[c.ContractIdentifiers()] = c.ID
+	}
+
+	params := db.UpsertChildContractsParams{}
+
+	for _, result := range combinedResult {
+		for _, edge := range result.Edges {
+			for _, child := range edge.Children {
+				params.ID = append(params.ID, persist.GenerateID().String())
+				params.Name = append(params.Name, child.Name)
+				params.Address = append(params.Address, child.ChildID)
+				params.CreatorAddress = append(params.CreatorAddress, child.CreatorAddress.String())
+				params.OwnerAddress = append(params.OwnerAddress, child.OwnerAddress.String())
+				params.Chain = append(params.Chain, int32(result.Chain))
+				params.Description = append(params.Description, child.Description)
+				params.ParentIds = append(params.ParentIds, contractToDBID[persist.NewContractIdentifiers(edge.Parent.Address, result.Chain)].String())
+			}
+		}
+	}
+
+	_, err = p.Queries.UpsertChildContracts(ctx, params)
+	return err
+}
+
+func (p *Provider) prepTokensForTokenProcessing(ctx context.Context, tokensFromProviders []chainTokens, contracts []persist.ContractGallery, user persist.User) ([]persist.TokenGallery, map[persist.TokenIdentifiers]bool, error) {
+	providerTokens, _ := tokensToNewDedupedTokens(tokensFromProviders, contracts, user)
 
 	currentTokens, err := p.Repos.TokenRepository.GetByUserID(ctx, user.ID, 0, 0)
 	if err != nil {
@@ -377,13 +504,13 @@ func (p *Provider) prepTokensForTokenProcessing(ctx context.Context, tokensFromP
 	return providerTokens, newTokens, nil
 }
 
-func (p *Provider) processTokensForOwnersOfContract(ctx context.Context, contractID persist.DBID, chain persist.Chain, users map[persist.DBID]persist.User, chainTokensForUsers map[persist.DBID][]chainTokens, addressToContract map[string]persist.DBID) error {
+func (p *Provider) processTokensForOwnersOfContract(ctx context.Context, contractID persist.DBID, chain persist.Chain, users map[persist.DBID]persist.User, chainTokensForUsers map[persist.DBID][]chainTokens, contracts []persist.ContractGallery) error {
 	tokensToUpsert := make([]persist.TokenGallery, 0, len(chainTokensForUsers)*3)
 	userTokenOffsets := make(map[persist.DBID][2]int)
 	newUserTokens := make(map[persist.DBID]map[persist.TokenIdentifiers]bool)
 
 	for userID, user := range users {
-		tokens, newTokens, err := p.prepTokensForTokenProcessing(ctx, chainTokensForUsers[userID], addressToContract, user)
+		tokens, newTokens, err := p.prepTokensForTokenProcessing(ctx, chainTokensForUsers[userID], contracts, user)
 		if err != nil {
 			return err
 		}
@@ -428,8 +555,18 @@ func (p *Provider) processTokensForOwnersOfContract(ctx context.Context, contrac
 	return nil
 }
 
-func (p *Provider) processTokensForUser(ctx context.Context, tokensFromProviders []chainTokens, addressToContract map[string]persist.DBID, user persist.User, chains []persist.Chain, skipDelete bool) ([]persist.TokenGallery, error) {
-	dedupedTokens, newTokens, err := p.prepTokensForTokenProcessing(ctx, tokensFromProviders, addressToContract, user)
+// AddTokensToUser will append to a user's existing tokens
+func (p *Provider) AddTokensToUser(ctx context.Context, tokensFromProviders []chainTokens, contracts []persist.ContractGallery, user persist.User, chains []persist.Chain) ([]persist.TokenGallery, error) {
+	return p.processTokensForUser(ctx, tokensFromProviders, contracts, user, chains, true)
+}
+
+// ReplaceTokensForUser will replace a user's existing tokens with the new tokens
+func (p *Provider) ReplaceTokensForUser(ctx context.Context, tokensFromProviders []chainTokens, contracts []persist.ContractGallery, user persist.User, chains []persist.Chain) ([]persist.TokenGallery, error) {
+	return p.processTokensForUser(ctx, tokensFromProviders, contracts, user, chains, false)
+}
+
+func (p *Provider) processTokensForUser(ctx context.Context, tokensFromProviders []chainTokens, contracts []persist.ContractGallery, user persist.User, chains []persist.Chain, skipDelete bool) ([]persist.TokenGallery, error) {
+	dedupedTokens, newTokens, err := p.prepTokensForTokenProcessing(ctx, tokensFromProviders, contracts, user)
 	if err != nil {
 		return nil, err
 	}
@@ -535,12 +672,7 @@ func (p *Provider) GetTokensOfContractForWallet(ctx context.Context, contractAdd
 		return nil, err
 	}
 
-	providers, err := p.getProvidersForChain(wallet.Chain())
-	if err != nil {
-		return nil, err
-	}
-
-	contractFetchers := getChainProvidersForTask[TokensContractFetcher](providers)
+	contractFetchers := matchingProvidersForChain[TokensContractFetcher](p.Chains, wallet.Chain())
 
 	tokensFromProviders := make([]chainTokens, 0, len(contractFetchers))
 	contracts := make([]chainContracts, 0, len(contractFetchers))
@@ -563,12 +695,12 @@ func (p *Provider) GetTokensOfContractForWallet(ctx context.Context, contractAdd
 		})
 	}
 
-	addressToContract, err := p.processContracts(ctx, contracts)
+	persistedContracts, err := p.processContracts(ctx, contracts)
 	if err != nil {
 		return nil, err
 	}
 
-	return p.processTokensForUser(ctx, tokensFromProviders, addressToContract, user, []persist.Chain{wallet.Chain()}, true)
+	return p.AddTokensToUser(ctx, tokensFromProviders, persistedContracts, user, []persist.Chain{wallet.Chain()})
 }
 
 type FieldRequirementLevel int
@@ -624,9 +756,9 @@ func (f FieldRequest[T]) MatchesFilter(filter persist.TokenMetadata) bool {
 }
 
 // GetTokenMetadataByTokenIdentifiers will get the metadata for a given token identifier
-func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contractAddress persist.Address, tokenID persist.TokenID, chain persist.Chain, requestedFields []FieldRequest[string]) (persist.TokenMetadata, error) {
+func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contractAddress persist.Address, tokenID persist.TokenID, chain persist.Chain, requestedFields []FieldRequest[string]) (persist.TokenMetadata, error) {
 
-	metadataFetchers := getChainProvidersForTask[TokenMetadataFetcher](d.Chains[chain])
+	metadataFetchers := matchingProvidersForChain[TokenMetadataFetcher](p.Chains, chain)
 
 	if len(metadataFetchers) == 0 {
 		return nil, fmt.Errorf("no metadata fetchers for chain %d", chain)
@@ -689,11 +821,7 @@ metadatas:
 
 // VerifySignature verifies a signature for a wallet address
 func (p *Provider) VerifySignature(ctx context.Context, pSig string, pNonce string, pChainAddress persist.ChainPubKey, pWalletType persist.WalletType) (bool, error) {
-	providers, err := p.getProvidersForChain(pChainAddress.Chain())
-	if err != nil {
-		return false, err
-	}
-	verifiers := getChainProvidersForTask[Verifier](providers)
+	verifiers := matchingProvidersForChain[Verifier](p.Chains, pChainAddress.Chain())
 	for _, verifier := range verifiers {
 		if valid, err := verifier.VerifySignature(ctx, pChainAddress.PubKey(), pWalletType, pNonce, pSig); err != nil || !valid {
 			return false, err
@@ -704,19 +832,12 @@ func (p *Provider) VerifySignature(ctx context.Context, pSig string, pNonce stri
 
 // RefreshToken refreshes a token on the given chain using the chain provider for that chain
 func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers) error {
-	providers, err := p.getProvidersForChain(ti.Chain)
+	err := p.processTokenMedia(ctx, ti.TokenID, ti.ContractAddress, ti.Chain)
 	if err != nil {
 		return err
 	}
 
-	logger.For(ctx).Infof("refreshing token %s-%s-%d", ti.TokenID, ti.ContractAddress, ti.Chain)
-
-	err = p.processTokenMedia(ctx, ti.TokenID, ti.ContractAddress, ti.Chain)
-	if err != nil {
-		return err
-	}
-
-	tokenFetchers := getChainProvidersForTask[TokenDescriptorsFetcher](providers)
+	tokenFetchers := matchingProvidersForChain[TokenDescriptorsFetcher](p.Chains, ti.Chain)
 
 	finalTokenDescriptors := ChainAgnosticTokenDescriptors{}
 	finalContractDescriptors := ChainAgnosticContractDescriptors{}
@@ -753,7 +874,7 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 
 	}
 
-	if err := p.Queries.UpdateTokenMetadataFieldsByTokenIdentifiers(ctx, coredb.UpdateTokenMetadataFieldsByTokenIdentifiersParams{
+	if err := p.Queries.UpdateTokenMetadataFieldsByTokenIdentifiers(ctx, db.UpdateTokenMetadataFieldsByTokenIdentifiersParams{
 		Name:            util.ToNullString(finalTokenDescriptors.Name, true),
 		Description:     util.ToNullString(finalTokenDescriptors.Description, true),
 		TokenID:         ti.TokenID,
@@ -766,7 +887,7 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 		Chain:        ti.Chain,
 		Address:      persist.Address(ti.Chain.NormalizeAddress(ti.ContractAddress)),
 		Symbol:       persist.NullString(finalContractDescriptors.Symbol),
-		Name:         util.ToNullString(finalContractDescriptors.Name, true),
+		Name:         persist.NullString(finalContractDescriptors.Name),
 		OwnerAddress: finalContractDescriptors.CreatorAddress,
 	}); err != nil {
 		return err
@@ -776,12 +897,7 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 
 // RefreshContract refreshes a contract on the given chain using the chain provider for that chain
 func (p *Provider) RefreshContract(ctx context.Context, ci persist.ContractIdentifiers) error {
-	providers, err := p.getProvidersForChain(ci.Chain)
-	if err != nil {
-		return err
-	}
-
-	contractRefreshers := getChainProvidersForTask[ContractRefresher](providers)
+	contractRefreshers := matchingProvidersForChain[ContractRefresher](p.Chains, ci.Chain)
 	for _, refresher := range contractRefreshers {
 		if err := refresher.RefreshContract(ctx, ci.ContractAddress); err != nil {
 			return err
@@ -792,12 +908,7 @@ func (p *Provider) RefreshContract(ctx context.Context, ci persist.ContractIdent
 
 // RefreshTokensForContract refreshes all tokens in a given contract
 func (p *Provider) RefreshTokensForContract(ctx context.Context, ci persist.ContractIdentifiers) error {
-	providers, err := p.getProvidersForChain(ci.Chain)
-	if err != nil {
-		return err
-	}
-
-	contractRefreshers := getChainProvidersForTask[TokensContractFetcher](providers)
+	contractRefreshers := matchingProvidersForChain[TokensContractFetcher](p.Chains, ci.Chain)
 
 	tokensFromProviders := []chainTokens{}
 	contractsFromProviders := []chainContracts{}
@@ -806,9 +917,7 @@ func (p *Provider) RefreshTokensForContract(ctx context.Context, ci persist.Cont
 	errChan := make(chan errWithPriority)
 	done := make(chan struct{})
 	wg := &sync.WaitGroup{}
-
 	for i, fetcher := range contractRefreshers {
-
 		wg.Add(1)
 		go func(priority int, p TokensContractFetcher) {
 			defer wg.Done()
@@ -819,7 +928,6 @@ func (p *Provider) RefreshTokensForContract(ctx context.Context, ci persist.Cont
 			}
 			tokensReceive <- chainTokens{chain: ci.Chain, tokens: tokens, priority: priority}
 			contractsReceive <- chainContracts{chain: ci.Chain, contracts: []ChainAgnosticContract{contract}, priority: priority}
-
 		}(i, fetcher)
 	}
 	go func() {
@@ -853,12 +961,12 @@ outer:
 
 	logger.For(ctx).Debug("creating contracts")
 
-	addressToContract, err := p.processContracts(ctx, contractsFromProviders)
+	persistedContracts, err := p.processContracts(ctx, contractsFromProviders)
 	if err != nil {
 		return err
 	}
 
-	contract, err := p.Queries.GetContractByChainAddress(ctx, coredb.GetContractByChainAddressParams{
+	contract, err := p.Queries.GetContractByChainAddress(ctx, db.GetContractByChainAddressParams{
 		Address: ci.ContractAddress,
 		Chain:   ci.Chain,
 	})
@@ -866,16 +974,7 @@ outer:
 		return err
 	}
 
-	return p.processTokensForOwnersOfContract(ctx, contract.ID, ci.Chain, users, chainTokensForUsers, addressToContract)
-}
-
-func (d *Provider) getProvidersForChain(chain persist.Chain) ([]any, error) {
-	providers, ok := d.Chains[chain]
-	if !ok {
-		return nil, ErrChainNotFound{Chain: chain}
-	}
-
-	return providers, nil
+	return p.processTokensForOwnersOfContract(ctx, contract.ID, ci.Chain, users, chainTokensForUsers, persistedContracts)
 }
 
 type tokenUniqueIdentifiers struct {
@@ -916,7 +1015,7 @@ func (p *Provider) createUsersForTokens(ctx context.Context, tokens []chainToken
 
 	// get all current users
 
-	allCurrentUsers, err := p.Queries.GetUsersByChainAddresses(ctx, coredb.GetUsersByChainAddressesParams{
+	allCurrentUsers, err := p.Queries.GetUsersByChainAddresses(ctx, db.GetUsersByChainAddressesParams{
 		Addresses: ownerAddresses,
 		Chain:     int32(chain),
 	})
@@ -937,9 +1036,9 @@ func (p *Provider) createUsersForTokens(ctx context.Context, tokens []chainToken
 		addressesToUsers[string(user.Address)] = persist.User{
 			Version:            persist.NullInt32(user.Version.Int32),
 			ID:                 user.ID,
-			CreationTime:       persist.CreationTime(user.CreatedAt),
+			CreationTime:       user.CreatedAt,
 			Deleted:            persist.NullBool(user.Deleted),
-			LastUpdated:        persist.LastUpdatedTime(user.LastUpdated),
+			LastUpdated:        user.LastUpdated,
 			Username:           persist.NullString(user.Username.String),
 			UsernameIdempotent: persist.NullString(user.UsernameIdempotent.String),
 			Wallets:            user.Wallets,
@@ -954,12 +1053,7 @@ func (p *Provider) createUsersForTokens(ctx context.Context, tokens []chainToken
 	// create users for those that are not in the database
 
 	for _, chainToken := range tokens {
-		providers, err := p.getProvidersForChain(chainToken.chain)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		nameResolvers := getChainProvidersForTask[NameResolver](providers)
+		resolvers := matchingProvidersForChain[NameResolver](p.Chains, chainToken.chain)
 
 		for _, agnosticToken := range chainToken.tokens {
 			if agnosticToken.OwnerAddress == "" {
@@ -976,7 +1070,7 @@ func (p *Provider) createUsersForTokens(ctx context.Context, tokens []chainToken
 				user, ok := addressesToUsers[string(t.OwnerAddress)]
 				if !ok {
 					username := t.OwnerAddress.String()
-					for _, resolver := range nameResolvers {
+					for _, resolver := range resolvers {
 						doBreak := func() bool {
 							displayCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 							defer cancel()
@@ -1089,44 +1183,26 @@ outer:
 	return chainTokensForUser, users, nil
 }
 
-func (d *Provider) processContracts(ctx context.Context, contractsFromProviders []chainContracts) (map[string]persist.DBID, error) {
-	newContracts, err := contractsToNewDedupedContracts(ctx, contractsFromProviders)
-	if err != nil {
-		return nil, err
-	}
-
-	logger.For(ctx).Infof("upserting %d contracts", len(newContracts))
-
-	if err := d.Repos.ContractRepository.BulkUpsert(ctx, newContracts); err != nil {
-		return nil, fmt.Errorf("error upserting contracts: %s", err)
-	}
-	contractsForChain := map[persist.Chain][]persist.Address{}
-	for _, c := range newContracts {
-		if _, ok := contractsForChain[c.Chain]; !ok {
-			contractsForChain[c.Chain] = []persist.Address{}
-		}
-		contractsForChain[c.Chain] = append(contractsForChain[c.Chain], c.Address)
-	}
-
-	addressesToContracts := map[string]persist.DBID{}
-	for chain, addresses := range contractsForChain {
-		newContracts, err := d.Repos.ContractRepository.GetByAddresses(ctx, addresses, chain)
-		if err != nil {
-			return nil, fmt.Errorf("error fetching contracts: %s", err)
-		}
-		for _, c := range newContracts {
-			addressesToContracts[c.Chain.NormalizeAddress(c.Address)] = c.ID
-		}
-	}
-	return addressesToContracts, nil
+func (d *Provider) processContracts(ctx context.Context, contractsFromProviders []chainContracts) ([]persist.ContractGallery, error) {
+	newContracts := contractsToNewDedupedContracts(contractsFromProviders)
+	return d.Repos.ContractRepository.BulkUpsert(ctx, newContracts)
 }
 
-func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contractAddressIDs map[string]persist.DBID, ownerUser persist.User) ([]persist.TokenGallery, error) {
+func tokensToNewDedupedTokens(tokens []chainTokens, contracts []persist.ContractGallery, ownerUser persist.User) ([]persist.TokenGallery, map[persist.DBID]persist.Address) {
+	addressToDBID := make(map[string]persist.DBID)
+
+	util.Map(contracts, func(c persist.ContractGallery) (any, error) {
+		addressToDBID[c.Chain.NormalizeAddress(c.Address)] = c.ID
+		return nil, nil
+	})
+
 	seenTokens := make(map[persist.TokenIdentifiers]persist.TokenGallery)
 
 	seenWallets := make(map[persist.TokenIdentifiers][]persist.Wallet)
 	seenQuantities := make(map[persist.TokenIdentifiers]persist.HexString)
 	addressToWallets := make(map[string]persist.Wallet)
+	tokenDBIDToAddress := make(map[persist.DBID]persist.Address)
+
 	for _, wallet := range ownerUser.Wallets {
 		// could a normalized address ever overlap with the normalized address of another chain?
 		normalizedAddress := wallet.Chain.NormalizeAddress(wallet.Address)
@@ -1141,7 +1217,6 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 		for _, token := range chainToken.tokens {
 
 			if token.Quantity.BigInt().Cmp(big.NewInt(0)) == 0 {
-				logger.For(ctx).Warnf("skipping token %s with quantity 0", token.Descriptors.Name)
 				continue
 			}
 
@@ -1158,7 +1233,7 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 				OwnerUserID:          ownerUser.ID,
 				FallbackMedia:        token.FallbackMedia,
 				TokenMetadata:        token.TokenMetadata,
-				Contract:             contractAddressIDs[chainToken.chain.NormalizeAddress(token.ContractAddress)],
+				Contract:             addressToDBID[chainToken.chain.NormalizeAddress(token.ContractAddress)],
 				ExternalURL:          persist.NullString(token.ExternalURL),
 				BlockNumber:          token.BlockNumber,
 				IsProviderMarkedSpam: token.IsSpam,
@@ -1198,16 +1273,13 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 				seenWallets[ti] = dedupeWallets(seenWallets[ti])
 			}
 
-			ownership, err := addressAtBlockToAddressAtBlock(ctx, token.OwnershipHistory, chainToken.chain)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get ownership history for token: %s", err)
-			}
-
 			seenToken := seenTokens[ti]
+			ownership := fromMultichainToAddressAtBlock(token.OwnershipHistory)
 			seenToken.OwnershipHistory = ownership
 			seenToken.OwnedByWallets = seenWallets[ti]
 			seenToken.Quantity = seenQuantities[ti]
 			seenTokens[ti] = seenToken
+			tokenDBIDToAddress[seenTokens[ti].ID] = ti.ContractAddress
 		}
 	}
 
@@ -1230,11 +1302,10 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 		res[i] = t
 		i++
 	}
-
-	return res, nil
+	return res, tokenDBIDToAddress
 }
 
-func contractsToNewDedupedContracts(ctx context.Context, contracts []chainContracts) ([]persist.ContractGallery, error) {
+func contractsToNewDedupedContracts(contracts []chainContracts) []persist.ContractGallery {
 	seen := make(map[persist.ChainAddress]persist.ContractGallery)
 
 	sort.SliceStable(contracts, func(i, j int) bool {
@@ -1244,7 +1315,7 @@ func contractsToNewDedupedContracts(ctx context.Context, contracts []chainContra
 	for _, chainContract := range contracts {
 		for _, contract := range chainContract.contracts {
 			if it, ok := seen[persist.NewChainAddress(contract.Address, chainContract.chain)]; ok {
-				if it.Name.String != "" {
+				if it.Name.String() != "" {
 					continue
 				}
 			}
@@ -1252,7 +1323,7 @@ func contractsToNewDedupedContracts(ctx context.Context, contracts []chainContra
 				Chain:        chainContract.chain,
 				Address:      contract.Address,
 				Symbol:       persist.NullString(contract.Descriptors.Symbol),
-				Name:         util.ToNullString(contract.Descriptors.Name, true),
+				Name:         persist.NullString(contract.Descriptors.Name),
 				OwnerAddress: contract.Descriptors.CreatorAddress,
 				Description:  persist.NullString(contract.Descriptors.Description),
 			}
@@ -1264,25 +1335,8 @@ func contractsToNewDedupedContracts(ctx context.Context, contracts []chainContra
 	for _, c := range seen {
 		res = append(res, c)
 	}
-	return res, nil
-
-}
-
-func communityOwnersToTokenHolders(owners []ChainAgnosticCommunityOwner) []TokenHolder {
-	seen := make(map[persist.Address]TokenHolder)
-	for _, owner := range owners {
-		if _, ok := seen[owner.Address]; !ok {
-			seen[owner.Address] = TokenHolder{
-				Address: owner.Address,
-			}
-		}
-	}
-
-	res := make([]TokenHolder, 0, len(seen))
-	for _, t := range seen {
-		res = append(res, t)
-	}
 	return res
+
 }
 
 func tokenHoldersToTokenHolders(ctx context.Context, owners []persist.TokenHolder, userRepo *postgres.UserRepository) ([]TokenHolder, error) {
@@ -1317,24 +1371,16 @@ func tokenHoldersToTokenHolders(ctx context.Context, owners []persist.TokenHolde
 	return res, nil
 }
 
-func addressAtBlockToAddressAtBlock(ctx context.Context, addresses []ChainAgnosticAddressAtBlock, chain persist.Chain) ([]persist.AddressAtBlock, error) {
+func fromMultichainToAddressAtBlock(addresses []ChainAgnosticAddressAtBlock) []persist.AddressAtBlock {
 	res := make([]persist.AddressAtBlock, len(addresses))
 	for i, addr := range addresses {
-
-		res[i] = persist.AddressAtBlock{
-			Address: addr.Address,
-			Block:   addr.Block,
-		}
+		res[i] = persist.AddressAtBlock{Address: addr.Address, Block: addr.Block}
 	}
-	return res, nil
+	return res
 }
 
 func (t ChainAgnosticIdentifiers) String() string {
 	return fmt.Sprintf("%s-%s", t.ContractAddress, t.TokenID)
-}
-
-func (e ErrChainNotFound) Error() string {
-	return fmt.Sprintf("chain provider not found for chain: %d", e.Chain)
 }
 
 func (e errWithPriority) Error() string {

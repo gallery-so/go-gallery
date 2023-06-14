@@ -5,6 +5,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"time"
 )
 
 const (
@@ -22,9 +23,9 @@ const (
 type CollectionDB struct {
 	Version        NullInt32                        `json:"version"` // schema version for this model
 	ID             DBID                             `json:"id" binding:"required"`
-	CreationTime   CreationTime                     `json:"created_at"`
+	CreationTime   time.Time                        `json:"created_at"`
 	Deleted        NullBool                         `json:"-"`
-	LastUpdated    LastUpdatedTime                  `json:"last_updated"`
+	LastUpdated    time.Time                        `json:"last_updated"`
 	Layout         TokenLayout                      `json:"layout"`
 	Name           NullString                       `json:"name"`
 	CollectorsNote NullString                       `json:"collectors_note"`
@@ -42,9 +43,9 @@ type CollectionDB struct {
 type Collection struct {
 	Version        NullInt32                        `json:"version"` // schema version for this model
 	ID             DBID                             `json:"id" binding:"required"`
-	CreationTime   CreationTime                     `json:"created_at"`
+	CreationTime   time.Time                        `json:"created_at"`
 	Deleted        NullBool                         `json:"-"`
-	LastUpdated    LastUpdatedTime                  `json:"last_updated"`
+	LastUpdated    time.Time                        `json:"last_updated"`
 	Layout         TokenLayout                      `json:"layout"`
 	Name           NullString                       `json:"name"`
 	CollectorsNote NullString                       `json:"collectors_note"`
@@ -73,7 +74,7 @@ type CollectionSectionLayout struct {
 
 // CollectionUpdateInfoInput represents the data that will be changed when updating a collection's metadata
 type CollectionUpdateInfoInput struct {
-	LastUpdated LastUpdatedTime `json:"last_updated"`
+	LastUpdated time.Time `json:"last_updated"`
 
 	Name           NullString `json:"name"`
 	CollectorsNote NullString `json:"collectors_note"`
@@ -81,7 +82,7 @@ type CollectionUpdateInfoInput struct {
 
 // CollectionUpdateTokensInput represents the data that will be changed when updating a collection's NFTs
 type CollectionUpdateTokensInput struct {
-	LastUpdated   LastUpdatedTime                  `json:"last_updated"`
+	LastUpdated   time.Time                        `json:"last_updated"`
 	Tokens        []DBID                           `json:"tokens"`
 	Layout        TokenLayout                      `json:"layout"`
 	TokenSettings map[DBID]CollectionTokenSettings `json:"token_settings"`
@@ -90,14 +91,14 @@ type CollectionUpdateTokensInput struct {
 
 // CollectionUpdateHiddenInput represents the data that will be changed when updating a collection's hidden status
 type CollectionUpdateHiddenInput struct {
-	LastUpdated LastUpdatedTime `json:"last_updated"`
+	LastUpdated time.Time `json:"last_updated"`
 
 	Hidden NullBool `json:"hidden"`
 }
 
 // CollectionUpdateDeletedInput represents the data that will be changed when updating a collection's deleted status
 type CollectionUpdateDeletedInput struct {
-	LastUpdated LastUpdatedTime `json:"last_updated"`
+	LastUpdated time.Time `json:"last_updated"`
 
 	Deleted NullBool `json:"-"`
 }

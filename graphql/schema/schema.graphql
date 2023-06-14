@@ -99,6 +99,13 @@ type GalleryUser implements Node @goEmbedHelper {
   sharedCommunities(before: String, after: String, first: Int, last: Int): CommunitiesConnection
     @authRequired
     @goField(forceResolver: true)
+  createdCommunities(
+    input: CreatedCommunitiesInput!
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): CommunitiesConnection @goField(forceResolver: true)
 }
 
 type Wallet implements Node {
@@ -133,6 +140,16 @@ input ChainAddressInput {
 input ChainPubKeyInput {
   pubKey: PubKey! @goField(forceResolver: true)
   chain: Chain! @goField(forceResolver: true)
+}
+
+input CreatedCommunitiesInput {
+  # When includeChains is empty, returns all communities from all chains.
+  includeChains: [Chain!]
+}
+
+input SyncCreatedTokensInput {
+  # When includeChains is empty, returns all communities from all chains.
+  includeChains: [Chain!]
 }
 
 type Badge {
@@ -462,7 +479,7 @@ type TokenHolder @goEmbedHelper {
   displayName: String
   wallets: [Wallet] @goField(forceResolver: true)
   user: GalleryUser @goField(forceResolver: true)
-  previewTokens: [String]
+  previewTokens: [String] @goField(forceResolver: true)
 }
 
 type MembershipTier implements Node {
@@ -494,7 +511,11 @@ type TokenHoldersConnection {
   pageInfo: PageInfo!
 }
 
-type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) @goEmbedHelper {
+type CommunityLink {
+  node: Community
+}
+
+type Community implements Node @goEmbedHelper {
   dbid: DBID!
   id: ID!
 
@@ -503,6 +524,7 @@ type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) @g
   contract: Contract
   contractAddress: ChainAddress
   creatorAddress: ChainAddress
+  creator: GalleryUserOrAddress @goField(forceResolver: true)
   chain: Chain
   name: String
   description: String
@@ -510,6 +532,9 @@ type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) @g
   profileImageURL: String
   profileBannerURL: String
   badgeURL: String
+  parentCommunity: CommunityLink @goField(forceResolver: true)
+  subCommunities(before: String, after: String, first: Int, last: Int): CommunitiesConnection
+    @goField(forceResolver: true)
 
   tokensInCommunity(
     before: String
@@ -1321,6 +1346,12 @@ type SyncTokensPayload {
   viewer: Viewer
 }
 
+union SyncCreatedTokensPayloadOrError = SyncCreatedTokensPayload | ErrNotAuthorized | ErrSyncFailed
+
+type SyncCreatedTokensPayload {
+  viewer: Viewer
+}
+
 union RefreshTokenPayloadOrError = RefreshTokenPayload | ErrInvalidInput | ErrSyncFailed
 
 type RefreshTokenPayload {
@@ -2122,6 +2153,7 @@ type Mutation {
   setSpamPreference(input: SetSpamPreferenceInput!): SetSpamPreferencePayloadOrError @authRequired
 
   syncTokens(chains: [Chain!]): SyncTokensPayloadOrError @authRequired
+  syncCreatedTokens(input: SyncCreatedTokensInput!): SyncCreatedTokensPayloadOrError @authRequired
   refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
   refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
   refreshContract(contractId: DBID!): RefreshContractPayloadOrError
