@@ -75,6 +75,7 @@ type Contract struct {
 	Description           sql.NullString
 	OwnerAddress          persist.Address
 	IsProviderMarkedSpam  bool
+	ParentID              persist.DBID
 	OverrideCreatorUserID persist.DBID
 }
 

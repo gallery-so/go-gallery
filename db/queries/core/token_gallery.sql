@@ -30,10 +30,10 @@ insert into tokens
 ) (
   select
     id
-    , deleted 
+    , false
     , version
-    , created_at
-    , last_updated
+    , now()
+    , now()
     , name
     , description
     , collectors_note
@@ -52,7 +52,7 @@ insert into tokens
     , contract
     , is_user_marked_spam
     , is_provider_marked_spam
-    , last_synced
+    , now()
     , token_uri
     , (select tm.id
        from token_medias tm
@@ -64,12 +64,8 @@ insert into tokens
         limit 1
       ) as token_media_id
   from (
-    select
-      unnest(@id::varchar[]) as id
-      , unnest(@deleted::boolean[]) as deleted
+    select unnest(@id::varchar[]) as id
       , unnest(@version::int[]) as version
-      , unnest(@created_at::timestamptz[]) as created_at
-      , unnest(@last_updated::timestamptz[]) as last_updated
       , unnest(@name::varchar[]) as name
       , unnest(@description::varchar[]) as description
       , unnest(@collectors_note::varchar[]) as collectors_note
@@ -89,7 +85,6 @@ insert into tokens
       , unnest(@owned_by_wallets_end_idx::int[]) as owned_by_wallets_end_idx
       , unnest(@is_user_marked_spam::bool[]) as is_user_marked_spam
       , unnest(@is_provider_marked_spam::bool[]) as is_provider_marked_spam
-      , unnest(@last_synced::timestamptz[]) as last_synced
       , unnest(@token_uri::varchar[]) as token_uri
       , unnest(@token_id::varchar[]) as token_id
       , unnest(@contract::varchar[]) as contract

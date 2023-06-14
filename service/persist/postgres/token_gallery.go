@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgtype"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 
 	"github.com/lib/pq"
@@ -333,80 +332,33 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 		return time.Time{}, []persist.TokenGallery{}, nil
 	}
 
-	appendWalletList := func(dest *[]string, src []persist.Wallet, startIndices, endIndices *[]int32) {
-		items := make([]persist.DBID, len(src))
-		for i, wallet := range src {
-			items[i] = wallet.ID
-		}
-		appendDBIDList(dest, items, startIndices, endIndices)
-	}
-
-	appendAddressAtBlock := func(dest *[]pgtype.JSONB, src []persist.AddressAtBlock, startIndices, endIndices *[]int32, errs *[]error) {
-		items := make([]any, len(src))
-		for i, item := range src {
-			items[i] = item
-		}
-		appendJSONBList(dest, items, startIndices, endIndices, errs)
-	}
-
-	// addIDIfMissing is used because sqlc was unable to bind arrays of our own custom types
-	// i.e. an array of persist.DBIDs instead of an array of strings. A zero-valued persist.DBID
-	// generates a new ID on insert, but instead we need to generate an ID beforehand.
-	addIDIfMissing := func(t *persist.TokenGallery) {
-		if t.ID == persist.DBID("") {
-			(*t).ID = persist.GenerateID()
-		}
-	}
-
-	// addTimesIfMissing is required because sqlc was unable to bind arrays of our own custom types
-	// i.e. an array of persist.CreationTime instead of an array of time.Time. A zero-valued persist.CreationTime
-	// uses the current time as the column value, but instead we need to manually add a time to the struct.
-	addTimesIfMissing := func(t *persist.TokenGallery, ts time.Time) {
-		if t.CreationTime.Time().IsZero() {
-			(*t).CreationTime = persist.CreationTime(ts)
-		}
-		if t.LastSynced.Time().IsZero() {
-			(*t).LastSynced = persist.LastUpdatedTime(ts)
-		}
-		if t.LastUpdated.Time().IsZero() {
-			(*t).LastUpdated = persist.LastUpdatedTime(ts)
-		}
-	}
-
 	tokens = t.dedupeTokens(tokens)
 	params := db.UpsertTokensParams{}
-	now := time.Now()
 
 	var errors []error
 
 	for i := range tokens {
 		t := &tokens[i]
-		addIDIfMissing(t)
-		addTimesIfMissing(t, now)
-		params.ID = append(params.ID, t.ID.String())
-		params.Deleted = append(params.Deleted, t.Deleted.Bool())
+		params.ID = append(params.ID, persist.GenerateID().String())
 		params.Version = append(params.Version, t.Version.Int32())
-		params.CreatedAt = append(params.CreatedAt, t.CreationTime.Time())
-		params.LastUpdated = append(params.LastUpdated, t.LastUpdated.Time())
 		params.Name = append(params.Name, t.Name.String())
 		params.Description = append(params.Description, t.Description.String())
 		params.CollectorsNote = append(params.CollectorsNote, t.CollectorsNote.String())
 		params.TokenType = append(params.TokenType, t.TokenType.String())
 		params.TokenID = append(params.TokenID, t.TokenID.String())
 		params.Quantity = append(params.Quantity, t.Quantity.String())
-		appendAddressAtBlock(&params.OwnershipHistory, t.OwnershipHistory, &params.OwnershipHistoryStartIdx, &params.OwnershipHistoryEndIdx, &errors)
+		InsertHelpers.AppendAddressAtBlock(&params.OwnershipHistory, t.OwnershipHistory, &params.OwnershipHistoryStartIdx, &params.OwnershipHistoryEndIdx, &errors)
 		appendJSONB(&params.Media, t.Media, &errors)
 		appendJSONB(&params.FallbackMedia, t.FallbackMedia, &errors)
 		appendJSONB(&params.TokenMetadata, t.TokenMetadata, &errors)
 		params.ExternalUrl = append(params.ExternalUrl, t.ExternalURL.String())
 		params.BlockNumber = append(params.BlockNumber, t.BlockNumber.BigInt().Int64())
 		params.OwnerUserID = append(params.OwnerUserID, t.OwnerUserID.String())
-		appendWalletList(&params.OwnedByWallets, t.OwnedByWallets, &params.OwnedByWalletsStartIdx, &params.OwnedByWalletsEndIdx)
+		InsertHelpers.AppendWalletList(&params.OwnedByWallets, t.OwnedByWallets, &params.OwnedByWalletsStartIdx, &params.OwnedByWalletsEndIdx)
 		params.Chain = append(params.Chain, int32(t.Chain))
 		params.Contract = append(params.Contract, t.Contract.String())
 		appendBool(&params.IsUserMarkedSpam, t.IsUserMarkedSpam, &errors)
 		appendBool(&params.IsProviderMarkedSpam, t.IsProviderMarkedSpam, &errors)
-		params.LastSynced = append(params.LastSynced, t.LastSynced.Time())
 		params.TokenUri = append(params.TokenUri, "")
 
 		// Defer error checking until now to keep the code above from being
@@ -425,56 +377,12 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 	for i := range tokens {
 		t := &tokens[i]
 		(*t).ID = upserted[i].ID
-		(*t).CreationTime = persist.CreationTime(upserted[i].CreatedAt)
-		(*t).LastUpdated = persist.LastUpdatedTime(upserted[i].LastUpdated)
-		(*t).LastSynced = persist.LastUpdatedTime(upserted[i].LastSynced)
+		(*t).CreationTime = upserted[i].CreatedAt
+		(*t).LastUpdated = upserted[i].LastUpdated
+		(*t).LastSynced = upserted[i].LastSynced
 	}
 
-	return now, tokens, nil
-}
-
-func appendIndices(startIndices *[]int32, endIndices *[]int32, entryLength int) {
-	// Postgres uses 1-based indexing
-	startIndex := int32(1)
-	if len(*endIndices) > 0 {
-		startIndex = (*endIndices)[len(*endIndices)-1] + 1
-	}
-	*startIndices = append(*startIndices, startIndex)
-	*endIndices = append(*endIndices, startIndex+int32(entryLength)-1)
-}
-
-func appendBool(dest *[]bool, src *bool, errs *[]error) {
-	if src == nil {
-		*dest = append(*dest, false)
-		return
-	}
-	*dest = append(*dest, *src)
-}
-
-func appendJSONB(dest *[]pgtype.JSONB, src any, errs *[]error) error {
-	jsonb, err := persist.ToJSONB(src)
-	if err != nil {
-		*errs = append(*errs, err)
-		return err
-	}
-	*dest = append(*dest, jsonb)
-	return nil
-}
-
-func appendDBIDList(dest *[]string, src []persist.DBID, startIndices, endIndices *[]int32) {
-	for _, id := range src {
-		*dest = append(*dest, id.String())
-	}
-	appendIndices(startIndices, endIndices, len(src))
-}
-
-func appendJSONBList(dest *[]pgtype.JSONB, src []any, startIndices, endIndices *[]int32, errs *[]error) {
-	for _, item := range src {
-		if err := appendJSONB(dest, item, errs); err != nil {
-			return
-		}
-	}
-	appendIndices(startIndices, endIndices, len(src))
+	return upserted[0].LastUpdated, tokens, nil
 }
 
 func (t *TokenGalleryRepository) excludeZeroQuantityTokens(pCtx context.Context, pTokens []persist.TokenGallery) ([]persist.TokenGallery, error) {

@@ -57,10 +57,10 @@ func newStatements(db *sql.DB) *statements {
 	deleteCollectionStmt, err := db.PrepareContext(ctx, `UPDATE collections SET DELETED = true WHERE ID = $1;`)
 	checkNoErr(err)
 
-	updateUserStmt, err := db.PrepareContext(ctx, `UPDATE users SET ADDRESSES = $1, BIO = $2, USERNAME = $3, USERNAME_IDEMPOTENT = $4, LAST_UPDATED = $5 WHERE ID = $6;`)
+	updateUserStmt, err := db.PrepareContext(ctx, `UPDATE users SET ADDRESSES = $1, BIO = $2, USERNAME = $3, USERNAME_IDEMPOTENT = $4, LAST_UPDATED = now() WHERE ID = $5;`)
 	checkNoErr(err)
 
-	updateGalleryStmt, err := db.PrepareContext(ctx, `UPDATE galleries SET COLLECTIONS = $1, LAST_UPDATED = $2 WHERE ID = $3;`)
+	updateGalleryStmt, err := db.PrepareContext(ctx, `UPDATE galleries SET COLLECTIONS = $1, LAST_UPDATED = now() WHERE ID = $2;`)
 	checkNoErr(err)
 
 	createUserStmt, err := db.PrepareContext(ctx, `INSERT INTO users (ID, ADDRESSES, USERNAME, USERNAME_IDEMPOTENT, BIO) VALUES ($1, $2, $3, $4, $5) RETURNING ID;`)
@@ -75,7 +75,7 @@ func newStatements(db *sql.DB) *statements {
 	getCollectionsStmt, err := db.PrepareContext(ctx, `SELECT ID,OWNER_USER_ID,NFTS,NAME,COLLECTORS_NOTE,LAYOUT,HIDDEN,VERSION,CREATED_AT,LAST_UPDATED FROM collections WHERE OWNER_USER_ID = $1 AND DELETED = false;`)
 	checkNoErr(err)
 
-	updateCollectionStmt, err := db.PrepareContext(ctx, `UPDATE collections SET NFTS = $1, NAME = $2, COLLECTORS_NOTE = $3, LAYOUT = $4, HIDDEN = $5, LAST_UPDATED = $6 WHERE ID = $7;`)
+	updateCollectionStmt, err := db.PrepareContext(ctx, `UPDATE collections SET NFTS = $1, NAME = $2, COLLECTORS_NOTE = $3, LAYOUT = $4, HIDDEN = $5, LAST_UPDATED = now() WHERE ID = $6;`)
 	checkNoErr(err)
 
 	//galleryRepo := postgres.NewGalleryRepository(db, nil)

@@ -246,6 +246,10 @@ type SocialQueriesOrError interface {
 	IsSocialQueriesOrError()
 }
 
+type SyncCreatedTokensPayloadOrError interface {
+	IsSyncCreatedTokensPayloadOrError()
+}
+
 type SyncTokensForUsernamePayloadOrError interface {
 	IsSyncTokensForUsernamePayloadOrError()
 }
@@ -610,6 +614,8 @@ type Community struct {
 	ProfileImageURL   *string                 `json:"profileImageURL"`
 	ProfileBannerURL  *string                 `json:"profileBannerURL"`
 	BadgeURL          *string                 `json:"badgeURL"`
+	ParentCommunity   *CommunityLink          `json:"parentCommunity"`
+	SubCommunities    *CommunitiesConnection  `json:"subCommunities"`
 	TokensInCommunity *TokensConnection       `json:"tokensInCommunity"`
 	Owners            *TokenHoldersConnection `json:"owners"`
 }
@@ -620,6 +626,10 @@ func (Community) IsCommunityByAddressOrError() {}
 type CommunityEdge struct {
 	Node   *Community `json:"node"`
 	Cursor *string    `json:"cursor"`
+}
+
+type CommunityLink struct {
+	Node *Community `json:"node"`
 }
 
 type CommunitySearchResult struct {
@@ -702,6 +712,10 @@ type CreateUserPayload struct {
 }
 
 func (CreateUserPayload) IsCreateUserPayloadOrError() {}
+
+type CreatedCommunitiesInput struct {
+	IncludeChains []persist.Chain `json:"includeChains"`
+}
 
 type DebugAuth struct {
 	AsUsername         *string                 `json:"asUsername"`
@@ -954,6 +968,7 @@ func (ErrNotAuthorized) IsUpdateUserInfoPayloadOrError()               {}
 func (ErrNotAuthorized) IsRegisterUserPushTokenPayloadOrError()        {}
 func (ErrNotAuthorized) IsUnregisterUserPushTokenPayloadOrError()      {}
 func (ErrNotAuthorized) IsSyncTokensPayloadOrError()                   {}
+func (ErrNotAuthorized) IsSyncCreatedTokensPayloadOrError()            {}
 func (ErrNotAuthorized) IsError()                                      {}
 func (ErrNotAuthorized) IsAddRolesToUserPayloadOrError()               {}
 func (ErrNotAuthorized) IsRevokeRolesFromUserPayloadOrError()          {}
@@ -1001,6 +1016,7 @@ type ErrSyncFailed struct {
 }
 
 func (ErrSyncFailed) IsSyncTokensPayloadOrError()            {}
+func (ErrSyncFailed) IsSyncCreatedTokensPayloadOrError()     {}
 func (ErrSyncFailed) IsRefreshTokenPayloadOrError()          {}
 func (ErrSyncFailed) IsRefreshCollectionPayloadOrError()     {}
 func (ErrSyncFailed) IsRefreshContractPayloadOrError()       {}
@@ -1214,6 +1230,7 @@ type GalleryUser struct {
 	Feed                *FeedConnection        `json:"feed"`
 	SharedFollowers     *UsersConnection       `json:"sharedFollowers"`
 	SharedCommunities   *CommunitiesConnection `json:"sharedCommunities"`
+	CreatedCommunities  *CommunitiesConnection `json:"createdCommunities"`
 }
 
 func (GalleryUser) IsNode()                              {}
@@ -1680,6 +1697,16 @@ type SomeoneViewedYourGalleryNotification struct {
 func (SomeoneViewedYourGalleryNotification) IsNotification()        {}
 func (SomeoneViewedYourGalleryNotification) IsNode()                {}
 func (SomeoneViewedYourGalleryNotification) IsGroupedNotification() {}
+
+type SyncCreatedTokensInput struct {
+	IncludeChains []persist.Chain `json:"includeChains"`
+}
+
+type SyncCreatedTokensPayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
+
+func (SyncCreatedTokensPayload) IsSyncCreatedTokensPayloadOrError() {}
 
 type SyncTokensForUsernamePayload struct {
 	Message string `json:"message"`
@@ -2362,6 +2389,7 @@ const (
 	UserExperienceTypeUpsellMintMemento4                UserExperienceType = "UpsellMintMemento4"
 	UserExperienceTypeUpsellGallerySelects1             UserExperienceType = "UpsellGallerySelects1"
 	UserExperienceTypeMobileUpsell1                     UserExperienceType = "MobileUpsell1"
+	UserExperienceTypeMobileBetaUpsell                  UserExperienceType = "MobileBetaUpsell"
 )
 
 var AllUserExperienceType = []UserExperienceType{
@@ -2373,11 +2401,12 @@ var AllUserExperienceType = []UserExperienceType{
 	UserExperienceTypeUpsellMintMemento4,
 	UserExperienceTypeUpsellGallerySelects1,
 	UserExperienceTypeMobileUpsell1,
+	UserExperienceTypeMobileBetaUpsell,
 }
 
 func (e UserExperienceType) IsValid() bool {
 	switch e {
-	case UserExperienceTypeMultiGalleryAnnouncement, UserExperienceTypeEmailUpsell, UserExperienceTypeMerchStoreUpsell, UserExperienceTypeMaintenanceFeb2023, UserExperienceTypeTwitterConnectionOnboardingUpsell, UserExperienceTypeUpsellMintMemento4, UserExperienceTypeUpsellGallerySelects1, UserExperienceTypeMobileUpsell1:
+	case UserExperienceTypeMultiGalleryAnnouncement, UserExperienceTypeEmailUpsell, UserExperienceTypeMerchStoreUpsell, UserExperienceTypeMaintenanceFeb2023, UserExperienceTypeTwitterConnectionOnboardingUpsell, UserExperienceTypeUpsellMintMemento4, UserExperienceTypeUpsellGallerySelects1, UserExperienceTypeMobileUpsell1, UserExperienceTypeMobileBetaUpsell:
 		return true
 	}
 	return false

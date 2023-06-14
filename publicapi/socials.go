@@ -129,7 +129,7 @@ func (api SocialAPI) GetConnectionsPaginate(ctx context.Context, socialProvider 
 				ProfileImage:       r.SocialProfileImage.(string),
 				HelperSocialConnectionData: model.HelperSocialConnectionData{
 					UserID:        r.UserID,
-					UserCreatedAt: persist.CreationTime(r.UserCreatedAt),
+					UserCreatedAt: r.UserCreatedAt,
 				},
 			}
 			return m, nil
@@ -152,7 +152,7 @@ func (api SocialAPI) GetConnectionsPaginate(ctx context.Context, socialProvider 
 
 	cursorFunc := func(i interface{}) (bool, time.Time, persist.DBID, error) {
 		if conn, ok := i.(model.SocialConnection); ok {
-			return conn.CurrentlyFollowing, conn.UserCreatedAt.Time(), conn.GalleryUser.Dbid, nil
+			return conn.CurrentlyFollowing, conn.UserCreatedAt, conn.GalleryUser.Dbid, nil
 		}
 		return false, time.Time{}, "", fmt.Errorf("interface{} is not a social connection")
 	}
@@ -254,7 +254,7 @@ func (api SocialAPI) GetConnections(ctx context.Context, socialProvider persist.
 				ProfileImage:       r.SocialProfileImage.(string),
 				HelperSocialConnectionData: model.HelperSocialConnectionData{
 					UserID:        r.UserID,
-					UserCreatedAt: persist.CreationTime(r.UserCreatedAt),
+					UserCreatedAt: r.UserCreatedAt,
 				},
 			}
 			return m, nil

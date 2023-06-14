@@ -69,7 +69,7 @@ func updateCollection(updateCollStmt *sql.Stmt) gin.HandlerFunc {
 			return
 		}
 
-		if _, err := updateCollStmt.ExecContext(c, input.ID, input.Name, input.CollectorsNote, input.Columns, input.Hidden, persist.LastUpdatedTime{}); err != nil {
+		if _, err := updateCollStmt.ExecContext(c, input.ID, input.Name, input.CollectorsNote, input.Columns, input.Hidden); err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}

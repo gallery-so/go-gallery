@@ -7,7 +7,6 @@ package coredb
 
 import (
 	"context"
-	"time"
 
 	"github.com/jackc/pgtype"
 )
@@ -44,10 +43,10 @@ insert into tokens
 ) (
   select
     id
-    , deleted 
+    , false
     , version
-    , created_at
-    , last_updated
+    , now()
+    , now()
     , name
     , description
     , collectors_note
@@ -66,7 +65,7 @@ insert into tokens
     , contract
     , is_user_marked_spam
     , is_provider_marked_spam
-    , last_synced
+    , now()
     , token_uri
     , (select tm.id
        from token_medias tm
@@ -78,36 +77,31 @@ insert into tokens
         limit 1
       ) as token_media_id
   from (
-    select
-      unnest($1::varchar[]) as id
-      , unnest($2::boolean[]) as deleted
-      , unnest($3::int[]) as version
-      , unnest($4::timestamptz[]) as created_at
-      , unnest($5::timestamptz[]) as last_updated
-      , unnest($6::varchar[]) as name
-      , unnest($7::varchar[]) as description
-      , unnest($8::varchar[]) as collectors_note
-      , unnest($9::varchar[]) as token_type
-      , unnest($10::varchar[]) as quantity
-      , $11::jsonb[] as ownership_history
-      , unnest($12::int[]) as ownership_history_start_idx
-      , unnest($13::int[]) as ownership_history_end_idx
-      , unnest($14::jsonb[]) as media
-      , unnest($15::jsonb[]) as fallback_media
-      , unnest($16::jsonb[]) as token_metadata
-      , unnest($17::varchar[]) as external_url
-      , unnest($18::bigint[]) as block_number
-      , unnest($19::varchar[]) as owner_user_id
-      , $20::varchar[] as owned_by_wallets
-      , unnest($21::int[]) as owned_by_wallets_start_idx
-      , unnest($22::int[]) as owned_by_wallets_end_idx
-      , unnest($23::bool[]) as is_user_marked_spam
-      , unnest($24::bool[]) as is_provider_marked_spam
-      , unnest($25::timestamptz[]) as last_synced
-      , unnest($26::varchar[]) as token_uri
-      , unnest($27::varchar[]) as token_id
-      , unnest($28::varchar[]) as contract
-      , unnest($29::int[]) as chain
+    select unnest($1::varchar[]) as id
+      , unnest($2::int[]) as version
+      , unnest($3::varchar[]) as name
+      , unnest($4::varchar[]) as description
+      , unnest($5::varchar[]) as collectors_note
+      , unnest($6::varchar[]) as token_type
+      , unnest($7::varchar[]) as quantity
+      , $8::jsonb[] as ownership_history
+      , unnest($9::int[]) as ownership_history_start_idx
+      , unnest($10::int[]) as ownership_history_end_idx
+      , unnest($11::jsonb[]) as media
+      , unnest($12::jsonb[]) as fallback_media
+      , unnest($13::jsonb[]) as token_metadata
+      , unnest($14::varchar[]) as external_url
+      , unnest($15::bigint[]) as block_number
+      , unnest($16::varchar[]) as owner_user_id
+      , $17::varchar[] as owned_by_wallets
+      , unnest($18::int[]) as owned_by_wallets_start_idx
+      , unnest($19::int[]) as owned_by_wallets_end_idx
+      , unnest($20::bool[]) as is_user_marked_spam
+      , unnest($21::bool[]) as is_provider_marked_spam
+      , unnest($22::varchar[]) as token_uri
+      , unnest($23::varchar[]) as token_id
+      , unnest($24::varchar[]) as contract
+      , unnest($25::int[]) as chain
   ) bulk_upsert
 )
 on conflict (token_id, contract, chain, owner_user_id) where deleted = false
@@ -133,10 +127,7 @@ returning id, deleted, version, created_at, last_updated, name, description, col
 
 type UpsertTokensParams struct {
 	ID                       []string
-	Deleted                  []bool
 	Version                  []int32
-	CreatedAt                []time.Time
-	LastUpdated              []time.Time
 	Name                     []string
 	Description              []string
 	CollectorsNote           []string
@@ -156,7 +147,6 @@ type UpsertTokensParams struct {
 	OwnedByWalletsEndIdx     []int32
 	IsUserMarkedSpam         []bool
 	IsProviderMarkedSpam     []bool
-	LastSynced               []time.Time
 	TokenUri                 []string
 	TokenID                  []string
 	Contract                 []string
@@ -166,10 +156,7 @@ type UpsertTokensParams struct {
 func (q *Queries) UpsertTokens(ctx context.Context, arg UpsertTokensParams) ([]Token, error) {
 	rows, err := q.db.Query(ctx, upsertTokens,
 		arg.ID,
-		arg.Deleted,
 		arg.Version,
-		arg.CreatedAt,
-		arg.LastUpdated,
 		arg.Name,
 		arg.Description,
 		arg.CollectorsNote,
@@ -189,7 +176,6 @@ func (q *Queries) UpsertTokens(ctx context.Context, arg UpsertTokensParams) ([]T
 		arg.OwnedByWalletsEndIdx,
 		arg.IsUserMarkedSpam,
 		arg.IsProviderMarkedSpam,
-		arg.LastSynced,
 		arg.TokenUri,
 		arg.TokenID,
 		arg.Contract,

@@ -170,55 +170,89 @@ func (r *commentOnFeedEventPayloadResolver) FeedEvent(ctx context.Context, obj *
 
 // Creator is the resolver for the creator field.
 func (r *communityResolver) Creator(ctx context.Context, obj *model.Community) (model.GalleryUserOrAddress, error) {
-	creator, err := publicapi.For(ctx).Contract.GetContractCreatorByContractID(ctx, obj.Dbid)
+	if obj.CreatorAddress == nil {
+		return nil, nil
+	}
+
+	user, err := resolveGalleryUserByAddress(ctx, *obj.CreatorAddress)
+
+	// If the user is not found, return the address instead
+	var notFoundErr persist.ErrUserNotFound
+	if errors.As(err, &notFoundErr) {
+		return obj.CreatorAddress, nil
+	}
+
 	if err != nil {
-		if _, ok := err.(persist.ErrContractCreatorNotFound); ok {
-			return nil, nil
-		}
 		return nil, err
 	}
 
-	if creator.CreatorUserIDValid {
-		return resolveGalleryUserByUserID(ctx, creator.CreatorUserID)
+	return user, nil
+}
+
+// ParentCommunity is the resolver for the parentCommunity field.
+func (r *communityResolver) ParentCommunity(ctx context.Context, obj *model.Community) (*model.CommunityLink, error) {
+	if obj.HelperCommunityData.ParentID == "" {
+		return nil, nil
 	}
 
-	if creator.CreatorAddressValid {
-		return util.ToPointer(persist.NewChainAddress(creator.CreatorAddress, creator.Chain)), nil
+	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, obj.ParentCommunity.Node.Dbid)
+	if err != nil {
+		return nil, err
 	}
 
-	// We should never get here: if our query returns a contract creator, there has to be an associated address or user ID.
-	return nil, fmt.Errorf("contract creator for community ID=%s is invalid: must have either an address or a user ID", obj.Dbid)
+	obj.ParentCommunity.Node = communityToModel(ctx, *contract, obj.ParentCommunity.Node.ForceRefresh)
+	return obj.ParentCommunity, nil
+}
+
+// SubCommunities is the resolver for the subCommunities field.
+func (r *communityResolver) SubCommunities(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error) {
+	communities, pageInfo, err := publicapi.For(ctx).Contract.GetChildContractsByParentID(ctx, obj.Dbid, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	edges := make([]*model.CommunityEdge, len(communities))
+	for i, community := range communities {
+		edges[i] = &model.CommunityEdge{
+			Node:   communityToModel(ctx, community, util.ToPointer(false)),
+			Cursor: nil, // not used by relay, but relay will complain without this field existing
+		}
+	}
+
+	return &model.CommunitiesConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
 }
 
 // TokensInCommunity is the resolver for the tokensInCommunity field.
 func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokensConnection, error) {
-	if onlyGalleryUsers == nil || (onlyGalleryUsers != nil && !*onlyGalleryUsers) {
-		refresh := false
-		if obj.ForceRefresh != nil {
-			refresh = *obj.ForceRefresh
-		}
-		err := refreshTokensInContractAsync(ctx, obj.Dbid, refresh)
+	onlyUsers := util.GetOptionalValue(onlyGalleryUsers, false)
+	forceRefresh := util.GetOptionalValue(obj.ForceRefresh, false)
+
+	if !onlyUsers {
+		err := refreshTokensInContractAsync(ctx, obj.Dbid, forceRefresh)
 		if err != nil {
 			return nil, err
 		}
 	}
-	return resolveTokensByContractIDWithPagination(ctx, obj.Dbid, before, after, first, last, onlyGalleryUsers)
+
+	return resolveTokensByContractIDWithPagination(ctx, obj.Dbid, before, after, first, last, onlyUsers)
 }
 
 // Owners is the resolver for the owners field.
 func (r *communityResolver) Owners(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokenHoldersConnection, error) {
-	if onlyGalleryUsers == nil || (onlyGalleryUsers != nil && !*onlyGalleryUsers) {
-		refresh := false
-		if obj.ForceRefresh != nil {
-			refresh = *obj.ForceRefresh
-		}
-		err := refreshTokensInContractAsync(ctx, obj.Dbid, refresh)
+	onlyUsers := util.GetOptionalValue(onlyGalleryUsers, false)
+	forceRefresh := util.GetOptionalValue(obj.ForceRefresh, false)
+
+	if !onlyUsers {
+		err := refreshTokensInContractAsync(ctx, obj.Dbid, forceRefresh)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return resolveCommunityOwnersByContractID(ctx, obj.Dbid, before, after, first, last, onlyGalleryUsers)
+	return resolveCommunityOwnersByContractID(ctx, obj.Dbid, before, after, first, last, onlyUsers)
 }
 
 // FeedEvent is the resolver for the feedEvent field.
@@ -499,6 +533,27 @@ func (r *galleryUserResolver) SharedFollowers(ctx context.Context, obj *model.Ga
 // SharedCommunities is the resolver for the sharedCommunities field.
 func (r *galleryUserResolver) SharedCommunities(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error) {
 	communities, pageInfo, err := publicapi.For(ctx).User.SharedCommunities(ctx, obj.UserID, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	edges := make([]*model.CommunityEdge, len(communities))
+	for i, community := range communities {
+		edges[i] = &model.CommunityEdge{
+			Node:   communityToModel(ctx, community, util.ToPointer(false)),
+			Cursor: nil, // not used by relay, but relay will complain without this field existing
+		}
+	}
+
+	return &model.CommunitiesConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
+}
+
+// CreatedCommunities is the resolver for the createdCommunities field.
+func (r *galleryUserResolver) CreatedCommunities(ctx context.Context, obj *model.GalleryUser, input model.CreatedCommunitiesInput, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error) {
+	communities, pageInfo, err := publicapi.For(ctx).User.CreatedCommunities(ctx, obj.UserID, input.IncludeChains, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}
@@ -836,6 +891,16 @@ func (r *mutationResolver) SyncTokens(ctx context.Context, chains []persist.Chai
 	}
 
 	return output, nil
+}
+
+// SyncCreatedTokens is the resolver for the syncCreatedTokens field.
+func (r *mutationResolver) SyncCreatedTokens(ctx context.Context, input model.SyncCreatedTokensInput) (model.SyncCreatedTokensPayloadOrError, error) {
+	err := publicapi.For(ctx).Token.SyncTokensCreatedByUser(ctx, input.IncludeChains)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.SyncCreatedTokensPayload{Viewer: resolveViewer(ctx)}, nil
 }
 
 // RefreshToken is the resolver for the refreshToken field.
@@ -2141,6 +2206,19 @@ func (r *tokenHolderResolver) User(ctx context.Context, obj *model.TokenHolder) 
 	return resolveGalleryUserByUserID(ctx, obj.UserId)
 }
 
+// PreviewTokens is the resolver for the previewTokens field.
+func (r *tokenHolderResolver) PreviewTokens(ctx context.Context, obj *model.TokenHolder) ([]*string, error) {
+	urls, err := publicapi.For(ctx).Contract.GetPreviewURLsByContractIDandUserID(ctx, obj.HelperTokenHolderData.UserId, obj.HelperTokenHolderData.ContractId)
+	if err != nil {
+		return nil, err
+	}
+	previewURLs := make([]*string, len(urls))
+	for i, url := range urls {
+		previewURLs[i] = &url
+	}
+	return previewURLs, nil
+}
+
 // Owner is the resolver for the owner field.
 func (r *tokensAddedToCollectionFeedEventDataResolver) Owner(ctx context.Context, obj *model.TokensAddedToCollectionFeedEventData) (*model.GalleryUser, error) {
 	return resolveGalleryUserByUserID(ctx, obj.Owner.Dbid)
@@ -2519,3 +2597,30 @@ type viewerResolver struct{ *Resolver }
 type walletResolver struct{ *Resolver }
 type chainAddressInputResolver struct{ *Resolver }
 type chainPubKeyInputResolver struct{ *Resolver }
+
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//   - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//     it when you're done.
+//   - You have helper methods in this file. Move them out to keep these resolver files clean.
+func (r *communityResolver) Creator_TODO(ctx context.Context, obj *model.Community) (model.GalleryUserOrAddress, error) {
+	creator, err := publicapi.For(ctx).Contract.GetContractCreatorByContractID(ctx, obj.Dbid)
+	if err != nil {
+		if _, ok := err.(persist.ErrContractCreatorNotFound); ok {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	if creator.CreatorUserIDValid {
+		return resolveGalleryUserByUserID(ctx, creator.CreatorUserID)
+	}
+
+	if creator.CreatorAddressValid {
+		return util.ToPointer(persist.NewChainAddress(creator.CreatorAddress, creator.Chain)), nil
+	}
+
+	// We should never get here: if our query returns a contract creator, there has to be an associated address or user ID.
+	return nil, fmt.Errorf("contract creator for community ID=%s is invalid: must have either an address or a user ID", obj.Dbid)
+}
