@@ -1276,7 +1276,10 @@ with new_image as (
 update users set profile_image_id = new_image.id where users.id = @user_id and not deleted;
 
 -- name: RemoveProfileImage :exec
-update profile_images set deleted = true, last_updated = now() where user_id = $1 and not deleted;
+with remove_image as (
+    update profile_images set deleted = true, last_updated = now() where user_id = $1 and not deleted
+)
+update users set profile_image_id = null where user_id = $1 and not deleted;
 
--- name: GetProfileImageByUserIDBatch :batchone
-select * from profile_images where user_id = $1 and not deleted;
+-- name: GetProfileImageByID :batchone
+select * from profile_images where id = $1 and not deleted;

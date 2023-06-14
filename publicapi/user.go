@@ -1386,5 +1386,5 @@ func (api UserAPI) GetProfileImageByUserID(ctx context.Context, userID persist.D
 		return db.ProfileImage{}, ErrProfileImageNotSet
 	}
 
-	return api.loaders.ProfileImageByUserID.Load(user.ProfileImageID)
+	return api.loaders.ProfileImageByID.Load(user.ProfileImageID)
 }

@@ -4816,7 +4816,10 @@ func (q *Queries) RemoveCollectionFromGallery(ctx context.Context, arg RemoveCol
 }
 
 const removeProfileImage = `-- name: RemoveProfileImage :exec
-update profile_images set deleted = true, last_updated = now() where user_id = $1 and not deleted
+with remove_image as (
+    update profile_images set deleted = true, last_updated = now() where user_id = $1 and not deleted
+)
+update users set profile_image_id = null where user_id = $1 and not deleted
 `
 
 func (q *Queries) RemoveProfileImage(ctx context.Context, userID persist.DBID) error {
