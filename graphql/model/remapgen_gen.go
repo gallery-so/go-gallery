@@ -198,6 +198,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"ProfileImage": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(ProfileImage)
+		return obj, ok
+	},
+
 	"PublishGalleryPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(PublishGalleryPayloadOrError)
 		return obj, ok
@@ -238,6 +243,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"RemoveProfileImagePayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(RemoveProfileImagePayloadOrError)
+		return obj, ok
+	},
+
 	"RemoveUserWalletsPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(RemoveUserWalletsPayloadOrError)
 		return obj, ok
@@ -265,6 +275,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 
 	"SearchUsersPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(SearchUsersPayloadOrError)
+		return obj, ok
+	},
+
+	"SetProfileImagePayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(SetProfileImagePayloadOrError)
 		return obj, ok
 	},
 
@@ -430,11 +445,6 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 
 	"UserByUsernameOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(UserByUsernameOrError)
-		return obj, ok
-	},
-
-	"UserProfileImage": func(object interface{}) (interface{}, bool) {
-		obj, ok := object.(UserProfileImage)
 		return obj, ok
 	},
 

@@ -170,6 +170,10 @@ type PreverifyEmailPayloadOrError interface {
 	IsPreverifyEmailPayloadOrError()
 }
 
+type ProfileImage interface {
+	IsProfileImage()
+}
+
 type PublishGalleryPayloadOrError interface {
 	IsPublishGalleryPayloadOrError()
 }
@@ -202,6 +206,10 @@ type RemoveCommentPayloadOrError interface {
 	IsRemoveCommentPayloadOrError()
 }
 
+type RemoveProfileImagePayloadOrError interface {
+	IsRemoveProfileImagePayloadOrError()
+}
+
 type RemoveUserWalletsPayloadOrError interface {
 	IsRemoveUserWalletsPayloadOrError()
 }
@@ -224,6 +232,10 @@ type SearchGalleriesPayloadOrError interface {
 
 type SearchUsersPayloadOrError interface {
 	IsSearchUsersPayloadOrError()
+}
+
+type SetProfileImagePayloadOrError interface {
+	IsSetProfileImagePayloadOrError()
 }
 
 type SetSpamPreferencePayloadOrError interface {
@@ -356,10 +368,6 @@ type UserByIDOrError interface {
 
 type UserByUsernameOrError interface {
 	IsUserByUsernameOrError()
-}
-
-type UserProfileImage interface {
-	IsUserProfileImage()
 }
 
 type VerifyEmailMagicLinkPayloadOrError interface {
@@ -754,13 +762,6 @@ type DisconnectSocialAccountPayload struct {
 }
 
 func (DisconnectSocialAccountPayload) IsDisconnectSocialAccountPayloadOrError() {}
-
-type ENSProfileImage struct {
-	Urls  *PreviewURLSet `json:"urls"`
-	Token *Token         `json:"token"`
-}
-
-func (ENSProfileImage) IsUserProfileImage() {}
 
 type EmailNotificationSettings struct {
 	UnsubscribedFromAll           bool `json:"unsubscribedFromAll"`
@@ -1218,7 +1219,7 @@ type GalleryUser struct {
 	HelperGalleryUserData
 	Dbid                persist.DBID           `json:"dbid"`
 	Username            *string                `json:"username"`
-	ProfileImage        UserProfileImage       `json:"profileImage"`
+	ProfileImage        ProfileImage           `json:"profileImage"`
 	Bio                 *string                `json:"bio"`
 	Traits              *string                `json:"traits"`
 	Universal           *bool                  `json:"universal"`
@@ -1405,19 +1406,6 @@ type MoveCollectionToGalleryPayload struct {
 
 func (MoveCollectionToGalleryPayload) IsMoveCollectionToGalleryPayloadOrError() {}
 
-type NFTProfileImage struct {
-	Urls  *PreviewURLSet `json:"urls"`
-	Token *Token         `json:"token"`
-}
-
-func (NFTProfileImage) IsUserProfileImage() {}
-
-type NoProfileImage struct {
-	Urls *PreviewURLSet `json:"urls"`
-}
-
-func (NoProfileImage) IsUserProfileImage() {}
-
 type NotificationEdge struct {
 	Node   Notification `json:"node"`
 	Cursor *string      `json:"cursor"`
@@ -1560,6 +1548,12 @@ type RemoveCommentPayload struct {
 
 func (RemoveCommentPayload) IsRemoveCommentPayloadOrError() {}
 
+type RemoveProfileImagePayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
+
+func (RemoveProfileImagePayload) IsRemoveProfileImagePayloadOrError() {}
+
 type RemoveUserWalletsPayload struct {
 	Viewer *Viewer `json:"viewer"`
 }
@@ -1589,6 +1583,16 @@ type SearchUsersPayload struct {
 }
 
 func (SearchUsersPayload) IsSearchUsersPayloadOrError() {}
+
+type SetProfileImageInput struct {
+	TokenID *persist.DBID `json:"tokenId"`
+}
+
+type SetProfileImagePayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
+
+func (SetProfileImagePayload) IsSetProfileImagePayloadOrError() {}
 
 type SetSpamPreferenceInput struct {
 	Tokens []persist.DBID `json:"tokens"`
@@ -1810,6 +1814,12 @@ type TokenHoldersConnection struct {
 	Edges    []*TokenHolderEdge `json:"edges"`
 	PageInfo *PageInfo          `json:"pageInfo"`
 }
+
+type TokenProfileImage struct {
+	Token *Token `json:"token"`
+}
+
+func (TokenProfileImage) IsProfileImage() {}
 
 type TokensAddedToCollectionFeedEventData struct {
 	HelperTokensAddedToCollectionFeedEventDataData

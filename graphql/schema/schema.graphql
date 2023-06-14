@@ -67,27 +67,17 @@ interface Error {
   message: String!
 }
 
-type NFTProfileImage {
-  urls: PreviewURLSet!
+type TokenProfileImage {
   token: Token!
 }
 
-type ENSProfileImage {
-  urls: PreviewURLSet!
-  token: Token!
-}
-
-type NoProfileImage {
-  urls: PreviewURLSet!
-}
-
-union UserProfileImage = NFTProfileImage | ENSProfileImage | NoProfileImage
+union ProfileImage = TokenProfileImage
 
 type GalleryUser implements Node @goEmbedHelper {
   id: ID!
   dbid: DBID!
   username: String
-  profileImage: UserProfileImage! @goField(forceResolver: true)
+  profileImage: ProfileImage @goField(forceResolver: true)
   bio: String
   traits: String
   universal: Boolean
@@ -2138,6 +2128,22 @@ type GenerateQRCodeLoginTokenPayload {
 
 union GenerateQRCodeLoginTokenPayloadOrError = GenerateQRCodeLoginTokenPayload | ErrNotAuthorized
 
+input SetProfileImageInput {
+  tokenId: DBID
+}
+
+type SetProfileImagePayload {
+  viewer: Viewer
+}
+
+type RemoveProfileImagePayload {
+  viewer: Viewer
+}
+
+union SetProfileImagePayloadOrError = SetProfileImagePayload
+
+union RemoveProfileImagePayloadOrError = RemoveProfileImagePayload
+
 type Mutation {
   # User Mutations
   addUserWallet(
@@ -2148,6 +2154,8 @@ type Mutation {
   updateUserInfo(input: UpdateUserInfoInput!): UpdateUserInfoPayloadOrError @authRequired
   registerUserPushToken(pushToken: String!): RegisterUserPushTokenPayloadOrError @authRequired
   unregisterUserPushToken(pushToken: String!): UnregisterUserPushTokenPayloadOrError @authRequired
+  setProfileImage(input: SetProfileImageInput!): SetProfileImagePayloadOrError @authRequired
+  removeProfileImage: RemoveProfileImagePayloadOrError @authRequired
 
   # Gallery Mutations
   updateGalleryCollections(

@@ -416,7 +416,7 @@ func (r *galleryUpdatedFeedEventDataResolver) SubEventDatas(ctx context.Context,
 }
 
 // ProfileImage is the resolver for the profileImage field.
-func (r *galleryUserResolver) ProfileImage(ctx context.Context, obj *model.GalleryUser) (model.UserProfileImage, error) {
+func (r *galleryUserResolver) ProfileImage(ctx context.Context, obj *model.GalleryUser) (model.ProfileImage, error) {
 	if obj.HelperGalleryUserData.ProfileTokenID == nil {
 		// TODO for now, no URLs
 		return model.NoProfileImage{}, nil
@@ -683,6 +683,16 @@ func (r *mutationResolver) UnregisterUserPushToken(ctx context.Context, pushToke
 	}
 
 	return output, nil
+}
+
+// SetProfileImage is the resolver for the setProfileImage field.
+func (r *mutationResolver) SetProfileImage(ctx context.Context, input model.SetProfileImageInput) (model.SetProfileImagePayloadOrError, error) {
+	panic(fmt.Errorf("not implemented: SetProfileImage - setProfileImage"))
+}
+
+// RemoveProfileImage is the resolver for the removeProfileImage field.
+func (r *mutationResolver) RemoveProfileImage(ctx context.Context) (model.RemoveProfileImagePayloadOrError, error) {
+	panic(fmt.Errorf("not implemented: RemoveProfileImage - removeProfileImage"))
 }
 
 // UpdateGalleryCollections is the resolver for the updateGalleryCollections field.
