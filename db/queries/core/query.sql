@@ -1249,7 +1249,7 @@ order by case when @paging_forward::bool then t.pos end asc, case when not @pagi
 limit $1;
 
 -- name: SetContractOverrideCreator :exec
-update contracts set override_creator_user_id = @creator_user_id where id = @contract_id and deleted = false;
+update contracts set override_creator_user_id = @creator_user_id, last_updated = now() where id = @contract_id and deleted = false;
 
 -- name: RemoveContractOverrideCreator :exec
-update contracts set override_creator_user_id = null where id = @contract_id and deleted = false;
+update contracts set override_creator_user_id = null, last_updated = now() where id = @contract_id and deleted = false;

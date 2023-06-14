@@ -4788,7 +4788,7 @@ func (q *Queries) RemoveCollectionFromGallery(ctx context.Context, arg RemoveCol
 }
 
 const removeContractOverrideCreator = `-- name: RemoveContractOverrideCreator :exec
-update contracts set override_creator_user_id = null where id = $1 and deleted = false
+update contracts set override_creator_user_id = null, last_updated = now() where id = $1 and deleted = false
 `
 
 func (q *Queries) RemoveContractOverrideCreator(ctx context.Context, contractID persist.DBID) error {
@@ -4811,7 +4811,7 @@ func (q *Queries) RemoveSocialFromUser(ctx context.Context, arg RemoveSocialFrom
 }
 
 const setContractOverrideCreator = `-- name: SetContractOverrideCreator :exec
-update contracts set override_creator_user_id = $1 where id = $2 and deleted = false
+update contracts set override_creator_user_id = $1, last_updated = now() where id = $2 and deleted = false
 `
 
 type SetContractOverrideCreatorParams struct {
