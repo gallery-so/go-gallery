@@ -187,8 +187,8 @@ sql:
             go_type: 'int'
 
           # Profile Images
-          - column: "profile_images.*source_type"
-            go_type: "github.com/mikeydub/go-gallery/service/persist.ProfileImageSource"
+          - column: 'profile_images.*source_type'
+            go_type: 'github.com/mikeydub/go-gallery/service/persist.ProfileImageSource'
 
           # Wildcards
           # Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above.
