@@ -2146,8 +2146,12 @@ union SetProfileImagePayloadOrError =
   | ErrUserNotFound
   | ErrInvalidInput
   | ErrTokenNotFound
+  | ErrNotAuthorized
 
-union RemoveProfileImagePayloadOrError = RemoveProfileImagePayload
+union RemoveProfileImagePayloadOrError =
+    RemoveProfileImagePayload
+  | ErrAuthenticationFailed
+  | ErrUserNotFound
 
 type Mutation {
   # User Mutations

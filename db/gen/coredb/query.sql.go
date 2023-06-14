@@ -4819,11 +4819,11 @@ const removeProfileImage = `-- name: RemoveProfileImage :exec
 with remove_image as (
     update profile_images set deleted = true, last_updated = now() where user_id = $1 and not deleted
 )
-update users set profile_image_id = null where user_id = $1 and not deleted
+update users set profile_image_id = null where users.id = $1 and not users.deleted
 `
 
-func (q *Queries) RemoveProfileImage(ctx context.Context, userID persist.DBID) error {
-	_, err := q.db.Exec(ctx, removeProfileImage, userID)
+func (q *Queries) RemoveProfileImage(ctx context.Context, id persist.DBID) error {
+	_, err := q.db.Exec(ctx, removeProfileImage, id)
 	return err
 }
 
@@ -4851,7 +4851,7 @@ with new_image as (
         , last_updated = excluded.last_updated
     returning id
 )
-update users set profile_image_id = new_image.id where users.id = $1 and not deleted
+update users set profile_image_id = new_image.id from new_image where users.id = $1 and not deleted
 `
 
 type SetProfileImageToTokenParams struct {

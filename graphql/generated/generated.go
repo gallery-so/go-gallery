@@ -9002,8 +9002,12 @@ union SetProfileImagePayloadOrError =
   | ErrUserNotFound
   | ErrInvalidInput
   | ErrTokenNotFound
+  | ErrNotAuthorized
 
-union RemoveProfileImagePayloadOrError = RemoveProfileImagePayload
+union RemoveProfileImagePayloadOrError =
+    RemoveProfileImagePayload
+  | ErrAuthenticationFailed
+  | ErrUserNotFound
 
 type Mutation {
   # User Mutations
@@ -52274,6 +52278,20 @@ func (ec *executionContext) _RemoveProfileImagePayloadOrError(ctx context.Contex
 			return graphql.Null
 		}
 		return ec._RemoveProfileImagePayload(ctx, sel, obj)
+	case model.ErrAuthenticationFailed:
+		return ec._ErrAuthenticationFailed(ctx, sel, &obj)
+	case *model.ErrAuthenticationFailed:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrAuthenticationFailed(ctx, sel, obj)
+	case model.ErrUserNotFound:
+		return ec._ErrUserNotFound(ctx, sel, &obj)
+	case *model.ErrUserNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrUserNotFound(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -52463,6 +52481,13 @@ func (ec *executionContext) _SetProfileImagePayloadOrError(ctx context.Context, 
 			return graphql.Null
 		}
 		return ec._ErrTokenNotFound(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -55477,7 +55502,7 @@ func (ec *executionContext) _ErrAdmireNotFound(ctx context.Context, sel ast.Sele
 	return out
 }
 
-var errAuthenticationFailedImplementors = []string{"ErrAuthenticationFailed", "AddUserWalletPayloadOrError", "Error", "LoginPayloadOrError", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "ViewGalleryPayloadOrError", "SetProfileImagePayloadOrError"}
+var errAuthenticationFailedImplementors = []string{"ErrAuthenticationFailed", "AddUserWalletPayloadOrError", "Error", "LoginPayloadOrError", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "ViewGalleryPayloadOrError", "SetProfileImagePayloadOrError", "RemoveProfileImagePayloadOrError"}
 
 func (ec *executionContext) _ErrAuthenticationFailed(ctx context.Context, sel ast.SelectionSet, obj *model.ErrAuthenticationFailed) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errAuthenticationFailedImplementors)
@@ -55806,7 +55831,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "SocialQueriesOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "SyncTokensPayloadOrError", "SyncCreatedTokensPayloadOrError", "Error", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "UnbanUserFromFeedPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "GenerateQRCodeLoginTokenPayloadOrError"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "SocialQueriesOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "SyncTokensPayloadOrError", "SyncCreatedTokensPayloadOrError", "Error", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "UnbanUserFromFeedPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "GenerateQRCodeLoginTokenPayloadOrError", "SetProfileImagePayloadOrError"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
@@ -56009,7 +56034,7 @@ func (ec *executionContext) _ErrUserAlreadyExists(ctx context.Context, sel ast.S
 	return out
 }
 
-var errUserNotFoundImplementors = []string{"ErrUserNotFound", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "Error", "LoginPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdminAddWalletPayloadOrError", "SetProfileImagePayloadOrError"}
+var errUserNotFoundImplementors = []string{"ErrUserNotFound", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "Error", "LoginPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdminAddWalletPayloadOrError", "SetProfileImagePayloadOrError", "RemoveProfileImagePayloadOrError"}
 
 func (ec *executionContext) _ErrUserNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrUserNotFound) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errUserNotFoundImplementors)

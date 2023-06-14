@@ -41,6 +41,7 @@ var ErrProfileImageTooManySources = errors.New("too many profile image sources p
 var ErrProfileImageNoSources = errors.New("no profile image source provided")
 var ErrProfileImageUnknownSource = errors.New("unsupported profile image sourceprovided")
 var ErrProfileImageNotSet = errors.New("no profile image set")
+var ErrProfileImageNotTokenOwner = errors.New("user is not an owner of the token")
 
 type UserAPI struct {
 	repos              *postgres.Repositories
@@ -1350,6 +1351,12 @@ func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID) e
 		if err != nil {
 			return err
 		}
+
+		// TODO: This should use the token ownership view when creator token support is merged
+		if token.OwnerUserID != userID {
+			return ErrProfileImageNotTokenOwner
+		}
+
 		return api.queries.SetProfileImageToToken(ctx, db.SetProfileImageToTokenParams{
 			TokenSourceType: persist.ProfileImageSourceToken,
 			ProfileID:       persist.GenerateID(),
