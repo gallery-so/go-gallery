@@ -40,6 +40,7 @@
 //go:generate go run github.com/gallery-so/dataloaden SharedFollowersLoaderByIDs github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedFollowersBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedFollowersBatchPaginateRow
 //go:generate go run github.com/gallery-so/dataloaden SharedContractsLoaderByIDs github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedContractsBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedContractsBatchPaginateRow
 //go:generate go run github.com/gallery-so/dataloaden MediaLoaderByTokenID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.TokenMedia
+//go:generate go run github.com/gallery-so/dataloaden ProfileImageLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.ProfileImage
 
 package dataloader
 
@@ -119,6 +120,7 @@ type Loaders struct {
 	InteractionsByFeedEventID     *FeedEventInteractionsLoader
 	AdmireByActorIDAndFeedEventID *AdmireLoaderByActorAndFeedEvent
 	MediaByTokenID                *MediaLoaderByTokenID
+	ProfileImageByUserID          *ProfileImageLoaderByID
 }
 
 func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loaders {
@@ -305,6 +307,10 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 
 	loaders.MediaByTokenID = NewMediaLoaderByTokenID(defaults, loadMediaByTokenID(q), MediaLoaderByTokenIDCacheSubscriptions{
 		AutoCacheWithKey: func(media db.TokenMedia) persist.DBID { return media.ID },
+	})
+
+	loaders.ProfileImageByUserID = NewProfileImageLoaderByID(defaults, loadProfileImageByUserID(q), ProfileImageLoaderByIDCacheSubscriptions{
+		AutoCacheWithKey: func(pfp db.ProfileImage) persist.DBID { return pfp.ID },
 	})
 
 	return loaders
@@ -1183,6 +1189,25 @@ func loadMediaByTokenID(q *db.Queries) func(context.Context, []persist.DBID) ([]
 		b.QueryRow(func(i int, media db.TokenMedia, err error) {
 			if err == pgx.ErrNoRows {
 				err = persist.ErrMediaNotFound{TokenID: tokenIDs[i]}
+			}
+			results[i], errors[i] = media, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadProfileImageByUserID(q *db.Queries) func(context.Context, []persist.DBID) ([]db.ProfileImage, []error) {
+	return func(ctx context.Context, pfpIDs []persist.DBID) ([]db.ProfileImage, []error) {
+		results := make([]db.ProfileImage, len(pfpIDs))
+		errors := make([]error, len(pfpIDs))
+
+		b := q.GetProfileImageByUserIDBatch(ctx, pfpIDs)
+		defer b.Close()
+
+		b.QueryRow(func(i int, media db.ProfileImage, err error) {
+			if err == pgx.ErrNoRows {
+				err = persist.ErrProfileImageNotFound{err, pfpIDs[i]}
 			}
 			results[i], errors[i] = media, err
 		})

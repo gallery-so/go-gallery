@@ -1262,3 +1262,21 @@ from collections, unnest(@collection_ids::varchar[]) with ordinality as t(id, po
 where collections.id = t.id and not deleted and not hidden and t.pos < @cur_before_pos::int and t.pos > @cur_after_pos::int
 order by case when @paging_forward::bool then t.pos end asc, case when not @paging_forward::bool then t.pos end desc
 limit $1;
+
+-- name: SetProfileImageToToken :exec
+with new_image as (
+    insert into profile_images (id, user_id, source_type, token_id, deleted, last_updated)
+    values (@profile_id, @user_id, @token_source_type, @token_id, false, now())
+    on conflict (user_id) do update set token_id = excluded.token_id
+        , source_type = excluded.source_type
+        , deleted = excluded.deleted
+        , last_updated = excluded.last_updated
+    returning id
+)
+update users set profile_image_id = new_image.id where users.id = @user_id and not deleted;
+
+-- name: RemoveProfileImage :exec
+update profile_images set deleted = true, last_updated = now() where user_id = $1 and not deleted;
+
+-- name: GetProfileImageByUserIDBatch :batchone
+select * from profile_images where user_id = $1 and not deleted;

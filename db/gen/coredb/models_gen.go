@@ -317,13 +317,14 @@ type PiiUserView struct {
 	PiiSocials           persist.Socials
 }
 
-type ProfilePicture struct {
+type ProfileImage struct {
 	ID          persist.DBID
+	UserID      persist.DBID
+	TokenID     persist.DBID
+	SourceType  persist.ProfileImageSource
 	Deleted     bool
 	CreatedAt   time.Time
 	LastUpdated time.Time
-	SourceType  string
-	TokenID     persist.DBID
 }
 
 type PushNotificationTicket struct {
@@ -507,7 +508,7 @@ type User struct {
 	FeaturedGallery      *persist.DBID
 	PrimaryWalletID      persist.DBID
 	UserExperiences      pgtype.JSONB
-	ProfilePictureID     persist.DBID
+	ProfileImageID       persist.DBID
 }
 
 type UserRelevance struct {

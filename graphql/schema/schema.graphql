@@ -2140,7 +2140,12 @@ type RemoveProfileImagePayload {
   viewer: Viewer
 }
 
-union SetProfileImagePayloadOrError = SetProfileImagePayload
+union SetProfileImagePayloadOrError =
+    SetProfileImagePayload
+  | ErrAuthenticationFailed
+  | ErrUserNotFound
+  | ErrInvalidInput
+  | ErrTokenNotFound
 
 union RemoveProfileImagePayloadOrError = RemoveProfileImagePayload
 

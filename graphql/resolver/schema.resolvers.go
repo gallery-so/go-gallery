@@ -417,40 +417,15 @@ func (r *galleryUpdatedFeedEventDataResolver) SubEventDatas(ctx context.Context,
 
 // ProfileImage is the resolver for the profileImage field.
 func (r *galleryUserResolver) ProfileImage(ctx context.Context, obj *model.GalleryUser) (model.ProfileImage, error) {
-	if obj.HelperGalleryUserData.ProfileTokenID == nil {
-		// TODO for now, no URLs
-		return model.NoProfileImage{}, nil
-	}
-	token, err := resolveTokenByTokenID(ctx, *obj.HelperGalleryUserData.ProfileTokenID)
+	pfp, err := publicapi.For(ctx).User.GetProfileImageByUserID(ctx, obj.Dbid)
 	if err != nil {
-		return nil, err
-	}
-	contract, err := resolveContractByTokenID(ctx, *obj.HelperGalleryUserData.ProfileTokenID)
-	if err != nil {
-		return nil, err
-	}
-
-	var previews *model.PreviewURLSet
-	tokenMedia, err := publicapi.For(ctx).Token.MediaByTokenID(ctx, token.Dbid)
-	if err != nil {
-		// If we have no media, just return the fallback media
-		var noMediaErr persist.ErrMediaNotFound
-		if errors.As(err, &noMediaErr) {
-			previews = getPreviewUrlsForURL(ctx, token.Token.FallbackMedia.ImageURL.String())
-		} else {
-			return nil, err
+		if errors.Is(err, publicapi.ErrProfileImageNotSet) {
+			return nil, nil
 		}
-	} else {
-		previews = getPreviewUrlsForMedia(ctx, tokenMedia.Media)
+		return nil, err
 	}
 
-	// is ENS?
-	if contract.ContractAddress.Address().String() == util.ENSAddress {
-		// TODO download image from ENS and return storage link because the image link might return that there is no avatar
-		return model.ENSProfileImage{Urls: getPreviewUrlsForURL(ctx, tokenMedia.Metadata["background_image"].(string)), Token: token}, nil
-	}
-
-	return model.NFTProfileImage{Urls: previews, Token: token}, nil
+	return profileImageToModel(ctx, pfp)
 }
 
 // Roles is the resolver for the roles field.
@@ -687,12 +662,20 @@ func (r *mutationResolver) UnregisterUserPushToken(ctx context.Context, pushToke
 
 // SetProfileImage is the resolver for the setProfileImage field.
 func (r *mutationResolver) SetProfileImage(ctx context.Context, input model.SetProfileImageInput) (model.SetProfileImagePayloadOrError, error) {
-	panic(fmt.Errorf("not implemented: SetProfileImage - setProfileImage"))
+	err := publicapi.For(ctx).User.SetProfileImage(ctx, input.TokenID)
+	if err != nil {
+		return nil, err
+	}
+	return &model.SetProfileImagePayload{Viewer: resolveViewer(ctx)}, nil
 }
 
 // RemoveProfileImage is the resolver for the removeProfileImage field.
 func (r *mutationResolver) RemoveProfileImage(ctx context.Context) (model.RemoveProfileImagePayloadOrError, error) {
-	panic(fmt.Errorf("not implemented: RemoveProfileImage - removeProfileImage"))
+	err := publicapi.For(ctx).User.RemoveProfileImage(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &model.RemoveProfileImagePayload{Viewer: resolveViewer(ctx)}, nil
 }
 
 // UpdateGalleryCollections is the resolver for the updateGalleryCollections field.

@@ -642,7 +642,7 @@ func FirstNonErrorWithValue[T any](ctx context.Context, autoCancel bool, returnO
 	}
 
 	if returnOnError == nil {
-		returnOnError = DefaultReturnOnError
+		returnOnError = func(error) bool { return false }
 	}
 
 	var cancel context.CancelFunc
@@ -685,7 +685,27 @@ func FirstNonErrorWithValue[T any](ctx context.Context, autoCancel bool, returnO
 	}
 }
 
-func DefaultReturnOnError(error) bool {
+// OnlyNils returns true if all values are nil
+func OnlyNils(values ...any) bool {
+	for _, value := range values {
+		if value != nil {
+			return false
+		}
+	}
+	return true
+}
+
+// ManyNotNils returns true if there is more than one non-nil value
+func ManyNotNils(values ...any) bool {
+	c := 0
+	for _, v := range values {
+		if v != nil {
+			if c >= 1 {
+				return true
+			}
+			c++
+		}
+	}
 	return false
 }
 

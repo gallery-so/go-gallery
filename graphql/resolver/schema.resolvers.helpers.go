@@ -164,6 +164,11 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrPushTokenBelongsToAnotherUser{Message: message}
 	}
 
+	switch err {
+	case publicapi.ErrProfileImageTooManySources, publicapi.ErrProfileImageNoSources, publicapi.ErrProfileImageUnknownSource:
+		mappedErr = model.ErrInvalidInput{Message: message}
+	}
+
 	if mappedErr != nil {
 		if converted, ok := model.ConvertToModelType(mappedErr, gqlTypeName); ok {
 			return converted, true
@@ -1539,18 +1544,10 @@ func userToModel(ctx context.Context, user db.User) *model.GalleryUser {
 		wallets[i] = walletToModelPersist(ctx, wallet)
 	}
 
-	profile := user.ProfileTokenID
-
-	var profileTokenID *persist.DBID
-	if profile != "" {
-		profileTokenID = &profile
-	}
-
 	return &model.GalleryUser{
 		HelperGalleryUserData: model.HelperGalleryUserData{
 			UserID:            user.ID,
 			FeaturedGalleryID: user.FeaturedGallery,
-			ProfileTokenID:    profileTokenID,
 		},
 		Dbid:      user.ID,
 		Username:  &user.Username.String,
@@ -1923,6 +1920,19 @@ func getMediaForToken(ctx context.Context, token db.Token) model.MediaSubtype {
 	return mediaToModel(ctx, token.Media, token.FallbackMedia)
 }
 
+func profileImageToModel(ctx context.Context, pfp db.ProfileImage) (model.ProfileImage, error) {
+	switch pfp.SourceType {
+	case persist.ProfileImageSourceToken:
+		token, err := resolveTokenByTokenID(ctx, pfp.TokenID)
+		if err != nil {
+			return nil, err
+		}
+		return &model.TokenProfileImage{Token: token}, nil
+	default:
+		return nil, publicapi.ErrProfileImageUnknownSource
+	}
+}
+
 func getPreviewUrlsForMedia(ctx context.Context, media persist.Media, options ...mediamapper.Option) *model.PreviewURLSet {
 	url := media.ThumbnailURL.String()
 	if (media.MediaType == persist.MediaTypeImage || media.MediaType == persist.MediaTypeSVG || media.MediaType == persist.MediaTypeGIF) && url == "" {
@@ -1944,21 +1954,6 @@ func getPreviewUrlsForMedia(ctx context.Context, media persist.Media, options ..
 		Large:      util.ToPointer(mm.GetLargeImageUrl(preview, options...)),
 		SrcSet:     util.ToPointer(mm.GetSrcSet(preview, options...)),
 		LiveRender: &live,
-	}
-}
-
-func getPreviewUrlsForURL(ctx context.Context, url string, options ...mediamapper.Option) *model.PreviewURLSet {
-
-	preview := remapLargeImageUrls(url)
-	mm := mediamapper.For(ctx)
-
-	return &model.PreviewURLSet{
-		Raw:       &preview,
-		Thumbnail: util.ToPointer(mm.GetThumbnailImageUrl(preview, options...)),
-		Small:     util.ToPointer(mm.GetSmallImageUrl(preview, options...)),
-		Medium:    util.ToPointer(mm.GetMediumImageUrl(preview, options...)),
-		Large:     util.ToPointer(mm.GetLargeImageUrl(preview, options...)),
-		SrcSet:    util.ToPointer(mm.GetSrcSet(preview, options...)),
 	}
 }
 

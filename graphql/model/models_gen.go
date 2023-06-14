@@ -811,6 +811,7 @@ func (ErrAuthenticationFailed) IsRemoveAdmirePayloadOrError()       {}
 func (ErrAuthenticationFailed) IsCommentOnFeedEventPayloadOrError() {}
 func (ErrAuthenticationFailed) IsRemoveCommentPayloadOrError()      {}
 func (ErrAuthenticationFailed) IsViewGalleryPayloadOrError()        {}
+func (ErrAuthenticationFailed) IsSetProfileImagePayloadOrError()    {}
 
 type ErrCollectionNotFound struct {
 	Message string `json:"message"`
@@ -928,6 +929,7 @@ func (ErrInvalidInput) IsUpdateSocialAccountDisplayedPayloadOrError()    {}
 func (ErrInvalidInput) IsMintPremiumCardToWalletPayloadOrError()         {}
 func (ErrInvalidInput) IsDisconnectSocialAccountPayloadOrError()         {}
 func (ErrInvalidInput) IsFollowAllSocialConnectionsPayloadOrError()      {}
+func (ErrInvalidInput) IsSetProfileImagePayloadOrError()                 {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -1034,9 +1036,10 @@ type ErrTokenNotFound struct {
 	Message string `json:"message"`
 }
 
-func (ErrTokenNotFound) IsTokenByIDOrError()           {}
-func (ErrTokenNotFound) IsError()                      {}
-func (ErrTokenNotFound) IsCollectionTokenByIDOrError() {}
+func (ErrTokenNotFound) IsTokenByIDOrError()              {}
+func (ErrTokenNotFound) IsError()                         {}
+func (ErrTokenNotFound) IsCollectionTokenByIDOrError()    {}
+func (ErrTokenNotFound) IsSetProfileImagePayloadOrError() {}
 
 type ErrUnknownAction struct {
 	Message string `json:"message"`
@@ -1057,14 +1060,15 @@ type ErrUserNotFound struct {
 	Message string `json:"message"`
 }
 
-func (ErrUserNotFound) IsUserByUsernameOrError()        {}
-func (ErrUserNotFound) IsUserByIDOrError()              {}
-func (ErrUserNotFound) IsUserByAddressOrError()         {}
-func (ErrUserNotFound) IsError()                        {}
-func (ErrUserNotFound) IsLoginPayloadOrError()          {}
-func (ErrUserNotFound) IsFollowUserPayloadOrError()     {}
-func (ErrUserNotFound) IsUnfollowUserPayloadOrError()   {}
-func (ErrUserNotFound) IsAdminAddWalletPayloadOrError() {}
+func (ErrUserNotFound) IsUserByUsernameOrError()         {}
+func (ErrUserNotFound) IsUserByIDOrError()               {}
+func (ErrUserNotFound) IsUserByAddressOrError()          {}
+func (ErrUserNotFound) IsError()                         {}
+func (ErrUserNotFound) IsLoginPayloadOrError()           {}
+func (ErrUserNotFound) IsFollowUserPayloadOrError()      {}
+func (ErrUserNotFound) IsUnfollowUserPayloadOrError()    {}
+func (ErrUserNotFound) IsAdminAddWalletPayloadOrError()  {}
+func (ErrUserNotFound) IsSetProfileImagePayloadOrError() {}
 
 type ErrUsernameNotAvailable struct {
 	Message string `json:"message"`
