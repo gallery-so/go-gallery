@@ -165,7 +165,7 @@ const searchUsers = `-- name: SearchUsers :many
 with min_content_score as (
     select score from user_relevance where id is null
 )
-select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_token_id, u.profile_image_id from users u left join user_relevance on u.id = user_relevance.id,
+select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_picture_id, u.profile_image_id from users u left join user_relevance on u.id = user_relevance.id,
     -- Adding the search condition to the wallet join statement is a very helpful optimization, but we can't use
     -- "simple_full_query" at this point in the statement, so we're repeating the "websearch_to_tsquery..." part here
     unnest(u.wallets) as wallet_id left join wallets w on w.id = wallet_id and w.deleted = false and websearch_to_tsquery('simple', $1) @@ w.fts_address,
@@ -229,7 +229,7 @@ func (q *Queries) SearchUsers(ctx context.Context, arg SearchUsersParams) ([]Use
 			&i.FeaturedGallery,
 			&i.PrimaryWalletID,
 			&i.UserExperiences,
-			&i.ProfileTokenID,
+			&i.ProfilePictureID,
 			&i.ProfileImageID,
 		); err != nil {
 			return nil, err
