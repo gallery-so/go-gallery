@@ -159,7 +159,7 @@ func (q *Queries) ClearNotificationsForUser(ctx context.Context, ownerID persist
 
 const countOwnersByContractId = `-- name: CountOwnersByContractId :one
 SELECT count(DISTINCT users.id) FROM users, tokens, contracts
-    WHERE (contracts.id = $1 or contracts.parent_contract_id = $1)
+    WHERE (contracts.id = $1 or contracts.parent_id = $1)
     AND tokens.owner_user_id = users.id
     AND (NOT $2::bool OR users.universal = false)
     AND tokens.deleted = false AND users.deleted = false AND contracts.deleted = false
@@ -259,7 +259,7 @@ SELECT count(*)
 FROM tokens
 JOIN users ON users.id = tokens.owner_user_id
 JOIN contracts ON tokens.contract = contracts.id
-WHERE (contracts.id = $1 OR contracts.parent_contract_id = $1)
+WHERE (contracts.id = $1 OR contracts.parent_id = $1)
   AND (NOT $2::bool OR users.universal = false) AND tokens.deleted = false AND contracts.deleted = false
 `
 
@@ -2963,7 +2963,7 @@ const getTokensByContractIdPaginate = `-- name: GetTokensByContractIdPaginate :m
 SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id FROM tokens t
     JOIN users u ON u.id = t.owner_user_id
     JOIN contracts c ON t.contract = c.id
-    WHERE (c.id = $1 OR c.parent_contract_id = $1)
+    WHERE (c.id = $1 OR c.parent_id = $1)
     AND t.deleted = false
     AND c.deleted = false
     AND (NOT $3::bool OR u.universal = false)

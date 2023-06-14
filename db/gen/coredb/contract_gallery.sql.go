@@ -91,7 +91,7 @@ func (q *Queries) UpsertChildContracts(ctx context.Context, arg UpsertChildContr
 	return items, nil
 }
 
-const upsertContracts = `-- name: UpsertContracts :many
+const upsertParentContracts = `-- name: UpsertParentContracts :many
 insert into contracts(id, deleted, version, created_at, address, symbol, name, owner_address, chain, description) (
   select unnest($1::varchar[])
     , false
@@ -115,7 +115,7 @@ do update set symbol = excluded.symbol
 returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id
 `
 
-type UpsertContractsParams struct {
+type UpsertParentContractsParams struct {
 	Ids          []string
 	Version      []int32
 	Address      []string
@@ -126,8 +126,8 @@ type UpsertContractsParams struct {
 	Description  []string
 }
 
-func (q *Queries) UpsertContracts(ctx context.Context, arg UpsertContractsParams) ([]Contract, error) {
-	rows, err := q.db.Query(ctx, upsertContracts,
+func (q *Queries) UpsertParentContracts(ctx context.Context, arg UpsertParentContractsParams) ([]Contract, error) {
+	rows, err := q.db.Query(ctx, upsertParentContracts,
 		arg.Ids,
 		arg.Version,
 		arg.Address,

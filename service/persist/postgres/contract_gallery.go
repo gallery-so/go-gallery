@@ -123,7 +123,7 @@ func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, pContracts 
 	}
 
 	contracts := removeDuplicateContractsGallery(pContracts)
-	params := db.UpsertContractsParams{}
+	params := db.UpsertParentContractsParams{}
 
 	for i := range contracts {
 		c := &contracts[i]
@@ -137,7 +137,7 @@ func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, pContracts 
 		params.Description = append(params.Description, c.Description.String())
 	}
 
-	upserted, err := c.queries.UpsertContracts(pCtx, params)
+	upserted, err := c.queries.UpsertParentContracts(pCtx, params)
 	if err != nil {
 		return nil, err
 	}

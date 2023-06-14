@@ -1,4 +1,4 @@
--- name: UpsertContracts :many
+-- name: UpsertParentContracts :many
 insert into contracts(id, deleted, version, created_at, address, symbol, name, owner_address, chain, description) (
   select unnest(@ids::varchar[])
     , false

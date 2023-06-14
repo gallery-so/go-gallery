@@ -191,7 +191,7 @@ SELECT * FROM tokens WHERE owned_by_wallets && $1 AND deleted = false
 SELECT t.* FROM tokens t
     JOIN users u ON u.id = t.owner_user_id
     JOIN contracts c ON t.contract = c.id
-    WHERE (c.id = $1 OR c.parent_contract_id = $1)
+    WHERE (c.id = $1 OR c.parent_id = $1)
     AND t.deleted = false
     AND c.deleted = false
     AND (NOT @gallery_users_only::bool OR u.universal = false)
@@ -205,7 +205,7 @@ SELECT t.* FROM tokens t
 SELECT t.* FROM tokens t
     JOIN users u ON u.id = t.owner_user_id
     JOIN contracts c ON t.contract = c.id
-    WHERE (c.id = @id OR c.parent_contract_id = @id)
+    WHERE (c.id = @id OR c.parent_id = @id)
     AND t.deleted = false
     AND c.deleted = false
     AND (NOT @gallery_users_only::bool OR u.universal = false)
@@ -220,7 +220,7 @@ SELECT count(*)
 FROM tokens
 JOIN users ON users.id = tokens.owner_user_id
 JOIN contracts ON tokens.contract = contracts.id
-WHERE (contracts.id = @id OR contracts.parent_contract_id = @id)
+WHERE (contracts.id = @id OR contracts.parent_id = @id)
   AND (NOT @gallery_users_only::bool OR users.universal = false) AND tokens.deleted = false AND contracts.deleted = false;
 
 -- name: GetOwnersByContractIdBatchPaginate :batchmany
@@ -243,7 +243,7 @@ select users.* from (
 
 -- name: CountOwnersByContractId :one
 SELECT count(DISTINCT users.id) FROM users, tokens, contracts
-    WHERE (contracts.id = @id or contracts.parent_contract_id = @id)
+    WHERE (contracts.id = @id or contracts.parent_id = @id)
     AND tokens.owner_user_id = users.id
     AND (NOT @gallery_users_only::bool OR users.universal = false)
     AND tokens.deleted = false AND users.deleted = false AND contracts.deleted = false;
