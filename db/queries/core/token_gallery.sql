@@ -22,7 +22,6 @@ insert into tokens
   , owned_by_wallets
   , chain
   , contract
-  , is_user_marked_spam
   , is_provider_marked_spam
   , last_synced
   , token_uri
@@ -50,7 +49,6 @@ insert into tokens
     , owned_by_wallets[owned_by_wallets_start_idx::int:owned_by_wallets_end_idx::int]
     , chain
     , contract
-    , is_user_marked_spam
     , is_provider_marked_spam
     , now()
     , token_uri
@@ -83,7 +81,6 @@ insert into tokens
       , @owned_by_wallets::varchar[] as owned_by_wallets
       , unnest(@owned_by_wallets_start_idx::int[]) as owned_by_wallets_start_idx
       , unnest(@owned_by_wallets_end_idx::int[]) as owned_by_wallets_end_idx
-      , unnest(@is_user_marked_spam::bool[]) as is_user_marked_spam
       , unnest(@is_provider_marked_spam::bool[]) as is_provider_marked_spam
       , unnest(@token_uri::varchar[]) as token_uri
       , unnest(@token_id::varchar[]) as token_id
@@ -106,7 +103,6 @@ do update set
   , block_number = excluded.block_number
   , version = excluded.version
   , last_updated = excluded.last_updated
-  , is_user_marked_spam = tokens.is_user_marked_spam
   , is_provider_marked_spam = excluded.is_provider_marked_spam
   , last_synced = greatest(excluded.last_synced,tokens.last_synced)
 returning *;

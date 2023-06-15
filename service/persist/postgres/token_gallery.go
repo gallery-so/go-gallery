@@ -357,7 +357,6 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 		InsertHelpers.AppendWalletList(&params.OwnedByWallets, t.OwnedByWallets, &params.OwnedByWalletsStartIdx, &params.OwnedByWalletsEndIdx)
 		params.Chain = append(params.Chain, int32(t.Chain))
 		params.Contract = append(params.Contract, t.Contract.String())
-		appendBool(&params.IsUserMarkedSpam, t.IsUserMarkedSpam, &errors)
 		appendBool(&params.IsProviderMarkedSpam, t.IsProviderMarkedSpam, &errors)
 		params.TokenUri = append(params.TokenUri, "")
 
