@@ -35,7 +35,6 @@ insert into tokens
   , owned_by_wallets
   , chain
   , contract
-  , is_user_marked_spam
   , is_provider_marked_spam
   , last_synced
   , token_uri
@@ -63,7 +62,6 @@ insert into tokens
     , owned_by_wallets[owned_by_wallets_start_idx::int:owned_by_wallets_end_idx::int]
     , chain
     , contract
-    , is_user_marked_spam
     , is_provider_marked_spam
     , now()
     , token_uri
@@ -96,12 +94,11 @@ insert into tokens
       , $17::varchar[] as owned_by_wallets
       , unnest($18::int[]) as owned_by_wallets_start_idx
       , unnest($19::int[]) as owned_by_wallets_end_idx
-      , unnest($20::bool[]) as is_user_marked_spam
-      , unnest($21::bool[]) as is_provider_marked_spam
-      , unnest($22::varchar[]) as token_uri
-      , unnest($23::varchar[]) as token_id
-      , unnest($24::varchar[]) as contract
-      , unnest($25::int[]) as chain
+      , unnest($20::bool[]) as is_provider_marked_spam
+      , unnest($21::varchar[]) as token_uri
+      , unnest($22::varchar[]) as token_id
+      , unnest($23::varchar[]) as contract
+      , unnest($24::int[]) as chain
   ) bulk_upsert
 )
 on conflict (token_id, contract, chain, owner_user_id) where deleted = false
@@ -119,7 +116,6 @@ do update set
   , block_number = excluded.block_number
   , version = excluded.version
   , last_updated = excluded.last_updated
-  , is_user_marked_spam = tokens.is_user_marked_spam
   , is_provider_marked_spam = excluded.is_provider_marked_spam
   , last_synced = greatest(excluded.last_synced,tokens.last_synced)
 returning id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id
@@ -145,7 +141,6 @@ type UpsertTokensParams struct {
 	OwnedByWallets           []string
 	OwnedByWalletsStartIdx   []int32
 	OwnedByWalletsEndIdx     []int32
-	IsUserMarkedSpam         []bool
 	IsProviderMarkedSpam     []bool
 	TokenUri                 []string
 	TokenID                  []string
@@ -174,7 +169,6 @@ func (q *Queries) UpsertTokens(ctx context.Context, arg UpsertTokensParams) ([]T
 		arg.OwnedByWallets,
 		arg.OwnedByWalletsStartIdx,
 		arg.OwnedByWalletsEndIdx,
-		arg.IsUserMarkedSpam,
 		arg.IsProviderMarkedSpam,
 		arg.TokenUri,
 		arg.TokenID,
