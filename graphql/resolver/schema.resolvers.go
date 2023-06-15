@@ -420,12 +420,8 @@ func (r *galleryUpdatedFeedEventDataResolver) SubEventDatas(ctx context.Context,
 func (r *galleryUserResolver) ProfileImage(ctx context.Context, obj *model.GalleryUser) (model.ProfileImage, error) {
 	pfp, err := publicapi.For(ctx).User.GetProfileImageByUserID(ctx, obj.Dbid)
 	if err != nil {
-		if errors.Is(err, publicapi.ErrProfileImageNotSet) {
-			return nil, nil
-		}
 		return nil, err
 	}
-
 	return profileImageToModel(ctx, pfp)
 }
 

@@ -1775,29 +1775,29 @@ func (b *GetOwnersByContractIdBatchPaginateBatchResults) Close() error {
 	return b.br.Close()
 }
 
-const getProfileImageByID = `-- name: GetProfileImageByID :batchone
-select id, user_id, token_id, source_type, deleted, created_at, last_updated from profile_images where id = $1 and not deleted
+const getProfileImageByUserID = `-- name: GetProfileImageByUserID :batchone
+select id, user_id, token_id, source_type, deleted, created_at, last_updated from profile_images where user_id = $1 and not deleted
 `
 
-type GetProfileImageByIDBatchResults struct {
+type GetProfileImageByUserIDBatchResults struct {
 	br     pgx.BatchResults
 	tot    int
 	closed bool
 }
 
-func (q *Queries) GetProfileImageByID(ctx context.Context, id []persist.DBID) *GetProfileImageByIDBatchResults {
+func (q *Queries) GetProfileImageByUserID(ctx context.Context, userID []persist.DBID) *GetProfileImageByUserIDBatchResults {
 	batch := &pgx.Batch{}
-	for _, a := range id {
+	for _, a := range userID {
 		vals := []interface{}{
 			a,
 		}
-		batch.Queue(getProfileImageByID, vals...)
+		batch.Queue(getProfileImageByUserID, vals...)
 	}
 	br := q.db.SendBatch(ctx, batch)
-	return &GetProfileImageByIDBatchResults{br, len(id), false}
+	return &GetProfileImageByUserIDBatchResults{br, len(userID), false}
 }
 
-func (b *GetProfileImageByIDBatchResults) QueryRow(f func(int, ProfileImage, error)) {
+func (b *GetProfileImageByUserIDBatchResults) QueryRow(f func(int, ProfileImage, error)) {
 	defer b.br.Close()
 	for t := 0; t < b.tot; t++ {
 		var i ProfileImage
@@ -1823,7 +1823,7 @@ func (b *GetProfileImageByIDBatchResults) QueryRow(f func(int, ProfileImage, err
 	}
 }
 
-func (b *GetProfileImageByIDBatchResults) Close() error {
+func (b *GetProfileImageByUserIDBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }

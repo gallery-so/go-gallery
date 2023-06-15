@@ -39,8 +39,7 @@ import (
 
 var ErrProfileImageTooManySources = errors.New("too many profile image sources provided")
 var ErrProfileImageNoSources = errors.New("no profile image source provided")
-var ErrProfileImageUnknownSource = errors.New("unsupported profile image sourceprovided")
-var ErrProfileImageNotSet = errors.New("no profile image set")
+var ErrProfileImageUnknownSource = errors.New("unsupported profile image source provided")
 var ErrProfileImageNotTokenOwner = errors.New("user is not an owner of the token")
 
 type UserAPI struct {
@@ -1384,14 +1383,12 @@ func (api UserAPI) GetProfileImageByUserID(ctx context.Context, userID persist.D
 		return db.ProfileImage{}, err
 	}
 
-	user, err := For(ctx).User.GetUserById(ctx, userID)
-	if err != nil {
-		return db.ProfileImage{}, err
+	pfp, err := api.loaders.ProfileImageByUserID.Load(userID)
+
+	var errNotFound persist.ErrProfileImageNotFound
+	if errors.As(err, &errNotFound) {
+		return db.ProfileImage{}, nil
 	}
 
-	if user.ProfileImageID == "" {
-		return db.ProfileImage{}, ErrProfileImageNotSet
-	}
-
-	return api.loaders.ProfileImageByID.Load(user.ProfileImageID)
+	return pfp, err
 }

@@ -1931,13 +1931,14 @@ func getMediaForToken(ctx context.Context, token db.Token) model.MediaSubtype {
 }
 
 func profileImageToModel(ctx context.Context, pfp db.ProfileImage) (model.ProfileImage, error) {
+	// PFP isn't set or we were unable to retrieve it
+	if pfp.ID == "" {
+		return nil, nil
+	}
 	switch pfp.SourceType {
 	case persist.ProfileImageSourceToken:
 		token, err := resolveTokenByTokenID(ctx, pfp.TokenID)
-		if err != nil {
-			return nil, err
-		}
-		return &model.TokenProfileImage{Token: token}, nil
+		return &model.TokenProfileImage{Token: token}, err
 	default:
 		return nil, publicapi.ErrProfileImageUnknownSource
 	}
