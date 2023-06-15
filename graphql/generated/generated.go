@@ -586,7 +586,7 @@ type ComplexityRoot struct {
 		SharedCommunities   func(childComplexity int, before *string, after *string, first *int, last *int) int
 		SharedFollowers     func(childComplexity int, before *string, after *string, first *int, last *int) int
 		SocialAccounts      func(childComplexity int) int
-		Tokens              func(childComplexity int) int
+		Tokens              func(childComplexity int, ownershipFilter []persist.TokenOwnershipType) int
 		TokensByChain       func(childComplexity int, chain persist.Chain) int
 		Traits              func(childComplexity int) int
 		Universal           func(childComplexity int) int
@@ -739,6 +739,7 @@ type ComplexityRoot struct {
 		RemoveUserWallets               func(childComplexity int, walletIds []persist.DBID) int
 		ResendVerificationEmail         func(childComplexity int) int
 		RevokeRolesFromUser             func(childComplexity int, username string, roles []*persist.Role) int
+		SetCommunityOverrideCreator     func(childComplexity int, communityID persist.DBID, creatorUserID *persist.DBID) int
 		SetProfileImage                 func(childComplexity int, input model.SetProfileImageInput) int
 		SetSpamPreference               func(childComplexity int, input model.SetSpamPreferenceInput) int
 		SyncCreatedTokens               func(childComplexity int, input model.SyncCreatedTokensInput) int
@@ -920,6 +921,10 @@ type ComplexityRoot struct {
 		Results func(childComplexity int) int
 	}
 
+	SetCommunityOverrideCreatorPayload struct {
+		User func(childComplexity int) int
+	}
+
 	SetProfileImagePayload struct {
 		Viewer func(childComplexity int) int
 	}
@@ -1049,6 +1054,7 @@ type ComplexityRoot struct {
 		BlockNumber           func(childComplexity int) int
 		Chain                 func(childComplexity int) int
 		CollectorsNote        func(childComplexity int) int
+		Community             func(childComplexity int) int
 		Contract              func(childComplexity int) int
 		CreationTime          func(childComplexity int) int
 		CreatorAddress        func(childComplexity int) int
@@ -1065,6 +1071,8 @@ type ComplexityRoot struct {
 		OpenseaID             func(childComplexity int) int
 		OwnedByWallets        func(childComplexity int) int
 		Owner                 func(childComplexity int) int
+		OwnerIsCreator        func(childComplexity int) int
+		OwnerIsHolder         func(childComplexity int) int
 		OwnershipHistory      func(childComplexity int) int
 		Quantity              func(childComplexity int) int
 		TokenID               func(childComplexity int) int
@@ -1414,7 +1422,7 @@ type GalleryUserResolver interface {
 
 	Roles(ctx context.Context, obj *model.GalleryUser) ([]*persist.Role, error)
 	SocialAccounts(ctx context.Context, obj *model.GalleryUser) (*model.SocialAccounts, error)
-	Tokens(ctx context.Context, obj *model.GalleryUser) ([]*model.Token, error)
+	Tokens(ctx context.Context, obj *model.GalleryUser, ownershipFilter []persist.TokenOwnershipType) ([]*model.Token, error)
 	TokensByChain(ctx context.Context, obj *model.GalleryUser, chain persist.Chain) (*model.ChainTokens, error)
 	Wallets(ctx context.Context, obj *model.GalleryUser) ([]*model.Wallet, error)
 	PrimaryWallet(ctx context.Context, obj *model.GalleryUser) (*model.Wallet, error)
@@ -1490,6 +1498,7 @@ type MutationResolver interface {
 	BanUserFromFeed(ctx context.Context, username string, action string) (model.BanUserFromFeedPayloadOrError, error)
 	UnbanUserFromFeed(ctx context.Context, username string) (model.UnbanUserFromFeedPayloadOrError, error)
 	MintPremiumCardToWallet(ctx context.Context, input model.MintPremiumCardToWalletInput) (model.MintPremiumCardToWalletPayloadOrError, error)
+	SetCommunityOverrideCreator(ctx context.Context, communityID persist.DBID, creatorUserID *persist.DBID) (model.SetCommunityOverrideCreatorPayloadOrError, error)
 	UploadPersistedQueries(ctx context.Context, input *model.UploadPersistedQueriesInput) (model.UploadPersistedQueriesPayloadOrError, error)
 	UpdatePrimaryWallet(ctx context.Context, walletID persist.DBID) (model.UpdatePrimaryWalletPayloadOrError, error)
 	UpdateUserExperience(ctx context.Context, input model.UpdateUserExperienceInput) (model.UpdateUserExperiencePayloadOrError, error)
@@ -1576,7 +1585,11 @@ type TokenResolver interface {
 	Owner(ctx context.Context, obj *model.Token) (*model.GalleryUser, error)
 	OwnedByWallets(ctx context.Context, obj *model.Token) ([]*model.Wallet, error)
 
+	OwnerIsHolder(ctx context.Context, obj *model.Token) (*bool, error)
+	OwnerIsCreator(ctx context.Context, obj *model.Token) (*bool, error)
+
 	Contract(ctx context.Context, obj *model.Token) (*model.Contract, error)
+	Community(ctx context.Context, obj *model.Token) (*model.Community, error)
 }
 type TokenHolderResolver interface {
 	Wallets(ctx context.Context, obj *model.TokenHolder) ([]*model.Wallet, error)
@@ -3399,7 +3412,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		return e.complexity.GalleryUser.Tokens(childComplexity), true
+		args, err := ec.field_GalleryUser_tokens_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.GalleryUser.Tokens(childComplexity, args["ownershipFilter"].([]persist.TokenOwnershipType)), true
 
 	case "GalleryUser.tokensByChain":
 		if e.complexity.GalleryUser.TokensByChain == nil {
@@ -4246,6 +4264,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.RevokeRolesFromUser(childComplexity, args["username"].(string), args["roles"].([]*persist.Role)), true
+
+	case "Mutation.setCommunityOverrideCreator":
+		if e.complexity.Mutation.SetCommunityOverrideCreator == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_setCommunityOverrideCreator_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.SetCommunityOverrideCreator(childComplexity, args["communityID"].(persist.DBID), args["creatorUserID"].(*persist.DBID)), true
 
 	case "Mutation.setProfileImage":
 		if e.complexity.Mutation.SetProfileImage == nil {
@@ -5292,6 +5322,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.SearchUsersPayload.Results(childComplexity), true
 
+	case "SetCommunityOverrideCreatorPayload.user":
+		if e.complexity.SetCommunityOverrideCreatorPayload.User == nil {
+			break
+		}
+
+		return e.complexity.SetCommunityOverrideCreatorPayload.User(childComplexity), true
+
 	case "SetProfileImagePayload.viewer":
 		if e.complexity.SetProfileImagePayload.Viewer == nil {
 			break
@@ -5835,6 +5872,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Token.CollectorsNote(childComplexity), true
 
+	case "Token.community":
+		if e.complexity.Token.Community == nil {
+			break
+		}
+
+		return e.complexity.Token.Community(childComplexity), true
+
 	case "Token.contract":
 		if e.complexity.Token.Contract == nil {
 			break
@@ -5946,6 +5990,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Token.Owner(childComplexity), true
+
+	case "Token.ownerIsCreator":
+		if e.complexity.Token.OwnerIsCreator == nil {
+			break
+		}
+
+		return e.complexity.Token.OwnerIsCreator(childComplexity), true
+
+	case "Token.ownerIsHolder":
+		if e.complexity.Token.OwnerIsHolder == nil {
+			break
+		}
+
+		return e.complexity.Token.OwnerIsHolder(childComplexity), true
 
 	case "Token.ownershipHistory":
 		if e.complexity.Token.OwnershipHistory == nil {
@@ -6943,7 +7001,7 @@ type GalleryUser implements Node @goEmbedHelper {
   # Returns all tokens owned by this user. Useful for retrieving all tokens without any duplicates,
   # as opposed to retrieving user -> wallets -> tokens, which would contain duplicates for any token
   # that appears in more than one of the user's wallets.
-  tokens: [Token] @goField(forceResolver: true)
+  tokens(ownershipFilter: [TokenOwnershipType!]): [Token] @goField(forceResolver: true)
   tokensByChain(chain: Chain!): ChainTokens @goField(forceResolver: true)
 
   wallets: [Wallet] @goField(forceResolver: true)
@@ -7236,6 +7294,11 @@ enum Chain {
   POAP
 }
 
+enum TokenOwnershipType {
+  Holder
+  Creator
+}
+
 enum WalletType {
   EOA
   GnosisSafe
@@ -7262,8 +7325,11 @@ type Token implements Node @goEmbedHelper {
   owner: GalleryUser @goField(forceResolver: true)
   ownedByWallets: [Wallet] @goField(forceResolver: true)
   ownershipHistory: [OwnerAtBlock]
+  ownerIsHolder: Boolean @goField(forceResolver: true)
+  ownerIsCreator: Boolean @goField(forceResolver: true)
   tokenMetadata: String # source is map[string]interface{} on backend, not sure what best format is here
   contract: Contract @goField(forceResolver: true)
+  community: Community @goField(forceResolver: true)
   externalUrl: String
   blockNumber: String # source is uint64
   isSpamByUser: Boolean
@@ -8732,6 +8798,14 @@ type UnbanUserFromFeedPayload {
 
 union UnbanUserFromFeedPayloadOrError = UnbanUserFromFeedPayload | ErrNotAuthorized
 
+type SetCommunityOverrideCreatorPayload {
+  user: GalleryUser
+}
+
+union SetCommunityOverrideCreatorPayloadOrError =
+    SetCommunityOverrideCreatorPayload
+  | ErrNotAuthorized
+
 input GalleryPositionInput {
   galleryId: DBID!
   position: String!
@@ -9123,6 +9197,10 @@ type Mutation {
   mintPremiumCardToWallet(
     input: MintPremiumCardToWalletInput!
   ): MintPremiumCardToWalletPayloadOrError @retoolAuth
+  setCommunityOverrideCreator(
+    communityID: DBID!
+    creatorUserID: DBID
+  ): SetCommunityOverrideCreatorPayloadOrError @retoolAuth
 
   # Gallery Frontend Deploy Persisted Queries
   uploadPersistedQueries(input: UploadPersistedQueriesInput): UploadPersistedQueriesPayloadOrError
@@ -9693,6 +9771,21 @@ func (ec *executionContext) field_GalleryUser_tokensByChain_args(ctx context.Con
 	return args, nil
 }
 
+func (ec *executionContext) field_GalleryUser_tokens_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 []persist.TokenOwnershipType
+	if tmp, ok := rawArgs["ownershipFilter"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("ownershipFilter"))
+		arg0, err = ec.unmarshalOTokenOwnershipType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenOwnershipTypeᚄ(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["ownershipFilter"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_addRolesToUser_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -10227,6 +10320,30 @@ func (ec *executionContext) field_Mutation_revokeRolesFromUser_args(ctx context.
 		}
 	}
 	args["roles"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_setCommunityOverrideCreator_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.DBID
+	if tmp, ok := rawArgs["communityID"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("communityID"))
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["communityID"] = arg0
+	var arg1 *persist.DBID
+	if tmp, ok := rawArgs["creatorUserID"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("creatorUserID"))
+		arg1, err = ec.unmarshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["creatorUserID"] = arg1
 	return args, nil
 }
 
@@ -13208,10 +13325,16 @@ func (ec *executionContext) fieldContext_ChainTokens_tokens(ctx context.Context,
 				return ec.fieldContext_Token_ownedByWallets(ctx, field)
 			case "ownershipHistory":
 				return ec.fieldContext_Token_ownershipHistory(ctx, field)
+			case "ownerIsHolder":
+				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
+			case "ownerIsCreator":
+				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
 				return ec.fieldContext_Token_contract(ctx, field)
+			case "community":
+				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
 			case "blockNumber":
@@ -14402,10 +14525,16 @@ func (ec *executionContext) fieldContext_CollectionToken_token(ctx context.Conte
 				return ec.fieldContext_Token_ownedByWallets(ctx, field)
 			case "ownershipHistory":
 				return ec.fieldContext_Token_ownershipHistory(ctx, field)
+			case "ownerIsHolder":
+				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
+			case "ownerIsCreator":
+				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
 				return ec.fieldContext_Token_contract(ctx, field)
+			case "community":
+				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
 			case "blockNumber":
@@ -23512,7 +23641,7 @@ func (ec *executionContext) _GalleryUser_tokens(ctx context.Context, field graph
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.GalleryUser().Tokens(rctx, obj)
+		return ec.resolvers.GalleryUser().Tokens(rctx, obj, fc.Args["ownershipFilter"].([]persist.TokenOwnershipType))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -23564,10 +23693,16 @@ func (ec *executionContext) fieldContext_GalleryUser_tokens(ctx context.Context,
 				return ec.fieldContext_Token_ownedByWallets(ctx, field)
 			case "ownershipHistory":
 				return ec.fieldContext_Token_ownershipHistory(ctx, field)
+			case "ownerIsHolder":
+				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
+			case "ownerIsCreator":
+				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
 				return ec.fieldContext_Token_contract(ctx, field)
+			case "community":
+				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
 			case "blockNumber":
@@ -23585,6 +23720,17 @@ func (ec *executionContext) fieldContext_GalleryUser_tokens(ctx context.Context,
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Token", field.Name)
 		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_GalleryUser_tokens_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
 	}
 	return fc, nil
 }
@@ -31203,6 +31349,78 @@ func (ec *executionContext) fieldContext_Mutation_mintPremiumCardToWallet(ctx co
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_setCommunityOverrideCreator(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_setCommunityOverrideCreator(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().SetCommunityOverrideCreator(rctx, fc.Args["communityID"].(persist.DBID), fc.Args["creatorUserID"].(*persist.DBID))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.RetoolAuth == nil {
+				return nil, errors.New("directive retoolAuth is not implemented")
+			}
+			return ec.directives.RetoolAuth(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.SetCommunityOverrideCreatorPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.SetCommunityOverrideCreatorPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.SetCommunityOverrideCreatorPayloadOrError)
+	fc.Result = res
+	return ec.marshalOSetCommunityOverrideCreatorPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSetCommunityOverrideCreatorPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_setCommunityOverrideCreator(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type SetCommunityOverrideCreatorPayloadOrError does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_setCommunityOverrideCreator_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_uploadPersistedQueries(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Mutation_uploadPersistedQueries(ctx, field)
 	if err != nil {
@@ -35174,10 +35392,16 @@ func (ec *executionContext) fieldContext_RefreshTokenPayload_token(ctx context.C
 				return ec.fieldContext_Token_ownedByWallets(ctx, field)
 			case "ownershipHistory":
 				return ec.fieldContext_Token_ownershipHistory(ctx, field)
+			case "ownerIsHolder":
+				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
+			case "ownerIsCreator":
+				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
 				return ec.fieldContext_Token_contract(ctx, field)
+			case "community":
+				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
 			case "blockNumber":
@@ -35875,6 +36099,95 @@ func (ec *executionContext) fieldContext_SearchUsersPayload_results(ctx context.
 	return fc, nil
 }
 
+func (ec *executionContext) _SetCommunityOverrideCreatorPayload_user(ctx context.Context, field graphql.CollectedField, obj *model.SetCommunityOverrideCreatorPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SetCommunityOverrideCreatorPayload_user(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.User, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.GalleryUser)
+	fc.Result = res
+	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SetCommunityOverrideCreatorPayload_user(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SetCommunityOverrideCreatorPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_GalleryUser_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_GalleryUser_dbid(ctx, field)
+			case "username":
+				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "bio":
+				return ec.fieldContext_GalleryUser_bio(ctx, field)
+			case "traits":
+				return ec.fieldContext_GalleryUser_traits(ctx, field)
+			case "universal":
+				return ec.fieldContext_GalleryUser_universal(ctx, field)
+			case "roles":
+				return ec.fieldContext_GalleryUser_roles(ctx, field)
+			case "socialAccounts":
+				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
+			case "tokens":
+				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensByChain":
+				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
+			case "wallets":
+				return ec.fieldContext_GalleryUser_wallets(ctx, field)
+			case "primaryWallet":
+				return ec.fieldContext_GalleryUser_primaryWallet(ctx, field)
+			case "featuredGallery":
+				return ec.fieldContext_GalleryUser_featuredGallery(ctx, field)
+			case "galleries":
+				return ec.fieldContext_GalleryUser_galleries(ctx, field)
+			case "badges":
+				return ec.fieldContext_GalleryUser_badges(ctx, field)
+			case "isAuthenticatedUser":
+				return ec.fieldContext_GalleryUser_isAuthenticatedUser(ctx, field)
+			case "followers":
+				return ec.fieldContext_GalleryUser_followers(ctx, field)
+			case "following":
+				return ec.fieldContext_GalleryUser_following(ctx, field)
+			case "feed":
+				return ec.fieldContext_GalleryUser_feed(ctx, field)
+			case "sharedFollowers":
+				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
+			case "sharedCommunities":
+				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _SetProfileImagePayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.SetProfileImagePayload) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_SetProfileImagePayload_viewer(ctx, field)
 	if err != nil {
@@ -36004,10 +36317,16 @@ func (ec *executionContext) fieldContext_SetSpamPreferencePayload_tokens(ctx con
 				return ec.fieldContext_Token_ownedByWallets(ctx, field)
 			case "ownershipHistory":
 				return ec.fieldContext_Token_ownershipHistory(ctx, field)
+			case "ownerIsHolder":
+				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
+			case "ownerIsCreator":
+				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
 				return ec.fieldContext_Token_contract(ctx, field)
+			case "community":
+				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
 			case "blockNumber":
@@ -40003,6 +40322,88 @@ func (ec *executionContext) fieldContext_Token_ownershipHistory(ctx context.Cont
 	return fc, nil
 }
 
+func (ec *executionContext) _Token_ownerIsHolder(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Token_ownerIsHolder(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Token().OwnerIsHolder(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Token_ownerIsHolder(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Token_ownerIsCreator(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Token_ownerIsCreator(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Token().OwnerIsCreator(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Token_ownerIsCreator(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Token_tokenMetadata(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Token_tokenMetadata(ctx, field)
 	if err != nil {
@@ -40104,6 +40505,85 @@ func (ec *executionContext) fieldContext_Token_contract(ctx context.Context, fie
 				return ec.fieldContext_Contract_isSpam(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Contract", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Token_community(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Token_community(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Token().Community(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Community)
+	fc.Result = res
+	return ec.marshalOCommunity2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunity(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Token_community(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "dbid":
+				return ec.fieldContext_Community_dbid(ctx, field)
+			case "id":
+				return ec.fieldContext_Community_id(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Community_lastUpdated(ctx, field)
+			case "contract":
+				return ec.fieldContext_Community_contract(ctx, field)
+			case "contractAddress":
+				return ec.fieldContext_Community_contractAddress(ctx, field)
+			case "creatorAddress":
+				return ec.fieldContext_Community_creatorAddress(ctx, field)
+			case "creator":
+				return ec.fieldContext_Community_creator(ctx, field)
+			case "chain":
+				return ec.fieldContext_Community_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Community_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Community_description(ctx, field)
+			case "previewImage":
+				return ec.fieldContext_Community_previewImage(ctx, field)
+			case "profileImageURL":
+				return ec.fieldContext_Community_profileImageURL(ctx, field)
+			case "profileBannerURL":
+				return ec.fieldContext_Community_profileBannerURL(ctx, field)
+			case "badgeURL":
+				return ec.fieldContext_Community_badgeURL(ctx, field)
+			case "parentCommunity":
+				return ec.fieldContext_Community_parentCommunity(ctx, field)
+			case "subCommunities":
+				return ec.fieldContext_Community_subCommunities(ctx, field)
+			case "tokensInCommunity":
+				return ec.fieldContext_Community_tokensInCommunity(ctx, field)
+			case "owners":
+				return ec.fieldContext_Community_owners(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
 		},
 	}
 	return fc, nil
@@ -40468,10 +40948,16 @@ func (ec *executionContext) fieldContext_TokenEdge_node(ctx context.Context, fie
 				return ec.fieldContext_Token_ownedByWallets(ctx, field)
 			case "ownershipHistory":
 				return ec.fieldContext_Token_ownershipHistory(ctx, field)
+			case "ownerIsHolder":
+				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
+			case "ownerIsCreator":
+				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
 				return ec.fieldContext_Token_contract(ctx, field)
+			case "community":
+				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
 			case "blockNumber":
@@ -41026,10 +41512,16 @@ func (ec *executionContext) fieldContext_TokenProfileImage_token(ctx context.Con
 				return ec.fieldContext_Token_ownedByWallets(ctx, field)
 			case "ownershipHistory":
 				return ec.fieldContext_Token_ownershipHistory(ctx, field)
+			case "ownerIsHolder":
+				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
+			case "ownerIsCreator":
+				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
 				return ec.fieldContext_Token_contract(ctx, field)
+			case "community":
+				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
 			case "blockNumber":
@@ -43410,10 +43902,16 @@ func (ec *executionContext) fieldContext_UpdateTokenInfoPayload_token(ctx contex
 				return ec.fieldContext_Token_ownedByWallets(ctx, field)
 			case "ownershipHistory":
 				return ec.fieldContext_Token_ownershipHistory(ctx, field)
+			case "ownerIsHolder":
+				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
+			case "ownerIsCreator":
+				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
 				return ec.fieldContext_Token_contract(ctx, field)
+			case "community":
+				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
 			case "blockNumber":
@@ -46023,10 +46521,16 @@ func (ec *executionContext) fieldContext_Wallet_tokens(ctx context.Context, fiel
 				return ec.fieldContext_Token_ownedByWallets(ctx, field)
 			case "ownershipHistory":
 				return ec.fieldContext_Token_ownershipHistory(ctx, field)
+			case "ownerIsHolder":
+				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
+			case "ownerIsCreator":
+				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
 				return ec.fieldContext_Token_contract(ctx, field)
+			case "community":
+				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
 			case "blockNumber":
@@ -52442,6 +52946,29 @@ func (ec *executionContext) _SearchUsersPayloadOrError(ctx context.Context, sel 
 	}
 }
 
+func (ec *executionContext) _SetCommunityOverrideCreatorPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.SetCommunityOverrideCreatorPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.SetCommunityOverrideCreatorPayload:
+		return ec._SetCommunityOverrideCreatorPayload(ctx, sel, &obj)
+	case *model.SetCommunityOverrideCreatorPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SetCommunityOverrideCreatorPayload(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _SetProfileImagePayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.SetProfileImagePayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -55831,7 +56358,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "SocialQueriesOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "SyncTokensPayloadOrError", "SyncCreatedTokensPayloadOrError", "Error", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "UnbanUserFromFeedPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "GenerateQRCodeLoginTokenPayloadOrError", "SetProfileImagePayloadOrError"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "SocialQueriesOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "SyncTokensPayloadOrError", "SyncCreatedTokensPayloadOrError", "Error", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "UnbanUserFromFeedPayloadOrError", "SetCommunityOverrideCreatorPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "GenerateQRCodeLoginTokenPayloadOrError", "SetProfileImagePayloadOrError"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
@@ -58265,6 +58792,12 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 				return ec._Mutation_mintPremiumCardToWallet(ctx, field)
 			})
 
+		case "setCommunityOverrideCreator":
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_setCommunityOverrideCreator(ctx, field)
+			})
+
 		case "uploadPersistedQueries":
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
@@ -59689,6 +60222,31 @@ func (ec *executionContext) _SearchUsersPayload(ctx context.Context, sel ast.Sel
 	return out
 }
 
+var setCommunityOverrideCreatorPayloadImplementors = []string{"SetCommunityOverrideCreatorPayload", "SetCommunityOverrideCreatorPayloadOrError"}
+
+func (ec *executionContext) _SetCommunityOverrideCreatorPayload(ctx context.Context, sel ast.SelectionSet, obj *model.SetCommunityOverrideCreatorPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, setCommunityOverrideCreatorPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SetCommunityOverrideCreatorPayload")
+		case "user":
+
+			out.Values[i] = ec._SetCommunityOverrideCreatorPayload_user(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var setProfileImagePayloadImplementors = []string{"SetProfileImagePayload", "SetProfileImagePayloadOrError"}
 
 func (ec *executionContext) _SetProfileImagePayload(ctx context.Context, sel ast.SelectionSet, obj *model.SetProfileImagePayload) graphql.Marshaler {
@@ -60659,6 +61217,40 @@ func (ec *executionContext) _Token(ctx context.Context, sel ast.SelectionSet, ob
 
 			out.Values[i] = ec._Token_ownershipHistory(ctx, field, obj)
 
+		case "ownerIsHolder":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Token_ownerIsHolder(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "ownerIsCreator":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Token_ownerIsCreator(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "tokenMetadata":
 
 			out.Values[i] = ec._Token_tokenMetadata(ctx, field, obj)
@@ -60673,6 +61265,23 @@ func (ec *executionContext) _Token(ctx context.Context, sel ast.SelectionSet, ob
 					}
 				}()
 				res = ec._Token_contract(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "community":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Token_community(ctx, field, obj)
 				return res
 			}
 
@@ -63363,6 +63972,16 @@ func (ec *executionContext) marshalNToken2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgall
 		return graphql.Null
 	}
 	return ec._Token(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNTokenOwnershipType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenOwnershipType(ctx context.Context, v interface{}) (persist.TokenOwnershipType, error) {
+	var res persist.TokenOwnershipType
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNTokenOwnershipType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenOwnershipType(ctx context.Context, sel ast.SelectionSet, v persist.TokenOwnershipType) graphql.Marshaler {
+	return v
 }
 
 func (ec *executionContext) unmarshalNTrendingUsersInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTrendingUsersInput(ctx context.Context, v interface{}) (model.TrendingUsersInput, error) {
@@ -66208,6 +66827,13 @@ func (ec *executionContext) marshalOSearchUsersPayloadOrError2githubᚗcomᚋmik
 	return ec._SearchUsersPayloadOrError(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalOSetCommunityOverrideCreatorPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSetCommunityOverrideCreatorPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.SetCommunityOverrideCreatorPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._SetCommunityOverrideCreatorPayloadOrError(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOSetProfileImagePayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSetProfileImagePayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.SetProfileImagePayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -66635,6 +67261,73 @@ func (ec *executionContext) marshalOTokenHoldersConnection2ᚖgithubᚗcomᚋmik
 		return graphql.Null
 	}
 	return ec._TokenHoldersConnection(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOTokenOwnershipType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenOwnershipTypeᚄ(ctx context.Context, v interface{}) ([]persist.TokenOwnershipType, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var vSlice []interface{}
+	if v != nil {
+		vSlice = graphql.CoerceList(v)
+	}
+	var err error
+	res := make([]persist.TokenOwnershipType, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNTokenOwnershipType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenOwnershipType(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalOTokenOwnershipType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenOwnershipTypeᚄ(ctx context.Context, sel ast.SelectionSet, v []persist.TokenOwnershipType) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNTokenOwnershipType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenOwnershipType(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) unmarshalOTokenType2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenType(ctx context.Context, v interface{}) (*model.TokenType, error) {

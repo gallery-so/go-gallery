@@ -87,7 +87,7 @@ type GalleryUser implements Node @goEmbedHelper {
   # Returns all tokens owned by this user. Useful for retrieving all tokens without any duplicates,
   # as opposed to retrieving user -> wallets -> tokens, which would contain duplicates for any token
   # that appears in more than one of the user's wallets.
-  tokens: [Token] @goField(forceResolver: true)
+  tokens(ownershipFilter: [TokenOwnershipType!]): [Token] @goField(forceResolver: true)
   tokensByChain(chain: Chain!): ChainTokens @goField(forceResolver: true)
 
   wallets: [Wallet] @goField(forceResolver: true)
@@ -380,6 +380,11 @@ enum Chain {
   POAP
 }
 
+enum TokenOwnershipType {
+  Holder
+  Creator
+}
+
 enum WalletType {
   EOA
   GnosisSafe
@@ -406,8 +411,11 @@ type Token implements Node @goEmbedHelper {
   owner: GalleryUser @goField(forceResolver: true)
   ownedByWallets: [Wallet] @goField(forceResolver: true)
   ownershipHistory: [OwnerAtBlock]
+  ownerIsHolder: Boolean @goField(forceResolver: true)
+  ownerIsCreator: Boolean @goField(forceResolver: true)
   tokenMetadata: String # source is map[string]interface{} on backend, not sure what best format is here
   contract: Contract @goField(forceResolver: true)
+  community: Community @goField(forceResolver: true)
   externalUrl: String
   blockNumber: String # source is uint64
   isSpamByUser: Boolean
@@ -1876,6 +1884,14 @@ type UnbanUserFromFeedPayload {
 
 union UnbanUserFromFeedPayloadOrError = UnbanUserFromFeedPayload | ErrNotAuthorized
 
+type SetCommunityOverrideCreatorPayload {
+  user: GalleryUser
+}
+
+union SetCommunityOverrideCreatorPayloadOrError =
+    SetCommunityOverrideCreatorPayload
+  | ErrNotAuthorized
+
 input GalleryPositionInput {
   galleryId: DBID!
   position: String!
@@ -2267,6 +2283,10 @@ type Mutation {
   mintPremiumCardToWallet(
     input: MintPremiumCardToWalletInput!
   ): MintPremiumCardToWalletPayloadOrError @retoolAuth
+  setCommunityOverrideCreator(
+    communityID: DBID!
+    creatorUserID: DBID
+  ): SetCommunityOverrideCreatorPayloadOrError @retoolAuth
 
   # Gallery Frontend Deploy Persisted Queries
   uploadPersistedQueries(input: UploadPersistedQueriesInput): UploadPersistedQueriesPayloadOrError

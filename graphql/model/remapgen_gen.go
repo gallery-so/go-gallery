@@ -278,6 +278,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"SetCommunityOverrideCreatorPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(SetCommunityOverrideCreatorPayloadOrError)
+		return obj, ok
+	},
+
 	"SetProfileImagePayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(SetProfileImagePayloadOrError)
 		return obj, ok

@@ -122,6 +122,17 @@ func (api ContractAPI) GetChildContractsByParentID(ctx context.Context, contract
 	return contracts, pageInfo, err
 }
 
+func (api ContractAPI) GetContractCreatorByContractID(ctx context.Context, contractID persist.DBID) (db.ContractCreator, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"contractID": {contractID, "required"},
+	}); err != nil {
+		return db.ContractCreator{}, err
+	}
+
+	return api.loaders.ContractCreatorByContractID.Load(contractID)
+}
+
 func (api ContractAPI) GetContractsDisplayedByUserID(ctx context.Context, userID persist.DBID) ([]db.Contract, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{

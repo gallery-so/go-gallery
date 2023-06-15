@@ -234,6 +234,10 @@ type SearchUsersPayloadOrError interface {
 	IsSearchUsersPayloadOrError()
 }
 
+type SetCommunityOverrideCreatorPayloadOrError interface {
+	IsSetCommunityOverrideCreatorPayloadOrError()
+}
+
 type SetProfileImagePayloadOrError interface {
 	IsSetProfileImagePayloadOrError()
 }
@@ -987,6 +991,7 @@ func (ErrNotAuthorized) IsUploadPersistedQueriesPayloadOrError()       {}
 func (ErrNotAuthorized) IsSyncTokensForUsernamePayloadOrError()        {}
 func (ErrNotAuthorized) IsBanUserFromFeedPayloadOrError()              {}
 func (ErrNotAuthorized) IsUnbanUserFromFeedPayloadOrError()            {}
+func (ErrNotAuthorized) IsSetCommunityOverrideCreatorPayloadOrError()  {}
 func (ErrNotAuthorized) IsCreateGalleryPayloadOrError()                {}
 func (ErrNotAuthorized) IsUpdateGalleryInfoPayloadOrError()            {}
 func (ErrNotAuthorized) IsUpdateGalleryHiddenPayloadOrError()          {}
@@ -1591,6 +1596,12 @@ type SearchUsersPayload struct {
 
 func (SearchUsersPayload) IsSearchUsersPayloadOrError() {}
 
+type SetCommunityOverrideCreatorPayload struct {
+	User *GalleryUser `json:"user"`
+}
+
+func (SetCommunityOverrideCreatorPayload) IsSetCommunityOverrideCreatorPayloadOrError() {}
+
 type SetProfileImageInput struct {
 	TokenID *persist.DBID `json:"tokenId"`
 }
@@ -1785,8 +1796,11 @@ type Token struct {
 	Owner                 *GalleryUser          `json:"owner"`
 	OwnedByWallets        []*Wallet             `json:"ownedByWallets"`
 	OwnershipHistory      []*OwnerAtBlock       `json:"ownershipHistory"`
+	OwnerIsHolder         *bool                 `json:"ownerIsHolder"`
+	OwnerIsCreator        *bool                 `json:"ownerIsCreator"`
 	TokenMetadata         *string               `json:"tokenMetadata"`
 	Contract              *Contract             `json:"contract"`
+	Community             *Community            `json:"community"`
 	ExternalURL           *string               `json:"externalUrl"`
 	BlockNumber           *string               `json:"blockNumber"`
 	IsSpamByUser          *bool                 `json:"isSpamByUser"`
