@@ -59,23 +59,31 @@ type Comment struct {
 }
 
 type Contract struct {
-	ID                   persist.DBID
-	Deleted              bool
-	Version              sql.NullInt32
-	CreatedAt            time.Time
-	LastUpdated          time.Time
-	Name                 sql.NullString
-	Symbol               sql.NullString
-	Address              persist.Address
-	CreatorAddress       persist.Address
-	Chain                persist.Chain
-	ProfileBannerUrl     sql.NullString
-	ProfileImageUrl      sql.NullString
-	BadgeUrl             sql.NullString
-	Description          sql.NullString
-	OwnerAddress         persist.Address
-	IsProviderMarkedSpam bool
-	ParentID             persist.DBID
+	ID                    persist.DBID
+	Deleted               bool
+	Version               sql.NullInt32
+	CreatedAt             time.Time
+	LastUpdated           time.Time
+	Name                  sql.NullString
+	Symbol                sql.NullString
+	Address               persist.Address
+	CreatorAddress        persist.Address
+	Chain                 persist.Chain
+	ProfileBannerUrl      sql.NullString
+	ProfileImageUrl       sql.NullString
+	BadgeUrl              sql.NullString
+	Description           sql.NullString
+	OwnerAddress          persist.Address
+	IsProviderMarkedSpam  bool
+	ParentID              persist.DBID
+	OverrideCreatorUserID persist.DBID
+}
+
+type ContractCreator struct {
+	ContractID     persist.DBID
+	CreatorUserID  persist.DBID
+	Chain          persist.Chain
+	CreatorAddress persist.Address
 }
 
 type ContractRelevance struct {
@@ -462,6 +470,13 @@ type TokenMediasNoValidationRule struct {
 	LastUpdated time.Time
 	IsValid     bool
 	Reason      string
+}
+
+type TokenOwnership struct {
+	TokenID     persist.DBID
+	OwnerUserID persist.DBID
+	IsHolder    bool
+	IsCreator   bool
 }
 
 type TokenProcessingJob struct {

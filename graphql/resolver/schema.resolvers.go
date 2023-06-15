@@ -168,25 +168,25 @@ func (r *commentOnFeedEventPayloadResolver) FeedEvent(ctx context.Context, obj *
 	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
 }
 
-// Creator is the resolver for the creator field.
 func (r *communityResolver) Creator(ctx context.Context, obj *model.Community) (model.GalleryUserOrAddress, error) {
-	if obj.CreatorAddress == nil {
-		return nil, nil
-	}
-
-	user, err := resolveGalleryUserByAddress(ctx, *obj.CreatorAddress)
-
-	// If the user is not found, return the address instead
-	var notFoundErr persist.ErrUserNotFound
-	if errors.As(err, &notFoundErr) {
-		return obj.CreatorAddress, nil
-	}
-
+	creator, err := publicapi.For(ctx).Contract.GetContractCreatorByContractID(ctx, obj.Dbid)
 	if err != nil {
+		if _, ok := err.(persist.ErrContractCreatorNotFound); ok {
+			return nil, nil
+		}
 		return nil, err
 	}
 
-	return user, nil
+	if creator.CreatorUserID != "" {
+		return resolveGalleryUserByUserID(ctx, creator.CreatorUserID)
+	}
+
+	if creator.CreatorAddress != "" {
+		return util.ToPointer(persist.NewChainAddress(creator.CreatorAddress, creator.Chain)), nil
+	}
+
+	// We should never get here: if our query returns a contract creator, there has to be an associated address or user ID.
+	return nil, fmt.Errorf("contract creator for community ID=%s is invalid: must have either an address or a user ID", obj.Dbid)
 }
 
 // ParentCommunity is the resolver for the parentCommunity field.
@@ -437,8 +437,14 @@ func (r *galleryUserResolver) SocialAccounts(ctx context.Context, obj *model.Gal
 }
 
 // Tokens is the resolver for the tokens field.
-func (r *galleryUserResolver) Tokens(ctx context.Context, obj *model.GalleryUser) ([]*model.Token, error) {
-	return resolveTokensByUserID(ctx, obj.Dbid)
+func (r *galleryUserResolver) Tokens(ctx context.Context, obj *model.GalleryUser, ownershipFilter []persist.TokenOwnershipType) ([]*model.Token, error) {
+	tokens, err := publicapi.For(ctx).Token.GetTokensByUserID(ctx, obj.Dbid, ownershipFilter)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return tokensToModel(ctx, tokens), nil
 }
 
 // TokensByChain is the resolver for the tokensByChain field.
@@ -1582,6 +1588,29 @@ func (r *mutationResolver) MintPremiumCardToWallet(ctx context.Context, input mo
 	return model.MintPremiumCardToWalletPayload{Tx: tx}, nil
 }
 
+// SetCommunityOverrideCreator is the resolver for the setCommunityOverrideCreator field.
+func (r *mutationResolver) SetCommunityOverrideCreator(ctx context.Context, communityID persist.DBID, creatorUserID *persist.DBID) (model.SetCommunityOverrideCreatorPayloadOrError, error) {
+	if creatorUserID == nil {
+		err := publicapi.For(ctx).Admin.RemoveContractOverrideCreator(ctx, communityID)
+		if err != nil {
+			return nil, err
+		}
+		return model.SetCommunityOverrideCreatorPayload{User: nil}, nil
+	}
+
+	user, err := publicapi.For(ctx).User.GetUserById(ctx, *creatorUserID)
+	if err != nil {
+		return nil, err
+	}
+
+	err = publicapi.For(ctx).Admin.SetContractOverrideCreator(ctx, communityID, *creatorUserID)
+	if err != nil {
+		return nil, err
+	}
+
+	return model.SetCommunityOverrideCreatorPayload{User: userToModel(ctx, *user)}, nil
+}
+
 // UploadPersistedQueries is the resolver for the uploadPersistedQueries field.
 func (r *mutationResolver) UploadPersistedQueries(ctx context.Context, input *model.UploadPersistedQueriesInput) (model.UploadPersistedQueriesPayloadOrError, error) {
 	err := publicapi.For(ctx).APQ.UploadPersistedQueries(ctx, *input.PersistedQueries)
@@ -2123,9 +2152,40 @@ func (r *tokenResolver) OwnedByWallets(ctx context.Context, obj *model.Token) ([
 	return wallets, nil
 }
 
+// OwnerIsHolder is the resolver for the ownerIsHolder field.
+func (r *tokenResolver) OwnerIsHolder(ctx context.Context, obj *model.Token) (*bool, error) {
+	ownership, err := publicapi.For(ctx).Token.GetTokenOwnershipByTokenID(ctx, obj.Dbid)
+	if err != nil {
+		if _, ok := err.(persist.ErrTokenOwnershipNotFound); ok {
+			return util.ToPointer(false), nil
+		}
+		return nil, err
+	}
+
+	return util.ToPointer(ownership.IsHolder), nil
+}
+
+// OwnerIsCreator is the resolver for the ownerIsCreator field.
+func (r *tokenResolver) OwnerIsCreator(ctx context.Context, obj *model.Token) (*bool, error) {
+	ownership, err := publicapi.For(ctx).Token.GetTokenOwnershipByTokenID(ctx, obj.Dbid)
+	if err != nil {
+		if _, ok := err.(persist.ErrTokenOwnershipNotFound); ok {
+			return util.ToPointer(false), nil
+		}
+		return nil, err
+	}
+
+	return util.ToPointer(ownership.IsCreator), nil
+}
+
 // Contract is the resolver for the contract field.
 func (r *tokenResolver) Contract(ctx context.Context, obj *model.Token) (*model.Contract, error) {
 	return resolveContractByTokenID(ctx, obj.Dbid)
+}
+
+// Community is the resolver for the community field.
+func (r *tokenResolver) Community(ctx context.Context, obj *model.Token) (*model.Community, error) {
+	return resolveCommunityByTokenID(ctx, obj.Dbid)
 }
 
 // Wallets is the resolver for the wallets field.

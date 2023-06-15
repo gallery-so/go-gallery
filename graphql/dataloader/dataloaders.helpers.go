@@ -156,3 +156,36 @@ func fillErrors(errors []error, err error) {
 		errors[i] = err
 	}
 }
+
+func emptyResultsWithError[T any](length int, err error) ([]T, []error) {
+	errors := make([]error, length)
+	fillErrors(errors, err)
+	return make([]T, length), errors
+}
+
+// fillUnnestedJoinResults is a helper for cases where we're looking up a slice of keys by their IDs via
+// inner joining on an unnested list of keys. For example:
+//
+// select u.* from unnest(@user_ids::text[]) ids(id) join users u on u.id = ids.id
+//
+// Given the list of keys, the results from the query, and a function to extract a key from a result,
+// fillUnnestedJoinResults will figure out which keys were returned in the results and use the supplied
+// onNotFound function to fill in result entries for the keys, returning a set of results with the same
+// order and length as the supplied keys.
+func fillUnnestedJoinResults[TKey comparable, TResult any](keys []TKey, results []TResult, keyFunc func(TResult) TKey, onNotFound func(TKey) (TResult, error)) ([]TResult, []error) {
+	output := make([]TResult, len(keys))
+	errors := make([]error, len(keys))
+
+	resultIdx := 0
+	for i, key := range keys {
+		if resultIdx < len(results) && keyFunc(results[resultIdx]) == key {
+			output[i], errors[i] = results[resultIdx], nil
+			resultIdx++
+			continue
+		}
+
+		output[i], errors[i] = onNotFound(key)
+	}
+
+	return output, errors
+}

@@ -106,6 +106,9 @@ models:
   ReportWindow:
     model:
       - github.com/mikeydub/go-gallery/graphql/model.Window
+  TokenOwnershipType:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.TokenOwnershipType
 directives:
   goGqlId:
     skip_runtime: true

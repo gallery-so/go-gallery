@@ -156,3 +156,35 @@ func requireRetoolAuthorized(ctx context.Context) {
 		panic(err)
 	}
 }
+
+func (api *AdminAPI) SetContractOverrideCreator(ctx context.Context, contractID persist.DBID, creatorUserID persist.DBID) error {
+	requireRetoolAuthorized(ctx)
+
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"contractID":    {contractID, "required"},
+		"creatorUserID": {creatorUserID, "required"},
+	}); err != nil {
+		return err
+	}
+
+	params := db.SetContractOverrideCreatorParams{
+		ContractID:    contractID,
+		CreatorUserID: creatorUserID,
+	}
+
+	return api.queries.SetContractOverrideCreator(ctx, params)
+}
+
+func (api *AdminAPI) RemoveContractOverrideCreator(ctx context.Context, contractID persist.DBID) error {
+	requireRetoolAuthorized(ctx)
+
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"contractID": {contractID, "required"},
+	}); err != nil {
+		return err
+	}
+
+	return api.queries.RemoveContractOverrideCreator(ctx, contractID)
+}
