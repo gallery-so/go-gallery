@@ -1346,13 +1346,18 @@ func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID) e
 
 	// Set the profile image to reference a token
 	if tokenID != nil {
-		token, err := For(ctx).Token.GetTokenById(ctx, *tokenID)
+		o, err := For(ctx).Token.GetTokenOwnershipByTokenID(ctx, *tokenID)
+
+		var errNoOwnership persist.ErrTokenOwnershipNotFound
+		if errors.As(err, &errNoOwnership) {
+			return ErrProfileImageNotTokenOwner
+		}
+
 		if err != nil {
 			return err
 		}
 
-		// TODO: This should use the token ownership view when creator token support is merged
-		if token.OwnerUserID != userID {
+		if !o.IsHolder || !o.IsCreator {
 			return ErrProfileImageNotTokenOwner
 		}
 
@@ -1360,7 +1365,7 @@ func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID) e
 			TokenSourceType: persist.ProfileImageSourceToken,
 			ProfileID:       persist.GenerateID(),
 			UserID:          userID,
-			TokenID:         token.ID,
+			TokenID:         o.TokenID,
 		})
 	}
 
