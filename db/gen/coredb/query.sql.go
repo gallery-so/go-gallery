@@ -1495,7 +1495,7 @@ func (q *Queries) GetContractByID(ctx context.Context, id persist.DBID) (Contrac
 }
 
 const getContractCreatorsByIds = `-- name: GetContractCreatorsByIds :many
-select o.contract_id, o.creator_user_id, o.creator_user_id_valid, o.chain, o.creator_address, o.creator_address_valid
+select o.contract_id, o.creator_user_id, o.chain, o.creator_address
     from unnest($1::text[]) as c(id)
         join contract_creators o on o.contract_id = c.id
 `
@@ -1512,10 +1512,8 @@ func (q *Queries) GetContractCreatorsByIds(ctx context.Context, contractIds []st
 		if err := rows.Scan(
 			&i.ContractID,
 			&i.CreatorUserID,
-			&i.CreatorUserIDValid,
 			&i.Chain,
 			&i.CreatorAddress,
-			&i.CreatorAddressValid,
 		); err != nil {
 			return nil, err
 		}

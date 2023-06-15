@@ -80,12 +80,10 @@ type Contract struct {
 }
 
 type ContractCreator struct {
-	ContractID          persist.DBID
-	CreatorUserID       persist.DBID
-	CreatorUserIDValid  bool
-	Chain               persist.Chain
-	CreatorAddress      persist.Address
-	CreatorAddressValid bool
+	ContractID     persist.DBID
+	CreatorUserID  persist.DBID
+	Chain          persist.Chain
+	CreatorAddress persist.Address
 }
 
 type ContractRelevance struct {

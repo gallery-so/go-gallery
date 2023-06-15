@@ -890,15 +890,9 @@ func (b *GetContractsDisplayedByUserIDBatchBatchResults) Close() error {
 
 const getCreatedContractsBatchPaginate = `-- name: GetCreatedContractsBatchPaginate :batchmany
 select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id
-from users, contracts, wallets
-where users.id = $1
-  and wallets.id = any(users.wallets)
-  and (contracts.creator_address = wallets.address or contracts.owner_address = wallets.address)
-  and contracts.chain = wallets.chain
-  and ($2::bool or contracts.chain = any(string_to_array($3, ',')::int[]))
-  and not users.deleted
-  and not contracts.deleted
-  and not wallets.deleted
+from contracts
+    join contract_creators on contracts.id = contract_creators.contract_id and contract_creators.creator_user_id = $1
+where ($2::bool or contracts.chain = any(string_to_array($3, ',')::int[]))
   and (contracts.created_at, contracts.id) < ($4, $5)
   and (contracts.created_at, contracts.id) > ( $6, $7)
 order by case when $8::bool then (contracts.created_at, contracts.id) end asc,
