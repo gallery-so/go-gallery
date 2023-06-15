@@ -168,25 +168,25 @@ func (r *commentOnFeedEventPayloadResolver) FeedEvent(ctx context.Context, obj *
 	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
 }
 
-// Creator is the resolver for the creator field.
 func (r *communityResolver) Creator(ctx context.Context, obj *model.Community) (model.GalleryUserOrAddress, error) {
-	if obj.CreatorAddress == nil {
-		return nil, nil
-	}
-
-	user, err := resolveGalleryUserByAddress(ctx, *obj.CreatorAddress)
-
-	// If the user is not found, return the address instead
-	var notFoundErr persist.ErrUserNotFound
-	if errors.As(err, &notFoundErr) {
-		return obj.CreatorAddress, nil
-	}
-
+	creator, err := publicapi.For(ctx).Contract.GetContractCreatorByContractID(ctx, obj.Dbid)
 	if err != nil {
+		if _, ok := err.(persist.ErrContractCreatorNotFound); ok {
+			return nil, nil
+		}
 		return nil, err
 	}
 
-	return user, nil
+	if creator.CreatorUserID != "" {
+		return resolveGalleryUserByUserID(ctx, creator.CreatorUserID)
+	}
+
+	if creator.CreatorAddress != "" {
+		return util.ToPointer(persist.NewChainAddress(creator.CreatorAddress, creator.Chain)), nil
+	}
+
+	// We should never get here: if our query returns a contract creator, there has to be an associated address or user ID.
+	return nil, fmt.Errorf("contract creator for community ID=%s is invalid: must have either an address or a user ID", obj.Dbid)
 }
 
 // ParentCommunity is the resolver for the parentCommunity field.
@@ -2597,30 +2597,3 @@ type viewerResolver struct{ *Resolver }
 type walletResolver struct{ *Resolver }
 type chainAddressInputResolver struct{ *Resolver }
 type chainPubKeyInputResolver struct{ *Resolver }
-
-// !!! WARNING !!!
-// The code below was going to be deleted when updating resolvers. It has been copied here so you have
-// one last chance to move it out of harms way if you want. There are two reasons this happens:
-//   - When renaming or deleting a resolver the old code will be put in here. You can safely delete
-//     it when you're done.
-//   - You have helper methods in this file. Move them out to keep these resolver files clean.
-func (r *communityResolver) Creator_TODO(ctx context.Context, obj *model.Community) (model.GalleryUserOrAddress, error) {
-	creator, err := publicapi.For(ctx).Contract.GetContractCreatorByContractID(ctx, obj.Dbid)
-	if err != nil {
-		if _, ok := err.(persist.ErrContractCreatorNotFound); ok {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	if creator.CreatorUserIDValid {
-		return resolveGalleryUserByUserID(ctx, creator.CreatorUserID)
-	}
-
-	if creator.CreatorAddressValid {
-		return util.ToPointer(persist.NewChainAddress(creator.CreatorAddress, creator.Chain)), nil
-	}
-
-	// We should never get here: if our query returns a contract creator, there has to be an associated address or user ID.
-	return nil, fmt.Errorf("contract creator for community ID=%s is invalid: must have either an address or a user ID", obj.Dbid)
-}
