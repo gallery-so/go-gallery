@@ -8,8 +8,4 @@ create table if not exists profile_images (
   last_updated timestamp with time zone default now() not null
 );
 create unique index if not exists profile_images_user_id_idx on profile_images(user_id);
-<<<<<<< HEAD
 alter table users add column if not exists profile_image_id varchar(255) references profile_images(id);
-=======
-alter table users add column profile_image_id varchar(255) references profile_images(id);
->>>>>>> 1b87533a (Bump migration)
