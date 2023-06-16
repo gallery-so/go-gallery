@@ -46,7 +46,6 @@ import (
 func init() {
 	env.RegisterValidation("TOKEN_PROCESSING_URL", "required")
 	env.RegisterValidation("INDEXER_HOST", "required")
-	env.RegisterValidation("GCLOUD_TOKEN_CONTENT_BUCKET", "required")
 }
 
 // Init initializes the server
@@ -198,7 +197,6 @@ func SetDefaults() {
 	viper.SetDefault("GAE_VERSION", "")
 	viper.SetDefault("TOKEN_PROCESSING_QUEUE", "projects/gallery-local/locations/here/queues/token-processing")
 	viper.SetDefault("GOOGLE_CLOUD_PROJECT", "gallery-dev-322005")
-	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "dev-token-content")
 	viper.SetDefault("PUBSUB_EMULATOR_HOST", "")
 	viper.SetDefault("PUBSUB_TOPIC_NEW_NOTIFICATIONS", "dev-new-notifications")
 	viper.SetDefault("PUBSUB_TOPIC_UPDATED_NOTIFICATIONS", "dev-updated-notifications")

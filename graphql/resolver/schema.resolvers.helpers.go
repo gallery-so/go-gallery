@@ -1932,12 +1932,11 @@ func getPreviewUrls(ctx context.Context, tokenMedia db.TokenMedia, options ...me
 		live = tokenMedia.Media.MediaURL.String()
 	}
 
-	if mediamapper.IsGalleryHosted(preview) {
-		o := make([]mediamapper.Option, len(options)+1)
-		copy(o, options)
-		o[len(o)-1] = mediamapper.WithTimestamp(tokenMedia.LastUpdated)
-		options = o
-	}
+	// Add timestamp to options
+	o := make([]mediamapper.Option, len(options)+1)
+	copy(o, options)
+	o[len(o)-1] = mediamapper.WithTimestamp(tokenMedia.LastUpdated)
+	options = o
 
 	return &model.PreviewURLSet{
 		Raw:        &preview,

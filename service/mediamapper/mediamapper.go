@@ -157,7 +157,7 @@ func WithStaticImage() Option {
 
 func WithTimestamp(t time.Time) Option {
 	return func(params *[]imgix.IxParam) {
-		*params = append(*params, imgix.Param("ts", strconv.FormatInt(t.Unix(), 10)))
+		*params = append(*params, imgix.Param("glryts", strconv.FormatInt(t.Unix(), 10)))
 	}
 }
 
@@ -278,8 +278,4 @@ func PurgeImage(ctx context.Context, u string) error {
 	}
 
 	return nil
-}
-
-func IsGalleryHosted(sourceURL string) bool {
-	return strings.Contains(sourceURL, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"))
 }
