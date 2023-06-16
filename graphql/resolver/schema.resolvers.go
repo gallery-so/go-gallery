@@ -2122,11 +2122,11 @@ func (r *tokenResolver) Media(ctx context.Context, obj *model.Token) (model.Medi
 		// If we have no media, just return the fallback media
 		var noMediaErr persist.ErrMediaNotFound
 		if errors.As(err, &noMediaErr) {
-			return mediaToModel(ctx, persist.Media{}, obj.HelperTokenData.Token.FallbackMedia), nil
+			return mediaToModel(ctx, tokenMedia, obj.HelperTokenData.Token.FallbackMedia), nil
 		}
 		return nil, err
 	}
-	return mediaToModel(ctx, tokenMedia.Media, obj.HelperTokenData.Token.FallbackMedia), nil
+	return mediaToModel(ctx, tokenMedia, obj.HelperTokenData.Token.FallbackMedia), nil
 }
 
 // Owner is the resolver for the owner field.

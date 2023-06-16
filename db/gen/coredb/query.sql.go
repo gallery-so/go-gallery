@@ -1904,7 +1904,7 @@ func (q *Queries) GetGalleryIDByCollectionID(ctx context.Context, id persist.DBI
 }
 
 const getGalleryTokenMediasByGalleryID = `-- name: GetGalleryTokenMediasByGalleryID :many
-select m.media from tokens t, collections c, galleries g, token_medias m where g.id = $1 and c.id = any(g.collections) and t.id = any(c.nfts) and t.deleted = false and g.deleted = false and c.deleted = false and (length(t.media->>'thumbnail_url'::varchar) > 0 or length(t.media->>'media_url'::varchar) > 0) and t.token_media_id = m.id and m.deleted = false and m.active order by array_position(g.collections, c.id),array_position(c.nfts, t.id) limit $2
+select m.id, m.created_at, m.last_updated, m.version, m.contract_id, m.token_id, m.chain, m.active, m.metadata, m.media, m.name, m.description, m.processing_job_id, m.deleted from tokens t, collections c, galleries g, token_medias m where g.id = $1 and c.id = any(g.collections) and t.id = any(c.nfts) and t.deleted = false and g.deleted = false and c.deleted = false and (length(t.media->>'thumbnail_url'::varchar) > 0 or length(t.media->>'media_url'::varchar) > 0) and t.token_media_id = m.id and m.deleted = false and m.active order by array_position(g.collections, c.id),array_position(c.nfts, t.id) limit $2
 `
 
 type GetGalleryTokenMediasByGalleryIDParams struct {
@@ -1912,19 +1912,34 @@ type GetGalleryTokenMediasByGalleryIDParams struct {
 	Limit int32
 }
 
-func (q *Queries) GetGalleryTokenMediasByGalleryID(ctx context.Context, arg GetGalleryTokenMediasByGalleryIDParams) ([]persist.Media, error) {
+func (q *Queries) GetGalleryTokenMediasByGalleryID(ctx context.Context, arg GetGalleryTokenMediasByGalleryIDParams) ([]TokenMedia, error) {
 	rows, err := q.db.Query(ctx, getGalleryTokenMediasByGalleryID, arg.ID, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []persist.Media
+	var items []TokenMedia
 	for rows.Next() {
-		var media persist.Media
-		if err := rows.Scan(&media); err != nil {
+		var i TokenMedia
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Version,
+			&i.ContractID,
+			&i.TokenID,
+			&i.Chain,
+			&i.Active,
+			&i.Metadata,
+			&i.Media,
+			&i.Name,
+			&i.Description,
+			&i.ProcessingJobID,
+			&i.Deleted,
+		); err != nil {
 			return nil, err
 		}
-		items = append(items, media)
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

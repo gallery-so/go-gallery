@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/imgix/imgix-go/v2"
@@ -154,6 +155,12 @@ func WithStaticImage() Option {
 	}
 }
 
+func WithTimestamp(t time.Time) Option {
+	return func(params *[]imgix.IxParam) {
+		*params = append(*params, imgix.Param("ts", strconv.FormatInt(t.Unix(), 10)))
+	}
+}
+
 func (u *MediaMapper) GetThumbnailImageUrl(sourceUrl string, options ...Option) string {
 	return u.buildPreviewImageUrl(sourceUrl, thumbnailWidth, u.thumbnailUrlParams, options...)
 }
@@ -271,4 +278,8 @@ func PurgeImage(ctx context.Context, u string) error {
 	}
 
 	return nil
+}
+
+func IsGalleryHosted(sourceURL string) bool {
+	return strings.Contains(sourceURL, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"))
 }

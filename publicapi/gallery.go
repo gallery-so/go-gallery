@@ -462,7 +462,7 @@ func (api GalleryAPI) GetGalleriesByUserId(ctx context.Context, userID persist.D
 	return galleries, nil
 }
 
-func (api GalleryAPI) GetTokenPreviewsByGalleryID(ctx context.Context, galleryID persist.DBID) ([]persist.Media, error) {
+func (api GalleryAPI) GetTokenPreviewsByGalleryID(ctx context.Context, galleryID persist.DBID) ([]db.TokenMedia, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"galleryID": {galleryID, "required"},
