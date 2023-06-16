@@ -236,7 +236,8 @@ WHERE (contracts.id = @id OR contracts.parent_id = @id)
 --       all users.* fields twice).
 select users.* from (
     select distinct on (u.id) u.* from users u, tokens t, contracts c
-        where t.contract = c.id and (c.id = @id or c.parent_id = @id)
+        where t.owner_user_id = u.id
+        and t.contract = c.id and (c.id = @id or c.parent_id = @id)
         and (not @gallery_users_only::bool or u.universal = false)
         and t.deleted = false and u.deleted = false and c.deleted = false
     ) as users
