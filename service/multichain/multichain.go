@@ -620,8 +620,9 @@ func (p *Provider) processTokenMedia(ctx context.Context, tokenID persist.TokenI
 	}
 
 	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
-		return util.GetErrFromResp(resp)
+		return util.BodyAsError(resp)
 	}
 
 	return nil

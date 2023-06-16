@@ -2,6 +2,7 @@ package util
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -55,13 +56,34 @@ func GetErrFromResp(res *http.Response) error {
 	return ErrHTTP{URL: res.Request.URL.String(), Status: res.StatusCode, Err: fmt.Errorf("%+v", errResp)}
 }
 
+type ErrReadBody struct {
+	Err error
+}
+
+func (e ErrReadBody) Error() string {
+	return fmt.Sprintf("error parsing body: %s", e.Err)
+}
+
+func (e ErrReadBody) Unwrap() error {
+	return e.Err
+}
+
 // BodyAsError returns the HTTP body as an error
+// Returns ErrReadBody if the body cannot be read
 func BodyAsError(res *http.Response) error {
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return err
+		return ErrReadBody{Err: err}
 	}
-	return ErrHTTP{URL: res.Request.URL.String(), Status: res.StatusCode, Err: fmt.Errorf("%s", body)}
+
+	// Check if the body is an error response
+	var errResp ErrorResponse
+	if err := json.Unmarshal(body, &errResp); err == nil {
+		return fmt.Errorf(errResp.Error)
+	}
+
+	// Otherwise, return the entire body as an error
+	return errors.New(string(body))
 }
 
 func HealthCheckHandler() gin.HandlerFunc {
