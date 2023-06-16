@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -64,6 +65,9 @@ func (c *ContractGalleryRepository) GetByID(ctx context.Context, id persist.DBID
 	contract := persist.ContractGallery{}
 	err := c.getByIDStmt.QueryRowContext(ctx, id).Scan(&contract.ID, &contract.Version, &contract.CreationTime, &contract.LastUpdated, &contract.Address, &contract.Symbol, &contract.Name, &contract.OwnerAddress, &contract.Chain, &contract.IsProviderMarkedSpam)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return persist.ContractGallery{}, persist.ErrContractNotFoundByID{ID: id}
+		}
 		return persist.ContractGallery{}, err
 	}
 
