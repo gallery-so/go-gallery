@@ -3,6 +3,7 @@ package publicapi
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -35,6 +36,11 @@ import (
 	"github.com/mikeydub/go-gallery/validate"
 	"roci.dev/fracdex"
 )
+
+var ErrProfileImageTooManySources = errors.New("too many profile image sources provided")
+var ErrProfileImageNoSources = errors.New("no profile image source provided")
+var ErrProfileImageUnknownSource = errors.New("unsupported profile image source provided")
+var ErrProfileImageNotTokenOwner = errors.New("user is not an owner of the token")
 
 type UserAPI struct {
 	repos              *postgres.Repositories
@@ -1320,4 +1326,68 @@ func (api UserAPI) DeletePushTokenByPushToken(ctx context.Context, pushToken str
 	}
 
 	return err
+}
+
+// SetProfileImage sets the profile image for the current user.
+func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID) error {
+	// Validate
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return err
+	}
+
+	if util.OnlyNils(tokenID) {
+		return ErrProfileImageNoSources
+	}
+
+	if util.ManyNotNils(tokenID) {
+		return ErrProfileImageTooManySources
+	}
+
+	// Set the profile image to reference a token
+	if tokenID != nil {
+		o, err := For(ctx).Token.GetTokenOwnershipByTokenID(ctx, *tokenID)
+
+		if util.ErrorAs[persist.ErrTokenOwnershipNotFound](err) {
+			return ErrProfileImageNotTokenOwner
+		}
+
+		if err != nil {
+			return err
+		}
+
+		if !o.IsHolder || !o.IsCreator {
+			return ErrProfileImageNotTokenOwner
+		}
+
+		return api.queries.SetProfileImageToToken(ctx, db.SetProfileImageToTokenParams{
+			TokenSourceType: persist.ProfileImageSourceToken,
+			ProfileID:       persist.GenerateID(),
+			UserID:          userID,
+			TokenID:         o.TokenID,
+		})
+	}
+
+	return ErrProfileImageUnknownSource
+}
+
+func (api UserAPI) RemoveProfileImage(ctx context.Context) error {
+	// Validate
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return err
+	}
+	return api.queries.RemoveProfileImage(ctx, userID)
+}
+
+func (api UserAPI) GetProfileImageByUserID(ctx context.Context, userID persist.DBID) (db.ProfileImage, error) {
+	// Validate
+	user, err := api.GetUserById(ctx, userID)
+	if err != nil {
+		return db.ProfileImage{}, err
+	}
+	if user.ProfileImageID == "" {
+		return db.ProfileImage{}, nil
+	}
+	return api.loaders.ProfileImageByID.Load(user.ProfileImageID)
 }

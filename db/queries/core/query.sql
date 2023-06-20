@@ -1262,3 +1262,24 @@ update contracts set override_creator_user_id = @creator_user_id, last_updated =
 
 -- name: RemoveContractOverrideCreator :exec
 update contracts set override_creator_user_id = null, last_updated = now() where id = @contract_id and deleted = false;
+
+-- name: SetProfileImageToToken :exec
+with new_image as (
+    insert into profile_images (id, user_id, source_type, token_id, deleted, last_updated)
+    values (@profile_id, @user_id, @token_source_type, @token_id, false, now())
+    on conflict (user_id) do update set token_id = excluded.token_id
+        , source_type = excluded.source_type
+        , deleted = excluded.deleted
+        , last_updated = excluded.last_updated
+    returning id
+)
+update users set profile_image_id = new_image.id from new_image where users.id = @user_id and not deleted;
+
+-- name: RemoveProfileImage :exec
+with remove_image as (
+    update profile_images set deleted = true, last_updated = now() where user_id = $1 and not deleted
+)
+update users set profile_image_id = null where users.id = $1 and not users.deleted;
+
+-- name: GetProfileImageByID :batchone
+select * from profile_images where id = $1 and not deleted;

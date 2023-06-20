@@ -341,3 +341,19 @@ func (l RoleList) Value() (driver.Value, error) {
 func (l *RoleList) Scan(value interface{}) error {
 	return pq.Array(l).Scan(value)
 }
+
+// ProfileImageSource represents the source of a profile image
+type ProfileImageSource string
+
+const (
+	ProfileImageSourceToken ProfileImageSource = "token"
+)
+
+type ErrProfileImageNotFound struct {
+	Err            error
+	ProfileImageID DBID
+}
+
+func (e ErrProfileImageNotFound) Error() string {
+	return fmt.Sprintf("profile image %s not found: %s", e.ProfileImageID, e.Err)
+}
