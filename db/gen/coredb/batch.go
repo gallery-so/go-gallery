@@ -1664,7 +1664,8 @@ func (b *GetNotificationByIDBatchBatchResults) Close() error {
 const getOwnersByContractIdBatchPaginate = `-- name: GetOwnersByContractIdBatchPaginate :batchmany
 select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id from (
     select distinct on (u.id) u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id from users u, tokens t, contracts c
-        where t.contract = c.id and (c.id = $1 or c.parent_id = $1)
+        where t.owner_user_id = u.id
+        and t.contract = c.id and (c.id = $1 or c.parent_id = $1)
         and (not $2::bool or u.universal = false)
         and t.deleted = false and u.deleted = false and c.deleted = false
     ) as users
