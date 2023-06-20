@@ -121,7 +121,7 @@ func arbitrumProviderSet(client *http.Client) arbitrumProviderList {
 	return serverArbitrumProviderList
 }
 
-// optimismProvidersConfig is a wire injector that binds multichain interfaces to their concrete Optimism implementations
+// arbitrumProvidersConfig is a wire injector that binds multichain interfaces to their concrete Arbitrum implementations
 func arbitrumProvidersConfig(arbitrumProvider2 *arbitrumProvider) arbitrumProviderList {
 	serverArbitrumProviderList := arbitrumRequirements(arbitrumProvider2, arbitrumProvider2)
 	return serverArbitrumProviderList
@@ -259,7 +259,7 @@ func optimismRequirements(
 	return optimismProviderList{tof, toc}
 }
 
-// arbitrumRequirements is the set of provider interfaces required for Optimism
+// arbitrumRequirements is the set of provider interfaces required for Arbitrum
 func arbitrumRequirements(
 	tof multichain.TokensOwnerFetcher,
 	toc multichain.TokensContractFetcher,
