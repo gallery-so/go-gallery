@@ -226,6 +226,10 @@ type SearchUsersPayloadOrError interface {
 	IsSearchUsersPayloadOrError()
 }
 
+type SetCommunityOverrideCreatorPayloadOrError interface {
+	IsSetCommunityOverrideCreatorPayloadOrError()
+}
+
 type SetSpamPreferencePayloadOrError interface {
 	IsSetSpamPreferencePayloadOrError()
 }
@@ -240,6 +244,10 @@ type SocialConnectionsOrError interface {
 
 type SocialQueriesOrError interface {
 	IsSocialQueriesOrError()
+}
+
+type SyncCreatedTokensPayloadOrError interface {
+	IsSyncCreatedTokensPayloadOrError()
 }
 
 type SyncTokensForUsernamePayloadOrError interface {
@@ -484,6 +492,11 @@ type CollectionCreatedFeedEventData struct {
 
 func (CollectionCreatedFeedEventData) IsFeedEventData() {}
 
+type CollectionEdge struct {
+	Node   *Collection `json:"node"`
+	Cursor *string     `json:"cursor"`
+}
+
 type CollectionLayout struct {
 	Sections      []*int                     `json:"sections"`
 	SectionLayout []*CollectionSectionLayout `json:"sectionLayout"`
@@ -534,6 +547,11 @@ type CollectionUpdatedFeedEventData struct {
 }
 
 func (CollectionUpdatedFeedEventData) IsFeedEventData() {}
+
+type CollectionsConnection struct {
+	Edges    []*CollectionEdge `json:"edges"`
+	PageInfo *PageInfo         `json:"pageInfo"`
+}
 
 type CollectorsNoteAddedToCollectionFeedEventData struct {
 	EventTime         *time.Time      `json:"eventTime"`
@@ -588,6 +606,7 @@ type Community struct {
 	Contract          *Contract               `json:"contract"`
 	ContractAddress   *persist.ChainAddress   `json:"contractAddress"`
 	CreatorAddress    *persist.ChainAddress   `json:"creatorAddress"`
+	Creator           GalleryUserOrAddress    `json:"creator"`
 	Chain             *persist.Chain          `json:"chain"`
 	Name              *string                 `json:"name"`
 	Description       *string                 `json:"description"`
@@ -595,6 +614,8 @@ type Community struct {
 	ProfileImageURL   *string                 `json:"profileImageURL"`
 	ProfileBannerURL  *string                 `json:"profileBannerURL"`
 	BadgeURL          *string                 `json:"badgeURL"`
+	ParentCommunity   *CommunityLink          `json:"parentCommunity"`
+	SubCommunities    *CommunitiesConnection  `json:"subCommunities"`
 	TokensInCommunity *TokensConnection       `json:"tokensInCommunity"`
 	Owners            *TokenHoldersConnection `json:"owners"`
 }
@@ -605,6 +626,10 @@ func (Community) IsCommunityByAddressOrError() {}
 type CommunityEdge struct {
 	Node   *Community `json:"node"`
 	Cursor *string    `json:"cursor"`
+}
+
+type CommunityLink struct {
+	Node *Community `json:"node"`
 }
 
 type CommunitySearchResult struct {
@@ -687,6 +712,10 @@ type CreateUserPayload struct {
 }
 
 func (CreateUserPayload) IsCreateUserPayloadOrError() {}
+
+type CreatedCommunitiesInput struct {
+	IncludeChains []persist.Chain `json:"includeChains"`
+}
 
 type DebugAuth struct {
 	AsUsername         *string                 `json:"asUsername"`
@@ -939,6 +968,7 @@ func (ErrNotAuthorized) IsUpdateUserInfoPayloadOrError()               {}
 func (ErrNotAuthorized) IsRegisterUserPushTokenPayloadOrError()        {}
 func (ErrNotAuthorized) IsUnregisterUserPushTokenPayloadOrError()      {}
 func (ErrNotAuthorized) IsSyncTokensPayloadOrError()                   {}
+func (ErrNotAuthorized) IsSyncCreatedTokensPayloadOrError()            {}
 func (ErrNotAuthorized) IsError()                                      {}
 func (ErrNotAuthorized) IsAddRolesToUserPayloadOrError()               {}
 func (ErrNotAuthorized) IsRevokeRolesFromUserPayloadOrError()          {}
@@ -946,6 +976,7 @@ func (ErrNotAuthorized) IsUploadPersistedQueriesPayloadOrError()       {}
 func (ErrNotAuthorized) IsSyncTokensForUsernamePayloadOrError()        {}
 func (ErrNotAuthorized) IsBanUserFromFeedPayloadOrError()              {}
 func (ErrNotAuthorized) IsUnbanUserFromFeedPayloadOrError()            {}
+func (ErrNotAuthorized) IsSetCommunityOverrideCreatorPayloadOrError()  {}
 func (ErrNotAuthorized) IsCreateGalleryPayloadOrError()                {}
 func (ErrNotAuthorized) IsUpdateGalleryInfoPayloadOrError()            {}
 func (ErrNotAuthorized) IsUpdateGalleryHiddenPayloadOrError()          {}
@@ -985,6 +1016,7 @@ type ErrSyncFailed struct {
 }
 
 func (ErrSyncFailed) IsSyncTokensPayloadOrError()            {}
+func (ErrSyncFailed) IsSyncCreatedTokensPayloadOrError()     {}
 func (ErrSyncFailed) IsRefreshTokenPayloadOrError()          {}
 func (ErrSyncFailed) IsRefreshCollectionPayloadOrError()     {}
 func (ErrSyncFailed) IsRefreshContractPayloadOrError()       {}
@@ -1198,6 +1230,7 @@ type GalleryUser struct {
 	Feed                *FeedConnection        `json:"feed"`
 	SharedFollowers     *UsersConnection       `json:"sharedFollowers"`
 	SharedCommunities   *CommunitiesConnection `json:"sharedCommunities"`
+	CreatedCommunities  *CommunitiesConnection `json:"createdCommunities"`
 }
 
 func (GalleryUser) IsNode()                              {}
@@ -1537,6 +1570,12 @@ type SearchUsersPayload struct {
 
 func (SearchUsersPayload) IsSearchUsersPayloadOrError() {}
 
+type SetCommunityOverrideCreatorPayload struct {
+	User *GalleryUser `json:"user"`
+}
+
+func (SetCommunityOverrideCreatorPayload) IsSetCommunityOverrideCreatorPayloadOrError() {}
+
 type SetSpamPreferenceInput struct {
 	Tokens []persist.DBID `json:"tokens"`
 	IsSpam bool           `json:"isSpam"`
@@ -1659,6 +1698,16 @@ func (SomeoneViewedYourGalleryNotification) IsNotification()        {}
 func (SomeoneViewedYourGalleryNotification) IsNode()                {}
 func (SomeoneViewedYourGalleryNotification) IsGroupedNotification() {}
 
+type SyncCreatedTokensInput struct {
+	IncludeChains []persist.Chain `json:"includeChains"`
+}
+
+type SyncCreatedTokensPayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
+
+func (SyncCreatedTokensPayload) IsSyncCreatedTokensPayloadOrError() {}
+
 type SyncTokensForUsernamePayload struct {
 	Message string `json:"message"`
 }
@@ -1711,8 +1760,11 @@ type Token struct {
 	Owner                 *GalleryUser          `json:"owner"`
 	OwnedByWallets        []*Wallet             `json:"ownedByWallets"`
 	OwnershipHistory      []*OwnerAtBlock       `json:"ownershipHistory"`
+	OwnerIsHolder         *bool                 `json:"ownerIsHolder"`
+	OwnerIsCreator        *bool                 `json:"ownerIsCreator"`
 	TokenMetadata         *string               `json:"tokenMetadata"`
 	Contract              *Contract             `json:"contract"`
+	Community             *Community            `json:"community"`
 	ExternalURL           *string               `json:"externalUrl"`
 	BlockNumber           *string               `json:"blockNumber"`
 	IsSpamByUser          *bool                 `json:"isSpamByUser"`
@@ -2152,6 +2204,10 @@ type Wallet struct {
 func (Wallet) IsNode()                {}
 func (Wallet) IsGalleryUserOrWallet() {}
 
+type TopCollectionsForCommunityInput struct {
+	ChainAddress *persist.ChainAddress `json:"chainAddress"`
+}
+
 type EmailUnsubscriptionType string
 
 const (
@@ -2333,6 +2389,7 @@ const (
 	UserExperienceTypeUpsellMintMemento4                UserExperienceType = "UpsellMintMemento4"
 	UserExperienceTypeUpsellGallerySelects1             UserExperienceType = "UpsellGallerySelects1"
 	UserExperienceTypeMobileUpsell1                     UserExperienceType = "MobileUpsell1"
+	UserExperienceTypeMobileBetaUpsell                  UserExperienceType = "MobileBetaUpsell"
 )
 
 var AllUserExperienceType = []UserExperienceType{
@@ -2344,11 +2401,12 @@ var AllUserExperienceType = []UserExperienceType{
 	UserExperienceTypeUpsellMintMemento4,
 	UserExperienceTypeUpsellGallerySelects1,
 	UserExperienceTypeMobileUpsell1,
+	UserExperienceTypeMobileBetaUpsell,
 }
 
 func (e UserExperienceType) IsValid() bool {
 	switch e {
-	case UserExperienceTypeMultiGalleryAnnouncement, UserExperienceTypeEmailUpsell, UserExperienceTypeMerchStoreUpsell, UserExperienceTypeMaintenanceFeb2023, UserExperienceTypeTwitterConnectionOnboardingUpsell, UserExperienceTypeUpsellMintMemento4, UserExperienceTypeUpsellGallerySelects1, UserExperienceTypeMobileUpsell1:
+	case UserExperienceTypeMultiGalleryAnnouncement, UserExperienceTypeEmailUpsell, UserExperienceTypeMerchStoreUpsell, UserExperienceTypeMaintenanceFeb2023, UserExperienceTypeTwitterConnectionOnboardingUpsell, UserExperienceTypeUpsellMintMemento4, UserExperienceTypeUpsellGallerySelects1, UserExperienceTypeMobileUpsell1, UserExperienceTypeMobileBetaUpsell:
 		return true
 	}
 	return false

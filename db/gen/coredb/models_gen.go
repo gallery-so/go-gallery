@@ -59,22 +59,31 @@ type Comment struct {
 }
 
 type Contract struct {
-	ID                   persist.DBID
-	Deleted              bool
-	Version              sql.NullInt32
-	CreatedAt            time.Time
-	LastUpdated          time.Time
-	Name                 sql.NullString
-	Symbol               sql.NullString
-	Address              persist.Address
-	CreatorAddress       persist.Address
-	Chain                persist.Chain
-	ProfileBannerUrl     sql.NullString
-	ProfileImageUrl      sql.NullString
-	BadgeUrl             sql.NullString
-	Description          sql.NullString
-	OwnerAddress         persist.Address
-	IsProviderMarkedSpam bool
+	ID                    persist.DBID
+	Deleted               bool
+	Version               sql.NullInt32
+	CreatedAt             time.Time
+	LastUpdated           time.Time
+	Name                  sql.NullString
+	Symbol                sql.NullString
+	Address               persist.Address
+	CreatorAddress        persist.Address
+	Chain                 persist.Chain
+	ProfileBannerUrl      sql.NullString
+	ProfileImageUrl       sql.NullString
+	BadgeUrl              sql.NullString
+	Description           sql.NullString
+	OwnerAddress          persist.Address
+	IsProviderMarkedSpam  bool
+	ParentID              persist.DBID
+	OverrideCreatorUserID persist.DBID
+}
+
+type ContractCreator struct {
+	ContractID     persist.DBID
+	CreatorUserID  persist.DBID
+	Chain          persist.Chain
+	CreatorAddress persist.Address
 }
 
 type ContractRelevance struct {
@@ -436,6 +445,38 @@ type TokenMedia struct {
 	Description     string
 	ProcessingJobID persist.DBID
 	Deleted         bool
+}
+
+type TokenMediasActive struct {
+	ID               persist.DBID
+	LastUpdated      time.Time
+	MediaType        interface{}
+	JobID            persist.DBID
+	TokenProperties  pgtype.JSONB
+	PipelineMetadata pgtype.JSONB
+}
+
+type TokenMediasMissingProperty struct {
+	ID          persist.DBID
+	MediaType   interface{}
+	LastUpdated time.Time
+	IsValid     bool
+	Reason      []byte
+}
+
+type TokenMediasNoValidationRule struct {
+	ID          persist.DBID
+	MediaType   interface{}
+	LastUpdated time.Time
+	IsValid     bool
+	Reason      string
+}
+
+type TokenOwnership struct {
+	TokenID     persist.DBID
+	OwnerUserID persist.DBID
+	IsHolder    bool
+	IsCreator   bool
 }
 
 type TokenProcessingJob struct {

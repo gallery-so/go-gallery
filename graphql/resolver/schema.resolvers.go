@@ -168,35 +168,91 @@ func (r *commentOnFeedEventPayloadResolver) FeedEvent(ctx context.Context, obj *
 	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
 }
 
+func (r *communityResolver) Creator(ctx context.Context, obj *model.Community) (model.GalleryUserOrAddress, error) {
+	creator, err := publicapi.For(ctx).Contract.GetContractCreatorByContractID(ctx, obj.Dbid)
+	if err != nil {
+		if _, ok := err.(persist.ErrContractCreatorNotFound); ok {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	if creator.CreatorUserID != "" {
+		return resolveGalleryUserByUserID(ctx, creator.CreatorUserID)
+	}
+
+	if creator.CreatorAddress != "" {
+		return util.ToPointer(persist.NewChainAddress(creator.CreatorAddress, creator.Chain)), nil
+	}
+
+	// We should never get here: if our query returns a contract creator, there has to be an associated address or user ID.
+	return nil, fmt.Errorf("contract creator for community ID=%s is invalid: must have either an address or a user ID", obj.Dbid)
+}
+
+// ParentCommunity is the resolver for the parentCommunity field.
+func (r *communityResolver) ParentCommunity(ctx context.Context, obj *model.Community) (*model.CommunityLink, error) {
+	if obj.HelperCommunityData.ParentID == "" {
+		return nil, nil
+	}
+
+	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, obj.ParentCommunity.Node.Dbid)
+	if err != nil {
+		return nil, err
+	}
+
+	obj.ParentCommunity.Node = communityToModel(ctx, *contract, obj.ParentCommunity.Node.ForceRefresh)
+	return obj.ParentCommunity, nil
+}
+
+// SubCommunities is the resolver for the subCommunities field.
+func (r *communityResolver) SubCommunities(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error) {
+	communities, pageInfo, err := publicapi.For(ctx).Contract.GetChildContractsByParentID(ctx, obj.Dbid, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	edges := make([]*model.CommunityEdge, len(communities))
+	for i, community := range communities {
+		edges[i] = &model.CommunityEdge{
+			Node:   communityToModel(ctx, community, util.ToPointer(false)),
+			Cursor: nil, // not used by relay, but relay will complain without this field existing
+		}
+	}
+
+	return &model.CommunitiesConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
+}
+
 // TokensInCommunity is the resolver for the tokensInCommunity field.
 func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokensConnection, error) {
-	if onlyGalleryUsers == nil || (onlyGalleryUsers != nil && !*onlyGalleryUsers) {
-		refresh := false
-		if obj.ForceRefresh != nil {
-			refresh = *obj.ForceRefresh
-		}
-		err := refreshTokensInContractAsync(ctx, obj.Dbid, refresh)
+	onlyUsers := util.GetOptionalValue(onlyGalleryUsers, false)
+	forceRefresh := util.GetOptionalValue(obj.ForceRefresh, false)
+
+	if !onlyUsers {
+		err := refreshTokensInContractAsync(ctx, obj.Dbid, forceRefresh)
 		if err != nil {
 			return nil, err
 		}
 	}
-	return resolveTokensByContractIDWithPagination(ctx, obj.Dbid, before, after, first, last, onlyGalleryUsers)
+
+	return resolveTokensByContractIDWithPagination(ctx, obj.Dbid, before, after, first, last, onlyUsers)
 }
 
 // Owners is the resolver for the owners field.
 func (r *communityResolver) Owners(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokenHoldersConnection, error) {
-	if onlyGalleryUsers == nil || (onlyGalleryUsers != nil && !*onlyGalleryUsers) {
-		refresh := false
-		if obj.ForceRefresh != nil {
-			refresh = *obj.ForceRefresh
-		}
-		err := refreshTokensInContractAsync(ctx, obj.Dbid, refresh)
+	onlyUsers := util.GetOptionalValue(onlyGalleryUsers, false)
+	forceRefresh := util.GetOptionalValue(obj.ForceRefresh, false)
+
+	if !onlyUsers {
+		err := refreshTokensInContractAsync(ctx, obj.Dbid, forceRefresh)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return resolveCommunityOwnersByContractID(ctx, obj.Dbid, before, after, first, last, onlyGalleryUsers)
+	return resolveCommunityOwnersByContractID(ctx, obj.Dbid, before, after, first, last, onlyUsers)
 }
 
 // FeedEvent is the resolver for the feedEvent field.
@@ -381,8 +437,14 @@ func (r *galleryUserResolver) SocialAccounts(ctx context.Context, obj *model.Gal
 }
 
 // Tokens is the resolver for the tokens field.
-func (r *galleryUserResolver) Tokens(ctx context.Context, obj *model.GalleryUser) ([]*model.Token, error) {
-	return resolveTokensByUserID(ctx, obj.Dbid)
+func (r *galleryUserResolver) Tokens(ctx context.Context, obj *model.GalleryUser, ownershipFilter []persist.TokenOwnershipType) ([]*model.Token, error) {
+	tokens, err := publicapi.For(ctx).Token.GetTokensByUserID(ctx, obj.Dbid, ownershipFilter)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return tokensToModel(ctx, tokens), nil
 }
 
 // TokensByChain is the resolver for the tokensByChain field.
@@ -471,6 +533,27 @@ func (r *galleryUserResolver) SharedFollowers(ctx context.Context, obj *model.Ga
 // SharedCommunities is the resolver for the sharedCommunities field.
 func (r *galleryUserResolver) SharedCommunities(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error) {
 	communities, pageInfo, err := publicapi.For(ctx).User.SharedCommunities(ctx, obj.UserID, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	edges := make([]*model.CommunityEdge, len(communities))
+	for i, community := range communities {
+		edges[i] = &model.CommunityEdge{
+			Node:   communityToModel(ctx, community, util.ToPointer(false)),
+			Cursor: nil, // not used by relay, but relay will complain without this field existing
+		}
+	}
+
+	return &model.CommunitiesConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
+}
+
+// CreatedCommunities is the resolver for the createdCommunities field.
+func (r *galleryUserResolver) CreatedCommunities(ctx context.Context, obj *model.GalleryUser, input model.CreatedCommunitiesInput, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error) {
+	communities, pageInfo, err := publicapi.For(ctx).User.CreatedCommunities(ctx, obj.UserID, input.IncludeChains, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}
@@ -808,6 +891,16 @@ func (r *mutationResolver) SyncTokens(ctx context.Context, chains []persist.Chai
 	}
 
 	return output, nil
+}
+
+// SyncCreatedTokens is the resolver for the syncCreatedTokens field.
+func (r *mutationResolver) SyncCreatedTokens(ctx context.Context, input model.SyncCreatedTokensInput) (model.SyncCreatedTokensPayloadOrError, error) {
+	err := publicapi.For(ctx).Token.SyncTokensCreatedByUser(ctx, input.IncludeChains)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.SyncCreatedTokensPayload{Viewer: resolveViewer(ctx)}, nil
 }
 
 // RefreshToken is the resolver for the refreshToken field.
@@ -1495,6 +1588,29 @@ func (r *mutationResolver) MintPremiumCardToWallet(ctx context.Context, input mo
 	return model.MintPremiumCardToWalletPayload{Tx: tx}, nil
 }
 
+// SetCommunityOverrideCreator is the resolver for the setCommunityOverrideCreator field.
+func (r *mutationResolver) SetCommunityOverrideCreator(ctx context.Context, communityID persist.DBID, creatorUserID *persist.DBID) (model.SetCommunityOverrideCreatorPayloadOrError, error) {
+	if creatorUserID == nil {
+		err := publicapi.For(ctx).Admin.RemoveContractOverrideCreator(ctx, communityID)
+		if err != nil {
+			return nil, err
+		}
+		return model.SetCommunityOverrideCreatorPayload{User: nil}, nil
+	}
+
+	user, err := publicapi.For(ctx).User.GetUserById(ctx, *creatorUserID)
+	if err != nil {
+		return nil, err
+	}
+
+	err = publicapi.For(ctx).Admin.SetContractOverrideCreator(ctx, communityID, *creatorUserID)
+	if err != nil {
+		return nil, err
+	}
+
+	return model.SetCommunityOverrideCreatorPayload{User: userToModel(ctx, *user)}, nil
+}
+
 // UploadPersistedQueries is the resolver for the uploadPersistedQueries field.
 func (r *mutationResolver) UploadPersistedQueries(ctx context.Context, input *model.UploadPersistedQueriesInput) (model.UploadPersistedQueriesPayloadOrError, error) {
 	err := publicapi.For(ctx).APQ.UploadPersistedQueries(ctx, *input.PersistedQueries)
@@ -1881,6 +1997,26 @@ func (r *queryResolver) SocialQueries(ctx context.Context) (model.SocialQueriesO
 	return &model.SocialQueries{}, nil
 }
 
+// TopCollectionsForCommunity is the resolver for the topCollectionsForCommunity field.
+func (r *queryResolver) TopCollectionsForCommunity(ctx context.Context, input model.TopCollectionsForCommunityInput, before *string, after *string, first *int, last *int) (*model.CollectionsConnection, error) {
+	collections, pageInfo, err := publicapi.For(ctx).Collection.GetTopCollectionsForCommunity(ctx, *input.ChainAddress, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	edges, _ := util.Map(collections, func(c coredb.Collection) (*model.CollectionEdge, error) {
+		return &model.CollectionEdge{
+			Node:   collectionToModel(ctx, c),
+			Cursor: nil,
+		}, nil
+	})
+
+	return &model.CollectionsConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
+}
+
 // FeedEvent is the resolver for the feedEvent field.
 func (r *removeAdmirePayloadResolver) FeedEvent(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.FeedEvent, error) {
 	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
@@ -1986,11 +2122,11 @@ func (r *tokenResolver) Media(ctx context.Context, obj *model.Token) (model.Medi
 		// If we have no media, just return the fallback media
 		var noMediaErr persist.ErrMediaNotFound
 		if errors.As(err, &noMediaErr) {
-			return mediaToModel(ctx, persist.Media{}, obj.HelperTokenData.Token.FallbackMedia), nil
+			return mediaToModel(ctx, tokenMedia, obj.HelperTokenData.Token.FallbackMedia), nil
 		}
 		return nil, err
 	}
-	return mediaToModel(ctx, tokenMedia.Media, obj.HelperTokenData.Token.FallbackMedia), nil
+	return mediaToModel(ctx, tokenMedia, obj.HelperTokenData.Token.FallbackMedia), nil
 }
 
 // Owner is the resolver for the owner field.
@@ -2016,9 +2152,40 @@ func (r *tokenResolver) OwnedByWallets(ctx context.Context, obj *model.Token) ([
 	return wallets, nil
 }
 
+// OwnerIsHolder is the resolver for the ownerIsHolder field.
+func (r *tokenResolver) OwnerIsHolder(ctx context.Context, obj *model.Token) (*bool, error) {
+	ownership, err := publicapi.For(ctx).Token.GetTokenOwnershipByTokenID(ctx, obj.Dbid)
+	if err != nil {
+		if _, ok := err.(persist.ErrTokenOwnershipNotFound); ok {
+			return util.ToPointer(false), nil
+		}
+		return nil, err
+	}
+
+	return util.ToPointer(ownership.IsHolder), nil
+}
+
+// OwnerIsCreator is the resolver for the ownerIsCreator field.
+func (r *tokenResolver) OwnerIsCreator(ctx context.Context, obj *model.Token) (*bool, error) {
+	ownership, err := publicapi.For(ctx).Token.GetTokenOwnershipByTokenID(ctx, obj.Dbid)
+	if err != nil {
+		if _, ok := err.(persist.ErrTokenOwnershipNotFound); ok {
+			return util.ToPointer(false), nil
+		}
+		return nil, err
+	}
+
+	return util.ToPointer(ownership.IsCreator), nil
+}
+
 // Contract is the resolver for the contract field.
 func (r *tokenResolver) Contract(ctx context.Context, obj *model.Token) (*model.Contract, error) {
 	return resolveContractByTokenID(ctx, obj.Dbid)
+}
+
+// Community is the resolver for the community field.
+func (r *tokenResolver) Community(ctx context.Context, obj *model.Token) (*model.Community, error) {
+	return resolveCommunityByTokenID(ctx, obj.Dbid)
 }
 
 // Wallets is the resolver for the wallets field.
@@ -2037,6 +2204,19 @@ func (r *tokenHolderResolver) Wallets(ctx context.Context, obj *model.TokenHolde
 // User is the resolver for the user field.
 func (r *tokenHolderResolver) User(ctx context.Context, obj *model.TokenHolder) (*model.GalleryUser, error) {
 	return resolveGalleryUserByUserID(ctx, obj.UserId)
+}
+
+// PreviewTokens is the resolver for the previewTokens field.
+func (r *tokenHolderResolver) PreviewTokens(ctx context.Context, obj *model.TokenHolder) ([]*string, error) {
+	urls, err := publicapi.For(ctx).Contract.GetPreviewURLsByContractIDandUserID(ctx, obj.HelperTokenHolderData.UserId, obj.HelperTokenHolderData.ContractId)
+	if err != nil {
+		return nil, err
+	}
+	previewURLs := make([]*string, len(urls))
+	for i, url := range urls {
+		previewURLs[i] = &url
+	}
+	return previewURLs, nil
 }
 
 // Owner is the resolver for the owner field.

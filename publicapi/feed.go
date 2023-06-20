@@ -2,8 +2,6 @@ package publicapi
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -19,6 +17,7 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/util"
 )
 
 type FeedAPI struct {
@@ -291,6 +290,7 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 			})
 
 			trendingIDs := make([]persist.DBID, 0)
+
 			for i := 0; i < len(trendData) && i < reportSize; i++ {
 				trendingIDs = append(trendingIDs, trendData[i].ID)
 			}
@@ -298,13 +298,10 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 			return trendingIDs, nil
 		}
 
-		t := trender{
-			Cache:    api.cache,
-			Key:      "trending.feedEvents",
-			TTL:      time.Minute * 10,
-			CalcFunc: calcFunc,
-		}
-		if err = t.load(ctx, &trendingIDs); err != nil {
+		l := newDBIDCache(api.cache, "trending:feedEvents", time.Minute*10, calcFunc)
+
+		trendingIDs, err = l.Load(ctx)
+		if err != nil {
 			return nil, PageInfo{}, err
 		}
 	}
@@ -324,16 +321,12 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 			PagingForward: params.PagingForward,
 			Limit:         params.Limit,
 		})
-		if err != nil {
-			return nil, err
-		}
 
-		results := make([]interface{}, len(keys))
-		for i, key := range keys {
-			results[i] = key
-		}
+		results, _ := util.Map(keys, func(k db.FeedEvent) (any, error) {
+			return k, nil
+		})
 
-		return results, nil
+		return results, err
 	}
 
 	cursorFunc := func(node any) (int, []persist.DBID, error) {
@@ -345,50 +338,44 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 	paginator.CursorFunc = cursorFunc
 	results, pageInfo, err := paginator.paginate(before, after, first, last)
 
-	feedEvents := make([]db.FeedEvent, len(results))
-	for i, result := range results {
-		feedEvents[i] = result.(db.FeedEvent)
-	}
+	feedEvents, _ := util.Map(results, func(r any) (db.FeedEvent, error) {
+		return r.(db.FeedEvent), nil
+	})
 
 	return feedEvents, pageInfo, err
 }
 
 func (api FeedAPI) TrendingUsers(ctx context.Context, report model.Window) ([]db.User, error) {
-	calcFunc := func(ctx context.Context) ([]persist.DBID, error) {
-		if report.Name == "ALL_TIME" {
-			return api.queries.GetAllTimeTrendingUserIDs(ctx, 24)
-		}
-		return api.queries.GetWindowedTrendingUserIDs(ctx, db.GetWindowedTrendingUserIDsParams{
-			WindowEnd: time.Now().Add(-time.Duration(report.Duration)),
-			Limit:     24,
-		})
-	}
-
-	// Reports that calculating trending users greater than a week or more
-	// are calculated once every 24 hours rather than once an hour.
 	ttl := time.Hour
+
+	// Reports that span a week or greater are calculated once every 24 hours rather than once an hour.
 	if report.Duration > 7*24*time.Hour {
 		ttl *= 24
 	}
 
-	t := trender{
-		Cache:    api.cache,
-		Key:      "trending.users." + report.Name,
-		TTL:      ttl,
-		CalcFunc: calcFunc,
+	calcFunc := func(ctx context.Context) ([]persist.DBID, error) {
+		return api.queries.GetAllTimeTrendingUserIDs(ctx, 24)
 	}
 
-	var trendingIDs []persist.DBID
+	if report.Name != "ALL_TIME" {
+		calcFunc = func(ctx context.Context) ([]persist.DBID, error) {
+			return api.queries.GetWindowedTrendingUserIDs(ctx, db.GetWindowedTrendingUserIDsParams{
+				WindowEnd: time.Now().Add(-time.Duration(report.Duration)),
+				Limit:     24,
+			})
+		}
+	}
 
-	err := t.load(ctx, &trendingIDs)
+	l := newDBIDCache(api.cache, "trending:users:"+report.Name, ttl, calcFunc)
+
+	ids, err := l.Load(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	asStr := make([]string, len(trendingIDs))
-	for i, id := range trendingIDs {
-		asStr[i] = id.String()
-	}
+	asStr, _ := util.Map(ids, func(id persist.DBID) (string, error) {
+		return id.String(), nil
+	})
 
 	return api.queries.GetTrendingUsersByIDs(ctx, asStr)
 }
@@ -398,41 +385,4 @@ func feedCursor(i interface{}) (time.Time, persist.DBID, error) {
 		return row.EventTime, row.ID, nil
 	}
 	return time.Time{}, "", fmt.Errorf("interface{} is not a feed event")
-}
-
-type trender struct {
-	// CalcFunc computes the results of a trend and returns record in sorted order
-	CalcFunc func(context.Context) ([]persist.DBID, error)
-	Cache    *redis.Cache  // Cache to store pre-computed trends
-	Key      string        // Key used to store and reference saved results
-	TTL      time.Duration // The length of time before a cached result is considered to be stale
-}
-
-// load implements a lazy filled cache where only requested data is stored in the cache.
-// It is possible for load to return stale data, however the staleness of data can be
-// limited by configuring a shorter TTL. The tradeoff being that a shorter TTL results in more
-// cache misses and more frequent trips to check the cache, compute the trend, and re-populate the cache.
-func (t *trender) load(ctx context.Context, into any) error {
-	byt, err := t.Cache.Get(ctx, t.Key)
-	var notFoundErr redis.ErrKeyNotFound
-
-	if err != nil && !errors.As(err, &notFoundErr) {
-		return err
-	}
-
-	if errors.As(err, &notFoundErr) {
-		trend, err := t.CalcFunc(ctx)
-		if err != nil {
-			return err
-		}
-
-		byt, err = json.Marshal(trend)
-		if err != nil {
-			return err
-		}
-
-		err = t.Cache.Set(ctx, t.Key, byt, t.TTL)
-	}
-
-	return json.Unmarshal(byt, &into)
 }

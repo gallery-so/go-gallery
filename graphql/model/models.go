@@ -19,14 +19,6 @@ func (r *CollectionToken) GetGqlIDField_CollectionID() string {
 	return r.HelperCollectionTokenData.CollectionId.String()
 }
 
-func (r *Community) GetGqlIDField_Chain() string {
-	return fmt.Sprint(r.ContractAddress.Chain())
-}
-
-func (r *Community) GetGqlIDField_ContractAddress() string {
-	return r.ContractAddress.Address().String()
-}
-
 func (v *Viewer) GetGqlIDField_UserID() string {
 	return string(v.UserId)
 }
@@ -37,8 +29,9 @@ type HelperCollectionTokenData struct {
 }
 
 type HelperTokenHolderData struct {
-	UserId    persist.DBID
-	WalletIds []persist.DBID
+	UserId     persist.DBID
+	WalletIds  []persist.DBID
+	ContractId persist.DBID
 }
 
 type HelperViewerData struct {
@@ -47,6 +40,7 @@ type HelperViewerData struct {
 
 type HelperCommunityData struct {
 	ForceRefresh *bool
+	ParentID     persist.DBID
 }
 
 type HelperTokensAddedToCollectionFeedEventDataData struct {
@@ -123,7 +117,7 @@ type HelperUserEmailData struct {
 
 type HelperSocialConnectionData struct {
 	UserID        persist.DBID
-	UserCreatedAt persist.CreationTime
+	UserCreatedAt time.Time
 }
 
 type HelperTokenData struct {

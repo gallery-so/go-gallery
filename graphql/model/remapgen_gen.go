@@ -268,6 +268,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"SetCommunityOverrideCreatorPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(SetCommunityOverrideCreatorPayloadOrError)
+		return obj, ok
+	},
+
 	"SetSpamPreferencePayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(SetSpamPreferencePayloadOrError)
 		return obj, ok
@@ -285,6 +290,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 
 	"SocialQueriesOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(SocialQueriesOrError)
+		return obj, ok
+	},
+
+	"SyncCreatedTokensPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(SyncCreatedTokensPayloadOrError)
 		return obj, ok
 	},
 

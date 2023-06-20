@@ -9,4 +9,5 @@ package util
 import (
 	_ "github.com/99designs/gqlgen"
 	_ "github.com/gallery-so/dataloaden"
+	_ "github.com/google/wire/cmd/wire"
 )

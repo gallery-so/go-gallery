@@ -3,6 +3,7 @@ package publicapi
 import (
 	"context"
 	"fmt"
+	"github.com/mikeydub/go-gallery/util"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -75,23 +76,7 @@ func (api TokenAPI) GetTokensByCollectionId(ctx context.Context, collectionID pe
 	return tokens, nil
 }
 
-func (api TokenAPI) GetTokensByContractId(ctx context.Context, contractID persist.DBID) ([]db.Token, error) {
-	// Validate
-	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"contractID": {contractID, "required"},
-	}); err != nil {
-		return nil, err
-	}
-
-	tokens, err := api.loaders.TokensByContractID.Load(contractID)
-	if err != nil {
-		return nil, err
-	}
-
-	return tokens, nil
-}
-
-func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int, onlyGalleryUsers *bool) ([]db.Token, PageInfo, error) {
+func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int, onlyGalleryUsers bool) ([]db.Token, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"contractID": {contractID, "required"},
@@ -103,18 +88,13 @@ func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractI
 		return nil, PageInfo{}, err
 	}
 
-	ogu := false
-	if onlyGalleryUsers != nil {
-		ogu = *onlyGalleryUsers
-	}
-
 	queryFunc := func(params boolTimeIDPagingParams) ([]interface{}, error) {
 
 		logger.For(ctx).Infof("GetTokensByContractIdPaginate: %+v", params)
 		tokens, err := api.queries.GetTokensByContractIdPaginate(ctx, db.GetTokensByContractIdPaginateParams{
-			Contract:           contractID,
+			ID:                 contractID,
 			Limit:              params.Limit,
-			GalleryUsersOnly:   ogu,
+			GalleryUsersOnly:   onlyGalleryUsers,
 			CurBeforeUniversal: params.CursorBeforeBool,
 			CurAfterUniversal:  params.CursorAfterBool,
 			CurBeforeTime:      params.CursorBeforeTime,
@@ -137,8 +117,8 @@ func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractI
 
 	countFunc := func() (int, error) {
 		total, err := api.queries.CountTokensByContractId(ctx, db.CountTokensByContractIdParams{
-			Contract:         contractID,
-			GalleryUsersOnly: ogu,
+			ID:               contractID,
+			GalleryUsersOnly: onlyGalleryUsers,
 		})
 		return int(total), err
 	}
@@ -227,7 +207,10 @@ func (api TokenAPI) GetTokensByWalletID(ctx context.Context, walletID persist.DB
 	return tokens, nil
 }
 
-func (api TokenAPI) GetTokensByUserID(ctx context.Context, userID persist.DBID) ([]db.Token, error) {
+// GetTokensByUserID returns all tokens owned by a user. ownershipFilter is optional and may be nil or empty,
+// which will cause all tokens to be returned. If filter values are provided, only the tokens matching the
+// filter will be returned.
+func (api TokenAPI) GetTokensByUserID(ctx context.Context, userID persist.DBID, ownershipFilter []persist.TokenOwnershipType) ([]db.Token, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userID": {userID, "required"},
@@ -235,24 +218,20 @@ func (api TokenAPI) GetTokensByUserID(ctx context.Context, userID persist.DBID) 
 		return nil, err
 	}
 
-	tokens, err := api.loaders.TokensByUserID.Load(userID)
-	if err != nil {
-		return nil, err
+	params := db.GetTokensByUserIdBatchParams{
+		OwnerUserID: userID,
 	}
 
-	return tokens, nil
-}
-
-func (api TokenAPI) GetTokensByUserIDAndContractID(ctx context.Context, userID, contractID persist.DBID) ([]db.Token, error) {
-	// Validate
-	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"userID":     {userID, "required"},
-		"contractID": {contractID, "required"},
-	}); err != nil {
-		return nil, err
+	if len(ownershipFilter) > 0 {
+		params.IncludeHolder = util.Contains(ownershipFilter, persist.TokenOwnershipTypeHolder)
+		params.IncludeCreator = util.Contains(ownershipFilter, persist.TokenOwnershipTypeCreator)
+	} else {
+		// If no filters are specified, include everything
+		params.IncludeHolder = true
+		params.IncludeCreator = true
 	}
 
-	tokens, err := api.loaders.TokensByUserIDAndContractID.Load(persist.DBIDTuple{userID, contractID})
+	tokens, err := api.loaders.TokensByUserID.Load(params)
 	if err != nil {
 		return nil, err
 	}
@@ -299,11 +278,13 @@ func isAdminUser(userID persist.DBID) bool {
 }
 
 func (api TokenAPI) SyncTokensAdmin(ctx context.Context, chains []persist.Chain, userID persist.DBID) error {
-	if err := api.throttler.Lock(ctx, userID.String()); err != nil {
+	key := fmt.Sprintf("sync:owned:%s", userID.String())
+
+	if err := api.throttler.Lock(ctx, key); err != nil {
 		return ErrTokenRefreshFailed{Message: err.Error()}
 	}
 
-	defer api.throttler.Unlock(ctx, userID.String())
+	defer api.throttler.Unlock(ctx, key)
 
 	if err := api.multichainProvider.SyncTokens(ctx, userID, chains); err != nil {
 		// Wrap all OpenSea sync failures in a generic type that can be returned to the frontend as an expected error type
@@ -320,10 +301,12 @@ func (api TokenAPI) SyncTokens(ctx context.Context, chains []persist.Chain) erro
 		return err
 	}
 
-	if err := api.throttler.Lock(ctx, userID.String()); err != nil {
+	key := fmt.Sprintf("sync:owned:%s", userID.String())
+
+	if err := api.throttler.Lock(ctx, key); err != nil {
 		return ErrTokenRefreshFailed{Message: err.Error()}
 	}
-	defer api.throttler.Unlock(ctx, userID.String())
+	defer api.throttler.Unlock(ctx, key)
 
 	err = api.multichainProvider.SyncTokens(ctx, userID, chains)
 	if err != nil {
@@ -332,6 +315,22 @@ func (api TokenAPI) SyncTokens(ctx context.Context, chains []persist.Chain) erro
 	}
 
 	return nil
+}
+
+func (api TokenAPI) SyncTokensCreatedByUser(ctx context.Context, includeChains []persist.Chain) error {
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return err
+	}
+
+	key := fmt.Sprintf("sync:created:%s", userID.String())
+
+	if err := api.throttler.Lock(ctx, key); err != nil {
+		return ErrTokenRefreshFailed{Message: err.Error()}
+	}
+	defer api.throttler.Unlock(ctx, key)
+
+	return api.multichainProvider.SyncTokensCreatedOnSharedContracts(ctx, userID, includeChains)
 }
 
 func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) error {
@@ -494,4 +493,15 @@ func (api TokenAPI) MediaByTokenID(ctx context.Context, tokenID persist.DBID) (d
 	}
 
 	return api.loaders.MediaByTokenID.Load(tokenID)
+}
+
+func (api TokenAPI) GetTokenOwnershipByTokenID(ctx context.Context, tokenID persist.DBID) (db.TokenOwnership, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"tokenID": {tokenID, "required"},
+	}); err != nil {
+		return db.TokenOwnership{}, err
+	}
+
+	return api.loaders.TokenOwnershipByTokenID.Load(tokenID)
 }

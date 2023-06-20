@@ -82,7 +82,7 @@ func ethProviderSet(serverEnvInit envInit, client *cloudtasks.Client, httpClient
 
 // ethProvidersConfig is a wire injector that binds multichain interfaces to their concrete Ethereum implementations
 func ethProvidersConfig(indexerProvider *eth.Provider, openseaProvider *opensea.Provider, fallbackProvider multichain.SyncFailureFallbackProvider) ethProviderList {
-	serverEthProviderList := ethRequirements(indexerProvider, indexerProvider, fallbackProvider, openseaProvider, indexerProvider, indexerProvider, indexerProvider)
+	serverEthProviderList := ethRequirements(indexerProvider, indexerProvider, fallbackProvider, openseaProvider, indexerProvider, indexerProvider, indexerProvider, openseaProvider)
 	return serverEthProviderList
 }
 
@@ -238,8 +238,9 @@ func ethRequirements(
 	cr multichain.ContractRefresher,
 	tmf multichain.TokenMetadataFetcher,
 	tdf multichain.TokenDescriptorsFetcher,
+	osccf multichain.OpenSeaChildContractFetcher,
 ) ethProviderList {
-	return ethProviderList{nr, v, tof, toc, cr, tmf, tdf}
+	return ethProviderList{nr, v, tof, toc, cr, tmf, tdf, osccf}
 }
 
 // tezosRequirements is the set of provider interfaces required for Tezos

@@ -77,10 +77,10 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 	getMetadataByTokenIdentifiersStmt, err := db.PrepareContext(ctx, `SELECT TOKEN_URI,TOKEN_METADATA FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2 ORDER BY BLOCK_NUMBER DESC LIMIT 1;`)
 	checkNoErr(err)
 
-	updateOwnerUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET OWNER_ADDRESS = $1, OWNERSHIP_HISTORY = $2 || OWNERSHIP_HISTORY, BLOCK_NUMBER = $3, LAST_UPDATED = $4 WHERE ID = $5;`)
+	updateOwnerUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET OWNER_ADDRESS = $1, OWNERSHIP_HISTORY = $2 || OWNERSHIP_HISTORY, BLOCK_NUMBER = $3, LAST_UPDATED = now() WHERE ID = $4;`)
 	checkNoErr(err)
 
-	updateBalanceUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET QUANTITY = $1, BLOCK_NUMBER = $2, LAST_UPDATED = $3 WHERE ID = $4;`)
+	updateBalanceUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET QUANTITY = $1, BLOCK_NUMBER = $2, LAST_UPDATED = now() WHERE ID = $3;`)
 	checkNoErr(err)
 
 	updateURIByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET TOKEN_URI = $1, LAST_UPDATED = $2 WHERE TOKEN_ID = $3 AND CONTRACT_ADDRESS = $4;`)
@@ -465,9 +465,9 @@ func (t *TokenRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUp
 	var err error
 	switch update := pUpdate.(type) {
 	case persist.TokenUpdateOwnerInput:
-		res, err = t.updateOwnerUnsafeStmt.ExecContext(pCtx, update.OwnerAddress, []persist.AddressAtBlock{{Address: persist.Address(update.OwnerAddress), Block: update.BlockNumber}}, update.BlockNumber, persist.LastUpdatedTime{}, pID)
+		res, err = t.updateOwnerUnsafeStmt.ExecContext(pCtx, update.OwnerAddress, []persist.AddressAtBlock{{Address: persist.Address(update.OwnerAddress), Block: update.BlockNumber}}, update.BlockNumber, pID)
 	case persist.TokenUpdateBalanceInput:
-		res, err = t.updateBalanceUnsafeStmt.ExecContext(pCtx, update.Quantity, update.BlockNumber, persist.LastUpdatedTime{}, pID)
+		res, err = t.updateBalanceUnsafeStmt.ExecContext(pCtx, update.Quantity, update.BlockNumber, pID)
 	default:
 		return fmt.Errorf("unsupported update type: %T", pUpdate)
 	}

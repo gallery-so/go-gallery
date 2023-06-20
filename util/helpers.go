@@ -749,3 +749,12 @@ func (lr *LoggingReader) WriteTo(w io.Writer) (n int64, err error) {
 	}
 	return 0, fmt.Errorf("No WriterTo provided")
 }
+
+// ErrorAs returns true if the given error is of type T
+func ErrorAs[T error](e error) bool {
+	var t T
+	if errors.As(e, &t) {
+		return true
+	}
+	return false
+}

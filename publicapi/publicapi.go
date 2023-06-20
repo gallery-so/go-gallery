@@ -3,6 +3,7 @@ package publicapi
 import (
 	"context"
 	"errors"
+	"time"
 
 	magicclient "github.com/magiclabs/magic-admin-go/client"
 	admin "github.com/mikeydub/go-gallery/adminapi"
@@ -187,4 +188,36 @@ func pushEvent(ctx context.Context, evt db.Event) {
 		logger.For(ctx).Error(err)
 		sentryutil.ReportError(ctx, err)
 	}
+}
+
+// dbidCache is a lazy cache that stores DBIDs from expensive queries
+type dbidCache struct {
+	*redis.LazyCache
+	CalcFunc func(context.Context) ([]persist.DBID, error)
+}
+
+func newDBIDCache(cache *redis.Cache, key string, ttl time.Duration, f func(context.Context) ([]persist.DBID, error)) dbidCache {
+	return dbidCache{
+		LazyCache: &redis.LazyCache{
+			Cache: cache,
+			Key:   key,
+			TTL:   ttl,
+			CalcFunc: func(ctx context.Context) ([]byte, error) {
+				ids, err := f(ctx)
+				var p positionPaginator
+				b, err := p.encodeCursor(0, ids)
+				return []byte(b), err
+			},
+		},
+	}
+}
+
+func (d dbidCache) Load(ctx context.Context) ([]persist.DBID, error) {
+	b, err := d.LazyCache.Load(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var p positionPaginator
+	_, ids, err := p.decodeCursor(string(b))
+	return ids, err
 }

@@ -186,7 +186,7 @@ func setTokenContext(scope *sentry.Scope, chain persist.Chain, contractAddress p
 
 func setRunTags(scope *sentry.Scope, runID persist.DBID) {
 	scope.SetTag("runID", runID.String())
-	scope.SetTag("log", "go/tp-runs/"+runID.String())
+	scope.SetTag("log", "go/tokenruns/"+runID.String())
 }
 
 // isSpamToken returns true if the token is marked as spam.

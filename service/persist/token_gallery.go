@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/lib/pq"
 )
@@ -15,13 +16,13 @@ type AddressAtBlockList []AddressAtBlock
 
 // TokenGallery represents an individual Token
 type TokenGallery struct {
-	Version      NullInt32       `json:"version"` // schema version for this model
-	ID           DBID            `json:"id" binding:"required"`
-	CreationTime CreationTime    `json:"created_at"`
-	Deleted      NullBool        `json:"-"`
-	LastUpdated  LastUpdatedTime `json:"last_updated"`
+	Version      NullInt32 `json:"version"` // schema version for this model
+	ID           DBID      `json:"id" binding:"required"`
+	CreationTime time.Time `json:"created_at"`
+	Deleted      NullBool  `json:"-"`
+	LastUpdated  time.Time `json:"last_updated"`
 
-	LastSynced LastUpdatedTime `json:"last_synced"`
+	LastSynced time.Time `json:"last_synced"`
 
 	CollectorsNote NullString    `json:"collectors_note"`
 	Media          Media         `json:"media"`
@@ -87,14 +88,14 @@ type ContractIdentifiers struct {
 
 // TokenUpdateInfoInput represents a token update to update the token's user inputted info
 type TokenUpdateInfoInput struct {
-	LastUpdated LastUpdatedTime `json:"last_updated"`
+	LastUpdated time.Time `json:"last_updated"`
 
 	CollectorsNote NullString `json:"collectors_note"`
 }
 
 // TokenUpdateAllURIDerivedFieldsInput represents an update to any field that can be derived from the token URI, including the metadata itself and tokenURI where the metadata is hosted
 type TokenUpdateAllURIDerivedFieldsInput struct {
-	LastUpdated LastUpdatedTime `json:"last_updated"`
+	LastUpdated time.Time `json:"last_updated"`
 
 	Media       Media         `json:"media"`
 	Metadata    TokenMetadata `json:"token_metadata"`
@@ -104,7 +105,7 @@ type TokenUpdateAllURIDerivedFieldsInput struct {
 }
 
 type TokenUpdateAllMetadataFieldsInput struct {
-	LastUpdated LastUpdatedTime `json:"last_updated"`
+	LastUpdated time.Time `json:"last_updated"`
 
 	Metadata    TokenMetadata `json:"token_metadata"`
 	TokenURI    TokenURI      `json:"token_uri"`
@@ -113,7 +114,7 @@ type TokenUpdateAllMetadataFieldsInput struct {
 }
 
 type TokenUpdateMetadataFieldsInput struct {
-	LastUpdated LastUpdatedTime `json:"last_updated"`
+	LastUpdated time.Time `json:"last_updated"`
 
 	Metadata TokenMetadata `json:"token_metadata"`
 	TokenURI TokenURI      `json:"token_uri"`
@@ -121,21 +122,21 @@ type TokenUpdateMetadataFieldsInput struct {
 
 // TokenUpdateURIInput represents an update to just a token's URI field
 type TokenUpdateURIInput struct {
-	LastUpdated LastUpdatedTime `json:"last_updated"`
+	LastUpdated time.Time `json:"last_updated"`
 
 	TokenURI TokenURI `json:"token_uri"`
 }
 
 // TokenUpdateMediaInput represents an update to just a token's media fields
 type TokenUpdateMediaInput struct {
-	LastUpdated LastUpdatedTime `json:"last_updated"`
+	LastUpdated time.Time `json:"last_updated"`
 
 	Media Media `json:"media"`
 }
 
 // TokenUpdateMetadataDerivedFieldsInput represents an update to any field that can be derived from the token metadata
 type TokenUpdateMetadataDerivedFieldsInput struct {
-	LastUpdated LastUpdatedTime `json:"last_updated"`
+	LastUpdated time.Time `json:"last_updated"`
 
 	Name        NullString `json:"name"`
 	Description NullString `json:"description"`

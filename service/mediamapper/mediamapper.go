@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/imgix/imgix-go/v2"
@@ -151,6 +152,12 @@ type Option func(*[]imgix.IxParam)
 func WithStaticImage() Option {
 	return func(params *[]imgix.IxParam) {
 		*params = append(*params, imgix.Param("frame", "1"))
+	}
+}
+
+func WithTimestamp(t time.Time) Option {
+	return func(params *[]imgix.IxParam) {
+		*params = append(*params, imgix.Param("glryts", strconv.FormatInt(t.Unix(), 10)))
 	}
 }
 

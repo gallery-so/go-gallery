@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/gammazero/workerpool"
@@ -54,12 +53,8 @@ var nodeFetcher = model.NodeFetcher{
 		return resolveCollectionTokenByID(ctx, persist.DBID(tokenId), persist.DBID(collectionId))
 	},
 
-	OnCommunity: func(ctx context.Context, contractAddress string, chain string) (*model.Community, error) {
-		if parsed, err := strconv.Atoi(chain); err == nil {
-			return resolveCommunityByContractAddress(ctx, persist.NewChainAddress(persist.Address(contractAddress), persist.Chain(parsed)), util.ToPointer(false))
-		} else {
-			return nil, err
-		}
+	OnCommunity: func(ctx context.Context, dbid persist.DBID) (*model.Community, error) {
+		return resolveCommunityByID(ctx, dbid)
 	},
 	OnSomeoneAdmiredYourFeedEventNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneAdmiredYourFeedEventNotification, error) {
 		notif, err := resolveNotificationByID(ctx, dbid)
@@ -382,8 +377,8 @@ func resolveTokenPreviewsByGalleryID(ctx context.Context, galleryID persist.DBID
 		return nil, err
 	}
 
-	return util.Map(medias, func(token persist.Media) (*model.PreviewURLSet, error) {
-		return getPreviewUrls(ctx, token), nil
+	return util.Map(medias, func(t db.TokenMedia) (*model.PreviewURLSet, error) {
+		return getPreviewUrls(ctx, t), nil
 	})
 }
 
@@ -458,33 +453,16 @@ func resolveTokensByWalletID(ctx context.Context, walletID persist.DBID) ([]*mod
 	return tokensToModel(ctx, tokens), nil
 }
 
-func resolveTokensByUserIDAndContractID(ctx context.Context, userID, contractID persist.DBID) ([]*model.Token, error) {
-
-	tokens, err := publicapi.For(ctx).Token.GetTokensByUserIDAndContractID(ctx, userID, contractID)
-	if err != nil {
-		return nil, err
-	}
-
-	return tokensToModel(ctx, tokens), nil
-}
-
-func resolveTokensByContractID(ctx context.Context, contractID persist.DBID) ([]*model.Token, error) {
-
-	tokens, err := publicapi.For(ctx).Token.GetTokensByContractId(ctx, contractID)
-	if err != nil {
-		return nil, err
-	}
-
-	return tokensToModel(ctx, tokens), nil
-}
-
-func resolveTokensByContractIDWithPagination(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int, onlyGalleryUsers *bool) (*model.TokensConnection, error) {
-
+func resolveTokensByContractIDWithPagination(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int, onlyGalleryUsers bool) (*model.TokensConnection, error) {
 	tokens, pageInfo, err := publicapi.For(ctx).Token.GetTokensByContractIdPaginate(ctx, contractID, before, after, first, last, onlyGalleryUsers)
 	if err != nil {
 		return nil, err
 	}
+	connection := tokensToConnection(ctx, tokens, pageInfo)
+	return &connection, nil
+}
 
+func tokensToConnection(ctx context.Context, tokens []db.Token, pageInfo publicapi.PageInfo) model.TokensConnection {
 	edges := make([]*model.TokenEdge, len(tokens))
 	for i, token := range tokens {
 		edges[i] = &model.TokenEdge{
@@ -492,25 +470,14 @@ func resolveTokensByContractIDWithPagination(ctx context.Context, contractID per
 			Cursor: nil, // not used by relay, but relay will complain without this field existing
 		}
 	}
-
-	return &model.TokensConnection{
+	return model.TokensConnection{
 		Edges:    edges,
 		PageInfo: pageInfoToModel(ctx, pageInfo),
-	}, nil
+	}
 }
 
 func refreshTokensInContractAsync(ctx context.Context, contractID persist.DBID, forceRefresh bool) error {
 	return publicapi.For(ctx).Contract.RefreshOwnersAsync(ctx, contractID, forceRefresh)
-}
-
-func resolveTokensByUserID(ctx context.Context, userID persist.DBID) ([]*model.Token, error) {
-	tokens, err := publicapi.For(ctx).Token.GetTokensByUserID(ctx, userID)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return tokensToModel(ctx, tokens), nil
 }
 
 func resolveTokenOwnerByTokenID(ctx context.Context, tokenID persist.DBID) (*model.GalleryUser, error) {
@@ -521,6 +488,24 @@ func resolveTokenOwnerByTokenID(ctx context.Context, tokenID persist.DBID) (*mod
 	}
 
 	return resolveGalleryUserByUserID(ctx, token.OwnerUserID)
+}
+
+func resolveCommunityByTokenID(ctx context.Context, tokenID persist.DBID) (*model.Community, error) {
+	token, err := publicapi.For(ctx).Token.GetTokenById(ctx, tokenID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, token.Contract)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: It's probably worth revisiting "forceRefresh" to see if it still makes sense as a
+	// parameter for every call to communityToModel.
+	return communityToModel(ctx, *contract, util.ToPointer(false)), nil
 }
 
 func resolveContractByTokenID(ctx context.Context, tokenID persist.DBID) (*model.Contract, error) {
@@ -612,6 +597,14 @@ func resolveMembershipTierByMembershipId(ctx context.Context, id persist.DBID) (
 	return membershipToModel(ctx, *tier), nil
 }
 
+func resolveCommunityByID(ctx context.Context, id persist.DBID) (*model.Community, error) {
+	community, err := publicapi.For(ctx).Contract.GetContractByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return communityToModel(ctx, *community, nil), nil
+}
+
 func resolveCommunityByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, forceRefresh *bool) (*model.Community, error) {
 	community, err := publicapi.For(ctx).Contract.GetContractByAddress(ctx, contractAddress)
 
@@ -622,7 +615,7 @@ func resolveCommunityByContractAddress(ctx context.Context, contractAddress pers
 	return communityToModel(ctx, *community, forceRefresh), nil
 }
 
-func resolveCommunityOwnersByContractID(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int, onlyGalleryUsers *bool) (*model.TokenHoldersConnection, error) {
+func resolveCommunityOwnersByContractID(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int, onlyGalleryUsers bool) (*model.TokenHoldersConnection, error) {
 	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, contractID)
 	if err != nil {
 		return nil, err
@@ -631,19 +624,36 @@ func resolveCommunityOwnersByContractID(ctx context.Context, contractID persist.
 	if err != nil {
 		return nil, err
 	}
+	connection := ownersToConnection(ctx, owners, contractID, pageInfo)
+	return &connection, nil
+}
+
+func ownersToConnection(ctx context.Context, owners []db.User, contractID persist.DBID, pageInfo publicapi.PageInfo) model.TokenHoldersConnection {
 	edges := make([]*model.TokenHolderEdge, len(owners))
 	for i, owner := range owners {
+		walletIDs := make([]persist.DBID, len(owner.Wallets))
+		for j, wallet := range owner.Wallets {
+			walletIDs[j] = wallet.ID
+		}
 		edges[i] = &model.TokenHolderEdge{
-			Node:   owner,
+			Node: &model.TokenHolder{
+				HelperTokenHolderData: model.HelperTokenHolderData{
+					UserId:     owner.ID,
+					WalletIds:  walletIDs,
+					ContractId: contractID,
+				},
+				DisplayName:   &owner.Username.String,
+				Wallets:       nil, // handled by a dedicated resolver
+				User:          nil, // handled by a dedicated resolver
+				PreviewTokens: nil, // handled by dedicated resolver
+			},
 			Cursor: nil, // not used by relay, but relay will complain without this field existing
 		}
 	}
-
-	return &model.TokenHoldersConnection{
+	return model.TokenHoldersConnection{
 		Edges:    edges,
 		PageInfo: pageInfoToModel(ctx, pageInfo),
-	}, nil
-
+	}
 }
 
 func resolveGeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error) {
@@ -1774,7 +1784,7 @@ func tokenToModel(ctx context.Context, token db.Token) *model.Token {
 		CreationTime:     &token.CreatedAt,
 		LastUpdated:      &token.LastUpdated,
 		CollectorsNote:   &token.CollectorsNote.String,
-		Media:            getMediaForToken(ctx, token),
+		Media:            nil, // handled by dedicated resolver
 		TokenType:        &tokenType,
 		Chain:            &chain,
 		Name:             &token.Name.String,
@@ -1819,8 +1829,15 @@ func tokenCollectionToModel(ctx context.Context, token *model.Token, collectionI
 func communityToModel(ctx context.Context, community db.Contract, forceRefresh *bool) *model.Community {
 	lastUpdated := community.LastUpdated
 	contractAddress := persist.NewChainAddress(community.Address, community.Chain)
-	creatorAddress := persist.NewChainAddress(community.OwnerAddress, community.Chain)
 	chain := community.Chain
+
+	// TODO: Should this use CreatorAddress or OwnerAddress?
+	var creatorAddress *persist.ChainAddress
+	if community.CreatorAddress != "" {
+		chainAddress := persist.NewChainAddress(community.CreatorAddress, chain)
+		creatorAddress = &chainAddress
+	}
+
 	return &model.Community{
 		HelperCommunityData: model.HelperCommunityData{
 			ForceRefresh: forceRefresh,
@@ -1829,15 +1846,19 @@ func communityToModel(ctx context.Context, community db.Contract, forceRefresh *
 		LastUpdated:     &lastUpdated,
 		Contract:        contractToModel(ctx, community),
 		ContractAddress: &contractAddress,
-		CreatorAddress:  &creatorAddress,
+		CreatorAddress:  creatorAddress,
 		Name:            util.ToPointer(community.Name.String),
 		Description:     util.ToPointer(community.Description.String),
 		// PreviewImage:     util.ToPointer(community.Pr.String()), // TODO do we still need this with the new image fields?
-		Chain:            &chain,
-		ProfileImageURL:  util.ToPointer(community.ProfileImageUrl.String),
-		ProfileBannerURL: util.ToPointer(community.ProfileBannerUrl.String),
-		BadgeURL:         util.ToPointer(community.BadgeUrl.String),
-		Owners:           nil, // handled by dedicated resolver
+		Chain:             &chain,
+		ProfileImageURL:   util.ToPointer(community.ProfileImageUrl.String),
+		ProfileBannerURL:  util.ToPointer(community.ProfileBannerUrl.String),
+		BadgeURL:          util.ToPointer(community.BadgeUrl.String),
+		Owners:            nil, // handled by dedicated resolver
+		Creator:           nil, // handled by dedicated resolver
+		ParentCommunity:   nil, // handled by dedicated resolver
+		SubCommunities:    nil, // handled by dedicated resolver
+		TokensInCommunity: nil, // handled by dedicated resolver
 	}
 }
 
@@ -1865,55 +1886,57 @@ func getUrlExtension(url string) string {
 	return strings.ToLower(strings.TrimPrefix(filepath.Ext(url), "."))
 }
 
-func mediaToModel(ctx context.Context, media persist.Media, fallback persist.FallbackMedia) model.MediaSubtype {
+func mediaToModel(ctx context.Context, tokenMedia db.TokenMedia, fallback persist.FallbackMedia) model.MediaSubtype {
 	var fallbackMedia *model.FallbackMedia
 
 	fallbackMedia = getFallbackMedia(ctx, fallback)
 
-	switch media.MediaType {
+	switch media := tokenMedia.Media; media.MediaType {
 	case persist.MediaTypeImage, persist.MediaTypeSVG:
-		return getImageMedia(ctx, media, fallbackMedia)
+		return getImageMedia(ctx, tokenMedia, fallbackMedia)
 	case persist.MediaTypeGIF:
-		return getGIFMedia(ctx, media, fallbackMedia)
+		return getGIFMedia(ctx, tokenMedia, fallbackMedia)
 	case persist.MediaTypeVideo:
-		return getVideoMedia(ctx, media, fallbackMedia)
+		return getVideoMedia(ctx, tokenMedia, fallbackMedia)
 	case persist.MediaTypeAudio:
-		return getAudioMedia(ctx, media, fallbackMedia)
+		return getAudioMedia(ctx, tokenMedia, fallbackMedia)
 	case persist.MediaTypeHTML:
-		return getHtmlMedia(ctx, media, fallbackMedia)
+		return getHtmlMedia(ctx, tokenMedia, fallbackMedia)
 	case persist.MediaTypeAnimation:
-		return getGltfMedia(ctx, media, fallbackMedia)
+		return getGltfMedia(ctx, tokenMedia, fallbackMedia)
 	case persist.MediaTypeJSON:
-		return getJsonMedia(ctx, media, fallbackMedia)
+		return getJsonMedia(ctx, tokenMedia, fallbackMedia)
 	case persist.MediaTypeText:
-		return getTextMedia(ctx, media, fallbackMedia)
+		return getTextMedia(ctx, tokenMedia, fallbackMedia)
 	case persist.MediaTypePDF:
-		return getPdfMedia(ctx, media, fallbackMedia)
+		return getPdfMedia(ctx, tokenMedia, fallbackMedia)
 	case persist.MediaTypeUnknown:
-		return getUnknownMedia(ctx, media, fallbackMedia)
+		return getUnknownMedia(ctx, tokenMedia, fallbackMedia)
 	case persist.MediaTypeSyncing:
-		return getSyncingMedia(ctx, media, fallbackMedia)
+		return getSyncingMedia(ctx, tokenMedia, fallbackMedia)
 	default:
-		return getInvalidMedia(ctx, media, fallbackMedia)
+		return getInvalidMedia(ctx, tokenMedia, fallbackMedia)
 	}
 }
 
-func getMediaForToken(ctx context.Context, token db.Token) model.MediaSubtype {
-	return mediaToModel(ctx, token.Media, token.FallbackMedia)
-}
-
-func getPreviewUrls(ctx context.Context, media persist.Media, options ...mediamapper.Option) *model.PreviewURLSet {
-	url := media.ThumbnailURL.String()
-	if (media.MediaType == persist.MediaTypeImage || media.MediaType == persist.MediaTypeSVG || media.MediaType == persist.MediaTypeGIF) && url == "" {
-		url = media.MediaURL.String()
+func getPreviewUrls(ctx context.Context, tokenMedia db.TokenMedia, options ...mediamapper.Option) *model.PreviewURLSet {
+	url := tokenMedia.Media.ThumbnailURL.String()
+	if (tokenMedia.Media.MediaType == persist.MediaTypeImage || tokenMedia.Media.MediaType == persist.MediaTypeSVG || tokenMedia.Media.MediaType == persist.MediaTypeGIF) && url == "" {
+		url = tokenMedia.Media.MediaURL.String()
 	}
 	preview := remapLargeImageUrls(url)
 	mm := mediamapper.For(ctx)
 
-	live := media.LivePreviewURL.String()
-	if media.LivePreviewURL == "" {
-		live = media.MediaURL.String()
+	live := tokenMedia.Media.LivePreviewURL.String()
+	if tokenMedia.Media.LivePreviewURL == "" {
+		live = tokenMedia.Media.MediaURL.String()
 	}
+
+	// Add timestamp to options
+	o := make([]mediamapper.Option, len(options)+1)
+	copy(o, options)
+	o[len(o)-1] = mediamapper.WithTimestamp(tokenMedia.LastUpdated)
+	options = o
 
 	return &model.PreviewURLSet{
 		Raw:        &preview,
@@ -1926,15 +1949,15 @@ func getPreviewUrls(ctx context.Context, media persist.Media, options ...mediama
 	}
 }
 
-func getImageMedia(ctx context.Context, media persist.Media, fallbackMedia *model.FallbackMedia) model.ImageMedia {
-	url := remapLargeImageUrls(media.MediaURL.String())
+func getImageMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia) model.ImageMedia {
+	url := remapLargeImageUrls(tokenMedia.Media.MediaURL.String())
 
 	return model.ImageMedia{
-		PreviewURLs:      getPreviewUrls(ctx, media),
-		MediaURL:         util.ToPointer(media.MediaURL.String()),
-		MediaType:        (*string)(&media.MediaType),
+		PreviewURLs:      getPreviewUrls(ctx, tokenMedia),
+		MediaURL:         util.ToPointer(tokenMedia.Media.MediaURL.String()),
+		MediaType:        (*string)(&tokenMedia.Media.MediaType),
 		ContentRenderURL: &url,
-		Dimensions:       mediaToDimensions(media.Dimensions),
+		Dimensions:       mediaToDimensions(tokenMedia.Media.Dimensions),
 		FallbackMedia:    fallbackMedia,
 	}
 }
@@ -1948,16 +1971,16 @@ func getFallbackMedia(ctx context.Context, media persist.FallbackMedia) *model.F
 	}
 }
 
-func getGIFMedia(ctx context.Context, media persist.Media, fallbackMedia *model.FallbackMedia) model.GIFMedia {
-	url := remapLargeImageUrls(media.MediaURL.String())
+func getGIFMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia) model.GIFMedia {
+	url := remapLargeImageUrls(tokenMedia.Media.MediaURL.String())
 
 	return model.GIFMedia{
-		PreviewURLs:       getPreviewUrls(ctx, media),
-		StaticPreviewURLs: getPreviewUrls(ctx, media, mediamapper.WithStaticImage()),
-		MediaURL:          util.ToPointer(media.MediaURL.String()),
-		MediaType:         (*string)(&media.MediaType),
+		PreviewURLs:       getPreviewUrls(ctx, tokenMedia),
+		StaticPreviewURLs: getPreviewUrls(ctx, tokenMedia, mediamapper.WithStaticImage()),
+		MediaURL:          util.ToPointer(tokenMedia.Media.MediaURL.String()),
+		MediaType:         (*string)(&tokenMedia.Media.MediaType),
 		ContentRenderURL:  &url,
-		Dimensions:        mediaToDimensions(media.Dimensions),
+		Dimensions:        mediaToDimensions(tokenMedia.Media.Dimensions),
 		FallbackMedia:     fallbackMedia,
 	}
 }
@@ -1972,8 +1995,8 @@ func remapLargeImageUrls(url string) string {
 	return url
 }
 
-func getVideoMedia(ctx context.Context, media persist.Media, fallbackMedia *model.FallbackMedia) model.VideoMedia {
-	asString := media.MediaURL.String()
+func getVideoMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia) model.VideoMedia {
+	asString := tokenMedia.Media.MediaURL.String()
 	videoUrls := model.VideoURLSet{
 		Raw:    &asString,
 		Small:  &asString,
@@ -1982,110 +2005,110 @@ func getVideoMedia(ctx context.Context, media persist.Media, fallbackMedia *mode
 	}
 
 	return model.VideoMedia{
-		PreviewURLs:       getPreviewUrls(ctx, media),
-		MediaURL:          util.ToPointer(media.MediaURL.String()),
-		MediaType:         (*string)(&media.MediaType),
+		PreviewURLs:       getPreviewUrls(ctx, tokenMedia),
+		MediaURL:          util.ToPointer(tokenMedia.Media.MediaURL.String()),
+		MediaType:         (*string)(&tokenMedia.Media.MediaType),
 		ContentRenderURLs: &videoUrls,
-		Dimensions:        mediaToDimensions(media.Dimensions),
+		Dimensions:        mediaToDimensions(tokenMedia.Media.Dimensions),
 		FallbackMedia:     fallbackMedia,
 	}
 }
 
-func getAudioMedia(ctx context.Context, media persist.Media, fallbackMedia *model.FallbackMedia) model.AudioMedia {
+func getAudioMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia) model.AudioMedia {
 	return model.AudioMedia{
-		PreviewURLs:      getPreviewUrls(ctx, media),
-		MediaURL:         util.ToPointer(media.MediaURL.String()),
-		MediaType:        (*string)(&media.MediaType),
-		ContentRenderURL: (*string)(&media.MediaURL),
-		Dimensions:       mediaToDimensions(media.Dimensions),
+		PreviewURLs:      getPreviewUrls(ctx, tokenMedia),
+		MediaURL:         util.ToPointer(tokenMedia.Media.MediaURL.String()),
+		MediaType:        (*string)(&tokenMedia.Media.MediaType),
+		ContentRenderURL: (*string)(&tokenMedia.Media.MediaURL),
+		Dimensions:       mediaToDimensions(tokenMedia.Media.Dimensions),
 		FallbackMedia:    fallbackMedia,
 	}
 }
 
-func getTextMedia(ctx context.Context, media persist.Media, fallbackMedia *model.FallbackMedia) model.TextMedia {
+func getTextMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia) model.TextMedia {
 	return model.TextMedia{
-		PreviewURLs:      getPreviewUrls(ctx, media),
-		MediaURL:         util.ToPointer(media.MediaURL.String()),
-		MediaType:        (*string)(&media.MediaType),
-		ContentRenderURL: (*string)(&media.MediaURL),
-		Dimensions:       mediaToDimensions(media.Dimensions),
+		PreviewURLs:      getPreviewUrls(ctx, tokenMedia),
+		MediaURL:         util.ToPointer(tokenMedia.Media.MediaURL.String()),
+		MediaType:        (*string)(&tokenMedia.Media.MediaType),
+		ContentRenderURL: (*string)(&tokenMedia.Media.MediaURL),
+		Dimensions:       mediaToDimensions(tokenMedia.Media.Dimensions),
 		FallbackMedia:    fallbackMedia,
 	}
 }
 
-func getPdfMedia(ctx context.Context, media persist.Media, fallbackMedia *model.FallbackMedia) model.PDFMedia {
+func getPdfMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia) model.PDFMedia {
 	return model.PDFMedia{
-		PreviewURLs:      getPreviewUrls(ctx, media),
-		MediaURL:         util.ToPointer(media.MediaURL.String()),
-		MediaType:        (*string)(&media.MediaType),
-		ContentRenderURL: (*string)(&media.MediaURL),
-		Dimensions:       mediaToDimensions(media.Dimensions),
+		PreviewURLs:      getPreviewUrls(ctx, tokenMedia),
+		MediaURL:         util.ToPointer(tokenMedia.Media.MediaURL.String()),
+		MediaType:        (*string)(&tokenMedia.Media.MediaType),
+		ContentRenderURL: (*string)(&tokenMedia.Media.MediaURL),
+		Dimensions:       mediaToDimensions(tokenMedia.Media.Dimensions),
 		FallbackMedia:    fallbackMedia,
 	}
 }
 
-func getHtmlMedia(ctx context.Context, media persist.Media, fallbackMedia *model.FallbackMedia) model.HTMLMedia {
+func getHtmlMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia) model.HTMLMedia {
 	return model.HTMLMedia{
-		PreviewURLs:      getPreviewUrls(ctx, media),
-		MediaURL:         util.ToPointer(media.MediaURL.String()),
-		MediaType:        (*string)(&media.MediaType),
-		ContentRenderURL: (*string)(&media.MediaURL),
-		Dimensions:       mediaToDimensions(media.Dimensions),
+		PreviewURLs:      getPreviewUrls(ctx, tokenMedia),
+		MediaURL:         util.ToPointer(tokenMedia.Media.MediaURL.String()),
+		MediaType:        (*string)(&tokenMedia.Media.MediaType),
+		ContentRenderURL: (*string)(&tokenMedia.Media.MediaURL),
+		Dimensions:       mediaToDimensions(tokenMedia.Media.Dimensions),
 		FallbackMedia:    fallbackMedia,
 	}
 }
 
-func getJsonMedia(ctx context.Context, media persist.Media, fallbackMedia *model.FallbackMedia) model.JSONMedia {
+func getJsonMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia) model.JSONMedia {
 	return model.JSONMedia{
-		PreviewURLs:      getPreviewUrls(ctx, media),
-		MediaURL:         util.ToPointer(media.MediaURL.String()),
-		MediaType:        (*string)(&media.MediaType),
-		ContentRenderURL: (*string)(&media.MediaURL),
-		Dimensions:       mediaToDimensions(media.Dimensions),
+		PreviewURLs:      getPreviewUrls(ctx, tokenMedia),
+		MediaURL:         util.ToPointer(tokenMedia.Media.MediaURL.String()),
+		MediaType:        (*string)(&tokenMedia.Media.MediaType),
+		ContentRenderURL: (*string)(&tokenMedia.Media.MediaURL),
+		Dimensions:       mediaToDimensions(tokenMedia.Media.Dimensions),
 		FallbackMedia:    fallbackMedia,
 	}
 }
 
-func getGltfMedia(ctx context.Context, media persist.Media, fallbackMedia *model.FallbackMedia) model.GltfMedia {
+func getGltfMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia) model.GltfMedia {
 	return model.GltfMedia{
-		PreviewURLs:      getPreviewUrls(ctx, media),
-		MediaURL:         util.ToPointer(media.MediaURL.String()),
-		MediaType:        (*string)(&media.MediaType),
-		ContentRenderURL: (*string)(&media.MediaURL),
-		Dimensions:       mediaToDimensions(media.Dimensions),
+		PreviewURLs:      getPreviewUrls(ctx, tokenMedia),
+		MediaURL:         util.ToPointer(tokenMedia.Media.MediaURL.String()),
+		MediaType:        (*string)(&tokenMedia.Media.MediaType),
+		ContentRenderURL: (*string)(&tokenMedia.Media.MediaURL),
+		Dimensions:       mediaToDimensions(tokenMedia.Media.Dimensions),
 		FallbackMedia:    fallbackMedia,
 	}
 }
 
-func getUnknownMedia(ctx context.Context, media persist.Media, fallbackMedia *model.FallbackMedia) model.UnknownMedia {
+func getUnknownMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia) model.UnknownMedia {
 	return model.UnknownMedia{
-		PreviewURLs:      getPreviewUrls(ctx, media),
-		MediaURL:         util.ToPointer(media.MediaURL.String()),
-		MediaType:        (*string)(&media.MediaType),
-		ContentRenderURL: (*string)(&media.MediaURL),
-		Dimensions:       mediaToDimensions(media.Dimensions),
+		PreviewURLs:      getPreviewUrls(ctx, tokenMedia),
+		MediaURL:         util.ToPointer(tokenMedia.Media.MediaURL.String()),
+		MediaType:        (*string)(&tokenMedia.Media.MediaType),
+		ContentRenderURL: (*string)(&tokenMedia.Media.MediaURL),
+		Dimensions:       mediaToDimensions(tokenMedia.Media.Dimensions),
 		FallbackMedia:    fallbackMedia,
 	}
 }
 
-func getSyncingMedia(ctx context.Context, media persist.Media, fallbackMedia *model.FallbackMedia) model.SyncingMedia {
+func getSyncingMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia) model.SyncingMedia {
 	return model.SyncingMedia{
-		PreviewURLs:      getPreviewUrls(ctx, media),
-		MediaURL:         util.ToPointer(media.MediaURL.String()),
-		MediaType:        (*string)(&media.MediaType),
-		ContentRenderURL: (*string)(&media.MediaURL),
-		Dimensions:       mediaToDimensions(media.Dimensions),
+		PreviewURLs:      getPreviewUrls(ctx, tokenMedia),
+		MediaURL:         util.ToPointer(tokenMedia.Media.MediaURL.String()),
+		MediaType:        (*string)(&tokenMedia.Media.MediaType),
+		ContentRenderURL: (*string)(&tokenMedia.Media.MediaURL),
+		Dimensions:       mediaToDimensions(tokenMedia.Media.Dimensions),
 		FallbackMedia:    fallbackMedia,
 	}
 }
 
-func getInvalidMedia(ctx context.Context, media persist.Media, fallbackMedia *model.FallbackMedia) model.InvalidMedia {
+func getInvalidMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia) model.InvalidMedia {
 	return model.InvalidMedia{
-		PreviewURLs:      getPreviewUrls(ctx, media),
-		MediaURL:         util.ToPointer(media.MediaURL.String()),
-		MediaType:        (*string)(&media.MediaType),
-		ContentRenderURL: (*string)(&media.MediaURL),
-		Dimensions:       mediaToDimensions(media.Dimensions),
+		PreviewURLs:      getPreviewUrls(ctx, tokenMedia),
+		MediaURL:         util.ToPointer(tokenMedia.Media.MediaURL.String()),
+		MediaType:        (*string)(&tokenMedia.Media.MediaType),
+		ContentRenderURL: (*string)(&tokenMedia.Media.MediaURL),
+		Dimensions:       mediaToDimensions(tokenMedia.Media.Dimensions),
 		FallbackMedia:    fallbackMedia,
 	}
 }

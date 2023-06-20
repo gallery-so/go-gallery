@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/multichain"
@@ -36,11 +37,11 @@ type GetUserInput struct {
 
 // GetUserOutput is the output of the user get pipeline
 type GetUserOutput struct {
-	UserID    persist.DBID         `json:"id"`
-	Username  string               `json:"username"`
-	BioStr    string               `json:"bio"`
-	Addresses []persist.Wallet     `json:"addresses"`
-	CreatedAt persist.CreationTime `json:"created_at"`
+	UserID    persist.DBID     `json:"id"`
+	Username  string           `json:"username"`
+	BioStr    string           `json:"bio"`
+	Addresses []persist.Wallet `json:"addresses"`
+	CreatedAt time.Time        `json:"created_at"`
 }
 
 // AddUserAddressesInput is the input for the user add addresses pipeline and also user creation pipeline given that they have the same requirements

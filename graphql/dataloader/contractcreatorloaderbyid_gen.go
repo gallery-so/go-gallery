@@ -8,9 +8,10 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-type TokensLoaderByContractIDSettings interface {
+type ContractCreatorLoaderByIDSettings interface {
 	getContext() context.Context
 	getWait() time.Duration
 	getMaxBatchOne() int
@@ -23,37 +24,63 @@ type TokensLoaderByContractIDSettings interface {
 	getMutexRegistry() *[]*sync.Mutex
 }
 
-func (l *TokensLoaderByContractID) setContext(ctx context.Context) {
+// ContractCreatorLoaderByIDCacheSubscriptions
+type ContractCreatorLoaderByIDCacheSubscriptions struct {
+	// AutoCacheWithKey is a function that returns the persist.DBID cache key for a coredb.ContractCreator.
+	// If AutoCacheWithKey is not nil, this loader will automatically cache published results from other loaders
+	// that return a coredb.ContractCreator. Loaders that return pointers or slices of coredb.ContractCreator
+	// will be dereferenced/iterated automatically, invoking this function with the base coredb.ContractCreator type.
+	AutoCacheWithKey func(coredb.ContractCreator) persist.DBID
+
+	// AutoCacheWithKeys is a function that returns the []persist.DBID cache keys for a coredb.ContractCreator.
+	// Similar to AutoCacheWithKey, but for cases where a single value gets cached by many keys.
+	// If AutoCacheWithKeys is not nil, this loader will automatically cache published results from other loaders
+	// that return a coredb.ContractCreator. Loaders that return pointers or slices of coredb.ContractCreator
+	// will be dereferenced/iterated automatically, invoking this function with the base coredb.ContractCreator type.
+	AutoCacheWithKeys func(coredb.ContractCreator) []persist.DBID
+
+	// TODO: Allow custom cache functions once we're able to use generics. It could be done without generics, but
+	// would be messy and error-prone. A non-generic implementation might look something like:
+	//
+	//   CustomCacheFuncs []func(primeFunc func(key, value)) func(typeToRegisterFor interface{})
+	//
+	// where each CustomCacheFunc is a closure that receives this loader's unsafePrime method and returns a
+	// function that accepts the type it's registering for and uses that type and the unsafePrime method
+	// to prime the cache.
+}
+
+func (l *ContractCreatorLoaderByID) setContext(ctx context.Context) {
 	l.ctx = ctx
 }
 
-func (l *TokensLoaderByContractID) setWait(wait time.Duration) {
+func (l *ContractCreatorLoaderByID) setWait(wait time.Duration) {
 	l.wait = wait
 }
 
-func (l *TokensLoaderByContractID) setMaxBatch(maxBatch int) {
+func (l *ContractCreatorLoaderByID) setMaxBatch(maxBatch int) {
 	l.maxBatch = maxBatch
 }
 
-func (l *TokensLoaderByContractID) setDisableCaching(disableCaching bool) {
+func (l *ContractCreatorLoaderByID) setDisableCaching(disableCaching bool) {
 	l.disableCaching = disableCaching
 }
 
-func (l *TokensLoaderByContractID) setPublishResults(publishResults bool) {
+func (l *ContractCreatorLoaderByID) setPublishResults(publishResults bool) {
 	l.publishResults = publishResults
 }
 
-func (l *TokensLoaderByContractID) setPreFetchHook(preFetchHook func(context.Context, string) context.Context) {
+func (l *ContractCreatorLoaderByID) setPreFetchHook(preFetchHook func(context.Context, string) context.Context) {
 	l.preFetchHook = preFetchHook
 }
 
-func (l *TokensLoaderByContractID) setPostFetchHook(postFetchHook func(context.Context, string)) {
+func (l *ContractCreatorLoaderByID) setPostFetchHook(postFetchHook func(context.Context, string)) {
 	l.postFetchHook = postFetchHook
 }
 
-// NewTokensLoaderByContractID creates a new TokensLoaderByContractID with the given settings, functions, and options
-func NewTokensLoaderByContractID(
-	settings TokensLoaderByContractIDSettings, fetch func(ctx context.Context, keys []coredb.GetTokensByContractIdBatchPaginateParams) ([][]coredb.Token, []error),
+// NewContractCreatorLoaderByID creates a new ContractCreatorLoaderByID with the given settings, functions, and options
+func NewContractCreatorLoaderByID(
+	settings ContractCreatorLoaderByIDSettings, fetch func(ctx context.Context, keys []persist.DBID) ([]coredb.ContractCreator, []error),
+	funcs ContractCreatorLoaderByIDCacheSubscriptions,
 	opts ...func(interface {
 		setContext(context.Context)
 		setWait(time.Duration)
@@ -63,8 +90,8 @@ func NewTokensLoaderByContractID(
 		setPreFetchHook(func(context.Context, string) context.Context)
 		setPostFetchHook(func(context.Context, string))
 	}),
-) *TokensLoaderByContractID {
-	loader := &TokensLoaderByContractID{
+) *ContractCreatorLoaderByID {
+	loader := &ContractCreatorLoaderByID{
 		ctx:                  settings.getContext(),
 		wait:                 settings.getWait(),
 		disableCaching:       settings.getDisableCaching(),
@@ -73,7 +100,7 @@ func NewTokensLoaderByContractID(
 		postFetchHook:        settings.getPostFetchHook(),
 		subscriptionRegistry: settings.getSubscriptionRegistry(),
 		mutexRegistry:        settings.getMutexRegistry(),
-		maxBatch:             settings.getMaxBatchMany(),
+		maxBatch:             settings.getMaxBatchOne(),
 	}
 
 	for _, opt := range opts {
@@ -81,18 +108,18 @@ func NewTokensLoaderByContractID(
 	}
 
 	// Set this after applying options, in case a different context was set via options
-	loader.fetch = func(keys []coredb.GetTokensByContractIdBatchPaginateParams) ([][]coredb.Token, []error) {
+	loader.fetch = func(keys []persist.DBID) ([]coredb.ContractCreator, []error) {
 		ctx := loader.ctx
 
 		// Allow the preFetchHook to modify and return a new context
 		if loader.preFetchHook != nil {
-			ctx = loader.preFetchHook(ctx, "TokensLoaderByContractID")
+			ctx = loader.preFetchHook(ctx, "ContractCreatorLoaderByID")
 		}
 
 		results, errors := fetch(ctx, keys)
 
 		if loader.postFetchHook != nil {
-			loader.postFetchHook(ctx, "TokensLoaderByContractID")
+			loader.postFetchHook(ctx, "ContractCreatorLoaderByID")
 		}
 
 		return results, errors
@@ -106,19 +133,37 @@ func NewTokensLoaderByContractID(
 		panic("mutexRegistry may not be nil")
 	}
 
-	// No cache functions here; caching isn't very useful for dataloaders that return slices. This dataloader can
-	// still send its results to other cache-priming receivers, but it won't register its own cache-priming function.
+	if !loader.disableCaching {
+		// One-to-one mappings: cache one value with one key
+		if funcs.AutoCacheWithKey != nil {
+			cacheFunc := func(t coredb.ContractCreator) {
+				loader.unsafePrime(funcs.AutoCacheWithKey(t), t)
+			}
+			loader.registerCacheFunc(&cacheFunc, &loader.mu)
+		}
+
+		// One-to-many mappings: cache one value with many keys
+		if funcs.AutoCacheWithKeys != nil {
+			cacheFunc := func(t coredb.ContractCreator) {
+				keys := funcs.AutoCacheWithKeys(t)
+				for _, key := range keys {
+					loader.unsafePrime(key, t)
+				}
+			}
+			loader.registerCacheFunc(&cacheFunc, &loader.mu)
+		}
+	}
 
 	return loader
 }
 
-// TokensLoaderByContractID batches and caches requests
-type TokensLoaderByContractID struct {
+// ContractCreatorLoaderByID batches and caches requests
+type ContractCreatorLoaderByID struct {
 	// context passed to fetch functions
 	ctx context.Context
 
 	// this method provides the data for the loader
-	fetch func(keys []coredb.GetTokensByContractIdBatchPaginateParams) ([][]coredb.Token, []error)
+	fetch func(keys []persist.DBID) ([]coredb.ContractCreator, []error)
 
 	// how long to wait before sending a batch
 	wait time.Duration
@@ -150,18 +195,18 @@ type TokensLoaderByContractID struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[coredb.GetTokensByContractIdBatchPaginateParams][]coredb.Token
+	cache map[persist.DBID]coredb.ContractCreator
 
 	// typed cache functions
-	//subscribers []func([]coredb.Token)
-	subscribers []tokensLoaderByContractIDSubscriber
+	//subscribers []func(coredb.ContractCreator)
+	subscribers []contractCreatorLoaderByIDSubscriber
 
 	// functions used to cache published results from other dataloaders
 	cacheFuncs []interface{}
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
-	batch *tokensLoaderByContractIDBatch
+	batch *contractCreatorLoaderByIDBatch
 
 	// mutex to prevent races
 	mu sync.Mutex
@@ -170,43 +215,43 @@ type TokensLoaderByContractID struct {
 	once sync.Once
 }
 
-type tokensLoaderByContractIDBatch struct {
-	keys    []coredb.GetTokensByContractIdBatchPaginateParams
-	data    [][]coredb.Token
+type contractCreatorLoaderByIDBatch struct {
+	keys    []persist.DBID
+	data    []coredb.ContractCreator
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
-// Load a Token by key, batching and caching will be applied automatically
-func (l *TokensLoaderByContractID) Load(key coredb.GetTokensByContractIdBatchPaginateParams) ([]coredb.Token, error) {
+// Load a ContractCreator by key, batching and caching will be applied automatically
+func (l *ContractCreatorLoaderByID) Load(key persist.DBID) (coredb.ContractCreator, error) {
 	return l.LoadThunk(key)()
 }
 
-// LoadThunk returns a function that when called will block waiting for a Token.
+// LoadThunk returns a function that when called will block waiting for a ContractCreator.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *TokensLoaderByContractID) LoadThunk(key coredb.GetTokensByContractIdBatchPaginateParams) func() ([]coredb.Token, error) {
+func (l *ContractCreatorLoaderByID) LoadThunk(key persist.DBID) func() (coredb.ContractCreator, error) {
 	l.mu.Lock()
 	if !l.disableCaching {
 		if it, ok := l.cache[key]; ok {
 			l.mu.Unlock()
-			return func() ([]coredb.Token, error) {
+			return func() (coredb.ContractCreator, error) {
 				return it, nil
 			}
 		}
 	}
 	if l.batch == nil {
-		l.batch = &tokensLoaderByContractIDBatch{done: make(chan struct{})}
+		l.batch = &contractCreatorLoaderByIDBatch{done: make(chan struct{})}
 	}
 	batch := l.batch
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-	return func() ([]coredb.Token, error) {
+	return func() (coredb.ContractCreator, error) {
 		<-batch.done
 
-		var data []coredb.Token
+		var data coredb.ContractCreator
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -237,61 +282,69 @@ func (l *TokensLoaderByContractID) LoadThunk(key coredb.GetTokensByContractIdBat
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *TokensLoaderByContractID) LoadAll(keys []coredb.GetTokensByContractIdBatchPaginateParams) ([][]coredb.Token, []error) {
-	results := make([]func() ([]coredb.Token, error), len(keys))
+func (l *ContractCreatorLoaderByID) LoadAll(keys []persist.DBID) ([]coredb.ContractCreator, []error) {
+	results := make([]func() (coredb.ContractCreator, error), len(keys))
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-	tokens := make([][]coredb.Token, len(keys))
+	contractCreators := make([]coredb.ContractCreator, len(keys))
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
-		tokens[i], errors[i] = thunk()
+		contractCreators[i], errors[i] = thunk()
 	}
-	return tokens, errors
+	return contractCreators, errors
 }
 
-// LoadAllThunk returns a function that when called will block waiting for a Tokens.
+// LoadAllThunk returns a function that when called will block waiting for a ContractCreators.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *TokensLoaderByContractID) LoadAllThunk(keys []coredb.GetTokensByContractIdBatchPaginateParams) func() ([][]coredb.Token, []error) {
-	results := make([]func() ([]coredb.Token, error), len(keys))
+func (l *ContractCreatorLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([]coredb.ContractCreator, []error) {
+	results := make([]func() (coredb.ContractCreator, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
-	return func() ([][]coredb.Token, []error) {
-		tokens := make([][]coredb.Token, len(keys))
+	return func() ([]coredb.ContractCreator, []error) {
+		contractCreators := make([]coredb.ContractCreator, len(keys))
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
-			tokens[i], errors[i] = thunk()
+			contractCreators[i], errors[i] = thunk()
 		}
-		return tokens, errors
+		return contractCreators, errors
 	}
 }
 
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *TokensLoaderByContractID) Prime(key coredb.GetTokensByContractIdBatchPaginateParams, value []coredb.Token) bool {
+func (l *ContractCreatorLoaderByID) Prime(key persist.DBID, value coredb.ContractCreator) bool {
 	if l.disableCaching {
 		return false
 	}
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
-		// make a copy when writing to the cache, its easy to pass a pointer in from a loop var
-		// and end up with the whole cache pointing to the same value.
-		cpy := make([]coredb.Token, len(value))
-		copy(cpy, value)
-		l.unsafeSet(key, cpy)
+		l.unsafeSet(key, value)
 	}
 	l.mu.Unlock()
 	return !found
 }
 
+// Prime the cache without acquiring locks. Should only be used when the lock is already held.
+func (l *ContractCreatorLoaderByID) unsafePrime(key persist.DBID, value coredb.ContractCreator) bool {
+	if l.disableCaching {
+		return false
+	}
+	var found bool
+	if _, found = l.cache[key]; !found {
+		l.unsafeSet(key, value)
+	}
+	return !found
+}
+
 // Clear the value at key from the cache, if it exists
-func (l *TokensLoaderByContractID) Clear(key coredb.GetTokensByContractIdBatchPaginateParams) {
+func (l *ContractCreatorLoaderByID) Clear(key persist.DBID) {
 	if l.disableCaching {
 		return
 	}
@@ -300,16 +353,16 @@ func (l *TokensLoaderByContractID) Clear(key coredb.GetTokensByContractIdBatchPa
 	l.mu.Unlock()
 }
 
-func (l *TokensLoaderByContractID) unsafeSet(key coredb.GetTokensByContractIdBatchPaginateParams, value []coredb.Token) {
+func (l *ContractCreatorLoaderByID) unsafeSet(key persist.DBID, value coredb.ContractCreator) {
 	if l.cache == nil {
-		l.cache = map[coredb.GetTokensByContractIdBatchPaginateParams][]coredb.Token{}
+		l.cache = map[persist.DBID]coredb.ContractCreator{}
 	}
 	l.cache[key] = value
 }
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
-func (b *tokensLoaderByContractIDBatch) keyIndex(l *TokensLoaderByContractID, key coredb.GetTokensByContractIdBatchPaginateParams) int {
+func (b *contractCreatorLoaderByIDBatch) keyIndex(l *ContractCreatorLoaderByID, key persist.DBID) int {
 	for i, existingKey := range b.keys {
 		if key == existingKey {
 			return i
@@ -333,7 +386,7 @@ func (b *tokensLoaderByContractIDBatch) keyIndex(l *TokensLoaderByContractID, ke
 	return pos
 }
 
-func (b *tokensLoaderByContractIDBatch) startTimer(l *TokensLoaderByContractID) {
+func (b *contractCreatorLoaderByIDBatch) startTimer(l *ContractCreatorLoaderByID) {
 	time.Sleep(l.wait)
 	l.mu.Lock()
 
@@ -349,24 +402,24 @@ func (b *tokensLoaderByContractIDBatch) startTimer(l *TokensLoaderByContractID) 
 	b.end(l)
 }
 
-func (b *tokensLoaderByContractIDBatch) end(l *TokensLoaderByContractID) {
+func (b *contractCreatorLoaderByIDBatch) end(l *ContractCreatorLoaderByID) {
 	b.data, b.error = l.fetch(b.keys)
 	close(b.done)
 }
 
-type tokensLoaderByContractIDSubscriber struct {
-	cacheFunc func(coredb.Token)
+type contractCreatorLoaderByIDSubscriber struct {
+	cacheFunc func(coredb.ContractCreator)
 	mutex     *sync.Mutex
 }
 
-func (l *TokensLoaderByContractID) publishToSubscribers(value []coredb.Token) {
+func (l *ContractCreatorLoaderByID) publishToSubscribers(value coredb.ContractCreator) {
 	// Lazy build our list of typed cache functions once
 	l.once.Do(func() {
 		for i, subscription := range *l.subscriptionRegistry {
-			if typedFunc, ok := subscription.(*func(coredb.Token)); ok {
+			if typedFunc, ok := subscription.(*func(coredb.ContractCreator)); ok {
 				// Don't invoke our own cache function
 				if !l.ownsCacheFunc(typedFunc) {
-					l.subscribers = append(l.subscribers, tokensLoaderByContractIDSubscriber{cacheFunc: *typedFunc, mutex: (*l.mutexRegistry)[i]})
+					l.subscribers = append(l.subscribers, contractCreatorLoaderByIDSubscriber{cacheFunc: *typedFunc, mutex: (*l.mutexRegistry)[i]})
 				}
 			}
 		}
@@ -377,20 +430,18 @@ func (l *TokensLoaderByContractID) publishToSubscribers(value []coredb.Token) {
 	// without having to acquire the lock many times.
 	for _, s := range l.subscribers {
 		s.mutex.Lock()
-		for _, v := range value {
-			s.cacheFunc(v)
-		}
+		s.cacheFunc(value)
 		s.mutex.Unlock()
 	}
 }
 
-func (l *TokensLoaderByContractID) registerCacheFunc(cacheFunc interface{}, mutex *sync.Mutex) {
+func (l *ContractCreatorLoaderByID) registerCacheFunc(cacheFunc interface{}, mutex *sync.Mutex) {
 	l.cacheFuncs = append(l.cacheFuncs, cacheFunc)
 	*l.subscriptionRegistry = append(*l.subscriptionRegistry, cacheFunc)
 	*l.mutexRegistry = append(*l.mutexRegistry, mutex)
 }
 
-func (l *TokensLoaderByContractID) ownsCacheFunc(f *func(coredb.Token)) bool {
+func (l *ContractCreatorLoaderByID) ownsCacheFunc(f *func(coredb.ContractCreator)) bool {
 	for _, cacheFunc := range l.cacheFuncs {
 		if cacheFunc == f {
 			return true

@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/lib/pq"
 
@@ -131,6 +132,11 @@ const (
 	CountTypeERC1155 TokenCountType = "erc1155"
 )
 
+const (
+	TokenOwnershipTypeHolder  TokenOwnershipType = "holder"
+	TokenOwnershipTypeCreator TokenOwnershipType = "creator"
+)
+
 // InvalidTokenURI represents an invalid token URI
 const InvalidTokenURI TokenURI = "INVALID"
 
@@ -204,13 +210,19 @@ type EthereumAddressAtBlock struct {
 // EthereumTokenIdentifiers represents a unique identifier for a token on the Ethereum Blockchain
 type EthereumTokenIdentifiers string
 
+type TokenOwnershipType string
+
+func (t TokenOwnershipType) String() string {
+	return string(t)
+}
+
 // Token represents an individual Token token
 type Token struct {
-	Version      NullInt32       `json:"version"` // schema version for this model
-	ID           DBID            `json:"id" binding:"required"`
-	CreationTime CreationTime    `json:"created_at"`
-	Deleted      NullBool        `json:"-"`
-	LastUpdated  LastUpdatedTime `json:"last_updated"`
+	Version      NullInt32 `json:"version"` // schema version for this model
+	ID           DBID      `json:"id" binding:"required"`
+	CreationTime time.Time `json:"created_at"`
+	Deleted      NullBool  `json:"-"`
+	LastUpdated  time.Time `json:"last_updated"`
 
 	TokenType TokenType `json:"token_type"`
 
@@ -928,4 +940,46 @@ func WalletsToEthereumAddresses(pWallets []Wallet) []EthereumAddress {
 		result[i] = EthereumAddress(wallet.Address)
 	}
 	return result
+}
+
+// UnmarshalGQL implements the graphql.Unmarshaler interface
+func (t *TokenOwnershipType) UnmarshalGQL(v interface{}) error {
+	n, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("TokenOwnershipType must be a string")
+	}
+
+	switch strings.ToLower(n) {
+	case "holder":
+		*t = TokenOwnershipTypeHolder
+	case "creator":
+		*t = TokenOwnershipTypeCreator
+	}
+	return nil
+}
+
+// MarshalGQL implements the graphql.Marshaler interface
+func (t TokenOwnershipType) MarshalGQL(w io.Writer) {
+	switch t {
+	case TokenOwnershipTypeHolder:
+		w.Write([]byte(`"holder"`))
+	case TokenOwnershipTypeCreator:
+		w.Write([]byte(`"creator"`))
+	}
+}
+
+type ErrTokenOwnershipNotFound struct {
+	TokenID DBID
+}
+
+func (e ErrTokenOwnershipNotFound) Error() string {
+	return fmt.Sprintf("TokenOwnership not found for tokenID %s", e.TokenID)
+}
+
+type ErrContractCreatorNotFound struct {
+	ContractID DBID
+}
+
+func (e ErrContractCreatorNotFound) Error() string {
+	return fmt.Sprintf("ContractCreator not found for contractID %s", e.ContractID)
 }

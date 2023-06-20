@@ -80,7 +80,7 @@ type GalleryUser implements Node @goEmbedHelper {
   # Returns all tokens owned by this user. Useful for retrieving all tokens without any duplicates,
   # as opposed to retrieving user -> wallets -> tokens, which would contain duplicates for any token
   # that appears in more than one of the user's wallets.
-  tokens: [Token] @goField(forceResolver: true)
+  tokens(ownershipFilter: [TokenOwnershipType!]): [Token] @goField(forceResolver: true)
   tokensByChain(chain: Chain!): ChainTokens @goField(forceResolver: true)
 
   wallets: [Wallet] @goField(forceResolver: true)
@@ -99,6 +99,13 @@ type GalleryUser implements Node @goEmbedHelper {
   sharedCommunities(before: String, after: String, first: Int, last: Int): CommunitiesConnection
     @authRequired
     @goField(forceResolver: true)
+  createdCommunities(
+    input: CreatedCommunitiesInput!
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): CommunitiesConnection @goField(forceResolver: true)
 }
 
 type Wallet implements Node {
@@ -133,6 +140,16 @@ input ChainAddressInput {
 input ChainPubKeyInput {
   pubKey: PubKey! @goField(forceResolver: true)
   chain: Chain! @goField(forceResolver: true)
+}
+
+input CreatedCommunitiesInput {
+  # When includeChains is empty, returns all communities from all chains.
+  includeChains: [Chain!]
+}
+
+input SyncCreatedTokensInput {
+  # When includeChains is empty, returns all communities from all chains.
+  includeChains: [Chain!]
 }
 
 type Badge {
@@ -356,6 +373,11 @@ enum Chain {
   POAP
 }
 
+enum TokenOwnershipType {
+  Holder
+  Creator
+}
+
 enum WalletType {
   EOA
   GnosisSafe
@@ -382,8 +404,11 @@ type Token implements Node @goEmbedHelper {
   owner: GalleryUser @goField(forceResolver: true)
   ownedByWallets: [Wallet] @goField(forceResolver: true)
   ownershipHistory: [OwnerAtBlock]
+  ownerIsHolder: Boolean @goField(forceResolver: true)
+  ownerIsCreator: Boolean @goField(forceResolver: true)
   tokenMetadata: String # source is map[string]interface{} on backend, not sure what best format is here
   contract: Contract @goField(forceResolver: true)
+  community: Community @goField(forceResolver: true)
   externalUrl: String
   blockNumber: String # source is uint64
   isSpamByUser: Boolean
@@ -424,6 +449,16 @@ type CollectionTokenSettings {
   renderLive: Boolean
 }
 
+type CollectionEdge {
+  node: Collection
+  cursor: String
+}
+
+type CollectionsConnection {
+  edges: [CollectionEdge]
+  pageInfo: PageInfo!
+}
+
 type Collection implements Node {
   id: ID!
   dbid: DBID!
@@ -452,7 +487,7 @@ type TokenHolder @goEmbedHelper {
   displayName: String
   wallets: [Wallet] @goField(forceResolver: true)
   user: GalleryUser @goField(forceResolver: true)
-  previewTokens: [String]
+  previewTokens: [String] @goField(forceResolver: true)
 }
 
 type MembershipTier implements Node {
@@ -484,7 +519,11 @@ type TokenHoldersConnection {
   pageInfo: PageInfo!
 }
 
-type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) @goEmbedHelper {
+type CommunityLink {
+  node: Community
+}
+
+type Community implements Node @goEmbedHelper {
   dbid: DBID!
   id: ID!
 
@@ -493,6 +532,7 @@ type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) @g
   contract: Contract
   contractAddress: ChainAddress
   creatorAddress: ChainAddress
+  creator: GalleryUserOrAddress @goField(forceResolver: true)
   chain: Chain
   name: String
   description: String
@@ -500,6 +540,9 @@ type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) @g
   profileImageURL: String
   profileBannerURL: String
   badgeURL: String
+  parentCommunity: CommunityLink @goField(forceResolver: true)
+  subCommunities(before: String, after: String, first: Int, last: Int): CommunitiesConnection
+    @goField(forceResolver: true)
 
   tokensInCommunity(
     before: String
@@ -653,6 +696,7 @@ enum UserExperienceType {
   UpsellMintMemento4
   UpsellGallerySelects1
   MobileUpsell1
+  MobileBetaUpsell
 }
 
 type UserExperience {
@@ -1096,6 +1140,13 @@ type Query {
   ): SocialConnectionsConnection @goField(forceResolver: true) @authRequired
 
   socialQueries: SocialQueriesOrError @authRequired
+  topCollectionsForCommunity(
+    input: topCollectionsForCommunityInput!
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): CollectionsConnection
 }
 
 type SocialQueries {
@@ -1107,6 +1158,10 @@ type SocialQueries {
     first: Int
     last: Int
   ): SocialConnectionsConnection @goField(forceResolver: true) @authRequired
+}
+
+input topCollectionsForCommunityInput {
+  chainAddress: ChainAddressInput!
 }
 
 input CollectionLayoutInput {
@@ -1296,6 +1351,12 @@ type UnregisterUserPushTokenPayload {
 union SyncTokensPayloadOrError = SyncTokensPayload | ErrNotAuthorized | ErrSyncFailed
 
 type SyncTokensPayload {
+  viewer: Viewer
+}
+
+union SyncCreatedTokensPayloadOrError = SyncCreatedTokensPayload | ErrNotAuthorized | ErrSyncFailed
+
+type SyncCreatedTokensPayload {
   viewer: Viewer
 }
 
@@ -1816,6 +1877,14 @@ type UnbanUserFromFeedPayload {
 
 union UnbanUserFromFeedPayloadOrError = UnbanUserFromFeedPayload | ErrNotAuthorized
 
+type SetCommunityOverrideCreatorPayload {
+  user: GalleryUser
+}
+
+union SetCommunityOverrideCreatorPayloadOrError =
+    SetCommunityOverrideCreatorPayload
+  | ErrNotAuthorized
+
 input GalleryPositionInput {
   galleryId: DBID!
   position: String!
@@ -2100,6 +2169,7 @@ type Mutation {
   setSpamPreference(input: SetSpamPreferenceInput!): SetSpamPreferencePayloadOrError @authRequired
 
   syncTokens(chains: [Chain!]): SyncTokensPayloadOrError @authRequired
+  syncCreatedTokens(input: SyncCreatedTokensInput!): SyncCreatedTokensPayloadOrError @authRequired
   refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
   refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
   refreshContract(contractId: DBID!): RefreshContractPayloadOrError
@@ -2179,6 +2249,10 @@ type Mutation {
   mintPremiumCardToWallet(
     input: MintPremiumCardToWalletInput!
   ): MintPremiumCardToWalletPayloadOrError @retoolAuth
+  setCommunityOverrideCreator(
+    communityID: DBID!
+    creatorUserID: DBID
+  ): SetCommunityOverrideCreatorPayloadOrError @retoolAuth
 
   # Gallery Frontend Deploy Persisted Queries
   uploadPersistedQueries(input: UploadPersistedQueriesInput): UploadPersistedQueriesPayloadOrError

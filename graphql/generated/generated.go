@@ -183,6 +183,11 @@ type ComplexityRoot struct {
 		Owner             func(childComplexity int) int
 	}
 
+	CollectionEdge struct {
+		Cursor func(childComplexity int) int
+		Node   func(childComplexity int) int
+	}
+
 	CollectionLayout struct {
 		SectionLayout func(childComplexity int) int
 		Sections      func(childComplexity int) int
@@ -211,6 +216,11 @@ type ComplexityRoot struct {
 		NewCollectorsNote func(childComplexity int) int
 		NewTokens         func(childComplexity int) int
 		Owner             func(childComplexity int) int
+	}
+
+	CollectionsConnection struct {
+		Edges    func(childComplexity int) int
+		PageInfo func(childComplexity int) int
 	}
 
 	CollectorsNoteAddedToCollectionFeedEventData struct {
@@ -256,6 +266,7 @@ type ComplexityRoot struct {
 		Chain             func(childComplexity int) int
 		Contract          func(childComplexity int) int
 		ContractAddress   func(childComplexity int) int
+		Creator           func(childComplexity int) int
 		CreatorAddress    func(childComplexity int) int
 		Dbid              func(childComplexity int) int
 		Description       func(childComplexity int) int
@@ -263,15 +274,21 @@ type ComplexityRoot struct {
 		LastUpdated       func(childComplexity int) int
 		Name              func(childComplexity int) int
 		Owners            func(childComplexity int, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) int
+		ParentCommunity   func(childComplexity int) int
 		PreviewImage      func(childComplexity int) int
 		ProfileBannerURL  func(childComplexity int) int
 		ProfileImageURL   func(childComplexity int) int
+		SubCommunities    func(childComplexity int, before *string, after *string, first *int, last *int) int
 		TokensInCommunity func(childComplexity int, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) int
 	}
 
 	CommunityEdge struct {
 		Cursor func(childComplexity int) int
 		Node   func(childComplexity int) int
+	}
+
+	CommunityLink struct {
+		Node func(childComplexity int) int
 	}
 
 	CommunitySearchResult struct {
@@ -554,6 +571,7 @@ type ComplexityRoot struct {
 	GalleryUser struct {
 		Badges              func(childComplexity int) int
 		Bio                 func(childComplexity int) int
+		CreatedCommunities  func(childComplexity int, input model.CreatedCommunitiesInput, before *string, after *string, first *int, last *int) int
 		Dbid                func(childComplexity int) int
 		FeaturedGallery     func(childComplexity int) int
 		Feed                func(childComplexity int, before *string, after *string, first *int, last *int) int
@@ -567,7 +585,7 @@ type ComplexityRoot struct {
 		SharedCommunities   func(childComplexity int, before *string, after *string, first *int, last *int) int
 		SharedFollowers     func(childComplexity int, before *string, after *string, first *int, last *int) int
 		SocialAccounts      func(childComplexity int) int
-		Tokens              func(childComplexity int) int
+		Tokens              func(childComplexity int, ownershipFilter []persist.TokenOwnershipType) int
 		TokensByChain       func(childComplexity int, chain persist.Chain) int
 		Traits              func(childComplexity int) int
 		Universal           func(childComplexity int) int
@@ -719,7 +737,9 @@ type ComplexityRoot struct {
 		RemoveUserWallets               func(childComplexity int, walletIds []persist.DBID) int
 		ResendVerificationEmail         func(childComplexity int) int
 		RevokeRolesFromUser             func(childComplexity int, username string, roles []*persist.Role) int
+		SetCommunityOverrideCreator     func(childComplexity int, communityID persist.DBID, creatorUserID *persist.DBID) int
 		SetSpamPreference               func(childComplexity int, input model.SetSpamPreferenceInput) int
+		SyncCreatedTokens               func(childComplexity int, input model.SyncCreatedTokensInput) int
 		SyncTokens                      func(childComplexity int, chains []persist.Chain) int
 		SyncTokensForUsername           func(childComplexity int, username string, chains []persist.Chain) int
 		UnbanUserFromFeed               func(childComplexity int, username string) int
@@ -811,35 +831,36 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		CollectionByID          func(childComplexity int, id persist.DBID) int
-		CollectionTokenByID     func(childComplexity int, tokenID persist.DBID, collectionID persist.DBID) int
-		CollectionsByIds        func(childComplexity int, ids []persist.DBID) int
-		CommunityByAddress      func(childComplexity int, communityAddress persist.ChainAddress, forceRefresh *bool) int
-		FeedEventByID           func(childComplexity int, id persist.DBID) int
-		GalleryByID             func(childComplexity int, id persist.DBID) int
-		GalleryOfTheWeekWinners func(childComplexity int) int
-		GeneralAllowlist        func(childComplexity int) int
-		GetMerchTokens          func(childComplexity int, wallet persist.Address) int
-		GlobalFeed              func(childComplexity int, before *string, after *string, first *int, last *int) int
-		MembershipTiers         func(childComplexity int, forceRefresh *bool) int
-		Node                    func(childComplexity int, id model.GqlID) int
-		SearchCommunities       func(childComplexity int, query string, limit *int, nameWeight *float64, descriptionWeight *float64, poapAddressWeight *float64) int
-		SearchGalleries         func(childComplexity int, query string, limit *int, nameWeight *float64, descriptionWeight *float64) int
-		SearchUsers             func(childComplexity int, query string, limit *int, usernameWeight *float64, bioWeight *float64) int
-		SocialConnections       func(childComplexity int, socialAccountType persist.SocialProvider, excludeAlreadyFollowing *bool, before *string, after *string, first *int, last *int) int
-		SocialQueries           func(childComplexity int) int
-		TokenByID               func(childComplexity int, id persist.DBID) int
-		TrendingFeed            func(childComplexity int, before *string, after *string, first *int, last *int) int
-		TrendingUsers           func(childComplexity int, input model.TrendingUsersInput) int
-		UserByAddress           func(childComplexity int, chainAddress persist.ChainAddress) int
-		UserByID                func(childComplexity int, id persist.DBID) int
-		UserByUsername          func(childComplexity int, username string) int
-		UsersByRole             func(childComplexity int, role persist.Role, before *string, after *string, first *int, last *int) int
-		UsersWithTrait          func(childComplexity int, trait string) int
-		Viewer                  func(childComplexity int) int
-		ViewerGalleryByID       func(childComplexity int, id persist.DBID) int
-		__resolve__service      func(childComplexity int) int
-		__resolve_entities      func(childComplexity int, representations []map[string]interface{}) int
+		CollectionByID             func(childComplexity int, id persist.DBID) int
+		CollectionTokenByID        func(childComplexity int, tokenID persist.DBID, collectionID persist.DBID) int
+		CollectionsByIds           func(childComplexity int, ids []persist.DBID) int
+		CommunityByAddress         func(childComplexity int, communityAddress persist.ChainAddress, forceRefresh *bool) int
+		FeedEventByID              func(childComplexity int, id persist.DBID) int
+		GalleryByID                func(childComplexity int, id persist.DBID) int
+		GalleryOfTheWeekWinners    func(childComplexity int) int
+		GeneralAllowlist           func(childComplexity int) int
+		GetMerchTokens             func(childComplexity int, wallet persist.Address) int
+		GlobalFeed                 func(childComplexity int, before *string, after *string, first *int, last *int) int
+		MembershipTiers            func(childComplexity int, forceRefresh *bool) int
+		Node                       func(childComplexity int, id model.GqlID) int
+		SearchCommunities          func(childComplexity int, query string, limit *int, nameWeight *float64, descriptionWeight *float64, poapAddressWeight *float64) int
+		SearchGalleries            func(childComplexity int, query string, limit *int, nameWeight *float64, descriptionWeight *float64) int
+		SearchUsers                func(childComplexity int, query string, limit *int, usernameWeight *float64, bioWeight *float64) int
+		SocialConnections          func(childComplexity int, socialAccountType persist.SocialProvider, excludeAlreadyFollowing *bool, before *string, after *string, first *int, last *int) int
+		SocialQueries              func(childComplexity int) int
+		TokenByID                  func(childComplexity int, id persist.DBID) int
+		TopCollectionsForCommunity func(childComplexity int, input model.TopCollectionsForCommunityInput, before *string, after *string, first *int, last *int) int
+		TrendingFeed               func(childComplexity int, before *string, after *string, first *int, last *int) int
+		TrendingUsers              func(childComplexity int, input model.TrendingUsersInput) int
+		UserByAddress              func(childComplexity int, chainAddress persist.ChainAddress) int
+		UserByID                   func(childComplexity int, id persist.DBID) int
+		UserByUsername             func(childComplexity int, username string) int
+		UsersByRole                func(childComplexity int, role persist.Role, before *string, after *string, first *int, last *int) int
+		UsersWithTrait             func(childComplexity int, trait string) int
+		Viewer                     func(childComplexity int) int
+		ViewerGalleryByID          func(childComplexity int, id persist.DBID) int
+		__resolve__service         func(childComplexity int) int
+		__resolve_entities         func(childComplexity int, representations []map[string]interface{}) int
 	}
 
 	RedeemMerchPayload struct {
@@ -891,6 +912,10 @@ type ComplexityRoot struct {
 
 	SearchUsersPayload struct {
 		Results func(childComplexity int) int
+	}
+
+	SetCommunityOverrideCreatorPayload struct {
+		User func(childComplexity int) int
 	}
 
 	SetSpamPreferencePayload struct {
@@ -984,6 +1009,10 @@ type ComplexityRoot struct {
 		NotificationUpdated func(childComplexity int) int
 	}
 
+	SyncCreatedTokensPayload struct {
+		Viewer func(childComplexity int) int
+	}
+
 	SyncTokensForUsernamePayload struct {
 		Message func(childComplexity int) int
 	}
@@ -1014,6 +1043,7 @@ type ComplexityRoot struct {
 		BlockNumber           func(childComplexity int) int
 		Chain                 func(childComplexity int) int
 		CollectorsNote        func(childComplexity int) int
+		Community             func(childComplexity int) int
 		Contract              func(childComplexity int) int
 		CreationTime          func(childComplexity int) int
 		CreatorAddress        func(childComplexity int) int
@@ -1030,6 +1060,8 @@ type ComplexityRoot struct {
 		OpenseaID             func(childComplexity int) int
 		OwnedByWallets        func(childComplexity int) int
 		Owner                 func(childComplexity int) int
+		OwnerIsCreator        func(childComplexity int) int
+		OwnerIsHolder         func(childComplexity int) int
 		OwnershipHistory      func(childComplexity int) int
 		Quantity              func(childComplexity int) int
 		TokenID               func(childComplexity int) int
@@ -1328,6 +1360,10 @@ type CommentOnFeedEventPayloadResolver interface {
 	FeedEvent(ctx context.Context, obj *model.CommentOnFeedEventPayload) (*model.FeedEvent, error)
 }
 type CommunityResolver interface {
+	Creator(ctx context.Context, obj *model.Community) (model.GalleryUserOrAddress, error)
+
+	ParentCommunity(ctx context.Context, obj *model.Community) (*model.CommunityLink, error)
+	SubCommunities(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error)
 	TokensInCommunity(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokensConnection, error)
 	Owners(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokenHoldersConnection, error)
 }
@@ -1369,7 +1405,7 @@ type GalleryUpdatedFeedEventDataResolver interface {
 type GalleryUserResolver interface {
 	Roles(ctx context.Context, obj *model.GalleryUser) ([]*persist.Role, error)
 	SocialAccounts(ctx context.Context, obj *model.GalleryUser) (*model.SocialAccounts, error)
-	Tokens(ctx context.Context, obj *model.GalleryUser) ([]*model.Token, error)
+	Tokens(ctx context.Context, obj *model.GalleryUser, ownershipFilter []persist.TokenOwnershipType) ([]*model.Token, error)
 	TokensByChain(ctx context.Context, obj *model.GalleryUser, chain persist.Chain) (*model.ChainTokens, error)
 	Wallets(ctx context.Context, obj *model.GalleryUser) ([]*model.Wallet, error)
 	PrimaryWallet(ctx context.Context, obj *model.GalleryUser) (*model.Wallet, error)
@@ -1382,6 +1418,7 @@ type GalleryUserResolver interface {
 	Feed(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
 	SharedFollowers(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.UsersConnection, error)
 	SharedCommunities(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error)
+	CreatedCommunities(ctx context.Context, obj *model.GalleryUser, input model.CreatedCommunitiesInput, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error)
 }
 type MutationResolver interface {
 	AddUserWallet(ctx context.Context, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) (model.AddUserWalletPayloadOrError, error)
@@ -1398,6 +1435,7 @@ type MutationResolver interface {
 	UpdateTokenInfo(ctx context.Context, input model.UpdateTokenInfoInput) (model.UpdateTokenInfoPayloadOrError, error)
 	SetSpamPreference(ctx context.Context, input model.SetSpamPreferenceInput) (model.SetSpamPreferencePayloadOrError, error)
 	SyncTokens(ctx context.Context, chains []persist.Chain) (model.SyncTokensPayloadOrError, error)
+	SyncCreatedTokens(ctx context.Context, input model.SyncCreatedTokensInput) (model.SyncCreatedTokensPayloadOrError, error)
 	RefreshToken(ctx context.Context, tokenID persist.DBID) (model.RefreshTokenPayloadOrError, error)
 	RefreshCollection(ctx context.Context, collectionID persist.DBID) (model.RefreshCollectionPayloadOrError, error)
 	RefreshContract(ctx context.Context, contractID persist.DBID) (model.RefreshContractPayloadOrError, error)
@@ -1441,6 +1479,7 @@ type MutationResolver interface {
 	BanUserFromFeed(ctx context.Context, username string, action string) (model.BanUserFromFeedPayloadOrError, error)
 	UnbanUserFromFeed(ctx context.Context, username string) (model.UnbanUserFromFeedPayloadOrError, error)
 	MintPremiumCardToWallet(ctx context.Context, input model.MintPremiumCardToWalletInput) (model.MintPremiumCardToWalletPayloadOrError, error)
+	SetCommunityOverrideCreator(ctx context.Context, communityID persist.DBID, creatorUserID *persist.DBID) (model.SetCommunityOverrideCreatorPayloadOrError, error)
 	UploadPersistedQueries(ctx context.Context, input *model.UploadPersistedQueriesInput) (model.UploadPersistedQueriesPayloadOrError, error)
 	UpdatePrimaryWallet(ctx context.Context, walletID persist.DBID) (model.UpdatePrimaryWalletPayloadOrError, error)
 	UpdateUserExperience(ctx context.Context, input model.UpdateUserExperienceInput) (model.UpdateUserExperiencePayloadOrError, error)
@@ -1481,6 +1520,7 @@ type QueryResolver interface {
 	UsersByRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) (*model.UsersConnection, error)
 	SocialConnections(ctx context.Context, socialAccountType persist.SocialProvider, excludeAlreadyFollowing *bool, before *string, after *string, first *int, last *int) (*model.SocialConnectionsConnection, error)
 	SocialQueries(ctx context.Context) (model.SocialQueriesOrError, error)
+	TopCollectionsForCommunity(ctx context.Context, input model.TopCollectionsForCommunityInput, before *string, after *string, first *int, last *int) (*model.CollectionsConnection, error)
 }
 type RemoveAdmirePayloadResolver interface {
 	FeedEvent(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.FeedEvent, error)
@@ -1526,11 +1566,16 @@ type TokenResolver interface {
 	Owner(ctx context.Context, obj *model.Token) (*model.GalleryUser, error)
 	OwnedByWallets(ctx context.Context, obj *model.Token) ([]*model.Wallet, error)
 
+	OwnerIsHolder(ctx context.Context, obj *model.Token) (*bool, error)
+	OwnerIsCreator(ctx context.Context, obj *model.Token) (*bool, error)
+
 	Contract(ctx context.Context, obj *model.Token) (*model.Contract, error)
+	Community(ctx context.Context, obj *model.Token) (*model.Community, error)
 }
 type TokenHolderResolver interface {
 	Wallets(ctx context.Context, obj *model.TokenHolder) ([]*model.Wallet, error)
 	User(ctx context.Context, obj *model.TokenHolder) (*model.GalleryUser, error)
+	PreviewTokens(ctx context.Context, obj *model.TokenHolder) ([]*string, error)
 }
 type TokensAddedToCollectionFeedEventDataResolver interface {
 	Owner(ctx context.Context, obj *model.TokensAddedToCollectionFeedEventData) (*model.GalleryUser, error)
@@ -1902,6 +1947,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.CollectionCreatedFeedEventData.Owner(childComplexity), true
 
+	case "CollectionEdge.cursor":
+		if e.complexity.CollectionEdge.Cursor == nil {
+			break
+		}
+
+		return e.complexity.CollectionEdge.Cursor(childComplexity), true
+
+	case "CollectionEdge.node":
+		if e.complexity.CollectionEdge.Node == nil {
+			break
+		}
+
+		return e.complexity.CollectionEdge.Node(childComplexity), true
+
 	case "CollectionLayout.sectionLayout":
 		if e.complexity.CollectionLayout.SectionLayout == nil {
 			break
@@ -2006,6 +2065,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.CollectionUpdatedFeedEventData.Owner(childComplexity), true
+
+	case "CollectionsConnection.edges":
+		if e.complexity.CollectionsConnection.Edges == nil {
+			break
+		}
+
+		return e.complexity.CollectionsConnection.Edges(childComplexity), true
+
+	case "CollectionsConnection.pageInfo":
+		if e.complexity.CollectionsConnection.PageInfo == nil {
+			break
+		}
+
+		return e.complexity.CollectionsConnection.PageInfo(childComplexity), true
 
 	case "CollectorsNoteAddedToCollectionFeedEventData.action":
 		if e.complexity.CollectorsNoteAddedToCollectionFeedEventData.Action == nil {
@@ -2196,6 +2269,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Community.ContractAddress(childComplexity), true
 
+	case "Community.creator":
+		if e.complexity.Community.Creator == nil {
+			break
+		}
+
+		return e.complexity.Community.Creator(childComplexity), true
+
 	case "Community.creatorAddress":
 		if e.complexity.Community.CreatorAddress == nil {
 			break
@@ -2250,6 +2330,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Community.Owners(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int), args["onlyGalleryUsers"].(*bool)), true
 
+	case "Community.parentCommunity":
+		if e.complexity.Community.ParentCommunity == nil {
+			break
+		}
+
+		return e.complexity.Community.ParentCommunity(childComplexity), true
+
 	case "Community.previewImage":
 		if e.complexity.Community.PreviewImage == nil {
 			break
@@ -2270,6 +2357,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Community.ProfileImageURL(childComplexity), true
+
+	case "Community.subCommunities":
+		if e.complexity.Community.SubCommunities == nil {
+			break
+		}
+
+		args, err := ec.field_Community_subCommunities_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Community.SubCommunities(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
 	case "Community.tokensInCommunity":
 		if e.complexity.Community.TokensInCommunity == nil {
@@ -2296,6 +2395,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.CommunityEdge.Node(childComplexity), true
+
+	case "CommunityLink.node":
+		if e.complexity.CommunityLink.Node == nil {
+			break
+		}
+
+		return e.complexity.CommunityLink.Node(childComplexity), true
 
 	case "CommunitySearchResult.community":
 		if e.complexity.CommunitySearchResult.Community == nil {
@@ -3157,6 +3263,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.GalleryUser.Bio(childComplexity), true
 
+	case "GalleryUser.createdCommunities":
+		if e.complexity.GalleryUser.CreatedCommunities == nil {
+			break
+		}
+
+		args, err := ec.field_GalleryUser_createdCommunities_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.GalleryUser.CreatedCommunities(childComplexity, args["input"].(model.CreatedCommunitiesInput), args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
+
 	case "GalleryUser.dbid":
 		if e.complexity.GalleryUser.Dbid == nil {
 			break
@@ -3268,7 +3386,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		return e.complexity.GalleryUser.Tokens(childComplexity), true
+		args, err := ec.field_GalleryUser_tokens_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.GalleryUser.Tokens(childComplexity, args["ownershipFilter"].([]persist.TokenOwnershipType)), true
 
 	case "GalleryUser.tokensByChain":
 		if e.complexity.GalleryUser.TokensByChain == nil {
@@ -4109,6 +4232,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.RevokeRolesFromUser(childComplexity, args["username"].(string), args["roles"].([]*persist.Role)), true
 
+	case "Mutation.setCommunityOverrideCreator":
+		if e.complexity.Mutation.SetCommunityOverrideCreator == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_setCommunityOverrideCreator_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.SetCommunityOverrideCreator(childComplexity, args["communityID"].(persist.DBID), args["creatorUserID"].(*persist.DBID)), true
+
 	case "Mutation.setSpamPreference":
 		if e.complexity.Mutation.SetSpamPreference == nil {
 			break
@@ -4120,6 +4255,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.SetSpamPreference(childComplexity, args["input"].(model.SetSpamPreferenceInput)), true
+
+	case "Mutation.syncCreatedTokens":
+		if e.complexity.Mutation.SyncCreatedTokens == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_syncCreatedTokens_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.SyncCreatedTokens(childComplexity, args["input"].(model.SyncCreatedTokensInput)), true
 
 	case "Mutation.syncTokens":
 		if e.complexity.Mutation.SyncTokens == nil {
@@ -4884,6 +5031,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.TokenByID(childComplexity, args["id"].(persist.DBID)), true
 
+	case "Query.topCollectionsForCommunity":
+		if e.complexity.Query.TopCollectionsForCommunity == nil {
+			break
+		}
+
+		args, err := ec.field_Query_topCollectionsForCommunity_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.TopCollectionsForCommunity(childComplexity, args["input"].(model.TopCollectionsForCommunityInput), args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
+
 	case "Query.trendingFeed":
 		if e.complexity.Query.TrendingFeed == nil {
 			break
@@ -5110,6 +5269,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.SearchUsersPayload.Results(childComplexity), true
+
+	case "SetCommunityOverrideCreatorPayload.user":
+		if e.complexity.SetCommunityOverrideCreatorPayload.User == nil {
+			break
+		}
+
+		return e.complexity.SetCommunityOverrideCreatorPayload.User(childComplexity), true
 
 	case "SetSpamPreferencePayload.tokens":
 		if e.complexity.SetSpamPreferencePayload.Tokens == nil {
@@ -5521,6 +5687,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Subscription.NotificationUpdated(childComplexity), true
 
+	case "SyncCreatedTokensPayload.viewer":
+		if e.complexity.SyncCreatedTokensPayload.Viewer == nil {
+			break
+		}
+
+		return e.complexity.SyncCreatedTokensPayload.Viewer(childComplexity), true
+
 	case "SyncTokensForUsernamePayload.message":
 		if e.complexity.SyncTokensForUsernamePayload.Message == nil {
 			break
@@ -5640,6 +5813,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Token.CollectorsNote(childComplexity), true
 
+	case "Token.community":
+		if e.complexity.Token.Community == nil {
+			break
+		}
+
+		return e.complexity.Token.Community(childComplexity), true
+
 	case "Token.contract":
 		if e.complexity.Token.Contract == nil {
 			break
@@ -5751,6 +5931,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Token.Owner(childComplexity), true
+
+	case "Token.ownerIsCreator":
+		if e.complexity.Token.OwnerIsCreator == nil {
+			break
+		}
+
+		return e.complexity.Token.OwnerIsCreator(childComplexity), true
+
+	case "Token.ownerIsHolder":
+		if e.complexity.Token.OwnerIsHolder == nil {
+			break
+		}
+
+		return e.complexity.Token.OwnerIsHolder(childComplexity), true
 
 	case "Token.ownershipHistory":
 		if e.complexity.Token.OwnershipHistory == nil {
@@ -6535,6 +6729,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputCreateCollectionInput,
 		ec.unmarshalInputCreateGalleryInput,
 		ec.unmarshalInputCreateUserInput,
+		ec.unmarshalInputCreatedCommunitiesInput,
 		ec.unmarshalInputDebugAuth,
 		ec.unmarshalInputDebugSocialAuth,
 		ec.unmarshalInputEoaAuth,
@@ -6550,6 +6745,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputRedeemMerchInput,
 		ec.unmarshalInputSetSpamPreferenceInput,
 		ec.unmarshalInputSocialAuthMechanism,
+		ec.unmarshalInputSyncCreatedTokensInput,
 		ec.unmarshalInputTrendingUsersInput,
 		ec.unmarshalInputTwitterAuth,
 		ec.unmarshalInputUnsubscribeFromEmailTypeInput,
@@ -6571,6 +6767,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputUploadPersistedQueriesInput,
 		ec.unmarshalInputVerifyEmailInput,
 		ec.unmarshalInputVerifyEmailMagicLinkInput,
+		ec.unmarshalInputtopCollectionsForCommunityInput,
 	)
 	first := true
 
@@ -6730,7 +6927,7 @@ type GalleryUser implements Node @goEmbedHelper {
   # Returns all tokens owned by this user. Useful for retrieving all tokens without any duplicates,
   # as opposed to retrieving user -> wallets -> tokens, which would contain duplicates for any token
   # that appears in more than one of the user's wallets.
-  tokens: [Token] @goField(forceResolver: true)
+  tokens(ownershipFilter: [TokenOwnershipType!]): [Token] @goField(forceResolver: true)
   tokensByChain(chain: Chain!): ChainTokens @goField(forceResolver: true)
 
   wallets: [Wallet] @goField(forceResolver: true)
@@ -6749,6 +6946,13 @@ type GalleryUser implements Node @goEmbedHelper {
   sharedCommunities(before: String, after: String, first: Int, last: Int): CommunitiesConnection
     @authRequired
     @goField(forceResolver: true)
+  createdCommunities(
+    input: CreatedCommunitiesInput!
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): CommunitiesConnection @goField(forceResolver: true)
 }
 
 type Wallet implements Node {
@@ -6783,6 +6987,16 @@ input ChainAddressInput {
 input ChainPubKeyInput {
   pubKey: PubKey! @goField(forceResolver: true)
   chain: Chain! @goField(forceResolver: true)
+}
+
+input CreatedCommunitiesInput {
+  # When includeChains is empty, returns all communities from all chains.
+  includeChains: [Chain!]
+}
+
+input SyncCreatedTokensInput {
+  # When includeChains is empty, returns all communities from all chains.
+  includeChains: [Chain!]
 }
 
 type Badge {
@@ -7006,6 +7220,11 @@ enum Chain {
   POAP
 }
 
+enum TokenOwnershipType {
+  Holder
+  Creator
+}
+
 enum WalletType {
   EOA
   GnosisSafe
@@ -7032,8 +7251,11 @@ type Token implements Node @goEmbedHelper {
   owner: GalleryUser @goField(forceResolver: true)
   ownedByWallets: [Wallet] @goField(forceResolver: true)
   ownershipHistory: [OwnerAtBlock]
+  ownerIsHolder: Boolean @goField(forceResolver: true)
+  ownerIsCreator: Boolean @goField(forceResolver: true)
   tokenMetadata: String # source is map[string]interface{} on backend, not sure what best format is here
   contract: Contract @goField(forceResolver: true)
+  community: Community @goField(forceResolver: true)
   externalUrl: String
   blockNumber: String # source is uint64
   isSpamByUser: Boolean
@@ -7074,6 +7296,16 @@ type CollectionTokenSettings {
   renderLive: Boolean
 }
 
+type CollectionEdge {
+  node: Collection
+  cursor: String
+}
+
+type CollectionsConnection {
+  edges: [CollectionEdge]
+  pageInfo: PageInfo!
+}
+
 type Collection implements Node {
   id: ID!
   dbid: DBID!
@@ -7102,7 +7334,7 @@ type TokenHolder @goEmbedHelper {
   displayName: String
   wallets: [Wallet] @goField(forceResolver: true)
   user: GalleryUser @goField(forceResolver: true)
-  previewTokens: [String]
+  previewTokens: [String] @goField(forceResolver: true)
 }
 
 type MembershipTier implements Node {
@@ -7134,7 +7366,11 @@ type TokenHoldersConnection {
   pageInfo: PageInfo!
 }
 
-type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) @goEmbedHelper {
+type CommunityLink {
+  node: Community
+}
+
+type Community implements Node @goEmbedHelper {
   dbid: DBID!
   id: ID!
 
@@ -7143,6 +7379,7 @@ type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) @g
   contract: Contract
   contractAddress: ChainAddress
   creatorAddress: ChainAddress
+  creator: GalleryUserOrAddress @goField(forceResolver: true)
   chain: Chain
   name: String
   description: String
@@ -7150,6 +7387,9 @@ type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) @g
   profileImageURL: String
   profileBannerURL: String
   badgeURL: String
+  parentCommunity: CommunityLink @goField(forceResolver: true)
+  subCommunities(before: String, after: String, first: Int, last: Int): CommunitiesConnection
+    @goField(forceResolver: true)
 
   tokensInCommunity(
     before: String
@@ -7303,6 +7543,7 @@ enum UserExperienceType {
   UpsellMintMemento4
   UpsellGallerySelects1
   MobileUpsell1
+  MobileBetaUpsell
 }
 
 type UserExperience {
@@ -7746,6 +7987,13 @@ type Query {
   ): SocialConnectionsConnection @goField(forceResolver: true) @authRequired
 
   socialQueries: SocialQueriesOrError @authRequired
+  topCollectionsForCommunity(
+    input: topCollectionsForCommunityInput!
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): CollectionsConnection
 }
 
 type SocialQueries {
@@ -7757,6 +8005,10 @@ type SocialQueries {
     first: Int
     last: Int
   ): SocialConnectionsConnection @goField(forceResolver: true) @authRequired
+}
+
+input topCollectionsForCommunityInput {
+  chainAddress: ChainAddressInput!
 }
 
 input CollectionLayoutInput {
@@ -7946,6 +8198,12 @@ type UnregisterUserPushTokenPayload {
 union SyncTokensPayloadOrError = SyncTokensPayload | ErrNotAuthorized | ErrSyncFailed
 
 type SyncTokensPayload {
+  viewer: Viewer
+}
+
+union SyncCreatedTokensPayloadOrError = SyncCreatedTokensPayload | ErrNotAuthorized | ErrSyncFailed
+
+type SyncCreatedTokensPayload {
   viewer: Viewer
 }
 
@@ -8466,6 +8724,14 @@ type UnbanUserFromFeedPayload {
 
 union UnbanUserFromFeedPayloadOrError = UnbanUserFromFeedPayload | ErrNotAuthorized
 
+type SetCommunityOverrideCreatorPayload {
+  user: GalleryUser
+}
+
+union SetCommunityOverrideCreatorPayloadOrError =
+    SetCommunityOverrideCreatorPayload
+  | ErrNotAuthorized
+
 input GalleryPositionInput {
   galleryId: DBID!
   position: String!
@@ -8750,6 +9016,7 @@ type Mutation {
   setSpamPreference(input: SetSpamPreferenceInput!): SetSpamPreferencePayloadOrError @authRequired
 
   syncTokens(chains: [Chain!]): SyncTokensPayloadOrError @authRequired
+  syncCreatedTokens(input: SyncCreatedTokensInput!): SyncCreatedTokensPayloadOrError @authRequired
   refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
   refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
   refreshContract(contractId: DBID!): RefreshContractPayloadOrError
@@ -8829,6 +9096,10 @@ type Mutation {
   mintPremiumCardToWallet(
     input: MintPremiumCardToWalletInput!
   ): MintPremiumCardToWalletPayloadOrError @retoolAuth
+  setCommunityOverrideCreator(
+    communityID: DBID!
+    creatorUserID: DBID
+  ): SetCommunityOverrideCreatorPayloadOrError @retoolAuth
 
   # Gallery Frontend Deploy Persisted Queries
   uploadPersistedQueries(input: UploadPersistedQueriesInput): UploadPersistedQueriesPayloadOrError
@@ -8970,6 +9241,48 @@ func (ec *executionContext) field_Community_owners_args(ctx context.Context, raw
 		}
 	}
 	args["onlyGalleryUsers"] = arg4
+	return args, nil
+}
+
+func (ec *executionContext) field_Community_subCommunities_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *string
+	if tmp, ok := rawArgs["before"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
+		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["before"] = arg0
+	var arg1 *string
+	if tmp, ok := rawArgs["after"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
+		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["after"] = arg1
+	var arg2 *int
+	if tmp, ok := rawArgs["first"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
+		arg2, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["first"] = arg2
+	var arg3 *int
+	if tmp, ok := rawArgs["last"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("last"))
+		arg3, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["last"] = arg3
 	return args, nil
 }
 
@@ -9165,6 +9478,57 @@ func (ec *executionContext) field_FeedEvent_interactions_args(ctx context.Contex
 	return args, nil
 }
 
+func (ec *executionContext) field_GalleryUser_createdCommunities_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.CreatedCommunitiesInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNCreatedCommunitiesInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCreatedCommunitiesInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
+	var arg1 *string
+	if tmp, ok := rawArgs["before"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
+		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["before"] = arg1
+	var arg2 *string
+	if tmp, ok := rawArgs["after"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
+		arg2, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["after"] = arg2
+	var arg3 *int
+	if tmp, ok := rawArgs["first"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
+		arg3, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["first"] = arg3
+	var arg4 *int
+	if tmp, ok := rawArgs["last"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("last"))
+		arg4, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["last"] = arg4
+	return args, nil
+}
+
 func (ec *executionContext) field_GalleryUser_feed_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -9303,6 +9667,21 @@ func (ec *executionContext) field_GalleryUser_tokensByChain_args(ctx context.Con
 		}
 	}
 	args["chain"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_GalleryUser_tokens_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 []persist.TokenOwnershipType
+	if tmp, ok := rawArgs["ownershipFilter"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("ownershipFilter"))
+		arg0, err = ec.unmarshalOTokenOwnershipType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenOwnershipTypeᚄ(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["ownershipFilter"] = arg0
 	return args, nil
 }
 
@@ -9843,6 +10222,30 @@ func (ec *executionContext) field_Mutation_revokeRolesFromUser_args(ctx context.
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_setCommunityOverrideCreator_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.DBID
+	if tmp, ok := rawArgs["communityID"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("communityID"))
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["communityID"] = arg0
+	var arg1 *persist.DBID
+	if tmp, ok := rawArgs["creatorUserID"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("creatorUserID"))
+		arg1, err = ec.unmarshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["creatorUserID"] = arg1
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_setSpamPreference_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -9850,6 +10253,21 @@ func (ec *executionContext) field_Mutation_setSpamPreference_args(ctx context.Co
 	if tmp, ok := rawArgs["input"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
 		arg0, err = ec.unmarshalNSetSpamPreferenceInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSetSpamPreferenceInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_syncCreatedTokens_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.SyncCreatedTokensInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNSyncCreatedTokensInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSyncCreatedTokensInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -10707,6 +11125,57 @@ func (ec *executionContext) field_Query_tokenById_args(ctx context.Context, rawA
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_topCollectionsForCommunity_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.TopCollectionsForCommunityInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNtopCollectionsForCommunityInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTopCollectionsForCommunityInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
+	var arg1 *string
+	if tmp, ok := rawArgs["before"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
+		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["before"] = arg1
+	var arg2 *string
+	if tmp, ok := rawArgs["after"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
+		arg2, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["after"] = arg2
+	var arg3 *int
+	if tmp, ok := rawArgs["first"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
+		arg3, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["first"] = arg3
+	var arg4 *int
+	if tmp, ok := rawArgs["last"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("last"))
+		arg4, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["last"] = arg4
+	return args, nil
+}
+
 func (ec *executionContext) field_Query_trendingFeed_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -11423,6 +11892,8 @@ func (ec *executionContext) fieldContext_AdminAddWalletPayload_user(ctx context.
 				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
 			case "sharedCommunities":
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -11678,6 +12149,8 @@ func (ec *executionContext) fieldContext_Admire_admirer(ctx context.Context, fie
 				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
 			case "sharedCommunities":
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -12450,6 +12923,8 @@ func (ec *executionContext) fieldContext_BanUserFromFeedPayload_user(ctx context
 				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
 			case "sharedCommunities":
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -12728,10 +13203,16 @@ func (ec *executionContext) fieldContext_ChainTokens_tokens(ctx context.Context,
 				return ec.fieldContext_Token_ownedByWallets(ctx, field)
 			case "ownershipHistory":
 				return ec.fieldContext_Token_ownershipHistory(ctx, field)
+			case "ownerIsHolder":
+				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
+			case "ownerIsCreator":
+				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
 				return ec.fieldContext_Token_contract(ctx, field)
+			case "community":
+				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
 			case "blockNumber":
@@ -13335,6 +13816,8 @@ func (ec *executionContext) fieldContext_CollectionCreatedFeedEventData_owner(ct
 				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
 			case "sharedCommunities":
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -13526,6 +14009,108 @@ func (ec *executionContext) _CollectionCreatedFeedEventData_newCollectorsNote(ct
 func (ec *executionContext) fieldContext_CollectionCreatedFeedEventData_newCollectorsNote(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "CollectionCreatedFeedEventData",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CollectionEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.CollectionEdge) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CollectionEdge_node(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Node, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Collection)
+	fc.Result = res
+	return ec.marshalOCollection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollection(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CollectionEdge_node(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CollectionEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Collection_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Collection_dbid(ctx, field)
+			case "version":
+				return ec.fieldContext_Collection_version(ctx, field)
+			case "name":
+				return ec.fieldContext_Collection_name(ctx, field)
+			case "collectorsNote":
+				return ec.fieldContext_Collection_collectorsNote(ctx, field)
+			case "gallery":
+				return ec.fieldContext_Collection_gallery(ctx, field)
+			case "layout":
+				return ec.fieldContext_Collection_layout(ctx, field)
+			case "hidden":
+				return ec.fieldContext_Collection_hidden(ctx, field)
+			case "tokens":
+				return ec.fieldContext_Collection_tokens(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Collection", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CollectionEdge_cursor(ctx context.Context, field graphql.CollectedField, obj *model.CollectionEdge) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CollectionEdge_cursor(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Cursor, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CollectionEdge_cursor(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CollectionEdge",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -13816,10 +14401,16 @@ func (ec *executionContext) fieldContext_CollectionToken_token(ctx context.Conte
 				return ec.fieldContext_Token_ownedByWallets(ctx, field)
 			case "ownershipHistory":
 				return ec.fieldContext_Token_ownershipHistory(ctx, field)
+			case "ownerIsHolder":
+				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
+			case "ownerIsCreator":
+				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
 				return ec.fieldContext_Token_contract(ctx, field)
+			case "community":
+				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
 			case "blockNumber":
@@ -14107,6 +14698,8 @@ func (ec *executionContext) fieldContext_CollectionUpdatedFeedEventData_owner(ct
 				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
 			case "sharedCommunities":
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -14308,6 +14901,111 @@ func (ec *executionContext) fieldContext_CollectionUpdatedFeedEventData_newToken
 	return fc, nil
 }
 
+func (ec *executionContext) _CollectionsConnection_edges(ctx context.Context, field graphql.CollectedField, obj *model.CollectionsConnection) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CollectionsConnection_edges(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Edges, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.CollectionEdge)
+	fc.Result = res
+	return ec.marshalOCollectionEdge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionEdge(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CollectionsConnection_edges(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CollectionsConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "node":
+				return ec.fieldContext_CollectionEdge_node(ctx, field)
+			case "cursor":
+				return ec.fieldContext_CollectionEdge_cursor(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type CollectionEdge", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CollectionsConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *model.CollectionsConnection) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CollectionsConnection_pageInfo(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PageInfo, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.PageInfo)
+	fc.Result = res
+	return ec.marshalNPageInfo2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPageInfo(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CollectionsConnection_pageInfo(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CollectionsConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "total":
+				return ec.fieldContext_PageInfo_total(ctx, field)
+			case "size":
+				return ec.fieldContext_PageInfo_size(ctx, field)
+			case "hasPreviousPage":
+				return ec.fieldContext_PageInfo_hasPreviousPage(ctx, field)
+			case "hasNextPage":
+				return ec.fieldContext_PageInfo_hasNextPage(ctx, field)
+			case "startCursor":
+				return ec.fieldContext_PageInfo_startCursor(ctx, field)
+			case "endCursor":
+				return ec.fieldContext_PageInfo_endCursor(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PageInfo", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEventData_eventTime(ctx context.Context, field graphql.CollectedField, obj *model.CollectorsNoteAddedToCollectionFeedEventData) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_CollectorsNoteAddedToCollectionFeedEventData_eventTime(ctx, field)
 	if err != nil {
@@ -14427,6 +15125,8 @@ func (ec *executionContext) fieldContext_CollectorsNoteAddedToCollectionFeedEven
 				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
 			case "sharedCommunities":
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -14696,6 +15396,8 @@ func (ec *executionContext) fieldContext_CollectorsNoteAddedToTokenFeedEventData
 				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
 			case "sharedCommunities":
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -15141,6 +15843,8 @@ func (ec *executionContext) fieldContext_Comment_commenter(ctx context.Context, 
 				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
 			case "sharedCommunities":
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -15820,6 +16524,47 @@ func (ec *executionContext) fieldContext_Community_creatorAddress(ctx context.Co
 	return fc, nil
 }
 
+func (ec *executionContext) _Community_creator(ctx context.Context, field graphql.CollectedField, obj *model.Community) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Community_creator(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Community().Creator(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.GalleryUserOrAddress)
+	fc.Result = res
+	return ec.marshalOGalleryUserOrAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUserOrAddress(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Community_creator(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Community",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type GalleryUserOrAddress does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Community_chain(ctx context.Context, field graphql.CollectedField, obj *model.Community) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Community_chain(ctx, field)
 	if err != nil {
@@ -16107,6 +16852,109 @@ func (ec *executionContext) fieldContext_Community_badgeURL(ctx context.Context,
 	return fc, nil
 }
 
+func (ec *executionContext) _Community_parentCommunity(ctx context.Context, field graphql.CollectedField, obj *model.Community) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Community_parentCommunity(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Community().ParentCommunity(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.CommunityLink)
+	fc.Result = res
+	return ec.marshalOCommunityLink2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunityLink(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Community_parentCommunity(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Community",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "node":
+				return ec.fieldContext_CommunityLink_node(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type CommunityLink", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Community_subCommunities(ctx context.Context, field graphql.CollectedField, obj *model.Community) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Community_subCommunities(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Community().SubCommunities(rctx, obj, fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.CommunitiesConnection)
+	fc.Result = res
+	return ec.marshalOCommunitiesConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunitiesConnection(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Community_subCommunities(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Community",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "edges":
+				return ec.fieldContext_CommunitiesConnection_edges(ctx, field)
+			case "pageInfo":
+				return ec.fieldContext_CommunitiesConnection_pageInfo(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type CommunitiesConnection", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Community_subCommunities_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Community_tokensInCommunity(ctx context.Context, field graphql.CollectedField, obj *model.Community) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Community_tokensInCommunity(ctx, field)
 	if err != nil {
@@ -16271,6 +17119,8 @@ func (ec *executionContext) fieldContext_CommunityEdge_node(ctx context.Context,
 				return ec.fieldContext_Community_contractAddress(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Community_creatorAddress(ctx, field)
+			case "creator":
+				return ec.fieldContext_Community_creator(ctx, field)
 			case "chain":
 				return ec.fieldContext_Community_chain(ctx, field)
 			case "name":
@@ -16285,6 +17135,10 @@ func (ec *executionContext) fieldContext_CommunityEdge_node(ctx context.Context,
 				return ec.fieldContext_Community_profileBannerURL(ctx, field)
 			case "badgeURL":
 				return ec.fieldContext_Community_badgeURL(ctx, field)
+			case "parentCommunity":
+				return ec.fieldContext_Community_parentCommunity(ctx, field)
+			case "subCommunities":
+				return ec.fieldContext_Community_subCommunities(ctx, field)
 			case "tokensInCommunity":
 				return ec.fieldContext_Community_tokensInCommunity(ctx, field)
 			case "owners":
@@ -16332,6 +17186,85 @@ func (ec *executionContext) fieldContext_CommunityEdge_cursor(ctx context.Contex
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CommunityLink_node(ctx context.Context, field graphql.CollectedField, obj *model.CommunityLink) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CommunityLink_node(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Node, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Community)
+	fc.Result = res
+	return ec.marshalOCommunity2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunity(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CommunityLink_node(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CommunityLink",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "dbid":
+				return ec.fieldContext_Community_dbid(ctx, field)
+			case "id":
+				return ec.fieldContext_Community_id(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Community_lastUpdated(ctx, field)
+			case "contract":
+				return ec.fieldContext_Community_contract(ctx, field)
+			case "contractAddress":
+				return ec.fieldContext_Community_contractAddress(ctx, field)
+			case "creatorAddress":
+				return ec.fieldContext_Community_creatorAddress(ctx, field)
+			case "creator":
+				return ec.fieldContext_Community_creator(ctx, field)
+			case "chain":
+				return ec.fieldContext_Community_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Community_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Community_description(ctx, field)
+			case "previewImage":
+				return ec.fieldContext_Community_previewImage(ctx, field)
+			case "profileImageURL":
+				return ec.fieldContext_Community_profileImageURL(ctx, field)
+			case "profileBannerURL":
+				return ec.fieldContext_Community_profileBannerURL(ctx, field)
+			case "badgeURL":
+				return ec.fieldContext_Community_badgeURL(ctx, field)
+			case "parentCommunity":
+				return ec.fieldContext_Community_parentCommunity(ctx, field)
+			case "subCommunities":
+				return ec.fieldContext_Community_subCommunities(ctx, field)
+			case "tokensInCommunity":
+				return ec.fieldContext_Community_tokensInCommunity(ctx, field)
+			case "owners":
+				return ec.fieldContext_Community_owners(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
 		},
 	}
 	return fc, nil
@@ -16385,6 +17318,8 @@ func (ec *executionContext) fieldContext_CommunitySearchResult_community(ctx con
 				return ec.fieldContext_Community_contractAddress(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Community_creatorAddress(ctx, field)
+			case "creator":
+				return ec.fieldContext_Community_creator(ctx, field)
 			case "chain":
 				return ec.fieldContext_Community_chain(ctx, field)
 			case "name":
@@ -16399,6 +17334,10 @@ func (ec *executionContext) fieldContext_CommunitySearchResult_community(ctx con
 				return ec.fieldContext_Community_profileBannerURL(ctx, field)
 			case "badgeURL":
 				return ec.fieldContext_Community_badgeURL(ctx, field)
+			case "parentCommunity":
+				return ec.fieldContext_Community_parentCommunity(ctx, field)
+			case "subCommunities":
+				return ec.fieldContext_Community_subCommunities(ctx, field)
 			case "tokensInCommunity":
 				return ec.fieldContext_Community_tokensInCommunity(ctx, field)
 			case "owners":
@@ -20506,6 +21445,8 @@ func (ec *executionContext) fieldContext_FollowInfo_user(ctx context.Context, fi
 				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
 			case "sharedCommunities":
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -20695,6 +21636,8 @@ func (ec *executionContext) fieldContext_FollowUserPayload_user(ctx context.Cont
 				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
 			case "sharedCommunities":
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -21428,6 +22371,8 @@ func (ec *executionContext) fieldContext_Gallery_owner(ctx context.Context, fiel
 				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
 			case "sharedCommunities":
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -21615,6 +22560,8 @@ func (ec *executionContext) fieldContext_GalleryInfoUpdatedFeedEventData_owner(c
 				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
 			case "sharedCommunities":
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -21925,6 +22872,8 @@ func (ec *executionContext) fieldContext_GalleryUpdatedFeedEventData_owner(ctx c
 				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
 			case "sharedCommunities":
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -22509,7 +23458,7 @@ func (ec *executionContext) _GalleryUser_tokens(ctx context.Context, field graph
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.GalleryUser().Tokens(rctx, obj)
+		return ec.resolvers.GalleryUser().Tokens(rctx, obj, fc.Args["ownershipFilter"].([]persist.TokenOwnershipType))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -22561,10 +23510,16 @@ func (ec *executionContext) fieldContext_GalleryUser_tokens(ctx context.Context,
 				return ec.fieldContext_Token_ownedByWallets(ctx, field)
 			case "ownershipHistory":
 				return ec.fieldContext_Token_ownershipHistory(ctx, field)
+			case "ownerIsHolder":
+				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
+			case "ownerIsCreator":
+				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
 				return ec.fieldContext_Token_contract(ctx, field)
+			case "community":
+				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
 			case "blockNumber":
@@ -22582,6 +23537,17 @@ func (ec *executionContext) fieldContext_GalleryUser_tokens(ctx context.Context,
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Token", field.Name)
 		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_GalleryUser_tokens_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
 	}
 	return fc, nil
 }
@@ -23044,6 +24010,8 @@ func (ec *executionContext) fieldContext_GalleryUser_followers(ctx context.Conte
 				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
 			case "sharedCommunities":
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -23129,6 +24097,8 @@ func (ec *executionContext) fieldContext_GalleryUser_following(ctx context.Conte
 				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
 			case "sharedCommunities":
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -23344,6 +24314,64 @@ func (ec *executionContext) fieldContext_GalleryUser_sharedCommunities(ctx conte
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_GalleryUser_sharedCommunities_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GalleryUser_createdCommunities(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.GalleryUser().CreatedCommunities(rctx, obj, fc.Args["input"].(model.CreatedCommunitiesInput), fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.CommunitiesConnection)
+	fc.Result = res
+	return ec.marshalOCommunitiesConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunitiesConnection(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_GalleryUser_createdCommunities(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GalleryUser",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "edges":
+				return ec.fieldContext_CommunitiesConnection_edges(ctx, field)
+			case "pageInfo":
+				return ec.fieldContext_CommunitiesConnection_pageInfo(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type CommunitiesConnection", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_GalleryUser_createdCommunities_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return
 	}
@@ -23750,6 +24778,8 @@ func (ec *executionContext) fieldContext_GroupNotificationUserEdge_node(ctx cont
 				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
 			case "sharedCommunities":
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -27093,6 +28123,78 @@ func (ec *executionContext) fieldContext_Mutation_syncTokens(ctx context.Context
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_syncCreatedTokens(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_syncCreatedTokens(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().SyncCreatedTokens(rctx, fc.Args["input"].(model.SyncCreatedTokensInput))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.SyncCreatedTokensPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.SyncCreatedTokensPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.SyncCreatedTokensPayloadOrError)
+	fc.Result = res
+	return ec.marshalOSyncCreatedTokensPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSyncCreatedTokensPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_syncCreatedTokens(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type SyncCreatedTokensPayloadOrError does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_syncCreatedTokens_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_refreshToken(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Mutation_refreshToken(ctx, field)
 	if err != nil {
@@ -29925,6 +31027,78 @@ func (ec *executionContext) fieldContext_Mutation_mintPremiumCardToWallet(ctx co
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_setCommunityOverrideCreator(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_setCommunityOverrideCreator(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().SetCommunityOverrideCreator(rctx, fc.Args["communityID"].(persist.DBID), fc.Args["creatorUserID"].(*persist.DBID))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.RetoolAuth == nil {
+				return nil, errors.New("directive retoolAuth is not implemented")
+			}
+			return ec.directives.RetoolAuth(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.SetCommunityOverrideCreatorPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.SetCommunityOverrideCreatorPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.SetCommunityOverrideCreatorPayloadOrError)
+	fc.Result = res
+	return ec.marshalOSetCommunityOverrideCreatorPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSetCommunityOverrideCreatorPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_setCommunityOverrideCreator(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type SetCommunityOverrideCreatorPayloadOrError does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_setCommunityOverrideCreator_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_uploadPersistedQueries(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Mutation_uploadPersistedQueries(ctx, field)
 	if err != nil {
@@ -32128,6 +33302,8 @@ func (ec *executionContext) fieldContext_Query_usersWithTrait(ctx context.Contex
 				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
 			case "sharedCommunities":
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -32597,6 +33773,8 @@ func (ec *executionContext) fieldContext_Query_galleryOfTheWeekWinners(ctx conte
 				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
 			case "sharedCommunities":
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -33353,6 +34531,64 @@ func (ec *executionContext) fieldContext_Query_socialQueries(ctx context.Context
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_topCollectionsForCommunity(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_topCollectionsForCommunity(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().TopCollectionsForCommunity(rctx, fc.Args["input"].(model.TopCollectionsForCommunityInput), fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.CollectionsConnection)
+	fc.Result = res
+	return ec.marshalOCollectionsConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionsConnection(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_topCollectionsForCommunity(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "edges":
+				return ec.fieldContext_CollectionsConnection_edges(ctx, field)
+			case "pageInfo":
+				return ec.fieldContext_CollectionsConnection_pageInfo(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type CollectionsConnection", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_topCollectionsForCommunity_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query__entities(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Query__entities(ctx, field)
 	if err != nil {
@@ -33830,10 +35066,16 @@ func (ec *executionContext) fieldContext_RefreshTokenPayload_token(ctx context.C
 				return ec.fieldContext_Token_ownedByWallets(ctx, field)
 			case "ownershipHistory":
 				return ec.fieldContext_Token_ownershipHistory(ctx, field)
+			case "ownerIsHolder":
+				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
+			case "ownerIsCreator":
+				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
 				return ec.fieldContext_Token_contract(ctx, field)
+			case "community":
+				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
 			case "blockNumber":
@@ -34468,6 +35710,93 @@ func (ec *executionContext) fieldContext_SearchUsersPayload_results(ctx context.
 	return fc, nil
 }
 
+func (ec *executionContext) _SetCommunityOverrideCreatorPayload_user(ctx context.Context, field graphql.CollectedField, obj *model.SetCommunityOverrideCreatorPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SetCommunityOverrideCreatorPayload_user(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.User, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.GalleryUser)
+	fc.Result = res
+	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SetCommunityOverrideCreatorPayload_user(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SetCommunityOverrideCreatorPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_GalleryUser_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_GalleryUser_dbid(ctx, field)
+			case "username":
+				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "bio":
+				return ec.fieldContext_GalleryUser_bio(ctx, field)
+			case "traits":
+				return ec.fieldContext_GalleryUser_traits(ctx, field)
+			case "universal":
+				return ec.fieldContext_GalleryUser_universal(ctx, field)
+			case "roles":
+				return ec.fieldContext_GalleryUser_roles(ctx, field)
+			case "socialAccounts":
+				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
+			case "tokens":
+				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensByChain":
+				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
+			case "wallets":
+				return ec.fieldContext_GalleryUser_wallets(ctx, field)
+			case "primaryWallet":
+				return ec.fieldContext_GalleryUser_primaryWallet(ctx, field)
+			case "featuredGallery":
+				return ec.fieldContext_GalleryUser_featuredGallery(ctx, field)
+			case "galleries":
+				return ec.fieldContext_GalleryUser_galleries(ctx, field)
+			case "badges":
+				return ec.fieldContext_GalleryUser_badges(ctx, field)
+			case "isAuthenticatedUser":
+				return ec.fieldContext_GalleryUser_isAuthenticatedUser(ctx, field)
+			case "followers":
+				return ec.fieldContext_GalleryUser_followers(ctx, field)
+			case "following":
+				return ec.fieldContext_GalleryUser_following(ctx, field)
+			case "feed":
+				return ec.fieldContext_GalleryUser_feed(ctx, field)
+			case "sharedFollowers":
+				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
+			case "sharedCommunities":
+				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _SetSpamPreferencePayload_tokens(ctx context.Context, field graphql.CollectedField, obj *model.SetSpamPreferencePayload) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_SetSpamPreferencePayload_tokens(ctx, field)
 	if err != nil {
@@ -34534,10 +35863,16 @@ func (ec *executionContext) fieldContext_SetSpamPreferencePayload_tokens(ctx con
 				return ec.fieldContext_Token_ownedByWallets(ctx, field)
 			case "ownershipHistory":
 				return ec.fieldContext_Token_ownershipHistory(ctx, field)
+			case "ownerIsHolder":
+				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
+			case "ownerIsCreator":
+				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
 				return ec.fieldContext_Token_contract(ctx, field)
+			case "community":
+				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
 			case "blockNumber":
@@ -34736,6 +36071,8 @@ func (ec *executionContext) fieldContext_SocialConnection_galleryUser(ctx contex
 				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
 			case "sharedCommunities":
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -37114,6 +38451,69 @@ func (ec *executionContext) fieldContext_Subscription_notificationUpdated(ctx co
 	return fc, nil
 }
 
+func (ec *executionContext) _SyncCreatedTokensPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.SyncCreatedTokensPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SyncCreatedTokensPayload_viewer(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Viewer, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Viewer)
+	fc.Result = res
+	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SyncCreatedTokensPayload_viewer(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SyncCreatedTokensPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Viewer_id(ctx, field)
+			case "user":
+				return ec.fieldContext_Viewer_user(ctx, field)
+			case "socialAccounts":
+				return ec.fieldContext_Viewer_socialAccounts(ctx, field)
+			case "viewerGalleries":
+				return ec.fieldContext_Viewer_viewerGalleries(ctx, field)
+			case "feed":
+				return ec.fieldContext_Viewer_feed(ctx, field)
+			case "email":
+				return ec.fieldContext_Viewer_email(ctx, field)
+			case "notifications":
+				return ec.fieldContext_Viewer_notifications(ctx, field)
+			case "notificationSettings":
+				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
+			case "userExperiences":
+				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _SyncTokensForUsernamePayload_message(ctx context.Context, field graphql.CollectedField, obj *model.SyncTokensForUsernamePayload) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_SyncTokensForUsernamePayload_message(ctx, field)
 	if err != nil {
@@ -38353,6 +39753,8 @@ func (ec *executionContext) fieldContext_Token_owner(ctx context.Context, field 
 				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
 			case "sharedCommunities":
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -38462,6 +39864,88 @@ func (ec *executionContext) fieldContext_Token_ownershipHistory(ctx context.Cont
 	return fc, nil
 }
 
+func (ec *executionContext) _Token_ownerIsHolder(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Token_ownerIsHolder(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Token().OwnerIsHolder(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Token_ownerIsHolder(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Token_ownerIsCreator(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Token_ownerIsCreator(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Token().OwnerIsCreator(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Token_ownerIsCreator(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Token_tokenMetadata(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Token_tokenMetadata(ctx, field)
 	if err != nil {
@@ -38563,6 +40047,85 @@ func (ec *executionContext) fieldContext_Token_contract(ctx context.Context, fie
 				return ec.fieldContext_Contract_isSpam(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Contract", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Token_community(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Token_community(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Token().Community(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Community)
+	fc.Result = res
+	return ec.marshalOCommunity2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunity(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Token_community(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "dbid":
+				return ec.fieldContext_Community_dbid(ctx, field)
+			case "id":
+				return ec.fieldContext_Community_id(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Community_lastUpdated(ctx, field)
+			case "contract":
+				return ec.fieldContext_Community_contract(ctx, field)
+			case "contractAddress":
+				return ec.fieldContext_Community_contractAddress(ctx, field)
+			case "creatorAddress":
+				return ec.fieldContext_Community_creatorAddress(ctx, field)
+			case "creator":
+				return ec.fieldContext_Community_creator(ctx, field)
+			case "chain":
+				return ec.fieldContext_Community_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Community_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Community_description(ctx, field)
+			case "previewImage":
+				return ec.fieldContext_Community_previewImage(ctx, field)
+			case "profileImageURL":
+				return ec.fieldContext_Community_profileImageURL(ctx, field)
+			case "profileBannerURL":
+				return ec.fieldContext_Community_profileBannerURL(ctx, field)
+			case "badgeURL":
+				return ec.fieldContext_Community_badgeURL(ctx, field)
+			case "parentCommunity":
+				return ec.fieldContext_Community_parentCommunity(ctx, field)
+			case "subCommunities":
+				return ec.fieldContext_Community_subCommunities(ctx, field)
+			case "tokensInCommunity":
+				return ec.fieldContext_Community_tokensInCommunity(ctx, field)
+			case "owners":
+				return ec.fieldContext_Community_owners(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
 		},
 	}
 	return fc, nil
@@ -38927,10 +40490,16 @@ func (ec *executionContext) fieldContext_TokenEdge_node(ctx context.Context, fie
 				return ec.fieldContext_Token_ownedByWallets(ctx, field)
 			case "ownershipHistory":
 				return ec.fieldContext_Token_ownershipHistory(ctx, field)
+			case "ownerIsHolder":
+				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
+			case "ownerIsCreator":
+				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
 				return ec.fieldContext_Token_contract(ctx, field)
+			case "community":
+				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
 			case "blockNumber":
@@ -39167,6 +40736,8 @@ func (ec *executionContext) fieldContext_TokenHolder_user(ctx context.Context, f
 				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
 			case "sharedCommunities":
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -39188,7 +40759,7 @@ func (ec *executionContext) _TokenHolder_previewTokens(ctx context.Context, fiel
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.PreviewTokens, nil
+		return ec.resolvers.TokenHolder().PreviewTokens(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -39206,8 +40777,8 @@ func (ec *executionContext) fieldContext_TokenHolder_previewTokens(ctx context.C
 	fc = &graphql.FieldContext{
 		Object:     "TokenHolder",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
 		},
@@ -39531,6 +41102,8 @@ func (ec *executionContext) fieldContext_TokensAddedToCollectionFeedEventData_ow
 				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
 			case "sharedCommunities":
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -39915,6 +41488,8 @@ func (ec *executionContext) fieldContext_TrendingUsersPayload_users(ctx context.
 				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
 			case "sharedCommunities":
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -40264,6 +41839,8 @@ func (ec *executionContext) fieldContext_UnbanUserFromFeedPayload_user(ctx conte
 				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
 			case "sharedCommunities":
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -40412,6 +41989,8 @@ func (ec *executionContext) fieldContext_UnfollowUserPayload_user(ctx context.Co
 				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
 			case "sharedCommunities":
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -41755,10 +43334,16 @@ func (ec *executionContext) fieldContext_UpdateTokenInfoPayload_token(ctx contex
 				return ec.fieldContext_Token_ownedByWallets(ctx, field)
 			case "ownershipHistory":
 				return ec.fieldContext_Token_ownershipHistory(ctx, field)
+			case "ownerIsHolder":
+				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
+			case "ownerIsCreator":
+				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
 				return ec.fieldContext_Token_contract(ctx, field)
+			case "community":
+				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
 			case "blockNumber":
@@ -42066,6 +43651,8 @@ func (ec *executionContext) fieldContext_UserCreatedFeedEventData_owner(ctx cont
 				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
 			case "sharedCommunities":
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -42192,6 +43779,8 @@ func (ec *executionContext) fieldContext_UserEdge_node(ctx context.Context, fiel
 				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
 			case "sharedCommunities":
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -42576,6 +44165,8 @@ func (ec *executionContext) fieldContext_UserFollowedUsersFeedEventData_owner(ct
 				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
 			case "sharedCommunities":
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -42749,6 +44340,8 @@ func (ec *executionContext) fieldContext_UserSearchResult_user(ctx context.Conte
 				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
 			case "sharedCommunities":
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -43584,6 +45177,8 @@ func (ec *executionContext) fieldContext_Viewer_user(ctx context.Context, field 
 				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
 			case "sharedCommunities":
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -44348,10 +45943,16 @@ func (ec *executionContext) fieldContext_Wallet_tokens(ctx context.Context, fiel
 				return ec.fieldContext_Token_ownedByWallets(ctx, field)
 			case "ownershipHistory":
 				return ec.fieldContext_Token_ownershipHistory(ctx, field)
+			case "ownerIsHolder":
+				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
+			case "ownerIsCreator":
+				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
 				return ec.fieldContext_Token_contract(ctx, field)
+			case "community":
+				return ec.fieldContext_Token_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_Token_externalUrl(ctx, field)
 			case "blockNumber":
@@ -46805,6 +48406,35 @@ func (ec *executionContext) unmarshalInputCreateUserInput(ctx context.Context, o
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputCreatedCommunitiesInput(ctx context.Context, obj interface{}) (model.CreatedCommunitiesInput, error) {
+	var it model.CreatedCommunitiesInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"includeChains"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "includeChains":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("includeChains"))
+			data, err := ec.unmarshalOChain2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.IncludeChains = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputDebugAuth(ctx context.Context, obj interface{}) (model.DebugAuth, error) {
 	var it model.DebugAuth
 	asMap := map[string]interface{}{}
@@ -47605,6 +49235,35 @@ func (ec *executionContext) unmarshalInputSocialAuthMechanism(ctx context.Contex
 				err := fmt.Errorf(`unexpected type %T from directive, should be *github.com/mikeydub/go-gallery/graphql/model.DebugSocialAuth`, tmp)
 				return it, graphql.ErrorOnPath(ctx, err)
 			}
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputSyncCreatedTokensInput(ctx context.Context, obj interface{}) (model.SyncCreatedTokensInput, error) {
+	var it model.SyncCreatedTokensInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"includeChains"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "includeChains":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("includeChains"))
+			data, err := ec.unmarshalOChain2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.IncludeChains = data
 		}
 	}
 
@@ -48502,6 +50161,35 @@ func (ec *executionContext) unmarshalInputVerifyEmailMagicLinkInput(ctx context.
 				return it, err
 			}
 			it.Email = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputtopCollectionsForCommunityInput(ctx context.Context, obj interface{}) (model.TopCollectionsForCommunityInput, error) {
+	var it model.TopCollectionsForCommunityInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"chainAddress"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "chainAddress":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chainAddress"))
+			data, err := ec.unmarshalNChainAddressInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ChainAddress = data
 		}
 	}
 
@@ -50605,6 +52293,29 @@ func (ec *executionContext) _SearchUsersPayloadOrError(ctx context.Context, sel 
 	}
 }
 
+func (ec *executionContext) _SetCommunityOverrideCreatorPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.SetCommunityOverrideCreatorPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.SetCommunityOverrideCreatorPayload:
+		return ec._SetCommunityOverrideCreatorPayload(ctx, sel, &obj)
+	case *model.SetCommunityOverrideCreatorPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SetCommunityOverrideCreatorPayload(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _SetSpamPreferencePayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.SetSpamPreferencePayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -50692,6 +52403,36 @@ func (ec *executionContext) _SocialQueriesOrError(ctx context.Context, sel ast.S
 			return graphql.Null
 		}
 		return ec._ErrNeedsToReconnectSocial(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _SyncCreatedTokensPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.SyncCreatedTokensPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.SyncCreatedTokensPayload:
+		return ec._SyncCreatedTokensPayload(ctx, sel, &obj)
+	case *model.SyncCreatedTokensPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SyncCreatedTokensPayload(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
+	case model.ErrSyncFailed:
+		return ec._ErrSyncFailed(ctx, sel, &obj)
+	case *model.ErrSyncFailed:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrSyncFailed(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -52233,6 +53974,35 @@ func (ec *executionContext) _CollectionCreatedFeedEventData(ctx context.Context,
 	return out
 }
 
+var collectionEdgeImplementors = []string{"CollectionEdge"}
+
+func (ec *executionContext) _CollectionEdge(ctx context.Context, sel ast.SelectionSet, obj *model.CollectionEdge) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, collectionEdgeImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CollectionEdge")
+		case "node":
+
+			out.Values[i] = ec._CollectionEdge_node(ctx, field, obj)
+
+		case "cursor":
+
+			out.Values[i] = ec._CollectionEdge_cursor(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var collectionLayoutImplementors = []string{"CollectionLayout"}
 
 func (ec *executionContext) _CollectionLayout(ctx context.Context, sel ast.SelectionSet, obj *model.CollectionLayout) graphql.Marshaler {
@@ -52468,6 +54238,38 @@ func (ec *executionContext) _CollectionUpdatedFeedEventData(ctx context.Context,
 				return innerFunc(ctx)
 
 			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var collectionsConnectionImplementors = []string{"CollectionsConnection"}
+
+func (ec *executionContext) _CollectionsConnection(ctx context.Context, sel ast.SelectionSet, obj *model.CollectionsConnection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, collectionsConnectionImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CollectionsConnection")
+		case "edges":
+
+			out.Values[i] = ec._CollectionsConnection_edges(ctx, field, obj)
+
+		case "pageInfo":
+
+			out.Values[i] = ec._CollectionsConnection_pageInfo(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -52842,6 +54644,23 @@ func (ec *executionContext) _Community(ctx context.Context, sel ast.SelectionSet
 
 			out.Values[i] = ec._Community_creatorAddress(ctx, field, obj)
 
+		case "creator":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Community_creator(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "chain":
 
 			out.Values[i] = ec._Community_chain(ctx, field, obj)
@@ -52870,6 +54689,40 @@ func (ec *executionContext) _Community(ctx context.Context, sel ast.SelectionSet
 
 			out.Values[i] = ec._Community_badgeURL(ctx, field, obj)
 
+		case "parentCommunity":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Community_parentCommunity(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "subCommunities":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Community_subCommunities(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "tokensInCommunity":
 			field := field
 
@@ -52932,6 +54785,31 @@ func (ec *executionContext) _CommunityEdge(ctx context.Context, sel ast.Selectio
 		case "cursor":
 
 			out.Values[i] = ec._CommunityEdge_cursor(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var communityLinkImplementors = []string{"CommunityLink"}
+
+func (ec *executionContext) _CommunityLink(ctx context.Context, sel ast.SelectionSet, obj *model.CommunityLink) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, communityLinkImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CommunityLink")
+		case "node":
+
+			out.Values[i] = ec._CommunityLink_node(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -53776,7 +55654,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "SocialQueriesOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "SyncTokensPayloadOrError", "Error", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "UnbanUserFromFeedPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "GenerateQRCodeLoginTokenPayloadOrError"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "SocialQueriesOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "SyncTokensPayloadOrError", "SyncCreatedTokensPayloadOrError", "Error", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "UnbanUserFromFeedPayloadOrError", "SetCommunityOverrideCreatorPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "GenerateQRCodeLoginTokenPayloadOrError"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
@@ -53867,7 +55745,7 @@ func (ec *executionContext) _ErrSessionInvalidated(ctx context.Context, sel ast.
 	return out
 }
 
-var errSyncFailedImplementors = []string{"ErrSyncFailed", "SyncTokensPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "SyncTokensForUsernamePayloadOrError"}
+var errSyncFailedImplementors = []string{"ErrSyncFailed", "SyncTokensPayloadOrError", "SyncCreatedTokensPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "SyncTokensForUsernamePayloadOrError"}
 
 func (ec *executionContext) _ErrSyncFailed(ctx context.Context, sel ast.SelectionSet, obj *model.ErrSyncFailed) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errSyncFailedImplementors)
@@ -55170,6 +57048,23 @@ func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionS
 				return innerFunc(ctx)
 
 			})
+		case "createdCommunities":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._GalleryUser_createdCommunities(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -55900,6 +57795,12 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 				return ec._Mutation_syncTokens(ctx, field)
 			})
 
+		case "syncCreatedTokens":
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_syncCreatedTokens(ctx, field)
+			})
+
 		case "refreshToken":
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
@@ -56156,6 +58057,12 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_mintPremiumCardToWallet(ctx, field)
+			})
+
+		case "setCommunityOverrideCreator":
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_setCommunityOverrideCreator(ctx, field)
 			})
 
 		case "uploadPersistedQueries":
@@ -57130,6 +59037,26 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			out.Concurrently(i, func() graphql.Marshaler {
 				return rrm(innerCtx)
 			})
+		case "topCollectionsForCommunity":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_topCollectionsForCommunity(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return rrm(innerCtx)
+			})
 		case "_entities":
 			field := field
 
@@ -57525,6 +59452,31 @@ func (ec *executionContext) _SearchUsersPayload(ctx context.Context, sel ast.Sel
 		case "results":
 
 			out.Values[i] = ec._SearchUsersPayload_results(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var setCommunityOverrideCreatorPayloadImplementors = []string{"SetCommunityOverrideCreatorPayload", "SetCommunityOverrideCreatorPayloadOrError"}
+
+func (ec *executionContext) _SetCommunityOverrideCreatorPayload(ctx context.Context, sel ast.SelectionSet, obj *model.SetCommunityOverrideCreatorPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, setCommunityOverrideCreatorPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SetCommunityOverrideCreatorPayload")
+		case "user":
+
+			out.Values[i] = ec._SetCommunityOverrideCreatorPayload_user(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -58199,6 +60151,31 @@ func (ec *executionContext) _Subscription(ctx context.Context, sel ast.Selection
 	}
 }
 
+var syncCreatedTokensPayloadImplementors = []string{"SyncCreatedTokensPayload", "SyncCreatedTokensPayloadOrError"}
+
+func (ec *executionContext) _SyncCreatedTokensPayload(ctx context.Context, sel ast.SelectionSet, obj *model.SyncCreatedTokensPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, syncCreatedTokensPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SyncCreatedTokensPayload")
+		case "viewer":
+
+			out.Values[i] = ec._SyncCreatedTokensPayload_viewer(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var syncTokensForUsernamePayloadImplementors = []string{"SyncTokensForUsernamePayload", "SyncTokensForUsernamePayloadOrError"}
 
 func (ec *executionContext) _SyncTokensForUsernamePayload(ctx context.Context, sel ast.SelectionSet, obj *model.SyncTokensForUsernamePayload) graphql.Marshaler {
@@ -58457,6 +60434,40 @@ func (ec *executionContext) _Token(ctx context.Context, sel ast.SelectionSet, ob
 
 			out.Values[i] = ec._Token_ownershipHistory(ctx, field, obj)
 
+		case "ownerIsHolder":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Token_ownerIsHolder(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "ownerIsCreator":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Token_ownerIsCreator(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "tokenMetadata":
 
 			out.Values[i] = ec._Token_tokenMetadata(ctx, field, obj)
@@ -58471,6 +60482,23 @@ func (ec *executionContext) _Token(ctx context.Context, sel ast.SelectionSet, ob
 					}
 				}()
 				res = ec._Token_contract(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "community":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Token_community(ctx, field, obj)
 				return res
 			}
 
@@ -58595,9 +60623,22 @@ func (ec *executionContext) _TokenHolder(ctx context.Context, sel ast.SelectionS
 
 			})
 		case "previewTokens":
+			field := field
 
-			out.Values[i] = ec._TokenHolder_previewTokens(ctx, field, obj)
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._TokenHolder_previewTokens(ctx, field, obj)
+				return res
+			}
 
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -60725,6 +62766,11 @@ func (ec *executionContext) unmarshalNCreateUserInput2githubᚗcomᚋmikeydubᚋ
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalNCreatedCommunitiesInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCreatedCommunitiesInput(ctx context.Context, v interface{}) (model.CreatedCommunitiesInput, error) {
+	res, err := ec.unmarshalInputCreatedCommunitiesInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx context.Context, v interface{}) (persist.DBID, error) {
 	tmp, err := graphql.UnmarshalString(v)
 	res := persist.DBID(tmp)
@@ -61095,6 +63141,21 @@ func (ec *executionContext) marshalNString2ᚕstringᚄ(ctx context.Context, sel
 	}
 
 	return ret
+}
+
+func (ec *executionContext) unmarshalNSyncCreatedTokensInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSyncCreatedTokensInput(ctx context.Context, v interface{}) (model.SyncCreatedTokensInput, error) {
+	res, err := ec.unmarshalInputSyncCreatedTokensInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNTokenOwnershipType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenOwnershipType(ctx context.Context, v interface{}) (persist.TokenOwnershipType, error) {
+	var res persist.TokenOwnershipType
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNTokenOwnershipType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenOwnershipType(ctx context.Context, sel ast.SelectionSet, v persist.TokenOwnershipType) graphql.Marshaler {
+	return v
 }
 
 func (ec *executionContext) unmarshalNTrendingUsersInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTrendingUsersInput(ctx context.Context, v interface{}) (model.TrendingUsersInput, error) {
@@ -61590,6 +63651,11 @@ func (ec *executionContext) marshalN__TypeKind2string(ctx context.Context, sel a
 	return res
 }
 
+func (ec *executionContext) unmarshalNtopCollectionsForCommunityInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTopCollectionsForCommunityInput(ctx context.Context, v interface{}) (model.TopCollectionsForCommunityInput, error) {
+	res, err := ec.unmarshalInputtopCollectionsForCommunityInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalOAction2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAction(ctx context.Context, v interface{}) (*persist.Action, error) {
 	if v == nil {
 		return nil, nil
@@ -62049,6 +64115,54 @@ func (ec *executionContext) marshalOCollectionByIdOrError2ᚕgithubᚗcomᚋmike
 	return ret
 }
 
+func (ec *executionContext) marshalOCollectionEdge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionEdge(ctx context.Context, sel ast.SelectionSet, v []*model.CollectionEdge) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalOCollectionEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionEdge(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	return ret
+}
+
+func (ec *executionContext) marshalOCollectionEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionEdge(ctx context.Context, sel ast.SelectionSet, v *model.CollectionEdge) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._CollectionEdge(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOCollectionLayout2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionLayout(ctx context.Context, sel ast.SelectionSet, v *model.CollectionLayout) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -62166,6 +64280,13 @@ func (ec *executionContext) marshalOCollectionTokenSettings2ᚖgithubᚗcomᚋmi
 	return ec._CollectionTokenSettings(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalOCollectionsConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionsConnection(ctx context.Context, sel ast.SelectionSet, v *model.CollectionsConnection) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._CollectionsConnection(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOComment2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐComment(ctx context.Context, sel ast.SelectionSet, v *model.Comment) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -62247,6 +64368,13 @@ func (ec *executionContext) marshalOCommunityEdge2ᚖgithubᚗcomᚋmikeydubᚋg
 		return graphql.Null
 	}
 	return ec._CommunityEdge(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOCommunityLink2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunityLink(ctx context.Context, sel ast.SelectionSet, v *model.CommunityLink) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._CommunityLink(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOCommunitySearchResult2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunitySearchResultᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.CommunitySearchResult) graphql.Marshaler {
@@ -63859,6 +65987,13 @@ func (ec *executionContext) marshalOSearchUsersPayloadOrError2githubᚗcomᚋmik
 	return ec._SearchUsersPayloadOrError(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalOSetCommunityOverrideCreatorPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSetCommunityOverrideCreatorPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.SetCommunityOverrideCreatorPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._SetCommunityOverrideCreatorPayloadOrError(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOSetSpamPreferencePayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSetSpamPreferencePayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.SetSpamPreferencePayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -64036,6 +66171,13 @@ func (ec *executionContext) marshalOString2ᚖstring(ctx context.Context, sel as
 	}
 	res := graphql.MarshalString(*v)
 	return res
+}
+
+func (ec *executionContext) marshalOSyncCreatedTokensPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSyncCreatedTokensPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.SyncCreatedTokensPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._SyncCreatedTokensPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOSyncTokensForUsernamePayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSyncTokensForUsernamePayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.SyncTokensForUsernamePayloadOrError) graphql.Marshaler {
@@ -64272,6 +66414,73 @@ func (ec *executionContext) marshalOTokenHoldersConnection2ᚖgithubᚗcomᚋmik
 		return graphql.Null
 	}
 	return ec._TokenHoldersConnection(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOTokenOwnershipType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenOwnershipTypeᚄ(ctx context.Context, v interface{}) ([]persist.TokenOwnershipType, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var vSlice []interface{}
+	if v != nil {
+		vSlice = graphql.CoerceList(v)
+	}
+	var err error
+	res := make([]persist.TokenOwnershipType, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNTokenOwnershipType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenOwnershipType(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalOTokenOwnershipType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenOwnershipTypeᚄ(ctx context.Context, sel ast.SelectionSet, v []persist.TokenOwnershipType) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNTokenOwnershipType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenOwnershipType(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) unmarshalOTokenType2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenType(ctx context.Context, v interface{}) (*model.TokenType, error) {

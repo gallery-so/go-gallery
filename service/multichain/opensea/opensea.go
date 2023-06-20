@@ -41,6 +41,17 @@ var baseURL, _ = url.Parse("https://api.opensea.io/api/v1")
 
 var eip1271MagicValue = [4]byte{0x16, 0x26, 0xBA, 0x7E}
 
+var sharedStoreFrontAddresses = []persist.EthereumAddress{
+	"0x09200b963c52d3297a93af71f919e7829c53cf9a",
+	"0x37530eef6290a0be43d481e8feb5597c3a05f03e",
+	"0x495f947276749ce646f68ac8c248420045cb7b5e",
+	"0x4bea754665a141bf4837e743f8ca08507e8afb01",
+	"0x5e30b1d6f920364c847512e2528efdadf72a97a9",
+	"0x80fa4ab88378853d97e30a9f002b084b1a4efd00",
+	"0x8798093380deea4af4007b8e874643c61ea2dae8",
+	"0xfda7a5ecd561af6a17506a686ad0a648857dcc14",
+}
+
 type Provider struct {
 	httpClient *http.Client
 	ethClient  *ethclient.Client
@@ -121,8 +132,10 @@ type Order struct {
 // Collection is a collection from OpenSea
 type Collection struct {
 	Name                  string                  `json:"name"`
+	Description           string                  `json:"description"`
 	PayoutAddress         persist.EthereumAddress `json:"payout_address"`
 	PrimaryAssetContracts []Contract              `json:"primary_asset_contracts"`
+	Slug                  string                  `json:"slug"`
 }
 
 // Contract represents an NFT contract from Opensea
@@ -168,7 +181,7 @@ func (p *Provider) GetTokensByWalletAddress(ctx context.Context, address persist
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
-		streamAssetsForWallet(ctx, assetsChan, persist.EthereumAddress(address))
+		streamAssetsForWallet(ctx, persist.EthereumAddress(address), assetsChan)
 	}()
 
 	return assetsToTokens(ctx, address, assetsChan, p.ethClient)
@@ -179,7 +192,7 @@ func (p *Provider) GetTokensByContractAddress(ctx context.Context, address persi
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
-		streamAssetsForContract(ctx, assetsChan, persist.EthereumAddress(address))
+		streamAssetsForContract(ctx, persist.EthereumAddress(address), assetsChan)
 	}()
 	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient)
 	if err != nil {
@@ -197,7 +210,7 @@ func (p *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, owner
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
-		streamAssetsForContractAddressAndOwner(ctx, assetsChan, persist.EthereumAddress(owner), persist.EthereumAddress(address))
+		streamAssetsForContractAddressAndOwner(ctx, persist.EthereumAddress(owner), persist.EthereumAddress(address), assetsChan)
 	}()
 	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient)
 	if err != nil {
@@ -215,7 +228,7 @@ func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, ti multichai
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
-		streamAssetsForTokenIdentifiers(ctx, assetsChan, persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID.Base10String()))
+		streamAssetsForTokenIdentifiers(ctx, persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID.Base10String()), assetsChan)
 	}()
 	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient)
 	if err != nil {
@@ -232,7 +245,7 @@ func (p *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, ti m
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
-		streamAssetsForTokenIdentifiersAndOwner(ctx, assetsChan, persist.EthereumAddress(ownerAddress), persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID.Base10String()))
+		streamAssetsForTokenIdentifiersAndOwner(ctx, persist.EthereumAddress(ownerAddress), persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID.Base10String()), assetsChan)
 	}()
 	tokens, contracts, err := assetsToTokens(ctx, ownerAddress, assetsChan, p.ethClient)
 	if err != nil {
@@ -280,6 +293,18 @@ func (d *Provider) GetOwnedTokensByContract(context.Context, persist.Address, pe
 
 func (d *Provider) GetDisplayNameByAddress(ctx context.Context, addr persist.Address) string {
 	return addr.String()
+}
+
+func (p *Provider) IsOpenSea() {}
+
+// GetChildContractsCreatedOnSharedContract returns a tokens created by the address under the Shared Storefront contract
+func (p *Provider) GetChildContractsCreatedOnSharedContract(ctx context.Context, creatorAddress persist.Address) ([]multichain.ParentToChildEdge, error) {
+	assetsChan := make(chan assetsReceieved)
+	go func() {
+		defer close(assetsChan)
+		streamAssetsForSharedContract(ctx, persist.EthereumAddress(creatorAddress), assetsChan)
+	}()
+	return assetsByChildContract(ctx, assetsChan, p.ethClient, creatorAddress)
 }
 
 // VerifySignature will verify a signature using all available methods (eth_sign and personal_sign)
@@ -399,113 +424,48 @@ func verifySignature(pSignatureStr string,
 }
 
 func FetchAssetsForWallet(ctx context.Context, address persist.EthereumAddress) ([]Asset, error) {
-	url := baseURL.JoinPath("assets")
-	setPagingParams(url)
-	setOwner(url, address)
+	outCh := make(chan assetsReceieved)
 
-	req, err := authRequest(ctx, url.String())
-	if err != nil {
-		return nil, err
+	go func() {
+		defer close(outCh)
+		streamAssetsForWallet(ctx, address, outCh)
+	}()
+
+	assets := make([]Asset, 0)
+	for a := range outCh {
+		if a.err != nil {
+			return nil, a.err
+		}
+		assets = append(assets, a.assets...)
 	}
 
-	return paginateAssets(req)
-}
-
-func FetchAssetsForContract(ctx context.Context, address persist.EthereumAddress) ([]Asset, error) {
-	url := baseURL.JoinPath("assets")
-	setPagingParams(url)
-	setContractAddress(url, address)
-
-	req, err := authRequest(ctx, url.String())
-	if err != nil {
-		return nil, err
-	}
-
-	return paginateAssets(req)
-}
-
-func FetchAssetsForContractAddressAndOwner(ctx context.Context, ownerAddress, contractAddress persist.EthereumAddress) ([]Asset, error) {
-	url := baseURL.JoinPath("assets")
-	setPagingParams(url)
-	setOwner(url, ownerAddress)
-	setContractAddress(url, contractAddress)
-
-	req, err := authRequest(ctx, url.String())
-	if err != nil {
-		return nil, err
-	}
-
-	return paginateAssets(req)
+	return assets, nil
 }
 
 func FetchAssetsForTokenIdentifiers(ctx context.Context, contractAddress persist.EthereumAddress, tokenID TokenID) ([]Asset, error) {
-	url := baseURL.JoinPath("assets")
-	setPagingParams(url)
-	setContractAddress(url, contractAddress)
-	setTokenID(url, tokenID)
+	outCh := make(chan assetsReceieved)
 
-	req, err := authRequest(ctx, url.String())
-	if err != nil {
-		return nil, err
+	go func() {
+		defer close(outCh)
+		streamAssetsForToken(ctx, contractAddress, tokenID, outCh)
+	}()
+
+	assets := make([]Asset, 0)
+	for a := range outCh {
+		if a.err != nil {
+			return nil, a.err
+		}
+		assets = append(assets, a.assets...)
 	}
 
-	return paginateAssets(req)
-}
-
-func FetchAssetsForTokenIdentifiersAndOwner(ctx context.Context, ownerAddress, contractAddress persist.EthereumAddress, tokenID TokenID) ([]Asset, error) {
-	url := baseURL.JoinPath("assets")
-	setPagingParams(url)
-	setContractAddress(url, contractAddress)
-	setTokenID(url, tokenID)
-	if ownerAddress != "" {
-		setOwner(url, ownerAddress)
-	}
-
-	req, err := authRequest(ctx, url.String())
-	if err != nil {
-		return nil, err
-	}
-
-	return paginateAssets(req)
-}
-
-// FetchCollectionsForAddress returns all collections that `address` has at least one token for
-func FetchCollectionsForAddress(ctx context.Context, address persist.EthereumAddress) ([]Collection, error) {
-	url := baseURL.JoinPath("collections")
-	setAssetOwner(url, address)
-
-	req, err := authRequest(ctx, url.String())
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := retry.RetryRequest(http.DefaultClient, req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, util.BodyAsError(resp)
-	}
-
-	collections := []Collection{}
-	err = util.UnmarshallBody(&collections, resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	return collections, nil
+	return assets, nil
 }
 
 // FetchContractByAddress fetches a contract by address
 func FetchContractByAddress(pCtx context.Context, pContract persist.EthereumAddress) (Contract, error) {
 	url := baseURL.JoinPath("asset_contract")
 
-	req, err := authRequest(pCtx, url.String())
-	if err != nil {
-		return Contract{}, err
-	}
+	req := authRequest(pCtx, url.String())
 
 	resp, err := retry.RetryRequest(http.DefaultClient, req)
 	if err != nil {
@@ -526,48 +486,197 @@ func FetchContractByAddress(pCtx context.Context, pContract persist.EthereumAddr
 	return contract, nil
 }
 
-func streamAssetsForWallet(ctx context.Context, assetsChan chan<- assetsReceieved, address persist.EthereumAddress) {
-	assets, err := FetchAssetsForWallet(ctx, address)
-	if err != nil {
-		assetsChan <- assetsReceieved{err: err}
-	}
-	assetsChan <- assetsReceieved{assets: assets}
+func streamAssetsForToken(ctx context.Context, address persist.EthereumAddress, tokenID TokenID, out chan assetsReceieved) {
+	url := baseURL.JoinPath("assets")
+	setPagingParams(url)
+	setContractAddress(url, address)
+	setTokenID(url, tokenID)
+	paginateAssets(authRequest(ctx, url.String()), out)
 }
 
-func streamAssetsForContract(ctx context.Context, assetsChan chan<- assetsReceieved, address persist.EthereumAddress) {
-	assets, err := FetchAssetsForContract(ctx, address)
-	if err != nil {
-		assetsChan <- assetsReceieved{err: err}
-	}
-	assetsChan <- assetsReceieved{assets: assets}
+func streamAssetsForWallet(ctx context.Context, address persist.EthereumAddress, out chan assetsReceieved) {
+	url := baseURL.JoinPath("assets")
+	setPagingParams(url)
+	setOwner(url, address)
+	paginateAssets(authRequest(ctx, url.String()), out)
 }
 
-func streamAssetsForContractAddressAndOwner(ctx context.Context, assetsChan chan<- assetsReceieved, ownerAddress, contractAddress persist.EthereumAddress) {
-	assets, err := FetchAssetsForContractAddressAndOwner(ctx, ownerAddress, contractAddress)
-	if err != nil {
-		assetsChan <- assetsReceieved{err: err}
-	}
-	assetsChan <- assetsReceieved{assets: assets}
+func streamAssetsForContract(ctx context.Context, address persist.EthereumAddress, out chan assetsReceieved) {
+	url := baseURL.JoinPath("assets")
+	setPagingParams(url)
+	setContractAddress(url, address)
+	paginateAssets(authRequest(ctx, url.String()), out)
 }
 
-func streamAssetsForTokenIdentifiers(ctx context.Context, assetsChan chan<- assetsReceieved, contractAddress persist.EthereumAddress, tokenID TokenID) {
-	assets, err := FetchAssetsForTokenIdentifiers(ctx, contractAddress, tokenID)
-	if err != nil {
-		assetsChan <- assetsReceieved{err: err}
-	}
-	assetsChan <- assetsReceieved{assets: assets}
+func streamAssetsForContractAddressAndOwner(ctx context.Context, ownerAddress, contractAddress persist.EthereumAddress, out chan assetsReceieved) {
+	url := baseURL.JoinPath("assets")
+	setPagingParams(url)
+	setOwner(url, ownerAddress)
+	setContractAddress(url, contractAddress)
+	paginateAssets(authRequest(ctx, url.String()), out)
 }
 
-func streamAssetsForTokenIdentifiersAndOwner(ctx context.Context, assetsChan chan<- assetsReceieved, ownerAddress, contractAddress persist.EthereumAddress, tokenID TokenID) {
-	assets, err := FetchAssetsForTokenIdentifiersAndOwner(ctx, ownerAddress, contractAddress, tokenID)
-	if err != nil {
-		assetsChan <- assetsReceieved{err: err}
+func streamAssetsForTokenIdentifiers(ctx context.Context, contractAddress persist.EthereumAddress, tokenID TokenID, out chan assetsReceieved) {
+	url := baseURL.JoinPath("assets")
+	setPagingParams(url)
+	setContractAddress(url, contractAddress)
+	setTokenID(url, tokenID)
+	paginateAssets(authRequest(ctx, url.String()), out)
+}
+
+func streamAssetsForTokenIdentifiersAndOwner(ctx context.Context, ownerAddress, contractAddress persist.EthereumAddress, tokenID TokenID, out chan assetsReceieved) {
+	url := baseURL.JoinPath("assets")
+	setPagingParams(url)
+	setContractAddress(url, contractAddress)
+	setTokenID(url, tokenID)
+	if ownerAddress != "" {
+		setOwner(url, ownerAddress)
 	}
-	assetsChan <- assetsReceieved{assets: assets}
+	paginateAssets(authRequest(ctx, url.String()), out)
+}
+
+func streamAssetsForSharedContract(ctx context.Context, editorAddress persist.EthereumAddress, out chan assetsReceieved) {
+	url := baseURL.JoinPath("assets")
+	setPagingParams(url)
+	setCollectionEditor(url, editorAddress)
+	for _, address := range sharedStoreFrontAddresses {
+		addContractAddresses(url, address)
+	}
+	paginateAssets(authRequest(ctx, url.String()), out)
+}
+
+// assetsByChildContract converts a channel of assets to a slice of sub-contract groups
+func assetsByChildContract(ctx context.Context, assetsChan <-chan assetsReceieved, ethClient *ethclient.Client, creatorAddress persist.Address) ([]multichain.ParentToChildEdge, error) {
+	block, err := ethClient.BlockNumber(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	childIdx := make(map[string]int)
+	parents := make(map[persist.EthereumAddress]multichain.ParentToChildEdge)
+
+	for page := range assetsChan {
+
+		if page.err != nil {
+			return nil, err
+		}
+
+		for _, asset := range page.assets {
+			// We override the owner of the token with the creator of the token
+			token, err := assetToToken(asset, persist.BlockNumber(block), creatorAddress)
+
+			var unknownSchemaErr unknownContractSchemaError
+			if errors.As(err, &unknownSchemaErr) {
+				continue
+			}
+			if err != nil {
+				return nil, err
+			}
+
+			parentAddress := asset.Contract.ContractAddress
+
+			// Found a new parent
+			if _, seen := parents[parentAddress]; !seen {
+				parents[parentAddress] = multichain.ParentToChildEdge{
+					Parent:   contractFromAsset(asset, persist.BlockNumber(block)),
+					Children: make([]multichain.ChildContract, 0),
+				}
+			}
+
+			childID := asset.Collection.Slug
+
+			// Found a new child
+			if _, seen := childIdx[childID]; !seen {
+				parent := parents[parentAddress]
+				parent.Children = append(parent.Children, multichain.ChildContract{
+					ChildID:        childID,
+					Name:           asset.Collection.Name,
+					Description:    asset.Collection.Description,
+					OwnerAddress:   creatorAddress,
+					CreatorAddress: creatorAddress,
+					Tokens:         make([]multichain.ChainAgnosticToken, 0),
+				})
+				parents[parentAddress] = parent
+				childIdx[childID] = len(parent.Children) - 1
+			}
+
+			// Add the token
+			idx := childIdx[childID]
+			parents[parentAddress].Children[idx].Tokens = append(parents[parentAddress].Children[idx].Tokens, token)
+		}
+	}
+
+	edges := make([]multichain.ParentToChildEdge, 0)
+	for _, edge := range parents {
+		edges = append(edges, edge)
+	}
+
+	return edges, nil
+}
+
+type unknownContractSchemaError struct {
+	schema string
+}
+
+func (e unknownContractSchemaError) Error() string {
+	return fmt.Sprintf("unknown token type: %s", e.schema)
+}
+
+func tokenTypeFromAsset(asset Asset) (persist.TokenType, error) {
+	switch asset.Contract.ContractSchemaName {
+	case "ERC721", "CRYPTOPUNKS":
+		return persist.TokenTypeERC721, nil
+	case "ERC1155":
+		return persist.TokenTypeERC1155, nil
+	default:
+		return "", unknownContractSchemaError{asset.Contract.ContractSchemaName.String()}
+	}
+}
+
+func assetToToken(asset Asset, block persist.BlockNumber, tokenOwner persist.Address) (multichain.ChainAgnosticToken, error) {
+	tokenType, err := tokenTypeFromAsset(asset)
+	if err != nil {
+		return multichain.ChainAgnosticToken{}, err
+	}
+	return multichain.ChainAgnosticToken{
+		TokenType: tokenType,
+		Descriptors: multichain.ChainAgnosticTokenDescriptors{
+			Name:        asset.Name,
+			Description: asset.Description,
+		},
+		TokenURI:     persist.TokenURI(asset.TokenMetadataURL),
+		TokenID:      persist.TokenID(asset.TokenID.ToBase16()),
+		OwnerAddress: tokenOwner,
+		FallbackMedia: persist.FallbackMedia{
+			ImageURL: persist.NullString(firstNonEmptyString(asset.ImagePreviewURL, asset.ImageThumbnailURL, asset.ImageURL)),
+		},
+		ContractAddress: persist.Address(asset.Contract.ContractAddress.String()),
+		ExternalURL:     asset.ExternalURL,
+		BlockNumber:     block,
+		TokenMetadata: persist.TokenMetadata{
+			"name":          asset.Name,
+			"description":   asset.Description,
+			"image_url":     asset.ImageOriginalURL,
+			"animation_url": asset.AnimationOriginalURL,
+		},
+		Quantity: "1",
+		IsSpam:   util.ToPointer(false), // OpenSea filters spam on their side
+	}, nil
+}
+
+func contractFromAsset(asset Asset, block persist.BlockNumber) multichain.ChainAgnosticContract {
+	return multichain.ChainAgnosticContract{
+		Address: persist.Address(asset.Contract.ContractAddress.String()),
+		Descriptors: multichain.ChainAgnosticContractDescriptors{
+			Symbol:         asset.Contract.ContractSymbol.String(),
+			Name:           asset.Contract.ContractName.String(),
+			CreatorAddress: persist.Address(asset.Collection.PayoutAddress),
+		},
+		LatestBlock: block,
+	}
 }
 
 func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsChan <-chan assetsReceieved, ethClient *ethclient.Client) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
-
 	block, err := ethClient.BlockNumber(ctx)
 	if err != nil {
 		return nil, nil, err
@@ -591,37 +700,7 @@ func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsCha
 			for _, n := range assetsReceived.assets {
 				nft := n
 				wp.Go(func(ctx context.Context) error {
-					var tokenType persist.TokenType
-					switch nft.Contract.ContractSchemaName {
-					case "ERC721", "CRYPTOPUNKS":
-						tokenType = persist.TokenTypeERC721
-					case "ERC1155":
-						tokenType = persist.TokenTypeERC1155
-					default:
-						logger.For(ctx).Warnf("unknown token type: %s", nft.Contract.ContractSchemaName)
-						return nil
-					}
-
-					metadata := persist.TokenMetadata{
-						"name":          nft.Name,
-						"description":   nft.Description,
-						"image_url":     nft.ImageOriginalURL,
-						"animation_url": nft.AnimationOriginalURL,
-					}
-
-					if err != nil {
-						logger.For(ctx).Errorf("failed to predict media type for %s: %s", nft.ImageThumbnailURL, err)
-					}
-
-					contract, ok := seenContracts.LoadOrStore(nft.Contract.ContractAddress.String(), multichain.ChainAgnosticContract{
-						Address: persist.Address(nft.Contract.ContractAddress.String()),
-						Descriptors: multichain.ChainAgnosticContractDescriptors{
-							Symbol:         nft.Contract.ContractSymbol.String(),
-							Name:           nft.Contract.ContractName.String(),
-							CreatorAddress: persist.Address(nft.Creator.Address),
-						},
-						LatestBlock: persist.BlockNumber(block),
-					})
+					contract, ok := seenContracts.LoadOrStore(nft.Contract.ContractAddress.String(), contractFromAsset(nft, persist.BlockNumber(block)))
 					if !ok {
 						contractsChan <- contract.(multichain.ChainAgnosticContract)
 					} else {
@@ -633,27 +712,20 @@ func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsCha
 						tokenOwner = persist.Address(nft.Owner.Address)
 					}
 
-					fallback := persist.FallbackMedia{
-						ImageURL: persist.NullString(firstNonEmptyString(nft.ImagePreviewURL, nft.ImageThumbnailURL, nft.ImageURL)),
+					token, err := assetToToken(nft, persist.BlockNumber(block), tokenOwner)
+
+					var unknownSchemaErr unknownContractSchemaError
+
+					if errors.As(err, &unknownSchemaErr) {
+						logger.For(ctx).Error(err)
+						return nil
 					}
 
-					tokensChan <- multichain.ChainAgnosticToken{
-						TokenType: tokenType,
-						Descriptors: multichain.ChainAgnosticTokenDescriptors{
-							Name:        nft.Name,
-							Description: nft.Description,
-						},
-						TokenURI:        persist.TokenURI(nft.TokenMetadataURL),
-						TokenID:         persist.TokenID(nft.TokenID.ToBase16()),
-						OwnerAddress:    tokenOwner,
-						FallbackMedia:   fallback,
-						ContractAddress: persist.Address(nft.Contract.ContractAddress.String()),
-						ExternalURL:     nft.ExternalURL,
-						BlockNumber:     persist.BlockNumber(block),
-						TokenMetadata:   metadata,
-						Quantity:        "1",
-						IsSpam:          util.ToPointer(false), // OpenSea filters spam on their side
+					if err != nil {
+						return err
 					}
+
+					tokensChan <- token
 					return nil
 				})
 			}
@@ -734,47 +806,45 @@ func firstNonEmptyString(strs ...string) string {
 }
 
 // authRequest returns a http.Request with authorization headers
-func authRequest(ctx context.Context, url string) (*http.Request, error) {
+func authRequest(ctx context.Context, url string) *http.Request {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 	req.Header.Set("X-API-KEY", env.GetString("OPENSEA_API_KEY"))
-	return req, nil
+	return req
 }
 
-func paginateAssets(req *http.Request) ([]Asset, error) {
-	result := []Asset{}
+func paginateAssets(req *http.Request, outCh chan assetsReceieved) {
 	for {
 		resp, err := retry.RetryRequest(client, req)
 		if err != nil {
-			return nil, err
+			outCh <- assetsReceieved{err: err}
+			return
 		}
 
 		defer resp.Body.Close()
 
 		if resp.StatusCode == http.StatusUnauthorized {
-			return nil, ErrAPIKeyExpired
+			outCh <- assetsReceieved{err: ErrAPIKeyExpired}
+			return
 		}
 
 		if resp.StatusCode != http.StatusOK {
-			return nil, util.BodyAsError(resp)
+			outCh <- assetsReceieved{err: util.BodyAsError(resp)}
+			return
 		}
 
 		assets := Assets{}
-
-		err = util.UnmarshallBody(&assets, resp.Body)
-		if err != nil {
-			return nil, err
+		if err := util.UnmarshallBody(&assets, resp.Body); err != nil {
+			outCh <- assetsReceieved{err: err}
+			return
 		}
 
-		for _, asset := range assets.Assets {
-			result = append(result, asset)
-		}
+		outCh <- assetsReceieved{assets: assets.Assets}
 
-		// No more pages to paginate
 		if assets.Next == "" {
-			return result, nil
+			return
 		}
 
 		query := req.URL.Query()
@@ -808,9 +878,15 @@ func setContractAddress(url *url.URL, address persist.EthereumAddress) {
 	url.RawQuery = query.Encode()
 }
 
-func addContractAddress(url *url.URL, address persist.EthereumAddress) {
+func addContractAddresses(url *url.URL, address persist.EthereumAddress) {
 	query := url.Query()
 	query.Add("asset_contract_addresses", address.String())
+	url.RawQuery = query.Encode()
+}
+
+func setCollectionEditor(url *url.URL, address persist.EthereumAddress) {
+	query := url.Query()
+	query.Add("collection_editor", address.String())
 	url.RawQuery = query.Encode()
 }
 
