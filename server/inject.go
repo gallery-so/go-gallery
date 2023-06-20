@@ -113,6 +113,7 @@ func ethProvidersConfig(indexerProvider *eth.Provider, openseaProvider *opensea.
 		wire.Bind(new(multichain.Verifier), util.ToPointer(indexerProvider)),
 		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(fallbackProvider)),
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(openseaProvider)),
+		wire.Bind(new(multichain.ContractsFetcher), util.ToPointer(indexerProvider)),
 		wire.Bind(new(multichain.ContractRefresher), util.ToPointer(indexerProvider)),
 		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(indexerProvider)),
 		wire.Bind(new(multichain.TokenDescriptorsFetcher), util.ToPointer(indexerProvider)),
@@ -128,12 +129,13 @@ func ethRequirements(
 	v multichain.Verifier,
 	tof multichain.TokensOwnerFetcher,
 	toc multichain.TokensContractFetcher,
+	cf multichain.ContractsFetcher,
 	cr multichain.ContractRefresher,
 	tmf multichain.TokenMetadataFetcher,
 	tdf multichain.TokenDescriptorsFetcher,
 	osccf multichain.OpenSeaChildContractFetcher,
 ) ethProviderList {
-	return ethProviderList{nr, v, tof, toc, cr, tmf, tdf, osccf}
+	return ethProviderList{nr, v, tof, toc, cf, cr, tmf, tdf, osccf}
 }
 
 // tezosProviderSet is a wire injector that creates the set of Tezos providers

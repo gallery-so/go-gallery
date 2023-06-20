@@ -174,6 +174,11 @@ type TokensContractFetcher interface {
 	GetTokensByContractAddressAndOwner(ctx context.Context, owner persist.Address, contract persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error)
 }
 
+type ContractsFetcher interface {
+	GetContractByAddress(ctx context.Context, contract persist.Address) (ChainAgnosticContract, error)
+	GetContractsByOwnerAddress(ctx context.Context, owner persist.Address) ([]ChainAgnosticContract, error)
+}
+
 type ChildContractFetcher interface {
 	GetChildContractsCreatedOnSharedContract(ctx context.Context, creatorAddress persist.Address) ([]ParentToChildEdge, error)
 }
@@ -976,6 +981,54 @@ outer:
 	}
 
 	return p.processTokensForOwnersOfContract(ctx, contract.ID, ci.Chain, users, chainTokensForUsers, persistedContracts)
+}
+
+func (p *Provider) GetContractsOwnedByAddress(ctx context.Context, addr persist.ChainAddress) ([]persist.ContractGallery, error) {
+	contractFetchers := matchingProvidersForChain[ContractsFetcher](p.Chains, addr.Chain())
+	contractsFromProviders := []chainContracts{}
+	contractsReceive := make(chan chainContracts)
+	errChan := make(chan errWithPriority)
+	done := make(chan struct{})
+	wg := &sync.WaitGroup{}
+	for i, fetcher := range contractFetchers {
+		wg.Add(1)
+		go func(priority int, p ContractsFetcher) {
+			defer wg.Done()
+			contracts, err := p.GetContractsByOwnerAddress(ctx, addr.Address())
+			if err != nil {
+				errChan <- errWithPriority{priority: priority, err: err}
+				return
+			}
+			contractsReceive <- chainContracts{chain: addr.Chain(), contracts: contracts, priority: priority}
+		}(i, fetcher)
+	}
+	go func() {
+		defer close(done)
+		wg.Wait()
+	}()
+
+outer:
+	for {
+		select {
+		case err := <-errChan:
+			if err.priority == 0 {
+				return nil, err
+			}
+		case contract := <-contractsReceive:
+			contractsFromProviders = append(contractsFromProviders, contract)
+		case <-done:
+			logger.For(ctx).Debug("done refreshing tokens for collection")
+			break outer
+		}
+	}
+
+	persistedContracts, err := p.processContracts(ctx, contractsFromProviders)
+	if err != nil {
+		return nil, err
+	}
+
+	return persistedContracts, nil
+
 }
 
 type tokenUniqueIdentifiers struct {
