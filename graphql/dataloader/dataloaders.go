@@ -126,7 +126,7 @@ type Loaders struct {
 	MediaByTokenID                *MediaLoaderByTokenID
 	TokenOwnershipByTokenID       *TokenOwnershipLoaderByID
 	ContractCreatorByContractID   *ContractCreatorLoaderByID
-	ProfileImageByUserID          *ProfileImageLoaderByID
+	ProfileImageByID              *ProfileImageLoaderByID
 }
 
 func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loaders {
@@ -319,7 +319,7 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 
 	loaders.ContractCreatorByContractID = NewContractCreatorLoaderByID(defaults, loadContractCreatorByContractID(q), ContractCreatorLoaderByIDCacheSubscriptions{})
 
-	loaders.ProfileImageByUserID = NewProfileImageLoaderByID(defaults, loadProfileImageByUserID(q), ProfileImageLoaderByIDCacheSubscriptions{
+	loaders.ProfileImageByID = NewProfileImageLoaderByID(defaults, loadProfileImageByID(q), ProfileImageLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(pfp db.ProfileImage) persist.DBID { return pfp.ID },
 	})
 
@@ -1239,12 +1239,12 @@ func loadContractCreatorByContractID(q *db.Queries) func(ctx context.Context, ke
 	}
 }
 
-func loadProfileImageByUserID(q *db.Queries) func(context.Context, []persist.DBID) ([]db.ProfileImage, []error) {
+func loadProfileImageByID(q *db.Queries) func(context.Context, []persist.DBID) ([]db.ProfileImage, []error) {
 	return func(ctx context.Context, pfpIDs []persist.DBID) ([]db.ProfileImage, []error) {
 		results := make([]db.ProfileImage, len(pfpIDs))
 		errors := make([]error, len(pfpIDs))
 
-		b := q.GetProfileImageByUserID(ctx, pfpIDs)
+		b := q.GetProfileImageByID(ctx, pfpIDs)
 		defer b.Close()
 
 		b.QueryRow(func(i int, media db.ProfileImage, err error) {

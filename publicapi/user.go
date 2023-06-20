@@ -1383,17 +1383,12 @@ func (api UserAPI) RemoveProfileImage(ctx context.Context) error {
 
 func (api UserAPI) GetProfileImageByUserID(ctx context.Context, userID persist.DBID) (db.ProfileImage, error) {
 	// Validate
-	userID, err := getAuthenticatedUserID(ctx)
+	user, err := api.GetUserById(ctx, userID)
 	if err != nil {
 		return db.ProfileImage{}, err
 	}
-
-	pfp, err := api.loaders.ProfileImageByUserID.Load(userID)
-
-	var errNotFound persist.ErrProfileImageNotFound
-	if errors.As(err, &errNotFound) {
+	if user.ProfileImageID == "" {
 		return db.ProfileImage{}, nil
 	}
-
-	return pfp, err
+	return api.loaders.ProfileImageByID.Load(user.ProfileImageID)
 }
