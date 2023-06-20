@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/sourcegraph/conc/pool"
 	"github.com/spf13/viper"
 )
@@ -19,7 +21,7 @@ func main() {
 
 	pgClient := postgres.MustCreateClient()
 
-	rows, err := pgClient.Query("select id from tokens where media->>'media_type' = 'html' and media->>'media_url' like 'https://storage.goo%' and deleted = false;")
+	rows, err := pgClient.Query("select tokens.id from tokens join token_medias on token_medias.id = tokens.token_media_id where tokens.contract = '2EpXhbM5HiZ52xwn0rJXwiq9fsD' and tokens.owner_user_id = '2NJr8ZFKQNOX55wOlfJbGczJknX' and tokens.chain = 4 and tokens.deleted = false and token_medias.metadata->>'thumbnailUri' = 'ipfs://QmNrhZHUaEqxhyLfqoq1mtHSipkWHeT31LNHb1QEbDHgnc' order by token_medias.last_updated desc;")
 	if err != nil {
 		panic(err)
 	}
@@ -96,6 +98,7 @@ func main() {
 }
 
 func setDefaults() {
+	viper.SetDefault("ENV", "local")
 	viper.SetDefault("POSTGRES_HOST", "0.0.0.0")
 	viper.SetDefault("POSTGRES_PORT", 5432)
 	viper.SetDefault("POSTGRES_USER", "gallery_backend")
@@ -103,4 +106,11 @@ func setDefaults() {
 	viper.SetDefault("POSTGRES_DB", "postgres")
 
 	viper.AutomaticEnv()
+
+	fi := "local"
+	if len(os.Args) > 1 {
+		fi = os.Args[1]
+	}
+	envFile := util.ResolveEnvFile("tokenprocessing", fi)
+	util.LoadEncryptedEnvFile(envFile)
 }

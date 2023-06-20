@@ -170,6 +170,10 @@ type PreverifyEmailPayloadOrError interface {
 	IsPreverifyEmailPayloadOrError()
 }
 
+type ProfileImage interface {
+	IsProfileImage()
+}
+
 type PublishGalleryPayloadOrError interface {
 	IsPublishGalleryPayloadOrError()
 }
@@ -202,6 +206,10 @@ type RemoveCommentPayloadOrError interface {
 	IsRemoveCommentPayloadOrError()
 }
 
+type RemoveProfileImagePayloadOrError interface {
+	IsRemoveProfileImagePayloadOrError()
+}
+
 type RemoveUserWalletsPayloadOrError interface {
 	IsRemoveUserWalletsPayloadOrError()
 }
@@ -228,6 +236,10 @@ type SearchUsersPayloadOrError interface {
 
 type SetCommunityOverrideCreatorPayloadOrError interface {
 	IsSetCommunityOverrideCreatorPayloadOrError()
+}
+
+type SetProfileImagePayloadOrError interface {
+	IsSetProfileImagePayloadOrError()
 }
 
 type SetSpamPreferencePayloadOrError interface {
@@ -803,6 +815,8 @@ func (ErrAuthenticationFailed) IsRemoveAdmirePayloadOrError()       {}
 func (ErrAuthenticationFailed) IsCommentOnFeedEventPayloadOrError() {}
 func (ErrAuthenticationFailed) IsRemoveCommentPayloadOrError()      {}
 func (ErrAuthenticationFailed) IsViewGalleryPayloadOrError()        {}
+func (ErrAuthenticationFailed) IsSetProfileImagePayloadOrError()    {}
+func (ErrAuthenticationFailed) IsRemoveProfileImagePayloadOrError() {}
 
 type ErrCollectionNotFound struct {
 	Message string `json:"message"`
@@ -920,6 +934,7 @@ func (ErrInvalidInput) IsUpdateSocialAccountDisplayedPayloadOrError()    {}
 func (ErrInvalidInput) IsMintPremiumCardToWalletPayloadOrError()         {}
 func (ErrInvalidInput) IsDisconnectSocialAccountPayloadOrError()         {}
 func (ErrInvalidInput) IsFollowAllSocialConnectionsPayloadOrError()      {}
+func (ErrInvalidInput) IsSetProfileImagePayloadOrError()                 {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -995,6 +1010,7 @@ func (ErrNotAuthorized) IsMintPremiumCardToWalletPayloadOrError()      {}
 func (ErrNotAuthorized) IsDisconnectSocialAccountPayloadOrError()      {}
 func (ErrNotAuthorized) IsFollowAllSocialConnectionsPayloadOrError()   {}
 func (ErrNotAuthorized) IsGenerateQRCodeLoginTokenPayloadOrError()     {}
+func (ErrNotAuthorized) IsSetProfileImagePayloadOrError()              {}
 
 type ErrPushTokenBelongsToAnotherUser struct {
 	Message string `json:"message"`
@@ -1027,9 +1043,10 @@ type ErrTokenNotFound struct {
 	Message string `json:"message"`
 }
 
-func (ErrTokenNotFound) IsTokenByIDOrError()           {}
-func (ErrTokenNotFound) IsError()                      {}
-func (ErrTokenNotFound) IsCollectionTokenByIDOrError() {}
+func (ErrTokenNotFound) IsTokenByIDOrError()              {}
+func (ErrTokenNotFound) IsError()                         {}
+func (ErrTokenNotFound) IsCollectionTokenByIDOrError()    {}
+func (ErrTokenNotFound) IsSetProfileImagePayloadOrError() {}
 
 type ErrUnknownAction struct {
 	Message string `json:"message"`
@@ -1050,14 +1067,16 @@ type ErrUserNotFound struct {
 	Message string `json:"message"`
 }
 
-func (ErrUserNotFound) IsUserByUsernameOrError()        {}
-func (ErrUserNotFound) IsUserByIDOrError()              {}
-func (ErrUserNotFound) IsUserByAddressOrError()         {}
-func (ErrUserNotFound) IsError()                        {}
-func (ErrUserNotFound) IsLoginPayloadOrError()          {}
-func (ErrUserNotFound) IsFollowUserPayloadOrError()     {}
-func (ErrUserNotFound) IsUnfollowUserPayloadOrError()   {}
-func (ErrUserNotFound) IsAdminAddWalletPayloadOrError() {}
+func (ErrUserNotFound) IsUserByUsernameOrError()            {}
+func (ErrUserNotFound) IsUserByIDOrError()                  {}
+func (ErrUserNotFound) IsUserByAddressOrError()             {}
+func (ErrUserNotFound) IsError()                            {}
+func (ErrUserNotFound) IsLoginPayloadOrError()              {}
+func (ErrUserNotFound) IsFollowUserPayloadOrError()         {}
+func (ErrUserNotFound) IsUnfollowUserPayloadOrError()       {}
+func (ErrUserNotFound) IsAdminAddWalletPayloadOrError()     {}
+func (ErrUserNotFound) IsSetProfileImagePayloadOrError()    {}
+func (ErrUserNotFound) IsRemoveProfileImagePayloadOrError() {}
 
 type ErrUsernameNotAvailable struct {
 	Message string `json:"message"`
@@ -1212,6 +1231,7 @@ type GalleryUser struct {
 	HelperGalleryUserData
 	Dbid                persist.DBID           `json:"dbid"`
 	Username            *string                `json:"username"`
+	ProfileImage        ProfileImage           `json:"profileImage"`
 	Bio                 *string                `json:"bio"`
 	Traits              *string                `json:"traits"`
 	Universal           *bool                  `json:"universal"`
@@ -1540,6 +1560,12 @@ type RemoveCommentPayload struct {
 
 func (RemoveCommentPayload) IsRemoveCommentPayloadOrError() {}
 
+type RemoveProfileImagePayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
+
+func (RemoveProfileImagePayload) IsRemoveProfileImagePayloadOrError() {}
+
 type RemoveUserWalletsPayload struct {
 	Viewer *Viewer `json:"viewer"`
 }
@@ -1575,6 +1601,16 @@ type SetCommunityOverrideCreatorPayload struct {
 }
 
 func (SetCommunityOverrideCreatorPayload) IsSetCommunityOverrideCreatorPayloadOrError() {}
+
+type SetProfileImageInput struct {
+	TokenID *persist.DBID `json:"tokenId"`
+}
+
+type SetProfileImagePayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
+
+func (SetProfileImagePayload) IsSetProfileImagePayloadOrError() {}
 
 type SetSpamPreferenceInput struct {
 	Tokens []persist.DBID `json:"tokens"`
@@ -1799,6 +1835,12 @@ type TokenHoldersConnection struct {
 	Edges    []*TokenHolderEdge `json:"edges"`
 	PageInfo *PageInfo          `json:"pageInfo"`
 }
+
+type TokenProfileImage struct {
+	Token *Token `json:"token"`
+}
+
+func (TokenProfileImage) IsProfileImage() {}
 
 type TokensAddedToCollectionFeedEventData struct {
 	HelperTokensAddedToCollectionFeedEventDataData

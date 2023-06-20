@@ -67,10 +67,17 @@ interface Error {
   message: String!
 }
 
+type TokenProfileImage {
+  token: Token!
+}
+
+union ProfileImage = TokenProfileImage
+
 type GalleryUser implements Node @goEmbedHelper {
   id: ID!
   dbid: DBID!
   username: String
+  profileImage: ProfileImage @goField(forceResolver: true)
   bio: String
   traits: String
   universal: Boolean
@@ -2137,6 +2144,31 @@ type GenerateQRCodeLoginTokenPayload {
 
 union GenerateQRCodeLoginTokenPayloadOrError = GenerateQRCodeLoginTokenPayload | ErrNotAuthorized
 
+input SetProfileImageInput {
+  tokenId: DBID
+}
+
+type SetProfileImagePayload {
+  viewer: Viewer
+}
+
+type RemoveProfileImagePayload {
+  viewer: Viewer
+}
+
+union SetProfileImagePayloadOrError =
+    SetProfileImagePayload
+  | ErrAuthenticationFailed
+  | ErrUserNotFound
+  | ErrInvalidInput
+  | ErrTokenNotFound
+  | ErrNotAuthorized
+
+union RemoveProfileImagePayloadOrError =
+    RemoveProfileImagePayload
+  | ErrAuthenticationFailed
+  | ErrUserNotFound
+
 type Mutation {
   # User Mutations
   addUserWallet(
@@ -2147,6 +2179,8 @@ type Mutation {
   updateUserInfo(input: UpdateUserInfoInput!): UpdateUserInfoPayloadOrError @authRequired
   registerUserPushToken(pushToken: String!): RegisterUserPushTokenPayloadOrError @authRequired
   unregisterUserPushToken(pushToken: String!): UnregisterUserPushTokenPayloadOrError @authRequired
+  setProfileImage(input: SetProfileImageInput!): SetProfileImagePayloadOrError @authRequired
+  removeProfileImage: RemoveProfileImagePayloadOrError @authRequired
 
   # Gallery Mutations
   updateGalleryCollections(

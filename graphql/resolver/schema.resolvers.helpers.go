@@ -164,6 +164,13 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrPushTokenBelongsToAnotherUser{Message: message}
 	}
 
+	switch err {
+	case publicapi.ErrProfileImageTooManySources, publicapi.ErrProfileImageNoSources, publicapi.ErrProfileImageUnknownSource:
+		mappedErr = model.ErrInvalidInput{Message: message}
+	case publicapi.ErrProfileImageNotTokenOwner:
+		mappedErr = model.ErrNotAuthorized{Message: message}
+	}
+
 	if mappedErr != nil {
 		if converted, ok := model.ConvertToModelType(mappedErr, gqlTypeName); ok {
 			return converted, true
@@ -1916,6 +1923,20 @@ func mediaToModel(ctx context.Context, tokenMedia db.TokenMedia, fallback persis
 		return getSyncingMedia(ctx, tokenMedia, fallbackMedia)
 	default:
 		return getInvalidMedia(ctx, tokenMedia, fallbackMedia)
+	}
+}
+
+func profileImageToModel(ctx context.Context, pfp db.ProfileImage) (model.ProfileImage, error) {
+	// PFP isn't set or we were unable to retrieve it
+	if pfp.ID == "" {
+		return nil, nil
+	}
+	switch pfp.SourceType {
+	case persist.ProfileImageSourceToken:
+		token, err := resolveTokenByTokenID(ctx, pfp.TokenID)
+		return &model.TokenProfileImage{Token: token}, err
+	default:
+		return nil, publicapi.ErrProfileImageUnknownSource
 	}
 }
 
