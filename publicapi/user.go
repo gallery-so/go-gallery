@@ -1348,8 +1348,7 @@ func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID) e
 	if tokenID != nil {
 		o, err := For(ctx).Token.GetTokenOwnershipByTokenID(ctx, *tokenID)
 
-		var errNoOwnership persist.ErrTokenOwnershipNotFound
-		if errors.As(err, &errNoOwnership) {
+		if util.ErrorAs[persist.ErrTokenOwnershipNotFound](err) {
 			return ErrProfileImageNotTokenOwner
 		}
 
