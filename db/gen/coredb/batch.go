@@ -1661,6 +1661,104 @@ func (b *GetNotificationByIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getOwnedTokenByIdentifiers = `-- name: GetOwnedTokenByIdentifiers :batchone
+with user_owns as (
+    select token_id, owner_user_id, is_holder, is_creator from token_ownership where token_ownership.owner_user_id = $1
+),
+selected_token as (
+	select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id
+	from tokens t
+	join contracts c on t.contract = c.id
+	where c.chain = $2 and c.address = $3 and t.token_id = $4 and not t.deleted and not c.deleted
+),
+owned_token as (
+    select selected_token.id
+    from user_owns
+    join selected_token on user_owns.token_id = selected_token.id
+)
+select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id
+from tokens
+join owned_token on tokens.id = owned_token.id
+`
+
+type GetOwnedTokenByIdentifiersBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type GetOwnedTokenByIdentifiersParams struct {
+	UserID          persist.DBID
+	Chain           persist.Chain
+	ContractAddress persist.Address
+	TokenID         persist.TokenID
+}
+
+func (q *Queries) GetOwnedTokenByIdentifiers(ctx context.Context, arg []GetOwnedTokenByIdentifiersParams) *GetOwnedTokenByIdentifiersBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.UserID,
+			a.Chain,
+			a.ContractAddress,
+			a.TokenID,
+		}
+		batch.Queue(getOwnedTokenByIdentifiers, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetOwnedTokenByIdentifiersBatchResults{br, len(arg), false}
+}
+
+func (b *GetOwnedTokenByIdentifiersBatchResults) QueryRow(f func(int, Token, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var i Token
+		if b.closed {
+			if f != nil {
+				f(t, i, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		row := b.br.QueryRow()
+		err := row.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Name,
+			&i.Description,
+			&i.CollectorsNote,
+			&i.Media,
+			&i.TokenUri,
+			&i.TokenType,
+			&i.TokenID,
+			&i.Quantity,
+			&i.OwnershipHistory,
+			&i.TokenMetadata,
+			&i.ExternalUrl,
+			&i.BlockNumber,
+			&i.OwnerUserID,
+			&i.OwnedByWallets,
+			&i.Chain,
+			&i.Contract,
+			&i.IsUserMarkedSpam,
+			&i.IsProviderMarkedSpam,
+			&i.LastSynced,
+			&i.FallbackMedia,
+			&i.TokenMediaID,
+		)
+		if f != nil {
+			f(t, i, err)
+		}
+	}
+}
+
+func (b *GetOwnedTokenByIdentifiersBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const getOwnersByContractIdBatchPaginate = `-- name: GetOwnersByContractIdBatchPaginate :batchmany
 select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id from (
     select distinct on (u.id) u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id from users u, tokens t, contracts c

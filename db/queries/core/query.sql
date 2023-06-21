@@ -103,7 +103,7 @@ select o.*
     from unnest(@token_ids::text[]) as t(id)
         join token_ownership o on o.token_id = t.id;
 
--- name: GetOwnedTokenByIdentifiers :one
+-- name: GetOwnedTokenByIdentifiers :batchone
 with user_owns as (
     select * from token_ownership where token_ownership.owner_user_id = @user_id
 ),

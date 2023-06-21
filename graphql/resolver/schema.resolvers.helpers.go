@@ -1967,8 +1967,8 @@ func ensAvatarToModel(ctx context.Context, userID persist.DBID, a eth.EnsAvatar)
 func nftProfileImage(ctx context.Context, userID persist.DBID, uri eth.EnsNftUri) (model.ProfileImage, error) {
 	// If the token is one that the user has synced, use the Gallery token as the source
 	token, err := publicapi.For(ctx).Token.GetOwnedTokenByIdentifiers(ctx, userID, uri.Chain(), uri.Address(), uri.TokenID())
-	if err != nil {
-		// XXX TODO: Handle missing token error
+
+	if err != nil && !util.ErrorAs[persist.ErrTokenNotFoundByIdentifiersWithOwner](err) {
 		return nil, err
 	}
 
@@ -1977,8 +1977,7 @@ func nftProfileImage(ctx context.Context, userID persist.DBID, uri eth.EnsNftUri
 	}
 
 	// Otherwise, fetch the metadata and return the appropriate profile image source
-	// XXX TODO: Cache this step somewhere
-	metadata, err := publicapi.For(ctx).Token.GetMetadataByTokenIdentifiers(ctx, uri.Chain(), uri.Address(), uri.TokenID())
+	metadata, err := publicapi.For(ctx).Token.GetImageMetadataByTokenIdentifiers(ctx, uri.Chain(), uri.Address(), uri.TokenID())
 	if err != nil {
 		return nil, err
 	}

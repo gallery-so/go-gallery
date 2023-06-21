@@ -331,6 +331,14 @@ type ErrTokenNotFoundByIdentifiers struct {
 	OwnerAddress    EthereumAddress
 }
 
+// ErrTokenNotFoundByIdentifiersWithOwner is an error that is returned when a token is not found by its identifiers owned by a specific owner
+type ErrTokenNotFoundByIdentifiersWithOwner struct {
+	TokenID         TokenID
+	ContractAddress Address
+	Chain           Chain
+	OwnerID         DBID
+}
+
 // ErrTokenNotFoundByID is an error that is returned when a token is not found by its ID
 type ErrTokenNotFoundByID struct {
 	ID DBID
@@ -362,6 +370,10 @@ func (e ErrTokenNotFoundByTokenIdentifiers) Error() string {
 
 func (e ErrTokenNotFoundByIdentifiers) Error() string {
 	return fmt.Sprintf("token not found with contract address %s and token ID %s and owner address %s", e.ContractAddress, e.TokenID, e.OwnerAddress)
+}
+
+func (e ErrTokenNotFoundByIdentifiersWithOwner) Error() string {
+	return fmt.Sprintf("token not found (chain=%d, contract=%s, tokenID=%s, ownerID=%s)", e.Chain, e.ContractAddress, e.TokenID, e.OwnerID)
 }
 
 // NormalizeAddress normalizes an address for the given chain

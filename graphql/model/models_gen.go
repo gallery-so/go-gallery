@@ -1439,12 +1439,6 @@ type MoveCollectionToGalleryPayload struct {
 
 func (MoveCollectionToGalleryPayload) IsMoveCollectionToGalleryPayloadOrError() {}
 
-type NFTProfileImage struct {
-	ProfileImage ProfileImage `json:"profileImage"`
-}
-
-func (NFTProfileImage) IsProfileImage() {}
-
 type NotificationEdge struct {
 	Node   Notification `json:"node"`
 	Cursor *string      `json:"cursor"`

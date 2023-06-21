@@ -83,16 +83,11 @@ type DataProfileImage {
   url: String!
 }
 
-type NFTProfileImage {
-  profileImage: ProfileImage
-}
-
 union ProfileImage =
     TokenProfileImage
   | IPFSProfileImage
   | HTTPSProfileImage
   | DataProfileImage
-  | NFTProfileImage
 
 type GalleryUser implements Node @goEmbedHelper {
   id: ID!

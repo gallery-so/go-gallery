@@ -128,6 +128,7 @@ type Loaders struct {
 	TokenOwnershipByTokenID       *TokenOwnershipLoaderByID
 	ContractCreatorByContractID   *ContractCreatorLoaderByID
 	ProfileImageByID              *ProfileImageLoaderByID
+	OwnedTokenByTokenIdentifiers  *OwnedTokenLoaderByTokenIdentifiers
 }
 
 func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loaders {
@@ -323,6 +324,8 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 	loaders.ProfileImageByID = NewProfileImageLoaderByID(defaults, loadProfileImageByID(q), ProfileImageLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(pfp db.ProfileImage) persist.DBID { return pfp.ID },
 	})
+
+	loaders.OwnedTokenByTokenIdentifiers = NewOwnedTokenLoaderByTokenIdentifiers(defaults, loadOwnedTokenByTokenIdentifiers(q), OwnedTokenLoaderByTokenIdentifiersCacheSubscriptions{})
 
 	return loaders
 }
@@ -1253,6 +1256,30 @@ func loadProfileImageByID(q *db.Queries) func(context.Context, []persist.DBID) (
 				err = persist.ErrProfileImageNotFound{err, pfpIDs[i]}
 			}
 			results[i], errors[i] = media, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadOwnedTokenByTokenIdentifiers(q *db.Queries) func(context.Context, []db.GetOwnedTokenByIdentifiersParams) ([]db.Token, []error) {
+	return func(ctx context.Context, params []db.GetOwnedTokenByIdentifiersParams) ([]db.Token, []error) {
+		results := make([]db.Token, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetOwnedTokenByIdentifiers(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, token db.Token, err error) {
+			if err == pgx.ErrNoRows {
+				err = persist.ErrTokenNotFoundByIdentifiersWithOwner{
+					TokenID:         params[i].TokenID,
+					ContractAddress: params[i].ContractAddress,
+					Chain:           params[i].Chain,
+					OwnerID:         params[i].UserID,
+				}
+			}
+			results[i], errors[i] = token, err
 		})
 
 		return results, errors

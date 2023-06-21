@@ -786,10 +786,6 @@ type ComplexityRoot struct {
 		ViewGallery                     func(childComplexity int, galleryID persist.DBID) int
 	}
 
-	NFTProfileImage struct {
-		ProfileImage func(childComplexity int) int
-	}
-
 	NotificationEdge struct {
 		Cursor func(childComplexity int) int
 		Node   func(childComplexity int) int
@@ -4691,13 +4687,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.ViewGallery(childComplexity, args["galleryId"].(persist.DBID)), true
 
-	case "NFTProfileImage.profileImage":
-		if e.complexity.NFTProfileImage.ProfileImage == nil {
-			break
-		}
-
-		return e.complexity.NFTProfileImage.ProfileImage(childComplexity), true
-
 	case "NotificationEdge.cursor":
 		if e.complexity.NotificationEdge.Cursor == nil {
 			break
@@ -7058,16 +7047,11 @@ type DataProfileImage {
   url: String!
 }
 
-type NFTProfileImage {
-  profileImage: ProfileImage
-}
-
 union ProfileImage =
     TokenProfileImage
   | IPFSProfileImage
   | HTTPSProfileImage
   | DataProfileImage
-  | NFTProfileImage
 
 type GalleryUser implements Node @goEmbedHelper {
   id: ID!
@@ -32135,47 +32119,6 @@ func (ec *executionContext) fieldContext_Mutation_generateQRCodeLoginToken(ctx c
 	return fc, nil
 }
 
-func (ec *executionContext) _NFTProfileImage_profileImage(ctx context.Context, field graphql.CollectedField, obj *model.NFTProfileImage) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_NFTProfileImage_profileImage(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.ProfileImage, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(model.ProfileImage)
-	fc.Result = res
-	return ec.marshalOProfileImage2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐProfileImage(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_NFTProfileImage_profileImage(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "NFTProfileImage",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type ProfileImage does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _NotificationEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.NotificationEdge) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_NotificationEdge_node(ctx, field)
 	if err != nil {
@@ -52964,13 +52907,6 @@ func (ec *executionContext) _ProfileImage(ctx context.Context, sel ast.Selection
 			return graphql.Null
 		}
 		return ec._DataProfileImage(ctx, sel, obj)
-	case model.NFTProfileImage:
-		return ec._NFTProfileImage(ctx, sel, &obj)
-	case *model.NFTProfileImage:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._NFTProfileImage(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -59399,31 +59335,6 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_generateQRCodeLoginToken(ctx, field)
 			})
-
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
-var nFTProfileImageImplementors = []string{"NFTProfileImage", "ProfileImage"}
-
-func (ec *executionContext) _NFTProfileImage(ctx context.Context, sel ast.SelectionSet, obj *model.NFTProfileImage) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, nFTProfileImageImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("NFTProfileImage")
-		case "profileImage":
-
-			out.Values[i] = ec._NFTProfileImage_profileImage(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))

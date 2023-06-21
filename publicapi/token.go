@@ -174,12 +174,40 @@ func (api TokenAPI) GetTokensByIDs(ctx context.Context, tokenIDs []persist.DBID)
 
 // GetOwnedTokenByIdentifiers returns a token owned by a user by its identifiers.
 func (api TokenAPI) GetOwnedTokenByIdentifiers(ctx context.Context, userID persist.DBID, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) (db.Token, error) {
-	panic("not implemented")
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"userID":          {userID, "required"},
+		"chain":           {chain, "required"},
+		"contractAddress": {contractAddress, "required"},
+		"tokenID":         {tokenID, "required"},
+	}); err != nil {
+		return db.Token{}, err
+	}
+	return api.loaders.OwnedTokenByTokenIdentifiers.Load(db.GetOwnedTokenByIdentifiersParams{
+		UserID:          userID,
+		Chain:           chain,
+		ContractAddress: contractAddress,
+		TokenID:         tokenID,
+	})
 }
 
-// GetMetadataByTokenIdentifiers fetches a token's metadata by its identifiers.
-func (api TokenAPI) GetMetadataByTokenIdentifiers(ctx context.Context, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) (persist.TokenMetadata, error) {
-	panic("not implemented")
+// GetImageMetadataByTokenIdentifiers fetches a token's image-related metadata by its identifiers.
+func (api TokenAPI) GetImageMetadataByTokenIdentifiers(ctx context.Context, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) (persist.TokenMetadata, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"chain":           {chain, "required"},
+		"contractAddress": {contractAddress, "required"},
+		"tokenID":         {tokenID, "required"},
+	}); err != nil {
+		return persist.TokenMetadata{}, err
+	}
+	imageKeywords, _ := chain.BaseKeywords()
+	return api.multichainProvider.GetTokenMetadataByTokenIdentifiers(ctx, contractAddress, tokenID, chain, []multichain.FieldRequest[string]{
+		{
+			FieldNames: imageKeywords,
+			Level:      multichain.FieldRequirementLevelOneRequired,
+		},
+	})
 }
 
 // GetNewTokensByFeedEventID returns new tokens added to a collection from an event.
