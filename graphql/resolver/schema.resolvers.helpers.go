@@ -2141,8 +2141,8 @@ func mediaToDimensions(dimensions persist.Dimensions) *model.MediaDimensions {
 	}
 
 	return &model.MediaDimensions{
-		Width:       &dimensions.Height,
-		Height:      &dimensions.Width,
+		Height:      &dimensions.Height,
+		Width:       &dimensions.Width,
 		AspectRatio: &aspect,
 	}
 }
