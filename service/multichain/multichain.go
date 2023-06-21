@@ -816,10 +816,11 @@ metadatas:
 	for metadata := range metadatas {
 		if metadata.Metadata != nil {
 			betterThanNothing = metadata.Metadata
-			prioritiesEncountered = append(prioritiesEncountered, metadata.Priority)
+
 			for _, fieldRequest := range requestedFields {
 				if !fieldRequest.MatchesFilter(metadata.Metadata) {
 					logger.For(ctx).Infof("metadata %+v does not match field request %+v", metadata, fieldRequest)
+					prioritiesEncountered = append(prioritiesEncountered, metadata.Priority)
 					continue metadatas
 				}
 			}
@@ -828,6 +829,7 @@ metadatas:
 				// short circuit if we've found the highest priority metadata
 				return metadata.Metadata, nil
 			}
+			prioritiesEncountered = append(prioritiesEncountered, metadata.Priority)
 
 			if result.Metadata == nil || metadata.Priority < result.Priority {
 				result = metadata
