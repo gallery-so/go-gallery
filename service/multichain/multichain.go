@@ -983,51 +983,65 @@ outer:
 	return p.processTokensForOwnersOfContract(ctx, contract.ID, ci.Chain, users, chainTokensForUsers, persistedContracts)
 }
 
-func (p *Provider) GetContractsOwnedByAddress(ctx context.Context, addr persist.ChainAddress) ([]persist.ContractGallery, error) {
-	contractFetchers := matchingProvidersForChain[ContractsFetcher](p.Chains, addr.Chain())
-	contractsFromProviders := []chainContracts{}
-	contractsReceive := make(chan chainContracts)
-	errChan := make(chan errWithPriority)
-	done := make(chan struct{})
-	wg := &sync.WaitGroup{}
-	for i, fetcher := range contractFetchers {
-		wg.Add(1)
-		go func(priority int, p ContractsFetcher) {
-			defer wg.Done()
-			contracts, err := p.GetContractsByOwnerAddress(ctx, addr.Address())
-			if err != nil {
-				errChan <- errWithPriority{priority: priority, err: err}
-				return
-			}
-			contractsReceive <- chainContracts{chain: addr.Chain(), contracts: contracts, priority: priority}
-		}(i, fetcher)
-	}
-	go func() {
-		defer close(done)
-		wg.Wait()
-	}()
+type ContractOwnerResult struct {
+	Priority  int
+	Contracts []ChainAgnosticContract
+	Chain     persist.Chain
+}
 
-outer:
-	for {
-		select {
-		case err := <-errChan:
-			if err.priority == 0 {
-				return nil, err
+func (p *Provider) SyncContractsOwnedByUser(ctx context.Context, userID persist.DBID, chains []persist.Chain) error {
+
+	user, err := p.Repos.UserRepository.GetByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	if len(chains) == 0 {
+		for chain := range p.Chains {
+			chains = append(chains, chain)
+		}
+	}
+	contractsFromProviders := []chainContracts{}
+
+	contractFetchers := matchingProvidersByChain[ContractsFetcher](p.Chains, chains...)
+	searchAddresses := matchingAddresses(user.Wallets, chains)
+	providerPool := pool.NewWithResults[ContractOwnerResult]().WithContext(ctx).WithCancelOnError()
+
+	for chain, addresses := range searchAddresses {
+		for priority, fetcher := range contractFetchers[chain] {
+			for _, address := range addresses {
+
+				c := chain
+				pr := priority
+				f := fetcher
+				a := address
+				providerPool.Go(func(ctx context.Context) (ContractOwnerResult, error) {
+
+					contracts, err := f.GetContractsByOwnerAddress(ctx, a)
+					if err != nil {
+						return ContractOwnerResult{Priority: pr}, err
+					}
+					return ContractOwnerResult{Contracts: contracts, Chain: c, Priority: pr}, nil
+				})
 			}
-		case contract := <-contractsReceive:
-			contractsFromProviders = append(contractsFromProviders, contract)
-		case <-done:
-			logger.For(ctx).Debug("done refreshing tokens for collection")
-			break outer
 		}
 	}
 
-	persistedContracts, err := p.processContracts(ctx, contractsFromProviders)
+	pResult, err := providerPool.Wait()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return persistedContracts, nil
+	for _, result := range pResult {
+		contractsFromProviders = append(contractsFromProviders, chainContracts{chain: result.Chain, contracts: result.Contracts, priority: result.Priority})
+	}
+
+	_, err = p.processContracts(ctx, contractsFromProviders)
+	if err != nil {
+		return err
+	}
+
+	return p.SyncTokensCreatedOnSharedContracts(ctx, userID, chains)
 
 }
 
