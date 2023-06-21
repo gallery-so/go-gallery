@@ -71,13 +71,37 @@ type TokenProfileImage {
   token: Token!
 }
 
-union ProfileImage = TokenProfileImage
+type IPFSProfileImage {
+  url: String!
+}
+
+type HTTPSProfileImage {
+  url: String!
+}
+
+type DataProfileImage {
+  url: String!
+}
+
+# XXX TODO: Should this just be a token?
+type NFTProfileImage {
+  url: String!
+}
+
+union ProfileImage =
+    TokenProfileImage
+  | IPFSProfileImage
+  | HTTPSProfileImage
+  | DataProfileImage
+  | NFTProfileImage
 
 type GalleryUser implements Node @goEmbedHelper {
   id: ID!
   dbid: DBID!
   username: String
   profileImage: ProfileImage @goField(forceResolver: true)
+  # Returns a profile image from one of the user's wallets if it is registered with ENS and has an avatar record set
+  ensProfileImage: ProfileImage @goField(forceResolver: true)
   bio: String
   traits: String
   universal: Boolean

@@ -731,6 +731,12 @@ type CreatedCommunitiesInput struct {
 	IncludeChains []persist.Chain `json:"includeChains"`
 }
 
+type DataProfileImage struct {
+	URL string `json:"url"`
+}
+
+func (DataProfileImage) IsProfileImage() {}
+
 type DebugAuth struct {
 	AsUsername         *string                 `json:"asUsername"`
 	UserID             *persist.DBID           `json:"userId"`
@@ -1234,6 +1240,7 @@ type GalleryUser struct {
 	Dbid                persist.DBID           `json:"dbid"`
 	Username            *string                `json:"username"`
 	ProfileImage        ProfileImage           `json:"profileImage"`
+	EnsProfileImage     ProfileImage           `json:"ensProfileImage"`
 	Bio                 *string                `json:"bio"`
 	Traits              *string                `json:"traits"`
 	Universal           *bool                  `json:"universal"`
@@ -1298,6 +1305,12 @@ type GroupNotificationUsersConnection struct {
 	PageInfo *PageInfo                    `json:"pageInfo"`
 }
 
+type HTTPSProfileImage struct {
+	URL string `json:"url"`
+}
+
+func (HTTPSProfileImage) IsProfileImage() {}
+
 type HTMLMedia struct {
 	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`
 	MediaURL         *string          `json:"mediaURL"`
@@ -1309,6 +1322,12 @@ type HTMLMedia struct {
 
 func (HTMLMedia) IsMediaSubtype() {}
 func (HTMLMedia) IsMedia()        {}
+
+type IPFSProfileImage struct {
+	URL string `json:"url"`
+}
+
+func (IPFSProfileImage) IsProfileImage() {}
 
 type ImageMedia struct {
 	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`
@@ -1419,6 +1438,12 @@ type MoveCollectionToGalleryPayload struct {
 }
 
 func (MoveCollectionToGalleryPayload) IsMoveCollectionToGalleryPayloadOrError() {}
+
+type NFTProfileImage struct {
+	URL string `json:"url"`
+}
+
+func (NFTProfileImage) IsProfileImage() {}
 
 type NotificationEdge struct {
 	Node   Notification `json:"node"`

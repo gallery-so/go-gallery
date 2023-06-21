@@ -5,36 +5,38 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/jackc/pgtype"
-	"github.com/jackc/pgx/v4"
-	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/multichain"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
-	"github.com/mikeydub/go-gallery/service/recommend"
-	"github.com/mikeydub/go-gallery/service/socialauth"
-	"github.com/mikeydub/go-gallery/service/user"
 
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/everFinance/goar"
 	"github.com/go-playground/validator/v10"
 	shell "github.com/ipfs/go-ipfs-api"
+	"github.com/jackc/pgtype"
+	"github.com/jackc/pgx/v4"
 	"github.com/jinzhu/copier"
+	"roci.dev/fracdex"
+
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/emails"
+	"github.com/mikeydub/go-gallery/service/eth"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/membership"
+	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/recommend"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/service/socialauth"
+	"github.com/mikeydub/go-gallery/service/user"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
-	"roci.dev/fracdex"
 )
 
 var ErrProfileImageTooManySources = errors.New("too many profile image sources provided")
@@ -1390,4 +1392,49 @@ func (api UserAPI) GetProfileImageByUserID(ctx context.Context, userID persist.D
 		return db.ProfileImage{}, nil
 	}
 	return api.loaders.ProfileImageByID.Load(user.ProfileImageID)
+}
+
+func (api UserAPI) GetENSProfileImageByUserID(ctx context.Context, userID persist.DBID) (eth.EnsAvatar, error) {
+	// Validate
+	user, err := api.GetUserById(ctx, userID)
+	if err != nil {
+		return eth.EnsAvatar{}, err
+	}
+
+	// TODO: Eventually we want to fetch PFPs from ENS tokens held in the user's wallets
+	if len(user.Wallets) == 0 {
+		return eth.EnsAvatar{}, nil
+	}
+
+	wallets := make([]persist.EthereumAddress, 0)
+
+	// Filter for only ETH wallets
+	for _, w := range user.Wallets {
+		if w.Chain == persist.ChainETH {
+			wallets = append(wallets, persist.EthereumAddress(w.Address))
+		}
+	}
+
+	// Sort wallets by primary wallet first then by ID
+	sort.Slice(wallets, func(i, j int) bool {
+		return user.Wallets[i].ID == user.PrimaryWalletID || user.Wallets[i].ID < user.Wallets[j].ID
+	})
+
+	errs := make([]error, 0)
+
+	for _, w := range wallets {
+		a, err := eth.EnsAvatarRecordFor(ctx, api.ethClient, w)
+		if err == nil && a.URI != nil {
+			return a, nil
+		}
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	if len(errs) == 0 {
+		return eth.EnsAvatar{}, nil
+	}
+
+	return eth.EnsAvatar{}, errs[0]
 }

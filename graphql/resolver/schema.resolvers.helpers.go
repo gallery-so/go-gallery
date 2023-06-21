@@ -12,23 +12,23 @@ import (
 
 	"github.com/gammazero/workerpool"
 	"github.com/magiclabs/magic-admin-go/token"
+
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/debugtools"
 	"github.com/mikeydub/go-gallery/graphql/model"
+	"github.com/mikeydub/go-gallery/publicapi"
+	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/emails"
+	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/notifications"
+	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/socialauth"
 	"github.com/mikeydub/go-gallery/service/twitter"
-	"github.com/mikeydub/go-gallery/validate"
-
-	"github.com/mikeydub/go-gallery/debugtools"
-
-	db "github.com/mikeydub/go-gallery/db/gen/coredb"
-	"github.com/mikeydub/go-gallery/publicapi"
-	"github.com/mikeydub/go-gallery/service/auth"
-	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/validate"
 )
 
 var errNoAuthMechanismFound = fmt.Errorf("no auth mechanism found")
@@ -1937,6 +1937,22 @@ func profileImageToModel(ctx context.Context, pfp db.ProfileImage) (model.Profil
 		return &model.TokenProfileImage{Token: token}, err
 	default:
 		return nil, publicapi.ErrProfileImageUnknownSource
+	}
+}
+
+func ensAvatarToModel(ctx context.Context, a eth.EnsAvatar) (model.ProfileImage, error) {
+	switch t := a.URI.(type) {
+	case eth.EnsHttpUri:
+		return &model.HTTPSProfileImage{URL: t.URL}, nil
+	case eth.EnsDataUri:
+		return &model.DataProfileImage{URL: t.URL}, nil
+	case eth.EnsIpfsUri:
+		return &model.IPFSProfileImage{URL: t.URL}, nil
+	case eth.EnsNftUri:
+		panic("not implemented")
+		// return &model.NFTProfileImage{URL: t.URL}, nil
+	default:
+		panic("not implemented")
 	}
 }
 

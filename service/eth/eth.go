@@ -2,101 +2,132 @@ package eth
 
 import (
 	"context"
-	"math/big"
+	"errors"
+	"regexp"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/mikeydub/go-gallery/contracts"
+	ens "github.com/wealdtech/go-ens/v3"
+
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-const ensContractAddress = "0xFaC7BEA255a6990f749363002136aF6556b31e04"
+var ErrNoResolution = errors.New("no resolution")
+var ErrUnknownENSAvatarURI = errors.New("unknown ENS avatar uri")
 
-// HasNFT checks if a wallet address has a given NFT
-func HasNFT(pCtx context.Context, contractAddress persist.EthereumAddress, id persist.TokenID, userAddr persist.EthereumAddress, ethcl *ethclient.Client) (bool, error) {
-
-	instance, err := contracts.NewIERC1155Caller(contractAddress.Address(), ethcl)
-	if err != nil {
-		return false, err
+// ReverseResolve returns the domain name for the given address
+func ReverseResolve(ctx context.Context, ethClient *ethclient.Client, address persist.EthereumAddress) (string, error) {
+	domain, err := ens.ReverseResolve(ethClient, common.HexToAddress(address.String()))
+	if err != nil && strings.Contains(err.Error(), "not a resolver") {
+		return "", ErrNoResolution
 	}
-
-	call, err := instance.BalanceOf(&bind.CallOpts{Context: pCtx}, userAddr.Address(), id.BigInt())
-	if err != nil {
-		return false, err
+	if err != nil && strings.Contains(err.Error(), "no resolution") {
+		return "", ErrNoResolution
 	}
-
-	return call.Cmp(big.NewInt(0)) > 0, nil
-
+	if err != nil {
+		return "", err
+	}
+	if domain == "" {
+		return "", ErrNoResolution
+	}
+	return domain, nil
 }
 
-// HasNFTs checks if a wallet address has a given set of NFTs
-func HasNFTs(pCtx context.Context, contractAddress persist.EthereumAddress, ids []persist.TokenID, userAddr persist.EthereumAddress, ethcl *ethclient.Client) (bool, error) {
-
-	instance, err := contracts.NewIERC1155Caller(contractAddress.Address(), ethcl)
+// ReverseResolves returns true if the given address resolves to the given domain
+func ReverseResolves(ctx context.Context, ethClient *ethclient.Client, domain string, address persist.EthereumAddress) (bool, error) {
+	revDomain, err := ReverseResolve(ctx, ethClient, address)
+	if errors.Is(err, ErrNoResolution) {
+		return false, nil
+	}
 	if err != nil {
 		return false, err
 	}
-
-	bigIntIDs := make([]*big.Int, len(ids))
-	addrs := make([]common.Address, len(ids))
-	for i := 0; i < len(ids); i++ {
-
-		bigIntIDs[i] = ids[i].BigInt()
-		addrs[i] = userAddr.Address()
-	}
-
-	call, err := instance.BalanceOfBatch(&bind.CallOpts{Context: pCtx}, addrs, bigIntIDs)
-	if err != nil {
-		return false, err
-	}
-	for _, v := range call {
-		if v.Cmp(big.NewInt(0)) > 0 {
-			return true, nil
-		}
-	}
-
-	return false, nil
-
+	return strings.EqualFold(domain, revDomain), nil
 }
 
-// ResolvesENS checks if an ENS resolves to a given address
-func ResolvesENS(pCtx context.Context, ens string, userAddr persist.EthereumAddress, ethcl *ethclient.Client) (bool, error) {
+// XXX TODO: Figure out what errors are possible here
+func EnsAvatarRecordFor(ctx context.Context, ethClient *ethclient.Client, a persist.EthereumAddress) (avatar EnsAvatar, err error) {
+	domain, err := ReverseResolve(ctx, ethClient, a)
+	if errors.Is(err, ErrNoResolution) {
+		return avatar, nil
+	}
 
-	instance, err := contracts.NewIENSCaller(common.HexToAddress(ens), ethcl)
+	resolver, err := ens.NewResolver(ethClient, domain)
 	if err != nil {
-		return false, err
+		return avatar, err
 	}
 
-	nh := namehash(ens)
-	asBytes32 := [32]byte{}
-	for i := 0; i < len(nh); i++ {
-		asBytes32[i] = nh[i]
-	}
-
-	call, err := instance.Resolver(&bind.CallOpts{Context: pCtx}, asBytes32)
+	record, err := resolver.Text("avatar")
 	if err != nil {
-		return false, err
+		return avatar, err
 	}
 
-	return strings.EqualFold(userAddr.String(), call.String()), nil
+	uri, err := recordToURI(record)
+	if err != nil {
+		return EnsAvatar{}, err
+	}
 
+	return EnsAvatar{URI: uri}, nil
 }
 
-// function that computes the namehash for a given ENS domain
-func namehash(name string) common.Hash {
-	node := common.Hash{}
+// Regex for CAIP-19 asset type with required asset ID
+// https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-19.md
+var caip19AssetTypeWithAssetID = regexp.MustCompile(`^(?P<chain_id>[-a-z0-9]{3,8}:[-_a-zA-Z0-9]{1,32})/(?P<asset_namespace>[-a-z0-9]{3,8}):(?P<asset_reference>[-.%a-zA-Z0-9]{1,78})/(?P<token_id>[-.%a-zA-Z0-9]{1,78})$`)
 
-	if len(name) > 0 {
-		labels := strings.Split(name, ".")
-
-		for i := len(labels) - 1; i >= 0; i-- {
-			labelSha := crypto.Keccak256Hash([]byte(labels[i]))
-			node = crypto.Keccak256Hash(node.Bytes(), labelSha.Bytes())
-		}
+func recordToURI(r string) (avatarURI, error) {
+	switch {
+	case strings.HasPrefix(r, "https://"):
+		return EnsHttpUri{URL: r}, nil
+	case strings.HasPrefix(r, "ipfs://"):
+		return EnsIpfsUri{URL: r}, nil
+	case strings.HasPrefix(r, "data:"):
+		return EnsDataUri{URL: r}, nil
+	case caip19AssetTypeWithAssetID.MatchString(r):
+		grps := caip19AssetTypeWithAssetID.FindStringSubmatch(r)
+		return EnsNftUri{
+			ChainID:        grps[1],
+			AssetNamespace: grps[2],
+			AssetReference: grps[3],
+			AssetID:        grps[4],
+		}, nil
+	default:
+		return nil, ErrUnknownENSAvatarURI
 	}
-
-	return node
 }
+
+// EnsAvatar is a representation of the ENS avatar text record
+type EnsAvatar struct {
+	URI avatarURI
+}
+
+type avatarURI interface {
+	IsAvatarURI()
+}
+
+type EnsHttpUri struct {
+	URL string
+}
+
+func (EnsHttpUri) IsAvatarURI() {}
+
+type EnsDataUri struct {
+	URL string
+}
+
+func (EnsDataUri) IsAvatarURI() {}
+
+type EnsIpfsUri struct {
+	URL string
+}
+
+func (EnsIpfsUri) IsAvatarURI() {}
+
+type EnsNftUri struct {
+	ChainID        string
+	AssetNamespace string
+	AssetReference string
+	AssetID        string
+}
+
+func (EnsNftUri) IsAvatarURI() {}

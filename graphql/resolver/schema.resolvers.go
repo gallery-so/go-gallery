@@ -425,6 +425,15 @@ func (r *galleryUserResolver) ProfileImage(ctx context.Context, obj *model.Galle
 	return profileImageToModel(ctx, pfp)
 }
 
+// EnsProfileImage is the resolver for the ensProfileImage field.
+func (r *galleryUserResolver) EnsProfileImage(ctx context.Context, obj *model.GalleryUser) (model.ProfileImage, error) {
+	a, err := publicapi.For(ctx).User.GetENSProfileImageByUserID(ctx, obj.Dbid)
+	if err != nil {
+		return nil, err
+	}
+	return ensAvatarToModel(ctx, a)
+}
+
 // Roles is the resolver for the roles field.
 func (r *galleryUserResolver) Roles(ctx context.Context, obj *model.GalleryUser) ([]*persist.Role, error) {
 	dbRoles, err := publicapi.For(ctx).User.GetUserRolesByUserID(ctx, obj.Dbid)
