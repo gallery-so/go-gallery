@@ -103,6 +103,25 @@ select o.*
     from unnest(@token_ids::text[]) as t(id)
         join token_ownership o on o.token_id = t.id;
 
+-- name: GetOwnedTokenByIdentifiers :one
+with user_owns as (
+    select * from token_ownership where token_ownership.owner_user_id = @user_id
+),
+selected_token as (
+	select t.*
+	from tokens t
+	join contracts c on t.contract = c.id
+	where c.chain = @chain and c.address = @contract_address and t.token_id = @token_id and not t.deleted and not c.deleted
+),
+owned_token as (
+    select selected_token.id
+    from user_owns
+    join selected_token on user_owns.token_id = selected_token.id
+)
+select tokens.*
+from tokens
+join owned_token on tokens.id = owned_token.id;
+
 -- name: GetContractCreatorsByIds :many
 select o.*
     from unnest(@contract_ids::text[]) as c(id)

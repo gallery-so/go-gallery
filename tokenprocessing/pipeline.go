@@ -12,6 +12,7 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/metric"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -168,7 +169,7 @@ func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) mediaRes
 	result.Media = tokenMedia
 
 	// Wrap the error to indicate that the token is bad to callers
-	if util.ErrorAs[errNoMediaURLs](err) || util.ErrorAs[errInvalidMedia](err) {
+	if errors.Is(err, media.ErrNoMediaURLs) || util.ErrorAs[errInvalidMedia](err) {
 		err = ErrBadToken{err}
 	}
 
@@ -231,7 +232,7 @@ func (tpj *tokenProcessingJob) retrieveTokenInfo(ctx context.Context, metadata p
 }
 
 func (tpj *tokenProcessingJob) cacheMediaObjects(ctx context.Context, metadata persist.TokenMetadata) (persist.Media, error) {
-	imgURL, animURL, err := findImageAndAnimationURLs(ctx, tpj.token.TokenID, tpj.contract.Address, tpj.token.Chain, metadata, tpj.token.TokenURI, tpj.token.Chain != persist.ChainETH, tpj.pipelineMetadata)
+	imgURL, animURL, err := findImageAndAnimationURLs(ctx, tpj.contract.Address, tpj.token.Chain, metadata, tpj.pipelineMetadata)
 	if err != nil {
 		return persist.Media{MediaType: persist.MediaTypeUnknown}, err
 	}

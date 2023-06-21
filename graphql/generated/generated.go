@@ -624,7 +624,7 @@ type ComplexityRoot struct {
 	}
 
 	HTTPSProfileImage struct {
-		URL func(childComplexity int) int
+		PreviewURLs func(childComplexity int) int
 	}
 
 	HtmlMedia struct {
@@ -637,7 +637,7 @@ type ComplexityRoot struct {
 	}
 
 	IPFSProfileImage struct {
-		URL func(childComplexity int) int
+		PreviewURLs func(childComplexity int) int
 	}
 
 	ImageMedia struct {
@@ -787,7 +787,7 @@ type ComplexityRoot struct {
 	}
 
 	NFTProfileImage struct {
-		URL func(childComplexity int) int
+		ProfileImage func(childComplexity int) int
 	}
 
 	NotificationEdge struct {
@@ -3576,12 +3576,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.GroupNotificationUsersConnection.PageInfo(childComplexity), true
 
-	case "HTTPSProfileImage.url":
-		if e.complexity.HTTPSProfileImage.URL == nil {
+	case "HTTPSProfileImage.previewURLs":
+		if e.complexity.HTTPSProfileImage.PreviewURLs == nil {
 			break
 		}
 
-		return e.complexity.HTTPSProfileImage.URL(childComplexity), true
+		return e.complexity.HTTPSProfileImage.PreviewURLs(childComplexity), true
 
 	case "HtmlMedia.contentRenderURL":
 		if e.complexity.HtmlMedia.ContentRenderURL == nil {
@@ -3625,12 +3625,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.HtmlMedia.PreviewURLs(childComplexity), true
 
-	case "IPFSProfileImage.url":
-		if e.complexity.IPFSProfileImage.URL == nil {
+	case "IPFSProfileImage.previewURLs":
+		if e.complexity.IPFSProfileImage.PreviewURLs == nil {
 			break
 		}
 
-		return e.complexity.IPFSProfileImage.URL(childComplexity), true
+		return e.complexity.IPFSProfileImage.PreviewURLs(childComplexity), true
 
 	case "ImageMedia.contentRenderURL":
 		if e.complexity.ImageMedia.ContentRenderURL == nil {
@@ -4691,12 +4691,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.ViewGallery(childComplexity, args["galleryId"].(persist.DBID)), true
 
-	case "NFTProfileImage.url":
-		if e.complexity.NFTProfileImage.URL == nil {
+	case "NFTProfileImage.profileImage":
+		if e.complexity.NFTProfileImage.ProfileImage == nil {
 			break
 		}
 
-		return e.complexity.NFTProfileImage.URL(childComplexity), true
+		return e.complexity.NFTProfileImage.ProfileImage(childComplexity), true
 
 	case "NotificationEdge.cursor":
 		if e.complexity.NotificationEdge.Cursor == nil {
@@ -7047,20 +7047,19 @@ type TokenProfileImage {
 }
 
 type IPFSProfileImage {
-  url: String!
+  previewURLs: PreviewURLSet
 }
 
 type HTTPSProfileImage {
-  url: String!
+  previewURLs: PreviewURLSet
 }
 
 type DataProfileImage {
   url: String!
 }
 
-# XXX TODO: Should this just be a token?
 type NFTProfileImage {
-  url: String!
+  profileImage: ProfileImage
 }
 
 union ProfileImage =
@@ -7075,7 +7074,7 @@ type GalleryUser implements Node @goEmbedHelper {
   dbid: DBID!
   username: String
   profileImage: ProfileImage @goField(forceResolver: true)
-  # Returns a profile image from one the user's wallets if it is registered with ENS and has an avatar record set
+  # Returns a profile image from one of the user's wallets if it is registered with ENS and has an avatar record set
   ensProfileImage: ProfileImage @goField(forceResolver: true)
   bio: String
   traits: String
@@ -25367,8 +25366,8 @@ func (ec *executionContext) fieldContext_GroupNotificationUsersConnection_pageIn
 	return fc, nil
 }
 
-func (ec *executionContext) _HTTPSProfileImage_url(ctx context.Context, field graphql.CollectedField, obj *model.HTTPSProfileImage) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_HTTPSProfileImage_url(ctx, field)
+func (ec *executionContext) _HTTPSProfileImage_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.HTTPSProfileImage) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_HTTPSProfileImage_previewURLs(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -25381,31 +25380,46 @@ func (ec *executionContext) _HTTPSProfileImage_url(ctx context.Context, field gr
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.URL, nil
+		return obj.PreviewURLs, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(*model.PreviewURLSet)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalOPreviewURLSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreviewURLSet(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_HTTPSProfileImage_url(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_HTTPSProfileImage_previewURLs(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "HTTPSProfileImage",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
+			switch field.Name {
+			case "raw":
+				return ec.fieldContext_PreviewURLSet_raw(ctx, field)
+			case "thumbnail":
+				return ec.fieldContext_PreviewURLSet_thumbnail(ctx, field)
+			case "small":
+				return ec.fieldContext_PreviewURLSet_small(ctx, field)
+			case "medium":
+				return ec.fieldContext_PreviewURLSet_medium(ctx, field)
+			case "large":
+				return ec.fieldContext_PreviewURLSet_large(ctx, field)
+			case "srcSet":
+				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "liveRender":
+				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
+			case "blurhash":
+				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
 	}
 	return fc, nil
@@ -25689,8 +25703,8 @@ func (ec *executionContext) fieldContext_HtmlMedia_fallbackMedia(ctx context.Con
 	return fc, nil
 }
 
-func (ec *executionContext) _IPFSProfileImage_url(ctx context.Context, field graphql.CollectedField, obj *model.IPFSProfileImage) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_IPFSProfileImage_url(ctx, field)
+func (ec *executionContext) _IPFSProfileImage_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.IPFSProfileImage) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_IPFSProfileImage_previewURLs(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -25703,31 +25717,46 @@ func (ec *executionContext) _IPFSProfileImage_url(ctx context.Context, field gra
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.URL, nil
+		return obj.PreviewURLs, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(*model.PreviewURLSet)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalOPreviewURLSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreviewURLSet(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_IPFSProfileImage_url(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_IPFSProfileImage_previewURLs(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "IPFSProfileImage",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
+			switch field.Name {
+			case "raw":
+				return ec.fieldContext_PreviewURLSet_raw(ctx, field)
+			case "thumbnail":
+				return ec.fieldContext_PreviewURLSet_thumbnail(ctx, field)
+			case "small":
+				return ec.fieldContext_PreviewURLSet_small(ctx, field)
+			case "medium":
+				return ec.fieldContext_PreviewURLSet_medium(ctx, field)
+			case "large":
+				return ec.fieldContext_PreviewURLSet_large(ctx, field)
+			case "srcSet":
+				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "liveRender":
+				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
+			case "blurhash":
+				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
 	}
 	return fc, nil
@@ -32106,8 +32135,8 @@ func (ec *executionContext) fieldContext_Mutation_generateQRCodeLoginToken(ctx c
 	return fc, nil
 }
 
-func (ec *executionContext) _NFTProfileImage_url(ctx context.Context, field graphql.CollectedField, obj *model.NFTProfileImage) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_NFTProfileImage_url(ctx, field)
+func (ec *executionContext) _NFTProfileImage_profileImage(ctx context.Context, field graphql.CollectedField, obj *model.NFTProfileImage) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_NFTProfileImage_profileImage(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -32120,31 +32149,28 @@ func (ec *executionContext) _NFTProfileImage_url(ctx context.Context, field grap
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.URL, nil
+		return obj.ProfileImage, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(model.ProfileImage)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalOProfileImage2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐProfileImage(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_NFTProfileImage_url(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_NFTProfileImage_profileImage(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "NFTProfileImage",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
+			return nil, errors.New("field of type ProfileImage does not have child fields")
 		},
 	}
 	return fc, nil
@@ -58434,13 +58460,10 @@ func (ec *executionContext) _HTTPSProfileImage(ctx context.Context, sel ast.Sele
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("HTTPSProfileImage")
-		case "url":
+		case "previewURLs":
 
-			out.Values[i] = ec._HTTPSProfileImage_url(ctx, field, obj)
+			out.Values[i] = ec._HTTPSProfileImage_previewURLs(ctx, field, obj)
 
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -58507,13 +58530,10 @@ func (ec *executionContext) _IPFSProfileImage(ctx context.Context, sel ast.Selec
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("IPFSProfileImage")
-		case "url":
+		case "previewURLs":
 
-			out.Values[i] = ec._IPFSProfileImage_url(ctx, field, obj)
+			out.Values[i] = ec._IPFSProfileImage_previewURLs(ctx, field, obj)
 
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -59401,13 +59421,10 @@ func (ec *executionContext) _NFTProfileImage(ctx context.Context, sel ast.Select
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("NFTProfileImage")
-		case "url":
+		case "profileImage":
 
-			out.Values[i] = ec._NFTProfileImage_url(ctx, field, obj)
+			out.Values[i] = ec._NFTProfileImage_profileImage(ctx, field, obj)
 
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

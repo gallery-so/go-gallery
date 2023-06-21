@@ -1401,28 +1401,27 @@ func (api UserAPI) GetENSProfileImageByUserID(ctx context.Context, userID persis
 		return eth.EnsAvatar{}, err
 	}
 
-	// TODO: Eventually we want to fetch PFPs from ENS tokens held in the user's wallets
 	if len(user.Wallets) == 0 {
 		return eth.EnsAvatar{}, nil
 	}
 
-	wallets := make([]persist.EthereumAddress, 0)
+	// Sort wallets by primary wallet first then by ID
+	sort.Slice(user.Wallets, func(i, j int) bool {
+		return user.Wallets[i].ID == user.PrimaryWalletID || user.Wallets[i].ID < user.Wallets[j].ID
+	})
+
+	ethWallets := make([]persist.EthereumAddress, 0)
 
 	// Filter for only ETH wallets
 	for _, w := range user.Wallets {
 		if w.Chain == persist.ChainETH {
-			wallets = append(wallets, persist.EthereumAddress(w.Address))
+			ethWallets = append(ethWallets, persist.EthereumAddress(w.Address))
 		}
 	}
 
-	// Sort wallets by primary wallet first then by ID
-	sort.Slice(wallets, func(i, j int) bool {
-		return user.Wallets[i].ID == user.PrimaryWalletID || user.Wallets[i].ID < user.Wallets[j].ID
-	})
-
 	errs := make([]error, 0)
 
-	for _, w := range wallets {
+	for _, w := range ethWallets {
 		a, err := eth.EnsAvatarRecordFor(ctx, api.ethClient, w)
 		if err == nil && a.URI != nil {
 			return a, nil
@@ -1432,9 +1431,9 @@ func (api UserAPI) GetENSProfileImageByUserID(ctx context.Context, userID persis
 		}
 	}
 
-	if len(errs) == 0 {
-		return eth.EnsAvatar{}, nil
+	if len(errs) > 0 {
+		return eth.EnsAvatar{}, errs[0]
 	}
 
-	return eth.EnsAvatar{}, errs[0]
+	return eth.EnsAvatar{}, nil
 }

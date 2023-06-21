@@ -1306,7 +1306,7 @@ type GroupNotificationUsersConnection struct {
 }
 
 type HTTPSProfileImage struct {
-	URL string `json:"url"`
+	PreviewURLs *PreviewURLSet `json:"previewURLs"`
 }
 
 func (HTTPSProfileImage) IsProfileImage() {}
@@ -1324,7 +1324,7 @@ func (HTMLMedia) IsMediaSubtype() {}
 func (HTMLMedia) IsMedia()        {}
 
 type IPFSProfileImage struct {
-	URL string `json:"url"`
+	PreviewURLs *PreviewURLSet `json:"previewURLs"`
 }
 
 func (IPFSProfileImage) IsProfileImage() {}
@@ -1440,7 +1440,7 @@ type MoveCollectionToGalleryPayload struct {
 func (MoveCollectionToGalleryPayload) IsMoveCollectionToGalleryPayloadOrError() {}
 
 type NFTProfileImage struct {
-	URL string `json:"url"`
+	ProfileImage ProfileImage `json:"profileImage"`
 }
 
 func (NFTProfileImage) IsProfileImage() {}

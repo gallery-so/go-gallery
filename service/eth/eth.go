@@ -46,7 +46,6 @@ func ReverseResolves(ctx context.Context, ethClient *ethclient.Client, domain st
 	return strings.EqualFold(domain, revDomain), nil
 }
 
-// XXX TODO: Figure out what errors are possible here
 func EnsAvatarRecordFor(ctx context.Context, ethClient *ethclient.Client, a persist.EthereumAddress) (avatar EnsAvatar, err error) {
 	domain, err := ReverseResolve(ctx, ethClient, a)
 	if errors.Is(err, ErrNoResolution) {
@@ -63,7 +62,11 @@ func EnsAvatarRecordFor(ctx context.Context, ethClient *ethclient.Client, a pers
 		return avatar, err
 	}
 
-	uri, err := recordToURI(record)
+	if record == "" {
+		return avatar, nil
+	}
+
+	uri, err := ENSRecordToURI(record)
 	if err != nil {
 		return EnsAvatar{}, err
 	}
@@ -75,7 +78,7 @@ func EnsAvatarRecordFor(ctx context.Context, ethClient *ethclient.Client, a pers
 // https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-19.md
 var caip19AssetTypeWithAssetID = regexp.MustCompile(`^(?P<chain_id>[-a-z0-9]{3,8}:[-_a-zA-Z0-9]{1,32})/(?P<asset_namespace>[-a-z0-9]{3,8}):(?P<asset_reference>[-.%a-zA-Z0-9]{1,78})/(?P<token_id>[-.%a-zA-Z0-9]{1,78})$`)
 
-func recordToURI(r string) (avatarURI, error) {
+func ENSRecordToURI(r string) (avatarURI, error) {
 	switch {
 	case strings.HasPrefix(r, "https://"):
 		return EnsHttpUri{URL: r}, nil
@@ -131,3 +134,15 @@ type EnsNftUri struct {
 }
 
 func (EnsNftUri) IsAvatarURI() {}
+
+func (e EnsNftUri) Chain() persist.Chain {
+	panic("not implemented")
+}
+
+func (e EnsNftUri) TokenID() persist.TokenID {
+	panic("not implemented")
+}
+
+func (e EnsNftUri) Address() persist.Address {
+	panic("not implemented")
+}

@@ -44,6 +44,7 @@
 //go:generate go run github.com/gallery-so/dataloaden ContractCreatorLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.ContractCreator
 //go:generate go run github.com/gallery-so/dataloaden TokensLoaderByUserIDAndFilters github.com/mikeydub/go-gallery/db/gen/coredb.GetTokensByUserIdBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.Token
 //go:generate go run github.com/gallery-so/dataloaden ProfileImageLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.ProfileImage
+//go:generate go run github.com/gallery-so/dataloaden OwnedTokenLoaderByTokenIdentifiers github.com/mikeydub/go-gallery/db/gen/coredb.GetOwnedTokenByIdentifiersParams github.com/mikeydub/go-gallery/db/gen/coredb.Token
 
 package dataloader
 

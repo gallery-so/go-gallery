@@ -172,6 +172,16 @@ func (api TokenAPI) GetTokensByIDs(ctx context.Context, tokenIDs []persist.DBID)
 	return foundTokens, nil
 }
 
+// GetOwnedTokenByIdentifiers returns a token owned by a user by its identifiers.
+func (api TokenAPI) GetOwnedTokenByIdentifiers(ctx context.Context, userID persist.DBID, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) (db.Token, error) {
+	panic("not implemented")
+}
+
+// GetMetadataByTokenIdentifiers fetches a token's metadata by its identifiers.
+func (api TokenAPI) GetMetadataByTokenIdentifiers(ctx context.Context, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) (persist.TokenMetadata, error) {
+	panic("not implemented")
+}
+
 // GetNewTokensByFeedEventID returns new tokens added to a collection from an event.
 // Since its possible for tokens to be deleted, the return size may not be the same size of
 // the tokens added, so the caller should handle the matching of arguments to response if used in that context.

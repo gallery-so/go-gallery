@@ -431,7 +431,7 @@ func (r *galleryUserResolver) EnsProfileImage(ctx context.Context, obj *model.Ga
 	if err != nil {
 		return nil, err
 	}
-	return ensAvatarToModel(ctx, a)
+	return ensAvatarToModel(ctx, obj.Dbid, a)
 }
 
 // Roles is the resolver for the roles field.
