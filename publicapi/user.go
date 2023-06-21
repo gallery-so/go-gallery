@@ -1356,7 +1356,7 @@ func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID) e
 			return err
 		}
 
-		if !o.IsHolder || !o.IsCreator {
+		if o.OwnerUserID != userID {
 			return ErrProfileImageNotTokenOwner
 		}
 
