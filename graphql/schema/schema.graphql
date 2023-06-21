@@ -192,6 +192,10 @@ type PreviewURLSet {
   srcSet: String
   liveRender: String
   blurhash: String @experimental @goField(forceResolver: true)
+  thumbnailHighDef: String
+  smallHighDef: String
+  mediumHighDef: String
+  largeHighDef: String
 }
 
 type VideoURLSet {
@@ -454,6 +458,7 @@ type CollectionSectionLayout {
 
 type CollectionTokenSettings {
   renderLive: Boolean
+  highDefinition: Boolean
 }
 
 type CollectionEdge {
@@ -1184,6 +1189,7 @@ input CollectionSectionLayoutInput {
 input CollectionTokenSettingsInput {
   tokenId: DBID!
   renderLive: Boolean!
+  highDefinition: Boolean!
 }
 
 input CreateCollectionInput {

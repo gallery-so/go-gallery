@@ -161,6 +161,12 @@ func WithTimestamp(t time.Time) Option {
 	}
 }
 
+func WithQuality(q int) Option {
+	return func(params *[]imgix.IxParam) {
+		*params = append(*params, imgix.Param("q", strconv.Itoa(q)))
+	}
+}
+
 func (u *MediaMapper) GetThumbnailImageUrl(sourceUrl string, options ...Option) string {
 	return u.buildPreviewImageUrl(sourceUrl, thumbnailWidth, u.thumbnailUrlParams, options...)
 }

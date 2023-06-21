@@ -105,7 +105,8 @@ type CollectionUpdateDeletedInput struct {
 
 // CollectionTokenSettings represents configurable token display options per collection
 type CollectionTokenSettings struct {
-	RenderLive bool `json:"render_live"`
+	RenderLive     bool `json:"render_live"`
+	HighDefinition bool `json:"high_definition"`
 }
 
 // CollectionRepository represents the interface for interacting with the collection persistence layer

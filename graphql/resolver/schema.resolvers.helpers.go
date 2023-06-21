@@ -998,10 +998,10 @@ func resolveTokenSettingsByIDs(ctx context.Context, tokenID, collectionID persis
 	}
 
 	if settings, ok := collection.TokenSettings[tokenID]; ok {
-		return &model.CollectionTokenSettings{RenderLive: &settings.RenderLive}, nil
+		return &model.CollectionTokenSettings{RenderLive: &settings.RenderLive, HighDefinition: &settings.HighDefinition}, nil
 	}
 
-	return &model.CollectionTokenSettings{RenderLive: &defaultTokenSettings.RenderLive}, nil
+	return &model.CollectionTokenSettings{RenderLive: &defaultTokenSettings.RenderLive, HighDefinition: &defaultTokenSettings.HighDefinition}, nil
 }
 
 func resolveNotificationByID(ctx context.Context, id persist.DBID) (model.Notification, error) {
@@ -1959,14 +1959,20 @@ func getPreviewUrls(ctx context.Context, tokenMedia db.TokenMedia, options ...me
 	o[len(o)-1] = mediamapper.WithTimestamp(tokenMedia.LastUpdated)
 	options = o
 
+	highDefOptions := append(options, mediamapper.WithQuality(100))
+
 	return &model.PreviewURLSet{
-		Raw:        &preview,
-		Thumbnail:  util.ToPointer(mm.GetThumbnailImageUrl(preview, options...)),
-		Small:      util.ToPointer(mm.GetSmallImageUrl(preview, options...)),
-		Medium:     util.ToPointer(mm.GetMediumImageUrl(preview, options...)),
-		Large:      util.ToPointer(mm.GetLargeImageUrl(preview, options...)),
-		SrcSet:     util.ToPointer(mm.GetSrcSet(preview, options...)),
-		LiveRender: &live,
+		Raw:              &preview,
+		Thumbnail:        util.ToPointer(mm.GetThumbnailImageUrl(preview, options...)),
+		Small:            util.ToPointer(mm.GetSmallImageUrl(preview, options...)),
+		Medium:           util.ToPointer(mm.GetMediumImageUrl(preview, options...)),
+		Large:            util.ToPointer(mm.GetLargeImageUrl(preview, options...)),
+		SrcSet:           util.ToPointer(mm.GetSrcSet(preview, options...)),
+		LiveRender:       &live,
+		ThumbnailHighDef: util.ToPointer(mm.GetThumbnailImageUrl(preview, highDefOptions...)),
+		SmallHighDef:     util.ToPointer(mm.GetSmallImageUrl(preview, highDefOptions...)),
+		MediumHighDef:    util.ToPointer(mm.GetMediumImageUrl(preview, highDefOptions...)),
+		LargeHighDef:     util.ToPointer(mm.GetLargeImageUrl(preview, highDefOptions...)),
 	}
 }
 
