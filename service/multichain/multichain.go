@@ -761,6 +761,11 @@ func (f FieldRequest[T]) MatchesFilter(filter persist.TokenMetadata) bool {
 	return true
 }
 
+type MetadataResult struct {
+	Priority int
+	Metadata persist.TokenMetadata
+}
+
 // GetTokenMetadataByTokenIdentifiers will get the metadata for a given token identifier
 func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contractAddress persist.Address, tokenID persist.TokenID, chain persist.Chain, requestedFields []FieldRequest[string]) (persist.TokenMetadata, error) {
 
@@ -773,7 +778,7 @@ func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contr
 	defer cancel()
 
 	wp := pool.New().WithMaxGoroutines(len(metadataFetchers)).WithContext(ctx).WithCancelOnError()
-	metadatas := make(chan persist.TokenMetadata)
+	metadatas := make(chan MetadataResult)
 	for i, metadataFetcher := range metadataFetchers {
 		i := i
 		metadataFetcher := metadataFetcher
@@ -790,7 +795,7 @@ func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contr
 					}
 				}
 			}
-			metadatas <- metadata
+			metadatas <- MetadataResult{Priority: i, Metadata: metadata}
 			return nil
 		})
 	}
@@ -803,26 +808,53 @@ func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contr
 		}
 	}()
 
+	prioritiesEncountered := []int{}
+
 	var betterThanNothing persist.TokenMetadata
+	var result MetadataResult
 metadatas:
 	for metadata := range metadatas {
-		if metadata != nil {
-			betterThanNothing = metadata
+		if metadata.Metadata != nil {
+			betterThanNothing = metadata.Metadata
+			prioritiesEncountered = append(prioritiesEncountered, metadata.Priority)
 			for _, fieldRequest := range requestedFields {
-				if !fieldRequest.MatchesFilter(metadata) {
+				if !fieldRequest.MatchesFilter(metadata.Metadata) {
 					logger.For(ctx).Infof("metadata %+v does not match field request %+v", metadata, fieldRequest)
 					continue metadatas
 				}
 			}
 			logger.For(ctx).Infof("got metadata %+v", metadata)
-			return metadata, nil
+			if lowestIntNotInList(prioritiesEncountered, len(metadataFetchers)) == metadata.Priority {
+				// short circuit if we've found the highest priority metadata
+				return metadata.Metadata, nil
+			}
+
+			if result.Metadata == nil || metadata.Priority < result.Priority {
+				result = metadata
+			}
 		}
+	}
+	if result.Metadata != nil {
+		return result.Metadata, nil
 	}
 
 	if betterThanNothing != nil {
 		return betterThanNothing, nil
 	}
+
 	return nil, fmt.Errorf("no metadata found for token %s-%s-%d", tokenID, contractAddress, chain)
+}
+
+// given a list of ints and a max, return the lowest int not in the list or max if all are in the list
+// for example, if the list is [0,1,3] and max is 4, return 2 or if the list is [1,2] and max is 4, return 0
+func lowestIntNotInList(list []int, max int) int {
+	sort.Ints(list)
+	for i := 0; i < max; i++ {
+		if !util.Contains(list, i) {
+			return i
+		}
+	}
+	return max
 }
 
 // VerifySignature verifies a signature for a wallet address
@@ -983,51 +1015,65 @@ outer:
 	return p.processTokensForOwnersOfContract(ctx, contract.ID, ci.Chain, users, chainTokensForUsers, persistedContracts)
 }
 
-func (p *Provider) GetContractsOwnedByAddress(ctx context.Context, addr persist.ChainAddress) ([]persist.ContractGallery, error) {
-	contractFetchers := matchingProvidersForChain[ContractsFetcher](p.Chains, addr.Chain())
-	contractsFromProviders := []chainContracts{}
-	contractsReceive := make(chan chainContracts)
-	errChan := make(chan errWithPriority)
-	done := make(chan struct{})
-	wg := &sync.WaitGroup{}
-	for i, fetcher := range contractFetchers {
-		wg.Add(1)
-		go func(priority int, p ContractsFetcher) {
-			defer wg.Done()
-			contracts, err := p.GetContractsByOwnerAddress(ctx, addr.Address())
-			if err != nil {
-				errChan <- errWithPriority{priority: priority, err: err}
-				return
-			}
-			contractsReceive <- chainContracts{chain: addr.Chain(), contracts: contracts, priority: priority}
-		}(i, fetcher)
-	}
-	go func() {
-		defer close(done)
-		wg.Wait()
-	}()
+type ContractOwnerResult struct {
+	Priority  int
+	Contracts []ChainAgnosticContract
+	Chain     persist.Chain
+}
 
-outer:
-	for {
-		select {
-		case err := <-errChan:
-			if err.priority == 0 {
-				return nil, err
+func (p *Provider) SyncContractsOwnedByUser(ctx context.Context, userID persist.DBID, chains []persist.Chain) error {
+
+	user, err := p.Repos.UserRepository.GetByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	if len(chains) == 0 {
+		for chain := range p.Chains {
+			chains = append(chains, chain)
+		}
+	}
+	contractsFromProviders := []chainContracts{}
+
+	contractFetchers := matchingProvidersByChain[ContractsFetcher](p.Chains, chains...)
+	searchAddresses := matchingAddresses(user.Wallets, chains)
+	providerPool := pool.NewWithResults[ContractOwnerResult]().WithContext(ctx).WithCancelOnError()
+
+	for chain, addresses := range searchAddresses {
+		for priority, fetcher := range contractFetchers[chain] {
+			for _, address := range addresses {
+
+				c := chain
+				pr := priority
+				f := fetcher
+				a := address
+				providerPool.Go(func(ctx context.Context) (ContractOwnerResult, error) {
+
+					contracts, err := f.GetContractsByOwnerAddress(ctx, a)
+					if err != nil {
+						return ContractOwnerResult{Priority: pr}, err
+					}
+					return ContractOwnerResult{Contracts: contracts, Chain: c, Priority: pr}, nil
+				})
 			}
-		case contract := <-contractsReceive:
-			contractsFromProviders = append(contractsFromProviders, contract)
-		case <-done:
-			logger.For(ctx).Debug("done refreshing tokens for collection")
-			break outer
 		}
 	}
 
-	persistedContracts, err := p.processContracts(ctx, contractsFromProviders)
+	pResult, err := providerPool.Wait()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return persistedContracts, nil
+	for _, result := range pResult {
+		contractsFromProviders = append(contractsFromProviders, chainContracts{chain: result.Chain, contracts: result.Contracts, priority: result.Priority})
+	}
+
+	_, err = p.processContracts(ctx, contractsFromProviders)
+	if err != nil {
+		return err
+	}
+
+	return p.SyncTokensCreatedOnSharedContracts(ctx, userID, chains)
 
 }
 
