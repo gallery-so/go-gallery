@@ -168,6 +168,7 @@ func (r *commentOnFeedEventPayloadResolver) FeedEvent(ctx context.Context, obj *
 	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
 }
 
+// Creator is the resolver for the creator field.
 func (r *communityResolver) Creator(ctx context.Context, obj *model.Community) (model.GalleryUserOrAddress, error) {
 	creator, err := publicapi.For(ctx).Contract.GetContractCreatorByContractID(ctx, obj.Dbid)
 	if err != nil {
@@ -895,7 +896,12 @@ func (r *mutationResolver) SyncTokens(ctx context.Context, chains []persist.Chai
 
 // SyncCreatedTokens is the resolver for the syncCreatedTokens field.
 func (r *mutationResolver) SyncCreatedTokens(ctx context.Context, input model.SyncCreatedTokensInput) (model.SyncCreatedTokensPayloadOrError, error) {
-	err := publicapi.For(ctx).Token.SyncTokensCreatedByUser(ctx, input.IncludeChains)
+	chains := input.IncludeChains
+	if input.IncludeChains == nil || len(input.IncludeChains) == 0 {
+		chains = persist.AllChains
+	}
+
+	err := publicapi.For(ctx).Token.SyncCreatedTokens(ctx, chains)
 	if err != nil {
 		return nil, err
 	}

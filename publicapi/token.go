@@ -317,7 +317,7 @@ func (api TokenAPI) SyncTokens(ctx context.Context, chains []persist.Chain) erro
 	return nil
 }
 
-func (api TokenAPI) SyncTokensCreatedByUser(ctx context.Context, includeChains []persist.Chain) error {
+func (api TokenAPI) SyncCreatedTokens(ctx context.Context, includeChains []persist.Chain) error {
 	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
@@ -330,7 +330,7 @@ func (api TokenAPI) SyncTokensCreatedByUser(ctx context.Context, includeChains [
 	}
 	defer api.throttler.Unlock(ctx, key)
 
-	return api.multichainProvider.SyncTokensCreatedOnSharedContracts(ctx, userID, includeChains)
+	return api.multichainProvider.SyncCreatedTokens(ctx, userID, includeChains)
 }
 
 func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) error {

@@ -113,7 +113,26 @@ func NewTokenGalleryRepository(db *sql.DB, queries *db.Queries) *TokenGalleryRep
 	deleteTokensOfContractBeforeTimeStampStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET DELETED = true WHERE CONTRACT = $1 AND LAST_SYNCED < $2 AND DELETED = false;`)
 	checkNoErr(err)
 
-	deleteTokensOfOwnerBeforeTimeStampStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET DELETED = true WHERE OWNER_USER_ID = $1 AND CHAIN = ANY($2) AND LAST_SYNCED < $3 AND DELETED = false;`)
+	// user_id = $1, chains = $2, can_delete_holder_tokens = $3, can_delete_creator_tokens = $4, last_synced = $5
+	deleteTokensOfOwnerBeforeTimeStampStmt, err := db.PrepareContext(ctx, `with can_delete as (
+    select tokens.id, tokens.contract from tokens
+        left join token_ownership on tokens.id = token_ownership.token_id and token_ownership.owner_user_id = tokens.owner_user_id
+    where tokens.owner_user_id = $1
+      and (cardinality($2::int[]) = 0 or tokens.chain = any($2))
+      and tokens.deleted = false
+      and (
+          token_ownership.token_id is null
+          or
+          (
+              ($3 or not token_ownership.is_holder)
+              and
+              ($4 or not token_ownership.is_creator)
+          )
+      )
+      and tokens.last_synced < $5
+	)
+	update tokens set deleted = true from can_delete where can_delete.id = tokens.id;`)
+
 	checkNoErr(err)
 
 	return &TokenGalleryRepository{
@@ -278,17 +297,22 @@ func (t *TokenGalleryRepository) GetByTokenID(pCtx context.Context, pTokenID per
 	return tokens, nil
 }
 
+type UpsertOptions struct {
+	UpsertingCreatorTokens bool
+	SkipDelete             bool
+}
+
 // BulkUpsertByOwnerUserID upserts multiple tokens for a user and removes any tokens that are not in the list
-func (t *TokenGalleryRepository) BulkUpsertByOwnerUserID(pCtx context.Context, ownerUserID persist.DBID, chains []persist.Chain, pTokens []persist.TokenGallery, skipDelete bool) ([]persist.TokenGallery, error) {
-	now, persistedTokens, err := t.bulkUpsert(pCtx, pTokens)
+func (t *TokenGalleryRepository) BulkUpsertByOwnerUserID(pCtx context.Context, ownerUserID persist.DBID, chains []persist.Chain, pTokens []persist.TokenGallery, options UpsertOptions) ([]persist.TokenGallery, error) {
+	now, persistedTokens, err := t.bulkUpsert(pCtx, pTokens, options.UpsertingCreatorTokens)
 	if err != nil {
 		return nil, err
 	}
 
 	// delete tokens of owner before timestamp
 
-	if !skipDelete {
-		res, err := t.deleteTokensOfOwnerBeforeTimeStampStmt.ExecContext(pCtx, ownerUserID, chains, now)
+	if !options.SkipDelete {
+		res, err := t.deleteTokensOfOwnerBeforeTimeStampStmt.ExecContext(pCtx, ownerUserID, chains, !options.UpsertingCreatorTokens, options.UpsertingCreatorTokens, now)
 		if err != nil {
 			return nil, fmt.Errorf("failed to delete tokens: %w", err)
 		}
@@ -305,14 +329,14 @@ func (t *TokenGalleryRepository) BulkUpsertByOwnerUserID(pCtx context.Context, o
 }
 
 // BulkUpsertTokensOfContract upserts all tokens of a contract and deletes the old tokens
-func (t *TokenGalleryRepository) BulkUpsertTokensOfContract(pCtx context.Context, contractID persist.DBID, pTokens []persist.TokenGallery, skipDelete bool) ([]persist.TokenGallery, error) {
-	now, persistedTokens, err := t.bulkUpsert(pCtx, pTokens)
+func (t *TokenGalleryRepository) BulkUpsertTokensOfContract(pCtx context.Context, contractID persist.DBID, pTokens []persist.TokenGallery, options UpsertOptions) ([]persist.TokenGallery, error) {
+	now, persistedTokens, err := t.bulkUpsert(pCtx, pTokens, options.UpsertingCreatorTokens)
 	if err != nil {
 		return nil, err
 	}
 
 	// delete tokens of contract before timestamp
-	if !skipDelete {
+	if !options.SkipDelete {
 		_, err = t.deleteTokensOfContractBeforeTimeStampStmt.ExecContext(pCtx, contractID, now)
 		if err != nil {
 			return nil, fmt.Errorf("failed to delete tokens: %w", err)
@@ -322,18 +346,27 @@ func (t *TokenGalleryRepository) BulkUpsertTokensOfContract(pCtx context.Context
 	return persistedTokens, nil
 }
 
-func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []persist.TokenGallery) (time.Time, []persist.TokenGallery, error) {
+func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []persist.TokenGallery, upsertingCreatorTokens bool) (time.Time, []persist.TokenGallery, error) {
 	tokens, err := t.excludeZeroQuantityTokens(pCtx, pTokens)
 	if err != nil {
 		return time.Time{}, nil, err
 	}
 
+	// If we're not upserting anything, we still need to return the current database time
+	// since it may be used by the caller and is assumed valid if err == nil
 	if len(tokens) == 0 {
-		return time.Time{}, []persist.TokenGallery{}, nil
+		currentTime, err := t.queries.GetCurrentTime(pCtx)
+		if err != nil {
+			return time.Time{}, nil, err
+		}
+		return currentTime, []persist.TokenGallery{}, nil
 	}
 
 	tokens = t.dedupeTokens(tokens)
-	params := db.UpsertTokensParams{}
+	params := db.UpsertTokensParams{
+		UpsertingCreatorTokens: upsertingCreatorTokens,
+		OwnedByWallets:         []string{},
+	}
 
 	var errors []error
 
@@ -381,7 +414,7 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 		(*t).LastSynced = upserted[i].LastSynced
 	}
 
-	return upserted[0].LastUpdated, tokens, nil
+	return upserted[0].LastSynced, tokens, nil
 }
 
 func (t *TokenGalleryRepository) excludeZeroQuantityTokens(pCtx context.Context, pTokens []persist.TokenGallery) ([]persist.TokenGallery, error) {

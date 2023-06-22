@@ -957,6 +957,12 @@ order by case when sqlc.arg('paging_forward')::bool then (a.displayed, b.display
         case when not sqlc.arg('paging_forward')::bool then (a.displayed, b.displayed, a.owned_count, contracts.id) end asc
 limit sqlc.arg('limit');
 
+-- name: GetCreatedContractsByUserID :many
+select contracts.*
+from contracts
+     join contract_creators on contracts.id = contract_creators.contract_id and contract_creators.creator_user_id = @user_id
+where contracts.chain = any(@chains::int[]);
+
 -- name: GetCreatedContractsBatchPaginate :batchmany
 select contracts.*
 from contracts
@@ -1262,3 +1268,6 @@ update contracts set override_creator_user_id = @creator_user_id, last_updated =
 
 -- name: RemoveContractOverrideCreator :exec
 update contracts set override_creator_user_id = null, last_updated = now() where id = @contract_id and deleted = false;
+
+-- name: GetCurrentTime :one
+select now()::timestamptz;

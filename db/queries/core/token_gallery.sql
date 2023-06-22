@@ -39,14 +39,14 @@ insert into tokens
     , token_type
     , token_id
     , quantity
-    , ownership_history[ownership_history_start_idx::int:ownership_history_end_idx::int]
+    , case when @upserting_creator_tokens::bool then '{}' else ownership_history[ownership_history_start_idx::int:ownership_history_end_idx::int] end
     , media
     , fallback_media
     , token_metadata
     , external_url
     , block_number
     , owner_user_id
-    , owned_by_wallets[owned_by_wallets_start_idx::int:owned_by_wallets_end_idx::int]
+    , case when @upserting_creator_tokens then '{}' else owned_by_wallets[owned_by_wallets_start_idx::int:owned_by_wallets_end_idx::int] end
     , chain
     , contract
     , is_provider_marked_spam
@@ -95,8 +95,8 @@ do update set
   , description = excluded.description
   , token_uri = excluded.token_uri
   , quantity = excluded.quantity
-  , owned_by_wallets = excluded.owned_by_wallets
-  , ownership_history = tokens.ownership_history || excluded.ownership_history
+  , owned_by_wallets = case when @upserting_creator_tokens then tokens.owned_by_wallets else excluded.owned_by_wallets end
+  , ownership_history = case when @upserting_creator_tokens then tokens.ownership_history else tokens.ownership_history || excluded.ownership_history end
   , fallback_media = excluded.fallback_media
   , token_metadata = excluded.token_metadata
   , external_url = excluded.external_url

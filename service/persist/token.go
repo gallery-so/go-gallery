@@ -78,6 +78,8 @@ const (
 	MaxChainValue = ChainPOAP
 )
 
+var AllChains = []Chain{ChainETH, ChainArbitrum, ChainPolygon, ChainOptimism, ChainTezos, ChainPOAP}
+
 const (
 	// URITypeIPFS represents an IPFS URI
 	URITypeIPFS URIType = "ipfs"
