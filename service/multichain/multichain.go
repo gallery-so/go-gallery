@@ -353,6 +353,11 @@ func (p *Provider) SyncCreatedTokens(ctx context.Context, userID persist.DBID, c
 
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"user_id": userID, "chains": chains})
 
+	err := p.SyncContractsOwnedByUser(ctx, userID, chains)
+	if err != nil {
+		return err
+	}
+
 	user, err := p.Repos.UserRepository.GetByID(ctx, userID)
 	if err != nil {
 		return err
