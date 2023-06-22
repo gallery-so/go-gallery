@@ -1953,7 +1953,7 @@ func getPreviewUrls(ctx context.Context, tokenMedia db.TokenMedia, options ...me
 		live = tokenMedia.Media.MediaURL.String()
 	}
 
-	// Add timestamp and quality to options
+	// Add timestamp to options
 	o := make([]mediamapper.Option, len(options)+1)
 	copy(o, options)
 	o[len(o)-1] = mediamapper.WithTimestamp(tokenMedia.LastUpdated)
