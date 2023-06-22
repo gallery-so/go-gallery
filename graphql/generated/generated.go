@@ -7627,6 +7627,7 @@ enum UserExperienceType {
   UpsellGallerySelects1
   MobileUpsell1
   MobileBetaUpsell
+  UpsellMintMemento5
 }
 
 type UserExperience {
