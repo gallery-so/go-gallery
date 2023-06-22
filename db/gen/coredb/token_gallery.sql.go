@@ -52,14 +52,14 @@ insert into tokens
     , token_type
     , token_id
     , quantity
-    , ownership_history[ownership_history_start_idx::int:ownership_history_end_idx::int]
+    , case when $1::bool then '{}' else ownership_history[ownership_history_start_idx::int:ownership_history_end_idx::int] end
     , media
     , fallback_media
     , token_metadata
     , external_url
     , block_number
     , owner_user_id
-    , owned_by_wallets[owned_by_wallets_start_idx::int:owned_by_wallets_end_idx::int]
+    , case when $1 then '{}' else owned_by_wallets[owned_by_wallets_start_idx::int:owned_by_wallets_end_idx::int] end
     , chain
     , contract
     , is_provider_marked_spam
@@ -75,30 +75,30 @@ insert into tokens
         limit 1
       ) as token_media_id
   from (
-    select unnest($1::varchar[]) as id
-      , unnest($2::int[]) as version
-      , unnest($3::varchar[]) as name
-      , unnest($4::varchar[]) as description
-      , unnest($5::varchar[]) as collectors_note
-      , unnest($6::varchar[]) as token_type
-      , unnest($7::varchar[]) as quantity
-      , $8::jsonb[] as ownership_history
-      , unnest($9::int[]) as ownership_history_start_idx
-      , unnest($10::int[]) as ownership_history_end_idx
-      , unnest($11::jsonb[]) as media
-      , unnest($12::jsonb[]) as fallback_media
-      , unnest($13::jsonb[]) as token_metadata
-      , unnest($14::varchar[]) as external_url
-      , unnest($15::bigint[]) as block_number
-      , unnest($16::varchar[]) as owner_user_id
-      , $17::varchar[] as owned_by_wallets
-      , unnest($18::int[]) as owned_by_wallets_start_idx
-      , unnest($19::int[]) as owned_by_wallets_end_idx
-      , unnest($20::bool[]) as is_provider_marked_spam
-      , unnest($21::varchar[]) as token_uri
-      , unnest($22::varchar[]) as token_id
-      , unnest($23::varchar[]) as contract
-      , unnest($24::int[]) as chain
+    select unnest($2::varchar[]) as id
+      , unnest($3::int[]) as version
+      , unnest($4::varchar[]) as name
+      , unnest($5::varchar[]) as description
+      , unnest($6::varchar[]) as collectors_note
+      , unnest($7::varchar[]) as token_type
+      , unnest($8::varchar[]) as quantity
+      , $9::jsonb[] as ownership_history
+      , unnest($10::int[]) as ownership_history_start_idx
+      , unnest($11::int[]) as ownership_history_end_idx
+      , unnest($12::jsonb[]) as media
+      , unnest($13::jsonb[]) as fallback_media
+      , unnest($14::jsonb[]) as token_metadata
+      , unnest($15::varchar[]) as external_url
+      , unnest($16::bigint[]) as block_number
+      , unnest($17::varchar[]) as owner_user_id
+      , $18::varchar[] as owned_by_wallets
+      , unnest($19::int[]) as owned_by_wallets_start_idx
+      , unnest($20::int[]) as owned_by_wallets_end_idx
+      , unnest($21::bool[]) as is_provider_marked_spam
+      , unnest($22::varchar[]) as token_uri
+      , unnest($23::varchar[]) as token_id
+      , unnest($24::varchar[]) as contract
+      , unnest($25::int[]) as chain
   ) bulk_upsert
 )
 on conflict (token_id, contract, chain, owner_user_id) where deleted = false
@@ -108,8 +108,8 @@ do update set
   , description = excluded.description
   , token_uri = excluded.token_uri
   , quantity = excluded.quantity
-  , owned_by_wallets = excluded.owned_by_wallets
-  , ownership_history = tokens.ownership_history || excluded.ownership_history
+  , owned_by_wallets = case when $1 then tokens.owned_by_wallets else excluded.owned_by_wallets end
+  , ownership_history = case when $1 then tokens.ownership_history else tokens.ownership_history || excluded.ownership_history end
   , fallback_media = excluded.fallback_media
   , token_metadata = excluded.token_metadata
   , external_url = excluded.external_url
@@ -122,6 +122,7 @@ returning id, deleted, version, created_at, last_updated, name, description, col
 `
 
 type UpsertTokensParams struct {
+	UpsertingCreatorTokens   bool
 	ID                       []string
 	Version                  []int32
 	Name                     []string
@@ -150,6 +151,7 @@ type UpsertTokensParams struct {
 
 func (q *Queries) UpsertTokens(ctx context.Context, arg UpsertTokensParams) ([]Token, error) {
 	rows, err := q.db.Query(ctx, upsertTokens,
+		arg.UpsertingCreatorTokens,
 		arg.ID,
 		arg.Version,
 		arg.Name,

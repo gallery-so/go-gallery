@@ -957,6 +957,12 @@ order by case when sqlc.arg('paging_forward')::bool then (a.displayed, b.display
         case when not sqlc.arg('paging_forward')::bool then (a.displayed, b.displayed, a.owned_count, contracts.id) end asc
 limit sqlc.arg('limit');
 
+-- name: GetCreatedContractsByUserID :many
+select contracts.*
+from contracts
+     join contract_creators on contracts.id = contract_creators.contract_id and contract_creators.creator_user_id = @user_id
+where contracts.chain = any(@chains::int[]);
+
 -- name: GetCreatedContractsBatchPaginate :batchmany
 select contracts.*
 from contracts
@@ -1283,3 +1289,6 @@ update users set profile_image_id = null where users.id = $1 and not users.delet
 
 -- name: GetProfileImageByID :batchone
 select * from profile_images where id = $1 and not deleted;
+
+-- name: GetCurrentTime :one
+select now()::timestamptz;

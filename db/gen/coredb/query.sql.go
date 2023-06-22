@@ -1568,6 +1568,68 @@ func (q *Queries) GetContractsByIDs(ctx context.Context, contractIds persist.DBI
 	return items, nil
 }
 
+const getCreatedContractsByUserID = `-- name: GetCreatedContractsByUserID :many
+select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id
+from contracts
+     join contract_creators on contracts.id = contract_creators.contract_id and contract_creators.creator_user_id = $1
+where contracts.chain = any($2::int[])
+`
+
+type GetCreatedContractsByUserIDParams struct {
+	UserID persist.DBID
+	Chains []int32
+}
+
+func (q *Queries) GetCreatedContractsByUserID(ctx context.Context, arg GetCreatedContractsByUserIDParams) ([]Contract, error) {
+	rows, err := q.db.Query(ctx, getCreatedContractsByUserID, arg.UserID, arg.Chains)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Contract
+	for rows.Next() {
+		var i Contract
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Name,
+			&i.Symbol,
+			&i.Address,
+			&i.CreatorAddress,
+			&i.Chain,
+			&i.ProfileBannerUrl,
+			&i.ProfileImageUrl,
+			&i.BadgeUrl,
+			&i.Description,
+			&i.OwnerAddress,
+			&i.IsProviderMarkedSpam,
+			&i.ParentID,
+			&i.OverrideCreatorUserID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getCurrentTime = `-- name: GetCurrentTime :one
+select now()::timestamptz
+`
+
+func (q *Queries) GetCurrentTime(ctx context.Context) (time.Time, error) {
+	row := q.db.QueryRow(ctx, getCurrentTime)
+	var column_1 time.Time
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const getEvent = `-- name: GetEvent :one
 SELECT id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id FROM events WHERE id = $1 AND deleted = false
 `

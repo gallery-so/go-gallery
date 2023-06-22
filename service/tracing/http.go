@@ -46,7 +46,7 @@ func (t *tracingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	span, _ := StartSpan(req.Context(), "http."+strings.ToLower(req.Method), fmt.Sprintf("HTTP %s %s", req.Method, req.URL.String()), t.opts...)
 
 	// Send sentry-trace header in case the receiving service can continue our trace
-	req.Header.Add("sentry-trace", span.TraceID.String())
+	req.Header.Set("sentry-trace", span.TraceID.String())
 
 	response, err := t.RoundTripper.RoundTrip(req)
 	defer FinishSpan(span)
