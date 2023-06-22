@@ -1204,7 +1204,8 @@ func (p *Provider) SyncContractsOwnedByUser(ctx context.Context, userID persist.
 		return err
 	}
 
-	return p.SyncTokensCreatedOnSharedContracts(ctx, userID, chains)
+	return nil
+	//return p.SyncTokensCreatedOnSharedContracts(ctx, userID, chains)
 
 }
 
