@@ -684,7 +684,7 @@ func modelToTokenLayout(u *model.CollectionLayoutInput) persist.TokenLayout {
 func modelToTokenSettings(u []*model.CollectionTokenSettingsInput) map[persist.DBID]persist.CollectionTokenSettings {
 	settings := make(map[persist.DBID]persist.CollectionTokenSettings)
 	for _, tokenSetting := range u {
-		settings[tokenSetting.TokenID] = persist.CollectionTokenSettings{RenderLive: tokenSetting.RenderLive}
+		settings[tokenSetting.TokenID] = persist.CollectionTokenSettings{RenderLive: tokenSetting.RenderLive, HighDefinition: tokenSetting.HighDefinition}
 	}
 	return settings
 }

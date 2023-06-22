@@ -206,7 +206,8 @@ type ComplexityRoot struct {
 	}
 
 	CollectionTokenSettings struct {
-		RenderLive func(childComplexity int) int
+		HighDefinition func(childComplexity int) int
+		RenderLive     func(childComplexity int) int
 	}
 
 	CollectionUpdatedFeedEventData struct {
@@ -2035,6 +2036,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.CollectionToken.TokenSettings(childComplexity), true
+
+	case "CollectionTokenSettings.highDefinition":
+		if e.complexity.CollectionTokenSettings.HighDefinition == nil {
+			break
+		}
+
+		return e.complexity.CollectionTokenSettings.HighDefinition(childComplexity), true
 
 	case "CollectionTokenSettings.renderLive":
 		if e.complexity.CollectionTokenSettings.RenderLive == nil {
@@ -7368,6 +7376,7 @@ type CollectionSectionLayout {
 
 type CollectionTokenSettings {
   renderLive: Boolean
+  highDefinition: Boolean
 }
 
 type CollectionEdge {
@@ -8098,6 +8107,7 @@ input CollectionSectionLayoutInput {
 input CollectionTokenSettingsInput {
   tokenId: DBID!
   renderLive: Boolean!
+  highDefinition: Boolean!
 }
 
 input CreateCollectionInput {
@@ -14655,6 +14665,8 @@ func (ec *executionContext) fieldContext_CollectionToken_tokenSettings(ctx conte
 			switch field.Name {
 			case "renderLive":
 				return ec.fieldContext_CollectionTokenSettings_renderLive(ctx, field)
+			case "highDefinition":
+				return ec.fieldContext_CollectionTokenSettings_highDefinition(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type CollectionTokenSettings", field.Name)
 		},
@@ -14691,6 +14703,47 @@ func (ec *executionContext) _CollectionTokenSettings_renderLive(ctx context.Cont
 }
 
 func (ec *executionContext) fieldContext_CollectionTokenSettings_renderLive(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CollectionTokenSettings",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CollectionTokenSettings_highDefinition(ctx context.Context, field graphql.CollectedField, obj *model.CollectionTokenSettings) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CollectionTokenSettings_highDefinition(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.HighDefinition, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CollectionTokenSettings_highDefinition(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "CollectionTokenSettings",
 		Field:      field,
@@ -48666,7 +48719,7 @@ func (ec *executionContext) unmarshalInputCollectionTokenSettingsInput(ctx conte
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"tokenId", "renderLive"}
+	fieldsInOrder := [...]string{"tokenId", "renderLive", "highDefinition"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -48691,6 +48744,15 @@ func (ec *executionContext) unmarshalInputCollectionTokenSettingsInput(ctx conte
 				return it, err
 			}
 			it.RenderLive = data
+		case "highDefinition":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("highDefinition"))
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.HighDefinition = data
 		}
 	}
 
@@ -54857,6 +54919,10 @@ func (ec *executionContext) _CollectionTokenSettings(ctx context.Context, sel as
 		case "renderLive":
 
 			out.Values[i] = ec._CollectionTokenSettings_renderLive(ctx, field, obj)
+
+		case "highDefinition":
+
+			out.Values[i] = ec._CollectionTokenSettings_highDefinition(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))

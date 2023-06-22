@@ -69,7 +69,7 @@ func (r *collectionResolver) Tokens(ctx context.Context, obj *model.Collection, 
 				TokenId:      token.ID,
 				CollectionId: obj.Dbid,
 			},
-			Token:         tokenToModel(ctx, token),
+			Token:         tokenToModel(ctx, token, &obj.Dbid),
 			Collection:    obj,
 			TokenSettings: nil, // handled by dedicated resolver
 		}
@@ -721,7 +721,7 @@ func (r *mutationResolver) CreateCollection(ctx context.Context, input model.Cre
 
 	settings := make(map[persist.DBID]persist.CollectionTokenSettings)
 	for _, tokenSetting := range input.TokenSettings {
-		settings[tokenSetting.TokenID] = persist.CollectionTokenSettings{RenderLive: tokenSetting.RenderLive}
+		settings[tokenSetting.TokenID] = persist.CollectionTokenSettings{RenderLive: tokenSetting.RenderLive, HighDefinition: tokenSetting.HighDefinition}
 	}
 
 	collection, feedEvent, err := api.Collection.CreateCollection(ctx, input.GalleryID, input.Name, input.CollectorsNote, input.Tokens, layout, settings, input.Caption)
@@ -813,7 +813,7 @@ func (r *mutationResolver) UpdateCollectionTokens(ctx context.Context, input mod
 
 	settings := make(map[persist.DBID]persist.CollectionTokenSettings)
 	for _, tokenSetting := range input.TokenSettings {
-		settings[tokenSetting.TokenID] = persist.CollectionTokenSettings{RenderLive: tokenSetting.RenderLive}
+		settings[tokenSetting.TokenID] = persist.CollectionTokenSettings{RenderLive: tokenSetting.RenderLive, HighDefinition: tokenSetting.HighDefinition}
 	}
 
 	feedEvent, err := api.Collection.UpdateCollectionTokens(ctx, input.CollectionID, input.Tokens, layout, settings, input.Caption)
@@ -880,7 +880,7 @@ func (r *mutationResolver) UpdateTokenInfo(ctx context.Context, input model.Upda
 	}
 
 	output := &model.UpdateTokenInfoPayload{
-		Token: tokenToModel(ctx, *token),
+		Token: tokenToModel(ctx, *token, input.CollectionID),
 	}
 
 	return output, nil
@@ -2150,16 +2150,24 @@ func (r *subscriptionResolver) NotificationUpdated(ctx context.Context) (<-chan 
 
 // Media is the resolver for the media field.
 func (r *tokenResolver) Media(ctx context.Context, obj *model.Token) (model.MediaSubtype, error) {
+	var highDef bool
+	if obj.CollectionID != nil {
+		settings, err := resolveTokenSettingsByIDs(ctx, obj.Dbid, *obj.CollectionID)
+		if err != nil {
+			return nil, err
+		}
+		highDef = *settings.HighDefinition
+	}
 	tokenMedia, err := publicapi.For(ctx).Token.MediaByTokenID(ctx, obj.Dbid)
 	if err != nil {
 		// If we have no media, just return the fallback media
 		var noMediaErr persist.ErrMediaNotFound
 		if errors.As(err, &noMediaErr) {
-			return mediaToModel(ctx, tokenMedia, obj.HelperTokenData.Token.FallbackMedia), nil
+			return mediaToModel(ctx, tokenMedia, obj.HelperTokenData.Token.FallbackMedia, highDef), nil
 		}
 		return nil, err
 	}
-	return mediaToModel(ctx, tokenMedia, obj.HelperTokenData.Token.FallbackMedia), nil
+	return mediaToModel(ctx, tokenMedia, obj.HelperTokenData.Token.FallbackMedia, highDef), nil
 }
 
 // Owner is the resolver for the owner field.

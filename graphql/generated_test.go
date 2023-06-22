@@ -103,8 +103,9 @@ func (v *CollectionSectionLayoutInput) GetColumns() int { return v.Columns }
 func (v *CollectionSectionLayoutInput) GetWhitespace() []int { return v.Whitespace }
 
 type CollectionTokenSettingsInput struct {
-	TokenId    persist.DBID `json:"tokenId"`
-	RenderLive bool         `json:"renderLive"`
+	TokenId        persist.DBID `json:"tokenId"`
+	RenderLive     bool         `json:"renderLive"`
+	HighDefinition bool         `json:"highDefinition"`
 }
 
 // GetTokenId returns CollectionTokenSettingsInput.TokenId, and is useful for accessing the field via an interface.
@@ -112,6 +113,9 @@ func (v *CollectionTokenSettingsInput) GetTokenId() persist.DBID { return v.Toke
 
 // GetRenderLive returns CollectionTokenSettingsInput.RenderLive, and is useful for accessing the field via an interface.
 func (v *CollectionTokenSettingsInput) GetRenderLive() bool { return v.RenderLive }
+
+// GetHighDefinition returns CollectionTokenSettingsInput.HighDefinition, and is useful for accessing the field via an interface.
+func (v *CollectionTokenSettingsInput) GetHighDefinition() bool { return v.HighDefinition }
 
 type CreateCollectionInGalleryInput struct {
 	Name           string                         `json:"name"`

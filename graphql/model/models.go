@@ -121,7 +121,8 @@ type HelperSocialConnectionData struct {
 }
 
 type HelperTokenData struct {
-	Token db.Token
+	Token        db.Token
+	CollectionID *persist.DBID
 }
 
 type ErrInvalidIDFormat struct {

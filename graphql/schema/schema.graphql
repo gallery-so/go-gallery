@@ -454,6 +454,7 @@ type CollectionSectionLayout {
 
 type CollectionTokenSettings {
   renderLive: Boolean
+  highDefinition: Boolean
 }
 
 type CollectionEdge {
@@ -1184,6 +1185,7 @@ input CollectionSectionLayoutInput {
 input CollectionTokenSettingsInput {
   tokenId: DBID!
   renderLive: Boolean!
+  highDefinition: Boolean!
 }
 
 input CreateCollectionInput {

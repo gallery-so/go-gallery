@@ -540,12 +540,14 @@ func (CollectionToken) IsNode()                       {}
 func (CollectionToken) IsCollectionTokenByIDOrError() {}
 
 type CollectionTokenSettings struct {
-	RenderLive *bool `json:"renderLive"`
+	RenderLive     *bool `json:"renderLive"`
+	HighDefinition *bool `json:"highDefinition"`
 }
 
 type CollectionTokenSettingsInput struct {
-	TokenID    persist.DBID `json:"tokenId"`
-	RenderLive bool         `json:"renderLive"`
+	TokenID        persist.DBID `json:"tokenId"`
+	RenderLive     bool         `json:"renderLive"`
+	HighDefinition bool         `json:"highDefinition"`
 }
 
 type CollectionUpdatedFeedEventData struct {

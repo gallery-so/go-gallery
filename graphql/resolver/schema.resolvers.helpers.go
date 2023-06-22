@@ -447,7 +447,7 @@ func resolveTokenByTokenID(ctx context.Context, tokenID persist.DBID) (*model.To
 		return nil, err
 	}
 
-	return tokenToModel(ctx, *token), nil
+	return tokenToModel(ctx, *token, nil), nil
 }
 
 func resolveTokensByWalletID(ctx context.Context, walletID persist.DBID) ([]*model.Token, error) {
@@ -473,7 +473,7 @@ func tokensToConnection(ctx context.Context, tokens []db.Token, pageInfo publica
 	edges := make([]*model.TokenEdge, len(tokens))
 	for i, token := range tokens {
 		edges[i] = &model.TokenEdge{
-			Node:   tokenToModel(ctx, token),
+			Node:   tokenToModel(ctx, token, nil),
 			Cursor: nil, // not used by relay, but relay will complain without this field existing
 		}
 	}
@@ -983,7 +983,7 @@ func resolveCollectionTokensByTokenIDs(ctx context.Context, collectionID persist
 	// Fill in the data for tokens that still exist.
 	// Tokens that have since been deleted will be nil.
 	for _, t := range tokens {
-		token := tokenToModel(ctx, t)
+		token := tokenToModel(ctx, t, &collectionID)
 		newTokens[tokenIDToPosition[t.ID]] = tokenCollectionToModel(ctx, token, collectionID)
 	}
 
@@ -998,10 +998,10 @@ func resolveTokenSettingsByIDs(ctx context.Context, tokenID, collectionID persis
 	}
 
 	if settings, ok := collection.TokenSettings[tokenID]; ok {
-		return &model.CollectionTokenSettings{RenderLive: &settings.RenderLive}, nil
+		return &model.CollectionTokenSettings{RenderLive: &settings.RenderLive, HighDefinition: &settings.HighDefinition}, nil
 	}
 
-	return &model.CollectionTokenSettings{RenderLive: &defaultTokenSettings.RenderLive}, nil
+	return &model.CollectionTokenSettings{RenderLive: &defaultTokenSettings.RenderLive, HighDefinition: &defaultTokenSettings.HighDefinition}, nil
 }
 
 func resolveNotificationByID(ctx context.Context, id persist.DBID) (model.Notification, error) {
@@ -1768,7 +1768,7 @@ func multichainTokenHolderToModel(ctx context.Context, tokenHolder multichain.To
 	}
 }
 
-func tokenToModel(ctx context.Context, token db.Token) *model.Token {
+func tokenToModel(ctx context.Context, token db.Token, collectionID *persist.DBID) *model.Token {
 	chain := token.Chain
 	metadata, _ := token.TokenMetadata.MarshalJSON()
 	metadataString := string(metadata)
@@ -1786,7 +1786,7 @@ func tokenToModel(ctx context.Context, token db.Token) *model.Token {
 	}
 
 	return &model.Token{
-		HelperTokenData:  model.HelperTokenData{Token: token},
+		HelperTokenData:  model.HelperTokenData{Token: token, CollectionID: collectionID},
 		Dbid:             token.ID,
 		CreationTime:     &token.CreatedAt,
 		LastUpdated:      &token.LastUpdated,
@@ -1816,7 +1816,7 @@ func tokenToModel(ctx context.Context, token db.Token) *model.Token {
 func tokensToModel(ctx context.Context, token []db.Token) []*model.Token {
 	res := make([]*model.Token, len(token))
 	for i, token := range token {
-		res[i] = tokenToModel(ctx, token)
+		res[i] = tokenToModel(ctx, token, nil)
 	}
 	return res
 }
@@ -1893,18 +1893,18 @@ func getUrlExtension(url string) string {
 	return strings.ToLower(strings.TrimPrefix(filepath.Ext(url), "."))
 }
 
-func mediaToModel(ctx context.Context, tokenMedia db.TokenMedia, fallback persist.FallbackMedia) model.MediaSubtype {
+func mediaToModel(ctx context.Context, tokenMedia db.TokenMedia, fallback persist.FallbackMedia, highDef bool) model.MediaSubtype {
 	var fallbackMedia *model.FallbackMedia
 
 	fallbackMedia = getFallbackMedia(ctx, fallback)
 
 	switch media := tokenMedia.Media; media.MediaType {
 	case persist.MediaTypeImage, persist.MediaTypeSVG:
-		return getImageMedia(ctx, tokenMedia, fallbackMedia)
+		return getImageMedia(ctx, tokenMedia, fallbackMedia, highDef)
 	case persist.MediaTypeGIF:
-		return getGIFMedia(ctx, tokenMedia, fallbackMedia)
+		return getGIFMedia(ctx, tokenMedia, fallbackMedia, highDef)
 	case persist.MediaTypeVideo:
-		return getVideoMedia(ctx, tokenMedia, fallbackMedia)
+		return getVideoMedia(ctx, tokenMedia, fallbackMedia, highDef)
 	case persist.MediaTypeAudio:
 		return getAudioMedia(ctx, tokenMedia, fallbackMedia)
 	case persist.MediaTypeHTML:
@@ -1970,11 +1970,15 @@ func getPreviewUrls(ctx context.Context, tokenMedia db.TokenMedia, options ...me
 	}
 }
 
-func getImageMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia) model.ImageMedia {
+func getImageMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia, highDef bool) model.ImageMedia {
 	url := remapLargeImageUrls(tokenMedia.Media.MediaURL.String())
 
+	options := make([]mediamapper.Option, 1)
+	if highDef {
+		options[0] = mediamapper.WithQuality(100)
+	}
 	return model.ImageMedia{
-		PreviewURLs:      getPreviewUrls(ctx, tokenMedia),
+		PreviewURLs:      getPreviewUrls(ctx, tokenMedia, options...),
 		MediaURL:         util.ToPointer(tokenMedia.Media.MediaURL.String()),
 		MediaType:        (*string)(&tokenMedia.Media.MediaType),
 		ContentRenderURL: &url,
@@ -1992,11 +1996,15 @@ func getFallbackMedia(ctx context.Context, media persist.FallbackMedia) *model.F
 	}
 }
 
-func getGIFMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia) model.GIFMedia {
+func getGIFMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia, highDef bool) model.GIFMedia {
 	url := remapLargeImageUrls(tokenMedia.Media.MediaURL.String())
 
+	options := make([]mediamapper.Option, 1)
+	if highDef {
+		options[0] = mediamapper.WithQuality(100)
+	}
 	return model.GIFMedia{
-		PreviewURLs:       getPreviewUrls(ctx, tokenMedia),
+		PreviewURLs:       getPreviewUrls(ctx, tokenMedia, options...),
 		StaticPreviewURLs: getPreviewUrls(ctx, tokenMedia, mediamapper.WithStaticImage()),
 		MediaURL:          util.ToPointer(tokenMedia.Media.MediaURL.String()),
 		MediaType:         (*string)(&tokenMedia.Media.MediaType),
@@ -2016,7 +2024,7 @@ func remapLargeImageUrls(url string) string {
 	return url
 }
 
-func getVideoMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia) model.VideoMedia {
+func getVideoMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia, highDef bool) model.VideoMedia {
 	asString := tokenMedia.Media.MediaURL.String()
 	videoUrls := model.VideoURLSet{
 		Raw:    &asString,
@@ -2025,8 +2033,13 @@ func getVideoMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia 
 		Large:  &asString,
 	}
 
+	options := make([]mediamapper.Option, 1)
+	if highDef {
+		options[0] = mediamapper.WithQuality(100)
+	}
+
 	return model.VideoMedia{
-		PreviewURLs:       getPreviewUrls(ctx, tokenMedia),
+		PreviewURLs:       getPreviewUrls(ctx, tokenMedia, options...),
 		MediaURL:          util.ToPointer(tokenMedia.Media.MediaURL.String()),
 		MediaType:         (*string)(&tokenMedia.Media.MediaType),
 		ContentRenderURLs: &videoUrls,
