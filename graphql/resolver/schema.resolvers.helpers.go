@@ -1973,9 +1973,9 @@ func getPreviewUrls(ctx context.Context, tokenMedia db.TokenMedia, options ...me
 func getImageMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia, highDef bool) model.ImageMedia {
 	url := remapLargeImageUrls(tokenMedia.Media.MediaURL.String())
 
-	options := make([]mediamapper.Option, 1)
+	options := []mediamapper.Option{}
 	if highDef {
-		options[0] = mediamapper.WithQuality(100)
+		options = append(options, mediamapper.WithQuality(100))
 	}
 	return model.ImageMedia{
 		PreviewURLs:      getPreviewUrls(ctx, tokenMedia, options...),
@@ -1999,9 +1999,9 @@ func getFallbackMedia(ctx context.Context, media persist.FallbackMedia) *model.F
 func getGIFMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia, highDef bool) model.GIFMedia {
 	url := remapLargeImageUrls(tokenMedia.Media.MediaURL.String())
 
-	options := make([]mediamapper.Option, 1)
+	options := []mediamapper.Option{}
 	if highDef {
-		options[0] = mediamapper.WithQuality(100)
+		options = append(options, mediamapper.WithQuality(100))
 	}
 	return model.GIFMedia{
 		PreviewURLs:       getPreviewUrls(ctx, tokenMedia, options...),
@@ -2033,9 +2033,9 @@ func getVideoMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia 
 		Large:  &asString,
 	}
 
-	options := make([]mediamapper.Option, 1)
+	options := []mediamapper.Option{}
 	if highDef {
-		options[0] = mediamapper.WithQuality(100)
+		options = append(options, mediamapper.WithQuality(100))
 	}
 
 	return model.VideoMedia{
