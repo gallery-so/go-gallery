@@ -653,15 +653,24 @@ func assetToToken(asset Asset, block persist.BlockNumber, tokenOwner persist.Add
 		ContractAddress: persist.Address(asset.Contract.ContractAddress.String()),
 		ExternalURL:     asset.ExternalURL,
 		BlockNumber:     block,
-		TokenMetadata: persist.TokenMetadata{
-			"name":          asset.Name,
-			"description":   asset.Description,
-			"image_url":     asset.ImageOriginalURL,
-			"animation_url": asset.AnimationOriginalURL,
-		},
-		Quantity: "1",
-		IsSpam:   util.ToPointer(false), // OpenSea filters spam on their side
+		TokenMetadata:   metadataFromAsset(asset),
+		Quantity:        "1",
+		IsSpam:          util.ToPointer(false), // OpenSea filters spam on their side
 	}, nil
+}
+
+func metadataFromAsset(asset Asset) persist.TokenMetadata {
+	m := persist.TokenMetadata{
+		"name":          asset.Name,
+		"description":   asset.Description,
+		"image_url":     asset.ImageOriginalURL,
+		"animation_url": asset.AnimationOriginalURL,
+	}
+	// ENS
+	if asset.Contract.ContractAddress == util.ENSAddress {
+		m["background_image"] = fmt.Sprintf("https://metadata.ens.domains/mainnet/avatar/%s", asset.Name)
+	}
+	return m
 }
 
 func contractFromAsset(asset Asset, block persist.BlockNumber) multichain.ChainAgnosticContract {

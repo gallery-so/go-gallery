@@ -64,9 +64,7 @@ type errNoCachedObjects struct {
 }
 
 type errNoMediaURLs struct {
-	metadata persist.TokenMetadata
-	tokenURI persist.TokenURI
-	tids     persist.TokenIdentifiers
+	tids persist.TokenIdentifiers
 }
 
 type errStoreObjectFailed struct {
@@ -96,7 +94,7 @@ func (e errInvalidMedia) Unwrap() error {
 }
 
 func (e errNoMediaURLs) Error() string {
-	return fmt.Sprintf("no media URLs found in metadata: %s (metadata: %+v, tokenURI: %s)", e.tids, e.metadata, e.tokenURI)
+	return fmt.Sprintf("no media URLs found in metadata for %s", e.tids)
 }
 
 func (e errNoCachedObjects) Error() string {
@@ -539,6 +537,7 @@ func findImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, con
 	}
 
 	image, anim := keywordsForToken(tokenID, contractAddress, chain)
+
 	for _, keyword := range anim {
 		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && it != "" {
 			logger.For(ctx).Debugf("found initial animation url from '%s': %s", keyword, it)
@@ -557,7 +556,7 @@ func findImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, con
 
 	if imgURL == "" && vURL == "" {
 		persist.FailStep(&pMeta.MediaURLsRetrieval)
-		return "", "", errNoMediaURLs{metadata: metadata, tokenURI: tokenURI, tids: persist.NewTokenIdentifiers(contractAddress, tokenID, chain)}
+		return "", "", errNoMediaURLs{tids: persist.NewTokenIdentifiers(contractAddress, tokenID, chain)}
 	}
 
 	if predict {

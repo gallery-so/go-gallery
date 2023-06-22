@@ -99,23 +99,41 @@ func processMediaForToken(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRe
 		var token persist.TokenGallery
 		tokens, err := tokenRepo.GetByTokenIdentifiers(reqCtx, input.TokenID, input.ContractAddress, input.Chain, 1, 0)
 		if err != nil {
+			if util.ErrorAs[persist.ErrTokenGalleryNotFoundByIdentifiers](err) {
+				util.ErrResponse(c, http.StatusNotFound, err)
+				return
+			}
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
+
 		if len(tokens) == 0 {
-			util.ErrResponse(c, http.StatusNotFound, fmt.Errorf("token not found by identifiers"))
+			util.ErrResponse(c, http.StatusNotFound, persist.ErrTokenGalleryNotFoundByIdentifiers{
+				TokenID:         input.TokenID,
+				ContractAddress: input.ContractAddress,
+				Chain:           input.Chain,
+			})
 			return
 		}
+
 		token = tokens[0]
 
 		contract, err := contractRepo.GetByID(reqCtx, token.Contract)
 		if err != nil {
+			if util.ErrorAs[persist.ErrContractNotFoundByID](err) {
+				util.ErrResponse(c, http.StatusNotFound, err)
+				return
+			}
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
 		_, err = tp.ProcessTokenPipeline(reqCtx, token, contract, persist.ProcessingCauseRefresh)
 		if err != nil {
+			if util.ErrorAs[ErrBadToken](err) {
+				util.ErrResponse(c, http.StatusUnprocessableEntity, err)
+				return
+			}
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}

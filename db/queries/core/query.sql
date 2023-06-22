@@ -737,7 +737,7 @@ update galleries set collections = @collections, last_updated = now() where gall
 update users set featured_gallery = @gallery_id, last_updated = now() from galleries where users.id = @user_id and galleries.id = @gallery_id and galleries.owner_user_id = @user_id and galleries.deleted = false;
 
 -- name: GetGalleryTokenMediasByGalleryID :many
-select m.media from tokens t, collections c, galleries g, token_medias m where g.id = $1 and c.id = any(g.collections) and t.id = any(c.nfts) and t.deleted = false and g.deleted = false and c.deleted = false and (length(t.media->>'thumbnail_url'::varchar) > 0 or length(t.media->>'media_url'::varchar) > 0) and t.token_media_id = m.id and m.deleted = false and m.active order by array_position(g.collections, c.id),array_position(c.nfts, t.id) limit $2;
+select m.* from tokens t, collections c, galleries g, token_medias m where g.id = $1 and c.id = any(g.collections) and t.id = any(c.nfts) and t.deleted = false and g.deleted = false and c.deleted = false and (length(t.media->>'thumbnail_url'::varchar) > 0 or length(t.media->>'media_url'::varchar) > 0) and t.token_media_id = m.id and m.deleted = false and m.active order by array_position(g.collections, c.id),array_position(c.nfts, t.id) limit $2;
 
 -- name: GetTokenByTokenIdentifiers :one
 select * from tokens where tokens.token_id = @token_hex and contract = (select contracts.id from contracts where contracts.address = @contract_address) and tokens.chain = @chain and tokens.deleted = false;
@@ -1268,6 +1268,27 @@ update contracts set override_creator_user_id = @creator_user_id, last_updated =
 
 -- name: RemoveContractOverrideCreator :exec
 update contracts set override_creator_user_id = null, last_updated = now() where id = @contract_id and deleted = false;
+
+-- name: SetProfileImageToToken :exec
+with new_image as (
+    insert into profile_images (id, user_id, source_type, token_id, deleted, last_updated)
+    values (@profile_id, @user_id, @token_source_type, @token_id, false, now())
+    on conflict (user_id) do update set token_id = excluded.token_id
+        , source_type = excluded.source_type
+        , deleted = excluded.deleted
+        , last_updated = excluded.last_updated
+    returning id
+)
+update users set profile_image_id = new_image.id from new_image where users.id = @user_id and not deleted;
+
+-- name: RemoveProfileImage :exec
+with remove_image as (
+    update profile_images set deleted = true, last_updated = now() where user_id = $1 and not deleted
+)
+update users set profile_image_id = null where users.id = $1 and not users.deleted;
+
+-- name: GetProfileImageByID :batchone
+select * from profile_images where id = $1 and not deleted;
 
 -- name: GetCurrentTime :one
 select now()::timestamptz;

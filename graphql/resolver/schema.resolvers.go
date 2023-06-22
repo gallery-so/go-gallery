@@ -416,6 +416,15 @@ func (r *galleryUpdatedFeedEventDataResolver) SubEventDatas(ctx context.Context,
 	return resolveSubEventDatasByFeedEventID(ctx, obj.FeedEventID)
 }
 
+// ProfileImage is the resolver for the profileImage field.
+func (r *galleryUserResolver) ProfileImage(ctx context.Context, obj *model.GalleryUser) (model.ProfileImage, error) {
+	pfp, err := publicapi.For(ctx).User.GetProfileImageByUserID(ctx, obj.Dbid)
+	if err != nil {
+		return nil, err
+	}
+	return profileImageToModel(ctx, pfp)
+}
+
 // Roles is the resolver for the roles field.
 func (r *galleryUserResolver) Roles(ctx context.Context, obj *model.GalleryUser) ([]*persist.Role, error) {
 	dbRoles, err := publicapi.For(ctx).User.GetUserRolesByUserID(ctx, obj.Dbid)
@@ -652,6 +661,24 @@ func (r *mutationResolver) UnregisterUserPushToken(ctx context.Context, pushToke
 	}
 
 	return output, nil
+}
+
+// SetProfileImage is the resolver for the setProfileImage field.
+func (r *mutationResolver) SetProfileImage(ctx context.Context, input model.SetProfileImageInput) (model.SetProfileImagePayloadOrError, error) {
+	err := publicapi.For(ctx).User.SetProfileImage(ctx, input.TokenID)
+	if err != nil {
+		return nil, err
+	}
+	return &model.SetProfileImagePayload{Viewer: resolveViewer(ctx)}, nil
+}
+
+// RemoveProfileImage is the resolver for the removeProfileImage field.
+func (r *mutationResolver) RemoveProfileImage(ctx context.Context) (model.RemoveProfileImagePayloadOrError, error) {
+	err := publicapi.For(ctx).User.RemoveProfileImage(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &model.RemoveProfileImagePayload{Viewer: resolveViewer(ctx)}, nil
 }
 
 // UpdateGalleryCollections is the resolver for the updateGalleryCollections field.
@@ -2128,11 +2155,11 @@ func (r *tokenResolver) Media(ctx context.Context, obj *model.Token) (model.Medi
 		// If we have no media, just return the fallback media
 		var noMediaErr persist.ErrMediaNotFound
 		if errors.As(err, &noMediaErr) {
-			return mediaToModel(ctx, persist.Media{}, obj.HelperTokenData.Token.FallbackMedia), nil
+			return mediaToModel(ctx, tokenMedia, obj.HelperTokenData.Token.FallbackMedia), nil
 		}
 		return nil, err
 	}
-	return mediaToModel(ctx, tokenMedia.Media, obj.HelperTokenData.Token.FallbackMedia), nil
+	return mediaToModel(ctx, tokenMedia, obj.HelperTokenData.Token.FallbackMedia), nil
 }
 
 // Owner is the resolver for the owner field.

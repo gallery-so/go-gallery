@@ -30,7 +30,7 @@ import (
 var uniqueMetadataHandlers = uniqueMetadatas{
 	persist.EthereumAddress("0xd4e4078ca3495de5b1d4db434bebc5a986197782"): autoglyphs,
 	persist.EthereumAddress("0x60f3680350f65beb2752788cb48abfce84a4759e"): colorglyphs,
-	persist.EthereumAddress("0x57f1887a8bf19b14fc0df6fd9b2acc9af147ea85"): ens,
+	persist.EthereumAddress(util.ENSAddress):                              ens,
 	persist.EthereumAddress("0xb47e3cd837ddf8e4c57f05d70ab865de6e193bbb"): cryptopunks,
 	persist.EthereumAddress("0xabefbc9fd2f806065b4f3c237d4b59d9a97bcac7"): zora,
 }
@@ -422,9 +422,10 @@ func ens(ctx context.Context, turi persist.TokenURI, addr persist.EthereumAddres
 
 	if ok {
 		return persist.TokenURI(withImage.ImageURL), persist.TokenMetadata{
-			"name":        fmt.Sprintf("ENS: %s", result),
-			"description": "ENS names are used to resolve domain names to Ethereum addresses.",
-			"image":       util.FirstNonEmptyString(withImage.ImageURL, withImage.ImagePreviewURL, withImage.ImageOriginalURL, withImage.ImageThumbnailURL),
+			"name":             fmt.Sprintf("ENS: %s", result),
+			"description":      "ENS names are used to resolve domain names to Ethereum addresses.",
+			"image":            util.FirstNonEmptyString(withImage.ImageURL, withImage.ImagePreviewURL, withImage.ImageOriginalURL, withImage.ImageThumbnailURL),
+			"background_image": fmt.Sprintf("https://metadata.ens.domains/mainnet/avatar/%s", result),
 		}, nil
 	}
 
@@ -446,9 +447,10 @@ func ens(ctx context.Context, turi persist.TokenURI, addr persist.EthereumAddres
 	}
 
 	return persist.TokenURI(result), persist.TokenMetadata{
-		"name":        fmt.Sprintf("ENS: %s", result),
-		"description": "ENS names are used to resolve domain names to Ethereum addresses.",
-		"image":       fmt.Sprintf("data:image/svg+xml;base64,%s", base64.StdEncoding.EncodeToString(buf.Bytes()[svgStart:])),
+		"name":             fmt.Sprintf("ENS: %s", result),
+		"description":      "ENS names are used to resolve domain names to Ethereum addresses.",
+		"image":            fmt.Sprintf("data:image/svg+xml;base64,%s", base64.StdEncoding.EncodeToString(buf.Bytes()[svgStart:])),
+		"background_image": fmt.Sprintf("https://metadata.ens.domains/mainnet/avatar/%s", result),
 	}, nil
 
 }
