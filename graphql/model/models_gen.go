@@ -1488,18 +1488,14 @@ type PreverifyEmailPayload struct {
 func (PreverifyEmailPayload) IsPreverifyEmailPayloadOrError() {}
 
 type PreviewURLSet struct {
-	Raw              *string `json:"raw"`
-	Thumbnail        *string `json:"thumbnail"`
-	Small            *string `json:"small"`
-	Medium           *string `json:"medium"`
-	Large            *string `json:"large"`
-	SrcSet           *string `json:"srcSet"`
-	LiveRender       *string `json:"liveRender"`
-	Blurhash         *string `json:"blurhash"`
-	ThumbnailHighDef *string `json:"thumbnailHighDef"`
-	SmallHighDef     *string `json:"smallHighDef"`
-	MediumHighDef    *string `json:"mediumHighDef"`
-	LargeHighDef     *string `json:"largeHighDef"`
+	Raw        *string `json:"raw"`
+	Thumbnail  *string `json:"thumbnail"`
+	Small      *string `json:"small"`
+	Medium     *string `json:"medium"`
+	Large      *string `json:"large"`
+	SrcSet     *string `json:"srcSet"`
+	LiveRender *string `json:"liveRender"`
+	Blurhash   *string `json:"blurhash"`
 }
 
 type PublishGalleryInput struct {

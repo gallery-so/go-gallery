@@ -820,18 +820,14 @@ type ComplexityRoot struct {
 	}
 
 	PreviewURLSet struct {
-		Blurhash         func(childComplexity int) int
-		Large            func(childComplexity int) int
-		LargeHighDef     func(childComplexity int) int
-		LiveRender       func(childComplexity int) int
-		Medium           func(childComplexity int) int
-		MediumHighDef    func(childComplexity int) int
-		Raw              func(childComplexity int) int
-		Small            func(childComplexity int) int
-		SmallHighDef     func(childComplexity int) int
-		SrcSet           func(childComplexity int) int
-		Thumbnail        func(childComplexity int) int
-		ThumbnailHighDef func(childComplexity int) int
+		Blurhash   func(childComplexity int) int
+		Large      func(childComplexity int) int
+		LiveRender func(childComplexity int) int
+		Medium     func(childComplexity int) int
+		Raw        func(childComplexity int) int
+		Small      func(childComplexity int) int
+		SrcSet     func(childComplexity int) int
+		Thumbnail  func(childComplexity int) int
 	}
 
 	PublishGalleryPayload struct {
@@ -4838,13 +4834,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.PreviewURLSet.Large(childComplexity), true
 
-	case "PreviewURLSet.largeHighDef":
-		if e.complexity.PreviewURLSet.LargeHighDef == nil {
-			break
-		}
-
-		return e.complexity.PreviewURLSet.LargeHighDef(childComplexity), true
-
 	case "PreviewURLSet.liveRender":
 		if e.complexity.PreviewURLSet.LiveRender == nil {
 			break
@@ -4858,13 +4847,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.PreviewURLSet.Medium(childComplexity), true
-
-	case "PreviewURLSet.mediumHighDef":
-		if e.complexity.PreviewURLSet.MediumHighDef == nil {
-			break
-		}
-
-		return e.complexity.PreviewURLSet.MediumHighDef(childComplexity), true
 
 	case "PreviewURLSet.raw":
 		if e.complexity.PreviewURLSet.Raw == nil {
@@ -4880,13 +4862,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.PreviewURLSet.Small(childComplexity), true
 
-	case "PreviewURLSet.smallHighDef":
-		if e.complexity.PreviewURLSet.SmallHighDef == nil {
-			break
-		}
-
-		return e.complexity.PreviewURLSet.SmallHighDef(childComplexity), true
-
 	case "PreviewURLSet.srcSet":
 		if e.complexity.PreviewURLSet.SrcSet == nil {
 			break
@@ -4900,13 +4875,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.PreviewURLSet.Thumbnail(childComplexity), true
-
-	case "PreviewURLSet.thumbnailHighDef":
-		if e.complexity.PreviewURLSet.ThumbnailHighDef == nil {
-			break
-		}
-
-		return e.complexity.PreviewURLSet.ThumbnailHighDef(childComplexity), true
 
 	case "PublishGalleryPayload.gallery":
 		if e.complexity.PublishGalleryPayload.Gallery == nil {
@@ -7146,10 +7114,6 @@ type PreviewURLSet {
   srcSet: String
   liveRender: String
   blurhash: String @experimental @goField(forceResolver: true)
-  thumbnailHighDef: String
-  smallHighDef: String
-  mediumHighDef: String
-  largeHighDef: String
 }
 
 type VideoURLSet {
@@ -12553,14 +12517,6 @@ func (ec *executionContext) fieldContext_AudioMedia_previewURLs(ctx context.Cont
 				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
 			case "blurhash":
 				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
-			case "thumbnailHighDef":
-				return ec.fieldContext_PreviewURLSet_thumbnailHighDef(ctx, field)
-			case "smallHighDef":
-				return ec.fieldContext_PreviewURLSet_smallHighDef(ctx, field)
-			case "mediumHighDef":
-				return ec.fieldContext_PreviewURLSet_mediumHighDef(ctx, field)
-			case "largeHighDef":
-				return ec.fieldContext_PreviewURLSet_largeHighDef(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -21930,14 +21886,6 @@ func (ec *executionContext) fieldContext_GIFMedia_previewURLs(ctx context.Contex
 				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
 			case "blurhash":
 				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
-			case "thumbnailHighDef":
-				return ec.fieldContext_PreviewURLSet_thumbnailHighDef(ctx, field)
-			case "smallHighDef":
-				return ec.fieldContext_PreviewURLSet_smallHighDef(ctx, field)
-			case "mediumHighDef":
-				return ec.fieldContext_PreviewURLSet_mediumHighDef(ctx, field)
-			case "largeHighDef":
-				return ec.fieldContext_PreviewURLSet_largeHighDef(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -21997,14 +21945,6 @@ func (ec *executionContext) fieldContext_GIFMedia_staticPreviewURLs(ctx context.
 				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
 			case "blurhash":
 				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
-			case "thumbnailHighDef":
-				return ec.fieldContext_PreviewURLSet_thumbnailHighDef(ctx, field)
-			case "smallHighDef":
-				return ec.fieldContext_PreviewURLSet_smallHighDef(ctx, field)
-			case "mediumHighDef":
-				return ec.fieldContext_PreviewURLSet_mediumHighDef(ctx, field)
-			case "largeHighDef":
-				return ec.fieldContext_PreviewURLSet_largeHighDef(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -22535,14 +22475,6 @@ func (ec *executionContext) fieldContext_Gallery_tokenPreviews(ctx context.Conte
 				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
 			case "blurhash":
 				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
-			case "thumbnailHighDef":
-				return ec.fieldContext_PreviewURLSet_thumbnailHighDef(ctx, field)
-			case "smallHighDef":
-				return ec.fieldContext_PreviewURLSet_smallHighDef(ctx, field)
-			case "mediumHighDef":
-				return ec.fieldContext_PreviewURLSet_mediumHighDef(ctx, field)
-			case "largeHighDef":
-				return ec.fieldContext_PreviewURLSet_largeHighDef(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -24782,14 +24714,6 @@ func (ec *executionContext) fieldContext_GltfMedia_previewURLs(ctx context.Conte
 				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
 			case "blurhash":
 				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
-			case "thumbnailHighDef":
-				return ec.fieldContext_PreviewURLSet_thumbnailHighDef(ctx, field)
-			case "smallHighDef":
-				return ec.fieldContext_PreviewURLSet_smallHighDef(ctx, field)
-			case "mediumHighDef":
-				return ec.fieldContext_PreviewURLSet_mediumHighDef(ctx, field)
-			case "largeHighDef":
-				return ec.fieldContext_PreviewURLSet_largeHighDef(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -25300,14 +25224,6 @@ func (ec *executionContext) fieldContext_HtmlMedia_previewURLs(ctx context.Conte
 				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
 			case "blurhash":
 				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
-			case "thumbnailHighDef":
-				return ec.fieldContext_PreviewURLSet_thumbnailHighDef(ctx, field)
-			case "smallHighDef":
-				return ec.fieldContext_PreviewURLSet_smallHighDef(ctx, field)
-			case "mediumHighDef":
-				return ec.fieldContext_PreviewURLSet_mediumHighDef(ctx, field)
-			case "largeHighDef":
-				return ec.fieldContext_PreviewURLSet_largeHighDef(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -25586,14 +25502,6 @@ func (ec *executionContext) fieldContext_ImageMedia_previewURLs(ctx context.Cont
 				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
 			case "blurhash":
 				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
-			case "thumbnailHighDef":
-				return ec.fieldContext_PreviewURLSet_thumbnailHighDef(ctx, field)
-			case "smallHighDef":
-				return ec.fieldContext_PreviewURLSet_smallHighDef(ctx, field)
-			case "mediumHighDef":
-				return ec.fieldContext_PreviewURLSet_mediumHighDef(ctx, field)
-			case "largeHighDef":
-				return ec.fieldContext_PreviewURLSet_largeHighDef(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -25872,14 +25780,6 @@ func (ec *executionContext) fieldContext_InvalidMedia_previewURLs(ctx context.Co
 				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
 			case "blurhash":
 				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
-			case "thumbnailHighDef":
-				return ec.fieldContext_PreviewURLSet_thumbnailHighDef(ctx, field)
-			case "smallHighDef":
-				return ec.fieldContext_PreviewURLSet_smallHighDef(ctx, field)
-			case "mediumHighDef":
-				return ec.fieldContext_PreviewURLSet_mediumHighDef(ctx, field)
-			case "largeHighDef":
-				return ec.fieldContext_PreviewURLSet_largeHighDef(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -26158,14 +26058,6 @@ func (ec *executionContext) fieldContext_JsonMedia_previewURLs(ctx context.Conte
 				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
 			case "blurhash":
 				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
-			case "thumbnailHighDef":
-				return ec.fieldContext_PreviewURLSet_thumbnailHighDef(ctx, field)
-			case "smallHighDef":
-				return ec.fieldContext_PreviewURLSet_smallHighDef(ctx, field)
-			case "mediumHighDef":
-				return ec.fieldContext_PreviewURLSet_mediumHighDef(ctx, field)
-			case "largeHighDef":
-				return ec.fieldContext_PreviewURLSet_largeHighDef(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -32715,14 +32607,6 @@ func (ec *executionContext) fieldContext_PdfMedia_previewURLs(ctx context.Contex
 				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
 			case "blurhash":
 				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
-			case "thumbnailHighDef":
-				return ec.fieldContext_PreviewURLSet_thumbnailHighDef(ctx, field)
-			case "smallHighDef":
-				return ec.fieldContext_PreviewURLSet_smallHighDef(ctx, field)
-			case "mediumHighDef":
-				return ec.fieldContext_PreviewURLSet_mediumHighDef(ctx, field)
-			case "largeHighDef":
-				return ec.fieldContext_PreviewURLSet_largeHighDef(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -33378,170 +33262,6 @@ func (ec *executionContext) fieldContext_PreviewURLSet_blurhash(ctx context.Cont
 		Field:      field,
 		IsMethod:   true,
 		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _PreviewURLSet_thumbnailHighDef(ctx context.Context, field graphql.CollectedField, obj *model.PreviewURLSet) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_PreviewURLSet_thumbnailHighDef(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.ThumbnailHighDef, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_PreviewURLSet_thumbnailHighDef(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "PreviewURLSet",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _PreviewURLSet_smallHighDef(ctx context.Context, field graphql.CollectedField, obj *model.PreviewURLSet) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_PreviewURLSet_smallHighDef(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.SmallHighDef, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_PreviewURLSet_smallHighDef(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "PreviewURLSet",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _PreviewURLSet_mediumHighDef(ctx context.Context, field graphql.CollectedField, obj *model.PreviewURLSet) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_PreviewURLSet_mediumHighDef(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.MediumHighDef, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_PreviewURLSet_mediumHighDef(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "PreviewURLSet",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _PreviewURLSet_largeHighDef(ctx context.Context, field graphql.CollectedField, obj *model.PreviewURLSet) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_PreviewURLSet_largeHighDef(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.LargeHighDef, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_PreviewURLSet_largeHighDef(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "PreviewURLSet",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
 		},
@@ -39462,14 +39182,6 @@ func (ec *executionContext) fieldContext_SyncingMedia_previewURLs(ctx context.Co
 				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
 			case "blurhash":
 				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
-			case "thumbnailHighDef":
-				return ec.fieldContext_PreviewURLSet_thumbnailHighDef(ctx, field)
-			case "smallHighDef":
-				return ec.fieldContext_PreviewURLSet_smallHighDef(ctx, field)
-			case "mediumHighDef":
-				return ec.fieldContext_PreviewURLSet_mediumHighDef(ctx, field)
-			case "largeHighDef":
-				return ec.fieldContext_PreviewURLSet_largeHighDef(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -39748,14 +39460,6 @@ func (ec *executionContext) fieldContext_TextMedia_previewURLs(ctx context.Conte
 				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
 			case "blurhash":
 				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
-			case "thumbnailHighDef":
-				return ec.fieldContext_PreviewURLSet_thumbnailHighDef(ctx, field)
-			case "smallHighDef":
-				return ec.fieldContext_PreviewURLSet_smallHighDef(ctx, field)
-			case "mediumHighDef":
-				return ec.fieldContext_PreviewURLSet_mediumHighDef(ctx, field)
-			case "largeHighDef":
-				return ec.fieldContext_PreviewURLSet_largeHighDef(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -42967,14 +42671,6 @@ func (ec *executionContext) fieldContext_UnknownMedia_previewURLs(ctx context.Co
 				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
 			case "blurhash":
 				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
-			case "thumbnailHighDef":
-				return ec.fieldContext_PreviewURLSet_thumbnailHighDef(ctx, field)
-			case "smallHighDef":
-				return ec.fieldContext_PreviewURLSet_smallHighDef(ctx, field)
-			case "mediumHighDef":
-				return ec.fieldContext_PreviewURLSet_mediumHighDef(ctx, field)
-			case "largeHighDef":
-				return ec.fieldContext_PreviewURLSet_largeHighDef(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -45527,14 +45223,6 @@ func (ec *executionContext) fieldContext_VideoMedia_previewURLs(ctx context.Cont
 				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
 			case "blurhash":
 				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
-			case "thumbnailHighDef":
-				return ec.fieldContext_PreviewURLSet_thumbnailHighDef(ctx, field)
-			case "smallHighDef":
-				return ec.fieldContext_PreviewURLSet_smallHighDef(ctx, field)
-			case "mediumHighDef":
-				return ec.fieldContext_PreviewURLSet_mediumHighDef(ctx, field)
-			case "largeHighDef":
-				return ec.fieldContext_PreviewURLSet_largeHighDef(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -59553,22 +59241,6 @@ func (ec *executionContext) _PreviewURLSet(ctx context.Context, sel ast.Selectio
 				return innerFunc(ctx)
 
 			})
-		case "thumbnailHighDef":
-
-			out.Values[i] = ec._PreviewURLSet_thumbnailHighDef(ctx, field, obj)
-
-		case "smallHighDef":
-
-			out.Values[i] = ec._PreviewURLSet_smallHighDef(ctx, field, obj)
-
-		case "mediumHighDef":
-
-			out.Values[i] = ec._PreviewURLSet_mediumHighDef(ctx, field, obj)
-
-		case "largeHighDef":
-
-			out.Values[i] = ec._PreviewURLSet_largeHighDef(ctx, field, obj)
-
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

@@ -1953,26 +1953,21 @@ func getPreviewUrls(ctx context.Context, tokenMedia db.TokenMedia, options ...me
 		live = tokenMedia.Media.MediaURL.String()
 	}
 
-	// Add timestamp to options
-	o := make([]mediamapper.Option, len(options)+1)
+	// Add timestamp and quality to options
+	o := make([]mediamapper.Option, len(options)+2)
 	copy(o, options)
 	o[len(o)-1] = mediamapper.WithTimestamp(tokenMedia.LastUpdated)
+	o[len(o)-2] = mediamapper.WithQuality(100)
 	options = o
 
-	highDefOptions := append(options, mediamapper.WithQuality(100))
-
 	return &model.PreviewURLSet{
-		Raw:              &preview,
-		Thumbnail:        util.ToPointer(mm.GetThumbnailImageUrl(preview, options...)),
-		Small:            util.ToPointer(mm.GetSmallImageUrl(preview, options...)),
-		Medium:           util.ToPointer(mm.GetMediumImageUrl(preview, options...)),
-		Large:            util.ToPointer(mm.GetLargeImageUrl(preview, options...)),
-		SrcSet:           util.ToPointer(mm.GetSrcSet(preview, options...)),
-		LiveRender:       &live,
-		ThumbnailHighDef: util.ToPointer(mm.GetThumbnailImageUrl(preview, highDefOptions...)),
-		SmallHighDef:     util.ToPointer(mm.GetSmallImageUrl(preview, highDefOptions...)),
-		MediumHighDef:    util.ToPointer(mm.GetMediumImageUrl(preview, highDefOptions...)),
-		LargeHighDef:     util.ToPointer(mm.GetLargeImageUrl(preview, highDefOptions...)),
+		Raw:        &preview,
+		Thumbnail:  util.ToPointer(mm.GetThumbnailImageUrl(preview, options...)),
+		Small:      util.ToPointer(mm.GetSmallImageUrl(preview, options...)),
+		Medium:     util.ToPointer(mm.GetMediumImageUrl(preview, options...)),
+		Large:      util.ToPointer(mm.GetLargeImageUrl(preview, options...)),
+		SrcSet:     util.ToPointer(mm.GetSrcSet(preview, options...)),
+		LiveRender: &live,
 	}
 }
 

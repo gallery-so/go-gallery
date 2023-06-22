@@ -192,10 +192,6 @@ type PreviewURLSet {
   srcSet: String
   liveRender: String
   blurhash: String @experimental @goField(forceResolver: true)
-  thumbnailHighDef: String
-  smallHighDef: String
-  mediumHighDef: String
-  largeHighDef: String
 }
 
 type VideoURLSet {
