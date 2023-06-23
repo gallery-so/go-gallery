@@ -519,17 +519,23 @@ func (api GalleryAPI) UpdateGalleryInfo(ctx context.Context, galleryID persist.D
 	}
 
 	var nullName, nullDesc string
+	var nameSet, descSet bool
+
 	if name != nil {
 		nullName = *name
+		nameSet = true
 	}
 	if description != nil {
 		nullDesc = *description
+		descSet = true
 	}
 
 	err := api.queries.UpdateGalleryInfo(ctx, db.UpdateGalleryInfoParams{
-		ID:          galleryID,
-		Name:        nullName,
-		Description: nullDesc,
+		ID:             galleryID,
+		Name:           nullName,
+		Description:    nullDesc,
+		NameSet:        nameSet,
+		DescriptionSet: descSet,
 	})
 	if err != nil {
 		return err
