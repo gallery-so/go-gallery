@@ -172,30 +172,10 @@ func (api TokenAPI) GetTokensByIDs(ctx context.Context, tokenIDs []persist.DBID)
 	return foundTokens, nil
 }
 
-// GetOwnedTokenByIdentifiers returns a token owned by a user by its identifiers.
-func (api TokenAPI) GetOwnedTokenByIdentifiers(ctx context.Context, userID persist.DBID, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) (db.Token, error) {
-	// Validate
-	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"userID":          {userID, "required"},
-		"chain":           {chain, "required"},
-		"contractAddress": {contractAddress, "required"},
-		"tokenID":         {tokenID, "required"},
-	}); err != nil {
-		return db.Token{}, err
-	}
-	return api.loaders.OwnedTokenByTokenIdentifiers.Load(db.GetOwnedTokenByIdentifiersParams{
-		UserID:          userID,
-		Chain:           chain,
-		ContractAddress: contractAddress,
-		TokenID:         tokenID,
-	})
-}
-
 // GetImageMetadataByTokenIdentifiers fetches a token's image-related metadata by its identifiers.
 func (api TokenAPI) GetImageMetadataByTokenIdentifiers(ctx context.Context, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) (persist.TokenMetadata, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"chain":           {chain, "required"},
 		"contractAddress": {contractAddress, "required"},
 		"tokenID":         {tokenID, "required"},
 	}); err != nil {

@@ -426,12 +426,21 @@ func (r *galleryUserResolver) ProfileImage(ctx context.Context, obj *model.Galle
 }
 
 // EnsProfileImage is the resolver for the ensProfileImage field.
-func (r *galleryUserResolver) EnsProfileImage(ctx context.Context, obj *model.GalleryUser) (model.ProfileImage, error) {
-	a, err := publicapi.For(ctx).User.GetENSProfileImageByUserID(ctx, obj.Dbid)
+func (r *galleryUserResolver) EnsProfileImage(ctx context.Context, obj *model.GalleryUser) (*model.EnsProfileImage, error) {
+	a, err := publicapi.For(ctx).User.GetEnsProfileImageByUserID(ctx, obj.Dbid)
 	if err != nil {
 		return nil, err
 	}
-	return ensAvatarToModel(ctx, obj.Dbid, a)
+
+	pfp, err := ensAvatarToProfileImage(ctx, a)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.EnsProfileImage{
+		ChainAddress: util.ToPointer(persist.NewChainAddress(a.Address, a.Chain)),
+		ProfileImage: pfp,
+	}, nil
 }
 
 // Roles is the resolver for the roles field.
@@ -674,7 +683,7 @@ func (r *mutationResolver) UnregisterUserPushToken(ctx context.Context, pushToke
 
 // SetProfileImage is the resolver for the setProfileImage field.
 func (r *mutationResolver) SetProfileImage(ctx context.Context, input model.SetProfileImageInput) (model.SetProfileImagePayloadOrError, error) {
-	err := publicapi.For(ctx).User.SetProfileImage(ctx, input.TokenID)
+	err := publicapi.For(ctx).User.SetProfileImage(ctx, input.TokenID, input.WalletAddress)
 	if err != nil {
 		return nil, err
 	}

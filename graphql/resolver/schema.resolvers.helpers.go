@@ -15,19 +15,16 @@ import (
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/debugtools"
-	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/emails"
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/notifications"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
 	"github.com/mikeydub/go-gallery/service/socialauth"
 	"github.com/mikeydub/go-gallery/service/twitter"
 	"github.com/mikeydub/go-gallery/util"
@@ -168,9 +165,9 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 	}
 
 	switch err {
-	case publicapi.ErrProfileImageTooManySources, publicapi.ErrProfileImageNoSources, publicapi.ErrProfileImageUnknownSource:
+	case publicapi.ErrProfileImageTooManySources, publicapi.ErrProfileImageUnknownSource:
 		mappedErr = model.ErrInvalidInput{Message: message}
-	case publicapi.ErrProfileImageNotTokenOwner:
+	case publicapi.ErrProfileImageNotTokenOwner, publicapi.ErrProfileImageNotWalletOwner:
 		mappedErr = model.ErrNotAuthorized{Message: message}
 	}
 
@@ -1937,62 +1934,30 @@ func profileImageToModel(ctx context.Context, pfp db.ProfileImage) (model.Profil
 	switch pfp.SourceType {
 	case persist.ProfileImageSourceToken:
 		token, err := resolveTokenByTokenID(ctx, pfp.TokenID)
-		return &model.TokenProfileImage{Token: token}, err
+		if err != nil {
+			return nil, err
+		}
+		return &model.TokenProfileImage{Token: token}, nil
+	case persist.ProfileImageSourceENS:
+		if pfp.EnsAvatarUri.String == "" {
+			return nil, nil
+		}
+		urls := previewURLs(ctx, pfp.EnsAvatarUri.String, nil)
+		return &model.HTTPSProfileImage{PreviewURLs: urls}, nil
 	default:
 		return nil, publicapi.ErrProfileImageUnknownSource
 	}
 }
 
-func ensAvatarToModel(ctx context.Context, userID persist.DBID, a eth.EnsAvatar) (model.ProfileImage, error) {
-	if a.URI == nil {
+func ensAvatarToProfileImage(ctx context.Context, a eth.EnsAvatar) (model.ProfileImage, error) {
+	uri, err := publicapi.For(ctx).User.URIForAvatar(ctx, a.URI)
+	if err != nil {
+		return nil, err
+	}
+	if uri == "" {
 		return nil, nil
 	}
-	switch t := a.URI.(type) {
-	case eth.EnsHttpUri:
-		urls := previewURLs(ctx, t.URL, nil)
-		return &model.HTTPSProfileImage{PreviewURLs: urls}, nil
-	case eth.EnsDataUri:
-		return &model.DataProfileImage{URL: t.URL}, nil
-	case eth.EnsIpfsUri:
-		url := ipfs.PathGatewayFrom(env.GetString("IPFS_URL"), t.URL, true) // Remap IPFS URI to use our own gateway
-		urls := previewURLs(ctx, url, nil)
-		return &model.IPFSProfileImage{PreviewURLs: urls}, nil
-	case eth.EnsNftUri:
-		return nftProfileImage(ctx, userID, t)
-	default:
-		return nil, eth.ErrUnknownENSAvatarURI
-	}
-}
-
-func nftProfileImage(ctx context.Context, userID persist.DBID, uri eth.EnsNftUri) (model.ProfileImage, error) {
-	// If the token is one that the user has synced, use the Gallery token as the source
-	token, err := publicapi.For(ctx).Token.GetOwnedTokenByIdentifiers(ctx, userID, uri.Chain(), uri.Address(), uri.TokenID())
-
-	if err != nil && !util.ErrorAs[persist.ErrTokenNotFoundByIdentifiersWithOwner](err) {
-		return nil, err
-	}
-
-	if token.ID != "" {
-		return &model.TokenProfileImage{Token: tokenToModel(ctx, token)}, nil
-	}
-
-	// Otherwise, fetch the metadata and return the appropriate profile image source
-	metadata, err := publicapi.For(ctx).Token.GetImageMetadataByTokenIdentifiers(ctx, uri.Chain(), uri.Address(), uri.TokenID())
-	if err != nil {
-		return nil, err
-	}
-
-	imageURL, _, err := media.FindImageAndAnimationURLs(ctx, uri.Chain(), uri.Address(), metadata)
-	if err != nil {
-		return nil, err
-	}
-
-	newURI, err := eth.ENSRecordToURI(string(imageURL))
-	if err != nil {
-		return nil, err
-	}
-
-	return ensAvatarToModel(ctx, userID, eth.EnsAvatar{URI: newURI})
+	return &model.HTTPSProfileImage{PreviewURLs: previewURLs(ctx, uri, nil)}, nil
 }
 
 func previewURLsForTokenMedia(ctx context.Context, tokenMedia db.TokenMedia, options ...mediamapper.Option) *model.PreviewURLSet {

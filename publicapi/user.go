@@ -21,17 +21,20 @@ import (
 	"roci.dev/fracdex"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/emails"
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/membership"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/recommend"
+	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/socialauth"
 	"github.com/mikeydub/go-gallery/service/user"
@@ -39,10 +42,11 @@ import (
 	"github.com/mikeydub/go-gallery/validate"
 )
 
+var ensProfileImageFetchRate = time.Duration(time.Hour * 3 * 24)
 var ErrProfileImageTooManySources = errors.New("too many profile image sources provided")
-var ErrProfileImageNoSources = errors.New("no profile image source provided")
-var ErrProfileImageUnknownSource = errors.New("unsupported profile image source provided")
+var ErrProfileImageUnknownSource = errors.New("unknown profile image source to use")
 var ErrProfileImageNotTokenOwner = errors.New("user is not an owner of the token")
+var ErrProfileImageNotWalletOwner = errors.New("user is not the owner of the wallet")
 
 type UserAPI struct {
 	repos              *postgres.Repositories
@@ -1331,43 +1335,27 @@ func (api UserAPI) DeletePushTokenByPushToken(ctx context.Context, pushToken str
 }
 
 // SetProfileImage sets the profile image for the current user.
-func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID) error {
+func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID, walletAddress *persist.ChainAddress) error {
 	// Validate
 	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
 
-	if util.OnlyNils(tokenID) {
-		return ErrProfileImageNoSources
-	}
-
-	if util.ManyNotNils(tokenID) {
+	// Too many inputs provided
+	if util.ManyNotNils(tokenID, walletAddress) {
 		return ErrProfileImageTooManySources
 	}
 
 	// Set the profile image to reference a token
 	if tokenID != nil {
-		o, err := For(ctx).Token.GetTokenOwnershipByTokenID(ctx, *tokenID)
+		api.updateUserProfileToToken(ctx, userID, *tokenID)
+	}
 
-		if util.ErrorAs[persist.ErrTokenOwnershipNotFound](err) {
-			return ErrProfileImageNotTokenOwner
-		}
-
-		if err != nil {
-			return err
-		}
-
-		if o.OwnerUserID != userID {
-			return ErrProfileImageNotTokenOwner
-		}
-
-		return api.queries.SetProfileImageToToken(ctx, db.SetProfileImageToTokenParams{
-			TokenSourceType: persist.ProfileImageSourceToken,
-			ProfileID:       persist.GenerateID(),
-			UserID:          userID,
-			TokenID:         o.TokenID,
-		})
+	// Set the profile image to reference ENS avatar
+	if walletAddress != nil {
+		_, err := api.updateUserProfileToEns(ctx, userID, *walletAddress)
+		return err
 	}
 
 	return ErrProfileImageUnknownSource
@@ -1388,13 +1376,31 @@ func (api UserAPI) GetProfileImageByUserID(ctx context.Context, userID persist.D
 	if err != nil {
 		return db.ProfileImage{}, err
 	}
+
+	// PFP isn't set
 	if user.ProfileImageID == "" {
 		return db.ProfileImage{}, nil
 	}
-	return api.loaders.ProfileImageByID.Load(user.ProfileImageID)
+
+	pfp, err := api.loaders.ProfileImageByID.Load(user.ProfileImageID)
+	if err != nil {
+		return db.ProfileImage{}, err
+	}
+
+	if pfp.SourceType != persist.ProfileImageSourceENS || time.Now().Before(pfp.LastUpdated.Add(ensProfileImageFetchRate)) {
+		return pfp, nil
+	}
+
+	wallet, err := api.loaders.WalletByWalletID.Load(pfp.WalletID)
+	if err != nil {
+		return db.ProfileImage{}, err
+	}
+
+	return api.updateUserProfileToEns(ctx, userID, persist.NewChainAddress(wallet.Address, wallet.Chain))
 }
 
-func (api UserAPI) GetENSProfileImageByUserID(ctx context.Context, userID persist.DBID) (eth.EnsAvatar, error) {
+// GetEnsProfileImageByUserID returns the an ENS profile image for a user based on their set of wallets.
+func (api UserAPI) GetEnsProfileImageByUserID(ctx context.Context, userID persist.DBID) (eth.EnsAvatar, error) {
 	// Validate
 	user, err := api.GetUserById(ctx, userID)
 	if err != nil {
@@ -1410,24 +1416,21 @@ func (api UserAPI) GetENSProfileImageByUserID(ctx context.Context, userID persis
 		return user.Wallets[i].ID == user.PrimaryWalletID || user.Wallets[i].ID < user.Wallets[j].ID
 	})
 
-	ethWallets := make([]persist.EthereumAddress, 0)
-
-	// Filter for only ETH wallets
-	for _, w := range user.Wallets {
-		if w.Chain == persist.ChainETH {
-			ethWallets = append(ethWallets, persist.EthereumAddress(w.Address))
-		}
-	}
-
 	errs := make([]error, 0)
 
-	for _, w := range ethWallets {
-		a, err := eth.EnsAvatarRecordFor(ctx, api.ethClient, w)
-		if err == nil && a.URI != nil {
-			return a, nil
+	for _, w := range user.Wallets {
+		if w.Chain != persist.ChainETH {
+			continue
 		}
+
+		a, err := eth.EnsAvatarRecordFor(ctx, api.ethClient, persist.EthereumAddress(w.Address))
 		if err != nil {
 			errs = append(errs, err)
+			continue
+		}
+
+		if a.URI != nil {
+			return a, nil
 		}
 	}
 
@@ -1436,4 +1439,134 @@ func (api UserAPI) GetENSProfileImageByUserID(ctx context.Context, userID persis
 	}
 
 	return eth.EnsAvatar{}, nil
+}
+
+func (api UserAPI) URIForAvatar(ctx context.Context, uri eth.AvatarURI) (string, error) {
+	return uriForAvatar(ctx, uri)
+}
+
+func (api UserAPI) updateUserProfileToToken(ctx context.Context, userID, tokenID persist.DBID) error {
+	o, err := For(ctx).Token.GetTokenOwnershipByTokenID(ctx, tokenID)
+
+	if util.ErrorAs[persist.ErrTokenOwnershipNotFound](err) {
+		return ErrProfileImageNotTokenOwner
+	}
+
+	if err != nil {
+		return err
+	}
+
+	if o.OwnerUserID != userID {
+		return ErrProfileImageNotTokenOwner
+	}
+
+	return api.queries.SetProfileImageToToken(ctx, db.SetProfileImageToTokenParams{
+		TokenSourceType: persist.ProfileImageSourceToken,
+		ProfileID:       persist.GenerateID(),
+		UserID:          userID,
+		TokenID:         o.TokenID,
+	})
+}
+
+func (api UserAPI) updateUserProfileToEns(ctx context.Context, userID persist.DBID, walletAddress persist.ChainAddress) (db.ProfileImage, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"chain":   {walletAddress.Chain(), fmt.Sprintf("eq=%d", persist.ChainETH)},
+		"address": {walletAddress.Address(), "required"},
+	}); err != nil {
+		return db.ProfileImage{}, err
+	}
+
+	wallets, err := api.loaders.WalletsByUserID.Load(userID)
+	if err != nil {
+		return db.ProfileImage{}, err
+	}
+
+	for _, w := range wallets {
+		if w.Chain == walletAddress.Chain() && w.Address == walletAddress.Address() {
+			// Found the wallet
+			a, err := eth.EnsAvatarRecordFor(ctx, api.ethClient, persist.EthereumAddress(w.Address))
+			if err != nil {
+				return db.ProfileImage{}, err
+			}
+
+			// Confirm that user owns the token
+			if t, ok := a.URI.(eth.EnsTokenURI); ok {
+				t.Chain()
+			}
+
+			uri, err := uriForAvatar(ctx, a.URI)
+			if err != nil {
+				return db.ProfileImage{}, err
+			}
+
+			pfp, err := api.queries.SetProfileImageToENS(ctx, db.SetProfileImageToENSParams{
+				EnsSourceType: persist.ProfileImageSourceENS,
+				ProfileID:     persist.GenerateID(),
+				UserID:        userID,
+				WalletID:      w.ID,
+				EnsAvatarUri:  util.ToNullString(uri, true),
+			})
+
+			// Manually prime the PFP loader
+			api.loaders.ProfileImageByID.Prime(pfp.ProfileImage.ID, pfp.ProfileImage)
+
+			return pfp.ProfileImage, err
+		}
+	}
+
+	return db.ProfileImage{}, ErrProfileImageNotWalletOwner
+}
+
+func uriForAvatar(ctx context.Context, uri eth.AvatarURI) (string, error) {
+	switch u := uri.(type) {
+	case nil:
+		return "", nil
+	case eth.EnsHttpURI:
+		return u.URL, nil
+	case eth.EnsIpfsURI:
+		return ipfs.PathGatewayFrom(env.GetString("IPFS_URL"), u.URL, true), nil
+	case eth.EnsTokenURI:
+		return uriFromToken(ctx, u)
+	default:
+		return "", eth.ErrUnknownENSAvatarURI
+	}
+}
+
+func uriFromToken(ctx context.Context, uri eth.EnsTokenURI) (string, error) {
+	chain, err := uri.Chain()
+	if err != nil {
+		return "", err
+	}
+
+	address, err := uri.Address()
+	if err != nil {
+		return "", err
+	}
+
+	tokenID, err := uri.TokenID()
+	if err != nil {
+		return "", err
+	}
+
+	// Fetch the metadata and return the appropriate profile image source
+	metadata, err := For(ctx).Token.GetImageMetadataByTokenIdentifiers(ctx, chain, address, tokenID)
+	if err != nil {
+		return "", err
+	}
+
+	imageURL, _, err := media.FindImageAndAnimationURLs(ctx, chain, address, metadata)
+	if err != nil {
+		if errors.Is(err, media.ErrNoMediaURLs) {
+			return "", nil
+		}
+		return "", err
+	}
+
+	newURI, err := eth.EnsRecordToURI(string(imageURL))
+	if err != nil {
+		return "", err
+	}
+
+	return uriForAvatar(ctx, newURI)
 }

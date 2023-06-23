@@ -326,13 +326,15 @@ type PiiUserView struct {
 }
 
 type ProfileImage struct {
-	ID          persist.DBID
-	UserID      persist.DBID
-	TokenID     persist.DBID
-	SourceType  persist.ProfileImageSource
-	Deleted     bool
-	CreatedAt   time.Time
-	LastUpdated time.Time
+	ID           persist.DBID
+	UserID       persist.DBID
+	TokenID      persist.DBID
+	SourceType   persist.ProfileImageSource
+	Deleted      bool
+	CreatedAt    time.Time
+	LastUpdated  time.Time
+	WalletID     persist.DBID
+	EnsAvatarUri sql.NullString
 }
 
 type PushNotificationTicket struct {

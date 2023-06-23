@@ -103,25 +103,6 @@ select o.*
     from unnest(@token_ids::text[]) as t(id)
         join token_ownership o on o.token_id = t.id;
 
--- name: GetOwnedTokenByIdentifiers :batchone
-with user_owns as (
-    select * from token_ownership where token_ownership.owner_user_id = @user_id
-),
-selected_token as (
-	select t.*
-	from tokens t
-	join contracts c on t.contract = c.id
-	where c.chain = @chain and c.address = @contract_address and t.token_id = @token_id and not t.deleted and not c.deleted
-),
-owned_token as (
-    select selected_token.id
-    from user_owns
-    join selected_token on user_owns.token_id = selected_token.id
-)
-select tokens.*
-from tokens
-join owned_token on tokens.id = owned_token.id;
-
 -- name: GetContractCreatorsByIds :many
 select o.*
     from unnest(@contract_ids::text[]) as c(id)
@@ -1299,6 +1280,19 @@ with new_image as (
     returning id
 )
 update users set profile_image_id = new_image.id from new_image where users.id = @user_id and not deleted;
+
+-- name: SetProfileImageToENS :one
+with profile_images as (
+    insert into profile_images (id, user_id, source_type, wallet_id, ens_avatar_uri, deleted, last_updated)
+    values (@profile_id, @user_id, @ens_source_type, @wallet_id, @ens_avatar_uri, false, now())
+    on conflict (user_id) do update set wallet_id = excluded.wallet_id
+        , ens_avatar_uri = excluded.ens_avatar_uri
+        , source_type = excluded.source_type
+        , deleted = excluded.deleted
+        , last_updated = excluded.last_updated
+    returning *
+)
+update users set profile_image_id = profile_images.id from profile_images where users.id = @user_id and not users.deleted returning sqlc.embed(profile_images);
 
 -- name: RemoveProfileImage :exec
 with remove_image as (

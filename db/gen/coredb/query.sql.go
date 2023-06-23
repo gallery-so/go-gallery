@@ -4845,6 +4845,55 @@ func (q *Queries) SetContractOverrideCreator(ctx context.Context, arg SetContrac
 	return err
 }
 
+const setProfileImageToENS = `-- name: SetProfileImageToENS :one
+with profile_images as (
+    insert into profile_images (id, user_id, source_type, wallet_id, ens_avatar_uri, deleted, last_updated)
+    values ($2, $1, $3, $4, $5, false, now())
+    on conflict (user_id) do update set wallet_id = excluded.wallet_id
+        , ens_avatar_uri = excluded.ens_avatar_uri
+        , source_type = excluded.source_type
+        , deleted = excluded.deleted
+        , last_updated = excluded.last_updated
+    returning id, user_id, token_id, source_type, deleted, created_at, last_updated, wallet_id, ens_avatar_uri
+)
+update users set profile_image_id = profile_images.id from profile_images where users.id = $1 and not users.deleted returning profile_images.id, profile_images.user_id, profile_images.token_id, profile_images.source_type, profile_images.deleted, profile_images.created_at, profile_images.last_updated, profile_images.wallet_id, profile_images.ens_avatar_uri
+`
+
+type SetProfileImageToENSParams struct {
+	UserID        persist.DBID
+	ProfileID     persist.DBID
+	EnsSourceType persist.ProfileImageSource
+	WalletID      persist.DBID
+	EnsAvatarUri  sql.NullString
+}
+
+type SetProfileImageToENSRow struct {
+	ProfileImage ProfileImage
+}
+
+func (q *Queries) SetProfileImageToENS(ctx context.Context, arg SetProfileImageToENSParams) (SetProfileImageToENSRow, error) {
+	row := q.db.QueryRow(ctx, setProfileImageToENS,
+		arg.UserID,
+		arg.ProfileID,
+		arg.EnsSourceType,
+		arg.WalletID,
+		arg.EnsAvatarUri,
+	)
+	var i SetProfileImageToENSRow
+	err := row.Scan(
+		&i.ProfileImage.ID,
+		&i.ProfileImage.UserID,
+		&i.ProfileImage.TokenID,
+		&i.ProfileImage.SourceType,
+		&i.ProfileImage.Deleted,
+		&i.ProfileImage.CreatedAt,
+		&i.ProfileImage.LastUpdated,
+		&i.ProfileImage.WalletID,
+		&i.ProfileImage.EnsAvatarUri,
+	)
+	return i, err
+}
+
 const setProfileImageToToken = `-- name: SetProfileImageToToken :exec
 with new_image as (
     insert into profile_images (id, user_id, source_type, token_id, deleted, last_updated)

@@ -342,11 +342,11 @@ func (l *RoleList) Scan(value interface{}) error {
 	return pq.Array(l).Scan(value)
 }
 
-// ProfileImageSource represents the source of a profile image
-type ProfileImageSource string
+type ProfileImageSource string // ProfileImageSource represents the source of a profile image
 
 const (
 	ProfileImageSourceToken ProfileImageSource = "token"
+	ProfileImageSourceENS                      = "ens"
 )
 
 type ErrProfileImageNotFound struct {
@@ -356,4 +356,8 @@ type ErrProfileImageNotFound struct {
 
 func (e ErrProfileImageNotFound) Error() string {
 	return fmt.Sprintf("profile image %s not found: %s", e.ProfileImageID, e.Err)
+}
+
+type EnsAvatarData struct {
+	URI string `json:"uri"` // URI of the avatar
 }

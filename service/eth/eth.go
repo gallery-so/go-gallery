@@ -3,7 +3,9 @@ package eth
 import (
 	"context"
 	"errors"
+	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -15,6 +17,11 @@ import (
 
 var ErrNoResolution = errors.New("no resolution")
 var ErrUnknownENSAvatarURI = errors.New("unknown ENS avatar uri")
+var ErrChainNotSupported = errors.New("chain not supported")
+
+const (
+	ethMainnetChainID = "eip155:1"
+)
 
 // ReverseResolve returns the domain name for the given address
 func ReverseResolve(ctx context.Context, ethClient *ethclient.Client, address persist.EthereumAddress) (string, error) {
@@ -46,6 +53,7 @@ func ReverseResolves(ctx context.Context, ethClient *ethclient.Client, domain st
 	return strings.EqualFold(domain, revDomain), nil
 }
 
+// EnsAvatarRecordFor returns the avatar record for the given address
 func EnsAvatarRecordFor(ctx context.Context, ethClient *ethclient.Client, a persist.EthereumAddress) (avatar EnsAvatar, err error) {
 	domain, err := ReverseResolve(ctx, ethClient, a)
 	if errors.Is(err, ErrNoResolution) {
@@ -66,33 +74,41 @@ func EnsAvatarRecordFor(ctx context.Context, ethClient *ethclient.Client, a pers
 		return avatar, nil
 	}
 
-	uri, err := ENSRecordToURI(record)
+	uri, err := EnsRecordToURI(record)
 	if err != nil {
 		return EnsAvatar{}, err
 	}
 
-	return EnsAvatar{URI: uri}, nil
+	return EnsAvatar{
+		Address: persist.Address(a),
+		Chain:   persist.ChainETH,
+		URI:     uri,
+	}, nil
 }
 
 // Regex for CAIP-19 asset type with required asset ID
 // https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-19.md
-var caip19AssetTypeWithAssetID = regexp.MustCompile(`^(?P<chain_id>[-a-z0-9]{3,8}:[-_a-zA-Z0-9]{1,32})/(?P<asset_namespace>[-a-z0-9]{3,8}):(?P<asset_reference>[-.%a-zA-Z0-9]{1,78})/(?P<token_id>[-.%a-zA-Z0-9]{1,78})$`)
+var caip19AssetTypeWithAssetID = regexp.MustCompile(
+	"^(?P<chain_id>[-a-z0-9]{3,8}:[-_a-zA-Z0-9]{1,32})/" +
+		"(?P<asset_namespace>[-a-z0-9]{3,8}):" +
+		"(?P<asset_reference>[-.%a-zA-Z0-9]{1,78})/" +
+		"(?P<token_id>[-.%a-zA-Z0-9]{1,78})$",
+)
 
-func ENSRecordToURI(r string) (avatarURI, error) {
+// EnsRecordToURI converts an ENS avatar record to an avatar URI
+func EnsRecordToURI(r string) (AvatarURI, error) {
 	switch {
-	case strings.HasPrefix(r, "https://"):
-		return EnsHttpUri{URL: r}, nil
+	case strings.HasPrefix(r, "https://"), strings.HasPrefix(r, "http://"):
+		return EnsHttpURI{URL: r}, nil
 	case strings.HasPrefix(r, "ipfs://"):
-		return EnsIpfsUri{URL: r}, nil
-	case strings.HasPrefix(r, "data:"):
-		return EnsDataUri{URL: r}, nil
+		return EnsIpfsURI{URL: r}, nil
 	case caip19AssetTypeWithAssetID.MatchString(r):
-		grps := caip19AssetTypeWithAssetID.FindStringSubmatch(r)
-		return EnsNftUri{
-			ChainID:        grps[1],
-			AssetNamespace: grps[2],
-			AssetReference: grps[3],
-			AssetID:        grps[4],
+		g := caip19AssetTypeWithAssetID.FindStringSubmatch(r)
+		return EnsTokenURI{
+			ChainID:        g[1],
+			AssetNamespace: g[2],
+			AssetReference: g[3],
+			AssetID:        g[4],
 		}, nil
 	default:
 		return nil, ErrUnknownENSAvatarURI
@@ -101,48 +117,70 @@ func ENSRecordToURI(r string) (avatarURI, error) {
 
 // EnsAvatar is a representation of the ENS avatar text record
 type EnsAvatar struct {
-	URI avatarURI
+	Domain          string
+	ResolverAddress persist.Address
+	Address         persist.Address
+	Chain           persist.Chain
+	URI             AvatarURI
 }
 
-type avatarURI interface {
+type AvatarURI interface {
 	IsAvatarURI()
 }
 
-type EnsHttpUri struct {
+type EnsHttpURI struct {
 	URL string
 }
 
-func (EnsHttpUri) IsAvatarURI() {}
+func (EnsHttpURI) IsAvatarURI() {}
 
-type EnsDataUri struct {
+type EnsIpfsURI struct {
 	URL string
 }
 
-func (EnsDataUri) IsAvatarURI() {}
+func (EnsIpfsURI) IsAvatarURI() {}
 
-type EnsIpfsUri struct {
-	URL string
-}
-
-func (EnsIpfsUri) IsAvatarURI() {}
-
-type EnsNftUri struct {
+type EnsTokenURI struct {
 	ChainID        string
 	AssetNamespace string
 	AssetReference string
 	AssetID        string
 }
 
-func (EnsNftUri) IsAvatarURI() {}
+func (EnsTokenURI) IsAvatarURI() {}
 
-func (e EnsNftUri) Chain() persist.Chain {
-	panic("not implemented")
+func (e EnsTokenURI) Chain() (persist.Chain, error) {
+	switch e.ChainID {
+	case ethMainnetChainID:
+		return persist.ChainETH, nil
+	default:
+		return 0, ErrChainNotSupported
+	}
 }
 
-func (e EnsNftUri) TokenID() persist.TokenID {
-	panic("not implemented")
+func (e EnsTokenURI) TokenID() (persist.TokenID, error) {
+	switch e.ChainID {
+	case ethMainnetChainID:
+		return asTokenID(e.AssetID)
+	default:
+		return persist.TokenID(""), ErrChainNotSupported
+	}
 }
 
-func (e EnsNftUri) Address() persist.Address {
-	panic("not implemented")
+func (e EnsTokenURI) Address() (persist.Address, error) {
+	switch e.ChainID {
+	case ethMainnetChainID:
+		return persist.Address(e.AssetReference), nil
+	default:
+		return persist.Address(""), ErrChainNotSupported
+	}
+}
+
+// asTokenID converts a decimal string to a token ID
+func asTokenID(s string) (persist.TokenID, error) {
+	i, err := strconv.ParseInt(s, 10, 0)
+	if err != nil {
+		return "", err
+	}
+	return persist.TokenID(fmt.Sprintf("%x", i)), nil
 }

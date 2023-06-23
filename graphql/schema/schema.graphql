@@ -71,31 +71,25 @@ type TokenProfileImage {
   token: Token!
 }
 
-type IPFSProfileImage {
-  previewURLs: PreviewURLSet
-}
-
 type HTTPSProfileImage {
   previewURLs: PreviewURLSet
 }
 
-type DataProfileImage {
-  url: String!
+type EnsProfileImage {
+  chainAddress: ChainAddress!
+  profileImage: ProfileImage
 }
 
-union ProfileImage =
-    TokenProfileImage
-  | IPFSProfileImage
-  | HTTPSProfileImage
-  | DataProfileImage
+union ProfileImage = TokenProfileImage | HTTPSProfileImage
 
 type GalleryUser implements Node @goEmbedHelper {
   id: ID!
   dbid: DBID!
   username: String
+  # Returns the user's profile image from their profile, if they have one
   profileImage: ProfileImage @goField(forceResolver: true)
   # Returns a profile image from one of the user's wallets if it is registered with ENS and has an avatar record set
-  ensProfileImage: ProfileImage @goField(forceResolver: true)
+  ensProfileImage: EnsProfileImage @goField(forceResolver: true)
   bio: String
   traits: String
   universal: Boolean
@@ -2166,7 +2160,9 @@ type GenerateQRCodeLoginTokenPayload {
 union GenerateQRCodeLoginTokenPayloadOrError = GenerateQRCodeLoginTokenPayload | ErrNotAuthorized
 
 input SetProfileImageInput {
+  # Only one of the following fields should be provided
   tokenId: DBID
+  walletAddress: ChainAddressInput
 }
 
 type SetProfileImagePayload {

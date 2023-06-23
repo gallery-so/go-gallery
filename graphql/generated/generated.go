@@ -329,10 +329,6 @@ type ComplexityRoot struct {
 		Viewer    func(childComplexity int) int
 	}
 
-	DataProfileImage struct {
-		URL func(childComplexity int) int
-	}
-
 	DeleteCollectionPayload struct {
 		Gallery func(childComplexity int) int
 	}
@@ -353,6 +349,11 @@ type ComplexityRoot struct {
 	EmailNotificationSettings struct {
 		UnsubscribedFromAll           func(childComplexity int) int
 		UnsubscribedFromNotifications func(childComplexity int) int
+	}
+
+	EnsProfileImage struct {
+		ChainAddress func(childComplexity int) int
+		ProfileImage func(childComplexity int) int
 	}
 
 	Entity struct {
@@ -634,10 +635,6 @@ type ComplexityRoot struct {
 		MediaType        func(childComplexity int) int
 		MediaURL         func(childComplexity int) int
 		PreviewURLs      func(childComplexity int) int
-	}
-
-	IPFSProfileImage struct {
-		PreviewURLs func(childComplexity int) int
 	}
 
 	ImageMedia struct {
@@ -1433,7 +1430,7 @@ type GalleryUpdatedFeedEventDataResolver interface {
 }
 type GalleryUserResolver interface {
 	ProfileImage(ctx context.Context, obj *model.GalleryUser) (model.ProfileImage, error)
-	EnsProfileImage(ctx context.Context, obj *model.GalleryUser) (model.ProfileImage, error)
+	EnsProfileImage(ctx context.Context, obj *model.GalleryUser) (*model.EnsProfileImage, error)
 
 	Roles(ctx context.Context, obj *model.GalleryUser) ([]*persist.Role, error)
 	SocialAccounts(ctx context.Context, obj *model.GalleryUser) (*model.SocialAccounts, error)
@@ -2577,13 +2574,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.CreateUserPayload.Viewer(childComplexity), true
 
-	case "DataProfileImage.url":
-		if e.complexity.DataProfileImage.URL == nil {
-			break
-		}
-
-		return e.complexity.DataProfileImage.URL(childComplexity), true
-
 	case "DeleteCollectionPayload.gallery":
 		if e.complexity.DeleteCollectionPayload.Gallery == nil {
 			break
@@ -2632,6 +2622,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.EmailNotificationSettings.UnsubscribedFromNotifications(childComplexity), true
+
+	case "EnsProfileImage.chainAddress":
+		if e.complexity.EnsProfileImage.ChainAddress == nil {
+			break
+		}
+
+		return e.complexity.EnsProfileImage.ChainAddress(childComplexity), true
+
+	case "EnsProfileImage.profileImage":
+		if e.complexity.EnsProfileImage.ProfileImage == nil {
+			break
+		}
+
+		return e.complexity.EnsProfileImage.ProfileImage(childComplexity), true
 
 	case "Entity.findFeedEventByDbid":
 		if e.complexity.Entity.FindFeedEventByDbid == nil {
@@ -3620,13 +3624,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.HtmlMedia.PreviewURLs(childComplexity), true
-
-	case "IPFSProfileImage.previewURLs":
-		if e.complexity.IPFSProfileImage.PreviewURLs == nil {
-			break
-		}
-
-		return e.complexity.IPFSProfileImage.PreviewURLs(childComplexity), true
 
 	case "ImageMedia.contentRenderURL":
 		if e.complexity.ImageMedia.ContentRenderURL == nil {
@@ -7035,31 +7032,25 @@ type TokenProfileImage {
   token: Token!
 }
 
-type IPFSProfileImage {
-  previewURLs: PreviewURLSet
-}
-
 type HTTPSProfileImage {
   previewURLs: PreviewURLSet
 }
 
-type DataProfileImage {
-  url: String!
+type EnsProfileImage {
+  chainAddress: ChainAddress!
+  profileImage: ProfileImage
 }
 
-union ProfileImage =
-    TokenProfileImage
-  | IPFSProfileImage
-  | HTTPSProfileImage
-  | DataProfileImage
+union ProfileImage = TokenProfileImage | HTTPSProfileImage
 
 type GalleryUser implements Node @goEmbedHelper {
   id: ID!
   dbid: DBID!
   username: String
+  # Returns the user's profile image from their profile, if they have one
   profileImage: ProfileImage @goField(forceResolver: true)
   # Returns a profile image from one of the user's wallets if it is registered with ENS and has an avatar record set
-  ensProfileImage: ProfileImage @goField(forceResolver: true)
+  ensProfileImage: EnsProfileImage @goField(forceResolver: true)
   bio: String
   traits: String
   universal: Boolean
@@ -9130,7 +9121,9 @@ type GenerateQRCodeLoginTokenPayload {
 union GenerateQRCodeLoginTokenPayloadOrError = GenerateQRCodeLoginTokenPayload | ErrNotAuthorized
 
 input SetProfileImageInput {
+  # Only one of the following fields should be provided
   tokenId: DBID
+  walletAddress: ChainAddressInput
 }
 
 type SetProfileImagePayload {
@@ -18471,50 +18464,6 @@ func (ec *executionContext) fieldContext_CreateUserPayload_viewer(ctx context.Co
 	return fc, nil
 }
 
-func (ec *executionContext) _DataProfileImage_url(ctx context.Context, field graphql.CollectedField, obj *model.DataProfileImage) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_DataProfileImage_url(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.URL, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_DataProfileImage_url(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "DataProfileImage",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _DeleteCollectionPayload_gallery(ctx context.Context, field graphql.CollectedField, obj *model.DeleteCollectionPayload) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_DeleteCollectionPayload_gallery(ctx, field)
 	if err != nil {
@@ -18857,6 +18806,97 @@ func (ec *executionContext) fieldContext_EmailNotificationSettings_unsubscribedF
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _EnsProfileImage_chainAddress(ctx context.Context, field graphql.CollectedField, obj *model.EnsProfileImage) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_EnsProfileImage_chainAddress(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ChainAddress, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*persist.ChainAddress)
+	fc.Result = res
+	return ec.marshalNChainAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_EnsProfileImage_chainAddress(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "EnsProfileImage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "address":
+				return ec.fieldContext_ChainAddress_address(ctx, field)
+			case "chain":
+				return ec.fieldContext_ChainAddress_chain(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ChainAddress", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _EnsProfileImage_profileImage(ctx context.Context, field graphql.CollectedField, obj *model.EnsProfileImage) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_EnsProfileImage_profileImage(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ProfileImage, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.ProfileImage)
+	fc.Result = res
+	return ec.marshalOProfileImage2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐProfileImage(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_EnsProfileImage_profileImage(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "EnsProfileImage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ProfileImage does not have child fields")
 		},
 	}
 	return fc, nil
@@ -23625,9 +23665,9 @@ func (ec *executionContext) _GalleryUser_ensProfileImage(ctx context.Context, fi
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(model.ProfileImage)
+	res := resTmp.(*model.EnsProfileImage)
 	fc.Result = res
-	return ec.marshalOProfileImage2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐProfileImage(ctx, field.Selections, res)
+	return ec.marshalOEnsProfileImage2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐEnsProfileImage(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_GalleryUser_ensProfileImage(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -23637,7 +23677,13 @@ func (ec *executionContext) fieldContext_GalleryUser_ensProfileImage(ctx context
 		IsMethod:   true,
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type ProfileImage does not have child fields")
+			switch field.Name {
+			case "chainAddress":
+				return ec.fieldContext_EnsProfileImage_chainAddress(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_EnsProfileImage_profileImage(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type EnsProfileImage", field.Name)
 		},
 	}
 	return fc, nil
@@ -25682,65 +25728,6 @@ func (ec *executionContext) fieldContext_HtmlMedia_fallbackMedia(ctx context.Con
 				return ec.fieldContext_FallbackMedia_mediaType(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FallbackMedia", field.Name)
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _IPFSProfileImage_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.IPFSProfileImage) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_IPFSProfileImage_previewURLs(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.PreviewURLs, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.PreviewURLSet)
-	fc.Result = res
-	return ec.marshalOPreviewURLSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreviewURLSet(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_IPFSProfileImage_previewURLs(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "IPFSProfileImage",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "raw":
-				return ec.fieldContext_PreviewURLSet_raw(ctx, field)
-			case "thumbnail":
-				return ec.fieldContext_PreviewURLSet_thumbnail(ctx, field)
-			case "small":
-				return ec.fieldContext_PreviewURLSet_small(ctx, field)
-			case "medium":
-				return ec.fieldContext_PreviewURLSet_medium(ctx, field)
-			case "large":
-				return ec.fieldContext_PreviewURLSet_large(ctx, field)
-			case "srcSet":
-				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
-			case "liveRender":
-				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
-			case "blurhash":
-				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
 	}
 	return fc, nil
@@ -50117,7 +50104,7 @@ func (ec *executionContext) unmarshalInputSetProfileImageInput(ctx context.Conte
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"tokenId"}
+	fieldsInOrder := [...]string{"tokenId", "walletAddress"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -50133,6 +50120,15 @@ func (ec *executionContext) unmarshalInputSetProfileImageInput(ctx context.Conte
 				return it, err
 			}
 			it.TokenID = data
+		case "walletAddress":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("walletAddress"))
+			data, err := ec.unmarshalOChainAddressInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.WalletAddress = data
 		}
 	}
 
@@ -52886,13 +52882,6 @@ func (ec *executionContext) _ProfileImage(ctx context.Context, sel ast.Selection
 			return graphql.Null
 		}
 		return ec._TokenProfileImage(ctx, sel, obj)
-	case model.IPFSProfileImage:
-		return ec._IPFSProfileImage(ctx, sel, &obj)
-	case *model.IPFSProfileImage:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._IPFSProfileImage(ctx, sel, obj)
 	case model.HTTPSProfileImage:
 		return ec._HTTPSProfileImage(ctx, sel, &obj)
 	case *model.HTTPSProfileImage:
@@ -52900,13 +52889,6 @@ func (ec *executionContext) _ProfileImage(ctx context.Context, sel ast.Selection
 			return graphql.Null
 		}
 		return ec._HTTPSProfileImage(ctx, sel, obj)
-	case model.DataProfileImage:
-		return ec._DataProfileImage(ctx, sel, &obj)
-	case *model.DataProfileImage:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._DataProfileImage(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -56160,34 +56142,6 @@ func (ec *executionContext) _CreateUserPayload(ctx context.Context, sel ast.Sele
 	return out
 }
 
-var dataProfileImageImplementors = []string{"DataProfileImage", "ProfileImage"}
-
-func (ec *executionContext) _DataProfileImage(ctx context.Context, sel ast.SelectionSet, obj *model.DataProfileImage) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, dataProfileImageImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("DataProfileImage")
-		case "url":
-
-			out.Values[i] = ec._DataProfileImage_url(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
 var deleteCollectionPayloadImplementors = []string{"DeleteCollectionPayload", "DeleteCollectionPayloadOrError"}
 
 func (ec *executionContext) _DeleteCollectionPayload(ctx context.Context, sel ast.SelectionSet, obj *model.DeleteCollectionPayload) graphql.Marshaler {
@@ -56322,6 +56276,38 @@ func (ec *executionContext) _EmailNotificationSettings(ctx context.Context, sel 
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var ensProfileImageImplementors = []string{"EnsProfileImage"}
+
+func (ec *executionContext) _EnsProfileImage(ctx context.Context, sel ast.SelectionSet, obj *model.EnsProfileImage) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, ensProfileImageImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("EnsProfileImage")
+		case "chainAddress":
+
+			out.Values[i] = ec._EnsProfileImage_chainAddress(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "profileImage":
+
+			out.Values[i] = ec._EnsProfileImage_profileImage(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -58444,31 +58430,6 @@ func (ec *executionContext) _HtmlMedia(ctx context.Context, sel ast.SelectionSet
 		case "fallbackMedia":
 
 			out.Values[i] = ec._HtmlMedia_fallbackMedia(ctx, field, obj)
-
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
-var iPFSProfileImageImplementors = []string{"IPFSProfileImage", "ProfileImage"}
-
-func (ec *executionContext) _IPFSProfileImage(ctx context.Context, sel ast.SelectionSet, obj *model.IPFSProfileImage) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, iPFSProfileImageImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("IPFSProfileImage")
-		case "previewURLs":
-
-			out.Values[i] = ec._IPFSProfileImage_previewURLs(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -65339,6 +65300,14 @@ func (ec *executionContext) unmarshalOChainAddressInput2ᚕᚖgithubᚗcomᚋmik
 	return res, nil
 }
 
+func (ec *executionContext) unmarshalOChainAddressInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx context.Context, v interface{}) (*persist.ChainAddress, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputChainAddressInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) marshalOChainTokens2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐChainTokens(ctx context.Context, sel ast.SelectionSet, v *model.ChainTokens) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -65958,6 +65927,13 @@ func (ec *executionContext) marshalOEmailVerificationStatus2ᚖgithubᚗcomᚋmi
 		return graphql.Null
 	}
 	return v
+}
+
+func (ec *executionContext) marshalOEnsProfileImage2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐEnsProfileImage(ctx context.Context, sel ast.SelectionSet, v *model.EnsProfileImage) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._EnsProfileImage(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOEoaAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐEoaAuth(ctx context.Context, v interface{}) (*model.EoaAuth, error) {

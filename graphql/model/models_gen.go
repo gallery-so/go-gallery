@@ -731,12 +731,6 @@ type CreatedCommunitiesInput struct {
 	IncludeChains []persist.Chain `json:"includeChains"`
 }
 
-type DataProfileImage struct {
-	URL string `json:"url"`
-}
-
-func (DataProfileImage) IsProfileImage() {}
-
 type DebugAuth struct {
 	AsUsername         *string                 `json:"asUsername"`
 	UserID             *persist.DBID           `json:"userId"`
@@ -778,6 +772,11 @@ func (DisconnectSocialAccountPayload) IsDisconnectSocialAccountPayloadOrError() 
 type EmailNotificationSettings struct {
 	UnsubscribedFromAll           bool `json:"unsubscribedFromAll"`
 	UnsubscribedFromNotifications bool `json:"unsubscribedFromNotifications"`
+}
+
+type EnsProfileImage struct {
+	ChainAddress *persist.ChainAddress `json:"chainAddress"`
+	ProfileImage ProfileImage          `json:"profileImage"`
 }
 
 type EoaAuth struct {
@@ -1240,7 +1239,7 @@ type GalleryUser struct {
 	Dbid                persist.DBID           `json:"dbid"`
 	Username            *string                `json:"username"`
 	ProfileImage        ProfileImage           `json:"profileImage"`
-	EnsProfileImage     ProfileImage           `json:"ensProfileImage"`
+	EnsProfileImage     *EnsProfileImage       `json:"ensProfileImage"`
 	Bio                 *string                `json:"bio"`
 	Traits              *string                `json:"traits"`
 	Universal           *bool                  `json:"universal"`
@@ -1322,12 +1321,6 @@ type HTMLMedia struct {
 
 func (HTMLMedia) IsMediaSubtype() {}
 func (HTMLMedia) IsMedia()        {}
-
-type IPFSProfileImage struct {
-	PreviewURLs *PreviewURLSet `json:"previewURLs"`
-}
-
-func (IPFSProfileImage) IsProfileImage() {}
 
 type ImageMedia struct {
 	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`
@@ -1624,7 +1617,8 @@ type SetCommunityOverrideCreatorPayload struct {
 func (SetCommunityOverrideCreatorPayload) IsSetCommunityOverrideCreatorPayloadOrError() {}
 
 type SetProfileImageInput struct {
-	TokenID *persist.DBID `json:"tokenId"`
+	TokenID       *persist.DBID         `json:"tokenId"`
+	WalletAddress *persist.ChainAddress `json:"walletAddress"`
 }
 
 type SetProfileImagePayload struct {
