@@ -182,7 +182,7 @@ sql:
           # Sessions
           - column: "sessions.current_refresh_id"
             go_type: "string"
-
+          
           # Reprocess Jobs
           - column: "reprocess_jobs.id"
             go_type: "int"

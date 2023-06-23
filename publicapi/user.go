@@ -1406,7 +1406,7 @@ func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID, w
 					}
 				}
 
-				uri, err := uriFromRecord(ctx, r)
+				uri, err := uriFromRecord(ctx, api.multichainProvider, r)
 				if err != nil {
 					return err
 				}
@@ -1515,7 +1515,7 @@ func (api UserAPI) GetEnsProfileImageByUserID(ctx context.Context, userID persis
 			}
 		}
 
-		uri, err := uriFromRecord(ctx, r)
+		uri, err := uriFromRecord(ctx, api.multichainProvider, r)
 		if err != nil {
 			return a, err
 		}
@@ -1534,7 +1534,7 @@ func (api UserAPI) GetEnsProfileImageByUserID(ctx context.Context, userID persis
 	return a, nil
 }
 
-func uriFromRecord(ctx context.Context, r eth.AvatarRecord) (uri string, err error) {
+func uriFromRecord(ctx context.Context, mc *multichain.Provider, r eth.AvatarRecord) (uri string, err error) {
 	switch u := r.(type) {
 	case nil:
 		return "", nil
@@ -1543,33 +1543,26 @@ func uriFromRecord(ctx context.Context, r eth.AvatarRecord) (uri string, err err
 	case eth.EnsIpfsRecord:
 		return standardizeURI(u.URL), nil
 	case eth.EnsTokenRecord:
-		uri, err = uriFromTokenRecord(ctx, u)
+		uri, err = uriFromTokenRecord(ctx, mc, u)
 		return standardizeURI(uri), err
 	default:
 		return "", eth.ErrUnknownENSAvatarURI
 	}
 }
 
-func standardizeURI(u string) string {
-	if strings.HasPrefix(u, "ipfs://") {
-		return ipfs.PathGatewayFrom(env.GetString("IPFS_URL"), u, true)
-	}
-	return u
-}
-
-func uriFromTokenRecord(ctx context.Context, r eth.EnsTokenRecord) (string, error) {
-	chain, address, _, tokenID, err := eth.TokenInfoFor(r)
+func uriFromTokenRecord(ctx context.Context, mc *multichain.Provider, r eth.EnsTokenRecord) (string, error) {
+	chain, contractAddr, _, tokenID, err := eth.TokenInfoFor(r)
 	if err != nil {
 		return "", err
 	}
 
 	// Fetch the metadata and return the appropriate profile image source
-	metadata, err := For(ctx).Token.getImageMetadataByTokenIdentifiers(ctx, chain, address, tokenID)
+	metadata, err := mc.GetTokenMetadataByTokenIdentifiers(ctx, contractAddr, tokenID, chain, imageMetadataRequest(chain))
 	if err != nil {
 		return "", err
 	}
 
-	imageURL, _, err := media.FindImageAndAnimationURLs(ctx, chain, address, metadata)
+	imageURL, _, err := media.FindImageAndAnimationURLs(ctx, chain, contractAddr, metadata)
 	if err != nil {
 		if errors.Is(err, media.ErrNoMediaURLs) {
 			return "", nil
@@ -1578,4 +1571,16 @@ func uriFromTokenRecord(ctx context.Context, r eth.EnsTokenRecord) (string, erro
 	}
 
 	return standardizeURI(string(imageURL)), nil
+}
+
+func imageMetadataRequest(chain persist.Chain) []multichain.FieldRequest[string] {
+	imageKeywords, _ := chain.BaseKeywords()
+	return []multichain.FieldRequest[string]{{FieldNames: imageKeywords, Level: multichain.FieldRequirementLevelOneRequired}}
+}
+
+func standardizeURI(u string) string {
+	if strings.HasPrefix(u, "ipfs://") {
+		return ipfs.PathGatewayFrom(env.GetString("IPFS_URL"), u, true)
+	}
+	return u
 }

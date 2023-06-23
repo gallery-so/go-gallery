@@ -125,7 +125,7 @@ func IsOwner(ctx context.Context, addr persist.EthereumAddress, uri EnsTokenReco
 	return false, ErrUnknownTokenType
 }
 
-// TokenInfoFor is a helper function for parsing the infor from a token URI
+// TokenInfoFor is a helper function for parsing info from a token URI
 func TokenInfoFor(uri EnsTokenRecord) (persist.Chain, persist.Address, persist.TokenType, persist.TokenID, error) {
 	errs := make([]error, 4)
 	chain, err := uri.Chain()

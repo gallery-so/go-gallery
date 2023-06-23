@@ -256,24 +256,6 @@ func (api TokenAPI) GetTokensByUserIDAndChain(ctx context.Context, userID persis
 	return tokens, nil
 }
 
-// getImageMetadataByTokenIdentifiers fetches a token's image-related metadata by its identifiers.
-func (api TokenAPI) getImageMetadataByTokenIdentifiers(ctx context.Context, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) (persist.TokenMetadata, error) {
-	// Validate
-	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"contractAddress": {contractAddress, "required"},
-		"tokenID":         {tokenID, "required"},
-	}); err != nil {
-		return persist.TokenMetadata{}, err
-	}
-	imageKeywords, _ := chain.BaseKeywords()
-	return api.multichainProvider.GetTokenMetadataByTokenIdentifiers(ctx, contractAddress, tokenID, chain, []multichain.FieldRequest[string]{
-		{
-			FieldNames: imageKeywords,
-			Level:      multichain.FieldRequirementLevelOneRequired,
-		},
-	})
-}
-
 // Short-term workaround to create admin-only functions. Should be removed when the
 // admin UI is back up and running.
 func isAdminUser(userID persist.DBID) bool {
