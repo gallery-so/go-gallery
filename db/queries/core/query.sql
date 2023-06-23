@@ -1310,7 +1310,7 @@ where pfp.id = @id
 		when source_type = @token_source_type
 		then exists(select 1 from tokens t where t.id = token_id and not t.deleted)
 		else
-		1 = 1
+		0 = 1
 	end;
 
 -- name: GetCurrentTime :one

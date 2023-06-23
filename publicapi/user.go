@@ -1468,7 +1468,7 @@ type EnsAvatar struct {
 	URI     string
 }
 
-// GetEnsProfileImageByUserID returns the an ENS profile image for a user based on their set of wallets.
+// GetEnsProfileImageByUserID returns the an ENS profile image for a user based on their set of wallets
 func (api UserAPI) GetEnsProfileImageByUserID(ctx context.Context, userID persist.DBID) (a EnsAvatar, err error) {
 	// Validate
 	user, err := api.GetUserById(ctx, userID)

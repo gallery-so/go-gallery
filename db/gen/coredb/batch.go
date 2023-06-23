@@ -1786,7 +1786,7 @@ where pfp.id = $1
 		when source_type = $3
 		then exists(select 1 from tokens t where t.id = token_id and not t.deleted)
 		else
-		1 = 1
+		0 = 1
 	end
 `
 

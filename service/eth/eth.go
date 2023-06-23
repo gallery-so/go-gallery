@@ -86,7 +86,7 @@ func EnsAvatarRecordFor(ctx context.Context, ethClient *ethclient.Client, a pers
 		return avatar, nil
 	}
 
-	uri, err := ensRecordToURI(record)
+	uri, err := toRecord(record)
 	if err != nil {
 		return nil, err
 	}
@@ -125,16 +125,16 @@ func IsOwner(ctx context.Context, addr persist.EthereumAddress, uri EnsTokenReco
 	return false, ErrUnknownTokenType
 }
 
-// TokenInfoFor is a helper function for parsing info from a token URI
-func TokenInfoFor(uri EnsTokenRecord) (persist.Chain, persist.Address, persist.TokenType, persist.TokenID, error) {
+// TokenInfoFor is a helper function for parsing info from a token record
+func TokenInfoFor(r EnsTokenRecord) (persist.Chain, persist.Address, persist.TokenType, persist.TokenID, error) {
 	errs := make([]error, 4)
-	chain, err := uri.Chain()
+	chain, err := r.Chain()
 	errs[0] = err
-	address, err := uri.Address()
+	address, err := r.Address()
 	errs[1] = err
-	tokenType, err := uri.TokenType()
+	tokenType, err := r.TokenType()
 	errs[2] = err
-	tokenID, err := uri.TokenID()
+	tokenID, err := r.TokenID()
 	errs[3] = err
 	for _, err := range errs {
 		if err != nil {
@@ -144,7 +144,7 @@ func TokenInfoFor(uri EnsTokenRecord) (persist.Chain, persist.Address, persist.T
 	return chain, address, tokenType, tokenID, nil
 }
 
-func ensRecordToURI(r string) (AvatarRecord, error) {
+func toRecord(r string) (AvatarRecord, error) {
 	switch {
 	case strings.HasPrefix(r, "https://"), strings.HasPrefix(r, "http://"):
 		return EnsHttpRecord{URL: r}, nil
