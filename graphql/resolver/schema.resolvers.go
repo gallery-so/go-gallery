@@ -425,24 +425,6 @@ func (r *galleryUserResolver) ProfileImage(ctx context.Context, obj *model.Galle
 	return profileImageToModel(ctx, pfp)
 }
 
-// EnsProfileImage is the resolver for the ensProfileImage field.
-func (r *galleryUserResolver) EnsProfileImage(ctx context.Context, obj *model.GalleryUser) (*model.EnsProfileImage, error) {
-	a, err := publicapi.For(ctx).User.GetEnsProfileImageByUserID(ctx, obj.Dbid)
-	if err != nil {
-		return nil, err
-	}
-
-	pfp, err := ensAvatarToProfileImage(ctx, a)
-	if err != nil {
-		return nil, err
-	}
-
-	return &model.EnsProfileImage{
-		ChainAddress: util.ToPointer(persist.NewChainAddress(a.Address, a.Chain)),
-		ProfileImage: pfp,
-	}, nil
-}
-
 // Roles is the resolver for the roles field.
 func (r *galleryUserResolver) Roles(ctx context.Context, obj *model.GalleryUser) ([]*persist.Role, error) {
 	dbRoles, err := publicapi.For(ctx).User.GetUserRolesByUserID(ctx, obj.Dbid)
@@ -2065,6 +2047,28 @@ func (r *queryResolver) TopCollectionsForCommunity(ctx context.Context, input mo
 	return &model.CollectionsConnection{
 		Edges:    edges,
 		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
+}
+
+// EnsProfileImageByUserID is the resolver for the ensProfileImageByUserId field.
+func (r *queryResolver) EnsProfileImageByUserID(ctx context.Context, userID persist.DBID) (*model.EnsProfileImage, error) {
+	a, err := publicapi.For(ctx).User.GetEnsProfileImageByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	uri, err := publicapi.For(ctx).User.URIForAvatar(ctx, a.URI)
+	if err != nil {
+		return nil, err
+	}
+
+	if uri == "" {
+		return nil, nil
+	}
+
+	return &model.EnsProfileImage{
+		ChainAddress: util.ToPointer(persist.NewChainAddress(a.Address, a.Chain)),
+		ProfileImage: &model.HTTPSProfileImage{PreviewURLs: previewURLs(ctx, uri, nil)},
 	}, nil
 }
 

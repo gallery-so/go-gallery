@@ -1239,7 +1239,6 @@ type GalleryUser struct {
 	Dbid                persist.DBID           `json:"dbid"`
 	Username            *string                `json:"username"`
 	ProfileImage        ProfileImage           `json:"profileImage"`
-	EnsProfileImage     *EnsProfileImage       `json:"ensProfileImage"`
 	Bio                 *string                `json:"bio"`
 	Traits              *string                `json:"traits"`
 	Universal           *bool                  `json:"universal"`

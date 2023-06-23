@@ -1949,17 +1949,6 @@ func profileImageToModel(ctx context.Context, pfp db.ProfileImage) (model.Profil
 	}
 }
 
-func ensAvatarToProfileImage(ctx context.Context, a eth.EnsAvatar) (model.ProfileImage, error) {
-	uri, err := publicapi.For(ctx).User.URIForAvatar(ctx, a.URI)
-	if err != nil {
-		return nil, err
-	}
-	if uri == "" {
-		return nil, nil
-	}
-	return &model.HTTPSProfileImage{PreviewURLs: previewURLs(ctx, uri, nil)}, nil
-}
-
 func previewURLsForTokenMedia(ctx context.Context, tokenMedia db.TokenMedia, options ...mediamapper.Option) *model.PreviewURLSet {
 	url := tokenMedia.Media.ThumbnailURL.String()
 	if (tokenMedia.Media.MediaType == persist.MediaTypeImage || tokenMedia.Media.MediaType == persist.MediaTypeSVG || tokenMedia.Media.MediaType == persist.MediaTypeGIF) && url == "" {
