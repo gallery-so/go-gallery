@@ -68,8 +68,8 @@ func ReverseResolves(ctx context.Context, ethClient *ethclient.Client, domain st
 // EnsAvatarRecordFor returns the avatar record for the given address
 func EnsAvatarRecordFor(ctx context.Context, ethClient *ethclient.Client, a persist.EthereumAddress) (avatar AvatarRecord, err error) {
 	domain, err := ReverseResolve(ctx, ethClient, a)
-	if errors.Is(err, ErrNoResolution) {
-		return avatar, nil
+	if err != nil {
+		return avatar, err
 	}
 
 	resolver, err := ens.NewResolver(ethClient, domain)
