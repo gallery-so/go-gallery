@@ -1301,7 +1301,17 @@ with remove_image as (
 update users set profile_image_id = null where users.id = $1 and not users.deleted;
 
 -- name: GetProfileImageByID :batchone
-select * from profile_images where id = $1 and not deleted;
+select * from profile_images pfp
+where pfp.id = @id
+	and not deleted
+	and case
+		when source_type = @ens_source_type
+		then exists(select 1 from wallets w where w.id = wallet_id and not w.deleted)
+		when source_type = @token_source_type
+		then exists(select 1 from tokens t where t.id = token_id and not t.deleted)
+		else
+		1 = 1
+	end;
 
 -- name: GetCurrentTime :one
 select now()::timestamptz;

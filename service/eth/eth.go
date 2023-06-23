@@ -20,6 +20,7 @@ import (
 var ErrNoResolution = errors.New("no resolution")
 var ErrUnknownENSAvatarURI = errors.New("unknown ENS avatar uri")
 var ErrChainNotSupported = errors.New("chain not supported")
+var ErrUnknownTokenType = errors.New("unknown token type")
 
 // Regex for CAIP-19 asset type with required asset ID
 // https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-19.md
@@ -121,7 +122,7 @@ func IsOwner(ctx context.Context, addr persist.EthereumAddress, uri EnsTokenReco
 		return balance.Cmp(&zero) > 0, nil
 	}
 
-	return false, errors.New("unknown token type")
+	return false, ErrUnknownTokenType
 }
 
 // TokenInfoFor is a helper function for parsing the infor from a token URI
@@ -195,7 +196,16 @@ func (e EnsTokenRecord) Chain() (persist.Chain, error) {
 }
 
 func (e EnsTokenRecord) TokenType() (persist.TokenType, error) {
-	panic("not implemented")
+	if e.ChainID != ethMainnetChainID {
+		return "", ErrChainNotSupported
+	}
+	if e.AssetNamespace == "erc721" {
+		return persist.TokenTypeERC721, nil
+	}
+	if e.AssetNamespace == "erc1155" {
+		return persist.TokenTypeERC1155, nil
+	}
+	return "", ErrUnknownTokenType
 }
 
 func (e EnsTokenRecord) TokenID() (persist.TokenID, error) {

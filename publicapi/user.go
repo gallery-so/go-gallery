@@ -1423,7 +1423,11 @@ func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID, w
 				}
 
 				// Manually prime the PFP loader
-				api.loaders.ProfileImageByID.Prime(pfp.ProfileImage.ID, pfp.ProfileImage)
+				api.loaders.ProfileImageByID.Prime(db.GetProfileImageByIDParams{
+					ID:              pfp.ProfileImage.ID,
+					EnsSourceType:   persist.ProfileImageSourceENS,
+					TokenSourceType: persist.ProfileImageSourceToken,
+				}, pfp.ProfileImage)
 				return nil
 			}
 		}
@@ -1451,7 +1455,11 @@ func (api UserAPI) GetProfileImageByUserID(ctx context.Context, userID persist.D
 	if user.ProfileImageID == "" {
 		return db.ProfileImage{}, nil
 	}
-	return api.loaders.ProfileImageByID.Load(user.ProfileImageID)
+	return api.loaders.ProfileImageByID.Load(db.GetProfileImageByIDParams{
+		ID:              user.ProfileImageID,
+		EnsSourceType:   persist.ProfileImageSourceENS,
+		TokenSourceType: persist.ProfileImageSourceToken,
+	})
 }
 
 type EnsAvatar struct {
@@ -1554,6 +1562,7 @@ func uriFromTokenRecord(ctx context.Context, r eth.EnsTokenRecord) (string, erro
 	if err != nil {
 		return "", err
 	}
+
 	// Fetch the metadata and return the appropriate profile image source
 	metadata, err := For(ctx).Token.getImageMetadataByTokenIdentifiers(ctx, chain, address, tokenID)
 	if err != nil {

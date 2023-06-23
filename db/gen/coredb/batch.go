@@ -1777,7 +1777,17 @@ func (b *GetOwnersByContractIdBatchPaginateBatchResults) Close() error {
 }
 
 const getProfileImageByID = `-- name: GetProfileImageByID :batchone
-select id, user_id, token_id, source_type, deleted, created_at, last_updated, wallet_id, ens_avatar_uri from profile_images where id = $1 and not deleted
+select id, user_id, token_id, source_type, deleted, created_at, last_updated, wallet_id, ens_avatar_uri from profile_images pfp
+where pfp.id = $1
+	and not deleted
+	and case
+		when source_type = $2
+		then exists(select 1 from wallets w where w.id = wallet_id and not w.deleted)
+		when source_type = $3
+		then exists(select 1 from tokens t where t.id = token_id and not t.deleted)
+		else
+		1 = 1
+	end
 `
 
 type GetProfileImageByIDBatchResults struct {
@@ -1786,16 +1796,24 @@ type GetProfileImageByIDBatchResults struct {
 	closed bool
 }
 
-func (q *Queries) GetProfileImageByID(ctx context.Context, id []persist.DBID) *GetProfileImageByIDBatchResults {
+type GetProfileImageByIDParams struct {
+	ID              persist.DBID
+	EnsSourceType   persist.ProfileImageSource
+	TokenSourceType persist.ProfileImageSource
+}
+
+func (q *Queries) GetProfileImageByID(ctx context.Context, arg []GetProfileImageByIDParams) *GetProfileImageByIDBatchResults {
 	batch := &pgx.Batch{}
-	for _, a := range id {
+	for _, a := range arg {
 		vals := []interface{}{
-			a,
+			a.ID,
+			a.EnsSourceType,
+			a.TokenSourceType,
 		}
 		batch.Queue(getProfileImageByID, vals...)
 	}
 	br := q.db.SendBatch(ctx, batch)
-	return &GetProfileImageByIDBatchResults{br, len(id), false}
+	return &GetProfileImageByIDBatchResults{br, len(arg), false}
 }
 
 func (b *GetProfileImageByIDBatchResults) QueryRow(f func(int, ProfileImage, error)) {

@@ -1165,7 +1165,9 @@ type Query {
     first: Int
     last: Int
   ): CollectionsConnection
-  """Returns a profile image from one of the user's wallets if the wallet is registered with ENS and has an avatar record set"""
+  """
+  Returns a profile image from one of the user's wallets if the wallet is registered with ENS and has an avatar record set
+  """
   ensProfileImageByUserId(userId: DBID!): EnsProfileImage
 }
 
