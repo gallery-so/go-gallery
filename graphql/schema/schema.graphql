@@ -86,7 +86,7 @@ type GalleryUser implements Node @goEmbedHelper {
   id: ID!
   dbid: DBID!
   username: String
-  # Returns the user's profile image from their profile, if they have one
+  # Returns the user's profile image if they have one set
   profileImage: ProfileImage @goField(forceResolver: true)
   # Returns a profile image from one of the user's wallets if it is registered with ENS and has an avatar record set
   ensProfileImage: EnsProfileImage @goField(forceResolver: true)

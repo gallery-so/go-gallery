@@ -357,7 +357,3 @@ type ErrProfileImageNotFound struct {
 func (e ErrProfileImageNotFound) Error() string {
 	return fmt.Sprintf("profile image %s not found: %s", e.ProfileImageID, e.Err)
 }
-
-type EnsAvatarData struct {
-	URI string `json:"uri"` // URI of the avatar
-}

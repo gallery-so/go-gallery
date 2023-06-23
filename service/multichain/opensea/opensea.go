@@ -265,12 +265,10 @@ func (p *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, ti m
 func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
 	tokens, _, err := p.GetTokensByTokenIdentifiers(ctx, ti, 1, 0)
 	if err != nil {
-		panic(err)
 		return nil, err
 	}
 
 	if len(tokens) == 0 {
-		panic("no tokens found")
 		return nil, fmt.Errorf("no tokens found for %s", ti)
 	}
 
