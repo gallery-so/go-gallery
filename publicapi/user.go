@@ -1550,7 +1550,7 @@ func uriFromToken(ctx context.Context, uri eth.EnsTokenURI) (string, error) {
 	}
 
 	// Fetch the metadata and return the appropriate profile image source
-	metadata, err := For(ctx).Token.GetImageMetadataByTokenIdentifiers(ctx, chain, address, tokenID)
+	metadata, err := For(ctx).Token.getImageMetadataByTokenIdentifiers(ctx, chain, address, tokenID)
 	if err != nil {
 		return "", err
 	}

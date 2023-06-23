@@ -172,24 +172,6 @@ func (api TokenAPI) GetTokensByIDs(ctx context.Context, tokenIDs []persist.DBID)
 	return foundTokens, nil
 }
 
-// GetImageMetadataByTokenIdentifiers fetches a token's image-related metadata by its identifiers.
-func (api TokenAPI) GetImageMetadataByTokenIdentifiers(ctx context.Context, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) (persist.TokenMetadata, error) {
-	// Validate
-	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"contractAddress": {contractAddress, "required"},
-		"tokenID":         {tokenID, "required"},
-	}); err != nil {
-		return persist.TokenMetadata{}, err
-	}
-	imageKeywords, _ := chain.BaseKeywords()
-	return api.multichainProvider.GetTokenMetadataByTokenIdentifiers(ctx, contractAddress, tokenID, chain, []multichain.FieldRequest[string]{
-		{
-			FieldNames: imageKeywords,
-			Level:      multichain.FieldRequirementLevelOneRequired,
-		},
-	})
-}
-
 // GetNewTokensByFeedEventID returns new tokens added to a collection from an event.
 // Since its possible for tokens to be deleted, the return size may not be the same size of
 // the tokens added, so the caller should handle the matching of arguments to response if used in that context.
@@ -272,6 +254,24 @@ func (api TokenAPI) GetTokensByUserIDAndChain(ctx context.Context, userID persis
 	}
 
 	return tokens, nil
+}
+
+// getImageMetadataByTokenIdentifiers fetches a token's image-related metadata by its identifiers.
+func (api TokenAPI) getImageMetadataByTokenIdentifiers(ctx context.Context, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) (persist.TokenMetadata, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"contractAddress": {contractAddress, "required"},
+		"tokenID":         {tokenID, "required"},
+	}); err != nil {
+		return persist.TokenMetadata{}, err
+	}
+	imageKeywords, _ := chain.BaseKeywords()
+	return api.multichainProvider.GetTokenMetadataByTokenIdentifiers(ctx, contractAddress, tokenID, chain, []multichain.FieldRequest[string]{
+		{
+			FieldNames: imageKeywords,
+			Level:      multichain.FieldRequirementLevelOneRequired,
+		},
+	})
 }
 
 // Short-term workaround to create admin-only functions. Should be removed when the

@@ -180,12 +180,12 @@ sql:
             go_type: "string"
 
           # Sessions
-          - column: 'sessions.current_refresh_id'
-            go_type: 'string'
+          - column: "sessions.current_refresh_id"
+            go_type: "string"
 
           # Reprocess Jobs
-          - column: 'reprocess_jobs.id'
-            go_type: 'int'
+          - column: "reprocess_jobs.id"
+            go_type: "int"
 
           # Profile Images
           - column: "profile_images.*source_type"
