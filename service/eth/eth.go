@@ -65,7 +65,7 @@ func ReverseResolves(ctx context.Context, ethClient *ethclient.Client, domain st
 }
 
 // EnsAvatarRecordFor returns the avatar record for the given address
-func EnsAvatarRecordFor(ctx context.Context, ethClient *ethclient.Client, a persist.EthereumAddress) (avatar EnsAvatar, err error) {
+func EnsAvatarRecordFor(ctx context.Context, ethClient *ethclient.Client, a persist.EthereumAddress) (avatar AvatarRecord, err error) {
 	domain, err := ReverseResolve(ctx, ethClient, a)
 	if errors.Is(err, ErrNoResolution) {
 		return avatar, nil
@@ -85,16 +85,16 @@ func EnsAvatarRecordFor(ctx context.Context, ethClient *ethclient.Client, a pers
 		return avatar, nil
 	}
 
-	uri, err := EnsRecordToURI(record)
+	uri, err := ensRecordToURI(record)
 	if err != nil {
-		return EnsAvatar{}, err
+		return nil, err
 	}
 
-	return EnsAvatar{Address: persist.Address(a), Chain: persist.ChainETH, URI: uri}, nil
+	return uri, nil
 }
 
 // IsOwner returns true if the address is the current holder of the token
-func IsOwner(ctx context.Context, addr persist.EthereumAddress, uri EnsTokenURI, ethClient *ethclient.Client) (bool, error) {
+func IsOwner(ctx context.Context, addr persist.EthereumAddress, uri EnsTokenRecord, ethClient *ethclient.Client) (bool, error) {
 	chain, contractAddr, tokenType, tokenID, err := TokenInfoFor(uri)
 	if err != nil {
 		return false, err
@@ -125,7 +125,7 @@ func IsOwner(ctx context.Context, addr persist.EthereumAddress, uri EnsTokenURI,
 }
 
 // TokenInfoFor is a helper function for parsing the infor from a token URI
-func TokenInfoFor(uri EnsTokenURI) (persist.Chain, persist.Address, persist.TokenType, persist.TokenID, error) {
+func TokenInfoFor(uri EnsTokenRecord) (persist.Chain, persist.Address, persist.TokenType, persist.TokenID, error) {
 	errs := make([]error, 4)
 	chain, err := uri.Chain()
 	errs[0] = err
@@ -143,16 +143,15 @@ func TokenInfoFor(uri EnsTokenURI) (persist.Chain, persist.Address, persist.Toke
 	return chain, address, tokenType, tokenID, nil
 }
 
-// EnsRecordToURI converts an ENS avatar record to an avatar URI
-func EnsRecordToURI(r string) (AvatarURI, error) {
+func ensRecordToURI(r string) (AvatarRecord, error) {
 	switch {
 	case strings.HasPrefix(r, "https://"), strings.HasPrefix(r, "http://"):
-		return EnsHttpURI{URL: r}, nil
+		return EnsHttpRecord{URL: r}, nil
 	case strings.HasPrefix(r, "ipfs://"):
-		return EnsIpfsURI{URL: r}, nil
+		return EnsIpfsRecord{URL: r}, nil
 	case caip19AssetTypeWithAssetID.MatchString(r):
 		g := caip19AssetTypeWithAssetID.FindStringSubmatch(r)
-		return EnsTokenURI{
+		return EnsTokenRecord{
 			ChainID:        g[1],
 			AssetNamespace: g[2],
 			AssetReference: g[3],
@@ -163,58 +162,50 @@ func EnsRecordToURI(r string) (AvatarURI, error) {
 	}
 }
 
-// EnsAvatar is a representation of the ENS avatar text record
-type EnsAvatar struct {
-	URI     AvatarURI
-	Address persist.Address
-	Chain   persist.Chain
-}
-
-type AvatarURI interface {
+type AvatarRecord interface {
 	IsAvatarURI()
 }
 
-type EnsHttpURI struct {
+type EnsHttpRecord struct {
 	URL string
 }
 
-func (EnsHttpURI) IsAvatarURI() {}
+func (EnsHttpRecord) IsAvatarURI() {}
 
-type EnsIpfsURI struct {
+type EnsIpfsRecord struct {
 	URL string
 }
 
-func (EnsIpfsURI) IsAvatarURI() {}
+func (EnsIpfsRecord) IsAvatarURI() {}
 
-type EnsTokenURI struct {
+type EnsTokenRecord struct {
 	ChainID        string
 	AssetNamespace string
 	AssetReference string
 	AssetID        string
-	IsOwner        bool
 }
 
-func (EnsTokenURI) IsAvatarURI() {}
+func (EnsTokenRecord) IsAvatarURI() {}
 
-func (e EnsTokenURI) Chain() (persist.Chain, error) {
+func (e EnsTokenRecord) Chain() (persist.Chain, error) {
 	if e.ChainID != ethMainnetChainID {
 		return 0, ErrChainNotSupported
 	}
 	return persist.ChainETH, nil
 }
 
-func (e EnsTokenURI) TokenType() (persist.TokenType, error) {
+func (e EnsTokenRecord) TokenType() (persist.TokenType, error) {
 	panic("not implemented")
 }
 
-func (e EnsTokenURI) TokenID() (persist.TokenID, error) {
+func (e EnsTokenRecord) TokenID() (persist.TokenID, error) {
 	if e.ChainID != ethMainnetChainID {
 		return "", ErrChainNotSupported
 	}
 	return asTokenID(e.AssetID)
 }
 
-func (e EnsTokenURI) Address() (persist.Address, error) {
+func (e EnsTokenRecord) Address() (persist.Address, error) {
 	if e.ChainID != ethMainnetChainID {
 		return "", ErrChainNotSupported
 	}

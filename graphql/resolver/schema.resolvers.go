@@ -2056,19 +2056,9 @@ func (r *queryResolver) EnsProfileImageByUserID(ctx context.Context, userID pers
 	if err != nil {
 		return nil, err
 	}
-
-	uri, err := publicapi.For(ctx).User.URIForAvatar(ctx, a.URI)
-	if err != nil {
-		return nil, err
-	}
-
-	if uri == "" {
-		return nil, nil
-	}
-
 	return &model.EnsProfileImage{
 		ChainAddress: util.ToPointer(persist.NewChainAddress(a.Address, a.Chain)),
-		ProfileImage: &model.HTTPSProfileImage{PreviewURLs: previewURLs(ctx, uri, nil)},
+		ProfileImage: &model.HTTPSProfileImage{PreviewURLs: previewURLs(ctx, a.URI, nil)},
 	}, nil
 }
 

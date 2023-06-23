@@ -1390,13 +1390,13 @@ func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID, w
 				// Found the wallet
 				addr := persist.EthereumAddress(w.Address)
 
-				a, err := eth.EnsAvatarRecordFor(ctx, api.ethClient, addr)
+				r, err := eth.EnsAvatarRecordFor(ctx, api.ethClient, addr)
 				if err != nil {
 					return err
 				}
 
 				// Confirm wallet owns the token
-				if t, ok := a.URI.(eth.EnsTokenURI); ok {
+				if t, ok := r.(eth.EnsTokenRecord); ok {
 					isOwner, err := eth.IsOwner(ctx, addr, t, api.ethClient)
 					if err != nil {
 						return err
@@ -1406,7 +1406,7 @@ func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID, w
 					}
 				}
 
-				uri, err := uriForAvatar(ctx, a.URI)
+				uri, err := uriFromRecord(ctx, r)
 				if err != nil {
 					return err
 				}
@@ -1454,16 +1454,22 @@ func (api UserAPI) GetProfileImageByUserID(ctx context.Context, userID persist.D
 	return api.loaders.ProfileImageByID.Load(user.ProfileImageID)
 }
 
+type EnsAvatar struct {
+	Address persist.Address
+	Chain   persist.Chain
+	URI     string
+}
+
 // GetEnsProfileImageByUserID returns the an ENS profile image for a user based on their set of wallets.
-func (api UserAPI) GetEnsProfileImageByUserID(ctx context.Context, userID persist.DBID) (eth.EnsAvatar, error) {
+func (api UserAPI) GetEnsProfileImageByUserID(ctx context.Context, userID persist.DBID) (a EnsAvatar, err error) {
 	// Validate
 	user, err := api.GetUserById(ctx, userID)
 	if err != nil {
-		return eth.EnsAvatar{}, err
+		return a, err
 	}
 
 	if len(user.Wallets) == 0 {
-		return eth.EnsAvatar{}, nil
+		return a, nil
 	}
 
 	// Sort wallets by primary wallet first then by ID
@@ -1480,18 +1486,18 @@ func (api UserAPI) GetEnsProfileImageByUserID(ctx context.Context, userID persis
 
 		addr := persist.EthereumAddress(w.Address)
 
-		a, err := eth.EnsAvatarRecordFor(ctx, api.ethClient, addr)
+		r, err := eth.EnsAvatarRecordFor(ctx, api.ethClient, addr)
 		if err != nil {
 			errs = append(errs, err)
 			continue
 		}
 
-		if a.URI == nil {
+		if r == nil {
 			continue
 		}
 
 		// Confirm wallet owns the token
-		if t, ok := a.URI.(eth.EnsTokenURI); ok {
+		if t, ok := r.(eth.EnsTokenRecord); ok {
 			isOwner, err := eth.IsOwner(ctx, addr, t, api.ethClient)
 			if err != nil {
 				return a, err
@@ -1501,37 +1507,50 @@ func (api UserAPI) GetEnsProfileImageByUserID(ctx context.Context, userID persis
 			}
 		}
 
-		return a, nil
+		uri, err := uriFromRecord(ctx, r)
+		if err != nil {
+			return a, err
+		}
+
+		return EnsAvatar{
+			Address: w.Address,
+			Chain:   w.Chain,
+			URI:     uri,
+		}, nil
 	}
 
 	if len(errs) > 0 {
-		return eth.EnsAvatar{}, errs[0]
+		return a, errs[0]
 	}
 
-	return eth.EnsAvatar{}, nil
+	return a, nil
 }
 
-func (api UserAPI) URIForAvatar(ctx context.Context, uri eth.AvatarURI) (string, error) {
-	return uriForAvatar(ctx, uri)
-}
-
-func uriForAvatar(ctx context.Context, uri eth.AvatarURI) (string, error) {
-	switch u := uri.(type) {
+func uriFromRecord(ctx context.Context, r eth.AvatarRecord) (uri string, err error) {
+	switch u := r.(type) {
 	case nil:
 		return "", nil
-	case eth.EnsHttpURI:
-		return u.URL, nil
-	case eth.EnsIpfsURI:
-		return ipfs.PathGatewayFrom(env.GetString("IPFS_URL"), u.URL, true), nil
-	case eth.EnsTokenURI:
-		return uriFromToken(ctx, u)
+	case eth.EnsHttpRecord:
+		return standardizeURI(u.URL), nil
+	case eth.EnsIpfsRecord:
+		return standardizeURI(u.URL), nil
+	case eth.EnsTokenRecord:
+		uri, err = uriFromTokenRecord(ctx, u)
+		return standardizeURI(uri), err
 	default:
 		return "", eth.ErrUnknownENSAvatarURI
 	}
 }
 
-func uriFromToken(ctx context.Context, uri eth.EnsTokenURI) (string, error) {
-	chain, address, _, tokenID, err := eth.TokenInfoFor(uri)
+func standardizeURI(u string) string {
+	if strings.HasPrefix(u, "ipfs://") {
+		return ipfs.PathGatewayFrom(env.GetString("IPFS_URL"), u, true)
+	}
+	return u
+}
+
+func uriFromTokenRecord(ctx context.Context, r eth.EnsTokenRecord) (string, error) {
+	chain, address, _, tokenID, err := eth.TokenInfoFor(r)
 	if err != nil {
 		return "", err
 	}
@@ -1549,10 +1568,5 @@ func uriFromToken(ctx context.Context, uri eth.EnsTokenURI) (string, error) {
 		return "", err
 	}
 
-	newURI, err := eth.EnsRecordToURI(string(imageURL))
-	if err != nil {
-		return "", err
-	}
-
-	return uriForAvatar(ctx, newURI)
+	return standardizeURI(string(imageURL)), nil
 }
