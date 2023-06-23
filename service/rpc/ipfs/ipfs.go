@@ -153,6 +153,17 @@ func defaultHTTPClient() *http.Client {
 	}
 }
 
+// PathGatewayFrom is a helper function that rewrites an IPFS URI to an IPFS gateway URL
+// If includeQueryParams is true, the query parameters will be included in the gateway URL
+func PathGatewayFrom(gatewayHost, ipfsURL string, includeQueryParams bool) string {
+	return PathGatewayFor(gatewayHost, util.GetURIPath(ipfsURL, includeQueryParams))
+}
+
+// PathGatewayFor returns the path gateway URL for a CID
+func PathGatewayFor(gatewayHost, cid string) string {
+	return fmt.Sprintf("%s/ipfs/%s", gatewayHost, cid)
+}
+
 // authTransport decorates each request with a basic auth header.
 type authTransport struct {
 	http.RoundTripper

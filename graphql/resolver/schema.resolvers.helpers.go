@@ -12,23 +12,22 @@ import (
 
 	"github.com/gammazero/workerpool"
 	"github.com/magiclabs/magic-admin-go/token"
+
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/debugtools"
 	"github.com/mikeydub/go-gallery/graphql/model"
+	"github.com/mikeydub/go-gallery/publicapi"
+	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/emails"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/notifications"
+	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/socialauth"
 	"github.com/mikeydub/go-gallery/service/twitter"
-	"github.com/mikeydub/go-gallery/validate"
-
-	"github.com/mikeydub/go-gallery/debugtools"
-
-	db "github.com/mikeydub/go-gallery/db/gen/coredb"
-	"github.com/mikeydub/go-gallery/publicapi"
-	"github.com/mikeydub/go-gallery/service/auth"
-	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/validate"
 )
 
 var errNoAuthMechanismFound = fmt.Errorf("no auth mechanism found")
@@ -165,9 +164,9 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 	}
 
 	switch err {
-	case publicapi.ErrProfileImageTooManySources, publicapi.ErrProfileImageNoSources, publicapi.ErrProfileImageUnknownSource:
+	case publicapi.ErrProfileImageTooManySources, publicapi.ErrProfileImageUnknownSource:
 		mappedErr = model.ErrInvalidInput{Message: message}
-	case publicapi.ErrProfileImageNotTokenOwner:
+	case publicapi.ErrProfileImageNotTokenOwner, publicapi.ErrProfileImageNotWalletOwner:
 		mappedErr = model.ErrNotAuthorized{Message: message}
 	}
 
@@ -385,7 +384,7 @@ func resolveTokenPreviewsByGalleryID(ctx context.Context, galleryID persist.DBID
 	}
 
 	return util.Map(medias, func(t db.TokenMedia) (*model.PreviewURLSet, error) {
-		return getPreviewUrls(ctx, t), nil
+		return previewURLsFromTokenMedia(ctx, t), nil
 	})
 }
 
@@ -1934,24 +1933,28 @@ func profileImageToModel(ctx context.Context, pfp db.ProfileImage) (model.Profil
 	switch pfp.SourceType {
 	case persist.ProfileImageSourceToken:
 		token, err := resolveTokenByTokenID(ctx, pfp.TokenID)
-		return &model.TokenProfileImage{Token: token}, err
+		if err != nil {
+			return nil, err
+		}
+		return &model.TokenProfileImage{Token: token}, nil
+	case persist.ProfileImageSourceENS:
+		if pfp.EnsAvatarUri.String == "" {
+			return nil, nil
+		}
+		urls := previewURLs(ctx, pfp.EnsAvatarUri.String, nil)
+		return &model.HTTPSProfileImage{PreviewURLs: urls}, nil
 	default:
 		return nil, publicapi.ErrProfileImageUnknownSource
 	}
 }
 
-func getPreviewUrls(ctx context.Context, tokenMedia db.TokenMedia, options ...mediamapper.Option) *model.PreviewURLSet {
+func previewURLsFromTokenMedia(ctx context.Context, tokenMedia db.TokenMedia, options ...mediamapper.Option) *model.PreviewURLSet {
 	url := tokenMedia.Media.ThumbnailURL.String()
 	if (tokenMedia.Media.MediaType == persist.MediaTypeImage || tokenMedia.Media.MediaType == persist.MediaTypeSVG || tokenMedia.Media.MediaType == persist.MediaTypeGIF) && url == "" {
 		url = tokenMedia.Media.MediaURL.String()
 	}
-	preview := remapLargeImageUrls(url)
-	mm := mediamapper.For(ctx)
 
-	live := tokenMedia.Media.LivePreviewURL.String()
-	if tokenMedia.Media.LivePreviewURL == "" {
-		live = tokenMedia.Media.MediaURL.String()
-	}
+	preview := remapLargeImageUrls(url)
 
 	// Add timestamp to options
 	o := make([]mediamapper.Option, len(options)+1)
@@ -1959,14 +1962,25 @@ func getPreviewUrls(ctx context.Context, tokenMedia db.TokenMedia, options ...me
 	o[len(o)-1] = mediamapper.WithTimestamp(tokenMedia.LastUpdated)
 	options = o
 
+	// Add live render
+	live := tokenMedia.Media.LivePreviewURL.String()
+	if tokenMedia.Media.LivePreviewURL == "" {
+		live = tokenMedia.Media.MediaURL.String()
+	}
+
+	return previewURLs(ctx, preview, &live, options...)
+}
+
+func previewURLs(ctx context.Context, url string, liveRender *string, options ...mediamapper.Option) *model.PreviewURLSet {
+	mm := mediamapper.For(ctx)
 	return &model.PreviewURLSet{
-		Raw:        &preview,
-		Thumbnail:  util.ToPointer(mm.GetThumbnailImageUrl(preview, options...)),
-		Small:      util.ToPointer(mm.GetSmallImageUrl(preview, options...)),
-		Medium:     util.ToPointer(mm.GetMediumImageUrl(preview, options...)),
-		Large:      util.ToPointer(mm.GetLargeImageUrl(preview, options...)),
-		SrcSet:     util.ToPointer(mm.GetSrcSet(preview, options...)),
-		LiveRender: &live,
+		Raw:        &url,
+		Thumbnail:  util.ToPointer(mm.GetThumbnailImageUrl(url, options...)),
+		Small:      util.ToPointer(mm.GetSmallImageUrl(url, options...)),
+		Medium:     util.ToPointer(mm.GetMediumImageUrl(url, options...)),
+		Large:      util.ToPointer(mm.GetLargeImageUrl(url, options...)),
+		SrcSet:     util.ToPointer(mm.GetSrcSet(url, options...)),
+		LiveRender: liveRender,
 	}
 }
 
@@ -1978,7 +1992,7 @@ func getImageMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia 
 		options = append(options, mediamapper.WithQuality(100))
 	}
 	return model.ImageMedia{
-		PreviewURLs:      getPreviewUrls(ctx, tokenMedia, options...),
+		PreviewURLs:      previewURLsFromTokenMedia(ctx, tokenMedia, options...),
 		MediaURL:         util.ToPointer(tokenMedia.Media.MediaURL.String()),
 		MediaType:        (*string)(&tokenMedia.Media.MediaType),
 		ContentRenderURL: &url,
@@ -2004,8 +2018,8 @@ func getGIFMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *m
 		options = append(options, mediamapper.WithQuality(100))
 	}
 	return model.GIFMedia{
-		PreviewURLs:       getPreviewUrls(ctx, tokenMedia, options...),
-		StaticPreviewURLs: getPreviewUrls(ctx, tokenMedia, mediamapper.WithStaticImage()),
+		PreviewURLs:       previewURLsFromTokenMedia(ctx, tokenMedia, options...),
+		StaticPreviewURLs: previewURLsFromTokenMedia(ctx, tokenMedia, mediamapper.WithStaticImage()),
 		MediaURL:          util.ToPointer(tokenMedia.Media.MediaURL.String()),
 		MediaType:         (*string)(&tokenMedia.Media.MediaType),
 		ContentRenderURL:  &url,
@@ -2039,7 +2053,7 @@ func getVideoMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia 
 	}
 
 	return model.VideoMedia{
-		PreviewURLs:       getPreviewUrls(ctx, tokenMedia, options...),
+		PreviewURLs:       previewURLsFromTokenMedia(ctx, tokenMedia, options...),
 		MediaURL:          util.ToPointer(tokenMedia.Media.MediaURL.String()),
 		MediaType:         (*string)(&tokenMedia.Media.MediaType),
 		ContentRenderURLs: &videoUrls,
@@ -2050,7 +2064,7 @@ func getVideoMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia 
 
 func getAudioMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia) model.AudioMedia {
 	return model.AudioMedia{
-		PreviewURLs:      getPreviewUrls(ctx, tokenMedia),
+		PreviewURLs:      previewURLsFromTokenMedia(ctx, tokenMedia),
 		MediaURL:         util.ToPointer(tokenMedia.Media.MediaURL.String()),
 		MediaType:        (*string)(&tokenMedia.Media.MediaType),
 		ContentRenderURL: (*string)(&tokenMedia.Media.MediaURL),
@@ -2061,7 +2075,7 @@ func getAudioMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia 
 
 func getTextMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia) model.TextMedia {
 	return model.TextMedia{
-		PreviewURLs:      getPreviewUrls(ctx, tokenMedia),
+		PreviewURLs:      previewURLsFromTokenMedia(ctx, tokenMedia),
 		MediaURL:         util.ToPointer(tokenMedia.Media.MediaURL.String()),
 		MediaType:        (*string)(&tokenMedia.Media.MediaType),
 		ContentRenderURL: (*string)(&tokenMedia.Media.MediaURL),
@@ -2072,7 +2086,7 @@ func getTextMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *
 
 func getPdfMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia) model.PDFMedia {
 	return model.PDFMedia{
-		PreviewURLs:      getPreviewUrls(ctx, tokenMedia),
+		PreviewURLs:      previewURLsFromTokenMedia(ctx, tokenMedia),
 		MediaURL:         util.ToPointer(tokenMedia.Media.MediaURL.String()),
 		MediaType:        (*string)(&tokenMedia.Media.MediaType),
 		ContentRenderURL: (*string)(&tokenMedia.Media.MediaURL),
@@ -2083,7 +2097,7 @@ func getPdfMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *m
 
 func getHtmlMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia) model.HTMLMedia {
 	return model.HTMLMedia{
-		PreviewURLs:      getPreviewUrls(ctx, tokenMedia),
+		PreviewURLs:      previewURLsFromTokenMedia(ctx, tokenMedia),
 		MediaURL:         util.ToPointer(tokenMedia.Media.MediaURL.String()),
 		MediaType:        (*string)(&tokenMedia.Media.MediaType),
 		ContentRenderURL: (*string)(&tokenMedia.Media.MediaURL),
@@ -2094,7 +2108,7 @@ func getHtmlMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *
 
 func getJsonMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia) model.JSONMedia {
 	return model.JSONMedia{
-		PreviewURLs:      getPreviewUrls(ctx, tokenMedia),
+		PreviewURLs:      previewURLsFromTokenMedia(ctx, tokenMedia),
 		MediaURL:         util.ToPointer(tokenMedia.Media.MediaURL.String()),
 		MediaType:        (*string)(&tokenMedia.Media.MediaType),
 		ContentRenderURL: (*string)(&tokenMedia.Media.MediaURL),
@@ -2105,7 +2119,7 @@ func getJsonMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *
 
 func getGltfMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia) model.GltfMedia {
 	return model.GltfMedia{
-		PreviewURLs:      getPreviewUrls(ctx, tokenMedia),
+		PreviewURLs:      previewURLsFromTokenMedia(ctx, tokenMedia),
 		MediaURL:         util.ToPointer(tokenMedia.Media.MediaURL.String()),
 		MediaType:        (*string)(&tokenMedia.Media.MediaType),
 		ContentRenderURL: (*string)(&tokenMedia.Media.MediaURL),
@@ -2116,7 +2130,7 @@ func getGltfMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *
 
 func getUnknownMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia) model.UnknownMedia {
 	return model.UnknownMedia{
-		PreviewURLs:      getPreviewUrls(ctx, tokenMedia),
+		PreviewURLs:      previewURLsFromTokenMedia(ctx, tokenMedia),
 		MediaURL:         util.ToPointer(tokenMedia.Media.MediaURL.String()),
 		MediaType:        (*string)(&tokenMedia.Media.MediaType),
 		ContentRenderURL: (*string)(&tokenMedia.Media.MediaURL),
@@ -2127,7 +2141,7 @@ func getUnknownMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedi
 
 func getSyncingMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia) model.SyncingMedia {
 	return model.SyncingMedia{
-		PreviewURLs:      getPreviewUrls(ctx, tokenMedia),
+		PreviewURLs:      previewURLsFromTokenMedia(ctx, tokenMedia),
 		MediaURL:         util.ToPointer(tokenMedia.Media.MediaURL.String()),
 		MediaType:        (*string)(&tokenMedia.Media.MediaType),
 		ContentRenderURL: (*string)(&tokenMedia.Media.MediaURL),
@@ -2138,7 +2152,7 @@ func getSyncingMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedi
 
 func getInvalidMedia(ctx context.Context, tokenMedia db.TokenMedia, fallbackMedia *model.FallbackMedia) model.InvalidMedia {
 	return model.InvalidMedia{
-		PreviewURLs:      getPreviewUrls(ctx, tokenMedia),
+		PreviewURLs:      previewURLsFromTokenMedia(ctx, tokenMedia),
 		MediaURL:         util.ToPointer(tokenMedia.Media.MediaURL.String()),
 		MediaType:        (*string)(&tokenMedia.Media.MediaType),
 		ContentRenderURL: (*string)(&tokenMedia.Media.MediaURL),

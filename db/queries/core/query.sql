@@ -1281,6 +1281,19 @@ with new_image as (
 )
 update users set profile_image_id = new_image.id from new_image where users.id = @user_id and not deleted;
 
+-- name: SetProfileImageToENS :one
+with profile_images as (
+    insert into profile_images (id, user_id, source_type, wallet_id, ens_avatar_uri, deleted, last_updated)
+    values (@profile_id, @user_id, @ens_source_type, @wallet_id, @ens_avatar_uri, false, now())
+    on conflict (user_id) do update set wallet_id = excluded.wallet_id
+        , ens_avatar_uri = excluded.ens_avatar_uri
+        , source_type = excluded.source_type
+        , deleted = excluded.deleted
+        , last_updated = excluded.last_updated
+    returning *
+)
+update users set profile_image_id = profile_images.id from profile_images where users.id = @user_id and not users.deleted returning sqlc.embed(profile_images);
+
 -- name: RemoveProfileImage :exec
 with remove_image as (
     update profile_images set deleted = true, last_updated = now() where user_id = $1 and not deleted
@@ -1288,7 +1301,17 @@ with remove_image as (
 update users set profile_image_id = null where users.id = $1 and not users.deleted;
 
 -- name: GetProfileImageByID :batchone
-select * from profile_images where id = $1 and not deleted;
+select * from profile_images pfp
+where pfp.id = @id
+	and not deleted
+	and case
+		when source_type = @ens_source_type
+		then exists(select 1 from wallets w where w.id = wallet_id and not w.deleted)
+		when source_type = @token_source_type
+		then exists(select 1 from tokens t where t.id = token_id and not t.deleted)
+		else
+		0 = 1
+	end;
 
 -- name: GetCurrentTime :one
 select now()::timestamptz;

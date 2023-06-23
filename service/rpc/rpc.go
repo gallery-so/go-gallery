@@ -625,8 +625,7 @@ func getContentHeaders(ctx context.Context, url string) (contentType string, con
 
 // GetIPFSHeaders returns the headers for the given IPFS hash
 func GetIPFSHeaders(ctx context.Context, path string) (contentType string, contentLength int64, err error) {
-	url := fmt.Sprintf("%s/ipfs/%s", env.GetString("IPFS_URL"), path)
-	return getContentHeaders(ctx, url)
+	return getContentHeaders(ctx, ipfs.PathGatewayFor(env.GetString("IPFS_URL"), path))
 }
 
 // GetHTTPHeaders returns the headers for the given URL

@@ -342,11 +342,11 @@ func (l *RoleList) Scan(value interface{}) error {
 	return pq.Array(l).Scan(value)
 }
 
-// ProfileImageSource represents the source of a profile image
-type ProfileImageSource string
+type ProfileImageSource string // ProfileImageSource represents the source of a profile image
 
 const (
 	ProfileImageSourceToken ProfileImageSource = "token"
+	ProfileImageSourceENS                      = "ens"
 )
 
 type ErrProfileImageNotFound struct {

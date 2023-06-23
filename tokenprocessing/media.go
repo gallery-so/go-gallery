@@ -24,7 +24,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
-	"github.com/mikeydub/go-gallery/service/multichain/tezos"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/googleapi"
 
@@ -33,6 +32,7 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
+	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -63,10 +63,6 @@ type errNoCachedObjects struct {
 	tids persist.TokenIdentifiers
 }
 
-type errNoMediaURLs struct {
-	tids persist.TokenIdentifiers
-}
-
 type errStoreObjectFailed struct {
 	bucket string
 	object cachedMediaObject
@@ -93,10 +89,6 @@ func (e errInvalidMedia) Unwrap() error {
 	return e.err
 }
 
-func (e errNoMediaURLs) Error() string {
-	return fmt.Sprintf("no media URLs found in metadata for %s", e.tids)
-}
-
 func (e errNoCachedObjects) Error() string {
 	return fmt.Sprintf("no cached objects found for token identifiers: %s", e.tids)
 }
@@ -117,9 +109,6 @@ func (e errStoreObjectFailed) Unwrap() error {
 	return e.err
 }
 
-type animationURL string
-type imageURL string
-
 type cachePipelineMetadata struct {
 	ContentHeaderValueRetrieval  *persist.PipelineStepStatus
 	ReaderRetrieval              *persist.PipelineStepStatus
@@ -132,7 +121,7 @@ type cachePipelineMetadata struct {
 	LiveRenderGCP                *persist.PipelineStepStatus
 }
 
-func cacheImageObjects(ctx context.Context, imageURL imageURL, metadata persist.TokenMetadata, job *tokenProcessingJob) chan cacheResult {
+func cacheImageObjects(ctx context.Context, imageURL media.ImageURL, metadata persist.TokenMetadata, job *tokenProcessingJob) chan cacheResult {
 	tids := persist.NewTokenIdentifiers(job.contract.Address, job.token.TokenID, job.token.Chain)
 	runMetadata := &cachePipelineMetadata{
 		ContentHeaderValueRetrieval:  &job.pipelineMetadata.ImageContentHeaderValueRetrieval,
@@ -148,7 +137,7 @@ func cacheImageObjects(ctx context.Context, imageURL imageURL, metadata persist.
 	return asyncCacheObjectsForURL(ctx, tids, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, objectTypeImage, string(imageURL), job.tp.tokenBucket, runMetadata)
 }
 
-func cacheAnimationObjects(ctx context.Context, animationURL animationURL, metadata persist.TokenMetadata, job *tokenProcessingJob) chan cacheResult {
+func cacheAnimationObjects(ctx context.Context, animationURL media.AnimationURL, metadata persist.TokenMetadata, job *tokenProcessingJob) chan cacheResult {
 	tids := persist.NewTokenIdentifiers(job.contract.Address, job.token.TokenID, job.token.Chain)
 	runMetadata := &cachePipelineMetadata{
 		ContentHeaderValueRetrieval:  &job.pipelineMetadata.AnimationContentHeaderValueRetrieval,
@@ -493,8 +482,7 @@ func getHTMLDimensions(ctx context.Context, url string) (persist.Dimensions, err
 func remapPaths(mediaURL string) string {
 	switch persist.TokenURI(mediaURL).Type() {
 	case persist.URITypeIPFS, persist.URITypeIPFSAPI:
-		path := util.GetURIPath(mediaURL, false)
-		return fmt.Sprintf("%s/ipfs/%s", env.GetString("IPFS_URL"), path)
+		return ipfs.PathGatewayFrom(env.GetString("IPFS_URL"), mediaURL, false)
 	case persist.URITypeArweave:
 		path := util.GetURIPath(mediaURL, false)
 		return fmt.Sprintf("https://arweave.net/%s", path)
@@ -513,57 +501,16 @@ func remapMedia(media persist.Media) persist.Media {
 	return media
 }
 
-func findImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, metadata persist.TokenMetadata, tokenURI persist.TokenURI, predict bool, pMeta *persist.PipelineMetadata) (imgURL imageURL, vURL animationURL, err error) {
-
+func findImageAndAnimationURLs(ctx context.Context, contractAddress persist.Address, chain persist.Chain, metadata persist.TokenMetadata, pMeta *persist.PipelineMetadata) (media.ImageURL, media.AnimationURL, error) {
 	traceCallback, ctx := persist.TrackStepStatus(ctx, &pMeta.MediaURLsRetrieval, "MediaURLsRetrieval")
 	defer traceCallback()
 
-	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"tokenID": tokenID, "contractAddress": contractAddress})
-	if metaMedia, ok := metadata["media"].(map[string]any); ok {
-		logger.For(ctx).Debugf("found media metadata: %s", metaMedia)
-		var mediaType persist.MediaType
-
-		if mime, ok := metaMedia["mimeType"].(string); ok {
-			mediaType = media.MediaFromContentType(mime)
-		}
-		if uri, ok := metaMedia["uri"].(string); ok {
-			switch mediaType {
-			case persist.MediaTypeImage, persist.MediaTypeSVG, persist.MediaTypeGIF:
-				imgURL = imageURL(uri)
-			default:
-				vURL = animationURL(uri)
-			}
-		}
-	}
-
-	image, anim := keywordsForToken(tokenID, contractAddress, chain)
-
-	for _, keyword := range anim {
-		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && it != "" {
-			logger.For(ctx).Debugf("found initial animation url from '%s': %s", keyword, it)
-			vURL = animationURL(it)
-			break
-		}
-	}
-
-	for _, keyword := range image {
-		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && string(it) != "" && animationURL(it) != vURL {
-			logger.For(ctx).Debugf("found initial image url from '%s': %s", keyword, it)
-			imgURL = imageURL(it)
-			break
-		}
-	}
-
-	if imgURL == "" && vURL == "" {
+	imgURL, vURL, err := media.FindImageAndAnimationURLs(ctx, chain, contractAddress, metadata)
+	if err != nil {
 		persist.FailStep(&pMeta.MediaURLsRetrieval)
-		return "", "", errNoMediaURLs{tids: persist.NewTokenIdentifiers(contractAddress, tokenID, chain)}
 	}
 
-	if predict {
-		imgURL, vURL = predictTrueURLs(ctx, imgURL, vURL)
-	}
-	return imgURL, vURL, nil
-
+	return imgURL, vURL, err
 }
 
 func findNameAndDescription(ctx context.Context, metadata persist.TokenMetadata) (string, string) {
@@ -578,31 +525,6 @@ func findNameAndDescription(ctx context.Context, metadata persist.TokenMetadata)
 	}
 
 	return name, description
-}
-
-func predictTrueURLs(ctx context.Context, curImg imageURL, curV animationURL) (imageURL, animationURL) {
-	imgMediaType, _, _, err := media.PredictMediaType(ctx, string(curImg))
-	if err != nil {
-		return curImg, curV
-	}
-	vMediaType, _, _, err := media.PredictMediaType(ctx, string(curV))
-	if err != nil {
-		return curImg, curV
-	}
-
-	if imgMediaType.IsAnimationLike() && !vMediaType.IsAnimationLike() {
-		return imageURL(curV), animationURL(curImg)
-	}
-
-	if !imgMediaType.IsValid() || !vMediaType.IsValid() {
-		return curImg, curV
-	}
-
-	if imgMediaType.IsMorePriorityThan(vMediaType) {
-		return imageURL(curV), animationURL(curImg)
-	}
-
-	return curImg, curV
 }
 
 func objectExists(ctx context.Context, client *storage.Client, bucket, fileName string) (bool, error) {
@@ -1289,18 +1211,6 @@ func truncateString(s string, i int) string {
 		return string(asRunes[:i])
 	}
 	return s
-}
-
-func keywordsForToken(tokenID persist.TokenID, contract persist.Address, chain persist.Chain) ([]string, []string) {
-	switch {
-	case tezos.IsHicEtNunc(contract):
-		_, anim := chain.BaseKeywords()
-		return []string{"artifactUri", "displayUri", "image"}, anim
-	case tezos.IsFxHash(contract):
-		return []string{"displayUri", "artifactUri", "image", "uri"}, []string{"artifactUri", "displayUri"}
-	default:
-		return chain.BaseKeywords()
-	}
 }
 
 func newObjectWriter(ctx context.Context, client *storage.Client, bucket, fileName string, contentType *string, contentLength *int64, objMetadata map[string]string) *storage.Writer {

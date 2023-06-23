@@ -665,7 +665,7 @@ func (r *mutationResolver) UnregisterUserPushToken(ctx context.Context, pushToke
 
 // SetProfileImage is the resolver for the setProfileImage field.
 func (r *mutationResolver) SetProfileImage(ctx context.Context, input model.SetProfileImageInput) (model.SetProfileImagePayloadOrError, error) {
-	err := publicapi.For(ctx).User.SetProfileImage(ctx, input.TokenID)
+	err := publicapi.For(ctx).User.SetProfileImage(ctx, input.TokenID, input.WalletAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -2073,6 +2073,18 @@ func (r *queryResolver) TopCollectionsForCommunity(ctx context.Context, input mo
 	return &model.CollectionsConnection{
 		Edges:    edges,
 		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
+}
+
+// EnsProfileImageByUserID is the resolver for the ensProfileImageByUserId field.
+func (r *queryResolver) EnsProfileImageByUserID(ctx context.Context, userID persist.DBID) (*model.EnsProfileImage, error) {
+	a, err := publicapi.For(ctx).User.GetEnsProfileImageByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return &model.EnsProfileImage{
+		ChainAddress: util.ToPointer(persist.NewChainAddress(a.Address, a.Chain)),
+		ProfileImage: &model.HTTPSProfileImage{PreviewURLs: previewURLs(ctx, a.URI, nil)},
 	}, nil
 }
 

@@ -5,42 +5,47 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/jackc/pgtype"
-	"github.com/jackc/pgx/v4"
-	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/multichain"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
-	"github.com/mikeydub/go-gallery/service/recommend"
-	"github.com/mikeydub/go-gallery/service/socialauth"
-	"github.com/mikeydub/go-gallery/service/user"
 
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/everFinance/goar"
 	"github.com/go-playground/validator/v10"
 	shell "github.com/ipfs/go-ipfs-api"
+	"github.com/jackc/pgtype"
+	"github.com/jackc/pgx/v4"
 	"github.com/jinzhu/copier"
+	"roci.dev/fracdex"
+
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/emails"
+	"github.com/mikeydub/go-gallery/service/eth"
+	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/membership"
+	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/recommend"
+	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/service/socialauth"
+	"github.com/mikeydub/go-gallery/service/user"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
-	"roci.dev/fracdex"
 )
 
 var ErrProfileImageTooManySources = errors.New("too many profile image sources provided")
-var ErrProfileImageNoSources = errors.New("no profile image source provided")
-var ErrProfileImageUnknownSource = errors.New("unsupported profile image source provided")
+var ErrProfileImageUnknownSource = errors.New("unknown profile image source to use")
 var ErrProfileImageNotTokenOwner = errors.New("user is not an owner of the token")
+var ErrProfileImageNotWalletOwner = errors.New("user is not the owner of the wallet")
 
 type UserAPI struct {
 	repos              *postgres.Repositories
@@ -1329,18 +1334,15 @@ func (api UserAPI) DeletePushTokenByPushToken(ctx context.Context, pushToken str
 }
 
 // SetProfileImage sets the profile image for the current user.
-func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID) error {
+func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID, walletAddress *persist.ChainAddress) error {
 	// Validate
 	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
 
-	if util.OnlyNils(tokenID) {
-		return ErrProfileImageNoSources
-	}
-
-	if util.ManyNotNils(tokenID) {
+	// Too many inputs provided
+	if util.ManyNotNils(tokenID, walletAddress) {
 		return ErrProfileImageTooManySources
 	}
 
@@ -1368,6 +1370,70 @@ func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID) e
 		})
 	}
 
+	// Set the profile image to reference ENS avatar
+	if walletAddress != nil {
+		// Validate
+		if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+			"chain":   {walletAddress.Chain(), fmt.Sprintf("eq=%d", persist.ChainETH)},
+			"address": {walletAddress.Address(), "required"},
+		}); err != nil {
+			return err
+		}
+
+		wallets, err := api.loaders.WalletsByUserID.Load(userID)
+		if err != nil {
+			return err
+		}
+
+		for _, w := range wallets {
+			if w.Chain == walletAddress.Chain() && w.Address == walletAddress.Address() {
+				// Found the wallet
+				addr := persist.EthereumAddress(w.Address)
+
+				r, err := eth.EnsAvatarRecordFor(ctx, api.ethClient, addr)
+				if err != nil {
+					return err
+				}
+
+				// Confirm wallet owns the token
+				if t, ok := r.(eth.EnsTokenRecord); ok {
+					isOwner, err := eth.IsOwner(ctx, addr, t, api.ethClient)
+					if err != nil {
+						return err
+					}
+					if !isOwner {
+						return ErrProfileImageNotTokenOwner
+					}
+				}
+
+				uri, err := uriFromRecord(ctx, api.multichainProvider, r)
+				if err != nil {
+					return err
+				}
+
+				pfp, err := api.queries.SetProfileImageToENS(ctx, db.SetProfileImageToENSParams{
+					EnsSourceType: persist.ProfileImageSourceENS,
+					ProfileID:     persist.GenerateID(),
+					UserID:        userID,
+					WalletID:      w.ID,
+					EnsAvatarUri:  util.ToNullString(uri, true),
+				})
+				if err != nil {
+					return err
+				}
+
+				// Manually prime the PFP loader
+				api.loaders.ProfileImageByID.Prime(db.GetProfileImageByIDParams{
+					ID:              pfp.ProfileImage.ID,
+					EnsSourceType:   persist.ProfileImageSourceENS,
+					TokenSourceType: persist.ProfileImageSourceToken,
+				}, pfp.ProfileImage)
+				return nil
+			}
+		}
+		return ErrProfileImageNotWalletOwner
+	}
+
 	return ErrProfileImageUnknownSource
 }
 
@@ -1389,5 +1455,132 @@ func (api UserAPI) GetProfileImageByUserID(ctx context.Context, userID persist.D
 	if user.ProfileImageID == "" {
 		return db.ProfileImage{}, nil
 	}
-	return api.loaders.ProfileImageByID.Load(user.ProfileImageID)
+	return api.loaders.ProfileImageByID.Load(db.GetProfileImageByIDParams{
+		ID:              user.ProfileImageID,
+		EnsSourceType:   persist.ProfileImageSourceENS,
+		TokenSourceType: persist.ProfileImageSourceToken,
+	})
+}
+
+type EnsAvatar struct {
+	Address persist.Address
+	Chain   persist.Chain
+	URI     string
+}
+
+// GetEnsProfileImageByUserID returns the an ENS profile image for a user based on their set of wallets
+func (api UserAPI) GetEnsProfileImageByUserID(ctx context.Context, userID persist.DBID) (a EnsAvatar, err error) {
+	// Validate
+	user, err := api.GetUserById(ctx, userID)
+	if err != nil {
+		return a, err
+	}
+
+	if len(user.Wallets) == 0 {
+		return a, nil
+	}
+
+	// Sort wallets by primary wallet first then by ID
+	sort.Slice(user.Wallets, func(i, j int) bool {
+		return user.Wallets[i].ID == user.PrimaryWalletID || user.Wallets[i].ID < user.Wallets[j].ID
+	})
+
+	errs := make([]error, 0)
+
+	for _, w := range user.Wallets {
+		if w.Chain != persist.ChainETH {
+			continue
+		}
+
+		addr := persist.EthereumAddress(w.Address)
+
+		r, err := eth.EnsAvatarRecordFor(ctx, api.ethClient, addr)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+
+		if r == nil {
+			continue
+		}
+
+		// Confirm wallet owns the token
+		if t, ok := r.(eth.EnsTokenRecord); ok {
+			isOwner, err := eth.IsOwner(ctx, addr, t, api.ethClient)
+			if err != nil {
+				return a, err
+			}
+			if !isOwner {
+				continue
+			}
+		}
+
+		uri, err := uriFromRecord(ctx, api.multichainProvider, r)
+		if err != nil {
+			return a, err
+		}
+
+		return EnsAvatar{
+			Address: w.Address,
+			Chain:   w.Chain,
+			URI:     uri,
+		}, nil
+	}
+
+	if len(errs) > 0 {
+		return a, errs[0]
+	}
+
+	return a, nil
+}
+
+func uriFromRecord(ctx context.Context, mc *multichain.Provider, r eth.AvatarRecord) (uri string, err error) {
+	switch u := r.(type) {
+	case nil:
+		return "", nil
+	case eth.EnsHttpRecord:
+		return standardizeURI(u.URL), nil
+	case eth.EnsIpfsRecord:
+		return standardizeURI(u.URL), nil
+	case eth.EnsTokenRecord:
+		uri, err = uriFromTokenRecord(ctx, mc, u)
+		return standardizeURI(uri), err
+	default:
+		return "", eth.ErrUnknownENSAvatarURI
+	}
+}
+
+func uriFromTokenRecord(ctx context.Context, mc *multichain.Provider, r eth.EnsTokenRecord) (string, error) {
+	chain, contractAddr, _, tokenID, err := eth.TokenInfoFor(r)
+	if err != nil {
+		return "", err
+	}
+
+	// Fetch the metadata and return the appropriate profile image source
+	metadata, err := mc.GetTokenMetadataByTokenIdentifiers(ctx, contractAddr, tokenID, chain, imageMetadataRequest(chain))
+	if err != nil {
+		return "", err
+	}
+
+	imageURL, _, err := media.FindImageAndAnimationURLs(ctx, chain, contractAddr, metadata)
+	if err != nil {
+		if errors.Is(err, media.ErrNoMediaURLs) {
+			return "", nil
+		}
+		return "", err
+	}
+
+	return standardizeURI(string(imageURL)), nil
+}
+
+func imageMetadataRequest(chain persist.Chain) []multichain.FieldRequest[string] {
+	imageKeywords, _ := chain.BaseKeywords()
+	return []multichain.FieldRequest[string]{{FieldNames: imageKeywords, Level: multichain.FieldRequirementLevelOneRequired}}
+}
+
+func standardizeURI(u string) string {
+	if strings.HasPrefix(u, "ipfs://") {
+		return ipfs.PathGatewayFrom(env.GetString("IPFS_URL"), u, true)
+	}
+	return u
 }

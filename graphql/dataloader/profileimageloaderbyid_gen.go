@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
-	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 type ProfileImageLoaderByIDSettings interface {
@@ -26,18 +25,18 @@ type ProfileImageLoaderByIDSettings interface {
 
 // ProfileImageLoaderByIDCacheSubscriptions
 type ProfileImageLoaderByIDCacheSubscriptions struct {
-	// AutoCacheWithKey is a function that returns the persist.DBID cache key for a coredb.ProfileImage.
+	// AutoCacheWithKey is a function that returns the coredb.GetProfileImageByIDParams cache key for a coredb.ProfileImage.
 	// If AutoCacheWithKey is not nil, this loader will automatically cache published results from other loaders
 	// that return a coredb.ProfileImage. Loaders that return pointers or slices of coredb.ProfileImage
 	// will be dereferenced/iterated automatically, invoking this function with the base coredb.ProfileImage type.
-	AutoCacheWithKey func(coredb.ProfileImage) persist.DBID
+	AutoCacheWithKey func(coredb.ProfileImage) coredb.GetProfileImageByIDParams
 
-	// AutoCacheWithKeys is a function that returns the []persist.DBID cache keys for a coredb.ProfileImage.
+	// AutoCacheWithKeys is a function that returns the []coredb.GetProfileImageByIDParams cache keys for a coredb.ProfileImage.
 	// Similar to AutoCacheWithKey, but for cases where a single value gets cached by many keys.
 	// If AutoCacheWithKeys is not nil, this loader will automatically cache published results from other loaders
 	// that return a coredb.ProfileImage. Loaders that return pointers or slices of coredb.ProfileImage
 	// will be dereferenced/iterated automatically, invoking this function with the base coredb.ProfileImage type.
-	AutoCacheWithKeys func(coredb.ProfileImage) []persist.DBID
+	AutoCacheWithKeys func(coredb.ProfileImage) []coredb.GetProfileImageByIDParams
 
 	// TODO: Allow custom cache functions once we're able to use generics. It could be done without generics, but
 	// would be messy and error-prone. A non-generic implementation might look something like:
@@ -79,7 +78,7 @@ func (l *ProfileImageLoaderByID) setPostFetchHook(postFetchHook func(context.Con
 
 // NewProfileImageLoaderByID creates a new ProfileImageLoaderByID with the given settings, functions, and options
 func NewProfileImageLoaderByID(
-	settings ProfileImageLoaderByIDSettings, fetch func(ctx context.Context, keys []persist.DBID) ([]coredb.ProfileImage, []error),
+	settings ProfileImageLoaderByIDSettings, fetch func(ctx context.Context, keys []coredb.GetProfileImageByIDParams) ([]coredb.ProfileImage, []error),
 	funcs ProfileImageLoaderByIDCacheSubscriptions,
 	opts ...func(interface {
 		setContext(context.Context)
@@ -108,7 +107,7 @@ func NewProfileImageLoaderByID(
 	}
 
 	// Set this after applying options, in case a different context was set via options
-	loader.fetch = func(keys []persist.DBID) ([]coredb.ProfileImage, []error) {
+	loader.fetch = func(keys []coredb.GetProfileImageByIDParams) ([]coredb.ProfileImage, []error) {
 		ctx := loader.ctx
 
 		// Allow the preFetchHook to modify and return a new context
@@ -163,7 +162,7 @@ type ProfileImageLoaderByID struct {
 	ctx context.Context
 
 	// this method provides the data for the loader
-	fetch func(keys []persist.DBID) ([]coredb.ProfileImage, []error)
+	fetch func(keys []coredb.GetProfileImageByIDParams) ([]coredb.ProfileImage, []error)
 
 	// how long to wait before sending a batch
 	wait time.Duration
@@ -195,7 +194,7 @@ type ProfileImageLoaderByID struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[persist.DBID]coredb.ProfileImage
+	cache map[coredb.GetProfileImageByIDParams]coredb.ProfileImage
 
 	// typed cache functions
 	//subscribers []func(coredb.ProfileImage)
@@ -216,7 +215,7 @@ type ProfileImageLoaderByID struct {
 }
 
 type profileImageLoaderByIDBatch struct {
-	keys    []persist.DBID
+	keys    []coredb.GetProfileImageByIDParams
 	data    []coredb.ProfileImage
 	error   []error
 	closing bool
@@ -224,14 +223,14 @@ type profileImageLoaderByIDBatch struct {
 }
 
 // Load a ProfileImage by key, batching and caching will be applied automatically
-func (l *ProfileImageLoaderByID) Load(key persist.DBID) (coredb.ProfileImage, error) {
+func (l *ProfileImageLoaderByID) Load(key coredb.GetProfileImageByIDParams) (coredb.ProfileImage, error) {
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a ProfileImage.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *ProfileImageLoaderByID) LoadThunk(key persist.DBID) func() (coredb.ProfileImage, error) {
+func (l *ProfileImageLoaderByID) LoadThunk(key coredb.GetProfileImageByIDParams) func() (coredb.ProfileImage, error) {
 	l.mu.Lock()
 	if !l.disableCaching {
 		if it, ok := l.cache[key]; ok {
@@ -282,7 +281,7 @@ func (l *ProfileImageLoaderByID) LoadThunk(key persist.DBID) func() (coredb.Prof
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *ProfileImageLoaderByID) LoadAll(keys []persist.DBID) ([]coredb.ProfileImage, []error) {
+func (l *ProfileImageLoaderByID) LoadAll(keys []coredb.GetProfileImageByIDParams) ([]coredb.ProfileImage, []error) {
 	results := make([]func() (coredb.ProfileImage, error), len(keys))
 
 	for i, key := range keys {
@@ -300,7 +299,7 @@ func (l *ProfileImageLoaderByID) LoadAll(keys []persist.DBID) ([]coredb.ProfileI
 // LoadAllThunk returns a function that when called will block waiting for a ProfileImages.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *ProfileImageLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([]coredb.ProfileImage, []error) {
+func (l *ProfileImageLoaderByID) LoadAllThunk(keys []coredb.GetProfileImageByIDParams) func() ([]coredb.ProfileImage, []error) {
 	results := make([]func() (coredb.ProfileImage, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
@@ -318,7 +317,7 @@ func (l *ProfileImageLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([]cor
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *ProfileImageLoaderByID) Prime(key persist.DBID, value coredb.ProfileImage) bool {
+func (l *ProfileImageLoaderByID) Prime(key coredb.GetProfileImageByIDParams, value coredb.ProfileImage) bool {
 	if l.disableCaching {
 		return false
 	}
@@ -332,7 +331,7 @@ func (l *ProfileImageLoaderByID) Prime(key persist.DBID, value coredb.ProfileIma
 }
 
 // Prime the cache without acquiring locks. Should only be used when the lock is already held.
-func (l *ProfileImageLoaderByID) unsafePrime(key persist.DBID, value coredb.ProfileImage) bool {
+func (l *ProfileImageLoaderByID) unsafePrime(key coredb.GetProfileImageByIDParams, value coredb.ProfileImage) bool {
 	if l.disableCaching {
 		return false
 	}
@@ -344,7 +343,7 @@ func (l *ProfileImageLoaderByID) unsafePrime(key persist.DBID, value coredb.Prof
 }
 
 // Clear the value at key from the cache, if it exists
-func (l *ProfileImageLoaderByID) Clear(key persist.DBID) {
+func (l *ProfileImageLoaderByID) Clear(key coredb.GetProfileImageByIDParams) {
 	if l.disableCaching {
 		return
 	}
@@ -353,16 +352,16 @@ func (l *ProfileImageLoaderByID) Clear(key persist.DBID) {
 	l.mu.Unlock()
 }
 
-func (l *ProfileImageLoaderByID) unsafeSet(key persist.DBID, value coredb.ProfileImage) {
+func (l *ProfileImageLoaderByID) unsafeSet(key coredb.GetProfileImageByIDParams, value coredb.ProfileImage) {
 	if l.cache == nil {
-		l.cache = map[persist.DBID]coredb.ProfileImage{}
+		l.cache = map[coredb.GetProfileImageByIDParams]coredb.ProfileImage{}
 	}
 	l.cache[key] = value
 }
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
-func (b *profileImageLoaderByIDBatch) keyIndex(l *ProfileImageLoaderByID, key persist.DBID) int {
+func (b *profileImageLoaderByIDBatch) keyIndex(l *ProfileImageLoaderByID, key coredb.GetProfileImageByIDParams) int {
 	for i, existingKey := range b.keys {
 		if key == existingKey {
 			return i

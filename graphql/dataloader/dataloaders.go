@@ -43,7 +43,7 @@
 //go:generate go run github.com/gallery-so/dataloaden TokenOwnershipLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.TokenOwnership
 //go:generate go run github.com/gallery-so/dataloaden ContractCreatorLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.ContractCreator
 //go:generate go run github.com/gallery-so/dataloaden TokensLoaderByUserIDAndFilters github.com/mikeydub/go-gallery/db/gen/coredb.GetTokensByUserIdBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.Token
-//go:generate go run github.com/gallery-so/dataloaden ProfileImageLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.ProfileImage
+//go:generate go run github.com/gallery-so/dataloaden ProfileImageLoaderByID github.com/mikeydub/go-gallery/db/gen/coredb.GetProfileImageByIDParams github.com/mikeydub/go-gallery/db/gen/coredb.ProfileImage
 
 package dataloader
 
@@ -319,9 +319,7 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 
 	loaders.ContractCreatorByContractID = NewContractCreatorLoaderByID(defaults, loadContractCreatorByContractID(q), ContractCreatorLoaderByIDCacheSubscriptions{})
 
-	loaders.ProfileImageByID = NewProfileImageLoaderByID(defaults, loadProfileImageByID(q), ProfileImageLoaderByIDCacheSubscriptions{
-		AutoCacheWithKey: func(pfp db.ProfileImage) persist.DBID { return pfp.ID },
-	})
+	loaders.ProfileImageByID = NewProfileImageLoaderByID(defaults, loadProfileImageByID(q), ProfileImageLoaderByIDCacheSubscriptions{})
 
 	return loaders
 }
@@ -1239,17 +1237,17 @@ func loadContractCreatorByContractID(q *db.Queries) func(ctx context.Context, ke
 	}
 }
 
-func loadProfileImageByID(q *db.Queries) func(context.Context, []persist.DBID) ([]db.ProfileImage, []error) {
-	return func(ctx context.Context, pfpIDs []persist.DBID) ([]db.ProfileImage, []error) {
-		results := make([]db.ProfileImage, len(pfpIDs))
-		errors := make([]error, len(pfpIDs))
+func loadProfileImageByID(q *db.Queries) func(context.Context, []db.GetProfileImageByIDParams) ([]db.ProfileImage, []error) {
+	return func(ctx context.Context, params []db.GetProfileImageByIDParams) ([]db.ProfileImage, []error) {
+		results := make([]db.ProfileImage, len(params))
+		errors := make([]error, len(params))
 
-		b := q.GetProfileImageByID(ctx, pfpIDs)
+		b := q.GetProfileImageByID(ctx, params)
 		defer b.Close()
 
 		b.QueryRow(func(i int, media db.ProfileImage, err error) {
 			if err == pgx.ErrNoRows {
-				err = persist.ErrProfileImageNotFound{err, pfpIDs[i]}
+				err = persist.ErrProfileImageNotFound{err, params[i].ID}
 			}
 			results[i], errors[i] = media, err
 		})

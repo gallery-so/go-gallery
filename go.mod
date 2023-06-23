@@ -67,6 +67,7 @@ require (
 	github.com/google/wire v0.5.0
 	github.com/jinzhu/copier v0.3.5
 	github.com/sourcegraph/conc v0.3.0
+	github.com/wealdtech/go-ens/v3 v3.5.5
 	go.mozilla.org/sops/v3 v3.7.3
 )
 

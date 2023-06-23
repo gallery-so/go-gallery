@@ -778,6 +778,11 @@ type EmailNotificationSettings struct {
 	UnsubscribedFromNotifications bool `json:"unsubscribedFromNotifications"`
 }
 
+type EnsProfileImage struct {
+	ChainAddress *persist.ChainAddress `json:"chainAddress"`
+	ProfileImage ProfileImage          `json:"profileImage"`
+}
+
 type EoaAuth struct {
 	ChainPubKey *persist.ChainPubKey `json:"chainPubKey"`
 	Nonce       string               `json:"nonce"`
@@ -1304,6 +1309,12 @@ type GroupNotificationUsersConnection struct {
 	PageInfo *PageInfo                    `json:"pageInfo"`
 }
 
+type HTTPSProfileImage struct {
+	PreviewURLs *PreviewURLSet `json:"previewURLs"`
+}
+
+func (HTTPSProfileImage) IsProfileImage() {}
+
 type HTMLMedia struct {
 	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`
 	MediaURL         *string          `json:"mediaURL"`
@@ -1611,7 +1622,8 @@ type SetCommunityOverrideCreatorPayload struct {
 func (SetCommunityOverrideCreatorPayload) IsSetCommunityOverrideCreatorPayloadOrError() {}
 
 type SetProfileImageInput struct {
-	TokenID *persist.DBID `json:"tokenId"`
+	TokenID       *persist.DBID         `json:"tokenId"`
+	WalletAddress *persist.ChainAddress `json:"walletAddress"`
 }
 
 type SetProfileImagePayload struct {
