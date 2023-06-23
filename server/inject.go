@@ -51,7 +51,7 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 	wire.Build(
 		setEnv,
 		wire.Value(&http.Client{Timeout: 0}), // HTTP client shared between providers
-		defaultChainOverrides,
+		defaultWalletOverrides,
 		task.NewClient,
 		newCommunitiesCache,
 		postgres.NewRepositories,
@@ -318,14 +318,15 @@ func newMultichainSet(
 	return chainToProviders
 }
 
-// defaultChainOverrides is a wire provider for chain overrides
-func defaultChainOverrides() multichain.ChainOverrideMap {
-	var ethChain = persist.ChainETH
-	return multichain.ChainOverrideMap{
-		persist.ChainPOAP:     &ethChain,
-		persist.ChainOptimism: &ethChain,
-		persist.ChainPolygon:  &ethChain,
-		persist.ChainArbitrum: &ethChain,
+// defaultWalletOverrides is a wire provider for wallet overrides
+func defaultWalletOverrides() multichain.WalletOverrideMap {
+	var evmChains = []persist.Chain{persist.ChainETH, persist.ChainOptimism, persist.ChainPolygon, persist.ChainArbitrum, persist.ChainPOAP}
+	return multichain.WalletOverrideMap{
+		persist.ChainPOAP:     evmChains,
+		persist.ChainOptimism: evmChains,
+		persist.ChainPolygon:  evmChains,
+		persist.ChainArbitrum: evmChains,
+		persist.ChainETH:      evmChains,
 	}
 }
 
