@@ -44,8 +44,8 @@ type Provider struct {
 	Cache   *redis.Cache
 	Chains  map[persist.Chain][]any
 	// some chains use the addresses of other chains, this will map of chain we want tokens from => chain that's address will be used for lookup
-	ChainAddressOverrides ChainOverrideMap
-	SendTokens            SendTokens
+	WalletOverrides WalletOverrideMap
+	SendTokens      SendTokens
 }
 
 // BlockchainInfo retrieves blockchain info from all chains
@@ -206,7 +206,7 @@ type ProviderSupplier interface {
 	GetSubproviders() []any
 }
 
-type ChainOverrideMap = map[persist.Chain]*persist.Chain
+type WalletOverrideMap = map[persist.Chain][]persist.Chain
 
 // providersMatchingInterface returns providers that adhere to the given interface
 func providersMatchingInterface[T any](providers []any) []T {
@@ -233,15 +233,20 @@ func matchingProvidersForChain[T any](availableProviders map[persist.Chain][]any
 	return matchingProvidersByChain[T](availableProviders, chain)[chain]
 }
 
-// matchingAddresses returns wallet addresses that belong to any of the passed chains
-func matchingAddresses(wallets []persist.Wallet, chains []persist.Chain) map[persist.Chain][]persist.Address {
+// matchingWallets returns wallet addresses that belong to any of the passed chains
+func (p *Provider) matchingWallets(wallets []persist.Wallet, chains []persist.Chain) map[persist.Chain][]persist.Address {
 	matches := make(map[persist.Chain][]persist.Address)
 	for _, chain := range chains {
 		for _, wallet := range wallets {
 			if wallet.Chain == chain {
 				matches[chain] = append(matches[chain], wallet.Address)
+			} else if overrides, ok := p.WalletOverrides[chain]; ok && util.Contains(overrides, wallet.Chain) {
+				matches[chain] = append(matches[chain], wallet.Address)
 			}
 		}
+	}
+	for chain, addresses := range matches {
+		matches[chain] = util.Dedupe(addresses, true)
 	}
 	return matches
 }
@@ -259,17 +264,7 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 	errChan := make(chan error)
 	incomingTokens := make(chan chainTokens)
 	incomingContracts := make(chan chainContracts)
-	chainsToAddresses := make(map[persist.Chain][]persist.Address)
-
-	for _, chain := range chains {
-		for _, wallet := range user.Wallets {
-			override := p.ChainAddressOverrides[chain]
-
-			if wallet.Chain == chain || (override != nil && *override == wallet.Chain) {
-				chainsToAddresses[chain] = append(chainsToAddresses[chain], wallet.Address)
-			}
-		}
-	}
+	chainsToAddresses := p.matchingWallets(user.Wallets, chains)
 
 	wg := conc.WaitGroup{}
 	for c, a := range chainsToAddresses {
@@ -379,9 +374,8 @@ func (p *Provider) SyncCreatedTokens(ctx context.Context, userID persist.DBID, c
 	chainsToAddresses := make(map[persist.Chain][]persist.Address)
 
 	for _, chain := range chains {
-		override := p.ChainAddressOverrides[chain]
 		for _, contract := range contracts {
-			if contract.Chain == chain || (override != nil && *override == contract.Chain) {
+			if contract.Chain == chain {
 				chainsToAddresses[chain] = append(chainsToAddresses[chain], contract.Address)
 			}
 		}
@@ -518,7 +512,7 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 	}
 
 	fetchers := matchingProvidersByChain[ChildContractFetcher](p.Chains, chains...)
-	searchAddresses := matchingAddresses(user.Wallets, chains)
+	searchAddresses := p.matchingWallets(user.Wallets, chains)
 	providerPool := pool.NewWithResults[ProviderChildContractResult]().WithContext(ctx).WithCancelOnError()
 
 	// Fetch all tokens created by the user
@@ -1172,7 +1166,7 @@ func (p *Provider) SyncContractsOwnedByUser(ctx context.Context, userID persist.
 	contractsFromProviders := []chainContracts{}
 
 	contractFetchers := matchingProvidersByChain[ContractsFetcher](p.Chains, chains...)
-	searchAddresses := matchingAddresses(user.Wallets, chains)
+	searchAddresses := p.matchingWallets(user.Wallets, chains)
 	providerPool := pool.NewWithResults[ContractOwnerResult]().WithContext(ctx).WithCancelOnError()
 
 	for chain, addresses := range searchAddresses {
