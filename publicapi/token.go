@@ -317,6 +317,17 @@ func (api TokenAPI) SyncTokens(ctx context.Context, chains []persist.Chain) erro
 	return nil
 }
 
+func (api TokenAPI) SyncCreatedTokensAdmin(ctx context.Context, includeChains []persist.Chain, userID persist.DBID) error {
+	key := fmt.Sprintf("sync:created:%s", userID.String())
+
+	if err := api.throttler.Lock(ctx, key); err != nil {
+		return ErrTokenRefreshFailed{Message: err.Error()}
+	}
+	defer api.throttler.Unlock(ctx, key)
+
+	return api.multichainProvider.SyncCreatedTokens(ctx, userID, includeChains)
+}
+
 func (api TokenAPI) SyncCreatedTokens(ctx context.Context, includeChains []persist.Chain) error {
 	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
