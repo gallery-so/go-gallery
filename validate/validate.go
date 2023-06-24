@@ -67,6 +67,7 @@ var bannedUsernames = map[string]bool{
 	"unsubscribe":   true,
 	"verify":        true,
 	"welcome":       true,
+	"zora":          true,
 	"404":           true,
 }
 
