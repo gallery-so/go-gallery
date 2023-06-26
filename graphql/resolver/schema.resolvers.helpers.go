@@ -1941,10 +1941,17 @@ func profileImageToModel(ctx context.Context, pfp db.ProfileImage) (model.Profil
 		if pfp.EnsAvatarUri.String == "" {
 			return nil, nil
 		}
-		urls := previewURLs(ctx, pfp.EnsAvatarUri.String, nil)
-		return &model.HTTPSProfileImage{PreviewURLs: urls}, nil
+		return ensProfileImageToModel(ctx, pfp.WalletID, pfp.EnsAvatarUri.String), nil
 	default:
 		return nil, publicapi.ErrProfileImageUnknownSource
+	}
+}
+
+func ensProfileImageToModel(ctx context.Context, walletID persist.DBID, url string) model.EnsProfileImage {
+	return model.EnsProfileImage{
+		ProfileImage:              &model.HTTPSProfileImage{PreviewURLs: previewURLs(ctx, url, nil)},
+		Wallet:                    nil, // handled by dedicated resolver
+		HelperEnsProfileImageData: model.HelperEnsProfileImageData{WalletID: walletID},
 	}
 }
 
