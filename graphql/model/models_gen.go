@@ -779,9 +779,12 @@ type EmailNotificationSettings struct {
 }
 
 type EnsProfileImage struct {
-	ChainAddress *persist.ChainAddress `json:"chainAddress"`
-	ProfileImage ProfileImage          `json:"profileImage"`
+	HelperEnsProfileImageData
+	Wallet       *Wallet            `json:"wallet"`
+	ProfileImage *HTTPSProfileImage `json:"profileImage"`
 }
+
+func (EnsProfileImage) IsProfileImage() {}
 
 type EoaAuth struct {
 	ChainPubKey *persist.ChainPubKey `json:"chainPubKey"`
@@ -1312,8 +1315,6 @@ type GroupNotificationUsersConnection struct {
 type HTTPSProfileImage struct {
 	PreviewURLs *PreviewURLSet `json:"previewURLs"`
 }
-
-func (HTTPSProfileImage) IsProfileImage() {}
 
 type HTMLMedia struct {
 	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`

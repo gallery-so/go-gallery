@@ -75,12 +75,12 @@ type HTTPSProfileImage {
   previewURLs: PreviewURLSet
 }
 
-type EnsProfileImage {
-  chainAddress: ChainAddress!
-  profileImage: ProfileImage
+type EnsProfileImage @goEmbedHelper {
+  wallet: Wallet @goField(forceResolver: true)
+  profileImage: HTTPSProfileImage
 }
 
-union ProfileImage = TokenProfileImage | HTTPSProfileImage
+union ProfileImage = TokenProfileImage | EnsProfileImage
 
 type GalleryUser implements Node @goEmbedHelper {
   id: ID!

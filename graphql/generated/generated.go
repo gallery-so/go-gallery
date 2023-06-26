@@ -52,6 +52,7 @@ type ResolverRoot interface {
 	CommentOnFeedEventPayload() CommentOnFeedEventPayloadResolver
 	Community() CommunityResolver
 	CreateCollectionPayload() CreateCollectionPayloadResolver
+	EnsProfileImage() EnsProfileImageResolver
 	Entity() EntityResolver
 	FeedEvent() FeedEventResolver
 	FollowInfo() FollowInfoResolver
@@ -352,8 +353,8 @@ type ComplexityRoot struct {
 	}
 
 	EnsProfileImage struct {
-		ChainAddress func(childComplexity int) int
 		ProfileImage func(childComplexity int) int
+		Wallet       func(childComplexity int) int
 	}
 
 	Entity struct {
@@ -1400,6 +1401,9 @@ type CommunityResolver interface {
 }
 type CreateCollectionPayloadResolver interface {
 	FeedEvent(ctx context.Context, obj *model.CreateCollectionPayload) (*model.FeedEvent, error)
+}
+type EnsProfileImageResolver interface {
+	Wallet(ctx context.Context, obj *model.EnsProfileImage) (*model.Wallet, error)
 }
 type EntityResolver interface {
 	FindFeedEventByDbid(ctx context.Context, dbid persist.DBID) (*model.FeedEvent, error)
@@ -2629,19 +2633,19 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.EmailNotificationSettings.UnsubscribedFromNotifications(childComplexity), true
 
-	case "EnsProfileImage.chainAddress":
-		if e.complexity.EnsProfileImage.ChainAddress == nil {
-			break
-		}
-
-		return e.complexity.EnsProfileImage.ChainAddress(childComplexity), true
-
 	case "EnsProfileImage.profileImage":
 		if e.complexity.EnsProfileImage.ProfileImage == nil {
 			break
 		}
 
 		return e.complexity.EnsProfileImage.ProfileImage(childComplexity), true
+
+	case "EnsProfileImage.wallet":
+		if e.complexity.EnsProfileImage.Wallet == nil {
+			break
+		}
+
+		return e.complexity.EnsProfileImage.Wallet(childComplexity), true
 
 	case "Entity.findFeedEventByDbid":
 		if e.complexity.Entity.FindFeedEventByDbid == nil {
@@ -7066,12 +7070,12 @@ type HTTPSProfileImage {
   previewURLs: PreviewURLSet
 }
 
-type EnsProfileImage {
-  chainAddress: ChainAddress!
-  profileImage: ProfileImage
+type EnsProfileImage @goEmbedHelper {
+  wallet: Wallet @goField(forceResolver: true)
+  profileImage: HTTPSProfileImage
 }
 
-union ProfileImage = TokenProfileImage | HTTPSProfileImage
+union ProfileImage = TokenProfileImage | EnsProfileImage
 
 type GalleryUser implements Node @goEmbedHelper {
   id: ID!
@@ -8156,7 +8160,9 @@ type Query {
     first: Int
     last: Int
   ): CollectionsConnection
-  """Returns a profile image from one of the user's wallets if the wallet is registered with ENS and has an avatar record set"""
+  """
+  Returns a profile image from one of the user's wallets if the wallet is registered with ENS and has an avatar record set
+  """
   ensProfileImageByUserId(userId: DBID!): EnsProfileImage
 }
 
@@ -18876,8 +18882,8 @@ func (ec *executionContext) fieldContext_EmailNotificationSettings_unsubscribedF
 	return fc, nil
 }
 
-func (ec *executionContext) _EnsProfileImage_chainAddress(ctx context.Context, field graphql.CollectedField, obj *model.EnsProfileImage) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_EnsProfileImage_chainAddress(ctx, field)
+func (ec *executionContext) _EnsProfileImage_wallet(ctx context.Context, field graphql.CollectedField, obj *model.EnsProfileImage) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_EnsProfileImage_wallet(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -18890,37 +18896,42 @@ func (ec *executionContext) _EnsProfileImage_chainAddress(ctx context.Context, f
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.ChainAddress, nil
+		return ec.resolvers.EnsProfileImage().Wallet(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
-	res := resTmp.(*persist.ChainAddress)
+	res := resTmp.(*model.Wallet)
 	fc.Result = res
-	return ec.marshalNChainAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, field.Selections, res)
+	return ec.marshalOWallet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐWallet(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_EnsProfileImage_chainAddress(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_EnsProfileImage_wallet(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "EnsProfileImage",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "address":
-				return ec.fieldContext_ChainAddress_address(ctx, field)
+			case "id":
+				return ec.fieldContext_Wallet_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Wallet_dbid(ctx, field)
+			case "chainAddress":
+				return ec.fieldContext_Wallet_chainAddress(ctx, field)
 			case "chain":
-				return ec.fieldContext_ChainAddress_chain(ctx, field)
+				return ec.fieldContext_Wallet_chain(ctx, field)
+			case "walletType":
+				return ec.fieldContext_Wallet_walletType(ctx, field)
+			case "tokens":
+				return ec.fieldContext_Wallet_tokens(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type ChainAddress", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type Wallet", field.Name)
 		},
 	}
 	return fc, nil
@@ -18949,9 +18960,9 @@ func (ec *executionContext) _EnsProfileImage_profileImage(ctx context.Context, f
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(model.ProfileImage)
+	res := resTmp.(*model.HTTPSProfileImage)
 	fc.Result = res
-	return ec.marshalOProfileImage2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐProfileImage(ctx, field.Selections, res)
+	return ec.marshalOHTTPSProfileImage2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐHTTPSProfileImage(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_EnsProfileImage_profileImage(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -18961,7 +18972,11 @@ func (ec *executionContext) fieldContext_EnsProfileImage_profileImage(ctx contex
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type ProfileImage does not have child fields")
+			switch field.Name {
+			case "previewURLs":
+				return ec.fieldContext_HTTPSProfileImage_previewURLs(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type HTTPSProfileImage", field.Name)
 		},
 	}
 	return fc, nil
@@ -35361,8 +35376,8 @@ func (ec *executionContext) fieldContext_Query_ensProfileImageByUserId(ctx conte
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "chainAddress":
-				return ec.fieldContext_EnsProfileImage_chainAddress(ctx, field)
+			case "wallet":
+				return ec.fieldContext_EnsProfileImage_wallet(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_EnsProfileImage_profileImage(ctx, field)
 			}
@@ -53028,13 +53043,13 @@ func (ec *executionContext) _ProfileImage(ctx context.Context, sel ast.Selection
 			return graphql.Null
 		}
 		return ec._TokenProfileImage(ctx, sel, obj)
-	case model.HTTPSProfileImage:
-		return ec._HTTPSProfileImage(ctx, sel, &obj)
-	case *model.HTTPSProfileImage:
+	case model.EnsProfileImage:
+		return ec._EnsProfileImage(ctx, sel, &obj)
+	case *model.EnsProfileImage:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._HTTPSProfileImage(ctx, sel, obj)
+		return ec._EnsProfileImage(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -56463,7 +56478,7 @@ func (ec *executionContext) _EmailNotificationSettings(ctx context.Context, sel 
 	return out
 }
 
-var ensProfileImageImplementors = []string{"EnsProfileImage"}
+var ensProfileImageImplementors = []string{"EnsProfileImage", "ProfileImage"}
 
 func (ec *executionContext) _EnsProfileImage(ctx context.Context, sel ast.SelectionSet, obj *model.EnsProfileImage) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, ensProfileImageImplementors)
@@ -56473,13 +56488,23 @@ func (ec *executionContext) _EnsProfileImage(ctx context.Context, sel ast.Select
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("EnsProfileImage")
-		case "chainAddress":
+		case "wallet":
+			field := field
 
-			out.Values[i] = ec._EnsProfileImage_chainAddress(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._EnsProfileImage_wallet(ctx, field, obj)
+				return res
 			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "profileImage":
 
 			out.Values[i] = ec._EnsProfileImage_profileImage(ctx, field, obj)
@@ -58531,7 +58556,7 @@ func (ec *executionContext) _GroupNotificationUsersConnection(ctx context.Contex
 	return out
 }
 
-var hTTPSProfileImageImplementors = []string{"HTTPSProfileImage", "ProfileImage"}
+var hTTPSProfileImageImplementors = []string{"HTTPSProfileImage"}
 
 func (ec *executionContext) _HTTPSProfileImage(ctx context.Context, sel ast.SelectionSet, obj *model.HTTPSProfileImage) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, hTTPSProfileImageImplementors)
@@ -66816,6 +66841,13 @@ func (ec *executionContext) marshalOGroupNotificationUsersConnection2ᚖgithub�
 		return graphql.Null
 	}
 	return ec._GroupNotificationUsersConnection(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOHTTPSProfileImage2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐHTTPSProfileImage(ctx context.Context, sel ast.SelectionSet, v *model.HTTPSProfileImage) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._HTTPSProfileImage(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOInt2ᚕᚖint(ctx context.Context, v interface{}) ([]*int, error) {

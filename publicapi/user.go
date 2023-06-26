@@ -1463,9 +1463,8 @@ func (api UserAPI) GetProfileImageByUserID(ctx context.Context, userID persist.D
 }
 
 type EnsAvatar struct {
-	Address persist.Address
-	Chain   persist.Chain
-	URI     string
+	WalletID persist.DBID
+	URI      string
 }
 
 // GetEnsProfileImageByUserID returns the an ENS profile image for a user based on their set of wallets
@@ -1520,11 +1519,7 @@ func (api UserAPI) GetEnsProfileImageByUserID(ctx context.Context, userID persis
 			return a, err
 		}
 
-		return EnsAvatar{
-			Address: w.Address,
-			Chain:   w.Chain,
-			URI:     uri,
-		}, nil
+		return EnsAvatar{WalletID: w.ID, URI: uri}, nil
 	}
 
 	if len(errs) > 0 {

@@ -264,6 +264,11 @@ func (r *createCollectionPayloadResolver) FeedEvent(ctx context.Context, obj *mo
 	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
 }
 
+// Wallet is the resolver for the wallet field.
+func (r *ensProfileImageResolver) Wallet(ctx context.Context, obj *model.EnsProfileImage) (*model.Wallet, error) {
+	return resolveWalletByWalletID(ctx, obj.HelperEnsProfileImageData.WalletID)
+}
+
 // EventData is the resolver for the eventData field.
 func (r *feedEventResolver) EventData(ctx context.Context, obj *model.FeedEvent) (model.FeedEventData, error) {
 	return resolveFeedEventDataByEventID(ctx, obj.Dbid)
@@ -2082,10 +2087,8 @@ func (r *queryResolver) EnsProfileImageByUserID(ctx context.Context, userID pers
 	if err != nil {
 		return nil, err
 	}
-	return &model.EnsProfileImage{
-		ChainAddress: util.ToPointer(persist.NewChainAddress(a.Address, a.Chain)),
-		ProfileImage: &model.HTTPSProfileImage{PreviewURLs: previewURLs(ctx, a.URI, nil)},
-	}, nil
+	pfp := ensProfileImageToModel(ctx, a.WalletID, a.URI)
+	return &pfp, nil
 }
 
 // FeedEvent is the resolver for the feedEvent field.
@@ -2494,6 +2497,11 @@ func (r *Resolver) CreateCollectionPayload() generated.CreateCollectionPayloadRe
 	return &createCollectionPayloadResolver{r}
 }
 
+// EnsProfileImage returns generated.EnsProfileImageResolver implementation.
+func (r *Resolver) EnsProfileImage() generated.EnsProfileImageResolver {
+	return &ensProfileImageResolver{r}
+}
+
 // FeedEvent returns generated.FeedEventResolver implementation.
 func (r *Resolver) FeedEvent() generated.FeedEventResolver { return &feedEventResolver{r} }
 
@@ -2643,6 +2651,7 @@ type commentResolver struct{ *Resolver }
 type commentOnFeedEventPayloadResolver struct{ *Resolver }
 type communityResolver struct{ *Resolver }
 type createCollectionPayloadResolver struct{ *Resolver }
+type ensProfileImageResolver struct{ *Resolver }
 type feedEventResolver struct{ *Resolver }
 type followInfoResolver struct{ *Resolver }
 type followUserPayloadResolver struct{ *Resolver }
