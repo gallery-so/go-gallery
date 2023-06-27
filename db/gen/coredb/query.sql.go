@@ -1630,6 +1630,43 @@ func (q *Queries) GetCurrentTime(ctx context.Context) (time.Time, error) {
 	return column_1, err
 }
 
+const getEthereumWalletsForEnsProfileImagesByUserID = `-- name: GetEthereumWalletsForEnsProfileImagesByUserID :many
+select w.id, w.created_at, w.last_updated, w.deleted, w.version, w.address, w.wallet_type, w.chain
+from wallets w
+join users u on w.id = any(u.wallets)
+where u.id = $1 and w.chain = 0 and not w.deleted
+order by u.primary_wallet_id = w.id desc, w.id desc
+`
+
+func (q *Queries) GetEthereumWalletsForEnsProfileImagesByUserID(ctx context.Context, id persist.DBID) ([]Wallet, error) {
+	rows, err := q.db.Query(ctx, getEthereumWalletsForEnsProfileImagesByUserID, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Wallet
+	for rows.Next() {
+		var i Wallet
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Deleted,
+			&i.Version,
+			&i.Address,
+			&i.WalletType,
+			&i.Chain,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getEvent = `-- name: GetEvent :one
 SELECT id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id FROM events WHERE id = $1 AND deleted = false
 `

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -1474,28 +1473,14 @@ func (api UserAPI) GetEnsProfileImageByUserID(ctx context.Context, userID persis
 		return a, err
 	}
 
-	user, err := api.loaders.UserByUserID.Load(userID)
+	wallets, err := api.queries.GetEthereumWalletsForEnsProfileImagesByUserID(ctx, userID)
 	if err != nil {
 		return a, err
 	}
-
-	wallets, err := api.loaders.WalletsByUserID.Load(userID)
-	if err != nil {
-		return a, err
-	}
-
-	// Sort wallets by primary wallet first then by ID
-	sort.Slice(wallets, func(i, j int) bool {
-		return wallets[i].ID == user.PrimaryWalletID || wallets[i].ID < wallets[j].ID
-	})
 
 	errs := make([]error, 0)
 
 	for _, w := range wallets {
-		if w.Chain != persist.ChainETH {
-			continue
-		}
-
 		addr := persist.EthereumAddress(w.Address)
 
 		r, err := eth.EnsAvatarRecordFor(ctx, api.ethClient, addr)

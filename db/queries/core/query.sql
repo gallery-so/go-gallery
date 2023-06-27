@@ -139,6 +139,13 @@ SELECT w.* FROM users u, unnest(u.wallets) WITH ORDINALITY AS a(wallet_id, walle
 -- name: GetWalletsByUserIDBatch :batchmany
 SELECT w.* FROM users u, unnest(u.wallets) WITH ORDINALITY AS a(wallet_id, wallet_ord)INNER JOIN wallets w on w.id = a.wallet_id WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.wallet_ord;
 
+-- name: GetEthereumWalletsForEnsProfileImagesByUserID :many
+select w.*
+from wallets w
+join users u on w.id = any(u.wallets)
+where u.id = $1 and w.chain = 0 and not w.deleted
+order by u.primary_wallet_id = w.id desc, w.id desc;
+
 -- name: GetContractByID :one
 select * FROM contracts WHERE id = $1 AND deleted = false;
 
