@@ -752,7 +752,9 @@ func testTrendingFeedEvents(t *testing.T) {
 func testSyncNewTokens(t *testing.T) {
 	userF := newUserFixture(t)
 	provider := defaultStubProvider(userF.Wallet.Address)
-	h := handlerWithProviders(t, sendTokensNOOP, provider)
+	contract := multichain.ChainAgnosticContract{Address: "0x124", Descriptors: multichain.ChainAgnosticContractDescriptors{Name: "wow"}}
+	secondProvider := newStubProvider(withContractTokens(contract, userF.Wallet.Address, 10))
+	h := handlerWithProviders(t, sendTokensNOOP, provider, secondProvider)
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 	ctx := context.Background()
 
@@ -770,6 +772,13 @@ func testSyncNewTokens(t *testing.T) {
 		require.NoError(t, err)
 		payload := (*response.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
 		assert.Len(t, payload.Viewer.User.Tokens, len(provider.Tokens))
+	})
+
+	t.Run("should sync tokens from multiple chains", func(t *testing.T) {
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum, ChainOptimism})
+		require.NoError(t, err)
+		payload := (*response.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
+		assert.Len(t, payload.Viewer.User.Tokens, len(provider.Tokens)*2)
 	})
 }
 
@@ -1383,10 +1392,17 @@ func handlerWithProviders(t *testing.T, sendTokens multichain.SendTokens, provid
 
 // newMultichainProvider a new multichain provider configured with the given providers
 func newMultichainProvider(c *server.Clients, sendToken multichain.SendTokens, providers []any) multichain.Provider {
+	chains := map[persist.Chain][]any{}
+	if len(providers) > 1 {
+		chains[persist.ChainETH] = providers[:1]
+		chains[persist.ChainOptimism] = providers[1:]
+	} else {
+		chains[persist.ChainETH] = providers
+	}
 	return multichain.Provider{
 		Repos:      c.Repos,
 		Queries:    c.Queries,
-		Chains:     map[persist.Chain][]any{persist.ChainETH: providers},
+		Chains:     map[persist.Chain][]any{persist.ChainETH: providers, persist.ChainOptimism: providers},
 		SendTokens: sendToken,
 	}
 }
