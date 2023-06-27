@@ -20,6 +20,7 @@ import (
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -667,7 +668,7 @@ func metadataFromAsset(asset Asset) persist.TokenMetadata {
 		"animation_url": asset.AnimationOriginalURL,
 	}
 	// ENS
-	if asset.Contract.ContractAddress == util.ENSAddress {
+	if asset.Contract.ContractAddress == eth.EnsAddress {
 		m["background_image"] = fmt.Sprintf("https://metadata.ens.domains/mainnet/avatar/%s", asset.Name)
 	}
 	return m

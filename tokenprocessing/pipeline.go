@@ -49,29 +49,41 @@ func NewTokenProcessor(queries *coredb.Queries, ethClient *ethclient.Client, mc 
 }
 
 type tokenProcessingJob struct {
-	tp *tokenProcessor
-
-	id       persist.DBID
-	key      string
-	token    persist.TokenGallery
-	contract persist.ContractGallery
-
+	tp               *tokenProcessor
+	id               persist.DBID
+	key              string
+	token            persist.TokenGallery
+	contract         persist.ContractGallery
 	cause            persist.ProcessingCause
 	pipelineMetadata *persist.PipelineMetadata
+	// extraSourceKey is an extra key in the metadata that the pipeline should also process
+	extraSourceKey string
+	// extraSourceType is the type of the additional source
+	extraSourceType objectType
 }
 
-func (tp *tokenProcessor) ProcessTokenPipeline(c context.Context, t persist.TokenGallery, contract persist.ContractGallery, cause persist.ProcessingCause) (coredb.TokenMedia, error) {
+type PipelineOption func(*tokenProcessingJob)
 
+type PipelineOptions struct{}
+
+var PipelineOpts PipelineOptions
+
+func (PipelineOptions) WithExtraSourceKey(key string, o objectType) PipelineOption {
+	return func(j *tokenProcessingJob) {
+		j.extraSourceKey = key
+		j.extraSourceType = o
+	}
+}
+
+func (tp *tokenProcessor) ProcessTokenPipeline(c context.Context, t persist.TokenGallery, contract persist.ContractGallery, cause persist.ProcessingCause, opts ...PipelineOption) (coredb.TokenMedia, error) {
 	runID := persist.GenerateID()
 
 	job := &tokenProcessingJob{
-		id: runID,
-
-		tp:       tp,
-		key:      persist.NewTokenIdentifiers(contract.Address, t.TokenID, t.Chain).String(),
-		token:    t,
-		contract: contract,
-
+		id:               runID,
+		tp:               tp,
+		key:              persist.NewTokenIdentifiers(contract.Address, t.TokenID, t.Chain).String(),
+		token:            t,
+		contract:         contract,
 		cause:            cause,
 		pipelineMetadata: new(persist.PipelineMetadata),
 	}
@@ -249,10 +261,10 @@ func (tpj *tokenProcessingJob) cacheMediaObjects(ctx context.Context, metadata p
 	)
 
 	if animURL != "" {
-		animCh = cacheAnimationObjects(ctx, animURL, metadata, tpj)
+		animCh = cacheAnimationObjects(ctx, animURL, tpj)
 	}
 	if imgURL != "" {
-		imgCh = cacheImageObjects(ctx, imgURL, metadata, tpj)
+		imgCh = cacheImageObjects(ctx, imgURL, tpj)
 	}
 
 	if animCh != nil {

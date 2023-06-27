@@ -20,6 +20,7 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	colorful "github.com/lucasb-eyer/go-colorful"
 	"github.com/mikeydub/go-gallery/contracts"
+	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -30,7 +31,7 @@ import (
 var uniqueMetadataHandlers = uniqueMetadatas{
 	persist.EthereumAddress("0xd4e4078ca3495de5b1d4db434bebc5a986197782"): autoglyphs,
 	persist.EthereumAddress("0x60f3680350f65beb2752788cb48abfce84a4759e"): colorglyphs,
-	persist.EthereumAddress(util.ENSAddress):                              ens,
+	persist.EthereumAddress(eth.EnsAddress):                               ens,
 	persist.EthereumAddress("0xb47e3cd837ddf8e4c57f05d70ab865de6e193bbb"): cryptopunks,
 	persist.EthereumAddress("0xabefbc9fd2f806065b4f3c237d4b59d9a97bcac7"): zora,
 }

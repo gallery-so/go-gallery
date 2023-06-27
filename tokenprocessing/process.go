@@ -128,7 +128,9 @@ func processMediaForToken(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRe
 			return
 		}
 
-		_, err = tp.ProcessTokenPipeline(reqCtx, token, contract, persist.ProcessingCauseRefresh)
+		_, err = tp.ProcessTokenPipeline(reqCtx, token, contract, persist.ProcessingCauseRefresh,
+			addPipelineRunOptions(contract)...,
+		)
 		if err != nil {
 			if util.ErrorAs[ErrBadToken](err) {
 				util.ErrResponse(c, http.StatusUnprocessableEntity, err)
@@ -241,4 +243,9 @@ func detectSpamContracts(queries *coredb.Queries) gin.HandlerFunc {
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
+}
+
+func addPipelineRunOptions(contract persist.ContractGallery) []PipelineOption {
+	opts := []PipelineOption{}
+	return opts
 }

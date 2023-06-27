@@ -121,7 +121,7 @@ type cachePipelineMetadata struct {
 	LiveRenderGCP                *persist.PipelineStepStatus
 }
 
-func cacheImageObjects(ctx context.Context, imageURL media.ImageURL, metadata persist.TokenMetadata, job *tokenProcessingJob) chan cacheResult {
+func cacheImageObjects(ctx context.Context, imageURL media.ImageURL, job *tokenProcessingJob) chan cacheResult {
 	tids := persist.NewTokenIdentifiers(job.contract.Address, job.token.TokenID, job.token.Chain)
 	runMetadata := &cachePipelineMetadata{
 		ContentHeaderValueRetrieval:  &job.pipelineMetadata.ImageContentHeaderValueRetrieval,
@@ -137,7 +137,7 @@ func cacheImageObjects(ctx context.Context, imageURL media.ImageURL, metadata pe
 	return asyncCacheObjectsForURL(ctx, tids, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, objectTypeImage, string(imageURL), job.tp.tokenBucket, runMetadata)
 }
 
-func cacheAnimationObjects(ctx context.Context, animationURL media.AnimationURL, metadata persist.TokenMetadata, job *tokenProcessingJob) chan cacheResult {
+func cacheAnimationObjects(ctx context.Context, animationURL media.AnimationURL, job *tokenProcessingJob) chan cacheResult {
 	tids := persist.NewTokenIdentifiers(job.contract.Address, job.token.TokenID, job.token.Chain)
 	runMetadata := &cachePipelineMetadata{
 		ContentHeaderValueRetrieval:  &job.pipelineMetadata.AnimationContentHeaderValueRetrieval,
