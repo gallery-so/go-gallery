@@ -576,29 +576,30 @@ type ComplexityRoot struct {
 	}
 
 	GalleryUser struct {
-		Badges              func(childComplexity int) int
-		Bio                 func(childComplexity int) int
-		CreatedCommunities  func(childComplexity int, input model.CreatedCommunitiesInput, before *string, after *string, first *int, last *int) int
-		Dbid                func(childComplexity int) int
-		FeaturedGallery     func(childComplexity int) int
-		Feed                func(childComplexity int, before *string, after *string, first *int, last *int) int
-		Followers           func(childComplexity int) int
-		Following           func(childComplexity int) int
-		Galleries           func(childComplexity int) int
-		ID                  func(childComplexity int) int
-		IsAuthenticatedUser func(childComplexity int) int
-		PrimaryWallet       func(childComplexity int) int
-		ProfileImage        func(childComplexity int) int
-		Roles               func(childComplexity int) int
-		SharedCommunities   func(childComplexity int, before *string, after *string, first *int, last *int) int
-		SharedFollowers     func(childComplexity int, before *string, after *string, first *int, last *int) int
-		SocialAccounts      func(childComplexity int) int
-		Tokens              func(childComplexity int, ownershipFilter []persist.TokenOwnershipType) int
-		TokensByChain       func(childComplexity int, chain persist.Chain) int
-		Traits              func(childComplexity int) int
-		Universal           func(childComplexity int) int
-		Username            func(childComplexity int) int
-		Wallets             func(childComplexity int) int
+		Badges                   func(childComplexity int) int
+		Bio                      func(childComplexity int) int
+		CreatedCommunities       func(childComplexity int, input model.CreatedCommunitiesInput, before *string, after *string, first *int, last *int) int
+		Dbid                     func(childComplexity int) int
+		FeaturedGallery          func(childComplexity int) int
+		Feed                     func(childComplexity int, before *string, after *string, first *int, last *int) int
+		Followers                func(childComplexity int) int
+		Following                func(childComplexity int) int
+		Galleries                func(childComplexity int) int
+		ID                       func(childComplexity int) int
+		IsAuthenticatedUser      func(childComplexity int) int
+		PotentialEnsProfileImage func(childComplexity int) int
+		PrimaryWallet            func(childComplexity int) int
+		ProfileImage             func(childComplexity int) int
+		Roles                    func(childComplexity int) int
+		SharedCommunities        func(childComplexity int, before *string, after *string, first *int, last *int) int
+		SharedFollowers          func(childComplexity int, before *string, after *string, first *int, last *int) int
+		SocialAccounts           func(childComplexity int) int
+		Tokens                   func(childComplexity int, ownershipFilter []persist.TokenOwnershipType) int
+		TokensByChain            func(childComplexity int, chain persist.Chain) int
+		Traits                   func(childComplexity int) int
+		Universal                func(childComplexity int) int
+		Username                 func(childComplexity int) int
+		Wallets                  func(childComplexity int) int
 	}
 
 	GenerateQRCodeLoginTokenPayload struct {
@@ -850,7 +851,6 @@ type ComplexityRoot struct {
 		CollectionTokenByID        func(childComplexity int, tokenID persist.DBID, collectionID persist.DBID) int
 		CollectionsByIds           func(childComplexity int, ids []persist.DBID) int
 		CommunityByAddress         func(childComplexity int, communityAddress persist.ChainAddress, forceRefresh *bool) int
-		EnsProfileImageByUserID    func(childComplexity int, userID persist.DBID) int
 		FeedEventByID              func(childComplexity int, id persist.DBID) int
 		GalleryByID                func(childComplexity int, id persist.DBID) int
 		GalleryOfTheWeekWinners    func(childComplexity int) int
@@ -1439,6 +1439,7 @@ type GalleryUpdatedFeedEventDataResolver interface {
 }
 type GalleryUserResolver interface {
 	ProfileImage(ctx context.Context, obj *model.GalleryUser) (model.ProfileImage, error)
+	PotentialEnsProfileImage(ctx context.Context, obj *model.GalleryUser) (*model.EnsProfileImage, error)
 
 	Roles(ctx context.Context, obj *model.GalleryUser) ([]*persist.Role, error)
 	SocialAccounts(ctx context.Context, obj *model.GalleryUser) (*model.SocialAccounts, error)
@@ -1561,7 +1562,6 @@ type QueryResolver interface {
 	SocialConnections(ctx context.Context, socialAccountType persist.SocialProvider, excludeAlreadyFollowing *bool, before *string, after *string, first *int, last *int) (*model.SocialConnectionsConnection, error)
 	SocialQueries(ctx context.Context) (model.SocialQueriesOrError, error)
 	TopCollectionsForCommunity(ctx context.Context, input model.TopCollectionsForCommunityInput, before *string, after *string, first *int, last *int) (*model.CollectionsConnection, error)
-	EnsProfileImageByUserID(ctx context.Context, userID persist.DBID) (*model.EnsProfileImage, error)
 }
 type RemoveAdmirePayloadResolver interface {
 	FeedEvent(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.FeedEvent, error)
@@ -3398,6 +3398,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.GalleryUser.IsAuthenticatedUser(childComplexity), true
 
+	case "GalleryUser.potentialEnsProfileImage":
+		if e.complexity.GalleryUser.PotentialEnsProfileImage == nil {
+			break
+		}
+
+		return e.complexity.GalleryUser.PotentialEnsProfileImage(childComplexity), true
+
 	case "GalleryUser.primaryWallet":
 		if e.complexity.GalleryUser.PrimaryWallet == nil {
 			break
@@ -4984,18 +4991,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.CommunityByAddress(childComplexity, args["communityAddress"].(persist.ChainAddress), args["forceRefresh"].(*bool)), true
-
-	case "Query.ensProfileImageByUserId":
-		if e.complexity.Query.EnsProfileImageByUserID == nil {
-			break
-		}
-
-		args, err := ec.field_Query_ensProfileImageByUserId_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Query.EnsProfileImageByUserID(childComplexity, args["userId"].(persist.DBID)), true
 
 	case "Query.feedEventById":
 		if e.complexity.Query.FeedEventByID == nil {
@@ -7082,6 +7077,7 @@ type GalleryUser implements Node @goEmbedHelper {
   dbid: DBID!
   username: String
   profileImage: ProfileImage @goField(forceResolver: true)
+  potentialEnsProfileImage: EnsProfileImage @goField(forceResolver: true)
   bio: String
   traits: String
   universal: Boolean
@@ -8160,10 +8156,6 @@ type Query {
     first: Int
     last: Int
   ): CollectionsConnection
-  """
-  Returns a profile image from one of the user's wallets if the wallet is registered with ENS and has an avatar record set
-  """
-  ensProfileImageByUserId(userId: DBID!): EnsProfileImage
 }
 
 type SocialQueries {
@@ -11050,21 +11042,6 @@ func (ec *executionContext) field_Query_communityByAddress_args(ctx context.Cont
 	return args, nil
 }
 
-func (ec *executionContext) field_Query_ensProfileImageByUserId_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 persist.DBID
-	if tmp, ok := rawArgs["userId"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userId"))
-		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["userId"] = arg0
-	return args, nil
-}
-
 func (ec *executionContext) field_Query_feedEventById_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -12125,6 +12102,8 @@ func (ec *executionContext) fieldContext_AdminAddWalletPayload_user(ctx context.
 				return ec.fieldContext_GalleryUser_username(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -12384,6 +12363,8 @@ func (ec *executionContext) fieldContext_Admire_admirer(ctx context.Context, fie
 				return ec.fieldContext_GalleryUser_username(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -13160,6 +13141,8 @@ func (ec *executionContext) fieldContext_BanUserFromFeedPayload_user(ctx context
 				return ec.fieldContext_GalleryUser_username(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -14055,6 +14038,8 @@ func (ec *executionContext) fieldContext_CollectionCreatedFeedEventData_owner(ct
 				return ec.fieldContext_GalleryUser_username(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -14982,6 +14967,8 @@ func (ec *executionContext) fieldContext_CollectionUpdatedFeedEventData_owner(ct
 				return ec.fieldContext_GalleryUser_username(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -15411,6 +15398,8 @@ func (ec *executionContext) fieldContext_CollectorsNoteAddedToCollectionFeedEven
 				return ec.fieldContext_GalleryUser_username(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -15684,6 +15673,8 @@ func (ec *executionContext) fieldContext_CollectorsNoteAddedToTokenFeedEventData
 				return ec.fieldContext_GalleryUser_username(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -16133,6 +16124,8 @@ func (ec *executionContext) fieldContext_Comment_commenter(ctx context.Context, 
 				return ec.fieldContext_GalleryUser_username(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -21837,6 +21830,8 @@ func (ec *executionContext) fieldContext_FollowInfo_user(ctx context.Context, fi
 				return ec.fieldContext_GalleryUser_username(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -22030,6 +22025,8 @@ func (ec *executionContext) fieldContext_FollowUserPayload_user(ctx context.Cont
 				return ec.fieldContext_GalleryUser_username(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -22767,6 +22764,8 @@ func (ec *executionContext) fieldContext_Gallery_owner(ctx context.Context, fiel
 				return ec.fieldContext_GalleryUser_username(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -22958,6 +22957,8 @@ func (ec *executionContext) fieldContext_GalleryInfoUpdatedFeedEventData_owner(c
 				return ec.fieldContext_GalleryUser_username(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -23272,6 +23273,8 @@ func (ec *executionContext) fieldContext_GalleryUpdatedFeedEventData_owner(ctx c
 				return ec.fieldContext_GalleryUser_username(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -23707,6 +23710,53 @@ func (ec *executionContext) fieldContext_GalleryUser_profileImage(ctx context.Co
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type ProfileImage does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GalleryUser_potentialEnsProfileImage(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.GalleryUser().PotentialEnsProfileImage(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.EnsProfileImage)
+	fc.Result = res
+	return ec.marshalOEnsProfileImage2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐEnsProfileImage(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_GalleryUser_potentialEnsProfileImage(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GalleryUser",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "wallet":
+				return ec.fieldContext_EnsProfileImage_wallet(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_EnsProfileImage_profileImage(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type EnsProfileImage", field.Name)
 		},
 	}
 	return fc, nil
@@ -24453,6 +24503,8 @@ func (ec *executionContext) fieldContext_GalleryUser_followers(ctx context.Conte
 				return ec.fieldContext_GalleryUser_username(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -24542,6 +24594,8 @@ func (ec *executionContext) fieldContext_GalleryUser_following(ctx context.Conte
 				return ec.fieldContext_GalleryUser_username(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -25225,6 +25279,8 @@ func (ec *executionContext) fieldContext_GroupNotificationUserEdge_node(ctx cont
 				return ec.fieldContext_GalleryUser_username(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -34015,6 +34071,8 @@ func (ec *executionContext) fieldContext_Query_usersWithTrait(ctx context.Contex
 				return ec.fieldContext_GalleryUser_username(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -34488,6 +34546,8 @@ func (ec *executionContext) fieldContext_Query_galleryOfTheWeekWinners(ctx conte
 				return ec.fieldContext_GalleryUser_username(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -35334,64 +35394,6 @@ func (ec *executionContext) fieldContext_Query_topCollectionsForCommunity(ctx co
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_topCollectionsForCommunity_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Query_ensProfileImageByUserId(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Query_ensProfileImageByUserId(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().EnsProfileImageByUserID(rctx, fc.Args["userId"].(persist.DBID))
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.EnsProfileImage)
-	fc.Result = res
-	return ec.marshalOEnsProfileImage2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐEnsProfileImage(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Query_ensProfileImageByUserId(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "wallet":
-				return ec.fieldContext_EnsProfileImage_wallet(ctx, field)
-			case "profileImage":
-				return ec.fieldContext_EnsProfileImage_profileImage(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type EnsProfileImage", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_ensProfileImageByUserId_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return
 	}
@@ -36626,6 +36628,8 @@ func (ec *executionContext) fieldContext_SetCommunityOverrideCreatorPayload_user
 				return ec.fieldContext_GalleryUser_username(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -36974,6 +36978,8 @@ func (ec *executionContext) fieldContext_SocialConnection_galleryUser(ctx contex
 				return ec.fieldContext_GalleryUser_username(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -40702,6 +40708,8 @@ func (ec *executionContext) fieldContext_Token_owner(ctx context.Context, field 
 				return ec.fieldContext_GalleryUser_username(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -41687,6 +41695,8 @@ func (ec *executionContext) fieldContext_TokenHolder_user(ctx context.Context, f
 				return ec.fieldContext_GalleryUser_username(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -42155,6 +42165,8 @@ func (ec *executionContext) fieldContext_TokensAddedToCollectionFeedEventData_ow
 				return ec.fieldContext_GalleryUser_username(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -42543,6 +42555,8 @@ func (ec *executionContext) fieldContext_TrendingUsersPayload_users(ctx context.
 				return ec.fieldContext_GalleryUser_username(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -42896,6 +42910,8 @@ func (ec *executionContext) fieldContext_UnbanUserFromFeedPayload_user(ctx conte
 				return ec.fieldContext_GalleryUser_username(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -43048,6 +43064,8 @@ func (ec *executionContext) fieldContext_UnfollowUserPayload_user(ctx context.Co
 				return ec.fieldContext_GalleryUser_username(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -44712,6 +44730,8 @@ func (ec *executionContext) fieldContext_UserCreatedFeedEventData_owner(ctx cont
 				return ec.fieldContext_GalleryUser_username(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -44842,6 +44862,8 @@ func (ec *executionContext) fieldContext_UserEdge_node(ctx context.Context, fiel
 				return ec.fieldContext_GalleryUser_username(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -45230,6 +45252,8 @@ func (ec *executionContext) fieldContext_UserFollowedUsersFeedEventData_owner(ct
 				return ec.fieldContext_GalleryUser_username(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -45407,6 +45431,8 @@ func (ec *executionContext) fieldContext_UserSearchResult_user(ctx context.Conte
 				return ec.fieldContext_GalleryUser_username(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -46246,6 +46272,8 @@ func (ec *executionContext) fieldContext_Viewer_user(ctx context.Context, field 
 				return ec.fieldContext_GalleryUser_username(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
 			case "bio":
 				return ec.fieldContext_GalleryUser_bio(ctx, field)
 			case "traits":
@@ -58143,6 +58171,23 @@ func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionS
 				return innerFunc(ctx)
 
 			})
+		case "potentialEnsProfileImage":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._GalleryUser_potentialEnsProfileImage(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "bio":
 
 			out.Values[i] = ec._GalleryUser_bio(ctx, field, obj)
@@ -60439,26 +60484,6 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_topCollectionsForCommunity(ctx, field)
-				return res
-			}
-
-			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
-			}
-
-			out.Concurrently(i, func() graphql.Marshaler {
-				return rrm(innerCtx)
-			})
-		case "ensProfileImageByUserId":
-			field := field
-
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Query_ensProfileImageByUserId(ctx, field)
 				return res
 			}
 

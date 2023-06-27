@@ -87,6 +87,7 @@ type GalleryUser implements Node @goEmbedHelper {
   dbid: DBID!
   username: String
   profileImage: ProfileImage @goField(forceResolver: true)
+  potentialEnsProfileImage: EnsProfileImage @goField(forceResolver: true)
   bio: String
   traits: String
   universal: Boolean
@@ -1165,10 +1166,6 @@ type Query {
     first: Int
     last: Int
   ): CollectionsConnection
-  """
-  Returns a profile image from one of the user's wallets if the wallet is registered with ENS and has an avatar record set
-  """
-  ensProfileImageByUserId(userId: DBID!): EnsProfileImage
 }
 
 type SocialQueries {

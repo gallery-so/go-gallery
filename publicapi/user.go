@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -1470,27 +1469,18 @@ type EnsAvatar struct {
 // GetEnsProfileImageByUserID returns the an ENS profile image for a user based on their set of wallets
 func (api UserAPI) GetEnsProfileImageByUserID(ctx context.Context, userID persist.DBID) (a EnsAvatar, err error) {
 	// Validate
-	user, err := api.GetUserById(ctx, userID)
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{"userID": {userID, "required"}}); err != nil {
+		return a, err
+	}
+
+	wallets, err := api.queries.GetEthereumWalletsForEnsProfileImagesByUserID(ctx, userID)
 	if err != nil {
 		return a, err
 	}
 
-	if len(user.Wallets) == 0 {
-		return a, nil
-	}
-
-	// Sort wallets by primary wallet first then by ID
-	sort.Slice(user.Wallets, func(i, j int) bool {
-		return user.Wallets[i].ID == user.PrimaryWalletID || user.Wallets[i].ID < user.Wallets[j].ID
-	})
-
 	errs := make([]error, 0)
 
-	for _, w := range user.Wallets {
-		if w.Chain != persist.ChainETH {
-			continue
-		}
-
+	for _, w := range wallets {
 		addr := persist.EthereumAddress(w.Address)
 
 		r, err := eth.EnsAvatarRecordFor(ctx, api.ethClient, addr)
