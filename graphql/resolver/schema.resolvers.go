@@ -430,6 +430,16 @@ func (r *galleryUserResolver) ProfileImage(ctx context.Context, obj *model.Galle
 	return profileImageToModel(ctx, pfp)
 }
 
+// PotentialEnsProfileImage is the resolver for the potentialEnsProfileImage field.
+func (r *galleryUserResolver) PotentialEnsProfileImage(ctx context.Context, obj *model.GalleryUser) (*model.EnsProfileImage, error) {
+	a, err := publicapi.For(ctx).User.GetEnsProfileImageByUserID(ctx, obj.Dbid)
+	if err != nil {
+		return nil, err
+	}
+	pfp := ensProfileImageToModel(ctx, a.WalletID, a.URI)
+	return &pfp, nil
+}
+
 // Roles is the resolver for the roles field.
 func (r *galleryUserResolver) Roles(ctx context.Context, obj *model.GalleryUser) ([]*persist.Role, error) {
 	dbRoles, err := publicapi.For(ctx).User.GetUserRolesByUserID(ctx, obj.Dbid)
@@ -2079,16 +2089,6 @@ func (r *queryResolver) TopCollectionsForCommunity(ctx context.Context, input mo
 		Edges:    edges,
 		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}, nil
-}
-
-// EnsProfileImageByUserID is the resolver for the ensProfileImageByUserId field.
-func (r *queryResolver) EnsProfileImageByUserID(ctx context.Context, userID persist.DBID) (*model.EnsProfileImage, error) {
-	a, err := publicapi.For(ctx).User.GetEnsProfileImageByUserID(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	pfp := ensProfileImageToModel(ctx, a.WalletID, a.URI)
-	return &pfp, nil
 }
 
 // FeedEvent is the resolver for the feedEvent field.

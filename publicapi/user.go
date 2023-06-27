@@ -1470,23 +1470,28 @@ type EnsAvatar struct {
 // GetEnsProfileImageByUserID returns the an ENS profile image for a user based on their set of wallets
 func (api UserAPI) GetEnsProfileImageByUserID(ctx context.Context, userID persist.DBID) (a EnsAvatar, err error) {
 	// Validate
-	user, err := api.GetUserById(ctx, userID)
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{"userID": {userID, "required"}}); err != nil {
+		return a, err
+	}
+
+	user, err := api.loaders.UserByUserID.Load(userID)
 	if err != nil {
 		return a, err
 	}
 
-	if len(user.Wallets) == 0 {
-		return a, nil
+	wallets, err := api.loaders.WalletsByUserID.Load(userID)
+	if err != nil {
+		return a, err
 	}
 
 	// Sort wallets by primary wallet first then by ID
-	sort.Slice(user.Wallets, func(i, j int) bool {
-		return user.Wallets[i].ID == user.PrimaryWalletID || user.Wallets[i].ID < user.Wallets[j].ID
+	sort.Slice(wallets, func(i, j int) bool {
+		return wallets[i].ID == user.PrimaryWalletID || wallets[i].ID < wallets[j].ID
 	})
 
 	errs := make([]error, 0)
 
-	for _, w := range user.Wallets {
+	for _, w := range wallets {
 		if w.Chain != persist.ChainETH {
 			continue
 		}
