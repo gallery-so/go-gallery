@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/everFinance/goar"
@@ -16,7 +17,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/recommend"
-	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/tokenprocessing"
 	"github.com/mikeydub/go-gallery/util"
@@ -91,6 +91,24 @@ func withContractTokens(contract multichain.ChainAgnosticContract, ownerAddress 
 		}
 		withContracts([]multichain.ChainAgnosticContract{contract})(p)
 		withTokens(tokens)(p)
+	}
+}
+
+// withContractToken will generate a token with the provided token ID
+func withContractToken(contract multichain.ChainAgnosticContract, ownerAddress string, tokenID int) providerOpt {
+	return func(p *stubProvider) {
+		withContracts([]multichain.ChainAgnosticContract{contract})(p)
+		withTokens([]multichain.ChainAgnosticToken{
+			{
+				Descriptors: multichain.ChainAgnosticTokenDescriptors{
+					Name: fmt.Sprintf("%s_testToken%d", contract.Descriptors.Name, tokenID),
+				},
+				TokenID:         persist.TokenID(fmt.Sprintf("%X", tokenID)),
+				Quantity:        "1",
+				ContractAddress: contract.Address,
+				OwnerAddress:    persist.Address(ownerAddress),
+			},
+		})(p)
 	}
 }
 
@@ -173,7 +191,15 @@ func fetchMetadataFromDummyMetadata(url, endpoint string, ipfsClient *shell.Shel
 		return nil, err
 	}
 
-	return rpc.GetMetadataFromURI(context.Background(), persist.TokenURI(body), ipfsClient, arweaveClient)
+	// Don't try to JSON parse base64 encoded data
+	if strings.Contains(string(body), "base64") {
+		return persist.TokenMetadata{"image_url": string(body)}, nil
+	}
+
+	var meta persist.TokenMetadata
+	err = json.Unmarshal(body, &meta)
+
+	return meta, err
 }
 
 // fetchFromDummyEndpoint fetches metadata from the given endpoint

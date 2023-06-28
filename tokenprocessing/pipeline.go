@@ -305,10 +305,8 @@ func (tpj *tokenProcessingJob) cacheMediaObjects(ctx context.Context, metadata p
 	// We somehow didn't cache media without getting an error anywhere
 	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.NothingCachedWithoutErrors, "NothingCachedWithoutErrors")
 	defer traceCallback()
-	logger.For(ctx).Fatal("failed to cache media, and no error occurred in the process")
 
-	tid := persist.NewTokenIdentifiers(tpj.contract.Address, tpj.token.TokenID, tpj.token.Chain)
-	return persist.Media{MediaType: persist.MediaTypeUnknown}, errNoCachedObjects{tid}
+	panic("failed to cache media, and no error occurred in the process")
 }
 
 func (tpj *tokenProcessingJob) createMediaFromCachedObjects(ctx context.Context, objects []cachedMediaObject) persist.Media {

@@ -753,12 +753,12 @@ func testSyncNewTokens(t *testing.T) {
 	userF := newUserFixture(t)
 	provider := defaultStubProvider(userF.Wallet.Address)
 	contract := multichain.ChainAgnosticContract{Address: "0x124", Descriptors: multichain.ChainAgnosticContractDescriptors{Name: "wow"}}
-	secondProvider := newStubProvider(withContractTokens(contract, userF.Wallet.Address, 10))
-	h := handlerWithProviders(t, sendTokensNOOP, provider, secondProvider)
-	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 	ctx := context.Background()
 
 	t.Run("should sync new tokens", func(t *testing.T) {
+		h := handlerWithProviders(t, sendTokensNOOP, provider)
+		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
 
 		require.NoError(t, err)
@@ -767,6 +767,9 @@ func testSyncNewTokens(t *testing.T) {
 	})
 
 	t.Run("should not duplicate tokens from repeat syncs", func(t *testing.T) {
+		h := handlerWithProviders(t, sendTokensNOOP, provider)
+		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
 
 		require.NoError(t, err)
@@ -775,6 +778,10 @@ func testSyncNewTokens(t *testing.T) {
 	})
 
 	t.Run("should sync tokens from multiple chains", func(t *testing.T) {
+		secondProvider := newStubProvider(withContractTokens(contract, userF.Wallet.Address, 10))
+		h := handlerWithProviders(t, sendTokensNOOP, provider, secondProvider)
+		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum, ChainOptimism})
 		require.NoError(t, err)
 		payload := (*response.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
@@ -884,22 +891,27 @@ func testSyncShouldMergeDuplicatesAcrossProviders(t *testing.T) {
 func testSyncShouldProcessMedia(t *testing.T) {
 	metadataServer := newMetadataServerFixture(t)
 
+	startTokenID := 0
+
 	patchMetadata := func(t *testing.T, ctx context.Context, address, endpoint string) http.Handler {
 		contract := multichain.ChainAgnosticContract{Address: "0x123", Descriptors: multichain.ChainAgnosticContractDescriptors{
 			Name: "testContract",
 		}}
 		clients := server.ClientInit(ctx)
 		provider := newStubProvider(
-			withContractTokens(contract, address, 1),
+			withContractToken(contract, address, startTokenID),
 			withFetchMetadata(fetchFromDummyEndpoint(metadataServer.URL, endpoint, clients.IPFSClient, clients.ArweaveClient)),
 		)
 		mc := newMultichainProvider(clients, sendTokensNOOP, []any{provider})
-		t.Cleanup(clients.Close)
+		t.Cleanup(func() {
+			clients.Close()
+			// Change the token ID so that the next test doesn't conflict with the token generated from the previous test
+			startTokenID++
+		})
 		return handlerWithProviders(t, sendTokensToTokenProcessing(clients, &mc), provider)
 	}
 
 	t.Run("should process image", func(t *testing.T) {
-		t.Skip("skip until after migration when token resolvers use v3 media")
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/image")
@@ -914,7 +926,6 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	})
 
 	t.Run("should process video", func(t *testing.T) {
-		t.Skip("skip until after migration when token resolvers use v3 media")
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/video")
@@ -929,7 +940,6 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	})
 
 	t.Run("should process iframe", func(t *testing.T) {
-		t.Skip("skip until after migration when token resolvers use v3 media")
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/iframe")
@@ -944,7 +954,6 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	})
 
 	t.Run("should process gif", func(t *testing.T) {
-		t.Skip("skip until after migration when token resolvers use v3 media")
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/gif")
@@ -959,7 +968,6 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	})
 
 	t.Run("should process bad metadata", func(t *testing.T) {
-		t.Skip("skip until after migration when token resolvers use v3 media")
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/bad")
@@ -973,7 +981,6 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	})
 
 	t.Run("should process missing metadata", func(t *testing.T) {
-		t.Skip("skip until after migration when token resolvers use v3 media")
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/notfound")
@@ -987,7 +994,6 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	})
 
 	t.Run("should process bad media", func(t *testing.T) {
-		t.Skip("skip until after migration when token resolvers use v3 media")
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/media/bad")
@@ -1001,7 +1007,6 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	})
 
 	t.Run("should process missing media", func(t *testing.T) {
-		t.Skip("skip until after migration when token resolvers use v3 media")
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/media/notfound")
@@ -1015,7 +1020,6 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	})
 
 	t.Run("should process svg", func(t *testing.T) {
-		t.Skip("skip until after migration when token resolvers use v3 media")
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/svg")
@@ -1030,7 +1034,6 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	})
 
 	t.Run("should process base64 encoded svg", func(t *testing.T) {
-		t.Skip("skip until after migration when token resolvers use v3 media")
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/base64svg")
@@ -1045,7 +1048,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	})
 
 	t.Run("should process base64 encoded metadata", func(t *testing.T) {
-		t.Skip("skip until after migration when token resolvers use v3 media")
+		t.Skip("base64 encoded metadata is not yet supported, pipeline see this as a JSON mediatype")
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/base64")
@@ -1060,7 +1063,6 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	})
 
 	t.Run("should process ipfs", func(t *testing.T) {
-		t.Skip("skip until after migration when token resolvers use v3 media")
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/media/ipfs")
@@ -1075,7 +1077,6 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	})
 
 	t.Run("should process bad dns", func(t *testing.T) {
-		t.Skip("skip until after migration when token resolvers use v3 media")
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/media/dnsbad")
@@ -1089,7 +1090,6 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	})
 
 	t.Run("should process different keyword", func(t *testing.T) {
-		t.Skip("skip until after migration when token resolvers use v3 media")
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/differentkeyword")
@@ -1104,7 +1104,6 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	})
 
 	t.Run("should process wrong keyword", func(t *testing.T) {
-		t.Skip("skip until after migration when token resolvers use v3 media")
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/wrongkeyword")
@@ -1119,7 +1118,6 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	})
 
 	t.Run("should process animation", func(t *testing.T) {
-		t.Skip("skip until after migration when token resolvers use v3 media")
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/animation")
@@ -1134,7 +1132,6 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	})
 
 	t.Run("should process pdf", func(t *testing.T) {
-		t.Skip("skip until after migration when token resolvers use v3 media")
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/pdf")
@@ -1149,7 +1146,6 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	})
 
 	t.Run("should process text", func(t *testing.T) {
-		t.Skip("skip until after migration when token resolvers use v3 media")
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/text")
@@ -1164,7 +1160,6 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	})
 
 	t.Run("should process bad image", func(t *testing.T) {
-		t.Skip("skip until after migration when token resolvers use v3 media")
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/badimage")

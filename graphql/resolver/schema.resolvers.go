@@ -6,7 +6,6 @@ package graphql
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/99designs/gqlgen/graphql"
@@ -2202,9 +2201,9 @@ func (r *tokenResolver) Media(ctx context.Context, obj *model.Token) (model.Medi
 	tokenMedia, err := publicapi.For(ctx).Token.MediaByTokenID(ctx, obj.Dbid)
 	if err != nil {
 		// If we have no media, just return the fallback media
-		var noMediaErr persist.ErrMediaNotFound
-		if errors.As(err, &noMediaErr) {
-			return mediaToModel(ctx, tokenMedia, obj.HelperTokenData.Token.FallbackMedia, highDef), nil
+		if util.ErrorAs[persist.ErrMediaNotFound](err) {
+			invalidMedia := coredb.TokenMedia{Media: persist.Media{MediaType: persist.MediaTypeInvalid}}
+			return mediaToModel(ctx, invalidMedia, obj.HelperTokenData.Token.FallbackMedia, highDef), nil
 		}
 		return nil, err
 	}
