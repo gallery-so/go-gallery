@@ -87,6 +87,7 @@ func testGraphQL(t *testing.T) {
 func testTokenSyncs(t *testing.T) {
 	tests := []testCase{
 		{title: "should sync new tokens", run: testSyncNewTokens},
+		{title: "should sync new tokens multichain", run: testSyncNewTokensMultichain},
 		{title: "should submit new tokens to tokenprocessing", run: testSyncOnlySubmitsNewTokens},
 		{title: "should not submit old tokens to tokenprocessing", run: testSyncSkipsSubmittingOldTokens},
 		{title: "should delete old tokens", run: testSyncDeletesOldTokens},
@@ -752,7 +753,6 @@ func testTrendingFeedEvents(t *testing.T) {
 func testSyncNewTokens(t *testing.T) {
 	userF := newUserFixture(t)
 	provider := defaultStubProvider(userF.Wallet.Address)
-	contract := multichain.ChainAgnosticContract{Address: "0x124", Descriptors: multichain.ChainAgnosticContractDescriptors{Name: "wow"}}
 	ctx := context.Background()
 
 	t.Run("should sync new tokens", func(t *testing.T) {
@@ -777,11 +777,18 @@ func testSyncNewTokens(t *testing.T) {
 		assert.Len(t, payload.Viewer.User.Tokens, len(provider.Tokens))
 	})
 
-	t.Run("should sync tokens from multiple chains", func(t *testing.T) {
-		secondProvider := newStubProvider(withContractTokens(contract, userF.Wallet.Address, 10))
-		h := handlerWithProviders(t, sendTokensNOOP, provider, secondProvider)
-		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+}
 
+func testSyncNewTokensMultichain(t *testing.T) {
+	userF := newUserFixture(t)
+	provider := defaultStubProvider(userF.Wallet.Address)
+	contract := multichain.ChainAgnosticContract{Address: "0x124", Descriptors: multichain.ChainAgnosticContractDescriptors{Name: "wow"}}
+	secondProvider := newStubProvider(withContractTokens(contract, userF.Wallet.Address, 10))
+	h := handlerWithProviders(t, sendTokensNOOP, provider, secondProvider)
+	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+	ctx := context.Background()
+
+	t.Run("should sync tokens from multiple chains", func(t *testing.T) {
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum, ChainOptimism})
 		require.NoError(t, err)
 		payload := (*response.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
