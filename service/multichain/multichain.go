@@ -334,7 +334,7 @@ outer:
 		logger.For(ctx).Debugf("discrepency: %+v", discrepencyLog)
 	}
 
-	persistedContracts, err := p.processContracts(ctx, contractsFromProviders)
+	persistedContracts, err := p.processContracts(ctx, contractsFromProviders, false)
 	if err != nil {
 		return err
 	}
@@ -450,7 +450,7 @@ outer:
 		logger.For(ctx).Debugf("discrepency: %+v", discrepencyLog)
 	}
 
-	persistedContracts, err := p.processContracts(ctx, contractsFromProviders)
+	persistedContracts, err := p.processContracts(ctx, contractsFromProviders, false)
 	if err != nil {
 		return err
 	}
@@ -545,7 +545,7 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 
 	combinedResult := combinedProviderChildContractResults(pResult)
 
-	parentContracts, err := p.Repos.ContractRepository.BulkUpsert(ctx, combinedResult.ParentContracts())
+	parentContracts, err := p.Repos.ContractRepository.BulkUpsert(ctx, combinedResult.ParentContracts(), true)
 	if err != nil {
 		return err
 	}
@@ -829,7 +829,7 @@ func (p *Provider) GetTokensOfContractForWallet(ctx context.Context, contractAdd
 		})
 	}
 
-	persistedContracts, err := p.processContracts(ctx, contracts)
+	persistedContracts, err := p.processContracts(ctx, contracts, false)
 	if err != nil {
 		return nil, err
 	}
@@ -1129,7 +1129,7 @@ outer:
 
 	logger.For(ctx).Debug("creating contracts")
 
-	persistedContracts, err := p.processContracts(ctx, contractsFromProviders)
+	persistedContracts, err := p.processContracts(ctx, contractsFromProviders, false)
 	if err != nil {
 		return err
 	}
@@ -1198,7 +1198,7 @@ func (p *Provider) SyncContractsOwnedByUser(ctx context.Context, userID persist.
 		contractsFromProviders = append(contractsFromProviders, chainContracts{chain: result.Chain, contracts: result.Contracts, priority: result.Priority})
 	}
 
-	_, err = p.processContracts(ctx, contractsFromProviders)
+	_, err = p.processContracts(ctx, contractsFromProviders, true)
 	if err != nil {
 		return err
 	}
@@ -1414,9 +1414,12 @@ outer:
 	return chainTokensForUser, users, nil
 }
 
-func (d *Provider) processContracts(ctx context.Context, contractsFromProviders []chainContracts) ([]persist.ContractGallery, error) {
+// processContracts deduplicates contracts and upserts them into the database. If canOverwriteOwnerAddress is true, then
+// the owner address of an existing contract will be overwritten if the new contract provides a non-empty owner address.
+// An empty owner address will never overwrite an existing address, even if canOverwriteOwnerAddress is true.
+func (d *Provider) processContracts(ctx context.Context, contractsFromProviders []chainContracts, canOverwriteOwnerAddress bool) ([]persist.ContractGallery, error) {
 	newContracts := contractsToNewDedupedContracts(contractsFromProviders)
-	return d.Repos.ContractRepository.BulkUpsert(ctx, newContracts)
+	return d.Repos.ContractRepository.BulkUpsert(ctx, newContracts, canOverwriteOwnerAddress)
 }
 
 func tokensToNewDedupedTokens(tokens []chainTokens, contracts []persist.ContractGallery, ownerUser persist.User) ([]persist.TokenGallery, map[persist.DBID]persist.Address) {
