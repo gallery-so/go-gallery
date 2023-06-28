@@ -267,6 +267,15 @@ func (tpj *tokenProcessingJob) cacheMediaObjects(ctx context.Context, metadata p
 		imgCh = cacheImageObjects(ctx, imgURL, tpj)
 	}
 
+	var extraSrcCh chan cacheResult
+
+	if tpj.extraSourceKey != "" {
+		extraSrcCh, err = cacheExtraSourceObjects(ctx, tpj, metadata)
+		if err != nil {
+			logger.For(ctx).Error("error caching extra source: %s")
+		}
+	}
+
 	if animCh != nil {
 		animResult = <-animCh
 		if isCacheResultValid(animResult.err, len(animResult.cachedObjects)) {
@@ -278,6 +287,9 @@ func (tpj *tokenProcessingJob) cacheMediaObjects(ctx context.Context, metadata p
 		if isCacheResultValid(imgResult.err, len(imgResult.cachedObjects)) {
 			downloadSuccess = true
 		}
+	}
+	if extraSrcCh != nil {
+		<-extraSrcCh
 	}
 
 	// If we have at least one successful download, we can create media from it

@@ -1,6 +1,7 @@
 package tokenprocessing
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"github.com/sourcegraph/conc/pool"
 
 	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -66,7 +68,7 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 				}
 				defer throttler.Unlock(reqCtx, lockID)
 				ctx := sentryutil.NewSentryHubContext(reqCtx)
-				_, err := tp.ProcessTokenPipeline(ctx, t, contract, persist.ProcessingCauseSync)
+				_, err := processToken(ctx, tp, t, contract, persist.ProcessingCauseSync)
 				return err
 			})
 		}
@@ -128,9 +130,7 @@ func processMediaForToken(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRe
 			return
 		}
 
-		_, err = tp.ProcessTokenPipeline(reqCtx, token, contract, persist.ProcessingCauseRefresh,
-			addPipelineRunOptions(contract)...,
-		)
+		_, err = processToken(reqCtx, tp, token, contract, persist.ProcessingCauseRefresh)
 		if err != nil {
 			if util.ErrorAs[ErrBadToken](err) {
 				util.ErrResponse(c, http.StatusUnprocessableEntity, err)
@@ -245,7 +245,14 @@ func detectSpamContracts(queries *coredb.Queries) gin.HandlerFunc {
 	}
 }
 
-func addPipelineRunOptions(contract persist.ContractGallery) []PipelineOption {
-	opts := []PipelineOption{}
+func processToken(ctx context.Context, tp *tokenProcessor, token persist.TokenGallery, contract persist.ContractGallery, cause persist.ProcessingCause) (coredb.TokenMedia, error) {
+	return tp.ProcessTokenPipeline(ctx, token, contract, cause, addPipelineRunOptions(contract)...)
+}
+
+// addPipelineRunOptions adds pipeline options for specific contracts
+func addPipelineRunOptions(contract persist.ContractGallery) (opts []PipelineOption) {
+	if contract.Address == eth.EnsAddress {
+		opts = append(opts, PipelineOpts.WithExtraSourceKey("background_image", objectTypeProfileImage))
+	}
 	return opts
 }

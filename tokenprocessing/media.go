@@ -153,6 +153,33 @@ func cacheAnimationObjects(ctx context.Context, animationURL media.AnimationURL,
 	return asyncCacheObjectsForURL(ctx, tids, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, objectTypeAnimation, string(animationURL), job.tp.tokenBucket, runMetadata)
 }
 
+func cacheExtraSourceObjects(ctx context.Context, job *tokenProcessingJob, metadata persist.TokenMetadata) (chan cacheResult, error) {
+	// Validate
+	if job.extraSourceType < 255 {
+		return nil, errors.New("object type would overwrite existing object types")
+	}
+	if metadata[job.extraSourceKey] == nil {
+		return nil, fmt.Errorf("key %s not found in metadata", job.extraSourceKey)
+	}
+	urlStr, ok := metadata[job.extraSourceKey].(string)
+	if !ok {
+		return nil, errors.New("url value is not a string")
+	}
+	tids := persist.NewTokenIdentifiers(job.contract.Address, job.token.TokenID, job.token.Chain)
+	runMetadata := &cachePipelineMetadata{
+		ContentHeaderValueRetrieval:  &job.pipelineMetadata.ExtraSourceContentHeaderValueRetrieval,
+		ReaderRetrieval:              &job.pipelineMetadata.ExtraSourceReaderRetrieval,
+		OpenseaFallback:              &job.pipelineMetadata.ExtraSourceOpenseaFallback,
+		DetermineMediaTypeWithReader: &job.pipelineMetadata.ExtraSourceDetermineMediaTypeWithReader,
+		AnimationGzip:                &job.pipelineMetadata.ExtraSourceAnimationGzip,
+		SVGRasterize:                 &job.pipelineMetadata.ExtraSourceSVGRasterize,
+		StoreGCP:                     &job.pipelineMetadata.ExtraSourceStoreGCP,
+		ThumbnailGCP:                 &job.pipelineMetadata.ExtraSourceThumbnailGCP,
+		LiveRenderGCP:                &job.pipelineMetadata.ExtraSourceLiveRenderGCP,
+	}
+	return asyncCacheObjectsForURL(ctx, tids, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, job.extraSourceType, urlStr, job.tp.tokenBucket, runMetadata), nil
+}
+
 func cacheOpenSeaObjects(ctx context.Context, job *tokenProcessingJob) ([]cachedMediaObject, error) {
 	tids := persist.NewTokenIdentifiers(job.contract.Address, job.token.TokenID, job.token.Chain)
 	runMetadata := &cachePipelineMetadata{
@@ -569,12 +596,18 @@ func persistToStorage(ctx context.Context, client *storage.Client, reader io.Rea
 type objectType int
 
 const (
+	// Object types that the pipeline creates
 	objectTypeUnknown objectType = iota
 	objectTypeImage
 	objectTypeAnimation
 	objectTypeThumbnail
 	objectTypeLiveRender
 	objectTypeSVG
+)
+
+const (
+	// Object types that are custom
+	objectTypeProfileImage objectType = iota + 255
 )
 
 func (o objectType) String() string {
