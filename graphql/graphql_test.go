@@ -789,10 +789,6 @@ func testSyncNewTokensMultichain(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("should sync tokens from multiple chains", func(t *testing.T) {
-		secondProvider := newStubProvider(withContractTokens(contract, userF.Wallet.Address, 10))
-		h := handlerWithProviders(t, sendTokensNOOP, provider, secondProvider)
-		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
-
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum, ChainOptimism})
 		require.NoError(t, err)
 		payload := (*response.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
