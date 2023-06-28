@@ -753,9 +753,7 @@ func testTrendingFeedEvents(t *testing.T) {
 func testSyncNewTokens(t *testing.T) {
 	userF := newUserFixture(t)
 	provider := defaultStubProvider(userF.Wallet.Address)
-	contract := multichain.ChainAgnosticContract{Address: "0x124", Descriptors: multichain.ChainAgnosticContractDescriptors{Name: "wow"}}
-	secondProvider := newStubProvider(withContractTokens(contract, userF.Wallet.Address, 10))
-	h := handlerWithProviders(t, sendTokensNOOP, provider, secondProvider)
+	h := handlerWithProviders(t, sendTokensNOOP, provider)
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 	ctx := context.Background()
 
