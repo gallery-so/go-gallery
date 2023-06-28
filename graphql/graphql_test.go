@@ -753,7 +753,6 @@ func testTrendingFeedEvents(t *testing.T) {
 func testSyncNewTokens(t *testing.T) {
 	userF := newUserFixture(t)
 	provider := defaultStubProvider(userF.Wallet.Address)
-	contract := multichain.ChainAgnosticContract{Address: "0x124", Descriptors: multichain.ChainAgnosticContractDescriptors{Name: "wow"}}
 	ctx := context.Background()
 
 	t.Run("should sync new tokens", func(t *testing.T) {
