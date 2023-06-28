@@ -551,7 +551,10 @@ func purgeIfExists(ctx context.Context, bucket string, fileName string, client *
 }
 
 func persistToStorage(ctx context.Context, client *storage.Client, reader io.Reader, bucket string, object cachedMediaObject, metadata map[string]string) error {
-	writer := newObjectWriter(ctx, client, bucket, object.fileName(), object.ContentType, object.ContentLength, metadata)
+	writer := newObjectWriter(ctx, client, bucket, object.fileName(), object.ContentLength,
+		objAttrsOpts.WithContentType(object.ContentType),
+		objAttrsOpts.WithCustomMetadata(metadata),
+	)
 	if written, err := io.Copy(writer, util.NewLoggingReader(ctx, reader, reader.(io.WriterTo))); err != nil {
 		if object.ContentLength != nil {
 			logger.For(ctx).Errorf("wrote %d out of %d bytes before error: %s", written, *object.ContentLength, err)
@@ -598,7 +601,7 @@ type cachedMediaObject struct {
 	TokenID         persist.TokenID
 	ContractAddress persist.Address
 	Chain           persist.Chain
-	ContentType     *string
+	ContentType     string
 	ContentLength   *int64
 	ObjectType      objectType
 }
@@ -614,7 +617,7 @@ func (m cachedMediaObject) storageURL(tokenBucket string) string {
 	return fmt.Sprintf("https://storage.googleapis.com/%s/%s", tokenBucket, m.fileName())
 }
 
-func cacheRawMedia(ctx context.Context, reader *util.FileHeaderReader, tids persist.TokenIdentifiers, mediaType persist.MediaType, contentLength *int64, contentType *string, oType objectType, bucket, ogURL string, client *storage.Client, subMeta *cachePipelineMetadata) (cachedMediaObject, error) {
+func cacheRawMedia(ctx context.Context, reader *util.FileHeaderReader, tids persist.TokenIdentifiers, mediaType persist.MediaType, contentLength *int64, contentType string, oType objectType, bucket, ogURL string, client *storage.Client, subMeta *cachePipelineMetadata) (cachedMediaObject, error) {
 	traceCallback, ctx := persist.TrackStepStatus(ctx, subMeta.StoreGCP, "StoreGCP")
 	defer traceCallback()
 
@@ -657,10 +660,10 @@ func cacheRawAnimationMedia(ctx context.Context, reader *util.FileHeaderReader, 
 		ObjectType:      oType,
 	}
 
-	sw := newObjectWriter(ctx, client, bucket, object.fileName(), nil, nil, map[string]string{
-		"originalURL": truncateString(ogURL, 100),
-		"mediaType":   mediaType.String(),
-	})
+	sw := newObjectWriter(ctx, client, bucket, object.fileName(), nil,
+		objAttrsOpts.WithContentEncoding("gzip"),
+		objAttrsOpts.WithCustomMetadata(map[string]string{"originalURL": truncateString(ogURL, 100), "mediaType": mediaType.String()}),
+	)
 	writer := gzip.NewWriter(sw)
 
 	written, err := io.Copy(writer, util.NewLoggingReader(ctx, reader, reader))
@@ -720,7 +723,7 @@ func rasterizeAndCacheSVGMedia(ctx context.Context, svgURL string, tids persist.
 
 	pngObject := cachedMediaObject{
 		MediaType:       persist.MediaTypeImage,
-		ContentType:     util.ToPointer("image/png"),
+		ContentType:     "image/png",
 		TokenID:         tids.TokenID,
 		ContractAddress: tids.ContractAddress,
 		Chain:           tids.Chain,
@@ -728,10 +731,10 @@ func rasterizeAndCacheSVGMedia(ctx context.Context, svgURL string, tids persist.
 		ObjectType:      objectTypeThumbnail,
 	}
 
-	sw := newObjectWriter(ctx, client, bucket, pngObject.fileName(), pngObject.ContentType, pngObject.ContentLength, map[string]string{
-		"originalURL": truncateString(ogURL, 100),
-		"mediaType":   persist.MediaTypeImage.String(),
-	})
+	sw := newObjectWriter(ctx, client, bucket, pngObject.fileName(), pngObject.ContentLength,
+		objAttrsOpts.WithContentType(pngObject.ContentType),
+		objAttrsOpts.WithCustomMetadata(map[string]string{"originalURL": truncateString(ogURL, 100), "mediaType": persist.MediaTypeImage.String()}),
+	)
 
 	_, err = sw.Write(data)
 	if err != nil {
@@ -766,15 +769,15 @@ func rasterizeAndCacheSVGMedia(ctx context.Context, svgURL string, tids persist.
 			TokenID:         tids.TokenID,
 			ContractAddress: tids.ContractAddress,
 			Chain:           tids.Chain,
-			ContentType:     util.ToPointer("image/gif"),
+			ContentType:     "image/gif",
 			ContentLength:   util.ToPointer(int64(len(data))),
 			ObjectType:      objectTypeLiveRender,
 		}
 
-		sw := newObjectWriter(ctx, client, bucket, gifObject.fileName(), gifObject.ContentType, gifObject.ContentLength, map[string]string{
-			"originalURL": truncateString(ogURL, 100),
-			"mediaType":   persist.MediaTypeGIF.String(),
-		})
+		sw := newObjectWriter(ctx, client, bucket, gifObject.fileName(), gifObject.ContentLength,
+			objAttrsOpts.WithContentType(gifObject.ContentType),
+			objAttrsOpts.WithCustomMetadata(map[string]string{"originalURL": truncateString(ogURL, 100), "mediaType": persist.MediaTypeGIF.String()}),
+		)
 
 		_, err = sw.Write(data)
 		if err != nil {
@@ -806,16 +809,17 @@ func thumbnailAndCache(ctx context.Context, tids persist.TokenIdentifiers, video
 		TokenID:         tids.TokenID,
 		ContractAddress: tids.ContractAddress,
 		Chain:           tids.Chain,
-		ContentType:     util.ToPointer("image/png"),
+		ContentType:     "image/png",
 	}
 
 	logger.For(ctx).Infof("caching thumbnail for '%s'", obj.fileName())
 
 	timeBeforeCopy := time.Now()
 
-	sw := newObjectWriter(ctx, client, bucket, obj.fileName(), util.ToPointer("image/jpeg"), nil, map[string]string{
-		"thumbnailedURL": videoURL,
-	})
+	sw := newObjectWriter(ctx, client, bucket, obj.fileName(), nil,
+		objAttrsOpts.WithContentType("image/jpeg"),
+		objAttrsOpts.WithCustomMetadata(map[string]string{"thumbnailedURL": videoURL}),
+	)
 
 	logger.For(ctx).Infof("thumbnailing %s", videoURL)
 	if err := thumbnailVideoToWriter(ctx, videoURL, sw); err != nil {
@@ -846,16 +850,17 @@ func createLiveRenderAndCache(ctx context.Context, tids persist.TokenIdentifiers
 		TokenID:         tids.TokenID,
 		ContractAddress: tids.ContractAddress,
 		Chain:           tids.Chain,
-		ContentType:     util.ToPointer("video/mp4"),
+		ContentType:     "video/mp4",
 	}
 
 	logger.For(ctx).Infof("caching live render media for '%s'", obj.fileName())
 
 	timeBeforeCopy := time.Now()
 
-	sw := newObjectWriter(ctx, client, bucket, obj.fileName(), util.ToPointer("video/mp4"), nil, map[string]string{
-		"liveRenderedURL": videoURL,
-	})
+	sw := newObjectWriter(ctx, client, bucket, obj.fileName(), nil,
+		objAttrsOpts.WithContentType("video/mp4"),
+		objAttrsOpts.WithCustomMetadata(map[string]string{"liveRenderedURL": videoURL}),
+	)
 
 	logger.For(ctx).Infof("creating live render for %s", videoURL)
 	if err := createLiveRenderPreviewVideo(ctx, videoURL, sw); err != nil {
@@ -891,7 +896,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 
 	asURI := persist.TokenURI(mediaURL)
 	timeBeforePredict := time.Now()
-	mediaType, contentType, contentLength := func() (persist.MediaType, *string, *int64) {
+	mediaType, contentType, contentLength := func() (persist.MediaType, string, *int64) {
 		traceCallback, pCtx := persist.TrackStepStatus(pCtx, subMeta.ContentHeaderValueRetrieval, "ContentHeaderValueRetrieval")
 		defer traceCallback()
 		mediaType, contentType, contentLength, err := media.PredictMediaType(pCtx, asURI.String())
@@ -900,7 +905,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 		}
 		pCtx = logger.NewContextWithFields(pCtx, logrus.Fields{
 			"predictedMediaType":   mediaType,
-			"predictedContentType": util.FromPointer(contentType),
+			"predictedContentType": contentType,
 		})
 
 		contentLengthStr := "nil"
@@ -978,8 +983,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 				logger.For(pCtx).Errorf("could not get headers for %s: %s", mediaURL, err)
 				return
 			}
-			contentType = util.ToPointer("")
-			mediaType, *contentType = media.SniffMediaType(bytesToSniff)
+			mediaType, contentType = media.SniffMediaType(bytesToSniff)
 			logger.For(pCtx).Infof("sniffed media type for %s: %s in %s", truncateString(mediaURL, 50), mediaType, time.Since(timeBeforeSniff))
 		}()
 	}
@@ -1213,19 +1217,43 @@ func truncateString(s string, i int) string {
 	return s
 }
 
-func newObjectWriter(ctx context.Context, client *storage.Client, bucket, fileName string, contentType *string, contentLength *int64, objMetadata map[string]string) *storage.Writer {
+func newObjectWriter(ctx context.Context, client *storage.Client, bucket, fileName string, contentLength *int64, opts ...func(*storage.ObjectAttrs)) *storage.Writer {
 	writer := client.Bucket(bucket).Object(fileName).NewWriter(ctx)
-	if contentType != nil {
-		writer.ObjectAttrs.ContentType = *contentType
-	}
 	writer.ProgressFunc = func(written int64) {
 		logger.For(ctx).Infof("wrote %s to %s", util.InByteSizeFormat(uint64(written)), fileName)
 	}
-	writer.ObjectAttrs.Metadata = objMetadata
 	writer.ObjectAttrs.CacheControl = "no-cache, no-store"
 	writer.ChunkSize = contentLengthToChunkSize(contentLength)
 	writer.ChunkRetryDeadline = 5 * time.Minute
+	for _, opt := range opts {
+		opt(&writer.ObjectAttrs)
+	}
 	return writer
+}
+
+type objectAttrsOptions struct{}
+
+var objAttrsOpts objectAttrsOptions
+
+// WithContentType sets the Content-Type header of the object
+func (objectAttrsOptions) WithContentType(typ string) func(*storage.ObjectAttrs) {
+	return func(a *storage.ObjectAttrs) {
+		a.ContentType = typ
+	}
+}
+
+// WithCustomMetadata sets custom metadata on the object
+func (objectAttrsOptions) WithCustomMetadata(m map[string]string) func(*storage.ObjectAttrs) {
+	return func(a *storage.ObjectAttrs) {
+		a.Metadata = m
+	}
+}
+
+// WithContentEncoding sets the Content-Encoding header of the object
+func (objectAttrsOptions) WithContentEncoding(enc string) func(*storage.ObjectAttrs) {
+	return func(a *storage.ObjectAttrs) {
+		a.ContentEncoding = enc
+	}
 }
 
 func contentLengthToChunkSize(contentLength *int64) int {

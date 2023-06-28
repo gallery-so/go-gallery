@@ -72,23 +72,23 @@ type contentTypeLengthTuple struct {
 
 type mediaPrediction struct {
 	mediaType   persist.MediaType
-	contentType *string
+	contentType string
 	length      *int64
 }
 
 // PredictMediaType guesses the media type of the given URL.
-func PredictMediaType(ctx context.Context, url string) (persist.MediaType, *string, *int64, error) {
+func PredictMediaType(ctx context.Context, url string) (persist.MediaType, string, *int64, error) {
 	// predicting is not critical, so we can afford to give it a timeout
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	f := func() (persist.MediaType, *string, *int64, error) {
+	f := func() (persist.MediaType, string, *int64, error) {
 		spl := strings.Split(url, ".")
 		if len(spl) > 1 {
 			ext := spl[len(spl)-1]
 			ext = strings.Split(ext, "?")[0]
 			if t, ok := postfixesToMediaTypes[ext]; ok {
-				return t.mediaType, &t.contentType, nil, nil
+				return t.mediaType, t.contentType, nil, nil
 			}
 		}
 		asURI := persist.TokenURI(url)
@@ -97,27 +97,27 @@ func PredictMediaType(ctx context.Context, url string) (persist.MediaType, *stri
 		logger.For(ctx).Debugf("predicting media type for %s with URI type %s", url, uriType)
 		switch uriType {
 		case persist.URITypeBase64JSON, persist.URITypeJSON:
-			return persist.MediaTypeJSON, util.ToPointer("application/json"), &lenURI, nil
+			return persist.MediaTypeJSON, "application/json", &lenURI, nil
 		case persist.URITypeBase64SVG, persist.URITypeSVG:
-			return persist.MediaTypeSVG, util.ToPointer("image/svg+xml"), &lenURI, nil
+			return persist.MediaTypeSVG, "image/svg+xml", &lenURI, nil
 		case persist.URITypeBase64BMP:
-			return persist.MediaTypeImage, util.ToPointer("image/bmp"), &lenURI, nil
+			return persist.MediaTypeImage, "image/bmp", &lenURI, nil
 		case persist.URITypeBase64PNG:
-			return persist.MediaTypeImage, util.ToPointer("image/png"), &lenURI, nil
+			return persist.MediaTypeImage, "image/png", &lenURI, nil
 		case persist.URITypeBase64HTML:
-			return persist.MediaTypeHTML, util.ToPointer("text/html"), &lenURI, nil
+			return persist.MediaTypeHTML, "text/html", &lenURI, nil
 		case persist.URITypeBase64JPEG:
-			return persist.MediaTypeImage, util.ToPointer("image/jpeg"), &lenURI, nil
+			return persist.MediaTypeImage, "image/jpeg", &lenURI, nil
 		case persist.URITypeBase64MP3:
-			return persist.MediaTypeAudio, util.ToPointer("audio/mpeg"), &lenURI, nil
+			return persist.MediaTypeAudio, "audio/mpeg", &lenURI, nil
 		case persist.URITypeBase64WAV:
-			return persist.MediaTypeAudio, util.ToPointer("audio/wav"), &lenURI, nil
+			return persist.MediaTypeAudio, "audio/wav", &lenURI, nil
 		case persist.URITypeIPFS:
 			contentType, contentLength, err := rpc.GetIPFSHeaders(ctx, strings.TrimPrefix(asURI.String(), "ipfs://"))
 			if err != nil {
-				return persist.MediaTypeUnknown, nil, nil, err
+				return persist.MediaTypeUnknown, "", nil, err
 			}
-			return MediaFromContentType(contentType), &contentType, &contentLength, nil
+			return MediaFromContentType(contentType), contentType, &contentLength, nil
 		case persist.URITypeIPFSGateway:
 
 			ctl, err := util.FirstNonErrorWithValue(ctx, true, retry.HTTPErrNotFound, func(ctx context.Context) (contentTypeLengthTuple, error) {
@@ -135,10 +135,10 @@ func PredictMediaType(ctx context.Context, url string) (persist.MediaType, *stri
 			})
 
 			if err != nil {
-				return persist.MediaTypeUnknown, nil, nil, err
+				return persist.MediaTypeUnknown, "", nil, err
 			}
 
-			return MediaFromContentType(ctl.contentType), &ctl.contentType, &ctl.length, nil
+			return MediaFromContentType(ctl.contentType), ctl.contentType, &ctl.length, nil
 		case persist.URITypeArweave:
 			path := util.GetURIPath(asURI.String(), false)
 			url = fmt.Sprintf("https://arweave.net/%s", path)
@@ -146,11 +146,11 @@ func PredictMediaType(ctx context.Context, url string) (persist.MediaType, *stri
 		case persist.URITypeHTTP, persist.URITypeIPFSAPI, persist.URITypeArweaveGateway:
 			contentType, contentLength, err := rpc.GetHTTPHeaders(ctx, url)
 			if err != nil {
-				return persist.MediaTypeUnknown, nil, nil, err
+				return persist.MediaTypeUnknown, "", nil, err
 			}
-			return MediaFromContentType(contentType), &contentType, &contentLength, nil
+			return MediaFromContentType(contentType), contentType, &contentLength, nil
 		}
-		return persist.MediaTypeUnknown, nil, nil, nil
+		return persist.MediaTypeUnknown, "", nil, nil
 	}
 
 	errChan := make(chan error)
@@ -168,9 +168,9 @@ func PredictMediaType(ctx context.Context, url string) (persist.MediaType, *stri
 
 	select {
 	case <-ctx.Done():
-		return persist.MediaTypeUnknown, nil, nil, ctx.Err()
+		return persist.MediaTypeUnknown, "", nil, ctx.Err()
 	case err := <-errChan:
-		return persist.MediaTypeUnknown, nil, nil, err
+		return persist.MediaTypeUnknown, "", nil, err
 	case result := <-resultChan:
 		return result.mediaType, result.contentType, result.length, nil
 	}
