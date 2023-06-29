@@ -54,8 +54,20 @@ func ReverseResolve(ctx context.Context, ethClient *ethclient.Client, address pe
 	return domain, nil
 }
 
-// ReverseResolves returns true if the given address resolves to the given domain
-func ReverseResolves(ctx context.Context, ethClient *ethclient.Client, domain string, address persist.EthereumAddress) (bool, error) {
+// ReverseResolves returns true if the reverse resolves to any domain
+func ReverseResolves(ctx context.Context, ethClient *ethclient.Client, address persist.EthereumAddress) (bool, error) {
+	_, err := ReverseResolve(ctx, ethClient, address)
+	if errors.Is(err, ErrNoResolution) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// ReverseResolvesTo returns true if the address reverse resolves to the given domain
+func ReverseResolvesTo(ctx context.Context, ethClient *ethclient.Client, domain string, address persist.EthereumAddress) (bool, error) {
 	revDomain, err := ReverseResolve(ctx, ethClient, address)
 	if errors.Is(err, ErrNoResolution) {
 		return false, nil
@@ -63,7 +75,13 @@ func ReverseResolves(ctx context.Context, ethClient *ethclient.Client, domain st
 	if err != nil {
 		return false, err
 	}
-	return strings.EqualFold(domain, revDomain), nil
+	// Resolve the returned domain to ensure that it actually resolves to the given address
+	addr, err := ens.Resolve(ethClient, revDomain)
+	if err != nil {
+		return false, err
+	}
+
+	return addr == common.HexToAddress(address.String()), nil
 }
 
 // EnsAvatarRecordFor returns the avatar record for the given address

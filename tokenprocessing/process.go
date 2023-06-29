@@ -252,7 +252,7 @@ func processToken(ctx context.Context, tp *tokenProcessor, token persist.TokenGa
 // addPipelineRunOptions adds pipeline options for specific contracts
 func addPipelineRunOptions(contract persist.ContractGallery) (opts []PipelineOption) {
 	if contract.Address == eth.EnsAddress {
-		opts = append(opts, PipelineOpts.WithExtraSourceKey("background_image", objectTypeProfileImage))
+		opts = append(opts, PipelineOpts.WithExtraSourceKey("profile_image", objectTypeProfileImage))
 	}
 	return opts
 }

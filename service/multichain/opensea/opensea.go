@@ -669,7 +669,7 @@ func metadataFromAsset(asset Asset) persist.TokenMetadata {
 	}
 	// ENS
 	if asset.Contract.ContractAddress == eth.EnsAddress {
-		m["background_image"] = fmt.Sprintf("https://metadata.ens.domains/mainnet/avatar/%s", asset.Name)
+		m["profile_image"] = fmt.Sprintf("https://metadata.ens.domains/mainnet/avatar/%s", asset.Name)
 	}
 	return m
 }

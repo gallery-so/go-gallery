@@ -423,10 +423,10 @@ func ens(ctx context.Context, turi persist.TokenURI, addr persist.EthereumAddres
 
 	if ok {
 		return persist.TokenURI(withImage.ImageURL), persist.TokenMetadata{
-			"name":             fmt.Sprintf("ENS: %s", result),
-			"description":      "ENS names are used to resolve domain names to Ethereum addresses.",
-			"image":            util.FirstNonEmptyString(withImage.ImageURL, withImage.ImagePreviewURL, withImage.ImageOriginalURL, withImage.ImageThumbnailURL),
-			"background_image": fmt.Sprintf("https://metadata.ens.domains/mainnet/avatar/%s", result),
+			"name":          fmt.Sprintf("ENS: %s", result),
+			"description":   "ENS names are used to resolve domain names to Ethereum addresses.",
+			"image":         util.FirstNonEmptyString(withImage.ImageURL, withImage.ImagePreviewURL, withImage.ImageOriginalURL, withImage.ImageThumbnailURL),
+			"profile_image": fmt.Sprintf("https://metadata.ens.domains/mainnet/avatar/%s", result),
 		}, nil
 	}
 
@@ -448,10 +448,10 @@ func ens(ctx context.Context, turi persist.TokenURI, addr persist.EthereumAddres
 	}
 
 	return persist.TokenURI(result), persist.TokenMetadata{
-		"name":             fmt.Sprintf("ENS: %s", result),
-		"description":      "ENS names are used to resolve domain names to Ethereum addresses.",
-		"image":            fmt.Sprintf("data:image/svg+xml;base64,%s", base64.StdEncoding.EncodeToString(buf.Bytes()[svgStart:])),
-		"background_image": fmt.Sprintf("https://metadata.ens.domains/mainnet/avatar/%s", result),
+		"name":          fmt.Sprintf("ENS: %s", result),
+		"description":   "ENS names are used to resolve domain names to Ethereum addresses.",
+		"image":         fmt.Sprintf("data:image/svg+xml;base64,%s", base64.StdEncoding.EncodeToString(buf.Bytes()[svgStart:])),
+		"profile_image": fmt.Sprintf("https://metadata.ens.domains/mainnet/avatar/%s", result),
 	}, nil
 
 }

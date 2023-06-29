@@ -57,6 +57,7 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 		postgres.NewRepositories,
 		dbConnSet,
 		newSendTokensFunc,
+		rpc.NewEthClient,
 		wire.Struct(new(multichain.Provider), "*"),
 		// Add additional chains here
 		newMultichainSet,
