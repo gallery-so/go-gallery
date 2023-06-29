@@ -1574,6 +1574,7 @@ func contractsToNewDedupedContracts(contracts []chainContracts) []persist.Contra
 			if contract.Descriptors.ProfileImageURL != "" {
 				meta.ProfileImageURL = contract.Descriptors.ProfileImageURL
 			}
+			contractMetadatas[persist.NewChainAddress(contract.Address, chainContract.chain)] = meta
 		}
 	}
 
