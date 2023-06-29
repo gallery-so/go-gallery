@@ -149,6 +149,7 @@ func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, pContracts 
 		params.OwnerAddress = append(params.OwnerAddress, c.OwnerAddress.String())
 		params.Chain = append(params.Chain, int32(c.Chain))
 		params.Description = append(params.Description, c.Description.String())
+		params.ProfileImageUrl = append(params.ProfileImageUrl, c.ProfileImageURL.String())
 	}
 
 	upserted, err := c.queries.UpsertParentContracts(pCtx, params)

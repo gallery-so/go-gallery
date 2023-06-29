@@ -93,7 +93,7 @@ func (q *Queries) UpsertChildContracts(ctx context.Context, arg UpsertChildContr
 }
 
 const upsertParentContracts = `-- name: UpsertParentContracts :many
-insert into contracts(id, deleted, version, created_at, address, symbol, name, owner_address, chain, description) (
+insert into contracts(id, deleted, version, created_at, address, symbol, name, owner_address, chain, description, profile_image_url) (
   select unnest($1::varchar[])
     , false
     , unnest($2::int[])
@@ -104,6 +104,7 @@ insert into contracts(id, deleted, version, created_at, address, symbol, name, o
     , unnest($6::varchar[])
     , unnest($7::int[])
     , unnest($8::varchar[])
+    , unnest($9::varchar[])
 )
 on conflict (chain, address) where parent_id is null
 do update set symbol = excluded.symbol
@@ -111,12 +112,13 @@ do update set symbol = excluded.symbol
   , name = excluded.name
   , owner_address =
       case
-          when nullif(contracts.owner_address, '') is null or ($9::bool and nullif (excluded.owner_address, '') is not null)
+          when nullif(contracts.owner_address, '') is null or ($10::bool and nullif (excluded.owner_address, '') is not null)
             then excluded.owner_address
           else
             contracts.owner_address
       end
   , description = excluded.description
+  , profile_image_url = excluded.profile_image_url
   , deleted = excluded.deleted
   , last_updated = now()
 returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id, override_creator_user_id
@@ -131,6 +133,7 @@ type UpsertParentContractsParams struct {
 	OwnerAddress             []string
 	Chain                    []int32
 	Description              []string
+	ProfileImageUrl          []string
 	CanOverwriteOwnerAddress bool
 }
 
@@ -144,6 +147,7 @@ func (q *Queries) UpsertParentContracts(ctx context.Context, arg UpsertParentCon
 		arg.OwnerAddress,
 		arg.Chain,
 		arg.Description,
+		arg.ProfileImageUrl,
 		arg.CanOverwriteOwnerAddress,
 	)
 	if err != nil {
