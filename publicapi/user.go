@@ -1369,7 +1369,7 @@ func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID, w
 		})
 	}
 
-	// Set the profile image to reference ENS avatar
+	// Set the profile image to reference an ENS avatar
 	if walletAddress != nil {
 		// Validate
 		if err := validate.ValidateFields(api.validator, validate.ValidationMap{
@@ -1389,7 +1389,7 @@ func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID, w
 				// Found the wallet
 				addr := persist.EthereumAddress(w.Address)
 
-				r, err := eth.EnsAvatarRecordFor(ctx, api.ethClient, addr)
+				r, domain, err := eth.EnsAvatarRecordFor(ctx, api.ethClient, addr)
 				if err != nil {
 					return err
 				}
@@ -1416,6 +1416,7 @@ func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID, w
 					UserID:        userID,
 					WalletID:      w.ID,
 					EnsAvatarUri:  util.ToNullString(uri, true),
+					EnsDomain:     util.ToNullString(domain, true),
 				})
 				if err != nil {
 					return err
@@ -1463,6 +1464,7 @@ func (api UserAPI) GetProfileImageByUserID(ctx context.Context, userID persist.D
 
 type EnsAvatar struct {
 	WalletID persist.DBID
+	Domain   string
 	URI      string
 }
 
@@ -1485,7 +1487,7 @@ func (api UserAPI) GetEnsProfileImageByUserID(ctx context.Context, userID persis
 	for _, w := range wallets {
 		addr := persist.EthereumAddress(w.Address)
 
-		r, err := eth.EnsAvatarRecordFor(ctx, api.ethClient, addr)
+		r, domain, err := eth.EnsAvatarRecordFor(ctx, api.ethClient, addr)
 		if err != nil {
 			errs = append(errs, err)
 			continue
@@ -1511,7 +1513,7 @@ func (api UserAPI) GetEnsProfileImageByUserID(ctx context.Context, userID persis
 			return a, err
 		}
 
-		return EnsAvatar{WalletID: w.ID, URI: uri}, nil
+		return EnsAvatar{WalletID: w.ID, Domain: domain, URI: uri}, nil
 	}
 
 	if len(errs) > 0 {

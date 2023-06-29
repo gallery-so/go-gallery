@@ -335,6 +335,7 @@ type ProfileImage struct {
 	LastUpdated  time.Time
 	WalletID     persist.DBID
 	EnsAvatarUri sql.NullString
+	EnsDomain    sql.NullString
 }
 
 type PushNotificationTicket struct {

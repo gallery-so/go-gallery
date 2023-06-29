@@ -85,6 +85,13 @@ SELECT * FROM tokens WHERE id = $1 AND deleted = false;
 -- name: GetTokenByIdBatch :batchone
 SELECT * FROM tokens WHERE id = $1 AND deleted = false;
 
+-- name: GetTokenByOwnerIdContractAddressAndTokenIdBatch :batchone
+select t.*
+from tokens t
+join token_ownership o on t.id = o.token_id
+join contracts c on t.contract = c.id
+where o.owner_user_id = @user_id and t.token_id = @token_id and c.address = @contract_address and c.chain = @chain and not t.deleted and not c.deleted;
+
 -- name: GetTokensByCollectionIdBatch :batchmany
 select t.* from collections c,
     unnest(c.nfts) with ordinality as u(nft_id, nft_ord)
@@ -1290,9 +1297,10 @@ update users set profile_image_id = new_image.id from new_image where users.id =
 
 -- name: SetProfileImageToENS :one
 with profile_images as (
-    insert into profile_images (id, user_id, source_type, wallet_id, ens_avatar_uri, deleted, last_updated)
-    values (@profile_id, @user_id, @ens_source_type, @wallet_id, @ens_avatar_uri, false, now())
+    insert into profile_images (id, user_id, source_type, wallet_id, ens_domain, ens_avatar_uri, deleted, last_updated)
+    values (@profile_id, @user_id, @ens_source_type, @wallet_id, @ens_domain, @ens_avatar_uri, false, now())
     on conflict (user_id) do update set wallet_id = excluded.wallet_id
+        , ens_domain = excluded.ens_domain
         , ens_avatar_uri = excluded.ens_avatar_uri
         , source_type = excluded.source_type
         , deleted = excluded.deleted

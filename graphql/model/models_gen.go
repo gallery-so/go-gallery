@@ -782,6 +782,7 @@ type EnsProfileImage struct {
 	HelperEnsProfileImageData
 	Wallet       *Wallet            `json:"wallet"`
 	ProfileImage *HTTPSProfileImage `json:"profileImage"`
+	Token        *Token             `json:"token"`
 }
 
 func (EnsProfileImage) IsProfileImage() {}

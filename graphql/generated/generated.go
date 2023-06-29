@@ -354,6 +354,7 @@ type ComplexityRoot struct {
 
 	EnsProfileImage struct {
 		ProfileImage func(childComplexity int) int
+		Token        func(childComplexity int) int
 		Wallet       func(childComplexity int) int
 	}
 
@@ -1404,6 +1405,8 @@ type CreateCollectionPayloadResolver interface {
 }
 type EnsProfileImageResolver interface {
 	Wallet(ctx context.Context, obj *model.EnsProfileImage) (*model.Wallet, error)
+
+	Token(ctx context.Context, obj *model.EnsProfileImage) (*model.Token, error)
 }
 type EntityResolver interface {
 	FindFeedEventByDbid(ctx context.Context, dbid persist.DBID) (*model.FeedEvent, error)
@@ -2639,6 +2642,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.EnsProfileImage.ProfileImage(childComplexity), true
+
+	case "EnsProfileImage.token":
+		if e.complexity.EnsProfileImage.Token == nil {
+			break
+		}
+
+		return e.complexity.EnsProfileImage.Token(childComplexity), true
 
 	case "EnsProfileImage.wallet":
 		if e.complexity.EnsProfileImage.Wallet == nil {
@@ -7068,6 +7078,7 @@ type HTTPSProfileImage {
 type EnsProfileImage @goEmbedHelper {
   wallet: Wallet @goField(forceResolver: true)
   profileImage: HTTPSProfileImage
+  token: Token @goField(forceResolver: true)
 }
 
 union ProfileImage = TokenProfileImage | EnsProfileImage
@@ -18975,6 +18986,103 @@ func (ec *executionContext) fieldContext_EnsProfileImage_profileImage(ctx contex
 	return fc, nil
 }
 
+func (ec *executionContext) _EnsProfileImage_token(ctx context.Context, field graphql.CollectedField, obj *model.EnsProfileImage) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_EnsProfileImage_token(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.EnsProfileImage().Token(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Token)
+	fc.Result = res
+	return ec.marshalOToken2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐToken(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_EnsProfileImage_token(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "EnsProfileImage",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Token_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Token_dbid(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Token_creationTime(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Token_lastUpdated(ctx, field)
+			case "collectorsNote":
+				return ec.fieldContext_Token_collectorsNote(ctx, field)
+			case "media":
+				return ec.fieldContext_Token_media(ctx, field)
+			case "tokenType":
+				return ec.fieldContext_Token_tokenType(ctx, field)
+			case "chain":
+				return ec.fieldContext_Token_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Token_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Token_description(ctx, field)
+			case "tokenId":
+				return ec.fieldContext_Token_tokenId(ctx, field)
+			case "quantity":
+				return ec.fieldContext_Token_quantity(ctx, field)
+			case "owner":
+				return ec.fieldContext_Token_owner(ctx, field)
+			case "ownedByWallets":
+				return ec.fieldContext_Token_ownedByWallets(ctx, field)
+			case "ownershipHistory":
+				return ec.fieldContext_Token_ownershipHistory(ctx, field)
+			case "ownerIsHolder":
+				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
+			case "ownerIsCreator":
+				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "tokenMetadata":
+				return ec.fieldContext_Token_tokenMetadata(ctx, field)
+			case "contract":
+				return ec.fieldContext_Token_contract(ctx, field)
+			case "community":
+				return ec.fieldContext_Token_community(ctx, field)
+			case "externalUrl":
+				return ec.fieldContext_Token_externalUrl(ctx, field)
+			case "blockNumber":
+				return ec.fieldContext_Token_blockNumber(ctx, field)
+			case "isSpamByUser":
+				return ec.fieldContext_Token_isSpamByUser(ctx, field)
+			case "isSpamByProvider":
+				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
+			case "creatorAddress":
+				return ec.fieldContext_Token_creatorAddress(ctx, field)
+			case "openseaCollectionName":
+				return ec.fieldContext_Token_openseaCollectionName(ctx, field)
+			case "openseaId":
+				return ec.fieldContext_Token_openseaId(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Token", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Entity_findFeedEventByDbid(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Entity_findFeedEventByDbid(ctx, field)
 	if err != nil {
@@ -23755,6 +23863,8 @@ func (ec *executionContext) fieldContext_GalleryUser_potentialEnsProfileImage(ct
 				return ec.fieldContext_EnsProfileImage_wallet(ctx, field)
 			case "profileImage":
 				return ec.fieldContext_EnsProfileImage_profileImage(ctx, field)
+			case "token":
+				return ec.fieldContext_EnsProfileImage_token(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type EnsProfileImage", field.Name)
 		},
@@ -56537,6 +56647,23 @@ func (ec *executionContext) _EnsProfileImage(ctx context.Context, sel ast.Select
 
 			out.Values[i] = ec._EnsProfileImage_profileImage(ctx, field, obj)
 
+		case "token":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._EnsProfileImage_token(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

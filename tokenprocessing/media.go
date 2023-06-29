@@ -153,31 +153,28 @@ func cacheAnimationObjects(ctx context.Context, animationURL media.AnimationURL,
 	return asyncCacheObjectsForURL(ctx, tids, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, objectTypeAnimation, string(animationURL), job.tp.tokenBucket, runMetadata)
 }
 
-func cacheExtraSourceObjects(ctx context.Context, job *tokenProcessingJob, metadata persist.TokenMetadata) (chan cacheResult, error) {
+func cacheProfileImageObjects(ctx context.Context, job *tokenProcessingJob, metadata persist.TokenMetadata) (chan cacheResult, error) {
 	// Validate
-	if job.extraSourceType < 255 {
-		return nil, errors.New("object type would overwrite existing object types")
+	if metadata[job.profileImageKey] == nil {
+		return nil, fmt.Errorf("key %s not found in metadata", job.profileImageKey)
 	}
-	if metadata[job.extraSourceKey] == nil {
-		return nil, fmt.Errorf("key %s not found in metadata", job.extraSourceKey)
-	}
-	urlStr, ok := metadata[job.extraSourceKey].(string)
+	urlStr, ok := metadata[job.profileImageKey].(string)
 	if !ok {
 		return nil, errors.New("url value is not a string")
 	}
 	tids := persist.NewTokenIdentifiers(job.contract.Address, job.token.TokenID, job.token.Chain)
 	runMetadata := &cachePipelineMetadata{
-		ContentHeaderValueRetrieval:  &job.pipelineMetadata.ExtraSourceContentHeaderValueRetrieval,
-		ReaderRetrieval:              &job.pipelineMetadata.ExtraSourceReaderRetrieval,
-		OpenseaFallback:              &job.pipelineMetadata.ExtraSourceOpenseaFallback,
-		DetermineMediaTypeWithReader: &job.pipelineMetadata.ExtraSourceDetermineMediaTypeWithReader,
-		AnimationGzip:                &job.pipelineMetadata.ExtraSourceAnimationGzip,
-		SVGRasterize:                 &job.pipelineMetadata.ExtraSourceSVGRasterize,
-		StoreGCP:                     &job.pipelineMetadata.ExtraSourceStoreGCP,
-		ThumbnailGCP:                 &job.pipelineMetadata.ExtraSourceThumbnailGCP,
-		LiveRenderGCP:                &job.pipelineMetadata.ExtraSourceLiveRenderGCP,
+		ContentHeaderValueRetrieval:  &job.pipelineMetadata.ProfileImageContentHeaderValueRetrieval,
+		ReaderRetrieval:              &job.pipelineMetadata.ProfileImageReaderRetrieval,
+		OpenseaFallback:              &job.pipelineMetadata.ProfileImageOpenseaFallback,
+		DetermineMediaTypeWithReader: &job.pipelineMetadata.ProfileImageDetermineMediaTypeWithReader,
+		AnimationGzip:                &job.pipelineMetadata.ProfileImageAnimationGzip,
+		SVGRasterize:                 &job.pipelineMetadata.ProfileImageSVGRasterize,
+		StoreGCP:                     &job.pipelineMetadata.ProfileImageStoreGCP,
+		ThumbnailGCP:                 &job.pipelineMetadata.ProfileImageThumbnailGCP,
+		LiveRenderGCP:                &job.pipelineMetadata.ProfileImageLiveRenderGCP,
 	}
-	return asyncCacheObjectsForURL(ctx, tids, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, job.extraSourceType, urlStr, job.tp.tokenBucket, runMetadata), nil
+	return asyncCacheObjectsForURL(ctx, tids, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, objectTypeProfileImage, urlStr, job.tp.tokenBucket, runMetadata), nil
 }
 
 func cacheOpenSeaObjects(ctx context.Context, job *tokenProcessingJob) ([]cachedMediaObject, error) {
@@ -221,8 +218,9 @@ func createUncachedMedia(ctx context.Context, job *tokenProcessingJob, url strin
 	return persist.Media{MediaType: mediaType, MediaURL: persist.NullString(url)}
 }
 
-func createMediaFromResults(ctx context.Context, job *tokenProcessingJob, animResult, imgResult cacheResult) persist.Media {
+func createMediaFromResults(ctx context.Context, job *tokenProcessingJob, animResult, imgResult, pfpResult cacheResult) persist.Media {
 	objects := append(animResult.cachedObjects, imgResult.cachedObjects...)
+	objects = append(objects, pfpResult.cachedObjects...)
 
 	if notCacheableErr, ok := animResult.err.(errNotCacheable); ok {
 		return createUncachedMedia(ctx, job, notCacheableErr.URL, notCacheableErr.MediaType, objects)
@@ -250,6 +248,7 @@ func createMediaFromCachedObjects(ctx context.Context, tokenBucket string, objec
 
 	var thumbnailObject *cachedMediaObject
 	var liveRenderObject = util.MapFindOrNil(objects, objectTypeLiveRender)
+	var profileImageObject = util.MapFindOrNil(objects, objectTypeProfileImage)
 
 	if primaryObject.ObjectType == objectTypeAnimation || primaryObject.ObjectType == objectTypeSVG {
 		// animations should have a thumbnail that could be an image or svg or thumbnail
@@ -281,6 +280,10 @@ func createMediaFromCachedObjects(ctx context.Context, tokenBucket string, objec
 
 	if liveRenderObject != nil {
 		result.LivePreviewURL = persist.NullString(liveRenderObject.storageURL(tokenBucket))
+	}
+
+	if profileImageObject != nil {
+		result.ProfileImageURL = persist.NullString(profileImageObject.storageURL(tokenBucket))
 	}
 
 	var err error
@@ -596,18 +599,13 @@ func persistToStorage(ctx context.Context, client *storage.Client, reader io.Rea
 type objectType int
 
 const (
-	// Object types that the pipeline creates
 	objectTypeUnknown objectType = iota
 	objectTypeImage
 	objectTypeAnimation
 	objectTypeThumbnail
 	objectTypeLiveRender
 	objectTypeSVG
-)
-
-const (
-	// Object types that are custom
-	objectTypeProfileImage objectType = iota + 255
+	objectTypeProfileImage
 )
 
 func (o objectType) String() string {
@@ -622,6 +620,8 @@ func (o objectType) String() string {
 		return "liverender"
 	case objectTypeSVG:
 		return "svg"
+	case objectTypeProfileImage:
+		return "pfp"
 	case objectTypeUnknown:
 		return "unknown"
 	default:

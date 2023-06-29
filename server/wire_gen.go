@@ -52,7 +52,6 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 	v := newMultichainSet(serverEthProviderList, serverOptimismProviderList, serverTezosProviderList, serverPoapProviderList, serverPolygonProviderList, serverArbitrumProviderList)
 	v2 := defaultWalletOverrides()
 	sendTokens := newSendTokensFunc(ctx, client)
-	ethclientClient := rpc.NewEthClient()
 	provider := &multichain.Provider{
 		Repos:           repositories,
 		Queries:         queries,
@@ -60,7 +59,6 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 		Chains:          v,
 		WalletOverrides: v2,
 		SendTokens:      sendTokens,
-		ethClient:       ethclientClient,
 	}
 	return provider, func() {
 		cleanup2()

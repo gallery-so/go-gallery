@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/ethclient"
 	ens "github.com/wealdtech/go-ens/v3"
 
@@ -84,33 +85,64 @@ func ReverseResolvesTo(ctx context.Context, ethClient *ethclient.Client, domain 
 	return addr == common.HexToAddress(address.String()), nil
 }
 
-// EnsAvatarRecordFor returns the avatar record for the given address
-func EnsAvatarRecordFor(ctx context.Context, ethClient *ethclient.Client, a persist.EthereumAddress) (avatar AvatarRecord, err error) {
-	domain, err := ReverseResolve(ctx, ethClient, a)
+// DeriveTokenID derives the token ID from a domain
+// Copied from main branch of go-ens, which is not available yet on the latest release at the time of writing (v3.5.5)
+func DeriveTokenID(ethClient *ethclient.Client, domain string) (persist.TokenID, error) {
+	if domain == "" {
+		return "", errors.New("empty domain")
+	}
+	_, err := ens.Resolve(ethClient, domain)
 	if err != nil {
-		return avatar, err
+		return "", err
+	}
+	domain, err = ens.NormaliseDomain(domain)
+	if err != nil {
+		return "", err
+	}
+
+	domain, err = ens.DomainPart(domain, 1)
+	if err != nil {
+		return "", err
+	}
+	labelHash, err := ens.LabelHash(domain)
+	if err != nil {
+		return "", err
+	}
+	hash := fmt.Sprintf("%#x", labelHash)
+	tokenId, ok := math.ParseBig256(hash)
+	if !ok {
+		return "", err
+	}
+	return persist.TokenID(tokenId.String()), nil
+}
+
+// EnsAvatarRecordFor returns the avatar record for the given address
+func EnsAvatarRecordFor(ctx context.Context, ethClient *ethclient.Client, a persist.EthereumAddress) (avatar AvatarRecord, domain string, err error) {
+	domain, err = ReverseResolve(ctx, ethClient, a)
+	if err != nil {
+		return avatar, domain, err
 	}
 
 	resolver, err := ens.NewResolver(ethClient, domain)
 	if err != nil {
-		return avatar, err
+		return avatar, domain, err
 	}
 
 	record, err := resolver.Text("avatar")
 	if err != nil {
-		return avatar, err
+		return avatar, domain, err
 	}
 
 	if record == "" {
-		return avatar, nil
+		return avatar, domain, nil
 	}
 
 	uri, err := toRecord(record)
 	if err != nil {
-		return nil, err
+		return nil, domain, err
 	}
 
-	return uri, nil
+	return uri, domain, nil
 }
 
 // IsOwner returns true if the address is the current holder of the token

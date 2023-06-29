@@ -56,10 +56,10 @@ type tokenProcessingJob struct {
 	contract         persist.ContractGallery
 	cause            persist.ProcessingCause
 	pipelineMetadata *persist.PipelineMetadata
-	// extraSourceKey is an extra key in the metadata that the pipeline should also process
-	extraSourceKey string
-	// extraSourceType is the type of the additional source
-	extraSourceType objectType
+	// profileImageKey is an optional key in the metadata that the pipeline should also process as a profile image
+	// The pipeline will looks at the root level of the metadata for the key and will also not fail
+	// if the key is missing or if processing media for the key fails
+	profileImageKey string
 }
 
 type PipelineOption func(*tokenProcessingJob)
@@ -68,10 +68,9 @@ type PipelineOptions struct{}
 
 var PipelineOpts PipelineOptions
 
-func (PipelineOptions) WithExtraSourceKey(key string, o objectType) PipelineOption {
+func (PipelineOptions) WithProfileImageKey(key string) PipelineOption {
 	return func(j *tokenProcessingJob) {
-		j.extraSourceKey = key
-		j.extraSourceType = o
+		j.profileImageKey = key
 	}
 }
 
@@ -86,6 +85,10 @@ func (tp *tokenProcessor) ProcessTokenPipeline(c context.Context, t persist.Toke
 		contract:         contract,
 		cause:            cause,
 		pipelineMetadata: new(persist.PipelineMetadata),
+	}
+
+	for _, opt := range opts {
+		opt(job)
 	}
 
 	loggerCtx := logger.NewContextWithFields(c, logrus.Fields{
@@ -255,9 +258,9 @@ func (tpj *tokenProcessingJob) cacheMediaObjects(ctx context.Context, metadata p
 	})
 
 	var (
-		imgCh, animCh         chan cacheResult
-		imgResult, animResult cacheResult
-		downloadSuccess       bool
+		imgCh, animCh, pfpCh             chan cacheResult
+		imgResult, animResult, pfpResult cacheResult
+		downloadSuccess                  bool
 	)
 
 	if animURL != "" {
@@ -266,11 +269,8 @@ func (tpj *tokenProcessingJob) cacheMediaObjects(ctx context.Context, metadata p
 	if imgURL != "" {
 		imgCh = cacheImageObjects(ctx, imgURL, tpj)
 	}
-
-	var extraSrcCh chan cacheResult
-
-	if tpj.extraSourceKey != "" {
-		extraSrcCh, err = cacheExtraSourceObjects(ctx, tpj, metadata)
+	if tpj.profileImageKey != "" {
+		pfpCh, err = cacheProfileImageObjects(ctx, tpj, metadata)
 		if err != nil {
 			logger.For(ctx).Error("error caching extra source: %s")
 		}
@@ -288,13 +288,13 @@ func (tpj *tokenProcessingJob) cacheMediaObjects(ctx context.Context, metadata p
 			downloadSuccess = true
 		}
 	}
-	if extraSrcCh != nil {
-		<-extraSrcCh
+	if pfpCh != nil {
+		pfpResult = <-pfpCh
 	}
 
 	// If we have at least one successful download, we can create media from it
 	if downloadSuccess {
-		return createMediaFromResults(ctx, tpj, animResult, imgResult), nil
+		return createMediaFromResults(ctx, tpj, animResult, imgResult, pfpResult), nil
 	}
 
 	// Try to use OpenSea as a fallback

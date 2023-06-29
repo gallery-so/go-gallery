@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gammazero/workerpool"
 	"github.com/sirupsen/logrus"
 	"github.com/sourcegraph/conc"
@@ -20,7 +19,6 @@ import (
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
-	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -48,7 +46,6 @@ type Provider struct {
 	// some chains use the addresses of other chains, this will map of chain we want tokens from => chain that's address will be used for lookup
 	WalletOverrides WalletOverrideMap
 	SendTokens      SendTokens
-	ethClient       *ethclient.Client
 }
 
 // BlockchainInfo retrieves blockchain info from all chains
@@ -580,7 +577,7 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 }
 
 func (p *Provider) prepTokensForTokenProcessing(ctx context.Context, tokensFromProviders []chainTokens, contracts []persist.ContractGallery, user persist.User) ([]persist.TokenGallery, map[persist.TokenIdentifiers]bool, error) {
-	providerTokens, _ := tokensToNewDedupedTokens(ctx, tokensFromProviders, contracts, user, p.ethClient)
+	providerTokens, _ := tokensToNewDedupedTokens(tokensFromProviders, contracts, user)
 
 	currentTokens, err := p.Repos.TokenRepository.GetByUserID(ctx, user.ID, 0, 0)
 	if err != nil {
@@ -1425,7 +1422,7 @@ func (d *Provider) processContracts(ctx context.Context, contractsFromProviders 
 	return d.Repos.ContractRepository.BulkUpsert(ctx, newContracts, canOverwriteOwnerAddress)
 }
 
-func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contracts []persist.ContractGallery, ownerUser persist.User, ethClient *ethclient.Client) (tokens []persist.TokenGallery, tokenDBIDToAddress map[persist.DBID]persist.Address) {
+func tokensToNewDedupedTokens(tokens []chainTokens, contracts []persist.ContractGallery, ownerUser persist.User) (t []persist.TokenGallery, tokenDBIDToAddress map[persist.DBID]persist.Address) {
 	addressToDBID := make(map[string]persist.DBID)
 
 	util.Map(contracts, func(c persist.ContractGallery) (any, error) {
@@ -1467,7 +1464,7 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 				TokenURI:             "", // We don't save tokenURI information anymore
 				TokenID:              token.TokenID,
 				OwnerUserID:          ownerUser.ID,
-				FallbackMedia:        chooseFallbackMedia(ctx, ethClient, token),
+				FallbackMedia:        token.FallbackMedia,
 				TokenMetadata:        token.TokenMetadata,
 				Contract:             addressToDBID[chainToken.chain.NormalizeAddress(token.ContractAddress)],
 				ExternalURL:          persist.NullString(token.ExternalURL),
@@ -1635,21 +1632,4 @@ func dedupeWallets(wallets []persist.Wallet) []persist.Wallet {
 	}
 
 	return ret
-}
-
-// chooseFallbackMedia selects which media to use as the fallback
-// Namely, if it is an ENS token, it uses the profile image to use as the fallback
-func chooseFallbackMedia(ctx context.Context, ethClient *ethclient.Client, token ChainAgnosticToken) persist.FallbackMedia {
-	isEns := token.ContractAddress == eth.EnsAddress
-	bgExists := token.TokenMetadata["profile_image"] != ""
-	bgImg, isStr := token.TokenMetadata["profile_image"].(string)
-
-	if isEns && bgExists && isStr {
-		ethAddress := persist.EthereumAddress(token.OwnerAddress)
-		if ok, _ := eth.ReverseResolves(ctx, ethClient, ethAddress); ok {
-			return persist.FallbackMedia{ImageURL: persist.NullString(bgImg)}
-		}
-	}
-
-	return token.FallbackMedia
 }

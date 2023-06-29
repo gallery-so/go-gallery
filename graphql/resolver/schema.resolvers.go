@@ -268,6 +268,14 @@ func (r *ensProfileImageResolver) Wallet(ctx context.Context, obj *model.EnsProf
 	return resolveWalletByWalletID(ctx, obj.HelperEnsProfileImageData.WalletID)
 }
 
+// Token is the resolver for the token field.
+func (r *ensProfileImageResolver) Token(ctx context.Context, obj *model.EnsProfileImage) (*model.Token, error) {
+	if obj.HelperEnsProfileImageData.EnsDomain == "" || obj.HelperEnsProfileImageData.UserID == "" {
+		return nil, nil
+	}
+	return resolveTokenByEnsDomain(ctx, obj.HelperEnsProfileImageData.UserID, obj.HelperEnsProfileImageData.EnsDomain)
+}
+
 // EventData is the resolver for the eventData field.
 func (r *feedEventResolver) EventData(ctx context.Context, obj *model.FeedEvent) (model.FeedEventData, error) {
 	return resolveFeedEventDataByEventID(ctx, obj.Dbid)
@@ -435,8 +443,7 @@ func (r *galleryUserResolver) PotentialEnsProfileImage(ctx context.Context, obj 
 	if err != nil {
 		return nil, err
 	}
-	pfp := ensProfileImageToModel(ctx, a.WalletID, a.URI)
-	return &pfp, nil
+	return ensProfileImageToModel(ctx, obj.Dbid, a.WalletID, a.URI, a.Domain)
 }
 
 // Roles is the resolver for the roles field.

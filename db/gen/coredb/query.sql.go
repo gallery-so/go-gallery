@@ -4884,16 +4884,17 @@ func (q *Queries) SetContractOverrideCreator(ctx context.Context, arg SetContrac
 
 const setProfileImageToENS = `-- name: SetProfileImageToENS :one
 with profile_images as (
-    insert into profile_images (id, user_id, source_type, wallet_id, ens_avatar_uri, deleted, last_updated)
-    values ($2, $1, $3, $4, $5, false, now())
+    insert into profile_images (id, user_id, source_type, wallet_id, ens_domain, ens_avatar_uri, deleted, last_updated)
+    values ($2, $1, $3, $4, $5, $6, false, now())
     on conflict (user_id) do update set wallet_id = excluded.wallet_id
+        , ens_domain = excluded.ens_domain
         , ens_avatar_uri = excluded.ens_avatar_uri
         , source_type = excluded.source_type
         , deleted = excluded.deleted
         , last_updated = excluded.last_updated
-    returning id, user_id, token_id, source_type, deleted, created_at, last_updated, wallet_id, ens_avatar_uri
+    returning id, user_id, token_id, source_type, deleted, created_at, last_updated, wallet_id, ens_avatar_uri, ens_domain
 )
-update users set profile_image_id = profile_images.id from profile_images where users.id = $1 and not users.deleted returning profile_images.id, profile_images.user_id, profile_images.token_id, profile_images.source_type, profile_images.deleted, profile_images.created_at, profile_images.last_updated, profile_images.wallet_id, profile_images.ens_avatar_uri
+update users set profile_image_id = profile_images.id from profile_images where users.id = $1 and not users.deleted returning profile_images.id, profile_images.user_id, profile_images.token_id, profile_images.source_type, profile_images.deleted, profile_images.created_at, profile_images.last_updated, profile_images.wallet_id, profile_images.ens_avatar_uri, profile_images.ens_domain
 `
 
 type SetProfileImageToENSParams struct {
@@ -4901,6 +4902,7 @@ type SetProfileImageToENSParams struct {
 	ProfileID     persist.DBID
 	EnsSourceType persist.ProfileImageSource
 	WalletID      persist.DBID
+	EnsDomain     sql.NullString
 	EnsAvatarUri  sql.NullString
 }
 
@@ -4914,6 +4916,7 @@ func (q *Queries) SetProfileImageToENS(ctx context.Context, arg SetProfileImageT
 		arg.ProfileID,
 		arg.EnsSourceType,
 		arg.WalletID,
+		arg.EnsDomain,
 		arg.EnsAvatarUri,
 	)
 	var i SetProfileImageToENSRow
@@ -4927,6 +4930,7 @@ func (q *Queries) SetProfileImageToENS(ctx context.Context, arg SetProfileImageT
 		&i.ProfileImage.LastUpdated,
 		&i.ProfileImage.WalletID,
 		&i.ProfileImage.EnsAvatarUri,
+		&i.ProfileImage.EnsDomain,
 	)
 	return i, err
 }
