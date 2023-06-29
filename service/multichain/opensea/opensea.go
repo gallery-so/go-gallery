@@ -136,6 +136,7 @@ type Collection struct {
 	PayoutAddress         persist.EthereumAddress `json:"payout_address"`
 	PrimaryAssetContracts []Contract              `json:"primary_asset_contracts"`
 	Slug                  string                  `json:"slug"`
+	ImageURL              string                  `json:"image_url"`
 }
 
 // Contract represents an NFT contract from Opensea
@@ -677,9 +678,11 @@ func contractFromAsset(asset Asset, block persist.BlockNumber) multichain.ChainA
 	return multichain.ChainAgnosticContract{
 		Address: persist.Address(asset.Contract.ContractAddress.String()),
 		Descriptors: multichain.ChainAgnosticContractDescriptors{
-			Symbol:         asset.Contract.ContractSymbol.String(),
-			Name:           asset.Contract.ContractName.String(),
-			CreatorAddress: persist.Address(asset.Collection.PayoutAddress),
+			Symbol:          asset.Contract.ContractSymbol.String(),
+			Name:            asset.Contract.ContractName.String(),
+			CreatorAddress:  persist.Address(asset.Collection.PayoutAddress),
+			Description:     asset.Collection.Description,
+			ProfileImageURL: firstNonEmptyString(asset.Collection.ImageURL, asset.Contract.ContractImage.String()),
 		},
 		LatestBlock: block,
 	}
