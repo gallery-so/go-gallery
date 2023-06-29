@@ -109,7 +109,13 @@ on conflict (chain, address) where parent_id is null
 do update set symbol = excluded.symbol
   , version = excluded.version
   , name = excluded.name
-  , owner_address = excluded.owner_address
+  , owner_address =
+      case
+          when nullif(contracts.owner_address, '') is null or ($9::bool and nullif (excluded.owner_address, '') is not null)
+            then excluded.owner_address
+          else
+            contracts.owner_address
+      end
   , description = excluded.description
   , deleted = excluded.deleted
   , last_updated = now()
@@ -117,14 +123,15 @@ returning id, deleted, version, created_at, last_updated, name, symbol, address,
 `
 
 type UpsertParentContractsParams struct {
-	Ids          []string
-	Version      []int32
-	Address      []string
-	Symbol       []string
-	Name         []string
-	OwnerAddress []string
-	Chain        []int32
-	Description  []string
+	Ids                      []string
+	Version                  []int32
+	Address                  []string
+	Symbol                   []string
+	Name                     []string
+	OwnerAddress             []string
+	Chain                    []int32
+	Description              []string
+	CanOverwriteOwnerAddress bool
 }
 
 func (q *Queries) UpsertParentContracts(ctx context.Context, arg UpsertParentContractsParams) ([]Contract, error) {
@@ -137,6 +144,7 @@ func (q *Queries) UpsertParentContracts(ctx context.Context, arg UpsertParentCon
 		arg.OwnerAddress,
 		arg.Chain,
 		arg.Description,
+		arg.CanOverwriteOwnerAddress,
 	)
 	if err != nil {
 		return nil, err

@@ -40,7 +40,15 @@ func NewContractGalleryRepository(db *sql.DB, queries *db.Queries) *ContractGall
 	getByAddressesStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,SYMBOL,NAME,OWNER_ADDRESS,CHAIN,IS_PROVIDER_MARKED_SPAM FROM contracts WHERE ADDRESS = ANY($1) AND CHAIN = $2 AND DELETED = false;`)
 	checkNoErr(err)
 
-	upsertByAddressStmt, err := db.PrepareContext(ctx, `INSERT INTO contracts (ID,VERSION,ADDRESS,SYMBOL,NAME,OWNER_ADDRESS,CHAIN) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (ADDRESS,CHAIN) WHERE parent_id IS NULL DO UPDATE SET VERSION = $2, ADDRESS = $3, SYMBOL = $4, OWNER_ADDRESS = $6, CHAIN = $7;`)
+	upsertByAddressStmt, err := db.PrepareContext(ctx, `
+		insert into contracts (id,version,address,symbol,name,owner_address,chain) values ($1,$2,$3,$4,$5,$6,$7)
+			on conflict (address,chain) where parent_id is null do update set
+			version = $2,
+			address = $3,
+			symbol = $4,
+			owner_address = case when nullif(contracts.owner_address, '') is null then $6 else contracts.owner_address end,
+			chain = $7;
+	`)
 	checkNoErr(err)
 
 	getOwnersStmt, err := db.PrepareContext(ctx,
@@ -121,13 +129,15 @@ func (c *ContractGalleryRepository) UpsertByAddress(pCtx context.Context, pAddre
 }
 
 // BulkUpsert bulk upserts the contracts by address
-func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, pContracts []persist.ContractGallery) ([]persist.ContractGallery, error) {
+func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, pContracts []persist.ContractGallery, canOverwriteOwnerAddress bool) ([]persist.ContractGallery, error) {
 	if len(pContracts) == 0 {
 		return []persist.ContractGallery{}, nil
 	}
 
 	contracts := removeDuplicateContractsGallery(pContracts)
-	params := db.UpsertParentContractsParams{}
+	params := db.UpsertParentContractsParams{
+		CanOverwriteOwnerAddress: canOverwriteOwnerAddress,
+	}
 
 	for i := range contracts {
 		c := &contracts[i]

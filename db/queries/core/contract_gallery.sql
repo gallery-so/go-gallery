@@ -15,7 +15,13 @@ on conflict (chain, address) where parent_id is null
 do update set symbol = excluded.symbol
   , version = excluded.version
   , name = excluded.name
-  , owner_address = excluded.owner_address
+  , owner_address =
+      case
+          when nullif(contracts.owner_address, '') is null or (@can_overwrite_owner_address::bool and nullif (excluded.owner_address, '') is not null)
+            then excluded.owner_address
+          else
+            contracts.owner_address
+      end
   , description = excluded.description
   , deleted = excluded.deleted
   , last_updated = now()
