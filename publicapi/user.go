@@ -1407,7 +1407,12 @@ func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID, w
 
 				uri, err := uriFromRecord(ctx, api.multichainProvider, r)
 				if err != nil {
-					return err
+					// Couldn't parse the URI, but tokenprocessing may support it so don't error out
+					if errors.Is(err, eth.ErrUnknownEnsAvatarURI) {
+						uri = ""
+					} else {
+						return err
+					}
 				}
 
 				pfp, err := api.queries.SetProfileImageToENS(ctx, db.SetProfileImageToENSParams{
@@ -1554,7 +1559,7 @@ func uriFromRecord(ctx context.Context, mc *multichain.Provider, r eth.AvatarRec
 		uri, err = uriFromTokenRecord(ctx, mc, u)
 		return standardizeURI(uri), err
 	default:
-		return "", eth.ErrUnknownENSAvatarURI
+		return "", eth.ErrUnknownEnsAvatarURI
 	}
 }
 

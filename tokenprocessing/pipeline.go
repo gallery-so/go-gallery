@@ -272,7 +272,7 @@ func (tpj *tokenProcessingJob) cacheMediaObjects(ctx context.Context, metadata p
 	if tpj.profileImageKey != "" {
 		pfpCh, err = cacheProfileImageObjects(ctx, tpj, metadata)
 		if err != nil {
-			logger.For(ctx).Error("error caching extra source: %s")
+			logger.For(ctx).Errorf("error caching profile image source: %s", err)
 		}
 	}
 

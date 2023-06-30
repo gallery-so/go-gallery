@@ -60,7 +60,7 @@ func (api TokenAPI) GetTokenById(ctx context.Context, tokenID persist.DBID) (*db
 func (api TokenAPI) GetTokenByEnsDomain(ctx context.Context, userID persist.DBID, domain string) (db.Token, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"domain": {domain, "required"},
+		"domain": validate.WithTag(domain, "required"),
 	}); err != nil {
 		return db.Token{}, err
 	}

@@ -20,7 +20,7 @@ import (
 )
 
 var ErrNoResolution = errors.New("no resolution")
-var ErrUnknownENSAvatarURI = errors.New("unknown ENS avatar uri")
+var ErrUnknownEnsAvatarURI = errors.New("unknown ENS avatar uri")
 var ErrChainNotSupported = errors.New("chain not supported")
 var ErrUnknownTokenType = errors.New("unknown token type")
 var ErrNoAvatarRecord = errors.New("no avatar record set")
@@ -241,7 +241,7 @@ func toRecord(r string) (AvatarRecord, error) {
 			AssetID:        g[4],
 		}, nil
 	default:
-		return nil, ErrUnknownENSAvatarURI
+		return nil, ErrUnknownEnsAvatarURI
 	}
 }
 
