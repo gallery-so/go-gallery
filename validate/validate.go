@@ -87,6 +87,10 @@ type ValWithTags struct {
 	Tag   string
 }
 
+func WithTag(v any, t string) ValWithTags {
+	return ValWithTags{Value: v, Tag: t}
+}
+
 type ValidationMap map[string]ValWithTags
 
 // ValidateFields validates input fields based on a set of predefined validation tags

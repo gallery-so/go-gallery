@@ -45,8 +45,8 @@ type PageInfo struct {
 
 func validatePaginationParams(validator *validator.Validate, first *int, last *int) error {
 	if err := validate.ValidateFields(validator, validate.ValidationMap{
-		"first": {first, "omitempty,gte=0"},
-		"last":  {last, "omitempty,gte=0"},
+		"first": validate.WithTag(first, "omitempty,gte=0"),
+		"last":  validate.WithTag(last, "omitempty,gte=0"),
 	}); err != nil {
 		return err
 	}

@@ -32,8 +32,8 @@ type FeedAPI struct {
 func (api FeedAPI) BlockUser(ctx context.Context, userId persist.DBID, action persist.Action) error {
 	// Validate
 	err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"userId": {userId, "required"},
-		"action": {action, "required"},
+		"userId": validate.WithTag(userId, "required"),
+		"action": validate.WithTag(action, "required"),
 	})
 
 	if err != nil {
@@ -51,7 +51,7 @@ func (api FeedAPI) BlockUser(ctx context.Context, userId persist.DBID, action pe
 func (api FeedAPI) UnBlockUser(ctx context.Context, userId persist.DBID) error {
 	// Validate
 	err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"userId": {userId, "required"},
+		"userId": validate.WithTag(userId, "required"),
 	})
 
 	if err != nil {
@@ -65,7 +65,7 @@ func (api FeedAPI) UnBlockUser(ctx context.Context, userId persist.DBID) error {
 func (api FeedAPI) GetFeedEventById(ctx context.Context, feedEventID persist.DBID) (*db.FeedEvent, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"feedEventID": {feedEventID, "required"},
+		"feedEventID": validate.WithTag(feedEventID, "required"),
 	}); err != nil {
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func (api FeedAPI) GetFeedEventById(ctx context.Context, feedEventID persist.DBI
 func (api FeedAPI) GetRawEventById(ctx context.Context, eventID persist.DBID) (*db.Event, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"eventID": {eventID, "required"},
+		"eventID": validate.WithTag(eventID, "required"),
 	}); err != nil {
 		return nil, err
 	}
@@ -102,7 +102,7 @@ func (api FeedAPI) PaginatePersonalFeed(ctx context.Context, before *string, aft
 
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"userID": {userID, "required"},
+		"userID": validate.WithTag(userID, "required"),
 	}); err != nil {
 		return nil, PageInfo{}, err
 	}
@@ -153,7 +153,7 @@ func (api FeedAPI) PaginateUserFeed(ctx context.Context, userID persist.DBID, be
 	first *int, last *int) ([]db.FeedEvent, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"userID": {userID, "required"},
+		"userID": validate.WithTag(userID, "required"),
 	}); err != nil {
 		return nil, PageInfo{}, err
 	}

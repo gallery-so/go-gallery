@@ -33,7 +33,7 @@ type ContractAPI struct {
 func (api ContractAPI) GetContractByID(ctx context.Context, contractID persist.DBID) (*db.Contract, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"contractID": {contractID, "required"},
+		"contractID": validate.WithTag(contractID, "required"),
 	}); err != nil {
 		return nil, err
 	}
@@ -49,7 +49,7 @@ func (api ContractAPI) GetContractByID(ctx context.Context, contractID persist.D
 func (api ContractAPI) GetContractByAddress(ctx context.Context, contractAddress persist.ChainAddress) (*db.Contract, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"contractAddress": {contractAddress, "required"},
+		"contractAddress": validate.WithTag(contractAddress, "required"),
 	}); err != nil {
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func (api ContractAPI) GetContractByAddress(ctx context.Context, contractAddress
 func (api ContractAPI) GetChildContractsByParentID(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int) ([]db.Contract, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"contractID": {contractID, "required"},
+		"contractID": validate.WithTag(contractID, "required"),
 	}); err != nil {
 		return nil, PageInfo{}, err
 	}
@@ -125,7 +125,7 @@ func (api ContractAPI) GetChildContractsByParentID(ctx context.Context, contract
 func (api ContractAPI) GetContractCreatorByContractID(ctx context.Context, contractID persist.DBID) (db.ContractCreator, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"contractID": {contractID, "required"},
+		"contractID": validate.WithTag(contractID, "required"),
 	}); err != nil {
 		return db.ContractCreator{}, err
 	}
@@ -136,7 +136,7 @@ func (api ContractAPI) GetContractCreatorByContractID(ctx context.Context, contr
 func (api ContractAPI) GetContractsDisplayedByUserID(ctx context.Context, userID persist.DBID) ([]db.Contract, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"userID": {userID, "required"},
+		"userID": validate.WithTag(userID, "required"),
 	}); err != nil {
 		return nil, err
 	}
@@ -153,7 +153,7 @@ func (api ContractAPI) GetContractsDisplayedByUserID(ctx context.Context, userID
 func (api ContractAPI) RefreshContract(ctx context.Context, contractID persist.DBID) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"contractID": {contractID, "required"},
+		"contractID": validate.WithTag(contractID, "required"),
 	}); err != nil {
 		return err
 	}
@@ -175,7 +175,7 @@ func (api ContractAPI) RefreshContract(ctx context.Context, contractID persist.D
 func (api ContractAPI) RefreshOwnersAsync(ctx context.Context, contractID persist.DBID, forceRefresh bool) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"contractID": {contractID, "required"},
+		"contractID": validate.WithTag(contractID, "required"),
 	}); err != nil {
 		return err
 	}
@@ -190,7 +190,7 @@ func (api ContractAPI) RefreshOwnersAsync(ctx context.Context, contractID persis
 func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, before, after *string, first, last *int, onlyGalleryUsers bool) ([]db.User, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"contractAddress": {contractAddress, "required"},
+		"contractAddress": validate.WithTag(contractAddress, "required"),
 	}); err != nil {
 		return nil, PageInfo{}, err
 	}

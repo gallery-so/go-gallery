@@ -44,7 +44,7 @@ func (e ErrTokenRefreshFailed) Error() string {
 func (api TokenAPI) GetTokenById(ctx context.Context, tokenID persist.DBID) (*db.Token, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"tokenID": {tokenID, "required"},
+		"tokenID": validate.WithTag(tokenID, "required"),
 	}); err != nil {
 		return nil, err
 	}
@@ -60,7 +60,7 @@ func (api TokenAPI) GetTokenById(ctx context.Context, tokenID persist.DBID) (*db
 func (api TokenAPI) GetTokensByCollectionId(ctx context.Context, collectionID persist.DBID, limit *int) ([]db.Token, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"collectionID": {collectionID, "required"},
+		"collectionID": validate.WithTag(collectionID, "required"),
 	}); err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func (api TokenAPI) GetTokensByCollectionId(ctx context.Context, collectionID pe
 func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int, onlyGalleryUsers bool) ([]db.Token, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"contractID": {contractID, "required"},
+		"contractID": validate.WithTag(contractID, "required"),
 	}); err != nil {
 		return nil, PageInfo{}, err
 	}
@@ -178,7 +178,7 @@ func (api TokenAPI) GetTokensByIDs(ctx context.Context, tokenIDs []persist.DBID)
 func (api TokenAPI) GetNewTokensByFeedEventID(ctx context.Context, eventID persist.DBID) ([]db.Token, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"eventID": {eventID, "required"},
+		"eventID": validate.WithTag(eventID, "required"),
 	}); err != nil {
 		return nil, err
 	}
@@ -194,7 +194,7 @@ func (api TokenAPI) GetNewTokensByFeedEventID(ctx context.Context, eventID persi
 func (api TokenAPI) GetTokensByWalletID(ctx context.Context, walletID persist.DBID) ([]db.Token, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"walletID": {walletID, "required"},
+		"walletID": validate.WithTag(walletID, "required"),
 	}); err != nil {
 		return nil, err
 	}
@@ -213,7 +213,7 @@ func (api TokenAPI) GetTokensByWalletID(ctx context.Context, walletID persist.DB
 func (api TokenAPI) GetTokensByUserID(ctx context.Context, userID persist.DBID, ownershipFilter []persist.TokenOwnershipType) ([]db.Token, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"userID": {userID, "required"},
+		"userID": validate.WithTag(userID, "required"),
 	}); err != nil {
 		return nil, err
 	}
@@ -242,8 +242,8 @@ func (api TokenAPI) GetTokensByUserID(ctx context.Context, userID persist.DBID, 
 func (api TokenAPI) GetTokensByUserIDAndChain(ctx context.Context, userID persist.DBID, chain persist.Chain) ([]db.Token, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"userID": {userID, "required"},
-		"chain":  {chain, "chain"},
+		"userID": validate.WithTag(userID, "required"),
+		"chain":  validate.WithTag(chain, "chain"),
 	}); err != nil {
 		return nil, err
 	}
@@ -346,7 +346,7 @@ func (api TokenAPI) SyncCreatedTokens(ctx context.Context, includeChains []persi
 
 func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) error {
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"tokenID": {tokenDBID, "required"},
+		"tokenID": validate.WithTag(tokenDBID, "required"),
 	}); err != nil {
 		return err
 	}
@@ -370,7 +370,7 @@ func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) er
 
 func (api TokenAPI) RefreshTokensInCollection(ctx context.Context, ci persist.ContractIdentifiers) error {
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"contractIdentifiers": {ci, "required"},
+		"contractIdentifiers": validate.WithTag(ci, "required"),
 	}); err != nil {
 		return err
 	}
@@ -385,7 +385,7 @@ func (api TokenAPI) RefreshTokensInCollection(ctx context.Context, ci persist.Co
 
 func (api TokenAPI) RefreshCollection(ctx context.Context, collectionDBID persist.DBID) error {
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"collectionID": {collectionDBID, "required"},
+		"collectionID": validate.WithTag(collectionDBID, "required"),
 	}); err != nil {
 		return err
 	}
@@ -428,8 +428,8 @@ func (api TokenAPI) RefreshCollection(ctx context.Context, collectionDBID persis
 func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID, collectorsNote string) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"tokenID":        {tokenID, "required"},
-		"collectorsNote": {collectorsNote, "token_note"},
+		"tokenID":        validate.WithTag(tokenID, "required"),
+		"collectorsNote": validate.WithTag(collectorsNote, "token_note"),
 	}); err != nil {
 		return err
 	}
@@ -477,7 +477,7 @@ func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, c
 func (api TokenAPI) SetSpamPreference(ctx context.Context, tokens []persist.DBID, isSpam bool) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"tokens": {tokens, "required,unique"},
+		"tokens": validate.WithTag(tokens, "required,unique"),
 	}); err != nil {
 		return err
 	}
@@ -498,7 +498,7 @@ func (api TokenAPI) SetSpamPreference(ctx context.Context, tokens []persist.DBID
 func (api TokenAPI) MediaByTokenID(ctx context.Context, tokenID persist.DBID) (db.TokenMedia, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"tokenID": {tokenID, "required"},
+		"tokenID": validate.WithTag(tokenID, "required"),
 	}); err != nil {
 		return db.TokenMedia{}, err
 	}
@@ -509,7 +509,7 @@ func (api TokenAPI) MediaByTokenID(ctx context.Context, tokenID persist.DBID) (d
 func (api TokenAPI) GetTokenOwnershipByTokenID(ctx context.Context, tokenID persist.DBID) (db.TokenOwnership, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"tokenID": {tokenID, "required"},
+		"tokenID": validate.WithTag(tokenID, "required"),
 	}); err != nil {
 		return db.TokenOwnership{}, err
 	}

@@ -23,10 +23,10 @@ type SearchAPI struct {
 func (api SearchAPI) SearchUsers(ctx context.Context, query string, limit int, usernameWeight float32, bioWeight float32) ([]db.User, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"query":          {query, fmt.Sprintf("required,min=1,max=%d", maxSearchQueryLength)},
-		"limit":          {limit, fmt.Sprintf("min=1,max=%d", maxSearchResults)},
-		"usernameWeight": {usernameWeight, "gte=0.0,lte=1.0"},
-		"bioWeight":      {bioWeight, "gte=0.0,lte=1.0"},
+		"query":          validate.WithTag(query, fmt.Sprintf("required,min=1,max=%d", maxSearchQueryLength)),
+		"limit":          validate.WithTag(limit, fmt.Sprintf("min=1,max=%d", maxSearchResults)),
+		"usernameWeight": validate.WithTag(usernameWeight, "gte=0.0,lte=1.0"),
+		"bioWeight":      validate.WithTag(bioWeight, "gte=0.0,lte=1.0"),
 	}); err != nil {
 		return nil, err
 	}
@@ -47,10 +47,10 @@ func (api SearchAPI) SearchUsers(ctx context.Context, query string, limit int, u
 func (api SearchAPI) SearchGalleries(ctx context.Context, query string, limit int, nameWeight float32, descriptionWeight float32) ([]db.Gallery, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"query":             {query, fmt.Sprintf("required,min=1,max=%d", maxSearchQueryLength)},
-		"limit":             {limit, fmt.Sprintf("min=1,max=%d", maxSearchResults)},
-		"nameWeight":        {nameWeight, "gte=0.0,lte=1.0"},
-		"descriptionWeight": {descriptionWeight, "gte=0.0,lte=1.0"},
+		"query":             validate.WithTag(query, fmt.Sprintf("required,min=1,max=%d", maxSearchQueryLength)),
+		"limit":             validate.WithTag(limit, fmt.Sprintf("min=1,max=%d", maxSearchResults)),
+		"nameWeight":        validate.WithTag(nameWeight, "gte=0.0,lte=1.0"),
+		"descriptionWeight": validate.WithTag(descriptionWeight, "gte=0.0,lte=1.0"),
 	}); err != nil {
 		return nil, err
 	}
@@ -71,11 +71,11 @@ func (api SearchAPI) SearchGalleries(ctx context.Context, query string, limit in
 func (api SearchAPI) SearchContracts(ctx context.Context, query string, limit int, nameWeight float32, descriptionWeight float32, poapAddressWeight float32) ([]db.Contract, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"query":             {query, fmt.Sprintf("required,min=1,max=%d", maxSearchQueryLength)},
-		"limit":             {limit, fmt.Sprintf("min=1,max=%d", maxSearchResults)},
-		"nameWeight":        {nameWeight, "gte=0.0,lte=1.0"},
-		"descriptionWeight": {descriptionWeight, "gte=0.0,lte=1.0"},
-		"poapAddressWeight": {poapAddressWeight, "gte=0.0,lte=1.0"},
+		"query":             validate.WithTag(query, fmt.Sprintf("required,min=1,max=%d", maxSearchQueryLength)),
+		"limit":             validate.WithTag(limit, fmt.Sprintf("min=1,max=%d", maxSearchResults)),
+		"nameWeight":        validate.WithTag(nameWeight, "gte=0.0,lte=1.0"),
+		"descriptionWeight": validate.WithTag(descriptionWeight, "gte=0.0,lte=1.0"),
+		"poapAddressWeight": validate.WithTag(poapAddressWeight, "gte=0.0,lte=1.0"),
 	}); err != nil {
 		return nil, err
 	}
