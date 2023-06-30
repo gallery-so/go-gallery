@@ -12,6 +12,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	ens "github.com/wealdtech/go-ens/v3"
+	"github.com/wealdtech/go-ens/v3/contracts/resolver"
+	"github.com/wealdtech/go-ens/v3/contracts/reverseresolver"
 
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
@@ -21,6 +23,7 @@ var ErrNoResolution = errors.New("no resolution")
 var ErrUnknownENSAvatarURI = errors.New("unknown ENS avatar uri")
 var ErrChainNotSupported = errors.New("chain not supported")
 var ErrUnknownTokenType = errors.New("unknown token type")
+var ErrNoAvatarRecord = errors.New("no avatar record set")
 
 // Regex for CAIP-19 asset type with required asset ID
 // https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-19.md
@@ -38,20 +41,40 @@ const (
 
 // ReverseResolve returns the domain name for the given address
 func ReverseResolve(ctx context.Context, ethClient *ethclient.Client, address persist.EthereumAddress) (string, error) {
-	domain, err := ens.ReverseResolve(ethClient, common.HexToAddress(address.String()))
-	if err != nil && strings.Contains(err.Error(), "not a resolver") {
-		return "", ErrNoResolution
-	}
-	if err != nil && strings.Contains(err.Error(), "no resolution") {
-		return "", ErrNoResolution
-	}
+	registry, err := ens.NewRegistry(ethClient)
 	if err != nil {
 		return "", err
 	}
-	if domain == "" {
+
+	// Fetch the resolver address
+	addr := common.HexToAddress(address.String())
+	domain := fmt.Sprintf("%x.addr.reverse", addr)
+	resolverAddress, err := registry.ResolverAddress(domain)
+	if err != nil {
+		return "", err
+	}
+
+	// Init the resolver contract
+	contract, err := reverseresolver.NewContract(resolverAddress, ethClient)
+	if err != nil {
+		return "", err
+	}
+
+	nameHash, err := ens.NameHash(fmt.Sprintf("%s.addr.reverse", addr.Hex()[2:]))
+	if err != nil {
+		return "", err
+	}
+
+	name, err := contract.Name(nil, nameHash)
+	if err != nil && err.Error() == "no contract code at given address" {
 		return "", ErrNoResolution
 	}
-	return domain, nil
+
+	if name == "" {
+		return "", ErrNoResolution
+	}
+
+	return name, err
 }
 
 // ReverseResolves returns true if the reverse resolves to any domain
@@ -120,26 +143,37 @@ func EnsAvatarRecordFor(ctx context.Context, ethClient *ethclient.Client, a pers
 		return avatar, domain, err
 	}
 
-	resolver, err := ens.NewResolver(ethClient, domain)
+	registry, err := ens.NewRegistry(ethClient)
 	if err != nil {
-		return avatar, domain, err
+		return nil, "", err
 	}
 
-	record, err := resolver.Text("avatar")
+	resolverAddress, err := registry.ResolverAddress(domain)
 	if err != nil {
-		return avatar, domain, err
+		return nil, "", err
+	}
+
+	contract, err := resolver.NewContract(resolverAddress, ethClient)
+	if err != nil {
+		return nil, "", err
+	}
+
+	nameHash, err := ens.NameHash(domain)
+	if err != nil {
+		return nil, "", err
+	}
+
+	record, err := contract.Text(nil, nameHash, "avatar")
+	if err != nil {
+		return nil, "", err
 	}
 
 	if record == "" {
-		return avatar, domain, nil
+		return avatar, domain, ErrNoAvatarRecord
 	}
 
 	uri, err := toRecord(record)
-	if err != nil {
-		return nil, domain, err
-	}
-
-	return uri, domain, nil
+	return uri, domain, err
 }
 
 // IsOwner returns true if the address is the current holder of the token
