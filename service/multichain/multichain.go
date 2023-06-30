@@ -1422,7 +1422,7 @@ func (d *Provider) processContracts(ctx context.Context, contractsFromProviders 
 	return d.Repos.ContractRepository.BulkUpsert(ctx, newContracts, canOverwriteOwnerAddress)
 }
 
-func tokensToNewDedupedTokens(tokens []chainTokens, contracts []persist.ContractGallery, ownerUser persist.User) (t []persist.TokenGallery, tokenDBIDToAddress map[persist.DBID]persist.Address) {
+func tokensToNewDedupedTokens(tokens []chainTokens, contracts []persist.ContractGallery, ownerUser persist.User) ([]persist.TokenGallery, map[persist.DBID]persist.Address) {
 	addressToDBID := make(map[string]persist.DBID)
 
 	util.Map(contracts, func(c persist.ContractGallery) (any, error) {
@@ -1435,6 +1435,7 @@ func tokensToNewDedupedTokens(tokens []chainTokens, contracts []persist.Contract
 	seenWallets := make(map[persist.TokenIdentifiers][]persist.Wallet)
 	seenQuantities := make(map[persist.TokenIdentifiers]persist.HexString)
 	addressToWallets := make(map[string]persist.Wallet)
+	tokenDBIDToAddress := make(map[persist.DBID]persist.Address)
 
 	for _, wallet := range ownerUser.Wallets {
 		// could a normalized address ever overlap with the normalized address of another chain?
