@@ -13,8 +13,6 @@ import (
 	"github.com/lib/pq"
 )
 
-var errWalletValueNoID = fmt.Errorf("wallet value has no ID")
-
 // Wallet represents an address on any chain
 type Wallet struct {
 	ID           DBID      `json:"id"`

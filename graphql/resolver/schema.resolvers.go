@@ -919,7 +919,7 @@ func (r *mutationResolver) SetSpamPreference(ctx context.Context, input model.Se
 func (r *mutationResolver) SyncTokens(ctx context.Context, chains []persist.Chain) (model.SyncTokensPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
-	if chains == nil || len(chains) == 0 {
+	if len(chains) == 0 {
 		chains = []persist.Chain{persist.ChainETH}
 	}
 
@@ -1575,7 +1575,7 @@ func (r *mutationResolver) SyncTokensForUsername(ctx context.Context, username s
 		return nil, err
 	}
 
-	if chains == nil || len(chains) == 0 {
+	if len(chains) == 0 {
 		chains = []persist.Chain{persist.ChainETH}
 	}
 
@@ -1601,7 +1601,7 @@ func (r *mutationResolver) SyncCreatedTokensForUsername(ctx context.Context, use
 		return nil, err
 	}
 
-	if chains == nil || len(chains) == 0 {
+	if len(chains) == 0 {
 		chains = persist.AllChains
 	}
 

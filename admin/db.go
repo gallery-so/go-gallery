@@ -27,9 +27,6 @@ type statements struct {
 	updateCollectionStmt  *sql.Stmt
 
 	galleryRepo postgres.GalleryRepository
-	// nftRepo     persist.NFTRepository
-	userRepo postgres.UserRepository
-	collRepo postgres.CollectionTokenRepository
 }
 
 func newStatements(db *sql.DB) *statements {
@@ -44,6 +41,7 @@ func newStatements(db *sql.DB) *statements {
 	checkNoErr(err)
 
 	getUserByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID, ADDRESSES, BIO, USERNAME, USERNAME_IDEMPOTENT, LAST_UPDATED, CREATED_AT FROM users WHERE ADDRESSES @> ARRAY[$1]:: varchar[] AND DELETED = false;`)
+	checkNoErr(err)
 
 	deleteUserStmt, err := db.PrepareContext(ctx, `UPDATE users SET DELETED = true WHERE ID = $1;`)
 	checkNoErr(err)

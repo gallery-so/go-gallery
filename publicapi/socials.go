@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
@@ -272,7 +271,7 @@ func (api SocialAPI) newTwitterAPIForUser(ctx context.Context, userID persist.DB
 
 	tapi, newSocials, err := twitter.NewAPI(api.queries, api.redis).WithAuth(ctx, socialAuth.AccessToken.String, socialAuth.RefreshToken.String)
 	if newSocials != nil {
-		err = api.queries.UpsertSocialOAuth(ctx, coredb.UpsertSocialOAuthParams{
+		err = api.queries.UpsertSocialOAuth(ctx, db.UpsertSocialOAuthParams{
 			ID:           persist.GenerateID(),
 			UserID:       userID,
 			Provider:     persist.SocialProviderTwitter,

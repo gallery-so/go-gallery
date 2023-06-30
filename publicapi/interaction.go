@@ -369,6 +369,9 @@ func (api InteractionAPI) AdmireFeedEvent(ctx context.Context, feedEventID persi
 	}
 
 	admireID, err := api.repos.AdmireRepository.CreateAdmire(ctx, feedEventID, userID)
+	if err != nil {
+		return "", err
+	}
 
 	_, err = dispatchEvent(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),

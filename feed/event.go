@@ -28,25 +28,7 @@ var (
 	eventGroups = createEventGroups(groupingConfig)
 )
 
-var (
-	eventSegments = map[persist.Action]segment{
-		persist.ActionUserFollowedUsers: actorActionSegment,
-	}
-
-	// Feed events in this group can contain a collection collector's note
-	collectionCollectorsNoteActions = persist.ActionList{
-		persist.ActionCollectionUpdated,
-		persist.ActionCollectorsNoteAddedToCollection,
-		persist.ActionCollectionCreated,
-	}
-
-	// Feed events in this group can contain added tokens
-	collectionTokensAddedActions = persist.ActionList{
-		persist.ActionCollectionUpdated,
-		persist.ActionTokensAddedToCollection,
-		persist.ActionCollectionCreated,
-	}
-)
+var eventSegments = map[persist.Action]segment{persist.ActionUserFollowedUsers: actorActionSegment}
 
 const (
 	noSegment segment = iota
@@ -281,37 +263,6 @@ func (b *EventBuilder) createGalleryUpdatedFeedEventFromEvents(ctx context.Conte
 	})
 }
 
-// getAddedTokens returns the new tokens that were added since the last published feed event.
-func getAddedTokens(ctx context.Context, feedRepo *postgres.FeedRepository, event db.Event) (added []persist.DBID, hasPrior bool, err error) {
-	priorEvent, err := feedRepo.LastPublishedCollectionFeedEvent(ctx, persist.NullStrToDBID(event.ActorID), event.CollectionID, event.CreatedAt, collectionTokensAddedActions)
-	if err != nil {
-		return added, true, err
-	}
-
-	// If a create event doesn't exist, then the collection was made before the feed
-	// or the event itself is the create event.
-	if priorEvent == nil {
-		return event.Data.CollectionTokenIDs, false, nil
-	}
-
-	added = newTokens(event.Data.CollectionTokenIDs, priorEvent.Data.CollectionTokenIDs)
-	return added, true, nil
-}
-
-// isCollectionCollectorsNoteChanged returns true if the collector's note differs from the last published feed event.
-func isCollectionCollectorsNoteChanged(ctx context.Context, feedRepo *postgres.FeedRepository, event db.Event) (bool, error) {
-	priorEvent, err := feedRepo.LastPublishedCollectionFeedEvent(ctx, persist.NullStrToDBID(event.ActorID), event.CollectionID, event.CreatedAt, collectionCollectorsNoteActions)
-	if err != nil {
-		return false, err
-	}
-
-	if priorEvent != nil && priorEvent.Data.CollectionNewCollectorsNote == event.Data.CollectionCollectorsNote {
-		return false, nil
-	}
-
-	return true, nil
-}
-
 func getActions(action persist.Action) persist.ActionList {
 	// Check if action belongs to a group
 	if actions, ok := groupingConfig[action]; ok {
@@ -331,25 +282,4 @@ func getSegment(action persist.Action) segment {
 		return noSegment
 	}
 	return eventSegment
-}
-
-func newTokens(tokens []persist.DBID, otherTokens []persist.DBID) []persist.DBID {
-	newTokens := make([]persist.DBID, 0)
-
-	for _, token := range tokens {
-		var exists bool
-
-		for _, otherToken := range otherTokens {
-			if token == otherToken {
-				exists = true
-				break
-			}
-		}
-
-		if !exists {
-			newTokens = append(newTokens, token)
-		}
-	}
-
-	return newTokens
 }

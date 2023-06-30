@@ -532,11 +532,6 @@ func (t *TokenRepository) deleteTokenUnsafe(pCtx context.Context, pTokenID persi
 	return err
 }
 
-type blockWithIndex struct {
-	block persist.BlockNumber
-	index int
-}
-
 func (t *TokenRepository) dedupeTokens(pTokens []persist.Token) []persist.Token {
 	seen := map[string]persist.Token{}
 	for _, token := range pTokens {

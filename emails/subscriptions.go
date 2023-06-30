@@ -27,17 +27,17 @@ func init() {
 var emailTypes = []model.EmailUnsubscriptionType{model.EmailUnsubscriptionTypeAll, model.EmailUnsubscriptionTypeNotifications}
 
 type UpdateSubscriptionsTypeInput struct {
-	UserID persist.DBID                 `json:"user_id,required"`
+	UserID persist.DBID                 `json:"user_id" binding:"required"`
 	Unsubs persist.EmailUnsubscriptions `json:"unsubscriptions" binding:"required"`
 }
 
 type UnsubInput struct {
-	JWT    string                          `json:"jwt,required"`
+	JWT    string                          `json:"jwt" binding:"required"`
 	Unsubs []model.EmailUnsubscriptionType `json:"unsubscriptions" binding:"required"`
 }
 
 type ResubInput struct {
-	JWT    string                          `json:"jwt,required"`
+	JWT    string                          `json:"jwt" binding:"required"`
 	Resubs []model.EmailUnsubscriptionType `json:"resubscriptions" binding:"required"`
 }
 

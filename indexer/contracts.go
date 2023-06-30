@@ -37,7 +37,7 @@ type GetContractInput struct {
 
 // UpdateContractMetadataInput is used to refresh metadata for a given contract
 type UpdateContractMetadataInput struct {
-	Address persist.EthereumAddress `json:"address,required"`
+	Address persist.EthereumAddress `json:"address" binding:"required"`
 }
 
 func getContract(contractsRepo persist.ContractRepository) gin.HandlerFunc {

@@ -150,10 +150,6 @@ type assetsReceieved struct {
 	err    error
 }
 
-type errNoSingleNFTForOpenseaID struct {
-	openseaID int
-}
-
 // ErrNoAssetsForWallets is returned when opensea returns an empty array of assets for a wallet address
 type ErrNoAssetsForWallets struct {
 	Wallets []persist.EthereumAddress
@@ -784,10 +780,6 @@ func contractToContract(ctx context.Context, openseaContract Contract, ethClient
 	}, nil
 }
 
-func (e errNoSingleNFTForOpenseaID) Error() string {
-	return fmt.Sprintf("no single NFT found for opensea id %d", e.openseaID)
-}
-
 func (e ErrNoAssetsForWallets) Error() string {
 	return fmt.Sprintf("no assets found for wallet: %v", e.Wallets)
 }
@@ -872,12 +864,6 @@ func setPagingParams(url *url.URL) {
 func setOwner(url *url.URL, address persist.EthereumAddress) {
 	query := url.Query()
 	query.Set("owner", address.String())
-	url.RawQuery = query.Encode()
-}
-
-func setAssetOwner(url *url.URL, address persist.EthereumAddress) {
-	query := url.Query()
-	query.Set("asset_owner", address.String())
 	url.RawQuery = query.Encode()
 }
 

@@ -202,7 +202,7 @@ func (tpj *tokenProcessingJob) retrieveMetadata(ctx context.Context) persist.Tok
 		if err != nil {
 			logger.For(ctx).Warnf("error getting metadata from chain: %s", err)
 			persist.FailStep(&tpj.pipelineMetadata.MetadataRetrieval)
-		} else if mcMetadata != nil && len(mcMetadata) > 0 {
+		} else if len(mcMetadata) > 0 {
 			logger.For(ctx).Infof("got metadata from chain: %v", mcMetadata)
 			newMetadata = mcMetadata
 		}
@@ -303,7 +303,7 @@ func (tpj *tokenProcessingJob) cacheMediaObjects(ctx context.Context, metadata p
 	}
 
 	// We somehow didn't cache media without getting an error anywhere
-	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.NothingCachedWithoutErrors, "NothingCachedWithoutErrors")
+	traceCallback, _ := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.NothingCachedWithoutErrors, "NothingCachedWithoutErrors")
 	defer traceCallback()
 
 	panic("failed to cache media, and no error occurred in the process")
@@ -334,15 +334,9 @@ func (tpj *tokenProcessingJob) createRawMedia(ctx context.Context, mediaType per
 }
 
 func (tpj *tokenProcessingJob) isNewMediaPreferable(ctx context.Context, media persist.Media) bool {
-	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.MediaResultComparison, "MediaResultComparison")
+	traceCallback, _ := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.MediaResultComparison, "MediaResultComparison")
 	defer traceCallback()
-
-	if media.IsServable() {
-		// if the media is good, it is active
-		return true
-	}
-	// any other case, the media is not active
-	return false
+	return media.IsServable()
 }
 
 func (tpj *tokenProcessingJob) persistResults(ctx context.Context, tmetadata coredb.TokenMedia) error {

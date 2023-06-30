@@ -16,7 +16,6 @@ import (
 	"github.com/bsm/redislock"
 	"github.com/gin-gonic/gin"
 	"github.com/googleapis/gax-go/v2/apierror"
-	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -210,7 +209,7 @@ func (d *notificationDispatcher) Dispatch(ctx context.Context, notif db.Notifica
 }
 
 type defaultNotificationHandler struct {
-	queries    *coredb.Queries
+	queries    *db.Queries
 	pubSub     *pubsub.Client
 	taskClient *cloudtasks.Client
 	limiter    *pushLimiter
@@ -221,7 +220,7 @@ func (h defaultNotificationHandler) Handle(ctx context.Context, notif db.Notific
 }
 
 type groupedNotificationHandler struct {
-	queries    *coredb.Queries
+	queries    *db.Queries
 	pubSub     *pubsub.Client
 	taskClient *cloudtasks.Client
 	limiter    *pushLimiter
@@ -256,7 +255,7 @@ func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notific
 }
 
 type viewedNotificationHandler struct {
-	queries    *coredb.Queries
+	queries    *db.Queries
 	pubSub     *pubsub.Client
 	taskClient *cloudtasks.Client
 	limiter    *pushLimiter
@@ -286,7 +285,7 @@ func (h viewedNotificationHandler) Handle(ctx context.Context, notif db.Notifica
 		Action:       notif.Action,
 		CreatedAfter: beginningOfWeek(time.Now()),
 	})
-	if notifs == nil || len(notifs) == 0 {
+	if len(notifs) == 0 {
 		// if there are no notifications this week, then we definitely are going to insert this one
 		logger.For(ctx).Debugf("no notifications this week, inserting: %s-%s", notif.Action, notif.OwnerID)
 		return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub, h.taskClient, h.limiter)
@@ -610,7 +609,7 @@ func insertAndPublishNotif(ctx context.Context, notif db.Notification, queries *
 }
 
 func updateAndPublishNotif(ctx context.Context, notif db.Notification, mostRecentNotif db.Notification, queries *db.Queries, ps *pubsub.Client, taskClient *cloudtasks.Client, limiter *pushLimiter) error {
-	amount := notif.Amount
+	var amount = notif.Amount
 	resultData := mostRecentNotif.Data.Concat(notif.Data)
 	switch notif.Action {
 	case persist.ActionAdmiredFeedEvent:

@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 	"os"
-	"time"
 
 	"cloud.google.com/go/pubsub"
 	"github.com/getsentry/sentry-go"
@@ -16,9 +15,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
-	"github.com/mikeydub/go-gallery/service/redis"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
-	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sendgrid/sendgrid-go"
@@ -123,10 +120,6 @@ func setDefaults() {
 	}
 }
 
-func newThrottler() *throttle.Locker {
-	return throttle.NewThrottleLocker(redis.NewCache(redis.EmailThrottleCache), time.Minute*5)
-}
-
 func initSentry() {
 	if env.GetString("ENV") == "local" {
 		logger.For(nil).Info("skipping sentry init")
@@ -152,24 +145,6 @@ func initSentry() {
 	if err != nil {
 		logger.For(nil).Fatalf("failed to start sentry: %s", err)
 	}
-}
-
-func initLogger() {
-	logger.SetLoggerOptions(func(l *logrus.Logger) {
-		l.SetReportCaller(true)
-
-		if env.GetString("ENV") != "production" {
-			l.SetLevel(logrus.DebugLevel)
-		}
-
-		if env.GetString("ENV") == "local" {
-			l.SetFormatter(&logrus.TextFormatter{DisableQuote: true})
-		} else {
-			// Use a JSONFormatter for non-local environments because Google Cloud Logging works well with JSON-formatted log entries
-			l.SetFormatter(&logrus.JSONFormatter{})
-		}
-
-	})
 }
 
 func isDevEnv() bool {

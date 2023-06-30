@@ -79,12 +79,6 @@ type tzMetadata struct {
 	ShouldPreferSymbol any    `json:"shouldPreferSymbol"`
 }
 
-type tzAccount struct {
-	Address string `json:"address"`
-	Alias   string `json:"alias"`
-	Public  string `json:"publicKey"`
-}
-
 type tokenID string
 type balance string
 
@@ -380,14 +374,11 @@ func (d *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, toke
 	if len(contracts) > 0 {
 		contract = contracts[0]
 	}
-	token := multichain.ChainAgnosticToken{}
 	if len(tokens) > 0 {
-		token = tokens[0]
+		return tokens[0], contract, nil
 	} else {
 		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, ErrNoTokensFoundByIdentifiers{tokenIdentifiers}
 	}
-
-	return token, contract, nil
 }
 
 func (d *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers) (multichain.ChainAgnosticTokenDescriptors, multichain.ChainAgnosticContractDescriptors, error) {
@@ -766,33 +757,6 @@ func dedupeBalances(tzTokens []tzktBalanceToken) []tzktBalanceToken {
 		result = append(result, t)
 	}
 	return result
-}
-
-func (d *Provider) getPublicKeyFromAddress(ctx context.Context, address persist.Address) (persist.Address, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/v1/accounts/%s", d.apiURL, address), nil)
-	if err != nil {
-		return "", err
-	}
-	resp, err := retry.RetryRequest(d.httpClient, req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return "", util.GetErrFromResp(resp)
-	}
-	var account tzAccount
-	if err := json.NewDecoder(resp.Body).Decode(&account); err != nil {
-		return "", err
-	}
-	key, err := tezos.ParseKey(account.Public)
-	if err != nil {
-		return "", err
-	}
-	if !strings.EqualFold(key.Address().String(), address.String()) {
-		return "", fmt.Errorf("public key hash %s does not match address %s", string(key.Hash()), address)
-	}
-	return persist.Address(account.Public), nil
 }
 
 func (d *Provider) tzContractToContract(ctx context.Context, tzContract tzktContract) multichain.ChainAgnosticContract {

@@ -17,8 +17,8 @@ type Traits map[string]interface{}
 type Socials map[SocialProvider]SocialUserIdentifiers
 
 type SocialUserIdentifiers struct {
-	Provider SocialProvider         `json:"provider,required" binding:"required"`
-	ID       string                 `json:"id,required" binding:"required"`
+	Provider SocialProvider         `json:"provider" binding:"required"`
+	ID       string                 `json:"id" binding:"required"`
 	Display  bool                   `json:"display"`
 	Metadata map[string]interface{} `json:"metadata"`
 }
@@ -280,8 +280,8 @@ type Role string
 
 const (
 	RoleAdmin       Role = "ADMIN"
-	RoleBetaTester       = "BETA_TESTER"
-	RoleEarlyAccess      = "EARLY_ACCESS"
+	RoleBetaTester  Role = "BETA_TESTER"
+	RoleEarlyAccess Role = "EARLY_ACCESS"
 )
 
 // Scan implements the database/sql Scanner interface for the DBID type
@@ -346,7 +346,7 @@ type ProfileImageSource string // ProfileImageSource represents the source of a 
 
 const (
 	ProfileImageSourceToken ProfileImageSource = "token"
-	ProfileImageSourceENS                      = "ens"
+	ProfileImageSourceENS   ProfileImageSource = "ens"
 )
 
 type ErrProfileImageNotFound struct {

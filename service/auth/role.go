@@ -14,7 +14,7 @@ func RolesByUserID(ctx context.Context, queries *db.Queries, userID persist.DBID
 		UserID:                userID,
 		MembershipAddress:     persist.Address(membershipAddress),
 		MembershipTokenIds:    memberTokens,
-		GrantedMembershipRole: persist.RoleEarlyAccess, // Role granted if user carries a matching token
+		GrantedMembershipRole: string(persist.RoleEarlyAccess), // Role granted if user carries a matching token
 		Chain:                 persist.ChainETH,
 	})
 }

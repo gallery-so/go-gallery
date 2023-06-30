@@ -17,7 +17,6 @@ import (
 	"github.com/mikeydub/go-gallery/validate"
 
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
-	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -56,7 +55,6 @@ type MerchAPI struct {
 	loaders            *dataloader.Loaders
 	validator          *validator.Validate
 	ethClient          *ethclient.Client
-	storageClient      *storage.Client
 	multichainProvider *multichain.Provider
 	secrets            *secretmanager.Client
 }

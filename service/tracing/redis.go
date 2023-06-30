@@ -44,7 +44,7 @@ func (r redisHook) BeforeProcess(ctx context.Context, cmd redis.Cmder) (context.
 	cmdBytes := make([]byte, 0, 32)
 	cmdString := string(appendCmd(cmdBytes, cmd))
 
-	span, ctx := StartSpan(ctx, "redis."+strings.ToLower(cmd.FullName()), r.dbName)
+	span, _ := StartSpan(ctx, "redis."+strings.ToLower(cmd.FullName()), r.dbName)
 
 	AddEventDataToSpan(span, map[string]interface{}{
 		"Redis Cmd": cmdString,
@@ -78,7 +78,7 @@ func (r redisHook) BeforeProcessPipeline(ctx context.Context, cmds []redis.Cmder
 		}
 	}
 
-	span, ctx := StartSpan(ctx, "redis.pipeline", r.dbName)
+	span, _ := StartSpan(ctx, "redis.pipeline", r.dbName)
 
 	AddEventDataToSpan(span, map[string]interface{}{
 		"Redis Pipeline Num Cmds": len(cmds),

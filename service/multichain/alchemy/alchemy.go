@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/big"
 	"net/http"
 	"net/url"
@@ -167,33 +167,6 @@ func (r getNFTsForCollectionResponse) GetNextPageKey() string {
 	return r.NextToken.String()
 }
 
-type getNFTsForCollectionWithOwnerResponse struct {
-	owner     persist.EthereumAddress
-	d         *Provider
-	ctx       context.Context
-	NFTs      []Token `json:"nfts"`
-	NextToken TokenID `json:"nextToken"`
-}
-
-func (r *getNFTsForCollectionWithOwnerResponse) GetTokensFromResponse(resp *http.Response) ([]Token, error) {
-	r.NFTs = nil
-	if err := json.NewDecoder(resp.Body).Decode(r); err != nil {
-		return nil, err
-	}
-
-	return util.Filter(r.NFTs, func(t Token) bool {
-		owners, err := r.d.getOwnersForToken(r.ctx, t)
-		if err != nil {
-			return false
-		}
-		return util.Contains(owners, r.owner)
-	}, true), nil
-}
-
-func (r getNFTsForCollectionWithOwnerResponse) GetNextPageKey() string {
-	return r.NextToken.String()
-}
-
 // Provider is an the struct for retrieving data from the Ethereum blockchain
 type Provider struct {
 	chain         persist.Chain
@@ -289,7 +262,7 @@ func getNFTsPaginate[T tokensPaginated](ctx context.Context, baseURL string, def
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		asString, _ := ioutil.ReadAll(resp.Body)
+		asString, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("failed to get tokens from alchemy api: %s (err: %s) (url: %s)", resp.Status, asString, u)
 	}
 
@@ -379,7 +352,7 @@ func (d *Provider) getTokenWithMetadata(ctx context.Context, ti multichain.Chain
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
 
-	if token.Metadata.Image == "" && forceRefresh == false {
+	if token.Metadata.Image == "" && !forceRefresh {
 		return d.getTokenWithMetadata(ctx, ti, true, timeout)
 	}
 

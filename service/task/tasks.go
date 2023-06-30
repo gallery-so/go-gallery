@@ -16,8 +16,7 @@ type update struct {
 	key string
 	val []byte
 
-	ttl  time.Duration
-	sync bool
+	ttl time.Duration
 }
 
 // UpdateQueue is a queue of updates to be run

@@ -47,7 +47,6 @@ func main() {
 	addresses = removeDuplicateAddresses(addresses)
 	if len(addresses) != numAddresses {
 		fmt.Printf("removed %d duplicate addresses\n", numAddresses-len(addresses))
-		numAddresses = len(addresses)
 	}
 
 	err = insertAddresses(context.Background(), connectionStr, addresses)

@@ -6,7 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/big"
 	"net/http"
 	"sort"
@@ -54,8 +54,6 @@ const (
 	transferSingleEventHash eventHash = "0xc3d58168c5ae7397731d063d5bbf3d657854427343f4c083240f7aacaa2d0f62"
 	// transferBatchEventHash represents the keccak256 hash of TransferBatch(address,address,address,uint256[],uint256[])
 	transferBatchEventHash eventHash = "0x4a39dc06d4c0dbc64b70af90fd698a233a518aa5d07e595d983b8c0526c8f7fb"
-	// uriEventHash represents the keccak256 hash of URI(string,uint256)
-	uriEventHash eventHash = "0x6bb7ff708619ba0610cba295a58592e0451dee2622938c8755667688daf3529b"
 
 	defaultWorkerPoolSize     = 3
 	defaultWorkerPoolWaitSize = 10
@@ -65,28 +63,12 @@ const (
 var (
 	rpcEnabled            bool = false // Enables external RPC calls
 	erc1155ABI, _              = contracts.IERC1155MetaData.GetAbi()
-	animationKeywords          = []string{"animation", "video"}
-	imageKeywords              = []string{"image"}
 	defaultTransferEvents      = []eventHash{
 		transferBatchEventHash,
 		transferEventHash,
 		transferSingleEventHash,
 	}
 )
-
-type errForTokenAtBlockAndIndex struct {
-	err error
-	boi blockchainOrderInfo
-	ti  persist.EthereumTokenIdentifiers
-}
-
-func (e errForTokenAtBlockAndIndex) TokenIdentifiers() persist.EthereumTokenIdentifiers {
-	return e.ti
-}
-
-func (e errForTokenAtBlockAndIndex) OrderInfo() blockchainOrderInfo {
-	return e.boi
-}
 
 // eventHash represents an event keccak256 hash
 type eventHash string
@@ -582,97 +564,6 @@ func logsToTransfers(ctx context.Context, pLogs []types.Log) []rpc.Transfer {
 	return result
 }
 
-type tokenIdentifiers struct {
-	tokenID         persist.TokenID
-	contractAddress persist.EthereumAddress
-	ownerAddress    persist.EthereumAddress
-	tokenType       persist.TokenType
-}
-
-func getTokenIdentifiersFromLog(ctx context.Context, log types.Log) ([]tokenIdentifiers, error) {
-
-	result := make([]tokenIdentifiers, 0, 10)
-	switch {
-	case strings.EqualFold(log.Topics[0].Hex(), string(transferEventHash)):
-
-		if len(log.Topics) < 4 {
-			return nil, fmt.Errorf("invalid log topics length: %d: %+v", len(log.Topics), log)
-		}
-
-		ti := tokenIdentifiers{
-			tokenID:         persist.TokenID(log.Topics[3].Hex()),
-			contractAddress: persist.EthereumAddress(log.Address.Hex()),
-			ownerAddress:    persist.EthereumAddress(log.Topics[2].Hex()),
-			tokenType:       persist.TokenTypeERC721,
-		}
-
-		result = append(result, ti)
-
-	case strings.EqualFold(log.Topics[0].Hex(), string(transferSingleEventHash)):
-		if len(log.Topics) < 4 {
-			return nil, fmt.Errorf("invalid log topics length: %d: %+v", len(log.Topics), log)
-		}
-
-		eventData := map[string]interface{}{}
-		err := erc1155ABI.UnpackIntoMap(eventData, "TransferSingle", log.Data)
-		if err != nil {
-			logger.For(ctx).WithError(err).Error("Failed to unpack TransferSingle event")
-			panic(err)
-		}
-
-		id, ok := eventData["id"].(*big.Int)
-		if !ok {
-			panic("Failed to unpack TransferSingle event, id not found")
-		}
-		ti := tokenIdentifiers{
-			tokenID:         persist.TokenID(id.Text(16)),
-			contractAddress: persist.EthereumAddress(log.Address.Hex()),
-			ownerAddress:    persist.EthereumAddress(log.Topics[3].Hex()),
-			tokenType:       persist.TokenTypeERC1155,
-		}
-
-		result = append(result, ti)
-
-	case strings.EqualFold(log.Topics[0].Hex(), string(transferBatchEventHash)):
-		if len(log.Topics) < 4 {
-			return nil, fmt.Errorf("invalid log topics length: %d: %+v", len(log.Topics), log)
-		}
-
-		eventData := map[string]interface{}{}
-		err := erc1155ABI.UnpackIntoMap(eventData, "TransferBatch", log.Data)
-		if err != nil {
-			logger.For(ctx).WithError(err).Error("Failed to unpack TransferBatch event")
-			panic(err)
-		}
-
-		ids, ok := eventData["ids"].([]*big.Int)
-		if !ok {
-			panic("Failed to unpack TransferBatch event, ids not found")
-		}
-
-		for j := 0; j < len(ids); j++ {
-
-			ti := tokenIdentifiers{
-				tokenID:         persist.TokenID(ids[j].Text(16)),
-				contractAddress: persist.EthereumAddress(log.Address.Hex()),
-				ownerAddress:    persist.EthereumAddress(log.Topics[3].Hex()),
-				tokenType:       persist.TokenTypeERC1155,
-			}
-
-			result = append(result, ti)
-		}
-	default:
-		logger.For(ctx).WithFields(logrus.Fields{
-			"address":   log.Address,
-			"block":     log.BlockNumber,
-			"eventType": log.Topics[0]},
-		).Warn("unknown event")
-	}
-
-	return result, nil
-
-}
-
 func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transfersAtBlock, topics [][]common.Hash, mostRecentBlock uint64, statsID persist.DBID) {
 	span, ctx := tracing.StartSpan(ctx, "indexer.logs", "pollLogs")
 	defer tracing.FinishSpan(span)
@@ -762,7 +653,7 @@ func (i *indexer) processAllTransfers(ctx context.Context, incomingTransfers <-c
 	logger.For(ctx).Info("Starting to process transfers...")
 	var totatTransfers int64
 	for transfers := range incomingTransfers {
-		if transfers == nil || len(transfers) == 0 {
+		if len(transfers) == 0 {
 			continue
 		}
 
@@ -1013,7 +904,7 @@ func GetContractMetadatas(ctx context.Context, batch []persist.Contract, httpCli
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		bodyAsBytes, _ := ioutil.ReadAll(resp.Body)
+		bodyAsBytes, _ := io.ReadAll(resp.Body)
 		logger.For(ctx).Errorf("Failed to execute contract metadata request: %s status: %s (url: %s) (input: %s) ", string(bodyAsBytes), resp.Status, u, string(inAsJSON))
 		return nil, err
 	}
@@ -1109,18 +1000,6 @@ func recoverAndWait(ctx context.Context) {
 	if err := recover(); err != nil {
 		logger.For(ctx).Errorf("Error in indexer: %v", err)
 		time.Sleep(time.Second * 10)
-	}
-}
-
-func logEthCallRPCError(entry *logrus.Entry, err error, message string) {
-	if rpcErr, ok := err.(gethrpc.Error); ok {
-		entry = entry.WithFields(logrus.Fields{"rpcErrorCode": strconv.Itoa(rpcErr.ErrorCode())})
-		// If the contract is missing a method then we only want to Warn rather than Error on it.
-		if rpcErr.ErrorCode() == -32000 && rpcErr.Error() == "execution reverted" {
-			entry.Warn(message)
-		}
-	} else {
-		entry.Error(message)
 	}
 }
 

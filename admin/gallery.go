@@ -17,14 +17,6 @@ type getGalleriesInput struct {
 	UserID persist.DBID `form:"user_id"`
 }
 
-type refreshCacheInput struct {
-	UserID persist.DBID `form:"user_id" binding:"required"`
-}
-
-type backupGalleriesInput struct {
-	UserID persist.DBID `form:"user_id" binding:"required"`
-}
-
 func getGalleries(galleryRepo postgres.GalleryRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 

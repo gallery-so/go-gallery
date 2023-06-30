@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -71,7 +71,7 @@ func (e ErrReadBody) Unwrap() error {
 // BodyAsError returns the HTTP body as an error
 // Returns ErrReadBody if the body cannot be read
 func BodyAsError(res *http.Response) error {
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return ErrReadBody{Err: err}
 	}

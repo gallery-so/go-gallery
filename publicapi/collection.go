@@ -75,7 +75,7 @@ func (api CollectionAPI) GetCollectionsByIds(ctx context.Context, collectionIDs 
 	collections := make([]*db.Collection, len(collectionIDs))
 	errors := make([]error, len(collectionIDs))
 
-	for i, _ := range collectionIDs {
+	for i := range collectionIDs {
 		collection, err := thunks[i]()
 		if err == nil {
 			collections[i] = &collection
@@ -191,7 +191,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 	var trimmedCaption string
 	if caption != nil {
 		trimmedCaption = strings.TrimSpace(*caption)
-		fieldsToValidate["caption"] = validate.WithTag(trimmedCaption, fmt.Sprintf("required,caption"))
+		fieldsToValidate["caption"] = validate.WithTag(trimmedCaption, "required,caption")
 		cleaned := validate.SanitizationPolicy.Sanitize(trimmedCaption)
 		caption = &cleaned
 	}
@@ -350,7 +350,7 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 	var trimmedCaption string
 	if caption != nil {
 		trimmedCaption = strings.TrimSpace(*caption)
-		fieldsToValidate["caption"] = validate.WithTag(trimmedCaption, fmt.Sprintf("required,caption"))
+		fieldsToValidate["caption"] = validate.WithTag(trimmedCaption, "required,caption")
 		cleaned := validate.SanitizationPolicy.Sanitize(trimmedCaption)
 		caption = &cleaned
 	}

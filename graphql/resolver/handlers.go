@@ -35,7 +35,8 @@ import (
 const scrubText = "<scrubbed>"
 const scrubDirectiveName = "scrub"
 
-const gqlRequestIdContextKey = "graphql.gqlRequestId"
+var gqlRequestIdContextKey struct{}
+
 const noCachePublicAPIContextKey = "graphql.noCachePublicAPI"
 const maxSentryDataLength = 8 * 1024
 
@@ -467,10 +468,12 @@ func scrubVariable(variableDefinition *ast.VariableDefinition, schema *ast.Schem
 	definition := schema.Types[namedType]
 	scrubFieldContents := false
 
-	for _, directive := range definition.Directives {
-		if directive.Name == scrubDirectiveName {
-			scrubFieldContents = true
-			break
+	if definition != nil {
+		for _, directive := range definition.Directives {
+			if directive.Name == scrubDirectiveName {
+				scrubFieldContents = true
+				break
+			}
 		}
 	}
 

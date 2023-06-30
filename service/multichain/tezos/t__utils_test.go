@@ -1,14 +1,11 @@
 package tezos
 
 import (
-	"context"
 	"testing"
 
-	"cloud.google.com/go/storage"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
-	"google.golang.org/api/option"
 )
 
 func setupTest(t *testing.T) *assert.Assertions {
@@ -16,14 +13,6 @@ func setupTest(t *testing.T) *assert.Assertions {
 	setDefaults()
 
 	return assert.New(t)
-}
-
-func newStorageClient(ctx context.Context) *storage.Client {
-	stg, err := storage.NewClient(ctx, option.WithCredentialsJSON(util.LoadEncryptedServiceKey("secrets/dev/service-key-dev.json")))
-	if err != nil {
-		panic(err)
-	}
-	return stg
 }
 
 func setDefaults() {

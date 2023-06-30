@@ -94,18 +94,6 @@ func tokenURIHasExpectedType(t *testing.T, a *assert.Assertions, err error, uri 
 	a.Equal(expectedType, uri.Type())
 }
 
-func mediaHasContent(t *testing.T, a *assert.Assertions, err error, metadata persist.TokenMetadata) {
-	t.Helper()
-	a.NoError(err)
-	a.NotEmpty(metadata["image"])
-}
-
-func mediaTypeHasExpectedType(t *testing.T, a *assert.Assertions, err error, expected, actual persist.MediaType) {
-	t.Helper()
-	a.NoError(err)
-	a.Equal(expected, actual)
-}
-
 func tokenMatchesExpected(t *testing.T, a *assert.Assertions, actual persist.Token) {
 	t.Helper()
 	id := persist.NewTokenIdentifiers(persist.Address(actual.ContractAddress), actual.TokenID, actual.Chain)
