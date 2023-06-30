@@ -38,9 +38,9 @@ type GalleryAPI struct {
 func (api GalleryAPI) CreateGallery(ctx context.Context, name, description *string, position string) (db.Gallery, error) {
 
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"name":        {name, "max=200"},
-		"description": {description, "max=1200"},
-		"position":    {position, "required"},
+		"name":        validate.WithTag(name, "max=200"),
+		"description": validate.WithTag(description, "max=1200"),
+		"position":    validate.WithTag(position, "required"),
 	}); err != nil {
 		return db.Gallery{}, err
 	}
@@ -67,11 +67,11 @@ func (api GalleryAPI) CreateGallery(ctx context.Context, name, description *stri
 func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGalleryInput) (db.Gallery, error) {
 
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"galleryID":           {update.GalleryID, "required"},
-		"name":                {update.Name, "omitempty,max=200"},
-		"description":         {update.Description, "omitempty,max=1200"},
-		"deleted_collections": {update.DeletedCollections, "omitempty,unique"},
-		"created_collections": {update.CreatedCollections, "omitempty,created_collections"},
+		"galleryID":           validate.WithTag(update.GalleryID, "required"),
+		"name":                validate.WithTag(update.Name, "omitempty,max=200"),
+		"description":         validate.WithTag(update.Description, "omitempty,max=1200"),
+		"deleted_collections": validate.WithTag(update.DeletedCollections, "omitempty,unique"),
+		"created_collections": validate.WithTag(update.CreatedCollections, "omitempty,created_collections"),
 	}); err != nil {
 		return db.Gallery{}, err
 	}
@@ -237,8 +237,8 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 func (api GalleryAPI) PublishGallery(ctx context.Context, update model.PublishGalleryInput) error {
 
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"galleryID": {update.GalleryID, "required"},
-		"editID":    {update.EditID, "required"},
+		"galleryID": validate.WithTag(update.GalleryID, "required"),
+		"editID":    validate.WithTag(update.EditID, "required"),
 	}); err != nil {
 		return err
 	}
@@ -367,7 +367,7 @@ func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, actor, g
 func (api GalleryAPI) DeleteGallery(ctx context.Context, galleryID persist.DBID) error {
 
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"galleryID": {galleryID, "required"},
+		"galleryID": validate.WithTag(galleryID, "required"),
 	}); err != nil {
 		return err
 	}
@@ -391,7 +391,7 @@ func (api GalleryAPI) DeleteGallery(ctx context.Context, galleryID persist.DBID)
 func (api GalleryAPI) GetGalleryById(ctx context.Context, galleryID persist.DBID) (*db.Gallery, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"galleryID": {galleryID, "required"},
+		"galleryID": validate.WithTag(galleryID, "required"),
 	}); err != nil {
 		return nil, err
 	}
@@ -407,7 +407,7 @@ func (api GalleryAPI) GetGalleryById(ctx context.Context, galleryID persist.DBID
 func (api GalleryAPI) GetViewerGalleryById(ctx context.Context, galleryID persist.DBID) (*db.Gallery, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"galleryID": {galleryID, "required"},
+		"galleryID": validate.WithTag(galleryID, "required"),
 	}); err != nil {
 		return nil, err
 	}
@@ -433,7 +433,7 @@ func (api GalleryAPI) GetViewerGalleryById(ctx context.Context, galleryID persis
 func (api GalleryAPI) GetGalleryByCollectionId(ctx context.Context, collectionID persist.DBID) (*db.Gallery, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"collectionID": {collectionID, "required"},
+		"collectionID": validate.WithTag(collectionID, "required"),
 	}); err != nil {
 		return nil, err
 	}
@@ -449,7 +449,7 @@ func (api GalleryAPI) GetGalleryByCollectionId(ctx context.Context, collectionID
 func (api GalleryAPI) GetGalleriesByUserId(ctx context.Context, userID persist.DBID) ([]db.Gallery, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"userID": {userID, "required"},
+		"userID": validate.WithTag(userID, "required"),
 	}); err != nil {
 		return nil, err
 	}
@@ -465,7 +465,7 @@ func (api GalleryAPI) GetGalleriesByUserId(ctx context.Context, userID persist.D
 func (api GalleryAPI) GetTokenPreviewsByGalleryID(ctx context.Context, galleryID persist.DBID) ([]db.TokenMedia, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"galleryID": {galleryID, "required"},
+		"galleryID": validate.WithTag(galleryID, "required"),
 	}); err != nil {
 		return nil, err
 	}
@@ -487,8 +487,8 @@ func (api GalleryAPI) GetTokenPreviewsByGalleryID(ctx context.Context, galleryID
 func (api GalleryAPI) UpdateGalleryCollections(ctx context.Context, galleryID persist.DBID, collections []persist.DBID) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"galleryID":   {galleryID, "required"},
-		"collections": {collections, fmt.Sprintf("required,unique,max=%d", maxCollectionsPerGallery)},
+		"galleryID":   validate.WithTag(galleryID, "required"),
+		"collections": validate.WithTag(collections, fmt.Sprintf("required,unique,max=%d", maxCollectionsPerGallery)),
 	}); err != nil {
 		return err
 	}
@@ -511,9 +511,9 @@ func (api GalleryAPI) UpdateGalleryCollections(ctx context.Context, galleryID pe
 func (api GalleryAPI) UpdateGalleryInfo(ctx context.Context, galleryID persist.DBID, name, description *string) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"galleryID":   {galleryID, "required"},
-		"name":        {name, "max=200"},
-		"description": {description, "max=1200"},
+		"galleryID":   validate.WithTag(galleryID, "required"),
+		"name":        validate.WithTag(name, "max=200"),
+		"description": validate.WithTag(description, "max=1200"),
 	}); err != nil {
 		return err
 	}
@@ -546,7 +546,7 @@ func (api GalleryAPI) UpdateGalleryInfo(ctx context.Context, galleryID persist.D
 func (api GalleryAPI) UpdateGalleryHidden(ctx context.Context, galleryID persist.DBID, hidden bool) (coredb.Gallery, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"galleryID": {galleryID, "required"},
+		"galleryID": validate.WithTag(galleryID, "required"),
 	}); err != nil {
 		return db.Gallery{}, err
 	}
@@ -565,7 +565,7 @@ func (api GalleryAPI) UpdateGalleryHidden(ctx context.Context, galleryID persist
 func (api GalleryAPI) UpdateGalleryPositions(ctx context.Context, positions []*model.GalleryPositionInput) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"positions": {positions, "required,min=1"},
+		"positions": validate.WithTag(positions, "required,min=1"),
 	}); err != nil {
 		return err
 	}
@@ -613,7 +613,7 @@ func (api GalleryAPI) UpdateGalleryPositions(ctx context.Context, positions []*m
 func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (db.Gallery, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"galleryID": {galleryID, "required"},
+		"galleryID": validate.WithTag(galleryID, "required"),
 	}); err != nil {
 		return db.Gallery{}, err
 	}

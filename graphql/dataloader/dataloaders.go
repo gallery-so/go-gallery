@@ -1247,7 +1247,7 @@ func loadProfileImageByID(q *db.Queries) func(context.Context, []db.GetProfileIm
 
 		b.QueryRow(func(i int, media db.ProfileImage, err error) {
 			if err == pgx.ErrNoRows {
-				err = persist.ErrProfileImageNotFound{err, params[i].ID}
+				err = persist.ErrProfileImageNotFound{Err: err, ProfileImageID: params[i].ID}
 			}
 			results[i], errors[i] = media, err
 		})

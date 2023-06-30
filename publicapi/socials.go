@@ -39,7 +39,7 @@ func (s SocialAPI) NewTwitterAuthenticator(userID persist.DBID, authCode string)
 func (api SocialAPI) GetConnectionsPaginate(ctx context.Context, socialProvider persist.SocialProvider, before, after *string, first, last *int, onlyUnfollowing *bool) ([]model.SocialConnection, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"socialProvider": {socialProvider, "required"},
+		"socialProvider": validate.WithTag(socialProvider, "required"),
 	}); err != nil {
 		return nil, PageInfo{}, err
 	}
@@ -179,7 +179,7 @@ func (api SocialAPI) GetConnectionsPaginate(ctx context.Context, socialProvider 
 func (api SocialAPI) GetConnections(ctx context.Context, socialProvider persist.SocialProvider, onlyUnfollowing *bool) ([]model.SocialConnection, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"socialProvider": {socialProvider, "required"},
+		"socialProvider": validate.WithTag(socialProvider, "required"),
 	}); err != nil {
 		return nil, err
 	}

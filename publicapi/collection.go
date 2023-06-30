@@ -36,7 +36,7 @@ type CollectionAPI struct {
 func (api CollectionAPI) GetCollectionById(ctx context.Context, collectionID persist.DBID) (*db.Collection, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"collectionID": {collectionID, "required"},
+		"collectionID": validate.WithTag(collectionID, "required"),
 	}); err != nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func (api CollectionAPI) GetCollectionsByIds(ctx context.Context, collectionIDs 
 	collectionThunk := func(collectionID persist.DBID) func() (db.Collection, error) {
 		// Validate
 		if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-			"collectionID": {collectionID, "required"},
+			"collectionID": validate.WithTag(collectionID, "required"),
 		}); err != nil {
 			return func() (db.Collection, error) { return db.Collection{}, err }
 		}
@@ -90,7 +90,7 @@ func (api CollectionAPI) GetCollectionsByIds(ctx context.Context, collectionIDs 
 func (api CollectionAPI) GetCollectionsByGalleryId(ctx context.Context, galleryID persist.DBID) ([]db.Collection, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"galleryID": {galleryID, "required"},
+		"galleryID": validate.WithTag(galleryID, "required"),
 	}); err != nil {
 		return nil, err
 	}
@@ -106,7 +106,7 @@ func (api CollectionAPI) GetCollectionsByGalleryId(ctx context.Context, galleryI
 func (api CollectionAPI) GetTopCollectionsForCommunity(ctx context.Context, chainAddress persist.ChainAddress, before, after *string, first, last *int) (c []db.Collection, pageInfo PageInfo, err error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"chainAddress": {chainAddress, "required"},
+		"chainAddress": validate.WithTag(chainAddress, "required"),
 	}); err != nil {
 		return nil, pageInfo, err
 	}
@@ -180,18 +180,18 @@ func (api CollectionAPI) GetTopCollectionsForCommunity(ctx context.Context, chai
 
 func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist.DBID, name string, collectorsNote string, tokens []persist.DBID, layout persist.TokenLayout, tokenSettings map[persist.DBID]persist.CollectionTokenSettings, caption *string) (*db.Collection, *db.FeedEvent, error) {
 	fieldsToValidate := validate.ValidationMap{
-		"galleryID":      {galleryID, "required"},
-		"name":           {name, "collection_name"},
-		"collectorsNote": {collectorsNote, "collection_note"},
-		"tokens":         {tokens, fmt.Sprintf("required,unique,min=1,max=%d", maxTokensPerCollection)},
-		"sections":       {layout.Sections, fmt.Sprintf("unique,sorted_asc,lte=%d,min=1,max=%d,len=%d,dive,gte=0,lte=%d", len(tokens), maxSectionsPerCollection, len(layout.SectionLayout), len(tokens)-1)},
+		"galleryID":      validate.WithTag(galleryID, "required"),
+		"name":           validate.WithTag(name, "collection_name"),
+		"collectorsNote": validate.WithTag(collectorsNote, "collection_note"),
+		"tokens":         validate.WithTag(tokens, fmt.Sprintf("required,unique,min=1,max=%d", maxTokensPerCollection)),
+		"sections":       validate.WithTag(layout.Sections, fmt.Sprintf("unique,sorted_asc,lte=%d,min=1,max=%d,len=%d,dive,gte=0,lte=%d", len(tokens), maxSectionsPerCollection, len(layout.SectionLayout), len(tokens)-1)),
 	}
 
 	// Trim and optimistically sanitize the input while we're at it.
 	var trimmedCaption string
 	if caption != nil {
 		trimmedCaption = strings.TrimSpace(*caption)
-		fieldsToValidate["caption"] = validate.ValWithTags{trimmedCaption, fmt.Sprintf("required,caption")}
+		fieldsToValidate["caption"] = validate.WithTag(trimmedCaption, fmt.Sprintf("required,caption"))
 		cleaned := validate.SanitizationPolicy.Sanitize(trimmedCaption)
 		caption = &cleaned
 	}
@@ -273,7 +273,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 func (api CollectionAPI) DeleteCollection(ctx context.Context, collectionID persist.DBID) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"collectionID": {collectionID, "required"},
+		"collectionID": validate.WithTag(collectionID, "required"),
 	}); err != nil {
 		return err
 	}
@@ -294,9 +294,9 @@ func (api CollectionAPI) DeleteCollection(ctx context.Context, collectionID pers
 func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID persist.DBID, name string, collectorsNote string) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"collectionID":   {collectionID, "required"},
-		"name":           {name, "collection_name"},
-		"collectorsNote": {collectorsNote, "collection_note"},
+		"collectionID":   validate.WithTag(collectionID, "required"),
+		"name":           validate.WithTag(name, "collection_name"),
+		"collectorsNote": validate.WithTag(collectorsNote, "collection_note"),
 	}); err != nil {
 		return err
 	}
@@ -341,16 +341,16 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 
 func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionID persist.DBID, tokens []persist.DBID, layout persist.TokenLayout, tokenSettings map[persist.DBID]persist.CollectionTokenSettings, caption *string) (*db.FeedEvent, error) {
 	fieldsToValidate := validate.ValidationMap{
-		"collectionID": {collectionID, "required"},
-		"tokens":       {tokens, fmt.Sprintf("required,unique,min=1,max=%d", maxTokensPerCollection)},
-		"sections":     {layout.Sections, fmt.Sprintf("unique,sorted_asc,lte=%d,min=1,max=%d,len=%d,dive,gte=0,lte=%d", len(tokens), maxSectionsPerCollection, len(layout.SectionLayout), len(tokens)-1)},
+		"collectionID": validate.WithTag(collectionID, "required"),
+		"tokens":       validate.WithTag(tokens, fmt.Sprintf("required,unique,min=1,max=%d", maxTokensPerCollection)),
+		"sections":     validate.WithTag(layout.Sections, fmt.Sprintf("unique,sorted_asc,lte=%d,min=1,max=%d,len=%d,dive,gte=0,lte=%d", len(tokens), maxSectionsPerCollection, len(layout.SectionLayout), len(tokens)-1)),
 	}
 
 	// Trim and optimistically sanitize the input while we're at it.
 	var trimmedCaption string
 	if caption != nil {
 		trimmedCaption = strings.TrimSpace(*caption)
-		fieldsToValidate["caption"] = validate.ValWithTags{trimmedCaption, fmt.Sprintf("required,caption")}
+		fieldsToValidate["caption"] = validate.WithTag(trimmedCaption, fmt.Sprintf("required,caption"))
 		cleaned := validate.SanitizationPolicy.Sanitize(trimmedCaption)
 		caption = &cleaned
 	}
@@ -415,7 +415,7 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 func (api CollectionAPI) UpdateCollectionHidden(ctx context.Context, collectionID persist.DBID, hidden bool) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"collectionID": {collectionID, "required"},
+		"collectionID": validate.WithTag(collectionID, "required"),
 	}); err != nil {
 		return err
 	}
@@ -439,8 +439,8 @@ func (api CollectionAPI) UpdateCollectionHidden(ctx context.Context, collectionI
 func (api CollectionAPI) UpdateCollectionGallery(ctx context.Context, collectionID, galleryID persist.DBID) (persist.DBID, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"collectionID": {collectionID, "required"},
-		"galleryID":    {galleryID, "required"},
+		"collectionID": validate.WithTag(collectionID, "required"),
+		"galleryID":    validate.WithTag(galleryID, "required"),
 	}); err != nil {
 		return "", err
 	}

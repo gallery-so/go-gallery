@@ -26,7 +26,7 @@ func (api NotificationsAPI) GetViewerNotifications(ctx context.Context, before, 
 
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"userID": {userID, "required"},
+		"userID": validate.WithTag(userID, "required"),
 	}); err != nil {
 		return nil, PageInfo{}, 0, err
 	}

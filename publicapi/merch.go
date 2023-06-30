@@ -64,7 +64,7 @@ type MerchAPI struct {
 func (api MerchAPI) GetMerchTokens(ctx context.Context, address persist.Address) ([]*model.MerchToken, error) {
 
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"address": {address, "required"},
+		"address": validate.WithTag(address, "required"),
 	}); err != nil {
 		return nil, err
 	}
@@ -150,7 +150,7 @@ func (api MerchAPI) GetMerchTokens(ctx context.Context, address persist.Address)
 func (api MerchAPI) GetMerchTokenByTokenID(ctx context.Context, tokenID persist.TokenID) (*model.MerchToken, error) {
 
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"tokenID": {tokenID, "required"},
+		"tokenID": validate.WithTag(tokenID, "required"),
 	}); err != nil {
 		return nil, err
 	}
@@ -234,9 +234,9 @@ func (api MerchAPI) GetMerchTokenByTokenID(ctx context.Context, tokenID persist.
 func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.TokenID, address persist.ChainAddress, sig string, walletType persist.WalletType) ([]*model.MerchToken, error) {
 
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"tokenIDs": {tokenIDs, "required,unique"},
-		"address":  {address, "required"},
-		"sig":      {sig, "required"},
+		"tokenIDs": validate.WithTag(tokenIDs, "required,unique"),
+		"address":  validate.WithTag(address, "required"),
+		"sig":      validate.WithTag(sig, "required"),
 	}); err != nil {
 		return nil, err
 	}

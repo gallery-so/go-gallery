@@ -31,8 +31,8 @@ func (api *AdminAPI) AddRolesToUser(ctx context.Context, username string, roles 
 	requireRetoolAuthorized(ctx)
 
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"username": {username, "required"},
-		"roles":    {roles, "required,unique,dive,role"},
+		"username": validate.WithTag(username, "required"),
+		"roles":    validate.WithTag(roles, "required,unique,dive,role"),
 	}); err != nil {
 		return nil, err
 	}
@@ -74,8 +74,8 @@ func (api *AdminAPI) RemoveRolesFromUser(ctx context.Context, username string, r
 	requireRetoolAuthorized(ctx)
 
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"username": {username, "required"},
-		"roles":    {roles, "required,unique,dive,role"},
+		"username": validate.WithTag(username, "required"),
+		"roles":    validate.WithTag(roles, "required,unique,dive,role"),
 	}); err != nil {
 		return nil, err
 	}
@@ -120,8 +120,8 @@ func (api *AdminAPI) AddWalletToUserUnchecked(ctx context.Context, username stri
 	requireRetoolAuthorized(ctx)
 
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"username":     {username, "required,username"},
-		"chainAddress": {chainAddress, "required"},
+		"username":     validate.WithTag(username, "required,username"),
+		"chainAddress": validate.WithTag(chainAddress, "required"),
 	}); err != nil {
 		return err
 	}
@@ -162,8 +162,8 @@ func (api *AdminAPI) SetContractOverrideCreator(ctx context.Context, contractID 
 
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"contractID":    {contractID, "required"},
-		"creatorUserID": {creatorUserID, "required"},
+		"contractID":    validate.WithTag(contractID, "required"),
+		"creatorUserID": validate.WithTag(creatorUserID, "required"),
 	}); err != nil {
 		return err
 	}
@@ -181,7 +181,7 @@ func (api *AdminAPI) RemoveContractOverrideCreator(ctx context.Context, contract
 
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"contractID": {contractID, "required"},
+		"contractID": validate.WithTag(contractID, "required"),
 	}); err != nil {
 		return err
 	}

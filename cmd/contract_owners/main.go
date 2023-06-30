@@ -135,7 +135,7 @@ func main() {
 			ctx = sentryutil.NewSentryHubContext(ctx)
 
 			defer func() {
-				logger.For(ctx).Infof("finished processing %s", i)
+				logger.For(ctx).Infof("finished processing %d", i)
 			}()
 			results, err := indexer.GetContractMetadatas(ctx, group, httpClient, ethClient)
 			if err != nil {

@@ -71,7 +71,7 @@ func (api UserAPI) IsUserLoggedIn(ctx context.Context) bool {
 func (api UserAPI) GetUserById(ctx context.Context, userID persist.DBID) (*db.User, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"userID": {userID, "required"},
+		"userID": validate.WithTag(userID, "required"),
 	}); err != nil {
 		return nil, err
 	}
@@ -87,7 +87,7 @@ func (api UserAPI) GetUserById(ctx context.Context, userID persist.DBID) (*db.Us
 func (api UserAPI) GetUserByVerifiedEmailAddress(ctx context.Context, emailAddress persist.Email) (*db.User, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"emailAddress": {emailAddress, "required"},
+		"emailAddress": validate.WithTag(emailAddress, "required"),
 	}); err != nil {
 		return nil, err
 	}
@@ -127,7 +127,7 @@ func (api UserAPI) GetUserWithPII(ctx context.Context) (*db.PiiUserView, error) 
 func (api UserAPI) GetUsersByIDs(ctx context.Context, userIDs []persist.DBID, before, after *string, first, last *int) ([]db.User, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"userIDs": {userIDs, "required"},
+		"userIDs": validate.WithTag(userIDs, "required"),
 	}); err != nil {
 		return nil, PageInfo{}, err
 	}
@@ -191,7 +191,7 @@ func (api UserAPI) GetUsersByIDs(ctx context.Context, userIDs []persist.DBID, be
 func (api UserAPI) GetUserByUsername(ctx context.Context, username string) (*db.User, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"username": {username, "required"},
+		"username": validate.WithTag(username, "required"),
 	}); err != nil {
 		return nil, err
 	}
@@ -207,7 +207,7 @@ func (api UserAPI) GetUserByUsername(ctx context.Context, username string) (*db.
 func (api UserAPI) GetUserByAddress(ctx context.Context, chainAddress persist.ChainAddress) (*db.User, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"chainAddress": {chainAddress, "required"},
+		"chainAddress": validate.WithTag(chainAddress, "required"),
 	}); err != nil {
 		return nil, err
 	}
@@ -227,7 +227,7 @@ func (api UserAPI) GetUserByAddress(ctx context.Context, chainAddress persist.Ch
 func (api UserAPI) GetUsersWithTrait(ctx context.Context, trait string) ([]db.User, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"trait": {trait, "required"},
+		"trait": validate.WithTag(trait, "required"),
 	}); err != nil {
 		return nil, err
 	}
@@ -256,7 +256,7 @@ func (api *UserAPI) UserIsAdmin(ctx context.Context) bool {
 func (api UserAPI) PaginateUsersWithRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) ([]db.User, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"role": {role, "required,role"},
+		"role": validate.WithTag(role, "required,role"),
 	}); err != nil {
 		return nil, PageInfo{}, err
 	}
@@ -313,8 +313,8 @@ func (api UserAPI) PaginateUsersWithRole(ctx context.Context, role persist.Role,
 func (api UserAPI) AddWalletToUser(ctx context.Context, chainAddress persist.ChainAddress, authenticator auth.Authenticator) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"chainAddress":  {chainAddress, "required"},
-		"authenticator": {authenticator, "required"},
+		"chainAddress":  validate.WithTag(chainAddress, "required"),
+		"authenticator": validate.WithTag(authenticator, "required"),
 	}); err != nil {
 		return err
 	}
@@ -335,7 +335,7 @@ func (api UserAPI) AddWalletToUser(ctx context.Context, chainAddress persist.Cha
 func (api UserAPI) RemoveWalletsFromUser(ctx context.Context, walletIDs []persist.DBID) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"walletIDs": {walletIDs, "required,unique,dive,required"},
+		"walletIDs": validate.WithTag(walletIDs, "required,unique,dive,required"),
 	}); err != nil {
 		return err
 	}
@@ -356,7 +356,7 @@ func (api UserAPI) RemoveWalletsFromUser(ctx context.Context, walletIDs []persis
 func (api UserAPI) AddSocialAccountToUser(ctx context.Context, authenticator socialauth.Authenticator, display bool) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"authenticator": {authenticator, "required"},
+		"authenticator": validate.WithTag(authenticator, "required"),
 	}); err != nil {
 		return err
 	}
@@ -387,8 +387,8 @@ func (api UserAPI) AddSocialAccountToUser(ctx context.Context, authenticator soc
 func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authenticator, username string, email *persist.Email, bio, galleryName, galleryDesc, galleryPos string) (userID persist.DBID, galleryID persist.DBID, err error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"username": {username, "required,username"},
-		"bio":      {bio, "bio"},
+		"username": validate.WithTag(username, "required,username"),
+		"bio":      validate.WithTag(bio, "bio"),
 	}); err != nil {
 		return "", "", err
 	}
@@ -459,8 +459,8 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio string) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"username": {username, "required,username"},
-		"bio":      {bio, "bio"},
+		"username": validate.WithTag(username, "required,username"),
+		"bio":      validate.WithTag(bio, "bio"),
 	}); err != nil {
 		return err
 	}
@@ -484,7 +484,7 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 func (api UserAPI) UpdateUserPrimaryWallet(ctx context.Context, primaryWalletID persist.DBID) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"primaryWalletID": {primaryWalletID, "required"},
+		"primaryWalletID": validate.WithTag(primaryWalletID, "required"),
 	}); err != nil {
 		return err
 	}
@@ -505,7 +505,7 @@ func (api UserAPI) UpdateUserPrimaryWallet(ctx context.Context, primaryWalletID 
 func (api UserAPI) UpdateFeaturedGallery(ctx context.Context, galleryID persist.DBID) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"galleryID": {galleryID, "required"},
+		"galleryID": validate.WithTag(galleryID, "required"),
 	}); err != nil {
 		return err
 	}
@@ -527,7 +527,7 @@ func (api UserAPI) UpdateFeaturedGallery(ctx context.Context, galleryID persist.
 func (api UserAPI) UpdateUserEmail(ctx context.Context, email persist.Email) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"email": {email, "required"},
+		"email": validate.WithTag(email, "required"),
 	}); err != nil {
 		return err
 	}
@@ -555,7 +555,7 @@ func (api UserAPI) UpdateUserEmail(ctx context.Context, email persist.Email) err
 func (api UserAPI) UpdateUserEmailNotificationSettings(ctx context.Context, settings persist.EmailUnsubscriptions) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"settings": {settings, "required"},
+		"settings": validate.WithTag(settings, "required"),
 	}); err != nil {
 		return err
 	}
@@ -589,7 +589,7 @@ func (api UserAPI) ResendEmailVerification(ctx context.Context) error {
 func (api UserAPI) UpdateUserNotificationSettings(ctx context.Context, notificationSettings persist.UserNotificationSettings) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"notification_settings": {notificationSettings, "required"},
+		"notification_settings": validate.WithTag(notificationSettings, "required"),
 	}); err != nil {
 		return err
 	}
@@ -610,7 +610,7 @@ func (api UserAPI) GetMembershipTiers(ctx context.Context, forceRefresh bool) ([
 func (api UserAPI) GetMembershipByMembershipId(ctx context.Context, membershipID persist.DBID) (*db.Membership, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"membershipID": {membershipID, "required"},
+		"membershipID": validate.WithTag(membershipID, "required"),
 	}); err != nil {
 		return nil, err
 	}
@@ -626,7 +626,7 @@ func (api UserAPI) GetMembershipByMembershipId(ctx context.Context, membershipID
 func (api UserAPI) GetFollowersByUserId(ctx context.Context, userID persist.DBID) ([]db.User, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"userID": {userID, "required"},
+		"userID": validate.WithTag(userID, "required"),
 	}); err != nil {
 		return nil, err
 	}
@@ -646,7 +646,7 @@ func (api UserAPI) GetFollowersByUserId(ctx context.Context, userID persist.DBID
 func (api UserAPI) GetFollowingByUserId(ctx context.Context, userID persist.DBID) ([]db.User, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"userID": {userID, "required"},
+		"userID": validate.WithTag(userID, "required"),
 	}); err != nil {
 		return nil, err
 	}
@@ -671,7 +671,7 @@ func (api UserAPI) SharedFollowers(ctx context.Context, userID persist.DBID, bef
 	}
 
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"userID": {userID, "required"},
+		"userID": validate.WithTag(userID, "required"),
 	}); err != nil {
 		return nil, PageInfo{}, err
 	}
@@ -748,7 +748,7 @@ func (api UserAPI) SharedCommunities(ctx context.Context, userID persist.DBID, b
 	}
 
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"userID": {userID, "required"},
+		"userID": validate.WithTag(userID, "required"),
 	}); err != nil {
 		return nil, PageInfo{}, err
 	}
@@ -821,7 +821,7 @@ func (api UserAPI) SharedCommunities(ctx context.Context, userID persist.DBID, b
 
 func (api UserAPI) CreatedCommunities(ctx context.Context, userID persist.DBID, includeChains []persist.Chain, before, after *string, first, last *int) ([]db.Contract, PageInfo, error) {
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"userID": {userID, "required"},
+		"userID": validate.WithTag(userID, "required"),
 	}); err != nil {
 		return nil, PageInfo{}, err
 	}
@@ -891,7 +891,7 @@ func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {
 	}
 
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"userID": {userID, fmt.Sprintf("required,ne=%s", curUserID)},
+		"userID": validate.WithTag(userID, fmt.Sprintf("required,ne=%s", curUserID)),
 	}); err != nil {
 		return err
 	}
@@ -919,7 +919,7 @@ func (api UserAPI) FollowAllSocialConnections(ctx context.Context, socialType pe
 	}
 
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"socialType": {socialType, "required"},
+		"socialType": validate.WithTag(socialType, "required"),
 	}); err != nil {
 		return err
 	}
@@ -954,7 +954,7 @@ func (api UserAPI) FollowAllSocialConnections(ctx context.Context, socialType pe
 func (api UserAPI) UnfollowUser(ctx context.Context, userID persist.DBID) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"userID": {userID, "required"},
+		"userID": validate.WithTag(userID, "required"),
 	}); err != nil {
 		return err
 	}
@@ -988,7 +988,7 @@ func dispatchFollowEventToFeed(ctx context.Context, api UserAPI, curUserID persi
 func (api UserAPI) GetUserExperiences(ctx context.Context, userID persist.DBID) ([]*model.UserExperience, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"userID": {userID, "required"},
+		"userID": validate.WithTag(userID, "required"),
 	}); err != nil {
 		return nil, err
 	}
@@ -1016,7 +1016,7 @@ func (api UserAPI) GetUserExperiences(ctx context.Context, userID persist.DBID) 
 func (api UserAPI) GetSocials(ctx context.Context, userID persist.DBID) (*model.SocialAccounts, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"userID": {userID, "required"},
+		"userID": validate.WithTag(userID, "required"),
 	}); err != nil {
 		return nil, err
 	}
@@ -1061,7 +1061,7 @@ func (api UserAPI) GetSocials(ctx context.Context, userID persist.DBID) (*model.
 func (api UserAPI) GetDisplayedSocials(ctx context.Context, userID persist.DBID) (*model.SocialAccounts, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"userID": {userID, "required"},
+		"userID": validate.WithTag(userID, "required"),
 	}); err != nil {
 		return nil, err
 	}
@@ -1106,7 +1106,7 @@ func (api UserAPI) GetDisplayedSocials(ctx context.Context, userID persist.DBID)
 func (api UserAPI) UpdateUserSocialDisplayed(ctx context.Context, socialType persist.SocialProvider, displayed bool) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"socialType": {socialType, "required"},
+		"socialType": validate.WithTag(socialType, "required"),
 	}); err != nil {
 		return err
 	}
@@ -1139,7 +1139,7 @@ func (api UserAPI) UpdateUserSocialDisplayed(ctx context.Context, socialType per
 func (api UserAPI) UpdateUserExperience(ctx context.Context, experienceType model.UserExperienceType, value bool) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"experienceType": {experienceType, "required"},
+		"experienceType": validate.WithTag(experienceType, "required"),
 	}); err != nil {
 		return err
 	}
@@ -1254,7 +1254,7 @@ func (api UserAPI) RecommendUsers(ctx context.Context, before, after *string, fi
 func (api UserAPI) CreatePushTokenForUser(ctx context.Context, pushToken string) (db.PushNotificationToken, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"pushToken": {pushToken, "required,min=1,max=255"},
+		"pushToken": validate.WithTag(pushToken, "required,min=1,max=255"),
 	}); err != nil {
 		return db.PushNotificationToken{}, err
 	}
@@ -1302,7 +1302,7 @@ func (api UserAPI) CreatePushTokenForUser(ctx context.Context, pushToken string)
 func (api UserAPI) DeletePushTokenByPushToken(ctx context.Context, pushToken string) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"pushToken": {pushToken, "required,min=1,max=255"},
+		"pushToken": validate.WithTag(pushToken, "required,min=1,max=255"),
 	}); err != nil {
 		return err
 	}
@@ -1373,8 +1373,8 @@ func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID, w
 	if walletAddress != nil {
 		// Validate
 		if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-			"chain":   {walletAddress.Chain(), fmt.Sprintf("eq=%d", persist.ChainETH)},
-			"address": {walletAddress.Address(), "required"},
+			"chain":   validate.WithTag(walletAddress.Chain(), fmt.Sprintf("eq=%d", persist.ChainETH)),
+			"address": validate.WithTag(walletAddress.Address(), "required"),
 		}); err != nil {
 			return err
 		}
@@ -1469,7 +1469,9 @@ type EnsAvatar struct {
 // GetEnsProfileImageByUserID returns the an ENS profile image for a user based on their set of wallets
 func (api UserAPI) GetEnsProfileImageByUserID(ctx context.Context, userID persist.DBID) (a EnsAvatar, err error) {
 	// Validate
-	if err := validate.ValidateFields(api.validator, validate.ValidationMap{"userID": {userID, "required"}}); err != nil {
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"userID": validate.WithTag(userID, "required"),
+	}); err != nil {
 		return a, err
 	}
 

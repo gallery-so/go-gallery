@@ -27,7 +27,7 @@ type WalletAPI struct {
 func (api WalletAPI) GetWalletByID(ctx context.Context, walletID persist.DBID) (*db.Wallet, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"walletID": {walletID, "required"},
+		"walletID": validate.WithTag(walletID, "required"),
 	}); err != nil {
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func (api WalletAPI) GetWalletByID(ctx context.Context, walletID persist.DBID) (
 func (api WalletAPI) GetWalletByChainAddress(ctx context.Context, chainAddress persist.ChainAddress) (*db.Wallet, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"chainAddress": {chainAddress, "required"},
+		"chainAddress": validate.WithTag(chainAddress, "required"),
 	}); err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func (api WalletAPI) GetWalletByChainAddress(ctx context.Context, chainAddress p
 func (api WalletAPI) GetWalletsByUserID(ctx context.Context, userID persist.DBID) ([]db.Wallet, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"userID": {userID, "required"},
+		"userID": validate.WithTag(userID, "required"),
 	}); err != nil {
 		return nil, err
 	}
