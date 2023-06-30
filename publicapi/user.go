@@ -1341,7 +1341,7 @@ func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID, w
 	}
 
 	// Too many inputs provided
-	if util.ManyNotNils(tokenID, walletAddress) {
+	if tokenID != nil && walletAddress != nil {
 		return ErrProfileImageTooManySources
 	}
 

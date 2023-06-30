@@ -684,20 +684,6 @@ func FirstNonErrorWithValue[T any](ctx context.Context, autoCancel bool, returnO
 	}
 }
 
-// ManyNotNils returns true if there is more than one non-nil value
-func ManyNotNils(values ...any) bool {
-	c := 0
-	for _, v := range values {
-		if v != nil {
-			if c > 1 {
-				return true
-			}
-			c++
-		}
-	}
-	return false
-}
-
 // FileHeaderReader is a struct that wraps an io.Reader and pre-reads the first 512 bytes of the reader
 // When the reader is read, the first 512 bytes are returned first, then the rest of the reader is read,
 // so that the first 512 bytes are not lost

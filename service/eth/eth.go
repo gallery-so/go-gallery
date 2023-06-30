@@ -85,7 +85,6 @@ func ReverseResolvesTo(ctx context.Context, ethClient *ethclient.Client, domain 
 }
 
 // DeriveTokenID derives the token ID (in hexadecimal) from a domain
-// Copied from main branch of go-ens, which isn't available yet on the latest release at the time of writing (v3.5.5)
 func DeriveTokenID(domain string) (persist.TokenID, error) {
 	domain, err := NormalizeDomain(domain)
 	if err != nil {

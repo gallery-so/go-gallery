@@ -132,42 +132,16 @@ func NewEthClient() *ethclient.Client {
 	return ethclient.NewClient(client)
 }
 
-// NewEthClient returns an ethclient.Client
-func NewEthClientContext(ctx context.Context) *ethclient.Client {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	var client *rpc.Client
-	var err error
-
-	if endpoint := env.GetString("RPC_URL"); strings.HasPrefix(endpoint, "https://") {
-		client, err = rpc.DialHTTPWithClient(endpoint, defaultHTTPClient)
-		if err != nil {
-			panic(err)
-		}
-	} else {
-		client, err = rpc.DialContext(ctx, endpoint)
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	return ethclient.NewClient(client)
-}
-
-// NewEthSocketClient returns a new websocket client with request tracing enabled
+// NewEthSocketClient returns a websocket client with request tracing enabled
 func NewEthSocketClient() *ethclient.Client {
-	if !strings.HasPrefix(env.GetString("RPC_URL"), "wss") {
-		return NewEthClient()
+	if strings.HasPrefix(env.GetString("RPC_URL"), "wss") {
+		log.Root().SetHandler(log.FilterHandler(func(r *log.Record) bool {
+			if reqID := valFromSlice(r.Ctx, "reqid"); reqID == nil || r.Msg != "Handled RPC response" {
+				return false
+			}
+			return true
+		}, defaultMetricsHandler))
 	}
-
-	log.Root().SetHandler(log.FilterHandler(func(r *log.Record) bool {
-		if reqID := valFromSlice(r.Ctx, "reqid"); reqID == nil || r.Msg != "Handled RPC response" {
-			return false
-		}
-		return true
-	}, defaultMetricsHandler))
-
 	return NewEthClient()
 }
 

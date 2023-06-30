@@ -12,18 +12,18 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gammazero/workerpool"
+	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/redis"
+	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/sirupsen/logrus"
 	"github.com/sourcegraph/conc"
 	"github.com/sourcegraph/conc/pool"
 
+	"github.com/gammazero/workerpool"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
-	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
-	"github.com/mikeydub/go-gallery/service/redis"
-	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
 )
 
