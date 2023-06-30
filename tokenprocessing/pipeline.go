@@ -57,7 +57,7 @@ type tokenProcessingJob struct {
 	cause            persist.ProcessingCause
 	pipelineMetadata *persist.PipelineMetadata
 	// profileImageKey is an optional key in the metadata that the pipeline should also process as a profile image
-	// The pipeline will looks at the root level of the metadata for the key and will also not fail
+	// The pipeline only looks at the root level of the metadata for the key and will also not fail
 	// if the key is missing or if processing media for the key fails
 	profileImageKey string
 }
