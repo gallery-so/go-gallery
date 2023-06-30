@@ -1327,5 +1327,21 @@ where pfp.id = @id
 		0 = 1
 	end;
 
+-- name: GetEnsProfileImagesByUserID :one
+select sqlc.embed(token_medias), sqlc.embed(wallets)
+from tokens, contracts, users, token_medias, wallets, unnest(tokens.owned_by_wallets) tw(id)
+where contracts.address = @ens_address
+    and contracts.chain = @chain
+    and tokens.owner_user_id = @user_id
+    and tokens.contract = contracts.id
+    and users.id = tokens.owner_user_id
+    and tokens.token_media_id = token_medias.id
+    and tw.id = wallets.id
+    and token_medias.active
+    and nullif(token_medias.media->>'profile_image_url', '') is not null
+    and not contracts.deleted and not users.deleted and not token_medias.deleted and not wallets.deleted
+order by tw.id = users.primary_wallet_id desc, tokens.id desc
+limit 1;
+
 -- name: GetCurrentTime :one
 select now()::timestamptz;

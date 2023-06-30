@@ -1477,15 +1477,31 @@ func (api UserAPI) GetEnsProfileImageByUserID(ctx context.Context, userID persis
 		return a, err
 	}
 
+	// Check if profile images have been processed
+	pfp, err := api.queries.GetEnsProfileImagesByUserID(ctx, db.GetEnsProfileImagesByUserIDParams{
+		EnsAddress: eth.EnsAddress,
+		Chain:      persist.ChainETH,
+		UserID:     userID,
+	})
+	if err == nil {
+		// Validate that the name is valid
+		domain, err := eth.NormalizeDomain(pfp.TokenMedia.Name)
+		if err == nil {
+			return EnsAvatar{
+				WalletID: pfp.Wallet.ID,
+				Domain:   domain,
+				URI:      string(pfp.TokenMedia.Media.ProfileImageURL),
+			}, nil
+		}
+	}
+
+	// Otherwise check for ENS profile images
 	wallets, err := api.queries.GetEthereumWalletsForEnsProfileImagesByUserID(ctx, userID)
 	if err != nil {
 		return a, err
 	}
 
 	errs := make([]error, 0)
-
-	// loop through all ens tokens
-	// sorted by tokens that already have a pfp, then by tokens that have a fallback
 
 	for _, w := range wallets {
 		addr := persist.EthereumAddress(w.Address)

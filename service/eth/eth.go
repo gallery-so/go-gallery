@@ -87,14 +87,10 @@ func ReverseResolvesTo(ctx context.Context, ethClient *ethclient.Client, domain 
 // DeriveTokenID derives the token ID (in hexadecimal) from a domain
 // Copied from main branch of go-ens, which isn't available yet on the latest release at the time of writing (v3.5.5)
 func DeriveTokenID(domain string) (persist.TokenID, error) {
-	if domain == "" {
-		return "", errors.New("empty domain")
-	}
-	domain, err := ens.NormaliseDomain(domain)
+	domain, err := NormalizeDomain(domain)
 	if err != nil {
 		return "", err
 	}
-
 	domain, err = ens.DomainPart(domain, 1)
 	if err != nil {
 		return "", err
@@ -104,6 +100,18 @@ func DeriveTokenID(domain string) (persist.TokenID, error) {
 		return "", err
 	}
 	return persist.TokenID(fmt.Sprintf("%x", labelHash)), nil
+}
+
+// NormalizeDomain converts a domain to its canonical form
+func NormalizeDomain(domain string) (string, error) {
+	if domain == "" {
+		return "", errors.New("empty domain")
+	}
+	domain, err := ens.NormaliseDomain(domain)
+	if err != nil {
+		return "", err
+	}
+	return domain, nil
 }
 
 // EnsAvatarRecordFor returns the avatar record for the given address
