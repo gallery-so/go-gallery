@@ -1948,15 +1948,17 @@ func profileImageToModel(ctx context.Context, pfp db.ProfileImage) (model.Profil
 }
 
 func ensProfileImageToModel(ctx context.Context, userID, walletID persist.DBID, url, domain string) (*model.EnsProfileImage, error) {
-	previewURLs := previewURLs(ctx, url, nil)
-	// Use the token's preview URLs if the token exists
+	previews := previewURLs(ctx, url, nil)
+	// Use the token's profile image if the token exists
 	if token, err := publicapi.For(ctx).Token.GetTokenByEnsDomain(ctx, userID, domain); err == nil {
 		if tokenMedia, err := publicapi.For(ctx).Token.MediaByTokenID(ctx, token.ID); err == nil {
-			previewURLs = previewURLsFromTokenMedia(ctx, tokenMedia)
+			if tokenMedia.Media.ProfileImageURL != "" {
+				previews = previewURLs(ctx, string(tokenMedia.Media.ProfileImageURL), nil)
+			}
 		}
 	}
 	return &model.EnsProfileImage{
-		ProfileImage: &model.HTTPSProfileImage{PreviewURLs: previewURLs},
+		ProfileImage: &model.HTTPSProfileImage{PreviewURLs: previews},
 		Wallet:       nil, // handled by dedicated resolver
 		Token:        nil, // handled by dedicated resolver, resolving this token should be free as it would be cached from the call above
 		HelperEnsProfileImageData: model.HelperEnsProfileImageData{

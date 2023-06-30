@@ -336,10 +336,11 @@ type ErrTokenNotFoundByID struct {
 	ID DBID
 }
 
-type ErrTokenNotFoundByOwnerIDContractAddressAndTokenID struct {
-	OwnerID         DBID
+type ErrTokenNotFoundByHolderIdentifiers struct {
+	HolderID        DBID
 	TokenID         TokenID
 	ContractAddress Address
+	Chain           Chain
 }
 
 type ErrTokensNotFoundByTokenID struct {
@@ -354,8 +355,8 @@ func (e ErrTokenNotFoundByID) Error() string {
 	return fmt.Sprintf("token not found by ID: %s", e.ID)
 }
 
-func (e ErrTokenNotFoundByOwnerIDContractAddressAndTokenID) Error() string {
-	return fmt.Sprintf("token not found by owner ID: %s, contract address: %s, and token ID: %s", e.OwnerID, e.ContractAddress, e.TokenID)
+func (e ErrTokenNotFoundByHolderIdentifiers) Error() string {
+	return fmt.Sprintf("token not found by holder ID: %s, chain: %d, contract address: %s, and token ID: %s", e.HolderID, e.Chain, e.ContractAddress, e.TokenID)
 }
 
 func (e ErrTokensNotFoundByTokenID) Error() string {

@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/ethclient"
 	ens "github.com/wealdtech/go-ens/v3"
 
@@ -85,17 +84,13 @@ func ReverseResolvesTo(ctx context.Context, ethClient *ethclient.Client, domain 
 	return addr == common.HexToAddress(address.String()), nil
 }
 
-// DeriveTokenID derives the token ID from a domain
-// Copied from main branch of go-ens, which is not available yet on the latest release at the time of writing (v3.5.5)
-func DeriveTokenID(ethClient *ethclient.Client, domain string) (persist.TokenID, error) {
+// DeriveTokenID derives the token ID (in hexadecimal) from a domain
+// Copied from main branch of go-ens, which isn't available yet on the latest release at the time of writing (v3.5.5)
+func DeriveTokenID(domain string) (persist.TokenID, error) {
 	if domain == "" {
 		return "", errors.New("empty domain")
 	}
-	_, err := ens.Resolve(ethClient, domain)
-	if err != nil {
-		return "", err
-	}
-	domain, err = ens.NormaliseDomain(domain)
+	domain, err := ens.NormaliseDomain(domain)
 	if err != nil {
 		return "", err
 	}
@@ -108,12 +103,7 @@ func DeriveTokenID(ethClient *ethclient.Client, domain string) (persist.TokenID,
 	if err != nil {
 		return "", err
 	}
-	hash := fmt.Sprintf("%#x", labelHash)
-	tokenId, ok := math.ParseBig256(hash)
-	if !ok {
-		return "", err
-	}
-	return persist.TokenID(tokenId.String()), nil
+	return persist.TokenID(fmt.Sprintf("%x", labelHash)), nil
 }
 
 // EnsAvatarRecordFor returns the avatar record for the given address
@@ -146,7 +136,7 @@ func EnsAvatarRecordFor(ctx context.Context, ethClient *ethclient.Client, a pers
 }
 
 // IsOwner returns true if the address is the current holder of the token
-func IsOwner(ctx context.Context, addr persist.EthereumAddress, uri EnsTokenRecord, ethClient *ethclient.Client) (bool, error) {
+func IsOwner(ctx context.Context, ethClient *ethclient.Client, addr persist.EthereumAddress, uri EnsTokenRecord) (bool, error) {
 	chain, contractAddr, tokenType, tokenID, err := TokenInfoFor(uri)
 	if err != nil {
 		return false, err

@@ -65,13 +65,13 @@ func (api TokenAPI) GetTokenByEnsDomain(ctx context.Context, userID persist.DBID
 		return db.Token{}, err
 	}
 
-	tokenID, err := eth.DeriveTokenID(api.ethClient, domain)
+	tokenID, err := eth.DeriveTokenID(domain)
 	if err != nil {
 		return db.Token{}, err
 	}
 
-	return api.loaders.TokenByOwnerIDContractAddressAndTokenID.Load(db.GetTokenByOwnerIdContractAddressAndTokenIdBatchParams{
-		UserID:          userID,
+	return api.loaders.TokenByHolderIDContractAddressAndTokenID.Load(db.GetTokenByHolderIdContractAddressAndTokenIdBatchParams{
+		HolderID:        userID,
 		TokenID:         persist.TokenID(tokenID),
 		ContractAddress: eth.EnsAddress,
 		Chain:           persist.ChainETH,

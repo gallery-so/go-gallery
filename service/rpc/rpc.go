@@ -114,28 +114,45 @@ func NewEthClient() *ethclient.Client {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	rpcClient, err := rpc.DialContext(ctx, env.GetString("RPC_URL"))
-	if err != nil {
-		panic(err)
+	var client *rpc.Client
+	var err error
+
+	if endpoint := env.GetString("RPC_URL"); strings.HasPrefix(endpoint, "https://") {
+		client, err = rpc.DialHTTPWithClient(endpoint, defaultHTTPClient)
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		client, err = rpc.DialContext(ctx, endpoint)
+		if err != nil {
+			panic(err)
+		}
 	}
 
-	return ethclient.NewClient(rpcClient)
-
+	return ethclient.NewClient(client)
 }
 
-// NewEthHTTPClient returns a new http client with request tracing enabled
-func NewEthHTTPClient() *ethclient.Client {
-	if !strings.HasPrefix(env.GetString("RPC_URL"), "http") {
-		return NewEthClient()
+// NewEthClient returns an ethclient.Client
+func NewEthClientContext(ctx context.Context) *ethclient.Client {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	var client *rpc.Client
+	var err error
+
+	if endpoint := env.GetString("RPC_URL"); strings.HasPrefix(endpoint, "https://") {
+		client, err = rpc.DialHTTPWithClient(endpoint, defaultHTTPClient)
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		client, err = rpc.DialContext(ctx, endpoint)
+		if err != nil {
+			panic(err)
+		}
 	}
 
-	httpClient := newHTTPClientForRPC(false, sentryutil.TransactionNameSafe("gethRPC"))
-	rpcClient, err := rpc.DialHTTPWithClient(env.GetString("RPC_URL"), httpClient)
-	if err != nil {
-		panic(err)
-	}
-
-	return ethclient.NewClient(rpcClient)
+	return ethclient.NewClient(client)
 }
 
 // NewEthSocketClient returns a new websocket client with request tracing enabled

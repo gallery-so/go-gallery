@@ -85,12 +85,11 @@ SELECT * FROM tokens WHERE id = $1 AND deleted = false;
 -- name: GetTokenByIdBatch :batchone
 SELECT * FROM tokens WHERE id = $1 AND deleted = false;
 
--- name: GetTokenByOwnerIdContractAddressAndTokenIdBatch :batchone
+-- name: GetTokenByHolderIdContractAddressAndTokenIdBatch :batchone
 select t.*
 from tokens t
-join token_ownership o on t.id = o.token_id
 join contracts c on t.contract = c.id
-where o.owner_user_id = @user_id and t.token_id = @token_id and c.address = @contract_address and c.chain = @chain and not t.deleted and not c.deleted;
+where t.owner_user_id = @holder_id and t.token_id = @token_id and c.address = @contract_address and c.chain = @chain and not t.deleted and not c.deleted;
 
 -- name: GetTokensByCollectionIdBatch :batchmany
 select t.* from collections c,

@@ -265,6 +265,9 @@ func (r *createCollectionPayloadResolver) FeedEvent(ctx context.Context, obj *mo
 
 // Wallet is the resolver for the wallet field.
 func (r *ensProfileImageResolver) Wallet(ctx context.Context, obj *model.EnsProfileImage) (*model.Wallet, error) {
+	if obj.HelperEnsProfileImageData.WalletID == "" {
+		return nil, nil
+	}
 	return resolveWalletByWalletID(ctx, obj.HelperEnsProfileImageData.WalletID)
 }
 

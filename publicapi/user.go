@@ -1396,7 +1396,7 @@ func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID, w
 
 				// Confirm wallet owns the token
 				if t, ok := r.(eth.EnsTokenRecord); ok {
-					isOwner, err := eth.IsOwner(ctx, addr, t, api.ethClient)
+					isOwner, err := eth.IsOwner(ctx, api.ethClient, addr, t)
 					if err != nil {
 						return err
 					}
@@ -1484,6 +1484,9 @@ func (api UserAPI) GetEnsProfileImageByUserID(ctx context.Context, userID persis
 
 	errs := make([]error, 0)
 
+	// loop through all ens tokens
+	// sorted by tokens that already have a pfp, then by tokens that have a fallback
+
 	for _, w := range wallets {
 		addr := persist.EthereumAddress(w.Address)
 
@@ -1499,7 +1502,7 @@ func (api UserAPI) GetEnsProfileImageByUserID(ctx context.Context, userID persis
 
 		// Confirm wallet owns the token
 		if t, ok := r.(eth.EnsTokenRecord); ok {
-			isOwner, err := eth.IsOwner(ctx, addr, t, api.ethClient)
+			isOwner, err := eth.IsOwner(ctx, api.ethClient, addr, t)
 			if err != nil {
 				return a, err
 			}
