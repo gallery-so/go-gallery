@@ -464,24 +464,24 @@ func FetchAssetsForTokenIdentifiers(ctx context.Context, contractAddress persist
 
 // FetchContractByAddress fetches a contract by address
 func FetchContractByAddress(pCtx context.Context, pContract persist.EthereumAddress) (Contract, error) {
-	url := baseURL.JoinPath("asset_contract")
+	url := baseURL.JoinPath("asset_contract", pContract.String())
 
 	req := authRequest(pCtx, url.String())
 
 	resp, err := retry.RetryRequest(http.DefaultClient, req)
 	if err != nil {
-		return Contract{}, err
+		return Contract{}, fmt.Errorf("err retrying: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return Contract{}, util.BodyAsError(resp)
+		return Contract{}, fmt.Errorf("error status: %s %w", resp.Status, util.BodyAsError(resp))
 	}
 
 	contract := Contract{}
 	err = util.UnmarshallBody(&contract, resp.Body)
 	if err != nil {
-		return Contract{}, err
+		return Contract{}, fmt.Errorf("err unmarshalling: %w", err)
 	}
 
 	return contract, nil
