@@ -36,6 +36,7 @@ type contract struct {
 	Creator_Address persist.Address
 	Level           int
 	Type            tokenStandard
+	Logo            string
 }
 
 type token struct {
@@ -169,10 +170,11 @@ func (p *TezosObjktProvider) GetTokensByWalletAddress(ctx context.Context, owner
 			dedupeContracts[node.Token.Fa.Contract] = multichain.ChainAgnosticContract{
 				Address: node.Token.Fa.Contract,
 				Descriptors: multichain.ChainAgnosticContractDescriptors{
-					Symbol:         node.Token.Symbol,
-					Name:           node.Token.Fa.Name,
-					Description:    node.Token.Fa.Description,
-					CreatorAddress: node.Token.Fa.Creator_Address,
+					Symbol:          node.Token.Symbol,
+					Name:            node.Token.Fa.Name,
+					Description:     node.Token.Fa.Description,
+					CreatorAddress:  node.Token.Fa.Creator_Address,
+					ProfileImageURL: node.Token.Fa.Logo,
 				},
 
 				LatestBlock: persist.BlockNumber(node.Token.Fa.Level),

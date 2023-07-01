@@ -1,5 +1,5 @@
 -- name: UpsertParentContracts :many
-insert into contracts(id, deleted, version, created_at, address, symbol, name, owner_address, chain, description) (
+insert into contracts(id, deleted, version, created_at, address, symbol, name, owner_address, chain, description, profile_image_url) (
   select unnest(@ids::varchar[])
     , false
     , unnest(@version::int[])
@@ -10,6 +10,7 @@ insert into contracts(id, deleted, version, created_at, address, symbol, name, o
     , unnest(@owner_address::varchar[])
     , unnest(@chain::int[])
     , unnest(@description::varchar[])
+    , unnest(@profile_image_url::varchar[])
 )
 on conflict (chain, address) where parent_id is null
 do update set symbol = excluded.symbol
@@ -23,6 +24,7 @@ do update set symbol = excluded.symbol
             contracts.owner_address
       end
   , description = excluded.description
+  , profile_image_url = excluded.profile_image_url
   , deleted = excluded.deleted
   , last_updated = now()
 returning *;

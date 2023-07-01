@@ -1265,6 +1265,9 @@ func syncTokens(t *testing.T, ctx context.Context, c graphql.Client, userID pers
 	t.Helper()
 	resp, err := syncTokensMutation(ctx, c, []Chain{"Ethereum"})
 	require.NoError(t, err)
+	if err, ok := (*resp.SyncTokens).(*syncTokensMutationSyncTokensErrSyncFailed); ok {
+		t.Fatal(err.Message)
+	}
 	payload := (*resp.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
 	tokens := make([]persist.DBID, len(payload.Viewer.User.Tokens))
 	for i, token := range payload.Viewer.User.Tokens {

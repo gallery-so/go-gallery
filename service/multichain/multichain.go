@@ -101,10 +101,11 @@ type ChainAgnosticTokenDescriptors struct {
 }
 
 type ChainAgnosticContractDescriptors struct {
-	Symbol         string          `json:"symbol"`
-	Name           string          `json:"name"`
-	Description    string          `json:"description"`
-	CreatorAddress persist.Address `json:"creator_address"`
+	Symbol          string          `json:"symbol"`
+	Name            string          `json:"name"`
+	Description     string          `json:"description"`
+	ProfileImageURL string          `json:"profile_image_url"`
+	CreatorAddress  persist.Address `json:"creator_address"`
 }
 
 // ChainAgnosticIdentifiers identify tokens despite their chain
@@ -1539,35 +1540,54 @@ func tokensToNewDedupedTokens(tokens []chainTokens, contracts []persist.Contract
 	return res, tokenDBIDToAddress
 }
 
+type contractMetadata struct {
+	Symbol          string
+	Name            string
+	OwnerAddress    persist.Address
+	ProfileImageURL string
+	Description     string
+}
+
 func contractsToNewDedupedContracts(contracts []chainContracts) []persist.ContractGallery {
-	seen := make(map[persist.ChainAddress]persist.ContractGallery)
 
 	sort.SliceStable(contracts, func(i, j int) bool {
 		return contracts[i].priority < contracts[j].priority
 	})
 
+	contractMetadatas := map[persist.ChainAddress]contractMetadata{}
 	for _, chainContract := range contracts {
 		for _, contract := range chainContract.contracts {
-			if it, ok := seen[persist.NewChainAddress(contract.Address, chainContract.chain)]; ok {
-				if it.Name.String() != "" {
-					continue
-				}
+
+			meta := contractMetadatas[persist.NewChainAddress(contract.Address, chainContract.chain)]
+			if contract.Descriptors.Symbol != "" {
+				meta.Symbol = contract.Descriptors.Symbol
 			}
-			c := persist.ContractGallery{
-				Chain:        chainContract.chain,
-				Address:      contract.Address,
-				Symbol:       persist.NullString(contract.Descriptors.Symbol),
-				Name:         persist.NullString(contract.Descriptors.Name),
-				OwnerAddress: contract.Descriptors.CreatorAddress,
-				Description:  persist.NullString(contract.Descriptors.Description),
+			if contract.Descriptors.Name != "" {
+				meta.Name = contract.Descriptors.Name
 			}
-			seen[persist.NewChainAddress(contract.Address, chainContract.chain)] = c
+			if contract.Descriptors.CreatorAddress != "" {
+				meta.OwnerAddress = contract.Descriptors.CreatorAddress
+			}
+			if contract.Descriptors.Description != "" {
+				meta.Description = contract.Descriptors.Description
+			}
+			if contract.Descriptors.ProfileImageURL != "" {
+				meta.ProfileImageURL = contract.Descriptors.ProfileImageURL
+			}
+			contractMetadatas[persist.NewChainAddress(contract.Address, chainContract.chain)] = meta
 		}
 	}
 
-	res := make([]persist.ContractGallery, 0, len(seen))
-	for _, c := range seen {
-		res = append(res, c)
+	res := make([]persist.ContractGallery, 0, len(contractMetadatas))
+	for address, meta := range contractMetadatas {
+		res = append(res, persist.ContractGallery{
+			Chain:        address.Chain(),
+			Address:      address.Address(),
+			Symbol:       persist.NullString(meta.Symbol),
+			Name:         persist.NullString(meta.Name),
+			OwnerAddress: meta.OwnerAddress,
+			Description:  persist.NullString(meta.Description),
+		})
 	}
 	return res
 

@@ -136,6 +136,7 @@ type Collection struct {
 	PayoutAddress         persist.EthereumAddress `json:"payout_address"`
 	PrimaryAssetContracts []Contract              `json:"primary_asset_contracts"`
 	Slug                  string                  `json:"slug"`
+	ImageURL              string                  `json:"image_url"`
 }
 
 // Contract represents an NFT contract from Opensea
@@ -463,24 +464,24 @@ func FetchAssetsForTokenIdentifiers(ctx context.Context, contractAddress persist
 
 // FetchContractByAddress fetches a contract by address
 func FetchContractByAddress(pCtx context.Context, pContract persist.EthereumAddress) (Contract, error) {
-	url := baseURL.JoinPath("asset_contract")
+	url := baseURL.JoinPath("asset_contract", pContract.String())
 
 	req := authRequest(pCtx, url.String())
 
 	resp, err := retry.RetryRequest(http.DefaultClient, req)
 	if err != nil {
-		return Contract{}, err
+		return Contract{}, fmt.Errorf("err retrying: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return Contract{}, util.BodyAsError(resp)
+		return Contract{}, fmt.Errorf("error status: %s %w", resp.Status, util.BodyAsError(resp))
 	}
 
 	contract := Contract{}
 	err = util.UnmarshallBody(&contract, resp.Body)
 	if err != nil {
-		return Contract{}, err
+		return Contract{}, fmt.Errorf("err unmarshalling: %w", err)
 	}
 
 	return contract, nil
@@ -677,9 +678,11 @@ func contractFromAsset(asset Asset, block persist.BlockNumber) multichain.ChainA
 	return multichain.ChainAgnosticContract{
 		Address: persist.Address(asset.Contract.ContractAddress.String()),
 		Descriptors: multichain.ChainAgnosticContractDescriptors{
-			Symbol:         asset.Contract.ContractSymbol.String(),
-			Name:           asset.Contract.ContractName.String(),
-			CreatorAddress: persist.Address(asset.Collection.PayoutAddress),
+			Symbol:          asset.Contract.ContractSymbol.String(),
+			Name:            asset.Contract.ContractName.String(),
+			CreatorAddress:  persist.Address(asset.Collection.PayoutAddress),
+			Description:     asset.Collection.Description,
+			ProfileImageURL: firstNonEmptyString(asset.Collection.ImageURL, asset.Contract.ContractImage.String()),
 		},
 		LatestBlock: block,
 	}
