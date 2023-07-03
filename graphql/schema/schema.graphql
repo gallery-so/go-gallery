@@ -78,6 +78,7 @@ type HTTPSProfileImage {
 type EnsProfileImage @goEmbedHelper {
   wallet: Wallet @goField(forceResolver: true)
   profileImage: HTTPSProfileImage
+  token: Token @goField(forceResolver: true)
 }
 
 union ProfileImage = TokenProfileImage | EnsProfileImage

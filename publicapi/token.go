@@ -3,22 +3,22 @@ package publicapi
 import (
 	"context"
 	"fmt"
-	"github.com/mikeydub/go-gallery/util"
 	"time"
 
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
-
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gammazero/workerpool"
+	"github.com/go-playground/validator/v10"
+
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/graphql/dataloader"
+	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
-	"github.com/mikeydub/go-gallery/service/throttle"
-	"github.com/mikeydub/go-gallery/validate"
-
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/go-playground/validator/v10"
-	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/throttle"
+	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/validate"
 )
 
 type TokenAPI struct {
@@ -55,6 +55,27 @@ func (api TokenAPI) GetTokenById(ctx context.Context, tokenID persist.DBID) (*db
 	}
 
 	return &token, nil
+}
+
+func (api TokenAPI) GetTokenByEnsDomain(ctx context.Context, userID persist.DBID, domain string) (db.Token, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"domain": validate.WithTag(domain, "required"),
+	}); err != nil {
+		return db.Token{}, err
+	}
+
+	tokenID, err := eth.DeriveTokenID(domain)
+	if err != nil {
+		return db.Token{}, err
+	}
+
+	return api.loaders.TokenByHolderIDContractAddressAndTokenID.Load(db.GetTokenByHolderIdContractAddressAndTokenIdBatchParams{
+		HolderID:        userID,
+		TokenID:         persist.TokenID(tokenID),
+		ContractAddress: eth.EnsAddress,
+		Chain:           persist.ChainETH,
+	})
 }
 
 func (api TokenAPI) GetTokensByCollectionId(ctx context.Context, collectionID persist.DBID, limit *int) ([]db.Token, error) {

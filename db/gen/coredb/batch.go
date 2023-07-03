@@ -1777,7 +1777,7 @@ func (b *GetOwnersByContractIdBatchPaginateBatchResults) Close() error {
 }
 
 const getProfileImageByID = `-- name: GetProfileImageByID :batchone
-select id, user_id, token_id, source_type, deleted, created_at, last_updated, wallet_id, ens_avatar_uri from profile_images pfp
+select id, user_id, token_id, source_type, deleted, created_at, last_updated, wallet_id, ens_avatar_uri, ens_domain from profile_images pfp
 where pfp.id = $1
 	and not deleted
 	and case
@@ -1837,6 +1837,7 @@ func (b *GetProfileImageByIDBatchResults) QueryRow(f func(int, ProfileImage, err
 			&i.LastUpdated,
 			&i.WalletID,
 			&i.EnsAvatarUri,
+			&i.EnsDomain,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -2141,6 +2142,91 @@ func (b *GetSharedFollowersBatchPaginateBatchResults) Query(f func(int, []GetSha
 }
 
 func (b *GetSharedFollowersBatchPaginateBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
+const getTokenByHolderIdContractAddressAndTokenIdBatch = `-- name: GetTokenByHolderIdContractAddressAndTokenIdBatch :batchone
+select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id
+from tokens t
+join contracts c on t.contract = c.id
+where t.owner_user_id = $1 and t.token_id = $2 and c.address = $3 and c.chain = $4 and not t.deleted and not c.deleted
+`
+
+type GetTokenByHolderIdContractAddressAndTokenIdBatchBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type GetTokenByHolderIdContractAddressAndTokenIdBatchParams struct {
+	HolderID        persist.DBID
+	TokenID         persist.TokenID
+	ContractAddress persist.Address
+	Chain           persist.Chain
+}
+
+func (q *Queries) GetTokenByHolderIdContractAddressAndTokenIdBatch(ctx context.Context, arg []GetTokenByHolderIdContractAddressAndTokenIdBatchParams) *GetTokenByHolderIdContractAddressAndTokenIdBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.HolderID,
+			a.TokenID,
+			a.ContractAddress,
+			a.Chain,
+		}
+		batch.Queue(getTokenByHolderIdContractAddressAndTokenIdBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetTokenByHolderIdContractAddressAndTokenIdBatchBatchResults{br, len(arg), false}
+}
+
+func (b *GetTokenByHolderIdContractAddressAndTokenIdBatchBatchResults) QueryRow(f func(int, Token, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var i Token
+		if b.closed {
+			if f != nil {
+				f(t, i, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		row := b.br.QueryRow()
+		err := row.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Name,
+			&i.Description,
+			&i.CollectorsNote,
+			&i.Media,
+			&i.TokenUri,
+			&i.TokenType,
+			&i.TokenID,
+			&i.Quantity,
+			&i.OwnershipHistory,
+			&i.TokenMetadata,
+			&i.ExternalUrl,
+			&i.BlockNumber,
+			&i.OwnerUserID,
+			&i.OwnedByWallets,
+			&i.Chain,
+			&i.Contract,
+			&i.IsUserMarkedSpam,
+			&i.IsProviderMarkedSpam,
+			&i.LastSynced,
+			&i.FallbackMedia,
+			&i.TokenMediaID,
+		)
+		if f != nil {
+			f(t, i, err)
+		}
+	}
+}
+
+func (b *GetTokenByHolderIdContractAddressAndTokenIdBatchBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }

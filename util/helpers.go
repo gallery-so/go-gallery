@@ -25,7 +25,6 @@ import (
 // DefaultSearchDepth represents the maximum amount of nested maps (aka recursions) that can be searched
 const DefaultSearchDepth = 5
 const GinContextKey string = "GinContextKey"
-const ENSAddress = "0x57f1887a8bf19b14fc0df6fd9b2acc9af147ea85"
 
 const (
 	// KB is the number of bytes in a kilobyte
@@ -683,20 +682,6 @@ func FirstNonErrorWithValue[T any](ctx context.Context, autoCancel bool, returnO
 	case <-ctx.Done():
 		return *new(T), ctx.Err()
 	}
-}
-
-// ManyNotNils returns true if there is more than one non-nil value
-func ManyNotNils(values ...any) bool {
-	c := 0
-	for _, v := range values {
-		if v != nil {
-			if c > 1 {
-				return true
-			}
-			c++
-		}
-	}
-	return false
 }
 
 // FileHeaderReader is a struct that wraps an io.Reader and pre-reads the first 512 bytes of the reader

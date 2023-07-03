@@ -1341,7 +1341,7 @@ func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID, w
 	}
 
 	// Too many inputs provided
-	if util.ManyNotNils(tokenID, walletAddress) {
+	if tokenID != nil && walletAddress != nil {
 		return ErrProfileImageTooManySources
 	}
 
@@ -1369,7 +1369,7 @@ func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID, w
 		})
 	}
 
-	// Set the profile image to reference ENS avatar
+	// Set the profile image to reference an ENS avatar
 	if walletAddress != nil {
 		// Validate
 		if err := validate.ValidateFields(api.validator, validate.ValidationMap{
@@ -1389,14 +1389,14 @@ func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID, w
 				// Found the wallet
 				addr := persist.EthereumAddress(w.Address)
 
-				r, err := eth.EnsAvatarRecordFor(ctx, api.ethClient, addr)
+				r, domain, err := eth.EnsAvatarRecordFor(ctx, api.ethClient, addr)
 				if err != nil {
 					return err
 				}
 
 				// Confirm wallet owns the token
 				if t, ok := r.(eth.EnsTokenRecord); ok {
-					isOwner, err := eth.IsOwner(ctx, addr, t, api.ethClient)
+					isOwner, err := eth.IsOwner(ctx, api.ethClient, addr, t)
 					if err != nil {
 						return err
 					}
@@ -1407,7 +1407,12 @@ func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID, w
 
 				uri, err := uriFromRecord(ctx, api.multichainProvider, r)
 				if err != nil {
-					return err
+					// Couldn't parse the URI, but tokenprocessing may support it so don't error out
+					if errors.Is(err, eth.ErrUnknownEnsAvatarURI) {
+						uri = ""
+					} else {
+						return err
+					}
 				}
 
 				pfp, err := api.queries.SetProfileImageToENS(ctx, db.SetProfileImageToENSParams{
@@ -1416,6 +1421,7 @@ func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID, w
 					UserID:        userID,
 					WalletID:      w.ID,
 					EnsAvatarUri:  util.ToNullString(uri, true),
+					EnsDomain:     util.ToNullString(domain, true),
 				})
 				if err != nil {
 					return err
@@ -1463,6 +1469,7 @@ func (api UserAPI) GetProfileImageByUserID(ctx context.Context, userID persist.D
 
 type EnsAvatar struct {
 	WalletID persist.DBID
+	Domain   string
 	URI      string
 }
 
@@ -1475,6 +1482,25 @@ func (api UserAPI) GetEnsProfileImageByUserID(ctx context.Context, userID persis
 		return a, err
 	}
 
+	// Check if profile images have been processed
+	pfp, err := api.queries.GetEnsProfileImagesByUserID(ctx, db.GetEnsProfileImagesByUserIDParams{
+		EnsAddress: eth.EnsAddress,
+		Chain:      persist.ChainETH,
+		UserID:     userID,
+	})
+	if err == nil {
+		// Validate that the name is valid
+		domain, err := eth.NormalizeDomain(pfp.TokenMedia.Name)
+		if err == nil {
+			return EnsAvatar{
+				WalletID: pfp.Wallet.ID,
+				Domain:   domain,
+				URI:      string(pfp.TokenMedia.Media.ProfileImageURL),
+			}, nil
+		}
+	}
+
+	// Otherwise check for ENS profile images
 	wallets, err := api.queries.GetEthereumWalletsForEnsProfileImagesByUserID(ctx, userID)
 	if err != nil {
 		return a, err
@@ -1485,7 +1511,7 @@ func (api UserAPI) GetEnsProfileImageByUserID(ctx context.Context, userID persis
 	for _, w := range wallets {
 		addr := persist.EthereumAddress(w.Address)
 
-		r, err := eth.EnsAvatarRecordFor(ctx, api.ethClient, addr)
+		r, domain, err := eth.EnsAvatarRecordFor(ctx, api.ethClient, addr)
 		if err != nil {
 			errs = append(errs, err)
 			continue
@@ -1497,7 +1523,7 @@ func (api UserAPI) GetEnsProfileImageByUserID(ctx context.Context, userID persis
 
 		// Confirm wallet owns the token
 		if t, ok := r.(eth.EnsTokenRecord); ok {
-			isOwner, err := eth.IsOwner(ctx, addr, t, api.ethClient)
+			isOwner, err := eth.IsOwner(ctx, api.ethClient, addr, t)
 			if err != nil {
 				return a, err
 			}
@@ -1511,7 +1537,7 @@ func (api UserAPI) GetEnsProfileImageByUserID(ctx context.Context, userID persis
 			return a, err
 		}
 
-		return EnsAvatar{WalletID: w.ID, URI: uri}, nil
+		return EnsAvatar{WalletID: w.ID, Domain: domain, URI: uri}, nil
 	}
 
 	if len(errs) > 0 {
@@ -1533,7 +1559,7 @@ func uriFromRecord(ctx context.Context, mc *multichain.Provider, r eth.AvatarRec
 		uri, err = uriFromTokenRecord(ctx, mc, u)
 		return standardizeURI(uri), err
 	default:
-		return "", eth.ErrUnknownENSAvatarURI
+		return "", eth.ErrUnknownEnsAvatarURI
 	}
 }
 

@@ -49,31 +49,46 @@ func NewTokenProcessor(queries *coredb.Queries, ethClient *ethclient.Client, mc 
 }
 
 type tokenProcessingJob struct {
-	tp *tokenProcessor
-
-	id       persist.DBID
-	key      string
-	token    persist.TokenGallery
-	contract persist.ContractGallery
-
+	tp               *tokenProcessor
+	id               persist.DBID
+	key              string
+	token            persist.TokenGallery
+	contract         persist.ContractGallery
 	cause            persist.ProcessingCause
 	pipelineMetadata *persist.PipelineMetadata
+	// profileImageKey is an optional key in the metadata that the pipeline should also process as a profile image
+	// The pipeline only looks at the root level of the metadata for the key and will also not fail
+	// if the key is missing or if processing media for the key fails
+	profileImageKey string
 }
 
-func (tp *tokenProcessor) ProcessTokenPipeline(c context.Context, t persist.TokenGallery, contract persist.ContractGallery, cause persist.ProcessingCause) (coredb.TokenMedia, error) {
+type PipelineOption func(*tokenProcessingJob)
 
+type PipelineOptions struct{}
+
+var PipelineOpts PipelineOptions
+
+func (PipelineOptions) WithProfileImageKey(key string) PipelineOption {
+	return func(j *tokenProcessingJob) {
+		j.profileImageKey = key
+	}
+}
+
+func (tp *tokenProcessor) ProcessTokenPipeline(c context.Context, t persist.TokenGallery, contract persist.ContractGallery, cause persist.ProcessingCause, opts ...PipelineOption) (coredb.TokenMedia, error) {
 	runID := persist.GenerateID()
 
 	job := &tokenProcessingJob{
-		id: runID,
-
-		tp:       tp,
-		key:      persist.NewTokenIdentifiers(contract.Address, t.TokenID, t.Chain).String(),
-		token:    t,
-		contract: contract,
-
+		id:               runID,
+		tp:               tp,
+		key:              persist.NewTokenIdentifiers(contract.Address, t.TokenID, t.Chain).String(),
+		token:            t,
+		contract:         contract,
 		cause:            cause,
 		pipelineMetadata: new(persist.PipelineMetadata),
+	}
+
+	for _, opt := range opts {
+		opt(job)
 	}
 
 	loggerCtx := logger.NewContextWithFields(c, logrus.Fields{
@@ -243,16 +258,22 @@ func (tpj *tokenProcessingJob) cacheMediaObjects(ctx context.Context, metadata p
 	})
 
 	var (
-		imgCh, animCh         chan cacheResult
-		imgResult, animResult cacheResult
-		downloadSuccess       bool
+		imgCh, animCh, pfpCh             chan cacheResult
+		imgResult, animResult, pfpResult cacheResult
+		downloadSuccess                  bool
 	)
 
 	if animURL != "" {
-		animCh = cacheAnimationObjects(ctx, animURL, metadata, tpj)
+		animCh = cacheAnimationObjects(ctx, animURL, tpj)
 	}
 	if imgURL != "" {
-		imgCh = cacheImageObjects(ctx, imgURL, metadata, tpj)
+		imgCh = cacheImageObjects(ctx, imgURL, tpj)
+	}
+	if tpj.profileImageKey != "" {
+		pfpCh, err = cacheProfileImageObjects(ctx, tpj, metadata)
+		if err != nil {
+			logger.For(ctx).Errorf("error caching profile image source: %s", err)
+		}
 	}
 
 	if animCh != nil {
@@ -267,10 +288,13 @@ func (tpj *tokenProcessingJob) cacheMediaObjects(ctx context.Context, metadata p
 			downloadSuccess = true
 		}
 	}
+	if pfpCh != nil {
+		pfpResult = <-pfpCh
+	}
 
 	// If we have at least one successful download, we can create media from it
 	if downloadSuccess {
-		return createMediaFromResults(ctx, tpj, animResult, imgResult), nil
+		return createMediaFromResults(ctx, tpj, animResult, imgResult, pfpResult), nil
 	}
 
 	// Try to use OpenSea as a fallback

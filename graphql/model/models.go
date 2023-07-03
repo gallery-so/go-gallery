@@ -126,7 +126,9 @@ type HelperTokenData struct {
 }
 
 type HelperEnsProfileImageData struct {
-	WalletID persist.DBID
+	UserID    persist.DBID
+	WalletID  persist.DBID
+	EnsDomain string
 }
 
 type ErrInvalidIDFormat struct {

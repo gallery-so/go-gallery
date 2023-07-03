@@ -114,43 +114,34 @@ func NewEthClient() *ethclient.Client {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	rpcClient, err := rpc.DialContext(ctx, env.GetString("RPC_URL"))
-	if err != nil {
-		panic(err)
-	}
+	var client *rpc.Client
+	var err error
 
-	return ethclient.NewClient(rpcClient)
-
-}
-
-// NewEthHTTPClient returns a new http client with request tracing enabled
-func NewEthHTTPClient() *ethclient.Client {
-	if !strings.HasPrefix(env.GetString("RPC_URL"), "http") {
-		return NewEthClient()
-	}
-
-	httpClient := newHTTPClientForRPC(false, sentryutil.TransactionNameSafe("gethRPC"))
-	rpcClient, err := rpc.DialHTTPWithClient(env.GetString("RPC_URL"), httpClient)
-	if err != nil {
-		panic(err)
-	}
-
-	return ethclient.NewClient(rpcClient)
-}
-
-// NewEthSocketClient returns a new websocket client with request tracing enabled
-func NewEthSocketClient() *ethclient.Client {
-	if !strings.HasPrefix(env.GetString("RPC_URL"), "wss") {
-		return NewEthClient()
-	}
-
-	log.Root().SetHandler(log.FilterHandler(func(r *log.Record) bool {
-		if reqID := valFromSlice(r.Ctx, "reqid"); reqID == nil || r.Msg != "Handled RPC response" {
-			return false
+	if endpoint := env.GetString("RPC_URL"); strings.HasPrefix(endpoint, "https://") {
+		client, err = rpc.DialHTTPWithClient(endpoint, defaultHTTPClient)
+		if err != nil {
+			panic(err)
 		}
-		return true
-	}, defaultMetricsHandler))
+	} else {
+		client, err = rpc.DialContext(ctx, endpoint)
+		if err != nil {
+			panic(err)
+		}
+	}
 
+	return ethclient.NewClient(client)
+}
+
+// NewEthSocketClient returns a websocket client with request tracing enabled
+func NewEthSocketClient() *ethclient.Client {
+	if strings.HasPrefix(env.GetString("RPC_URL"), "wss") {
+		log.Root().SetHandler(log.FilterHandler(func(r *log.Record) bool {
+			if reqID := valFromSlice(r.Ctx, "reqid"); reqID == nil || r.Msg != "Handled RPC response" {
+				return false
+			}
+			return true
+		}, defaultMetricsHandler))
+	}
 	return NewEthClient()
 }
 

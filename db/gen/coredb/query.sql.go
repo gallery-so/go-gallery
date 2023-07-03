@@ -1630,6 +1630,64 @@ func (q *Queries) GetCurrentTime(ctx context.Context) (time.Time, error) {
 	return column_1, err
 }
 
+const getEnsProfileImagesByUserID = `-- name: GetEnsProfileImagesByUserID :one
+select token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.contract_id, token_medias.token_id, token_medias.chain, token_medias.active, token_medias.metadata, token_medias.media, token_medias.name, token_medias.description, token_medias.processing_job_id, token_medias.deleted, wallets.id, wallets.created_at, wallets.last_updated, wallets.deleted, wallets.version, wallets.address, wallets.wallet_type, wallets.chain
+from tokens, contracts, users, token_medias, wallets, unnest(tokens.owned_by_wallets) tw(id)
+where contracts.address = $1
+    and contracts.chain = $2
+    and tokens.owner_user_id = $3
+    and tokens.contract = contracts.id
+    and users.id = tokens.owner_user_id
+    and tokens.token_media_id = token_medias.id
+    and tw.id = wallets.id
+    and token_medias.active
+    and nullif(token_medias.media->>'profile_image_url', '') is not null
+    and not contracts.deleted and not users.deleted and not token_medias.deleted and not wallets.deleted
+order by tw.id = users.primary_wallet_id desc, tokens.id desc
+limit 1
+`
+
+type GetEnsProfileImagesByUserIDParams struct {
+	EnsAddress persist.Address
+	Chain      persist.Chain
+	UserID     persist.DBID
+}
+
+type GetEnsProfileImagesByUserIDRow struct {
+	TokenMedia TokenMedia
+	Wallet     Wallet
+}
+
+func (q *Queries) GetEnsProfileImagesByUserID(ctx context.Context, arg GetEnsProfileImagesByUserIDParams) (GetEnsProfileImagesByUserIDRow, error) {
+	row := q.db.QueryRow(ctx, getEnsProfileImagesByUserID, arg.EnsAddress, arg.Chain, arg.UserID)
+	var i GetEnsProfileImagesByUserIDRow
+	err := row.Scan(
+		&i.TokenMedia.ID,
+		&i.TokenMedia.CreatedAt,
+		&i.TokenMedia.LastUpdated,
+		&i.TokenMedia.Version,
+		&i.TokenMedia.ContractID,
+		&i.TokenMedia.TokenID,
+		&i.TokenMedia.Chain,
+		&i.TokenMedia.Active,
+		&i.TokenMedia.Metadata,
+		&i.TokenMedia.Media,
+		&i.TokenMedia.Name,
+		&i.TokenMedia.Description,
+		&i.TokenMedia.ProcessingJobID,
+		&i.TokenMedia.Deleted,
+		&i.Wallet.ID,
+		&i.Wallet.CreatedAt,
+		&i.Wallet.LastUpdated,
+		&i.Wallet.Deleted,
+		&i.Wallet.Version,
+		&i.Wallet.Address,
+		&i.Wallet.WalletType,
+		&i.Wallet.Chain,
+	)
+	return i, err
+}
+
 const getEthereumWalletsForEnsProfileImagesByUserID = `-- name: GetEthereumWalletsForEnsProfileImagesByUserID :many
 select w.id, w.created_at, w.last_updated, w.deleted, w.version, w.address, w.wallet_type, w.chain
 from wallets w
@@ -4884,16 +4942,17 @@ func (q *Queries) SetContractOverrideCreator(ctx context.Context, arg SetContrac
 
 const setProfileImageToENS = `-- name: SetProfileImageToENS :one
 with profile_images as (
-    insert into profile_images (id, user_id, source_type, wallet_id, ens_avatar_uri, deleted, last_updated)
-    values ($2, $1, $3, $4, $5, false, now())
+    insert into profile_images (id, user_id, source_type, wallet_id, ens_domain, ens_avatar_uri, deleted, last_updated)
+    values ($2, $1, $3, $4, $5, $6, false, now())
     on conflict (user_id) do update set wallet_id = excluded.wallet_id
+        , ens_domain = excluded.ens_domain
         , ens_avatar_uri = excluded.ens_avatar_uri
         , source_type = excluded.source_type
         , deleted = excluded.deleted
         , last_updated = excluded.last_updated
-    returning id, user_id, token_id, source_type, deleted, created_at, last_updated, wallet_id, ens_avatar_uri
+    returning id, user_id, token_id, source_type, deleted, created_at, last_updated, wallet_id, ens_avatar_uri, ens_domain
 )
-update users set profile_image_id = profile_images.id from profile_images where users.id = $1 and not users.deleted returning profile_images.id, profile_images.user_id, profile_images.token_id, profile_images.source_type, profile_images.deleted, profile_images.created_at, profile_images.last_updated, profile_images.wallet_id, profile_images.ens_avatar_uri
+update users set profile_image_id = profile_images.id from profile_images where users.id = $1 and not users.deleted returning profile_images.id, profile_images.user_id, profile_images.token_id, profile_images.source_type, profile_images.deleted, profile_images.created_at, profile_images.last_updated, profile_images.wallet_id, profile_images.ens_avatar_uri, profile_images.ens_domain
 `
 
 type SetProfileImageToENSParams struct {
@@ -4901,6 +4960,7 @@ type SetProfileImageToENSParams struct {
 	ProfileID     persist.DBID
 	EnsSourceType persist.ProfileImageSource
 	WalletID      persist.DBID
+	EnsDomain     sql.NullString
 	EnsAvatarUri  sql.NullString
 }
 
@@ -4914,6 +4974,7 @@ func (q *Queries) SetProfileImageToENS(ctx context.Context, arg SetProfileImageT
 		arg.ProfileID,
 		arg.EnsSourceType,
 		arg.WalletID,
+		arg.EnsDomain,
 		arg.EnsAvatarUri,
 	)
 	var i SetProfileImageToENSRow
@@ -4927,6 +4988,7 @@ func (q *Queries) SetProfileImageToENS(ctx context.Context, arg SetProfileImageT
 		&i.ProfileImage.LastUpdated,
 		&i.ProfileImage.WalletID,
 		&i.ProfileImage.EnsAvatarUri,
+		&i.ProfileImage.EnsDomain,
 	)
 	return i, err
 }

@@ -1941,18 +1941,40 @@ func profileImageToModel(ctx context.Context, pfp db.ProfileImage) (model.Profil
 		if pfp.EnsAvatarUri.String == "" {
 			return nil, nil
 		}
-		return ensProfileImageToModel(ctx, pfp.WalletID, pfp.EnsAvatarUri.String), nil
+		return ensProfileImageToModel(ctx, pfp.UserID, pfp.WalletID, pfp.EnsAvatarUri.String, pfp.EnsDomain.String)
 	default:
 		return nil, publicapi.ErrProfileImageUnknownSource
 	}
 }
 
-func ensProfileImageToModel(ctx context.Context, walletID persist.DBID, url string) model.EnsProfileImage {
-	return model.EnsProfileImage{
-		ProfileImage:              &model.HTTPSProfileImage{PreviewURLs: previewURLs(ctx, url, nil)},
-		Wallet:                    nil, // handled by dedicated resolver
-		HelperEnsProfileImageData: model.HelperEnsProfileImageData{WalletID: walletID},
+func ensProfileImageToModel(ctx context.Context, userID, walletID persist.DBID, url, domain string) (*model.EnsProfileImage, error) {
+	previews := previewURLs(ctx, url, nil)
+	// Use the token's profile image if the token exists
+	if token, err := publicapi.For(ctx).Token.GetTokenByEnsDomain(ctx, userID, domain); err == nil {
+		if tokenMedia, err := publicapi.For(ctx).Token.MediaByTokenID(ctx, token.ID); err == nil {
+			if tokenMedia.Media.ProfileImageURL != "" {
+				previews = previewURLs(ctx, string(tokenMedia.Media.ProfileImageURL), nil)
+			}
+		}
 	}
+	return &model.EnsProfileImage{
+		ProfileImage: &model.HTTPSProfileImage{PreviewURLs: previews},
+		Wallet:       nil, // handled by dedicated resolver
+		Token:        nil, // handled by dedicated resolver, resolving this token should be free as it would be cached from the call above
+		HelperEnsProfileImageData: model.HelperEnsProfileImageData{
+			UserID:    userID,
+			WalletID:  walletID,
+			EnsDomain: domain,
+		},
+	}, nil
+}
+
+func resolveTokenByEnsDomain(ctx context.Context, userID persist.DBID, domain string) (*model.Token, error) {
+	token, err := publicapi.For(ctx).Token.GetTokenByEnsDomain(ctx, userID, domain)
+	if err != nil {
+		return nil, err
+	}
+	return tokenToModel(ctx, token, nil), nil
 }
 
 func previewURLsFromTokenMedia(ctx context.Context, tokenMedia db.TokenMedia, options ...mediamapper.Option) *model.PreviewURLSet {
