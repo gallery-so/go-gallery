@@ -125,7 +125,7 @@ func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.Blockchain
 
 	return multichain.BlockchainInfo{
 		Chain:   persist.ChainZora,
-		ChainID: 777777,
+		ChainID: 7777777,
 	}, nil
 }
 
