@@ -275,6 +275,7 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 		for _, addr := range addresses {
 			addr := addr
 			chain := chain
+
 			wg.Go(func() {
 				tokenFetchers := matchingProvidersForChain[TokensOwnerFetcher](p.Chains, chain)
 				subWg := &conc.WaitGroup{}
