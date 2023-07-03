@@ -129,6 +129,8 @@ func NormalizeDomain(domain string) (string, error) {
 	if domain == "" {
 		return "", errors.New("empty domain")
 	}
+	// Some ENS tokens are formatted as "ENS: vitalk.eth", so we remove the "ENS: " prefix
+	domain = strings.Replace(domain, "ENS: ", "", 1)
 	domain, err := ens.NormaliseDomain(domain)
 	if err != nil {
 		return "", err
