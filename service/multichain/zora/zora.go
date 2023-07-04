@@ -131,34 +131,21 @@ func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.Blockchain
 
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the zora Blockchain
 func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
-	if limit == 0 {
-		limit = 500
-	}
-	return d.getTokensByWalletAddressPaginate(ctx, addr, limit, offset, "")
+	return d.getTokensByWalletAddressPaginate(ctx, addr, "")
 }
 
-func (d *Provider) getTokensWithRequest(ctx context.Context, req string, owner, collection persist.Address, limit, offset int, endCursor string) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (d *Provider) getTokensWithRequest(ctx context.Context, req string, owner, collection persist.Address, endCursor string) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 
 	greq := graphql.NewRequest(req)
 	greq.Var("address", owner)
 	greq.Var("collection", collection)
 	greq.Var("after", endCursor)
-	greq.Var("limit", limit)
+	greq.Var("limit", 500)
 
 	resp := getTokensResponse{}
 	err := d.zgql.Run(ctx, greq, &resp)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error getting tokens from zora: %w", err)
-	}
-
-	if offset > 0 {
-		if len(resp.Tokens.Nodes) > offset {
-			resp.Tokens.Nodes = resp.Tokens.Nodes[offset:]
-		} else {
-			resp.Tokens.Nodes = []tokenNode{}
-		}
-
-		offset -= len(resp.Tokens.Nodes)
 	}
 
 	nodesToTokens, _ := util.Map(resp.Tokens.Nodes, func(n tokenNode) (token, error) {
@@ -170,7 +157,7 @@ func (d *Provider) getTokensWithRequest(ctx context.Context, req string, owner, 
 	}
 
 	if resp.Tokens.PageInfo.hasNextPage {
-		nextTokens, nextContracts, err := d.getTokensWithRequest(ctx, req, owner, collection, limit, offset, resp.Tokens.PageInfo.endCursor)
+		nextTokens, nextContracts, err := d.getTokensWithRequest(ctx, req, owner, collection, resp.Tokens.PageInfo.endCursor)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -185,7 +172,7 @@ func (d *Provider) GetTokensByTokenIdentifiersAndOwner(context.Context, multicha
 	panic("implement me")
 }
 
-func (d *Provider) getTokensByWalletAddressPaginate(ctx context.Context, addr persist.Address, limit, offset int, endCursor string) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (d *Provider) getTokensByWalletAddressPaginate(ctx context.Context, addr persist.Address, endCursor string) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	req := fmt.Sprintf(`query tokensByWalletAddress($address: String!, $after:String!, $limit:Int!) {
   tokens(where:{ownerAddresses:[$address]}, networks:{network:ZORA, chain: ZORA_MAINNET}, pagination: {limit: $limit, after:$after}, sort:{sortKey: TRANSFERRED, sortDirection: ASC}) {
     nodes {
@@ -217,10 +204,10 @@ func (d *Provider) getTokensByWalletAddressPaginate(ctx context.Context, addr pe
   }
 }`)
 
-	return d.getTokensWithRequest(ctx, req, addr, "", limit, offset, endCursor)
+	return d.getTokensWithRequest(ctx, req, addr, "", endCursor)
 }
 
-func (d *Provider) getTokensByContractAddressPaginate(ctx context.Context, addr persist.Address, limit, offset int, endCursor string) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (d *Provider) getTokensByContractAddressPaginate(ctx context.Context, addr persist.Address, endCursor string) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	req := fmt.Sprintf(`query tokensByContractAddress($collection: String!, $after:String!, $limit:Int!) {
   tokens(where:{collectionAddresses:[$collection]}, networks:{network:ZORA, chain: ZORA_MAINNET}, pagination: {limit: $limit, after:$after}, sort:{sortKey: TRANSFERRED, sortDirection: ASC}) {
     nodes {
@@ -252,7 +239,7 @@ func (d *Provider) getTokensByContractAddressPaginate(ctx context.Context, addr 
   }
 }`)
 
-	tokens, contracts, err := d.getTokensWithRequest(ctx, req, addr, "", limit, offset, endCursor)
+	tokens, contracts, err := d.getTokensWithRequest(ctx, req, addr, "", endCursor)
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
@@ -262,7 +249,7 @@ func (d *Provider) getTokensByContractAddressPaginate(ctx context.Context, addr 
 	return tokens, contracts[0], nil
 }
 
-func (d *Provider) getTokensByWalletAddressAndContractPaginate(ctx context.Context, addr, contractAddress persist.Address, limit, offset int, endCursor string) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (d *Provider) getTokensByWalletAddressAndContractPaginate(ctx context.Context, addr, contractAddress persist.Address, endCursor string) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	req := fmt.Sprintf(`query tokensByAll($address: String!, $collection: String!, $after:String!, $limit:Int!) {
   tokens(where:{collectionAddresses: [$collection], ownerAddresses: [$address]}, networks:{network:ZORA, chain: ZORA_MAINNET}, pagination: {limit: $limit, after:$after}, sort:{sortKey: TRANSFERRED, sortDirection: ASC}) {
     nodes {
@@ -294,7 +281,7 @@ func (d *Provider) getTokensByWalletAddressAndContractPaginate(ctx context.Conte
   }
 }`)
 
-	tokens, contracts, err := d.getTokensWithRequest(ctx, req, addr, contractAddress, limit, offset, endCursor)
+	tokens, contracts, err := d.getTokensWithRequest(ctx, req, addr, contractAddress, endCursor)
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
@@ -307,17 +294,11 @@ func (d *Provider) getTokensByWalletAddressAndContractPaginate(ctx context.Conte
 
 // GetTokensByContractAddress retrieves tokens for a contract address on the zora Blockchain
 func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	if limit == 0 {
-		limit = 500
-	}
-	return d.getTokensByContractAddressPaginate(ctx, contractAddress, limit, offset, "")
+	return d.getTokensByContractAddressPaginate(ctx, contractAddress, "")
 }
 
 func (d *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, ownerAddress persist.Address, contractAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	if limit == 0 {
-		limit = 500
-	}
-	return d.getTokensByWalletAddressAndContractPaginate(ctx, ownerAddress, contractAddress, limit, offset, "")
+	return d.getTokensByWalletAddressAndContractPaginate(ctx, ownerAddress, contractAddress, "")
 }
 
 // GetContractByAddress retrieves an zora contract by address

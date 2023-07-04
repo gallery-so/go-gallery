@@ -80,7 +80,7 @@ const (
 	MaxChainValue = ChainZora
 )
 
-var AllChains = []Chain{ChainETH, ChainArbitrum, ChainPolygon, ChainOptimism, ChainTezos, ChainPOAP}
+var AllChains = []Chain{ChainETH, ChainArbitrum, ChainPolygon, ChainOptimism, ChainTezos, ChainPOAP, ChainZora}
 
 const (
 	// URITypeIPFS represents an IPFS URI
