@@ -7389,6 +7389,7 @@ enum Chain {
   Optimism
   Tezos
   POAP
+  Zora
 }
 
 enum TokenOwnershipType {

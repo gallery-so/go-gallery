@@ -23,6 +23,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/mikeydub/go-gallery/service/multichain/poap"
 	"github.com/mikeydub/go-gallery/service/multichain/tezos"
+	"github.com/mikeydub/go-gallery/service/multichain/zora"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/redis"
@@ -47,9 +48,10 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 	serverOptimismProviderList := optimismProviderSet(httpClient)
 	serverTezosProviderList := tezosProviderSet(serverEnvInit, httpClient)
 	serverPoapProviderList := poapProviderSet(serverEnvInit, httpClient)
+	serverZoraProviderList := zoraProviderSet(serverEnvInit, httpClient)
 	serverPolygonProviderList := polygonProviderSet(httpClient)
 	serverArbitrumProviderList := arbitrumProviderSet(httpClient)
-	v := newMultichainSet(serverEthProviderList, serverOptimismProviderList, serverTezosProviderList, serverPoapProviderList, serverPolygonProviderList, serverArbitrumProviderList)
+	v := newMultichainSet(serverEthProviderList, serverOptimismProviderList, serverTezosProviderList, serverPoapProviderList, serverZoraProviderList, serverPolygonProviderList, serverArbitrumProviderList)
 	v2 := defaultWalletOverrides()
 	sendTokens := newSendTokensFunc(ctx, client)
 	provider := &multichain.Provider{
@@ -140,6 +142,19 @@ func poapProvidersConfig(poapProvider *poap.Provider) poapProviderList {
 	return serverPoapProviderList
 }
 
+// zoraProviderSet is a wire injector that creates the set of zora providers
+func zoraProviderSet(serverEnvInit envInit, client *http.Client) zoraProviderList {
+	provider := newZoraProvider(serverEnvInit, client)
+	serverZoraProviderList := zoraProvidersConfig(provider)
+	return serverZoraProviderList
+}
+
+// zoraProvidersConfig is a wire injector that binds multichain interfaces to their concrete zora implementations
+func zoraProvidersConfig(zoraProvider *zora.Provider) zoraProviderList {
+	serverZoraProviderList := zoraRequirements(zoraProvider, zoraProvider, zoraProvider)
+	return serverZoraProviderList
+}
+
 // polygonProviderSet is a wire injector that creates the set of polygon providers
 func polygonProviderSet(client *http.Client) polygonProviderList {
 	serverPolygonProvider := newPolygonProvider(client)
@@ -192,6 +207,8 @@ type tezosProviderList []any
 type optimismProviderList []any
 
 type poapProviderList []any
+
+type zoraProviderList []any
 
 type polygonProviderList []any
 
@@ -277,6 +294,15 @@ func poapRequirements(
 	return poapProviderList{nr, tof, toc}
 }
 
+// zoraRequirements is the set of provider interfaces required for zora
+func zoraRequirements(
+	nr multichain.ContractsFetcher,
+	tof multichain.TokensOwnerFetcher,
+	toc multichain.TokensContractFetcher,
+) zoraProviderList {
+	return zoraProviderList{nr, tof, toc}
+}
+
 // polygonRequirements is the set of provider interfaces required for Polygon
 func polygonRequirements(
 	tof multichain.TokensOwnerFetcher,
@@ -291,6 +317,7 @@ func newMultichainSet(
 	optimismProviders optimismProviderList,
 	tezosProviders tezosProviderList,
 	poapProviders poapProviderList,
+	zoraProviders zoraProviderList,
 	polygonProviders polygonProviderList,
 	arbitrumProviders arbitrumProviderList,
 ) map[persist.Chain][]any {
@@ -312,6 +339,7 @@ func newMultichainSet(
 	chainToProviders[persist.ChainOptimism] = dedupe(optimismProviders)
 	chainToProviders[persist.ChainTezos] = dedupe(tezosProviders)
 	chainToProviders[persist.ChainPOAP] = dedupe(poapProviders)
+	chainToProviders[persist.ChainZora] = dedupe(zoraProviders)
 	chainToProviders[persist.ChainPolygon] = dedupe(polygonProviders)
 	chainToProviders[persist.ChainArbitrum] = dedupe(arbitrumProviders)
 	return chainToProviders
@@ -319,8 +347,8 @@ func newMultichainSet(
 
 // defaultWalletOverrides is a wire provider for wallet overrides
 func defaultWalletOverrides() multichain.WalletOverrideMap {
-	var evmChains = []persist.Chain{persist.ChainETH, persist.ChainOptimism, persist.ChainPolygon, persist.ChainArbitrum, persist.ChainPOAP}
-	return multichain.WalletOverrideMap{persist.ChainPOAP: evmChains, persist.ChainOptimism: evmChains, persist.ChainPolygon: evmChains, persist.ChainArbitrum: evmChains, persist.ChainETH: evmChains}
+	var evmWalletChains = []persist.Chain{persist.ChainETH, persist.ChainOptimism, persist.ChainPolygon, persist.ChainArbitrum, persist.ChainPOAP, persist.ChainZora}
+	return multichain.WalletOverrideMap{persist.ChainPOAP: evmWalletChains, persist.ChainOptimism: evmWalletChains, persist.ChainPolygon: evmWalletChains, persist.ChainArbitrum: evmWalletChains, persist.ChainETH: evmWalletChains, persist.ChainZora: evmWalletChains}
 }
 
 func newIndexerProvider(e envInit, httpClient *http.Client, ethClient *ethclient.Client, taskClient *cloudtasks.Client) *eth.Provider {
@@ -343,6 +371,10 @@ func tezosTokenEvalFunc() func(context.Context, multichain.ChainAgnosticToken) b
 
 func newPoapProvider(e envInit, c *http.Client) *poap.Provider {
 	return poap.NewProvider(c, env.GetString("POAP_API_KEY"), env.GetString("POAP_AUTH_TOKEN"))
+}
+
+func newZoraProvider(e envInit, c *http.Client) *zora.Provider {
+	return zora.NewProvider(c)
 }
 
 func newOptimismProvider(c *http.Client) *optimismProvider {

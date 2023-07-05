@@ -221,6 +221,8 @@ func SetDefaults() {
 	viper.SetDefault("INFURA_API_KEY", "")
 	viper.SetDefault("INFURA_API_SECRET", "")
 	viper.SetDefault("PUSH_NOTIFICATIONS_SECRET", "push-notifications-secret")
+	viper.SetDefault("ZORA_API_KEY", "")
+	viper.SetDefault("GOLDSKY_API_KEY", "")
 
 	viper.AutomaticEnv()
 
