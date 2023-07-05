@@ -165,6 +165,7 @@ func (f SyncFailureFallbackProvider) GetTokensByContractAddress(ctx context.Cont
 		if tcf, ok := f.Fallback.(TokensContractFetcher); ok {
 			return tcf.GetTokensByContractAddress(ctx, contract, limit, offset)
 		}
+		return nil, ChainAgnosticContract{}, err
 	}
 	return ts, c, nil
 }
@@ -175,6 +176,7 @@ func (f SyncFailureFallbackProvider) GetTokensByContractAddressAndOwner(ctx cont
 		if tcf, ok := f.Fallback.(TokensContractFetcher); ok {
 			return tcf.GetTokensByContractAddressAndOwner(ctx, owner, contract, limit, offset)
 		}
+		return nil, ChainAgnosticContract{}, err
 	}
 	return ts, c, nil
 }
