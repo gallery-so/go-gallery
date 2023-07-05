@@ -78,13 +78,19 @@ func ethProviderSet(serverEnvInit envInit, client *cloudtasks.Client, httpClient
 	provider := newIndexerProvider(serverEnvInit, httpClient, ethclientClient, client)
 	openseaProvider := opensea.NewProvider(ethclientClient, httpClient)
 	syncFailureFallbackProvider := ethFallbackProvider(httpClient)
-	serverEthProviderList := ethProvidersConfig(provider, openseaProvider, syncFailureFallbackProvider)
+	chain := _wireChainValue
+	alchemyProvider := alchemy.NewProvider(chain, httpClient)
+	serverEthProviderList := ethProvidersConfig(provider, openseaProvider, syncFailureFallbackProvider, alchemyProvider)
 	return serverEthProviderList
 }
 
+var (
+	_wireChainValue = persist.ChainETH
+)
+
 // ethProvidersConfig is a wire injector that binds multichain interfaces to their concrete Ethereum implementations
-func ethProvidersConfig(indexerProvider *eth.Provider, openseaProvider *opensea.Provider, fallbackProvider multichain.SyncFailureFallbackProvider) ethProviderList {
-	serverEthProviderList := ethRequirements(indexerProvider, indexerProvider, fallbackProvider, fallbackProvider, indexerProvider, indexerProvider, indexerProvider, indexerProvider, openseaProvider)
+func ethProvidersConfig(indexerProvider *eth.Provider, openseaProvider *opensea.Provider, fallbackProvider multichain.SyncFailureFallbackProvider, alchemyProvider *alchemy.Provider) ethProviderList {
+	serverEthProviderList := ethRequirements(indexerProvider, indexerProvider, fallbackProvider, alchemyProvider, indexerProvider, indexerProvider, indexerProvider, indexerProvider, openseaProvider)
 	return serverEthProviderList
 }
 
@@ -169,7 +175,7 @@ func polygonProvidersConfig(polygonProvider2 *polygonProvider) polygonProviderLi
 }
 
 func ethFallbackProvider(httpClient *http.Client) multichain.SyncFailureFallbackProvider {
-	chain := _wireChainValue
+	chain := _wirePersistChainValue
 	provider := alchemy.NewProvider(chain, httpClient)
 	infuraProvider := infura.NewProvider(httpClient)
 	syncFailureFallbackProvider := multichain.SyncFailureFallbackProvider{
@@ -180,7 +186,7 @@ func ethFallbackProvider(httpClient *http.Client) multichain.SyncFailureFallback
 }
 
 var (
-	_wireChainValue = persist.ChainETH
+	_wirePersistChainValue = persist.ChainETH
 )
 
 func tezosFallbackProvider(httpClient *http.Client, tzktProvider *tezos.Provider, objktProvider *tezos.TezosObjktProvider) multichain.SyncWithContractEvalFallbackProvider {

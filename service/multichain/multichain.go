@@ -1319,18 +1319,21 @@ func (p *Provider) createUsersForTokens(ctx context.Context, tokens []chainToken
 						}, nil)
 						if err != nil {
 							if _, ok := err.(persist.ErrUsernameNotAvailable); ok {
+								logger.For(ctx).Infof("username %s not available", username)
 								user, err = p.Repos.UserRepository.GetByUsername(ctx, username)
 								if err != nil {
 									errChan <- err
 									return
 								}
 							} else if _, ok := err.(persist.ErrAddressOwnedByUser); ok {
+								logger.For(ctx).Infof("address %s already owned by user", t.OwnerAddress)
 								user, err = p.Repos.UserRepository.GetByChainAddress(ctx, persist.NewChainAddress(t.OwnerAddress, ct.chain))
 								if err != nil {
 									errChan <- err
 									return
 								}
 							} else if _, ok := err.(persist.ErrWalletCreateFailed); ok {
+								logger.For(ctx).Infof("wallet creation failed for address %s", t.OwnerAddress)
 								user, err = p.Repos.UserRepository.GetByChainAddress(ctx, persist.NewChainAddress(t.OwnerAddress, ct.chain))
 								if err != nil {
 									errChan <- err

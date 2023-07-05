@@ -126,6 +126,16 @@ type Token struct {
 	SpamInfo         SpamInfo         `json:"spamInfo"`
 }
 
+type OwnerWithBalances struct {
+	OwnerAddress  persist.EthereumAddress `json:"ownerAddress"`
+	TokenBalances []TokenBalance          `json:"tokenBalances"`
+}
+
+type TokenBalance struct {
+	TokenID TokenID `json:"tokenId"`
+	Balance int     `json:"balance"`
+}
+
 type tokensPaginated interface {
 	GetTokensFromResponse(resp *http.Response) ([]Token, error)
 	GetNextPageKey() string
@@ -165,6 +175,10 @@ func (r *getNFTsForCollectionResponse) GetTokensFromResponse(resp *http.Response
 
 func (r getNFTsForCollectionResponse) GetNextPageKey() string {
 	return r.NextToken.String()
+}
+
+type getOwnersOfCollectionResponse struct {
+	Owners []OwnerWithBalances `json:"ownerAddresses"`
 }
 
 // Provider is an the struct for retrieving data from the Ethereum blockchain
@@ -309,6 +323,49 @@ func getNFTsPaginate[T tokensPaginated](ctx context.Context, baseURL string, def
 	return tokens, nil
 }
 
+func (d *Provider) getOwnersForContract(ctx context.Context, contract persist.EthereumAddress) ([]OwnerWithBalances, error) {
+
+	u := d.alchemyAPIURL + "/getOwnersForCollection"
+
+	parsedURL, err := url.Parse(u)
+	if err != nil {
+		return nil, err
+	}
+
+	q := parsedURL.Query()
+
+	q.Set("contractAddress", contract.String())
+	q.Set("withTokenBalances", "true")
+
+	parsedURL.RawQuery = q.Encode()
+	u = parsedURL.String()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := d.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		asString, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to get tokens from alchemy api: %s (err: %s) (url: %s)", resp.Status, asString, u)
+	}
+
+	result := &getOwnersOfCollectionResponse{}
+	err = json.NewDecoder(resp.Body).Decode(result)
+	if err != nil {
+		return nil, err
+	}
+
+	return result.Owners, nil
+}
+
 // // GetTokenMetadataByTokenIdentifiers retrieves a token's metadata for a given contract address and token ID
 // func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
 // 	tokens, _, err := d.getTokenWithMetadata(ctx, ti, false, 0)
@@ -376,7 +433,26 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
 
-	cTokens, cContracts, err := d.alchemyTokensToChainAgnosticTokens(ctx, tokens)
+	owners, err := d.getOwnersForContract(ctx, persist.EthereumAddress(contractAddress))
+	if err != nil {
+		return nil, multichain.ChainAgnosticContract{}, err
+	}
+
+	tokenIDToOwner := make(map[TokenID][]persist.EthereumAddress)
+	for _, owner := range owners {
+		for _, tokenID := range owner.TokenBalances {
+			tokenIDToOwner[tokenID.TokenID] = append(tokenIDToOwner[tokenID.TokenID], owner.OwnerAddress)
+		}
+	}
+
+	ownersToTokens := make(map[persist.EthereumAddress][]Token)
+	for _, token := range tokens {
+		for _, owner := range tokenIDToOwner[token.ID.TokenID] {
+			ownersToTokens[owner] = append(ownersToTokens[owner], token)
+		}
+	}
+
+	cTokens, cContracts := alchemyTokensToChainAgnosticTokensWithOwners(ctx, ownersToTokens)
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
@@ -397,7 +473,7 @@ func (d *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, owner
 		return []multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, nil
 	}
 
-	cTokens, cContracts, err := d.alchemyTokensToChainAgnosticTokens(ctx, tokens)
+	cTokens, cContracts := alchemyTokensToChainAgnosticTokensForOwner(persist.EthereumAddress(ownerAddress), tokens)
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
@@ -613,6 +689,23 @@ func (d *Provider) alchemyTokensToChainAgnosticTokens(ctx context.Context, token
 		}
 	}
 	return chainAgnosticTokens, chainAgnosticContracts, nil
+}
+
+func alchemyTokensToChainAgnosticTokensWithOwners(ctx context.Context, tokens map[persist.EthereumAddress][]Token) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract) {
+	chainAgnosticTokens := make([]multichain.ChainAgnosticToken, 0, len(tokens))
+	chainAgnosticContracts := make([]multichain.ChainAgnosticContract, 0, len(tokens))
+	seenContracts := make(map[persist.Address]bool)
+	for owner, ownerTokens := range tokens {
+		for _, token := range ownerTokens {
+			cToken, cContract := alchemyTokenToChainAgnosticToken(owner, token)
+			if _, ok := seenContracts[cContract.Address]; !ok {
+				seenContracts[cContract.Address] = true
+				chainAgnosticContracts = append(chainAgnosticContracts, cContract)
+			}
+			chainAgnosticTokens = append(chainAgnosticTokens, cToken)
+		}
+	}
+	return chainAgnosticTokens, chainAgnosticContracts
 }
 
 type ownersResponse struct {
