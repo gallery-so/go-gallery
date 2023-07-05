@@ -118,7 +118,7 @@ func ethProvidersConfig(indexerProvider *eth.Provider, openseaProvider *opensea.
 		wire.Bind(new(multichain.NameResolver), util.ToPointer(indexerProvider)),
 		wire.Bind(new(multichain.Verifier), util.ToPointer(indexerProvider)),
 		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(fallbackProvider)),
-		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(openseaProvider)),
+		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(fallbackProvider)),
 		wire.Bind(new(multichain.ContractsFetcher), util.ToPointer(indexerProvider)),
 		wire.Bind(new(multichain.ContractRefresher), util.ToPointer(indexerProvider)),
 		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(indexerProvider)),

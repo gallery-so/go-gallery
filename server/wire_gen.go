@@ -84,7 +84,7 @@ func ethProviderSet(serverEnvInit envInit, client *cloudtasks.Client, httpClient
 
 // ethProvidersConfig is a wire injector that binds multichain interfaces to their concrete Ethereum implementations
 func ethProvidersConfig(indexerProvider *eth.Provider, openseaProvider *opensea.Provider, fallbackProvider multichain.SyncFailureFallbackProvider) ethProviderList {
-	serverEthProviderList := ethRequirements(indexerProvider, indexerProvider, fallbackProvider, openseaProvider, indexerProvider, indexerProvider, indexerProvider, indexerProvider, openseaProvider)
+	serverEthProviderList := ethRequirements(indexerProvider, indexerProvider, fallbackProvider, fallbackProvider, indexerProvider, indexerProvider, indexerProvider, indexerProvider, openseaProvider)
 	return serverEthProviderList
 }
 

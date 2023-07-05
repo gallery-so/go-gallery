@@ -1099,6 +1099,7 @@ outer:
 	for {
 		select {
 		case err := <-errChan:
+			logger.For(ctx).Errorf("error fetching tokens for contract %s-%d: %s", ci.ContractAddress, ci.Chain, err)
 			if err.priority == 0 {
 				return err
 			}
