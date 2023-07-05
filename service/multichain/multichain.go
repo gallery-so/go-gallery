@@ -76,10 +76,6 @@ type ChainAgnosticToken struct {
 	IsSpam      *bool               `json:"is_spam"`
 }
 
-func (c ChainAgnosticToken) hasMetadata() bool {
-	return len(c.TokenMetadata) > 0
-}
-
 // ChainAgnosticAddressAtBlock is an address at a block
 type ChainAgnosticAddressAtBlock struct {
 	Address persist.Address     `json:"address"`
@@ -136,12 +132,6 @@ type chainContracts struct {
 	priority  int
 	chain     persist.Chain
 	contracts []ChainAgnosticContract
-}
-
-type tokenIdentifiers struct {
-	chain    persist.Chain
-	tokenID  persist.TokenID
-	contract persist.DBID
 }
 
 type errWithPriority struct {

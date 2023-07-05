@@ -434,13 +434,11 @@ func (t *TokenGalleryRepository) UpdateByID(pCtx context.Context, pID persist.DB
 	var res sql.Result
 	var err error
 
-	switch pUpdate.(type) {
+	switch errTyp := pUpdate.(type) {
 	case persist.TokenUpdateInfoInput:
-		update := pUpdate.(persist.TokenUpdateInfoInput)
-		res, err = t.updateInfoStmt.ExecContext(pCtx, update.CollectorsNote, update.LastUpdated, pID, pUserID)
+		res, err = t.updateInfoStmt.ExecContext(pCtx, errTyp.CollectorsNote, errTyp.LastUpdated, pID, pUserID)
 	case persist.TokenUpdateAllURIDerivedFieldsInput:
-		update := pUpdate.(persist.TokenUpdateAllURIDerivedFieldsInput)
-		res, err = t.updateMediaStmt.ExecContext(pCtx, update.Media, update.Metadata, update.LastUpdated, pID, pUserID)
+		res, err = t.updateMediaStmt.ExecContext(pCtx, errTyp.Media, errTyp.Metadata, errTyp.LastUpdated, pID, pUserID)
 
 	default:
 		return fmt.Errorf("unsupported update type: %T", pUpdate)
@@ -468,22 +466,17 @@ func (t *TokenGalleryRepository) UpdateByTokenIdentifiersUnsafe(pCtx context.Con
 
 	var res sql.Result
 	var err error
-	switch pUpdate.(type) {
+	switch errTyp := pUpdate.(type) {
 	case persist.TokenUpdateInfoInput:
-		update := pUpdate.(persist.TokenUpdateInfoInput)
-		res, err = t.updateInfoByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, update.CollectorsNote, update.LastUpdated, pTokenID, contractID)
+		res, err = t.updateInfoByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, errTyp.CollectorsNote, errTyp.LastUpdated, pTokenID, contractID)
 	case persist.TokenUpdateAllURIDerivedFieldsInput:
-		update := pUpdate.(persist.TokenUpdateAllURIDerivedFieldsInput)
-		res, err = t.updateAllURIDerivedFieldsByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, update.Media, update.Metadata, update.Name, update.Description, update.LastUpdated, pTokenID, contractID)
+		res, err = t.updateAllURIDerivedFieldsByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, errTyp.Media, errTyp.Metadata, errTyp.Name, errTyp.Description, errTyp.LastUpdated, pTokenID, contractID)
 	case persist.TokenUpdateAllMetadataFieldsInput:
-		update := pUpdate.(persist.TokenUpdateAllMetadataFieldsInput)
-		res, err = t.updateAllMetadataFieldsByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, update.Metadata, update.Name, update.Description, update.LastUpdated, pTokenID, contractID)
+		res, err = t.updateAllMetadataFieldsByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, errTyp.Metadata, errTyp.Name, errTyp.Description, errTyp.LastUpdated, pTokenID, contractID)
 	case persist.TokenUpdateMediaInput:
-		update := pUpdate.(persist.TokenUpdateMediaInput)
-		res, err = t.updateMediaByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, update.Media, update.LastUpdated, pTokenID, contractID)
+		res, err = t.updateMediaByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, errTyp.Media, errTyp.LastUpdated, pTokenID, contractID)
 	case persist.TokenUpdateMetadataDerivedFieldsInput:
-		update := pUpdate.(persist.TokenUpdateMetadataDerivedFieldsInput)
-		res, err = t.updateMetadataFieldsByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, update.Name, update.Description, update.LastUpdated, pTokenID, contractID)
+		res, err = t.updateMetadataFieldsByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, errTyp.Name, errTyp.Description, errTyp.LastUpdated, pTokenID, contractID)
 	default:
 		return fmt.Errorf("unsupported update type: %T", pUpdate)
 	}
@@ -526,11 +519,6 @@ func (t *TokenGalleryRepository) TokensAreOwnedByUser(ctx context.Context, userI
 	}
 
 	return nil
-}
-
-func (t *TokenGalleryRepository) deleteTokenUnsafe(pCtx context.Context, pTokenID persist.TokenID, pContractAddress persist.DBID, pOwnerUserID persist.DBID, pChain persist.Chain) error {
-	_, err := t.deleteByIdentifiersStmt.ExecContext(pCtx, pTokenID, pContractAddress, pOwnerUserID, pChain)
-	return err
 }
 
 type uniqueConstraintKey struct {

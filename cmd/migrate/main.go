@@ -8,7 +8,7 @@ import (
 	migrate "github.com/mikeydub/go-gallery/db"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/spf13/viper"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 )
 
 func init() {
@@ -36,7 +36,7 @@ func main() {
 		fmt.Scanln(&user)
 
 		fmt.Printf("Password for %s: ", user)
-		pw, err := terminal.ReadPassword(int(os.Stdin.Fd()))
+		pw, err := term.ReadPassword(int(os.Stdin.Fd()))
 		if err != nil {
 			panic(err)
 		}

@@ -3,7 +3,6 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"time"
 
@@ -12,8 +11,6 @@ import (
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
-
-var errNotOwnedByUser = errors.New("not all nfts are owned by the user")
 
 // CollectionTokenRepository is the repository for interacting with collections in a postgres database
 type CollectionTokenRepository struct {
@@ -159,8 +156,6 @@ func (c *CollectionTokenRepository) UpdateTokens(pCtx context.Context, pID persi
 	return nil
 }
 
-// UpdateUnsafe updates a collection in the database
-
 // Delete deletes a collection from the database
 func (c *CollectionTokenRepository) Delete(pCtx context.Context, pID persist.DBID, pUserID persist.DBID) error {
 	res, err := c.deleteCollectionStmt.ExecContext(pCtx, pID, pUserID)
@@ -175,13 +170,4 @@ func (c *CollectionTokenRepository) Delete(pCtx context.Context, pID persist.DBI
 		return persist.ErrCollectionNotFoundByID{ID: pID}
 	}
 	return nil
-}
-
-func containsAddress(pStrings []persist.Address, pString persist.Address) bool {
-	for _, s := range pStrings {
-		if s == pString {
-			return true
-		}
-	}
-	return false
 }

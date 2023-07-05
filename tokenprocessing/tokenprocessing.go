@@ -2,7 +2,6 @@ package tokenprocessing
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -199,11 +198,7 @@ func isSpamToken(job tokenProcessingJob) bool {
 
 // isBadTokenErr returns true if the error is a bad token error.
 func isBadTokenErr(err error) bool {
-	var badTokenErr ErrBadToken
-	if errors.As(err, &badTokenErr) {
-		return true
-	}
-	return false
+	return util.ErrorAs[ErrBadToken](err)
 }
 
 // excludeTokenSpamEvents excludes events for tokens marked as spam.

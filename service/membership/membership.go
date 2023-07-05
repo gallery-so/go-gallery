@@ -36,20 +36,20 @@ func UpdateMembershipTiers(membershipRepository *postgres.MembershipRepository, 
 	for _, v := range MembershipTierIDs {
 		md, err := getTokenMetadata(ctx, v, PremiumCards, ipfsClient, arweaveClient, stg)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to get token metadata for token: %s, %v", v, err)
+			return nil, fmt.Errorf("failed to get token metadata for token: %s, %v", v, err)
 		}
 		owners, err := getOwnersForToken(ctx, v, PremiumCards)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to get owners for token: %s, %v", v, err)
+			return nil, fmt.Errorf("failed to get owners for token: %s, %v", v, err)
 		}
 		if len(owners) == 0 {
-			logger.For(ctx).Errorf("No owners found for token: %s", v)
+			logger.For(ctx).Errorf("no owners found for token: %s", v)
 			continue
 		}
 		go func(id persist.TokenID, o []persist.EthereumAddress) {
 			tier, err := processOwners(ctx, id, md, o, ethClient, userRepository, galleryRepository, membershipRepository, walletRepository)
 			if err != nil {
-				logger.For(ctx).Errorf("Failed to process membership events for token: %s, %v", id, err)
+				logger.For(ctx).Errorf("failed to process membership events for token: %s, %v", id, err)
 			}
 			tierChan <- tier
 		}(v, owners)
@@ -67,18 +67,18 @@ func UpdateMembershipTier(pTokenID persist.TokenID, membershipRepository *postgr
 	defer cancel()
 	_, err := processCurrentTier(ctx, pTokenID, ethClient, userRepository, galleryRepository, membershipRepository, walletRepository)
 	if err != nil {
-		return persist.MembershipTier{}, fmt.Errorf("Failed to process membership events for token: %s, %v", pTokenID, err)
+		return persist.MembershipTier{}, fmt.Errorf("failed to process membership events for token: %s, %v", pTokenID, err)
 	}
 	md, err := getTokenMetadata(ctx, pTokenID, PremiumCards, ipfsClient, arweaveClient, stg)
 	if err != nil {
-		return persist.MembershipTier{}, fmt.Errorf("Failed to get token metadata for token: %s, %v", pTokenID, err)
+		return persist.MembershipTier{}, fmt.Errorf("failed to get token metadata for token: %s, %v", pTokenID, err)
 	}
 	owners, err := getOwnersForToken(ctx, pTokenID, PremiumCards)
 	if err != nil {
-		return persist.MembershipTier{}, fmt.Errorf("Failed to get owners for token: %s, %v", pTokenID, err)
+		return persist.MembershipTier{}, fmt.Errorf("failed to get owners for token: %s, %v", pTokenID, err)
 	}
 	if len(owners) == 0 {
-		return persist.MembershipTier{}, fmt.Errorf("No owners found for token: %s", pTokenID)
+		return persist.MembershipTier{}, fmt.Errorf("no owners found for token: %s", pTokenID)
 	}
 	return processOwners(ctx, pTokenID, md, owners, ethClient, userRepository, galleryRepository, membershipRepository, walletRepository)
 }

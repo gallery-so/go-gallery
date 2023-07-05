@@ -76,6 +76,9 @@ func main() {
 			StartID: r.StartID,
 			EndID:   r.EndID,
 		})
+		if err != nil {
+			panic(err)
+		}
 	} else {
 
 		logrus.Infof("running as local job")
@@ -96,6 +99,9 @@ func main() {
 			StartID: r.StartID,
 			EndID:   r.EndID,
 		})
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	if err != nil {

@@ -246,7 +246,7 @@ func (l *pgxTracer) Log(ctx context.Context, level pgx.LogLevel, msg string, dat
 		}
 	}
 
-	span, ctx := tracing.StartSpan(ctx, "db."+operation, description)
+	span, _ := tracing.StartSpan(ctx, "db."+operation, description)
 	defer tracing.FinishSpan(span)
 
 	spanData := map[string]interface{}{
@@ -277,10 +277,8 @@ func (l *pgxTracer) Log(ctx context.Context, level pgx.LogLevel, msg string, dat
 
 func generateValuesPlaceholders(l, offset int, nows []int) string {
 	indexToNow := make(map[int]bool)
-	if nows != nil {
-		for _, i := range nows {
-			indexToNow[i] = true
-		}
+	for _, i := range nows {
+		indexToNow[i] = true
 	}
 	values := "("
 	d := 0

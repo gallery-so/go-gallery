@@ -505,7 +505,7 @@ func zora(ctx context.Context, turi persist.TokenURI, addr persist.EthereumAddre
 	if ok {
 		mediaType = media.MediaFromContentType(contentType)
 	} else {
-		mediaType, _, _, err = media.PredictMediaType(ctx, mediaURI)
+		mediaType, _, _, _ = media.PredictMediaType(ctx, mediaURI)
 	}
 	switch mediaType {
 	case persist.MediaTypeImage, persist.MediaTypeGIF, persist.MediaTypeSVG:

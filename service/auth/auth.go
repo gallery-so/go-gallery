@@ -259,7 +259,7 @@ type OneTimeLoginTokenAuthenticator struct {
 }
 
 func (a OneTimeLoginTokenAuthenticator) GetDescription() string {
-	return fmt.Sprintf("OneTimeLoginTokenAuthenticator")
+	return "OneTimeLoginTokenAuthenticator"
 }
 
 func (a OneTimeLoginTokenAuthenticator) Authenticate(ctx context.Context) (*AuthResult, error) {

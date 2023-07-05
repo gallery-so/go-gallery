@@ -151,7 +151,7 @@ func findErrorByCode(errorString string, errs []*PushError) error {
 }
 
 func getResponseError(errs []map[string]string) error {
-	if errs == nil || len(errs) == 0 {
+	if len(errs) == 0 {
 		return nil
 	}
 

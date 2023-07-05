@@ -59,10 +59,6 @@ type errInvalidMedia struct {
 	URL string
 }
 
-type errNoCachedObjects struct {
-	tids persist.TokenIdentifiers
-}
-
 type errStoreObjectFailed struct {
 	bucket string
 	object cachedMediaObject
@@ -87,10 +83,6 @@ func (e errInvalidMedia) Error() string {
 
 func (e errInvalidMedia) Unwrap() error {
 	return e.err
-}
-
-func (e errNoCachedObjects) Error() string {
-	return fmt.Sprintf("no cached objects found for token identifiers: %s", e.tids)
 }
 
 func (e errNoDataFromOpensea) Error() string {
@@ -913,18 +905,6 @@ func createLiveRenderAndCache(ctx context.Context, tids persist.TokenIdentifiers
 	return obj, nil
 }
 
-func deleteMedia(ctx context.Context, bucket, fileName string, client *storage.Client) error {
-	return client.Bucket(bucket).Object(fileName).Delete(ctx)
-}
-
-func getMediaServingURL(pCtx context.Context, bucketID, objectID string, client *storage.Client) (string, error) {
-	if exists, err := objectExists(pCtx, client, bucketID, objectID); err != nil || !exists {
-		objectName := fmt.Sprintf("/gs/%s/%s", bucketID, objectID)
-		return "", fmt.Errorf("failed to check if object %s exists: %s", objectName, err)
-	}
-	return fmt.Sprintf("https://storage.googleapis.com/%s/%s", bucketID, objectID), nil
-}
-
 func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, mediaURL string, oType objectType, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, bucket string, subMeta *cachePipelineMetadata, isRecursive bool) ([]cachedMediaObject, error) {
 
 	asURI := persist.TokenURI(mediaURL)
@@ -1141,15 +1121,6 @@ type dimensions struct {
 		Width  int `json:"width"`
 		Height int `json:"height"`
 	} `json:"streams"`
-}
-
-type errNoStreams struct {
-	url string
-	err error
-}
-
-func (e errNoStreams) Error() string {
-	return fmt.Sprintf("no streams in %s: %s", e.url, e.err)
 }
 
 func getMediaDimensions(ctx context.Context, url string) (persist.Dimensions, error) {

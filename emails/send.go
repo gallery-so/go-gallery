@@ -36,14 +36,9 @@ type VerificationEmailInput struct {
 }
 
 type sendNotificationEmailHttpInput struct {
-	UserID         persist.DBID  `json:"user_id,required"`
-	ToEmail        persist.Email `json:"to_email,required"`
+	UserID         persist.DBID  `json:"user_id" binding:"required"`
+	ToEmail        persist.Email `json:"to_email" binding:"required"`
 	SendRealEmails bool          `json:"send_real_emails"`
-}
-
-type verificationEmailTemplateData struct {
-	Username string
-	JWT      string
 }
 
 type errNoEmailSet struct {

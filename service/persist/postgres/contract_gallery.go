@@ -247,11 +247,11 @@ func (c *ContractGalleryRepository) GetOwnersByAddress(ctx context.Context, cont
 		previewNFTs := make([]persist.NullString, 0, 3)
 
 		rows, err = c.getPreviewNFTsStmt.QueryContext(ctx, contract.ID, pq.Array(tokenHolder.WalletIDs))
-		defer rows.Close()
 
 		if err != nil {
 			logrus.Warnf("error getting preview NFTs of community '%s' by wallet IDs '%s': %s", contractAddr, tokenHolder.WalletIDs, err)
 		} else {
+			defer rows.Close()
 			for rows.Next() {
 				var imageURL persist.NullString
 				err = rows.Scan(&imageURL)

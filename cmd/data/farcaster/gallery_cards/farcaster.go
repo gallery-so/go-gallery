@@ -22,12 +22,6 @@ func init() {
 	env.RegisterValidation("FARCASTER_MNEMONIC", "required")
 }
 
-type farcastGalleryAcc struct {
-	galleryUsername string
-	galleryId       string
-	galleryAddress  string
-}
-
 func main() {
 
 	ctx := context.Background()

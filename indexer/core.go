@@ -15,11 +15,9 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
-	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
-	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
@@ -160,10 +158,6 @@ func ValidateEnv() {
 func newRepos(storageClient *storage.Client) (persist.TokenRepository, persist.ContractRepository) {
 	pgClient := postgres.MustCreateClient()
 	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient)
-}
-
-func newThrottler() *throttle.Locker {
-	return throttle.NewThrottleLocker(redis.NewCache(redis.IndexerServerThrottleCache), time.Minute*5)
 }
 
 func InitSentry() {

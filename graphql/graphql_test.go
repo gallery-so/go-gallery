@@ -16,7 +16,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Khan/genqlient/graphql"
 	genql "github.com/Khan/genqlient/graphql"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -1237,7 +1236,7 @@ func newWallet(t *testing.T) wallet {
 	}
 }
 
-func newNonce(t *testing.T, ctx context.Context, c graphql.Client, w wallet) string {
+func newNonce(t *testing.T, ctx context.Context, c genql.Client, w wallet) string {
 	t.Helper()
 	response, err := getAuthNonceMutation(ctx, c, chainAddressInput(w.Address))
 	require.NoError(t, err)
@@ -1246,7 +1245,7 @@ func newNonce(t *testing.T, ctx context.Context, c graphql.Client, w wallet) str
 }
 
 // newUser makes a GraphQL request to generate a new user
-func newUser(t *testing.T, ctx context.Context, c graphql.Client, w wallet) (userID persist.DBID, username string, galleryID persist.DBID) {
+func newUser(t *testing.T, ctx context.Context, c genql.Client, w wallet) (userID persist.DBID, username string, galleryID persist.DBID) {
 	t.Helper()
 	nonce := newNonce(t, ctx, c, w)
 	username = "user" + persist.GenerateID().String()
@@ -1261,7 +1260,7 @@ func newUser(t *testing.T, ctx context.Context, c graphql.Client, w wallet) (use
 }
 
 // syncTokens makes a GraphQL request to sync a user's wallet
-func syncTokens(t *testing.T, ctx context.Context, c graphql.Client, userID persist.DBID) []persist.DBID {
+func syncTokens(t *testing.T, ctx context.Context, c genql.Client, userID persist.DBID) []persist.DBID {
 	t.Helper()
 	resp, err := syncTokensMutation(ctx, c, []Chain{"Ethereum"})
 	require.NoError(t, err)
@@ -1277,7 +1276,7 @@ func syncTokens(t *testing.T, ctx context.Context, c graphql.Client, userID pers
 }
 
 // viewGallery makes a GraphQL request to view a gallery
-func viewGallery(t *testing.T, ctx context.Context, c graphql.Client, galleryID persist.DBID) {
+func viewGallery(t *testing.T, ctx context.Context, c genql.Client, galleryID persist.DBID) {
 	t.Helper()
 	resp, err := viewGalleryMutation(ctx, c, galleryID)
 	require.NoError(t, err)
@@ -1285,7 +1284,7 @@ func viewGallery(t *testing.T, ctx context.Context, c graphql.Client, galleryID 
 }
 
 // createCollection makes a GraphQL request to create a collection
-func createCollection(t *testing.T, ctx context.Context, c graphql.Client, input CreateCollectionInput) persist.DBID {
+func createCollection(t *testing.T, ctx context.Context, c genql.Client, input CreateCollectionInput) persist.DBID {
 	t.Helper()
 	resp, err := createCollectionMutation(ctx, c, input)
 	require.NoError(t, err)
@@ -1294,7 +1293,7 @@ func createCollection(t *testing.T, ctx context.Context, c graphql.Client, input
 }
 
 // globalFeedEvents makes a GraphQL request to return existing feed events
-func globalFeedEvents(t *testing.T, ctx context.Context, c graphql.Client, limit int) []persist.DBID {
+func globalFeedEvents(t *testing.T, ctx context.Context, c genql.Client, limit int) []persist.DBID {
 	t.Helper()
 	resp, err := globalFeedQuery(ctx, c, &limit)
 	require.NoError(t, err)
@@ -1308,7 +1307,7 @@ func globalFeedEvents(t *testing.T, ctx context.Context, c graphql.Client, limit
 }
 
 // trendingFeedEvents makes a GraphQL request to return trending feedEvents
-func trendingFeedEvents(t *testing.T, ctx context.Context, c graphql.Client, limit int) []persist.DBID {
+func trendingFeedEvents(t *testing.T, ctx context.Context, c genql.Client, limit int) []persist.DBID {
 	t.Helper()
 	resp, err := trendingFeedQuery(ctx, c, &limit)
 	require.NoError(t, err)
@@ -1322,7 +1321,7 @@ func trendingFeedEvents(t *testing.T, ctx context.Context, c graphql.Client, lim
 }
 
 // admireFeedEvent makes a GraphQL request to admire a feed event
-func admireFeedEvent(t *testing.T, ctx context.Context, c graphql.Client, feedEventID persist.DBID) {
+func admireFeedEvent(t *testing.T, ctx context.Context, c genql.Client, feedEventID persist.DBID) {
 	t.Helper()
 	resp, err := admireFeedEventMutation(ctx, c, feedEventID)
 	require.NoError(t, err)
@@ -1330,7 +1329,7 @@ func admireFeedEvent(t *testing.T, ctx context.Context, c graphql.Client, feedEv
 }
 
 // commentOnFeedEvent makes a GraphQL request to admire a feed event
-func commentOnFeedEvent(t *testing.T, ctx context.Context, c graphql.Client, feedEventID persist.DBID, comment string) {
+func commentOnFeedEvent(t *testing.T, ctx context.Context, c genql.Client, feedEventID persist.DBID, comment string) {
 	t.Helper()
 	resp, err := commentOnFeedEventMutation(ctx, c, feedEventID, comment)
 	require.NoError(t, err)
@@ -1425,11 +1424,6 @@ func authedHandlerClient(t *testing.T, userID persist.DBID) *handlerClient {
 // customHandlerClient configures the client with the provided HTTP handler and client options
 func customHandlerClient(t *testing.T, handler http.Handler, opts ...func(*http.Request)) *handlerClient {
 	return &handlerClient{handler: handler, opts: opts, endpoint: "/glry/graphql/query"}
-}
-
-// defaultServerClient provides a client to a live server
-func defaultServerClient(t *testing.T, host string) *serverClient {
-	return customServerClient(t, host)
 }
 
 // authedServerClient provides an authenticated client to a live server

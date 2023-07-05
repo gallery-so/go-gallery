@@ -14,7 +14,6 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 
 	"github.com/lib/pq"
-	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
@@ -41,7 +40,6 @@ type UserRepository struct {
 	addFollowerStmt          *sql.Stmt
 	removeFollowerStmt       *sql.Stmt
 	followsUserStmt          *sql.Stmt
-	userHasTrait             *sql.Stmt
 }
 
 // NewUserRepository creates a new postgres repository for interacting with users
@@ -156,7 +154,7 @@ func (u *UserRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUpd
 			return persist.ErrUserNotFound{UserID: pID}
 		}
 	case persist.UserUpdateNotificationSettings:
-		return u.queries.UpdateNotificationSettingsByID(pCtx, coredb.UpdateNotificationSettingsByIDParams{
+		return u.queries.UpdateNotificationSettingsByID(pCtx, db.UpdateNotificationSettingsByIDParams{
 			ID:                   pID,
 			NotificationSettings: update.NotificationSettings,
 		})
@@ -168,12 +166,12 @@ func (u *UserRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUpd
 
 }
 
-func (u *UserRepository) createWalletWithTx(ctx context.Context, queries *coredb.Queries, chainAddress persist.ChainAddress, walletType persist.WalletType) (persist.DBID, error) {
+func (u *UserRepository) createWalletWithTx(ctx context.Context, queries *db.Queries, chainAddress persist.ChainAddress, walletType persist.WalletType) (persist.DBID, error) {
 	if queries == nil {
 		queries = u.queries
 	}
 
-	wallet, err := queries.GetWalletByChainAddress(ctx, coredb.GetWalletByChainAddressParams{
+	wallet, err := queries.GetWalletByChainAddress(ctx, db.GetWalletByChainAddressParams{
 		Address: chainAddress.Address(),
 		Chain:   chainAddress.Chain(),
 	})
@@ -213,7 +211,7 @@ func (u *UserRepository) createWalletWithTx(ctx context.Context, queries *coredb
 
 	newWalletID := persist.GenerateID()
 	// At this point, we know there's no existing wallet in the database with this ChainAddress, so let's make a new one!
-	err = queries.InsertWallet(ctx, coredb.InsertWalletParams{
+	err = queries.InsertWallet(ctx, db.InsertWalletParams{
 		ID:         newWalletID,
 		Address:    chainAddress.Address(),
 		Chain:      chainAddress.Chain(),
@@ -231,7 +229,7 @@ func (u *UserRepository) createWalletWithTx(ctx context.Context, queries *coredb
 }
 
 // Create creates a new user
-func (u *UserRepository) Create(pCtx context.Context, pUser persist.CreateUserInput, queries *coredb.Queries) (persist.DBID, error) {
+func (u *UserRepository) Create(pCtx context.Context, pUser persist.CreateUserInput, queries *db.Queries) (persist.DBID, error) {
 	if queries == nil {
 		tx, err := u.pgx.BeginTx(pCtx, pgx.TxOptions{})
 		if err != nil {
@@ -262,7 +260,7 @@ func (u *UserRepository) Create(pCtx context.Context, pUser persist.CreateUserIn
 	}
 
 	userID := persist.GenerateID()
-	err = queries.InsertUser(pCtx, coredb.InsertUserParams{
+	err = queries.InsertUser(pCtx, db.InsertUserParams{
 		ID:                   userID,
 		Username:             util.ToNullString(pUser.Username, true),
 		UsernameIdempotent:   util.ToNullString(strings.ToLower(pUser.Username), true),
@@ -277,7 +275,7 @@ func (u *UserRepository) Create(pCtx context.Context, pUser persist.CreateUserIn
 	}
 
 	if pUser.Email != nil {
-		err := queries.UpdateUserEmail(pCtx, coredb.UpdateUserEmailParams{
+		err := queries.UpdateUserEmail(pCtx, db.UpdateUserEmailParams{
 			UserID:       userID,
 			EmailAddress: *pUser.Email,
 		})
@@ -420,7 +418,7 @@ func (u *UserRepository) GetByEmail(pCtx context.Context, pEmail persist.Email) 
 }
 
 // AddWallet adds an address to user as well as ensures that the wallet and address exists
-func (u *UserRepository) AddWallet(pCtx context.Context, pUserID persist.DBID, pChainAddress persist.ChainAddress, pWalletType persist.WalletType, queries *coredb.Queries) error {
+func (u *UserRepository) AddWallet(pCtx context.Context, pUserID persist.DBID, pChainAddress persist.ChainAddress, pWalletType persist.WalletType, queries *db.Queries) error {
 
 	if queries == nil {
 		tx, err := u.pgx.BeginTx(pCtx, pgx.TxOptions{})
@@ -442,7 +440,7 @@ func (u *UserRepository) AddWallet(pCtx context.Context, pUserID persist.DBID, p
 		return err
 	}
 
-	queries.AddWalletToUserByID(pCtx, coredb.AddWalletToUserByIDParams{
+	queries.AddWalletToUserByID(pCtx, db.AddWalletToUserByIDParams{
 		WalletID: walletID.String(),
 		UserID:   pUserID,
 	})

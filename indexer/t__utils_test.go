@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -19,9 +18,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
-	"github.com/mikeydub/go-gallery/util"
 	"github.com/stretchr/testify/assert"
-	"google.golang.org/api/option"
 )
 
 var (
@@ -92,14 +89,6 @@ func newMockIndexer(db *sql.DB, pool *pgxpool.Pool) *indexer {
 		return transferAgainLogs, nil
 	}, &start, &end)
 	return i
-}
-
-func newStorageClient(ctx context.Context) *storage.Client {
-	stg, err := storage.NewClient(ctx, option.WithCredentialsJSON(util.LoadEncryptedServiceKey("secrets/dev/service-key-dev.json")))
-	if err != nil {
-		panic(err)
-	}
-	return stg
 }
 
 var htmlLogs = []types.Log{

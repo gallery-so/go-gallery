@@ -1007,7 +1007,7 @@ func (d *cursorDecoder) readTime() (time.Time, error) {
 	}
 
 	if uint64(numRead) != timeLen {
-		return t, fmt.Errorf("error reading time: expected %d bytes, but only read %d bytes\n", timeLen, numRead)
+		return t, fmt.Errorf("error reading time: expected %d bytes, but only read %d bytes", timeLen, numRead)
 	}
 
 	err = t.UnmarshalBinary(timeBytes)
@@ -1033,7 +1033,7 @@ func (d *cursorDecoder) readString() (string, error) {
 	}
 
 	if uint64(numRead) != strLen {
-		return "", fmt.Errorf("error reading string: expected %d bytes, but only read %d bytes\n", strLen, numRead)
+		return "", fmt.Errorf("error reading string: expected %d bytes, but only read %d bytes", strLen, numRead)
 	}
 
 	return string(strBytes), nil

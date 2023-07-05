@@ -576,8 +576,5 @@ func SpanFilterEventProcessor(ctx context.Context, maxSpans int, minSpanDuration
 // the errors.errorString type isn't exported and we'd really like a way to separate those
 // errors on Sentry. It's not very useful to group every error created with errors.New().
 func isErrErrorString(err error) bool {
-	if fmt.Sprintf("%T", err) == "*errors.errorString" {
-		return true
-	}
-	return false
+	return fmt.Sprintf("%T", err) == "*errors.errorString"
 }

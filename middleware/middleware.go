@@ -22,8 +22,6 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
-var mixpanelDistinctIDs = map[string]string{}
-
 type errBadTaskRequest struct {
 	msg string
 }

@@ -11,8 +11,8 @@ import (
 )
 
 type SocialAuthResult struct {
-	Provider persist.SocialProvider `json:"provider,required" binding:"required"`
-	ID       string                 `json:"id,required" binding:"required"`
+	Provider persist.SocialProvider `json:"provider" binding:"required"`
+	ID       string                 `json:"id" binding:"required"`
 	Metadata map[string]interface{} `json:"metadata"`
 }
 

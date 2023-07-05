@@ -25,7 +25,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
-	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/auth"
@@ -65,7 +64,7 @@ func Init() {
 
 type Clients struct {
 	Repos           *postgres.Repositories
-	Queries         *coredb.Queries
+	Queries         *db.Queries
 	HTTPClient      *http.Client
 	EthClient       *ethclient.Client
 	IPFSClient      *shell.Shell

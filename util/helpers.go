@@ -531,7 +531,7 @@ func LoadEncryptedServiceKeyOrError(filePath string) ([]byte, error) {
 
 	serviceKey, err := decrypt.File(path, "json")
 	if err != nil {
-		return nil, fmt.Errorf("error decrypting service key: %s\n", err)
+		return nil, fmt.Errorf("error decrypting service key: %s", err)
 	}
 
 	return serviceKey, nil
@@ -743,14 +743,11 @@ func (lr *LoggingReader) WriteTo(w io.Writer) (n int64, err error) {
 		logger.For(lr.ctx).Infof("Wrote %d bytes", n)
 		return n, err
 	}
-	return 0, fmt.Errorf("No WriterTo provided")
+	return 0, fmt.Errorf("no WriterTo provided")
 }
 
 // ErrorAs returns true if the given error is of type T
 func ErrorAs[T error](e error) bool {
 	var t T
-	if errors.As(e, &t) {
-		return true
-	}
-	return false
+	return errors.As(e, &t)
 }

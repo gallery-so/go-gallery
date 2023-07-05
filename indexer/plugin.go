@@ -71,7 +71,7 @@ func NewTransferPlugins(ctx context.Context) TransferPlugins {
 
 // RunTransferPlugins returns when all plugins have received the message. Every plugin recieves the same message.
 func RunTransferPlugins(ctx context.Context, transfer rpc.Transfer, key persist.EthereumTokenIdentifiers, plugins []chan<- TransferPluginMsg) {
-	span, ctx := tracing.StartSpan(ctx, "indexer.plugin", "submitMessage")
+	span, _ := tracing.StartSpan(ctx, "indexer.plugin", "submitMessage")
 	defer tracing.FinishSpan(span)
 
 	msg := TransferPluginMsg{

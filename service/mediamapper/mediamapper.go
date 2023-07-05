@@ -50,15 +50,8 @@ func For(ctx context.Context) *MediaMapper {
 
 func buildParams(defaults []imgix.IxParam, other ...imgix.IxParam) []imgix.IxParam {
 	var output []imgix.IxParam
-
-	for _, p := range defaults {
-		output = append(output, p)
-	}
-
-	for _, p := range other {
-		output = append(output, p)
-	}
-
+	output = append(output, defaults...)
+	output = append(output, other...)
 	return output
 }
 
@@ -235,6 +228,9 @@ func (u *MediaMapper) GetAspectRatio(sourceUrl string) *float64 {
 
 	var imgixJsonResponse ImgixJsonResponse
 	rseponseBytes, err := io.ReadAll(rawResponse.Body)
+	if err != nil {
+		return nil
+	}
 
 	json.Unmarshal(rseponseBytes, &imgixJsonResponse)
 

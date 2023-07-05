@@ -2,7 +2,7 @@ package gqlidgen
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -373,6 +373,6 @@ func readTemplateFile(filename string) (string, error) {
 	rootDir := filepath.Dir(callerFile)
 	templatePath := filepath.Join(rootDir, filename)
 
-	data, err := ioutil.ReadFile(templatePath)
+	data, err := os.ReadFile(templatePath)
 	return string(data), err
 }

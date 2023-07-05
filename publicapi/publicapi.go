@@ -2,7 +2,6 @@ package publicapi
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	magicclient "github.com/magiclabs/magic-admin-go/client"
@@ -33,8 +32,6 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 )
-
-var errBadCursorFormat = errors.New("bad cursor format")
 
 const apiContextKey = "publicapi.api"
 
@@ -204,6 +201,10 @@ func newDBIDCache(cache *redis.Cache, key string, ttl time.Duration, f func(cont
 			TTL:   ttl,
 			CalcFunc: func(ctx context.Context) ([]byte, error) {
 				ids, err := f(ctx)
+				if err != nil {
+					return nil, err
+				}
+
 				var p positionPaginator
 				b, err := p.encodeCursor(0, ids)
 				return []byte(b), err

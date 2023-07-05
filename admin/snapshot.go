@@ -33,7 +33,7 @@ func getSnapshot(stg *storage.Client) gin.HandlerFunc {
 			return
 		}
 		defer r.Close()
-		c.DataFromReader(http.StatusOK, int64(r.Size()), "application/json", r, nil)
+		c.DataFromReader(http.StatusOK, int64(r.Attrs.Size), "application/json", r, nil)
 	}
 }
 

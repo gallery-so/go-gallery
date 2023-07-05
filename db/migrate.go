@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -31,7 +30,7 @@ func strToVersion(s string) (uint, error) {
 func superMigrations(dir string) (map[uint]bool, uint, error) {
 	versions := make(map[uint]bool, 0)
 
-	files, err := ioutil.ReadDir(dir)
+	files, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, 0, err
 	}

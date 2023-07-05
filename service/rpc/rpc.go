@@ -13,11 +13,11 @@ import (
 	"image/png"
 	"io"
 	"io/fs"
-	"io/ioutil"
 	"math/big"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -216,7 +216,7 @@ func newHTTPClientForRPC(continueTrace bool, spanOptions ...sentry.SpanOption) *
 		if d.IsDir() {
 			return nil
 		}
-		bs, err := ioutil.ReadFile(path)
+		bs, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
@@ -970,7 +970,7 @@ func GetArweaveDataHTTP(ctx context.Context, id string) ([]byte, error) {
 		return nil, err
 	}
 	defer resp.Close()
-	data, err := ioutil.ReadAll(resp)
+	data, err := io.ReadAll(resp)
 	if err != nil {
 		return nil, fmt.Errorf("error reading data: %s", err.Error())
 	}
@@ -998,13 +998,6 @@ func GetArweaveContentType(client *goar.Client, id string) (string, error) {
 		}
 	}
 	return "", nil
-}
-
-func padHex(pHex string, pLength int) string {
-	for len(pHex) < pLength {
-		pHex = "0" + pHex
-	}
-	return pHex
 }
 
 // valFromSlice returns the value from a slice formatted as [key val key val ...]

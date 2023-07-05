@@ -11,10 +11,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
-	"cloud.google.com/go/storage"
-	"github.com/everFinance/goar"
-	shell "github.com/ipfs/go-ipfs-api"
-
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/eth"
@@ -220,19 +216,16 @@ func GetUser(pCtx context.Context, pInput GetUserInput, userRepo postgres.UserRe
 		if err != nil {
 			return GetUserOutput{}, err
 		}
-		break
 	case pInput.Username != "":
 		user, err = userRepo.GetByUsername(pCtx, pInput.Username)
 		if err != nil {
 			return GetUserOutput{}, err
 		}
-		break
 	case pInput.Address.String() != "":
 		user, err = userRepo.GetByChainAddress(pCtx, chainAddress)
 		if err != nil {
 			return GetUserOutput{}, err
 		}
-		break
 	}
 
 	if user.ID == "" {
@@ -315,36 +308,6 @@ func UpdateUserInfo(pCtx context.Context, userID persist.DBID, username string, 
 
 // }
 
-// TODO need interface for interacting with other chains for this
-func validateNFTsForUser(pCtx context.Context, pUserID persist.DBID, userRepo postgres.UserRepository, tokenRepo postgres.TokenGalleryRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) error {
-	// input := indexer.ValidateUsersNFTsInput{
-	// 	UserID: pUserID,
-	// }
-
-	// _, err := indexer.ValidateNFTs(pCtx, input, userRepo, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, stg)
-	// if err != nil {
-	// 	logger.For(pCtx).Errorf("Error validating user NFTs %s: %s", pUserID, err)
-	// 	return err
-	// }
-	return nil
-}
-
-// TODO need interface for interacting with other chains for this
-func ensureMediaContent(pCtx context.Context, pChainAddress persist.ChainAddress, tokenRepo postgres.TokenGalleryRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) error {
-
-	// input := indexer.UpdateMediaInput{
-	// 	OwnerAddress: pAddress,
-	// }
-
-	// err := indexer.UpdateMedia(pCtx, input, tokenRepo, ethClient, ipfsClient, arweaveClient, stg)
-	// if err != nil {
-	// 	logrus.Errorf("Error ensuring media content for address %s: %s", pAddress, err)
-	// 	return err
-	// }
-	return nil
-
-}
-
 // DoesUserOwnWallets checks if a user owns any wallets
 func DoesUserOwnWallets(pCtx context.Context, userID persist.DBID, walletAddresses []persist.DBID, userRepo postgres.UserRepository) (bool, error) {
 	user, err := userRepo.GetByID(pCtx, userID)
@@ -391,23 +354,4 @@ type ErrUserAlreadyExists struct {
 
 func (e ErrUserAlreadyExists) Error() string {
 	return fmt.Sprintf("user already exists: address: %s, authenticator: %s", e.Address, e.Authenticator)
-}
-
-func (e errCouldNotEnsureMediaForAddress) Error() string {
-	return fmt.Sprintf("could not ensure media for wallet: %s", e.address.Address)
-}
-
-type errCouldNotEnsureMediaForAddress struct {
-	address persist.Wallet
-}
-
-// containsWallet checks whether an address exists in a slice
-func containsWallet(a []persist.Wallet, b persist.Wallet) bool {
-	for _, v := range a {
-		if v == b {
-			return true
-		}
-	}
-
-	return false
 }

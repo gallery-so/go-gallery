@@ -71,7 +71,7 @@ var bannedUsernames = map[string]bool{
 	"404":           true,
 }
 
-var alphanumericUnderscoresPeriodsRegex = regexp.MustCompile("^[\\w.]*$")
+var alphanumericUnderscoresPeriodsRegex = regexp.MustCompile(`^[\w.]*$`)
 
 // SanitizationPolicy is a policy for sanitizing user input
 var SanitizationPolicy = bluemonday.UGCPolicy()
