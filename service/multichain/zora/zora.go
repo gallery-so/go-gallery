@@ -106,16 +106,26 @@ func (t *customTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 // NewProvider creates a new zora Provider
 func NewProvider(httpClient *http.Client) *Provider {
 
+	copy1 := *httpClient
+	copy2 := *httpClient
+
 	// if api key exists, add to headers with X-API-KEY
 	if env.GetString("ZORA_API_KEY") != "" {
-		httpClient.Transport = &customTransport{
+		copy1.Transport = &customTransport{
 			underlyingTransport: httpClient.Transport,
 			apiKey:              env.GetString("ZORA_API_KEY"),
 		}
 	}
+	if env.GetString("GOLDSKY_API_KEY") != "" {
+		copy2.Transport = &customTransport{
+			underlyingTransport: httpClient.Transport,
+			apiKey:              env.GetString("GOLDSKY_API_KEY"),
+		}
+	}
+
 	return &Provider{
-		zgql:       graphql.NewClient(zoraURL, graphql.WithHTTPClient(httpClient)),
-		ggql:       graphql.NewClient(goldskyURL, graphql.WithHTTPClient(httpClient)),
+		zgql:       graphql.NewClient(zoraURL, graphql.WithHTTPClient(&copy1)),
+		ggql:       graphql.NewClient(goldskyURL, graphql.WithHTTPClient(&copy2)),
 		httpClient: httpClient,
 	}
 }
