@@ -301,12 +301,12 @@ func (api TokenAPI) SyncTokens(ctx context.Context, chains []persist.Chain) erro
 		return err
 	}
 
-	// key := fmt.Sprintf("sync:owned:%s", userID.String())
+	key := fmt.Sprintf("sync:owned:%s", userID.String())
 
-	// if err := api.throttler.Lock(ctx, key); err != nil {
-	// 	return ErrTokenRefreshFailed{Message: err.Error()}
-	// }
-	// defer api.throttler.Unlock(ctx, key)
+	if err := api.throttler.Lock(ctx, key); err != nil {
+		return ErrTokenRefreshFailed{Message: err.Error()}
+	}
+	defer api.throttler.Unlock(ctx, key)
 
 	err = api.multichainProvider.SyncTokens(ctx, userID, chains)
 	if err != nil {
