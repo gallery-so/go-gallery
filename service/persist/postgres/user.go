@@ -60,7 +60,7 @@ func NewUserRepository(db *sql.DB, queries *db.Queries, pgx *pgxpool.Pool) *User
 	getByWalletIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,WALLETS,BIO,TRAITS,UNIVERSAL,PRIMARY_WALLET_ID,CREATED_AT,LAST_UPDATED FROM users WHERE ARRAY[$1]::varchar[] <@ WALLETS AND DELETED = false;`)
 	checkNoErr(err)
 
-	getByUsernameStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,WALLETS,BIO,TRAITS,UNIVERSAL,PRIMARY_WALLET_ID,CREATED_AT,LAST_UPDATED FROM users WHERE USERNAME_IDEMPOTENT = $1 AND DELETED = false AND UNIVERSAL = false;`)
+	getByUsernameStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,WALLETS,BIO,TRAITS,UNIVERSAL,PRIMARY_WALLET_ID,CREATED_AT,LAST_UPDATED FROM users WHERE USERNAME_IDEMPOTENT = $1 AND DELETED = false;`)
 	checkNoErr(err)
 
 	getByEmailStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,WALLETS,BIO,TRAITS,UNIVERSAL,PRIMARY_WALLET_ID,CREATED_AT,LAST_UPDATED FROM pii.user_view WHERE PII_EMAIL_ADDRESS = $1 AND DELETED = false AND (EMAIL_VERIFIED = 1 OR EMAIL_VERIFIED = 3);`)
@@ -245,8 +245,8 @@ func (u *UserRepository) Create(pCtx context.Context, pUser persist.CreateUserIn
 		}()
 	}
 
-	_, err := queries.GetUserByUsername(pCtx, strings.ToLower(pUser.Username))
-	if err == nil {
+	user, err := queries.GetUserByUsername(pCtx, strings.ToLower(pUser.Username))
+	if err == nil && user.ID != "" {
 		return "", persist.ErrUsernameNotAvailable{Username: pUser.Username}
 	}
 

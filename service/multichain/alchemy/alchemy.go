@@ -325,7 +325,7 @@ func getNFTsPaginate[T tokensPaginated](ctx context.Context, baseURL string, def
 
 func (d *Provider) getOwnersForContract(ctx context.Context, contract persist.EthereumAddress) ([]OwnerWithBalances, error) {
 
-	u := d.alchemyAPIURL
+	u := d.alchemyAPIURL + "/getOwnersForCollection"
 
 	parsedURL, err := url.Parse(u)
 	if err != nil {
@@ -334,7 +334,7 @@ func (d *Provider) getOwnersForContract(ctx context.Context, contract persist.Et
 
 	q := parsedURL.Query()
 
-	q.Set("contract_address", contract.String())
+	q.Set("contractAddress", contract.String())
 	q.Set("withTokenBalances", "true")
 
 	parsedURL.RawQuery = q.Encode()
