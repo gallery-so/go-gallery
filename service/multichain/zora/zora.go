@@ -100,32 +100,33 @@ type customTransport struct {
 
 func (t *customTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req.Header.Add("X-API-KEY", t.apiKey)
+	if t.underlyingTransport == nil {
+		return http.DefaultTransport.RoundTrip(req)
+	}
 	return t.underlyingTransport.RoundTrip(req)
 }
 
 // NewProvider creates a new zora Provider
 func NewProvider(httpClient *http.Client) *Provider {
 
-	copy1 := *httpClient
-	copy2 := *httpClient
+	zoraClient := httpClient
 
 	// if api key exists, add to headers with X-API-KEY
 	if env.GetString("ZORA_API_KEY") != "" {
-		copy1.Transport = &customTransport{
-			underlyingTransport: httpClient.Transport,
-			apiKey:              env.GetString("ZORA_API_KEY"),
-		}
-	}
-	if env.GetString("GOLDSKY_API_KEY") != "" {
-		copy2.Transport = &customTransport{
-			underlyingTransport: httpClient.Transport,
-			apiKey:              env.GetString("GOLDSKY_API_KEY"),
+		zoraClient = &http.Client{
+			Transport: &customTransport{
+				underlyingTransport: httpClient.Transport,
+				apiKey:              env.GetString("ZORA_API_KEY"),
+			},
+			CheckRedirect: httpClient.CheckRedirect,
+			Jar:           httpClient.Jar,
+			Timeout:       httpClient.Timeout,
 		}
 	}
 
 	return &Provider{
-		zgql:       graphql.NewClient(zoraURL, graphql.WithHTTPClient(&copy1)),
-		ggql:       graphql.NewClient(goldskyURL, graphql.WithHTTPClient(&copy2)),
+		zgql:       graphql.NewClient(zoraURL, graphql.WithHTTPClient(zoraClient)),
+		ggql:       graphql.NewClient(goldskyURL, graphql.WithHTTPClient(httpClient)),
 		httpClient: httpClient,
 	}
 }
