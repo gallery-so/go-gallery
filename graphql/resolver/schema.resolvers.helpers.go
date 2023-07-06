@@ -1177,8 +1177,8 @@ func feedEntityToModel(event *persist.FeedEntity) (model.FeedEventOrPostOrError,
 	if caption != nil {
 		captionVal = util.ToPointer(caption.(string))
 	}
-	switch event.Source.String {
-	case "post":
+	switch event.Source {
+	case persist.FeedEntitySourcePost:
 		return &model.Post{
 			HelperPostData: model.HelperPostData{
 				TokenIDs: event.TokenIDs,
@@ -1186,7 +1186,7 @@ func feedEntityToModel(event *persist.FeedEntity) (model.FeedEventOrPostOrError,
 			Dbid:    event.ID,
 			Caption: captionVal,
 		}, nil
-	case "feed_event":
+	case persist.FeedEntitySourceFeedEvent:
 		var feedEventData persist.FeedEventData
 		if err := event.Data.AssignTo(&feedEventData); err != nil {
 			return nil, err
@@ -1223,7 +1223,7 @@ func feedEntityToModel(event *persist.FeedEntity) (model.FeedEventOrPostOrError,
 			EventData: data,
 		}, nil
 	default:
-		panic(fmt.Sprintf("unknown source: %s", event.Source.String))
+		panic(fmt.Sprintf("unknown source: %s", event.Source))
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/jackc/pgtype"
 )
@@ -29,23 +30,26 @@ create type feed_entity AS (
 );
 */
 type FeedEntity struct {
-	ID          DBID           `json:"id"`
-	TokenIDs    DBIDList       `json:"token_ids"`
-	Caption     sql.NullString `json:"caption"`
-	EventTime   sql.NullTime   `json:"event_time"`
-	Source      sql.NullString `json:"source"`
-	Version     sql.NullInt32  `json:"version"`
-	OwnerID     DBID           `json:"owner_id"`
-	GroupID     DBID           `json:"group_id"`
-	Action      sql.NullString `json:"action"`
-	Data        pgtype.JSONB   `json:"data"`
-	EventIDs    DBIDList       `json:"event_ids"`
-	Deleted     sql.NullBool   `json:"deleted"`
-	LastUpdated sql.NullTime   `json:"last_updated"`
-	CreatedAt   sql.NullTime   `json:"created_at"`
+	ID          DBID             `json:"id"`
+	TokenIDs    DBIDList         `json:"token_ids"`
+	Caption     sql.NullString   `json:"caption"`
+	EventTime   sql.NullTime     `json:"event_time"`
+	Source      FeedEntitySource `json:"source"`
+	Version     sql.NullInt32    `json:"version"`
+	OwnerID     DBID             `json:"owner_id"`
+	GroupID     DBID             `json:"group_id"`
+	Action      sql.NullString   `json:"action"`
+	Data        pgtype.JSONB     `json:"data"`
+	EventIDs    DBIDList         `json:"event_ids"`
+	Deleted     sql.NullBool     `json:"deleted"`
+	LastUpdated sql.NullTime     `json:"last_updated"`
+	CreatedAt   sql.NullTime     `json:"created_at"`
 }
 
 func (f *FeedEntity) Scan(src interface{}) error {
+	if src == nil {
+		return nil
+	}
 	// Convert the interface{} type to a byte array
 	source, ok := src.([]byte)
 	if !ok {
@@ -58,5 +62,28 @@ func (f *FeedEntity) Scan(src interface{}) error {
 		return err
 	}
 
+	return nil
+}
+
+type FeedEntitySource string
+
+const (
+	FeedEntitySourceFeedEvent FeedEntitySource = "feed_event"
+	FeedEntitySourcePost      FeedEntitySource = "post"
+)
+
+func (f *FeedEntitySource) Scan(src interface{}) error {
+	if src == nil {
+		return nil
+	}
+	source := FeedEntitySource(src.(string))
+	switch source {
+	case FeedEntitySourceFeedEvent:
+		*f = FeedEntitySourceFeedEvent
+	case FeedEntitySourcePost:
+		*f = FeedEntitySourcePost
+	default:
+		return fmt.Errorf("invalid FeedEntitySource: %s", source)
+	}
 	return nil
 }
