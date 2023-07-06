@@ -66,8 +66,8 @@ where
 `
 
 type GetFollowGraphSourceRow struct {
-	Follower persist.DBID
-	Followee persist.DBID
+	Follower persist.DBID `json:"follower"`
+	Followee persist.DBID `json:"followee"`
 }
 
 func (q *Queries) GetFollowGraphSource(ctx context.Context) ([]GetFollowGraphSourceRow, error) {
@@ -135,10 +135,10 @@ do update set
 `
 
 type UpdatedRecommendationResultsParams struct {
-	ID                []string
-	UserID            []string
-	RecommendedUserID []string
-	RecommendedCount  []int32
+	ID                []string `json:"id"`
+	UserID            []string `json:"user_id"`
+	RecommendedUserID []string `json:"recommended_user_id"`
+	RecommendedCount  []int32  `json:"recommended_count"`
 }
 
 func (q *Queries) UpdatedRecommendationResults(ctx context.Context, arg UpdatedRecommendationResultsParams) error {

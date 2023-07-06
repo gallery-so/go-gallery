@@ -6,6 +6,7 @@ package graphql
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/gammazero/workerpool"
@@ -1158,12 +1159,65 @@ func feedEventToDataModel(event *db.FeedEvent) (model.FeedEventData, error) {
 	}
 }
 
-func feedEventToModel(event *db.FeedEvent) (*model.FeedEvent, error) {
-	data, err := feedEventToDataModel(event)
-	if err != nil {
-		return nil, err
-	}
+func feedEntityToModel(event *persist.FeedEntity) (model.FeedEventOrPostOrError, error) {
+	// Value always returns a nil error so we can safely ignore it.
+	caption, _ := event.Caption.Value()
 
+	var captionVal *string
+	if caption != nil {
+		captionVal = util.ToPointer(caption.(string))
+	}
+	switch event.Source.String {
+	case "post":
+		return &model.Post{
+			HelperPostData: model.HelperPostData{
+				TokenIDs: event.TokenIDs,
+			},
+			Dbid:    event.ID,
+			Caption: captionVal,
+		}, nil
+	case "feed_event":
+		var feedEventData persist.FeedEventData
+		if err := event.Data.AssignTo(&feedEventData); err != nil {
+			return nil, err
+		}
+
+		var groupID sql.NullString
+		if event.GroupID.String() != "" {
+			groupID = sql.NullString{
+				String: event.GroupID.String(),
+				Valid:  true,
+			}
+		}
+		data, err := feedEventToDataModel(&db.FeedEvent{
+			ID:          event.ID,
+			Version:     event.Version.Int32,
+			OwnerID:     event.OwnerID,
+			Action:      persist.Action(event.Action.String),
+			Data:        feedEventData,
+			EventTime:   event.EventTime.Time,
+			EventIds:    event.EventIDs,
+			Deleted:     event.Deleted.Bool,
+			LastUpdated: event.LastUpdated.Time,
+			CreatedAt:   event.CreatedAt.Time,
+			Caption:     event.Caption,
+			GroupID:     groupID,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		return &model.FeedEvent{
+			Dbid:      event.ID,
+			Caption:   captionVal,
+			EventData: data,
+		}, nil
+	default:
+		panic(fmt.Sprintf("unknown source: %s", event.Source.String))
+	}
+}
+
+func feedEventToModel(event *db.FeedEvent) (*model.FeedEvent, error) {
 	// Value always returns a nil error so we can safely ignore it.
 	caption, _ := event.Caption.Value()
 
@@ -1172,11 +1226,17 @@ func feedEventToModel(event *db.FeedEvent) (*model.FeedEvent, error) {
 		captionVal = util.ToPointer(caption.(string))
 	}
 
+	data, err := feedEventToDataModel(event)
+	if err != nil {
+		return nil, err
+	}
+
 	return &model.FeedEvent{
 		Dbid:      event.ID,
 		Caption:   captionVal,
 		EventData: data,
 	}, nil
+
 }
 
 func feedEventToUserCreatedFeedEventData(event *db.FeedEvent) model.FeedEventData {
@@ -1389,12 +1449,12 @@ func feedEventToSubEventDatas(ctx context.Context, event db.FeedEvent) ([]model.
 	return result, nil
 }
 
-func eventsToFeedEdges(events []db.FeedEvent) ([]*model.FeedEdge, error) {
+func eventsToFeedEdges(events []persist.FeedEntity) ([]*model.FeedEdge, error) {
 	edges := make([]*model.FeedEdge, len(events))
 
 	for i, evt := range events {
-		var node model.FeedEventOrError
-		node, err := feedEventToModel(&evt)
+		var node model.FeedEventOrPostOrError
+		node, err := feedEntityToModel(&evt)
 
 		if e, ok := err.(*persist.ErrUnknownAction); ok {
 			node = model.ErrUnknownAction{Message: e.Error()}

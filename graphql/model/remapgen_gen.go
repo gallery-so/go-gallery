@@ -103,8 +103,8 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
-	"FeedEventOrError": func(object interface{}) (interface{}, bool) {
-		obj, ok := object.(FeedEventOrError)
+	"FeedEventOrPostOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(FeedEventOrPostOrError)
 		return obj, ok
 	},
 
@@ -190,6 +190,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 
 	"Notification": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(Notification)
+		return obj, ok
+	},
+
+	"PostTokenPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(PostTokenPayloadOrError)
 		return obj, ok
 	},
 

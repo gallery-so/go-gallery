@@ -22,9 +22,9 @@
 //go:generate go run github.com/gallery-so/dataloaden ContractsLoaderByCreatorID github.com/mikeydub/go-gallery/db/gen/coredb.GetCreatedContractsBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.Contract
 //go:generate go run github.com/gallery-so/dataloaden ContractsLoaderByParentID github.com/mikeydub/go-gallery/db/gen/coredb.GetChildContractsByParentIDBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.Contract
 //go:generate go run github.com/gallery-so/dataloaden ContractLoaderByChainAddress github.com/mikeydub/go-gallery/service/persist.ChainAddress github.com/mikeydub/go-gallery/db/gen/coredb.Contract
-//go:generate go run github.com/gallery-so/dataloaden GlobalFeedLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginateGlobalFeedParams []github.com/mikeydub/go-gallery/db/gen/coredb.FeedEvent
-//go:generate go run github.com/gallery-so/dataloaden PersonalFeedLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginatePersonalFeedByUserIDParams []github.com/mikeydub/go-gallery/db/gen/coredb.FeedEvent
-//go:generate go run github.com/gallery-so/dataloaden UserFeedLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginateUserFeedByUserIDParams []github.com/mikeydub/go-gallery/db/gen/coredb.FeedEvent
+//go:generate go run github.com/gallery-so/dataloaden GlobalFeedLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginateGlobalFeedParams []github.com/mikeydub/go-gallery/service/persist.FeedEntity
+//go:generate go run github.com/gallery-so/dataloaden PersonalFeedLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginatePersonalFeedByUserIDParams []github.com/mikeydub/go-gallery/service/persist.FeedEntity
+//go:generate go run github.com/gallery-so/dataloaden UserFeedLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginateUserFeedByUserIDParams []github.com/mikeydub/go-gallery/service/persist.FeedEntity
 //go:generate go run github.com/gallery-so/dataloaden EventLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.FeedEvent
 //go:generate go run github.com/gallery-so/dataloaden AdmireLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Admire
 //go:generate go run github.com/gallery-so/dataloaden AdmiresLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Admire
@@ -34,10 +34,15 @@
 //go:generate go run github.com/gallery-so/dataloaden NotificationsLoaderByUserID github.com/mikeydub/go-gallery/db/gen/coredb.GetUserNotificationsBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.Notification
 //go:generate go run github.com/gallery-so/dataloaden FeedEventCommentsLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginateCommentsByFeedEventIDBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.Comment
 //go:generate go run github.com/gallery-so/dataloaden FeedEventAdmiresLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginateAdmiresByFeedEventIDBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.Admire
+//go:generate go run github.com/gallery-so/dataloaden PostCommentsLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginateCommentsByPostIDBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.Comment
+//go:generate go run github.com/gallery-so/dataloaden PostAdmiresLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginateAdmiresByPostIDBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.Admire
 //go:generate go run github.com/gallery-so/dataloaden FeedEventInteractionsLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginateInteractionsByFeedEventIDBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.PaginateInteractionsByFeedEventIDBatchRow
 //go:generate go run github.com/gallery-so/dataloaden FeedEventInteractionCountLoader github.com/mikeydub/go-gallery/db/gen/coredb.CountInteractionsByFeedEventIDBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.CountInteractionsByFeedEventIDBatchRow
+//go:generate go run github.com/gallery-so/dataloaden PostInteractionsLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginateInteractionsByPostIDBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.PaginateInteractionsByPostIDBatchRow
+//go:generate go run github.com/gallery-so/dataloaden PostInteractionCountLoader github.com/mikeydub/go-gallery/db/gen/coredb.CountInteractionsByPostIDBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.CountInteractionsByPostIDBatchRow
 //go:generate go run github.com/gallery-so/dataloaden IntLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID int
 //go:generate go run github.com/gallery-so/dataloaden AdmireLoaderByActorAndFeedEvent github.com/mikeydub/go-gallery/db/gen/coredb.GetAdmireByActorIDAndFeedEventIDParams github.com/mikeydub/go-gallery/db/gen/coredb.Admire
+//go:generate go run github.com/gallery-so/dataloaden AdmireLoaderByActorAndPost github.com/mikeydub/go-gallery/db/gen/coredb.GetAdmireByActorIDAndPostIDParams github.com/mikeydub/go-gallery/db/gen/coredb.Admire
 //go:generate go run github.com/gallery-so/dataloaden SharedFollowersLoaderByIDs github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedFollowersBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedFollowersBatchPaginateRow
 //go:generate go run github.com/gallery-so/dataloaden SharedContractsLoaderByIDs github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedContractsBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedContractsBatchPaginateRow
 //go:generate go run github.com/gallery-so/dataloaden MediaLoaderByTokenID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.TokenMedia
@@ -51,9 +56,10 @@ package dataloader
 import (
 	"context"
 	"database/sql"
-	"github.com/mikeydub/go-gallery/util"
 	"sync"
 	"time"
+
+	"github.com/mikeydub/go-gallery/util"
 
 	"github.com/mikeydub/go-gallery/service/tracing"
 
@@ -114,17 +120,24 @@ type Loaders struct {
 	AdmireByAdmireID                         *AdmireLoaderByID
 	AdmireCountByFeedEventID                 *IntLoaderByID
 	AdmiresByFeedEventID                     *FeedEventAdmiresLoader
+	AdmireCountByPostID                      *IntLoaderByID
+	AdmiresByPostID                          *PostAdmiresLoader
 	CommentByCommentID                       *CommentLoaderByID
 	CommentCountByFeedEventID                *IntLoaderByID
+	CommentsByFeedEventID                    *FeedEventCommentsLoader
+	CommentCountByPostID                     *IntLoaderByID
+	CommentsByPostID                         *PostCommentsLoader
+	InteractionCountByFeedEventID            *FeedEventInteractionCountLoader
+	InteractionsByFeedEventID                *FeedEventInteractionsLoader
+	InteractionCountByPostID                 *PostInteractionCountLoader
+	InteractionsByPostID                     *PostInteractionsLoader
 	EventByEventID                           *EventLoaderByID
 	NotificationByID                         *NotificationLoaderByID
 	NotificationsByUserID                    *NotificationsLoaderByUserID
 	ContractsDisplayedByUserID               *ContractsLoaderByID
 	OwnersByContractID                       *UsersLoaderByContractID
-	CommentsByFeedEventID                    *FeedEventCommentsLoader
-	InteractionCountByFeedEventID            *FeedEventInteractionCountLoader
-	InteractionsByFeedEventID                *FeedEventInteractionsLoader
 	AdmireByActorIDAndFeedEventID            *AdmireLoaderByActorAndFeedEvent
+	AdmireByActorIDAndPostID                 *AdmireLoaderByActorAndPost
 	MediaByTokenID                           *MediaLoaderByTokenID
 	TokenOwnershipByTokenID                  *TokenOwnershipLoaderByID
 	ContractCreatorByContractID              *ContractCreatorLoaderByID
@@ -295,7 +308,11 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 
 	loaders.AdmireCountByFeedEventID = NewIntLoaderByID(defaults, loadAdmireCountByFeedEventID(q), IntLoaderByIDCacheSubscriptions{})
 
+	loaders.AdmireCountByPostID = NewIntLoaderByID(defaults, loadAdmireCountByPostID(q), IntLoaderByIDCacheSubscriptions{})
+
 	loaders.AdmiresByFeedEventID = NewFeedEventAdmiresLoader(defaults, loadAdmiresByFeedEventID(q))
+
+	loaders.AdmiresByPostID = NewPostAdmiresLoader(defaults, loadAdmiresByPostID(q))
 
 	loaders.CommentByCommentID = NewCommentLoaderByID(defaults, loadCommentById(q), CommentLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(comment db.Comment) persist.DBID { return comment.ID },
@@ -303,13 +320,23 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 
 	loaders.CommentCountByFeedEventID = NewIntLoaderByID(defaults, loadCommentCountByFeedEventID(q), IntLoaderByIDCacheSubscriptions{})
 
+	loaders.CommentCountByPostID = NewIntLoaderByID(defaults, loadCommentCountByPostID(q), IntLoaderByIDCacheSubscriptions{})
+
 	loaders.CommentsByFeedEventID = NewFeedEventCommentsLoader(defaults, loadCommentsByFeedEventID(q))
+
+	loaders.CommentsByPostID = NewPostCommentsLoader(defaults, loadCommentsByPostID(q))
 
 	loaders.InteractionCountByFeedEventID = NewFeedEventInteractionCountLoader(defaults, loadInteractionCountByFeedEventID(q))
 
 	loaders.InteractionsByFeedEventID = NewFeedEventInteractionsLoader(defaults, loadInteractionsByFeedEventID(q))
 
+	loaders.InteractionsByPostID = NewPostInteractionsLoader(defaults, loadInteractionsByPostID(q))
+
+	loaders.InteractionCountByPostID = NewPostInteractionCountLoader(defaults, loadInteractionCountByPostID(q))
+
 	loaders.AdmireByActorIDAndFeedEventID = NewAdmireLoaderByActorAndFeedEvent(defaults, loadAdmireByActorIDAndFeedEventID(q), AdmireLoaderByActorAndFeedEventCacheSubscriptions{})
+
+	loaders.AdmireByActorIDAndPostID = NewAdmireLoaderByActorAndPost(defaults, loadAdmireByActorIDAndPostID(q), AdmireLoaderByActorAndPostCacheSubscriptions{})
 
 	loaders.NotificationByID = NewNotificationLoaderByID(defaults, loadNotificationById(q), NotificationLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(notification db.Notification) persist.DBID { return notification.ID },
@@ -974,15 +1001,15 @@ func loadEventById(q *db.Queries) func(context.Context, []persist.DBID) ([]db.Fe
 	}
 }
 
-func loadPersonalFeed(q *db.Queries) func(context.Context, []db.PaginatePersonalFeedByUserIDParams) ([][]db.FeedEvent, []error) {
-	return func(ctx context.Context, params []db.PaginatePersonalFeedByUserIDParams) ([][]db.FeedEvent, []error) {
-		events := make([][]db.FeedEvent, len(params))
+func loadPersonalFeed(q *db.Queries) func(context.Context, []db.PaginatePersonalFeedByUserIDParams) ([][]persist.FeedEntity, []error) {
+	return func(ctx context.Context, params []db.PaginatePersonalFeedByUserIDParams) ([][]persist.FeedEntity, []error) {
+		events := make([][]persist.FeedEntity, len(params))
 		errors := make([]error, len(params))
 
 		b := q.PaginatePersonalFeedByUserID(ctx, params)
 		defer b.Close()
 
-		b.Query(func(i int, evts []db.FeedEvent, err error) {
+		b.Query(func(i int, evts []persist.FeedEntity, err error) {
 			events[i] = evts
 			errors[i] = err
 		})
@@ -991,15 +1018,15 @@ func loadPersonalFeed(q *db.Queries) func(context.Context, []db.PaginatePersonal
 	}
 }
 
-func loadGlobalFeed(q *db.Queries) func(context.Context, []db.PaginateGlobalFeedParams) ([][]db.FeedEvent, []error) {
-	return func(ctx context.Context, params []db.PaginateGlobalFeedParams) ([][]db.FeedEvent, []error) {
-		events := make([][]db.FeedEvent, len(params))
+func loadGlobalFeed(q *db.Queries) func(context.Context, []db.PaginateGlobalFeedParams) ([][]persist.FeedEntity, []error) {
+	return func(ctx context.Context, params []db.PaginateGlobalFeedParams) ([][]persist.FeedEntity, []error) {
+		events := make([][]persist.FeedEntity, len(params))
 		errors := make([]error, len(params))
 
 		b := q.PaginateGlobalFeed(ctx, params)
 		defer b.Close()
 
-		b.Query(func(i int, evts []db.FeedEvent, err error) {
+		b.Query(func(i int, evts []persist.FeedEntity, err error) {
 			events[i] = evts
 			errors[i] = err
 		})
@@ -1008,15 +1035,15 @@ func loadGlobalFeed(q *db.Queries) func(context.Context, []db.PaginateGlobalFeed
 	}
 }
 
-func loadUserFeed(q *db.Queries) func(context.Context, []db.PaginateUserFeedByUserIDParams) ([][]db.FeedEvent, []error) {
-	return func(ctx context.Context, params []db.PaginateUserFeedByUserIDParams) ([][]db.FeedEvent, []error) {
-		events := make([][]db.FeedEvent, len(params))
+func loadUserFeed(q *db.Queries) func(context.Context, []db.PaginateUserFeedByUserIDParams) ([][]persist.FeedEntity, []error) {
+	return func(ctx context.Context, params []db.PaginateUserFeedByUserIDParams) ([][]persist.FeedEntity, []error) {
+		events := make([][]persist.FeedEntity, len(params))
 		errors := make([]error, len(params))
 
 		b := q.PaginateUserFeedByUserID(ctx, params)
 		defer b.Close()
 
-		b.Query(func(i int, evts []db.FeedEvent, err error) {
+		b.Query(func(i int, evts []persist.FeedEntity, err error) {
 			events[i] = evts
 			errors[i] = err
 		})
@@ -1086,12 +1113,45 @@ func loadAdmireCountByFeedEventID(q *db.Queries) func(context.Context, []persist
 	}
 }
 
+func loadAdmireCountByPostID(q *db.Queries) func(context.Context, []persist.DBID) ([]int, []error) {
+	return func(ctx context.Context, postIDs []persist.DBID) ([]int, []error) {
+		counts := make([]int, len(postIDs))
+		errors := make([]error, len(postIDs))
+
+		b := q.CountAdmiresByPostIDBatch(ctx, postIDs)
+		defer b.Close()
+
+		b.QueryRow(func(i int, count int64, err error) {
+			counts[i], errors[i] = int(count), err
+		})
+
+		return counts, errors
+	}
+}
+
 func loadAdmiresByFeedEventID(q *db.Queries) func(context.Context, []db.PaginateAdmiresByFeedEventIDBatchParams) ([][]db.Admire, []error) {
 	return func(ctx context.Context, params []db.PaginateAdmiresByFeedEventIDBatchParams) ([][]db.Admire, []error) {
 		admires := make([][]db.Admire, len(params))
 		errors := make([]error, len(params))
 
 		b := q.PaginateAdmiresByFeedEventIDBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, admrs []db.Admire, err error) {
+			admires[i] = admrs
+			errors[i] = err
+		})
+
+		return admires, errors
+	}
+}
+
+func loadAdmiresByPostID(q *db.Queries) func(context.Context, []db.PaginateAdmiresByPostIDBatchParams) ([][]db.Admire, []error) {
+	return func(ctx context.Context, params []db.PaginateAdmiresByPostIDBatchParams) ([][]db.Admire, []error) {
+		admires := make([][]db.Admire, len(params))
+		errors := make([]error, len(params))
+
+		b := q.PaginateAdmiresByPostIDBatch(ctx, params)
 		defer b.Close()
 
 		b.Query(func(i int, admrs []db.Admire, err error) {
@@ -1147,12 +1207,45 @@ func loadCommentCountByFeedEventID(q *db.Queries) func(context.Context, []persis
 	}
 }
 
+func loadCommentCountByPostID(q *db.Queries) func(context.Context, []persist.DBID) ([]int, []error) {
+	return func(ctx context.Context, postIDs []persist.DBID) ([]int, []error) {
+		counts := make([]int, len(postIDs))
+		errors := make([]error, len(postIDs))
+
+		b := q.CountCommentsByPostIDBatch(ctx, postIDs)
+		defer b.Close()
+
+		b.QueryRow(func(i int, count int64, err error) {
+			counts[i], errors[i] = int(count), err
+		})
+
+		return counts, errors
+	}
+}
+
 func loadCommentsByFeedEventID(q *db.Queries) func(context.Context, []db.PaginateCommentsByFeedEventIDBatchParams) ([][]db.Comment, []error) {
 	return func(ctx context.Context, params []db.PaginateCommentsByFeedEventIDBatchParams) ([][]db.Comment, []error) {
 		comments := make([][]db.Comment, len(params))
 		errors := make([]error, len(params))
 
 		b := q.PaginateCommentsByFeedEventIDBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, cmts []db.Comment, err error) {
+			comments[i] = cmts
+			errors[i] = err
+		})
+
+		return comments, errors
+	}
+}
+
+func loadCommentsByPostID(q *db.Queries) func(context.Context, []db.PaginateCommentsByPostIDBatchParams) ([][]db.Comment, []error) {
+	return func(ctx context.Context, params []db.PaginateCommentsByPostIDBatchParams) ([][]db.Comment, []error) {
+		comments := make([][]db.Comment, len(params))
+		errors := make([]error, len(params))
+
+		b := q.PaginateCommentsByPostIDBatch(ctx, params)
 		defer b.Close()
 
 		b.Query(func(i int, cmts []db.Comment, err error) {
@@ -1196,6 +1289,38 @@ func loadInteractionsByFeedEventID(q *db.Queries) func(context.Context, []db.Pag
 	}
 }
 
+func loadInteractionCountByPostID(q *db.Queries) func(context.Context, []db.CountInteractionsByPostIDBatchParams) ([][]db.CountInteractionsByPostIDBatchRow, []error) {
+	return func(ctx context.Context, params []db.CountInteractionsByPostIDBatchParams) ([][]db.CountInteractionsByPostIDBatchRow, []error) {
+		rows := make([][]db.CountInteractionsByPostIDBatchRow, len(params))
+		errors := make([]error, len(params))
+
+		b := q.CountInteractionsByPostIDBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []db.CountInteractionsByPostIDBatchRow, err error) {
+			rows[i], errors[i] = r, err
+		})
+
+		return rows, errors
+	}
+}
+
+func loadInteractionsByPostID(q *db.Queries) func(context.Context, []db.PaginateInteractionsByPostIDBatchParams) ([][]db.PaginateInteractionsByPostIDBatchRow, []error) {
+	return func(ctx context.Context, params []db.PaginateInteractionsByPostIDBatchParams) ([][]db.PaginateInteractionsByPostIDBatchRow, []error) {
+		interactions := make([][]db.PaginateInteractionsByPostIDBatchRow, len(params))
+		errors := make([]error, len(params))
+
+		b := q.PaginateInteractionsByPostIDBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, r []db.PaginateInteractionsByPostIDBatchRow, err error) {
+			interactions[i], errors[i] = r, err
+		})
+
+		return interactions, errors
+	}
+}
+
 func loadAdmireByActorIDAndFeedEventID(q *db.Queries) func(context.Context, []db.GetAdmireByActorIDAndFeedEventIDParams) ([]db.Admire, []error) {
 	return func(ctx context.Context, params []db.GetAdmireByActorIDAndFeedEventIDParams) ([]db.Admire, []error) {
 		results := make([]db.Admire, len(params))
@@ -1207,6 +1332,25 @@ func loadAdmireByActorIDAndFeedEventID(q *db.Queries) func(context.Context, []db
 		b.QueryRow(func(i int, admire db.Admire, err error) {
 			if err == pgx.ErrNoRows {
 				err = persist.ErrAdmireNotFound{ActorID: params[i].ActorID, FeedEventID: params[i].FeedEventID}
+			}
+			results[i], errors[i] = admire, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadAdmireByActorIDAndPostID(q *db.Queries) func(context.Context, []db.GetAdmireByActorIDAndPostIDParams) ([]db.Admire, []error) {
+	return func(ctx context.Context, params []db.GetAdmireByActorIDAndPostIDParams) ([]db.Admire, []error) {
+		results := make([]db.Admire, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetAdmireByActorIDAndPostID(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, admire db.Admire, err error) {
+			if err == pgx.ErrNoRows {
+				err = persist.ErrAdmireNotFound{ActorID: params[i].ActorID, PostID: params[i].PostID}
 			}
 			results[i], errors[i] = admire, err
 		})

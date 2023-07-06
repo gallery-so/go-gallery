@@ -806,6 +806,28 @@ type FeedEventCommentsConnection {
   pageInfo: PageInfo!
 }
 
+type PostAdmireEdge {
+  node: Admire
+  cursor: String
+  post: Post
+}
+
+type PostCommentEdge {
+  node: Comment
+  cursor: String
+  post: Post
+}
+
+type PostCommentsConnection {
+  edges: [PostCommentEdge]
+  pageInfo: PageInfo!
+}
+
+type PostAdmiresConnection {
+  edges: [PostAdmireEdge]
+  pageInfo: PageInfo!
+}
+
 union Interaction = Admire | Comment
 
 type FeedEventInteractionsEdge {
@@ -816,6 +838,17 @@ type FeedEventInteractionsEdge {
 
 type FeedEventInteractionsConnection {
   edges: [FeedEventInteractionsEdge]
+  pageInfo: PageInfo!
+}
+
+type PostInteractionsEdge {
+  node: Interaction
+  cursor: String
+  post: Post
+}
+
+type PostInteractionsConnection {
+  edges: [PostInteractionsEdge]
   pageInfo: PageInfo!
 }
 
@@ -848,6 +881,24 @@ type FeedEvent implements Node @key(fields: "dbid") {
   # TODO: This is just here while we migrate the frontend over to viewerAdmire.
   # Remove this in the near future.
   hasViewerAdmiredEvent: Boolean @goField(forceResolver: true)
+}
+
+type Post implements Node @key(fields: "dbid") @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+
+  tokens: [Token] @goField(forceResolver: true)
+
+  caption: String
+  admires(before: String, after: String, first: Int, last: Int): PostAdmiresConnection
+    @goField(forceResolver: true)
+  comments(before: String, after: String, first: Int, last: Int): PostCommentsConnection
+    @goField(forceResolver: true)
+
+  interactions(before: String, after: String, first: Int, last: Int): PostInteractionsConnection
+    @goField(forceResolver: true)
+
+  viewerAdmire: Admire @goField(forceResolver: true)
 }
 
 type UserCreatedFeedEventData implements FeedEventData {
@@ -932,7 +983,16 @@ type ErrFeedEventNotFound implements Error {
   message: String!
 }
 
-union FeedEventOrError = FeedEvent | ErrFeedEventNotFound | ErrUnknownAction
+type ErrPostNotFound implements Error {
+  message: String!
+}
+
+union FeedEventOrPostOrError =
+    FeedEvent
+  | Post
+  | ErrPostNotFound
+  | ErrFeedEventNotFound
+  | ErrUnknownAction
 
 union FeedEventByIdOrError = FeedEvent | ErrFeedEventNotFound | ErrUnknownAction
 
@@ -946,7 +1006,7 @@ type PageInfo {
 }
 
 type FeedEdge {
-  node: FeedEventOrError
+  node: FeedEventOrPostOrError
   cursor: String
 }
 
@@ -2195,6 +2255,12 @@ union RemoveProfileImagePayloadOrError =
   | ErrAuthenticationFailed
   | ErrUserNotFound
 
+type PostTokenPayload {
+  post: Post!
+}
+
+union PostTokenPayloadOrError = PostTokenPayload | ErrInvalidInput | ErrNotAuthorized
+
 type Mutation {
   # User Mutations
   addUserWallet(
@@ -2272,6 +2338,8 @@ type Mutation {
     comment: String!
   ): CommentOnFeedEventPayloadOrError @authRequired
   removeComment(commentId: DBID!): RemoveCommentPayloadOrError @authRequired
+
+  postToken(tokenId: DBID!): PostTokenPayloadOrError @authRequired
 
   viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
 

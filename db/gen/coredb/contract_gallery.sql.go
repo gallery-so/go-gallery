@@ -34,14 +34,14 @@ returning id, deleted, version, created_at, last_updated, name, symbol, address,
 `
 
 type UpsertChildContractsParams struct {
-	ID             []string
-	Name           []string
-	Address        []string
-	CreatorAddress []string
-	OwnerAddress   []string
-	Chain          []int32
-	Description    []string
-	ParentIds      []string
+	ID             []string `json:"id"`
+	Name           []string `json:"name"`
+	Address        []string `json:"address"`
+	CreatorAddress []string `json:"creator_address"`
+	OwnerAddress   []string `json:"owner_address"`
+	Chain          []int32  `json:"chain"`
+	Description    []string `json:"description"`
+	ParentIds      []string `json:"parent_ids"`
 }
 
 func (q *Queries) UpsertChildContracts(ctx context.Context, arg UpsertChildContractsParams) ([]Contract, error) {
@@ -125,16 +125,16 @@ returning id, deleted, version, created_at, last_updated, name, symbol, address,
 `
 
 type UpsertParentContractsParams struct {
-	Ids                      []string
-	Version                  []int32
-	Address                  []string
-	Symbol                   []string
-	Name                     []string
-	OwnerAddress             []string
-	Chain                    []int32
-	Description              []string
-	ProfileImageUrl          []string
-	CanOverwriteOwnerAddress bool
+	Ids                      []string `json:"ids"`
+	Version                  []int32  `json:"version"`
+	Address                  []string `json:"address"`
+	Symbol                   []string `json:"symbol"`
+	Name                     []string `json:"name"`
+	OwnerAddress             []string `json:"owner_address"`
+	Chain                    []int32  `json:"chain"`
+	Description              []string `json:"description"`
+	ProfileImageUrl          []string `json:"profile_image_url"`
+	CanOverwriteOwnerAddress bool     `json:"can_overwrite_owner_address"`
 }
 
 func (q *Queries) UpsertParentContracts(ctx context.Context, arg UpsertParentContractsParams) ([]Contract, error) {

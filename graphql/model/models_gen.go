@@ -91,8 +91,8 @@ type FeedEventData interface {
 	IsFeedEventData()
 }
 
-type FeedEventOrError interface {
-	IsFeedEventOrError()
+type FeedEventOrPostOrError interface {
+	IsFeedEventOrPostOrError()
 }
 
 type FollowAllSocialConnectionsPayloadOrError interface {
@@ -164,6 +164,10 @@ type Node interface {
 type Notification interface {
 	Node
 	IsNotification()
+}
+
+type PostTokenPayloadOrError interface {
+	IsPostTokenPayloadOrError()
 }
 
 type PreverifyEmailPayloadOrError interface {
@@ -871,7 +875,7 @@ type ErrFeedEventNotFound struct {
 }
 
 func (ErrFeedEventNotFound) IsError()                            {}
-func (ErrFeedEventNotFound) IsFeedEventOrError()                 {}
+func (ErrFeedEventNotFound) IsFeedEventOrPostOrError()           {}
 func (ErrFeedEventNotFound) IsFeedEventByIDOrError()             {}
 func (ErrFeedEventNotFound) IsAdmireFeedEventPayloadOrError()    {}
 func (ErrFeedEventNotFound) IsRemoveAdmirePayloadOrError()       {}
@@ -950,6 +954,7 @@ func (ErrInvalidInput) IsMintPremiumCardToWalletPayloadOrError()         {}
 func (ErrInvalidInput) IsDisconnectSocialAccountPayloadOrError()         {}
 func (ErrInvalidInput) IsFollowAllSocialConnectionsPayloadOrError()      {}
 func (ErrInvalidInput) IsSetProfileImagePayloadOrError()                 {}
+func (ErrInvalidInput) IsPostTokenPayloadOrError()                       {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -1027,6 +1032,14 @@ func (ErrNotAuthorized) IsDisconnectSocialAccountPayloadOrError()      {}
 func (ErrNotAuthorized) IsFollowAllSocialConnectionsPayloadOrError()   {}
 func (ErrNotAuthorized) IsGenerateQRCodeLoginTokenPayloadOrError()     {}
 func (ErrNotAuthorized) IsSetProfileImagePayloadOrError()              {}
+func (ErrNotAuthorized) IsPostTokenPayloadOrError()                    {}
+
+type ErrPostNotFound struct {
+	Message string `json:"message"`
+}
+
+func (ErrPostNotFound) IsError()                  {}
+func (ErrPostNotFound) IsFeedEventOrPostOrError() {}
 
 type ErrPushTokenBelongsToAnotherUser struct {
 	Message string `json:"message"`
@@ -1069,9 +1082,9 @@ type ErrUnknownAction struct {
 	Message string `json:"message"`
 }
 
-func (ErrUnknownAction) IsError()                {}
-func (ErrUnknownAction) IsFeedEventOrError()     {}
-func (ErrUnknownAction) IsFeedEventByIDOrError() {}
+func (ErrUnknownAction) IsError()                  {}
+func (ErrUnknownAction) IsFeedEventOrPostOrError() {}
+func (ErrUnknownAction) IsFeedEventByIDOrError()   {}
 
 type ErrUserAlreadyExists struct {
 	Message string `json:"message"`
@@ -1114,8 +1127,8 @@ type FeedConnection struct {
 }
 
 type FeedEdge struct {
-	Node   FeedEventOrError `json:"node"`
-	Cursor *string          `json:"cursor"`
+	Node   FeedEventOrPostOrError `json:"node"`
+	Cursor *string                `json:"cursor"`
 }
 
 type FeedEvent struct {
@@ -1129,10 +1142,10 @@ type FeedEvent struct {
 	HasViewerAdmiredEvent *bool                            `json:"hasViewerAdmiredEvent"`
 }
 
-func (FeedEvent) IsNode()                 {}
-func (FeedEvent) IsFeedEventOrError()     {}
-func (FeedEvent) IsFeedEventByIDOrError() {}
-func (FeedEvent) IsEntity()               {}
+func (FeedEvent) IsNode()                   {}
+func (FeedEvent) IsFeedEventOrPostOrError() {}
+func (FeedEvent) IsFeedEventByIDOrError()   {}
+func (FeedEvent) IsEntity()                 {}
 
 type FeedEventAdmireEdge struct {
 	Node   *Admire    `json:"node"`
@@ -1495,6 +1508,60 @@ type PDFMedia struct {
 
 func (PDFMedia) IsMediaSubtype() {}
 func (PDFMedia) IsMedia()        {}
+
+type Post struct {
+	HelperPostData
+	Dbid         persist.DBID                `json:"dbid"`
+	Tokens       []*Token                    `json:"tokens"`
+	Caption      *string                     `json:"caption"`
+	Admires      *PostAdmiresConnection      `json:"admires"`
+	Comments     *PostCommentsConnection     `json:"comments"`
+	Interactions *PostInteractionsConnection `json:"interactions"`
+	ViewerAdmire *Admire                     `json:"viewerAdmire"`
+}
+
+func (Post) IsNode()                   {}
+func (Post) IsFeedEventOrPostOrError() {}
+func (Post) IsEntity()                 {}
+
+type PostAdmireEdge struct {
+	Node   *Admire `json:"node"`
+	Cursor *string `json:"cursor"`
+	Post   *Post   `json:"post"`
+}
+
+type PostAdmiresConnection struct {
+	Edges    []*PostAdmireEdge `json:"edges"`
+	PageInfo *PageInfo         `json:"pageInfo"`
+}
+
+type PostCommentEdge struct {
+	Node   *Comment `json:"node"`
+	Cursor *string  `json:"cursor"`
+	Post   *Post    `json:"post"`
+}
+
+type PostCommentsConnection struct {
+	Edges    []*PostCommentEdge `json:"edges"`
+	PageInfo *PageInfo          `json:"pageInfo"`
+}
+
+type PostInteractionsConnection struct {
+	Edges    []*PostInteractionsEdge `json:"edges"`
+	PageInfo *PageInfo               `json:"pageInfo"`
+}
+
+type PostInteractionsEdge struct {
+	Node   Interaction `json:"node"`
+	Cursor *string     `json:"cursor"`
+	Post   *Post       `json:"post"`
+}
+
+type PostTokenPayload struct {
+	Post *Post `json:"post"`
+}
+
+func (PostTokenPayload) IsPostTokenPayloadOrError() {}
 
 type PreverifyEmailInput struct {
 	Email persist.Email `json:"email"`

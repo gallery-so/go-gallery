@@ -1306,6 +1306,11 @@ func (r *mutationResolver) RemoveComment(ctx context.Context, commentID persist.
 	return output, nil
 }
 
+// PostToken is the resolver for the postToken field.
+func (r *mutationResolver) PostToken(ctx context.Context, tokenID persist.DBID) (model.PostTokenPayloadOrError, error) {
+	panic(fmt.Errorf("not implemented: PostToken - postToken"))
+}
+
 // ViewGallery is the resolver for the viewGallery field.
 func (r *mutationResolver) ViewGallery(ctx context.Context, galleryID persist.DBID) (model.ViewGalleryPayloadOrError, error) {
 	gallery, err := publicapi.For(ctx).Gallery.ViewGallery(ctx, galleryID)
@@ -1763,6 +1768,109 @@ func (r *mutationResolver) GenerateQRCodeLoginToken(ctx context.Context) (model.
 // Owner is the resolver for the owner field.
 func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error) {
 	panic(fmt.Errorf("not implemented"))
+}
+
+// Tokens is the resolver for the tokens field.
+func (r *postResolver) Tokens(ctx context.Context, obj *model.Post) ([]*model.Token, error) {
+	result := make([]*model.Token, len(obj.Tokens))
+	for i, token := range obj.TokenIDs {
+		t, err := resolveTokenByTokenID(ctx, token)
+		if err != nil {
+			return nil, err
+		}
+		result[i] = t
+	}
+
+	return result, nil
+}
+
+// Admires is the resolver for the admires field.
+func (r *postResolver) Admires(ctx context.Context, obj *model.Post, before *string, after *string, first *int, last *int) (*model.PostAdmiresConnection, error) {
+	admires, pageInfo, err := publicapi.For(ctx).Interaction.PaginateAdmiresByPostID(ctx, obj.Dbid, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	var edges []*model.PostAdmireEdge
+	for _, admire := range admires {
+		edges = append(edges, &model.PostAdmireEdge{
+			Node: admireToModel(ctx, admire),
+			Post: obj,
+		})
+	}
+
+	return &model.PostAdmiresConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
+}
+
+// Comments is the resolver for the comments field.
+func (r *postResolver) Comments(ctx context.Context, obj *model.Post, before *string, after *string, first *int, last *int) (*model.PostCommentsConnection, error) {
+	comments, pageInfo, err := publicapi.For(ctx).Interaction.PaginateCommentsByPostID(ctx, obj.Dbid, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	var edges []*model.PostCommentEdge
+	for _, comment := range comments {
+		edges = append(edges, &model.PostCommentEdge{
+			Node: commentToModel(ctx, comment),
+			Post: obj,
+		})
+	}
+
+	return &model.PostCommentsConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
+}
+
+// Interactions is the resolver for the interactions field.
+func (r *postResolver) Interactions(ctx context.Context, obj *model.Post, before *string, after *string, first *int, last *int) (*model.PostInteractionsConnection, error) {
+	interactions, pageInfo, err := publicapi.For(ctx).Interaction.PaginateInteractionsByPostID(ctx, obj.Dbid, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	var edges []*model.PostInteractionsEdge
+	for _, interaction := range interactions {
+		edge := &model.PostInteractionsEdge{
+			Post: obj,
+		}
+		if admire, ok := interaction.(coredb.Admire); ok {
+			edge.Node = admireToModel(ctx, admire)
+		} else if comment, ok := interaction.(coredb.Comment); ok {
+			edge.Node = commentToModel(ctx, comment)
+		}
+		edges = append(edges, edge)
+	}
+
+	return &model.PostInteractionsConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
+}
+
+// ViewerAdmire is the resolver for the viewerAdmire field.
+func (r *postResolver) ViewerAdmire(ctx context.Context, obj *model.Post) (*model.Admire, error) {
+	api := publicapi.For(ctx)
+
+	// If the user isn't logged in, there is no viewer
+	if !api.User.IsUserLoggedIn(ctx) {
+		return nil, nil
+	}
+
+	userID := api.User.GetLoggedInUserId(ctx)
+
+	admire, err := api.Interaction.GetAdmireByActorIDAndPostID(ctx, userID, obj.Dbid)
+	if err != nil {
+		// If getting the admire fails for any reason, just return nil. This resolver doesn't
+		// return error types -- it just returns an admire (if it can find one) or nil.
+		return nil, nil
+	}
+
+	return admireToModel(ctx, *admire), nil
 }
 
 // Blurhash is the resolver for the blurhash field.
@@ -2549,6 +2657,9 @@ func (r *Resolver) Mutation() generated.MutationResolver { return &mutationResol
 // OwnerAtBlock returns generated.OwnerAtBlockResolver implementation.
 func (r *Resolver) OwnerAtBlock() generated.OwnerAtBlockResolver { return &ownerAtBlockResolver{r} }
 
+// Post returns generated.PostResolver implementation.
+func (r *Resolver) Post() generated.PostResolver { return &postResolver{r} }
+
 // PreviewURLSet returns generated.PreviewURLSetResolver implementation.
 func (r *Resolver) PreviewURLSet() generated.PreviewURLSetResolver { return &previewURLSetResolver{r} }
 
@@ -2675,6 +2786,7 @@ type galleryUpdatedFeedEventDataResolver struct{ *Resolver }
 type galleryUserResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type ownerAtBlockResolver struct{ *Resolver }
+type postResolver struct{ *Resolver }
 type previewURLSetResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type removeAdmirePayloadResolver struct{ *Resolver }

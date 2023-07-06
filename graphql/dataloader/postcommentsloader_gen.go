@@ -8,10 +8,9 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
-	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-type GlobalFeedLoaderSettings interface {
+type PostCommentsLoaderSettings interface {
 	getContext() context.Context
 	getWait() time.Duration
 	getMaxBatchOne() int
@@ -24,37 +23,37 @@ type GlobalFeedLoaderSettings interface {
 	getMutexRegistry() *[]*sync.Mutex
 }
 
-func (l *GlobalFeedLoader) setContext(ctx context.Context) {
+func (l *PostCommentsLoader) setContext(ctx context.Context) {
 	l.ctx = ctx
 }
 
-func (l *GlobalFeedLoader) setWait(wait time.Duration) {
+func (l *PostCommentsLoader) setWait(wait time.Duration) {
 	l.wait = wait
 }
 
-func (l *GlobalFeedLoader) setMaxBatch(maxBatch int) {
+func (l *PostCommentsLoader) setMaxBatch(maxBatch int) {
 	l.maxBatch = maxBatch
 }
 
-func (l *GlobalFeedLoader) setDisableCaching(disableCaching bool) {
+func (l *PostCommentsLoader) setDisableCaching(disableCaching bool) {
 	l.disableCaching = disableCaching
 }
 
-func (l *GlobalFeedLoader) setPublishResults(publishResults bool) {
+func (l *PostCommentsLoader) setPublishResults(publishResults bool) {
 	l.publishResults = publishResults
 }
 
-func (l *GlobalFeedLoader) setPreFetchHook(preFetchHook func(context.Context, string) context.Context) {
+func (l *PostCommentsLoader) setPreFetchHook(preFetchHook func(context.Context, string) context.Context) {
 	l.preFetchHook = preFetchHook
 }
 
-func (l *GlobalFeedLoader) setPostFetchHook(postFetchHook func(context.Context, string)) {
+func (l *PostCommentsLoader) setPostFetchHook(postFetchHook func(context.Context, string)) {
 	l.postFetchHook = postFetchHook
 }
 
-// NewGlobalFeedLoader creates a new GlobalFeedLoader with the given settings, functions, and options
-func NewGlobalFeedLoader(
-	settings GlobalFeedLoaderSettings, fetch func(ctx context.Context, keys []coredb.PaginateGlobalFeedParams) ([][]persist.FeedEntity, []error),
+// NewPostCommentsLoader creates a new PostCommentsLoader with the given settings, functions, and options
+func NewPostCommentsLoader(
+	settings PostCommentsLoaderSettings, fetch func(ctx context.Context, keys []coredb.PaginateCommentsByPostIDBatchParams) ([][]coredb.Comment, []error),
 	opts ...func(interface {
 		setContext(context.Context)
 		setWait(time.Duration)
@@ -64,8 +63,8 @@ func NewGlobalFeedLoader(
 		setPreFetchHook(func(context.Context, string) context.Context)
 		setPostFetchHook(func(context.Context, string))
 	}),
-) *GlobalFeedLoader {
-	loader := &GlobalFeedLoader{
+) *PostCommentsLoader {
+	loader := &PostCommentsLoader{
 		ctx:                  settings.getContext(),
 		wait:                 settings.getWait(),
 		disableCaching:       settings.getDisableCaching(),
@@ -82,18 +81,18 @@ func NewGlobalFeedLoader(
 	}
 
 	// Set this after applying options, in case a different context was set via options
-	loader.fetch = func(keys []coredb.PaginateGlobalFeedParams) ([][]persist.FeedEntity, []error) {
+	loader.fetch = func(keys []coredb.PaginateCommentsByPostIDBatchParams) ([][]coredb.Comment, []error) {
 		ctx := loader.ctx
 
 		// Allow the preFetchHook to modify and return a new context
 		if loader.preFetchHook != nil {
-			ctx = loader.preFetchHook(ctx, "GlobalFeedLoader")
+			ctx = loader.preFetchHook(ctx, "PostCommentsLoader")
 		}
 
 		results, errors := fetch(ctx, keys)
 
 		if loader.postFetchHook != nil {
-			loader.postFetchHook(ctx, "GlobalFeedLoader")
+			loader.postFetchHook(ctx, "PostCommentsLoader")
 		}
 
 		return results, errors
@@ -113,13 +112,13 @@ func NewGlobalFeedLoader(
 	return loader
 }
 
-// GlobalFeedLoader batches and caches requests
-type GlobalFeedLoader struct {
+// PostCommentsLoader batches and caches requests
+type PostCommentsLoader struct {
 	// context passed to fetch functions
 	ctx context.Context
 
 	// this method provides the data for the loader
-	fetch func(keys []coredb.PaginateGlobalFeedParams) ([][]persist.FeedEntity, []error)
+	fetch func(keys []coredb.PaginateCommentsByPostIDBatchParams) ([][]coredb.Comment, []error)
 
 	// how long to wait before sending a batch
 	wait time.Duration
@@ -151,18 +150,18 @@ type GlobalFeedLoader struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[coredb.PaginateGlobalFeedParams][]persist.FeedEntity
+	cache map[coredb.PaginateCommentsByPostIDBatchParams][]coredb.Comment
 
 	// typed cache functions
-	//subscribers []func([]persist.FeedEntity)
-	subscribers []globalFeedLoaderSubscriber
+	//subscribers []func([]coredb.Comment)
+	subscribers []postCommentsLoaderSubscriber
 
 	// functions used to cache published results from other dataloaders
 	cacheFuncs []interface{}
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
-	batch *globalFeedLoaderBatch
+	batch *postCommentsLoaderBatch
 
 	// mutex to prevent races
 	mu sync.Mutex
@@ -171,43 +170,43 @@ type GlobalFeedLoader struct {
 	once sync.Once
 }
 
-type globalFeedLoaderBatch struct {
-	keys    []coredb.PaginateGlobalFeedParams
-	data    [][]persist.FeedEntity
+type postCommentsLoaderBatch struct {
+	keys    []coredb.PaginateCommentsByPostIDBatchParams
+	data    [][]coredb.Comment
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
-// Load a FeedEntity by key, batching and caching will be applied automatically
-func (l *GlobalFeedLoader) Load(key coredb.PaginateGlobalFeedParams) ([]persist.FeedEntity, error) {
+// Load a Comment by key, batching and caching will be applied automatically
+func (l *PostCommentsLoader) Load(key coredb.PaginateCommentsByPostIDBatchParams) ([]coredb.Comment, error) {
 	return l.LoadThunk(key)()
 }
 
-// LoadThunk returns a function that when called will block waiting for a FeedEntity.
+// LoadThunk returns a function that when called will block waiting for a Comment.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *GlobalFeedLoader) LoadThunk(key coredb.PaginateGlobalFeedParams) func() ([]persist.FeedEntity, error) {
+func (l *PostCommentsLoader) LoadThunk(key coredb.PaginateCommentsByPostIDBatchParams) func() ([]coredb.Comment, error) {
 	l.mu.Lock()
 	if !l.disableCaching {
 		if it, ok := l.cache[key]; ok {
 			l.mu.Unlock()
-			return func() ([]persist.FeedEntity, error) {
+			return func() ([]coredb.Comment, error) {
 				return it, nil
 			}
 		}
 	}
 	if l.batch == nil {
-		l.batch = &globalFeedLoaderBatch{done: make(chan struct{})}
+		l.batch = &postCommentsLoaderBatch{done: make(chan struct{})}
 	}
 	batch := l.batch
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-	return func() ([]persist.FeedEntity, error) {
+	return func() ([]coredb.Comment, error) {
 		<-batch.done
 
-		var data []persist.FeedEntity
+		var data []coredb.Comment
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -238,43 +237,43 @@ func (l *GlobalFeedLoader) LoadThunk(key coredb.PaginateGlobalFeedParams) func()
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *GlobalFeedLoader) LoadAll(keys []coredb.PaginateGlobalFeedParams) ([][]persist.FeedEntity, []error) {
-	results := make([]func() ([]persist.FeedEntity, error), len(keys))
+func (l *PostCommentsLoader) LoadAll(keys []coredb.PaginateCommentsByPostIDBatchParams) ([][]coredb.Comment, []error) {
+	results := make([]func() ([]coredb.Comment, error), len(keys))
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-	feedEntitys := make([][]persist.FeedEntity, len(keys))
+	comments := make([][]coredb.Comment, len(keys))
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
-		feedEntitys[i], errors[i] = thunk()
+		comments[i], errors[i] = thunk()
 	}
-	return feedEntitys, errors
+	return comments, errors
 }
 
-// LoadAllThunk returns a function that when called will block waiting for a FeedEntitys.
+// LoadAllThunk returns a function that when called will block waiting for a Comments.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *GlobalFeedLoader) LoadAllThunk(keys []coredb.PaginateGlobalFeedParams) func() ([][]persist.FeedEntity, []error) {
-	results := make([]func() ([]persist.FeedEntity, error), len(keys))
+func (l *PostCommentsLoader) LoadAllThunk(keys []coredb.PaginateCommentsByPostIDBatchParams) func() ([][]coredb.Comment, []error) {
+	results := make([]func() ([]coredb.Comment, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
-	return func() ([][]persist.FeedEntity, []error) {
-		feedEntitys := make([][]persist.FeedEntity, len(keys))
+	return func() ([][]coredb.Comment, []error) {
+		comments := make([][]coredb.Comment, len(keys))
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
-			feedEntitys[i], errors[i] = thunk()
+			comments[i], errors[i] = thunk()
 		}
-		return feedEntitys, errors
+		return comments, errors
 	}
 }
 
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *GlobalFeedLoader) Prime(key coredb.PaginateGlobalFeedParams, value []persist.FeedEntity) bool {
+func (l *PostCommentsLoader) Prime(key coredb.PaginateCommentsByPostIDBatchParams, value []coredb.Comment) bool {
 	if l.disableCaching {
 		return false
 	}
@@ -283,7 +282,7 @@ func (l *GlobalFeedLoader) Prime(key coredb.PaginateGlobalFeedParams, value []pe
 	if _, found = l.cache[key]; !found {
 		// make a copy when writing to the cache, its easy to pass a pointer in from a loop var
 		// and end up with the whole cache pointing to the same value.
-		cpy := make([]persist.FeedEntity, len(value))
+		cpy := make([]coredb.Comment, len(value))
 		copy(cpy, value)
 		l.unsafeSet(key, cpy)
 	}
@@ -292,7 +291,7 @@ func (l *GlobalFeedLoader) Prime(key coredb.PaginateGlobalFeedParams, value []pe
 }
 
 // Clear the value at key from the cache, if it exists
-func (l *GlobalFeedLoader) Clear(key coredb.PaginateGlobalFeedParams) {
+func (l *PostCommentsLoader) Clear(key coredb.PaginateCommentsByPostIDBatchParams) {
 	if l.disableCaching {
 		return
 	}
@@ -301,16 +300,16 @@ func (l *GlobalFeedLoader) Clear(key coredb.PaginateGlobalFeedParams) {
 	l.mu.Unlock()
 }
 
-func (l *GlobalFeedLoader) unsafeSet(key coredb.PaginateGlobalFeedParams, value []persist.FeedEntity) {
+func (l *PostCommentsLoader) unsafeSet(key coredb.PaginateCommentsByPostIDBatchParams, value []coredb.Comment) {
 	if l.cache == nil {
-		l.cache = map[coredb.PaginateGlobalFeedParams][]persist.FeedEntity{}
+		l.cache = map[coredb.PaginateCommentsByPostIDBatchParams][]coredb.Comment{}
 	}
 	l.cache[key] = value
 }
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
-func (b *globalFeedLoaderBatch) keyIndex(l *GlobalFeedLoader, key coredb.PaginateGlobalFeedParams) int {
+func (b *postCommentsLoaderBatch) keyIndex(l *PostCommentsLoader, key coredb.PaginateCommentsByPostIDBatchParams) int {
 	for i, existingKey := range b.keys {
 		if key == existingKey {
 			return i
@@ -334,7 +333,7 @@ func (b *globalFeedLoaderBatch) keyIndex(l *GlobalFeedLoader, key coredb.Paginat
 	return pos
 }
 
-func (b *globalFeedLoaderBatch) startTimer(l *GlobalFeedLoader) {
+func (b *postCommentsLoaderBatch) startTimer(l *PostCommentsLoader) {
 	time.Sleep(l.wait)
 	l.mu.Lock()
 
@@ -350,24 +349,24 @@ func (b *globalFeedLoaderBatch) startTimer(l *GlobalFeedLoader) {
 	b.end(l)
 }
 
-func (b *globalFeedLoaderBatch) end(l *GlobalFeedLoader) {
+func (b *postCommentsLoaderBatch) end(l *PostCommentsLoader) {
 	b.data, b.error = l.fetch(b.keys)
 	close(b.done)
 }
 
-type globalFeedLoaderSubscriber struct {
-	cacheFunc func(persist.FeedEntity)
+type postCommentsLoaderSubscriber struct {
+	cacheFunc func(coredb.Comment)
 	mutex     *sync.Mutex
 }
 
-func (l *GlobalFeedLoader) publishToSubscribers(value []persist.FeedEntity) {
+func (l *PostCommentsLoader) publishToSubscribers(value []coredb.Comment) {
 	// Lazy build our list of typed cache functions once
 	l.once.Do(func() {
 		for i, subscription := range *l.subscriptionRegistry {
-			if typedFunc, ok := subscription.(*func(persist.FeedEntity)); ok {
+			if typedFunc, ok := subscription.(*func(coredb.Comment)); ok {
 				// Don't invoke our own cache function
 				if !l.ownsCacheFunc(typedFunc) {
-					l.subscribers = append(l.subscribers, globalFeedLoaderSubscriber{cacheFunc: *typedFunc, mutex: (*l.mutexRegistry)[i]})
+					l.subscribers = append(l.subscribers, postCommentsLoaderSubscriber{cacheFunc: *typedFunc, mutex: (*l.mutexRegistry)[i]})
 				}
 			}
 		}
@@ -385,13 +384,13 @@ func (l *GlobalFeedLoader) publishToSubscribers(value []persist.FeedEntity) {
 	}
 }
 
-func (l *GlobalFeedLoader) registerCacheFunc(cacheFunc interface{}, mutex *sync.Mutex) {
+func (l *PostCommentsLoader) registerCacheFunc(cacheFunc interface{}, mutex *sync.Mutex) {
 	l.cacheFuncs = append(l.cacheFuncs, cacheFunc)
 	*l.subscriptionRegistry = append(*l.subscriptionRegistry, cacheFunc)
 	*l.mutexRegistry = append(*l.mutexRegistry, mutex)
 }
 
-func (l *GlobalFeedLoader) ownsCacheFunc(f *func(persist.FeedEntity)) bool {
+func (l *PostCommentsLoader) ownsCacheFunc(f *func(coredb.Comment)) bool {
 	for _, cacheFunc := range l.cacheFuncs {
 		if cacheFunc == f {
 			return true

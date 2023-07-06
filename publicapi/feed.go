@@ -94,7 +94,7 @@ func (api FeedAPI) GetRawEventById(ctx context.Context, eventID persist.DBID) (*
 	return &event, nil
 }
 
-func (api FeedAPI) PaginatePersonalFeed(ctx context.Context, before *string, after *string, first *int, last *int) ([]db.FeedEvent, PageInfo, error) {
+func (api FeedAPI) PaginatePersonalFeed(ctx context.Context, before *string, after *string, first *int, last *int) ([]persist.FeedEntity, PageInfo, error) {
 	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return nil, PageInfo{}, err
@@ -141,16 +141,16 @@ func (api FeedAPI) PaginatePersonalFeed(ctx context.Context, before *string, aft
 
 	results, pageInfo, err := paginator.paginate(before, after, first, last)
 
-	feedEvents := make([]db.FeedEvent, len(results))
+	feedEvents := make([]persist.FeedEntity, len(results))
 	for i, result := range results {
-		feedEvents[i] = result.(db.FeedEvent)
+		feedEvents[i] = result.(persist.FeedEntity)
 	}
 
 	return feedEvents, pageInfo, err
 }
 
 func (api FeedAPI) PaginateUserFeed(ctx context.Context, userID persist.DBID, before *string, after *string,
-	first *int, last *int) ([]db.FeedEvent, PageInfo, error) {
+	first *int, last *int) ([]persist.FeedEntity, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userID": validate.WithTag(userID, "required"),
@@ -192,15 +192,15 @@ func (api FeedAPI) PaginateUserFeed(ctx context.Context, userID persist.DBID, be
 
 	results, pageInfo, err := paginator.paginate(before, after, first, last)
 
-	feedEvents := make([]db.FeedEvent, len(results))
+	feedEvents := make([]persist.FeedEntity, len(results))
 	for i, result := range results {
-		feedEvents[i] = result.(db.FeedEvent)
+		feedEvents[i] = result.(persist.FeedEntity)
 	}
 
 	return feedEvents, pageInfo, err
 }
 
-func (api FeedAPI) PaginateGlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) ([]db.FeedEvent, PageInfo, error) {
+func (api FeedAPI) PaginateGlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) ([]persist.FeedEntity, PageInfo, error) {
 	// Validate
 	if err := validatePaginationParams(api.validator, first, last); err != nil {
 		return nil, PageInfo{}, err
@@ -235,15 +235,15 @@ func (api FeedAPI) PaginateGlobalFeed(ctx context.Context, before *string, after
 
 	results, pageInfo, err := paginator.paginate(before, after, first, last)
 
-	feedEvents := make([]db.FeedEvent, len(results))
+	feedEvents := make([]persist.FeedEntity, len(results))
 	for i, result := range results {
-		feedEvents[i] = result.(db.FeedEvent)
+		feedEvents[i] = result.(persist.FeedEntity)
 	}
 
 	return feedEvents, pageInfo, err
 }
 
-func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, after *string, first *int, last *int) ([]db.FeedEvent, PageInfo, error) {
+func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, after *string, first *int, last *int) ([]persist.FeedEntity, PageInfo, error) {
 	// Validate
 	if err := validatePaginationParams(api.validator, first, last); err != nil {
 		return nil, PageInfo{}, err
@@ -322,7 +322,7 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 			Limit:         params.Limit,
 		})
 
-		results, _ := util.Map(keys, func(k db.FeedEvent) (any, error) {
+		results, _ := util.Map(keys, func(k persist.FeedEntity) (any, error) {
 			return k, nil
 		})
 
@@ -338,8 +338,8 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 	paginator.CursorFunc = cursorFunc
 	results, pageInfo, err := paginator.paginate(before, after, first, last)
 
-	feedEvents, _ := util.Map(results, func(r any) (db.FeedEvent, error) {
-		return r.(db.FeedEvent), nil
+	feedEvents, _ := util.Map(results, func(r any) (persist.FeedEntity, error) {
+		return r.(persist.FeedEntity), nil
 	})
 
 	return feedEvents, pageInfo, err

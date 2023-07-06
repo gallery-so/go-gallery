@@ -131,6 +131,10 @@ type HelperEnsProfileImageData struct {
 	EnsDomain string
 }
 
+type HelperPostData struct {
+	TokenIDs persist.DBIDList
+}
+
 type ErrInvalidIDFormat struct {
 	message string
 }

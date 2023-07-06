@@ -16,9 +16,9 @@ insert into admires (id, feed_event_id, actor_id) values ($1, $2, $3) returning 
 `
 
 type CreateAdmireParams struct {
-	ID          persist.DBID
-	FeedEventID persist.DBID
-	ActorID     persist.DBID
+	ID          persist.DBID `json:"id"`
+	FeedEventID persist.DBID `json:"feed_event_id"`
+	ActorID     persist.DBID `json:"actor_id"`
 }
 
 func (q *Queries) CreateAdmire(ctx context.Context, arg CreateAdmireParams) (persist.DBID, error) {

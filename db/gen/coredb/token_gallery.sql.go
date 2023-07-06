@@ -122,31 +122,31 @@ returning id, deleted, version, created_at, last_updated, name, description, col
 `
 
 type UpsertTokensParams struct {
-	UpsertingCreatorTokens   bool
-	ID                       []string
-	Version                  []int32
-	Name                     []string
-	Description              []string
-	CollectorsNote           []string
-	TokenType                []string
-	Quantity                 []string
-	OwnershipHistory         []pgtype.JSONB
-	OwnershipHistoryStartIdx []int32
-	OwnershipHistoryEndIdx   []int32
-	Media                    []pgtype.JSONB
-	FallbackMedia            []pgtype.JSONB
-	TokenMetadata            []pgtype.JSONB
-	ExternalUrl              []string
-	BlockNumber              []int64
-	OwnerUserID              []string
-	OwnedByWallets           []string
-	OwnedByWalletsStartIdx   []int32
-	OwnedByWalletsEndIdx     []int32
-	IsProviderMarkedSpam     []bool
-	TokenUri                 []string
-	TokenID                  []string
-	Contract                 []string
-	Chain                    []int32
+	UpsertingCreatorTokens   bool           `json:"upserting_creator_tokens"`
+	ID                       []string       `json:"id"`
+	Version                  []int32        `json:"version"`
+	Name                     []string       `json:"name"`
+	Description              []string       `json:"description"`
+	CollectorsNote           []string       `json:"collectors_note"`
+	TokenType                []string       `json:"token_type"`
+	Quantity                 []string       `json:"quantity"`
+	OwnershipHistory         []pgtype.JSONB `json:"ownership_history"`
+	OwnershipHistoryStartIdx []int32        `json:"ownership_history_start_idx"`
+	OwnershipHistoryEndIdx   []int32        `json:"ownership_history_end_idx"`
+	Media                    []pgtype.JSONB `json:"media"`
+	FallbackMedia            []pgtype.JSONB `json:"fallback_media"`
+	TokenMetadata            []pgtype.JSONB `json:"token_metadata"`
+	ExternalUrl              []string       `json:"external_url"`
+	BlockNumber              []int64        `json:"block_number"`
+	OwnerUserID              []string       `json:"owner_user_id"`
+	OwnedByWallets           []string       `json:"owned_by_wallets"`
+	OwnedByWalletsStartIdx   []int32        `json:"owned_by_wallets_start_idx"`
+	OwnedByWalletsEndIdx     []int32        `json:"owned_by_wallets_end_idx"`
+	IsProviderMarkedSpam     []bool         `json:"is_provider_marked_spam"`
+	TokenUri                 []string       `json:"token_uri"`
+	TokenID                  []string       `json:"token_id"`
+	Contract                 []string       `json:"contract"`
+	Chain                    []int32        `json:"chain"`
 }
 
 func (q *Queries) UpsertTokens(ctx context.Context, arg UpsertTokensParams) ([]Token, error) {

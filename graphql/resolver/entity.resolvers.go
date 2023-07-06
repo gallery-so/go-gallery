@@ -6,6 +6,7 @@ package graphql
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/mikeydub/go-gallery/graphql/generated"
 	"github.com/mikeydub/go-gallery/graphql/model"
@@ -15,6 +16,11 @@ import (
 // FindFeedEventByDbid is the resolver for the findFeedEventByDbid field.
 func (r *entityResolver) FindFeedEventByDbid(ctx context.Context, dbid persist.DBID) (*model.FeedEvent, error) {
 	return resolveFeedEventByEventID(ctx, dbid)
+}
+
+// FindPostByDbid is the resolver for the findPostByDbid field.
+func (r *entityResolver) FindPostByDbid(ctx context.Context, dbid persist.DBID) (*model.Post, error) {
+	panic(fmt.Errorf("not implemented: FindPostByDbid - findPostByDbid"))
 }
 
 // Entity returns generated.EntityResolver implementation.

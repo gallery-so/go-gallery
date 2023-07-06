@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 type PersonalFeedLoaderSettings interface {
@@ -53,7 +54,7 @@ func (l *PersonalFeedLoader) setPostFetchHook(postFetchHook func(context.Context
 
 // NewPersonalFeedLoader creates a new PersonalFeedLoader with the given settings, functions, and options
 func NewPersonalFeedLoader(
-	settings PersonalFeedLoaderSettings, fetch func(ctx context.Context, keys []coredb.PaginatePersonalFeedByUserIDParams) ([][]coredb.FeedEvent, []error),
+	settings PersonalFeedLoaderSettings, fetch func(ctx context.Context, keys []coredb.PaginatePersonalFeedByUserIDParams) ([][]persist.FeedEntity, []error),
 	opts ...func(interface {
 		setContext(context.Context)
 		setWait(time.Duration)
@@ -81,7 +82,7 @@ func NewPersonalFeedLoader(
 	}
 
 	// Set this after applying options, in case a different context was set via options
-	loader.fetch = func(keys []coredb.PaginatePersonalFeedByUserIDParams) ([][]coredb.FeedEvent, []error) {
+	loader.fetch = func(keys []coredb.PaginatePersonalFeedByUserIDParams) ([][]persist.FeedEntity, []error) {
 		ctx := loader.ctx
 
 		// Allow the preFetchHook to modify and return a new context
@@ -118,7 +119,7 @@ type PersonalFeedLoader struct {
 	ctx context.Context
 
 	// this method provides the data for the loader
-	fetch func(keys []coredb.PaginatePersonalFeedByUserIDParams) ([][]coredb.FeedEvent, []error)
+	fetch func(keys []coredb.PaginatePersonalFeedByUserIDParams) ([][]persist.FeedEntity, []error)
 
 	// how long to wait before sending a batch
 	wait time.Duration
@@ -150,10 +151,10 @@ type PersonalFeedLoader struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[coredb.PaginatePersonalFeedByUserIDParams][]coredb.FeedEvent
+	cache map[coredb.PaginatePersonalFeedByUserIDParams][]persist.FeedEntity
 
 	// typed cache functions
-	//subscribers []func([]coredb.FeedEvent)
+	//subscribers []func([]persist.FeedEntity)
 	subscribers []personalFeedLoaderSubscriber
 
 	// functions used to cache published results from other dataloaders
@@ -172,26 +173,26 @@ type PersonalFeedLoader struct {
 
 type personalFeedLoaderBatch struct {
 	keys    []coredb.PaginatePersonalFeedByUserIDParams
-	data    [][]coredb.FeedEvent
+	data    [][]persist.FeedEntity
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
-// Load a FeedEvent by key, batching and caching will be applied automatically
-func (l *PersonalFeedLoader) Load(key coredb.PaginatePersonalFeedByUserIDParams) ([]coredb.FeedEvent, error) {
+// Load a FeedEntity by key, batching and caching will be applied automatically
+func (l *PersonalFeedLoader) Load(key coredb.PaginatePersonalFeedByUserIDParams) ([]persist.FeedEntity, error) {
 	return l.LoadThunk(key)()
 }
 
-// LoadThunk returns a function that when called will block waiting for a FeedEvent.
+// LoadThunk returns a function that when called will block waiting for a FeedEntity.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *PersonalFeedLoader) LoadThunk(key coredb.PaginatePersonalFeedByUserIDParams) func() ([]coredb.FeedEvent, error) {
+func (l *PersonalFeedLoader) LoadThunk(key coredb.PaginatePersonalFeedByUserIDParams) func() ([]persist.FeedEntity, error) {
 	l.mu.Lock()
 	if !l.disableCaching {
 		if it, ok := l.cache[key]; ok {
 			l.mu.Unlock()
-			return func() ([]coredb.FeedEvent, error) {
+			return func() ([]persist.FeedEntity, error) {
 				return it, nil
 			}
 		}
@@ -203,10 +204,10 @@ func (l *PersonalFeedLoader) LoadThunk(key coredb.PaginatePersonalFeedByUserIDPa
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-	return func() ([]coredb.FeedEvent, error) {
+	return func() ([]persist.FeedEntity, error) {
 		<-batch.done
 
-		var data []coredb.FeedEvent
+		var data []persist.FeedEntity
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -237,43 +238,43 @@ func (l *PersonalFeedLoader) LoadThunk(key coredb.PaginatePersonalFeedByUserIDPa
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *PersonalFeedLoader) LoadAll(keys []coredb.PaginatePersonalFeedByUserIDParams) ([][]coredb.FeedEvent, []error) {
-	results := make([]func() ([]coredb.FeedEvent, error), len(keys))
+func (l *PersonalFeedLoader) LoadAll(keys []coredb.PaginatePersonalFeedByUserIDParams) ([][]persist.FeedEntity, []error) {
+	results := make([]func() ([]persist.FeedEntity, error), len(keys))
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-	feedEvents := make([][]coredb.FeedEvent, len(keys))
+	feedEntitys := make([][]persist.FeedEntity, len(keys))
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
-		feedEvents[i], errors[i] = thunk()
+		feedEntitys[i], errors[i] = thunk()
 	}
-	return feedEvents, errors
+	return feedEntitys, errors
 }
 
-// LoadAllThunk returns a function that when called will block waiting for a FeedEvents.
+// LoadAllThunk returns a function that when called will block waiting for a FeedEntitys.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *PersonalFeedLoader) LoadAllThunk(keys []coredb.PaginatePersonalFeedByUserIDParams) func() ([][]coredb.FeedEvent, []error) {
-	results := make([]func() ([]coredb.FeedEvent, error), len(keys))
+func (l *PersonalFeedLoader) LoadAllThunk(keys []coredb.PaginatePersonalFeedByUserIDParams) func() ([][]persist.FeedEntity, []error) {
+	results := make([]func() ([]persist.FeedEntity, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
-	return func() ([][]coredb.FeedEvent, []error) {
-		feedEvents := make([][]coredb.FeedEvent, len(keys))
+	return func() ([][]persist.FeedEntity, []error) {
+		feedEntitys := make([][]persist.FeedEntity, len(keys))
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
-			feedEvents[i], errors[i] = thunk()
+			feedEntitys[i], errors[i] = thunk()
 		}
-		return feedEvents, errors
+		return feedEntitys, errors
 	}
 }
 
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *PersonalFeedLoader) Prime(key coredb.PaginatePersonalFeedByUserIDParams, value []coredb.FeedEvent) bool {
+func (l *PersonalFeedLoader) Prime(key coredb.PaginatePersonalFeedByUserIDParams, value []persist.FeedEntity) bool {
 	if l.disableCaching {
 		return false
 	}
@@ -282,7 +283,7 @@ func (l *PersonalFeedLoader) Prime(key coredb.PaginatePersonalFeedByUserIDParams
 	if _, found = l.cache[key]; !found {
 		// make a copy when writing to the cache, its easy to pass a pointer in from a loop var
 		// and end up with the whole cache pointing to the same value.
-		cpy := make([]coredb.FeedEvent, len(value))
+		cpy := make([]persist.FeedEntity, len(value))
 		copy(cpy, value)
 		l.unsafeSet(key, cpy)
 	}
@@ -300,9 +301,9 @@ func (l *PersonalFeedLoader) Clear(key coredb.PaginatePersonalFeedByUserIDParams
 	l.mu.Unlock()
 }
 
-func (l *PersonalFeedLoader) unsafeSet(key coredb.PaginatePersonalFeedByUserIDParams, value []coredb.FeedEvent) {
+func (l *PersonalFeedLoader) unsafeSet(key coredb.PaginatePersonalFeedByUserIDParams, value []persist.FeedEntity) {
 	if l.cache == nil {
-		l.cache = map[coredb.PaginatePersonalFeedByUserIDParams][]coredb.FeedEvent{}
+		l.cache = map[coredb.PaginatePersonalFeedByUserIDParams][]persist.FeedEntity{}
 	}
 	l.cache[key] = value
 }
@@ -355,15 +356,15 @@ func (b *personalFeedLoaderBatch) end(l *PersonalFeedLoader) {
 }
 
 type personalFeedLoaderSubscriber struct {
-	cacheFunc func(coredb.FeedEvent)
+	cacheFunc func(persist.FeedEntity)
 	mutex     *sync.Mutex
 }
 
-func (l *PersonalFeedLoader) publishToSubscribers(value []coredb.FeedEvent) {
+func (l *PersonalFeedLoader) publishToSubscribers(value []persist.FeedEntity) {
 	// Lazy build our list of typed cache functions once
 	l.once.Do(func() {
 		for i, subscription := range *l.subscriptionRegistry {
-			if typedFunc, ok := subscription.(*func(coredb.FeedEvent)); ok {
+			if typedFunc, ok := subscription.(*func(persist.FeedEntity)); ok {
 				// Don't invoke our own cache function
 				if !l.ownsCacheFunc(typedFunc) {
 					l.subscribers = append(l.subscribers, personalFeedLoaderSubscriber{cacheFunc: *typedFunc, mutex: (*l.mutexRegistry)[i]})
@@ -390,7 +391,7 @@ func (l *PersonalFeedLoader) registerCacheFunc(cacheFunc interface{}, mutex *syn
 	*l.mutexRegistry = append(*l.mutexRegistry, mutex)
 }
 
-func (l *PersonalFeedLoader) ownsCacheFunc(f *func(coredb.FeedEvent)) bool {
+func (l *PersonalFeedLoader) ownsCacheFunc(f *func(persist.FeedEntity)) bool {
 	for _, cacheFunc := range l.cacheFuncs {
 		if cacheFunc == f {
 			return true
