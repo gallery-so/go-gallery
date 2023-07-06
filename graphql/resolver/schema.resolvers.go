@@ -2212,11 +2212,7 @@ func (r *tokenResolver) Media(ctx context.Context, obj *model.Token) (model.Medi
 	if err != nil {
 		// If we have no media, just return the fallback media
 		if util.ErrorAs[persist.ErrMediaNotFound](err) {
-			if obj.Token.FallbackMedia.ImageURL != "" {
-				tokenMedia = coredb.TokenMedia{Media: persist.Media{MediaType: persist.MediaTypeSyncing}}
-			} else {
-				tokenMedia = coredb.TokenMedia{Media: persist.Media{MediaType: persist.MediaTypeInvalid}}
-			}
+			tokenMedia = coredb.TokenMedia{Media: persist.Media{MediaType: persist.MediaTypeSyncing}}
 			return mediaToModel(ctx, tokenMedia, obj.HelperTokenData.Token.FallbackMedia, highDef), nil
 		}
 		return nil, err
