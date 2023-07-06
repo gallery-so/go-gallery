@@ -333,7 +333,7 @@ type Post struct {
 	TokenIds  persist.DBIDList `json:"token_ids"`
 	ActorID   persist.DBID     `json:"actor_id"`
 	Caption   sql.NullString   `json:"caption"`
-	CreatedAt interface{}      `json:"created_at"`
+	CreatedAt time.Time        `json:"created_at"`
 }
 
 type ProfileImage struct {

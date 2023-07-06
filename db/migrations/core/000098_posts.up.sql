@@ -4,7 +4,7 @@ create table if not exists posts (
     token_ids varchar(255)[],
     actor_id varchar(255) references users(id) not null,
     caption varchar,
-    created_at timestampz not null default current_timestamp
+    created_at timestamptz not null default current_timestamp
 );
 
 alter table admires add column post_id varchar(255) references posts(id) not null;
@@ -14,7 +14,7 @@ create type feed_entity AS (
     id varchar(255),
     token_ids varchar(255)[],
     caption varchar,
-    event_time timestampz,
+    event_time timestamptz,
     source varchar,
     version int,
     owner_id varchar(255),
