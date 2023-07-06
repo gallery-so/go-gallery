@@ -19,7 +19,7 @@ func main() {
 
 	pgClient := postgres.MustCreateClient()
 
-	rows, err := pgClient.Query("select contracts.address from contracts where chain = 0 and (profile_image_url is null or description is null) and is_provider_marked_spam = false order by contracts.last_updated desc;")
+	rows, err := pgClient.Query("select contracts.address,contracts.name from contracts where chain = 0 and (profile_image_url is null or description is null or profile_image_url = '') and is_provider_marked_spam = false order by contracts.last_updated desc;")
 	if err != nil {
 		panic(err)
 	}
@@ -30,9 +30,9 @@ func main() {
 
 	for rows.Next() {
 
-		var address string
+		var address, name string
 
-		err := rows.Scan(&address)
+		err := rows.Scan(&address, &name)
 		if err != nil {
 			panic(err)
 		}
@@ -40,6 +40,8 @@ func main() {
 		p.Go(func() error {
 			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 			defer cancel()
+
+			logger.For(ctx).Infof("fetching contract %s (%s)", address, name)
 
 			c, err := opensea.FetchContractByAddress(ctx, persist.EthereumAddress(address))
 			if err != nil {

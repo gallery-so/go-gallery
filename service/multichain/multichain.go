@@ -1576,12 +1576,13 @@ func contractsToNewDedupedContracts(contracts []chainContracts) []persist.Contra
 	res := make([]persist.ContractGallery, 0, len(contractMetadatas))
 	for address, meta := range contractMetadatas {
 		res = append(res, persist.ContractGallery{
-			Chain:        address.Chain(),
-			Address:      address.Address(),
-			Symbol:       persist.NullString(meta.Symbol),
-			Name:         persist.NullString(meta.Name),
-			OwnerAddress: meta.OwnerAddress,
-			Description:  persist.NullString(meta.Description),
+			Chain:           address.Chain(),
+			Address:         address.Address(),
+			Symbol:          persist.NullString(meta.Symbol),
+			Name:            persist.NullString(meta.Name),
+			ProfileImageURL: persist.NullString(meta.ProfileImageURL),
+			OwnerAddress:    meta.OwnerAddress,
+			Description:     persist.NullString(meta.Description),
 		})
 	}
 	return res
