@@ -760,6 +760,9 @@ func alchemyTokenToChainAgnosticToken(owner persist.EthereumAddress, token Token
 		OwnerAddress:    persist.Address(owner),
 		ContractAddress: persist.Address(token.Contract.Address),
 		ExternalURL:     token.Metadata.ExternalURL,
+		FallbackMedia: persist.FallbackMedia{
+			ImageURL: persist.NullString(token.Metadata.Image),
+		},
 	}
 
 	isSpam, err := strconv.ParseBool(token.SpamInfo.IsSpam)
