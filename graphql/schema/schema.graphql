@@ -2255,11 +2255,16 @@ union RemoveProfileImagePayloadOrError =
   | ErrAuthenticationFailed
   | ErrUserNotFound
 
-type PostTokenPayload {
+input PostTokensInput {
+  tokenIds: [DBID!]
+  caption: String
+}
+
+type PostTokensPayload {
   post: Post!
 }
 
-union PostTokenPayloadOrError = PostTokenPayload | ErrInvalidInput | ErrNotAuthorized
+union PostTokensPayloadOrError = PostTokensPayload | ErrInvalidInput | ErrNotAuthorized
 
 type Mutation {
   # User Mutations
@@ -2339,7 +2344,7 @@ type Mutation {
   ): CommentOnFeedEventPayloadOrError @authRequired
   removeComment(commentId: DBID!): RemoveCommentPayloadOrError @authRequired
 
-  postToken(tokenId: DBID!): PostTokenPayloadOrError @authRequired
+  postTokens(input: PostTokensInput!): PostTokensPayloadOrError @authRequired
 
   viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
 

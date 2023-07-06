@@ -193,8 +193,8 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
-	"PostTokenPayloadOrError": func(object interface{}) (interface{}, bool) {
-		obj, ok := object.(PostTokenPayloadOrError)
+	"PostTokensPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(PostTokensPayloadOrError)
 		return obj, ok
 	},
 

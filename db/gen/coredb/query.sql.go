@@ -4431,6 +4431,29 @@ func (q *Queries) HasLaterGroupedEvent(ctx context.Context, arg HasLaterGroupedE
 	return exists, err
 }
 
+const insertPost = `-- name: InsertPost :one
+insert into posts(id, token_ids, actor_id, caption, created_at) values ($1, $2, $3, $4, now()) returning id
+`
+
+type InsertPostParams struct {
+	ID       persist.DBID     `json:"id"`
+	TokenIds persist.DBIDList `json:"token_ids"`
+	ActorID  persist.DBID     `json:"actor_id"`
+	Caption  sql.NullString   `json:"caption"`
+}
+
+func (q *Queries) InsertPost(ctx context.Context, arg InsertPostParams) (persist.DBID, error) {
+	row := q.db.QueryRow(ctx, insertPost,
+		arg.ID,
+		arg.TokenIds,
+		arg.ActorID,
+		arg.Caption,
+	)
+	var id persist.DBID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const insertSpamContracts = `-- name: InsertSpamContracts :exec
 with insert_spam_contracts as (
     insert into alchemy_spam_contracts (id, chain, address, created_at, is_spam) (

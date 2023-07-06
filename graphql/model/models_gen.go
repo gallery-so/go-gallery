@@ -166,8 +166,8 @@ type Notification interface {
 	IsNotification()
 }
 
-type PostTokenPayloadOrError interface {
-	IsPostTokenPayloadOrError()
+type PostTokensPayloadOrError interface {
+	IsPostTokensPayloadOrError()
 }
 
 type PreverifyEmailPayloadOrError interface {
@@ -954,7 +954,7 @@ func (ErrInvalidInput) IsMintPremiumCardToWalletPayloadOrError()         {}
 func (ErrInvalidInput) IsDisconnectSocialAccountPayloadOrError()         {}
 func (ErrInvalidInput) IsFollowAllSocialConnectionsPayloadOrError()      {}
 func (ErrInvalidInput) IsSetProfileImagePayloadOrError()                 {}
-func (ErrInvalidInput) IsPostTokenPayloadOrError()                       {}
+func (ErrInvalidInput) IsPostTokensPayloadOrError()                      {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -1032,7 +1032,7 @@ func (ErrNotAuthorized) IsDisconnectSocialAccountPayloadOrError()      {}
 func (ErrNotAuthorized) IsFollowAllSocialConnectionsPayloadOrError()   {}
 func (ErrNotAuthorized) IsGenerateQRCodeLoginTokenPayloadOrError()     {}
 func (ErrNotAuthorized) IsSetProfileImagePayloadOrError()              {}
-func (ErrNotAuthorized) IsPostTokenPayloadOrError()                    {}
+func (ErrNotAuthorized) IsPostTokensPayloadOrError()                   {}
 
 type ErrPostNotFound struct {
 	Message string `json:"message"`
@@ -1557,11 +1557,16 @@ type PostInteractionsEdge struct {
 	Post   *Post       `json:"post"`
 }
 
-type PostTokenPayload struct {
+type PostTokensInput struct {
+	TokenIds []persist.DBID `json:"tokenIds"`
+	Caption  *string        `json:"caption"`
+}
+
+type PostTokensPayload struct {
 	Post *Post `json:"post"`
 }
 
-func (PostTokenPayload) IsPostTokenPayloadOrError() {}
+func (PostTokensPayload) IsPostTokensPayloadOrError() {}
 
 type PreverifyEmailInput struct {
 	Email persist.Email `json:"email"`

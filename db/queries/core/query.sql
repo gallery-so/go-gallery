@@ -729,12 +729,14 @@ SELECT count(*), sqlc.arg('admire_tag')::int as tag FROM admires t WHERE sqlc.ar
                                                         UNION
 SELECT count(*), sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.arg('comment_tag') != 0 AND t.post_id = sqlc.arg('post_id') AND t.deleted = false;
 
-
 -- name: GetAdmireByActorIDAndFeedEventID :batchone
 SELECT * FROM admires WHERE actor_id = $1 AND feed_event_id = $2 AND deleted = false;
 
 -- name: GetAdmireByActorIDAndPostID :batchone
 SELECT * FROM admires WHERE actor_id = $1 AND post_id = $2 AND deleted = false;
+
+-- name: InsertPost :one
+insert into posts(id, token_ids, actor_id, caption, created_at) values ($1, $2, $3, $4, now()) returning id;
 
 -- for some reason this query will not allow me to use @tags for $1
 -- name: GetUsersWithEmailNotificationsOnForEmailType :many

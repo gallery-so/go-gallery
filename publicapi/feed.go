@@ -2,6 +2,7 @@ package publicapi
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"math"
 	"sort"
@@ -92,6 +93,40 @@ func (api FeedAPI) GetPostById(ctx context.Context, postID persist.DBID) (*db.Po
 	}
 
 	return &post, nil
+}
+
+func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, caption *string) (persist.DBID, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"tokenIDs": validate.WithTag(tokenIDs, "required"),
+		// caption can be null but less than 600 chars
+		"caption": validate.WithTag(caption, "max=600"),
+	}); err != nil {
+		return "", err
+	}
+	actorID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	var cap sql.NullString
+	if caption != nil {
+		cap = sql.NullString{
+			String: *caption,
+			Valid:  true,
+		}
+	}
+
+	id, err := api.queries.InsertPost(ctx, db.InsertPostParams{
+		ID:       persist.GenerateID(),
+		TokenIds: tokenIDs,
+		ActorID:  actorID,
+		Caption:  cap,
+	})
+	if err != nil {
+		return "", err
+	}
+	return id, nil
 }
 
 func (api FeedAPI) GetRawEventById(ctx context.Context, eventID persist.DBID) (*db.Event, error) {

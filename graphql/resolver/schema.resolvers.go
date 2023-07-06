@@ -1306,9 +1306,23 @@ func (r *mutationResolver) RemoveComment(ctx context.Context, commentID persist.
 	return output, nil
 }
 
-// PostToken is the resolver for the postToken field.
-func (r *mutationResolver) PostToken(ctx context.Context, tokenID persist.DBID) (model.PostTokenPayloadOrError, error) {
-	panic(fmt.Errorf("not implemented: PostToken - postToken"))
+// PostTokens is the resolver for the postTokens field.
+func (r *mutationResolver) PostTokens(ctx context.Context, input model.PostTokensInput) (model.PostTokensPayloadOrError, error) {
+	id, err := publicapi.For(ctx).Feed.PostTokens(ctx, input.TokenIds, input.Caption)
+	if err != nil {
+		return nil, err
+	}
+
+	post, err := resolvePostByPostID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.PostTokensPayload{
+		Post: post,
+	}
+
+	return output, nil
 }
 
 // ViewGallery is the resolver for the viewGallery field.
