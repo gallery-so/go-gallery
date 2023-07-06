@@ -26,6 +26,7 @@
 //go:generate go run github.com/gallery-so/dataloaden PersonalFeedLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginatePersonalFeedByUserIDParams []github.com/mikeydub/go-gallery/service/persist.FeedEntity
 //go:generate go run github.com/gallery-so/dataloaden UserFeedLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginateUserFeedByUserIDParams []github.com/mikeydub/go-gallery/service/persist.FeedEntity
 //go:generate go run github.com/gallery-so/dataloaden EventLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.FeedEvent
+//go:generate go run github.com/gallery-so/dataloaden PostLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Post
 //go:generate go run github.com/gallery-so/dataloaden AdmireLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Admire
 //go:generate go run github.com/gallery-so/dataloaden AdmiresLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Admire
 //go:generate go run github.com/gallery-so/dataloaden CommentLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Comment
@@ -117,6 +118,7 @@ type Loaders struct {
 	PersonalFeedByUserID                     *PersonalFeedLoader
 	UserFeedByUserID                         *UserFeedLoader
 	FeedEventByFeedEventID                   *EventLoaderByID
+	PostByPostID                             *PostLoaderByID
 	AdmireByAdmireID                         *AdmireLoaderByID
 	AdmireCountByFeedEventID                 *IntLoaderByID
 	AdmiresByFeedEventID                     *FeedEventAdmiresLoader
@@ -292,6 +294,10 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 
 	loaders.EventByEventID = NewEventLoaderByID(defaults, loadEventById(q), EventLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(event db.FeedEvent) persist.DBID { return event.ID },
+	})
+
+	loaders.PostByPostID = NewPostLoaderByID(defaults, loadPostById(q), PostLoaderByIDCacheSubscriptions{
+		AutoCacheWithKey: func(post db.Post) persist.DBID { return post.ID },
 	})
 
 	loaders.PersonalFeedByUserID = NewPersonalFeedLoader(defaults, loadPersonalFeed(q))
@@ -994,6 +1000,27 @@ func loadEventById(q *db.Queries) func(context.Context, []persist.DBID) ([]db.Fe
 
 			if errors[i] == pgx.ErrNoRows {
 				errors[i] = persist.ErrFeedEventNotFoundByID{ID: eventIds[i]}
+			}
+		})
+
+		return events, errors
+	}
+}
+
+func loadPostById(q *db.Queries) func(context.Context, []persist.DBID) ([]db.Post, []error) {
+	return func(ctx context.Context, postIDs []persist.DBID) ([]db.Post, []error) {
+		events := make([]db.Post, len(postIDs))
+		errors := make([]error, len(postIDs))
+
+		b := q.GetPostByIdBatch(ctx, postIDs)
+		defer b.Close()
+
+		b.QueryRow(func(i int, p db.Post, err error) {
+			events[i] = p
+			errors[i] = err
+
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = persist.ErrPostNotFoundByID{ID: postIDs[i]}
 			}
 		})
 

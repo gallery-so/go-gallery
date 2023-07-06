@@ -497,6 +497,9 @@ LIMIT sqlc.arg('limit');
 -- name: GetEventByIdBatch :batchone
 SELECT * FROM feed_events WHERE id = $1 AND deleted = false;
 
+-- name: GetPostByIdBatch :batchone
+SELECT * FROM posts WHERE id = $1 AND deleted = false;
+
 -- name: CreateFeedEvent :one
 INSERT INTO feed_events (id, owner_id, action, data, event_time, event_ids, group_id, caption) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *;
 

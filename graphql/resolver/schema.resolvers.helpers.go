@@ -45,6 +45,7 @@ var nodeFetcher = model.NodeFetcher{
 	OnViewer:           resolveViewerByID,
 	OnDeletedNode:      resolveDeletedNodeByID,
 	OnSocialConnection: resolveSocialConnectionByIdentifiers,
+	OnPost:             resolvePostByPostID,
 
 	OnCollectionToken: func(ctx context.Context, tokenId string, collectionId string) (*model.CollectionToken, error) {
 		return resolveCollectionTokenByID(ctx, persist.DBID(tokenId), persist.DBID(collectionId))
@@ -714,6 +715,15 @@ func resolveFeedEventByEventID(ctx context.Context, eventID persist.DBID) (*mode
 	}
 
 	return feedEventToModel(event)
+}
+
+func resolvePostByPostID(ctx context.Context, postID persist.DBID) (*model.Post, error) {
+	post, err := publicapi.For(ctx).Feed.GetPostById(ctx, postID)
+	if err != nil {
+		return nil, err
+	}
+
+	return postToModel(post)
 }
 
 func resolveViewerNotifications(ctx context.Context, before *string, after *string, first *int, last *int) (*model.NotificationsConnection, error) {
@@ -1466,6 +1476,25 @@ func eventsToFeedEdges(events []persist.FeedEntity) ([]*model.FeedEdge, error) {
 	}
 
 	return edges, nil
+}
+
+func postToModel(event *db.Post) (*model.Post, error) {
+	// Value always returns a nil error so we can safely ignore it.
+	caption, _ := event.Caption.Value()
+
+	var captionVal *string
+	if caption != nil {
+		captionVal = util.ToPointer(caption.(string))
+	}
+
+	return &model.Post{
+		HelperPostData: model.HelperPostData{
+			TokenIDs: event.TokenIds,
+		},
+		Dbid:    event.ID,
+		Caption: captionVal,
+	}, nil
+
 }
 
 func galleryToModel(ctx context.Context, gallery db.Gallery) *model.Gallery {

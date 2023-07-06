@@ -2004,6 +2004,58 @@ func (b *GetOwnersByContractIdBatchPaginateBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getPostByIdBatch = `-- name: GetPostByIdBatch :batchone
+SELECT id, version, token_ids, actor_id, caption, created_at FROM posts WHERE id = $1 AND deleted = false
+`
+
+type GetPostByIdBatchBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+func (q *Queries) GetPostByIdBatch(ctx context.Context, id []persist.DBID) *GetPostByIdBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range id {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(getPostByIdBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetPostByIdBatchBatchResults{br, len(id), false}
+}
+
+func (b *GetPostByIdBatchBatchResults) QueryRow(f func(int, Post, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var i Post
+		if b.closed {
+			if f != nil {
+				f(t, i, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		row := b.br.QueryRow()
+		err := row.Scan(
+			&i.ID,
+			&i.Version,
+			&i.TokenIds,
+			&i.ActorID,
+			&i.Caption,
+			&i.CreatedAt,
+		)
+		if f != nil {
+			f(t, i, err)
+		}
+	}
+}
+
+func (b *GetPostByIdBatchBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const getProfileImageByID = `-- name: GetProfileImageByID :batchone
 select id, user_id, token_id, source_type, deleted, created_at, last_updated, wallet_id, ens_avatar_uri, ens_domain from profile_images pfp
 where pfp.id = $1

@@ -78,6 +78,22 @@ func (api FeedAPI) GetFeedEventById(ctx context.Context, feedEventID persist.DBI
 	return &event, nil
 }
 
+func (api FeedAPI) GetPostById(ctx context.Context, postID persist.DBID) (*db.Post, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"feedEventID": validate.WithTag(postID, "required"),
+	}); err != nil {
+		return nil, err
+	}
+
+	post, err := api.loaders.PostByPostID.Load(postID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &post, nil
+}
+
 func (api FeedAPI) GetRawEventById(ctx context.Context, eventID persist.DBID) (*db.Event, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{

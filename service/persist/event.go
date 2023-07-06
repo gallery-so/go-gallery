@@ -79,6 +79,14 @@ func (e ErrFeedEventNotFoundByID) Error() string {
 	return fmt.Sprintf("event not found by id: %s", e.ID)
 }
 
+type ErrPostNotFoundByID struct {
+	ID DBID
+}
+
+func (e ErrPostNotFoundByID) Error() string {
+	return fmt.Sprintf("post not found by id: %s", e.ID)
+}
+
 type ErrUnknownAction struct {
 	Action Action
 }
