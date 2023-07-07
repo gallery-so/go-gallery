@@ -4848,9 +4848,9 @@ FROM (
         FROM posts 
         WHERE id = ANY($2::text[]) AND deleted = false
     )
-) AS combined 
+) AS result 
 JOIN unnest(ARRAY_CAT($1::text[], $2::text[])) WITH ORDINALITY t(id, pos) 
-ON combined.id = t.id 
+ON result.id = t.id 
 WHERE t.pos > $3::int
 AND t.pos < $4::int
 ORDER BY 

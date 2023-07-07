@@ -9,8 +9,8 @@ create table if not exists posts (
     deleted boolean not null default false
 );
 
-alter table admires add column post_id varchar(255) references posts(id) not null;
-alter table comments add column post_id varchar(255) references posts(id) not null;
+alter table admires add column post_id varchar(255) references posts(id);
+alter table comments add column post_id varchar(255) references posts(id);
 
 create type feed_entity AS (
     id varchar(255),

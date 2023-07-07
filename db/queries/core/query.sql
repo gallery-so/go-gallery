@@ -483,9 +483,9 @@ FROM (
         FROM posts 
         WHERE id = ANY(@post_ids::text[]) AND deleted = false
     )
-) AS combined 
+) AS result 
 JOIN unnest(ARRAY_CAT(@feed_event_ids::text[], @post_ids::text[])) WITH ORDINALITY t(id, pos) 
-ON combined.id = t.id 
+ON result.id = t.id 
 WHERE t.pos > @cur_before_pos::int
 AND t.pos < @cur_after_pos::int
 ORDER BY 
