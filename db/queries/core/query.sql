@@ -219,20 +219,6 @@ SELECT t.* FROM tokens t
              CASE WHEN NOT @paging_forward::bool THEN (u.universal,t.created_at,t.id) END DESC
     LIMIT $2;
 
--- name: GetTokensByContractIdBatchPaginate :batchmany
-SELECT t.* FROM tokens t
-    JOIN users u ON u.id = t.owner_user_id
-    JOIN contracts c ON t.contract = c.id
-    WHERE (c.id = @id OR c.parent_id = @id)
-    AND t.deleted = false
-    AND c.deleted = false
-    AND (NOT @gallery_users_only::bool OR u.universal = false)
-    AND (u.universal,t.created_at,t.id) < (@cur_before_universal, @cur_before_time::timestamptz, @cur_before_id)
-    AND (u.universal,t.created_at,t.id) > (@cur_after_universal, @cur_after_time::timestamptz, @cur_after_id)
-    ORDER BY CASE WHEN @paging_forward::bool THEN (u.universal,t.created_at,t.id) END ASC,
-             CASE WHEN NOT @paging_forward::bool THEN (u.universal,t.created_at,t.id) END DESC
-    LIMIT sqlc.arg('limit');
-
 -- name: CountTokensByContractId :one
 SELECT count(*)
 FROM tokens
@@ -754,9 +740,6 @@ select m.* from tokens t, collections c, galleries g, token_medias m where g.id 
 
 -- name: GetTokenByTokenIdentifiers :one
 select * from tokens where tokens.token_id = @token_hex and contract = (select contracts.id from contracts where contracts.address = @contract_address) and tokens.chain = @chain and tokens.deleted = false;
-
--- name: GetTokensByIDs :many
-select * from tokens join unnest(@token_ids::varchar[]) with ordinality t(id, pos) using (id) where deleted = false order by t.pos asc;
 
 -- name: DeleteCollections :exec
 update collections set deleted = true, last_updated = now() where id = any(@ids::varchar[]);
