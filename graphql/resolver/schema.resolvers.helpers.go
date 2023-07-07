@@ -1791,9 +1791,6 @@ func profileImageToModel(ctx context.Context, pfp db.ProfileImage) (model.Profil
 		}
 		return &model.TokenProfileImage{Token: token}, nil
 	case persist.ProfileImageSourceENS:
-		if pfp.EnsAvatarUri.String == "" {
-			return nil, nil
-		}
 		return ensProfileImageToModel(ctx, pfp.UserID, pfp.WalletID, pfp.EnsAvatarUri.String, pfp.EnsDomain.String)
 	default:
 		return nil, publicapi.ErrProfileImageUnknownSource
@@ -1801,17 +1798,23 @@ func profileImageToModel(ctx context.Context, pfp db.ProfileImage) (model.Profil
 }
 
 func ensProfileImageToModel(ctx context.Context, userID, walletID persist.DBID, url, domain string) (*model.EnsProfileImage, error) {
-	previews := previewURLs(ctx, url, nil)
 	// Use the token's profile image if the token exists
 	if token, err := publicapi.For(ctx).Token.GetTokenByEnsDomain(ctx, userID, domain); err == nil {
 		if tokenMedia, err := publicapi.For(ctx).Token.MediaByTokenID(ctx, token.ID); err == nil {
 			if tokenMedia.Media.ProfileImageURL != "" {
-				previews = previewURLs(ctx, string(tokenMedia.Media.ProfileImageURL), nil)
+				url = string(tokenMedia.Media.ProfileImageURL)
 			}
 		}
 	}
+
+	var pfp *model.HTTPSProfileImage = nil
+
+	if url != "" {
+		pfp = &model.HTTPSProfileImage{PreviewURLs: previewURLs(ctx, url, nil)}
+	}
+
 	return &model.EnsProfileImage{
-		ProfileImage: &model.HTTPSProfileImage{PreviewURLs: previews},
+		ProfileImage: pfp,
 		Wallet:       nil, // handled by dedicated resolver
 		Token:        nil, // handled by dedicated resolver, resolving this token should be free as it would be cached from the call above
 		HelperEnsProfileImageData: model.HelperEnsProfileImageData{
