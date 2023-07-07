@@ -7,6 +7,7 @@ package graphql
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -2213,7 +2214,8 @@ func (r *tokenResolver) Media(ctx context.Context, obj *model.Token) (model.Medi
 		// If we have no media, just return the fallback media
 		if util.ErrorAs[persist.ErrMediaNotFound](err) {
 			// TODO this is hacky, replace this logic later
-			if obj.Token.FallbackMedia.ImageURL == "" {
+			fallbackURL := strings.ToLower(obj.Token.FallbackMedia.ImageURL.String())
+			if fallbackURL == "" || strings.HasPrefix(fallbackURL, "ar://") || strings.HasPrefix(fallbackURL, "ipfs://") {
 				tokenMedia = coredb.TokenMedia{Media: persist.Media{MediaType: persist.MediaTypeSyncing}}
 			} else {
 				tokenMedia = coredb.TokenMedia{Media: persist.Media{MediaType: persist.MediaTypeInvalid}}
