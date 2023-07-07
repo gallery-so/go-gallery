@@ -986,8 +986,8 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
 
 		tokens := assertSyncedTokens(t, response, err, 1)
-		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia)
-		assert.Equal(t, string(persist.MediaTypeInvalid), *media.MediaType)
+		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia)
+		assert.Equal(t, string(persist.MediaTypeSyncing), *media.MediaType)
 	})
 
 	t.Run("should process missing metadata", func(t *testing.T) {
@@ -999,8 +999,8 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
 
 		tokens := assertSyncedTokens(t, response, err, 1)
-		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia)
-		assert.Equal(t, string(persist.MediaTypeInvalid), *media.MediaType)
+		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia)
+		assert.Equal(t, string(persist.MediaTypeSyncing), *media.MediaType)
 	})
 
 	t.Run("should process bad media", func(t *testing.T) {
@@ -1012,8 +1012,8 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
 
 		tokens := assertSyncedTokens(t, response, err, 1)
-		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia)
-		assert.Equal(t, string(persist.MediaTypeInvalid), *media.MediaType)
+		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia)
+		assert.Equal(t, string(persist.MediaTypeSyncing), *media.MediaType)
 	})
 
 	t.Run("should process missing media", func(t *testing.T) {
@@ -1025,8 +1025,8 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
 
 		tokens := assertSyncedTokens(t, response, err, 1)
-		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia)
-		assert.Equal(t, string(persist.MediaTypeInvalid), *media.MediaType)
+		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia)
+		assert.Equal(t, string(persist.MediaTypeSyncing), *media.MediaType)
 	})
 
 	t.Run("should process svg", func(t *testing.T) {
@@ -1095,8 +1095,8 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
 
 		tokens := assertSyncedTokens(t, response, err, 1)
-		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaInvalidMedia)
-		assert.Equal(t, string(persist.MediaTypeInvalid), *media.MediaType)
+		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia)
+		assert.Equal(t, string(persist.MediaTypeSyncing), *media.MediaType)
 	})
 
 	t.Run("should process different keyword", func(t *testing.T) {
