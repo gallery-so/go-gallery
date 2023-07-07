@@ -1459,7 +1459,7 @@ func feedEventToSubEventDatas(ctx context.Context, event db.FeedEvent) ([]model.
 	return result, nil
 }
 
-func eventsToFeedEdges(events []persist.FeedEntity) ([]*model.FeedEdge, error) {
+func entitiesToFeedEdges(events []persist.FeedEntity) ([]*model.FeedEdge, error) {
 	edges := make([]*model.FeedEdge, len(events))
 
 	for i, evt := range events {

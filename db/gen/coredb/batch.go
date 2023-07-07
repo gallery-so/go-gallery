@@ -2005,7 +2005,7 @@ func (b *GetOwnersByContractIdBatchPaginateBatchResults) Close() error {
 }
 
 const getPostByIdBatch = `-- name: GetPostByIdBatch :batchone
-SELECT id, version, token_ids, actor_id, caption, created_at FROM posts WHERE id = $1 AND deleted = false
+SELECT id, version, token_ids, actor_id, caption, created_at, last_updated, deleted FROM posts WHERE id = $1 AND deleted = false
 `
 
 type GetPostByIdBatchBatchResults struct {
@@ -2044,6 +2044,8 @@ func (b *GetPostByIdBatchBatchResults) QueryRow(f func(int, Post, error)) {
 			&i.ActorID,
 			&i.Caption,
 			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Deleted,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -4062,7 +4064,7 @@ const paginateGlobalFeed = `-- name: PaginateGlobalFeed :batchmany
 SELECT subquery.*::feed_entity
 FROM (
     (
-        SELECT id, null::varchar(255)[], caption, event_time, 'feed_event'::varchar, version, owner_id, group_id, action, data, event_ids, deleted, last_updated, event_time
+        SELECT id, null::varchar(255)[], caption, event_time, 'feed_event'::varchar, version, owner_id, group_id, action, data, event_ids, deleted, last_updated, created_at
         FROM feed_events 
         WHERE deleted = false
         AND (event_time, id) < ($1, $2)
@@ -4070,7 +4072,7 @@ FROM (
     )
     UNION ALL
     (
-        SELECT id, token_ids, caption, created_at, 'post'::varchar, version, owner_id, null::varchar(255), null::varchar, null::jsonb, null::varchar(255)[], deleted, last_updated, created_at
+        SELECT id, token_ids, caption, created_at, 'post'::varchar, version, null::varchar(255), null::varchar(255), null::varchar, null::jsonb, null::varchar(255)[], deleted, last_updated, created_at
         FROM posts 
         WHERE deleted = false
         AND (created_at, id) < ($1, $2)
@@ -4351,7 +4353,7 @@ const paginatePersonalFeedByUserID = `-- name: PaginatePersonalFeedByUserID :bat
 SELECT subquery.*::feed_entity
 FROM (
     (
-        SELECT fe.id, null::varchar(255)[], caption, event_time, 'feed_event'::varchar, version, owner_id, group_id, action, data, event_ids, fe.deleted, fe.last_updated, event_time 
+        SELECT fe.id, null::varchar(255)[], caption, event_time, 'feed_event'::varchar, version, owner_id, group_id, action, data, event_ids, fe.deleted, fe.last_updated, fe.created_at 
         FROM feed_events fe, follows fl 
         WHERE fe.deleted = false AND fl.deleted = false
         AND fe.owner_id = fl.followee AND fl.follower = $1
@@ -4360,11 +4362,11 @@ FROM (
     ) 
     UNION ALL 
     (
-        SELECT posts.id, token_ids, caption, created_at, 'post'::varchar, version, owner_id, null::varchar(255), null::varchar, null::jsonb, null::varchar(255)[], posts.deleted, posts.last_updated, created_at 
+        SELECT posts.id, token_ids, caption, created_at, 'post'::varchar, version, null::varchar(255), null::varchar(255), null::varchar, null::jsonb, null::varchar(255)[], posts.deleted, posts.last_updated, created_at 
         FROM posts, follows fll 
-        WHERE posts.owner_id = fll.followee AND fll.follower = $1 AND fll.deleted = false AND posts.deleted = false
-        AND (created_at, id) < ($2, $3)
-        AND (created_at, id) > ($4, $5)
+        WHERE posts.actor_id = fll.followee AND fll.follower = $1 AND fll.deleted = false AND posts.deleted = false
+        AND (posts.created_at, id) < ($2, $3)
+        AND (posts.created_at, id) > ($4, $5)
     )
 ) subquery
 ORDER BY 
@@ -4447,7 +4449,7 @@ const paginateUserFeedByUserID = `-- name: PaginateUserFeedByUserID :batchmany
 SELECT subquery.*::feed_entity
 FROM (
     (
-        SELECT id, null::varchar(255)[], caption, event_time, 'feed_event'::varchar, version, owner_id, group_id, action, data, event_ids, deleted, last_updated, event_time 
+        SELECT id, null::varchar(255)[], caption, event_time, 'feed_event'::varchar, version, owner_id, group_id, action, data, event_ids, deleted, last_updated, created_at
         FROM feed_events 
         WHERE owner_id = $1 AND deleted = false
         AND (event_time, id) < ($2, $3)
@@ -4455,9 +4457,9 @@ FROM (
     ) 
     UNION ALL 
     (
-        SELECT id, token_ids, caption, created_at, 'post'::varchar, version, owner_id, null::varchar(255), null::varchar, null::jsonb, null::varchar(255)[], deleted, last_updated, created_at 
+        SELECT id, token_ids, caption, created_at, 'post'::varchar, version, null::varchar(255), null::varchar(255), null::varchar, null::jsonb, null::varchar(255)[], deleted, last_updated, created_at 
         FROM posts 
-        WHERE owner_id = $1 AND deleted = false
+        WHERE actor_id = $1 AND deleted = false
         AND (created_at, id) < ($2, $3)
         AND (created_at, id) > ($4, $5)
     )

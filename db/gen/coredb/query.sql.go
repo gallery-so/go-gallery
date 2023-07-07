@@ -4838,13 +4838,13 @@ const paginateTrendingFeed = `-- name: PaginateTrendingFeed :many
 SELECT (result.*)::feed_entity
 FROM (
     (
-        SELECT id, null::varchar(255)[], caption, event_time, 'feed_event'::varchar, version, owner_id, group_id, action, data, event_ids, deleted, last_updated, event_time 
+        SELECT id, null::varchar(255)[], caption, event_time, 'feed_event'::varchar, version, owner_id, group_id, action, data, event_ids, deleted, last_updated, created_at 
         FROM feed_events 
         WHERE id = ANY($1::text[]) AND deleted = false
     )
     UNION ALL
     (
-        SELECT id, token_ids, caption, created_at, 'post'::varchar, version, owner_id, null::varchar(255), null::varchar, null::jsonb, null::varchar(255)[], deleted, last_updated, created_at 
+        SELECT id, token_ids, caption, created_at, 'post'::varchar, version, null::varchar(255), null::varchar(255), null::varchar, null::jsonb, null::varchar(255)[], deleted, last_updated, created_at 
         FROM posts 
         WHERE id = ANY($2::text[]) AND deleted = false
     )

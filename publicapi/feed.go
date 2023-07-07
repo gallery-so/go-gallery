@@ -432,8 +432,8 @@ func (api FeedAPI) TrendingUsers(ctx context.Context, report model.Window) ([]db
 }
 
 func feedCursor(i interface{}) (time.Time, persist.DBID, error) {
-	if row, ok := i.(db.FeedEvent); ok {
-		return row.EventTime, row.ID, nil
+	if row, ok := i.(persist.FeedEntity); ok {
+		return row.EventTime.Time, row.ID, nil
 	}
-	return time.Time{}, "", fmt.Errorf("interface{} is not a feed event")
+	return time.Time{}, "", fmt.Errorf("interface{} is not a feed entity")
 }

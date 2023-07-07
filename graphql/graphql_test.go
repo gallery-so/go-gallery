@@ -369,6 +369,10 @@ func testUpdateGalleryWithPublish(t *testing.T) {
 	require.NoError(t, err)
 
 	vPayload := (*vResp.Viewer).(*viewerQueryViewer)
+	assert.NotNil(t, vPayload.User)
+	assert.NotNil(t, vPayload.User.Feed)
+	assert.NotNil(t, vPayload.User.Feed.Edges)
+	assert.Len(t, vPayload.User.Feed.Edges, 1)
 	node := vPayload.User.Feed.Edges[0].Node
 	assert.NotNil(t, node)
 	feedEvent := (*node).(*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent)

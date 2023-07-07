@@ -328,12 +328,14 @@ type PiiUserView struct {
 }
 
 type Post struct {
-	ID        persist.DBID     `json:"id"`
-	Version   int32            `json:"version"`
-	TokenIds  persist.DBIDList `json:"token_ids"`
-	ActorID   persist.DBID     `json:"actor_id"`
-	Caption   sql.NullString   `json:"caption"`
-	CreatedAt time.Time        `json:"created_at"`
+	ID          persist.DBID     `json:"id"`
+	Version     int32            `json:"version"`
+	TokenIds    persist.DBIDList `json:"token_ids"`
+	ActorID     persist.DBID     `json:"actor_id"`
+	Caption     sql.NullString   `json:"caption"`
+	CreatedAt   time.Time        `json:"created_at"`
+	LastUpdated time.Time        `json:"last_updated"`
+	Deleted     bool             `json:"deleted"`
 }
 
 type ProfileImage struct {

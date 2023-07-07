@@ -399,7 +399,7 @@ select exists(
 SELECT subquery.*::feed_entity
 FROM (
     (
-        SELECT id, null::varchar(255)[], caption, event_time, 'feed_event'::varchar, version, owner_id, group_id, action, data, event_ids, deleted, last_updated, event_time
+        SELECT id, null::varchar(255)[], caption, event_time, 'feed_event'::varchar, version, owner_id, group_id, action, data, event_ids, deleted, last_updated, created_at
         FROM feed_events 
         WHERE deleted = false
         AND (event_time, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
@@ -407,7 +407,7 @@ FROM (
     )
     UNION ALL
     (
-        SELECT id, token_ids, caption, created_at, 'post'::varchar, version, owner_id, null::varchar(255), null::varchar, null::jsonb, null::varchar(255)[], deleted, last_updated, created_at
+        SELECT id, token_ids, caption, created_at, 'post'::varchar, version, null::varchar(255), null::varchar(255), null::varchar, null::jsonb, null::varchar(255)[], deleted, last_updated, created_at
         FROM posts 
         WHERE deleted = false
         AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
@@ -424,7 +424,7 @@ LIMIT sqlc.arg('limit');
 SELECT subquery.*::feed_entity
 FROM (
     (
-        SELECT fe.id, null::varchar(255)[], caption, event_time, 'feed_event'::varchar, version, owner_id, group_id, action, data, event_ids, fe.deleted, fe.last_updated, event_time 
+        SELECT fe.id, null::varchar(255)[], caption, event_time, 'feed_event'::varchar, version, owner_id, group_id, action, data, event_ids, fe.deleted, fe.last_updated, fe.created_at 
         FROM feed_events fe, follows fl 
         WHERE fe.deleted = false AND fl.deleted = false
         AND fe.owner_id = fl.followee AND fl.follower = sqlc.arg('follower')
@@ -433,11 +433,11 @@ FROM (
     ) 
     UNION ALL 
     (
-        SELECT posts.id, token_ids, caption, created_at, 'post'::varchar, version, owner_id, null::varchar(255), null::varchar, null::jsonb, null::varchar(255)[], posts.deleted, posts.last_updated, created_at 
+        SELECT posts.id, token_ids, caption, created_at, 'post'::varchar, version, null::varchar(255), null::varchar(255), null::varchar, null::jsonb, null::varchar(255)[], posts.deleted, posts.last_updated, created_at 
         FROM posts, follows fll 
-        WHERE posts.owner_id = fll.followee AND fll.follower = sqlc.arg('follower') AND fll.deleted = false AND posts.deleted = false
-        AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-        AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+        WHERE posts.actor_id = fll.followee AND fll.follower = sqlc.arg('follower') AND fll.deleted = false AND posts.deleted = false
+        AND (posts.created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+        AND (posts.created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
     )
 ) subquery
 ORDER BY 
@@ -449,7 +449,7 @@ LIMIT sqlc.arg('limit');
 SELECT subquery.*::feed_entity
 FROM (
     (
-        SELECT id, null::varchar(255)[], caption, event_time, 'feed_event'::varchar, version, owner_id, group_id, action, data, event_ids, deleted, last_updated, event_time 
+        SELECT id, null::varchar(255)[], caption, event_time, 'feed_event'::varchar, version, owner_id, group_id, action, data, event_ids, deleted, last_updated, created_at
         FROM feed_events 
         WHERE owner_id = sqlc.arg('owner_id') AND deleted = false
         AND (event_time, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
@@ -457,9 +457,9 @@ FROM (
     ) 
     UNION ALL 
     (
-        SELECT id, token_ids, caption, created_at, 'post'::varchar, version, owner_id, null::varchar(255), null::varchar, null::jsonb, null::varchar(255)[], deleted, last_updated, created_at 
+        SELECT id, token_ids, caption, created_at, 'post'::varchar, version, null::varchar(255), null::varchar(255), null::varchar, null::jsonb, null::varchar(255)[], deleted, last_updated, created_at 
         FROM posts 
-        WHERE owner_id = sqlc.arg('owner_id') AND deleted = false
+        WHERE actor_id = sqlc.arg('owner_id') AND deleted = false
         AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
         AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
     )
@@ -473,13 +473,13 @@ LIMIT sqlc.arg('limit');
 SELECT (result.*)::feed_entity
 FROM (
     (
-        SELECT id, null::varchar(255)[], caption, event_time, 'feed_event'::varchar, version, owner_id, group_id, action, data, event_ids, deleted, last_updated, event_time 
+        SELECT id, null::varchar(255)[], caption, event_time, 'feed_event'::varchar, version, owner_id, group_id, action, data, event_ids, deleted, last_updated, created_at 
         FROM feed_events 
         WHERE id = ANY(@feed_event_ids::text[]) AND deleted = false
     )
     UNION ALL
     (
-        SELECT id, token_ids, caption, created_at, 'post'::varchar, version, owner_id, null::varchar(255), null::varchar, null::jsonb, null::varchar(255)[], deleted, last_updated, created_at 
+        SELECT id, token_ids, caption, created_at, 'post'::varchar, version, null::varchar(255), null::varchar(255), null::varchar, null::jsonb, null::varchar(255)[], deleted, last_updated, created_at 
         FROM posts 
         WHERE id = ANY(@post_ids::text[]) AND deleted = false
     )
