@@ -33,8 +33,6 @@ type TokenGalleryRepository struct {
 	updateAllMetadataFieldsByTokenIdentifiersUnsafeStmt   *sql.Stmt
 	updateMediaByTokenIdentifiersUnsafeStmt               *sql.Stmt
 	updateMetadataFieldsByTokenIdentifiersUnsafeStmt      *sql.Stmt
-	deleteByIdentifiersStmt                               *sql.Stmt
-	deleteByIDStmt                                        *sql.Stmt
 	getContractByAddressStmt                              *sql.Stmt
 	setTokensAsUserMarkedSpamStmt                         *sql.Stmt
 	checkOwnTokensStmt                                    *sql.Stmt
@@ -95,12 +93,6 @@ func NewTokenGalleryRepository(db *sql.DB, queries *db.Queries) *TokenGalleryRep
 	updateMetadataFieldsByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET NAME = $1, DESCRIPTION = $2, LAST_UPDATED = $3 WHERE TOKEN_ID = $4 AND CONTRACT = $5 AND DELETED = false;`)
 	checkNoErr(err)
 
-	deleteByIdentifiersStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET DELETED = true WHERE TOKEN_ID = $1 AND CONTRACT = $2 AND OWNER_USER_ID = $3 AND CHAIN = $4;`)
-	checkNoErr(err)
-
-	deleteByIDStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET DELETED = true WHERE ID = $1;`)
-	checkNoErr(err)
-
 	getContractByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID FROM contracts WHERE ADDRESS = $1 AND CHAIN = $2 AND DELETED = false;`)
 	checkNoErr(err)
 
@@ -110,7 +102,7 @@ func NewTokenGalleryRepository(db *sql.DB, queries *db.Queries) *TokenGalleryRep
 	checkOwnTokensStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) = $1 FROM tokens WHERE OWNER_USER_ID = $2 AND ID = ANY($3);`)
 	checkNoErr(err)
 
-	deleteTokensOfContractBeforeTimeStampStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET DELETED = true WHERE CONTRACT = $1 AND LAST_SYNCED < $2 AND DELETED = false;`)
+	deleteTokensOfContractBeforeTimeStampStmt, err := db.PrepareContext(ctx, `update tokens set owned_by_wallets = '{}' where contract = $1 and last_synced < $2 and deleted = false;`)
 	checkNoErr(err)
 
 	// user_id = $1, chains = $2, can_delete_holder_tokens = $3, can_delete_creator_tokens = $4, last_synced = $5
@@ -131,7 +123,7 @@ func NewTokenGalleryRepository(db *sql.DB, queries *db.Queries) *TokenGalleryRep
       )
       and tokens.last_synced < $5
 	)
-	update tokens set deleted = true from can_delete where can_delete.id = tokens.id;`)
+	update tokens set owned_by_wallets = '{}' from can_delete where can_delete.id = tokens.id;`)
 
 	checkNoErr(err)
 
@@ -149,17 +141,15 @@ func NewTokenGalleryRepository(db *sql.DB, queries *db.Queries) *TokenGalleryRep
 		updateAllURIDerivedFieldsByTokenIdentifiersUnsafeStmt: updateURIDerivedFieldsByTokenIdentifiersUnsafeStmt,
 		updateMediaByTokenIdentifiersUnsafeStmt:               updateMediaByTokenIdentifiersUnsafeStmt,
 		updateMetadataFieldsByTokenIdentifiersUnsafeStmt:      updateMetadataFieldsByTokenIdentifiersUnsafeStmt,
-		deleteByIdentifiersStmt:                               deleteByIdentifiersStmt,
-		getByTokenIDStmt:                                      getByTokenIDStmt,
-		getByTokenIDPaginateStmt:                              getByTokenIDPaginateStmt,
-		deleteByIDStmt:                                        deleteByIDStmt,
-		getContractByAddressStmt:                              getContractByAddressStmt,
-		setTokensAsUserMarkedSpamStmt:                         setTokensAsUserMarkedSpamStmt,
-		checkOwnTokensStmt:                                    checkOwnTokensStmt,
-		getByFullIdentifiersStmt:                              getByFullIdentifiersStmt,
-		deleteTokensOfContractBeforeTimeStampStmt:             deleteTokensOfContractBeforeTimeStampStmt,
-		deleteTokensOfOwnerBeforeTimeStampStmt:                deleteTokensOfOwnerBeforeTimeStampStmt,
-		updateAllMetadataFieldsByTokenIdentifiersUnsafeStmt:   updateAllMetadataFieldsByTokenIdentifiersUnsafeStmt,
+		getByTokenIDStmt:                                    getByTokenIDStmt,
+		getByTokenIDPaginateStmt:                            getByTokenIDPaginateStmt,
+		getContractByAddressStmt:                            getContractByAddressStmt,
+		setTokensAsUserMarkedSpamStmt:                       setTokensAsUserMarkedSpamStmt,
+		checkOwnTokensStmt:                                  checkOwnTokensStmt,
+		getByFullIdentifiersStmt:                            getByFullIdentifiersStmt,
+		deleteTokensOfContractBeforeTimeStampStmt:           deleteTokensOfContractBeforeTimeStampStmt,
+		deleteTokensOfOwnerBeforeTimeStampStmt:              deleteTokensOfOwnerBeforeTimeStampStmt,
+		updateAllMetadataFieldsByTokenIdentifiersUnsafeStmt: updateAllMetadataFieldsByTokenIdentifiersUnsafeStmt,
 	}
 
 }
@@ -491,12 +481,6 @@ func (t *TokenGalleryRepository) UpdateByTokenIdentifiersUnsafe(pCtx context.Con
 		return persist.ErrTokenGalleryNotFoundByIdentifiers{TokenID: pTokenID, ContractAddress: pContractAddress, Chain: pChain}
 	}
 	return nil
-}
-
-// DeleteByID deletes a token by its ID
-func (t *TokenGalleryRepository) DeleteByID(ctx context.Context, id persist.DBID) error {
-	_, err := t.deleteByIDStmt.ExecContext(ctx, id)
-	return err
 }
 
 // FlagTokensAsUserMarkedSpam marks tokens as spam by the user.
