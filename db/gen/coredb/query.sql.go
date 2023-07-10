@@ -4865,7 +4865,7 @@ const paginateTrendingFeed = `-- name: PaginateTrendingFeed :many
 SELECT result.created_at, result.id, result.tag
 FROM (
     (
-        SELECT id, 'feed_event'::int as tag, created_at 
+        SELECT id, 'feed_event'::int as tag, event_time as created_at 
         FROM feed_events 
         WHERE id = ANY($1::text[]) AND deleted = false
     )

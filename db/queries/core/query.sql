@@ -385,7 +385,7 @@ select exists(
 SELECT subquery.id, subquery.tag, subquery.created_at
 FROM (
     (
-        SELECT id, @feed_event_tag::int as tag, created_at
+        SELECT id, @feed_event_tag::int as tag, event_time as created_at
         FROM feed_events 
         WHERE deleted = false
         AND (event_time, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
@@ -410,7 +410,7 @@ LIMIT sqlc.arg('limit');
 SELECT subquery.id, subquery.tag, subquery.created_at
 FROM (
     (
-        SELECT fe.id, @feed_event_tag::int as tag, fe.created_at
+        SELECT fe.id, @feed_event_tag::int as tag, fe.event_time as created_at
         FROM feed_events fe, follows fl 
         WHERE fe.deleted = false AND fl.deleted = false
         AND fe.owner_id = fl.followee AND fl.follower = sqlc.arg('follower')
@@ -435,11 +435,11 @@ LIMIT sqlc.arg('limit');
 SELECT subquery.id, subquery.created_at, subquery.tag
 FROM (
     (
-        SELECT id, @feed_event_tag::int as tag, created_at
+        SELECT id, @feed_event_tag::int as tag, event_time as created_at
         FROM feed_events 
         WHERE owner_id = sqlc.arg('owner_id') AND deleted = false
-        AND (event_time, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-        AND (event_time, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+        AND (feed_events.event_time, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+        AND (feed_events.event_time, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
     ) 
     UNION ALL 
     (
@@ -459,7 +459,7 @@ LIMIT sqlc.arg('limit');
 SELECT result.created_at, result.id, result.tag
 FROM (
     (
-        SELECT id, 'feed_event'::int as tag, created_at 
+        SELECT id, 'feed_event'::int as tag, event_time as created_at 
         FROM feed_events 
         WHERE id = ANY(@feed_event_ids::text[]) AND deleted = false
     )
