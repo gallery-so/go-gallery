@@ -219,20 +219,6 @@ SELECT t.* FROM tokens t
              CASE WHEN NOT @paging_forward::bool THEN (u.universal,t.created_at,t.id) END DESC
     LIMIT $2;
 
--- name: GetTokensByContractIdBatchPaginate :batchmany
-SELECT t.* FROM tokens t
-    JOIN users u ON u.id = t.owner_user_id
-    JOIN contracts c ON t.contract = c.id
-    WHERE (c.id = @id OR c.parent_id = @id)
-    AND t.deleted = false
-    AND c.deleted = false
-    AND (NOT @gallery_users_only::bool OR u.universal = false)
-    AND (u.universal,t.created_at,t.id) < (@cur_before_universal, @cur_before_time::timestamptz, @cur_before_id)
-    AND (u.universal,t.created_at,t.id) > (@cur_after_universal, @cur_after_time::timestamptz, @cur_after_id)
-    ORDER BY CASE WHEN @paging_forward::bool THEN (u.universal,t.created_at,t.id) END ASC,
-             CASE WHEN NOT @paging_forward::bool THEN (u.universal,t.created_at,t.id) END DESC
-    LIMIT sqlc.arg('limit');
-
 -- name: CountTokensByContractId :one
 SELECT count(*)
 FROM tokens
@@ -750,13 +736,18 @@ update galleries set collections = @collections, last_updated = now() where gall
 update users set featured_gallery = @gallery_id, last_updated = now() from galleries where users.id = @user_id and galleries.id = @gallery_id and galleries.owner_user_id = @user_id and galleries.deleted = false;
 
 -- name: GetGalleryTokenMediasByGalleryID :many
-select m.* from tokens t, collections c, galleries g, token_medias m where g.id = $1 and c.id = any(g.collections) and t.id = any(c.nfts) and t.deleted = false and g.deleted = false and c.deleted = false and (length(m.media->>'thumbnail_url'::varchar) > 0 or length(m.media->>'media_url'::varchar) > 0) and t.token_media_id = m.id and m.deleted = false and m.active order by array_position(g.collections, c.id),array_position(c.nfts, t.id) limit $2;
+select m.* from collections c, galleries g, token_medias m, users u, tokens t
+    left join contract_creators cc on t.contract = cc.contract_id
+    where g.id = $1 and c.id = any(g.collections) and t.id = any(c.nfts)
+      and u.id = g.owner_user_id
+      and ((cc.creator_user_id = u.id) or (t.owned_by_wallets && u.wallets))
+      and t.deleted = false and g.deleted = false and c.deleted = false
+      and (length(m.media->>'thumbnail_url'::varchar) > 0 or length(m.media->>'media_url'::varchar) > 0)
+      and t.token_media_id = m.id and m.deleted = false and m.active
+    order by array_position(g.collections, c.id),array_position(c.nfts, t.id) limit $2;
 
 -- name: GetTokenByTokenIdentifiers :one
 select * from tokens where tokens.token_id = @token_hex and contract = (select contracts.id from contracts where contracts.address = @contract_address) and tokens.chain = @chain and tokens.deleted = false;
-
--- name: GetTokensByIDs :many
-select * from tokens join unnest(@token_ids::varchar[]) with ordinality t(id, pos) using (id) where deleted = false order by t.pos asc;
 
 -- name: DeleteCollections :exec
 update collections set deleted = true, last_updated = now() where id = any(@ids::varchar[]);

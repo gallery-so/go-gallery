@@ -2061,7 +2061,15 @@ func (q *Queries) GetGalleryIDByCollectionID(ctx context.Context, id persist.DBI
 }
 
 const getGalleryTokenMediasByGalleryID = `-- name: GetGalleryTokenMediasByGalleryID :many
-select m.id, m.created_at, m.last_updated, m.version, m.contract_id, m.token_id, m.chain, m.active, m.metadata, m.media, m.name, m.description, m.processing_job_id, m.deleted from tokens t, collections c, galleries g, token_medias m where g.id = $1 and c.id = any(g.collections) and t.id = any(c.nfts) and t.deleted = false and g.deleted = false and c.deleted = false and (length(m.media->>'thumbnail_url'::varchar) > 0 or length(m.media->>'media_url'::varchar) > 0) and t.token_media_id = m.id and m.deleted = false and m.active order by array_position(g.collections, c.id),array_position(c.nfts, t.id) limit $2
+select m.id, m.created_at, m.last_updated, m.version, m.contract_id, m.token_id, m.chain, m.active, m.metadata, m.media, m.name, m.description, m.processing_job_id, m.deleted from collections c, galleries g, token_medias m, users u, tokens t
+    left join contract_creators cc on t.contract = cc.contract_id
+    where g.id = $1 and c.id = any(g.collections) and t.id = any(c.nfts)
+      and u.id = g.owner_user_id
+      and ((cc.creator_user_id = u.id) or (t.owned_by_wallets && u.wallets))
+      and t.deleted = false and g.deleted = false and c.deleted = false
+      and (length(m.media->>'thumbnail_url'::varchar) > 0 or length(m.media->>'media_url'::varchar) > 0)
+      and t.token_media_id = m.id and m.deleted = false and m.active
+    order by array_position(g.collections, c.id),array_position(c.nfts, t.id) limit $2
 `
 
 type GetGalleryTokenMediasByGalleryIDParams struct {
@@ -3184,57 +3192,6 @@ func (q *Queries) GetTokensByContractIdPaginate(ctx context.Context, arg GetToke
 		arg.CurAfterID,
 		arg.PagingForward,
 	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Token
-	for rows.Next() {
-		var i Token
-		if err := rows.Scan(
-			&i.ID,
-			&i.Deleted,
-			&i.Version,
-			&i.CreatedAt,
-			&i.LastUpdated,
-			&i.Name,
-			&i.Description,
-			&i.CollectorsNote,
-			&i.Media,
-			&i.TokenUri,
-			&i.TokenType,
-			&i.TokenID,
-			&i.Quantity,
-			&i.OwnershipHistory,
-			&i.TokenMetadata,
-			&i.ExternalUrl,
-			&i.BlockNumber,
-			&i.OwnerUserID,
-			&i.OwnedByWallets,
-			&i.Chain,
-			&i.Contract,
-			&i.IsUserMarkedSpam,
-			&i.IsProviderMarkedSpam,
-			&i.LastSynced,
-			&i.FallbackMedia,
-			&i.TokenMediaID,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getTokensByIDs = `-- name: GetTokensByIDs :many
-select id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id from tokens join unnest($1::varchar[]) with ordinality t(id, pos) using (id) where deleted = false order by t.pos asc
-`
-
-func (q *Queries) GetTokensByIDs(ctx context.Context, tokenIds []string) ([]Token, error) {
-	rows, err := q.db.Query(ctx, getTokensByIDs, tokenIds)
 	if err != nil {
 		return nil, err
 	}
