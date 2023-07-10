@@ -633,9 +633,10 @@ type CommentOnFeedEventPayload struct {
 func (CommentOnFeedEventPayload) IsCommentOnFeedEventPayloadOrError() {}
 
 type CommentOnPostPayload struct {
-	Viewer  *Viewer  `json:"viewer"`
-	Post    *Post    `json:"post"`
-	Comment *Comment `json:"comment"`
+	Viewer         *Viewer  `json:"viewer"`
+	Post           *Post    `json:"post"`
+	Comment        *Comment `json:"comment"`
+	ReplyToComment *Comment `json:"replyToComment"`
 }
 
 func (CommentOnPostPayload) IsCommentOnPostPayloadOrError() {}

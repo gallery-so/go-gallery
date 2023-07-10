@@ -36,21 +36,17 @@ func (r *admireFeedEventPayloadResolver) Admire(ctx context.Context, obj *model.
 
 // FeedEvent is the resolver for the feedEvent field.
 func (r *admireFeedEventPayloadResolver) FeedEvent(ctx context.Context, obj *model.AdmireFeedEventPayload) (*model.FeedEvent, error) {
-	admire, err := publicapi.For(ctx).Interaction.GetAdmireByID(ctx, obj.Admire.Dbid)
-	if err != nil {
-		return nil, err
-	}
-	return resolveFeedEventByEventID(ctx, admire.FeedEventID)
+	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
 }
 
 // Post is the resolver for the post field.
 func (r *admirePostPayloadResolver) Post(ctx context.Context, obj *model.AdmirePostPayload) (*model.Post, error) {
-	panic(fmt.Errorf("not implemented: Post - post"))
+	return resolvePostByPostID(ctx, obj.Post.Dbid)
 }
 
 // Admire is the resolver for the admire field.
 func (r *admirePostPayloadResolver) Admire(ctx context.Context, obj *model.AdmirePostPayload) (*model.Admire, error) {
-	panic(fmt.Errorf("not implemented: Admire - admire"))
+	return resolveAdmireByAdmireID(ctx, obj.Admire.Dbid)
 }
 
 // Gallery is the resolver for the gallery field.
@@ -180,12 +176,17 @@ func (r *commentOnFeedEventPayloadResolver) FeedEvent(ctx context.Context, obj *
 
 // Post is the resolver for the post field.
 func (r *commentOnPostPayloadResolver) Post(ctx context.Context, obj *model.CommentOnPostPayload) (*model.Post, error) {
-	panic(fmt.Errorf("not implemented: Post - post"))
+	return resolvePostByPostID(ctx, obj.Post.Dbid)
 }
 
 // Comment is the resolver for the comment field.
 func (r *commentOnPostPayloadResolver) Comment(ctx context.Context, obj *model.CommentOnPostPayload) (*model.Comment, error) {
-	panic(fmt.Errorf("not implemented: Comment - comment"))
+	return resolveCommentByCommentID(ctx, obj.Comment.Dbid)
+}
+
+// ReplyToComment is the resolver for the replyToComment field.
+func (r *commentOnPostPayloadResolver) ReplyToComment(ctx context.Context, obj *model.CommentOnPostPayload) (*model.Comment, error) {
+	panic(fmt.Errorf("not implemented: ReplyToComment - replyToComment"))
 }
 
 // Creator is the resolver for the creator field.
@@ -558,7 +559,6 @@ func (r *galleryUserResolver) Following(ctx context.Context, obj *model.GalleryU
 func (r *galleryUserResolver) Feed(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
 	events, pageInfo, err := publicapi.For(ctx).Feed.PaginateUserFeed(ctx, obj.Dbid, before, after, first, last)
 	if err != nil {
-		panic("failed to paginate user feed: " + err.Error())
 		return nil, err
 	}
 
@@ -1274,12 +1274,21 @@ func (r *mutationResolver) AdmireFeedEvent(ctx context.Context, feedEventID pers
 
 // AdmirePost is the resolver for the admirePost field.
 func (r *mutationResolver) AdmirePost(ctx context.Context, postID persist.DBID) (model.AdmirePostPayloadOrError, error) {
-	panic(fmt.Errorf("not implemented: AdmirePost - admirePost"))
+	id, err := publicapi.For(ctx).Interaction.AdmirePost(ctx, postID)
+	if err != nil {
+		return nil, err
+	}
+	output := &model.AdmirePostPayload{
+		Viewer: resolveViewer(ctx),
+		Admire: &model.Admire{Dbid: id},
+		Post:   &model.Post{Dbid: postID},
+	}
+	return output, nil
 }
 
 // RemoveAdmire is the resolver for the removeAdmire field.
 func (r *mutationResolver) RemoveAdmire(ctx context.Context, admireID persist.DBID) (model.RemoveAdmirePayloadOrError, error) {
-	feedEventID, err := publicapi.For(ctx).Interaction.RemoveAdmire(ctx, admireID)
+	feedEventID, postID, err := publicapi.For(ctx).Interaction.RemoveAdmire(ctx, admireID)
 	if err != nil {
 		return nil, err
 	}
@@ -1289,6 +1298,9 @@ func (r *mutationResolver) RemoveAdmire(ctx context.Context, admireID persist.DB
 		AdmireID: &admireID,
 		FeedEvent: &model.FeedEvent{
 			Dbid: feedEventID, // remaining fields handled by dedicated resolver
+		},
+		Post: &model.Post{
+			Dbid: postID, // remaining fields handled by dedicated resolver
 		},
 	}
 	return output, nil
@@ -1320,7 +1332,7 @@ func (r *mutationResolver) CommentOnFeedEvent(ctx context.Context, feedEventID p
 
 // RemoveComment is the resolver for the removeComment field.
 func (r *mutationResolver) RemoveComment(ctx context.Context, commentID persist.DBID) (model.RemoveCommentPayloadOrError, error) {
-	feedEvent, err := publicapi.For(ctx).Interaction.RemoveComment(ctx, commentID)
+	feedEvent, postID, err := publicapi.For(ctx).Interaction.RemoveComment(ctx, commentID)
 	if err != nil {
 		return nil, err
 	}
@@ -1329,13 +1341,33 @@ func (r *mutationResolver) RemoveComment(ctx context.Context, commentID persist.
 		FeedEvent: &model.FeedEvent{
 			Dbid: feedEvent,
 		},
+		Post: &model.Post{
+			Dbid: postID,
+		},
 	}
 	return output, nil
 }
 
 // CommentOnPost is the resolver for the commentOnPost field.
 func (r *mutationResolver) CommentOnPost(ctx context.Context, postID persist.DBID, replyToID *persist.DBID, comment string) (model.CommentOnPostPayloadOrError, error) {
-	panic(fmt.Errorf("not implemented: CommentOnPost - commentOnPost"))
+	id, err := publicapi.For(ctx).Interaction.CommentOnPost(ctx, postID, replyToID, comment)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.CommentOnPostPayload{
+		Viewer: resolveViewer(ctx),
+		Comment: &model.Comment{
+			Dbid: id,
+		},
+		Post: &model.Post{Dbid: postID},
+	}
+	if replyToID != nil {
+		output.ReplyToComment = &model.Comment{
+			Dbid: *replyToID, // remaining fields handled by dedicated resolver
+		}
+	}
+	return output, nil
 }
 
 // PostTokens is the resolver for the postTokens field.
@@ -2063,7 +2095,6 @@ func (r *queryResolver) GlobalFeed(ctx context.Context, before *string, after *s
 func (r *queryResolver) TrendingFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
 	events, pageInfo, err := publicapi.For(ctx).Feed.PaginateTrendingFeed(ctx, before, after, first, last)
 	if err != nil {
-		panic(err)
 		return nil, err
 	}
 
@@ -2257,22 +2288,34 @@ func (r *queryResolver) TopCollectionsForCommunity(ctx context.Context, input mo
 
 // FeedEvent is the resolver for the feedEvent field.
 func (r *removeAdmirePayloadResolver) FeedEvent(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.FeedEvent, error) {
+	if obj.FeedEvent == nil || obj.FeedEvent.Dbid == "" {
+		return nil, nil
+	}
 	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
 }
 
 // Post is the resolver for the post field.
 func (r *removeAdmirePayloadResolver) Post(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.Post, error) {
-	panic(fmt.Errorf("not implemented: Post - post"))
+	if obj.Post == nil || obj.Post.Dbid == "" {
+		return nil, nil
+	}
+	return resolvePostByPostID(ctx, obj.Post.Dbid)
 }
 
 // FeedEvent is the resolver for the feedEvent field.
 func (r *removeCommentPayloadResolver) FeedEvent(ctx context.Context, obj *model.RemoveCommentPayload) (*model.FeedEvent, error) {
+	if obj.FeedEvent == nil || obj.FeedEvent.Dbid == "" {
+		return nil, nil
+	}
 	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
 }
 
 // Post is the resolver for the post field.
 func (r *removeCommentPayloadResolver) Post(ctx context.Context, obj *model.RemoveCommentPayload) (*model.Post, error) {
-	panic(fmt.Errorf("not implemented: Post - post"))
+	if obj.Post == nil || obj.Post.Dbid == "" {
+		return nil, nil
+	}
+	return resolvePostByPostID(ctx, obj.Post.Dbid)
 }
 
 // Tokens is the resolver for the tokens field.

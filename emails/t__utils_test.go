@@ -161,8 +161,8 @@ func seedNotifications(ctx context.Context, t *testing.T, q *coredb.Queries, rep
 func seedAdmireNotif(ctx context.Context, t *testing.T, q *coredb.Queries, userID persist.DBID, userID2 persist.DBID) {
 
 	admire, err := q.CreateAdmire(ctx, coredb.CreateAdmireParams{
-		ActorID:     userID2,
-		FeedEventID: feedEvent.ID,
+		ActorID:   userID2,
+		FeedEvent: sql.NullString{String: feedEvent.ID.String(), Valid: true},
 	})
 
 	if err != nil {
@@ -175,7 +175,7 @@ func seedAdmireNotif(ctx context.Context, t *testing.T, q *coredb.Queries, userI
 		Action:         persist.ActionAdmiredFeedEvent,
 		ResourceTypeID: persist.ResourceTypeAdmire,
 		AdmireID:       admire,
-		FeedEventID:    feedEvent.ID,
+		FeedEvent:      sql.NullString{String: feedEvent.ID.String(), Valid: true},
 	})
 
 	if err != nil {
@@ -219,7 +219,7 @@ func seedCommentNotif(ctx context.Context, t *testing.T, q *coredb.Queries, repo
 		Action:         persist.ActionCommentedOnFeedEvent,
 		ResourceTypeID: persist.ResourceTypeAdmire,
 		CommentID:      commentID,
-		FeedEventID:    feedEvent.ID,
+		FeedEvent:      sql.NullString{String: feedEvent.ID.String(), Valid: true},
 	})
 
 	if err != nil {

@@ -124,6 +124,7 @@ type Event struct {
 	ExternalID     sql.NullString       `json:"external_id"`
 	Caption        sql.NullString       `json:"caption"`
 	GroupID        sql.NullString       `json:"group_id"`
+	PostID         persist.DBID         `json:"post_id"`
 }
 
 type FeedBlocklist struct {

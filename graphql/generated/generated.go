@@ -268,9 +268,10 @@ type ComplexityRoot struct {
 	}
 
 	CommentOnPostPayload struct {
-		Comment func(childComplexity int) int
-		Post    func(childComplexity int) int
-		Viewer  func(childComplexity int) int
+		Comment        func(childComplexity int) int
+		Post           func(childComplexity int) int
+		ReplyToComment func(childComplexity int) int
+		Viewer         func(childComplexity int) int
 	}
 
 	CommunitiesConnection struct {
@@ -1472,6 +1473,7 @@ type CommentOnFeedEventPayloadResolver interface {
 type CommentOnPostPayloadResolver interface {
 	Post(ctx context.Context, obj *model.CommentOnPostPayload) (*model.Post, error)
 	Comment(ctx context.Context, obj *model.CommentOnPostPayload) (*model.Comment, error)
+	ReplyToComment(ctx context.Context, obj *model.CommentOnPostPayload) (*model.Comment, error)
 }
 type CommunityResolver interface {
 	Creator(ctx context.Context, obj *model.Community) (model.GalleryUserOrAddress, error)
@@ -2407,6 +2409,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.CommentOnPostPayload.Post(childComplexity), true
+
+	case "CommentOnPostPayload.replyToComment":
+		if e.complexity.CommentOnPostPayload.ReplyToComment == nil {
+			break
+		}
+
+		return e.complexity.CommentOnPostPayload.ReplyToComment(childComplexity), true
 
 	case "CommentOnPostPayload.viewer":
 		if e.complexity.CommentOnPostPayload.Viewer == nil {
@@ -9670,6 +9679,7 @@ type CommentOnPostPayload {
   viewer: Viewer
   post: Post @goField(forceResolver: true)
   comment: Comment @goField(forceResolver: true)
+  replyToComment: Comment @goField(forceResolver: true)
 }
 
 union CommentOnPostPayloadOrError = CommentOnPostPayload | ErrInvalidInput | ErrNotAuthorized
@@ -17477,6 +17487,63 @@ func (ec *executionContext) _CommentOnPostPayload_comment(ctx context.Context, f
 }
 
 func (ec *executionContext) fieldContext_CommentOnPostPayload_comment(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CommentOnPostPayload",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Comment_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Comment_dbid(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Comment_creationTime(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Comment_lastUpdated(ctx, field)
+			case "replyTo":
+				return ec.fieldContext_Comment_replyTo(ctx, field)
+			case "commenter":
+				return ec.fieldContext_Comment_commenter(ctx, field)
+			case "comment":
+				return ec.fieldContext_Comment_comment(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Comment", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CommentOnPostPayload_replyToComment(ctx context.Context, field graphql.CollectedField, obj *model.CommentOnPostPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CommentOnPostPayload_replyToComment(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.CommentOnPostPayload().ReplyToComment(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Comment)
+	fc.Result = res
+	return ec.marshalOComment2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐComment(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CommentOnPostPayload_replyToComment(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "CommentOnPostPayload",
 		Field:      field,
@@ -59045,6 +59112,23 @@ func (ec *executionContext) _CommentOnPostPayload(ctx context.Context, sel ast.S
 					}
 				}()
 				res = ec._CommentOnPostPayload_comment(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "replyToComment":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._CommentOnPostPayload_replyToComment(ctx, field, obj)
 				return res
 			}
 

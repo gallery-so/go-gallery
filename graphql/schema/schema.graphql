@@ -2280,6 +2280,7 @@ type CommentOnPostPayload {
   viewer: Viewer
   post: Post @goField(forceResolver: true)
   comment: Comment @goField(forceResolver: true)
+  replyToComment: Comment @goField(forceResolver: true)
 }
 
 union CommentOnPostPayloadOrError = CommentOnPostPayload | ErrInvalidInput | ErrNotAuthorized

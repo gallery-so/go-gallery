@@ -637,7 +637,7 @@ func (api InteractionAPI) AdmireFeedEvent(ctx context.Context, feedEventID persi
 		return "", err
 	}
 
-	admireID, err := api.repos.AdmireRepository.CreateAdmire(ctx, feedEventID, userID)
+	admireID, err := api.repos.AdmireRepository.CreateAdmire(ctx, feedEventID, "", userID)
 	if err != nil {
 		return "", err
 	}
@@ -657,24 +657,67 @@ func (api InteractionAPI) AdmireFeedEvent(ctx context.Context, feedEventID persi
 	return admireID, err
 }
 
-func (api InteractionAPI) RemoveAdmire(ctx context.Context, admireID persist.DBID) (persist.DBID, error) {
+func (api InteractionAPI) AdmirePost(ctx context.Context, postID persist.DBID) (persist.DBID, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"postID": validate.WithTag(postID, "required"),
+	}); err != nil {
+		return "", err
+	}
+
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	admire, err := api.GetAdmireByActorIDAndPostID(ctx, userID, postID)
+	if err == nil {
+		return "", persist.ErrAdmireAlreadyExists{AdmireID: admire.ID, ActorID: userID, PostID: postID}
+	}
+
+	notFoundErr := persist.ErrAdmireNotFound{}
+	if !errors.As(err, &notFoundErr) {
+		return "", err
+	}
+
+	admireID, err := api.repos.AdmireRepository.CreateAdmire(ctx, "", postID, userID)
+	if err != nil {
+		return "", err
+	}
+
+	_, err = dispatchEvent(ctx, db.Event{
+		ActorID:        persist.DBIDToNullStr(userID),
+		ResourceTypeID: persist.ResourceTypeAdmire,
+		SubjectID:      postID,
+		PostID:         postID,
+		AdmireID:       admireID,
+		Action:         persist.ActionAdmiredPost,
+	}, api.validator, nil)
+	if err != nil {
+		return "", err
+	}
+
+	return admireID, err
+}
+
+func (api InteractionAPI) RemoveAdmire(ctx context.Context, admireID persist.DBID) (persist.DBID, persist.DBID, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"admireID": validate.WithTag(admireID, "required"),
 	}); err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	// will also fail if admire does not exist
 	admire, err := api.GetAdmireByID(ctx, admireID)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if admire.ActorID != For(ctx).User.GetLoggedInUserId(ctx) {
-		return "", ErrOnlyRemoveOwnAdmire
+		return "", "", ErrOnlyRemoveOwnAdmire
 	}
 
-	return admire.FeedEventID, api.repos.AdmireRepository.RemoveAdmire(ctx, admireID)
+	return admire.FeedEventID, admire.PostID, api.repos.AdmireRepository.RemoveAdmire(ctx, admireID)
 }
 
 func (api InteractionAPI) HasUserAdmiredFeedEvent(ctx context.Context, userID persist.DBID, feedEventID persist.DBID) (*bool, error) {
@@ -738,7 +781,7 @@ func (api InteractionAPI) CommentOnFeedEvent(ctx context.Context, feedEventID pe
 	// Sanitize
 	comment = validate.SanitizationPolicy.Sanitize(comment)
 
-	commentID, err := api.repos.CommentRepository.CreateComment(ctx, feedEventID, actor, replyToID, comment)
+	commentID, err := api.repos.CommentRepository.CreateComment(ctx, feedEventID, "", actor, replyToID, comment)
 	if err != nil {
 		return "", err
 	}
@@ -758,20 +801,61 @@ func (api InteractionAPI) CommentOnFeedEvent(ctx context.Context, feedEventID pe
 	return commentID, nil
 }
 
-func (api InteractionAPI) RemoveComment(ctx context.Context, commentID persist.DBID) (persist.DBID, error) {
+func (api InteractionAPI) CommentOnPost(ctx context.Context, postID persist.DBID, replyToID *persist.DBID, comment string) (persist.DBID, error) {
+	// Trim whitespace first, so comments consisting only of whitespace will fail
+	// the "required" validation below
+	comment = strings.TrimSpace(comment)
+
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"postID":  validate.WithTag(postID, "required"),
+		"comment": validate.WithTag(comment, "required"),
+	}); err != nil {
+		return "", err
+	}
+
+	actor, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	// Sanitize
+	comment = validate.SanitizationPolicy.Sanitize(comment)
+
+	commentID, err := api.repos.CommentRepository.CreateComment(ctx, "", postID, actor, replyToID, comment)
+	if err != nil {
+		return "", err
+	}
+
+	_, err = dispatchEvent(ctx, db.Event{
+		ActorID:        persist.DBIDToNullStr(actor),
+		ResourceTypeID: persist.ResourceTypeComment,
+		SubjectID:      postID,
+		PostID:         postID,
+		CommentID:      commentID,
+		Action:         persist.ActionCommentedOnPost,
+	}, api.validator, nil)
+	if err != nil {
+		return "", err
+	}
+
+	return commentID, nil
+}
+
+func (api InteractionAPI) RemoveComment(ctx context.Context, commentID persist.DBID) (persist.DBID, persist.DBID, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"commentID": validate.WithTag(commentID, "required"),
 	}); err != nil {
-		return "", err
+		return "", "", err
 	}
 	comment, err := api.GetCommentByID(ctx, commentID)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if comment.ActorID != For(ctx).User.GetLoggedInUserId(ctx) {
-		return "", ErrOnlyRemoveOwnComment
+		return "", "", ErrOnlyRemoveOwnComment
 	}
 
-	return comment.FeedEventID, api.repos.CommentRepository.RemoveComment(ctx, commentID)
+	return comment.FeedEventID, comment.PostID, api.repos.CommentRepository.RemoveComment(ctx, commentID)
 }
