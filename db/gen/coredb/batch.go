@@ -4084,7 +4084,7 @@ const paginateGlobalFeed = `-- name: PaginateGlobalFeed :batchmany
 SELECT subquery.id, subquery.tag, subquery.created_at
 FROM (
     (
-        SELECT id, $1::int as tag, created_at
+        SELECT id, $1::int as tag, event_time as created_at
         FROM feed_events 
         WHERE deleted = false
         AND (event_time, id) < ($2, $3)
@@ -4100,8 +4100,8 @@ FROM (
     )
 ) subquery
 ORDER BY 
-    CASE WHEN $7::bool THEN (event_time, id) END ASC,
-    CASE WHEN NOT $7::bool THEN (event_time, id) END DESC
+    CASE WHEN $7::bool THEN (created_at, id) END ASC,
+    CASE WHEN NOT $7::bool THEN (created_at, id) END DESC
 LIMIT $8
 `
 
@@ -4383,7 +4383,7 @@ const paginatePersonalFeedByUserID = `-- name: PaginatePersonalFeedByUserID :bat
 SELECT subquery.id, subquery.tag, subquery.created_at
 FROM (
     (
-        SELECT fe.id, $1::int as tag, fe.created_at
+        SELECT fe.id, $1::int as tag, fe.event_time as created_at
         FROM feed_events fe, follows fl 
         WHERE fe.deleted = false AND fl.deleted = false
         AND fe.owner_id = fl.followee AND fl.follower = $2
@@ -4400,8 +4400,8 @@ FROM (
     )
 ) subquery
 ORDER BY 
-    CASE WHEN $8::bool THEN (event_time, id) END ASC,
-    CASE WHEN NOT $8::bool THEN (event_time, id) END DESC
+    CASE WHEN $8::bool THEN (created_at, id) END ASC,
+    CASE WHEN NOT $8::bool THEN (created_at, id) END DESC
 LIMIT $9
 `
 
@@ -4489,11 +4489,11 @@ const paginateUserFeedByUserID = `-- name: PaginateUserFeedByUserID :batchmany
 SELECT subquery.id, subquery.created_at, subquery.tag
 FROM (
     (
-        SELECT id, $1::int as tag, created_at
+        SELECT id, $1::int as tag, event_time as created_at
         FROM feed_events 
         WHERE owner_id = $2 AND deleted = false
-        AND (event_time, id) < ($3, $4)
-        AND (event_time, id) > ($5, $6)
+        AND (feed_events.event_time, id) < ($3, $4)
+        AND (feed_events.event_time, id) > ($5, $6)
     ) 
     UNION ALL 
     (
@@ -4505,8 +4505,8 @@ FROM (
     )
 ) subquery
 ORDER BY 
-    CASE WHEN $8::bool THEN (event_time, id) END ASC,
-    CASE WHEN NOT $8::bool THEN (event_time, id) END DESC
+    CASE WHEN $8::bool THEN (created_at, id) END ASC,
+    CASE WHEN NOT $8::bool THEN (created_at, id) END DESC
 LIMIT $9
 `
 
