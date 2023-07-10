@@ -1901,6 +1901,43 @@ func (q *Queries) GetFeedEventByID(ctx context.Context, id persist.DBID) (FeedEv
 	return i, err
 }
 
+const getFeedEventsByIds = `-- name: GetFeedEventsByIds :many
+SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption, group_id FROM feed_events WHERE id = ANY($1::varchar(255)[]) AND deleted = false
+`
+
+func (q *Queries) GetFeedEventsByIds(ctx context.Context, ids []string) ([]FeedEvent, error) {
+	rows, err := q.db.Query(ctx, getFeedEventsByIds, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []FeedEvent
+	for rows.Next() {
+		var i FeedEvent
+		if err := rows.Scan(
+			&i.ID,
+			&i.Version,
+			&i.OwnerID,
+			&i.Action,
+			&i.Data,
+			&i.EventTime,
+			&i.EventIds,
+			&i.Deleted,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Caption,
+			&i.GroupID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getGalleriesByUserId = `-- name: GetGalleriesByUserId :many
 SELECT id, deleted, last_updated, created_at, version, owner_user_id, collections, name, description, hidden, position FROM galleries WHERE owner_user_id = $1 AND deleted = false order by position
 `
@@ -2511,6 +2548,39 @@ func (q *Queries) GetNotificationsByOwnerIDForActionAfter(ctx context.Context, a
 			&i.GalleryID,
 			&i.Seen,
 			&i.Amount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPostsByIds = `-- name: GetPostsByIds :many
+SELECT id, version, token_ids, actor_id, caption, created_at, last_updated, deleted FROM posts WHERE id = ANY($1::varchar(255)[]) AND deleted = false
+`
+
+func (q *Queries) GetPostsByIds(ctx context.Context, ids []string) ([]Post, error) {
+	rows, err := q.db.Query(ctx, getPostsByIds, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Post
+	for rows.Next() {
+		var i Post
+		if err := rows.Scan(
+			&i.ID,
+			&i.Version,
+			&i.TokenIds,
+			&i.ActorID,
+			&i.Caption,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Deleted,
 		); err != nil {
 			return nil, err
 		}
@@ -4792,16 +4862,16 @@ func (q *Queries) IsFeedUserActionBlocked(ctx context.Context, arg IsFeedUserAct
 }
 
 const paginateTrendingFeed = `-- name: PaginateTrendingFeed :many
-SELECT (result.*)::feed_entity
+SELECT result.created_at, result.id, result.tag
 FROM (
     (
-        SELECT id, null::varchar(255)[], caption, event_time, 'feed_event'::varchar, version, owner_id, group_id, action, data, event_ids, deleted, last_updated, created_at 
+        SELECT id, 'feed_event'::int as tag, created_at 
         FROM feed_events 
         WHERE id = ANY($1::text[]) AND deleted = false
     )
     UNION ALL
     (
-        SELECT id, token_ids, caption, created_at, 'post'::varchar, version, null::varchar(255), null::varchar(255), null::varchar, null::jsonb, null::varchar(255)[], deleted, last_updated, created_at 
+        SELECT id, 'post'::int as tag, created_at
         FROM posts 
         WHERE id = ANY($2::text[]) AND deleted = false
     )
@@ -4825,7 +4895,13 @@ type PaginateTrendingFeedParams struct {
 	Limit         int32    `json:"limit"`
 }
 
-func (q *Queries) PaginateTrendingFeed(ctx context.Context, arg PaginateTrendingFeedParams) ([]persist.FeedEntity, error) {
+type PaginateTrendingFeedRow struct {
+	CreatedAt time.Time    `json:"created_at"`
+	ID        persist.DBID `json:"id"`
+	Tag       int32        `json:"tag"`
+}
+
+func (q *Queries) PaginateTrendingFeed(ctx context.Context, arg PaginateTrendingFeedParams) ([]PaginateTrendingFeedRow, error) {
 	rows, err := q.db.Query(ctx, paginateTrendingFeed,
 		arg.FeedEventIds,
 		arg.PostIds,
@@ -4838,13 +4914,13 @@ func (q *Queries) PaginateTrendingFeed(ctx context.Context, arg PaginateTrending
 		return nil, err
 	}
 	defer rows.Close()
-	var items []persist.FeedEntity
+	var items []PaginateTrendingFeedRow
 	for rows.Next() {
-		var result persist.FeedEntity
-		if err := rows.Scan(&result); err != nil {
+		var i PaginateTrendingFeedRow
+		if err := rows.Scan(&i.CreatedAt, &i.ID, &i.Tag); err != nil {
 			return nil, err
 		}
-		items = append(items, result)
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

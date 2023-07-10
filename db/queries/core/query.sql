@@ -382,10 +382,10 @@ select exists(
 );
 
 -- name: PaginateGlobalFeed :batchmany
-SELECT subquery.*::feed_entity
+SELECT subquery.id, subquery.tag, subquery.created_at
 FROM (
     (
-        SELECT id, null::varchar(255)[], caption, event_time, 'feed_event'::varchar, version, owner_id, group_id, action, data, event_ids, deleted, last_updated, created_at
+        SELECT id, @feed_event_tag::int as tag, created_at
         FROM feed_events 
         WHERE deleted = false
         AND (event_time, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
@@ -393,7 +393,7 @@ FROM (
     )
     UNION ALL
     (
-        SELECT id, token_ids, caption, created_at, 'post'::varchar, version, null::varchar(255), null::varchar(255), null::varchar, null::jsonb, null::varchar(255)[], deleted, last_updated, created_at
+        SELECT id, @post_event_tag::int as tag, created_at
         FROM posts 
         WHERE deleted = false
         AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
@@ -407,10 +407,10 @@ LIMIT sqlc.arg('limit');
 
 
 -- name: PaginatePersonalFeedByUserID :batchmany
-SELECT subquery.*::feed_entity
+SELECT subquery.id, subquery.tag, subquery.created_at
 FROM (
     (
-        SELECT fe.id, null::varchar(255)[], caption, event_time, 'feed_event'::varchar, version, owner_id, group_id, action, data, event_ids, fe.deleted, fe.last_updated, fe.created_at 
+        SELECT fe.id, @feed_event_tag::int as tag, fe.created_at
         FROM feed_events fe, follows fl 
         WHERE fe.deleted = false AND fl.deleted = false
         AND fe.owner_id = fl.followee AND fl.follower = sqlc.arg('follower')
@@ -419,7 +419,7 @@ FROM (
     ) 
     UNION ALL 
     (
-        SELECT posts.id, token_ids, caption, created_at, 'post'::varchar, version, null::varchar(255), null::varchar(255), null::varchar, null::jsonb, null::varchar(255)[], posts.deleted, posts.last_updated, created_at 
+        SELECT posts.id, @post_tag::int as tag, created_at
         FROM posts, follows fll 
         WHERE posts.actor_id = fll.followee AND fll.follower = sqlc.arg('follower') AND fll.deleted = false AND posts.deleted = false
         AND (posts.created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
@@ -432,10 +432,10 @@ ORDER BY
 LIMIT sqlc.arg('limit');
 
 -- name: PaginateUserFeedByUserID :batchmany
-SELECT subquery.*::feed_entity
+SELECT subquery.id, subquery.created_at, subquery.tag
 FROM (
     (
-        SELECT id, null::varchar(255)[], caption, event_time, 'feed_event'::varchar, version, owner_id, group_id, action, data, event_ids, deleted, last_updated, created_at
+        SELECT id, @feed_event_tag::int as tag, created_at
         FROM feed_events 
         WHERE owner_id = sqlc.arg('owner_id') AND deleted = false
         AND (event_time, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
@@ -443,7 +443,7 @@ FROM (
     ) 
     UNION ALL 
     (
-        SELECT id, token_ids, caption, created_at, 'post'::varchar, version, null::varchar(255), null::varchar(255), null::varchar, null::jsonb, null::varchar(255)[], deleted, last_updated, created_at 
+        SELECT id, @post_tag::int as tag, created_at
         FROM posts 
         WHERE actor_id = sqlc.arg('owner_id') AND deleted = false
         AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
@@ -456,16 +456,16 @@ ORDER BY
 LIMIT sqlc.arg('limit');
 
 -- name: PaginateTrendingFeed :many
-SELECT (result.*)::feed_entity
+SELECT result.created_at, result.id, result.tag
 FROM (
     (
-        SELECT id, null::varchar(255)[], caption, event_time, 'feed_event'::varchar, version, owner_id, group_id, action, data, event_ids, deleted, last_updated, created_at 
+        SELECT id, 'feed_event'::int as tag, created_at 
         FROM feed_events 
         WHERE id = ANY(@feed_event_ids::text[]) AND deleted = false
     )
     UNION ALL
     (
-        SELECT id, token_ids, caption, created_at, 'post'::varchar, version, null::varchar(255), null::varchar(255), null::varchar, null::jsonb, null::varchar(255)[], deleted, last_updated, created_at 
+        SELECT id, 'post'::int as tag, created_at
         FROM posts 
         WHERE id = ANY(@post_ids::text[]) AND deleted = false
     )
@@ -478,6 +478,18 @@ ORDER BY
     CASE WHEN @paging_forward::bool THEN t.pos END DESC,
     CASE WHEN NOT @paging_forward::bool THEN t.pos END ASC
 LIMIT sqlc.arg('limit');
+
+-- name: GetFeedEventsByIds :many
+SELECT * FROM feed_events WHERE id = ANY(@ids::varchar(255)[]) AND deleted = false;
+
+-- name: GetFeedEventsByIdsBatch :batchmany
+SELECT * FROM feed_events WHERE id = ANY($1) AND deleted = false;
+
+-- name: GetPostsByIds :many
+SELECT * FROM posts WHERE id = ANY(@ids::varchar(255)[]) AND deleted = false;
+
+-- name: GetPostsByIdsBatch :batchmany
+SELECT * FROM posts WHERE id = ANY($1) AND deleted = false;
 
 
 -- name: GetEventByIdBatch :batchone

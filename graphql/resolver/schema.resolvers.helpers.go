@@ -1187,10 +1187,6 @@ func feedEntityToModel(event *persist.FeedEntity) (model.FeedEventOrPostOrError,
 			Caption: captionVal,
 		}, nil
 	case persist.FeedEntitySourceFeedEvent:
-		var feedEventData persist.FeedEventData
-		if err := event.Data.AssignTo(&feedEventData); err != nil {
-			return nil, err
-		}
 
 		var groupID sql.NullString
 		if event.GroupID.String() != "" {
@@ -1203,13 +1199,13 @@ func feedEntityToModel(event *persist.FeedEntity) (model.FeedEventOrPostOrError,
 			ID:          event.ID,
 			Version:     event.Version.Int32,
 			OwnerID:     event.OwnerID,
-			Action:      persist.Action(event.Action.String),
-			Data:        feedEventData,
-			EventTime:   event.EventTime.Time,
+			Action:      event.Action,
+			Data:        event.Data,
+			EventTime:   event.EventTime,
 			EventIds:    event.EventIDs,
 			Deleted:     event.Deleted.Bool,
-			LastUpdated: event.LastUpdated.Time,
-			CreatedAt:   event.CreatedAt.Time,
+			LastUpdated: event.LastUpdated,
+			CreatedAt:   event.CreatedAt,
 			Caption:     event.Caption,
 			GroupID:     groupID,
 		})

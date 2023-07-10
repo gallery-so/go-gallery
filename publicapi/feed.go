@@ -373,8 +373,22 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 			Limit:         params.Limit,
 		})
 
-		results, _ := util.Map(keys, func(k persist.FeedEntity) (any, error) {
-			return k, nil
+		rows := make([]dataloader.PaginateFeedRow, len(keys))
+		for i, key := range keys {
+			rows[i] = dataloader.PaginateFeedRow{
+				ID:        key.ID,
+				Tag:       key.Tag,
+				CreatedAt: key.CreatedAt,
+			}
+		}
+
+		events, err := dataloader.PaginatedRowToFeedEntity(ctx, api.queries, rows)
+		if err != nil {
+			return nil, err
+		}
+
+		results, _ := util.Map(events, func(e persist.FeedEntity) (any, error) {
+			return e, nil
 		})
 
 		return results, err
@@ -433,7 +447,7 @@ func (api FeedAPI) TrendingUsers(ctx context.Context, report model.Window) ([]db
 
 func feedCursor(i interface{}) (time.Time, persist.DBID, error) {
 	if row, ok := i.(persist.FeedEntity); ok {
-		return row.EventTime.Time, row.ID, nil
+		return row.EventTime, row.ID, nil
 	}
 	return time.Time{}, "", fmt.Errorf("interface{} is not a feed entity")
 }

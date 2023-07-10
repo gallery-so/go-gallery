@@ -57,6 +57,7 @@ package dataloader
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"sync"
 	"time"
 
@@ -1028,54 +1029,210 @@ func loadPostById(q *db.Queries) func(context.Context, []persist.DBID) ([]db.Pos
 	}
 }
 
+type PaginateFeedRow struct {
+	ID        persist.DBID
+	Tag       int32
+	CreatedAt time.Time
+}
+
 func loadPersonalFeed(q *db.Queries) func(context.Context, []db.PaginatePersonalFeedByUserIDParams) ([][]persist.FeedEntity, []error) {
 	return func(ctx context.Context, params []db.PaginatePersonalFeedByUserIDParams) ([][]persist.FeedEntity, []error) {
-		events := make([][]persist.FeedEntity, len(params))
+		eventIdentifiers := make([][]db.PaginatePersonalFeedByUserIDRow, len(params))
 		errors := make([]error, len(params))
 
 		b := q.PaginatePersonalFeedByUserID(ctx, params)
 		defer b.Close()
 
-		b.Query(func(i int, evts []persist.FeedEntity, err error) {
-			events[i] = evts
+		b.Query(func(i int, evts []db.PaginatePersonalFeedByUserIDRow, err error) {
+			eventIdentifiers[i] = evts
 			errors[i] = err
 		})
 
-		return events, errors
+		rows := make([][]PaginateFeedRow, len(eventIdentifiers))
+		for i, ids := range eventIdentifiers {
+			rows[i] = make([]PaginateFeedRow, len(ids))
+			for j, id := range ids {
+				rows[i][j] = PaginateFeedRow{
+					ID:        id.ID,
+					Tag:       id.Tag,
+					CreatedAt: id.CreatedAt,
+				}
+			}
+		}
+
+		return paginatedFeedRowsToFeedEntities(ctx, q, rows, errors)
+	}
+}
+
+func paginatedFeedRowsToFeedEntities(ctx context.Context, q *db.Queries, rows [][]PaginateFeedRow, errors []error) ([][]persist.FeedEntity, []error) {
+	events := make([][]persist.FeedEntity, len(rows))
+	for i, ids := range rows {
+		e, err := PaginatedRowToFeedEntity(ctx, q, ids)
+		if err != nil {
+			errors[i] = err
+		}
+		events[i] = e
+	}
+
+	return events, errors
+}
+
+func PaginatedRowToFeedEntity(ctx context.Context, q *db.Queries, ids []PaginateFeedRow) ([]persist.FeedEntity, error) {
+	events := make([]persist.FeedEntity, len(ids))
+	feedEventIDs := make([]string, 0, len(ids))
+	feedPostsIDs := make([]string, 0, len(ids))
+	for _, id := range ids {
+		switch id.Tag {
+		case persist.FeedEventTag:
+			feedEventIDs = append(feedEventIDs, id.ID.String())
+		case persist.PostTag:
+			feedPostsIDs = append(feedPostsIDs, id.ID.String())
+		default:
+			return nil, fmt.Errorf("unknown tag %d", id.Tag)
+		}
+	}
+
+	incomingFeedEvents := make(chan []db.FeedEvent)
+	incomingFeedPosts := make(chan []db.Post)
+	incomingErrors := make(chan error)
+
+	go func() {
+		feedEvents, err := q.GetFeedEventsByIds(ctx, feedEventIDs)
+		if err != nil {
+			incomingErrors <- err
+			return
+		}
+		incomingFeedEvents <- feedEvents
+	}()
+
+	go func() {
+		feedPosts, err := q.GetPostsByIds(ctx, feedPostsIDs)
+		if err != nil {
+			incomingErrors <- err
+			return
+		}
+		incomingFeedPosts <- feedPosts
+	}()
+
+	for i := 0; i < 2; i++ {
+		select {
+		case feedEvents := <-incomingFeedEvents:
+			idsToFeedEvents := make(map[persist.DBID]db.FeedEvent, len(feedEvents))
+			for _, evt := range feedEvents {
+				idsToFeedEvents[evt.ID] = evt
+			}
+
+			for j, id := range ids {
+				if it, ok := idsToFeedEvents[id.ID]; ok {
+					events[j] = feedEventToFeedEntity(it)
+				}
+			}
+		case feedPosts := <-incomingFeedPosts:
+			idsToFeedPosts := make(map[persist.DBID]db.Post, len(feedPosts))
+			for _, evt := range feedPosts {
+				idsToFeedPosts[evt.ID] = evt
+			}
+
+			for j, id := range ids {
+				if it, ok := idsToFeedPosts[id.ID]; ok {
+					events[j] = postToFeedEntity(it)
+				}
+			}
+		case err := <-incomingErrors:
+			return nil, err
+		}
+	}
+
+	return events, nil
+}
+
+func feedEventToFeedEntity(evt db.FeedEvent) persist.FeedEntity {
+	return persist.FeedEntity{
+		ID:          evt.ID,
+		Caption:     evt.Caption,
+		EventTime:   evt.EventTime,
+		Source:      persist.FeedEntitySourceFeedEvent,
+		Version:     sql.NullInt32{Valid: true, Int32: evt.Version},
+		OwnerID:     evt.OwnerID,
+		GroupID:     persist.DBID(evt.GroupID.String),
+		Action:      evt.Action,
+		Data:        evt.Data,
+		EventIDs:    evt.EventIds,
+		Deleted:     sql.NullBool{Valid: true, Bool: evt.Deleted},
+		LastUpdated: evt.LastUpdated,
+		CreatedAt:   evt.CreatedAt,
+	}
+}
+
+func postToFeedEntity(p db.Post) persist.FeedEntity {
+	return persist.FeedEntity{
+		ID:          p.ID,
+		TokenIDs:    p.TokenIds,
+		Caption:     p.Caption,
+		Source:      persist.FeedEntitySourcePost,
+		Deleted:     sql.NullBool{Valid: true, Bool: p.Deleted},
+		OwnerID:     p.ActorID,
+		LastUpdated: p.LastUpdated,
+		CreatedAt:   p.CreatedAt,
+		Version:     sql.NullInt32{Valid: true, Int32: p.Version},
 	}
 }
 
 func loadGlobalFeed(q *db.Queries) func(context.Context, []db.PaginateGlobalFeedParams) ([][]persist.FeedEntity, []error) {
 	return func(ctx context.Context, params []db.PaginateGlobalFeedParams) ([][]persist.FeedEntity, []error) {
-		events := make([][]persist.FeedEntity, len(params))
+		events := make([][]db.PaginateGlobalFeedRow, len(params))
 		errors := make([]error, len(params))
 
 		b := q.PaginateGlobalFeed(ctx, params)
 		defer b.Close()
 
-		b.Query(func(i int, evts []persist.FeedEntity, err error) {
+		b.Query(func(i int, evts []db.PaginateGlobalFeedRow, err error) {
 			events[i] = evts
 			errors[i] = err
 		})
 
-		return events, errors
+		rows := make([][]PaginateFeedRow, len(events))
+		for i, ids := range events {
+			rows[i] = make([]PaginateFeedRow, len(ids))
+			for j, id := range ids {
+				rows[i][j] = PaginateFeedRow{
+					ID:        id.ID,
+					Tag:       id.Tag,
+					CreatedAt: id.CreatedAt,
+				}
+			}
+		}
+
+		return paginatedFeedRowsToFeedEntities(ctx, q, rows, errors)
 	}
 }
 
 func loadUserFeed(q *db.Queries) func(context.Context, []db.PaginateUserFeedByUserIDParams) ([][]persist.FeedEntity, []error) {
 	return func(ctx context.Context, params []db.PaginateUserFeedByUserIDParams) ([][]persist.FeedEntity, []error) {
-		events := make([][]persist.FeedEntity, len(params))
+		events := make([][]db.PaginateUserFeedByUserIDRow, len(params))
 		errors := make([]error, len(params))
 
 		b := q.PaginateUserFeedByUserID(ctx, params)
 		defer b.Close()
 
-		b.Query(func(i int, evts []persist.FeedEntity, err error) {
+		b.Query(func(i int, evts []db.PaginateUserFeedByUserIDRow, err error) {
 			events[i] = evts
 			errors[i] = err
 		})
 
-		return events, errors
+		rows := make([][]PaginateFeedRow, len(events))
+		for i, ids := range events {
+			rows[i] = make([]PaginateFeedRow, len(ids))
+			for j, id := range ids {
+				rows[i][j] = PaginateFeedRow{
+					ID:        id.ID,
+					Tag:       id.Tag,
+					CreatedAt: id.CreatedAt,
+				}
+			}
+		}
+
+		return paginatedFeedRowsToFeedEntities(ctx, q, rows, errors)
 	}
 }
 

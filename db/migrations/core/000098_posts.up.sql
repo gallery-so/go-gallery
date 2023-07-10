@@ -11,20 +11,3 @@ create table if not exists posts (
 
 alter table admires add column post_id varchar(255) references posts(id);
 alter table comments add column post_id varchar(255) references posts(id);
-
-create type feed_entity AS (
-    id varchar(255),
-    token_ids varchar(255)[],
-    caption varchar,
-    event_time timestamptz,
-    source varchar,
-    version int,
-    owner_id varchar(255),
-    group_id varchar(255),
-    action varchar(255),
-    data jsonb,
-    event_ids varchar(255)[],
-    deleted boolean,
-    last_updated timestamptz,
-    created_at timestamptz
-);

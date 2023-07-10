@@ -1279,6 +1279,77 @@ func (b *GetEventByIdBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getFeedEventsByIdsBatch = `-- name: GetFeedEventsByIdsBatch :batchmany
+SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption, group_id FROM feed_events WHERE id = ANY($1) AND deleted = false
+`
+
+type GetFeedEventsByIdsBatchBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+func (q *Queries) GetFeedEventsByIdsBatch(ctx context.Context, id []persist.DBID) *GetFeedEventsByIdsBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range id {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(getFeedEventsByIdsBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetFeedEventsByIdsBatchBatchResults{br, len(id), false}
+}
+
+func (b *GetFeedEventsByIdsBatchBatchResults) Query(f func(int, []FeedEvent, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var items []FeedEvent
+		if b.closed {
+			if f != nil {
+				f(t, items, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		err := func() error {
+			rows, err := b.br.Query()
+			defer rows.Close()
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var i FeedEvent
+				if err := rows.Scan(
+					&i.ID,
+					&i.Version,
+					&i.OwnerID,
+					&i.Action,
+					&i.Data,
+					&i.EventTime,
+					&i.EventIds,
+					&i.Deleted,
+					&i.LastUpdated,
+					&i.CreatedAt,
+					&i.Caption,
+					&i.GroupID,
+				); err != nil {
+					return err
+				}
+				items = append(items, i)
+			}
+			return rows.Err()
+		}()
+		if f != nil {
+			f(t, items, err)
+		}
+	}
+}
+
+func (b *GetFeedEventsByIdsBatchBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const getFollowersByUserIdBatch = `-- name: GetFollowersByUserIdBatch :batchmany
 SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id FROM follows f
     INNER JOIN users u ON f.follower = u.id
@@ -2054,6 +2125,73 @@ func (b *GetPostByIdBatchBatchResults) QueryRow(f func(int, Post, error)) {
 }
 
 func (b *GetPostByIdBatchBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
+const getPostsByIdsBatch = `-- name: GetPostsByIdsBatch :batchmany
+SELECT id, version, token_ids, actor_id, caption, created_at, last_updated, deleted FROM posts WHERE id = ANY($1) AND deleted = false
+`
+
+type GetPostsByIdsBatchBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+func (q *Queries) GetPostsByIdsBatch(ctx context.Context, id []persist.DBID) *GetPostsByIdsBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range id {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(getPostsByIdsBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetPostsByIdsBatchBatchResults{br, len(id), false}
+}
+
+func (b *GetPostsByIdsBatchBatchResults) Query(f func(int, []Post, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var items []Post
+		if b.closed {
+			if f != nil {
+				f(t, items, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		err := func() error {
+			rows, err := b.br.Query()
+			defer rows.Close()
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var i Post
+				if err := rows.Scan(
+					&i.ID,
+					&i.Version,
+					&i.TokenIds,
+					&i.ActorID,
+					&i.Caption,
+					&i.CreatedAt,
+					&i.LastUpdated,
+					&i.Deleted,
+				); err != nil {
+					return err
+				}
+				items = append(items, i)
+			}
+			return rows.Err()
+		}()
+		if f != nil {
+			f(t, items, err)
+		}
+	}
+}
+
+func (b *GetPostsByIdsBatchBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }
@@ -3943,28 +4081,28 @@ func (b *PaginateCommentsByPostIDBatchBatchResults) Close() error {
 }
 
 const paginateGlobalFeed = `-- name: PaginateGlobalFeed :batchmany
-SELECT subquery.*::feed_entity
+SELECT subquery.id, subquery.tag, subquery.created_at
 FROM (
     (
-        SELECT id, null::varchar(255)[], caption, event_time, 'feed_event'::varchar, version, owner_id, group_id, action, data, event_ids, deleted, last_updated, created_at
+        SELECT id, $1::int as tag, created_at
         FROM feed_events 
         WHERE deleted = false
-        AND (event_time, id) < ($1, $2)
-        AND (event_time, id) > ($3, $4)
+        AND (event_time, id) < ($2, $3)
+        AND (event_time, id) > ($4, $5)
     )
     UNION ALL
     (
-        SELECT id, token_ids, caption, created_at, 'post'::varchar, version, null::varchar(255), null::varchar(255), null::varchar, null::jsonb, null::varchar(255)[], deleted, last_updated, created_at
+        SELECT id, $6::int as tag, created_at
         FROM posts 
         WHERE deleted = false
-        AND (created_at, id) < ($1, $2)
-        AND (created_at, id) > ($3, $4)
+        AND (created_at, id) < ($2, $3)
+        AND (created_at, id) > ($4, $5)
     )
 ) subquery
 ORDER BY 
-    CASE WHEN $5::bool THEN (event_time, id) END ASC,
-    CASE WHEN NOT $5::bool THEN (event_time, id) END DESC
-LIMIT $6
+    CASE WHEN $7::bool THEN (event_time, id) END ASC,
+    CASE WHEN NOT $7::bool THEN (event_time, id) END DESC
+LIMIT $8
 `
 
 type PaginateGlobalFeedBatchResults struct {
@@ -3974,22 +4112,32 @@ type PaginateGlobalFeedBatchResults struct {
 }
 
 type PaginateGlobalFeedParams struct {
+	FeedEventTag  int32        `json:"feed_event_tag"`
 	CurBeforeTime time.Time    `json:"cur_before_time"`
 	CurBeforeID   persist.DBID `json:"cur_before_id"`
 	CurAfterTime  time.Time    `json:"cur_after_time"`
 	CurAfterID    persist.DBID `json:"cur_after_id"`
+	PostEventTag  int32        `json:"post_event_tag"`
 	PagingForward bool         `json:"paging_forward"`
 	Limit         int32        `json:"limit"`
+}
+
+type PaginateGlobalFeedRow struct {
+	ID        persist.DBID `json:"id"`
+	Tag       int32        `json:"tag"`
+	CreatedAt time.Time    `json:"created_at"`
 }
 
 func (q *Queries) PaginateGlobalFeed(ctx context.Context, arg []PaginateGlobalFeedParams) *PaginateGlobalFeedBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range arg {
 		vals := []interface{}{
+			a.FeedEventTag,
 			a.CurBeforeTime,
 			a.CurBeforeID,
 			a.CurAfterTime,
 			a.CurAfterID,
+			a.PostEventTag,
 			a.PagingForward,
 			a.Limit,
 		}
@@ -3999,10 +4147,10 @@ func (q *Queries) PaginateGlobalFeed(ctx context.Context, arg []PaginateGlobalFe
 	return &PaginateGlobalFeedBatchResults{br, len(arg), false}
 }
 
-func (b *PaginateGlobalFeedBatchResults) Query(f func(int, []persist.FeedEntity, error)) {
+func (b *PaginateGlobalFeedBatchResults) Query(f func(int, []PaginateGlobalFeedRow, error)) {
 	defer b.br.Close()
 	for t := 0; t < b.tot; t++ {
-		var items []persist.FeedEntity
+		var items []PaginateGlobalFeedRow
 		if b.closed {
 			if f != nil {
 				f(t, items, ErrBatchAlreadyClosed)
@@ -4016,11 +4164,11 @@ func (b *PaginateGlobalFeedBatchResults) Query(f func(int, []persist.FeedEntity,
 				return err
 			}
 			for rows.Next() {
-				var subquery persist.FeedEntity
-				if err := rows.Scan(&subquery); err != nil {
+				var i PaginateGlobalFeedRow
+				if err := rows.Scan(&i.ID, &i.Tag, &i.CreatedAt); err != nil {
 					return err
 				}
-				items = append(items, subquery)
+				items = append(items, i)
 			}
 			return rows.Err()
 		}()
@@ -4232,29 +4380,29 @@ func (b *PaginateInteractionsByPostIDBatchBatchResults) Close() error {
 }
 
 const paginatePersonalFeedByUserID = `-- name: PaginatePersonalFeedByUserID :batchmany
-SELECT subquery.*::feed_entity
+SELECT subquery.id, subquery.tag, subquery.created_at
 FROM (
     (
-        SELECT fe.id, null::varchar(255)[], caption, event_time, 'feed_event'::varchar, version, owner_id, group_id, action, data, event_ids, fe.deleted, fe.last_updated, fe.created_at 
+        SELECT fe.id, $1::int as tag, fe.created_at
         FROM feed_events fe, follows fl 
         WHERE fe.deleted = false AND fl.deleted = false
-        AND fe.owner_id = fl.followee AND fl.follower = $1
-        AND (fe.event_time, fe.id) < ($2, $3)
-        AND (fe.event_time, fe.id) > ($4, $5)
+        AND fe.owner_id = fl.followee AND fl.follower = $2
+        AND (fe.event_time, fe.id) < ($3, $4)
+        AND (fe.event_time, fe.id) > ($5, $6)
     ) 
     UNION ALL 
     (
-        SELECT posts.id, token_ids, caption, created_at, 'post'::varchar, version, null::varchar(255), null::varchar(255), null::varchar, null::jsonb, null::varchar(255)[], posts.deleted, posts.last_updated, created_at 
+        SELECT posts.id, $7::int as tag, created_at
         FROM posts, follows fll 
-        WHERE posts.actor_id = fll.followee AND fll.follower = $1 AND fll.deleted = false AND posts.deleted = false
-        AND (posts.created_at, id) < ($2, $3)
-        AND (posts.created_at, id) > ($4, $5)
+        WHERE posts.actor_id = fll.followee AND fll.follower = $2 AND fll.deleted = false AND posts.deleted = false
+        AND (posts.created_at, id) < ($3, $4)
+        AND (posts.created_at, id) > ($5, $6)
     )
 ) subquery
 ORDER BY 
-    CASE WHEN $6::bool THEN (event_time, id) END ASC,
-    CASE WHEN NOT $6::bool THEN (event_time, id) END DESC
-LIMIT $7
+    CASE WHEN $8::bool THEN (event_time, id) END ASC,
+    CASE WHEN NOT $8::bool THEN (event_time, id) END DESC
+LIMIT $9
 `
 
 type PaginatePersonalFeedByUserIDBatchResults struct {
@@ -4264,24 +4412,34 @@ type PaginatePersonalFeedByUserIDBatchResults struct {
 }
 
 type PaginatePersonalFeedByUserIDParams struct {
+	FeedEventTag  int32        `json:"feed_event_tag"`
 	Follower      persist.DBID `json:"follower"`
 	CurBeforeTime time.Time    `json:"cur_before_time"`
 	CurBeforeID   persist.DBID `json:"cur_before_id"`
 	CurAfterTime  time.Time    `json:"cur_after_time"`
 	CurAfterID    persist.DBID `json:"cur_after_id"`
+	PostTag       int32        `json:"post_tag"`
 	PagingForward bool         `json:"paging_forward"`
 	Limit         int32        `json:"limit"`
+}
+
+type PaginatePersonalFeedByUserIDRow struct {
+	ID        persist.DBID `json:"id"`
+	Tag       int32        `json:"tag"`
+	CreatedAt time.Time    `json:"created_at"`
 }
 
 func (q *Queries) PaginatePersonalFeedByUserID(ctx context.Context, arg []PaginatePersonalFeedByUserIDParams) *PaginatePersonalFeedByUserIDBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range arg {
 		vals := []interface{}{
+			a.FeedEventTag,
 			a.Follower,
 			a.CurBeforeTime,
 			a.CurBeforeID,
 			a.CurAfterTime,
 			a.CurAfterID,
+			a.PostTag,
 			a.PagingForward,
 			a.Limit,
 		}
@@ -4291,10 +4449,10 @@ func (q *Queries) PaginatePersonalFeedByUserID(ctx context.Context, arg []Pagina
 	return &PaginatePersonalFeedByUserIDBatchResults{br, len(arg), false}
 }
 
-func (b *PaginatePersonalFeedByUserIDBatchResults) Query(f func(int, []persist.FeedEntity, error)) {
+func (b *PaginatePersonalFeedByUserIDBatchResults) Query(f func(int, []PaginatePersonalFeedByUserIDRow, error)) {
 	defer b.br.Close()
 	for t := 0; t < b.tot; t++ {
-		var items []persist.FeedEntity
+		var items []PaginatePersonalFeedByUserIDRow
 		if b.closed {
 			if f != nil {
 				f(t, items, ErrBatchAlreadyClosed)
@@ -4308,11 +4466,11 @@ func (b *PaginatePersonalFeedByUserIDBatchResults) Query(f func(int, []persist.F
 				return err
 			}
 			for rows.Next() {
-				var subquery persist.FeedEntity
-				if err := rows.Scan(&subquery); err != nil {
+				var i PaginatePersonalFeedByUserIDRow
+				if err := rows.Scan(&i.ID, &i.Tag, &i.CreatedAt); err != nil {
 					return err
 				}
-				items = append(items, subquery)
+				items = append(items, i)
 			}
 			return rows.Err()
 		}()
@@ -4328,28 +4486,28 @@ func (b *PaginatePersonalFeedByUserIDBatchResults) Close() error {
 }
 
 const paginateUserFeedByUserID = `-- name: PaginateUserFeedByUserID :batchmany
-SELECT subquery.*::feed_entity
+SELECT subquery.id, subquery.created_at, subquery.tag
 FROM (
     (
-        SELECT id, null::varchar(255)[], caption, event_time, 'feed_event'::varchar, version, owner_id, group_id, action, data, event_ids, deleted, last_updated, created_at
+        SELECT id, $1::int as tag, created_at
         FROM feed_events 
-        WHERE owner_id = $1 AND deleted = false
-        AND (event_time, id) < ($2, $3)
-        AND (event_time, id) > ($4, $5)
+        WHERE owner_id = $2 AND deleted = false
+        AND (event_time, id) < ($3, $4)
+        AND (event_time, id) > ($5, $6)
     ) 
     UNION ALL 
     (
-        SELECT id, token_ids, caption, created_at, 'post'::varchar, version, null::varchar(255), null::varchar(255), null::varchar, null::jsonb, null::varchar(255)[], deleted, last_updated, created_at 
+        SELECT id, $7::int as tag, created_at
         FROM posts 
-        WHERE actor_id = $1 AND deleted = false
-        AND (created_at, id) < ($2, $3)
-        AND (created_at, id) > ($4, $5)
+        WHERE actor_id = $2 AND deleted = false
+        AND (created_at, id) < ($3, $4)
+        AND (created_at, id) > ($5, $6)
     )
 ) subquery
 ORDER BY 
-    CASE WHEN $6::bool THEN (event_time, id) END ASC,
-    CASE WHEN NOT $6::bool THEN (event_time, id) END DESC
-LIMIT $7
+    CASE WHEN $8::bool THEN (event_time, id) END ASC,
+    CASE WHEN NOT $8::bool THEN (event_time, id) END DESC
+LIMIT $9
 `
 
 type PaginateUserFeedByUserIDBatchResults struct {
@@ -4359,24 +4517,34 @@ type PaginateUserFeedByUserIDBatchResults struct {
 }
 
 type PaginateUserFeedByUserIDParams struct {
+	FeedEventTag  int32        `json:"feed_event_tag"`
 	OwnerID       persist.DBID `json:"owner_id"`
 	CurBeforeTime time.Time    `json:"cur_before_time"`
 	CurBeforeID   persist.DBID `json:"cur_before_id"`
 	CurAfterTime  time.Time    `json:"cur_after_time"`
 	CurAfterID    persist.DBID `json:"cur_after_id"`
+	PostTag       int32        `json:"post_tag"`
 	PagingForward bool         `json:"paging_forward"`
 	Limit         int32        `json:"limit"`
+}
+
+type PaginateUserFeedByUserIDRow struct {
+	ID        persist.DBID `json:"id"`
+	CreatedAt time.Time    `json:"created_at"`
+	Tag       int32        `json:"tag"`
 }
 
 func (q *Queries) PaginateUserFeedByUserID(ctx context.Context, arg []PaginateUserFeedByUserIDParams) *PaginateUserFeedByUserIDBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range arg {
 		vals := []interface{}{
+			a.FeedEventTag,
 			a.OwnerID,
 			a.CurBeforeTime,
 			a.CurBeforeID,
 			a.CurAfterTime,
 			a.CurAfterID,
+			a.PostTag,
 			a.PagingForward,
 			a.Limit,
 		}
@@ -4386,10 +4554,10 @@ func (q *Queries) PaginateUserFeedByUserID(ctx context.Context, arg []PaginateUs
 	return &PaginateUserFeedByUserIDBatchResults{br, len(arg), false}
 }
 
-func (b *PaginateUserFeedByUserIDBatchResults) Query(f func(int, []persist.FeedEntity, error)) {
+func (b *PaginateUserFeedByUserIDBatchResults) Query(f func(int, []PaginateUserFeedByUserIDRow, error)) {
 	defer b.br.Close()
 	for t := 0; t < b.tot; t++ {
-		var items []persist.FeedEntity
+		var items []PaginateUserFeedByUserIDRow
 		if b.closed {
 			if f != nil {
 				f(t, items, ErrBatchAlreadyClosed)
@@ -4403,11 +4571,11 @@ func (b *PaginateUserFeedByUserIDBatchResults) Query(f func(int, []persist.FeedE
 				return err
 			}
 			for rows.Next() {
-				var subquery persist.FeedEntity
-				if err := rows.Scan(&subquery); err != nil {
+				var i PaginateUserFeedByUserIDRow
+				if err := rows.Scan(&i.ID, &i.CreatedAt, &i.Tag); err != nil {
 					return err
 				}
-				items = append(items, subquery)
+				items = append(items, i)
 			}
 			return rows.Err()
 		}()
