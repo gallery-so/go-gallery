@@ -27,6 +27,10 @@ type AdmireFeedEventPayloadOrError interface {
 	IsAdmireFeedEventPayloadOrError()
 }
 
+type AdmirePostPayloadOrError interface {
+	IsAdmirePostPayloadOrError()
+}
+
 type AuthorizationError interface {
 	IsAuthorizationError()
 }
@@ -45,6 +49,10 @@ type CollectionTokenByIDOrError interface {
 
 type CommentOnFeedEventPayloadOrError interface {
 	IsCommentOnFeedEventPayloadOrError()
+}
+
+type CommentOnPostPayloadOrError interface {
+	IsCommentOnPostPayloadOrError()
 }
 
 type CommunityByAddressOrError interface {
@@ -438,6 +446,14 @@ type AdmireFeedEventPayload struct {
 
 func (AdmireFeedEventPayload) IsAdmireFeedEventPayloadOrError() {}
 
+type AdmirePostPayload struct {
+	Viewer *Viewer `json:"viewer"`
+	Post   *Post   `json:"post"`
+	Admire *Admire `json:"admire"`
+}
+
+func (AdmirePostPayload) IsAdmirePostPayloadOrError() {}
+
 type AudioMedia struct {
 	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`
 	MediaURL         *string          `json:"mediaURL"`
@@ -615,6 +631,14 @@ type CommentOnFeedEventPayload struct {
 }
 
 func (CommentOnFeedEventPayload) IsCommentOnFeedEventPayloadOrError() {}
+
+type CommentOnPostPayload struct {
+	Viewer  *Viewer  `json:"viewer"`
+	Post    *Post    `json:"post"`
+	Comment *Comment `json:"comment"`
+}
+
+func (CommentOnPostPayload) IsCommentOnPostPayloadOrError() {}
 
 type CommunitiesConnection struct {
 	Edges    []*CommunityEdge `json:"edges"`
@@ -955,6 +979,8 @@ func (ErrInvalidInput) IsDisconnectSocialAccountPayloadOrError()         {}
 func (ErrInvalidInput) IsFollowAllSocialConnectionsPayloadOrError()      {}
 func (ErrInvalidInput) IsSetProfileImagePayloadOrError()                 {}
 func (ErrInvalidInput) IsPostTokensPayloadOrError()                      {}
+func (ErrInvalidInput) IsAdmirePostPayloadOrError()                      {}
+func (ErrInvalidInput) IsCommentOnPostPayloadOrError()                   {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -1033,6 +1059,8 @@ func (ErrNotAuthorized) IsFollowAllSocialConnectionsPayloadOrError()   {}
 func (ErrNotAuthorized) IsGenerateQRCodeLoginTokenPayloadOrError()     {}
 func (ErrNotAuthorized) IsSetProfileImagePayloadOrError()              {}
 func (ErrNotAuthorized) IsPostTokensPayloadOrError()                   {}
+func (ErrNotAuthorized) IsAdmirePostPayloadOrError()                   {}
+func (ErrNotAuthorized) IsCommentOnPostPayloadOrError()                {}
 
 type ErrPostNotFound struct {
 	Message string `json:"message"`
@@ -1643,6 +1671,7 @@ type RemoveAdmirePayload struct {
 	Viewer    *Viewer       `json:"viewer"`
 	AdmireID  *persist.DBID `json:"admireID"`
 	FeedEvent *FeedEvent    `json:"feedEvent"`
+	Post      *Post         `json:"post"`
 }
 
 func (RemoveAdmirePayload) IsRemoveAdmirePayloadOrError() {}
@@ -1650,6 +1679,7 @@ func (RemoveAdmirePayload) IsRemoveAdmirePayloadOrError() {}
 type RemoveCommentPayload struct {
 	Viewer    *Viewer    `json:"viewer"`
 	FeedEvent *FeedEvent `json:"feedEvent"`
+	Post      *Post      `json:"post"`
 }
 
 func (RemoveCommentPayload) IsRemoveCommentPayloadOrError() {}

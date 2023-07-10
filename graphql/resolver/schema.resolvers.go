@@ -43,6 +43,16 @@ func (r *admireFeedEventPayloadResolver) FeedEvent(ctx context.Context, obj *mod
 	return resolveFeedEventByEventID(ctx, admire.FeedEventID)
 }
 
+// Post is the resolver for the post field.
+func (r *admirePostPayloadResolver) Post(ctx context.Context, obj *model.AdmirePostPayload) (*model.Post, error) {
+	panic(fmt.Errorf("not implemented: Post - post"))
+}
+
+// Admire is the resolver for the admire field.
+func (r *admirePostPayloadResolver) Admire(ctx context.Context, obj *model.AdmirePostPayload) (*model.Admire, error) {
+	panic(fmt.Errorf("not implemented: Admire - admire"))
+}
+
 // Gallery is the resolver for the gallery field.
 func (r *collectionResolver) Gallery(ctx context.Context, obj *model.Collection) (*model.Gallery, error) {
 	gallery, err := publicapi.For(ctx).Gallery.GetGalleryByCollectionId(ctx, obj.Dbid)
@@ -166,6 +176,16 @@ func (r *commentOnFeedEventPayloadResolver) ReplyToComment(ctx context.Context, 
 // FeedEvent is the resolver for the feedEvent field.
 func (r *commentOnFeedEventPayloadResolver) FeedEvent(ctx context.Context, obj *model.CommentOnFeedEventPayload) (*model.FeedEvent, error) {
 	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
+}
+
+// Post is the resolver for the post field.
+func (r *commentOnPostPayloadResolver) Post(ctx context.Context, obj *model.CommentOnPostPayload) (*model.Post, error) {
+	panic(fmt.Errorf("not implemented: Post - post"))
+}
+
+// Comment is the resolver for the comment field.
+func (r *commentOnPostPayloadResolver) Comment(ctx context.Context, obj *model.CommentOnPostPayload) (*model.Comment, error) {
+	panic(fmt.Errorf("not implemented: Comment - comment"))
 }
 
 // Creator is the resolver for the creator field.
@@ -1252,6 +1272,11 @@ func (r *mutationResolver) AdmireFeedEvent(ctx context.Context, feedEventID pers
 	return output, nil
 }
 
+// AdmirePost is the resolver for the admirePost field.
+func (r *mutationResolver) AdmirePost(ctx context.Context, postID persist.DBID) (model.AdmirePostPayloadOrError, error) {
+	panic(fmt.Errorf("not implemented: AdmirePost - admirePost"))
+}
+
 // RemoveAdmire is the resolver for the removeAdmire field.
 func (r *mutationResolver) RemoveAdmire(ctx context.Context, admireID persist.DBID) (model.RemoveAdmirePayloadOrError, error) {
 	feedEventID, err := publicapi.For(ctx).Interaction.RemoveAdmire(ctx, admireID)
@@ -1306,6 +1331,11 @@ func (r *mutationResolver) RemoveComment(ctx context.Context, commentID persist.
 		},
 	}
 	return output, nil
+}
+
+// CommentOnPost is the resolver for the commentOnPost field.
+func (r *mutationResolver) CommentOnPost(ctx context.Context, postID persist.DBID, replyToID *persist.DBID, comment string) (model.CommentOnPostPayloadOrError, error) {
+	panic(fmt.Errorf("not implemented: CommentOnPost - commentOnPost"))
 }
 
 // PostTokens is the resolver for the postTokens field.
@@ -2230,9 +2260,19 @@ func (r *removeAdmirePayloadResolver) FeedEvent(ctx context.Context, obj *model.
 	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
 }
 
+// Post is the resolver for the post field.
+func (r *removeAdmirePayloadResolver) Post(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.Post, error) {
+	panic(fmt.Errorf("not implemented: Post - post"))
+}
+
 // FeedEvent is the resolver for the feedEvent field.
 func (r *removeCommentPayloadResolver) FeedEvent(ctx context.Context, obj *model.RemoveCommentPayload) (*model.FeedEvent, error) {
 	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
+}
+
+// Post is the resolver for the post field.
+func (r *removeCommentPayloadResolver) Post(ctx context.Context, obj *model.RemoveCommentPayload) (*model.Post, error) {
+	panic(fmt.Errorf("not implemented: Post - post"))
 }
 
 // Tokens is the resolver for the tokens field.
@@ -2593,6 +2633,11 @@ func (r *Resolver) AdmireFeedEventPayload() generated.AdmireFeedEventPayloadReso
 	return &admireFeedEventPayloadResolver{r}
 }
 
+// AdmirePostPayload returns generated.AdmirePostPayloadResolver implementation.
+func (r *Resolver) AdmirePostPayload() generated.AdmirePostPayloadResolver {
+	return &admirePostPayloadResolver{r}
+}
+
 // Collection returns generated.CollectionResolver implementation.
 func (r *Resolver) Collection() generated.CollectionResolver { return &collectionResolver{r} }
 
@@ -2627,6 +2672,11 @@ func (r *Resolver) Comment() generated.CommentResolver { return &commentResolver
 // CommentOnFeedEventPayload returns generated.CommentOnFeedEventPayloadResolver implementation.
 func (r *Resolver) CommentOnFeedEventPayload() generated.CommentOnFeedEventPayloadResolver {
 	return &commentOnFeedEventPayloadResolver{r}
+}
+
+// CommentOnPostPayload returns generated.CommentOnPostPayloadResolver implementation.
+func (r *Resolver) CommentOnPostPayload() generated.CommentOnPostPayloadResolver {
+	return &commentOnPostPayloadResolver{r}
 }
 
 // Community returns generated.CommunityResolver implementation.
@@ -2784,6 +2834,7 @@ func (r *Resolver) ChainPubKeyInput() generated.ChainPubKeyInputResolver {
 
 type admireResolver struct{ *Resolver }
 type admireFeedEventPayloadResolver struct{ *Resolver }
+type admirePostPayloadResolver struct{ *Resolver }
 type collectionResolver struct{ *Resolver }
 type collectionCreatedFeedEventDataResolver struct{ *Resolver }
 type collectionTokenResolver struct{ *Resolver }
@@ -2792,6 +2843,7 @@ type collectorsNoteAddedToCollectionFeedEventDataResolver struct{ *Resolver }
 type collectorsNoteAddedToTokenFeedEventDataResolver struct{ *Resolver }
 type commentResolver struct{ *Resolver }
 type commentOnFeedEventPayloadResolver struct{ *Resolver }
+type commentOnPostPayloadResolver struct{ *Resolver }
 type communityResolver struct{ *Resolver }
 type createCollectionPayloadResolver struct{ *Resolver }
 type ensProfileImageResolver struct{ *Resolver }
