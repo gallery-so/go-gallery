@@ -162,7 +162,7 @@ func (d *Provider) getTokensWithRequest(ctx context.Context, req string, owner, 
 	nodesToTokens, _ := util.Map(resp.Tokens.Nodes, func(n tokenNode) (token, error) {
 		return n.Token, nil
 	})
-	tokens, contracts, err := d.tokensToChainAgnostic(ctx, nodesToTokens)
+	tokens, contracts, err := d.tokensToChainAgnostic(ctx, nodesToTokens, owner)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -381,7 +381,7 @@ func (d *Provider) GetContractsByOwnerAddress(ctx context.Context, addr persist.
 	return result, nil
 }
 
-func (d *Provider) tokensToChainAgnostic(ctx context.Context, tokens []token) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (d *Provider) tokensToChainAgnostic(ctx context.Context, tokens []token, owner persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	result := make([]multichain.ChainAgnosticToken, len(tokens))
 	contracts := map[string]multichain.ChainAgnosticContract{}
 	for i, token := range tokens {
@@ -403,7 +403,7 @@ func (d *Provider) tokensToChainAgnostic(ctx context.Context, tokens []token) ([
 			TokenMetadata:   token.Metadata,
 			TokenID:         persist.TokenID(token.TokenID.toBase16String()),
 			Quantity:        "1",
-			OwnerAddress:    persist.Address(strings.ToLower(token.Owner)),
+			OwnerAddress:    persist.Address(util.FirstNonEmptyString(strings.ToLower(token.Owner), owner.String())),
 			ContractAddress: persist.Address(strings.ToLower(token.TokenContract.CollectionAddress)),
 			ExternalURL:     token.TokenURL,
 			FallbackMedia: persist.FallbackMedia{
