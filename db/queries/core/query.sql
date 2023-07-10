@@ -459,13 +459,13 @@ LIMIT sqlc.arg('limit');
 SELECT result.created_at, result.id, result.tag
 FROM (
     (
-        SELECT id, 'feed_event'::int as tag, event_time as created_at 
+        SELECT id, @feed_event_tag::int as tag, event_time as created_at 
         FROM feed_events 
         WHERE id = ANY(@feed_event_ids::text[]) AND deleted = false
     )
     UNION ALL
     (
-        SELECT id, 'post'::int as tag, created_at
+        SELECT id, @post_tag::int as tag, created_at
         FROM posts 
         WHERE id = ANY(@post_ids::text[]) AND deleted = false
     )

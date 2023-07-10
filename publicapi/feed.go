@@ -171,6 +171,8 @@ func (api FeedAPI) PaginatePersonalFeed(ctx context.Context, before *string, aft
 			CurAfterTime:  params.CursorAfterTime,
 			CurAfterID:    params.CursorAfterID,
 			PagingForward: params.PagingForward,
+			FeedEventTag:  persist.FeedEventTag,
+			PostTag:       persist.PostTag,
 		})
 
 		if err != nil {
@@ -222,6 +224,8 @@ func (api FeedAPI) PaginateUserFeed(ctx context.Context, userID persist.DBID, be
 			CurAfterTime:  params.CursorAfterTime,
 			CurAfterID:    params.CursorAfterID,
 			PagingForward: params.PagingForward,
+			FeedEventTag:  persist.FeedEventTag,
+			PostTag:       persist.PostTag,
 		})
 
 		if err != nil {
@@ -265,6 +269,8 @@ func (api FeedAPI) PaginateGlobalFeed(ctx context.Context, before *string, after
 			CurAfterTime:  params.CursorAfterTime,
 			CurAfterID:    params.CursorAfterID,
 			PagingForward: params.PagingForward,
+			FeedEventTag:  persist.FeedEventTag,
+			PostEventTag:  persist.PostTag,
 		})
 
 		if err != nil {
@@ -371,6 +377,8 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 			CurAfterPos:   params.CursorAfterPos,
 			PagingForward: params.PagingForward,
 			Limit:         params.Limit,
+			FeedEventTag:  persist.FeedEventTag,
+			PostTag:       persist.PostTag,
 		})
 
 		rows := make([]dataloader.PaginateFeedRow, len(keys))

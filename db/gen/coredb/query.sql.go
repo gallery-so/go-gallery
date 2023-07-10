@@ -4865,29 +4865,31 @@ const paginateTrendingFeed = `-- name: PaginateTrendingFeed :many
 SELECT result.created_at, result.id, result.tag
 FROM (
     (
-        SELECT id, 'feed_event'::int as tag, event_time as created_at 
+        SELECT id, $1::int as tag, event_time as created_at 
         FROM feed_events 
-        WHERE id = ANY($1::text[]) AND deleted = false
+        WHERE id = ANY($2::text[]) AND deleted = false
     )
     UNION ALL
     (
-        SELECT id, 'post'::int as tag, created_at
+        SELECT id, $3::int as tag, created_at
         FROM posts 
-        WHERE id = ANY($2::text[]) AND deleted = false
+        WHERE id = ANY($4::text[]) AND deleted = false
     )
 ) AS result 
-JOIN unnest(ARRAY_CAT($1::text[], $2::text[])) WITH ORDINALITY t(id, pos) 
+JOIN unnest(ARRAY_CAT($2::text[], $4::text[])) WITH ORDINALITY t(id, pos) 
 ON result.id = t.id 
-WHERE t.pos > $3::int
-AND t.pos < $4::int
+WHERE t.pos > $5::int
+AND t.pos < $6::int
 ORDER BY 
-    CASE WHEN $5::bool THEN t.pos END DESC,
-    CASE WHEN NOT $5::bool THEN t.pos END ASC
-LIMIT $6
+    CASE WHEN $7::bool THEN t.pos END DESC,
+    CASE WHEN NOT $7::bool THEN t.pos END ASC
+LIMIT $8
 `
 
 type PaginateTrendingFeedParams struct {
+	FeedEventTag  int32    `json:"feed_event_tag"`
 	FeedEventIds  []string `json:"feed_event_ids"`
+	PostTag       int32    `json:"post_tag"`
 	PostIds       []string `json:"post_ids"`
 	CurBeforePos  int32    `json:"cur_before_pos"`
 	CurAfterPos   int32    `json:"cur_after_pos"`
@@ -4903,7 +4905,9 @@ type PaginateTrendingFeedRow struct {
 
 func (q *Queries) PaginateTrendingFeed(ctx context.Context, arg PaginateTrendingFeedParams) ([]PaginateTrendingFeedRow, error) {
 	rows, err := q.db.Query(ctx, paginateTrendingFeed,
+		arg.FeedEventTag,
 		arg.FeedEventIds,
+		arg.PostTag,
 		arg.PostIds,
 		arg.CurBeforePos,
 		arg.CurAfterPos,
