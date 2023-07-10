@@ -26,9 +26,3 @@ add constraint post_feed_event_comment_check check (
     (post_id is null and feed_event_id is not null) or
     (post_id is null and feed_event_id is null)
 );
-
-alter table events
-add constraint post_feed_event_check check (
-    (post_id is not null and feed_event_id is null) or 
-    (post_id is null and feed_event_id is not null)
-);
