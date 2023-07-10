@@ -401,8 +401,8 @@ FROM (
     )
 ) subquery
 ORDER BY 
-    CASE WHEN sqlc.arg('paging_forward')::bool THEN (event_time, id) END ASC,
-    CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (event_time, id) END DESC
+    CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
+    CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
 LIMIT sqlc.arg('limit');
 
 
@@ -427,8 +427,8 @@ FROM (
     )
 ) subquery
 ORDER BY 
-    CASE WHEN sqlc.arg('paging_forward')::bool THEN (event_time, id) END ASC,
-    CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (event_time, id) END DESC
+    CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
+    CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
 LIMIT sqlc.arg('limit');
 
 -- name: PaginateUserFeedByUserID :batchmany
@@ -451,8 +451,8 @@ FROM (
     )
 ) subquery
 ORDER BY 
-    CASE WHEN sqlc.arg('paging_forward')::bool THEN (event_time, id) END ASC,
-    CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (event_time, id) END DESC
+    CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
+    CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
 LIMIT sqlc.arg('limit');
 
 -- name: PaginateTrendingFeed :many

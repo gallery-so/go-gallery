@@ -4100,8 +4100,8 @@ FROM (
     )
 ) subquery
 ORDER BY 
-    CASE WHEN $7::bool THEN (event_time, id) END ASC,
-    CASE WHEN NOT $7::bool THEN (event_time, id) END DESC
+    CASE WHEN $7::bool THEN (created_at, id) END ASC,
+    CASE WHEN NOT $7::bool THEN (created_at, id) END DESC
 LIMIT $8
 `
 
@@ -4400,8 +4400,8 @@ FROM (
     )
 ) subquery
 ORDER BY 
-    CASE WHEN $8::bool THEN (event_time, id) END ASC,
-    CASE WHEN NOT $8::bool THEN (event_time, id) END DESC
+    CASE WHEN $8::bool THEN (created_at, id) END ASC,
+    CASE WHEN NOT $8::bool THEN (created_at, id) END DESC
 LIMIT $9
 `
 
@@ -4505,8 +4505,8 @@ FROM (
     )
 ) subquery
 ORDER BY 
-    CASE WHEN $8::bool THEN (event_time, id) END ASC,
-    CASE WHEN NOT $8::bool THEN (event_time, id) END DESC
+    CASE WHEN $8::bool THEN (created_at, id) END ASC,
+    CASE WHEN NOT $8::bool THEN (created_at, id) END DESC
 LIMIT $9
 `
 
