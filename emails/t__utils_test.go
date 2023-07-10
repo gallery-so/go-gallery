@@ -201,7 +201,7 @@ func seedAdmireNotif(ctx context.Context, t *testing.T, q *coredb.Queries, userI
 
 func seedCommentNotif(ctx context.Context, t *testing.T, q *coredb.Queries, repos *postgres.Repositories, userID persist.DBID, userID2 persist.DBID) {
 
-	commentID, err := repos.CommentRepository.CreateComment(ctx, feedEvent.ID, userID2, nil, "test comment")
+	commentID, err := repos.CommentRepository.CreateComment(ctx, feedEvent.ID, "", userID2, nil, "test comment")
 
 	if err != nil {
 		t.Fatalf("failed to create admire event: %s", err)
