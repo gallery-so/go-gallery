@@ -92,10 +92,10 @@ func processMediaForToken(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRe
 
 		lockID := fmt.Sprintf("%s-%s-%d", input.TokenID, input.ContractAddress, input.Chain)
 
-		// if err := throttler.Lock(reqCtx, lockID); err != nil {
-		// 	util.ErrResponse(c, http.StatusTooManyRequests, err)
-		// 	return
-		// }
+		if err := throttler.Lock(reqCtx, lockID); err != nil {
+			util.ErrResponse(c, http.StatusTooManyRequests, err)
+			return
+		}
 		defer throttler.Unlock(reqCtx, lockID)
 
 		var token persist.TokenGallery
