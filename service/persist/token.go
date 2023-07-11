@@ -59,6 +59,33 @@ const (
 
 var mediaTypePriorities = []MediaType{MediaTypeHTML, MediaTypeAudio, MediaTypeAnimation, MediaTypeVideo, MediaTypeGIF, MediaTypeSVG, MediaTypeImage, MediaTypeJSON, MediaTypeText, MediaTypeSyncing, MediaTypeUnknown, MediaTypeInvalid}
 
+func (m MediaType) ToContentType() string {
+	switch m {
+	case MediaTypeVideo:
+		return "video/mp4"
+	case MediaTypeImage:
+		return "image/jpeg"
+	case MediaTypeGIF:
+		return "image/gif"
+	case MediaTypeSVG:
+		return "image/svg+xml"
+	case MediaTypeText:
+		return "text/plain"
+	case MediaTypeHTML:
+		return "text/html"
+	case MediaTypeAudio:
+		return "audio/mpeg"
+	case MediaTypeJSON:
+		return "application/json"
+	case MediaTypeAnimation:
+		return "model/gltf-binary"
+	case MediaTypePDF:
+		return "application/pdf"
+	default:
+		return ""
+	}
+}
+
 const (
 	// ChainETH represents the Ethereum blockchain
 	ChainETH Chain = iota
@@ -126,6 +153,40 @@ const (
 	// URITypeNone represents no URI
 	URITypeNone URIType = "none"
 )
+
+func (u URIType) IsRaw() bool {
+	switch u {
+	case URITypeBase64JSON, URITypeBase64HTML, URITypeBase64SVG, URITypeBase64BMP, URITypeBase64PNG, URITypeBase64JPEG, URITypeBase64GIF, URITypeBase64WAV, URITypeBase64MP3, URITypeJSON, URITypeSVG, URITypeENS:
+		return true
+	default:
+		return false
+	}
+}
+
+func (u URIType) ToMediaType() MediaType {
+	switch u {
+	case URITypeBase64JSON, URITypeJSON:
+		return MediaTypeJSON
+	case URITypeBase64SVG, URITypeSVG:
+		return MediaTypeSVG
+	case URITypeBase64BMP:
+		return MediaTypeImage
+	case URITypeBase64PNG:
+		return MediaTypeImage
+	case URITypeBase64HTML:
+		return MediaTypeHTML
+	case URITypeBase64JPEG:
+		return MediaTypeImage
+	case URITypeBase64GIF:
+		return MediaTypeGIF
+	case URITypeBase64MP3:
+		return MediaTypeAudio
+	case URITypeBase64WAV:
+		return MediaTypeAudio
+	default:
+		return MediaTypeUnknown
+	}
+}
 
 const (
 	// CountTypeTotal represents the total count
@@ -827,6 +888,11 @@ func (a EthereumAddressAtBlock) Value() (driver.Value, error) {
 // IsValid returns true if the media type is not unknown, syncing, or invalid
 func (m MediaType) IsValid() bool {
 	return m != MediaTypeUnknown && m != MediaTypeInvalid && m != MediaTypeSyncing && m != ""
+}
+
+// IsRenderable returns true if the media type is renderable by gallery
+func (m MediaType) IsRenderable() bool {
+	return m.IsAnimationLike() || m.IsImageLike()
 }
 
 // IsImageLike returns true if the media type is a type that is expected to be like an image and not live render

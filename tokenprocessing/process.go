@@ -18,7 +18,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/sentry"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/util"
@@ -92,10 +92,10 @@ func processMediaForToken(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRe
 
 		lockID := fmt.Sprintf("%s-%s-%d", input.TokenID, input.ContractAddress, input.Chain)
 
-		if err := throttler.Lock(reqCtx, lockID); err != nil {
-			util.ErrResponse(c, http.StatusTooManyRequests, err)
-			return
-		}
+		// if err := throttler.Lock(reqCtx, lockID); err != nil {
+		// 	util.ErrResponse(c, http.StatusTooManyRequests, err)
+		// 	return
+		// }
 		defer throttler.Unlock(reqCtx, lockID)
 
 		var token persist.TokenGallery

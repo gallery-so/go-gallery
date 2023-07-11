@@ -348,7 +348,7 @@ func RetryGetTokenContractMetadata(ctx context.Context, contractAddress persist.
 func GetMetadataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shell.Shell, arweaveClient *goar.Client) (persist.TokenMetadata, error) {
 
 	var meta persist.TokenMetadata
-	r, err := GetDataFromURIAsReader(ctx, turi, ipfsClient, arweaveClient, 1024, time.Minute)
+	r, _, err := GetDataFromURIAsReader(ctx, turi, turi.Type().ToMediaType(), ipfsClient, arweaveClient, 1024, time.Minute, false)
 	if err != nil {
 		return meta, err
 	}
@@ -366,7 +366,10 @@ func GetMetadataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *
 
 // GetDataFromURIAsReader calls URI and returns the data as an unread reader with the headers pre-read.
 // retrieveTimeout is the timeout for just the retrieval of the reader, not the reading of the reader which will be handled by the context
-func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClient *shell.Shell, arweaveClient *goar.Client, bufSize int, retrieveTimeout time.Duration) (*util.FileHeaderReader, error) {
+// recurseRawReturns will cause the function to recursively call itself if the reader returned from any initial call is a "raw" URI (a URI that in itself contains the data to be retrieved, not a URI that points to the data to be retrieved)
+func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, mediaType persist.MediaType, ipfsClient *shell.Shell, arweaveClient *goar.Client, bufSize int, retrieveTimeout time.Duration, recurseRawReturns bool) (*util.FileHeaderReader, persist.MediaType, error) {
+
+	timeStart := time.Now()
 
 	errChan := make(chan error)
 	readerChan := make(chan *util.FileHeaderReader)
@@ -423,7 +426,7 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 			newImage := bytes.NewBuffer(nil)
 			err = png.Encode(newImage, img)
 			if err != nil {
-				errChan <- fmt.Errorf("error encoding jpeg data: %s \n\n%s", err, b64data)
+				errChan <- fmt.Errorf("error encoding png data: %s \n\n%s", err, b64data)
 				return
 			}
 			readerChan <- util.NewFileHeaderReader(newImage, bufSize)
@@ -555,13 +558,32 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 
 	select {
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		return nil, mediaType, ctx.Err()
 	case err := <-errChan:
-		return nil, err
+		return nil, mediaType, err
 	case reader := <-readerChan:
-		return reader, nil
+		h, err := reader.Headers()
+		if err != nil {
+			return nil, mediaType, err
+		}
+		uriType := persist.TokenURI(h).Type()
+		if recurseRawReturns && uriType.IsRaw() {
+			full := &bytes.Buffer{}
+			_, err := io.Copy(full, reader)
+			if err != nil {
+				return nil, mediaType, err
+			}
+
+			newRetrieveTimeout := retrieveTimeout - time.Since(timeStart)
+			if newRetrieveTimeout < 0 {
+				newRetrieveTimeout = 0
+			}
+
+			return GetDataFromURIAsReader(ctx, persist.TokenURI(full.String()), uriType.ToMediaType(), ipfsClient, arweaveClient, full.Len(), retrieveTimeout, recurseRawReturns)
+		}
+		return reader, mediaType, nil
 	case <-time.After(retrieveTimeout):
-		return nil, fmt.Errorf("%s: timeout retrieving data from uri: %s", context.DeadlineExceeded.Error(), turi.String())
+		return nil, mediaType, fmt.Errorf("%s: timeout retrieving data from uri: %s", context.DeadlineExceeded.Error(), turi.String())
 	}
 }
 
