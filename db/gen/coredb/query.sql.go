@@ -177,6 +177,21 @@ func (q *Queries) CountOwnersByContractId(ctx context.Context, arg CountOwnersBy
 	return count, err
 }
 
+const countPostsByContractID = `-- name: CountPostsByContractID :one
+SELECT COUNT(*)
+FROM posts
+JOIN tokens ON tokens.id = ANY(posts.token_ids)
+WHERE tokens.contract = $1
+AND posts.deleted = false
+`
+
+func (q *Queries) CountPostsByContractID(ctx context.Context, contract persist.DBID) (int64, error) {
+	row := q.db.QueryRow(ctx, countPostsByContractID, contract)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countSharedContracts = `-- name: CountSharedContracts :one
 select count(*)
 from owned_contracts a, owned_contracts b, contracts

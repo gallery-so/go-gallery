@@ -479,6 +479,33 @@ ORDER BY
     CASE WHEN NOT @paging_forward::bool THEN t.pos END ASC
 LIMIT sqlc.arg('limit');
 
+-- name: PaginatePostsByContractID :batchmany
+WITH unnest_post_ids AS (
+    SELECT posts.id, unnest(token_ids) AS post_token_id
+    FROM posts
+    WHERE posts.deleted = false
+    AND (posts.created_at, posts.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+    AND (posts.created_at, posts.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+)
+SELECT posts.*
+FROM unnest_post_ids
+JOIN posts ON unnest_post_ids.id = posts.id
+JOIN tokens ON tokens.id = unnest_post_ids.post_token_id
+WHERE tokens.contract = sqlc.arg('contract')
+ORDER BY 
+    CASE WHEN sqlc.arg('paging_forward')::bool THEN (posts.created_at, posts.id) END ASC,
+    CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (posts.created_at, posts.id) END DESC
+LIMIT sqlc.arg('limit');
+
+-- name: CountPostsByContractID :one
+SELECT COUNT(*)
+FROM posts
+JOIN tokens ON tokens.id = ANY(posts.token_ids)
+WHERE tokens.contract = sqlc.arg('contract')
+AND posts.deleted = false;
+
+
+
 -- name: GetFeedEventsByIds :many
 SELECT * FROM feed_events WHERE id = ANY(@ids::varchar(255)[]) AND deleted = false;
 

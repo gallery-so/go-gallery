@@ -632,6 +632,19 @@ func resolveCommunityOwnersByContractID(ctx context.Context, contractID persist.
 	return &connection, nil
 }
 
+func resolveCommunityPostsByContractID(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int) (*model.PostsConnection, error) {
+	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, contractID)
+	if err != nil {
+		return nil, err
+	}
+	posts, pageInfo, err := publicapi.For(ctx).Contract.GetCommunityPostsByContractAddress(ctx, persist.NewChainAddress(contract.Address, contract.Chain), before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+	connection := postsToConnection(ctx, posts, contractID, pageInfo)
+	return &connection, nil
+}
+
 func ownersToConnection(ctx context.Context, owners []db.User, contractID persist.DBID, pageInfo publicapi.PageInfo) model.TokenHoldersConnection {
 	edges := make([]*model.TokenHolderEdge, len(owners))
 	for i, owner := range owners {
@@ -655,6 +668,37 @@ func ownersToConnection(ctx context.Context, owners []db.User, contractID persis
 		}
 	}
 	return model.TokenHoldersConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}
+}
+
+func postsToConnection(ctx context.Context, posts []db.Post, contractID persist.DBID, pageInfo publicapi.PageInfo) model.PostsConnection {
+	edges := make([]*model.PostEdge, len(posts))
+	for i, post := range posts {
+
+		var caption *string
+		if post.Caption.Valid {
+			caption = &post.Caption.String
+		}
+		edges[i] = &model.PostEdge{
+			Node: &model.Post{
+				HelperPostData: model.HelperPostData{
+					TokenIDs: post.TokenIds,
+				},
+				Dbid:         post.ID,
+				Tokens:       nil, // handled by dedicated resolver
+				Caption:      caption,
+				Admires:      nil, // handled by dedicated resolver
+				Comments:     nil, // handled by dedicated resolver
+				Interactions: nil, // handled by dedicated resolver
+				ViewerAdmire: nil, // handled by dedicated resolver
+
+			},
+			Cursor: nil, // not used by relay, but relay will complain without this field existing
+		}
+	}
+	return model.PostsConnection{
 		Edges:    edges,
 		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}

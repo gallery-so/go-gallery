@@ -4485,6 +4485,104 @@ func (b *PaginatePersonalFeedByUserIDBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const paginatePostsByContractID = `-- name: PaginatePostsByContractID :batchmany
+WITH unnest_post_ids AS (
+    SELECT posts.id, unnest(token_ids) AS post_token_id
+    FROM posts
+    WHERE posts.deleted = false
+    AND (posts.created_at, posts.id) < ($4, $5)
+    AND (posts.created_at, posts.id) > ($6, $7)
+)
+SELECT posts.id, posts.version, posts.token_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted
+FROM unnest_post_ids
+JOIN posts ON unnest_post_ids.id = posts.id
+JOIN tokens ON tokens.id = unnest_post_ids.post_token_id
+WHERE tokens.contract = $1
+ORDER BY 
+    CASE WHEN $2::bool THEN (posts.created_at, posts.id) END ASC,
+    CASE WHEN NOT $2::bool THEN (posts.created_at, posts.id) END DESC
+LIMIT $3
+`
+
+type PaginatePostsByContractIDBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type PaginatePostsByContractIDParams struct {
+	Contract      persist.DBID `json:"contract"`
+	PagingForward bool         `json:"paging_forward"`
+	Limit         int32        `json:"limit"`
+	CurBeforeTime time.Time    `json:"cur_before_time"`
+	CurBeforeID   persist.DBID `json:"cur_before_id"`
+	CurAfterTime  time.Time    `json:"cur_after_time"`
+	CurAfterID    persist.DBID `json:"cur_after_id"`
+}
+
+func (q *Queries) PaginatePostsByContractID(ctx context.Context, arg []PaginatePostsByContractIDParams) *PaginatePostsByContractIDBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.Contract,
+			a.PagingForward,
+			a.Limit,
+			a.CurBeforeTime,
+			a.CurBeforeID,
+			a.CurAfterTime,
+			a.CurAfterID,
+		}
+		batch.Queue(paginatePostsByContractID, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &PaginatePostsByContractIDBatchResults{br, len(arg), false}
+}
+
+func (b *PaginatePostsByContractIDBatchResults) Query(f func(int, []Post, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var items []Post
+		if b.closed {
+			if f != nil {
+				f(t, items, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		err := func() error {
+			rows, err := b.br.Query()
+			defer rows.Close()
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var i Post
+				if err := rows.Scan(
+					&i.ID,
+					&i.Version,
+					&i.TokenIds,
+					&i.ActorID,
+					&i.Caption,
+					&i.CreatedAt,
+					&i.LastUpdated,
+					&i.Deleted,
+				); err != nil {
+					return err
+				}
+				items = append(items, i)
+			}
+			return rows.Err()
+		}()
+		if f != nil {
+			f(t, items, err)
+		}
+	}
+}
+
+func (b *PaginatePostsByContractIDBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const paginateUserFeedByUserID = `-- name: PaginateUserFeedByUserID :batchmany
 SELECT subquery.id, subquery.created_at, subquery.tag
 FROM (
