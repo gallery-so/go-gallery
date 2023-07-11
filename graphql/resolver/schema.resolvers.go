@@ -2366,6 +2366,16 @@ func (r *someoneAdmiredYourFeedEventNotificationResolver) Admirers(ctx context.C
 	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.NotificationData.AdmirerIDs, before, after, first, last)
 }
 
+// Post is the resolver for the post field.
+func (r *someoneAdmiredYourPostNotificationResolver) Post(ctx context.Context, obj *model.SomeoneAdmiredYourPostNotification) (*model.Post, error) {
+	return resolvePostByPostID(ctx, obj.PostID)
+}
+
+// Admirers is the resolver for the admirers field.
+func (r *someoneAdmiredYourPostNotificationResolver) Admirers(ctx context.Context, obj *model.SomeoneAdmiredYourPostNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error) {
+	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.NotificationData.AdmirerIDs, before, after, first, last)
+}
+
 // Comment is the resolver for the comment field.
 func (r *someoneCommentedOnYourFeedEventNotificationResolver) Comment(ctx context.Context, obj *model.SomeoneCommentedOnYourFeedEventNotification) (*model.Comment, error) {
 	return resolveCommentByCommentID(ctx, obj.CommentID)
@@ -2374,6 +2384,16 @@ func (r *someoneCommentedOnYourFeedEventNotificationResolver) Comment(ctx contex
 // FeedEvent is the resolver for the feedEvent field.
 func (r *someoneCommentedOnYourFeedEventNotificationResolver) FeedEvent(ctx context.Context, obj *model.SomeoneCommentedOnYourFeedEventNotification) (*model.FeedEvent, error) {
 	return resolveFeedEventByEventID(ctx, obj.HelperSomeoneCommentedOnYourFeedEventNotificationData.FeedEventID)
+}
+
+// Comment is the resolver for the comment field.
+func (r *someoneCommentedOnYourPostNotificationResolver) Comment(ctx context.Context, obj *model.SomeoneCommentedOnYourPostNotification) (*model.Comment, error) {
+	return resolveCommentByCommentID(ctx, obj.CommentID)
+}
+
+// Post is the resolver for the post field.
+func (r *someoneCommentedOnYourPostNotificationResolver) Post(ctx context.Context, obj *model.SomeoneCommentedOnYourPostNotification) (*model.Post, error) {
+	return resolvePostByPostID(ctx, obj.PostID)
 }
 
 // Followers is the resolver for the followers field.
@@ -2805,9 +2825,19 @@ func (r *Resolver) SomeoneAdmiredYourFeedEventNotification() generated.SomeoneAd
 	return &someoneAdmiredYourFeedEventNotificationResolver{r}
 }
 
+// SomeoneAdmiredYourPostNotification returns generated.SomeoneAdmiredYourPostNotificationResolver implementation.
+func (r *Resolver) SomeoneAdmiredYourPostNotification() generated.SomeoneAdmiredYourPostNotificationResolver {
+	return &someoneAdmiredYourPostNotificationResolver{r}
+}
+
 // SomeoneCommentedOnYourFeedEventNotification returns generated.SomeoneCommentedOnYourFeedEventNotificationResolver implementation.
 func (r *Resolver) SomeoneCommentedOnYourFeedEventNotification() generated.SomeoneCommentedOnYourFeedEventNotificationResolver {
 	return &someoneCommentedOnYourFeedEventNotificationResolver{r}
+}
+
+// SomeoneCommentedOnYourPostNotification returns generated.SomeoneCommentedOnYourPostNotificationResolver implementation.
+func (r *Resolver) SomeoneCommentedOnYourPostNotification() generated.SomeoneCommentedOnYourPostNotificationResolver {
+	return &someoneCommentedOnYourPostNotificationResolver{r}
 }
 
 // SomeoneFollowedYouBackNotification returns generated.SomeoneFollowedYouBackNotificationResolver implementation.
@@ -2908,7 +2938,9 @@ type setSpamPreferencePayloadResolver struct{ *Resolver }
 type socialConnectionResolver struct{ *Resolver }
 type socialQueriesResolver struct{ *Resolver }
 type someoneAdmiredYourFeedEventNotificationResolver struct{ *Resolver }
+type someoneAdmiredYourPostNotificationResolver struct{ *Resolver }
 type someoneCommentedOnYourFeedEventNotificationResolver struct{ *Resolver }
+type someoneCommentedOnYourPostNotificationResolver struct{ *Resolver }
 type someoneFollowedYouBackNotificationResolver struct{ *Resolver }
 type someoneFollowedYouNotificationResolver struct{ *Resolver }
 type someoneViewedYourGalleryNotificationResolver struct{ *Resolver }

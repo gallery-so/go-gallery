@@ -1809,6 +1809,33 @@ type SomeoneCommentedOnYourFeedEventNotification implements Notification & Node 
   feedEvent: FeedEvent @goField(forceResolver: true)
 }
 
+type SomeoneAdmiredYourPostNotification implements Notification & Node & GroupedNotification
+  @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+  count: Int
+
+  post: Post @goField(forceResolver: true)
+  admirers(before: String, after: String, first: Int, last: Int): GroupNotificationUsersConnection
+    @goField(forceResolver: true)
+}
+
+type SomeoneCommentedOnYourPostNotification implements Notification & Node @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+
+  # Don't need a `who` here since the `comment` can provide that
+  # Do we want this comment to be the latest comment
+  comment: Comment @goField(forceResolver: true)
+  post: Post @goField(forceResolver: true)
+}
+
 type SomeoneViewedYourGalleryNotification implements Notification & Node & GroupedNotification
   @goEmbedHelper {
   id: ID!

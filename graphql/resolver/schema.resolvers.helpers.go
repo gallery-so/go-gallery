@@ -74,6 +74,26 @@ var nodeFetcher = model.NodeFetcher{
 
 		return &notifConverted, nil
 	},
+	OnSomeoneAdmiredYourPostNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneAdmiredYourPostNotification, error) {
+		notif, err := resolveNotificationByID(ctx, dbid)
+		if err != nil {
+			return nil, err
+		}
+
+		notifConverted := notif.(model.SomeoneAdmiredYourPostNotification)
+
+		return &notifConverted, nil
+	},
+	OnSomeoneCommentedOnYourPostNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneCommentedOnYourPostNotification, error) {
+		notif, err := resolveNotificationByID(ctx, dbid)
+		if err != nil {
+			return nil, err
+		}
+
+		notifConverted := notif.(model.SomeoneCommentedOnYourPostNotification)
+
+		return &notifConverted, nil
+	},
 	OnSomeoneFollowedYouBackNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneFollowedYouBackNotification, error) {
 		notif, err := resolveNotificationByID(ctx, dbid)
 		if err != nil {
@@ -796,6 +816,36 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 			CreationTime: &notif.CreatedAt,
 			UpdatedTime:  &notif.LastUpdated,
 			FeedEvent:    nil, // handled by dedicated resolver
+			Comment:      nil, // handled by dedicated resolver
+		}, nil
+	case persist.ActionAdmiredPost:
+		return model.SomeoneAdmiredYourPostNotification{
+			HelperSomeoneAdmiredYourPostNotificationData: model.HelperSomeoneAdmiredYourPostNotificationData{
+				OwnerID:          notif.OwnerID,
+				PostID:           notif.FeedEventID,
+				NotificationData: notif.Data,
+			},
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
+			Count:        &amount,
+			Post:         nil, // handled by dedicated resolver
+			Admirers:     nil, // handled by dedicated resolver
+		}, nil
+	case persist.ActionCommentedOnPost:
+		return model.SomeoneCommentedOnYourPostNotification{
+			HelperSomeoneCommentedOnYourPostNotificationData: model.HelperSomeoneCommentedOnYourPostNotificationData{
+				OwnerID:          notif.OwnerID,
+				PostID:           notif.PostID,
+				CommentID:        notif.CommentID,
+				NotificationData: notif.Data,
+			},
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
+			Post:         nil, // handled by dedicated resolver
 			Comment:      nil, // handled by dedicated resolver
 		}, nil
 	case persist.ActionUserFollowedUsers:

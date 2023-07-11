@@ -1803,6 +1803,21 @@ func (SomeoneAdmiredYourFeedEventNotification) IsNotification()        {}
 func (SomeoneAdmiredYourFeedEventNotification) IsNode()                {}
 func (SomeoneAdmiredYourFeedEventNotification) IsGroupedNotification() {}
 
+type SomeoneAdmiredYourPostNotification struct {
+	HelperSomeoneAdmiredYourPostNotificationData
+	Dbid         persist.DBID                      `json:"dbid"`
+	Seen         *bool                             `json:"seen"`
+	CreationTime *time.Time                        `json:"creationTime"`
+	UpdatedTime  *time.Time                        `json:"updatedTime"`
+	Count        *int                              `json:"count"`
+	Post         *Post                             `json:"post"`
+	Admirers     *GroupNotificationUsersConnection `json:"admirers"`
+}
+
+func (SomeoneAdmiredYourPostNotification) IsNotification()        {}
+func (SomeoneAdmiredYourPostNotification) IsNode()                {}
+func (SomeoneAdmiredYourPostNotification) IsGroupedNotification() {}
+
 type SomeoneCommentedOnYourFeedEventNotification struct {
 	HelperSomeoneCommentedOnYourFeedEventNotificationData
 	Dbid         persist.DBID `json:"dbid"`
@@ -1815,6 +1830,19 @@ type SomeoneCommentedOnYourFeedEventNotification struct {
 
 func (SomeoneCommentedOnYourFeedEventNotification) IsNotification() {}
 func (SomeoneCommentedOnYourFeedEventNotification) IsNode()         {}
+
+type SomeoneCommentedOnYourPostNotification struct {
+	HelperSomeoneCommentedOnYourPostNotificationData
+	Dbid         persist.DBID `json:"dbid"`
+	Seen         *bool        `json:"seen"`
+	CreationTime *time.Time   `json:"creationTime"`
+	UpdatedTime  *time.Time   `json:"updatedTime"`
+	Comment      *Comment     `json:"comment"`
+	Post         *Post        `json:"post"`
+}
+
+func (SomeoneCommentedOnYourPostNotification) IsNotification() {}
+func (SomeoneCommentedOnYourPostNotification) IsNode()         {}
 
 type SomeoneFollowedYouBackNotification struct {
 	HelperSomeoneFollowedYouBackNotificationData
