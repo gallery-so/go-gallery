@@ -579,7 +579,7 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, mediaTyp
 				newRetrieveTimeout = 0
 			}
 
-			return GetDataFromURIAsReader(ctx, persist.TokenURI(full.String()), uriType.ToMediaType(), ipfsClient, arweaveClient, full.Len(), retrieveTimeout, recurseRawReturns)
+			return GetDataFromURIAsReader(ctx, persist.TokenURI(full.String()), uriType.ToMediaType(), ipfsClient, arweaveClient, full.Len(), retrieveTimeout, false)
 		}
 		return reader, mediaType, nil
 	case <-time.After(retrieveTimeout):
