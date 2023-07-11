@@ -39,7 +39,7 @@ func base64MetadataSVGHandler(c *gin.Context) {
 		panic(err)
 	}
 	asBase64 := base64.StdEncoding.EncodeToString(asBytes)
-	c.Data(200, "application/svg+xml", []byte("data:image/svg+xml;base64,"+asBase64))
+	c.JSON(http.StatusOK, gin.H{"image_url": "data:image/svg+xml;base64," + asBase64})
 }
 
 func base64MetadataHandler(c *gin.Context) {

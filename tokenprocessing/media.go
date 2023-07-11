@@ -940,8 +940,9 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 	reader, retryOpensea, err := func() (*util.FileHeaderReader, bool, error) {
 		traceCallback, pCtx := persist.TrackStepStatus(pCtx, subMeta.ReaderRetrieval, "ReaderRetrieval")
 		defer traceCallback()
-
-		reader, err := rpc.GetDataFromURIAsReader(pCtx, asURI, ipfsClient, arweaveClient, util.MB, time.Minute)
+		var reader *util.FileHeaderReader
+		var err error
+		reader, mediaType, err = rpc.GetDataFromURIAsReader(pCtx, asURI, mediaType, ipfsClient, arweaveClient, util.MB, time.Minute, true)
 		if err != nil {
 			persist.FailStep(subMeta.ReaderRetrieval)
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
