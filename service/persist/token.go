@@ -59,6 +59,33 @@ const (
 
 var mediaTypePriorities = []MediaType{MediaTypeHTML, MediaTypeAudio, MediaTypeAnimation, MediaTypeVideo, MediaTypeGIF, MediaTypeSVG, MediaTypeImage, MediaTypeJSON, MediaTypeText, MediaTypeSyncing, MediaTypeUnknown, MediaTypeInvalid}
 
+func (m MediaType) ToContentType() string {
+	switch m {
+	case MediaTypeVideo:
+		return "video/mp4"
+	case MediaTypeImage:
+		return "image/jpeg"
+	case MediaTypeGIF:
+		return "image/gif"
+	case MediaTypeSVG:
+		return "image/svg+xml"
+	case MediaTypeText:
+		return "text/plain"
+	case MediaTypeHTML:
+		return "text/html"
+	case MediaTypeAudio:
+		return "audio/mpeg"
+	case MediaTypeJSON:
+		return "application/json"
+	case MediaTypeAnimation:
+		return "model/gltf-binary"
+	case MediaTypePDF:
+		return "application/pdf"
+	default:
+		return ""
+	}
+}
+
 const (
 	// ChainETH represents the Ethereum blockchain
 	ChainETH Chain = iota
@@ -109,6 +136,8 @@ const (
 	URITypeBase64PNG URIType = "base64png"
 	// URITypeBase64JPEG represents a base64 encoded JPEG
 	URITypeBase64JPEG URIType = "base64jpeg"
+	// URITypeBase64GIF represents a base64 encoded GIF
+	URITypeBase64GIF URIType = "base64gif"
 	// URITypeBase64WAV represents a base64 encoded WAV
 	URITypeBase64WAV URIType = "base64wav"
 	// URITypeBase64MP3 represents a base64 encoded MP3
@@ -124,6 +153,40 @@ const (
 	// URITypeNone represents no URI
 	URITypeNone URIType = "none"
 )
+
+func (u URIType) IsRaw() bool {
+	switch u {
+	case URITypeBase64JSON, URITypeBase64HTML, URITypeBase64SVG, URITypeBase64BMP, URITypeBase64PNG, URITypeBase64JPEG, URITypeBase64GIF, URITypeBase64WAV, URITypeBase64MP3, URITypeJSON, URITypeSVG, URITypeENS:
+		return true
+	default:
+		return false
+	}
+}
+
+func (u URIType) ToMediaType() MediaType {
+	switch u {
+	case URITypeBase64JSON, URITypeJSON:
+		return MediaTypeJSON
+	case URITypeBase64SVG, URITypeSVG:
+		return MediaTypeSVG
+	case URITypeBase64BMP:
+		return MediaTypeImage
+	case URITypeBase64PNG:
+		return MediaTypeImage
+	case URITypeBase64HTML:
+		return MediaTypeHTML
+	case URITypeBase64JPEG:
+		return MediaTypeImage
+	case URITypeBase64GIF:
+		return MediaTypeGIF
+	case URITypeBase64MP3:
+		return MediaTypeAudio
+	case URITypeBase64WAV:
+		return MediaTypeAudio
+	default:
+		return MediaTypeUnknown
+	}
+}
 
 const (
 	// CountTypeTotal represents the total count
@@ -556,6 +619,8 @@ func (uri TokenURI) Type() URIType {
 		return URITypeBase64PNG
 	case strings.HasPrefix(asString, "data:image/jpeg;base64,"), strings.HasPrefix(asString, "data:image/jpeg;charset=utf-8;base64,"), strings.HasPrefix(asString, "data:image/jpeg") && strings.Contains(asString, ";base64,"):
 		return URITypeBase64JPEG
+	case strings.HasPrefix(asString, "data:image/gif;base64,"), strings.HasPrefix(asString, "data:image/gif;charset=utf-8;base64,"), strings.HasPrefix(asString, "data:image/gif") && strings.Contains(asString, ";base64,"):
+		return URITypeBase64GIF
 	case strings.HasPrefix(asString, "data:audio/wav;base64,"), strings.HasPrefix(asString, "data:audio/wav;charset=utf-8;base64,"), strings.HasPrefix(asString, "data:audio/wav") && strings.Contains(asString, ";base64,"):
 		return URITypeBase64WAV
 	case strings.HasPrefix(asString, "data:audio/mpeg;base64,"), strings.HasPrefix(asString, "data:audio/mpeg;charset=utf-8;base64,"), strings.HasPrefix(asString, "data:audio/mpeg") && strings.Contains(asString, ";base64,"):
