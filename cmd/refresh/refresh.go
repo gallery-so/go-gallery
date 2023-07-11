@@ -21,7 +21,7 @@ func main() {
 
 	pgClient := postgres.MustCreateClient()
 
-	rows, err := pgClient.Query("select tokens.id from tokens join token_medias on token_medias.id = tokens.token_media_id where tokens.contract = '2EpXhbM5HiZ52xwn0rJXwiq9fsD' and tokens.owner_user_id = '2NJr8ZFKQNOX55wOlfJbGczJknX' and tokens.chain = 4 and tokens.deleted = false and token_medias.metadata->>'thumbnailUri' = 'ipfs://QmNrhZHUaEqxhyLfqoq1mtHSipkWHeT31LNHb1QEbDHgnc' order by token_medias.last_updated desc;")
+	rows, err := pgClient.Query("select tokens.id from tokens where tokens.contract = '240KyCCvlcRt9GjrDRAH9MTieGF' order by tokens.last_updated desc;")
 	if err != nil {
 		panic(err)
 	}
