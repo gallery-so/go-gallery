@@ -890,11 +890,6 @@ func (m MediaType) IsValid() bool {
 	return m != MediaTypeUnknown && m != MediaTypeInvalid && m != MediaTypeSyncing && m != ""
 }
 
-// IsRenderable returns true if the media type is renderable by gallery
-func (m MediaType) IsRenderable() bool {
-	return m.IsAnimationLike() || m.IsImageLike()
-}
-
 // IsImageLike returns true if the media type is a type that is expected to be like an image and not live render
 func (m MediaType) IsImageLike() bool {
 	return m == MediaTypeImage || m == MediaTypeGIF || m == MediaTypeSVG
