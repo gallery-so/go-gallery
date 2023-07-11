@@ -12,6 +12,7 @@ create table if not exists posts (
 alter table admires add column post_id varchar(255) references posts(id);
 alter table comments add column post_id varchar(255) references posts(id);
 alter table events add column post_id varchar(255) references posts(id);
+alter table notifications add column post_id varchar(255) references posts(id);
 
 alter table admires
 add constraint post_feed_event_admire_check check (

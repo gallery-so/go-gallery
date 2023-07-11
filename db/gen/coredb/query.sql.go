@@ -119,7 +119,7 @@ func (q *Queries) BlockUserFromFeed(ctx context.Context, arg BlockUserFromFeedPa
 }
 
 const clearNotificationsForUser = `-- name: ClearNotificationsForUser :many
-UPDATE notifications SET seen = true WHERE owner_id = $1 AND seen = false RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount
+UPDATE notifications SET seen = true WHERE owner_id = $1 AND seen = false RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id
 `
 
 func (q *Queries) ClearNotificationsForUser(ctx context.Context, ownerID persist.DBID) ([]Notification, error) {
@@ -146,6 +146,7 @@ func (q *Queries) ClearNotificationsForUser(ctx context.Context, ownerID persist
 			&i.GalleryID,
 			&i.Seen,
 			&i.Amount,
+			&i.PostID,
 		); err != nil {
 			return nil, err
 		}
@@ -355,16 +356,17 @@ func (q *Queries) CreateAdmireEvent(ctx context.Context, arg CreateAdmireEventPa
 }
 
 const createAdmireNotification = `-- name: CreateAdmireNotification :one
-INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount
+INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id
 `
 
 type CreateAdmireNotificationParams struct {
-	ID          persist.DBID             `json:"id"`
-	OwnerID     persist.DBID             `json:"owner_id"`
-	Action      persist.Action           `json:"action"`
-	Data        persist.NotificationData `json:"data"`
-	EventIds    persist.DBIDList         `json:"event_ids"`
-	FeedEventID persist.DBID             `json:"feed_event_id"`
+	ID        persist.DBID             `json:"id"`
+	OwnerID   persist.DBID             `json:"owner_id"`
+	Action    persist.Action           `json:"action"`
+	Data      persist.NotificationData `json:"data"`
+	EventIds  persist.DBIDList         `json:"event_ids"`
+	FeedEvent sql.NullString           `json:"feed_event"`
+	Post      sql.NullString           `json:"post"`
 }
 
 func (q *Queries) CreateAdmireNotification(ctx context.Context, arg CreateAdmireNotificationParams) (Notification, error) {
@@ -374,7 +376,8 @@ func (q *Queries) CreateAdmireNotification(ctx context.Context, arg CreateAdmire
 		arg.Action,
 		arg.Data,
 		arg.EventIds,
-		arg.FeedEventID,
+		arg.FeedEvent,
+		arg.Post,
 	)
 	var i Notification
 	err := row.Scan(
@@ -392,6 +395,7 @@ func (q *Queries) CreateAdmireNotification(ctx context.Context, arg CreateAdmire
 		&i.GalleryID,
 		&i.Seen,
 		&i.Amount,
+		&i.PostID,
 	)
 	return i, err
 }
@@ -542,17 +546,18 @@ func (q *Queries) CreateCommentEvent(ctx context.Context, arg CreateCommentEvent
 }
 
 const createCommentNotification = `-- name: CreateCommentNotification :one
-INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, comment_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount
+INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, comment_id) VALUES ($1, $2, $3, $4, $5, $7, $8, $6) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id
 `
 
 type CreateCommentNotificationParams struct {
-	ID          persist.DBID             `json:"id"`
-	OwnerID     persist.DBID             `json:"owner_id"`
-	Action      persist.Action           `json:"action"`
-	Data        persist.NotificationData `json:"data"`
-	EventIds    persist.DBIDList         `json:"event_ids"`
-	FeedEventID persist.DBID             `json:"feed_event_id"`
-	CommentID   persist.DBID             `json:"comment_id"`
+	ID        persist.DBID             `json:"id"`
+	OwnerID   persist.DBID             `json:"owner_id"`
+	Action    persist.Action           `json:"action"`
+	Data      persist.NotificationData `json:"data"`
+	EventIds  persist.DBIDList         `json:"event_ids"`
+	CommentID persist.DBID             `json:"comment_id"`
+	FeedEvent sql.NullString           `json:"feed_event"`
+	Post      sql.NullString           `json:"post"`
 }
 
 func (q *Queries) CreateCommentNotification(ctx context.Context, arg CreateCommentNotificationParams) (Notification, error) {
@@ -562,8 +567,9 @@ func (q *Queries) CreateCommentNotification(ctx context.Context, arg CreateComme
 		arg.Action,
 		arg.Data,
 		arg.EventIds,
-		arg.FeedEventID,
 		arg.CommentID,
+		arg.FeedEvent,
+		arg.Post,
 	)
 	var i Notification
 	err := row.Scan(
@@ -581,6 +587,7 @@ func (q *Queries) CreateCommentNotification(ctx context.Context, arg CreateComme
 		&i.GalleryID,
 		&i.Seen,
 		&i.Amount,
+		&i.PostID,
 	)
 	return i, err
 }
@@ -630,7 +637,7 @@ func (q *Queries) CreateFeedEvent(ctx context.Context, arg CreateFeedEventParams
 }
 
 const createFollowNotification = `-- name: CreateFollowNotification :one
-INSERT INTO notifications (id, owner_id, action, data, event_ids) VALUES ($1, $2, $3, $4, $5) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount
+INSERT INTO notifications (id, owner_id, action, data, event_ids) VALUES ($1, $2, $3, $4, $5) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id
 `
 
 type CreateFollowNotificationParams struct {
@@ -665,6 +672,7 @@ func (q *Queries) CreateFollowNotification(ctx context.Context, arg CreateFollow
 		&i.GalleryID,
 		&i.Seen,
 		&i.Amount,
+		&i.PostID,
 	)
 	return i, err
 }
@@ -883,7 +891,7 @@ func (q *Queries) CreateUserEvent(ctx context.Context, arg CreateUserEventParams
 }
 
 const createViewGalleryNotification = `-- name: CreateViewGalleryNotification :one
-INSERT INTO notifications (id, owner_id, action, data, event_ids, gallery_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount
+INSERT INTO notifications (id, owner_id, action, data, event_ids, gallery_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id
 `
 
 type CreateViewGalleryNotificationParams struct {
@@ -920,6 +928,7 @@ func (q *Queries) CreateViewGalleryNotification(ctx context.Context, arg CreateV
 		&i.GalleryID,
 		&i.Seen,
 		&i.Amount,
+		&i.PostID,
 	)
 	return i, err
 }
@@ -2457,11 +2466,12 @@ func (q *Queries) GetMissingThumbnailTokensByIDRange(ctx context.Context, arg Ge
 }
 
 const getMostRecentNotificationByOwnerIDForAction = `-- name: GetMostRecentNotificationByOwnerIDForAction :one
-select id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount from notifications
+select id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id from notifications
     where owner_id = $1
     and action = $2
     and deleted = false
-    and (not $4::bool or feed_event_id = $3)
+    and (not $5::bool or feed_event_id = $3)
+    and (not $6::bool or post_id = $4)
     order by created_at desc
     limit 1
 `
@@ -2470,7 +2480,9 @@ type GetMostRecentNotificationByOwnerIDForActionParams struct {
 	OwnerID          persist.DBID   `json:"owner_id"`
 	Action           persist.Action `json:"action"`
 	FeedEventID      persist.DBID   `json:"feed_event_id"`
+	PostID           persist.DBID   `json:"post_id"`
 	OnlyForFeedEvent bool           `json:"only_for_feed_event"`
+	OnlyForPost      bool           `json:"only_for_post"`
 }
 
 func (q *Queries) GetMostRecentNotificationByOwnerIDForAction(ctx context.Context, arg GetMostRecentNotificationByOwnerIDForActionParams) (Notification, error) {
@@ -2478,7 +2490,9 @@ func (q *Queries) GetMostRecentNotificationByOwnerIDForAction(ctx context.Contex
 		arg.OwnerID,
 		arg.Action,
 		arg.FeedEventID,
+		arg.PostID,
 		arg.OnlyForFeedEvent,
+		arg.OnlyForPost,
 	)
 	var i Notification
 	err := row.Scan(
@@ -2496,12 +2510,13 @@ func (q *Queries) GetMostRecentNotificationByOwnerIDForAction(ctx context.Contex
 		&i.GalleryID,
 		&i.Seen,
 		&i.Amount,
+		&i.PostID,
 	)
 	return i, err
 }
 
 const getNotificationByID = `-- name: GetNotificationByID :one
-SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount FROM notifications WHERE id = $1 AND deleted = false
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id FROM notifications WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetNotificationByID(ctx context.Context, id persist.DBID) (Notification, error) {
@@ -2522,12 +2537,13 @@ func (q *Queries) GetNotificationByID(ctx context.Context, id persist.DBID) (Not
 		&i.GalleryID,
 		&i.Seen,
 		&i.Amount,
+		&i.PostID,
 	)
 	return i, err
 }
 
 const getNotificationsByOwnerIDForActionAfter = `-- name: GetNotificationsByOwnerIDForActionAfter :many
-SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount FROM notifications
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id FROM notifications
     WHERE owner_id = $1 AND action = $2 AND deleted = false AND created_at > $3
     ORDER BY created_at DESC
 `
@@ -2562,6 +2578,7 @@ func (q *Queries) GetNotificationsByOwnerIDForActionAfter(ctx context.Context, a
 			&i.GalleryID,
 			&i.Seen,
 			&i.Amount,
+			&i.PostID,
 		); err != nil {
 			return nil, err
 		}
@@ -2713,7 +2730,7 @@ func (q *Queries) GetPushTokensByUserID(ctx context.Context, userID persist.DBID
 }
 
 const getRecentUnseenNotifications = `-- name: GetRecentUnseenNotifications :many
-SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false and created_at > $2 order by created_at desc limit $3
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false and created_at > $2 order by created_at desc limit $3
 `
 
 type GetRecentUnseenNotificationsParams struct {
@@ -2746,6 +2763,7 @@ func (q *Queries) GetRecentUnseenNotifications(ctx context.Context, arg GetRecen
 			&i.GalleryID,
 			&i.Seen,
 			&i.Amount,
+			&i.PostID,
 		); err != nil {
 			return nil, err
 		}
@@ -3582,7 +3600,7 @@ func (q *Queries) GetUserExperiencesByUserID(ctx context.Context, id persist.DBI
 }
 
 const getUserNotifications = `-- name: GetUserNotifications :many
-SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount FROM notifications WHERE owner_id = $1 AND deleted = false
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id FROM notifications WHERE owner_id = $1 AND deleted = false
     AND (created_at, id) < ($3, $4)
     AND (created_at, id) > ($5, $6)
     ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
@@ -3632,6 +3650,7 @@ func (q *Queries) GetUserNotifications(ctx context.Context, arg GetUserNotificat
 			&i.GalleryID,
 			&i.Seen,
 			&i.Amount,
+			&i.PostID,
 		); err != nil {
 			return nil, err
 		}
@@ -3718,7 +3737,7 @@ func (q *Queries) GetUserRolesByUserId(ctx context.Context, arg GetUserRolesByUs
 }
 
 const getUserUnseenNotifications = `-- name: GetUserUnseenNotifications :many
-SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false
     AND (created_at, id) < ($3, $4)
     AND (created_at, id) > ($5, $6)
     ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
@@ -3768,6 +3787,7 @@ func (q *Queries) GetUserUnseenNotifications(ctx context.Context, arg GetUserUns
 			&i.GalleryID,
 			&i.Seen,
 			&i.Amount,
+			&i.PostID,
 		); err != nil {
 			return nil, err
 		}

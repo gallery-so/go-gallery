@@ -183,11 +183,11 @@ func seedAdmireNotif(ctx context.Context, t *testing.T, q *coredb.Queries, userI
 	}
 
 	admireNotif, err = q.CreateAdmireNotification(ctx, coredb.CreateAdmireNotificationParams{
-		ID:          persist.GenerateID(),
-		OwnerID:     userID,
-		Action:      persist.ActionAdmiredFeedEvent,
-		EventIds:    []persist.DBID{admireEvent.ID},
-		FeedEventID: feedEvent.ID,
+		ID:        persist.GenerateID(),
+		OwnerID:   userID,
+		Action:    persist.ActionAdmiredFeedEvent,
+		EventIds:  []persist.DBID{admireEvent.ID},
+		FeedEvent: sql.NullString{String: feedEvent.ID.String(), Valid: true},
 		Data: persist.NotificationData{
 			AdmirerIDs: []persist.DBID{userID2},
 		},
@@ -227,12 +227,12 @@ func seedCommentNotif(ctx context.Context, t *testing.T, q *coredb.Queries, repo
 	}
 
 	commentNotif, err = q.CreateCommentNotification(ctx, coredb.CreateCommentNotificationParams{
-		ID:          persist.GenerateID(),
-		OwnerID:     userID,
-		Action:      persist.ActionCommentedOnFeedEvent,
-		EventIds:    []persist.DBID{commentEvent.ID},
-		FeedEventID: feedEvent.ID,
-		CommentID:   commentID,
+		ID:        persist.GenerateID(),
+		OwnerID:   userID,
+		Action:    persist.ActionCommentedOnFeedEvent,
+		EventIds:  []persist.DBID{commentEvent.ID},
+		FeedEvent: sql.NullString{String: feedEvent.ID.String(), Valid: true},
+		CommentID: commentID,
 	})
 
 	if err != nil {

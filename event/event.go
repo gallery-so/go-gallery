@@ -396,6 +396,7 @@ func (h notificationHandler) handleDelayed(ctx context.Context, persistedEvent d
 		EventIds:    persist.DBIDList{persistedEvent.ID},
 		GalleryID:   persistedEvent.GalleryID,
 		FeedEventID: persistedEvent.FeedEventID,
+		PostID:      persistedEvent.PostID,
 		CommentID:   persistedEvent.CommentID,
 	})
 }

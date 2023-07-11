@@ -269,6 +269,7 @@ type Notification struct {
 	GalleryID   persist.DBID             `json:"gallery_id"`
 	Seen        bool                     `json:"seen"`
 	Amount      int32                    `json:"amount"`
+	PostID      persist.DBID             `json:"post_id"`
 }
 
 type OwnedContract struct {
