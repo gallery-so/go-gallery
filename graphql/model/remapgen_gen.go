@@ -83,6 +83,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"DeletePostPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(DeletePostPayloadOrError)
+		return obj, ok
+	},
+
 	"DisconnectSocialAccountPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(DisconnectSocialAccountPayloadOrError)
 		return obj, ok

@@ -736,6 +736,9 @@ SELECT * FROM admires WHERE actor_id = $1 AND post_id = $2 AND deleted = false;
 -- name: InsertPost :one
 insert into posts(id, token_ids, actor_id, caption, created_at) values ($1, $2, $3, $4, now()) returning id;
 
+-- name: DeletePostByID :exec
+update posts set deleted = true where id = $1;
+
 -- for some reason this query will not allow me to use @tags for $1
 -- name: GetUsersWithEmailNotificationsOnForEmailType :many
 select * from pii.user_view

@@ -129,6 +129,22 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, capt
 	return id, nil
 }
 
+func (api FeedAPI) DeletePostById(ctx context.Context, postID persist.DBID) error {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"postID": validate.WithTag(postID, "required"),
+	}); err != nil {
+		return err
+	}
+
+	err := api.queries.DeletePostByID(ctx, postID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (api FeedAPI) GetRawEventById(ctx context.Context, eventID persist.DBID) (*db.Event, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{

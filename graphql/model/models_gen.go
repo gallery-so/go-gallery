@@ -75,6 +75,10 @@ type DeleteGalleryPayloadOrError interface {
 	IsDeleteGalleryPayloadOrError()
 }
 
+type DeletePostPayloadOrError interface {
+	IsDeletePostPayloadOrError()
+}
+
 type DisconnectSocialAccountPayloadOrError interface {
 	IsDisconnectSocialAccountPayloadOrError()
 }
@@ -765,6 +769,12 @@ type DeleteGalleryPayload struct {
 
 func (DeleteGalleryPayload) IsDeleteGalleryPayloadOrError() {}
 
+type DeletePostPayload struct {
+	DeletedID *DeletedNode `json:"deletedId"`
+}
+
+func (DeletePostPayload) IsDeletePostPayloadOrError() {}
+
 type DeletedNode struct {
 	Dbid persist.DBID `json:"dbid"`
 }
@@ -955,6 +965,7 @@ func (ErrInvalidInput) IsDisconnectSocialAccountPayloadOrError()         {}
 func (ErrInvalidInput) IsFollowAllSocialConnectionsPayloadOrError()      {}
 func (ErrInvalidInput) IsSetProfileImagePayloadOrError()                 {}
 func (ErrInvalidInput) IsPostTokensPayloadOrError()                      {}
+func (ErrInvalidInput) IsDeletePostPayloadOrError()                      {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -1033,6 +1044,7 @@ func (ErrNotAuthorized) IsFollowAllSocialConnectionsPayloadOrError()   {}
 func (ErrNotAuthorized) IsGenerateQRCodeLoginTokenPayloadOrError()     {}
 func (ErrNotAuthorized) IsSetProfileImagePayloadOrError()              {}
 func (ErrNotAuthorized) IsPostTokensPayloadOrError()                   {}
+func (ErrNotAuthorized) IsDeletePostPayloadOrError()                   {}
 
 type ErrPostNotFound struct {
 	Message string `json:"message"`

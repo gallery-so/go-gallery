@@ -1327,6 +1327,21 @@ func (r *mutationResolver) PostTokens(ctx context.Context, input model.PostToken
 	return output, nil
 }
 
+// DeletePost is the resolver for the deletePost field.
+func (r *mutationResolver) DeletePost(ctx context.Context, postID persist.DBID) (model.DeletePostPayloadOrError, error) {
+	err := publicapi.For(ctx).Feed.DeletePostById(ctx, postID)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.DeletePostPayload{
+		DeletedID: &model.DeletedNode{
+			Dbid: postID,
+		},
+	}
+	return output, nil
+}
+
 // ViewGallery is the resolver for the viewGallery field.
 func (r *mutationResolver) ViewGallery(ctx context.Context, galleryID persist.DBID) (model.ViewGalleryPayloadOrError, error) {
 	gallery, err := publicapi.For(ctx).Gallery.ViewGallery(ctx, galleryID)
@@ -2033,7 +2048,6 @@ func (r *queryResolver) GlobalFeed(ctx context.Context, before *string, after *s
 func (r *queryResolver) TrendingFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
 	events, pageInfo, err := publicapi.For(ctx).Feed.PaginateTrendingFeed(ctx, before, after, first, last)
 	if err != nil {
-		panic(err)
 		return nil, err
 	}
 
