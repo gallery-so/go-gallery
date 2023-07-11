@@ -108,6 +108,8 @@ func PredictMediaType(ctx context.Context, url string) (persist.MediaType, strin
 			return persist.MediaTypeHTML, "text/html", &lenURI, nil
 		case persist.URITypeBase64JPEG:
 			return persist.MediaTypeImage, "image/jpeg", &lenURI, nil
+		case persist.URITypeBase64GIF:
+			return persist.MediaTypeGIF, "image/gif", &lenURI, nil
 		case persist.URITypeBase64MP3:
 			return persist.MediaTypeAudio, "audio/mpeg", &lenURI, nil
 		case persist.URITypeBase64WAV:

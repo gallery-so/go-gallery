@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"image/gif"
 	"image/jpeg"
 	"image/png"
 	"io"
@@ -445,6 +446,25 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 				return
 			}
 			readerChan <- util.NewFileHeaderReader(newImage, bufSize)
+		case persist.URITypeBase64GIF:
+			b64data := asString[strings.IndexByte(asString, ',')+1:]
+			decoded, err := util.Base64Decode(b64data, base64.RawStdEncoding, base64.StdEncoding, base64.RawURLEncoding, base64.URLEncoding)
+			if err != nil {
+				errChan <- fmt.Errorf("error decoding base64 gif data: %s \n\n%s", err, b64data)
+				return
+			}
+			img, err := gif.Decode(bytes.NewReader(decoded))
+			if err != nil {
+				errChan <- fmt.Errorf("error decoding gif data: %s \n\n%s", err, b64data)
+				return
+			}
+			newGif := bytes.NewBuffer(nil)
+			err = gif.Encode(newGif, img, nil)
+			if err != nil {
+				errChan <- fmt.Errorf("error encoding gif data: %s \n\n%s", err, b64data)
+				return
+			}
+			readerChan <- util.NewFileHeaderReader(newGif, bufSize)
 		case persist.URITypeArweave, persist.URITypeArweaveGateway:
 			path := util.GetURIPath(asString, true)
 

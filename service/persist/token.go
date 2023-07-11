@@ -109,6 +109,8 @@ const (
 	URITypeBase64PNG URIType = "base64png"
 	// URITypeBase64JPEG represents a base64 encoded JPEG
 	URITypeBase64JPEG URIType = "base64jpeg"
+	// URITypeBase64GIF represents a base64 encoded GIF
+	URITypeBase64GIF URIType = "base64gif"
 	// URITypeBase64WAV represents a base64 encoded WAV
 	URITypeBase64WAV URIType = "base64wav"
 	// URITypeBase64MP3 represents a base64 encoded MP3
@@ -556,6 +558,8 @@ func (uri TokenURI) Type() URIType {
 		return URITypeBase64PNG
 	case strings.HasPrefix(asString, "data:image/jpeg;base64,"), strings.HasPrefix(asString, "data:image/jpeg;charset=utf-8;base64,"), strings.HasPrefix(asString, "data:image/jpeg") && strings.Contains(asString, ";base64,"):
 		return URITypeBase64JPEG
+	case strings.HasPrefix(asString, "data:image/gif;base64,"), strings.HasPrefix(asString, "data:image/gif;charset=utf-8;base64,"), strings.HasPrefix(asString, "data:image/gif") && strings.Contains(asString, ";base64,"):
+		return URITypeBase64GIF
 	case strings.HasPrefix(asString, "data:audio/wav;base64,"), strings.HasPrefix(asString, "data:audio/wav;charset=utf-8;base64,"), strings.HasPrefix(asString, "data:audio/wav") && strings.Contains(asString, ";base64,"):
 		return URITypeBase64WAV
 	case strings.HasPrefix(asString, "data:audio/mpeg;base64,"), strings.HasPrefix(asString, "data:audio/mpeg;charset=utf-8;base64,"), strings.HasPrefix(asString, "data:audio/mpeg") && strings.Contains(asString, ";base64,"):
