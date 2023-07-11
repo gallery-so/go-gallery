@@ -95,23 +95,11 @@ func PredictMediaType(ctx context.Context, url string) (persist.MediaType, strin
 		lenURI := int64(len(asURI.String()))
 		uriType := asURI.Type()
 		logger.For(ctx).Debugf("predicting media type for %s with URI type %s", url, uriType)
+		mediaType := uriType.ToMediaType()
+		if mediaType.IsValid() {
+			return mediaType, mediaType.ToContentType(), &lenURI, nil
+		}
 		switch uriType {
-		case persist.URITypeBase64JSON, persist.URITypeJSON:
-			return persist.MediaTypeJSON, "application/json", &lenURI, nil
-		case persist.URITypeBase64SVG, persist.URITypeSVG:
-			return persist.MediaTypeSVG, "image/svg+xml", &lenURI, nil
-		case persist.URITypeBase64BMP:
-			return persist.MediaTypeImage, "image/bmp", &lenURI, nil
-		case persist.URITypeBase64PNG:
-			return persist.MediaTypeImage, "image/png", &lenURI, nil
-		case persist.URITypeBase64HTML:
-			return persist.MediaTypeHTML, "text/html", &lenURI, nil
-		case persist.URITypeBase64JPEG:
-			return persist.MediaTypeImage, "image/jpeg", &lenURI, nil
-		case persist.URITypeBase64MP3:
-			return persist.MediaTypeAudio, "audio/mpeg", &lenURI, nil
-		case persist.URITypeBase64WAV:
-			return persist.MediaTypeAudio, "audio/wav", &lenURI, nil
 		case persist.URITypeIPFS:
 			contentType, contentLength, err := rpc.GetIPFSHeaders(ctx, strings.TrimPrefix(asURI.String(), "ipfs://"))
 			if err != nil {

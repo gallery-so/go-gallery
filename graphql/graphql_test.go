@@ -1058,7 +1058,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	})
 
 	t.Run("should process base64 encoded metadata", func(t *testing.T) {
-		t.Skip("base64 encoded metadata is not yet supported, pipeline see this as a JSON mediatype")
+		// t.Skip("base64 encoded metadata is not yet supported, pipeline see this as a JSON mediatype")
 		ctx := context.Background()
 		userF := newUserFixture(t)
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/base64")

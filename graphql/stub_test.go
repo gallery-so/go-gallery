@@ -3,6 +3,7 @@ package graphql_test
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -192,8 +193,12 @@ func fetchMetadataFromDummyMetadata(url, endpoint string, ipfsClient *shell.Shel
 	}
 
 	// Don't try to JSON parse base64 encoded data
-	if strings.Contains(string(body), "base64") {
-		return persist.TokenMetadata{"image_url": string(body)}, nil
+	if strings.HasPrefix(string(body), "data:application/json;base64,") {
+		body = []byte(strings.Split(string(body), ",")[1])
+		body, err = util.Base64Decode(string(body), base64.StdEncoding, base64.RawStdEncoding)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var meta persist.TokenMetadata
