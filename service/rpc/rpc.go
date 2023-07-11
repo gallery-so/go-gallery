@@ -369,8 +369,6 @@ func GetMetadataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *
 // recurseRawReturns will cause the function to recursively call itself if the reader returned from any initial call is a "raw" URI (a URI that in itself contains the data to be retrieved, not a URI that points to the data to be retrieved)
 func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, mediaType persist.MediaType, ipfsClient *shell.Shell, arweaveClient *goar.Client, bufSize int, retrieveTimeout time.Duration, recurseRawReturns bool) (*util.FileHeaderReader, persist.MediaType, error) {
 
-	timeStart := time.Now()
-
 	errChan := make(chan error)
 	readerChan := make(chan *util.FileHeaderReader)
 

@@ -193,7 +193,7 @@ func fetchMetadataFromDummyMetadata(url, endpoint string, ipfsClient *shell.Shel
 	}
 
 	// Don't try to JSON parse base64 encoded data
-	if strings.Contains(string(body), "base64") {
+	if strings.HasPrefix(string(body), "data:application/json;base64,") {
 		body = []byte(strings.Split(string(body), ",")[1])
 		body, err = util.Base64Decode(string(body), base64.StdEncoding, base64.RawStdEncoding)
 		if err != nil {
