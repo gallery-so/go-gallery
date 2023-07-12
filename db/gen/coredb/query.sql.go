@@ -160,6 +160,7 @@ func (q *Queries) ClearNotificationsForUser(ctx context.Context, ownerID persist
 const countOwnersByContractId = `-- name: CountOwnersByContractId :one
 SELECT count(DISTINCT users.id) FROM users, tokens, contracts
     WHERE (contracts.id = $1 or contracts.parent_id = $1)
+    AND tokens.contract = contracts.id
     AND tokens.owner_user_id = users.id
     AND (NOT $2::bool OR users.universal = false)
     AND tokens.deleted = false AND users.deleted = false AND contracts.deleted = false
