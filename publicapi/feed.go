@@ -177,7 +177,7 @@ func (api FeedAPI) PaginatePersonalFeed(ctx context.Context, before *string, aft
 			return nil, err
 		}
 
-		return feedEntityToTypedType(ctx, api.queries, api.loaders, keys)
+		return feedEntityToTypedType(ctx, api.loaders, keys)
 	}
 
 	paginator := timeIDPaginator{
@@ -215,7 +215,7 @@ func (api FeedAPI) PaginateUserFeed(ctx context.Context, userID persist.DBID, be
 			return nil, err
 		}
 
-		return feedEntityToTypedType(ctx, api.queries, api.loaders, keys)
+		return feedEntityToTypedType(ctx, api.loaders, keys)
 	}
 
 	paginator := timeIDPaginator{
@@ -246,7 +246,7 @@ func (api FeedAPI) PaginateGlobalFeed(ctx context.Context, before *string, after
 			return nil, err
 		}
 
-		return feedEntityToTypedType(ctx, api.queries, api.loaders, keys)
+		return feedEntityToTypedType(ctx, api.loaders, keys)
 	}
 
 	paginator := timeIDPaginator{
@@ -336,7 +336,7 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 			Limit:         params.Limit,
 		})
 
-		events, err := feedEntityToTypedType(ctx, api.queries, api.loaders, keys)
+		events, err := feedEntityToTypedType(ctx, api.loaders, keys)
 		if err != nil {
 			return nil, err
 		}
@@ -401,16 +401,16 @@ func feedCursor(i interface{}) (time.Time, persist.DBID, error) {
 	return time.Time{}, "", fmt.Errorf("interface{} is not a feed entity: %T", i)
 }
 
-func feedEntityToTypedType(ctx context.Context, q *db.Queries, d *dataloader.Loaders, ids []db.FeedEntity) ([]any, error) {
+func feedEntityToTypedType(ctx context.Context, d *dataloader.Loaders, ids []db.FeedEntity) ([]any, error) {
 	entities := make([]any, len(ids))
-	feedEventIDs := make([]string, 0, len(ids))
-	postIDs := make([]string, 0, len(ids))
+	feedEventIDs := make([]persist.DBID, 0, len(ids))
+	postIDs := make([]persist.DBID, 0, len(ids))
 	for _, id := range ids {
 		switch id.FeedEntityType {
 		case persist.FeedEventTypeTag:
-			feedEventIDs = append(feedEventIDs, id.ID.String())
+			feedEventIDs = append(feedEventIDs, id.ID)
 		case persist.PostTypeTag:
-			postIDs = append(postIDs, id.ID.String())
+			postIDs = append(postIDs, id.ID)
 		default:
 			return nil, fmt.Errorf("unknown feed entity type %d", id.FeedEntityType)
 		}
@@ -421,25 +421,19 @@ func feedEntityToTypedType(ctx context.Context, q *db.Queries, d *dataloader.Loa
 	incomingErrors := make(chan error)
 
 	go func() {
-		feedEvents, err := q.GetFeedEventsByIds(ctx, feedEventIDs)
-		if err != nil {
-			incomingErrors <- err
+		feedEvents, errs := d.FeedEventByFeedEventID.LoadAll(feedEventIDs)
+		if errs != nil && len(errs) > 0 {
+			incomingErrors <- util.MultiErr(errs)
 			return
-		}
-		for _, evt := range feedEvents {
-			d.FeedEventByFeedEventID.Prime(evt.ID, evt)
 		}
 		incomingFeedEvents <- feedEvents
 	}()
 
 	go func() {
-		feedPosts, err := q.GetPostsByIds(ctx, postIDs)
-		if err != nil {
-			incomingErrors <- err
+		feedPosts, errs := d.PostByPostID.LoadAll(postIDs)
+		if errs != nil && len(errs) > 0 {
+			incomingErrors <- util.MultiErr(errs)
 			return
-		}
-		for _, pst := range feedPosts {
-			d.PostByPostID.Prime(pst.ID, pst)
 		}
 		incomingFeedPosts <- feedPosts
 	}()
