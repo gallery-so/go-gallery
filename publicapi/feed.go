@@ -174,6 +174,7 @@ func (api FeedAPI) PaginatePersonalFeed(ctx context.Context, before *string, aft
 		})
 
 		if err != nil {
+			panic(err)
 			return nil, err
 		}
 
@@ -212,6 +213,7 @@ func (api FeedAPI) PaginateUserFeed(ctx context.Context, userID persist.DBID, be
 			PagingForward: params.PagingForward,
 		})
 		if err != nil {
+			panic(err)
 			return nil, err
 		}
 
@@ -243,6 +245,7 @@ func (api FeedAPI) PaginateGlobalFeed(ctx context.Context, before *string, after
 		})
 
 		if err != nil {
+			panic(err)
 			return nil, err
 		}
 
@@ -422,18 +425,22 @@ func feedEntityToTypedType(ctx context.Context, d *dataloader.Loaders, ids []db.
 
 	go func() {
 		feedEvents, errs := d.FeedEventByFeedEventID.LoadAll(feedEventIDs)
-		if errs != nil && len(errs) > 0 {
-			incomingErrors <- util.MultiErr(errs)
-			return
+		for _, err := range errs {
+			if err != nil {
+				incomingErrors <- err
+				return
+			}
 		}
 		incomingFeedEvents <- feedEvents
 	}()
 
 	go func() {
 		feedPosts, errs := d.PostByPostID.LoadAll(postIDs)
-		if errs != nil && len(errs) > 0 {
-			incomingErrors <- util.MultiErr(errs)
-			return
+		for _, err := range errs {
+			if err != nil {
+				incomingErrors <- err
+				return
+			}
 		}
 		incomingFeedPosts <- feedPosts
 	}()
