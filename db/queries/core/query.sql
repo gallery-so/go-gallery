@@ -381,7 +381,7 @@ select exists(
   and created_at > @window_start and created_at <= @window_end
 );
 
--- name: PaginateGlobalFeed :batchmany
+-- name: PaginateGlobalFeed :many
 SELECT * FROM feed_entities
 WHERE deleted = false
         AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
@@ -392,7 +392,7 @@ ORDER BY
 LIMIT sqlc.arg('limit');
 
 
--- name: PaginatePersonalFeedByUserID :batchmany
+-- name: PaginatePersonalFeedByUserID :many
 select fe.* from feed_entities fe, follows fl
     where fl.deleted = false
       and fe.actor_id = fl.followee
@@ -404,7 +404,7 @@ order by
     case when not sqlc.arg('paging_forward')::bool then (fe.created_at, fe.id) end desc
 limit sqlc.arg('limit');
 
--- name: PaginateUserFeedByUserID :batchmany
+-- name: PaginateUserFeedByUserID :many
 SELECT * from feed_entities
 WHERE actor_id = sqlc.arg('owner_id') AND deleted = false
         AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
@@ -425,15 +425,8 @@ select * from feed_entities join unnest(@feed_entity_ids::text[]) with ordinalit
 -- name: GetFeedEventsByIds :many
 SELECT * FROM feed_events WHERE id = ANY(@ids::varchar(255)[]) AND deleted = false;
 
--- name: GetFeedEventsByIdsBatch :batchmany
-SELECT * FROM feed_events WHERE id = ANY($1) AND deleted = false;
-
 -- name: GetPostsByIds :many
 SELECT * FROM posts WHERE id = ANY(@ids::varchar(255)[]) AND deleted = false;
-
--- name: GetPostsByIdsBatch :batchmany
-SELECT * FROM posts WHERE id = ANY($1) AND deleted = false;
-
 
 -- name: GetEventByIdBatch :batchone
 SELECT * FROM feed_events WHERE id = $1 AND deleted = false;

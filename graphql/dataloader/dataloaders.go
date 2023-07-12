@@ -22,9 +22,6 @@
 //go:generate go run github.com/gallery-so/dataloaden ContractsLoaderByCreatorID github.com/mikeydub/go-gallery/db/gen/coredb.GetCreatedContractsBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.Contract
 //go:generate go run github.com/gallery-so/dataloaden ContractsLoaderByParentID github.com/mikeydub/go-gallery/db/gen/coredb.GetChildContractsByParentIDBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.Contract
 //go:generate go run github.com/gallery-so/dataloaden ContractLoaderByChainAddress github.com/mikeydub/go-gallery/service/persist.ChainAddress github.com/mikeydub/go-gallery/db/gen/coredb.Contract
-//go:generate go run github.com/gallery-so/dataloaden GlobalFeedLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginateGlobalFeedParams []any
-//go:generate go run github.com/gallery-so/dataloaden PersonalFeedLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginatePersonalFeedByUserIDParams []any
-//go:generate go run github.com/gallery-so/dataloaden UserFeedLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginateUserFeedByUserIDParams []any
 //go:generate go run github.com/gallery-so/dataloaden EventLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.FeedEvent
 //go:generate go run github.com/gallery-so/dataloaden PostLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Post
 //go:generate go run github.com/gallery-so/dataloaden AdmireLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Admire
@@ -57,7 +54,6 @@ package dataloader
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"sync"
 	"time"
 
@@ -115,9 +111,6 @@ type Loaders struct {
 	FollowingByUserID                        *UsersLoaderByID
 	SharedFollowersByUserIDs                 *SharedFollowersLoaderByIDs
 	SharedContractsByUserIDs                 *SharedContractsLoaderByIDs
-	GlobalFeed                               *GlobalFeedLoader
-	PersonalFeedByUserID                     *PersonalFeedLoader
-	UserFeedByUserID                         *UserFeedLoader
 	FeedEventByFeedEventID                   *EventLoaderByID
 	PostByPostID                             *PostLoaderByID
 	AdmireByAdmireID                         *AdmireLoaderByID
@@ -134,7 +127,6 @@ type Loaders struct {
 	InteractionsByFeedEventID                *FeedEventInteractionsLoader
 	InteractionCountByPostID                 *PostInteractionCountLoader
 	InteractionsByPostID                     *PostInteractionsLoader
-	EventByEventID                           *EventLoaderByID
 	NotificationByID                         *NotificationLoaderByID
 	NotificationsByUserID                    *NotificationsLoaderByUserID
 	ContractsDisplayedByUserID               *ContractsLoaderByID
@@ -293,19 +285,9 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 
 	loaders.ContractsDisplayedByUserID = NewContractsLoaderByID(defaults, loadContractsDisplayedByUserID(q))
 
-	loaders.EventByEventID = NewEventLoaderByID(defaults, loadEventById(q), EventLoaderByIDCacheSubscriptions{
-		AutoCacheWithKey: func(event db.FeedEvent) persist.DBID { return event.ID },
-	})
-
 	loaders.PostByPostID = NewPostLoaderByID(defaults, loadPostById(q), PostLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(post db.Post) persist.DBID { return post.ID },
 	})
-
-	loaders.PersonalFeedByUserID = NewPersonalFeedLoader(defaults, loadPersonalFeed(q))
-
-	loaders.UserFeedByUserID = NewUserFeedLoader(defaults, loadUserFeed(q))
-
-	loaders.GlobalFeed = NewGlobalFeedLoader(defaults, loadGlobalFeed(q))
 
 	loaders.NotificationsByUserID = NewNotificationsLoaderByUserID(defaults, loadUserNotifications(q))
 
@@ -1010,14 +992,14 @@ func loadEventById(q *db.Queries) func(context.Context, []persist.DBID) ([]db.Fe
 
 func loadPostById(q *db.Queries) func(context.Context, []persist.DBID) ([]db.Post, []error) {
 	return func(ctx context.Context, postIDs []persist.DBID) ([]db.Post, []error) {
-		events := make([]db.Post, len(postIDs))
+		posts := make([]db.Post, len(postIDs))
 		errors := make([]error, len(postIDs))
 
 		b := q.GetPostByIdBatch(ctx, postIDs)
 		defer b.Close()
 
 		b.QueryRow(func(i int, p db.Post, err error) {
-			events[i] = p
+			posts[i] = p
 			errors[i] = err
 
 			if errors[i] == pgx.ErrNoRows {
@@ -1025,140 +1007,7 @@ func loadPostById(q *db.Queries) func(context.Context, []persist.DBID) ([]db.Pos
 			}
 		})
 
-		return events, errors
-	}
-}
-
-func loadPersonalFeed(q *db.Queries) func(context.Context, []db.PaginatePersonalFeedByUserIDParams) ([][]any, []error) {
-	return func(ctx context.Context, params []db.PaginatePersonalFeedByUserIDParams) ([][]any, []error) {
-		eventIdentifiers := make([][]db.FeedEntity, len(params))
-		errors := make([]error, len(params))
-
-		b := q.PaginatePersonalFeedByUserID(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, evts []db.FeedEntity, err error) {
-			eventIdentifiers[i] = evts
-			errors[i] = err
-		})
-
-		return paginatedFeedRowsToFeedEntities(ctx, q, eventIdentifiers, errors)
-	}
-}
-
-func paginatedFeedRowsToFeedEntities(ctx context.Context, q *db.Queries, rows [][]db.FeedEntity, errors []error) ([][]any, []error) {
-	events := make([][]any, len(rows))
-	for i, ids := range rows {
-		e, err := PaginatedRowToFeedEntity(ctx, q, ids)
-		if err != nil {
-			errors[i] = err
-		}
-		events[i] = e
-	}
-
-	return events, errors
-}
-
-func PaginatedRowToFeedEntity(ctx context.Context, q *db.Queries, ids []db.FeedEntity) ([]any, error) {
-	entities := make([]any, len(ids))
-	feedEventIDs := make([]string, 0, len(ids))
-	feedPostsIDs := make([]string, 0, len(ids))
-	for _, id := range ids {
-		switch id.FeedEntityType {
-		case persist.FeedEventTypeTag:
-			feedEventIDs = append(feedEventIDs, id.ID.String())
-		case persist.PostTypeTag:
-			feedPostsIDs = append(feedPostsIDs, id.ID.String())
-		default:
-			return nil, fmt.Errorf("unknown feed entity type %d", id.FeedEntityType)
-		}
-	}
-
-	incomingFeedEvents := make(chan []db.FeedEvent)
-	incomingFeedPosts := make(chan []db.Post)
-	incomingErrors := make(chan error)
-
-	go func() {
-		feedEvents, err := q.GetFeedEventsByIds(ctx, feedEventIDs)
-		if err != nil {
-			incomingErrors <- err
-			return
-		}
-		incomingFeedEvents <- feedEvents
-	}()
-
-	go func() {
-		feedPosts, err := q.GetPostsByIds(ctx, feedPostsIDs)
-		if err != nil {
-			incomingErrors <- err
-			return
-		}
-		incomingFeedPosts <- feedPosts
-	}()
-
-	for i := 0; i < 2; i++ {
-		select {
-		case feedEvents := <-incomingFeedEvents:
-			idsToFeedEvents := make(map[persist.DBID]db.FeedEvent, len(feedEvents))
-			for _, evt := range feedEvents {
-				idsToFeedEvents[evt.ID] = evt
-			}
-
-			for j, id := range ids {
-				if it, ok := idsToFeedEvents[id.ID]; ok {
-					entities[j] = it
-				}
-			}
-		case feedPosts := <-incomingFeedPosts:
-			idsToFeedPosts := make(map[persist.DBID]db.Post, len(feedPosts))
-			for _, evt := range feedPosts {
-				idsToFeedPosts[evt.ID] = evt
-			}
-
-			for j, id := range ids {
-				if it, ok := idsToFeedPosts[id.ID]; ok {
-					entities[j] = it
-				}
-			}
-		case err := <-incomingErrors:
-			return nil, err
-		}
-	}
-
-	return entities, nil
-}
-
-func loadGlobalFeed(q *db.Queries) func(context.Context, []db.PaginateGlobalFeedParams) ([][]any, []error) {
-	return func(ctx context.Context, params []db.PaginateGlobalFeedParams) ([][]any, []error) {
-		events := make([][]db.FeedEntity, len(params))
-		errors := make([]error, len(params))
-
-		b := q.PaginateGlobalFeed(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, evts []db.FeedEntity, err error) {
-			events[i] = evts
-			errors[i] = err
-		})
-
-		return paginatedFeedRowsToFeedEntities(ctx, q, events, errors)
-	}
-}
-
-func loadUserFeed(q *db.Queries) func(context.Context, []db.PaginateUserFeedByUserIDParams) ([][]any, []error) {
-	return func(ctx context.Context, params []db.PaginateUserFeedByUserIDParams) ([][]any, []error) {
-		events := make([][]db.FeedEntity, len(params))
-		errors := make([]error, len(params))
-
-		b := q.PaginateUserFeedByUserID(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, evts []db.FeedEntity, err error) {
-			events[i] = evts
-			errors[i] = err
-		})
-
-		return paginatedFeedRowsToFeedEntities(ctx, q, events, errors)
+		return posts, errors
 	}
 }
 

@@ -163,7 +163,7 @@ func (api FeedAPI) PaginatePersonalFeed(ctx context.Context, before *string, aft
 	}
 
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-		keys, err := api.loaders.PersonalFeedByUserID.Load(db.PaginatePersonalFeedByUserIDParams{
+		keys, err := api.queries.PaginatePersonalFeedByUserID(ctx, db.PaginatePersonalFeedByUserIDParams{
 			Follower:      userID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -177,12 +177,7 @@ func (api FeedAPI) PaginatePersonalFeed(ctx context.Context, before *string, aft
 			return nil, err
 		}
 
-		results := make([]any, len(keys))
-		for i, key := range keys {
-			results[i] = key
-		}
-
-		return results, nil
+		return feedEntityToTypedType(ctx, api.queries, api.loaders, keys)
 	}
 
 	paginator := timeIDPaginator{
@@ -207,7 +202,7 @@ func (api FeedAPI) PaginateUserFeed(ctx context.Context, userID persist.DBID, be
 	}
 
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-		keys, err := api.loaders.UserFeedByUserID.Load(db.PaginateUserFeedByUserIDParams{
+		keys, err := api.queries.PaginateUserFeedByUserID(ctx, db.PaginateUserFeedByUserIDParams{
 			OwnerID:       userID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -216,17 +211,11 @@ func (api FeedAPI) PaginateUserFeed(ctx context.Context, userID persist.DBID, be
 			CurAfterID:    params.CursorAfterID,
 			PagingForward: params.PagingForward,
 		})
-
 		if err != nil {
 			return nil, err
 		}
 
-		results := make([]interface{}, len(keys))
-		for i, key := range keys {
-			results[i] = key
-		}
-
-		return results, nil
+		return feedEntityToTypedType(ctx, api.queries, api.loaders, keys)
 	}
 
 	paginator := timeIDPaginator{
@@ -244,7 +233,7 @@ func (api FeedAPI) PaginateGlobalFeed(ctx context.Context, before *string, after
 	}
 
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-		keys, err := api.loaders.GlobalFeed.Load(db.PaginateGlobalFeedParams{
+		keys, err := api.queries.PaginateGlobalFeed(ctx, db.PaginateGlobalFeedParams{
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
 			CurBeforeID:   params.CursorBeforeID,
@@ -257,12 +246,7 @@ func (api FeedAPI) PaginateGlobalFeed(ctx context.Context, before *string, after
 			return nil, err
 		}
 
-		results := make([]interface{}, len(keys))
-		for i, key := range keys {
-			results[i] = key
-		}
-
-		return results, nil
+		return feedEntityToTypedType(ctx, api.queries, api.loaders, keys)
 	}
 
 	paginator := timeIDPaginator{
@@ -352,7 +336,7 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 			Limit:         params.Limit,
 		})
 
-		events, err := dataloader.PaginatedRowToFeedEntity(ctx, api.queries, keys)
+		events, err := feedEntityToTypedType(ctx, api.queries, api.loaders, keys)
 		if err != nil {
 			return nil, err
 		}
@@ -361,16 +345,9 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 	}
 
 	cursorFunc := func(node any) (int, []persist.DBID, error) {
-		switch node := node.(type) {
-		case db.FeedEvent:
-			_, id, err := feedCursor(node)
-			return lookup[id], trendingIDs, err
-		case db.Post:
-			_, id, err := postCursor(node)
-			return lookup[id], trendingIDs, err
-		default:
-			return 0, nil, fmt.Errorf("unexpected node type %T", node)
-		}
+		_, id, err := feedCursor(node)
+		return lookup[id], trendingIDs, err
+
 	}
 
 	paginator.QueryFunc = queryFunc
@@ -415,15 +392,86 @@ func (api FeedAPI) TrendingUsers(ctx context.Context, report model.Window) ([]db
 }
 
 func feedCursor(i interface{}) (time.Time, persist.DBID, error) {
-	if row, ok := i.(db.FeedEvent); ok {
+	switch row := i.(type) {
+	case db.FeedEvent:
 		return row.EventTime, row.ID, nil
-	}
-	return time.Time{}, "", fmt.Errorf("interface{} is not a feed entity")
-}
-
-func postCursor(i interface{}) (time.Time, persist.DBID, error) {
-	if row, ok := i.(db.Post); ok {
+	case db.Post:
 		return row.CreatedAt, row.ID, nil
 	}
-	return time.Time{}, "", fmt.Errorf("interface{} is not a feed entity")
+	return time.Time{}, "", fmt.Errorf("interface{} is not a feed entity: %T", i)
+}
+
+func feedEntityToTypedType(ctx context.Context, q *db.Queries, d *dataloader.Loaders, ids []db.FeedEntity) ([]any, error) {
+	entities := make([]any, len(ids))
+	feedEventIDs := make([]string, 0, len(ids))
+	postIDs := make([]string, 0, len(ids))
+	for _, id := range ids {
+		switch id.FeedEntityType {
+		case persist.FeedEventTypeTag:
+			feedEventIDs = append(feedEventIDs, id.ID.String())
+		case persist.PostTypeTag:
+			postIDs = append(postIDs, id.ID.String())
+		default:
+			return nil, fmt.Errorf("unknown feed entity type %d", id.FeedEntityType)
+		}
+	}
+
+	incomingFeedEvents := make(chan []db.FeedEvent)
+	incomingFeedPosts := make(chan []db.Post)
+	incomingErrors := make(chan error)
+
+	go func() {
+		feedEvents, err := q.GetFeedEventsByIds(ctx, feedEventIDs)
+		if err != nil {
+			incomingErrors <- err
+			return
+		}
+		for _, evt := range feedEvents {
+			d.FeedEventByFeedEventID.Prime(evt.ID, evt)
+		}
+		incomingFeedEvents <- feedEvents
+	}()
+
+	go func() {
+		feedPosts, err := q.GetPostsByIds(ctx, postIDs)
+		if err != nil {
+			incomingErrors <- err
+			return
+		}
+		for _, pst := range feedPosts {
+			d.PostByPostID.Prime(pst.ID, pst)
+		}
+		incomingFeedPosts <- feedPosts
+	}()
+
+	for i := 0; i < 2; i++ {
+		select {
+		case feedEvents := <-incomingFeedEvents:
+			idsToFeedEvents := make(map[persist.DBID]db.FeedEvent, len(feedEvents))
+			for _, evt := range feedEvents {
+				idsToFeedEvents[evt.ID] = evt
+			}
+
+			for j, id := range ids {
+				if it, ok := idsToFeedEvents[id.ID]; ok {
+					entities[j] = it
+				}
+			}
+		case feedPosts := <-incomingFeedPosts:
+			idsToFeedPosts := make(map[persist.DBID]db.Post, len(feedPosts))
+			for _, evt := range feedPosts {
+				idsToFeedPosts[evt.ID] = evt
+			}
+
+			for j, id := range ids {
+				if it, ok := idsToFeedPosts[id.ID]; ok {
+					entities[j] = it
+				}
+			}
+		case err := <-incomingErrors:
+			return nil, err
+		}
+	}
+
+	return entities, nil
 }
