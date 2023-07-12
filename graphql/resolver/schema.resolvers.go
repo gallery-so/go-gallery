@@ -538,7 +538,6 @@ func (r *galleryUserResolver) Following(ctx context.Context, obj *model.GalleryU
 func (r *galleryUserResolver) Feed(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
 	events, pageInfo, err := publicapi.For(ctx).Feed.PaginateUserFeed(ctx, obj.Dbid, before, after, first, last)
 	if err != nil {
-		panic("failed to paginate user feed: " + err.Error())
 		return nil, err
 	}
 

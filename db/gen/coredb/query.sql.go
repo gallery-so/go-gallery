@@ -4862,53 +4862,25 @@ func (q *Queries) IsFeedUserActionBlocked(ctx context.Context, arg IsFeedUserAct
 }
 
 const paginateTrendingFeed = `-- name: PaginateTrendingFeed :many
-SELECT result.created_at, result.id, result.tag
-FROM (
-    (
-        SELECT id, $1::int as tag, event_time as created_at 
-        FROM feed_events 
-        WHERE id = ANY($2::text[]) AND deleted = false
-    )
-    UNION ALL
-    (
-        SELECT id, $3::int as tag, created_at
-        FROM posts 
-        WHERE id = ANY($4::text[]) AND deleted = false
-    )
-) AS result 
-JOIN unnest(ARRAY_CAT($2::text[], $4::text[])) WITH ORDINALITY t(id, pos) 
-ON result.id = t.id 
-WHERE t.pos > $5::int
-AND t.pos < $6::int
-ORDER BY 
-    CASE WHEN $7::bool THEN t.pos END DESC,
-    CASE WHEN NOT $7::bool THEN t.pos END ASC
-LIMIT $8
+select id, feed_entity_type, created_at, actor_id from feed_entities join unnest($1::text[]) with ordinality t(id, pos) using(id) where deleted = false
+  and t.pos > $2::int
+  and t.pos < $3::int
+  order by case when $4::bool then t.pos end desc,
+          case when not $4::bool then t.pos end asc
+  limit $5
 `
 
 type PaginateTrendingFeedParams struct {
-	FeedEventTag  int32    `json:"feed_event_tag"`
-	FeedEventIds  []string `json:"feed_event_ids"`
-	PostTag       int32    `json:"post_tag"`
-	PostIds       []string `json:"post_ids"`
+	FeedEntityIds []string `json:"feed_entity_ids"`
 	CurBeforePos  int32    `json:"cur_before_pos"`
 	CurAfterPos   int32    `json:"cur_after_pos"`
 	PagingForward bool     `json:"paging_forward"`
 	Limit         int32    `json:"limit"`
 }
 
-type PaginateTrendingFeedRow struct {
-	CreatedAt time.Time    `json:"created_at"`
-	ID        persist.DBID `json:"id"`
-	Tag       int32        `json:"tag"`
-}
-
-func (q *Queries) PaginateTrendingFeed(ctx context.Context, arg PaginateTrendingFeedParams) ([]PaginateTrendingFeedRow, error) {
+func (q *Queries) PaginateTrendingFeed(ctx context.Context, arg PaginateTrendingFeedParams) ([]FeedEntity, error) {
 	rows, err := q.db.Query(ctx, paginateTrendingFeed,
-		arg.FeedEventTag,
-		arg.FeedEventIds,
-		arg.PostTag,
-		arg.PostIds,
+		arg.FeedEntityIds,
 		arg.CurBeforePos,
 		arg.CurAfterPos,
 		arg.PagingForward,
@@ -4918,10 +4890,15 @@ func (q *Queries) PaginateTrendingFeed(ctx context.Context, arg PaginateTrending
 		return nil, err
 	}
 	defer rows.Close()
-	var items []PaginateTrendingFeedRow
+	var items []FeedEntity
 	for rows.Next() {
-		var i PaginateTrendingFeedRow
-		if err := rows.Scan(&i.CreatedAt, &i.ID, &i.Tag); err != nil {
+		var i FeedEntity
+		if err := rows.Scan(
+			&i.ID,
+			&i.FeedEntityType,
+			&i.CreatedAt,
+			&i.ActorID,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
-	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 type GlobalFeedLoaderSettings interface {
@@ -54,7 +53,7 @@ func (l *GlobalFeedLoader) setPostFetchHook(postFetchHook func(context.Context, 
 
 // NewGlobalFeedLoader creates a new GlobalFeedLoader with the given settings, functions, and options
 func NewGlobalFeedLoader(
-	settings GlobalFeedLoaderSettings, fetch func(ctx context.Context, keys []coredb.PaginateGlobalFeedParams) ([][]persist.FeedEntity, []error),
+	settings GlobalFeedLoaderSettings, fetch func(ctx context.Context, keys []coredb.PaginateGlobalFeedParams) ([][]any, []error),
 	opts ...func(interface {
 		setContext(context.Context)
 		setWait(time.Duration)
@@ -82,7 +81,7 @@ func NewGlobalFeedLoader(
 	}
 
 	// Set this after applying options, in case a different context was set via options
-	loader.fetch = func(keys []coredb.PaginateGlobalFeedParams) ([][]persist.FeedEntity, []error) {
+	loader.fetch = func(keys []coredb.PaginateGlobalFeedParams) ([][]any, []error) {
 		ctx := loader.ctx
 
 		// Allow the preFetchHook to modify and return a new context
@@ -119,7 +118,7 @@ type GlobalFeedLoader struct {
 	ctx context.Context
 
 	// this method provides the data for the loader
-	fetch func(keys []coredb.PaginateGlobalFeedParams) ([][]persist.FeedEntity, []error)
+	fetch func(keys []coredb.PaginateGlobalFeedParams) ([][]any, []error)
 
 	// how long to wait before sending a batch
 	wait time.Duration
@@ -151,10 +150,10 @@ type GlobalFeedLoader struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[coredb.PaginateGlobalFeedParams][]persist.FeedEntity
+	cache map[coredb.PaginateGlobalFeedParams][]any
 
 	// typed cache functions
-	//subscribers []func([]persist.FeedEntity)
+	//subscribers []func([]any)
 	subscribers []globalFeedLoaderSubscriber
 
 	// functions used to cache published results from other dataloaders
@@ -173,26 +172,26 @@ type GlobalFeedLoader struct {
 
 type globalFeedLoaderBatch struct {
 	keys    []coredb.PaginateGlobalFeedParams
-	data    [][]persist.FeedEntity
+	data    [][]any
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
-// Load a FeedEntity by key, batching and caching will be applied automatically
-func (l *GlobalFeedLoader) Load(key coredb.PaginateGlobalFeedParams) ([]persist.FeedEntity, error) {
+// Load a any by key, batching and caching will be applied automatically
+func (l *GlobalFeedLoader) Load(key coredb.PaginateGlobalFeedParams) ([]any, error) {
 	return l.LoadThunk(key)()
 }
 
-// LoadThunk returns a function that when called will block waiting for a FeedEntity.
+// LoadThunk returns a function that when called will block waiting for a any.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *GlobalFeedLoader) LoadThunk(key coredb.PaginateGlobalFeedParams) func() ([]persist.FeedEntity, error) {
+func (l *GlobalFeedLoader) LoadThunk(key coredb.PaginateGlobalFeedParams) func() ([]any, error) {
 	l.mu.Lock()
 	if !l.disableCaching {
 		if it, ok := l.cache[key]; ok {
 			l.mu.Unlock()
-			return func() ([]persist.FeedEntity, error) {
+			return func() ([]any, error) {
 				return it, nil
 			}
 		}
@@ -204,10 +203,10 @@ func (l *GlobalFeedLoader) LoadThunk(key coredb.PaginateGlobalFeedParams) func()
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-	return func() ([]persist.FeedEntity, error) {
+	return func() ([]any, error) {
 		<-batch.done
 
-		var data []persist.FeedEntity
+		var data []any
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -238,43 +237,43 @@ func (l *GlobalFeedLoader) LoadThunk(key coredb.PaginateGlobalFeedParams) func()
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *GlobalFeedLoader) LoadAll(keys []coredb.PaginateGlobalFeedParams) ([][]persist.FeedEntity, []error) {
-	results := make([]func() ([]persist.FeedEntity, error), len(keys))
+func (l *GlobalFeedLoader) LoadAll(keys []coredb.PaginateGlobalFeedParams) ([][]any, []error) {
+	results := make([]func() ([]any, error), len(keys))
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-	feedEntitys := make([][]persist.FeedEntity, len(keys))
+	anys := make([][]any, len(keys))
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
-		feedEntitys[i], errors[i] = thunk()
+		anys[i], errors[i] = thunk()
 	}
-	return feedEntitys, errors
+	return anys, errors
 }
 
-// LoadAllThunk returns a function that when called will block waiting for a FeedEntitys.
+// LoadAllThunk returns a function that when called will block waiting for a anys.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *GlobalFeedLoader) LoadAllThunk(keys []coredb.PaginateGlobalFeedParams) func() ([][]persist.FeedEntity, []error) {
-	results := make([]func() ([]persist.FeedEntity, error), len(keys))
+func (l *GlobalFeedLoader) LoadAllThunk(keys []coredb.PaginateGlobalFeedParams) func() ([][]any, []error) {
+	results := make([]func() ([]any, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
-	return func() ([][]persist.FeedEntity, []error) {
-		feedEntitys := make([][]persist.FeedEntity, len(keys))
+	return func() ([][]any, []error) {
+		anys := make([][]any, len(keys))
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
-			feedEntitys[i], errors[i] = thunk()
+			anys[i], errors[i] = thunk()
 		}
-		return feedEntitys, errors
+		return anys, errors
 	}
 }
 
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *GlobalFeedLoader) Prime(key coredb.PaginateGlobalFeedParams, value []persist.FeedEntity) bool {
+func (l *GlobalFeedLoader) Prime(key coredb.PaginateGlobalFeedParams, value []any) bool {
 	if l.disableCaching {
 		return false
 	}
@@ -283,7 +282,7 @@ func (l *GlobalFeedLoader) Prime(key coredb.PaginateGlobalFeedParams, value []pe
 	if _, found = l.cache[key]; !found {
 		// make a copy when writing to the cache, its easy to pass a pointer in from a loop var
 		// and end up with the whole cache pointing to the same value.
-		cpy := make([]persist.FeedEntity, len(value))
+		cpy := make([]any, len(value))
 		copy(cpy, value)
 		l.unsafeSet(key, cpy)
 	}
@@ -301,9 +300,9 @@ func (l *GlobalFeedLoader) Clear(key coredb.PaginateGlobalFeedParams) {
 	l.mu.Unlock()
 }
 
-func (l *GlobalFeedLoader) unsafeSet(key coredb.PaginateGlobalFeedParams, value []persist.FeedEntity) {
+func (l *GlobalFeedLoader) unsafeSet(key coredb.PaginateGlobalFeedParams, value []any) {
 	if l.cache == nil {
-		l.cache = map[coredb.PaginateGlobalFeedParams][]persist.FeedEntity{}
+		l.cache = map[coredb.PaginateGlobalFeedParams][]any{}
 	}
 	l.cache[key] = value
 }
@@ -356,15 +355,15 @@ func (b *globalFeedLoaderBatch) end(l *GlobalFeedLoader) {
 }
 
 type globalFeedLoaderSubscriber struct {
-	cacheFunc func(persist.FeedEntity)
+	cacheFunc func(any)
 	mutex     *sync.Mutex
 }
 
-func (l *GlobalFeedLoader) publishToSubscribers(value []persist.FeedEntity) {
+func (l *GlobalFeedLoader) publishToSubscribers(value []any) {
 	// Lazy build our list of typed cache functions once
 	l.once.Do(func() {
 		for i, subscription := range *l.subscriptionRegistry {
-			if typedFunc, ok := subscription.(*func(persist.FeedEntity)); ok {
+			if typedFunc, ok := subscription.(*func(any)); ok {
 				// Don't invoke our own cache function
 				if !l.ownsCacheFunc(typedFunc) {
 					l.subscribers = append(l.subscribers, globalFeedLoaderSubscriber{cacheFunc: *typedFunc, mutex: (*l.mutexRegistry)[i]})
@@ -391,7 +390,7 @@ func (l *GlobalFeedLoader) registerCacheFunc(cacheFunc interface{}, mutex *sync.
 	*l.mutexRegistry = append(*l.mutexRegistry, mutex)
 }
 
-func (l *GlobalFeedLoader) ownsCacheFunc(f *func(persist.FeedEntity)) bool {
+func (l *GlobalFeedLoader) ownsCacheFunc(f *func(any)) bool {
 	for _, cacheFunc := range l.cacheFuncs {
 		if cacheFunc == f {
 			return true

@@ -1,11 +1,5 @@
 package persist
 
-import (
-	"database/sql"
-	"fmt"
-	"time"
-)
-
 /*
 create type feed_entity AS (
 
@@ -26,47 +20,47 @@ create type feed_entity AS (
 
 );
 */
-type FeedEntity struct {
-	ID          DBID             `json:"id"`
-	TokenIDs    DBIDList         `json:"token_ids"`
-	Caption     sql.NullString   `json:"caption"`
-	EventTime   time.Time        `json:"event_time"`
-	Source      FeedEntitySource `json:"source"`
-	Version     sql.NullInt32    `json:"version"`
-	OwnerID     DBID             `json:"owner_id"`
-	GroupID     DBID             `json:"group_id"`
-	Action      Action           `json:"action"`
-	Data        FeedEventData    `json:"data"`
-	EventIDs    DBIDList         `json:"event_ids"`
-	Deleted     sql.NullBool     `json:"deleted"`
-	LastUpdated time.Time        `json:"last_updated"`
-	CreatedAt   time.Time        `json:"created_at"`
-}
+// type FeedEntity struct {
+// 	ID          DBID             `json:"id"`
+// 	TokenIDs    DBIDList         `json:"token_ids"`
+// 	Caption     sql.NullString   `json:"caption"`
+// 	EventTime   time.Time        `json:"event_time"`
+// 	Source      FeedEntitySource `json:"source"`
+// 	Version     sql.NullInt32    `json:"version"`
+// 	OwnerID     DBID             `json:"owner_id"`
+// 	GroupID     DBID             `json:"group_id"`
+// 	Action      Action           `json:"action"`
+// 	Data        FeedEventData    `json:"data"`
+// 	EventIDs    DBIDList         `json:"event_ids"`
+// 	Deleted     sql.NullBool     `json:"deleted"`
+// 	LastUpdated time.Time        `json:"last_updated"`
+// 	CreatedAt   time.Time        `json:"created_at"`
+// }
 
-type FeedEntitySource string
+// type FeedEntitySource string
+
+// const (
+// 	FeedEntitySourceFeedEvent FeedEntitySource = "feed_event"
+// 	FeedEntitySourcePost      FeedEntitySource = "post"
+// )
+
+// func (f *FeedEntitySource) Scan(src interface{}) error {
+// 	if src == nil {
+// 		return nil
+// 	}
+// 	source := FeedEntitySource(src.(string))
+// 	switch source {
+// 	case FeedEntitySourceFeedEvent:
+// 		*f = FeedEntitySourceFeedEvent
+// 	case FeedEntitySourcePost:
+// 		*f = FeedEntitySourcePost
+// 	default:
+// 		return fmt.Errorf("invalid FeedEntitySource: %s", source)
+// 	}
+// 	return nil
+// }
 
 const (
-	FeedEntitySourceFeedEvent FeedEntitySource = "feed_event"
-	FeedEntitySourcePost      FeedEntitySource = "post"
-)
-
-func (f *FeedEntitySource) Scan(src interface{}) error {
-	if src == nil {
-		return nil
-	}
-	source := FeedEntitySource(src.(string))
-	switch source {
-	case FeedEntitySourceFeedEvent:
-		*f = FeedEntitySourceFeedEvent
-	case FeedEntitySourcePost:
-		*f = FeedEntitySourcePost
-	default:
-		return fmt.Errorf("invalid FeedEntitySource: %s", source)
-	}
-	return nil
-}
-
-const (
-	FeedEventTag = iota
-	PostTag
+	FeedEventTypeTag = iota
+	PostTypeTag
 )
