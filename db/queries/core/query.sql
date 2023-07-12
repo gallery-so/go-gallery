@@ -383,8 +383,7 @@ select exists(
 
 -- name: PaginateGlobalFeed :many
 SELECT * FROM feed_entities
-WHERE deleted = false
-        AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+WHERE (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
         AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
 ORDER BY 
     CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
@@ -406,7 +405,7 @@ limit sqlc.arg('limit');
 
 -- name: PaginateUserFeedByUserID :many
 SELECT * from feed_entities
-WHERE actor_id = sqlc.arg('owner_id') AND deleted = false
+WHERE actor_id = sqlc.arg('owner_id')
         AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
         AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
 ORDER BY 
@@ -415,8 +414,8 @@ ORDER BY
 LIMIT sqlc.arg('limit');
 
 -- name: PaginateTrendingFeed :many
-select * from feed_entities join unnest(@feed_entity_ids::text[]) with ordinality t(id, pos) using(id) where deleted = false
-  and t.pos > @cur_before_pos::int
+select * from feed_entities join unnest(@feed_entity_ids::text[]) with ordinality t(id, pos) using(id)
+  where t.pos > @cur_before_pos::int
   and t.pos < @cur_after_pos::int
   order by case when @paging_forward::bool then t.pos end desc,
           case when not @paging_forward::bool then t.pos end asc

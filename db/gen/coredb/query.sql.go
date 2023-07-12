@@ -4863,8 +4863,7 @@ func (q *Queries) IsFeedUserActionBlocked(ctx context.Context, arg IsFeedUserAct
 
 const paginateGlobalFeed = `-- name: PaginateGlobalFeed :many
 SELECT id, feed_entity_type, created_at, actor_id FROM feed_entities
-WHERE deleted = false
-        AND (created_at, id) < ($1, $2)
+WHERE (created_at, id) < ($1, $2)
         AND (created_at, id) > ($3, $4)
 ORDER BY 
     CASE WHEN $5::bool THEN (created_at, id) END ASC,
@@ -4970,8 +4969,8 @@ func (q *Queries) PaginatePersonalFeedByUserID(ctx context.Context, arg Paginate
 }
 
 const paginateTrendingFeed = `-- name: PaginateTrendingFeed :many
-select id, feed_entity_type, created_at, actor_id from feed_entities join unnest($1::text[]) with ordinality t(id, pos) using(id) where deleted = false
-  and t.pos > $2::int
+select id, feed_entity_type, created_at, actor_id from feed_entities join unnest($1::text[]) with ordinality t(id, pos) using(id)
+  where t.pos > $2::int
   and t.pos < $3::int
   order by case when $4::bool then t.pos end desc,
           case when not $4::bool then t.pos end asc
@@ -5019,7 +5018,7 @@ func (q *Queries) PaginateTrendingFeed(ctx context.Context, arg PaginateTrending
 
 const paginateUserFeedByUserID = `-- name: PaginateUserFeedByUserID :many
 SELECT id, feed_entity_type, created_at, actor_id from feed_entities
-WHERE actor_id = $1 AND deleted = false
+WHERE actor_id = $1
         AND (created_at, id) < ($2, $3)
         AND (created_at, id) > ($4, $5)
 ORDER BY 
