@@ -2032,7 +2032,6 @@ func (r *queryResolver) GlobalFeed(ctx context.Context, before *string, after *s
 func (r *queryResolver) TrendingFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
 	events, pageInfo, err := publicapi.For(ctx).Feed.PaginateTrendingFeed(ctx, before, after, first, last)
 	if err != nil {
-		panic(err)
 		return nil, err
 	}
 

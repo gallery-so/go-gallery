@@ -1467,7 +1467,7 @@ func entitiesToFeedEdges(events []any) ([]*model.FeedEdge, error) {
 
 	for i, evt := range events {
 		var node model.FeedEntityOrError
-		node, err := feedEntityToModel(&evt)
+		node, err := feedEntityToModel(evt)
 
 		if e, ok := err.(*persist.ErrUnknownAction); ok {
 			node = model.ErrUnknownAction{Message: e.Error()}
