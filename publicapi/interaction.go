@@ -774,7 +774,7 @@ func (api InteractionAPI) CommentOnFeedEvent(ctx context.Context, feedEventID pe
 		return "", err
 	}
 
-	return api.comment(ctx, comment, "", feedEventID, replyToID)
+	return api.comment(ctx, comment, feedEventID, "", replyToID)
 }
 
 func (api InteractionAPI) CommentOnPost(ctx context.Context, postID persist.DBID, replyToID *persist.DBID, comment string) (persist.DBID, error) {
@@ -790,10 +790,10 @@ func (api InteractionAPI) CommentOnPost(ctx context.Context, postID persist.DBID
 		return "", err
 	}
 
-	return api.comment(ctx, comment, postID, "", replyToID)
+	return api.comment(ctx, comment, "", postID, replyToID)
 }
 
-func (api InteractionAPI) comment(ctx context.Context, comment string, postID persist.DBID, feedEventID persist.DBID, replyToID *persist.DBID) (persist.DBID, error) {
+func (api InteractionAPI) comment(ctx context.Context, comment string, feedEventID, postID persist.DBID, replyToID *persist.DBID) (persist.DBID, error) {
 	actor, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return "", err
@@ -805,6 +805,14 @@ func (api InteractionAPI) comment(ctx context.Context, comment string, postID pe
 	if err != nil {
 		return "", err
 	}
+	var action persist.Action
+	if feedEventID != "" {
+		action = persist.ActionCommentedOnFeedEvent
+	} else if postID != "" {
+		action = persist.ActionCommentedOnPost
+	} else {
+		panic("commenting on neither feed event nor post")
+	}
 
 	_, err = dispatchEvent(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(actor),
@@ -813,7 +821,7 @@ func (api InteractionAPI) comment(ctx context.Context, comment string, postID pe
 		PostID:         postID,
 		FeedEventID:    feedEventID,
 		CommentID:      commentID,
-		Action:         persist.ActionCommentedOnPost,
+		Action:         action,
 	}, api.validator, nil)
 	if err != nil {
 		return "", err
