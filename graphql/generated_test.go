@@ -3069,11 +3069,11 @@ func (v *globalFeedQueryGlobalFeedFeedConnection) GetEdges() []*globalFeedQueryG
 
 // globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdge includes the requested fields of the GraphQL type FeedEdge.
 type globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdge struct {
-	Node *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError `json:"-"`
+	Node *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError `json:"-"`
 }
 
 // GetNode returns globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdge.Node, and is useful for accessing the field via an interface.
-func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdge) GetNode() *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError {
+func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdge) GetNode() *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError {
 	return v.Node
 }
 
@@ -3099,8 +3099,8 @@ func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdge) UnmarshalJSON(b [
 		dst := &v.Node
 		src := firstPass.Node
 		if len(src) != 0 && string(src) != "null" {
-			*dst = new(globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError)
-			err = __unmarshalglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError(
+			*dst = new(globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError)
+			err = __unmarshalglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError(
 				src, *dst)
 			if err != nil {
 				return fmt.Errorf(
@@ -3132,7 +3132,7 @@ func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdge) __premarshalJSON(
 		src := v.Node
 		if src != nil {
 			var err error
-			*dst, err = __marshalglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError(
+			*dst, err = __marshalglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError(
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
@@ -3191,48 +3191,32 @@ func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownActio
 	return v.Message
 }
 
-// globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent includes the requested fields of the GraphQL type FeedEvent.
-type globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent struct {
-	Typename *string      `json:"__typename"`
-	Dbid     persist.DBID `json:"dbid"`
-}
-
-// GetTypename returns globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent.Typename, and is useful for accessing the field via an interface.
-func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) GetTypename() *string {
-	return v.Typename
-}
-
-// GetDbid returns globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent.Dbid, and is useful for accessing the field via an interface.
-func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) GetDbid() persist.DBID {
-	return v.Dbid
-}
-
-// globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError includes the requested fields of the GraphQL interface FeedEventOrPostOrError.
+// globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError includes the requested fields of the GraphQL interface FeedEntityOrError.
 //
-// globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError is implemented by the following types:
+// globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError is implemented by the following types:
 // globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound
 // globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound
 // globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction
 // globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent
 // globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodePost
-type globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError interface {
-	implementsGraphQLInterfaceglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError()
+type globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError interface {
+	implementsGraphQLInterfaceglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
 	GetTypename() *string
 }
 
-func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound) implementsGraphQLInterfaceglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError() {
+func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound) implementsGraphQLInterfaceglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError() {
 }
-func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound) implementsGraphQLInterfaceglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError() {
+func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound) implementsGraphQLInterfaceglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError() {
 }
-func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction) implementsGraphQLInterfaceglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError() {
+func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction) implementsGraphQLInterfaceglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError() {
 }
-func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) implementsGraphQLInterfaceglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError() {
+func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) implementsGraphQLInterfaceglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError() {
 }
-func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodePost) implementsGraphQLInterfaceglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError() {
+func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodePost) implementsGraphQLInterfaceglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError() {
 }
 
-func __unmarshalglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError(b []byte, v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError) error {
+func __unmarshalglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError(b []byte, v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError) error {
 	if string(b) == "null" {
 		return nil
 	}
@@ -3263,14 +3247,14 @@ func __unmarshalglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEven
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
-			"response was missing FeedEventOrPostOrError.__typename")
+			"response was missing FeedEntityOrError.__typename")
 	default:
 		return fmt.Errorf(
-			`unexpected concrete type for globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError: "%v"`, tn.TypeName)
+			`unexpected concrete type for globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError: "%v"`, tn.TypeName)
 	}
 }
 
-func __marshalglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError(v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError) ([]byte, error) {
+func __marshalglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError(v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError) ([]byte, error) {
 
 	var typename string
 	switch v := (*v).(type) {
@@ -3318,8 +3302,24 @@ func __marshalglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventO
 		return []byte("null"), nil
 	default:
 		return nil, fmt.Errorf(
-			`unexpected concrete type for globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError: "%T"`, v)
+			`unexpected concrete type for globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError: "%T"`, v)
 	}
+}
+
+// globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent includes the requested fields of the GraphQL type FeedEvent.
+type globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent struct {
+	Typename *string      `json:"__typename"`
+	Dbid     persist.DBID `json:"dbid"`
+}
+
+// GetTypename returns globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent.Typename, and is useful for accessing the field via an interface.
+func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) GetTypename() *string {
+	return v.Typename
+}
+
+// GetDbid returns globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent.Dbid, and is useful for accessing the field via an interface.
+func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) GetDbid() persist.DBID {
+	return v.Dbid
 }
 
 // globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodePost includes the requested fields of the GraphQL type Post.
@@ -5207,11 +5207,11 @@ func (v *trendingFeedQueryTrendingFeedFeedConnection) GetEdges() []*trendingFeed
 
 // trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdge includes the requested fields of the GraphQL type FeedEdge.
 type trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdge struct {
-	Node *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError `json:"-"`
+	Node *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError `json:"-"`
 }
 
 // GetNode returns trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdge.Node, and is useful for accessing the field via an interface.
-func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdge) GetNode() *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError {
+func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdge) GetNode() *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError {
 	return v.Node
 }
 
@@ -5237,8 +5237,8 @@ func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdge) UnmarshalJSON
 		dst := &v.Node
 		src := firstPass.Node
 		if len(src) != 0 && string(src) != "null" {
-			*dst = new(trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError)
-			err = __unmarshaltrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError(
+			*dst = new(trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError)
+			err = __unmarshaltrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError(
 				src, *dst)
 			if err != nil {
 				return fmt.Errorf(
@@ -5270,7 +5270,7 @@ func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdge) __premarshalJ
 		src := v.Node
 		if src != nil {
 			var err error
-			*dst, err = __marshaltrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError(
+			*dst, err = __marshaltrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError(
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
@@ -5329,48 +5329,32 @@ func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownA
 	return v.Message
 }
 
-// trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent includes the requested fields of the GraphQL type FeedEvent.
-type trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent struct {
-	Typename *string      `json:"__typename"`
-	Dbid     persist.DBID `json:"dbid"`
-}
-
-// GetTypename returns trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent.Typename, and is useful for accessing the field via an interface.
-func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) GetTypename() *string {
-	return v.Typename
-}
-
-// GetDbid returns trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent.Dbid, and is useful for accessing the field via an interface.
-func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) GetDbid() persist.DBID {
-	return v.Dbid
-}
-
-// trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError includes the requested fields of the GraphQL interface FeedEventOrPostOrError.
+// trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError includes the requested fields of the GraphQL interface FeedEntityOrError.
 //
-// trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError is implemented by the following types:
+// trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError is implemented by the following types:
 // trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound
 // trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound
 // trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction
 // trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent
 // trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodePost
-type trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError interface {
-	implementsGraphQLInterfacetrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError()
+type trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError interface {
+	implementsGraphQLInterfacetrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
 	GetTypename() *string
 }
 
-func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound) implementsGraphQLInterfacetrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError() {
+func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound) implementsGraphQLInterfacetrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError() {
 }
-func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound) implementsGraphQLInterfacetrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError() {
+func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound) implementsGraphQLInterfacetrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError() {
 }
-func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction) implementsGraphQLInterfacetrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError() {
+func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction) implementsGraphQLInterfacetrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError() {
 }
-func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) implementsGraphQLInterfacetrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError() {
+func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) implementsGraphQLInterfacetrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError() {
 }
-func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodePost) implementsGraphQLInterfacetrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError() {
+func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodePost) implementsGraphQLInterfacetrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError() {
 }
 
-func __unmarshaltrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError(b []byte, v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError) error {
+func __unmarshaltrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError(b []byte, v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError) error {
 	if string(b) == "null" {
 		return nil
 	}
@@ -5401,14 +5385,14 @@ func __unmarshaltrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeed
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
-			"response was missing FeedEventOrPostOrError.__typename")
+			"response was missing FeedEntityOrError.__typename")
 	default:
 		return fmt.Errorf(
-			`unexpected concrete type for trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError: "%v"`, tn.TypeName)
+			`unexpected concrete type for trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError: "%v"`, tn.TypeName)
 	}
 }
 
-func __marshaltrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError(v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError) ([]byte, error) {
+func __marshaltrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError(v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError) ([]byte, error) {
 
 	var typename string
 	switch v := (*v).(type) {
@@ -5456,8 +5440,24 @@ func __marshaltrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEv
 		return []byte("null"), nil
 	default:
 		return nil, fmt.Errorf(
-			`unexpected concrete type for trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError: "%T"`, v)
+			`unexpected concrete type for trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError: "%T"`, v)
 	}
+}
+
+// trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent includes the requested fields of the GraphQL type FeedEvent.
+type trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent struct {
+	Typename *string      `json:"__typename"`
+	Dbid     persist.DBID `json:"dbid"`
+}
+
+// GetTypename returns trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent.Typename, and is useful for accessing the field via an interface.
+func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) GetTypename() *string {
+	return v.Typename
+}
+
+// GetDbid returns trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent.Dbid, and is useful for accessing the field via an interface.
+func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) GetDbid() persist.DBID {
+	return v.Dbid
 }
 
 // trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodePost includes the requested fields of the GraphQL type Post.
@@ -7420,11 +7420,11 @@ func (v *viewerQueryViewerUserGalleryUserFeedFeedConnection) GetEdges() []*viewe
 
 // viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdge includes the requested fields of the GraphQL type FeedEdge.
 type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdge struct {
-	Node *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError `json:"-"`
+	Node *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError `json:"-"`
 }
 
 // GetNode returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdge.Node, and is useful for accessing the field via an interface.
-func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdge) GetNode() *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError {
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdge) GetNode() *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError {
 	return v.Node
 }
 
@@ -7450,8 +7450,8 @@ func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdge) Unmars
 		dst := &v.Node
 		src := firstPass.Node
 		if len(src) != 0 && string(src) != "null" {
-			*dst = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError)
-			err = __unmarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError(
+			*dst = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError)
+			err = __unmarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError(
 				src, *dst)
 			if err != nil {
 				return fmt.Errorf(
@@ -7483,7 +7483,7 @@ func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdge) __prem
 		src := v.Node
 		if src != nil {
 			var err error
-			*dst, err = __marshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError(
+			*dst, err = __marshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError(
 				src)
 			if err != nil {
 				return nil, fmt.Errorf(
@@ -7540,6 +7540,125 @@ func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrU
 // GetMessage returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction.Message, and is useful for accessing the field via an interface.
 func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction) GetMessage() string {
 	return v.Message
+}
+
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError includes the requested fields of the GraphQL interface FeedEntityOrError.
+//
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError is implemented by the following types:
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodePost
+type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError interface {
+	implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() *string
+}
+
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError() {
+}
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError() {
+}
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError() {
+}
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError() {
+}
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodePost) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError() {
+}
+
+func __unmarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError(b []byte, v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "ErrFeedEventNotFound":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound)
+		return json.Unmarshal(b, *v)
+	case "ErrPostNotFound":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound)
+		return json.Unmarshal(b, *v)
+	case "ErrUnknownAction":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction)
+		return json.Unmarshal(b, *v)
+	case "FeedEvent":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent)
+		return json.Unmarshal(b, *v)
+	case "Post":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodePost)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing FeedEntityOrError.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError(v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound:
+		typename = "ErrFeedEventNotFound"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound:
+		typename = "ErrPostNotFound"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction:
+		typename = "ErrUnknownAction"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent:
+		typename = "FeedEvent"
+
+		premarshaled, err := v.__premarshalJSON()
+		if err != nil {
+			return nil, err
+		}
+		result := struct {
+			TypeName string `json:"__typename"`
+			*__premarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent
+		}{typename, premarshaled}
+		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodePost:
+		typename = "Post"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodePost
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEntityOrError: "%T"`, v)
+	}
 }
 
 // viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent includes the requested fields of the GraphQL type FeedEvent.
@@ -8444,125 +8563,6 @@ func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeed
 // GetAction returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserFollowedUsersFeedEventData.Action, and is useful for accessing the field via an interface.
 func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserFollowedUsersFeedEventData) GetAction() *Action {
 	return v.Action
-}
-
-// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError includes the requested fields of the GraphQL interface FeedEventOrPostOrError.
-//
-// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError is implemented by the following types:
-// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound
-// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound
-// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction
-// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent
-// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodePost
-type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError interface {
-	implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError()
-	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
-	GetTypename() *string
-}
-
-func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError() {
-}
-func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError() {
-}
-func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError() {
-}
-func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError() {
-}
-func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodePost) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError() {
-}
-
-func __unmarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError(b []byte, v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError) error {
-	if string(b) == "null" {
-		return nil
-	}
-
-	var tn struct {
-		TypeName string `json:"__typename"`
-	}
-	err := json.Unmarshal(b, &tn)
-	if err != nil {
-		return err
-	}
-
-	switch tn.TypeName {
-	case "ErrFeedEventNotFound":
-		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound)
-		return json.Unmarshal(b, *v)
-	case "ErrPostNotFound":
-		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound)
-		return json.Unmarshal(b, *v)
-	case "ErrUnknownAction":
-		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction)
-		return json.Unmarshal(b, *v)
-	case "FeedEvent":
-		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent)
-		return json.Unmarshal(b, *v)
-	case "Post":
-		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodePost)
-		return json.Unmarshal(b, *v)
-	case "":
-		return fmt.Errorf(
-			"response was missing FeedEventOrPostOrError.__typename")
-	default:
-		return fmt.Errorf(
-			`unexpected concrete type for viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError: "%v"`, tn.TypeName)
-	}
-}
-
-func __marshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError(v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError) ([]byte, error) {
-
-	var typename string
-	switch v := (*v).(type) {
-	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound:
-		typename = "ErrFeedEventNotFound"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound
-		}{typename, v}
-		return json.Marshal(result)
-	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound:
-		typename = "ErrPostNotFound"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound
-		}{typename, v}
-		return json.Marshal(result)
-	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction:
-		typename = "ErrUnknownAction"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction
-		}{typename, v}
-		return json.Marshal(result)
-	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent:
-		typename = "FeedEvent"
-
-		premarshaled, err := v.__premarshalJSON()
-		if err != nil {
-			return nil, err
-		}
-		result := struct {
-			TypeName string `json:"__typename"`
-			*__premarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent
-		}{typename, premarshaled}
-		return json.Marshal(result)
-	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodePost:
-		typename = "Post"
-
-		result := struct {
-			TypeName string `json:"__typename"`
-			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodePost
-		}{typename, v}
-		return json.Marshal(result)
-	case nil:
-		return []byte("null"), nil
-	default:
-		return nil, fmt.Errorf(
-			`unexpected concrete type for viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrPostOrError: "%T"`, v)
-	}
 }
 
 // viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodePost includes the requested fields of the GraphQL type Post.

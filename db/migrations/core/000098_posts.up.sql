@@ -27,3 +27,22 @@ add constraint post_feed_event_comment_check check (
     (post_id is null and feed_event_id is not null) or
     (post_id is null and feed_event_id is null)
 );
+
+
+create view feed_entities as (
+SELECT subquery.id, subquery.feed_entity_type, subquery.created_at, subquery.actor_id
+
+    FROM (
+        (
+            SELECT id, 0 as feed_entity_type, event_time as created_at, owner_id as actor_id
+            FROM feed_events
+            WHERE deleted = false
+        )
+        UNION ALL
+        (
+            SELECT id, 1 as feed_entity_type, created_at, actor_id
+            FROM posts
+            WHERE deleted = false
+        )
+    ) subquery
+);

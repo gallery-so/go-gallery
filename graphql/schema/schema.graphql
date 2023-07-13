@@ -987,7 +987,7 @@ type ErrPostNotFound implements Error {
   message: String!
 }
 
-union FeedEventOrPostOrError =
+union FeedEntityOrError =
     FeedEvent
   | Post
   | ErrPostNotFound
@@ -1006,7 +1006,7 @@ type PageInfo {
 }
 
 type FeedEdge {
-  node: FeedEventOrPostOrError
+  node: FeedEntityOrError
   cursor: String
 }
 
