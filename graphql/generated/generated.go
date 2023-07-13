@@ -8619,7 +8619,10 @@ type ErrPostNotFound implements Error {
   message: String!
 }
 
-union FeedEntityOrError =
+"""
+Can return posts as well
+"""
+union FeedEventOrError =
     FeedEvent
   | Post
   | ErrPostNotFound
@@ -8638,7 +8641,7 @@ type PageInfo {
 }
 
 type FeedEdge {
-  node: FeedEntityOrError
+  node: FeedEventOrError
   cursor: String
 }
 
@@ -22261,9 +22264,9 @@ func (ec *executionContext) _FeedEdge_node(ctx context.Context, field graphql.Co
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(model.FeedEntityOrError)
+	res := resTmp.(model.FeedEventOrError)
 	fc.Result = res
-	return ec.marshalOFeedEntityOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEntityOrError(ctx, field.Selections, res)
+	return ec.marshalOFeedEventOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventOrError(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_FeedEdge_node(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -22273,7 +22276,7 @@ func (ec *executionContext) fieldContext_FeedEdge_node(ctx context.Context, fiel
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type FeedEntityOrError does not have child fields")
+			return nil, errors.New("field of type FeedEventOrError does not have child fields")
 		},
 	}
 	return fc, nil
@@ -56658,50 +56661,6 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 	}
 }
 
-func (ec *executionContext) _FeedEntityOrError(ctx context.Context, sel ast.SelectionSet, obj model.FeedEntityOrError) graphql.Marshaler {
-	switch obj := (obj).(type) {
-	case nil:
-		return graphql.Null
-	case model.FeedEvent:
-		return ec._FeedEvent(ctx, sel, &obj)
-	case *model.FeedEvent:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._FeedEvent(ctx, sel, obj)
-	case model.Post:
-		return ec._Post(ctx, sel, &obj)
-	case *model.Post:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._Post(ctx, sel, obj)
-	case model.ErrPostNotFound:
-		return ec._ErrPostNotFound(ctx, sel, &obj)
-	case *model.ErrPostNotFound:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrPostNotFound(ctx, sel, obj)
-	case model.ErrFeedEventNotFound:
-		return ec._ErrFeedEventNotFound(ctx, sel, &obj)
-	case *model.ErrFeedEventNotFound:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrFeedEventNotFound(ctx, sel, obj)
-	case model.ErrUnknownAction:
-		return ec._ErrUnknownAction(ctx, sel, &obj)
-	case *model.ErrUnknownAction:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrUnknownAction(ctx, sel, obj)
-	default:
-		panic(fmt.Errorf("unexpected type %T", obj))
-	}
-}
-
 func (ec *executionContext) _FeedEventByIdOrError(ctx context.Context, sel ast.SelectionSet, obj model.FeedEventByIDOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -56799,6 +56758,50 @@ func (ec *executionContext) _FeedEventData(ctx context.Context, sel ast.Selectio
 			return graphql.Null
 		}
 		return ec._GalleryUpdatedFeedEventData(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _FeedEventOrError(ctx context.Context, sel ast.SelectionSet, obj model.FeedEventOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.FeedEvent:
+		return ec._FeedEvent(ctx, sel, &obj)
+	case *model.FeedEvent:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._FeedEvent(ctx, sel, obj)
+	case model.Post:
+		return ec._Post(ctx, sel, &obj)
+	case *model.Post:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._Post(ctx, sel, obj)
+	case model.ErrPostNotFound:
+		return ec._ErrPostNotFound(ctx, sel, &obj)
+	case *model.ErrPostNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrPostNotFound(ctx, sel, obj)
+	case model.ErrFeedEventNotFound:
+		return ec._ErrFeedEventNotFound(ctx, sel, &obj)
+	case *model.ErrFeedEventNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrFeedEventNotFound(ctx, sel, obj)
+	case model.ErrUnknownAction:
+		return ec._ErrUnknownAction(ctx, sel, &obj)
+	case *model.ErrUnknownAction:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrUnknownAction(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -61693,7 +61696,7 @@ func (ec *executionContext) _ErrDoesNotOwnRequiredToken(ctx context.Context, sel
 	return out
 }
 
-var errFeedEventNotFoundImplementors = []string{"ErrFeedEventNotFound", "Error", "FeedEntityOrError", "FeedEventByIdOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError"}
+var errFeedEventNotFoundImplementors = []string{"ErrFeedEventNotFound", "Error", "FeedEventOrError", "FeedEventByIdOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError"}
 
 func (ec *executionContext) _ErrFeedEventNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrFeedEventNotFound) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errFeedEventNotFoundImplementors)
@@ -61917,7 +61920,7 @@ func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.Selec
 	return out
 }
 
-var errPostNotFoundImplementors = []string{"ErrPostNotFound", "PostOrError", "Error", "FeedEntityOrError"}
+var errPostNotFoundImplementors = []string{"ErrPostNotFound", "PostOrError", "Error", "FeedEventOrError"}
 
 func (ec *executionContext) _ErrPostNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrPostNotFound) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errPostNotFoundImplementors)
@@ -62057,7 +62060,7 @@ func (ec *executionContext) _ErrTokenNotFound(ctx context.Context, sel ast.Selec
 	return out
 }
 
-var errUnknownActionImplementors = []string{"ErrUnknownAction", "Error", "FeedEntityOrError", "FeedEventByIdOrError"}
+var errUnknownActionImplementors = []string{"ErrUnknownAction", "Error", "FeedEventOrError", "FeedEventByIdOrError"}
 
 func (ec *executionContext) _ErrUnknownAction(ctx context.Context, sel ast.SelectionSet, obj *model.ErrUnknownAction) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errUnknownActionImplementors)
@@ -62259,7 +62262,7 @@ func (ec *executionContext) _FeedEdge(ctx context.Context, sel ast.SelectionSet,
 	return out
 }
 
-var feedEventImplementors = []string{"FeedEvent", "Node", "FeedEntityOrError", "FeedEventByIdOrError", "_Entity"}
+var feedEventImplementors = []string{"FeedEvent", "Node", "FeedEventOrError", "FeedEventByIdOrError", "_Entity"}
 
 func (ec *executionContext) _FeedEvent(ctx context.Context, sel ast.SelectionSet, obj *model.FeedEvent) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, feedEventImplementors)
@@ -64709,7 +64712,7 @@ func (ec *executionContext) _PdfMedia(ctx context.Context, sel ast.SelectionSet,
 	return out
 }
 
-var postImplementors = []string{"Post", "PostOrError", "Node", "FeedEntityOrError", "_Entity"}
+var postImplementors = []string{"Post", "PostOrError", "Node", "FeedEventOrError", "_Entity"}
 
 func (ec *executionContext) _Post(ctx context.Context, sel ast.SelectionSet, obj *model.Post) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, postImplementors)
@@ -71837,13 +71840,6 @@ func (ec *executionContext) marshalOFeedEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑg
 	return ec._FeedEdge(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalOFeedEntityOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEntityOrError(ctx context.Context, sel ast.SelectionSet, v model.FeedEntityOrError) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._FeedEntityOrError(ctx, sel, v)
-}
-
 func (ec *executionContext) marshalOFeedEvent2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEvent(ctx context.Context, sel ast.SelectionSet, v *model.FeedEvent) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -72075,6 +72071,13 @@ func (ec *executionContext) marshalOFeedEventInteractionsEdge2ᚖgithubᚗcomᚋ
 		return graphql.Null
 	}
 	return ec._FeedEventInteractionsEdge(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOFeedEventOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventOrError(ctx context.Context, sel ast.SelectionSet, v model.FeedEventOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._FeedEventOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOFloat2ᚖfloat64(ctx context.Context, v interface{}) (*float64, error) {

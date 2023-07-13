@@ -95,16 +95,17 @@ type Error interface {
 	IsError()
 }
 
-type FeedEntityOrError interface {
-	IsFeedEntityOrError()
-}
-
 type FeedEventByIDOrError interface {
 	IsFeedEventByIDOrError()
 }
 
 type FeedEventData interface {
 	IsFeedEventData()
+}
+
+// Can return posts as well
+type FeedEventOrError interface {
+	IsFeedEventOrError()
 }
 
 type FollowAllSocialConnectionsPayloadOrError interface {
@@ -915,7 +916,7 @@ type ErrFeedEventNotFound struct {
 }
 
 func (ErrFeedEventNotFound) IsError()                            {}
-func (ErrFeedEventNotFound) IsFeedEntityOrError()                {}
+func (ErrFeedEventNotFound) IsFeedEventOrError()                 {}
 func (ErrFeedEventNotFound) IsFeedEventByIDOrError()             {}
 func (ErrFeedEventNotFound) IsAdmireFeedEventPayloadOrError()    {}
 func (ErrFeedEventNotFound) IsRemoveAdmirePayloadOrError()       {}
@@ -1085,9 +1086,9 @@ type ErrPostNotFound struct {
 	Message string `json:"message"`
 }
 
-func (ErrPostNotFound) IsPostOrError()       {}
-func (ErrPostNotFound) IsError()             {}
-func (ErrPostNotFound) IsFeedEntityOrError() {}
+func (ErrPostNotFound) IsPostOrError()      {}
+func (ErrPostNotFound) IsError()            {}
+func (ErrPostNotFound) IsFeedEventOrError() {}
 
 type ErrPushTokenBelongsToAnotherUser struct {
 	Message string `json:"message"`
@@ -1131,7 +1132,7 @@ type ErrUnknownAction struct {
 }
 
 func (ErrUnknownAction) IsError()                {}
-func (ErrUnknownAction) IsFeedEntityOrError()    {}
+func (ErrUnknownAction) IsFeedEventOrError()     {}
 func (ErrUnknownAction) IsFeedEventByIDOrError() {}
 
 type ErrUserAlreadyExists struct {
@@ -1175,8 +1176,8 @@ type FeedConnection struct {
 }
 
 type FeedEdge struct {
-	Node   FeedEntityOrError `json:"node"`
-	Cursor *string           `json:"cursor"`
+	Node   FeedEventOrError `json:"node"`
+	Cursor *string          `json:"cursor"`
 }
 
 type FeedEvent struct {
@@ -1191,7 +1192,7 @@ type FeedEvent struct {
 }
 
 func (FeedEvent) IsNode()                 {}
-func (FeedEvent) IsFeedEntityOrError()    {}
+func (FeedEvent) IsFeedEventOrError()     {}
 func (FeedEvent) IsFeedEventByIDOrError() {}
 func (FeedEvent) IsEntity()               {}
 
@@ -1568,10 +1569,10 @@ type Post struct {
 	ViewerAdmire *Admire                     `json:"viewerAdmire"`
 }
 
-func (Post) IsPostOrError()       {}
-func (Post) IsNode()              {}
-func (Post) IsFeedEntityOrError() {}
-func (Post) IsEntity()            {}
+func (Post) IsPostOrError()      {}
+func (Post) IsNode()             {}
+func (Post) IsFeedEventOrError() {}
+func (Post) IsEntity()           {}
 
 type PostAdmireEdge struct {
 	Node   *Admire `json:"node"`

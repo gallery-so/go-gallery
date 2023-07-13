@@ -1267,7 +1267,7 @@ func feedEventToDataModel(event *db.FeedEvent) (model.FeedEventData, error) {
 	}
 }
 
-func feedEntityToModel(event any) (model.FeedEntityOrError, error) {
+func feedEntityToModel(event any) (model.FeedEventOrError, error) {
 	// Value always returns a nil error so we can safely ignore it.
 
 	switch event := event.(type) {
@@ -1564,7 +1564,7 @@ func entitiesToFeedEdges(events []any) ([]*model.FeedEdge, error) {
 	edges := make([]*model.FeedEdge, len(events))
 
 	for i, evt := range events {
-		var node model.FeedEntityOrError
+		var node model.FeedEventOrError
 		node, err := feedEntityToModel(evt)
 
 		if e, ok := err.(*persist.ErrUnknownAction); ok {
