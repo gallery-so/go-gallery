@@ -24,6 +24,7 @@
 //go:generate go run github.com/gallery-so/dataloaden ContractLoaderByChainAddress github.com/mikeydub/go-gallery/service/persist.ChainAddress github.com/mikeydub/go-gallery/db/gen/coredb.Contract
 //go:generate go run github.com/gallery-so/dataloaden EventLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.FeedEvent
 //go:generate go run github.com/gallery-so/dataloaden PostLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Post
+//go:generate go run github.com/gallery-so/dataloaden PostsPaginatedLoaderByContractID github.com/mikeydub/go-gallery/db/gen/coredb.PaginatePostsByContractIDParams []github.com/mikeydub/go-gallery/db/gen/coredb.Post
 //go:generate go run github.com/gallery-so/dataloaden AdmireLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Admire
 //go:generate go run github.com/gallery-so/dataloaden AdmiresLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Admire
 //go:generate go run github.com/gallery-so/dataloaden CommentLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Comment
@@ -113,6 +114,7 @@ type Loaders struct {
 	SharedContractsByUserIDs                 *SharedContractsLoaderByIDs
 	FeedEventByFeedEventID                   *EventLoaderByID
 	PostByPostID                             *PostLoaderByID
+	PostsPaginatedByContractID               *PostsPaginatedLoaderByContractID
 	AdmireByAdmireID                         *AdmireLoaderByID
 	AdmireCountByFeedEventID                 *IntLoaderByID
 	AdmiresByFeedEventID                     *FeedEventAdmiresLoader
@@ -288,6 +290,8 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 	loaders.PostByPostID = NewPostLoaderByID(defaults, loadPostById(q), PostLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(post db.Post) persist.DBID { return post.ID },
 	})
+
+	loaders.PostsPaginatedByContractID = NewPostsPaginatedLoaderByContractID(defaults, loadPostsPaginatedByContractID(q))
 
 	loaders.NotificationsByUserID = NewNotificationsLoaderByUserID(defaults, loadUserNotifications(q))
 
@@ -1011,6 +1015,21 @@ func loadPostById(q *db.Queries) func(context.Context, []persist.DBID) ([]db.Pos
 	}
 }
 
+func loadPostsPaginatedByContractID(q *db.Queries) func(context.Context, []db.PaginatePostsByContractIDParams) ([][]db.Post, []error) {
+	return func(ctx context.Context, postIDs []db.PaginatePostsByContractIDParams) ([][]db.Post, []error) {
+		events := make([][]db.Post, len(postIDs))
+		errors := make([]error, len(postIDs))
+
+		b := q.PaginatePostsByContractID(ctx, postIDs)
+		defer b.Close()
+
+		b.Query(func(i int, p []db.Post, err error) {
+			events[i], errors[i] = p, err
+		})
+
+		return events, errors
+	}
+}
 func loadUserNotifications(q *db.Queries) func(context.Context, []db.GetUserNotificationsBatchParams) ([][]db.Notification, []error) {
 	return func(ctx context.Context, params []db.GetUserNotificationsBatchParams) ([][]db.Notification, []error) {
 		notifs := make([][]db.Notification, len(params))

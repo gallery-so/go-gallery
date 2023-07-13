@@ -277,6 +277,11 @@ func (r *communityResolver) Owners(ctx context.Context, obj *model.Community, be
 	return resolveCommunityOwnersByContractID(ctx, obj.Dbid, before, after, first, last, onlyUsers)
 }
 
+// Posts is the resolver for the posts field.
+func (r *communityResolver) Posts(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.PostsConnection, error) {
+	return resolveCommunityPostsByContractID(ctx, obj.Dbid, before, after, first, last)
+}
+
 // FeedEvent is the resolver for the feedEvent field.
 func (r *createCollectionPayloadResolver) FeedEvent(ctx context.Context, obj *model.CreateCollectionPayload) (*model.FeedEvent, error) {
 	if obj.FeedEvent.Dbid == "" {

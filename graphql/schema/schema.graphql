@@ -579,6 +579,9 @@ type Community implements Node @goEmbedHelper {
     last: Int
     onlyGalleryUsers: Boolean
   ): TokenHoldersConnection @goField(forceResolver: true)
+
+  posts(before: String, after: String, first: Int, last: Int): PostsConnection
+    @goField(forceResolver: true)
 }
 
 type Contract implements Node {
@@ -849,6 +852,18 @@ type PostInteractionsEdge {
 
 type PostInteractionsConnection {
   edges: [PostInteractionsEdge]
+  pageInfo: PageInfo!
+}
+
+union PostOrError = Post | ErrPostNotFound | ErrInvalidInput
+
+type PostEdge {
+  node: PostOrError
+  cursor: String
+}
+
+type PostsConnection {
+  edges: [PostEdge]
   pageInfo: PageInfo!
 }
 

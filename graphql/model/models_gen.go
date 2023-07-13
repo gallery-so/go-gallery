@@ -178,6 +178,10 @@ type Notification interface {
 	IsNotification()
 }
 
+type PostOrError interface {
+	IsPostOrError()
+}
+
 type PostTokensPayloadOrError interface {
 	IsPostTokensPayloadOrError()
 }
@@ -669,6 +673,7 @@ type Community struct {
 	SubCommunities    *CommunitiesConnection  `json:"subCommunities"`
 	TokensInCommunity *TokensConnection       `json:"tokensInCommunity"`
 	Owners            *TokenHoldersConnection `json:"owners"`
+	Posts             *PostsConnection        `json:"posts"`
 }
 
 func (Community) IsNode()                      {}
@@ -936,6 +941,7 @@ func (ErrInvalidInput) IsUserByIDOrError()                               {}
 func (ErrInvalidInput) IsUserByAddressOrError()                          {}
 func (ErrInvalidInput) IsCollectionByIDOrError()                         {}
 func (ErrInvalidInput) IsCommunityByAddressOrError()                     {}
+func (ErrInvalidInput) IsPostOrError()                                   {}
 func (ErrInvalidInput) IsSocialConnectionsOrError()                      {}
 func (ErrInvalidInput) IsMerchTokensPayloadOrError()                     {}
 func (ErrInvalidInput) IsSearchUsersPayloadOrError()                     {}
@@ -1079,6 +1085,7 @@ type ErrPostNotFound struct {
 	Message string `json:"message"`
 }
 
+func (ErrPostNotFound) IsPostOrError()       {}
 func (ErrPostNotFound) IsError()             {}
 func (ErrPostNotFound) IsFeedEntityOrError() {}
 
@@ -1561,6 +1568,7 @@ type Post struct {
 	ViewerAdmire *Admire                     `json:"viewerAdmire"`
 }
 
+func (Post) IsPostOrError()       {}
 func (Post) IsNode()              {}
 func (Post) IsFeedEntityOrError() {}
 func (Post) IsEntity()            {}
@@ -1587,6 +1595,11 @@ type PostCommentsConnection struct {
 	PageInfo *PageInfo          `json:"pageInfo"`
 }
 
+type PostEdge struct {
+	Node   PostOrError `json:"node"`
+	Cursor *string     `json:"cursor"`
+}
+
 type PostInteractionsConnection struct {
 	Edges    []*PostInteractionsEdge `json:"edges"`
 	PageInfo *PageInfo               `json:"pageInfo"`
@@ -1608,6 +1621,11 @@ type PostTokensPayload struct {
 }
 
 func (PostTokensPayload) IsPostTokensPayloadOrError() {}
+
+type PostsConnection struct {
+	Edges    []*PostEdge `json:"edges"`
+	PageInfo *PageInfo   `json:"pageInfo"`
+}
 
 type PreverifyEmailInput struct {
 	Email persist.Email `json:"email"`

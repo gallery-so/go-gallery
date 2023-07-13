@@ -295,6 +295,7 @@ type ComplexityRoot struct {
 		Name              func(childComplexity int) int
 		Owners            func(childComplexity int, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) int
 		ParentCommunity   func(childComplexity int) int
+		Posts             func(childComplexity int, before *string, after *string, first *int, last *int) int
 		PreviewImage      func(childComplexity int) int
 		ProfileBannerURL  func(childComplexity int) int
 		ProfileImageURL   func(childComplexity int) int
@@ -891,6 +892,11 @@ type ComplexityRoot struct {
 		PageInfo func(childComplexity int) int
 	}
 
+	PostEdge struct {
+		Cursor func(childComplexity int) int
+		Node   func(childComplexity int) int
+	}
+
 	PostInteractionsConnection struct {
 		Edges    func(childComplexity int) int
 		PageInfo func(childComplexity int) int
@@ -904,6 +910,11 @@ type ComplexityRoot struct {
 
 	PostTokensPayload struct {
 		Post func(childComplexity int) int
+	}
+
+	PostsConnection struct {
+		Edges    func(childComplexity int) int
+		PageInfo func(childComplexity int) int
 	}
 
 	PreverifyEmailPayload struct {
@@ -1510,6 +1521,7 @@ type CommunityResolver interface {
 	SubCommunities(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error)
 	TokensInCommunity(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokensConnection, error)
 	Owners(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokenHoldersConnection, error)
+	Posts(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.PostsConnection, error)
 }
 type CreateCollectionPayloadResolver interface {
 	FeedEvent(ctx context.Context, obj *model.CreateCollectionPayload) (*model.FeedEvent, error)
@@ -2570,6 +2582,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Community.ParentCommunity(childComplexity), true
+
+	case "Community.posts":
+		if e.complexity.Community.Posts == nil {
+			break
+		}
+
+		args, err := ec.field_Community_posts_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Community.Posts(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
 	case "Community.previewImage":
 		if e.complexity.Community.PreviewImage == nil {
@@ -5275,6 +5299,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.PostCommentsConnection.PageInfo(childComplexity), true
 
+	case "PostEdge.cursor":
+		if e.complexity.PostEdge.Cursor == nil {
+			break
+		}
+
+		return e.complexity.PostEdge.Cursor(childComplexity), true
+
+	case "PostEdge.node":
+		if e.complexity.PostEdge.Node == nil {
+			break
+		}
+
+		return e.complexity.PostEdge.Node(childComplexity), true
+
 	case "PostInteractionsConnection.edges":
 		if e.complexity.PostInteractionsConnection.Edges == nil {
 			break
@@ -5316,6 +5354,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.PostTokensPayload.Post(childComplexity), true
+
+	case "PostsConnection.edges":
+		if e.complexity.PostsConnection.Edges == nil {
+			break
+		}
+
+		return e.complexity.PostsConnection.Edges(childComplexity), true
+
+	case "PostsConnection.pageInfo":
+		if e.complexity.PostsConnection.PageInfo == nil {
+			break
+		}
+
+		return e.complexity.PostsConnection.PageInfo(childComplexity), true
 
 	case "PreverifyEmailPayload.email":
 		if e.complexity.PreverifyEmailPayload.Email == nil {
@@ -8144,6 +8196,9 @@ type Community implements Node @goEmbedHelper {
     last: Int
     onlyGalleryUsers: Boolean
   ): TokenHoldersConnection @goField(forceResolver: true)
+
+  posts(before: String, after: String, first: Int, last: Int): PostsConnection
+    @goField(forceResolver: true)
 }
 
 type Contract implements Node {
@@ -8414,6 +8469,18 @@ type PostInteractionsEdge {
 
 type PostInteractionsConnection {
   edges: [PostInteractionsEdge]
+  pageInfo: PageInfo!
+}
+
+union PostOrError = Post | ErrPostNotFound | ErrInvalidInput
+
+type PostEdge {
+  node: PostOrError
+  cursor: String
+}
+
+type PostsConnection {
+  edges: [PostEdge]
   pageInfo: PageInfo!
 }
 
@@ -10153,6 +10220,48 @@ func (ec *executionContext) field_Community_owners_args(ctx context.Context, raw
 		}
 	}
 	args["onlyGalleryUsers"] = arg4
+	return args, nil
+}
+
+func (ec *executionContext) field_Community_posts_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *string
+	if tmp, ok := rawArgs["before"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
+		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["before"] = arg0
+	var arg1 *string
+	if tmp, ok := rawArgs["after"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
+		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["after"] = arg1
+	var arg2 *int
+	if tmp, ok := rawArgs["first"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
+		arg2, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["first"] = arg2
+	var arg3 *int
+	if tmp, ok := rawArgs["last"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("last"))
+		arg3, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["last"] = arg3
 	return args, nil
 }
 
@@ -18769,6 +18878,64 @@ func (ec *executionContext) fieldContext_Community_owners(ctx context.Context, f
 	return fc, nil
 }
 
+func (ec *executionContext) _Community_posts(ctx context.Context, field graphql.CollectedField, obj *model.Community) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Community_posts(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Community().Posts(rctx, obj, fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.PostsConnection)
+	fc.Result = res
+	return ec.marshalOPostsConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostsConnection(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Community_posts(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Community",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "edges":
+				return ec.fieldContext_PostsConnection_edges(ctx, field)
+			case "pageInfo":
+				return ec.fieldContext_PostsConnection_pageInfo(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PostsConnection", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Community_posts_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _CommunityEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.CommunityEdge) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_CommunityEdge_node(ctx, field)
 	if err != nil {
@@ -18841,6 +19008,8 @@ func (ec *executionContext) fieldContext_CommunityEdge_node(ctx context.Context,
 				return ec.fieldContext_Community_tokensInCommunity(ctx, field)
 			case "owners":
 				return ec.fieldContext_Community_owners(ctx, field)
+			case "posts":
+				return ec.fieldContext_Community_posts(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
 		},
@@ -18961,6 +19130,8 @@ func (ec *executionContext) fieldContext_CommunityLink_node(ctx context.Context,
 				return ec.fieldContext_Community_tokensInCommunity(ctx, field)
 			case "owners":
 				return ec.fieldContext_Community_owners(ctx, field)
+			case "posts":
+				return ec.fieldContext_Community_posts(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
 		},
@@ -19040,6 +19211,8 @@ func (ec *executionContext) fieldContext_CommunitySearchResult_community(ctx con
 				return ec.fieldContext_Community_tokensInCommunity(ctx, field)
 			case "owners":
 				return ec.fieldContext_Community_owners(ctx, field)
+			case "posts":
+				return ec.fieldContext_Community_posts(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
 		},
@@ -36168,6 +36341,88 @@ func (ec *executionContext) fieldContext_PostCommentsConnection_pageInfo(ctx con
 	return fc, nil
 }
 
+func (ec *executionContext) _PostEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.PostEdge) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PostEdge_node(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Node, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.PostOrError)
+	fc.Result = res
+	return ec.marshalOPostOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PostEdge_node(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PostEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type PostOrError does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PostEdge_cursor(ctx context.Context, field graphql.CollectedField, obj *model.PostEdge) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PostEdge_cursor(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Cursor, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PostEdge_cursor(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PostEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _PostInteractionsConnection_edges(ctx context.Context, field graphql.CollectedField, obj *model.PostInteractionsConnection) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_PostInteractionsConnection_edges(ctx, field)
 	if err != nil {
@@ -36473,6 +36728,111 @@ func (ec *executionContext) fieldContext_PostTokensPayload_post(ctx context.Cont
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PostsConnection_edges(ctx context.Context, field graphql.CollectedField, obj *model.PostsConnection) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PostsConnection_edges(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Edges, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.PostEdge)
+	fc.Result = res
+	return ec.marshalOPostEdge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostEdge(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PostsConnection_edges(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PostsConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "node":
+				return ec.fieldContext_PostEdge_node(ctx, field)
+			case "cursor":
+				return ec.fieldContext_PostEdge_cursor(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PostEdge", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PostsConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *model.PostsConnection) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PostsConnection_pageInfo(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PageInfo, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.PageInfo)
+	fc.Result = res
+	return ec.marshalNPageInfo2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPageInfo(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PostsConnection_pageInfo(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PostsConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "total":
+				return ec.fieldContext_PageInfo_total(ctx, field)
+			case "size":
+				return ec.fieldContext_PageInfo_size(ctx, field)
+			case "hasPreviousPage":
+				return ec.fieldContext_PageInfo_hasPreviousPage(ctx, field)
+			case "hasNextPage":
+				return ec.fieldContext_PageInfo_hasNextPage(ctx, field)
+			case "startCursor":
+				return ec.fieldContext_PageInfo_startCursor(ctx, field)
+			case "endCursor":
+				return ec.fieldContext_PageInfo_endCursor(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PageInfo", field.Name)
 		},
 	}
 	return fc, nil
@@ -45148,6 +45508,8 @@ func (ec *executionContext) fieldContext_Token_community(ctx context.Context, fi
 				return ec.fieldContext_Community_tokensInCommunity(ctx, field)
 			case "owners":
 				return ec.fieldContext_Community_owners(ctx, field)
+			case "posts":
+				return ec.fieldContext_Community_posts(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
 		},
@@ -57259,6 +57621,36 @@ func (ec *executionContext) _Notification(ctx context.Context, sel ast.Selection
 	}
 }
 
+func (ec *executionContext) _PostOrError(ctx context.Context, sel ast.SelectionSet, obj model.PostOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.Post:
+		return ec._Post(ctx, sel, &obj)
+	case *model.Post:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._Post(ctx, sel, obj)
+	case model.ErrPostNotFound:
+		return ec._ErrPostNotFound(ctx, sel, &obj)
+	case *model.ErrPostNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrPostNotFound(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _PostTokensPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.PostTokensPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -60469,6 +60861,23 @@ func (ec *executionContext) _Community(ctx context.Context, sel ast.SelectionSet
 				return innerFunc(ctx)
 
 			})
+		case "posts":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Community_posts(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -61340,7 +61749,7 @@ func (ec *executionContext) _ErrGalleryNotFound(ctx context.Context, sel ast.Sel
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "SocialConnectionsOrError", "MerchTokensPayloadOrError", "SearchUsersPayloadOrError", "SearchGalleriesPayloadOrError", "SearchCommunitiesPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "VerifyEmailMagicLinkPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "RedeemMerchPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "AdmirePostPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "PostOrError", "SocialConnectionsOrError", "MerchTokensPayloadOrError", "SearchUsersPayloadOrError", "SearchGalleriesPayloadOrError", "SearchCommunitiesPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "VerifyEmailMagicLinkPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "RedeemMerchPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "AdmirePostPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -61508,7 +61917,7 @@ func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.Selec
 	return out
 }
 
-var errPostNotFoundImplementors = []string{"ErrPostNotFound", "Error", "FeedEntityOrError"}
+var errPostNotFoundImplementors = []string{"ErrPostNotFound", "PostOrError", "Error", "FeedEntityOrError"}
 
 func (ec *executionContext) _ErrPostNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrPostNotFound) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errPostNotFoundImplementors)
@@ -64300,7 +64709,7 @@ func (ec *executionContext) _PdfMedia(ctx context.Context, sel ast.SelectionSet,
 	return out
 }
 
-var postImplementors = []string{"Post", "Node", "FeedEntityOrError", "_Entity"}
+var postImplementors = []string{"Post", "PostOrError", "Node", "FeedEntityOrError", "_Entity"}
 
 func (ec *executionContext) _Post(ctx context.Context, sel ast.SelectionSet, obj *model.Post) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, postImplementors)
@@ -64554,6 +64963,35 @@ func (ec *executionContext) _PostCommentsConnection(ctx context.Context, sel ast
 	return out
 }
 
+var postEdgeImplementors = []string{"PostEdge"}
+
+func (ec *executionContext) _PostEdge(ctx context.Context, sel ast.SelectionSet, obj *model.PostEdge) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, postEdgeImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PostEdge")
+		case "node":
+
+			out.Values[i] = ec._PostEdge_node(ctx, field, obj)
+
+		case "cursor":
+
+			out.Values[i] = ec._PostEdge_cursor(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var postInteractionsConnectionImplementors = []string{"PostInteractionsConnection"}
 
 func (ec *executionContext) _PostInteractionsConnection(ctx context.Context, sel ast.SelectionSet, obj *model.PostInteractionsConnection) graphql.Marshaler {
@@ -64632,6 +65070,38 @@ func (ec *executionContext) _PostTokensPayload(ctx context.Context, sel ast.Sele
 		case "post":
 
 			out.Values[i] = ec._PostTokensPayload_post(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var postsConnectionImplementors = []string{"PostsConnection"}
+
+func (ec *executionContext) _PostsConnection(ctx context.Context, sel ast.SelectionSet, obj *model.PostsConnection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, postsConnectionImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PostsConnection")
+		case "edges":
+
+			out.Values[i] = ec._PostsConnection_edges(ctx, field, obj)
+
+		case "pageInfo":
+
+			out.Values[i] = ec._PostsConnection_pageInfo(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
 				invalids++
@@ -72541,6 +73011,54 @@ func (ec *executionContext) marshalOPostCommentsConnection2ᚖgithubᚗcomᚋmik
 	return ec._PostCommentsConnection(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalOPostEdge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostEdge(ctx context.Context, sel ast.SelectionSet, v []*model.PostEdge) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalOPostEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostEdge(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	return ret
+}
+
+func (ec *executionContext) marshalOPostEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostEdge(ctx context.Context, sel ast.SelectionSet, v *model.PostEdge) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._PostEdge(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOPostInteractionsConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostInteractionsConnection(ctx context.Context, sel ast.SelectionSet, v *model.PostInteractionsConnection) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -72596,11 +73114,25 @@ func (ec *executionContext) marshalOPostInteractionsEdge2ᚖgithubᚗcomᚋmikey
 	return ec._PostInteractionsEdge(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalOPostOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostOrError(ctx context.Context, sel ast.SelectionSet, v model.PostOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._PostOrError(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOPostTokensPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostTokensPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.PostTokensPayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
 	return ec._PostTokensPayloadOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOPostsConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostsConnection(ctx context.Context, sel ast.SelectionSet, v *model.PostsConnection) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._PostsConnection(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOPreverifyEmailPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreverifyEmailPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.PreverifyEmailPayloadOrError) graphql.Marshaler {

@@ -340,6 +340,7 @@ type Post struct {
 	ID          persist.DBID     `json:"id"`
 	Version     int32            `json:"version"`
 	TokenIds    persist.DBIDList `json:"token_ids"`
+	ContractIds persist.DBIDList `json:"contract_ids"`
 	ActorID     persist.DBID     `json:"actor_id"`
 	Caption     sql.NullString   `json:"caption"`
 	CreatedAt   time.Time        `json:"created_at"`

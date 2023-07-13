@@ -117,11 +117,21 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, capt
 		}
 	}
 
+	contracts, err := api.queries.GetContractsByTokenIDs(ctx, tokenIDs)
+	if err != nil {
+		return "", err
+	}
+
+	contractIDs, _ := util.Map(contracts, func(c db.Contract) (persist.DBID, error) {
+		return c.ID, nil
+	})
+
 	id, err := api.queries.InsertPost(ctx, db.InsertPostParams{
-		ID:       persist.GenerateID(),
-		TokenIds: tokenIDs,
-		ActorID:  actorID,
-		Caption:  cap,
+		ID:          persist.GenerateID(),
+		TokenIds:    tokenIDs,
+		ContractIds: contractIDs,
+		ActorID:     actorID,
+		Caption:     cap,
 	})
 	if err != nil {
 		return "", err
