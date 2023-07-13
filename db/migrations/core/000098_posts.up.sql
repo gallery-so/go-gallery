@@ -11,6 +11,7 @@ create table if not exists posts (
 );
 
 create index if not exists contract_ids_idx on posts using gin (contract_ids);
+create index if not exists actor_id_idx on posts (actor_id);
 
 alter table admires add column post_id varchar(255) references posts(id);
 alter table comments add column post_id varchar(255) references posts(id);
