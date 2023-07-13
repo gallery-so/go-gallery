@@ -2,14 +2,16 @@ package notifications
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/mikeydub/go-gallery/service/limiters"
 	"github.com/mikeydub/go-gallery/service/redis"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
-	"time"
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"cloud.google.com/go/pubsub"
@@ -230,20 +232,16 @@ func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notific
 	var curNotif db.Notification
 
 	// Bucket notifications on the feed event if it has one
-	if notif.FeedEventID == "" {
-		curNotif, _ = h.queries.GetMostRecentNotificationByOwnerIDForAction(ctx, db.GetMostRecentNotificationByOwnerIDForActionParams{
-			OwnerID:          notif.OwnerID,
-			Action:           notif.Action,
-			OnlyForFeedEvent: false,
-		})
-	} else {
-		curNotif, _ = h.queries.GetMostRecentNotificationByOwnerIDForAction(ctx, db.GetMostRecentNotificationByOwnerIDForActionParams{
-			OwnerID:          notif.OwnerID,
-			Action:           notif.Action,
-			OnlyForFeedEvent: true,
-			FeedEventID:      notif.FeedEventID,
-		})
-	}
+	onlyForFeed := notif.FeedEventID != ""
+	onlyForPost := notif.PostID != ""
+	curNotif, _ = h.queries.GetMostRecentNotificationByOwnerIDForAction(ctx, db.GetMostRecentNotificationByOwnerIDForActionParams{
+		OwnerID:          notif.OwnerID,
+		Action:           notif.Action,
+		OnlyForFeedEvent: onlyForFeed,
+		FeedEventID:      notif.FeedEventID,
+		PostID:           notif.PostID,
+		OnlyForPost:      onlyForPost,
+	})
 
 	if time.Since(curNotif.CreatedAt) < groupedWindow {
 		logger.For(ctx).Infof("grouping notification %s: %s-%s", curNotif.ID, notif.Action, notif.OwnerID)
@@ -664,24 +662,42 @@ func addNotification(ctx context.Context, notif db.Notification, queries *db.Que
 	switch notif.Action {
 	case persist.ActionAdmiredFeedEvent:
 		return queries.CreateAdmireNotification(ctx, db.CreateAdmireNotificationParams{
-			ID:          id,
-			OwnerID:     notif.OwnerID,
-			Action:      notif.Action,
-			Data:        notif.Data,
-			EventIds:    notif.EventIds,
-			FeedEventID: notif.FeedEventID,
+			ID:        id,
+			OwnerID:   notif.OwnerID,
+			Action:    notif.Action,
+			Data:      notif.Data,
+			EventIds:  notif.EventIds,
+			FeedEvent: sql.NullString{String: notif.FeedEventID.String(), Valid: true},
 		})
 	case persist.ActionCommentedOnFeedEvent:
 		return queries.CreateCommentNotification(ctx, db.CreateCommentNotificationParams{
-			ID:          id,
-			OwnerID:     notif.OwnerID,
-			Action:      notif.Action,
-			Data:        notif.Data,
-			EventIds:    notif.EventIds,
-			FeedEventID: notif.FeedEventID,
-			CommentID:   notif.CommentID,
+			ID:        id,
+			OwnerID:   notif.OwnerID,
+			Action:    notif.Action,
+			Data:      notif.Data,
+			EventIds:  notif.EventIds,
+			FeedEvent: sql.NullString{String: notif.FeedEventID.String(), Valid: true},
+			CommentID: notif.CommentID,
 		})
-
+	case persist.ActionAdmiredPost:
+		return queries.CreateAdmireNotification(ctx, db.CreateAdmireNotificationParams{
+			ID:       id,
+			OwnerID:  notif.OwnerID,
+			Action:   notif.Action,
+			Data:     notif.Data,
+			EventIds: notif.EventIds,
+			Post:     sql.NullString{String: notif.PostID.String(), Valid: true},
+		})
+	case persist.ActionCommentedOnPost:
+		return queries.CreateCommentNotification(ctx, db.CreateCommentNotificationParams{
+			ID:        id,
+			OwnerID:   notif.OwnerID,
+			Action:    notif.Action,
+			Data:      notif.Data,
+			EventIds:  notif.EventIds,
+			Post:      sql.NullString{String: notif.PostID.String(), Valid: true},
+			CommentID: notif.CommentID,
+		})
 	case persist.ActionUserFollowedUsers:
 		return queries.CreateFollowNotification(ctx, db.CreateFollowNotificationParams{
 			ID:       id,

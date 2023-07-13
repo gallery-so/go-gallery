@@ -80,8 +80,16 @@ func (r *SomeoneAdmiredYourFeedEventNotification) ID() GqlID {
 	return GqlID(fmt.Sprintf("SomeoneAdmiredYourFeedEventNotification:%s", r.Dbid))
 }
 
+func (r *SomeoneAdmiredYourPostNotification) ID() GqlID {
+	return GqlID(fmt.Sprintf("SomeoneAdmiredYourPostNotification:%s", r.Dbid))
+}
+
 func (r *SomeoneCommentedOnYourFeedEventNotification) ID() GqlID {
 	return GqlID(fmt.Sprintf("SomeoneCommentedOnYourFeedEventNotification:%s", r.Dbid))
+}
+
+func (r *SomeoneCommentedOnYourPostNotification) ID() GqlID {
+	return GqlID(fmt.Sprintf("SomeoneCommentedOnYourPostNotification:%s", r.Dbid))
 }
 
 func (r *SomeoneFollowedYouBackNotification) ID() GqlID {
@@ -133,7 +141,9 @@ type NodeFetcher struct {
 	OnPost                                        func(ctx context.Context, dbid persist.DBID) (*Post, error)
 	OnSocialConnection                            func(ctx context.Context, socialId string, socialType persist.SocialProvider) (*SocialConnection, error)
 	OnSomeoneAdmiredYourFeedEventNotification     func(ctx context.Context, dbid persist.DBID) (*SomeoneAdmiredYourFeedEventNotification, error)
+	OnSomeoneAdmiredYourPostNotification          func(ctx context.Context, dbid persist.DBID) (*SomeoneAdmiredYourPostNotification, error)
 	OnSomeoneCommentedOnYourFeedEventNotification func(ctx context.Context, dbid persist.DBID) (*SomeoneCommentedOnYourFeedEventNotification, error)
+	OnSomeoneCommentedOnYourPostNotification      func(ctx context.Context, dbid persist.DBID) (*SomeoneCommentedOnYourPostNotification, error)
 	OnSomeoneFollowedYouBackNotification          func(ctx context.Context, dbid persist.DBID) (*SomeoneFollowedYouBackNotification, error)
 	OnSomeoneFollowedYouNotification              func(ctx context.Context, dbid persist.DBID) (*SomeoneFollowedYouNotification, error)
 	OnSomeoneViewedYourGalleryNotification        func(ctx context.Context, dbid persist.DBID) (*SomeoneViewedYourGalleryNotification, error)
@@ -227,11 +237,21 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'SomeoneAdmiredYourFeedEventNotification' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
 		return n.OnSomeoneAdmiredYourFeedEventNotification(ctx, persist.DBID(ids[0]))
+	case "SomeoneAdmiredYourPostNotification":
+		if len(ids) != 1 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'SomeoneAdmiredYourPostNotification' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnSomeoneAdmiredYourPostNotification(ctx, persist.DBID(ids[0]))
 	case "SomeoneCommentedOnYourFeedEventNotification":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'SomeoneCommentedOnYourFeedEventNotification' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
 		return n.OnSomeoneCommentedOnYourFeedEventNotification(ctx, persist.DBID(ids[0]))
+	case "SomeoneCommentedOnYourPostNotification":
+		if len(ids) != 1 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'SomeoneCommentedOnYourPostNotification' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnSomeoneCommentedOnYourPostNotification(ctx, persist.DBID(ids[0]))
 	case "SomeoneFollowedYouBackNotification":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'SomeoneFollowedYouBackNotification' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
@@ -299,8 +319,12 @@ func (n *NodeFetcher) ValidateHandlers() {
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnSocialConnection")
 	case n.OnSomeoneAdmiredYourFeedEventNotification == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnSomeoneAdmiredYourFeedEventNotification")
+	case n.OnSomeoneAdmiredYourPostNotification == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnSomeoneAdmiredYourPostNotification")
 	case n.OnSomeoneCommentedOnYourFeedEventNotification == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnSomeoneCommentedOnYourFeedEventNotification")
+	case n.OnSomeoneCommentedOnYourPostNotification == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnSomeoneCommentedOnYourPostNotification")
 	case n.OnSomeoneFollowedYouBackNotification == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnSomeoneFollowedYouBackNotification")
 	case n.OnSomeoneFollowedYouNotification == nil:

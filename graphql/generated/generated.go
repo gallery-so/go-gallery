@@ -42,6 +42,7 @@ type Config struct {
 type ResolverRoot interface {
 	Admire() AdmireResolver
 	AdmireFeedEventPayload() AdmireFeedEventPayloadResolver
+	AdmirePostPayload() AdmirePostPayloadResolver
 	Collection() CollectionResolver
 	CollectionCreatedFeedEventData() CollectionCreatedFeedEventDataResolver
 	CollectionToken() CollectionTokenResolver
@@ -50,6 +51,7 @@ type ResolverRoot interface {
 	CollectorsNoteAddedToTokenFeedEventData() CollectorsNoteAddedToTokenFeedEventDataResolver
 	Comment() CommentResolver
 	CommentOnFeedEventPayload() CommentOnFeedEventPayloadResolver
+	CommentOnPostPayload() CommentOnPostPayloadResolver
 	Community() CommunityResolver
 	CreateCollectionPayload() CreateCollectionPayloadResolver
 	EnsProfileImage() EnsProfileImageResolver
@@ -72,7 +74,9 @@ type ResolverRoot interface {
 	SocialConnection() SocialConnectionResolver
 	SocialQueries() SocialQueriesResolver
 	SomeoneAdmiredYourFeedEventNotification() SomeoneAdmiredYourFeedEventNotificationResolver
+	SomeoneAdmiredYourPostNotification() SomeoneAdmiredYourPostNotificationResolver
 	SomeoneCommentedOnYourFeedEventNotification() SomeoneCommentedOnYourFeedEventNotificationResolver
+	SomeoneCommentedOnYourPostNotification() SomeoneCommentedOnYourPostNotificationResolver
 	SomeoneFollowedYouBackNotification() SomeoneFollowedYouBackNotificationResolver
 	SomeoneFollowedYouNotification() SomeoneFollowedYouNotificationResolver
 	SomeoneViewedYourGalleryNotification() SomeoneViewedYourGalleryNotificationResolver
@@ -119,6 +123,12 @@ type ComplexityRoot struct {
 		Admire    func(childComplexity int) int
 		FeedEvent func(childComplexity int) int
 		Viewer    func(childComplexity int) int
+	}
+
+	AdmirePostPayload struct {
+		Admire func(childComplexity int) int
+		Post   func(childComplexity int) int
+		Viewer func(childComplexity int) int
 	}
 
 	AudioMedia struct {
@@ -255,6 +265,13 @@ type ComplexityRoot struct {
 	CommentOnFeedEventPayload struct {
 		Comment        func(childComplexity int) int
 		FeedEvent      func(childComplexity int) int
+		ReplyToComment func(childComplexity int) int
+		Viewer         func(childComplexity int) int
+	}
+
+	CommentOnPostPayload struct {
+		Comment        func(childComplexity int) int
+		Post           func(childComplexity int) int
 		ReplyToComment func(childComplexity int) int
 		Viewer         func(childComplexity int) int
 	}
@@ -731,9 +748,11 @@ type ComplexityRoot struct {
 		AddUserWallet                   func(childComplexity int, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) int
 		AddWalletToUserUnchecked        func(childComplexity int, input model.AdminAddWalletInput) int
 		AdmireFeedEvent                 func(childComplexity int, feedEventID persist.DBID) int
+		AdmirePost                      func(childComplexity int, postID persist.DBID) int
 		BanUserFromFeed                 func(childComplexity int, username string, action string) int
 		ClearAllNotifications           func(childComplexity int) int
 		CommentOnFeedEvent              func(childComplexity int, feedEventID persist.DBID, replyToID *persist.DBID, comment string) int
+		CommentOnPost                   func(childComplexity int, postID persist.DBID, replyToID *persist.DBID, comment string) int
 		ConnectSocialAccount            func(childComplexity int, input model.SocialAuthMechanism, display bool) int
 		CreateCollection                func(childComplexity int, input model.CreateCollectionInput) int
 		CreateGallery                   func(childComplexity int, input model.CreateGalleryInput) int
@@ -963,11 +982,13 @@ type ComplexityRoot struct {
 	RemoveAdmirePayload struct {
 		AdmireID  func(childComplexity int) int
 		FeedEvent func(childComplexity int) int
+		Post      func(childComplexity int) int
 		Viewer    func(childComplexity int) int
 	}
 
 	RemoveCommentPayload struct {
 		FeedEvent func(childComplexity int) int
+		Post      func(childComplexity int) int
 		Viewer    func(childComplexity int) int
 	}
 
@@ -1047,12 +1068,33 @@ type ComplexityRoot struct {
 		UpdatedTime  func(childComplexity int) int
 	}
 
+	SomeoneAdmiredYourPostNotification struct {
+		Admirers     func(childComplexity int, before *string, after *string, first *int, last *int) int
+		Count        func(childComplexity int) int
+		CreationTime func(childComplexity int) int
+		Dbid         func(childComplexity int) int
+		ID           func(childComplexity int) int
+		Post         func(childComplexity int) int
+		Seen         func(childComplexity int) int
+		UpdatedTime  func(childComplexity int) int
+	}
+
 	SomeoneCommentedOnYourFeedEventNotification struct {
 		Comment      func(childComplexity int) int
 		CreationTime func(childComplexity int) int
 		Dbid         func(childComplexity int) int
 		FeedEvent    func(childComplexity int) int
 		ID           func(childComplexity int) int
+		Seen         func(childComplexity int) int
+		UpdatedTime  func(childComplexity int) int
+	}
+
+	SomeoneCommentedOnYourPostNotification struct {
+		Comment      func(childComplexity int) int
+		CreationTime func(childComplexity int) int
+		Dbid         func(childComplexity int) int
+		ID           func(childComplexity int) int
+		Post         func(childComplexity int) int
 		Seen         func(childComplexity int) int
 		UpdatedTime  func(childComplexity int) int
 	}
@@ -1410,6 +1452,10 @@ type AdmireFeedEventPayloadResolver interface {
 	Admire(ctx context.Context, obj *model.AdmireFeedEventPayload) (*model.Admire, error)
 	FeedEvent(ctx context.Context, obj *model.AdmireFeedEventPayload) (*model.FeedEvent, error)
 }
+type AdmirePostPayloadResolver interface {
+	Post(ctx context.Context, obj *model.AdmirePostPayload) (*model.Post, error)
+	Admire(ctx context.Context, obj *model.AdmirePostPayload) (*model.Admire, error)
+}
 type CollectionResolver interface {
 	Gallery(ctx context.Context, obj *model.Collection) (*model.Gallery, error)
 
@@ -1451,6 +1497,11 @@ type CommentOnFeedEventPayloadResolver interface {
 	Comment(ctx context.Context, obj *model.CommentOnFeedEventPayload) (*model.Comment, error)
 	ReplyToComment(ctx context.Context, obj *model.CommentOnFeedEventPayload) (*model.Comment, error)
 	FeedEvent(ctx context.Context, obj *model.CommentOnFeedEventPayload) (*model.FeedEvent, error)
+}
+type CommentOnPostPayloadResolver interface {
+	Post(ctx context.Context, obj *model.CommentOnPostPayload) (*model.Post, error)
+	Comment(ctx context.Context, obj *model.CommentOnPostPayload) (*model.Comment, error)
+	ReplyToComment(ctx context.Context, obj *model.CommentOnPostPayload) (*model.Comment, error)
 }
 type CommunityResolver interface {
 	Creator(ctx context.Context, obj *model.Community) (model.GalleryUserOrAddress, error)
@@ -1558,9 +1609,11 @@ type MutationResolver interface {
 	FollowAllSocialConnections(ctx context.Context, accountType persist.SocialProvider) (model.FollowAllSocialConnectionsPayloadOrError, error)
 	UnfollowUser(ctx context.Context, userID persist.DBID) (model.UnfollowUserPayloadOrError, error)
 	AdmireFeedEvent(ctx context.Context, feedEventID persist.DBID) (model.AdmireFeedEventPayloadOrError, error)
+	AdmirePost(ctx context.Context, postID persist.DBID) (model.AdmirePostPayloadOrError, error)
 	RemoveAdmire(ctx context.Context, admireID persist.DBID) (model.RemoveAdmirePayloadOrError, error)
 	CommentOnFeedEvent(ctx context.Context, feedEventID persist.DBID, replyToID *persist.DBID, comment string) (model.CommentOnFeedEventPayloadOrError, error)
 	RemoveComment(ctx context.Context, commentID persist.DBID) (model.RemoveCommentPayloadOrError, error)
+	CommentOnPost(ctx context.Context, postID persist.DBID, replyToID *persist.DBID, comment string) (model.CommentOnPostPayloadOrError, error)
 	PostTokens(ctx context.Context, input model.PostTokensInput) (model.PostTokensPayloadOrError, error)
 	DeletePost(ctx context.Context, postID persist.DBID) (model.DeletePostPayloadOrError, error)
 	ViewGallery(ctx context.Context, galleryID persist.DBID) (model.ViewGalleryPayloadOrError, error)
@@ -1639,9 +1692,11 @@ type QueryResolver interface {
 }
 type RemoveAdmirePayloadResolver interface {
 	FeedEvent(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.FeedEvent, error)
+	Post(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.Post, error)
 }
 type RemoveCommentPayloadResolver interface {
 	FeedEvent(ctx context.Context, obj *model.RemoveCommentPayload) (*model.FeedEvent, error)
+	Post(ctx context.Context, obj *model.RemoveCommentPayload) (*model.Post, error)
 }
 type SetSpamPreferencePayloadResolver interface {
 	Tokens(ctx context.Context, obj *model.SetSpamPreferencePayload) ([]*model.Token, error)
@@ -1656,9 +1711,17 @@ type SomeoneAdmiredYourFeedEventNotificationResolver interface {
 	FeedEvent(ctx context.Context, obj *model.SomeoneAdmiredYourFeedEventNotification) (*model.FeedEvent, error)
 	Admirers(ctx context.Context, obj *model.SomeoneAdmiredYourFeedEventNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error)
 }
+type SomeoneAdmiredYourPostNotificationResolver interface {
+	Post(ctx context.Context, obj *model.SomeoneAdmiredYourPostNotification) (*model.Post, error)
+	Admirers(ctx context.Context, obj *model.SomeoneAdmiredYourPostNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error)
+}
 type SomeoneCommentedOnYourFeedEventNotificationResolver interface {
 	Comment(ctx context.Context, obj *model.SomeoneCommentedOnYourFeedEventNotification) (*model.Comment, error)
 	FeedEvent(ctx context.Context, obj *model.SomeoneCommentedOnYourFeedEventNotification) (*model.FeedEvent, error)
+}
+type SomeoneCommentedOnYourPostNotificationResolver interface {
+	Comment(ctx context.Context, obj *model.SomeoneCommentedOnYourPostNotification) (*model.Comment, error)
+	Post(ctx context.Context, obj *model.SomeoneCommentedOnYourPostNotification) (*model.Post, error)
 }
 type SomeoneFollowedYouBackNotificationResolver interface {
 	Followers(ctx context.Context, obj *model.SomeoneFollowedYouBackNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error)
@@ -1818,6 +1881,27 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.AdmireFeedEventPayload.Viewer(childComplexity), true
+
+	case "AdmirePostPayload.admire":
+		if e.complexity.AdmirePostPayload.Admire == nil {
+			break
+		}
+
+		return e.complexity.AdmirePostPayload.Admire(childComplexity), true
+
+	case "AdmirePostPayload.post":
+		if e.complexity.AdmirePostPayload.Post == nil {
+			break
+		}
+
+		return e.complexity.AdmirePostPayload.Post(childComplexity), true
+
+	case "AdmirePostPayload.viewer":
+		if e.complexity.AdmirePostPayload.Viewer == nil {
+			break
+		}
+
+		return e.complexity.AdmirePostPayload.Viewer(childComplexity), true
 
 	case "AudioMedia.contentRenderURL":
 		if e.complexity.AudioMedia.ContentRenderURL == nil {
@@ -2348,6 +2432,34 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.CommentOnFeedEventPayload.Viewer(childComplexity), true
+
+	case "CommentOnPostPayload.comment":
+		if e.complexity.CommentOnPostPayload.Comment == nil {
+			break
+		}
+
+		return e.complexity.CommentOnPostPayload.Comment(childComplexity), true
+
+	case "CommentOnPostPayload.post":
+		if e.complexity.CommentOnPostPayload.Post == nil {
+			break
+		}
+
+		return e.complexity.CommentOnPostPayload.Post(childComplexity), true
+
+	case "CommentOnPostPayload.replyToComment":
+		if e.complexity.CommentOnPostPayload.ReplyToComment == nil {
+			break
+		}
+
+		return e.complexity.CommentOnPostPayload.ReplyToComment(childComplexity), true
+
+	case "CommentOnPostPayload.viewer":
+		if e.complexity.CommentOnPostPayload.Viewer == nil {
+			break
+		}
+
+		return e.complexity.CommentOnPostPayload.Viewer(childComplexity), true
 
 	case "CommunitiesConnection.edges":
 		if e.complexity.CommunitiesConnection.Edges == nil {
@@ -4077,6 +4189,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.AdmireFeedEvent(childComplexity, args["feedEventId"].(persist.DBID)), true
 
+	case "Mutation.admirePost":
+		if e.complexity.Mutation.AdmirePost == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_admirePost_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.AdmirePost(childComplexity, args["postId"].(persist.DBID)), true
+
 	case "Mutation.banUserFromFeed":
 		if e.complexity.Mutation.BanUserFromFeed == nil {
 			break
@@ -4107,6 +4231,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.CommentOnFeedEvent(childComplexity, args["feedEventId"].(persist.DBID), args["replyToID"].(*persist.DBID), args["comment"].(string)), true
+
+	case "Mutation.commentOnPost":
+		if e.complexity.Mutation.CommentOnPost == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_commentOnPost_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.CommentOnPost(childComplexity, args["postId"].(persist.DBID), args["replyToID"].(*persist.DBID), args["comment"].(string)), true
 
 	case "Mutation.connectSocialAccount":
 		if e.complexity.Mutation.ConnectSocialAccount == nil {
@@ -5642,6 +5778,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RemoveAdmirePayload.FeedEvent(childComplexity), true
 
+	case "RemoveAdmirePayload.post":
+		if e.complexity.RemoveAdmirePayload.Post == nil {
+			break
+		}
+
+		return e.complexity.RemoveAdmirePayload.Post(childComplexity), true
+
 	case "RemoveAdmirePayload.viewer":
 		if e.complexity.RemoveAdmirePayload.Viewer == nil {
 			break
@@ -5655,6 +5798,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.RemoveCommentPayload.FeedEvent(childComplexity), true
+
+	case "RemoveCommentPayload.post":
+		if e.complexity.RemoveCommentPayload.Post == nil {
+			break
+		}
+
+		return e.complexity.RemoveCommentPayload.Post(childComplexity), true
 
 	case "RemoveCommentPayload.viewer":
 		if e.complexity.RemoveCommentPayload.Viewer == nil {
@@ -5890,6 +6040,67 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.SomeoneAdmiredYourFeedEventNotification.UpdatedTime(childComplexity), true
 
+	case "SomeoneAdmiredYourPostNotification.admirers":
+		if e.complexity.SomeoneAdmiredYourPostNotification.Admirers == nil {
+			break
+		}
+
+		args, err := ec.field_SomeoneAdmiredYourPostNotification_admirers_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.SomeoneAdmiredYourPostNotification.Admirers(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
+
+	case "SomeoneAdmiredYourPostNotification.count":
+		if e.complexity.SomeoneAdmiredYourPostNotification.Count == nil {
+			break
+		}
+
+		return e.complexity.SomeoneAdmiredYourPostNotification.Count(childComplexity), true
+
+	case "SomeoneAdmiredYourPostNotification.creationTime":
+		if e.complexity.SomeoneAdmiredYourPostNotification.CreationTime == nil {
+			break
+		}
+
+		return e.complexity.SomeoneAdmiredYourPostNotification.CreationTime(childComplexity), true
+
+	case "SomeoneAdmiredYourPostNotification.dbid":
+		if e.complexity.SomeoneAdmiredYourPostNotification.Dbid == nil {
+			break
+		}
+
+		return e.complexity.SomeoneAdmiredYourPostNotification.Dbid(childComplexity), true
+
+	case "SomeoneAdmiredYourPostNotification.id":
+		if e.complexity.SomeoneAdmiredYourPostNotification.ID == nil {
+			break
+		}
+
+		return e.complexity.SomeoneAdmiredYourPostNotification.ID(childComplexity), true
+
+	case "SomeoneAdmiredYourPostNotification.post":
+		if e.complexity.SomeoneAdmiredYourPostNotification.Post == nil {
+			break
+		}
+
+		return e.complexity.SomeoneAdmiredYourPostNotification.Post(childComplexity), true
+
+	case "SomeoneAdmiredYourPostNotification.seen":
+		if e.complexity.SomeoneAdmiredYourPostNotification.Seen == nil {
+			break
+		}
+
+		return e.complexity.SomeoneAdmiredYourPostNotification.Seen(childComplexity), true
+
+	case "SomeoneAdmiredYourPostNotification.updatedTime":
+		if e.complexity.SomeoneAdmiredYourPostNotification.UpdatedTime == nil {
+			break
+		}
+
+		return e.complexity.SomeoneAdmiredYourPostNotification.UpdatedTime(childComplexity), true
+
 	case "SomeoneCommentedOnYourFeedEventNotification.comment":
 		if e.complexity.SomeoneCommentedOnYourFeedEventNotification.Comment == nil {
 			break
@@ -5938,6 +6149,55 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.SomeoneCommentedOnYourFeedEventNotification.UpdatedTime(childComplexity), true
+
+	case "SomeoneCommentedOnYourPostNotification.comment":
+		if e.complexity.SomeoneCommentedOnYourPostNotification.Comment == nil {
+			break
+		}
+
+		return e.complexity.SomeoneCommentedOnYourPostNotification.Comment(childComplexity), true
+
+	case "SomeoneCommentedOnYourPostNotification.creationTime":
+		if e.complexity.SomeoneCommentedOnYourPostNotification.CreationTime == nil {
+			break
+		}
+
+		return e.complexity.SomeoneCommentedOnYourPostNotification.CreationTime(childComplexity), true
+
+	case "SomeoneCommentedOnYourPostNotification.dbid":
+		if e.complexity.SomeoneCommentedOnYourPostNotification.Dbid == nil {
+			break
+		}
+
+		return e.complexity.SomeoneCommentedOnYourPostNotification.Dbid(childComplexity), true
+
+	case "SomeoneCommentedOnYourPostNotification.id":
+		if e.complexity.SomeoneCommentedOnYourPostNotification.ID == nil {
+			break
+		}
+
+		return e.complexity.SomeoneCommentedOnYourPostNotification.ID(childComplexity), true
+
+	case "SomeoneCommentedOnYourPostNotification.post":
+		if e.complexity.SomeoneCommentedOnYourPostNotification.Post == nil {
+			break
+		}
+
+		return e.complexity.SomeoneCommentedOnYourPostNotification.Post(childComplexity), true
+
+	case "SomeoneCommentedOnYourPostNotification.seen":
+		if e.complexity.SomeoneCommentedOnYourPostNotification.Seen == nil {
+			break
+		}
+
+		return e.complexity.SomeoneCommentedOnYourPostNotification.Seen(childComplexity), true
+
+	case "SomeoneCommentedOnYourPostNotification.updatedTime":
+		if e.complexity.SomeoneCommentedOnYourPostNotification.UpdatedTime == nil {
+			break
+		}
+
+		return e.complexity.SomeoneCommentedOnYourPostNotification.UpdatedTime(childComplexity), true
 
 	case "SomeoneFollowedYouBackNotification.count":
 		if e.complexity.SomeoneFollowedYouBackNotification.Count == nil {
@@ -9019,6 +9279,7 @@ type RemoveAdmirePayload {
   viewer: Viewer
   admireID: DBID
   feedEvent: FeedEvent @goField(forceResolver: true)
+  post: Post @goField(forceResolver: true)
 }
 
 type CommentOnFeedEventPayload {
@@ -9031,6 +9292,7 @@ type CommentOnFeedEventPayload {
 type RemoveCommentPayload {
   viewer: Viewer
   feedEvent: FeedEvent @goField(forceResolver: true)
+  post: Post @goField(forceResolver: true)
 }
 
 interface Notification implements Node {
@@ -9110,6 +9372,33 @@ type SomeoneCommentedOnYourFeedEventNotification implements Notification & Node 
   # Do we want this comment to be the latest comment
   comment: Comment @goField(forceResolver: true)
   feedEvent: FeedEvent @goField(forceResolver: true)
+}
+
+type SomeoneAdmiredYourPostNotification implements Notification & Node & GroupedNotification
+  @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+  count: Int
+
+  post: Post @goField(forceResolver: true)
+  admirers(before: String, after: String, first: Int, last: Int): GroupNotificationUsersConnection
+    @goField(forceResolver: true)
+}
+
+type SomeoneCommentedOnYourPostNotification implements Notification & Node @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+
+  # Don't need a ` + "`" + `who` + "`" + ` here since the ` + "`" + `comment` + "`" + ` can provide that
+  # Do we want this comment to be the latest comment
+  comment: Comment @goField(forceResolver: true)
+  post: Post @goField(forceResolver: true)
 }
 
 type SomeoneViewedYourGalleryNotification implements Notification & Node & GroupedNotification
@@ -9571,6 +9860,23 @@ type PostTokensPayload {
 
 union PostTokensPayloadOrError = PostTokensPayload | ErrInvalidInput | ErrNotAuthorized
 
+type AdmirePostPayload {
+  viewer: Viewer
+  post: Post @goField(forceResolver: true)
+  admire: Admire @goField(forceResolver: true)
+}
+
+union AdmirePostPayloadOrError = AdmirePostPayload | ErrInvalidInput | ErrNotAuthorized
+
+type CommentOnPostPayload {
+  viewer: Viewer
+  post: Post @goField(forceResolver: true)
+  comment: Comment @goField(forceResolver: true)
+  replyToComment: Comment @goField(forceResolver: true)
+}
+
+union CommentOnPostPayloadOrError = CommentOnPostPayload | ErrInvalidInput | ErrNotAuthorized
+
 type DeletePostPayload {
   deletedId: DeletedNode
 }
@@ -9647,6 +9953,7 @@ type Mutation {
   unfollowUser(userId: DBID!): UnfollowUserPayloadOrError @authRequired
 
   admireFeedEvent(feedEventId: DBID!): AdmireFeedEventPayloadOrError @authRequired
+  admirePost(postId: DBID!): AdmirePostPayloadOrError @authRequired
   removeAdmire(admireId: DBID!): RemoveAdmirePayloadOrError @authRequired
   commentOnFeedEvent(
     feedEventId: DBID!
@@ -9654,6 +9961,8 @@ type Mutation {
     comment: String!
   ): CommentOnFeedEventPayloadOrError @authRequired
   removeComment(commentId: DBID!): RemoveCommentPayloadOrError @authRequired
+  commentOnPost(postId: DBID!, replyToID: DBID, comment: String!): CommentOnPostPayloadOrError
+    @authRequired
 
   postTokens(input: PostTokensInput!): PostTokensPayloadOrError @authRequired
   deletePost(postId: DBID!): DeletePostPayloadOrError @authRequired
@@ -10381,6 +10690,21 @@ func (ec *executionContext) field_Mutation_admireFeedEvent_args(ctx context.Cont
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_admirePost_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.DBID
+	if tmp, ok := rawArgs["postId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("postId"))
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["postId"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_banUserFromFeed_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -10417,6 +10741,39 @@ func (ec *executionContext) field_Mutation_commentOnFeedEvent_args(ctx context.C
 		}
 	}
 	args["feedEventId"] = arg0
+	var arg1 *persist.DBID
+	if tmp, ok := rawArgs["replyToID"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("replyToID"))
+		arg1, err = ec.unmarshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["replyToID"] = arg1
+	var arg2 string
+	if tmp, ok := rawArgs["comment"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("comment"))
+		arg2, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["comment"] = arg2
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_commentOnPost_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.DBID
+	if tmp, ok := rawArgs["postId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("postId"))
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["postId"] = arg0
 	var arg1 *persist.DBID
 	if tmp, ok := rawArgs["replyToID"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("replyToID"))
@@ -12274,6 +12631,48 @@ func (ec *executionContext) field_SomeoneAdmiredYourFeedEventNotification_admire
 	return args, nil
 }
 
+func (ec *executionContext) field_SomeoneAdmiredYourPostNotification_admirers_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *string
+	if tmp, ok := rawArgs["before"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
+		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["before"] = arg0
+	var arg1 *string
+	if tmp, ok := rawArgs["after"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
+		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["after"] = arg1
+	var arg2 *int
+	if tmp, ok := rawArgs["first"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
+		arg2, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["first"] = arg2
+	var arg3 *int
+	if tmp, ok := rawArgs["last"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("last"))
+		arg3, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["last"] = arg3
+	return args, nil
+}
+
 func (ec *executionContext) field_SomeoneFollowedYouBackNotification_followers_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -13151,6 +13550,181 @@ func (ec *executionContext) fieldContext_AdmireFeedEventPayload_feedEvent(ctx co
 				return ec.fieldContext_FeedEvent_hasViewerAdmiredEvent(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FeedEvent", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AdmirePostPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.AdmirePostPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AdmirePostPayload_viewer(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Viewer, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Viewer)
+	fc.Result = res
+	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AdmirePostPayload_viewer(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AdmirePostPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Viewer_id(ctx, field)
+			case "user":
+				return ec.fieldContext_Viewer_user(ctx, field)
+			case "socialAccounts":
+				return ec.fieldContext_Viewer_socialAccounts(ctx, field)
+			case "viewerGalleries":
+				return ec.fieldContext_Viewer_viewerGalleries(ctx, field)
+			case "feed":
+				return ec.fieldContext_Viewer_feed(ctx, field)
+			case "email":
+				return ec.fieldContext_Viewer_email(ctx, field)
+			case "notifications":
+				return ec.fieldContext_Viewer_notifications(ctx, field)
+			case "notificationSettings":
+				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
+			case "userExperiences":
+				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AdmirePostPayload_post(ctx context.Context, field graphql.CollectedField, obj *model.AdmirePostPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AdmirePostPayload_post(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.AdmirePostPayload().Post(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Post)
+	fc.Result = res
+	return ec.marshalOPost2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPost(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AdmirePostPayload_post(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AdmirePostPayload",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Post_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Post_dbid(ctx, field)
+			case "tokens":
+				return ec.fieldContext_Post_tokens(ctx, field)
+			case "caption":
+				return ec.fieldContext_Post_caption(ctx, field)
+			case "admires":
+				return ec.fieldContext_Post_admires(ctx, field)
+			case "comments":
+				return ec.fieldContext_Post_comments(ctx, field)
+			case "interactions":
+				return ec.fieldContext_Post_interactions(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Post_viewerAdmire(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AdmirePostPayload_admire(ctx context.Context, field graphql.CollectedField, obj *model.AdmirePostPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AdmirePostPayload_admire(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.AdmirePostPayload().Admire(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Admire)
+	fc.Result = res
+	return ec.marshalOAdmire2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdmire(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AdmirePostPayload_admire(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AdmirePostPayload",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Admire_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Admire_dbid(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Admire_creationTime(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Admire_lastUpdated(ctx, field)
+			case "admirer":
+				return ec.fieldContext_Admire_admirer(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Admire", field.Name)
 		},
 	}
 	return fc, nil
@@ -17014,6 +17588,242 @@ func (ec *executionContext) fieldContext_CommentOnFeedEventPayload_feedEvent(ctx
 				return ec.fieldContext_FeedEvent_hasViewerAdmiredEvent(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FeedEvent", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CommentOnPostPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.CommentOnPostPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CommentOnPostPayload_viewer(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Viewer, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Viewer)
+	fc.Result = res
+	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CommentOnPostPayload_viewer(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CommentOnPostPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Viewer_id(ctx, field)
+			case "user":
+				return ec.fieldContext_Viewer_user(ctx, field)
+			case "socialAccounts":
+				return ec.fieldContext_Viewer_socialAccounts(ctx, field)
+			case "viewerGalleries":
+				return ec.fieldContext_Viewer_viewerGalleries(ctx, field)
+			case "feed":
+				return ec.fieldContext_Viewer_feed(ctx, field)
+			case "email":
+				return ec.fieldContext_Viewer_email(ctx, field)
+			case "notifications":
+				return ec.fieldContext_Viewer_notifications(ctx, field)
+			case "notificationSettings":
+				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
+			case "userExperiences":
+				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CommentOnPostPayload_post(ctx context.Context, field graphql.CollectedField, obj *model.CommentOnPostPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CommentOnPostPayload_post(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.CommentOnPostPayload().Post(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Post)
+	fc.Result = res
+	return ec.marshalOPost2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPost(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CommentOnPostPayload_post(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CommentOnPostPayload",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Post_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Post_dbid(ctx, field)
+			case "tokens":
+				return ec.fieldContext_Post_tokens(ctx, field)
+			case "caption":
+				return ec.fieldContext_Post_caption(ctx, field)
+			case "admires":
+				return ec.fieldContext_Post_admires(ctx, field)
+			case "comments":
+				return ec.fieldContext_Post_comments(ctx, field)
+			case "interactions":
+				return ec.fieldContext_Post_interactions(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Post_viewerAdmire(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CommentOnPostPayload_comment(ctx context.Context, field graphql.CollectedField, obj *model.CommentOnPostPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CommentOnPostPayload_comment(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.CommentOnPostPayload().Comment(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Comment)
+	fc.Result = res
+	return ec.marshalOComment2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐComment(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CommentOnPostPayload_comment(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CommentOnPostPayload",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Comment_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Comment_dbid(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Comment_creationTime(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Comment_lastUpdated(ctx, field)
+			case "replyTo":
+				return ec.fieldContext_Comment_replyTo(ctx, field)
+			case "commenter":
+				return ec.fieldContext_Comment_commenter(ctx, field)
+			case "comment":
+				return ec.fieldContext_Comment_comment(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Comment", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CommentOnPostPayload_replyToComment(ctx context.Context, field graphql.CollectedField, obj *model.CommentOnPostPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CommentOnPostPayload_replyToComment(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.CommentOnPostPayload().ReplyToComment(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Comment)
+	fc.Result = res
+	return ec.marshalOComment2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐComment(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CommentOnPostPayload_replyToComment(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CommentOnPostPayload",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Comment_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Comment_dbid(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Comment_creationTime(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Comment_lastUpdated(ctx, field)
+			case "replyTo":
+				return ec.fieldContext_Comment_replyTo(ctx, field)
+			case "commenter":
+				return ec.fieldContext_Comment_commenter(ctx, field)
+			case "comment":
+				return ec.fieldContext_Comment_comment(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Comment", field.Name)
 		},
 	}
 	return fc, nil
@@ -30887,6 +31697,78 @@ func (ec *executionContext) fieldContext_Mutation_admireFeedEvent(ctx context.Co
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_admirePost(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_admirePost(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().AdmirePost(rctx, fc.Args["postId"].(persist.DBID))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.AdmirePostPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.AdmirePostPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.AdmirePostPayloadOrError)
+	fc.Result = res
+	return ec.marshalOAdmirePostPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdmirePostPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_admirePost(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type AdmirePostPayloadOrError does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_admirePost_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_removeAdmire(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Mutation_removeAdmire(ctx, field)
 	if err != nil {
@@ -31097,6 +31979,78 @@ func (ec *executionContext) fieldContext_Mutation_removeComment(ctx context.Cont
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_removeComment_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_commentOnPost(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_commentOnPost(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().CommentOnPost(rctx, fc.Args["postId"].(persist.DBID), fc.Args["replyToID"].(*persist.DBID), fc.Args["comment"].(string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.CommentOnPostPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.CommentOnPostPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.CommentOnPostPayloadOrError)
+	fc.Result = res
+	return ec.marshalOCommentOnPostPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommentOnPostPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_commentOnPost(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type CommentOnPostPayloadOrError does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_commentOnPost_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return
 	}
@@ -38399,6 +39353,65 @@ func (ec *executionContext) fieldContext_RemoveAdmirePayload_feedEvent(ctx conte
 	return fc, nil
 }
 
+func (ec *executionContext) _RemoveAdmirePayload_post(ctx context.Context, field graphql.CollectedField, obj *model.RemoveAdmirePayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RemoveAdmirePayload_post(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.RemoveAdmirePayload().Post(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Post)
+	fc.Result = res
+	return ec.marshalOPost2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPost(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RemoveAdmirePayload_post(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RemoveAdmirePayload",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Post_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Post_dbid(ctx, field)
+			case "tokens":
+				return ec.fieldContext_Post_tokens(ctx, field)
+			case "caption":
+				return ec.fieldContext_Post_caption(ctx, field)
+			case "admires":
+				return ec.fieldContext_Post_admires(ctx, field)
+			case "comments":
+				return ec.fieldContext_Post_comments(ctx, field)
+			case "interactions":
+				return ec.fieldContext_Post_interactions(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Post_viewerAdmire(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _RemoveCommentPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.RemoveCommentPayload) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_RemoveCommentPayload_viewer(ctx, field)
 	if err != nil {
@@ -38518,6 +39531,65 @@ func (ec *executionContext) fieldContext_RemoveCommentPayload_feedEvent(ctx cont
 				return ec.fieldContext_FeedEvent_hasViewerAdmiredEvent(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FeedEvent", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RemoveCommentPayload_post(ctx context.Context, field graphql.CollectedField, obj *model.RemoveCommentPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RemoveCommentPayload_post(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.RemoveCommentPayload().Post(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Post)
+	fc.Result = res
+	return ec.marshalOPost2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPost(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RemoveCommentPayload_post(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RemoveCommentPayload",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Post_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Post_dbid(ctx, field)
+			case "tokens":
+				return ec.fieldContext_Post_tokens(ctx, field)
+			case "caption":
+				return ec.fieldContext_Post_caption(ctx, field)
+			case "admires":
+				return ec.fieldContext_Post_admires(ctx, field)
+			case "comments":
+				return ec.fieldContext_Post_comments(ctx, field)
+			case "interactions":
+				return ec.fieldContext_Post_interactions(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Post_viewerAdmire(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
 	}
 	return fc, nil
@@ -40188,6 +41260,375 @@ func (ec *executionContext) fieldContext_SomeoneAdmiredYourFeedEventNotification
 	return fc, nil
 }
 
+func (ec *executionContext) _SomeoneAdmiredYourPostNotification_id(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneAdmiredYourPostNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneAdmiredYourPostNotification_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID(), nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.GqlID)
+	fc.Result = res
+	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneAdmiredYourPostNotification_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneAdmiredYourPostNotification",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneAdmiredYourPostNotification_dbid(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneAdmiredYourPostNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneAdmiredYourPostNotification_dbid(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dbid, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(persist.DBID)
+	fc.Result = res
+	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneAdmiredYourPostNotification_dbid(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneAdmiredYourPostNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DBID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneAdmiredYourPostNotification_seen(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneAdmiredYourPostNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneAdmiredYourPostNotification_seen(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Seen, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneAdmiredYourPostNotification_seen(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneAdmiredYourPostNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneAdmiredYourPostNotification_creationTime(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneAdmiredYourPostNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneAdmiredYourPostNotification_creationTime(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreationTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneAdmiredYourPostNotification_creationTime(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneAdmiredYourPostNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneAdmiredYourPostNotification_updatedTime(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneAdmiredYourPostNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneAdmiredYourPostNotification_updatedTime(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UpdatedTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneAdmiredYourPostNotification_updatedTime(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneAdmiredYourPostNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneAdmiredYourPostNotification_count(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneAdmiredYourPostNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneAdmiredYourPostNotification_count(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Count, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*int)
+	fc.Result = res
+	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneAdmiredYourPostNotification_count(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneAdmiredYourPostNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneAdmiredYourPostNotification_post(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneAdmiredYourPostNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneAdmiredYourPostNotification_post(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.SomeoneAdmiredYourPostNotification().Post(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Post)
+	fc.Result = res
+	return ec.marshalOPost2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPost(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneAdmiredYourPostNotification_post(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneAdmiredYourPostNotification",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Post_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Post_dbid(ctx, field)
+			case "tokens":
+				return ec.fieldContext_Post_tokens(ctx, field)
+			case "caption":
+				return ec.fieldContext_Post_caption(ctx, field)
+			case "admires":
+				return ec.fieldContext_Post_admires(ctx, field)
+			case "comments":
+				return ec.fieldContext_Post_comments(ctx, field)
+			case "interactions":
+				return ec.fieldContext_Post_interactions(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Post_viewerAdmire(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneAdmiredYourPostNotification_admirers(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneAdmiredYourPostNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneAdmiredYourPostNotification_admirers(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.SomeoneAdmiredYourPostNotification().Admirers(rctx, obj, fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.GroupNotificationUsersConnection)
+	fc.Result = res
+	return ec.marshalOGroupNotificationUsersConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGroupNotificationUsersConnection(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneAdmiredYourPostNotification_admirers(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneAdmiredYourPostNotification",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "edges":
+				return ec.fieldContext_GroupNotificationUsersConnection_edges(ctx, field)
+			case "pageInfo":
+				return ec.fieldContext_GroupNotificationUsersConnection_pageInfo(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type GroupNotificationUsersConnection", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_SomeoneAdmiredYourPostNotification_admirers_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _SomeoneCommentedOnYourFeedEventNotification_id(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneCommentedOnYourFeedEventNotification) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_SomeoneCommentedOnYourFeedEventNotification_id(ctx, field)
 	if err != nil {
@@ -40512,6 +41953,333 @@ func (ec *executionContext) fieldContext_SomeoneCommentedOnYourFeedEventNotifica
 				return ec.fieldContext_FeedEvent_hasViewerAdmiredEvent(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FeedEvent", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneCommentedOnYourPostNotification_id(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneCommentedOnYourPostNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneCommentedOnYourPostNotification_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID(), nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.GqlID)
+	fc.Result = res
+	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneCommentedOnYourPostNotification_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneCommentedOnYourPostNotification",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneCommentedOnYourPostNotification_dbid(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneCommentedOnYourPostNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneCommentedOnYourPostNotification_dbid(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dbid, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(persist.DBID)
+	fc.Result = res
+	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneCommentedOnYourPostNotification_dbid(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneCommentedOnYourPostNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DBID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneCommentedOnYourPostNotification_seen(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneCommentedOnYourPostNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneCommentedOnYourPostNotification_seen(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Seen, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneCommentedOnYourPostNotification_seen(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneCommentedOnYourPostNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneCommentedOnYourPostNotification_creationTime(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneCommentedOnYourPostNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneCommentedOnYourPostNotification_creationTime(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreationTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneCommentedOnYourPostNotification_creationTime(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneCommentedOnYourPostNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneCommentedOnYourPostNotification_updatedTime(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneCommentedOnYourPostNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneCommentedOnYourPostNotification_updatedTime(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UpdatedTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneCommentedOnYourPostNotification_updatedTime(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneCommentedOnYourPostNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneCommentedOnYourPostNotification_comment(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneCommentedOnYourPostNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneCommentedOnYourPostNotification_comment(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.SomeoneCommentedOnYourPostNotification().Comment(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Comment)
+	fc.Result = res
+	return ec.marshalOComment2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐComment(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneCommentedOnYourPostNotification_comment(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneCommentedOnYourPostNotification",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Comment_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Comment_dbid(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Comment_creationTime(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Comment_lastUpdated(ctx, field)
+			case "replyTo":
+				return ec.fieldContext_Comment_replyTo(ctx, field)
+			case "commenter":
+				return ec.fieldContext_Comment_commenter(ctx, field)
+			case "comment":
+				return ec.fieldContext_Comment_comment(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Comment", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneCommentedOnYourPostNotification_post(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneCommentedOnYourPostNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneCommentedOnYourPostNotification_post(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.SomeoneCommentedOnYourPostNotification().Post(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Post)
+	fc.Result = res
+	return ec.marshalOPost2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPost(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneCommentedOnYourPostNotification_post(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneCommentedOnYourPostNotification",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Post_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Post_dbid(ctx, field)
+			case "tokens":
+				return ec.fieldContext_Post_tokens(ctx, field)
+			case "caption":
+				return ec.fieldContext_Post_caption(ctx, field)
+			case "admires":
+				return ec.fieldContext_Post_admires(ctx, field)
+			case "comments":
+				return ec.fieldContext_Post_comments(ctx, field)
+			case "interactions":
+				return ec.fieldContext_Post_interactions(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Post_viewerAdmire(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
 	}
 	return fc, nil
@@ -53829,6 +55597,36 @@ func (ec *executionContext) _AdmireFeedEventPayloadOrError(ctx context.Context, 
 	}
 }
 
+func (ec *executionContext) _AdmirePostPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.AdmirePostPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.AdmirePostPayload:
+		return ec._AdmirePostPayload(ctx, sel, &obj)
+	case *model.AdmirePostPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._AdmirePostPayload(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _AuthorizationError(ctx context.Context, sel ast.SelectionSet, obj model.AuthorizationError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -53981,6 +55779,36 @@ func (ec *executionContext) _CommentOnFeedEventPayloadOrError(ctx context.Contex
 			return graphql.Null
 		}
 		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _CommentOnPostPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.CommentOnPostPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.CommentOnPostPayload:
+		return ec._CommentOnPostPayload(ctx, sel, &obj)
+	case *model.CommentOnPostPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._CommentOnPostPayload(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -54826,6 +56654,13 @@ func (ec *executionContext) _GroupedNotification(ctx context.Context, sel ast.Se
 			return graphql.Null
 		}
 		return ec._SomeoneAdmiredYourFeedEventNotification(ctx, sel, obj)
+	case model.SomeoneAdmiredYourPostNotification:
+		return ec._SomeoneAdmiredYourPostNotification(ctx, sel, &obj)
+	case *model.SomeoneAdmiredYourPostNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SomeoneAdmiredYourPostNotification(ctx, sel, obj)
 	case model.SomeoneViewedYourGalleryNotification:
 		return ec._SomeoneViewedYourGalleryNotification(ctx, sel, &obj)
 	case *model.SomeoneViewedYourGalleryNotification:
@@ -55335,6 +57170,20 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 			return graphql.Null
 		}
 		return ec._SomeoneCommentedOnYourFeedEventNotification(ctx, sel, obj)
+	case model.SomeoneAdmiredYourPostNotification:
+		return ec._SomeoneAdmiredYourPostNotification(ctx, sel, &obj)
+	case *model.SomeoneAdmiredYourPostNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SomeoneAdmiredYourPostNotification(ctx, sel, obj)
+	case model.SomeoneCommentedOnYourPostNotification:
+		return ec._SomeoneCommentedOnYourPostNotification(ctx, sel, &obj)
+	case *model.SomeoneCommentedOnYourPostNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SomeoneCommentedOnYourPostNotification(ctx, sel, obj)
 	case model.SomeoneViewedYourGalleryNotification:
 		return ec._SomeoneViewedYourGalleryNotification(ctx, sel, &obj)
 	case *model.SomeoneViewedYourGalleryNotification:
@@ -55384,6 +57233,20 @@ func (ec *executionContext) _Notification(ctx context.Context, sel ast.Selection
 			return graphql.Null
 		}
 		return ec._SomeoneCommentedOnYourFeedEventNotification(ctx, sel, obj)
+	case model.SomeoneAdmiredYourPostNotification:
+		return ec._SomeoneAdmiredYourPostNotification(ctx, sel, &obj)
+	case *model.SomeoneAdmiredYourPostNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SomeoneAdmiredYourPostNotification(ctx, sel, obj)
+	case model.SomeoneCommentedOnYourPostNotification:
+		return ec._SomeoneCommentedOnYourPostNotification(ctx, sel, &obj)
+	case *model.SomeoneCommentedOnYourPostNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SomeoneCommentedOnYourPostNotification(ctx, sel, obj)
 	case model.SomeoneViewedYourGalleryNotification:
 		return ec._SomeoneViewedYourGalleryNotification(ctx, sel, &obj)
 	case *model.SomeoneViewedYourGalleryNotification:
@@ -57264,6 +59127,65 @@ func (ec *executionContext) _AdmireFeedEventPayload(ctx context.Context, sel ast
 	return out
 }
 
+var admirePostPayloadImplementors = []string{"AdmirePostPayload", "AdmirePostPayloadOrError"}
+
+func (ec *executionContext) _AdmirePostPayload(ctx context.Context, sel ast.SelectionSet, obj *model.AdmirePostPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, admirePostPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AdmirePostPayload")
+		case "viewer":
+
+			out.Values[i] = ec._AdmirePostPayload_viewer(ctx, field, obj)
+
+		case "post":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._AdmirePostPayload_post(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "admire":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._AdmirePostPayload_admire(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var audioMediaImplementors = []string{"AudioMedia", "MediaSubtype", "Media"}
 
 func (ec *executionContext) _AudioMedia(ctx context.Context, sel ast.SelectionSet, obj *model.AudioMedia) graphql.Marshaler {
@@ -58268,6 +60190,82 @@ func (ec *executionContext) _CommentOnFeedEventPayload(ctx context.Context, sel 
 					}
 				}()
 				res = ec._CommentOnFeedEventPayload_feedEvent(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var commentOnPostPayloadImplementors = []string{"CommentOnPostPayload", "CommentOnPostPayloadOrError"}
+
+func (ec *executionContext) _CommentOnPostPayload(ctx context.Context, sel ast.SelectionSet, obj *model.CommentOnPostPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, commentOnPostPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CommentOnPostPayload")
+		case "viewer":
+
+			out.Values[i] = ec._CommentOnPostPayload_viewer(ctx, field, obj)
+
+		case "post":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._CommentOnPostPayload_post(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "comment":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._CommentOnPostPayload_comment(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "replyToComment":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._CommentOnPostPayload_replyToComment(ctx, field, obj)
 				return res
 			}
 
@@ -59342,7 +61340,7 @@ func (ec *executionContext) _ErrGalleryNotFound(ctx context.Context, sel ast.Sel
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "SocialConnectionsOrError", "MerchTokensPayloadOrError", "SearchUsersPayloadOrError", "SearchGalleriesPayloadOrError", "SearchCommunitiesPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "VerifyEmailMagicLinkPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "RedeemMerchPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "DeletePostPayloadOrError"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "SocialConnectionsOrError", "MerchTokensPayloadOrError", "SearchUsersPayloadOrError", "SearchGalleriesPayloadOrError", "SearchCommunitiesPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "VerifyEmailMagicLinkPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "RedeemMerchPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "AdmirePostPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -59475,7 +61473,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "SocialQueriesOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "SyncTokensPayloadOrError", "SyncCreatedTokensPayloadOrError", "Error", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "SyncCreatedTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "UnbanUserFromFeedPayloadOrError", "SetCommunityOverrideCreatorPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "GenerateQRCodeLoginTokenPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "DeletePostPayloadOrError"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "SocialQueriesOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "SyncTokensPayloadOrError", "SyncCreatedTokensPayloadOrError", "Error", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "SyncCreatedTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "UnbanUserFromFeedPayloadOrError", "SetCommunityOverrideCreatorPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "GenerateQRCodeLoginTokenPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "AdmirePostPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
@@ -61829,6 +63827,12 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 				return ec._Mutation_admireFeedEvent(ctx, field)
 			})
 
+		case "admirePost":
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_admirePost(ctx, field)
+			})
+
 		case "removeAdmire":
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
@@ -61845,6 +63849,12 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_removeComment(ctx, field)
+			})
+
+		case "commentOnPost":
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_commentOnPost(ctx, field)
 			})
 
 		case "postTokens":
@@ -63571,6 +65581,23 @@ func (ec *executionContext) _RemoveAdmirePayload(ctx context.Context, sel ast.Se
 				return innerFunc(ctx)
 
 			})
+		case "post":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._RemoveAdmirePayload_post(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -63606,6 +65633,23 @@ func (ec *executionContext) _RemoveCommentPayload(ctx context.Context, sel ast.S
 					}
 				}()
 				res = ec._RemoveCommentPayload_feedEvent(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "post":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._RemoveCommentPayload_post(ctx, field, obj)
 				return res
 			}
 
@@ -64158,6 +66202,91 @@ func (ec *executionContext) _SomeoneAdmiredYourFeedEventNotification(ctx context
 	return out
 }
 
+var someoneAdmiredYourPostNotificationImplementors = []string{"SomeoneAdmiredYourPostNotification", "Notification", "Node", "GroupedNotification"}
+
+func (ec *executionContext) _SomeoneAdmiredYourPostNotification(ctx context.Context, sel ast.SelectionSet, obj *model.SomeoneAdmiredYourPostNotification) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, someoneAdmiredYourPostNotificationImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SomeoneAdmiredYourPostNotification")
+		case "id":
+
+			out.Values[i] = ec._SomeoneAdmiredYourPostNotification_id(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "dbid":
+
+			out.Values[i] = ec._SomeoneAdmiredYourPostNotification_dbid(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "seen":
+
+			out.Values[i] = ec._SomeoneAdmiredYourPostNotification_seen(ctx, field, obj)
+
+		case "creationTime":
+
+			out.Values[i] = ec._SomeoneAdmiredYourPostNotification_creationTime(ctx, field, obj)
+
+		case "updatedTime":
+
+			out.Values[i] = ec._SomeoneAdmiredYourPostNotification_updatedTime(ctx, field, obj)
+
+		case "count":
+
+			out.Values[i] = ec._SomeoneAdmiredYourPostNotification_count(ctx, field, obj)
+
+		case "post":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._SomeoneAdmiredYourPostNotification_post(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "admirers":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._SomeoneAdmiredYourPostNotification_admirers(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var someoneCommentedOnYourFeedEventNotificationImplementors = []string{"SomeoneCommentedOnYourFeedEventNotification", "Notification", "Node"}
 
 func (ec *executionContext) _SomeoneCommentedOnYourFeedEventNotification(ctx context.Context, sel ast.SelectionSet, obj *model.SomeoneCommentedOnYourFeedEventNotification) graphql.Marshaler {
@@ -64221,6 +66350,87 @@ func (ec *executionContext) _SomeoneCommentedOnYourFeedEventNotification(ctx con
 					}
 				}()
 				res = ec._SomeoneCommentedOnYourFeedEventNotification_feedEvent(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var someoneCommentedOnYourPostNotificationImplementors = []string{"SomeoneCommentedOnYourPostNotification", "Notification", "Node"}
+
+func (ec *executionContext) _SomeoneCommentedOnYourPostNotification(ctx context.Context, sel ast.SelectionSet, obj *model.SomeoneCommentedOnYourPostNotification) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, someoneCommentedOnYourPostNotificationImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SomeoneCommentedOnYourPostNotification")
+		case "id":
+
+			out.Values[i] = ec._SomeoneCommentedOnYourPostNotification_id(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "dbid":
+
+			out.Values[i] = ec._SomeoneCommentedOnYourPostNotification_dbid(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "seen":
+
+			out.Values[i] = ec._SomeoneCommentedOnYourPostNotification_seen(ctx, field, obj)
+
+		case "creationTime":
+
+			out.Values[i] = ec._SomeoneCommentedOnYourPostNotification_creationTime(ctx, field, obj)
+
+		case "updatedTime":
+
+			out.Values[i] = ec._SomeoneCommentedOnYourPostNotification_updatedTime(ctx, field, obj)
+
+		case "comment":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._SomeoneCommentedOnYourPostNotification_comment(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "post":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._SomeoneCommentedOnYourPostNotification_post(ctx, field, obj)
 				return res
 			}
 
@@ -68182,6 +70392,13 @@ func (ec *executionContext) marshalOAdmireFeedEventPayloadOrError2githubᚗcom�
 	return ec._AdmireFeedEventPayloadOrError(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalOAdmirePostPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdmirePostPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.AdmirePostPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._AdmirePostPayloadOrError(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOBadge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐBadge(ctx context.Context, sel ast.SelectionSet, v []*model.Badge) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -68732,6 +70949,13 @@ func (ec *executionContext) marshalOCommentOnFeedEventPayloadOrError2githubᚗco
 		return graphql.Null
 	}
 	return ec._CommentOnFeedEventPayloadOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOCommentOnPostPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommentOnPostPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.CommentOnPostPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._CommentOnPostPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOCommunitiesConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunitiesConnection(ctx context.Context, sel ast.SelectionSet, v *model.CommunitiesConnection) graphql.Marshaler {

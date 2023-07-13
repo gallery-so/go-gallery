@@ -36,11 +36,17 @@ func (r *admireFeedEventPayloadResolver) Admire(ctx context.Context, obj *model.
 
 // FeedEvent is the resolver for the feedEvent field.
 func (r *admireFeedEventPayloadResolver) FeedEvent(ctx context.Context, obj *model.AdmireFeedEventPayload) (*model.FeedEvent, error) {
-	admire, err := publicapi.For(ctx).Interaction.GetAdmireByID(ctx, obj.Admire.Dbid)
-	if err != nil {
-		return nil, err
-	}
-	return resolveFeedEventByEventID(ctx, admire.FeedEventID)
+	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
+}
+
+// Post is the resolver for the post field.
+func (r *admirePostPayloadResolver) Post(ctx context.Context, obj *model.AdmirePostPayload) (*model.Post, error) {
+	return resolvePostByPostID(ctx, obj.Post.Dbid)
+}
+
+// Admire is the resolver for the admire field.
+func (r *admirePostPayloadResolver) Admire(ctx context.Context, obj *model.AdmirePostPayload) (*model.Admire, error) {
+	return resolveAdmireByAdmireID(ctx, obj.Admire.Dbid)
 }
 
 // Gallery is the resolver for the gallery field.
@@ -95,7 +101,7 @@ func (r *collectionCreatedFeedEventDataResolver) NewTokens(ctx context.Context, 
 
 // Token is the resolver for the token field.
 func (r *collectionTokenResolver) Token(ctx context.Context, obj *model.CollectionToken) (*model.Token, error) {
-	return resolveTokenByTokenID(ctx, obj.HelperCollectionTokenData.TokenId)
+	return resolveTokenByTokenIDCollectionID(ctx, obj.HelperCollectionTokenData.TokenId, obj.CollectionId)
 }
 
 // Collection is the resolver for the collection field.
@@ -166,6 +172,21 @@ func (r *commentOnFeedEventPayloadResolver) ReplyToComment(ctx context.Context, 
 // FeedEvent is the resolver for the feedEvent field.
 func (r *commentOnFeedEventPayloadResolver) FeedEvent(ctx context.Context, obj *model.CommentOnFeedEventPayload) (*model.FeedEvent, error) {
 	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
+}
+
+// Post is the resolver for the post field.
+func (r *commentOnPostPayloadResolver) Post(ctx context.Context, obj *model.CommentOnPostPayload) (*model.Post, error) {
+	return resolvePostByPostID(ctx, obj.Post.Dbid)
+}
+
+// Comment is the resolver for the comment field.
+func (r *commentOnPostPayloadResolver) Comment(ctx context.Context, obj *model.CommentOnPostPayload) (*model.Comment, error) {
+	return resolveCommentByCommentID(ctx, obj.Comment.Dbid)
+}
+
+// ReplyToComment is the resolver for the replyToComment field.
+func (r *commentOnPostPayloadResolver) ReplyToComment(ctx context.Context, obj *model.CommentOnPostPayload) (*model.Comment, error) {
+	panic(fmt.Errorf("not implemented: ReplyToComment - replyToComment"))
 }
 
 // Creator is the resolver for the creator field.
@@ -1251,9 +1272,23 @@ func (r *mutationResolver) AdmireFeedEvent(ctx context.Context, feedEventID pers
 	return output, nil
 }
 
+// AdmirePost is the resolver for the admirePost field.
+func (r *mutationResolver) AdmirePost(ctx context.Context, postID persist.DBID) (model.AdmirePostPayloadOrError, error) {
+	id, err := publicapi.For(ctx).Interaction.AdmirePost(ctx, postID)
+	if err != nil {
+		return nil, err
+	}
+	output := &model.AdmirePostPayload{
+		Viewer: resolveViewer(ctx),
+		Admire: &model.Admire{Dbid: id},
+		Post:   &model.Post{Dbid: postID},
+	}
+	return output, nil
+}
+
 // RemoveAdmire is the resolver for the removeAdmire field.
 func (r *mutationResolver) RemoveAdmire(ctx context.Context, admireID persist.DBID) (model.RemoveAdmirePayloadOrError, error) {
-	feedEventID, err := publicapi.For(ctx).Interaction.RemoveAdmire(ctx, admireID)
+	feedEventID, postID, err := publicapi.For(ctx).Interaction.RemoveAdmire(ctx, admireID)
 	if err != nil {
 		return nil, err
 	}
@@ -1263,6 +1298,9 @@ func (r *mutationResolver) RemoveAdmire(ctx context.Context, admireID persist.DB
 		AdmireID: &admireID,
 		FeedEvent: &model.FeedEvent{
 			Dbid: feedEventID, // remaining fields handled by dedicated resolver
+		},
+		Post: &model.Post{
+			Dbid: postID, // remaining fields handled by dedicated resolver
 		},
 	}
 	return output, nil
@@ -1294,7 +1332,7 @@ func (r *mutationResolver) CommentOnFeedEvent(ctx context.Context, feedEventID p
 
 // RemoveComment is the resolver for the removeComment field.
 func (r *mutationResolver) RemoveComment(ctx context.Context, commentID persist.DBID) (model.RemoveCommentPayloadOrError, error) {
-	feedEvent, err := publicapi.For(ctx).Interaction.RemoveComment(ctx, commentID)
+	feedEvent, postID, err := publicapi.For(ctx).Interaction.RemoveComment(ctx, commentID)
 	if err != nil {
 		return nil, err
 	}
@@ -1303,6 +1341,31 @@ func (r *mutationResolver) RemoveComment(ctx context.Context, commentID persist.
 		FeedEvent: &model.FeedEvent{
 			Dbid: feedEvent,
 		},
+		Post: &model.Post{
+			Dbid: postID,
+		},
+	}
+	return output, nil
+}
+
+// CommentOnPost is the resolver for the commentOnPost field.
+func (r *mutationResolver) CommentOnPost(ctx context.Context, postID persist.DBID, replyToID *persist.DBID, comment string) (model.CommentOnPostPayloadOrError, error) {
+	id, err := publicapi.For(ctx).Interaction.CommentOnPost(ctx, postID, replyToID, comment)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.CommentOnPostPayload{
+		Viewer: resolveViewer(ctx),
+		Comment: &model.Comment{
+			Dbid: id,
+		},
+		Post: &model.Post{Dbid: postID},
+	}
+	if replyToID != nil {
+		output.ReplyToComment = &model.Comment{
+			Dbid: *replyToID, // remaining fields handled by dedicated resolver
+		}
 	}
 	return output, nil
 }
@@ -2240,12 +2303,34 @@ func (r *queryResolver) TopCollectionsForCommunity(ctx context.Context, input mo
 
 // FeedEvent is the resolver for the feedEvent field.
 func (r *removeAdmirePayloadResolver) FeedEvent(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.FeedEvent, error) {
+	if obj.FeedEvent == nil || obj.FeedEvent.Dbid == "" {
+		return nil, nil
+	}
 	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
+}
+
+// Post is the resolver for the post field.
+func (r *removeAdmirePayloadResolver) Post(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.Post, error) {
+	if obj.Post == nil || obj.Post.Dbid == "" {
+		return nil, nil
+	}
+	return resolvePostByPostID(ctx, obj.Post.Dbid)
 }
 
 // FeedEvent is the resolver for the feedEvent field.
 func (r *removeCommentPayloadResolver) FeedEvent(ctx context.Context, obj *model.RemoveCommentPayload) (*model.FeedEvent, error) {
+	if obj.FeedEvent == nil || obj.FeedEvent.Dbid == "" {
+		return nil, nil
+	}
 	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
+}
+
+// Post is the resolver for the post field.
+func (r *removeCommentPayloadResolver) Post(ctx context.Context, obj *model.RemoveCommentPayload) (*model.Post, error) {
+	if obj.Post == nil || obj.Post.Dbid == "" {
+		return nil, nil
+	}
+	return resolvePostByPostID(ctx, obj.Post.Dbid)
 }
 
 // Tokens is the resolver for the tokens field.
@@ -2296,6 +2381,16 @@ func (r *someoneAdmiredYourFeedEventNotificationResolver) Admirers(ctx context.C
 	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.NotificationData.AdmirerIDs, before, after, first, last)
 }
 
+// Post is the resolver for the post field.
+func (r *someoneAdmiredYourPostNotificationResolver) Post(ctx context.Context, obj *model.SomeoneAdmiredYourPostNotification) (*model.Post, error) {
+	return resolvePostByPostID(ctx, obj.PostID)
+}
+
+// Admirers is the resolver for the admirers field.
+func (r *someoneAdmiredYourPostNotificationResolver) Admirers(ctx context.Context, obj *model.SomeoneAdmiredYourPostNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error) {
+	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.NotificationData.AdmirerIDs, before, after, first, last)
+}
+
 // Comment is the resolver for the comment field.
 func (r *someoneCommentedOnYourFeedEventNotificationResolver) Comment(ctx context.Context, obj *model.SomeoneCommentedOnYourFeedEventNotification) (*model.Comment, error) {
 	return resolveCommentByCommentID(ctx, obj.CommentID)
@@ -2304,6 +2399,16 @@ func (r *someoneCommentedOnYourFeedEventNotificationResolver) Comment(ctx contex
 // FeedEvent is the resolver for the feedEvent field.
 func (r *someoneCommentedOnYourFeedEventNotificationResolver) FeedEvent(ctx context.Context, obj *model.SomeoneCommentedOnYourFeedEventNotification) (*model.FeedEvent, error) {
 	return resolveFeedEventByEventID(ctx, obj.HelperSomeoneCommentedOnYourFeedEventNotificationData.FeedEventID)
+}
+
+// Comment is the resolver for the comment field.
+func (r *someoneCommentedOnYourPostNotificationResolver) Comment(ctx context.Context, obj *model.SomeoneCommentedOnYourPostNotification) (*model.Comment, error) {
+	return resolveCommentByCommentID(ctx, obj.CommentID)
+}
+
+// Post is the resolver for the post field.
+func (r *someoneCommentedOnYourPostNotificationResolver) Post(ctx context.Context, obj *model.SomeoneCommentedOnYourPostNotification) (*model.Post, error) {
+	return resolvePostByPostID(ctx, obj.PostID)
 }
 
 // Followers is the resolver for the followers field.
@@ -2606,6 +2711,11 @@ func (r *Resolver) AdmireFeedEventPayload() generated.AdmireFeedEventPayloadReso
 	return &admireFeedEventPayloadResolver{r}
 }
 
+// AdmirePostPayload returns generated.AdmirePostPayloadResolver implementation.
+func (r *Resolver) AdmirePostPayload() generated.AdmirePostPayloadResolver {
+	return &admirePostPayloadResolver{r}
+}
+
 // Collection returns generated.CollectionResolver implementation.
 func (r *Resolver) Collection() generated.CollectionResolver { return &collectionResolver{r} }
 
@@ -2640,6 +2750,11 @@ func (r *Resolver) Comment() generated.CommentResolver { return &commentResolver
 // CommentOnFeedEventPayload returns generated.CommentOnFeedEventPayloadResolver implementation.
 func (r *Resolver) CommentOnFeedEventPayload() generated.CommentOnFeedEventPayloadResolver {
 	return &commentOnFeedEventPayloadResolver{r}
+}
+
+// CommentOnPostPayload returns generated.CommentOnPostPayloadResolver implementation.
+func (r *Resolver) CommentOnPostPayload() generated.CommentOnPostPayloadResolver {
+	return &commentOnPostPayloadResolver{r}
 }
 
 // Community returns generated.CommunityResolver implementation.
@@ -2725,9 +2840,19 @@ func (r *Resolver) SomeoneAdmiredYourFeedEventNotification() generated.SomeoneAd
 	return &someoneAdmiredYourFeedEventNotificationResolver{r}
 }
 
+// SomeoneAdmiredYourPostNotification returns generated.SomeoneAdmiredYourPostNotificationResolver implementation.
+func (r *Resolver) SomeoneAdmiredYourPostNotification() generated.SomeoneAdmiredYourPostNotificationResolver {
+	return &someoneAdmiredYourPostNotificationResolver{r}
+}
+
 // SomeoneCommentedOnYourFeedEventNotification returns generated.SomeoneCommentedOnYourFeedEventNotificationResolver implementation.
 func (r *Resolver) SomeoneCommentedOnYourFeedEventNotification() generated.SomeoneCommentedOnYourFeedEventNotificationResolver {
 	return &someoneCommentedOnYourFeedEventNotificationResolver{r}
+}
+
+// SomeoneCommentedOnYourPostNotification returns generated.SomeoneCommentedOnYourPostNotificationResolver implementation.
+func (r *Resolver) SomeoneCommentedOnYourPostNotification() generated.SomeoneCommentedOnYourPostNotificationResolver {
+	return &someoneCommentedOnYourPostNotificationResolver{r}
 }
 
 // SomeoneFollowedYouBackNotification returns generated.SomeoneFollowedYouBackNotificationResolver implementation.
@@ -2797,6 +2922,7 @@ func (r *Resolver) ChainPubKeyInput() generated.ChainPubKeyInputResolver {
 
 type admireResolver struct{ *Resolver }
 type admireFeedEventPayloadResolver struct{ *Resolver }
+type admirePostPayloadResolver struct{ *Resolver }
 type collectionResolver struct{ *Resolver }
 type collectionCreatedFeedEventDataResolver struct{ *Resolver }
 type collectionTokenResolver struct{ *Resolver }
@@ -2805,6 +2931,7 @@ type collectorsNoteAddedToCollectionFeedEventDataResolver struct{ *Resolver }
 type collectorsNoteAddedToTokenFeedEventDataResolver struct{ *Resolver }
 type commentResolver struct{ *Resolver }
 type commentOnFeedEventPayloadResolver struct{ *Resolver }
+type commentOnPostPayloadResolver struct{ *Resolver }
 type communityResolver struct{ *Resolver }
 type createCollectionPayloadResolver struct{ *Resolver }
 type ensProfileImageResolver struct{ *Resolver }
@@ -2826,7 +2953,9 @@ type setSpamPreferencePayloadResolver struct{ *Resolver }
 type socialConnectionResolver struct{ *Resolver }
 type socialQueriesResolver struct{ *Resolver }
 type someoneAdmiredYourFeedEventNotificationResolver struct{ *Resolver }
+type someoneAdmiredYourPostNotificationResolver struct{ *Resolver }
 type someoneCommentedOnYourFeedEventNotificationResolver struct{ *Resolver }
+type someoneCommentedOnYourPostNotificationResolver struct{ *Resolver }
 type someoneFollowedYouBackNotificationResolver struct{ *Resolver }
 type someoneFollowedYouNotificationResolver struct{ *Resolver }
 type someoneViewedYourGalleryNotificationResolver struct{ *Resolver }
