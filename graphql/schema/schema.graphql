@@ -2312,6 +2312,12 @@ type CommentOnPostPayload {
 
 union CommentOnPostPayloadOrError = CommentOnPostPayload | ErrInvalidInput | ErrNotAuthorized
 
+type DeletePostPayload {
+  deletedId: DeletedNode
+}
+
+union DeletePostPayloadOrError = DeletePostPayload | ErrInvalidInput | ErrNotAuthorized
+
 type Mutation {
   # User Mutations
   addUserWallet(
@@ -2394,6 +2400,7 @@ type Mutation {
     @authRequired
 
   postTokens(input: PostTokensInput!): PostTokensPayloadOrError @authRequired
+  deletePost(postId: DBID!): DeletePostPayloadOrError @authRequired
 
   viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
 

@@ -943,6 +943,15 @@ func (q *Queries) DeleteCollections(ctx context.Context, ids []string) error {
 	return err
 }
 
+const deletePostByID = `-- name: DeletePostByID :exec
+update posts set deleted = true where id = $1
+`
+
+func (q *Queries) DeletePostByID(ctx context.Context, id persist.DBID) error {
+	_, err := q.db.Exec(ctx, deletePostByID, id)
+	return err
+}
+
 const deletePushTokensByIDs = `-- name: DeletePushTokensByIDs :exec
 update push_notification_tokens set deleted = true where id = any($1) and deleted = false
 `
