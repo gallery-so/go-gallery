@@ -673,19 +673,16 @@ func (api InteractionAPI) AdmirePost(ctx context.Context, postID persist.DBID) (
 
 	admire, err := api.GetAdmireByActorIDAndPostID(ctx, userID, postID)
 	if err == nil {
-		panic("admire already exists")
 		return "", persist.ErrAdmireAlreadyExists{AdmireID: admire.ID, ActorID: userID, PostID: postID}
 	}
 
 	notFoundErr := persist.ErrAdmireNotFound{}
 	if !errors.As(err, &notFoundErr) {
-		panic("admire not found")
 		return "", err
 	}
 
 	admireID, err := api.repos.AdmireRepository.CreateAdmire(ctx, "", postID, userID)
 	if err != nil {
-		panic(fmt.Sprintf("error creating admire: %s", err.Error()))
 		return "", err
 	}
 
@@ -698,7 +695,6 @@ func (api InteractionAPI) AdmirePost(ctx context.Context, postID persist.DBID) (
 		Action:         persist.ActionAdmiredPost,
 	}, api.validator, nil)
 	if err != nil {
-		panic(fmt.Sprintf("error dispatching event: %s", err.Error()))
 		return "", err
 	}
 
