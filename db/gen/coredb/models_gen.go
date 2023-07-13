@@ -135,6 +135,13 @@ type FeedBlocklist struct {
 	Deleted     bool           `json:"deleted"`
 }
 
+type FeedEntity struct {
+	ID             persist.DBID `json:"id"`
+	FeedEntityType int32        `json:"feed_entity_type"`
+	CreatedAt      time.Time    `json:"created_at"`
+	ActorID        persist.DBID `json:"actor_id"`
+}
+
 type FeedEvent struct {
 	ID          persist.DBID          `json:"id"`
 	Version     int32                 `json:"version"`

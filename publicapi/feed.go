@@ -145,7 +145,7 @@ func (api FeedAPI) GetRawEventById(ctx context.Context, eventID persist.DBID) (*
 	return &event, nil
 }
 
-func (api FeedAPI) PaginatePersonalFeed(ctx context.Context, before *string, after *string, first *int, last *int) ([]persist.FeedEntity, PageInfo, error) {
+func (api FeedAPI) PaginatePersonalFeed(ctx context.Context, before *string, after *string, first *int, last *int) ([]any, PageInfo, error) {
 	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return nil, PageInfo{}, err
@@ -163,7 +163,7 @@ func (api FeedAPI) PaginatePersonalFeed(ctx context.Context, before *string, aft
 	}
 
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-		keys, err := api.loaders.PersonalFeedByUserID.Load(db.PaginatePersonalFeedByUserIDParams{
+		keys, err := api.queries.PaginatePersonalFeedByUserID(ctx, db.PaginatePersonalFeedByUserIDParams{
 			Follower:      userID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -171,20 +171,14 @@ func (api FeedAPI) PaginatePersonalFeed(ctx context.Context, before *string, aft
 			CurAfterTime:  params.CursorAfterTime,
 			CurAfterID:    params.CursorAfterID,
 			PagingForward: params.PagingForward,
-			FeedEventTag:  persist.FeedEventTag,
-			PostTag:       persist.PostTag,
 		})
 
 		if err != nil {
+			panic(err)
 			return nil, err
 		}
 
-		results := make([]interface{}, len(keys))
-		for i, key := range keys {
-			results[i] = key
-		}
-
-		return results, nil
+		return feedEntityToTypedType(ctx, api.loaders, keys)
 	}
 
 	paginator := timeIDPaginator{
@@ -192,18 +186,11 @@ func (api FeedAPI) PaginatePersonalFeed(ctx context.Context, before *string, aft
 		CursorFunc: feedCursor,
 	}
 
-	results, pageInfo, err := paginator.paginate(before, after, first, last)
-
-	feedEvents := make([]persist.FeedEntity, len(results))
-	for i, result := range results {
-		feedEvents[i] = result.(persist.FeedEntity)
-	}
-
-	return feedEvents, pageInfo, err
+	return paginator.paginate(before, after, first, last)
 }
 
 func (api FeedAPI) PaginateUserFeed(ctx context.Context, userID persist.DBID, before *string, after *string,
-	first *int, last *int) ([]persist.FeedEntity, PageInfo, error) {
+	first *int, last *int) ([]any, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userID": validate.WithTag(userID, "required"),
@@ -216,7 +203,7 @@ func (api FeedAPI) PaginateUserFeed(ctx context.Context, userID persist.DBID, be
 	}
 
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-		keys, err := api.loaders.UserFeedByUserID.Load(db.PaginateUserFeedByUserIDParams{
+		keys, err := api.queries.PaginateUserFeedByUserID(ctx, db.PaginateUserFeedByUserIDParams{
 			OwnerID:       userID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -224,20 +211,13 @@ func (api FeedAPI) PaginateUserFeed(ctx context.Context, userID persist.DBID, be
 			CurAfterTime:  params.CursorAfterTime,
 			CurAfterID:    params.CursorAfterID,
 			PagingForward: params.PagingForward,
-			FeedEventTag:  persist.FeedEventTag,
-			PostTag:       persist.PostTag,
 		})
-
 		if err != nil {
+			panic(err)
 			return nil, err
 		}
 
-		results := make([]interface{}, len(keys))
-		for i, key := range keys {
-			results[i] = key
-		}
-
-		return results, nil
+		return feedEntityToTypedType(ctx, api.loaders, keys)
 	}
 
 	paginator := timeIDPaginator{
@@ -245,44 +225,31 @@ func (api FeedAPI) PaginateUserFeed(ctx context.Context, userID persist.DBID, be
 		CursorFunc: feedCursor,
 	}
 
-	results, pageInfo, err := paginator.paginate(before, after, first, last)
-
-	feedEvents := make([]persist.FeedEntity, len(results))
-	for i, result := range results {
-		feedEvents[i] = result.(persist.FeedEntity)
-	}
-
-	return feedEvents, pageInfo, err
+	return paginator.paginate(before, after, first, last)
 }
 
-func (api FeedAPI) PaginateGlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) ([]persist.FeedEntity, PageInfo, error) {
+func (api FeedAPI) PaginateGlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) ([]any, PageInfo, error) {
 	// Validate
 	if err := validatePaginationParams(api.validator, first, last); err != nil {
 		return nil, PageInfo{}, err
 	}
 
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-		keys, err := api.loaders.GlobalFeed.Load(db.PaginateGlobalFeedParams{
+		keys, err := api.queries.PaginateGlobalFeed(ctx, db.PaginateGlobalFeedParams{
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
 			CurBeforeID:   params.CursorBeforeID,
 			CurAfterTime:  params.CursorAfterTime,
 			CurAfterID:    params.CursorAfterID,
 			PagingForward: params.PagingForward,
-			FeedEventTag:  persist.FeedEventTag,
-			PostEventTag:  persist.PostTag,
 		})
 
 		if err != nil {
+			panic(err)
 			return nil, err
 		}
 
-		results := make([]interface{}, len(keys))
-		for i, key := range keys {
-			results[i] = key
-		}
-
-		return results, nil
+		return feedEntityToTypedType(ctx, api.loaders, keys)
 	}
 
 	paginator := timeIDPaginator{
@@ -290,17 +257,10 @@ func (api FeedAPI) PaginateGlobalFeed(ctx context.Context, before *string, after
 		CursorFunc: feedCursor,
 	}
 
-	results, pageInfo, err := paginator.paginate(before, after, first, last)
-
-	feedEvents := make([]persist.FeedEntity, len(results))
-	for i, result := range results {
-		feedEvents[i] = result.(persist.FeedEntity)
-	}
-
-	return feedEvents, pageInfo, err
+	return paginator.paginate(before, after, first, last)
 }
 
-func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, after *string, first *int, last *int) ([]persist.FeedEntity, PageInfo, error) {
+func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, after *string, first *int, last *int) ([]any, PageInfo, error) {
 	// Validate
 	if err := validatePaginationParams(api.validator, first, last); err != nil {
 		return nil, PageInfo{}, err
@@ -372,50 +332,31 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 
 	queryFunc := func(params positionPagingParams) ([]any, error) {
 		keys, err := api.queries.PaginateTrendingFeed(ctx, db.PaginateTrendingFeedParams{
-			FeedEventIds:  asStr,
+			FeedEntityIds: asStr,
 			CurBeforePos:  params.CursorBeforePos,
 			CurAfterPos:   params.CursorAfterPos,
 			PagingForward: params.PagingForward,
 			Limit:         params.Limit,
-			FeedEventTag:  persist.FeedEventTag,
-			PostTag:       persist.PostTag,
 		})
 
-		rows := make([]dataloader.PaginateFeedRow, len(keys))
-		for i, key := range keys {
-			rows[i] = dataloader.PaginateFeedRow{
-				ID:        key.ID,
-				Tag:       key.Tag,
-				CreatedAt: key.CreatedAt,
-			}
-		}
-
-		events, err := dataloader.PaginatedRowToFeedEntity(ctx, api.queries, rows)
+		events, err := feedEntityToTypedType(ctx, api.loaders, keys)
 		if err != nil {
 			return nil, err
 		}
 
-		results, _ := util.Map(events, func(e persist.FeedEntity) (any, error) {
-			return e, nil
-		})
-
-		return results, err
+		return events, err
 	}
 
 	cursorFunc := func(node any) (int, []persist.DBID, error) {
 		_, id, err := feedCursor(node)
 		return lookup[id], trendingIDs, err
+
 	}
 
 	paginator.QueryFunc = queryFunc
 	paginator.CursorFunc = cursorFunc
-	results, pageInfo, err := paginator.paginate(before, after, first, last)
 
-	feedEvents, _ := util.Map(results, func(r any) (persist.FeedEntity, error) {
-		return r.(persist.FeedEntity), nil
-	})
-
-	return feedEvents, pageInfo, err
+	return paginator.paginate(before, after, first, last)
 }
 
 func (api FeedAPI) TrendingUsers(ctx context.Context, report model.Window) ([]db.User, error) {
@@ -454,8 +395,84 @@ func (api FeedAPI) TrendingUsers(ctx context.Context, report model.Window) ([]db
 }
 
 func feedCursor(i interface{}) (time.Time, persist.DBID, error) {
-	if row, ok := i.(persist.FeedEntity); ok {
+	switch row := i.(type) {
+	case db.FeedEvent:
 		return row.EventTime, row.ID, nil
+	case db.Post:
+		return row.CreatedAt, row.ID, nil
 	}
-	return time.Time{}, "", fmt.Errorf("interface{} is not a feed entity")
+	return time.Time{}, "", fmt.Errorf("interface{} is not a feed entity: %T", i)
+}
+
+func feedEntityToTypedType(ctx context.Context, d *dataloader.Loaders, ids []db.FeedEntity) ([]any, error) {
+	entities := make([]any, len(ids))
+	feedEventIDs := make([]persist.DBID, 0, len(ids))
+	postIDs := make([]persist.DBID, 0, len(ids))
+	for _, id := range ids {
+		switch id.FeedEntityType {
+		case persist.FeedEventTypeTag:
+			feedEventIDs = append(feedEventIDs, id.ID)
+		case persist.PostTypeTag:
+			postIDs = append(postIDs, id.ID)
+		default:
+			return nil, fmt.Errorf("unknown feed entity type %d", id.FeedEntityType)
+		}
+	}
+
+	incomingFeedEvents := make(chan []db.FeedEvent)
+	incomingFeedPosts := make(chan []db.Post)
+	incomingErrors := make(chan error)
+
+	go func() {
+		feedEvents, errs := d.FeedEventByFeedEventID.LoadAll(feedEventIDs)
+		for _, err := range errs {
+			if err != nil {
+				incomingErrors <- err
+				return
+			}
+		}
+		incomingFeedEvents <- feedEvents
+	}()
+
+	go func() {
+		feedPosts, errs := d.PostByPostID.LoadAll(postIDs)
+		for _, err := range errs {
+			if err != nil {
+				incomingErrors <- err
+				return
+			}
+		}
+		incomingFeedPosts <- feedPosts
+	}()
+
+	for i := 0; i < 2; i++ {
+		select {
+		case feedEvents := <-incomingFeedEvents:
+			idsToFeedEvents := make(map[persist.DBID]db.FeedEvent, len(feedEvents))
+			for _, evt := range feedEvents {
+				idsToFeedEvents[evt.ID] = evt
+			}
+
+			for j, id := range ids {
+				if it, ok := idsToFeedEvents[id.ID]; ok {
+					entities[j] = it
+				}
+			}
+		case feedPosts := <-incomingFeedPosts:
+			idsToFeedPosts := make(map[persist.DBID]db.Post, len(feedPosts))
+			for _, evt := range feedPosts {
+				idsToFeedPosts[evt.ID] = evt
+			}
+
+			for j, id := range ids {
+				if it, ok := idsToFeedPosts[id.ID]; ok {
+					entities[j] = it
+				}
+			}
+		case err := <-incomingErrors:
+			return nil, err
+		}
+	}
+
+	return entities, nil
 }

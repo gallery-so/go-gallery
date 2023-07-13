@@ -1213,41 +1213,41 @@ func feedEventToDataModel(event *db.FeedEvent) (model.FeedEventData, error) {
 	}
 }
 
-func feedEntityToModel(event *persist.FeedEntity) (model.FeedEventOrPostOrError, error) {
+func feedEntityToModel(event any) (model.FeedEntityOrError, error) {
 	// Value always returns a nil error so we can safely ignore it.
-	caption, _ := event.Caption.Value()
 
-	var captionVal *string
-	if caption != nil {
-		captionVal = util.ToPointer(caption.(string))
-	}
-	switch event.Source {
-	case persist.FeedEntitySourcePost:
+	switch event := event.(type) {
+	case db.Post:
+		caption, _ := event.Caption.Value()
+
+		var captionVal *string
+		if caption != nil {
+			captionVal = util.ToPointer(caption.(string))
+		}
 		return &model.Post{
 			HelperPostData: model.HelperPostData{
-				TokenIDs: event.TokenIDs,
+				TokenIDs: event.TokenIds,
 			},
 			Dbid:    event.ID,
 			Caption: captionVal,
 		}, nil
-	case persist.FeedEntitySourceFeedEvent:
-
+	case db.FeedEvent:
 		var groupID sql.NullString
-		if event.GroupID.String() != "" {
+		if event.GroupID.String != "" {
 			groupID = sql.NullString{
-				String: event.GroupID.String(),
+				String: event.GroupID.String,
 				Valid:  true,
 			}
 		}
 		data, err := feedEventToDataModel(&db.FeedEvent{
 			ID:          event.ID,
-			Version:     event.Version.Int32,
+			Version:     event.Version,
 			OwnerID:     event.OwnerID,
 			Action:      event.Action,
 			Data:        event.Data,
 			EventTime:   event.EventTime,
-			EventIds:    event.EventIDs,
-			Deleted:     event.Deleted.Bool,
+			EventIds:    event.EventIds,
+			Deleted:     event.Deleted,
 			LastUpdated: event.LastUpdated,
 			CreatedAt:   event.CreatedAt,
 			Caption:     event.Caption,
@@ -1257,13 +1257,20 @@ func feedEntityToModel(event *persist.FeedEntity) (model.FeedEventOrPostOrError,
 			return nil, err
 		}
 
+		caption, _ := event.Caption.Value()
+
+		var captionVal *string
+		if caption != nil {
+			captionVal = util.ToPointer(caption.(string))
+		}
+
 		return &model.FeedEvent{
 			Dbid:      event.ID,
 			Caption:   captionVal,
 			EventData: data,
 		}, nil
 	default:
-		panic(fmt.Sprintf("unknown source: %s", event.Source))
+		panic(fmt.Sprintf("unknown type: %T", event))
 	}
 }
 
@@ -1499,12 +1506,12 @@ func feedEventToSubEventDatas(ctx context.Context, event db.FeedEvent) ([]model.
 	return result, nil
 }
 
-func entitiesToFeedEdges(events []persist.FeedEntity) ([]*model.FeedEdge, error) {
+func entitiesToFeedEdges(events []any) ([]*model.FeedEdge, error) {
 	edges := make([]*model.FeedEdge, len(events))
 
 	for i, evt := range events {
-		var node model.FeedEventOrPostOrError
-		node, err := feedEntityToModel(&evt)
+		var node model.FeedEntityOrError
+		node, err := feedEntityToModel(evt)
 
 		if e, ok := err.(*persist.ErrUnknownAction); ok {
 			node = model.ErrUnknownAction{Message: e.Error()}
