@@ -585,3 +585,61 @@ mutation commentOnPostMutation($postId: DBID!, $comment: String!) {
     }
   }
 }
+
+mutation deletePostMutation($postId: DBID!) {
+  deletePost(postId: $postId) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on DeletePostPayload {
+      deletedId {
+        dbid
+      }
+    }
+  }
+}
+
+query communityByAddressQuery($address: ChainAddressInput!) {
+  communityByAddress(communityAddress: $address) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on Community {
+      dbid
+      name
+      posts(first: 3) {
+        edges {
+          node {
+            ... on Error {
+              __typename
+              message
+            }
+            ... on Post {
+              dbid
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+query tokenByIdQuery($id: DBID!) {
+  tokenById(id: $id) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on Token {
+      dbid
+      contract {
+        dbid
+        contractAddress {
+          address
+        }
+      }
+    }
+  }
+}

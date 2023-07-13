@@ -72,6 +72,8 @@ func testGraphQL(t *testing.T) {
 		{title: "update gallery with a new collection", run: testUpdateGalleryWithNewCollection},
 		{title: "should get trending users", run: testTrendingUsers, fixtures: []fixture{usePostgres, useRedis}},
 		{title: "should get trending feed events", run: testTrendingFeedEvents},
+		{title: "should delete a post", run: testDeletePost},
+		{title: "should get community with posts", run: testGetCommunity},
 		{title: "should delete collection in gallery update", run: testUpdateGalleryDeleteCollection},
 		{title: "should update user experiences", run: testUpdateUserExperiences},
 		{title: "should create gallery", run: testCreateGallery},
@@ -757,6 +759,26 @@ func testTrendingFeedEvents(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
+func testDeletePost(t *testing.T) {
+	ctx := context.Background()
+	userF := newUserWithFeedEntitiesFixture(t)
+	c := authedHandlerClient(t, userF.ID)
+	deletePost(t, ctx, c, userF.PostIDs[0])
+	actual := globalFeedEvents(t, ctx, c, 4)
+	assert.Len(t, actual, 3)
+}
+
+func testGetCommunity(t *testing.T) {
+	ctx := context.Background()
+	userF := newUserWithFeedEntitiesFixture(t)
+	c := authedHandlerClient(t, userF.ID)
+	contract := contractAddressByTokenID(t, ctx, c, userF.TokenIDs[0])
+	communityByAddress(t, ctx, c, ChainAddressInput{
+		Address: contract,
+		Chain:   ChainEthereum,
+	})
+}
+
 func testSyncNewTokens(t *testing.T) {
 	userF := newUserFixture(t)
 	provider := defaultStubProvider(userF.Wallet.Address)
@@ -1373,6 +1395,34 @@ func commentOnPost(t *testing.T, ctx context.Context, c genql.Client, postID per
 	resp, err := commentOnPostMutation(ctx, c, postID, comment)
 	require.NoError(t, err)
 	_ = (*resp.CommentOnPost).(*commentOnPostMutationCommentOnPostCommentOnPostPayload)
+}
+
+func deletePost(t *testing.T, ctx context.Context, c genql.Client, postID persist.DBID) {
+	t.Helper()
+	resp, err := deletePostMutation(ctx, c, postID)
+	require.NoError(t, err)
+	_ = (*resp.DeletePost).(*deletePostMutationDeletePostDeletePostPayload)
+}
+
+func communityByAddress(t *testing.T, ctx context.Context, c genql.Client, address ChainAddressInput) persist.DBID {
+	t.Helper()
+	resp, err := communityByAddressQuery(ctx, c, address)
+	require.NoError(t, err)
+	it := (*resp.CommunityByAddress).(*communityByAddressQueryCommunityByAddressCommunity)
+	posts := it.GetPosts().GetEdges()
+	if len(posts) == 0 {
+		t.Fatal("no posts found")
+	}
+	return it.Dbid
+}
+
+func contractAddressByTokenID(t *testing.T, ctx context.Context, c genql.Client, tokenID persist.DBID) string {
+	t.Helper()
+	resp, err := tokenByIdQuery(ctx, c, tokenID)
+	require.NoError(t, err)
+	it := (*resp.TokenById).(*tokenByIdQueryTokenByIdToken)
+	co := it.GetContract().ContractAddress.GetAddress()
+	return *co
 }
 
 // defaultLayout returns a collection layout of one section with one column
