@@ -101,7 +101,7 @@ func (r *collectionCreatedFeedEventDataResolver) NewTokens(ctx context.Context, 
 
 // Token is the resolver for the token field.
 func (r *collectionTokenResolver) Token(ctx context.Context, obj *model.CollectionToken) (*model.Token, error) {
-	return resolveTokenByTokenID(ctx, obj.HelperCollectionTokenData.TokenId)
+	return resolveTokenByTokenIDCollectionID(ctx, obj.HelperCollectionTokenData.TokenId, obj.CollectionId)
 }
 
 // Collection is the resolver for the collection field.

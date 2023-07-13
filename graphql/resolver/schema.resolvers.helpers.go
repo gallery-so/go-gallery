@@ -407,11 +407,11 @@ func resolveTokenPreviewsByGalleryID(ctx context.Context, galleryID persist.DBID
 }
 
 func resolveCollectionTokenByID(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (*model.CollectionToken, error) {
-	token, err := resolveTokenByTokenID(ctx, tokenID)
+	token, err := resolveTokenByTokenIDCollectionID(ctx, tokenID, collectionID)
 	if err != nil {
 		return nil, err
 	}
-	return tokenCollectionToModel(ctx, token, collectionID), nil
+	return collectionTokenToModel(ctx, token, collectionID), nil
 }
 
 func resolveGalleryByGalleryID(ctx context.Context, galleryID persist.DBID) (*model.Gallery, error) {
@@ -457,9 +457,17 @@ func resolveUserSocialsByUserID(ctx context.Context, userID persist.DBID) (*mode
 	return publicapi.For(ctx).User.GetDisplayedSocials(ctx, userID)
 }
 
+func resolveTokenByTokenIDCollectionID(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (*model.Token, error) {
+	token, err := publicapi.For(ctx).Token.GetTokenById(ctx, tokenID)
+	if err != nil {
+		return nil, err
+	}
+
+	return tokenToModel(ctx, *token, &collectionID), nil
+}
+
 func resolveTokenByTokenID(ctx context.Context, tokenID persist.DBID) (*model.Token, error) {
 	token, err := publicapi.For(ctx).Token.GetTokenById(ctx, tokenID)
-
 	if err != nil {
 		return nil, err
 	}
@@ -1040,7 +1048,7 @@ func resolveCollectionTokensByTokenIDs(ctx context.Context, collectionID persist
 	// Tokens that have since been deleted will be nil.
 	for _, t := range tokens {
 		token := tokenToModel(ctx, t, &collectionID)
-		newTokens[tokenIDToPosition[t.ID]] = tokenCollectionToModel(ctx, token, collectionID)
+		newTokens[tokenIDToPosition[t.ID]] = collectionTokenToModel(ctx, token, collectionID)
 	}
 
 	return newTokens, nil
@@ -1325,7 +1333,7 @@ func feedEventToCollectorsNoteAddedToTokenFeedEventData(event *db.FeedEvent) mod
 	return model.CollectorsNoteAddedToTokenFeedEventData{
 		EventTime:         &event.EventTime,
 		Owner:             &model.GalleryUser{Dbid: event.OwnerID}, // remaining fields handled by dedicated resolver
-		Token:             &model.CollectionToken{Token: &model.Token{Dbid: event.Data.TokenID}, Collection: &model.Collection{Dbid: event.Data.TokenCollectionID}, HelperCollectionTokenData: model.HelperCollectionTokenData{TokenId: event.Data.TokenID, CollectionId: event.Data.TokenCollectionID}},
+		Token:             &model.CollectionToken{Token: &model.Token{Dbid: event.Data.TokenID, HelperTokenData: model.HelperTokenData{CollectionID: (*persist.DBID)(util.StringToPointerIfNotEmpty(string(event.Data.TokenCollectionID)))}}, Collection: &model.Collection{Dbid: event.Data.TokenCollectionID}, HelperCollectionTokenData: model.HelperCollectionTokenData{TokenId: event.Data.TokenID, CollectionId: event.Data.TokenCollectionID}},
 		Action:            &event.Action,
 		NewCollectorsNote: util.ToPointer(event.Data.TokenNewCollectorsNote),
 	}
@@ -1491,7 +1499,7 @@ func feedEventToSubEventDatas(ctx context.Context, event db.FeedEvent) ([]model.
 				result = append(result, model.CollectorsNoteAddedToTokenFeedEventData{
 					EventTime: &event.CreatedAt,
 					Owner:     &model.GalleryUser{Dbid: persist.DBID(event.OwnerID)}, // remaining fields handled by dedicated resolver
-					Token: &model.CollectionToken{Token: &model.Token{Dbid: tokenID}, Collection: &model.Collection{Dbid: collectionID}, HelperCollectionTokenData: model.HelperCollectionTokenData{
+					Token: &model.CollectionToken{Token: &model.Token{Dbid: tokenID, HelperTokenData: model.HelperTokenData{CollectionID: (*persist.DBID)(util.StringToPointerIfNotEmpty(string(collectionID)))}}, Collection: &model.Collection{Dbid: collectionID}, HelperCollectionTokenData: model.HelperCollectionTokenData{
 						TokenId:      tokenID,
 						CollectionId: collectionID,
 					}}, // remaining fields handled by dedicated resolver
@@ -1823,7 +1831,7 @@ func tokensToModel(ctx context.Context, token []db.Token) []*model.Token {
 	return res
 }
 
-func tokenCollectionToModel(ctx context.Context, token *model.Token, collectionID persist.DBID) *model.CollectionToken {
+func collectionTokenToModel(ctx context.Context, token *model.Token, collectionID persist.DBID) *model.CollectionToken {
 	return &model.CollectionToken{
 		HelperCollectionTokenData: model.HelperCollectionTokenData{
 			TokenId:      token.Dbid,
@@ -1977,10 +1985,7 @@ func previewURLsFromTokenMedia(ctx context.Context, tokenMedia db.TokenMedia, op
 	preview := remapLargeImageUrls(url)
 
 	// Add timestamp to options
-	o := make([]mediamapper.Option, len(options)+1)
-	copy(o, options)
-	o[len(o)-1] = mediamapper.WithTimestamp(tokenMedia.LastUpdated)
-	options = o
+	options = append(options, mediamapper.WithTimestamp(tokenMedia.LastUpdated))
 
 	// Add live render
 	live := tokenMedia.Media.LivePreviewURL.String()

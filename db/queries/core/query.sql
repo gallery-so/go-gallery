@@ -249,6 +249,7 @@ select users.* from (
 -- name: CountOwnersByContractId :one
 SELECT count(DISTINCT users.id) FROM users, tokens, contracts
     WHERE (contracts.id = @id or contracts.parent_id = @id)
+    AND tokens.contract = contracts.id
     AND tokens.owner_user_id = users.id
     AND (NOT @gallery_users_only::bool OR users.universal = false)
     AND tokens.deleted = false AND users.deleted = false AND contracts.deleted = false;
