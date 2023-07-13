@@ -269,10 +269,10 @@ func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, 
 	return owners, pageInfo, err
 }
 
-func (api ContractAPI) GetCommunityPostsByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, before, after *string, first, last *int) ([]db.Post, PageInfo, error) {
+func (api ContractAPI) GetCommunityPostsByContractID(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int) ([]db.Post, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"contractAddress": validate.WithTag(contractAddress, "required"),
+		"contractAddress": validate.WithTag(contractID, "required"),
 	}); err != nil {
 		return nil, PageInfo{}, err
 	}
@@ -281,15 +281,10 @@ func (api ContractAPI) GetCommunityPostsByContractAddress(ctx context.Context, c
 		return nil, PageInfo{}, err
 	}
 
-	contract, err := api.loaders.ContractByChainAddress.Load(contractAddress)
-	if err != nil {
-		return nil, PageInfo{}, err
-	}
-
 	timeFunc := func(params timeIDPagingParams) ([]interface{}, error) {
 
 		posts, err := api.loaders.PostsPaginatedByContractID.Load(db.PaginatePostsByContractIDParams{
-			Contract:      contract.ID,
+			Contract:      contractID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
 			CurBeforeID:   params.CursorBeforeID,
@@ -311,7 +306,7 @@ func (api ContractAPI) GetCommunityPostsByContractAddress(ctx context.Context, c
 	}
 
 	countFunc := func() (int, error) {
-		total, err := api.queries.CountPostsByContractID(ctx, contract.ID)
+		total, err := api.queries.CountPostsByContractID(ctx, contractID)
 		return int(total), err
 	}
 

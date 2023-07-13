@@ -7,22 +7,29 @@ package coredb
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 const createAdmire = `-- name: CreateAdmire :one
-insert into admires (id, feed_event_id, actor_id) values ($1, $2, $3) returning id
+insert into admires (id, feed_event_id, post_id, actor_id) values ($1, $3, $4, $2) returning id
 `
 
 type CreateAdmireParams struct {
-	ID          persist.DBID `json:"id"`
-	FeedEventID persist.DBID `json:"feed_event_id"`
-	ActorID     persist.DBID `json:"actor_id"`
+	ID        persist.DBID   `json:"id"`
+	ActorID   persist.DBID   `json:"actor_id"`
+	FeedEvent sql.NullString `json:"feed_event"`
+	Post      sql.NullString `json:"post"`
 }
 
 func (q *Queries) CreateAdmire(ctx context.Context, arg CreateAdmireParams) (persist.DBID, error) {
-	row := q.db.QueryRow(ctx, createAdmire, arg.ID, arg.FeedEventID, arg.ActorID)
+	row := q.db.QueryRow(ctx, createAdmire,
+		arg.ID,
+		arg.ActorID,
+		arg.FeedEvent,
+		arg.Post,
+	)
 	var id persist.DBID
 	err := row.Scan(&id)
 	return id, err

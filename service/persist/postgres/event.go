@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -81,13 +82,22 @@ func (r *EventRepository) AddCollectionEvent(ctx context.Context, event db.Event
 }
 
 func (r *EventRepository) AddAdmireEvent(ctx context.Context, event db.Event) (*db.Event, error) {
+	var feedEventID sql.NullString
+	var postID sql.NullString
+	if event.FeedEventID != "" {
+		feedEventID = sql.NullString{String: string(event.FeedEventID), Valid: true}
+	}
+	if event.PostID != "" {
+		postID = sql.NullString{String: string(event.PostID), Valid: true}
+	}
 	event, err := r.Queries.CreateAdmireEvent(ctx, db.CreateAdmireEventParams{
 		ID:             persist.GenerateID(),
 		ActorID:        event.ActorID,
 		Action:         event.Action,
 		ResourceTypeID: event.ResourceTypeID,
 		AdmireID:       event.AdmireID,
-		FeedEventID:    event.FeedEventID,
+		FeedEvent:      feedEventID,
+		Post:           postID,
 		Data:           event.Data,
 		GroupID:        event.GroupID,
 		Caption:        event.Caption,
@@ -96,13 +106,23 @@ func (r *EventRepository) AddAdmireEvent(ctx context.Context, event db.Event) (*
 }
 
 func (r *EventRepository) AddCommentEvent(ctx context.Context, event db.Event) (*db.Event, error) {
+	var feedEventID sql.NullString
+	if event.FeedEventID != "" {
+		feedEventID = sql.NullString{String: string(event.FeedEventID), Valid: true}
+	}
+
+	var postID sql.NullString
+	if event.PostID != "" {
+		postID = sql.NullString{String: string(event.PostID), Valid: true}
+	}
 	event, err := r.Queries.CreateCommentEvent(ctx, db.CreateCommentEventParams{
 		ID:             persist.GenerateID(),
 		ActorID:        event.ActorID,
 		Action:         event.Action,
 		ResourceTypeID: event.ResourceTypeID,
 		CommentID:      event.CommentID,
-		FeedEventID:    event.FeedEventID,
+		FeedEvent:      feedEventID,
+		Post:           postID,
 		Data:           event.Data,
 		GroupID:        event.GroupID,
 		Caption:        event.Caption,

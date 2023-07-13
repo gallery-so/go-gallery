@@ -27,6 +27,10 @@ type AdmireFeedEventPayloadOrError interface {
 	IsAdmireFeedEventPayloadOrError()
 }
 
+type AdmirePostPayloadOrError interface {
+	IsAdmirePostPayloadOrError()
+}
+
 type AuthorizationError interface {
 	IsAuthorizationError()
 }
@@ -45,6 +49,10 @@ type CollectionTokenByIDOrError interface {
 
 type CommentOnFeedEventPayloadOrError interface {
 	IsCommentOnFeedEventPayloadOrError()
+}
+
+type CommentOnPostPayloadOrError interface {
+	IsCommentOnPostPayloadOrError()
 }
 
 type CommunityByAddressOrError interface {
@@ -73,6 +81,10 @@ type DeleteCollectionPayloadOrError interface {
 
 type DeleteGalleryPayloadOrError interface {
 	IsDeleteGalleryPayloadOrError()
+}
+
+type DeletePostPayloadOrError interface {
+	IsDeletePostPayloadOrError()
 }
 
 type DisconnectSocialAccountPayloadOrError interface {
@@ -442,6 +454,14 @@ type AdmireFeedEventPayload struct {
 
 func (AdmireFeedEventPayload) IsAdmireFeedEventPayloadOrError() {}
 
+type AdmirePostPayload struct {
+	Viewer *Viewer `json:"viewer"`
+	Post   *Post   `json:"post"`
+	Admire *Admire `json:"admire"`
+}
+
+func (AdmirePostPayload) IsAdmirePostPayloadOrError() {}
+
 type AudioMedia struct {
 	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`
 	MediaURL         *string          `json:"mediaURL"`
@@ -620,6 +640,15 @@ type CommentOnFeedEventPayload struct {
 
 func (CommentOnFeedEventPayload) IsCommentOnFeedEventPayloadOrError() {}
 
+type CommentOnPostPayload struct {
+	Viewer         *Viewer  `json:"viewer"`
+	Post           *Post    `json:"post"`
+	Comment        *Comment `json:"comment"`
+	ReplyToComment *Comment `json:"replyToComment"`
+}
+
+func (CommentOnPostPayload) IsCommentOnPostPayloadOrError() {}
+
 type CommunitiesConnection struct {
 	Edges    []*CommunityEdge `json:"edges"`
 	PageInfo *PageInfo        `json:"pageInfo"`
@@ -769,6 +798,12 @@ type DeleteGalleryPayload struct {
 }
 
 func (DeleteGalleryPayload) IsDeleteGalleryPayloadOrError() {}
+
+type DeletePostPayload struct {
+	DeletedID *DeletedNode `json:"deletedId"`
+}
+
+func (DeletePostPayload) IsDeletePostPayloadOrError() {}
 
 type DeletedNode struct {
 	Dbid persist.DBID `json:"dbid"`
@@ -961,6 +996,9 @@ func (ErrInvalidInput) IsDisconnectSocialAccountPayloadOrError()         {}
 func (ErrInvalidInput) IsFollowAllSocialConnectionsPayloadOrError()      {}
 func (ErrInvalidInput) IsSetProfileImagePayloadOrError()                 {}
 func (ErrInvalidInput) IsPostTokensPayloadOrError()                      {}
+func (ErrInvalidInput) IsAdmirePostPayloadOrError()                      {}
+func (ErrInvalidInput) IsCommentOnPostPayloadOrError()                   {}
+func (ErrInvalidInput) IsDeletePostPayloadOrError()                      {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -1039,6 +1077,9 @@ func (ErrNotAuthorized) IsFollowAllSocialConnectionsPayloadOrError()   {}
 func (ErrNotAuthorized) IsGenerateQRCodeLoginTokenPayloadOrError()     {}
 func (ErrNotAuthorized) IsSetProfileImagePayloadOrError()              {}
 func (ErrNotAuthorized) IsPostTokensPayloadOrError()                   {}
+func (ErrNotAuthorized) IsAdmirePostPayloadOrError()                   {}
+func (ErrNotAuthorized) IsCommentOnPostPayloadOrError()                {}
+func (ErrNotAuthorized) IsDeletePostPayloadOrError()                   {}
 
 type ErrPostNotFound struct {
 	Message string `json:"message"`
@@ -1661,6 +1702,7 @@ type RemoveAdmirePayload struct {
 	Viewer    *Viewer       `json:"viewer"`
 	AdmireID  *persist.DBID `json:"admireID"`
 	FeedEvent *FeedEvent    `json:"feedEvent"`
+	Post      *Post         `json:"post"`
 }
 
 func (RemoveAdmirePayload) IsRemoveAdmirePayloadOrError() {}
@@ -1668,6 +1710,7 @@ func (RemoveAdmirePayload) IsRemoveAdmirePayloadOrError() {}
 type RemoveCommentPayload struct {
 	Viewer    *Viewer    `json:"viewer"`
 	FeedEvent *FeedEvent `json:"feedEvent"`
+	Post      *Post      `json:"post"`
 }
 
 func (RemoveCommentPayload) IsRemoveCommentPayloadOrError() {}
@@ -1790,6 +1833,21 @@ func (SomeoneAdmiredYourFeedEventNotification) IsNotification()        {}
 func (SomeoneAdmiredYourFeedEventNotification) IsNode()                {}
 func (SomeoneAdmiredYourFeedEventNotification) IsGroupedNotification() {}
 
+type SomeoneAdmiredYourPostNotification struct {
+	HelperSomeoneAdmiredYourPostNotificationData
+	Dbid         persist.DBID                      `json:"dbid"`
+	Seen         *bool                             `json:"seen"`
+	CreationTime *time.Time                        `json:"creationTime"`
+	UpdatedTime  *time.Time                        `json:"updatedTime"`
+	Count        *int                              `json:"count"`
+	Post         *Post                             `json:"post"`
+	Admirers     *GroupNotificationUsersConnection `json:"admirers"`
+}
+
+func (SomeoneAdmiredYourPostNotification) IsNotification()        {}
+func (SomeoneAdmiredYourPostNotification) IsNode()                {}
+func (SomeoneAdmiredYourPostNotification) IsGroupedNotification() {}
+
 type SomeoneCommentedOnYourFeedEventNotification struct {
 	HelperSomeoneCommentedOnYourFeedEventNotificationData
 	Dbid         persist.DBID `json:"dbid"`
@@ -1802,6 +1860,19 @@ type SomeoneCommentedOnYourFeedEventNotification struct {
 
 func (SomeoneCommentedOnYourFeedEventNotification) IsNotification() {}
 func (SomeoneCommentedOnYourFeedEventNotification) IsNode()         {}
+
+type SomeoneCommentedOnYourPostNotification struct {
+	HelperSomeoneCommentedOnYourPostNotificationData
+	Dbid         persist.DBID `json:"dbid"`
+	Seen         *bool        `json:"seen"`
+	CreationTime *time.Time   `json:"creationTime"`
+	UpdatedTime  *time.Time   `json:"updatedTime"`
+	Comment      *Comment     `json:"comment"`
+	Post         *Post        `json:"post"`
+}
+
+func (SomeoneCommentedOnYourPostNotification) IsNotification() {}
+func (SomeoneCommentedOnYourPostNotification) IsNode()         {}
 
 type SomeoneFollowedYouBackNotification struct {
 	HelperSomeoneFollowedYouBackNotificationData

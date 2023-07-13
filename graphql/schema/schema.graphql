@@ -1729,6 +1729,7 @@ type RemoveAdmirePayload {
   viewer: Viewer
   admireID: DBID
   feedEvent: FeedEvent @goField(forceResolver: true)
+  post: Post @goField(forceResolver: true)
 }
 
 type CommentOnFeedEventPayload {
@@ -1741,6 +1742,7 @@ type CommentOnFeedEventPayload {
 type RemoveCommentPayload {
   viewer: Viewer
   feedEvent: FeedEvent @goField(forceResolver: true)
+  post: Post @goField(forceResolver: true)
 }
 
 interface Notification implements Node {
@@ -1820,6 +1822,33 @@ type SomeoneCommentedOnYourFeedEventNotification implements Notification & Node 
   # Do we want this comment to be the latest comment
   comment: Comment @goField(forceResolver: true)
   feedEvent: FeedEvent @goField(forceResolver: true)
+}
+
+type SomeoneAdmiredYourPostNotification implements Notification & Node & GroupedNotification
+  @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+  count: Int
+
+  post: Post @goField(forceResolver: true)
+  admirers(before: String, after: String, first: Int, last: Int): GroupNotificationUsersConnection
+    @goField(forceResolver: true)
+}
+
+type SomeoneCommentedOnYourPostNotification implements Notification & Node @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+
+  # Don't need a `who` here since the `comment` can provide that
+  # Do we want this comment to be the latest comment
+  comment: Comment @goField(forceResolver: true)
+  post: Post @goField(forceResolver: true)
 }
 
 type SomeoneViewedYourGalleryNotification implements Notification & Node & GroupedNotification
@@ -2281,6 +2310,29 @@ type PostTokensPayload {
 
 union PostTokensPayloadOrError = PostTokensPayload | ErrInvalidInput | ErrNotAuthorized
 
+type AdmirePostPayload {
+  viewer: Viewer
+  post: Post @goField(forceResolver: true)
+  admire: Admire @goField(forceResolver: true)
+}
+
+union AdmirePostPayloadOrError = AdmirePostPayload | ErrInvalidInput | ErrNotAuthorized
+
+type CommentOnPostPayload {
+  viewer: Viewer
+  post: Post @goField(forceResolver: true)
+  comment: Comment @goField(forceResolver: true)
+  replyToComment: Comment @goField(forceResolver: true)
+}
+
+union CommentOnPostPayloadOrError = CommentOnPostPayload | ErrInvalidInput | ErrNotAuthorized
+
+type DeletePostPayload {
+  deletedId: DeletedNode
+}
+
+union DeletePostPayloadOrError = DeletePostPayload | ErrInvalidInput | ErrNotAuthorized
+
 type Mutation {
   # User Mutations
   addUserWallet(
@@ -2351,6 +2403,7 @@ type Mutation {
   unfollowUser(userId: DBID!): UnfollowUserPayloadOrError @authRequired
 
   admireFeedEvent(feedEventId: DBID!): AdmireFeedEventPayloadOrError @authRequired
+  admirePost(postId: DBID!): AdmirePostPayloadOrError @authRequired
   removeAdmire(admireId: DBID!): RemoveAdmirePayloadOrError @authRequired
   commentOnFeedEvent(
     feedEventId: DBID!
@@ -2358,8 +2411,11 @@ type Mutation {
     comment: String!
   ): CommentOnFeedEventPayloadOrError @authRequired
   removeComment(commentId: DBID!): RemoveCommentPayloadOrError @authRequired
+  commentOnPost(postId: DBID!, replyToID: DBID, comment: String!): CommentOnPostPayloadOrError
+    @authRequired
 
   postTokens(input: PostTokensInput!): PostTokensPayloadOrError @authRequired
+  deletePost(postId: DBID!): DeletePostPayloadOrError @authRequired
 
   viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
 

@@ -2,6 +2,8 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
+
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
@@ -18,18 +20,36 @@ func NewAdmireRepository(queries *db.Queries) *AdmireRepository {
 	}
 }
 
-func (a *AdmireRepository) CreateAdmire(ctx context.Context, feedEventID persist.DBID, actorID persist.DBID) (persist.DBID, error) {
+func (a *AdmireRepository) CreateAdmire(ctx context.Context, feedEventID, postID, actorID persist.DBID) (persist.DBID, error) {
+
+	var feedEventString sql.NullString
+	if feedEventID != "" {
+		feedEventString = sql.NullString{
+			String: feedEventID.String(),
+			Valid:  true,
+		}
+	}
+
+	var postString sql.NullString
+	if postID != "" {
+		postString = sql.NullString{
+			String: postID.String(),
+			Valid:  true,
+		}
+	}
+
 	admireID, err := a.queries.CreateAdmire(ctx, db.CreateAdmireParams{
-		ID:          persist.GenerateID(),
-		FeedEventID: feedEventID,
-		ActorID:     actorID,
+		ID:        persist.GenerateID(),
+		Post:      postString,
+		FeedEvent: feedEventString,
+		ActorID:   actorID,
 	})
 
 	if err != nil {
 		return "", err
 	}
-
 	return admireID, nil
+
 }
 
 func (a *AdmireRepository) RemoveAdmire(ctx context.Context, admireID persist.DBID) error {
