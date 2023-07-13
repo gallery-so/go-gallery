@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -773,32 +774,7 @@ func (api InteractionAPI) CommentOnFeedEvent(ctx context.Context, feedEventID pe
 		return "", err
 	}
 
-	actor, err := getAuthenticatedUserID(ctx)
-	if err != nil {
-		return "", err
-	}
-
-	// Sanitize
-	comment = validate.SanitizationPolicy.Sanitize(comment)
-
-	commentID, err := api.repos.CommentRepository.CreateComment(ctx, feedEventID, "", actor, replyToID, comment)
-	if err != nil {
-		return "", err
-	}
-
-	_, err = dispatchEvent(ctx, db.Event{
-		ActorID:        persist.DBIDToNullStr(actor),
-		ResourceTypeID: persist.ResourceTypeComment,
-		SubjectID:      feedEventID,
-		FeedEventID:    feedEventID,
-		CommentID:      commentID,
-		Action:         persist.ActionCommentedOnFeedEvent,
-	}, api.validator, nil)
-	if err != nil {
-		return "", err
-	}
-
-	return commentID, nil
+	return api.comment(ctx, comment, "", feedEventID, replyToID)
 }
 
 func (api InteractionAPI) CommentOnPost(ctx context.Context, postID persist.DBID, replyToID *persist.DBID, comment string) (persist.DBID, error) {
@@ -814,15 +790,18 @@ func (api InteractionAPI) CommentOnPost(ctx context.Context, postID persist.DBID
 		return "", err
 	}
 
+	return api.comment(ctx, comment, postID, "", replyToID)
+}
+
+func (api InteractionAPI) comment(ctx context.Context, comment string, postID persist.DBID, feedEventID persist.DBID, replyToID *persist.DBID) (persist.DBID, error) {
 	actor, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return "", err
 	}
 
-	// Sanitize
 	comment = validate.SanitizationPolicy.Sanitize(comment)
 
-	commentID, err := api.repos.CommentRepository.CreateComment(ctx, "", postID, actor, replyToID, comment)
+	commentID, err := api.repos.CommentRepository.CreateComment(ctx, feedEventID, postID, actor, replyToID, comment)
 	if err != nil {
 		return "", err
 	}
@@ -830,15 +809,15 @@ func (api InteractionAPI) CommentOnPost(ctx context.Context, postID persist.DBID
 	_, err = dispatchEvent(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(actor),
 		ResourceTypeID: persist.ResourceTypeComment,
-		SubjectID:      postID,
+		SubjectID:      persist.DBID(util.FirstNonEmptyString(postID.String(), feedEventID.String())),
 		PostID:         postID,
+		FeedEventID:    feedEventID,
 		CommentID:      commentID,
 		Action:         persist.ActionCommentedOnPost,
 	}, api.validator, nil)
 	if err != nil {
 		return "", err
 	}
-
 	return commentID, nil
 }
 
