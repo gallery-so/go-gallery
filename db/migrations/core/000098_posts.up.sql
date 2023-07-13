@@ -25,6 +25,9 @@ add constraint post_feed_event_admire_check check (
     (post_id is null and feed_event_id is null)
 );
 
+alter table admires 
+alter column feed_event_id drop not null;
+
 alter table comments
 add constraint post_feed_event_comment_check check (
     (post_id is not null and feed_event_id is null) or 
@@ -32,6 +35,8 @@ add constraint post_feed_event_comment_check check (
     (post_id is null and feed_event_id is null)
 );
 
+alter table comments 
+alter column feed_event_id drop not null;
 
 create view feed_entities as (
 SELECT subquery.id, subquery.feed_entity_type, subquery.created_at, subquery.actor_id
@@ -50,3 +55,4 @@ SELECT subquery.id, subquery.feed_entity_type, subquery.created_at, subquery.act
         )
     ) subquery
 );
+

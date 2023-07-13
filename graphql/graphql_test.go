@@ -676,9 +676,9 @@ func testViewsAreRolledUp(t *testing.T) {
 func testTrendingUsers(t *testing.T) {
 	t.Skip("This test is pretty flaky, skipping for now")
 	serverF := newServerFixture(t)
-	bob := newUserWithFeedEventsFixture(t)
-	alice := newUserWithFeedEventsFixture(t)
-	dave := newUserWithFeedEventsFixture(t)
+	bob := newUserWithFeedEntitiesFixture(t)
+	alice := newUserWithFeedEntitiesFixture(t)
+	dave := newUserWithFeedEntitiesFixture(t)
 	ctx := context.Background()
 	var c *serverClient
 	// view bob a few times
@@ -732,7 +732,7 @@ func testTrendingUsers(t *testing.T) {
 
 func testTrendingFeedEvents(t *testing.T) {
 	ctx := context.Background()
-	userF := newUserWithFeedEventsFixture(t)
+	userF := newUserWithFeedEntitiesFixture(t)
 	c := authedHandlerClient(t, userF.ID)
 	admireFeedEvent(t, ctx, c, userF.FeedEventIDs[1])
 	commentOnFeedEvent(t, ctx, c, userF.FeedEventIDs[1], "a")
@@ -742,6 +742,10 @@ func testTrendingFeedEvents(t *testing.T) {
 	commentOnFeedEvent(t, ctx, c, userF.FeedEventIDs[0], "a")
 	commentOnFeedEvent(t, ctx, c, userF.FeedEventIDs[0], "b")
 	admireFeedEvent(t, ctx, c, userF.FeedEventIDs[2])
+	// admire and comment on a post to ensure it works, but trending does not currently include posts so it should not affect anything in the result
+	admirePost(t, ctx, c, userF.PostIDs[0])
+	commentOnPost(t, ctx, c, userF.PostIDs[0], "a")
+
 	expected := []persist.DBID{
 		userF.FeedEventIDs[2],
 		userF.FeedEventIDs[0],
@@ -1296,18 +1300,32 @@ func createCollection(t *testing.T, ctx context.Context, c genql.Client, input C
 	return payload.Collection.Dbid
 }
 
+func createPost(t *testing.T, ctx context.Context, c genql.Client, input PostTokensInput) persist.DBID {
+	t.Helper()
+	resp, err := postTokens(ctx, c, input)
+	require.NoError(t, err)
+	payload := (*resp.PostTokens).(*postTokensPostTokensPostTokensPayload)
+	return payload.Post.Dbid
+}
+
 // globalFeedEvents makes a GraphQL request to return existing feed events
 func globalFeedEvents(t *testing.T, ctx context.Context, c genql.Client, limit int) []persist.DBID {
 	t.Helper()
 	resp, err := globalFeedQuery(ctx, c, &limit)
 	require.NoError(t, err)
-	feedEvents := make([]persist.DBID, len(resp.GlobalFeed.Edges))
+	feedEntities := make([]persist.DBID, len(resp.GlobalFeed.Edges))
 	for i, event := range resp.GlobalFeed.Edges {
-		e := (*event.Node).(*globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent)
-		feedEvents[i] = e.Dbid
+		switch e := (*event.Node).(type) {
+		case *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent:
+			feedEntities[i] = e.Dbid
+		case *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodePost:
+			feedEntities[i] = e.Dbid
+		default:
+			t.Fatalf("unexpected type %T", e)
+		}
 
 	}
-	return feedEvents
+	return feedEntities
 }
 
 // trendingFeedEvents makes a GraphQL request to return trending feedEvents
@@ -1338,6 +1356,23 @@ func commentOnFeedEvent(t *testing.T, ctx context.Context, c genql.Client, feedE
 	resp, err := commentOnFeedEventMutation(ctx, c, feedEventID, comment)
 	require.NoError(t, err)
 	_ = (*resp.CommentOnFeedEvent).(*commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayload)
+}
+
+// admirePost makes a GraphQL request to admire a post
+func admirePost(t *testing.T, ctx context.Context, c genql.Client, postID persist.DBID) {
+	t.Helper()
+	resp, err := admirePostMutation(ctx, c, postID)
+	require.NoError(t, err)
+
+	_ = (*resp.AdmirePost).(*admirePostMutationAdmirePostAdmirePostPayload)
+}
+
+// commentOnPost makes a GraphQL request to comment on a post
+func commentOnPost(t *testing.T, ctx context.Context, c genql.Client, postID persist.DBID, comment string) {
+	t.Helper()
+	resp, err := commentOnPostMutation(ctx, c, postID, comment)
+	require.NoError(t, err)
+	_ = (*resp.CommentOnPost).(*commentOnPostMutationCommentOnPostCommentOnPostPayload)
 }
 
 // defaultLayout returns a collection layout of one section with one column
