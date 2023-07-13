@@ -28,6 +28,10 @@ add constraint post_feed_event_admire_check check (
 alter table admires 
 alter column feed_event_id drop not null;
 
+create index if not exists admire_post_idx on admires (post_id);
+create unique index if not exists admire_actor_post_idx on admires (actor_id, post_id) where (deleted = false);
+create unique index if not exists admires_created_at_id_post_id_idx on admires (created_at desc, id desc, feed_event_id) where (deleted = false);
+
 alter table comments
 add constraint post_feed_event_comment_check check (
     (post_id is not null and feed_event_id is null) or 
@@ -37,6 +41,12 @@ add constraint post_feed_event_comment_check check (
 
 alter table comments 
 alter column feed_event_id drop not null;
+
+create index if not exists comment_post_idx on comments (post_id);
+create unique index if not exists comments_created_at_id_post_id_idx on comments (created_at desc, id desc, feed_event_id) WHERE (deleted = false);
+
+drop index if exists events_feed_interactions_idx;
+create index events_feed_interactions_idx on events (created_at) WHERE (((action)::text = ANY (ARRAY[('CommentedOnFeedEvent'::character varying)::text, ('AdmiredFeedEvent'::character varying)::text, ('CommentedOnPost'::character varying)::text, ('AdmiredPost'::character varying)::text])) and (feed_event_id is not null or post_id is not null));
 
 create view feed_entities as (
 SELECT subquery.id, subquery.feed_entity_type, subquery.created_at, subquery.actor_id
