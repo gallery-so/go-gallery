@@ -765,7 +765,7 @@ func testDeletePost(t *testing.T) {
 	c := authedHandlerClient(t, userF.ID)
 	deletePost(t, ctx, c, userF.PostIDs[0])
 	actual := globalFeedEvents(t, ctx, c, 4)
-	assert.Len(t, actual, 3)
+	assert.False(t, util.Contains(actual, userF.PostIDs[0]))
 }
 
 func testGetCommunity(t *testing.T) {
