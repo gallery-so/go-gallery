@@ -1870,7 +1870,7 @@ func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBloc
 
 // Tokens is the resolver for the tokens field.
 func (r *postResolver) Tokens(ctx context.Context, obj *model.Post) ([]*model.Token, error) {
-	result := make([]*model.Token, len(obj.Tokens))
+	result := make([]*model.Token, len(obj.TokenIDs))
 	for i, token := range obj.TokenIDs {
 		t, err := resolveTokenByTokenID(ctx, token)
 		if err != nil {
