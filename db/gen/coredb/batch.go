@@ -2006,7 +2006,7 @@ func (b *GetOwnersByContractIdBatchPaginateBatchResults) Close() error {
 }
 
 const getPostByIdBatch = `-- name: GetPostByIdBatch :batchone
-SELECT id, version, token_ids, actor_id, caption, created_at, last_updated, deleted FROM posts WHERE id = $1 AND deleted = false
+SELECT id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted FROM posts WHERE id = $1 AND deleted = false
 `
 
 type GetPostByIdBatchBatchResults struct {
@@ -2042,6 +2042,7 @@ func (b *GetPostByIdBatchBatchResults) QueryRow(f func(int, Post, error)) {
 			&i.ID,
 			&i.Version,
 			&i.TokenIds,
+			&i.ContractIds,
 			&i.ActorID,
 			&i.Caption,
 			&i.CreatedAt,
@@ -4141,22 +4142,16 @@ func (b *PaginateInteractionsByPostIDBatchBatchResults) Close() error {
 }
 
 const paginatePostsByContractID = `-- name: PaginatePostsByContractID :batchmany
-WITH unnest_post_ids AS (
-    SELECT posts.id, unnest(token_ids) AS post_token_id
-    FROM posts
-    WHERE posts.deleted = false
-    AND (posts.created_at, posts.id) < ($4, $5)
-    AND (posts.created_at, posts.id) > ($6, $7)
-)
-SELECT posts.id, posts.version, posts.token_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted
-FROM unnest_post_ids
-JOIN posts ON unnest_post_ids.id = posts.id
-JOIN tokens ON tokens.id = unnest_post_ids.post_token_id
-WHERE tokens.contract = $1
+SELECT posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted
+FROM posts
+WHERE $1 = ANY(posts.contract_ids)
+AND posts.deleted = false
+AND (posts.created_at, posts.id) < ($2, $3)
+AND (posts.created_at, posts.id) > ($4, $5)
 ORDER BY 
-    CASE WHEN $2::bool THEN (posts.created_at, posts.id) END ASC,
-    CASE WHEN NOT $2::bool THEN (posts.created_at, posts.id) END DESC
-LIMIT $3
+    CASE WHEN $6::bool THEN (posts.created_at, posts.id) END ASC,
+    CASE WHEN NOT $6::bool THEN (posts.created_at, posts.id) END DESC
+LIMIT $7
 `
 
 type PaginatePostsByContractIDBatchResults struct {
@@ -4166,26 +4161,26 @@ type PaginatePostsByContractIDBatchResults struct {
 }
 
 type PaginatePostsByContractIDParams struct {
-	Contract      persist.DBID `json:"contract"`
-	PagingForward bool         `json:"paging_forward"`
-	Limit         int32        `json:"limit"`
+	ContractID    persist.DBID `json:"contract_id"`
 	CurBeforeTime time.Time    `json:"cur_before_time"`
 	CurBeforeID   persist.DBID `json:"cur_before_id"`
 	CurAfterTime  time.Time    `json:"cur_after_time"`
 	CurAfterID    persist.DBID `json:"cur_after_id"`
+	PagingForward bool         `json:"paging_forward"`
+	Limit         int32        `json:"limit"`
 }
 
 func (q *Queries) PaginatePostsByContractID(ctx context.Context, arg []PaginatePostsByContractIDParams) *PaginatePostsByContractIDBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range arg {
 		vals := []interface{}{
-			a.Contract,
-			a.PagingForward,
-			a.Limit,
+			a.ContractID,
 			a.CurBeforeTime,
 			a.CurBeforeID,
 			a.CurAfterTime,
 			a.CurAfterID,
+			a.PagingForward,
+			a.Limit,
 		}
 		batch.Queue(paginatePostsByContractID, vals...)
 	}
@@ -4215,6 +4210,7 @@ func (b *PaginatePostsByContractIDBatchResults) Query(f func(int, []Post, error)
 					&i.ID,
 					&i.Version,
 					&i.TokenIds,
+					&i.ContractIds,
 					&i.ActorID,
 					&i.Caption,
 					&i.CreatedAt,

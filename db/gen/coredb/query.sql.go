@@ -1618,6 +1618,49 @@ func (q *Queries) GetContractsByIDs(ctx context.Context, contractIds persist.DBI
 	return items, nil
 }
 
+const getContractsByTokenIDs = `-- name: GetContractsByTokenIDs :many
+select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id from contracts join tokens on contracts.id = tokens.contract where tokens.id = any($1) and contracts.deleted = false
+`
+
+func (q *Queries) GetContractsByTokenIDs(ctx context.Context, tokenIds persist.DBIDList) ([]Contract, error) {
+	rows, err := q.db.Query(ctx, getContractsByTokenIDs, tokenIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Contract
+	for rows.Next() {
+		var i Contract
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Name,
+			&i.Symbol,
+			&i.Address,
+			&i.CreatorAddress,
+			&i.Chain,
+			&i.ProfileBannerUrl,
+			&i.ProfileImageUrl,
+			&i.BadgeUrl,
+			&i.Description,
+			&i.OwnerAddress,
+			&i.IsProviderMarkedSpam,
+			&i.ParentID,
+			&i.OverrideCreatorUserID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getCreatedContractsByUserID = `-- name: GetCreatedContractsByUserID :many
 select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id
 from contracts
@@ -2616,7 +2659,7 @@ func (q *Queries) GetNotificationsByOwnerIDForActionAfter(ctx context.Context, a
 }
 
 const getPostsByIds = `-- name: GetPostsByIds :many
-SELECT id, version, token_ids, actor_id, caption, created_at, last_updated, deleted FROM posts WHERE id = ANY($1::varchar(255)[]) AND deleted = false
+SELECT id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted FROM posts WHERE id = ANY($1::varchar(255)[]) AND deleted = false
 `
 
 func (q *Queries) GetPostsByIds(ctx context.Context, ids []string) ([]Post, error) {
@@ -2632,6 +2675,7 @@ func (q *Queries) GetPostsByIds(ctx context.Context, ids []string) ([]Post, erro
 			&i.ID,
 			&i.Version,
 			&i.TokenIds,
+			&i.ContractIds,
 			&i.ActorID,
 			&i.Caption,
 			&i.CreatedAt,
@@ -4518,20 +4562,22 @@ func (q *Queries) HasLaterGroupedEvent(ctx context.Context, arg HasLaterGroupedE
 }
 
 const insertPost = `-- name: InsertPost :one
-insert into posts(id, token_ids, actor_id, caption, created_at) values ($1, $2, $3, $4, now()) returning id
+insert into posts(id, token_ids, contract_ids, actor_id, caption, created_at) values ($1, $2, $3, $4, $5, now()) returning id
 `
 
 type InsertPostParams struct {
-	ID       persist.DBID     `json:"id"`
-	TokenIds persist.DBIDList `json:"token_ids"`
-	ActorID  persist.DBID     `json:"actor_id"`
-	Caption  sql.NullString   `json:"caption"`
+	ID          persist.DBID     `json:"id"`
+	TokenIds    persist.DBIDList `json:"token_ids"`
+	ContractIds persist.DBIDList `json:"contract_ids"`
+	ActorID     persist.DBID     `json:"actor_id"`
+	Caption     sql.NullString   `json:"caption"`
 }
 
 func (q *Queries) InsertPost(ctx context.Context, arg InsertPostParams) (persist.DBID, error) {
 	row := q.db.QueryRow(ctx, insertPost,
 		arg.ID,
 		arg.TokenIds,
+		arg.ContractIds,
 		arg.ActorID,
 		arg.Caption,
 	)

@@ -158,6 +158,9 @@ select * FROM contracts WHERE id = $1 AND deleted = false;
 -- name: GetContractsByIDs :many
 SELECT * from contracts WHERE id = ANY(@contract_ids) AND deleted = false;
 
+-- name: GetContractsByTokenIDs :many
+select contracts.* from contracts join tokens on contracts.id = tokens.contract where tokens.id = any(@token_ids) and contracts.deleted = false;
+
 -- name: GetContractByChainAddress :one
 select * FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false;
 
@@ -423,18 +426,12 @@ select * from feed_entities join unnest(@feed_entity_ids::text[]) with ordinalit
   limit sqlc.arg('limit');
 
 -- name: PaginatePostsByContractID :batchmany
-WITH unnest_post_ids AS (
-    SELECT posts.id, unnest(token_ids) AS post_token_id
-    FROM posts
-    WHERE posts.deleted = false
-    AND (posts.created_at, posts.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-    AND (posts.created_at, posts.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
-)
 SELECT posts.*
-FROM unnest_post_ids
-JOIN posts ON unnest_post_ids.id = posts.id
-JOIN tokens ON tokens.id = unnest_post_ids.post_token_id
-WHERE tokens.contract = sqlc.arg('contract')
+FROM posts
+WHERE sqlc.arg('contract_id') = ANY(posts.contract_ids)
+AND posts.deleted = false
+AND (posts.created_at, posts.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+AND (posts.created_at, posts.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
 ORDER BY 
     CASE WHEN sqlc.arg('paging_forward')::bool THEN (posts.created_at, posts.id) END ASC,
     CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (posts.created_at, posts.id) END DESC
@@ -698,7 +695,7 @@ SELECT * FROM admires WHERE actor_id = $1 AND feed_event_id = $2 AND deleted = f
 SELECT * FROM admires WHERE actor_id = $1 AND post_id = $2 AND deleted = false;
 
 -- name: InsertPost :one
-insert into posts(id, token_ids, actor_id, caption, created_at) values ($1, $2, $3, $4, now()) returning id;
+insert into posts(id, token_ids, contract_ids, actor_id, caption, created_at) values ($1, $2, $3, $4, $5, now()) returning id;
 
 -- name: DeletePostByID :exec
 update posts set deleted = true where id = $1;

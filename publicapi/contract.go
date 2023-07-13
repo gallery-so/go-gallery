@@ -284,7 +284,7 @@ func (api ContractAPI) GetCommunityPostsByContractID(ctx context.Context, contra
 	timeFunc := func(params timeIDPagingParams) ([]interface{}, error) {
 
 		posts, err := api.loaders.PostsPaginatedByContractID.Load(db.PaginatePostsByContractIDParams{
-			Contract:      contractID,
+			ContractID:    contractID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
 			CurBeforeID:   params.CursorBeforeID,
