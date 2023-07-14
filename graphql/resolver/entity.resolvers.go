@@ -17,6 +17,11 @@ func (r *entityResolver) FindFeedEventByDbid(ctx context.Context, dbid persist.D
 	return resolveFeedEventByEventID(ctx, dbid)
 }
 
+// FindPostByDbid is the resolver for the findPostByDbid field.
+func (r *entityResolver) FindPostByDbid(ctx context.Context, dbid persist.DBID) (*model.Post, error) {
+	return resolvePostByPostID(ctx, dbid)
+}
+
 // Entity returns generated.EntityResolver implementation.
 func (r *Resolver) Entity() generated.EntityResolver { return &entityResolver{r} }
 

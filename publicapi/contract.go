@@ -269,6 +269,75 @@ func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, 
 	return owners, pageInfo, err
 }
 
+func (api ContractAPI) GetCommunityPostsByContractID(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int) ([]db.Post, PageInfo, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"contractAddress": validate.WithTag(contractID, "required"),
+	}); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	timeFunc := func(params timeIDPagingParams) ([]interface{}, error) {
+
+		posts, err := api.loaders.PostsPaginatedByContractID.Load(db.PaginatePostsByContractIDParams{
+			ContractID:    contractID,
+			Limit:         params.Limit,
+			CurBeforeTime: params.CursorBeforeTime,
+			CurBeforeID:   params.CursorBeforeID,
+			CurAfterTime:  params.CursorAfterTime,
+			CurAfterID:    params.CursorAfterID,
+			PagingForward: params.PagingForward,
+		})
+
+		if err != nil {
+			return nil, err
+		}
+
+		results := make([]interface{}, len(posts))
+		for i, owner := range posts {
+			results[i] = owner
+		}
+
+		return results, nil
+	}
+
+	countFunc := func() (int, error) {
+		total, err := api.queries.CountPostsByContractID(ctx, contractID)
+		return int(total), err
+	}
+
+	timeCursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
+		if user, ok := i.(db.Post); ok {
+			return user.CreatedAt, user.ID, nil
+		}
+		return time.Time{}, "", fmt.Errorf("interface{} is not a token")
+	}
+
+	paginator := timeIDPaginator{
+		QueryFunc:  timeFunc,
+		CursorFunc: timeCursorFunc,
+		CountFunc:  countFunc,
+	}
+
+	results, pageInfo, err := paginator.paginate(before, after, first, last)
+	if err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	posts := make([]db.Post, len(results))
+	for i, result := range results {
+		if owner, ok := result.(db.Post); ok {
+			posts[i] = owner
+		}
+	}
+
+	return posts, pageInfo, err
+}
+
 func (api ContractAPI) GetPreviewURLsByContractIDandUserID(ctx context.Context, userID, contractID persist.DBID) ([]string, error) {
 	return api.queries.GetPreviewURLsByContractIdAndUserId(ctx, db.GetPreviewURLsByContractIdAndUserIdParams{
 		Contract:    contractID,

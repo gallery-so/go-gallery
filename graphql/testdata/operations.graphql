@@ -135,6 +135,9 @@ query globalFeedQuery($first: Int) {
         ... on FeedEvent {
           dbid
         }
+        ... on Post {
+          dbid
+        }
       }
     }
   }
@@ -535,6 +538,106 @@ mutation updateSocialAccountDisplayed($input: UpdateSocialAccountDisplayedInput!
             username
             display
           }
+        }
+      }
+    }
+  }
+}
+
+mutation postTokens($input: PostTokensInput!) {
+  postTokens(input: $input) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on PostTokensPayload {
+      post {
+        dbid
+      }
+    }
+  }
+}
+
+mutation admirePostMutation($postId: DBID!) {
+  admirePost(postId: $postId) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on AdmirePostPayload {
+      post {
+        dbid
+      }
+    }
+  }
+}
+
+mutation commentOnPostMutation($postId: DBID!, $comment: String!) {
+  commentOnPost(postId: $postId, comment: $comment) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on CommentOnPostPayload {
+      post {
+        dbid
+      }
+    }
+  }
+}
+
+mutation deletePostMutation($postId: DBID!) {
+  deletePost(postId: $postId) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on DeletePostPayload {
+      deletedId {
+        dbid
+      }
+    }
+  }
+}
+
+query communityByAddressQuery($address: ChainAddressInput!) {
+  communityByAddress(communityAddress: $address) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on Community {
+      dbid
+      name
+      posts(first: 3) {
+        edges {
+          node {
+            ... on Error {
+              __typename
+              message
+            }
+            ... on Post {
+              dbid
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+query tokenByIdQuery($id: DBID!) {
+  tokenById(id: $id) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on Token {
+      dbid
+      contract {
+        dbid
+        contractAddress {
+          address
         }
       }
     }

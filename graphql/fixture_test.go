@@ -220,13 +220,14 @@ func newUserWithTokensFixture(t *testing.T) userWithTokensFixture {
 	return userWithTokensFixture{user, tokenIDs}
 }
 
-type userWithFeedEventsFixture struct {
+type userWithFeedEntititesFixture struct {
 	userWithTokensFixture
 	FeedEventIDs []persist.DBID
+	PostIDs      []persist.DBID
 }
 
-// newUserWithFeedEventsFixture generates a new user with feed events pre-generated
-func newUserWithFeedEventsFixture(t *testing.T) userWithFeedEventsFixture {
+// newUserWithFeedEntitiesFixture generates a new user with feed events pre-generated
+func newUserWithFeedEntitiesFixture(t *testing.T) userWithFeedEntititesFixture {
 	t.Helper()
 	serverF := newServerFixture(t)
 	user := newUserWithTokensFixture(t)
@@ -256,7 +257,11 @@ func newUserWithFeedEventsFixture(t *testing.T) userWithFeedEventsFixture {
 		TokenSettings: defaultTokenSettings(user.TokenIDs),
 		Caption:       util.ToPointer("this is a caption"),
 	})
-	feedEvents := globalFeedEvents(t, ctx, c, 3)
-	require.Len(t, feedEvents, 3)
-	return userWithFeedEventsFixture{user, feedEvents}
+	postID := createPost(t, ctx, c, PostTokensInput{
+		TokenIds: user.TokenIDs,
+		Caption:  util.ToPointer("this is a post caption"),
+	})
+	feedEvents := globalFeedEvents(t, ctx, c, 4)
+	require.Len(t, feedEvents, 4)
+	return userWithFeedEntititesFixture{user, feedEvents, []persist.DBID{postID}}
 }

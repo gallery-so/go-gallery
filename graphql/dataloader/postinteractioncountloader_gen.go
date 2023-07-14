@@ -10,7 +10,7 @@ import (
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 )
 
-type UserFeedLoaderSettings interface {
+type PostInteractionCountLoaderSettings interface {
 	getContext() context.Context
 	getWait() time.Duration
 	getMaxBatchOne() int
@@ -23,37 +23,37 @@ type UserFeedLoaderSettings interface {
 	getMutexRegistry() *[]*sync.Mutex
 }
 
-func (l *UserFeedLoader) setContext(ctx context.Context) {
+func (l *PostInteractionCountLoader) setContext(ctx context.Context) {
 	l.ctx = ctx
 }
 
-func (l *UserFeedLoader) setWait(wait time.Duration) {
+func (l *PostInteractionCountLoader) setWait(wait time.Duration) {
 	l.wait = wait
 }
 
-func (l *UserFeedLoader) setMaxBatch(maxBatch int) {
+func (l *PostInteractionCountLoader) setMaxBatch(maxBatch int) {
 	l.maxBatch = maxBatch
 }
 
-func (l *UserFeedLoader) setDisableCaching(disableCaching bool) {
+func (l *PostInteractionCountLoader) setDisableCaching(disableCaching bool) {
 	l.disableCaching = disableCaching
 }
 
-func (l *UserFeedLoader) setPublishResults(publishResults bool) {
+func (l *PostInteractionCountLoader) setPublishResults(publishResults bool) {
 	l.publishResults = publishResults
 }
 
-func (l *UserFeedLoader) setPreFetchHook(preFetchHook func(context.Context, string) context.Context) {
+func (l *PostInteractionCountLoader) setPreFetchHook(preFetchHook func(context.Context, string) context.Context) {
 	l.preFetchHook = preFetchHook
 }
 
-func (l *UserFeedLoader) setPostFetchHook(postFetchHook func(context.Context, string)) {
+func (l *PostInteractionCountLoader) setPostFetchHook(postFetchHook func(context.Context, string)) {
 	l.postFetchHook = postFetchHook
 }
 
-// NewUserFeedLoader creates a new UserFeedLoader with the given settings, functions, and options
-func NewUserFeedLoader(
-	settings UserFeedLoaderSettings, fetch func(ctx context.Context, keys []coredb.PaginateUserFeedByUserIDParams) ([][]coredb.FeedEvent, []error),
+// NewPostInteractionCountLoader creates a new PostInteractionCountLoader with the given settings, functions, and options
+func NewPostInteractionCountLoader(
+	settings PostInteractionCountLoaderSettings, fetch func(ctx context.Context, keys []coredb.CountInteractionsByPostIDBatchParams) ([][]coredb.CountInteractionsByPostIDBatchRow, []error),
 	opts ...func(interface {
 		setContext(context.Context)
 		setWait(time.Duration)
@@ -63,8 +63,8 @@ func NewUserFeedLoader(
 		setPreFetchHook(func(context.Context, string) context.Context)
 		setPostFetchHook(func(context.Context, string))
 	}),
-) *UserFeedLoader {
-	loader := &UserFeedLoader{
+) *PostInteractionCountLoader {
+	loader := &PostInteractionCountLoader{
 		ctx:                  settings.getContext(),
 		wait:                 settings.getWait(),
 		disableCaching:       settings.getDisableCaching(),
@@ -81,18 +81,18 @@ func NewUserFeedLoader(
 	}
 
 	// Set this after applying options, in case a different context was set via options
-	loader.fetch = func(keys []coredb.PaginateUserFeedByUserIDParams) ([][]coredb.FeedEvent, []error) {
+	loader.fetch = func(keys []coredb.CountInteractionsByPostIDBatchParams) ([][]coredb.CountInteractionsByPostIDBatchRow, []error) {
 		ctx := loader.ctx
 
 		// Allow the preFetchHook to modify and return a new context
 		if loader.preFetchHook != nil {
-			ctx = loader.preFetchHook(ctx, "UserFeedLoader")
+			ctx = loader.preFetchHook(ctx, "PostInteractionCountLoader")
 		}
 
 		results, errors := fetch(ctx, keys)
 
 		if loader.postFetchHook != nil {
-			loader.postFetchHook(ctx, "UserFeedLoader")
+			loader.postFetchHook(ctx, "PostInteractionCountLoader")
 		}
 
 		return results, errors
@@ -112,13 +112,13 @@ func NewUserFeedLoader(
 	return loader
 }
 
-// UserFeedLoader batches and caches requests
-type UserFeedLoader struct {
+// PostInteractionCountLoader batches and caches requests
+type PostInteractionCountLoader struct {
 	// context passed to fetch functions
 	ctx context.Context
 
 	// this method provides the data for the loader
-	fetch func(keys []coredb.PaginateUserFeedByUserIDParams) ([][]coredb.FeedEvent, []error)
+	fetch func(keys []coredb.CountInteractionsByPostIDBatchParams) ([][]coredb.CountInteractionsByPostIDBatchRow, []error)
 
 	// how long to wait before sending a batch
 	wait time.Duration
@@ -150,18 +150,18 @@ type UserFeedLoader struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[coredb.PaginateUserFeedByUserIDParams][]coredb.FeedEvent
+	cache map[coredb.CountInteractionsByPostIDBatchParams][]coredb.CountInteractionsByPostIDBatchRow
 
 	// typed cache functions
-	//subscribers []func([]coredb.FeedEvent)
-	subscribers []userFeedLoaderSubscriber
+	//subscribers []func([]coredb.CountInteractionsByPostIDBatchRow)
+	subscribers []postInteractionCountLoaderSubscriber
 
 	// functions used to cache published results from other dataloaders
 	cacheFuncs []interface{}
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
-	batch *userFeedLoaderBatch
+	batch *postInteractionCountLoaderBatch
 
 	// mutex to prevent races
 	mu sync.Mutex
@@ -170,43 +170,43 @@ type UserFeedLoader struct {
 	once sync.Once
 }
 
-type userFeedLoaderBatch struct {
-	keys    []coredb.PaginateUserFeedByUserIDParams
-	data    [][]coredb.FeedEvent
+type postInteractionCountLoaderBatch struct {
+	keys    []coredb.CountInteractionsByPostIDBatchParams
+	data    [][]coredb.CountInteractionsByPostIDBatchRow
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
-// Load a FeedEvent by key, batching and caching will be applied automatically
-func (l *UserFeedLoader) Load(key coredb.PaginateUserFeedByUserIDParams) ([]coredb.FeedEvent, error) {
+// Load a CountInteractionsByPostIDBatchRow by key, batching and caching will be applied automatically
+func (l *PostInteractionCountLoader) Load(key coredb.CountInteractionsByPostIDBatchParams) ([]coredb.CountInteractionsByPostIDBatchRow, error) {
 	return l.LoadThunk(key)()
 }
 
-// LoadThunk returns a function that when called will block waiting for a FeedEvent.
+// LoadThunk returns a function that when called will block waiting for a CountInteractionsByPostIDBatchRow.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *UserFeedLoader) LoadThunk(key coredb.PaginateUserFeedByUserIDParams) func() ([]coredb.FeedEvent, error) {
+func (l *PostInteractionCountLoader) LoadThunk(key coredb.CountInteractionsByPostIDBatchParams) func() ([]coredb.CountInteractionsByPostIDBatchRow, error) {
 	l.mu.Lock()
 	if !l.disableCaching {
 		if it, ok := l.cache[key]; ok {
 			l.mu.Unlock()
-			return func() ([]coredb.FeedEvent, error) {
+			return func() ([]coredb.CountInteractionsByPostIDBatchRow, error) {
 				return it, nil
 			}
 		}
 	}
 	if l.batch == nil {
-		l.batch = &userFeedLoaderBatch{done: make(chan struct{})}
+		l.batch = &postInteractionCountLoaderBatch{done: make(chan struct{})}
 	}
 	batch := l.batch
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-	return func() ([]coredb.FeedEvent, error) {
+	return func() ([]coredb.CountInteractionsByPostIDBatchRow, error) {
 		<-batch.done
 
-		var data []coredb.FeedEvent
+		var data []coredb.CountInteractionsByPostIDBatchRow
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -237,43 +237,43 @@ func (l *UserFeedLoader) LoadThunk(key coredb.PaginateUserFeedByUserIDParams) fu
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *UserFeedLoader) LoadAll(keys []coredb.PaginateUserFeedByUserIDParams) ([][]coredb.FeedEvent, []error) {
-	results := make([]func() ([]coredb.FeedEvent, error), len(keys))
+func (l *PostInteractionCountLoader) LoadAll(keys []coredb.CountInteractionsByPostIDBatchParams) ([][]coredb.CountInteractionsByPostIDBatchRow, []error) {
+	results := make([]func() ([]coredb.CountInteractionsByPostIDBatchRow, error), len(keys))
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-	feedEvents := make([][]coredb.FeedEvent, len(keys))
+	countInteractionsByPostIDBatchRows := make([][]coredb.CountInteractionsByPostIDBatchRow, len(keys))
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
-		feedEvents[i], errors[i] = thunk()
+		countInteractionsByPostIDBatchRows[i], errors[i] = thunk()
 	}
-	return feedEvents, errors
+	return countInteractionsByPostIDBatchRows, errors
 }
 
-// LoadAllThunk returns a function that when called will block waiting for a FeedEvents.
+// LoadAllThunk returns a function that when called will block waiting for a CountInteractionsByPostIDBatchRows.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *UserFeedLoader) LoadAllThunk(keys []coredb.PaginateUserFeedByUserIDParams) func() ([][]coredb.FeedEvent, []error) {
-	results := make([]func() ([]coredb.FeedEvent, error), len(keys))
+func (l *PostInteractionCountLoader) LoadAllThunk(keys []coredb.CountInteractionsByPostIDBatchParams) func() ([][]coredb.CountInteractionsByPostIDBatchRow, []error) {
+	results := make([]func() ([]coredb.CountInteractionsByPostIDBatchRow, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
-	return func() ([][]coredb.FeedEvent, []error) {
-		feedEvents := make([][]coredb.FeedEvent, len(keys))
+	return func() ([][]coredb.CountInteractionsByPostIDBatchRow, []error) {
+		countInteractionsByPostIDBatchRows := make([][]coredb.CountInteractionsByPostIDBatchRow, len(keys))
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
-			feedEvents[i], errors[i] = thunk()
+			countInteractionsByPostIDBatchRows[i], errors[i] = thunk()
 		}
-		return feedEvents, errors
+		return countInteractionsByPostIDBatchRows, errors
 	}
 }
 
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *UserFeedLoader) Prime(key coredb.PaginateUserFeedByUserIDParams, value []coredb.FeedEvent) bool {
+func (l *PostInteractionCountLoader) Prime(key coredb.CountInteractionsByPostIDBatchParams, value []coredb.CountInteractionsByPostIDBatchRow) bool {
 	if l.disableCaching {
 		return false
 	}
@@ -282,7 +282,7 @@ func (l *UserFeedLoader) Prime(key coredb.PaginateUserFeedByUserIDParams, value 
 	if _, found = l.cache[key]; !found {
 		// make a copy when writing to the cache, its easy to pass a pointer in from a loop var
 		// and end up with the whole cache pointing to the same value.
-		cpy := make([]coredb.FeedEvent, len(value))
+		cpy := make([]coredb.CountInteractionsByPostIDBatchRow, len(value))
 		copy(cpy, value)
 		l.unsafeSet(key, cpy)
 	}
@@ -291,7 +291,7 @@ func (l *UserFeedLoader) Prime(key coredb.PaginateUserFeedByUserIDParams, value 
 }
 
 // Clear the value at key from the cache, if it exists
-func (l *UserFeedLoader) Clear(key coredb.PaginateUserFeedByUserIDParams) {
+func (l *PostInteractionCountLoader) Clear(key coredb.CountInteractionsByPostIDBatchParams) {
 	if l.disableCaching {
 		return
 	}
@@ -300,16 +300,16 @@ func (l *UserFeedLoader) Clear(key coredb.PaginateUserFeedByUserIDParams) {
 	l.mu.Unlock()
 }
 
-func (l *UserFeedLoader) unsafeSet(key coredb.PaginateUserFeedByUserIDParams, value []coredb.FeedEvent) {
+func (l *PostInteractionCountLoader) unsafeSet(key coredb.CountInteractionsByPostIDBatchParams, value []coredb.CountInteractionsByPostIDBatchRow) {
 	if l.cache == nil {
-		l.cache = map[coredb.PaginateUserFeedByUserIDParams][]coredb.FeedEvent{}
+		l.cache = map[coredb.CountInteractionsByPostIDBatchParams][]coredb.CountInteractionsByPostIDBatchRow{}
 	}
 	l.cache[key] = value
 }
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
-func (b *userFeedLoaderBatch) keyIndex(l *UserFeedLoader, key coredb.PaginateUserFeedByUserIDParams) int {
+func (b *postInteractionCountLoaderBatch) keyIndex(l *PostInteractionCountLoader, key coredb.CountInteractionsByPostIDBatchParams) int {
 	for i, existingKey := range b.keys {
 		if key == existingKey {
 			return i
@@ -333,7 +333,7 @@ func (b *userFeedLoaderBatch) keyIndex(l *UserFeedLoader, key coredb.PaginateUse
 	return pos
 }
 
-func (b *userFeedLoaderBatch) startTimer(l *UserFeedLoader) {
+func (b *postInteractionCountLoaderBatch) startTimer(l *PostInteractionCountLoader) {
 	time.Sleep(l.wait)
 	l.mu.Lock()
 
@@ -349,24 +349,24 @@ func (b *userFeedLoaderBatch) startTimer(l *UserFeedLoader) {
 	b.end(l)
 }
 
-func (b *userFeedLoaderBatch) end(l *UserFeedLoader) {
+func (b *postInteractionCountLoaderBatch) end(l *PostInteractionCountLoader) {
 	b.data, b.error = l.fetch(b.keys)
 	close(b.done)
 }
 
-type userFeedLoaderSubscriber struct {
-	cacheFunc func(coredb.FeedEvent)
+type postInteractionCountLoaderSubscriber struct {
+	cacheFunc func(coredb.CountInteractionsByPostIDBatchRow)
 	mutex     *sync.Mutex
 }
 
-func (l *UserFeedLoader) publishToSubscribers(value []coredb.FeedEvent) {
+func (l *PostInteractionCountLoader) publishToSubscribers(value []coredb.CountInteractionsByPostIDBatchRow) {
 	// Lazy build our list of typed cache functions once
 	l.once.Do(func() {
 		for i, subscription := range *l.subscriptionRegistry {
-			if typedFunc, ok := subscription.(*func(coredb.FeedEvent)); ok {
+			if typedFunc, ok := subscription.(*func(coredb.CountInteractionsByPostIDBatchRow)); ok {
 				// Don't invoke our own cache function
 				if !l.ownsCacheFunc(typedFunc) {
-					l.subscribers = append(l.subscribers, userFeedLoaderSubscriber{cacheFunc: *typedFunc, mutex: (*l.mutexRegistry)[i]})
+					l.subscribers = append(l.subscribers, postInteractionCountLoaderSubscriber{cacheFunc: *typedFunc, mutex: (*l.mutexRegistry)[i]})
 				}
 			}
 		}
@@ -384,13 +384,13 @@ func (l *UserFeedLoader) publishToSubscribers(value []coredb.FeedEvent) {
 	}
 }
 
-func (l *UserFeedLoader) registerCacheFunc(cacheFunc interface{}, mutex *sync.Mutex) {
+func (l *PostInteractionCountLoader) registerCacheFunc(cacheFunc interface{}, mutex *sync.Mutex) {
 	l.cacheFuncs = append(l.cacheFuncs, cacheFunc)
 	*l.subscriptionRegistry = append(*l.subscriptionRegistry, cacheFunc)
 	*l.mutexRegistry = append(*l.mutexRegistry, mutex)
 }
 
-func (l *UserFeedLoader) ownsCacheFunc(f *func(coredb.FeedEvent)) bool {
+func (l *PostInteractionCountLoader) ownsCacheFunc(f *func(coredb.CountInteractionsByPostIDBatchRow)) bool {
 	for _, cacheFunc := range l.cacheFuncs {
 		if cacheFunc == f {
 			return true

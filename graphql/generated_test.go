@@ -317,6 +317,17 @@ type OneTimeLoginTokenAuth struct {
 // GetToken returns OneTimeLoginTokenAuth.Token, and is useful for accessing the field via an interface.
 func (v *OneTimeLoginTokenAuth) GetToken() string { return v.Token }
 
+type PostTokensInput struct {
+	TokenIds []persist.DBID `json:"tokenIds"`
+	Caption  *string        `json:"caption"`
+}
+
+// GetTokenIds returns PostTokensInput.TokenIds, and is useful for accessing the field via an interface.
+func (v *PostTokensInput) GetTokenIds() []persist.DBID { return v.TokenIds }
+
+// GetCaption returns PostTokensInput.Caption, and is useful for accessing the field via an interface.
+func (v *PostTokensInput) GetCaption() *string { return v.Caption }
+
 type PublishGalleryInput struct {
 	GalleryId persist.DBID `json:"galleryId"`
 	EditId    string       `json:"editId"`
@@ -504,6 +515,14 @@ type __admireFeedEventMutationInput struct {
 // GetFeedEventId returns __admireFeedEventMutationInput.FeedEventId, and is useful for accessing the field via an interface.
 func (v *__admireFeedEventMutationInput) GetFeedEventId() persist.DBID { return v.FeedEventId }
 
+// __admirePostMutationInput is used internally by genqlient
+type __admirePostMutationInput struct {
+	PostId persist.DBID `json:"postId"`
+}
+
+// GetPostId returns __admirePostMutationInput.PostId, and is useful for accessing the field via an interface.
+func (v *__admirePostMutationInput) GetPostId() persist.DBID { return v.PostId }
+
 // __commentOnFeedEventMutationInput is used internally by genqlient
 type __commentOnFeedEventMutationInput struct {
 	FeedEventId persist.DBID `json:"feedEventId"`
@@ -515,6 +534,26 @@ func (v *__commentOnFeedEventMutationInput) GetFeedEventId() persist.DBID { retu
 
 // GetComment returns __commentOnFeedEventMutationInput.Comment, and is useful for accessing the field via an interface.
 func (v *__commentOnFeedEventMutationInput) GetComment() string { return v.Comment }
+
+// __commentOnPostMutationInput is used internally by genqlient
+type __commentOnPostMutationInput struct {
+	PostId  persist.DBID `json:"postId"`
+	Comment string       `json:"comment"`
+}
+
+// GetPostId returns __commentOnPostMutationInput.PostId, and is useful for accessing the field via an interface.
+func (v *__commentOnPostMutationInput) GetPostId() persist.DBID { return v.PostId }
+
+// GetComment returns __commentOnPostMutationInput.Comment, and is useful for accessing the field via an interface.
+func (v *__commentOnPostMutationInput) GetComment() string { return v.Comment }
+
+// __communityByAddressQueryInput is used internally by genqlient
+type __communityByAddressQueryInput struct {
+	Address ChainAddressInput `json:"address"`
+}
+
+// GetAddress returns __communityByAddressQueryInput.Address, and is useful for accessing the field via an interface.
+func (v *__communityByAddressQueryInput) GetAddress() ChainAddressInput { return v.Address }
 
 // __connectSocialAccountInput is used internally by genqlient
 type __connectSocialAccountInput struct {
@@ -556,6 +595,14 @@ func (v *__createUserMutationInput) GetAuthMechanism() AuthMechanism { return v.
 // GetInput returns __createUserMutationInput.Input, and is useful for accessing the field via an interface.
 func (v *__createUserMutationInput) GetInput() CreateUserInput { return v.Input }
 
+// __deletePostMutationInput is used internally by genqlient
+type __deletePostMutationInput struct {
+	PostId persist.DBID `json:"postId"`
+}
+
+// GetPostId returns __deletePostMutationInput.PostId, and is useful for accessing the field via an interface.
+func (v *__deletePostMutationInput) GetPostId() persist.DBID { return v.PostId }
+
 // __disconnectSocialAccountInput is used internally by genqlient
 type __disconnectSocialAccountInput struct {
 	AccountType SocialAccountType `json:"accountType"`
@@ -596,6 +643,14 @@ type __moveCollectionToGalleryInput struct {
 // GetInput returns __moveCollectionToGalleryInput.Input, and is useful for accessing the field via an interface.
 func (v *__moveCollectionToGalleryInput) GetInput() MoveCollectionToGalleryInput { return v.Input }
 
+// __postTokensInput is used internally by genqlient
+type __postTokensInput struct {
+	Input PostTokensInput `json:"input"`
+}
+
+// GetInput returns __postTokensInput.Input, and is useful for accessing the field via an interface.
+func (v *__postTokensInput) GetInput() PostTokensInput { return v.Input }
+
 // __publishGalleryMutationInput is used internally by genqlient
 type __publishGalleryMutationInput struct {
 	Input PublishGalleryInput `json:"input"`
@@ -619,6 +674,14 @@ type __syncTokensMutationInput struct {
 
 // GetChains returns __syncTokensMutationInput.Chains, and is useful for accessing the field via an interface.
 func (v *__syncTokensMutationInput) GetChains() []Chain { return v.Chains }
+
+// __tokenByIdQueryInput is used internally by genqlient
+type __tokenByIdQueryInput struct {
+	Id persist.DBID `json:"id"`
+}
+
+// GetId returns __tokenByIdQueryInput.Id, and is useful for accessing the field via an interface.
+func (v *__tokenByIdQueryInput) GetId() persist.DBID { return v.Id }
 
 // __trendingFeedQueryInput is used internally by genqlient
 type __trendingFeedQueryInput struct {
@@ -1288,6 +1351,215 @@ func (v *admireFeedEventMutationResponse) __premarshalJSON() (*__premarshaladmir
 	return &retval, nil
 }
 
+// admirePostMutationAdmirePostAdmirePostPayload includes the requested fields of the GraphQL type AdmirePostPayload.
+type admirePostMutationAdmirePostAdmirePostPayload struct {
+	Typename *string                                            `json:"__typename"`
+	Post     *admirePostMutationAdmirePostAdmirePostPayloadPost `json:"post"`
+}
+
+// GetTypename returns admirePostMutationAdmirePostAdmirePostPayload.Typename, and is useful for accessing the field via an interface.
+func (v *admirePostMutationAdmirePostAdmirePostPayload) GetTypename() *string { return v.Typename }
+
+// GetPost returns admirePostMutationAdmirePostAdmirePostPayload.Post, and is useful for accessing the field via an interface.
+func (v *admirePostMutationAdmirePostAdmirePostPayload) GetPost() *admirePostMutationAdmirePostAdmirePostPayloadPost {
+	return v.Post
+}
+
+// admirePostMutationAdmirePostAdmirePostPayloadOrError includes the requested fields of the GraphQL interface AdmirePostPayloadOrError.
+//
+// admirePostMutationAdmirePostAdmirePostPayloadOrError is implemented by the following types:
+// admirePostMutationAdmirePostAdmirePostPayload
+// admirePostMutationAdmirePostErrInvalidInput
+// admirePostMutationAdmirePostErrNotAuthorized
+type admirePostMutationAdmirePostAdmirePostPayloadOrError interface {
+	implementsGraphQLInterfaceadmirePostMutationAdmirePostAdmirePostPayloadOrError()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() *string
+}
+
+func (v *admirePostMutationAdmirePostAdmirePostPayload) implementsGraphQLInterfaceadmirePostMutationAdmirePostAdmirePostPayloadOrError() {
+}
+func (v *admirePostMutationAdmirePostErrInvalidInput) implementsGraphQLInterfaceadmirePostMutationAdmirePostAdmirePostPayloadOrError() {
+}
+func (v *admirePostMutationAdmirePostErrNotAuthorized) implementsGraphQLInterfaceadmirePostMutationAdmirePostAdmirePostPayloadOrError() {
+}
+
+func __unmarshaladmirePostMutationAdmirePostAdmirePostPayloadOrError(b []byte, v *admirePostMutationAdmirePostAdmirePostPayloadOrError) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "AdmirePostPayload":
+		*v = new(admirePostMutationAdmirePostAdmirePostPayload)
+		return json.Unmarshal(b, *v)
+	case "ErrInvalidInput":
+		*v = new(admirePostMutationAdmirePostErrInvalidInput)
+		return json.Unmarshal(b, *v)
+	case "ErrNotAuthorized":
+		*v = new(admirePostMutationAdmirePostErrNotAuthorized)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing AdmirePostPayloadOrError.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for admirePostMutationAdmirePostAdmirePostPayloadOrError: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshaladmirePostMutationAdmirePostAdmirePostPayloadOrError(v *admirePostMutationAdmirePostAdmirePostPayloadOrError) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *admirePostMutationAdmirePostAdmirePostPayload:
+		typename = "AdmirePostPayload"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*admirePostMutationAdmirePostAdmirePostPayload
+		}{typename, v}
+		return json.Marshal(result)
+	case *admirePostMutationAdmirePostErrInvalidInput:
+		typename = "ErrInvalidInput"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*admirePostMutationAdmirePostErrInvalidInput
+		}{typename, v}
+		return json.Marshal(result)
+	case *admirePostMutationAdmirePostErrNotAuthorized:
+		typename = "ErrNotAuthorized"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*admirePostMutationAdmirePostErrNotAuthorized
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for admirePostMutationAdmirePostAdmirePostPayloadOrError: "%T"`, v)
+	}
+}
+
+// admirePostMutationAdmirePostAdmirePostPayloadPost includes the requested fields of the GraphQL type Post.
+type admirePostMutationAdmirePostAdmirePostPayloadPost struct {
+	Dbid persist.DBID `json:"dbid"`
+}
+
+// GetDbid returns admirePostMutationAdmirePostAdmirePostPayloadPost.Dbid, and is useful for accessing the field via an interface.
+func (v *admirePostMutationAdmirePostAdmirePostPayloadPost) GetDbid() persist.DBID { return v.Dbid }
+
+// admirePostMutationAdmirePostErrInvalidInput includes the requested fields of the GraphQL type ErrInvalidInput.
+type admirePostMutationAdmirePostErrInvalidInput struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns admirePostMutationAdmirePostErrInvalidInput.Typename, and is useful for accessing the field via an interface.
+func (v *admirePostMutationAdmirePostErrInvalidInput) GetTypename() *string { return v.Typename }
+
+// GetMessage returns admirePostMutationAdmirePostErrInvalidInput.Message, and is useful for accessing the field via an interface.
+func (v *admirePostMutationAdmirePostErrInvalidInput) GetMessage() string { return v.Message }
+
+// admirePostMutationAdmirePostErrNotAuthorized includes the requested fields of the GraphQL type ErrNotAuthorized.
+type admirePostMutationAdmirePostErrNotAuthorized struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns admirePostMutationAdmirePostErrNotAuthorized.Typename, and is useful for accessing the field via an interface.
+func (v *admirePostMutationAdmirePostErrNotAuthorized) GetTypename() *string { return v.Typename }
+
+// GetMessage returns admirePostMutationAdmirePostErrNotAuthorized.Message, and is useful for accessing the field via an interface.
+func (v *admirePostMutationAdmirePostErrNotAuthorized) GetMessage() string { return v.Message }
+
+// admirePostMutationResponse is returned by admirePostMutation on success.
+type admirePostMutationResponse struct {
+	AdmirePost *admirePostMutationAdmirePostAdmirePostPayloadOrError `json:"-"`
+}
+
+// GetAdmirePost returns admirePostMutationResponse.AdmirePost, and is useful for accessing the field via an interface.
+func (v *admirePostMutationResponse) GetAdmirePost() *admirePostMutationAdmirePostAdmirePostPayloadOrError {
+	return v.AdmirePost
+}
+
+func (v *admirePostMutationResponse) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*admirePostMutationResponse
+		AdmirePost json.RawMessage `json:"admirePost"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.admirePostMutationResponse = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.AdmirePost
+		src := firstPass.AdmirePost
+		if len(src) != 0 && string(src) != "null" {
+			*dst = new(admirePostMutationAdmirePostAdmirePostPayloadOrError)
+			err = __unmarshaladmirePostMutationAdmirePostAdmirePostPayloadOrError(
+				src, *dst)
+			if err != nil {
+				return fmt.Errorf(
+					"unable to unmarshal admirePostMutationResponse.AdmirePost: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshaladmirePostMutationResponse struct {
+	AdmirePost json.RawMessage `json:"admirePost"`
+}
+
+func (v *admirePostMutationResponse) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *admirePostMutationResponse) __premarshalJSON() (*__premarshaladmirePostMutationResponse, error) {
+	var retval __premarshaladmirePostMutationResponse
+
+	{
+
+		dst := &retval.AdmirePost
+		src := v.AdmirePost
+		if src != nil {
+			var err error
+			*dst, err = __marshaladmirePostMutationAdmirePostAdmirePostPayloadOrError(
+				src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"unable to marshal admirePostMutationResponse.AdmirePost: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
 // commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayload includes the requested fields of the GraphQL type CommentOnFeedEventPayload.
 type commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayload struct {
 	Typename  *string                                                                         `json:"__typename"`
@@ -1533,6 +1805,657 @@ func (v *commentOnFeedEventMutationResponse) __premarshalJSON() (*__premarshalco
 			if err != nil {
 				return nil, fmt.Errorf(
 					"unable to marshal commentOnFeedEventMutationResponse.CommentOnFeedEvent: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
+// commentOnPostMutationCommentOnPostCommentOnPostPayload includes the requested fields of the GraphQL type CommentOnPostPayload.
+type commentOnPostMutationCommentOnPostCommentOnPostPayload struct {
+	Typename *string                                                     `json:"__typename"`
+	Post     *commentOnPostMutationCommentOnPostCommentOnPostPayloadPost `json:"post"`
+}
+
+// GetTypename returns commentOnPostMutationCommentOnPostCommentOnPostPayload.Typename, and is useful for accessing the field via an interface.
+func (v *commentOnPostMutationCommentOnPostCommentOnPostPayload) GetTypename() *string {
+	return v.Typename
+}
+
+// GetPost returns commentOnPostMutationCommentOnPostCommentOnPostPayload.Post, and is useful for accessing the field via an interface.
+func (v *commentOnPostMutationCommentOnPostCommentOnPostPayload) GetPost() *commentOnPostMutationCommentOnPostCommentOnPostPayloadPost {
+	return v.Post
+}
+
+// commentOnPostMutationCommentOnPostCommentOnPostPayloadOrError includes the requested fields of the GraphQL interface CommentOnPostPayloadOrError.
+//
+// commentOnPostMutationCommentOnPostCommentOnPostPayloadOrError is implemented by the following types:
+// commentOnPostMutationCommentOnPostCommentOnPostPayload
+// commentOnPostMutationCommentOnPostErrInvalidInput
+// commentOnPostMutationCommentOnPostErrNotAuthorized
+type commentOnPostMutationCommentOnPostCommentOnPostPayloadOrError interface {
+	implementsGraphQLInterfacecommentOnPostMutationCommentOnPostCommentOnPostPayloadOrError()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() *string
+}
+
+func (v *commentOnPostMutationCommentOnPostCommentOnPostPayload) implementsGraphQLInterfacecommentOnPostMutationCommentOnPostCommentOnPostPayloadOrError() {
+}
+func (v *commentOnPostMutationCommentOnPostErrInvalidInput) implementsGraphQLInterfacecommentOnPostMutationCommentOnPostCommentOnPostPayloadOrError() {
+}
+func (v *commentOnPostMutationCommentOnPostErrNotAuthorized) implementsGraphQLInterfacecommentOnPostMutationCommentOnPostCommentOnPostPayloadOrError() {
+}
+
+func __unmarshalcommentOnPostMutationCommentOnPostCommentOnPostPayloadOrError(b []byte, v *commentOnPostMutationCommentOnPostCommentOnPostPayloadOrError) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "CommentOnPostPayload":
+		*v = new(commentOnPostMutationCommentOnPostCommentOnPostPayload)
+		return json.Unmarshal(b, *v)
+	case "ErrInvalidInput":
+		*v = new(commentOnPostMutationCommentOnPostErrInvalidInput)
+		return json.Unmarshal(b, *v)
+	case "ErrNotAuthorized":
+		*v = new(commentOnPostMutationCommentOnPostErrNotAuthorized)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing CommentOnPostPayloadOrError.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for commentOnPostMutationCommentOnPostCommentOnPostPayloadOrError: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshalcommentOnPostMutationCommentOnPostCommentOnPostPayloadOrError(v *commentOnPostMutationCommentOnPostCommentOnPostPayloadOrError) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *commentOnPostMutationCommentOnPostCommentOnPostPayload:
+		typename = "CommentOnPostPayload"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*commentOnPostMutationCommentOnPostCommentOnPostPayload
+		}{typename, v}
+		return json.Marshal(result)
+	case *commentOnPostMutationCommentOnPostErrInvalidInput:
+		typename = "ErrInvalidInput"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*commentOnPostMutationCommentOnPostErrInvalidInput
+		}{typename, v}
+		return json.Marshal(result)
+	case *commentOnPostMutationCommentOnPostErrNotAuthorized:
+		typename = "ErrNotAuthorized"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*commentOnPostMutationCommentOnPostErrNotAuthorized
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for commentOnPostMutationCommentOnPostCommentOnPostPayloadOrError: "%T"`, v)
+	}
+}
+
+// commentOnPostMutationCommentOnPostCommentOnPostPayloadPost includes the requested fields of the GraphQL type Post.
+type commentOnPostMutationCommentOnPostCommentOnPostPayloadPost struct {
+	Dbid persist.DBID `json:"dbid"`
+}
+
+// GetDbid returns commentOnPostMutationCommentOnPostCommentOnPostPayloadPost.Dbid, and is useful for accessing the field via an interface.
+func (v *commentOnPostMutationCommentOnPostCommentOnPostPayloadPost) GetDbid() persist.DBID {
+	return v.Dbid
+}
+
+// commentOnPostMutationCommentOnPostErrInvalidInput includes the requested fields of the GraphQL type ErrInvalidInput.
+type commentOnPostMutationCommentOnPostErrInvalidInput struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns commentOnPostMutationCommentOnPostErrInvalidInput.Typename, and is useful for accessing the field via an interface.
+func (v *commentOnPostMutationCommentOnPostErrInvalidInput) GetTypename() *string { return v.Typename }
+
+// GetMessage returns commentOnPostMutationCommentOnPostErrInvalidInput.Message, and is useful for accessing the field via an interface.
+func (v *commentOnPostMutationCommentOnPostErrInvalidInput) GetMessage() string { return v.Message }
+
+// commentOnPostMutationCommentOnPostErrNotAuthorized includes the requested fields of the GraphQL type ErrNotAuthorized.
+type commentOnPostMutationCommentOnPostErrNotAuthorized struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns commentOnPostMutationCommentOnPostErrNotAuthorized.Typename, and is useful for accessing the field via an interface.
+func (v *commentOnPostMutationCommentOnPostErrNotAuthorized) GetTypename() *string { return v.Typename }
+
+// GetMessage returns commentOnPostMutationCommentOnPostErrNotAuthorized.Message, and is useful for accessing the field via an interface.
+func (v *commentOnPostMutationCommentOnPostErrNotAuthorized) GetMessage() string { return v.Message }
+
+// commentOnPostMutationResponse is returned by commentOnPostMutation on success.
+type commentOnPostMutationResponse struct {
+	CommentOnPost *commentOnPostMutationCommentOnPostCommentOnPostPayloadOrError `json:"-"`
+}
+
+// GetCommentOnPost returns commentOnPostMutationResponse.CommentOnPost, and is useful for accessing the field via an interface.
+func (v *commentOnPostMutationResponse) GetCommentOnPost() *commentOnPostMutationCommentOnPostCommentOnPostPayloadOrError {
+	return v.CommentOnPost
+}
+
+func (v *commentOnPostMutationResponse) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*commentOnPostMutationResponse
+		CommentOnPost json.RawMessage `json:"commentOnPost"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.commentOnPostMutationResponse = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.CommentOnPost
+		src := firstPass.CommentOnPost
+		if len(src) != 0 && string(src) != "null" {
+			*dst = new(commentOnPostMutationCommentOnPostCommentOnPostPayloadOrError)
+			err = __unmarshalcommentOnPostMutationCommentOnPostCommentOnPostPayloadOrError(
+				src, *dst)
+			if err != nil {
+				return fmt.Errorf(
+					"unable to unmarshal commentOnPostMutationResponse.CommentOnPost: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshalcommentOnPostMutationResponse struct {
+	CommentOnPost json.RawMessage `json:"commentOnPost"`
+}
+
+func (v *commentOnPostMutationResponse) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *commentOnPostMutationResponse) __premarshalJSON() (*__premarshalcommentOnPostMutationResponse, error) {
+	var retval __premarshalcommentOnPostMutationResponse
+
+	{
+
+		dst := &retval.CommentOnPost
+		src := v.CommentOnPost
+		if src != nil {
+			var err error
+			*dst, err = __marshalcommentOnPostMutationCommentOnPostCommentOnPostPayloadOrError(
+				src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"unable to marshal commentOnPostMutationResponse.CommentOnPost: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
+// communityByAddressQueryCommunityByAddressCommunity includes the requested fields of the GraphQL type Community.
+type communityByAddressQueryCommunityByAddressCommunity struct {
+	Typename *string                                                                 `json:"__typename"`
+	Dbid     persist.DBID                                                            `json:"dbid"`
+	Name     *string                                                                 `json:"name"`
+	Posts    *communityByAddressQueryCommunityByAddressCommunityPostsPostsConnection `json:"posts"`
+}
+
+// GetTypename returns communityByAddressQueryCommunityByAddressCommunity.Typename, and is useful for accessing the field via an interface.
+func (v *communityByAddressQueryCommunityByAddressCommunity) GetTypename() *string { return v.Typename }
+
+// GetDbid returns communityByAddressQueryCommunityByAddressCommunity.Dbid, and is useful for accessing the field via an interface.
+func (v *communityByAddressQueryCommunityByAddressCommunity) GetDbid() persist.DBID { return v.Dbid }
+
+// GetName returns communityByAddressQueryCommunityByAddressCommunity.Name, and is useful for accessing the field via an interface.
+func (v *communityByAddressQueryCommunityByAddressCommunity) GetName() *string { return v.Name }
+
+// GetPosts returns communityByAddressQueryCommunityByAddressCommunity.Posts, and is useful for accessing the field via an interface.
+func (v *communityByAddressQueryCommunityByAddressCommunity) GetPosts() *communityByAddressQueryCommunityByAddressCommunityPostsPostsConnection {
+	return v.Posts
+}
+
+// communityByAddressQueryCommunityByAddressCommunityByAddressOrError includes the requested fields of the GraphQL interface CommunityByAddressOrError.
+//
+// communityByAddressQueryCommunityByAddressCommunityByAddressOrError is implemented by the following types:
+// communityByAddressQueryCommunityByAddressCommunity
+// communityByAddressQueryCommunityByAddressErrCommunityNotFound
+// communityByAddressQueryCommunityByAddressErrInvalidInput
+type communityByAddressQueryCommunityByAddressCommunityByAddressOrError interface {
+	implementsGraphQLInterfacecommunityByAddressQueryCommunityByAddressCommunityByAddressOrError()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() *string
+}
+
+func (v *communityByAddressQueryCommunityByAddressCommunity) implementsGraphQLInterfacecommunityByAddressQueryCommunityByAddressCommunityByAddressOrError() {
+}
+func (v *communityByAddressQueryCommunityByAddressErrCommunityNotFound) implementsGraphQLInterfacecommunityByAddressQueryCommunityByAddressCommunityByAddressOrError() {
+}
+func (v *communityByAddressQueryCommunityByAddressErrInvalidInput) implementsGraphQLInterfacecommunityByAddressQueryCommunityByAddressCommunityByAddressOrError() {
+}
+
+func __unmarshalcommunityByAddressQueryCommunityByAddressCommunityByAddressOrError(b []byte, v *communityByAddressQueryCommunityByAddressCommunityByAddressOrError) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "Community":
+		*v = new(communityByAddressQueryCommunityByAddressCommunity)
+		return json.Unmarshal(b, *v)
+	case "ErrCommunityNotFound":
+		*v = new(communityByAddressQueryCommunityByAddressErrCommunityNotFound)
+		return json.Unmarshal(b, *v)
+	case "ErrInvalidInput":
+		*v = new(communityByAddressQueryCommunityByAddressErrInvalidInput)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing CommunityByAddressOrError.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for communityByAddressQueryCommunityByAddressCommunityByAddressOrError: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshalcommunityByAddressQueryCommunityByAddressCommunityByAddressOrError(v *communityByAddressQueryCommunityByAddressCommunityByAddressOrError) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *communityByAddressQueryCommunityByAddressCommunity:
+		typename = "Community"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*communityByAddressQueryCommunityByAddressCommunity
+		}{typename, v}
+		return json.Marshal(result)
+	case *communityByAddressQueryCommunityByAddressErrCommunityNotFound:
+		typename = "ErrCommunityNotFound"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*communityByAddressQueryCommunityByAddressErrCommunityNotFound
+		}{typename, v}
+		return json.Marshal(result)
+	case *communityByAddressQueryCommunityByAddressErrInvalidInput:
+		typename = "ErrInvalidInput"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*communityByAddressQueryCommunityByAddressErrInvalidInput
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for communityByAddressQueryCommunityByAddressCommunityByAddressOrError: "%T"`, v)
+	}
+}
+
+// communityByAddressQueryCommunityByAddressCommunityPostsPostsConnection includes the requested fields of the GraphQL type PostsConnection.
+type communityByAddressQueryCommunityByAddressCommunityPostsPostsConnection struct {
+	Edges []*communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdge `json:"edges"`
+}
+
+// GetEdges returns communityByAddressQueryCommunityByAddressCommunityPostsPostsConnection.Edges, and is useful for accessing the field via an interface.
+func (v *communityByAddressQueryCommunityByAddressCommunityPostsPostsConnection) GetEdges() []*communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdge {
+	return v.Edges
+}
+
+// communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdge includes the requested fields of the GraphQL type PostEdge.
+type communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdge struct {
+	Node *communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodePostOrError `json:"-"`
+}
+
+// GetNode returns communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdge.Node, and is useful for accessing the field via an interface.
+func (v *communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdge) GetNode() *communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodePostOrError {
+	return v.Node
+}
+
+func (v *communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdge) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdge
+		Node json.RawMessage `json:"node"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdge = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.Node
+		src := firstPass.Node
+		if len(src) != 0 && string(src) != "null" {
+			*dst = new(communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodePostOrError)
+			err = __unmarshalcommunityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodePostOrError(
+				src, *dst)
+			if err != nil {
+				return fmt.Errorf(
+					"unable to unmarshal communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdge.Node: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshalcommunityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdge struct {
+	Node json.RawMessage `json:"node"`
+}
+
+func (v *communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdge) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdge) __premarshalJSON() (*__premarshalcommunityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdge, error) {
+	var retval __premarshalcommunityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdge
+
+	{
+
+		dst := &retval.Node
+		src := v.Node
+		if src != nil {
+			var err error
+			*dst, err = __marshalcommunityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodePostOrError(
+				src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"unable to marshal communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdge.Node: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
+// communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodeErrInvalidInput includes the requested fields of the GraphQL type ErrInvalidInput.
+type communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodeErrInvalidInput struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodeErrInvalidInput.Typename, and is useful for accessing the field via an interface.
+func (v *communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodeErrInvalidInput) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodeErrInvalidInput.Message, and is useful for accessing the field via an interface.
+func (v *communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodeErrInvalidInput) GetMessage() string {
+	return v.Message
+}
+
+// communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodeErrPostNotFound includes the requested fields of the GraphQL type ErrPostNotFound.
+type communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodeErrPostNotFound struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodeErrPostNotFound.Typename, and is useful for accessing the field via an interface.
+func (v *communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodeErrPostNotFound) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodeErrPostNotFound.Message, and is useful for accessing the field via an interface.
+func (v *communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodeErrPostNotFound) GetMessage() string {
+	return v.Message
+}
+
+// communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodePost includes the requested fields of the GraphQL type Post.
+type communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodePost struct {
+	Typename *string      `json:"__typename"`
+	Dbid     persist.DBID `json:"dbid"`
+}
+
+// GetTypename returns communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodePost.Typename, and is useful for accessing the field via an interface.
+func (v *communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodePost) GetTypename() *string {
+	return v.Typename
+}
+
+// GetDbid returns communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodePost.Dbid, and is useful for accessing the field via an interface.
+func (v *communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodePost) GetDbid() persist.DBID {
+	return v.Dbid
+}
+
+// communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodePostOrError includes the requested fields of the GraphQL interface PostOrError.
+//
+// communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodePostOrError is implemented by the following types:
+// communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodeErrInvalidInput
+// communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodeErrPostNotFound
+// communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodePost
+type communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodePostOrError interface {
+	implementsGraphQLInterfacecommunityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodePostOrError()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() *string
+}
+
+func (v *communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodeErrInvalidInput) implementsGraphQLInterfacecommunityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodePostOrError() {
+}
+func (v *communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodeErrPostNotFound) implementsGraphQLInterfacecommunityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodePostOrError() {
+}
+func (v *communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodePost) implementsGraphQLInterfacecommunityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodePostOrError() {
+}
+
+func __unmarshalcommunityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodePostOrError(b []byte, v *communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodePostOrError) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "ErrInvalidInput":
+		*v = new(communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodeErrInvalidInput)
+		return json.Unmarshal(b, *v)
+	case "ErrPostNotFound":
+		*v = new(communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodeErrPostNotFound)
+		return json.Unmarshal(b, *v)
+	case "Post":
+		*v = new(communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodePost)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing PostOrError.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodePostOrError: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshalcommunityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodePostOrError(v *communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodePostOrError) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodeErrInvalidInput:
+		typename = "ErrInvalidInput"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodeErrInvalidInput
+		}{typename, v}
+		return json.Marshal(result)
+	case *communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodeErrPostNotFound:
+		typename = "ErrPostNotFound"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodeErrPostNotFound
+		}{typename, v}
+		return json.Marshal(result)
+	case *communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodePost:
+		typename = "Post"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodePost
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for communityByAddressQueryCommunityByAddressCommunityPostsPostsConnectionEdgesPostEdgeNodePostOrError: "%T"`, v)
+	}
+}
+
+// communityByAddressQueryCommunityByAddressErrCommunityNotFound includes the requested fields of the GraphQL type ErrCommunityNotFound.
+type communityByAddressQueryCommunityByAddressErrCommunityNotFound struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns communityByAddressQueryCommunityByAddressErrCommunityNotFound.Typename, and is useful for accessing the field via an interface.
+func (v *communityByAddressQueryCommunityByAddressErrCommunityNotFound) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns communityByAddressQueryCommunityByAddressErrCommunityNotFound.Message, and is useful for accessing the field via an interface.
+func (v *communityByAddressQueryCommunityByAddressErrCommunityNotFound) GetMessage() string {
+	return v.Message
+}
+
+// communityByAddressQueryCommunityByAddressErrInvalidInput includes the requested fields of the GraphQL type ErrInvalidInput.
+type communityByAddressQueryCommunityByAddressErrInvalidInput struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns communityByAddressQueryCommunityByAddressErrInvalidInput.Typename, and is useful for accessing the field via an interface.
+func (v *communityByAddressQueryCommunityByAddressErrInvalidInput) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns communityByAddressQueryCommunityByAddressErrInvalidInput.Message, and is useful for accessing the field via an interface.
+func (v *communityByAddressQueryCommunityByAddressErrInvalidInput) GetMessage() string {
+	return v.Message
+}
+
+// communityByAddressQueryResponse is returned by communityByAddressQuery on success.
+type communityByAddressQueryResponse struct {
+	CommunityByAddress *communityByAddressQueryCommunityByAddressCommunityByAddressOrError `json:"-"`
+}
+
+// GetCommunityByAddress returns communityByAddressQueryResponse.CommunityByAddress, and is useful for accessing the field via an interface.
+func (v *communityByAddressQueryResponse) GetCommunityByAddress() *communityByAddressQueryCommunityByAddressCommunityByAddressOrError {
+	return v.CommunityByAddress
+}
+
+func (v *communityByAddressQueryResponse) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*communityByAddressQueryResponse
+		CommunityByAddress json.RawMessage `json:"communityByAddress"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.communityByAddressQueryResponse = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.CommunityByAddress
+		src := firstPass.CommunityByAddress
+		if len(src) != 0 && string(src) != "null" {
+			*dst = new(communityByAddressQueryCommunityByAddressCommunityByAddressOrError)
+			err = __unmarshalcommunityByAddressQueryCommunityByAddressCommunityByAddressOrError(
+				src, *dst)
+			if err != nil {
+				return fmt.Errorf(
+					"unable to unmarshal communityByAddressQueryResponse.CommunityByAddress: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshalcommunityByAddressQueryResponse struct {
+	CommunityByAddress json.RawMessage `json:"communityByAddress"`
+}
+
+func (v *communityByAddressQueryResponse) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *communityByAddressQueryResponse) __premarshalJSON() (*__premarshalcommunityByAddressQueryResponse, error) {
+	var retval __premarshalcommunityByAddressQueryResponse
+
+	{
+
+		dst := &retval.CommunityByAddress
+		src := v.CommunityByAddress
+		if src != nil {
+			var err error
+			*dst, err = __marshalcommunityByAddressQueryCommunityByAddressCommunityByAddressOrError(
+				src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"unable to marshal communityByAddressQueryResponse.CommunityByAddress: %w", err)
 			}
 		}
 	}
@@ -2605,6 +3528,217 @@ func (v *createUserMutationResponse) __premarshalJSON() (*__premarshalcreateUser
 	return &retval, nil
 }
 
+// deletePostMutationDeletePostDeletePostPayload includes the requested fields of the GraphQL type DeletePostPayload.
+type deletePostMutationDeletePostDeletePostPayload struct {
+	Typename  *string                                                            `json:"__typename"`
+	DeletedId *deletePostMutationDeletePostDeletePostPayloadDeletedIdDeletedNode `json:"deletedId"`
+}
+
+// GetTypename returns deletePostMutationDeletePostDeletePostPayload.Typename, and is useful for accessing the field via an interface.
+func (v *deletePostMutationDeletePostDeletePostPayload) GetTypename() *string { return v.Typename }
+
+// GetDeletedId returns deletePostMutationDeletePostDeletePostPayload.DeletedId, and is useful for accessing the field via an interface.
+func (v *deletePostMutationDeletePostDeletePostPayload) GetDeletedId() *deletePostMutationDeletePostDeletePostPayloadDeletedIdDeletedNode {
+	return v.DeletedId
+}
+
+// deletePostMutationDeletePostDeletePostPayloadDeletedIdDeletedNode includes the requested fields of the GraphQL type DeletedNode.
+type deletePostMutationDeletePostDeletePostPayloadDeletedIdDeletedNode struct {
+	Dbid persist.DBID `json:"dbid"`
+}
+
+// GetDbid returns deletePostMutationDeletePostDeletePostPayloadDeletedIdDeletedNode.Dbid, and is useful for accessing the field via an interface.
+func (v *deletePostMutationDeletePostDeletePostPayloadDeletedIdDeletedNode) GetDbid() persist.DBID {
+	return v.Dbid
+}
+
+// deletePostMutationDeletePostDeletePostPayloadOrError includes the requested fields of the GraphQL interface DeletePostPayloadOrError.
+//
+// deletePostMutationDeletePostDeletePostPayloadOrError is implemented by the following types:
+// deletePostMutationDeletePostDeletePostPayload
+// deletePostMutationDeletePostErrInvalidInput
+// deletePostMutationDeletePostErrNotAuthorized
+type deletePostMutationDeletePostDeletePostPayloadOrError interface {
+	implementsGraphQLInterfacedeletePostMutationDeletePostDeletePostPayloadOrError()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() *string
+}
+
+func (v *deletePostMutationDeletePostDeletePostPayload) implementsGraphQLInterfacedeletePostMutationDeletePostDeletePostPayloadOrError() {
+}
+func (v *deletePostMutationDeletePostErrInvalidInput) implementsGraphQLInterfacedeletePostMutationDeletePostDeletePostPayloadOrError() {
+}
+func (v *deletePostMutationDeletePostErrNotAuthorized) implementsGraphQLInterfacedeletePostMutationDeletePostDeletePostPayloadOrError() {
+}
+
+func __unmarshaldeletePostMutationDeletePostDeletePostPayloadOrError(b []byte, v *deletePostMutationDeletePostDeletePostPayloadOrError) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "DeletePostPayload":
+		*v = new(deletePostMutationDeletePostDeletePostPayload)
+		return json.Unmarshal(b, *v)
+	case "ErrInvalidInput":
+		*v = new(deletePostMutationDeletePostErrInvalidInput)
+		return json.Unmarshal(b, *v)
+	case "ErrNotAuthorized":
+		*v = new(deletePostMutationDeletePostErrNotAuthorized)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing DeletePostPayloadOrError.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for deletePostMutationDeletePostDeletePostPayloadOrError: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshaldeletePostMutationDeletePostDeletePostPayloadOrError(v *deletePostMutationDeletePostDeletePostPayloadOrError) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *deletePostMutationDeletePostDeletePostPayload:
+		typename = "DeletePostPayload"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*deletePostMutationDeletePostDeletePostPayload
+		}{typename, v}
+		return json.Marshal(result)
+	case *deletePostMutationDeletePostErrInvalidInput:
+		typename = "ErrInvalidInput"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*deletePostMutationDeletePostErrInvalidInput
+		}{typename, v}
+		return json.Marshal(result)
+	case *deletePostMutationDeletePostErrNotAuthorized:
+		typename = "ErrNotAuthorized"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*deletePostMutationDeletePostErrNotAuthorized
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for deletePostMutationDeletePostDeletePostPayloadOrError: "%T"`, v)
+	}
+}
+
+// deletePostMutationDeletePostErrInvalidInput includes the requested fields of the GraphQL type ErrInvalidInput.
+type deletePostMutationDeletePostErrInvalidInput struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns deletePostMutationDeletePostErrInvalidInput.Typename, and is useful for accessing the field via an interface.
+func (v *deletePostMutationDeletePostErrInvalidInput) GetTypename() *string { return v.Typename }
+
+// GetMessage returns deletePostMutationDeletePostErrInvalidInput.Message, and is useful for accessing the field via an interface.
+func (v *deletePostMutationDeletePostErrInvalidInput) GetMessage() string { return v.Message }
+
+// deletePostMutationDeletePostErrNotAuthorized includes the requested fields of the GraphQL type ErrNotAuthorized.
+type deletePostMutationDeletePostErrNotAuthorized struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns deletePostMutationDeletePostErrNotAuthorized.Typename, and is useful for accessing the field via an interface.
+func (v *deletePostMutationDeletePostErrNotAuthorized) GetTypename() *string { return v.Typename }
+
+// GetMessage returns deletePostMutationDeletePostErrNotAuthorized.Message, and is useful for accessing the field via an interface.
+func (v *deletePostMutationDeletePostErrNotAuthorized) GetMessage() string { return v.Message }
+
+// deletePostMutationResponse is returned by deletePostMutation on success.
+type deletePostMutationResponse struct {
+	DeletePost *deletePostMutationDeletePostDeletePostPayloadOrError `json:"-"`
+}
+
+// GetDeletePost returns deletePostMutationResponse.DeletePost, and is useful for accessing the field via an interface.
+func (v *deletePostMutationResponse) GetDeletePost() *deletePostMutationDeletePostDeletePostPayloadOrError {
+	return v.DeletePost
+}
+
+func (v *deletePostMutationResponse) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*deletePostMutationResponse
+		DeletePost json.RawMessage `json:"deletePost"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.deletePostMutationResponse = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.DeletePost
+		src := firstPass.DeletePost
+		if len(src) != 0 && string(src) != "null" {
+			*dst = new(deletePostMutationDeletePostDeletePostPayloadOrError)
+			err = __unmarshaldeletePostMutationDeletePostDeletePostPayloadOrError(
+				src, *dst)
+			if err != nil {
+				return fmt.Errorf(
+					"unable to unmarshal deletePostMutationResponse.DeletePost: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshaldeletePostMutationResponse struct {
+	DeletePost json.RawMessage `json:"deletePost"`
+}
+
+func (v *deletePostMutationResponse) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *deletePostMutationResponse) __premarshalJSON() (*__premarshaldeletePostMutationResponse, error) {
+	var retval __premarshaldeletePostMutationResponse
+
+	{
+
+		dst := &retval.DeletePost
+		src := v.DeletePost
+		if src != nil {
+			var err error
+			*dst, err = __marshaldeletePostMutationDeletePostDeletePostPayloadOrError(
+				src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"unable to marshal deletePostMutationResponse.DeletePost: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
 // disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayload includes the requested fields of the GraphQL type DisconnectSocialAccountPayload.
 type disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayload struct {
 	Typename *string                                                                             `json:"__typename"`
@@ -3159,6 +4293,22 @@ func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNot
 	return v.Message
 }
 
+// globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound includes the requested fields of the GraphQL type ErrPostNotFound.
+type globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound.Typename, and is useful for accessing the field via an interface.
+func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound.Message, and is useful for accessing the field via an interface.
+func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound) GetMessage() string {
+	return v.Message
+}
+
 // globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction includes the requested fields of the GraphQL type ErrUnknownAction.
 type globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction struct {
 	Typename *string `json:"__typename"`
@@ -3195,8 +4345,13 @@ func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) GetD
 //
 // globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError is implemented by the following types:
 // globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound
+// globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound
 // globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction
 // globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent
+// globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodePost
+// The GraphQL type's documentation follows.
+//
+// Can return posts as well
 type globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError interface {
 	implementsGraphQLInterfaceglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
@@ -3205,9 +4360,13 @@ type globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError in
 
 func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound) implementsGraphQLInterfaceglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
 }
+func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound) implementsGraphQLInterfaceglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
+}
 func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction) implementsGraphQLInterfaceglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
 }
 func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) implementsGraphQLInterfaceglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
+}
+func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodePost) implementsGraphQLInterfaceglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
 }
 
 func __unmarshalglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError(b []byte, v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError) error {
@@ -3227,11 +4386,17 @@ func __unmarshalglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEven
 	case "ErrFeedEventNotFound":
 		*v = new(globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound)
 		return json.Unmarshal(b, *v)
+	case "ErrPostNotFound":
+		*v = new(globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound)
+		return json.Unmarshal(b, *v)
 	case "ErrUnknownAction":
 		*v = new(globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction)
 		return json.Unmarshal(b, *v)
 	case "FeedEvent":
 		*v = new(globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent)
+		return json.Unmarshal(b, *v)
+	case "Post":
+		*v = new(globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodePost)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -3254,6 +4419,14 @@ func __marshalglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventO
 			*globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound
 		}{typename, v}
 		return json.Marshal(result)
+	case *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound:
+		typename = "ErrPostNotFound"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound
+		}{typename, v}
+		return json.Marshal(result)
 	case *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction:
 		typename = "ErrUnknownAction"
 
@@ -3270,12 +4443,36 @@ func __marshalglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventO
 			*globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent
 		}{typename, v}
 		return json.Marshal(result)
+	case *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodePost:
+		typename = "Post"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodePost
+		}{typename, v}
+		return json.Marshal(result)
 	case nil:
 		return []byte("null"), nil
 	default:
 		return nil, fmt.Errorf(
 			`unexpected concrete type for globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError: "%T"`, v)
 	}
+}
+
+// globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodePost includes the requested fields of the GraphQL type Post.
+type globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodePost struct {
+	Typename *string      `json:"__typename"`
+	Dbid     persist.DBID `json:"dbid"`
+}
+
+// GetTypename returns globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodePost.Typename, and is useful for accessing the field via an interface.
+func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodePost) GetTypename() *string {
+	return v.Typename
+}
+
+// GetDbid returns globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodePost.Dbid, and is useful for accessing the field via an interface.
+func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodePost) GetDbid() persist.DBID {
+	return v.Dbid
 }
 
 // globalFeedQueryResponse is returned by globalFeedQuery on success.
@@ -3844,6 +5041,215 @@ func (v *moveCollectionToGalleryResponse) __premarshalJSON() (*__premarshalmoveC
 			if err != nil {
 				return nil, fmt.Errorf(
 					"unable to marshal moveCollectionToGalleryResponse.MoveCollectionToGallery: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
+// postTokensPostTokensErrInvalidInput includes the requested fields of the GraphQL type ErrInvalidInput.
+type postTokensPostTokensErrInvalidInput struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns postTokensPostTokensErrInvalidInput.Typename, and is useful for accessing the field via an interface.
+func (v *postTokensPostTokensErrInvalidInput) GetTypename() *string { return v.Typename }
+
+// GetMessage returns postTokensPostTokensErrInvalidInput.Message, and is useful for accessing the field via an interface.
+func (v *postTokensPostTokensErrInvalidInput) GetMessage() string { return v.Message }
+
+// postTokensPostTokensErrNotAuthorized includes the requested fields of the GraphQL type ErrNotAuthorized.
+type postTokensPostTokensErrNotAuthorized struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns postTokensPostTokensErrNotAuthorized.Typename, and is useful for accessing the field via an interface.
+func (v *postTokensPostTokensErrNotAuthorized) GetTypename() *string { return v.Typename }
+
+// GetMessage returns postTokensPostTokensErrNotAuthorized.Message, and is useful for accessing the field via an interface.
+func (v *postTokensPostTokensErrNotAuthorized) GetMessage() string { return v.Message }
+
+// postTokensPostTokensPostTokensPayload includes the requested fields of the GraphQL type PostTokensPayload.
+type postTokensPostTokensPostTokensPayload struct {
+	Typename *string                                   `json:"__typename"`
+	Post     postTokensPostTokensPostTokensPayloadPost `json:"post"`
+}
+
+// GetTypename returns postTokensPostTokensPostTokensPayload.Typename, and is useful for accessing the field via an interface.
+func (v *postTokensPostTokensPostTokensPayload) GetTypename() *string { return v.Typename }
+
+// GetPost returns postTokensPostTokensPostTokensPayload.Post, and is useful for accessing the field via an interface.
+func (v *postTokensPostTokensPostTokensPayload) GetPost() postTokensPostTokensPostTokensPayloadPost {
+	return v.Post
+}
+
+// postTokensPostTokensPostTokensPayloadOrError includes the requested fields of the GraphQL interface PostTokensPayloadOrError.
+//
+// postTokensPostTokensPostTokensPayloadOrError is implemented by the following types:
+// postTokensPostTokensErrInvalidInput
+// postTokensPostTokensErrNotAuthorized
+// postTokensPostTokensPostTokensPayload
+type postTokensPostTokensPostTokensPayloadOrError interface {
+	implementsGraphQLInterfacepostTokensPostTokensPostTokensPayloadOrError()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() *string
+}
+
+func (v *postTokensPostTokensErrInvalidInput) implementsGraphQLInterfacepostTokensPostTokensPostTokensPayloadOrError() {
+}
+func (v *postTokensPostTokensErrNotAuthorized) implementsGraphQLInterfacepostTokensPostTokensPostTokensPayloadOrError() {
+}
+func (v *postTokensPostTokensPostTokensPayload) implementsGraphQLInterfacepostTokensPostTokensPostTokensPayloadOrError() {
+}
+
+func __unmarshalpostTokensPostTokensPostTokensPayloadOrError(b []byte, v *postTokensPostTokensPostTokensPayloadOrError) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "ErrInvalidInput":
+		*v = new(postTokensPostTokensErrInvalidInput)
+		return json.Unmarshal(b, *v)
+	case "ErrNotAuthorized":
+		*v = new(postTokensPostTokensErrNotAuthorized)
+		return json.Unmarshal(b, *v)
+	case "PostTokensPayload":
+		*v = new(postTokensPostTokensPostTokensPayload)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing PostTokensPayloadOrError.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for postTokensPostTokensPostTokensPayloadOrError: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshalpostTokensPostTokensPostTokensPayloadOrError(v *postTokensPostTokensPostTokensPayloadOrError) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *postTokensPostTokensErrInvalidInput:
+		typename = "ErrInvalidInput"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*postTokensPostTokensErrInvalidInput
+		}{typename, v}
+		return json.Marshal(result)
+	case *postTokensPostTokensErrNotAuthorized:
+		typename = "ErrNotAuthorized"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*postTokensPostTokensErrNotAuthorized
+		}{typename, v}
+		return json.Marshal(result)
+	case *postTokensPostTokensPostTokensPayload:
+		typename = "PostTokensPayload"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*postTokensPostTokensPostTokensPayload
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for postTokensPostTokensPostTokensPayloadOrError: "%T"`, v)
+	}
+}
+
+// postTokensPostTokensPostTokensPayloadPost includes the requested fields of the GraphQL type Post.
+type postTokensPostTokensPostTokensPayloadPost struct {
+	Dbid persist.DBID `json:"dbid"`
+}
+
+// GetDbid returns postTokensPostTokensPostTokensPayloadPost.Dbid, and is useful for accessing the field via an interface.
+func (v *postTokensPostTokensPostTokensPayloadPost) GetDbid() persist.DBID { return v.Dbid }
+
+// postTokensResponse is returned by postTokens on success.
+type postTokensResponse struct {
+	PostTokens *postTokensPostTokensPostTokensPayloadOrError `json:"-"`
+}
+
+// GetPostTokens returns postTokensResponse.PostTokens, and is useful for accessing the field via an interface.
+func (v *postTokensResponse) GetPostTokens() *postTokensPostTokensPostTokensPayloadOrError {
+	return v.PostTokens
+}
+
+func (v *postTokensResponse) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*postTokensResponse
+		PostTokens json.RawMessage `json:"postTokens"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.postTokensResponse = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.PostTokens
+		src := firstPass.PostTokens
+		if len(src) != 0 && string(src) != "null" {
+			*dst = new(postTokensPostTokensPostTokensPayloadOrError)
+			err = __unmarshalpostTokensPostTokensPostTokensPayloadOrError(
+				src, *dst)
+			if err != nil {
+				return fmt.Errorf(
+					"unable to unmarshal postTokensResponse.PostTokens: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshalpostTokensResponse struct {
+	PostTokens json.RawMessage `json:"postTokens"`
+}
+
+func (v *postTokensResponse) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *postTokensResponse) __premarshalJSON() (*__premarshalpostTokensResponse, error) {
+	var retval __premarshalpostTokensResponse
+
+	{
+
+		dst := &retval.PostTokens
+		src := v.PostTokens
+		if src != nil {
+			var err error
+			*dst, err = __marshalpostTokensPostTokensPostTokensPayloadOrError(
+				src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"unable to marshal postTokensResponse.PostTokens: %w", err)
 			}
 		}
 	}
@@ -5131,6 +6537,209 @@ func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserToken
 	return v.MediaType
 }
 
+// tokenByIdQueryResponse is returned by tokenByIdQuery on success.
+type tokenByIdQueryResponse struct {
+	TokenById *tokenByIdQueryTokenByIdTokenByIdOrError `json:"-"`
+}
+
+// GetTokenById returns tokenByIdQueryResponse.TokenById, and is useful for accessing the field via an interface.
+func (v *tokenByIdQueryResponse) GetTokenById() *tokenByIdQueryTokenByIdTokenByIdOrError {
+	return v.TokenById
+}
+
+func (v *tokenByIdQueryResponse) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*tokenByIdQueryResponse
+		TokenById json.RawMessage `json:"tokenById"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.tokenByIdQueryResponse = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.TokenById
+		src := firstPass.TokenById
+		if len(src) != 0 && string(src) != "null" {
+			*dst = new(tokenByIdQueryTokenByIdTokenByIdOrError)
+			err = __unmarshaltokenByIdQueryTokenByIdTokenByIdOrError(
+				src, *dst)
+			if err != nil {
+				return fmt.Errorf(
+					"unable to unmarshal tokenByIdQueryResponse.TokenById: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshaltokenByIdQueryResponse struct {
+	TokenById json.RawMessage `json:"tokenById"`
+}
+
+func (v *tokenByIdQueryResponse) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *tokenByIdQueryResponse) __premarshalJSON() (*__premarshaltokenByIdQueryResponse, error) {
+	var retval __premarshaltokenByIdQueryResponse
+
+	{
+
+		dst := &retval.TokenById
+		src := v.TokenById
+		if src != nil {
+			var err error
+			*dst, err = __marshaltokenByIdQueryTokenByIdTokenByIdOrError(
+				src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"unable to marshal tokenByIdQueryResponse.TokenById: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
+// tokenByIdQueryTokenByIdErrTokenNotFound includes the requested fields of the GraphQL type ErrTokenNotFound.
+type tokenByIdQueryTokenByIdErrTokenNotFound struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns tokenByIdQueryTokenByIdErrTokenNotFound.Typename, and is useful for accessing the field via an interface.
+func (v *tokenByIdQueryTokenByIdErrTokenNotFound) GetTypename() *string { return v.Typename }
+
+// GetMessage returns tokenByIdQueryTokenByIdErrTokenNotFound.Message, and is useful for accessing the field via an interface.
+func (v *tokenByIdQueryTokenByIdErrTokenNotFound) GetMessage() string { return v.Message }
+
+// tokenByIdQueryTokenByIdToken includes the requested fields of the GraphQL type Token.
+type tokenByIdQueryTokenByIdToken struct {
+	Typename *string                               `json:"__typename"`
+	Dbid     persist.DBID                          `json:"dbid"`
+	Contract *tokenByIdQueryTokenByIdTokenContract `json:"contract"`
+}
+
+// GetTypename returns tokenByIdQueryTokenByIdToken.Typename, and is useful for accessing the field via an interface.
+func (v *tokenByIdQueryTokenByIdToken) GetTypename() *string { return v.Typename }
+
+// GetDbid returns tokenByIdQueryTokenByIdToken.Dbid, and is useful for accessing the field via an interface.
+func (v *tokenByIdQueryTokenByIdToken) GetDbid() persist.DBID { return v.Dbid }
+
+// GetContract returns tokenByIdQueryTokenByIdToken.Contract, and is useful for accessing the field via an interface.
+func (v *tokenByIdQueryTokenByIdToken) GetContract() *tokenByIdQueryTokenByIdTokenContract {
+	return v.Contract
+}
+
+// tokenByIdQueryTokenByIdTokenByIdOrError includes the requested fields of the GraphQL interface TokenByIdOrError.
+//
+// tokenByIdQueryTokenByIdTokenByIdOrError is implemented by the following types:
+// tokenByIdQueryTokenByIdErrTokenNotFound
+// tokenByIdQueryTokenByIdToken
+type tokenByIdQueryTokenByIdTokenByIdOrError interface {
+	implementsGraphQLInterfacetokenByIdQueryTokenByIdTokenByIdOrError()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() *string
+}
+
+func (v *tokenByIdQueryTokenByIdErrTokenNotFound) implementsGraphQLInterfacetokenByIdQueryTokenByIdTokenByIdOrError() {
+}
+func (v *tokenByIdQueryTokenByIdToken) implementsGraphQLInterfacetokenByIdQueryTokenByIdTokenByIdOrError() {
+}
+
+func __unmarshaltokenByIdQueryTokenByIdTokenByIdOrError(b []byte, v *tokenByIdQueryTokenByIdTokenByIdOrError) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "ErrTokenNotFound":
+		*v = new(tokenByIdQueryTokenByIdErrTokenNotFound)
+		return json.Unmarshal(b, *v)
+	case "Token":
+		*v = new(tokenByIdQueryTokenByIdToken)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing TokenByIdOrError.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for tokenByIdQueryTokenByIdTokenByIdOrError: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshaltokenByIdQueryTokenByIdTokenByIdOrError(v *tokenByIdQueryTokenByIdTokenByIdOrError) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *tokenByIdQueryTokenByIdErrTokenNotFound:
+		typename = "ErrTokenNotFound"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*tokenByIdQueryTokenByIdErrTokenNotFound
+		}{typename, v}
+		return json.Marshal(result)
+	case *tokenByIdQueryTokenByIdToken:
+		typename = "Token"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*tokenByIdQueryTokenByIdToken
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for tokenByIdQueryTokenByIdTokenByIdOrError: "%T"`, v)
+	}
+}
+
+// tokenByIdQueryTokenByIdTokenContract includes the requested fields of the GraphQL type Contract.
+type tokenByIdQueryTokenByIdTokenContract struct {
+	Dbid            persist.DBID                                                     `json:"dbid"`
+	ContractAddress *tokenByIdQueryTokenByIdTokenContractContractAddressChainAddress `json:"contractAddress"`
+}
+
+// GetDbid returns tokenByIdQueryTokenByIdTokenContract.Dbid, and is useful for accessing the field via an interface.
+func (v *tokenByIdQueryTokenByIdTokenContract) GetDbid() persist.DBID { return v.Dbid }
+
+// GetContractAddress returns tokenByIdQueryTokenByIdTokenContract.ContractAddress, and is useful for accessing the field via an interface.
+func (v *tokenByIdQueryTokenByIdTokenContract) GetContractAddress() *tokenByIdQueryTokenByIdTokenContractContractAddressChainAddress {
+	return v.ContractAddress
+}
+
+// tokenByIdQueryTokenByIdTokenContractContractAddressChainAddress includes the requested fields of the GraphQL type ChainAddress.
+type tokenByIdQueryTokenByIdTokenContractContractAddressChainAddress struct {
+	Address *string `json:"address"`
+}
+
+// GetAddress returns tokenByIdQueryTokenByIdTokenContractContractAddressChainAddress.Address, and is useful for accessing the field via an interface.
+func (v *tokenByIdQueryTokenByIdTokenContractContractAddressChainAddress) GetAddress() *string {
+	return v.Address
+}
+
 // trendingFeedQueryResponse is returned by trendingFeedQuery on success.
 type trendingFeedQueryResponse struct {
 	TrendingFeed *trendingFeedQueryTrendingFeedFeedConnection `json:"trendingFeed"`
@@ -5243,6 +6852,22 @@ func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEven
 	return v.Message
 }
 
+// trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound includes the requested fields of the GraphQL type ErrPostNotFound.
+type trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound.Typename, and is useful for accessing the field via an interface.
+func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound.Message, and is useful for accessing the field via an interface.
+func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound) GetMessage() string {
+	return v.Message
+}
+
 // trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction includes the requested fields of the GraphQL type ErrUnknownAction.
 type trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction struct {
 	Typename *string `json:"__typename"`
@@ -5279,8 +6904,13 @@ func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) 
 //
 // trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError is implemented by the following types:
 // trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound
+// trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound
 // trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction
 // trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent
+// trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodePost
+// The GraphQL type's documentation follows.
+//
+// Can return posts as well
 type trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError interface {
 	implementsGraphQLInterfacetrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
@@ -5289,9 +6919,13 @@ type trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrErro
 
 func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound) implementsGraphQLInterfacetrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
 }
+func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound) implementsGraphQLInterfacetrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
+}
 func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction) implementsGraphQLInterfacetrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
 }
 func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) implementsGraphQLInterfacetrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
+}
+func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodePost) implementsGraphQLInterfacetrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
 }
 
 func __unmarshaltrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError(b []byte, v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError) error {
@@ -5311,11 +6945,17 @@ func __unmarshaltrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeed
 	case "ErrFeedEventNotFound":
 		*v = new(trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound)
 		return json.Unmarshal(b, *v)
+	case "ErrPostNotFound":
+		*v = new(trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound)
+		return json.Unmarshal(b, *v)
 	case "ErrUnknownAction":
 		*v = new(trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction)
 		return json.Unmarshal(b, *v)
 	case "FeedEvent":
 		*v = new(trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent)
+		return json.Unmarshal(b, *v)
+	case "Post":
+		*v = new(trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodePost)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -5338,6 +6978,14 @@ func __marshaltrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEv
 			*trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound
 		}{typename, v}
 		return json.Marshal(result)
+	case *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound:
+		typename = "ErrPostNotFound"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound
+		}{typename, v}
+		return json.Marshal(result)
 	case *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction:
 		typename = "ErrUnknownAction"
 
@@ -5354,12 +7002,30 @@ func __marshaltrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEv
 			*trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent
 		}{typename, v}
 		return json.Marshal(result)
+	case *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodePost:
+		typename = "Post"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodePost
+		}{typename, v}
+		return json.Marshal(result)
 	case nil:
 		return []byte("null"), nil
 	default:
 		return nil, fmt.Errorf(
 			`unexpected concrete type for trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError: "%T"`, v)
 	}
+}
+
+// trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodePost includes the requested fields of the GraphQL type Post.
+type trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodePost struct {
+	Typename *string `json:"__typename"`
+}
+
+// GetTypename returns trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodePost.Typename, and is useful for accessing the field via an interface.
+func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodePost) GetTypename() *string {
+	return v.Typename
 }
 
 // trendingUsersQueryResponse is returned by trendingUsersQuery on success.
@@ -7402,6 +9068,22 @@ func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrF
 	return v.Message
 }
 
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound includes the requested fields of the GraphQL type ErrPostNotFound.
+type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound.Typename, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound.Message, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound) GetMessage() string {
+	return v.Message
+}
+
 // viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction includes the requested fields of the GraphQL type ErrUnknownAction.
 type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction struct {
 	Typename *string `json:"__typename"`
@@ -8326,8 +10008,13 @@ func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeed
 //
 // viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError is implemented by the following types:
 // viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound
 // viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction
 // viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodePost
+// The GraphQL type's documentation follows.
+//
+// Can return posts as well
 type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError interface {
 	implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
@@ -8336,9 +10023,13 @@ type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEven
 
 func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
 }
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
+}
 func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
 }
 func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
+}
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodePost) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
 }
 
 func __unmarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError(b []byte, v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError) error {
@@ -8358,11 +10049,17 @@ func __unmarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeN
 	case "ErrFeedEventNotFound":
 		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound)
 		return json.Unmarshal(b, *v)
+	case "ErrPostNotFound":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound)
+		return json.Unmarshal(b, *v)
 	case "ErrUnknownAction":
 		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction)
 		return json.Unmarshal(b, *v)
 	case "FeedEvent":
 		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent)
+		return json.Unmarshal(b, *v)
+	case "Post":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodePost)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -8385,6 +10082,14 @@ func __marshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNod
 			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound
 		}{typename, v}
 		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound:
+		typename = "ErrPostNotFound"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrPostNotFound
+		}{typename, v}
+		return json.Marshal(result)
 	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction:
 		typename = "ErrUnknownAction"
 
@@ -8405,12 +10110,30 @@ func __marshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNod
 			*__premarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent
 		}{typename, premarshaled}
 		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodePost:
+		typename = "Post"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodePost
+		}{typename, v}
+		return json.Marshal(result)
 	case nil:
 		return []byte("null"), nil
 	default:
 		return nil, fmt.Errorf(
 			`unexpected concrete type for viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError: "%T"`, v)
 	}
+}
+
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodePost includes the requested fields of the GraphQL type Post.
+type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodePost struct {
+	Typename *string `json:"__typename"`
+}
+
+// GetTypename returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodePost.Typename, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodePost) GetTypename() *string {
+	return v.Typename
 }
 
 // viewerQueryViewerUserGalleryUserSocialAccounts includes the requested fields of the GraphQL type SocialAccounts.
@@ -8603,6 +10326,50 @@ func admireFeedEventMutation(
 	return &data, err
 }
 
+// The query or mutation executed by admirePostMutation.
+const admirePostMutation_Operation = `
+mutation admirePostMutation ($postId: DBID!) {
+	admirePost(postId: $postId) {
+		__typename
+		... on Error {
+			__typename
+			message
+		}
+		... on AdmirePostPayload {
+			post {
+				dbid
+			}
+		}
+	}
+}
+`
+
+func admirePostMutation(
+	ctx context.Context,
+	client graphql.Client,
+	postId persist.DBID,
+) (*admirePostMutationResponse, error) {
+	req := &graphql.Request{
+		OpName: "admirePostMutation",
+		Query:  admirePostMutation_Operation,
+		Variables: &__admirePostMutationInput{
+			PostId: postId,
+		},
+	}
+	var err error
+
+	var data admirePostMutationResponse
+	resp := &graphql.Response{Data: &data}
+
+	err = client.MakeRequest(
+		ctx,
+		req,
+		resp,
+	)
+
+	return &data, err
+}
+
 // The query or mutation executed by commentOnFeedEventMutation.
 const commentOnFeedEventMutation_Operation = `
 mutation commentOnFeedEventMutation ($feedEventId: DBID!, $comment: String!) {
@@ -8638,6 +10405,109 @@ func commentOnFeedEventMutation(
 	var err error
 
 	var data commentOnFeedEventMutationResponse
+	resp := &graphql.Response{Data: &data}
+
+	err = client.MakeRequest(
+		ctx,
+		req,
+		resp,
+	)
+
+	return &data, err
+}
+
+// The query or mutation executed by commentOnPostMutation.
+const commentOnPostMutation_Operation = `
+mutation commentOnPostMutation ($postId: DBID!, $comment: String!) {
+	commentOnPost(postId: $postId, comment: $comment) {
+		__typename
+		... on Error {
+			__typename
+			message
+		}
+		... on CommentOnPostPayload {
+			post {
+				dbid
+			}
+		}
+	}
+}
+`
+
+func commentOnPostMutation(
+	ctx context.Context,
+	client graphql.Client,
+	postId persist.DBID,
+	comment string,
+) (*commentOnPostMutationResponse, error) {
+	req := &graphql.Request{
+		OpName: "commentOnPostMutation",
+		Query:  commentOnPostMutation_Operation,
+		Variables: &__commentOnPostMutationInput{
+			PostId:  postId,
+			Comment: comment,
+		},
+	}
+	var err error
+
+	var data commentOnPostMutationResponse
+	resp := &graphql.Response{Data: &data}
+
+	err = client.MakeRequest(
+		ctx,
+		req,
+		resp,
+	)
+
+	return &data, err
+}
+
+// The query or mutation executed by communityByAddressQuery.
+const communityByAddressQuery_Operation = `
+query communityByAddressQuery ($address: ChainAddressInput!) {
+	communityByAddress(communityAddress: $address) {
+		__typename
+		... on Error {
+			__typename
+			message
+		}
+		... on Community {
+			dbid
+			name
+			posts(first: 3) {
+				edges {
+					node {
+						__typename
+						... on Error {
+							__typename
+							message
+						}
+						... on Post {
+							dbid
+						}
+					}
+				}
+			}
+		}
+	}
+}
+`
+
+func communityByAddressQuery(
+	ctx context.Context,
+	client graphql.Client,
+	address ChainAddressInput,
+) (*communityByAddressQueryResponse, error) {
+	req := &graphql.Request{
+		OpName: "communityByAddressQuery",
+		Query:  communityByAddressQuery_Operation,
+		Variables: &__communityByAddressQueryInput{
+			Address: address,
+		},
+	}
+	var err error
+
+	var data communityByAddressQueryResponse
 	resp := &graphql.Response{Data: &data}
 
 	err = client.MakeRequest(
@@ -8850,6 +10720,50 @@ func createUserMutation(
 	return &data, err
 }
 
+// The query or mutation executed by deletePostMutation.
+const deletePostMutation_Operation = `
+mutation deletePostMutation ($postId: DBID!) {
+	deletePost(postId: $postId) {
+		__typename
+		... on Error {
+			__typename
+			message
+		}
+		... on DeletePostPayload {
+			deletedId {
+				dbid
+			}
+		}
+	}
+}
+`
+
+func deletePostMutation(
+	ctx context.Context,
+	client graphql.Client,
+	postId persist.DBID,
+) (*deletePostMutationResponse, error) {
+	req := &graphql.Request{
+		OpName: "deletePostMutation",
+		Query:  deletePostMutation_Operation,
+		Variables: &__deletePostMutationInput{
+			PostId: postId,
+		},
+	}
+	var err error
+
+	var data deletePostMutationResponse
+	resp := &graphql.Response{Data: &data}
+
+	err = client.MakeRequest(
+		ctx,
+		req,
+		resp,
+	)
+
+	return &data, err
+}
+
 // The query or mutation executed by disconnectSocialAccount.
 const disconnectSocialAccount_Operation = `
 mutation disconnectSocialAccount ($accountType: SocialAccountType!) {
@@ -8953,6 +10867,9 @@ query globalFeedQuery ($first: Int) {
 					message
 				}
 				... on FeedEvent {
+					dbid
+				}
+				... on Post {
 					dbid
 				}
 			}
@@ -9112,6 +11029,50 @@ func moveCollectionToGallery(
 	var err error
 
 	var data moveCollectionToGalleryResponse
+	resp := &graphql.Response{Data: &data}
+
+	err = client.MakeRequest(
+		ctx,
+		req,
+		resp,
+	)
+
+	return &data, err
+}
+
+// The query or mutation executed by postTokens.
+const postTokens_Operation = `
+mutation postTokens ($input: PostTokensInput!) {
+	postTokens(input: $input) {
+		__typename
+		... on Error {
+			__typename
+			message
+		}
+		... on PostTokensPayload {
+			post {
+				dbid
+			}
+		}
+	}
+}
+`
+
+func postTokens(
+	ctx context.Context,
+	client graphql.Client,
+	input PostTokensInput,
+) (*postTokensResponse, error) {
+	req := &graphql.Request{
+		OpName: "postTokens",
+		Query:  postTokens_Operation,
+		Variables: &__postTokensInput{
+			Input: input,
+		},
+	}
+	var err error
+
+	var data postTokensResponse
 	resp := &graphql.Response{Data: &data}
 
 	err = client.MakeRequest(
@@ -9309,6 +11270,54 @@ func syncTokensMutation(
 	var err error
 
 	var data syncTokensMutationResponse
+	resp := &graphql.Response{Data: &data}
+
+	err = client.MakeRequest(
+		ctx,
+		req,
+		resp,
+	)
+
+	return &data, err
+}
+
+// The query or mutation executed by tokenByIdQuery.
+const tokenByIdQuery_Operation = `
+query tokenByIdQuery ($id: DBID!) {
+	tokenById(id: $id) {
+		__typename
+		... on Error {
+			__typename
+			message
+		}
+		... on Token {
+			dbid
+			contract {
+				dbid
+				contractAddress {
+					address
+				}
+			}
+		}
+	}
+}
+`
+
+func tokenByIdQuery(
+	ctx context.Context,
+	client graphql.Client,
+	id persist.DBID,
+) (*tokenByIdQueryResponse, error) {
+	req := &graphql.Request{
+		OpName: "tokenByIdQuery",
+		Query:  tokenByIdQuery_Operation,
+		Variables: &__tokenByIdQueryInput{
+			Id: id,
+		},
+	}
+	var err error
+
+	var data tokenByIdQueryResponse
 	resp := &graphql.Response{Data: &data}
 
 	err = client.MakeRequest(

@@ -85,9 +85,23 @@ type HelperSomeoneCommentedOnYourFeedEventNotificationData struct {
 	CommentID        persist.DBID
 	NotificationData persist.NotificationData
 }
+
+type HelperSomeoneCommentedOnYourPostNotificationData struct {
+	OwnerID          persist.DBID
+	PostID           persist.DBID
+	CommentID        persist.DBID
+	NotificationData persist.NotificationData
+}
+
 type HelperSomeoneAdmiredYourFeedEventNotificationData struct {
 	OwnerID          persist.DBID
 	FeedEventID      persist.DBID
+	NotificationData persist.NotificationData
+}
+
+type HelperSomeoneAdmiredYourPostNotificationData struct {
+	OwnerID          persist.DBID
+	PostID           persist.DBID
 	NotificationData persist.NotificationData
 }
 
@@ -129,6 +143,10 @@ type HelperEnsProfileImageData struct {
 	UserID    persist.DBID
 	WalletID  persist.DBID
 	EnsDomain string
+}
+
+type HelperPostData struct {
+	TokenIDs persist.DBIDList
 }
 
 type ErrInvalidIDFormat struct {

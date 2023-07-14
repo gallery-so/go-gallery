@@ -6,6 +6,7 @@ package graphql
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/gammazero/workerpool"
@@ -44,6 +45,7 @@ var nodeFetcher = model.NodeFetcher{
 	OnViewer:           resolveViewerByID,
 	OnDeletedNode:      resolveDeletedNodeByID,
 	OnSocialConnection: resolveSocialConnectionByIdentifiers,
+	OnPost:             resolvePostByPostID,
 
 	OnCollectionToken: func(ctx context.Context, tokenId string, collectionId string) (*model.CollectionToken, error) {
 		return resolveCollectionTokenByID(ctx, persist.DBID(tokenId), persist.DBID(collectionId))
@@ -69,6 +71,26 @@ var nodeFetcher = model.NodeFetcher{
 		}
 
 		notifConverted := notif.(model.SomeoneCommentedOnYourFeedEventNotification)
+
+		return &notifConverted, nil
+	},
+	OnSomeoneAdmiredYourPostNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneAdmiredYourPostNotification, error) {
+		notif, err := resolveNotificationByID(ctx, dbid)
+		if err != nil {
+			return nil, err
+		}
+
+		notifConverted := notif.(model.SomeoneAdmiredYourPostNotification)
+
+		return &notifConverted, nil
+	},
+	OnSomeoneCommentedOnYourPostNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneCommentedOnYourPostNotification, error) {
+		notif, err := resolveNotificationByID(ctx, dbid)
+		if err != nil {
+			return nil, err
+		}
+
+		notifConverted := notif.(model.SomeoneCommentedOnYourPostNotification)
 
 		return &notifConverted, nil
 	},
@@ -638,6 +660,15 @@ func resolveCommunityOwnersByContractID(ctx context.Context, contractID persist.
 	return &connection, nil
 }
 
+func resolveCommunityPostsByContractID(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int) (*model.PostsConnection, error) {
+	posts, pageInfo, err := publicapi.For(ctx).Contract.GetCommunityPostsByContractID(ctx, contractID, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+	connection := postsToConnection(ctx, posts, contractID, pageInfo)
+	return &connection, nil
+}
+
 func ownersToConnection(ctx context.Context, owners []db.User, contractID persist.DBID, pageInfo publicapi.PageInfo) model.TokenHoldersConnection {
 	edges := make([]*model.TokenHolderEdge, len(owners))
 	for i, owner := range owners {
@@ -661,6 +692,37 @@ func ownersToConnection(ctx context.Context, owners []db.User, contractID persis
 		}
 	}
 	return model.TokenHoldersConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}
+}
+
+func postsToConnection(ctx context.Context, posts []db.Post, contractID persist.DBID, pageInfo publicapi.PageInfo) model.PostsConnection {
+	edges := make([]*model.PostEdge, len(posts))
+	for i, post := range posts {
+
+		var caption *string
+		if post.Caption.Valid {
+			caption = &post.Caption.String
+		}
+		edges[i] = &model.PostEdge{
+			Node: &model.Post{
+				HelperPostData: model.HelperPostData{
+					TokenIDs: post.TokenIds,
+				},
+				Dbid:         post.ID,
+				Tokens:       nil, // handled by dedicated resolver
+				Caption:      caption,
+				Admires:      nil, // handled by dedicated resolver
+				Comments:     nil, // handled by dedicated resolver
+				Interactions: nil, // handled by dedicated resolver
+				ViewerAdmire: nil, // handled by dedicated resolver
+
+			},
+			Cursor: nil, // not used by relay, but relay will complain without this field existing
+		}
+	}
+	return model.PostsConnection{
 		Edges:    edges,
 		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}
@@ -721,6 +783,15 @@ func resolveFeedEventByEventID(ctx context.Context, eventID persist.DBID) (*mode
 	}
 
 	return feedEventToModel(event)
+}
+
+func resolvePostByPostID(ctx context.Context, postID persist.DBID) (*model.Post, error) {
+	post, err := publicapi.For(ctx).Feed.GetPostById(ctx, postID)
+	if err != nil {
+		return nil, err
+	}
+
+	return postToModel(post)
 }
 
 func resolveViewerNotifications(ctx context.Context, before *string, after *string, first *int, last *int) (*model.NotificationsConnection, error) {
@@ -793,6 +864,36 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 			CreationTime: &notif.CreatedAt,
 			UpdatedTime:  &notif.LastUpdated,
 			FeedEvent:    nil, // handled by dedicated resolver
+			Comment:      nil, // handled by dedicated resolver
+		}, nil
+	case persist.ActionAdmiredPost:
+		return model.SomeoneAdmiredYourPostNotification{
+			HelperSomeoneAdmiredYourPostNotificationData: model.HelperSomeoneAdmiredYourPostNotificationData{
+				OwnerID:          notif.OwnerID,
+				PostID:           notif.FeedEventID,
+				NotificationData: notif.Data,
+			},
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
+			Count:        &amount,
+			Post:         nil, // handled by dedicated resolver
+			Admirers:     nil, // handled by dedicated resolver
+		}, nil
+	case persist.ActionCommentedOnPost:
+		return model.SomeoneCommentedOnYourPostNotification{
+			HelperSomeoneCommentedOnYourPostNotificationData: model.HelperSomeoneCommentedOnYourPostNotificationData{
+				OwnerID:          notif.OwnerID,
+				PostID:           notif.PostID,
+				CommentID:        notif.CommentID,
+				NotificationData: notif.Data,
+			},
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
+			Post:         nil, // handled by dedicated resolver
 			Comment:      nil, // handled by dedicated resolver
 		}, nil
 	case persist.ActionUserFollowedUsers:
@@ -1166,12 +1267,68 @@ func feedEventToDataModel(event *db.FeedEvent) (model.FeedEventData, error) {
 	}
 }
 
-func feedEventToModel(event *db.FeedEvent) (*model.FeedEvent, error) {
-	data, err := feedEventToDataModel(event)
-	if err != nil {
-		return nil, err
-	}
+func feedEntityToModel(event any) (model.FeedEventOrError, error) {
+	// Value always returns a nil error so we can safely ignore it.
 
+	switch event := event.(type) {
+	case db.Post:
+		caption, _ := event.Caption.Value()
+
+		var captionVal *string
+		if caption != nil {
+			captionVal = util.ToPointer(caption.(string))
+		}
+		return &model.Post{
+			HelperPostData: model.HelperPostData{
+				TokenIDs: event.TokenIds,
+			},
+			Dbid:    event.ID,
+			Caption: captionVal,
+		}, nil
+	case db.FeedEvent:
+		var groupID sql.NullString
+		if event.GroupID.String != "" {
+			groupID = sql.NullString{
+				String: event.GroupID.String,
+				Valid:  true,
+			}
+		}
+		data, err := feedEventToDataModel(&db.FeedEvent{
+			ID:          event.ID,
+			Version:     event.Version,
+			OwnerID:     event.OwnerID,
+			Action:      event.Action,
+			Data:        event.Data,
+			EventTime:   event.EventTime,
+			EventIds:    event.EventIds,
+			Deleted:     event.Deleted,
+			LastUpdated: event.LastUpdated,
+			CreatedAt:   event.CreatedAt,
+			Caption:     event.Caption,
+			GroupID:     groupID,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		caption, _ := event.Caption.Value()
+
+		var captionVal *string
+		if caption != nil {
+			captionVal = util.ToPointer(caption.(string))
+		}
+
+		return &model.FeedEvent{
+			Dbid:      event.ID,
+			Caption:   captionVal,
+			EventData: data,
+		}, nil
+	default:
+		panic(fmt.Sprintf("unknown type: %T", event))
+	}
+}
+
+func feedEventToModel(event *db.FeedEvent) (*model.FeedEvent, error) {
 	// Value always returns a nil error so we can safely ignore it.
 	caption, _ := event.Caption.Value()
 
@@ -1180,11 +1337,17 @@ func feedEventToModel(event *db.FeedEvent) (*model.FeedEvent, error) {
 		captionVal = util.ToPointer(caption.(string))
 	}
 
+	data, err := feedEventToDataModel(event)
+	if err != nil {
+		return nil, err
+	}
+
 	return &model.FeedEvent{
 		Dbid:      event.ID,
 		Caption:   captionVal,
 		EventData: data,
 	}, nil
+
 }
 
 func feedEventToUserCreatedFeedEventData(event *db.FeedEvent) model.FeedEventData {
@@ -1397,12 +1560,12 @@ func feedEventToSubEventDatas(ctx context.Context, event db.FeedEvent) ([]model.
 	return result, nil
 }
 
-func eventsToFeedEdges(events []db.FeedEvent) ([]*model.FeedEdge, error) {
+func entitiesToFeedEdges(events []any) ([]*model.FeedEdge, error) {
 	edges := make([]*model.FeedEdge, len(events))
 
 	for i, evt := range events {
 		var node model.FeedEventOrError
-		node, err := feedEventToModel(&evt)
+		node, err := feedEntityToModel(evt)
 
 		if e, ok := err.(*persist.ErrUnknownAction); ok {
 			node = model.ErrUnknownAction{Message: e.Error()}
@@ -1414,6 +1577,25 @@ func eventsToFeedEdges(events []db.FeedEvent) ([]*model.FeedEdge, error) {
 	}
 
 	return edges, nil
+}
+
+func postToModel(event *db.Post) (*model.Post, error) {
+	// Value always returns a nil error so we can safely ignore it.
+	caption, _ := event.Caption.Value()
+
+	var captionVal *string
+	if caption != nil {
+		captionVal = util.ToPointer(caption.(string))
+	}
+
+	return &model.Post{
+		HelperPostData: model.HelperPostData{
+			TokenIDs: event.TokenIds,
+		},
+		Dbid:    event.ID,
+		Caption: captionVal,
+	}, nil
+
 }
 
 func galleryToModel(ctx context.Context, gallery db.Gallery) *model.Gallery {

@@ -100,6 +100,26 @@ func (ec *executionContext) __resolve_entities(ctx context.Context, representati
 				list[idx[i]] = entity
 				return nil
 			}
+		case "Post":
+			resolverName, err := entityResolverNameForPost(ctx, rep)
+			if err != nil {
+				return fmt.Errorf(`finding resolver for Entity "Post": %w`, err)
+			}
+			switch resolverName {
+
+			case "findPostByDbid":
+				id0, err := ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, rep["dbid"])
+				if err != nil {
+					return fmt.Errorf(`unmarshalling param 0 for findPostByDbid(): %w`, err)
+				}
+				entity, err := ec.resolvers.Entity().FindPostByDbid(ctx, id0)
+				if err != nil {
+					return fmt.Errorf(`resolving Entity "Post": %w`, err)
+				}
+
+				list[idx[i]] = entity
+				return nil
+			}
 
 		}
 		return fmt.Errorf("%w: %s", ErrUnknownType, typeName)
@@ -184,4 +204,21 @@ func entityResolverNameForFeedEvent(ctx context.Context, rep map[string]interfac
 		return "findFeedEventByDbid", nil
 	}
 	return "", fmt.Errorf("%w for FeedEvent", ErrTypeNotFound)
+}
+
+func entityResolverNameForPost(ctx context.Context, rep map[string]interface{}) (string, error) {
+	for {
+		var (
+			m   map[string]interface{}
+			val interface{}
+			ok  bool
+		)
+		_ = val
+		m = rep
+		if _, ok = m["dbid"]; !ok {
+			break
+		}
+		return "findPostByDbid", nil
+	}
+	return "", fmt.Errorf("%w for Post", ErrTypeNotFound)
 }

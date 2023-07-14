@@ -65,6 +65,51 @@ func (b *CountAdmiresByFeedEventIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const countAdmiresByPostIDBatch = `-- name: CountAdmiresByPostIDBatch :batchone
+SELECT count(*) FROM admires WHERE post_id = $1 AND deleted = false
+`
+
+type CountAdmiresByPostIDBatchBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+func (q *Queries) CountAdmiresByPostIDBatch(ctx context.Context, postID []persist.DBID) *CountAdmiresByPostIDBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range postID {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(countAdmiresByPostIDBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &CountAdmiresByPostIDBatchBatchResults{br, len(postID), false}
+}
+
+func (b *CountAdmiresByPostIDBatchBatchResults) QueryRow(f func(int, int64, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var count int64
+		if b.closed {
+			if f != nil {
+				f(t, count, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		row := b.br.QueryRow()
+		err := row.Scan(&count)
+		if f != nil {
+			f(t, count, err)
+		}
+	}
+}
+
+func (b *CountAdmiresByPostIDBatchBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const countCommentsByFeedEventIDBatch = `-- name: CountCommentsByFeedEventIDBatch :batchone
 SELECT count(*) FROM comments WHERE feed_event_id = $1 AND deleted = false
 `
@@ -110,6 +155,51 @@ func (b *CountCommentsByFeedEventIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const countCommentsByPostIDBatch = `-- name: CountCommentsByPostIDBatch :batchone
+SELECT count(*) FROM comments WHERE post_id = $1 AND deleted = false
+`
+
+type CountCommentsByPostIDBatchBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+func (q *Queries) CountCommentsByPostIDBatch(ctx context.Context, postID []persist.DBID) *CountCommentsByPostIDBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range postID {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(countCommentsByPostIDBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &CountCommentsByPostIDBatchBatchResults{br, len(postID), false}
+}
+
+func (b *CountCommentsByPostIDBatchBatchResults) QueryRow(f func(int, int64, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var count int64
+		if b.closed {
+			if f != nil {
+				f(t, count, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		row := b.br.QueryRow()
+		err := row.Scan(&count)
+		if f != nil {
+			f(t, count, err)
+		}
+	}
+}
+
+func (b *CountCommentsByPostIDBatchBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const countInteractionsByFeedEventIDBatch = `-- name: CountInteractionsByFeedEventIDBatch :batchmany
 SELECT count(*), $1::int as tag FROM admires t WHERE $1 != 0 AND t.feed_event_id = $2 AND t.deleted = false
                                                         UNION
@@ -123,14 +213,14 @@ type CountInteractionsByFeedEventIDBatchBatchResults struct {
 }
 
 type CountInteractionsByFeedEventIDBatchParams struct {
-	AdmireTag   int32
-	FeedEventID persist.DBID
-	CommentTag  int32
+	AdmireTag   int32        `json:"admire_tag"`
+	FeedEventID persist.DBID `json:"feed_event_id"`
+	CommentTag  int32        `json:"comment_tag"`
 }
 
 type CountInteractionsByFeedEventIDBatchRow struct {
-	Count int64
-	Tag   int32
+	Count int64 `json:"count"`
+	Tag   int32 `json:"tag"`
 }
 
 func (q *Queries) CountInteractionsByFeedEventIDBatch(ctx context.Context, arg []CountInteractionsByFeedEventIDBatchParams) *CountInteractionsByFeedEventIDBatchBatchResults {
@@ -183,8 +273,81 @@ func (b *CountInteractionsByFeedEventIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const countInteractionsByPostIDBatch = `-- name: CountInteractionsByPostIDBatch :batchmany
+SELECT count(*), $1::int as tag FROM admires t WHERE $1 != 0 AND t.post_id = $2 AND t.deleted = false
+                                                        UNION
+SELECT count(*), $3::int as tag FROM comments t WHERE $3 != 0 AND t.post_id = $2 AND t.deleted = false
+`
+
+type CountInteractionsByPostIDBatchBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type CountInteractionsByPostIDBatchParams struct {
+	AdmireTag  int32        `json:"admire_tag"`
+	PostID     persist.DBID `json:"post_id"`
+	CommentTag int32        `json:"comment_tag"`
+}
+
+type CountInteractionsByPostIDBatchRow struct {
+	Count int64 `json:"count"`
+	Tag   int32 `json:"tag"`
+}
+
+func (q *Queries) CountInteractionsByPostIDBatch(ctx context.Context, arg []CountInteractionsByPostIDBatchParams) *CountInteractionsByPostIDBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.AdmireTag,
+			a.PostID,
+			a.CommentTag,
+		}
+		batch.Queue(countInteractionsByPostIDBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &CountInteractionsByPostIDBatchBatchResults{br, len(arg), false}
+}
+
+func (b *CountInteractionsByPostIDBatchBatchResults) Query(f func(int, []CountInteractionsByPostIDBatchRow, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var items []CountInteractionsByPostIDBatchRow
+		if b.closed {
+			if f != nil {
+				f(t, items, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		err := func() error {
+			rows, err := b.br.Query()
+			defer rows.Close()
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var i CountInteractionsByPostIDBatchRow
+				if err := rows.Scan(&i.Count, &i.Tag); err != nil {
+					return err
+				}
+				items = append(items, i)
+			}
+			return rows.Err()
+		}()
+		if f != nil {
+			f(t, items, err)
+		}
+	}
+}
+
+func (b *CountInteractionsByPostIDBatchBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const getAdmireByActorIDAndFeedEventID = `-- name: GetAdmireByActorIDAndFeedEventID :batchone
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated FROM admires WHERE actor_id = $1 AND feed_event_id = $2 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id FROM admires WHERE actor_id = $1 AND feed_event_id = $2 AND deleted = false
 `
 
 type GetAdmireByActorIDAndFeedEventIDBatchResults struct {
@@ -194,8 +357,8 @@ type GetAdmireByActorIDAndFeedEventIDBatchResults struct {
 }
 
 type GetAdmireByActorIDAndFeedEventIDParams struct {
-	ActorID     persist.DBID
-	FeedEventID persist.DBID
+	ActorID     persist.DBID `json:"actor_id"`
+	FeedEventID persist.DBID `json:"feed_event_id"`
 }
 
 func (q *Queries) GetAdmireByActorIDAndFeedEventID(ctx context.Context, arg []GetAdmireByActorIDAndFeedEventIDParams) *GetAdmireByActorIDAndFeedEventIDBatchResults {
@@ -230,6 +393,7 @@ func (b *GetAdmireByActorIDAndFeedEventIDBatchResults) QueryRow(f func(int, Admi
 			&i.Deleted,
 			&i.CreatedAt,
 			&i.LastUpdated,
+			&i.PostID,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -242,8 +406,68 @@ func (b *GetAdmireByActorIDAndFeedEventIDBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getAdmireByActorIDAndPostID = `-- name: GetAdmireByActorIDAndPostID :batchone
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id FROM admires WHERE actor_id = $1 AND post_id = $2 AND deleted = false
+`
+
+type GetAdmireByActorIDAndPostIDBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type GetAdmireByActorIDAndPostIDParams struct {
+	ActorID persist.DBID `json:"actor_id"`
+	PostID  persist.DBID `json:"post_id"`
+}
+
+func (q *Queries) GetAdmireByActorIDAndPostID(ctx context.Context, arg []GetAdmireByActorIDAndPostIDParams) *GetAdmireByActorIDAndPostIDBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.ActorID,
+			a.PostID,
+		}
+		batch.Queue(getAdmireByActorIDAndPostID, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetAdmireByActorIDAndPostIDBatchResults{br, len(arg), false}
+}
+
+func (b *GetAdmireByActorIDAndPostIDBatchResults) QueryRow(f func(int, Admire, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var i Admire
+		if b.closed {
+			if f != nil {
+				f(t, i, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		row := b.br.QueryRow()
+		err := row.Scan(
+			&i.ID,
+			&i.Version,
+			&i.FeedEventID,
+			&i.ActorID,
+			&i.Deleted,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.PostID,
+		)
+		if f != nil {
+			f(t, i, err)
+		}
+	}
+}
+
+func (b *GetAdmireByActorIDAndPostIDBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const getAdmireByAdmireIDBatch = `-- name: GetAdmireByAdmireIDBatch :batchone
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated FROM admires WHERE id = $1 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id FROM admires WHERE id = $1 AND deleted = false
 `
 
 type GetAdmireByAdmireIDBatchBatchResults struct {
@@ -283,6 +507,7 @@ func (b *GetAdmireByAdmireIDBatchBatchResults) QueryRow(f func(int, Admire, erro
 			&i.Deleted,
 			&i.CreatedAt,
 			&i.LastUpdated,
+			&i.PostID,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -296,7 +521,7 @@ func (b *GetAdmireByAdmireIDBatchBatchResults) Close() error {
 }
 
 const getAdmiresByActorIDBatch = `-- name: GetAdmiresByActorIDBatch :batchmany
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated FROM admires WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id FROM admires WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC
 `
 
 type GetAdmiresByActorIDBatchBatchResults struct {
@@ -343,6 +568,7 @@ func (b *GetAdmiresByActorIDBatchBatchResults) Query(f func(int, []Admire, error
 					&i.Deleted,
 					&i.CreatedAt,
 					&i.LastUpdated,
+					&i.PostID,
 				); err != nil {
 					return err
 				}
@@ -380,13 +606,13 @@ type GetChildContractsByParentIDBatchPaginateBatchResults struct {
 }
 
 type GetChildContractsByParentIDBatchPaginateParams struct {
-	ParentID      persist.DBID
-	CurBeforeTime time.Time
-	CurBeforeID   persist.DBID
-	CurAfterTime  time.Time
-	CurAfterID    persist.DBID
-	PagingForward bool
-	Limit         int32
+	ParentID      persist.DBID `json:"parent_id"`
+	CurBeforeTime time.Time    `json:"cur_before_time"`
+	CurBeforeID   persist.DBID `json:"cur_before_id"`
+	CurAfterTime  time.Time    `json:"cur_after_time"`
+	CurAfterID    persist.DBID `json:"cur_after_id"`
+	PagingForward bool         `json:"paging_forward"`
+	Limit         int32        `json:"limit"`
 }
 
 func (q *Queries) GetChildContractsByParentIDBatchPaginate(ctx context.Context, arg []GetChildContractsByParentIDBatchPaginateParams) *GetChildContractsByParentIDBatchPaginateBatchResults {
@@ -597,7 +823,7 @@ func (b *GetCollectionsByGalleryIdBatchBatchResults) Close() error {
 }
 
 const getCommentByCommentIDBatch = `-- name: GetCommentByCommentIDBatch :batchone
-SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated FROM comments WHERE id = $1 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id FROM comments WHERE id = $1 AND deleted = false
 `
 
 type GetCommentByCommentIDBatchBatchResults struct {
@@ -639,6 +865,7 @@ func (b *GetCommentByCommentIDBatchBatchResults) QueryRow(f func(int, Comment, e
 			&i.Deleted,
 			&i.CreatedAt,
 			&i.LastUpdated,
+			&i.PostID,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -652,7 +879,7 @@ func (b *GetCommentByCommentIDBatchBatchResults) Close() error {
 }
 
 const getCommentsByActorIDBatch = `-- name: GetCommentsByActorIDBatch :batchmany
-SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated FROM comments WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id FROM comments WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC
 `
 
 type GetCommentsByActorIDBatchBatchResults struct {
@@ -701,6 +928,7 @@ func (b *GetCommentsByActorIDBatchBatchResults) Query(f func(int, []Comment, err
 					&i.Deleted,
 					&i.CreatedAt,
 					&i.LastUpdated,
+					&i.PostID,
 				); err != nil {
 					return err
 				}
@@ -730,8 +958,8 @@ type GetContractByChainAddressBatchBatchResults struct {
 }
 
 type GetContractByChainAddressBatchParams struct {
-	Address persist.Address
-	Chain   persist.Chain
+	Address persist.Address `json:"address"`
+	Chain   persist.Chain   `json:"chain"`
 }
 
 func (q *Queries) GetContractByChainAddressBatch(ctx context.Context, arg []GetContractByChainAddressBatchParams) *GetContractByChainAddressBatchBatchResults {
@@ -907,15 +1135,15 @@ type GetCreatedContractsBatchPaginateBatchResults struct {
 }
 
 type GetCreatedContractsBatchPaginateParams struct {
-	UserID           persist.DBID
-	IncludeAllChains bool
-	Chains           string
-	CurBeforeTime    time.Time
-	CurBeforeID      persist.DBID
-	CurAfterTime     time.Time
-	CurAfterID       persist.DBID
-	PagingForward    bool
-	Limit            int32
+	UserID           persist.DBID `json:"user_id"`
+	IncludeAllChains bool         `json:"include_all_chains"`
+	Chains           string       `json:"chains"`
+	CurBeforeTime    time.Time    `json:"cur_before_time"`
+	CurBeforeID      persist.DBID `json:"cur_before_id"`
+	CurAfterTime     time.Time    `json:"cur_after_time"`
+	CurAfterID       persist.DBID `json:"cur_after_id"`
+	PagingForward    bool         `json:"paging_forward"`
+	Limit            int32        `json:"limit"`
 }
 
 func (q *Queries) GetCreatedContractsBatchPaginate(ctx context.Context, arg []GetCreatedContractsBatchPaginateParams) *GetCreatedContractsBatchPaginateBatchResults {
@@ -1602,7 +1830,7 @@ func (b *GetNewTokensByFeedEventIdBatchBatchResults) Close() error {
 }
 
 const getNotificationByIDBatch = `-- name: GetNotificationByIDBatch :batchone
-SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount FROM notifications WHERE id = $1 AND deleted = false
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id FROM notifications WHERE id = $1 AND deleted = false
 `
 
 type GetNotificationByIDBatchBatchResults struct {
@@ -1649,6 +1877,7 @@ func (b *GetNotificationByIDBatchBatchResults) QueryRow(f func(int, Notification
 			&i.GalleryID,
 			&i.Seen,
 			&i.Amount,
+			&i.PostID,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -1682,16 +1911,16 @@ type GetOwnersByContractIdBatchPaginateBatchResults struct {
 }
 
 type GetOwnersByContractIdBatchPaginateParams struct {
-	ID                 persist.DBID
-	GalleryUsersOnly   bool
-	CurBeforeUniversal bool
-	CurBeforeTime      time.Time
-	CurBeforeID        persist.DBID
-	CurAfterUniversal  bool
-	CurAfterTime       time.Time
-	CurAfterID         persist.DBID
-	PagingForward      bool
-	Limit              sql.NullInt32
+	ID                 persist.DBID  `json:"id"`
+	GalleryUsersOnly   bool          `json:"gallery_users_only"`
+	CurBeforeUniversal bool          `json:"cur_before_universal"`
+	CurBeforeTime      time.Time     `json:"cur_before_time"`
+	CurBeforeID        persist.DBID  `json:"cur_before_id"`
+	CurAfterUniversal  bool          `json:"cur_after_universal"`
+	CurAfterTime       time.Time     `json:"cur_after_time"`
+	CurAfterID         persist.DBID  `json:"cur_after_id"`
+	PagingForward      bool          `json:"paging_forward"`
+	Limit              sql.NullInt32 `json:"limit"`
 }
 
 // Note: sqlc has trouble recognizing that the output of the "select distinct" subquery below will
@@ -1776,6 +2005,61 @@ func (b *GetOwnersByContractIdBatchPaginateBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getPostByIdBatch = `-- name: GetPostByIdBatch :batchone
+SELECT id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted FROM posts WHERE id = $1 AND deleted = false
+`
+
+type GetPostByIdBatchBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+func (q *Queries) GetPostByIdBatch(ctx context.Context, id []persist.DBID) *GetPostByIdBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range id {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(getPostByIdBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetPostByIdBatchBatchResults{br, len(id), false}
+}
+
+func (b *GetPostByIdBatchBatchResults) QueryRow(f func(int, Post, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var i Post
+		if b.closed {
+			if f != nil {
+				f(t, i, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		row := b.br.QueryRow()
+		err := row.Scan(
+			&i.ID,
+			&i.Version,
+			&i.TokenIds,
+			&i.ContractIds,
+			&i.ActorID,
+			&i.Caption,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Deleted,
+		)
+		if f != nil {
+			f(t, i, err)
+		}
+	}
+}
+
+func (b *GetPostByIdBatchBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const getProfileImageByID = `-- name: GetProfileImageByID :batchone
 select id, user_id, token_id, source_type, deleted, created_at, last_updated, wallet_id, ens_avatar_uri, ens_domain from profile_images pfp
 where pfp.id = $1
@@ -1797,9 +2081,9 @@ type GetProfileImageByIDBatchResults struct {
 }
 
 type GetProfileImageByIDParams struct {
-	ID              persist.DBID
-	EnsSourceType   persist.ProfileImageSource
-	TokenSourceType persist.ProfileImageSource
+	ID              persist.DBID               `json:"id"`
+	EnsSourceType   persist.ProfileImageSource `json:"ens_source_type"`
+	TokenSourceType persist.ProfileImageSource `json:"token_source_type"`
 }
 
 func (q *Queries) GetProfileImageByID(ctx context.Context, arg []GetProfileImageByIDParams) *GetProfileImageByIDBatchResults {
@@ -1896,42 +2180,42 @@ type GetSharedContractsBatchPaginateBatchResults struct {
 }
 
 type GetSharedContractsBatchPaginateParams struct {
-	UserAID                   persist.DBID
-	UserBID                   persist.DBID
-	CurBeforeDisplayedByUserA bool
-	CurBeforeDisplayedByUserB bool
-	CurBeforeOwnedCount       int32
-	CurBeforeContractID       persist.DBID
-	CurAfterDisplayedByUserA  bool
-	CurAfterDisplayedByUserB  bool
-	CurAfterOwnedCount        int32
-	CurAfterContractID        persist.DBID
-	PagingForward             bool
-	Limit                     int32
+	UserAID                   persist.DBID `json:"user_a_id"`
+	UserBID                   persist.DBID `json:"user_b_id"`
+	CurBeforeDisplayedByUserA bool         `json:"cur_before_displayed_by_user_a"`
+	CurBeforeDisplayedByUserB bool         `json:"cur_before_displayed_by_user_b"`
+	CurBeforeOwnedCount       int32        `json:"cur_before_owned_count"`
+	CurBeforeContractID       persist.DBID `json:"cur_before_contract_id"`
+	CurAfterDisplayedByUserA  bool         `json:"cur_after_displayed_by_user_a"`
+	CurAfterDisplayedByUserB  bool         `json:"cur_after_displayed_by_user_b"`
+	CurAfterOwnedCount        int32        `json:"cur_after_owned_count"`
+	CurAfterContractID        persist.DBID `json:"cur_after_contract_id"`
+	PagingForward             bool         `json:"paging_forward"`
+	Limit                     int32        `json:"limit"`
 }
 
 type GetSharedContractsBatchPaginateRow struct {
-	ID                    persist.DBID
-	Deleted               bool
-	Version               sql.NullInt32
-	CreatedAt             time.Time
-	LastUpdated           time.Time
-	Name                  sql.NullString
-	Symbol                sql.NullString
-	Address               persist.Address
-	CreatorAddress        persist.Address
-	Chain                 persist.Chain
-	ProfileBannerUrl      sql.NullString
-	ProfileImageUrl       sql.NullString
-	BadgeUrl              sql.NullString
-	Description           sql.NullString
-	OwnerAddress          persist.Address
-	IsProviderMarkedSpam  bool
-	ParentID              persist.DBID
-	OverrideCreatorUserID persist.DBID
-	DisplayedByUserA      bool
-	DisplayedByUserB      bool
-	OwnedCount            int64
+	ID                    persist.DBID    `json:"id"`
+	Deleted               bool            `json:"deleted"`
+	Version               sql.NullInt32   `json:"version"`
+	CreatedAt             time.Time       `json:"created_at"`
+	LastUpdated           time.Time       `json:"last_updated"`
+	Name                  sql.NullString  `json:"name"`
+	Symbol                sql.NullString  `json:"symbol"`
+	Address               persist.Address `json:"address"`
+	CreatorAddress        persist.Address `json:"creator_address"`
+	Chain                 persist.Chain   `json:"chain"`
+	ProfileBannerUrl      sql.NullString  `json:"profile_banner_url"`
+	ProfileImageUrl       sql.NullString  `json:"profile_image_url"`
+	BadgeUrl              sql.NullString  `json:"badge_url"`
+	Description           sql.NullString  `json:"description"`
+	OwnerAddress          persist.Address `json:"owner_address"`
+	IsProviderMarkedSpam  bool            `json:"is_provider_marked_spam"`
+	ParentID              persist.DBID    `json:"parent_id"`
+	OverrideCreatorUserID persist.DBID    `json:"override_creator_user_id"`
+	DisplayedByUserA      bool            `json:"displayed_by_user_a"`
+	DisplayedByUserB      bool            `json:"displayed_by_user_b"`
+	OwnedCount            int64           `json:"owned_count"`
 }
 
 func (q *Queries) GetSharedContractsBatchPaginate(ctx context.Context, arg []GetSharedContractsBatchPaginateParams) *GetSharedContractsBatchPaginateBatchResults {
@@ -2039,36 +2323,36 @@ type GetSharedFollowersBatchPaginateBatchResults struct {
 }
 
 type GetSharedFollowersBatchPaginateParams struct {
-	Follower      persist.DBID
-	Followee      persist.DBID
-	CurBeforeTime time.Time
-	CurBeforeID   persist.DBID
-	CurAfterTime  time.Time
-	CurAfterID    persist.DBID
-	PagingForward bool
-	Limit         int32
+	Follower      persist.DBID `json:"follower"`
+	Followee      persist.DBID `json:"followee"`
+	CurBeforeTime time.Time    `json:"cur_before_time"`
+	CurBeforeID   persist.DBID `json:"cur_before_id"`
+	CurAfterTime  time.Time    `json:"cur_after_time"`
+	CurAfterID    persist.DBID `json:"cur_after_id"`
+	PagingForward bool         `json:"paging_forward"`
+	Limit         int32        `json:"limit"`
 }
 
 type GetSharedFollowersBatchPaginateRow struct {
-	ID                   persist.DBID
-	Deleted              bool
-	Version              sql.NullInt32
-	LastUpdated          time.Time
-	CreatedAt            time.Time
-	Username             sql.NullString
-	UsernameIdempotent   sql.NullString
-	Wallets              persist.WalletList
-	Bio                  sql.NullString
-	Traits               pgtype.JSONB
-	Universal            bool
-	NotificationSettings persist.UserNotificationSettings
-	EmailVerified        persist.EmailVerificationStatus
-	EmailUnsubscriptions persist.EmailUnsubscriptions
-	FeaturedGallery      *persist.DBID
-	PrimaryWalletID      persist.DBID
-	UserExperiences      pgtype.JSONB
-	ProfileImageID       persist.DBID
-	FollowedOn           time.Time
+	ID                   persist.DBID                     `json:"id"`
+	Deleted              bool                             `json:"deleted"`
+	Version              sql.NullInt32                    `json:"version"`
+	LastUpdated          time.Time                        `json:"last_updated"`
+	CreatedAt            time.Time                        `json:"created_at"`
+	Username             sql.NullString                   `json:"username"`
+	UsernameIdempotent   sql.NullString                   `json:"username_idempotent"`
+	Wallets              persist.WalletList               `json:"wallets"`
+	Bio                  sql.NullString                   `json:"bio"`
+	Traits               pgtype.JSONB                     `json:"traits"`
+	Universal            bool                             `json:"universal"`
+	NotificationSettings persist.UserNotificationSettings `json:"notification_settings"`
+	EmailVerified        persist.EmailVerificationStatus  `json:"email_verified"`
+	EmailUnsubscriptions persist.EmailUnsubscriptions     `json:"email_unsubscriptions"`
+	FeaturedGallery      *persist.DBID                    `json:"featured_gallery"`
+	PrimaryWalletID      persist.DBID                     `json:"primary_wallet_id"`
+	UserExperiences      pgtype.JSONB                     `json:"user_experiences"`
+	ProfileImageID       persist.DBID                     `json:"profile_image_id"`
+	FollowedOn           time.Time                        `json:"followed_on"`
 }
 
 func (q *Queries) GetSharedFollowersBatchPaginate(ctx context.Context, arg []GetSharedFollowersBatchPaginateParams) *GetSharedFollowersBatchPaginateBatchResults {
@@ -2160,10 +2444,10 @@ type GetTokenByHolderIdContractAddressAndTokenIdBatchBatchResults struct {
 }
 
 type GetTokenByHolderIdContractAddressAndTokenIdBatchParams struct {
-	HolderID        persist.DBID
-	TokenID         persist.TokenID
-	ContractAddress persist.Address
-	Chain           persist.Chain
+	HolderID        persist.DBID    `json:"holder_id"`
+	TokenID         persist.TokenID `json:"token_id"`
+	ContractAddress persist.Address `json:"contract_address"`
+	Chain           persist.Chain   `json:"chain"`
 }
 
 func (q *Queries) GetTokenByHolderIdContractAddressAndTokenIdBatch(ctx context.Context, arg []GetTokenByHolderIdContractAddressAndTokenIdBatchParams) *GetTokenByHolderIdContractAddressAndTokenIdBatchBatchResults {
@@ -2390,8 +2674,8 @@ type GetTokensByCollectionIdBatchBatchResults struct {
 }
 
 type GetTokensByCollectionIdBatchParams struct {
-	CollectionID persist.DBID
-	Limit        sql.NullInt32
+	CollectionID persist.DBID  `json:"collection_id"`
+	Limit        sql.NullInt32 `json:"limit"`
 }
 
 func (q *Queries) GetTokensByCollectionIdBatch(ctx context.Context, arg []GetTokensByCollectionIdBatchParams) *GetTokensByCollectionIdBatchBatchResults {
@@ -2486,8 +2770,8 @@ type GetTokensByUserIdAndChainBatchBatchResults struct {
 }
 
 type GetTokensByUserIdAndChainBatchParams struct {
-	OwnerUserID persist.DBID
-	Chain       persist.Chain
+	OwnerUserID persist.DBID  `json:"owner_user_id"`
+	Chain       persist.Chain `json:"chain"`
 }
 
 func (q *Queries) GetTokensByUserIdAndChainBatch(ctx context.Context, arg []GetTokensByUserIdAndChainBatchParams) *GetTokensByUserIdAndChainBatchBatchResults {
@@ -2582,9 +2866,9 @@ type GetTokensByUserIdBatchBatchResults struct {
 }
 
 type GetTokensByUserIdBatchParams struct {
-	OwnerUserID    persist.DBID
-	IncludeHolder  bool
-	IncludeCreator bool
+	OwnerUserID    persist.DBID `json:"owner_user_id"`
+	IncludeHolder  bool         `json:"include_holder"`
+	IncludeCreator bool         `json:"include_creator"`
 }
 
 func (q *Queries) GetTokensByUserIdBatch(ctx context.Context, arg []GetTokensByUserIdBatchParams) *GetTokensByUserIdBatchBatchResults {
@@ -2767,8 +3051,8 @@ type GetUserByAddressBatchBatchResults struct {
 }
 
 type GetUserByAddressBatchParams struct {
-	Address persist.Address
-	Chain   int32
+	Address persist.Address `json:"address"`
+	Chain   int32           `json:"chain"`
 }
 
 func (q *Queries) GetUserByAddressBatch(ctx context.Context, arg []GetUserByAddressBatchParams) *GetUserByAddressBatchBatchResults {
@@ -2955,7 +3239,7 @@ func (b *GetUserByUsernameBatchBatchResults) Close() error {
 }
 
 const getUserNotificationsBatch = `-- name: GetUserNotificationsBatch :batchmany
-SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount FROM notifications WHERE owner_id = $1 AND deleted = false
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id FROM notifications WHERE owner_id = $1 AND deleted = false
     AND (created_at, id) < ($2, $3)
     AND (created_at, id) > ($4, $5)
     ORDER BY CASE WHEN $6::bool THEN (created_at, id) END ASC,
@@ -2970,13 +3254,13 @@ type GetUserNotificationsBatchBatchResults struct {
 }
 
 type GetUserNotificationsBatchParams struct {
-	OwnerID       persist.DBID
-	CurBeforeTime time.Time
-	CurBeforeID   persist.DBID
-	CurAfterTime  time.Time
-	CurAfterID    persist.DBID
-	PagingForward bool
-	Limit         int32
+	OwnerID       persist.DBID `json:"owner_id"`
+	CurBeforeTime time.Time    `json:"cur_before_time"`
+	CurBeforeID   persist.DBID `json:"cur_before_id"`
+	CurAfterTime  time.Time    `json:"cur_after_time"`
+	CurAfterID    persist.DBID `json:"cur_after_id"`
+	PagingForward bool         `json:"paging_forward"`
+	Limit         int32        `json:"limit"`
 }
 
 func (q *Queries) GetUserNotificationsBatch(ctx context.Context, arg []GetUserNotificationsBatchParams) *GetUserNotificationsBatchBatchResults {
@@ -3030,6 +3314,7 @@ func (b *GetUserNotificationsBatchBatchResults) Query(f func(int, []Notification
 					&i.GalleryID,
 					&i.Seen,
 					&i.Amount,
+					&i.PostID,
 				); err != nil {
 					return err
 				}
@@ -3136,8 +3421,8 @@ type GetWalletByChainAddressBatchBatchResults struct {
 }
 
 type GetWalletByChainAddressBatchParams struct {
-	Address persist.Address
-	Chain   persist.Chain
+	Address persist.Address `json:"address"`
+	Chain   persist.Chain   `json:"chain"`
 }
 
 func (q *Queries) GetWalletByChainAddressBatch(ctx context.Context, arg []GetWalletByChainAddressBatchParams) *GetWalletByChainAddressBatchBatchResults {
@@ -3307,7 +3592,7 @@ func (b *GetWalletsByUserIDBatchBatchResults) Close() error {
 }
 
 const paginateAdmiresByFeedEventIDBatch = `-- name: PaginateAdmiresByFeedEventIDBatch :batchmany
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated FROM admires WHERE feed_event_id = $1 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id FROM admires WHERE feed_event_id = $1 AND deleted = false
     AND (created_at, id) < ($2, $3) AND (created_at, id) > ($4, $5)
     ORDER BY CASE WHEN $6::bool THEN (created_at, id) END ASC,
              CASE WHEN NOT $6::bool THEN (created_at, id) END DESC
@@ -3321,13 +3606,13 @@ type PaginateAdmiresByFeedEventIDBatchBatchResults struct {
 }
 
 type PaginateAdmiresByFeedEventIDBatchParams struct {
-	FeedEventID   persist.DBID
-	CurBeforeTime time.Time
-	CurBeforeID   persist.DBID
-	CurAfterTime  time.Time
-	CurAfterID    persist.DBID
-	PagingForward bool
-	Limit         int32
+	FeedEventID   persist.DBID `json:"feed_event_id"`
+	CurBeforeTime time.Time    `json:"cur_before_time"`
+	CurBeforeID   persist.DBID `json:"cur_before_id"`
+	CurAfterTime  time.Time    `json:"cur_after_time"`
+	CurAfterID    persist.DBID `json:"cur_after_id"`
+	PagingForward bool         `json:"paging_forward"`
+	Limit         int32        `json:"limit"`
 }
 
 func (q *Queries) PaginateAdmiresByFeedEventIDBatch(ctx context.Context, arg []PaginateAdmiresByFeedEventIDBatchParams) *PaginateAdmiresByFeedEventIDBatchBatchResults {
@@ -3374,6 +3659,7 @@ func (b *PaginateAdmiresByFeedEventIDBatchBatchResults) Query(f func(int, []Admi
 					&i.Deleted,
 					&i.CreatedAt,
 					&i.LastUpdated,
+					&i.PostID,
 				); err != nil {
 					return err
 				}
@@ -3392,8 +3678,95 @@ func (b *PaginateAdmiresByFeedEventIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const paginateAdmiresByPostIDBatch = `-- name: PaginateAdmiresByPostIDBatch :batchmany
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id FROM admires WHERE post_id = $1 AND deleted = false
+    AND (created_at, id) < ($2, $3) AND (created_at, id) > ($4, $5)
+    ORDER BY CASE WHEN $6::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT $6::bool THEN (created_at, id) END DESC
+    LIMIT $7
+`
+
+type PaginateAdmiresByPostIDBatchBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type PaginateAdmiresByPostIDBatchParams struct {
+	PostID        persist.DBID `json:"post_id"`
+	CurBeforeTime time.Time    `json:"cur_before_time"`
+	CurBeforeID   persist.DBID `json:"cur_before_id"`
+	CurAfterTime  time.Time    `json:"cur_after_time"`
+	CurAfterID    persist.DBID `json:"cur_after_id"`
+	PagingForward bool         `json:"paging_forward"`
+	Limit         int32        `json:"limit"`
+}
+
+func (q *Queries) PaginateAdmiresByPostIDBatch(ctx context.Context, arg []PaginateAdmiresByPostIDBatchParams) *PaginateAdmiresByPostIDBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.PostID,
+			a.CurBeforeTime,
+			a.CurBeforeID,
+			a.CurAfterTime,
+			a.CurAfterID,
+			a.PagingForward,
+			a.Limit,
+		}
+		batch.Queue(paginateAdmiresByPostIDBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &PaginateAdmiresByPostIDBatchBatchResults{br, len(arg), false}
+}
+
+func (b *PaginateAdmiresByPostIDBatchBatchResults) Query(f func(int, []Admire, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var items []Admire
+		if b.closed {
+			if f != nil {
+				f(t, items, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		err := func() error {
+			rows, err := b.br.Query()
+			defer rows.Close()
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var i Admire
+				if err := rows.Scan(
+					&i.ID,
+					&i.Version,
+					&i.FeedEventID,
+					&i.ActorID,
+					&i.Deleted,
+					&i.CreatedAt,
+					&i.LastUpdated,
+					&i.PostID,
+				); err != nil {
+					return err
+				}
+				items = append(items, i)
+			}
+			return rows.Err()
+		}()
+		if f != nil {
+			f(t, items, err)
+		}
+	}
+}
+
+func (b *PaginateAdmiresByPostIDBatchBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const paginateCommentsByFeedEventIDBatch = `-- name: PaginateCommentsByFeedEventIDBatch :batchmany
-SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated FROM comments WHERE feed_event_id = $1 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id FROM comments WHERE feed_event_id = $1 AND deleted = false
     AND (created_at, id) < ($2, $3)
     AND (created_at, id) > ($4, $5)
     ORDER BY CASE WHEN $6::bool THEN (created_at, id) END ASC,
@@ -3408,13 +3781,13 @@ type PaginateCommentsByFeedEventIDBatchBatchResults struct {
 }
 
 type PaginateCommentsByFeedEventIDBatchParams struct {
-	FeedEventID   persist.DBID
-	CurBeforeTime time.Time
-	CurBeforeID   persist.DBID
-	CurAfterTime  time.Time
-	CurAfterID    persist.DBID
-	PagingForward bool
-	Limit         int32
+	FeedEventID   persist.DBID `json:"feed_event_id"`
+	CurBeforeTime time.Time    `json:"cur_before_time"`
+	CurBeforeID   persist.DBID `json:"cur_before_id"`
+	CurAfterTime  time.Time    `json:"cur_after_time"`
+	CurAfterID    persist.DBID `json:"cur_after_id"`
+	PagingForward bool         `json:"paging_forward"`
+	Limit         int32        `json:"limit"`
 }
 
 func (q *Queries) PaginateCommentsByFeedEventIDBatch(ctx context.Context, arg []PaginateCommentsByFeedEventIDBatchParams) *PaginateCommentsByFeedEventIDBatchBatchResults {
@@ -3463,6 +3836,7 @@ func (b *PaginateCommentsByFeedEventIDBatchBatchResults) Query(f func(int, []Com
 					&i.Deleted,
 					&i.CreatedAt,
 					&i.LastUpdated,
+					&i.PostID,
 				); err != nil {
 					return err
 				}
@@ -3481,34 +3855,36 @@ func (b *PaginateCommentsByFeedEventIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
-const paginateGlobalFeed = `-- name: PaginateGlobalFeed :batchmany
-SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption, group_id FROM feed_events WHERE deleted = false
-    AND (event_time, id) < ($1, $2)
-    AND (event_time, id) > ($3, $4)
-    ORDER BY CASE WHEN $5::bool THEN (event_time, id) END ASC,
-            CASE WHEN NOT $5::bool THEN (event_time, id) END DESC
-    LIMIT $6
+const paginateCommentsByPostIDBatch = `-- name: PaginateCommentsByPostIDBatch :batchmany
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id FROM comments WHERE post_id = $1 AND deleted = false
+    AND (created_at, id) < ($2, $3)
+    AND (created_at, id) > ($4, $5)
+    ORDER BY CASE WHEN $6::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT $6::bool THEN (created_at, id) END DESC
+    LIMIT $7
 `
 
-type PaginateGlobalFeedBatchResults struct {
+type PaginateCommentsByPostIDBatchBatchResults struct {
 	br     pgx.BatchResults
 	tot    int
 	closed bool
 }
 
-type PaginateGlobalFeedParams struct {
-	CurBeforeTime time.Time
-	CurBeforeID   persist.DBID
-	CurAfterTime  time.Time
-	CurAfterID    persist.DBID
-	PagingForward bool
-	Limit         int32
+type PaginateCommentsByPostIDBatchParams struct {
+	PostID        persist.DBID `json:"post_id"`
+	CurBeforeTime time.Time    `json:"cur_before_time"`
+	CurBeforeID   persist.DBID `json:"cur_before_id"`
+	CurAfterTime  time.Time    `json:"cur_after_time"`
+	CurAfterID    persist.DBID `json:"cur_after_id"`
+	PagingForward bool         `json:"paging_forward"`
+	Limit         int32        `json:"limit"`
 }
 
-func (q *Queries) PaginateGlobalFeed(ctx context.Context, arg []PaginateGlobalFeedParams) *PaginateGlobalFeedBatchResults {
+func (q *Queries) PaginateCommentsByPostIDBatch(ctx context.Context, arg []PaginateCommentsByPostIDBatchParams) *PaginateCommentsByPostIDBatchBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range arg {
 		vals := []interface{}{
+			a.PostID,
 			a.CurBeforeTime,
 			a.CurBeforeID,
 			a.CurAfterTime,
@@ -3516,16 +3892,16 @@ func (q *Queries) PaginateGlobalFeed(ctx context.Context, arg []PaginateGlobalFe
 			a.PagingForward,
 			a.Limit,
 		}
-		batch.Queue(paginateGlobalFeed, vals...)
+		batch.Queue(paginateCommentsByPostIDBatch, vals...)
 	}
 	br := q.db.SendBatch(ctx, batch)
-	return &PaginateGlobalFeedBatchResults{br, len(arg), false}
+	return &PaginateCommentsByPostIDBatchBatchResults{br, len(arg), false}
 }
 
-func (b *PaginateGlobalFeedBatchResults) Query(f func(int, []FeedEvent, error)) {
+func (b *PaginateCommentsByPostIDBatchBatchResults) Query(f func(int, []Comment, error)) {
 	defer b.br.Close()
 	for t := 0; t < b.tot; t++ {
-		var items []FeedEvent
+		var items []Comment
 		if b.closed {
 			if f != nil {
 				f(t, items, ErrBatchAlreadyClosed)
@@ -3539,20 +3915,18 @@ func (b *PaginateGlobalFeedBatchResults) Query(f func(int, []FeedEvent, error)) 
 				return err
 			}
 			for rows.Next() {
-				var i FeedEvent
+				var i Comment
 				if err := rows.Scan(
 					&i.ID,
 					&i.Version,
-					&i.OwnerID,
-					&i.Action,
-					&i.Data,
-					&i.EventTime,
-					&i.EventIds,
+					&i.FeedEventID,
+					&i.ActorID,
+					&i.ReplyTo,
+					&i.Comment,
 					&i.Deleted,
-					&i.LastUpdated,
 					&i.CreatedAt,
-					&i.Caption,
-					&i.GroupID,
+					&i.LastUpdated,
+					&i.PostID,
 				); err != nil {
 					return err
 				}
@@ -3566,7 +3940,7 @@ func (b *PaginateGlobalFeedBatchResults) Query(f func(int, []FeedEvent, error)) 
 	}
 }
 
-func (b *PaginateGlobalFeedBatchResults) Close() error {
+func (b *PaginateCommentsByPostIDBatchBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }
@@ -3592,23 +3966,23 @@ type PaginateInteractionsByFeedEventIDBatchBatchResults struct {
 }
 
 type PaginateInteractionsByFeedEventIDBatchParams struct {
-	AdmireTag     int32
-	FeedEventID   persist.DBID
-	CurBeforeTag  int32
-	CurBeforeTime time.Time
-	CurBeforeID   persist.DBID
-	CurAfterTag   int32
-	CurAfterTime  time.Time
-	CurAfterID    persist.DBID
-	CommentTag    int32
-	PagingForward bool
-	Limit         int32
+	AdmireTag     int32        `json:"admire_tag"`
+	FeedEventID   persist.DBID `json:"feed_event_id"`
+	CurBeforeTag  int32        `json:"cur_before_tag"`
+	CurBeforeTime time.Time    `json:"cur_before_time"`
+	CurBeforeID   persist.DBID `json:"cur_before_id"`
+	CurAfterTag   int32        `json:"cur_after_tag"`
+	CurAfterTime  time.Time    `json:"cur_after_time"`
+	CurAfterID    persist.DBID `json:"cur_after_id"`
+	CommentTag    int32        `json:"comment_tag"`
+	PagingForward bool         `json:"paging_forward"`
+	Limit         int32        `json:"limit"`
 }
 
 type PaginateInteractionsByFeedEventIDBatchRow struct {
-	CreatedAt time.Time
-	ID        persist.DBID
-	Tag       int32
+	CreatedAt time.Time    `json:"created_at"`
+	ID        persist.DBID `json:"id"`
+	Tag       int32        `json:"tag"`
 }
 
 func (q *Queries) PaginateInteractionsByFeedEventIDBatch(ctx context.Context, arg []PaginateInteractionsByFeedEventIDBatchParams) *PaginateInteractionsByFeedEventIDBatchBatchResults {
@@ -3669,54 +4043,72 @@ func (b *PaginateInteractionsByFeedEventIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
-const paginatePersonalFeedByUserID = `-- name: PaginatePersonalFeedByUserID :batchmany
-SELECT fe.id, fe.version, fe.owner_id, fe.action, fe.data, fe.event_time, fe.event_ids, fe.deleted, fe.last_updated, fe.created_at, fe.caption, fe.group_id FROM feed_events fe, follows fl WHERE fe.deleted = false AND fl.deleted = false
-    AND fe.owner_id = fl.followee AND fl.follower = $1
-    AND (fe.event_time, fe.id) < ($2, $3)
-    AND (fe.event_time, fe.id) > ($4, $5)
-    ORDER BY CASE WHEN $6::bool THEN (fe.event_time, fe.id) END ASC,
-            CASE WHEN NOT $6::bool THEN (fe.event_time, fe.id) END DESC
-    LIMIT $7
+const paginateInteractionsByPostIDBatch = `-- name: PaginateInteractionsByPostIDBatch :batchmany
+SELECT interactions.created_At, interactions.id, interactions.tag FROM (
+    SELECT t.created_at, t.id, $1::int as tag FROM admires t WHERE $1 != 0 AND t.post_id = $2 AND t.deleted = false
+        AND ($1, t.created_at, t.id) < ($3::int, $4, $5) AND ($1, t.created_at, t.id) > ($6::int, $7, $8)
+                                                                    UNION
+    SELECT t.created_at, t.id, $9::int as tag FROM comments t WHERE $9 != 0 AND t.post_id = $2 AND t.deleted = false
+        AND ($9, t.created_at, t.id) < ($3::int, $4, $5) AND ($9, t.created_at, t.id) > ($6::int, $7, $8)
+) as interactions
+
+ORDER BY CASE WHEN $10::bool THEN (tag, created_at, id) END ASC,
+         CASE WHEN NOT $10::bool THEN (tag, created_at, id) END DESC
+LIMIT $11
 `
 
-type PaginatePersonalFeedByUserIDBatchResults struct {
+type PaginateInteractionsByPostIDBatchBatchResults struct {
 	br     pgx.BatchResults
 	tot    int
 	closed bool
 }
 
-type PaginatePersonalFeedByUserIDParams struct {
-	Follower      persist.DBID
-	CurBeforeTime time.Time
-	CurBeforeID   persist.DBID
-	CurAfterTime  time.Time
-	CurAfterID    persist.DBID
-	PagingForward bool
-	Limit         int32
+type PaginateInteractionsByPostIDBatchParams struct {
+	AdmireTag     int32        `json:"admire_tag"`
+	PostID        persist.DBID `json:"post_id"`
+	CurBeforeTag  int32        `json:"cur_before_tag"`
+	CurBeforeTime time.Time    `json:"cur_before_time"`
+	CurBeforeID   persist.DBID `json:"cur_before_id"`
+	CurAfterTag   int32        `json:"cur_after_tag"`
+	CurAfterTime  time.Time    `json:"cur_after_time"`
+	CurAfterID    persist.DBID `json:"cur_after_id"`
+	CommentTag    int32        `json:"comment_tag"`
+	PagingForward bool         `json:"paging_forward"`
+	Limit         int32        `json:"limit"`
 }
 
-func (q *Queries) PaginatePersonalFeedByUserID(ctx context.Context, arg []PaginatePersonalFeedByUserIDParams) *PaginatePersonalFeedByUserIDBatchResults {
+type PaginateInteractionsByPostIDBatchRow struct {
+	CreatedAt time.Time    `json:"created_at"`
+	ID        persist.DBID `json:"id"`
+	Tag       int32        `json:"tag"`
+}
+
+func (q *Queries) PaginateInteractionsByPostIDBatch(ctx context.Context, arg []PaginateInteractionsByPostIDBatchParams) *PaginateInteractionsByPostIDBatchBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range arg {
 		vals := []interface{}{
-			a.Follower,
+			a.AdmireTag,
+			a.PostID,
+			a.CurBeforeTag,
 			a.CurBeforeTime,
 			a.CurBeforeID,
+			a.CurAfterTag,
 			a.CurAfterTime,
 			a.CurAfterID,
+			a.CommentTag,
 			a.PagingForward,
 			a.Limit,
 		}
-		batch.Queue(paginatePersonalFeedByUserID, vals...)
+		batch.Queue(paginateInteractionsByPostIDBatch, vals...)
 	}
 	br := q.db.SendBatch(ctx, batch)
-	return &PaginatePersonalFeedByUserIDBatchResults{br, len(arg), false}
+	return &PaginateInteractionsByPostIDBatchBatchResults{br, len(arg), false}
 }
 
-func (b *PaginatePersonalFeedByUserIDBatchResults) Query(f func(int, []FeedEvent, error)) {
+func (b *PaginateInteractionsByPostIDBatchBatchResults) Query(f func(int, []PaginateInteractionsByPostIDBatchRow, error)) {
 	defer b.br.Close()
 	for t := 0; t < b.tot; t++ {
-		var items []FeedEvent
+		var items []PaginateInteractionsByPostIDBatchRow
 		if b.closed {
 			if f != nil {
 				f(t, items, ErrBatchAlreadyClosed)
@@ -3730,21 +4122,8 @@ func (b *PaginatePersonalFeedByUserIDBatchResults) Query(f func(int, []FeedEvent
 				return err
 			}
 			for rows.Next() {
-				var i FeedEvent
-				if err := rows.Scan(
-					&i.ID,
-					&i.Version,
-					&i.OwnerID,
-					&i.Action,
-					&i.Data,
-					&i.EventTime,
-					&i.EventIds,
-					&i.Deleted,
-					&i.LastUpdated,
-					&i.CreatedAt,
-					&i.Caption,
-					&i.GroupID,
-				); err != nil {
+				var i PaginateInteractionsByPostIDBatchRow
+				if err := rows.Scan(&i.CreatedAt, &i.ID, &i.Tag); err != nil {
 					return err
 				}
 				items = append(items, i)
@@ -3757,41 +4136,45 @@ func (b *PaginatePersonalFeedByUserIDBatchResults) Query(f func(int, []FeedEvent
 	}
 }
 
-func (b *PaginatePersonalFeedByUserIDBatchResults) Close() error {
+func (b *PaginateInteractionsByPostIDBatchBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }
 
-const paginateUserFeedByUserID = `-- name: PaginateUserFeedByUserID :batchmany
-SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption, group_id FROM feed_events WHERE owner_id = $1 AND deleted = false
-    AND (event_time, id) < ($2, $3)
-    AND (event_time, id) > ($4, $5)
-    ORDER BY CASE WHEN $6::bool THEN (event_time, id) END ASC,
-            CASE WHEN NOT $6::bool THEN (event_time, id) END DESC
-    LIMIT $7
+const paginatePostsByContractID = `-- name: PaginatePostsByContractID :batchmany
+SELECT posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted
+FROM posts
+WHERE $1 = ANY(posts.contract_ids)
+AND posts.deleted = false
+AND (posts.created_at, posts.id) < ($2, $3)
+AND (posts.created_at, posts.id) > ($4, $5)
+ORDER BY 
+    CASE WHEN $6::bool THEN (posts.created_at, posts.id) END ASC,
+    CASE WHEN NOT $6::bool THEN (posts.created_at, posts.id) END DESC
+LIMIT $7
 `
 
-type PaginateUserFeedByUserIDBatchResults struct {
+type PaginatePostsByContractIDBatchResults struct {
 	br     pgx.BatchResults
 	tot    int
 	closed bool
 }
 
-type PaginateUserFeedByUserIDParams struct {
-	OwnerID       persist.DBID
-	CurBeforeTime time.Time
-	CurBeforeID   persist.DBID
-	CurAfterTime  time.Time
-	CurAfterID    persist.DBID
-	PagingForward bool
-	Limit         int32
+type PaginatePostsByContractIDParams struct {
+	ContractID    persist.DBID `json:"contract_id"`
+	CurBeforeTime time.Time    `json:"cur_before_time"`
+	CurBeforeID   persist.DBID `json:"cur_before_id"`
+	CurAfterTime  time.Time    `json:"cur_after_time"`
+	CurAfterID    persist.DBID `json:"cur_after_id"`
+	PagingForward bool         `json:"paging_forward"`
+	Limit         int32        `json:"limit"`
 }
 
-func (q *Queries) PaginateUserFeedByUserID(ctx context.Context, arg []PaginateUserFeedByUserIDParams) *PaginateUserFeedByUserIDBatchResults {
+func (q *Queries) PaginatePostsByContractID(ctx context.Context, arg []PaginatePostsByContractIDParams) *PaginatePostsByContractIDBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range arg {
 		vals := []interface{}{
-			a.OwnerID,
+			a.ContractID,
 			a.CurBeforeTime,
 			a.CurBeforeID,
 			a.CurAfterTime,
@@ -3799,16 +4182,16 @@ func (q *Queries) PaginateUserFeedByUserID(ctx context.Context, arg []PaginateUs
 			a.PagingForward,
 			a.Limit,
 		}
-		batch.Queue(paginateUserFeedByUserID, vals...)
+		batch.Queue(paginatePostsByContractID, vals...)
 	}
 	br := q.db.SendBatch(ctx, batch)
-	return &PaginateUserFeedByUserIDBatchResults{br, len(arg), false}
+	return &PaginatePostsByContractIDBatchResults{br, len(arg), false}
 }
 
-func (b *PaginateUserFeedByUserIDBatchResults) Query(f func(int, []FeedEvent, error)) {
+func (b *PaginatePostsByContractIDBatchResults) Query(f func(int, []Post, error)) {
 	defer b.br.Close()
 	for t := 0; t < b.tot; t++ {
-		var items []FeedEvent
+		var items []Post
 		if b.closed {
 			if f != nil {
 				f(t, items, ErrBatchAlreadyClosed)
@@ -3822,20 +4205,17 @@ func (b *PaginateUserFeedByUserIDBatchResults) Query(f func(int, []FeedEvent, er
 				return err
 			}
 			for rows.Next() {
-				var i FeedEvent
+				var i Post
 				if err := rows.Scan(
 					&i.ID,
 					&i.Version,
-					&i.OwnerID,
-					&i.Action,
-					&i.Data,
-					&i.EventTime,
-					&i.EventIds,
-					&i.Deleted,
-					&i.LastUpdated,
-					&i.CreatedAt,
+					&i.TokenIds,
+					&i.ContractIds,
+					&i.ActorID,
 					&i.Caption,
-					&i.GroupID,
+					&i.CreatedAt,
+					&i.LastUpdated,
+					&i.Deleted,
 				); err != nil {
 					return err
 				}
@@ -3849,7 +4229,7 @@ func (b *PaginateUserFeedByUserIDBatchResults) Query(f func(int, []FeedEvent, er
 	}
 }
 
-func (b *PaginateUserFeedByUserIDBatchResults) Close() error {
+func (b *PaginatePostsByContractIDBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }

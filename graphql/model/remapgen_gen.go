@@ -23,6 +23,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"AdmirePostPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(AdmirePostPayloadOrError)
+		return obj, ok
+	},
+
 	"AuthorizationError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(AuthorizationError)
 		return obj, ok
@@ -45,6 +50,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 
 	"CommentOnFeedEventPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(CommentOnFeedEventPayloadOrError)
+		return obj, ok
+	},
+
+	"CommentOnPostPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(CommentOnPostPayloadOrError)
 		return obj, ok
 	},
 
@@ -80,6 +90,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 
 	"DeleteGalleryPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(DeleteGalleryPayloadOrError)
+		return obj, ok
+	},
+
+	"DeletePostPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(DeletePostPayloadOrError)
 		return obj, ok
 	},
 
@@ -190,6 +205,16 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 
 	"Notification": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(Notification)
+		return obj, ok
+	},
+
+	"PostOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(PostOrError)
+		return obj, ok
+	},
+
+	"PostTokensPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(PostTokensPayloadOrError)
 		return obj, ok
 	},
 

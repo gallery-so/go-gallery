@@ -43,11 +43,11 @@ limit $4
 `
 
 type SearchContractsParams struct {
-	Query             string
-	NameWeight        float32
-	DescriptionWeight float32
-	Limit             int32
-	PoapAddressWeight float32
+	Query             string  `json:"query"`
+	NameWeight        float32 `json:"name_weight"`
+	DescriptionWeight float32 `json:"description_weight"`
+	Limit             int32   `json:"limit"`
+	PoapAddressWeight float32 `json:"poap_address_weight"`
 }
 
 func (q *Queries) SearchContracts(ctx context.Context, arg SearchContractsParams) ([]Contract, error) {
@@ -118,10 +118,10 @@ limit $4
 `
 
 type SearchGalleriesParams struct {
-	Query             string
-	NameWeight        float32
-	DescriptionWeight float32
-	Limit             int32
+	Query             string  `json:"query"`
+	NameWeight        float32 `json:"name_weight"`
+	DescriptionWeight float32 `json:"description_weight"`
+	Limit             int32   `json:"limit"`
 }
 
 func (q *Queries) SearchGalleries(ctx context.Context, arg SearchGalleriesParams) ([]Gallery, error) {
@@ -191,10 +191,10 @@ limit $4
 `
 
 type SearchUsersParams struct {
-	Query          string
-	UsernameWeight float32
-	BioWeight      float32
-	Limit          int32
+	Query          string  `json:"query"`
+	UsernameWeight float32 `json:"username_weight"`
+	BioWeight      float32 `json:"bio_weight"`
+	Limit          int32   `json:"limit"`
 }
 
 func (q *Queries) SearchUsers(ctx context.Context, arg SearchUsersParams) ([]User, error) {

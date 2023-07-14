@@ -23,7 +23,9 @@ const (
 	ActionCollectorsNoteAddedToCollection Action = "CollectorsNoteAddedToCollection"
 	ActionTokensAddedToCollection         Action = "TokensAddedToCollection"
 	ActionAdmiredFeedEvent                Action = "AdmiredFeedEvent"
+	ActionAdmiredPost                     Action = "AdmiredPost"
 	ActionCommentedOnFeedEvent            Action = "CommentedOnFeedEvent"
+	ActionCommentedOnPost                 Action = "CommentedOnPost"
 	ActionViewedGallery                   Action = "ViewedGallery"
 	ActionCollectionUpdated               Action = "CollectionUpdated"
 	ActionGalleryUpdated                  Action = "GalleryUpdated"
@@ -77,6 +79,14 @@ type ErrFeedEventNotFoundByID struct {
 
 func (e ErrFeedEventNotFoundByID) Error() string {
 	return fmt.Sprintf("event not found by id: %s", e.ID)
+}
+
+type ErrPostNotFoundByID struct {
+	ID DBID
+}
+
+func (e ErrPostNotFoundByID) Error() string {
+	return fmt.Sprintf("post not found by id: %s", e.ID)
 }
 
 type ErrUnknownAction struct {
