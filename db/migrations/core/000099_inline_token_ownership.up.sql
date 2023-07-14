@@ -1,0 +1,2 @@
+create index if not exists contracts_override_creator_user_id_idx on contracts (override_creator_user_id) where deleted = false;
+create index if not exists contracts_owner_address_creator_address_coalesce_idx on contracts (coalesce(nullif(owner_address, ''), nullif(creator_address, ''))) where deleted = false;

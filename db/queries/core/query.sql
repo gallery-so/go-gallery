@@ -1050,12 +1050,6 @@ order by case when sqlc.arg('paging_forward')::bool then (a.displayed, b.display
         case when not sqlc.arg('paging_forward')::bool then (a.displayed, b.displayed, a.owned_count, contracts.id) end asc
 limit sqlc.arg('limit');
 
--- name: GetCreatedContractsByUserID :many
-select contracts.*
-from contracts
-     join contract_creators on contracts.id = contract_creators.contract_id and contract_creators.creator_user_id = @user_id
-where contracts.chain = any(@chains::int[]);
-
 -- name: GetCreatedContractsBatchPaginate :batchmany
 select contracts.*
 from contracts
@@ -1425,3 +1419,52 @@ limit 1;
 
 -- name: GetCurrentTime :one
 select now()::timestamptz;
+
+-- name: GetContractCreatorsByContractIDs :many
+with contract_creators as (
+    select c.id as contract_id,
+           u.id as creator_user_id,
+           c.chain as chain,
+           coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) as creator_address,
+           w.id as creator_wallet_id
+    from contracts c
+             left join wallets w on
+                w.deleted = false and
+                w.chain = c.chain and
+                coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) = w.address
+             left join users u on
+                u.deleted = false and
+                (
+                        (c.override_creator_user_id is not null and c.override_creator_user_id = u.id)
+                        or
+                        (c.override_creator_user_id is null and w.address is not null and array[w.id] <@ u.wallets)
+                    )
+    where c.deleted = false
+      and (u.id is not null or coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) is not null)
+)
+select * from unnest(@contract_ids::text[]) as ids
+                  join contract_creators cc on cc.contract_id = ids;
+
+-- name: GetCreatedContractsByUserID :many
+select sqlc.embed(c) as contract_id,
+       w.id as wallet_id,
+       false as is_override_creator
+from users u, contracts c, wallets w
+where u.id = @user_id
+  and c.chain = any(@chains::int[])
+  and w.id = any(u.wallets) and coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) = w.address
+  and c.chain = w.chain
+  and u.deleted = false
+  and c.deleted = false
+  and w.deleted = false
+  and c.override_creator_user_id is null
+
+union all
+
+select sqlc.embed(c) as contract_id,
+       null as wallet_id,
+       true as is_override_creator
+from contracts c
+where c.override_creator_user_id = @user_id
+  and c.chain = any(@chains::int[])
+  and c.deleted = false;

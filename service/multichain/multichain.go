@@ -351,7 +351,7 @@ func (p *Provider) SyncCreatedTokens(ctx context.Context, userID persist.DBID, c
 	}
 
 	chainInts, _ := util.Map(chains, func(c persist.Chain) (int32, error) { return int32(c), nil })
-	contracts, err := p.Queries.GetCreatedContractsByUserID(ctx, db.GetCreatedContractsByUserIDParams{
+	rows, err := p.Queries.GetCreatedContractsByUserID(ctx, db.GetCreatedContractsByUserIDParams{
 		UserID: userID,
 		Chains: chainInts,
 	})
@@ -359,6 +359,8 @@ func (p *Provider) SyncCreatedTokens(ctx context.Context, userID persist.DBID, c
 	if err != nil {
 		return err
 	}
+
+	contracts, _ := util.Map(rows, func(row db.GetCreatedContractsByUserIDRow) (db.Contract, error) { return row.Contract, nil })
 
 	errChan := make(chan error)
 	incomingTokens := make(chan chainTokens)

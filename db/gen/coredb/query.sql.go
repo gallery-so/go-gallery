@@ -1544,6 +1544,66 @@ func (q *Queries) GetContractByID(ctx context.Context, id persist.DBID) (Contrac
 	return i, err
 }
 
+const getContractCreatorsByContractIDs = `-- name: GetContractCreatorsByContractIDs :many
+with contract_creators as (
+    select c.id as contract_id,
+           u.id as creator_user_id,
+           c.chain as chain,
+           coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) as creator_address,
+           w.id as creator_wallet_id
+    from contracts c
+             left join wallets w on
+                w.deleted = false and
+                w.chain = c.chain and
+                coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) = w.address
+             left join users u on
+                u.deleted = false and
+                (
+                        (c.override_creator_user_id is not null and c.override_creator_user_id = u.id)
+                        or
+                        (c.override_creator_user_id is null and w.address is not null and array[w.id] <@ u.wallets)
+                    )
+    where c.deleted = false
+      and (u.id is not null or coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) is not null)
+)
+select contract_id, creator_user_id, chain, creator_address, creator_wallet_id from unnest($1::text[]) as ids
+                  join contract_creators cc on cc.contract_id = ids
+`
+
+type GetContractCreatorsByContractIDsRow struct {
+	ContractID      persist.DBID    `json:"contract_id"`
+	CreatorUserID   persist.DBID    `json:"creator_user_id"`
+	Chain           persist.Chain   `json:"chain"`
+	CreatorAddress  persist.Address `json:"creator_address"`
+	CreatorWalletID persist.DBID    `json:"creator_wallet_id"`
+}
+
+func (q *Queries) GetContractCreatorsByContractIDs(ctx context.Context, contractIds []string) ([]GetContractCreatorsByContractIDsRow, error) {
+	rows, err := q.db.Query(ctx, getContractCreatorsByContractIDs, contractIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetContractCreatorsByContractIDsRow
+	for rows.Next() {
+		var i GetContractCreatorsByContractIDsRow
+		if err := rows.Scan(
+			&i.ContractID,
+			&i.CreatorUserID,
+			&i.Chain,
+			&i.CreatorAddress,
+			&i.CreatorWalletID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getContractCreatorsByIds = `-- name: GetContractCreatorsByIds :many
 select o.contract_id, o.creator_user_id, o.chain, o.creator_address
     from unnest($1::text[]) as c(id)
@@ -1662,10 +1722,28 @@ func (q *Queries) GetContractsByTokenIDs(ctx context.Context, tokenIds persist.D
 }
 
 const getCreatedContractsByUserID = `-- name: GetCreatedContractsByUserID :many
-select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id
-from contracts
-     join contract_creators on contracts.id = contract_creators.contract_id and contract_creators.creator_user_id = $1
-where contracts.chain = any($2::int[])
+select c.contract_id, c.contract_id, c.contract_id, c.contract_id, c.contract_id, c.contract_id, c.contract_id, c.contract_id, c.contract_id, c.contract_id, c.contract_id, c.contract_id, c.contract_id, c.contract_id, c.contract_id, c.contract_id, c.contract_id, c.contract_id as contract_id,
+       w.id as wallet_id,
+       false as is_override_creator
+from users u, contracts c, wallets w
+where u.id = $1
+  and c.chain = any($2::int[])
+  and w.id = any(u.wallets) and coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) = w.address
+  and c.chain = w.chain
+  and u.deleted = false
+  and c.deleted = false
+  and w.deleted = false
+  and c.override_creator_user_id is null
+
+union all
+
+select c.contract_id, c.contract_id, c.contract_id, c.contract_id, c.contract_id, c.contract_id, c.contract_id, c.contract_id, c.contract_id, c.contract_id, c.contract_id, c.contract_id, c.contract_id, c.contract_id, c.contract_id, c.contract_id, c.contract_id, c.contract_id as contract_id,
+       null as wallet_id,
+       true as is_override_creator
+from contracts c
+where c.override_creator_user_id = $1
+  and c.chain = any($2::int[])
+  and c.deleted = false
 `
 
 type GetCreatedContractsByUserIDParams struct {
@@ -1673,34 +1751,42 @@ type GetCreatedContractsByUserIDParams struct {
 	Chains []int32      `json:"chains"`
 }
 
-func (q *Queries) GetCreatedContractsByUserID(ctx context.Context, arg GetCreatedContractsByUserIDParams) ([]Contract, error) {
+type GetCreatedContractsByUserIDRow struct {
+	Contract          Contract     `json:"contract"`
+	WalletID          persist.DBID `json:"wallet_id"`
+	IsOverrideCreator bool         `json:"is_override_creator"`
+}
+
+func (q *Queries) GetCreatedContractsByUserID(ctx context.Context, arg GetCreatedContractsByUserIDParams) ([]GetCreatedContractsByUserIDRow, error) {
 	rows, err := q.db.Query(ctx, getCreatedContractsByUserID, arg.UserID, arg.Chains)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Contract
+	var items []GetCreatedContractsByUserIDRow
 	for rows.Next() {
-		var i Contract
+		var i GetCreatedContractsByUserIDRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.Deleted,
-			&i.Version,
-			&i.CreatedAt,
-			&i.LastUpdated,
-			&i.Name,
-			&i.Symbol,
-			&i.Address,
-			&i.CreatorAddress,
-			&i.Chain,
-			&i.ProfileBannerUrl,
-			&i.ProfileImageUrl,
-			&i.BadgeUrl,
-			&i.Description,
-			&i.OwnerAddress,
-			&i.IsProviderMarkedSpam,
-			&i.ParentID,
-			&i.OverrideCreatorUserID,
+			&i.Contract.ID,
+			&i.Contract.Deleted,
+			&i.Contract.Version,
+			&i.Contract.CreatedAt,
+			&i.Contract.LastUpdated,
+			&i.Contract.Name,
+			&i.Contract.Symbol,
+			&i.Contract.Address,
+			&i.Contract.CreatorAddress,
+			&i.Contract.Chain,
+			&i.Contract.ProfileBannerUrl,
+			&i.Contract.ProfileImageUrl,
+			&i.Contract.BadgeUrl,
+			&i.Contract.Description,
+			&i.Contract.OwnerAddress,
+			&i.Contract.IsProviderMarkedSpam,
+			&i.Contract.ParentID,
+			&i.Contract.OverrideCreatorUserID,
+			&i.WalletID,
+			&i.IsOverrideCreator,
 		); err != nil {
 			return nil, err
 		}
