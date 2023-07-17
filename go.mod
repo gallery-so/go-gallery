@@ -48,8 +48,8 @@ require (
 	github.com/stretchr/testify v1.8.2
 	github.com/vektah/gqlparser/v2 v2.5.1
 	golang.org/x/crypto v0.6.0
-	golang.org/x/exp v0.0.0-20230213192124-5e25df0256eb
-	golang.org/x/image v0.0.0-20210216034530-4410531fe030
+	golang.org/x/exp v0.0.0-20230321023759-10a507213a29
+	golang.org/x/image v0.6.0
 	golang.org/x/sync v0.2.0
 	google.golang.org/api v0.114.0
 	google.golang.org/appengine v1.6.7

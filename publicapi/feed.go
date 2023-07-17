@@ -1,11 +1,11 @@
 package publicapi
 
 import (
+	heappkg "container/heap"
 	"context"
 	"database/sql"
 	"fmt"
 	"math"
-	"sort"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -200,7 +200,6 @@ func (api FeedAPI) PaginatePersonalFeed(ctx context.Context, before *string, aft
 		})
 
 		if err != nil {
-			panic(err)
 			return nil, err
 		}
 
@@ -239,7 +238,6 @@ func (api FeedAPI) PaginateUserFeed(ctx context.Context, userID persist.DBID, be
 			PagingForward: params.PagingForward,
 		})
 		if err != nil {
-			panic(err)
 			return nil, err
 		}
 
@@ -271,7 +269,6 @@ func (api FeedAPI) PaginateGlobalFeed(ctx context.Context, before *string, after
 		})
 
 		if err != nil {
-			panic(err)
 			return nil, err
 		}
 
@@ -297,9 +294,6 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 		trendingIDs []persist.DBID
 		paginator   = positionPaginator{}
 		lookup      = make(map[persist.DBID]int)
-		// lambda determines how quickly the score decreases over time. A larger value (i.e. a smaller denominator) has a faster decay rate.
-		lambda     = float64(1) / 100000
-		reportSize = 100
 	)
 
 	// If a cursor is provided, we can skip querying the cache
@@ -313,29 +307,39 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 		}
 	} else {
 		calcFunc := func(ctx context.Context) ([]persist.DBID, error) {
-			trendData, err := api.queries.GetTrendingFeedEventIDs(ctx, time.Now().Add(-time.Duration(72*time.Hour)))
+			trendData, err := api.queries.GetTrendingFeedEventIDs(ctx, db.GetTrendingFeedEventIDsParams{
+				WindowEnd:           time.Now().Add(-time.Duration(72 * time.Hour)),
+				FeedEventType:       persist.FeedEventTypeTag,
+				ExcludedFeedActions: []string{string(persist.ActionUserCreated), string(persist.ActionUserFollowedUsers)},
+			})
 			if err != nil {
 				return nil, err
 			}
 
-			// Compute a new score for each event by weighting the current score by its relative age
-			scores := make(map[persist.DBID]float64)
-			now := time.Now()
+			h := heap{}
+
 			for _, event := range trendData {
-				eventAge := now.Sub(event.CreatedAt).Seconds()
-				score := float64(event.Count) * math.Pow(math.E, (-lambda*eventAge))
-				// Invert the score so that events are in descending order (in terms of absolute value) below
-				scores[event.ID] = -score
+				score := timeFactor(event.CreatedAt) * float64(event.Interactions)
+				node := heapNode{id: event.ID, score: score}
+
+				// Add first 100 numbers in the heap
+				if len(h) < 100 {
+					heappkg.Push(&h, node)
+					continue
+				}
+
+				// If the score is greater than the smallest score in the heap, replace it
+				if score > h[0].(heapNode).score {
+					heappkg.Pop(&h)
+					heappkg.Push(&h, node)
+				}
 			}
 
-			sort.Slice(trendData, func(i, j int) bool {
-				return scores[trendData[i].ID] < scores[trendData[j].ID]
-			})
+			trendingIDs := make([]persist.DBID, 100)
 
-			trendingIDs := make([]persist.DBID, 0)
-
-			for i := 0; i < len(trendData) && i < reportSize; i++ {
-				trendingIDs = append(trendingIDs, trendData[i].ID)
+			for len(h) > 0 {
+				node := heappkg.Pop(&h).(heapNode)
+				trendingIDs = append(trendingIDs, node.id)
 			}
 
 			return trendingIDs, nil
@@ -376,7 +380,6 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 	cursorFunc := func(node any) (int, []persist.DBID, error) {
 		_, id, err := feedCursor(node)
 		return lookup[id], trendingIDs, err
-
 	}
 
 	paginator.QueryFunc = queryFunc
@@ -501,4 +504,36 @@ func feedEntityToTypedType(ctx context.Context, d *dataloader.Loaders, ids []db.
 	}
 
 	return entities, nil
+}
+
+func timeFactor(t time.Time) float64 {
+	lambda := 1.0 / 100_000
+	now := time.Now()
+	age := now.Sub(t).Seconds()
+	return 1 * math.Pow(math.E, (-lambda*age))
+}
+
+type heapNode struct {
+	id    persist.DBID
+	score float64
+}
+
+type heap []any
+
+func (h heap) Len() int      { return len(h) }
+func (h heap) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
+func (h *heap) Push(s any)   { *h = append(*h, s) }
+
+func (h heap) Less(i, j int) bool {
+	// We want Pop to give us the highest, not lowest, score so we use greater than here.
+	return h[i].(heapNode).score > h[j].(heapNode).score
+}
+
+func (h *heap) Pop() any {
+	old := *h
+	n := len(old)
+	item := old[n-1]
+	old[n-1] = nil
+	*h = old[:n-1]
+	return item
 }
