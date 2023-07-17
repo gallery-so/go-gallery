@@ -179,18 +179,22 @@ func tezosRequirements(
 // optimismProviderSet is a wire injector that creates the set of Optimism providers
 func optimismProviderSet(*http.Client) optimismProviderList {
 	wire.Build(
+		rpc.NewEthClient,
 		optimismProvidersConfig,
+		wire.Value(persist.ChainOptimism),
 		// Add providers for Optimism here
 		newOptimismProvider,
+		opensea.NewProvider,
 	)
 	return optimismProviderList{}
 }
 
 // optimismProvidersConfig is a wire injector that binds multichain interfaces to their concrete Optimism implementations
-func optimismProvidersConfig(optimismProvider *optimismProvider) optimismProviderList {
+func optimismProvidersConfig(optimismProvider *optimismProvider, openseaProvier *opensea.Provider) optimismProviderList {
 	wire.Build(
 		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(optimismProvider)),
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(optimismProvider)),
+		wire.Bind(new(multichain.OpenSeaChildContractFetcher), util.ToPointer(openseaProvier)),
 		optimismRequirements,
 	)
 	return nil
@@ -200,25 +204,30 @@ func optimismProvidersConfig(optimismProvider *optimismProvider) optimismProvide
 func optimismRequirements(
 	tof multichain.TokensOwnerFetcher,
 	toc multichain.TokensContractFetcher,
+	opensea multichain.OpenSeaChildContractFetcher,
 ) optimismProviderList {
-	return optimismProviderList{tof, toc}
+	return optimismProviderList{tof, toc, opensea}
 }
 
 // arbitrumProviderSet is a wire injector that creates the set of Arbitrum providers
 func arbitrumProviderSet(*http.Client) arbitrumProviderList {
 	wire.Build(
+		rpc.NewEthClient,
 		arbitrumProvidersConfig,
+		wire.Value(persist.ChainArbitrum),
 		// Add providers for Optimism here
 		newArbitrumProvider,
+		opensea.NewProvider,
 	)
 	return arbitrumProviderList{}
 }
 
 // arbitrumProvidersConfig is a wire injector that binds multichain interfaces to their concrete Arbitrum implementations
-func arbitrumProvidersConfig(arbitrumProvider *arbitrumProvider) arbitrumProviderList {
+func arbitrumProvidersConfig(arbitrumProvider *arbitrumProvider, openseaProvider *opensea.Provider) arbitrumProviderList {
 	wire.Build(
 		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(arbitrumProvider)),
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(arbitrumProvider)),
+		wire.Bind(new(multichain.OpenSeaChildContractFetcher), util.ToPointer(openseaProvider)),
 		arbitrumRequirements,
 	)
 	return nil
@@ -228,8 +237,9 @@ func arbitrumProvidersConfig(arbitrumProvider *arbitrumProvider) arbitrumProvide
 func arbitrumRequirements(
 	tof multichain.TokensOwnerFetcher,
 	toc multichain.TokensContractFetcher,
+	opensea multichain.OpenSeaChildContractFetcher,
 ) arbitrumProviderList {
-	return arbitrumProviderList{tof, toc}
+	return arbitrumProviderList{tof, toc, opensea}
 }
 
 // poapProviderSet is a wire injector that creates the set of POAP providers
@@ -295,18 +305,22 @@ func zoraRequirements(
 // polygonProviderSet is a wire injector that creates the set of polygon providers
 func polygonProviderSet(*http.Client) polygonProviderList {
 	wire.Build(
+		rpc.NewEthClient,
 		polygonProvidersConfig,
-		// Add providers for POAP here
+		wire.Value(persist.ChainPolygon),
+		// Add providers for Polygon here
 		newPolygonProvider,
+		opensea.NewProvider,
 	)
 	return polygonProviderList{}
 }
 
 // polygonProvidersConfig is a wire injector that binds multichain interfaces to their concrete Polygon implementations
-func polygonProvidersConfig(polygonProvider *polygonProvider) polygonProviderList {
+func polygonProvidersConfig(polygonProvider *polygonProvider, openseaProvider *opensea.Provider) polygonProviderList {
 	wire.Build(
 		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(polygonProvider)),
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(polygonProvider)),
+		wire.Bind(new(multichain.OpenSeaChildContractFetcher), util.ToPointer(openseaProvider)),
 		polygonRequirements,
 	)
 	return nil
@@ -316,8 +330,9 @@ func polygonProvidersConfig(polygonProvider *polygonProvider) polygonProviderLis
 func polygonRequirements(
 	tof multichain.TokensOwnerFetcher,
 	toc multichain.TokensContractFetcher,
+	opensea multichain.OpenSeaChildContractFetcher,
 ) polygonProviderList {
-	return polygonProviderList{tof, toc}
+	return polygonProviderList{tof, toc, opensea}
 }
 
 // newMultichain is a wire provider that creates a multichain provider

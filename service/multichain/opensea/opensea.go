@@ -56,6 +56,7 @@ var sharedStoreFrontAddresses = []persist.EthereumAddress{
 type Provider struct {
 	httpClient *http.Client
 	ethClient  *ethclient.Client
+	chain      persist.Chain
 }
 
 // TokenID represents a token ID from Opensea. It is separate from persist.TokenID because opensea returns token IDs in base 10 format instead of what we want, base 16
@@ -75,12 +76,12 @@ type Asset struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 
-	ExternalURL      string              `json:"external_link"`
-	TokenMetadataURL string              `json:"token_metadata"`
-	Creator          Account             `json:"creator"`
-	Owner            Account             `json:"owner"`
-	Contract         persist.NFTContract `json:"asset_contract"`
-	Collection       Collection          `json:"collection"`
+	ExternalURL      string     `json:"external_link"`
+	TokenMetadataURL string     `json:"token_metadata"`
+	Creator          Account    `json:"creator"`
+	Owner            Account    `json:"owner"`
+	Contract         Contract   `json:"asset_contract"`
+	Collection       Collection `json:"collection"`
 
 	// OPEN_SEA_TOKEN_ID
 	// https://api.opensea.io/api/v1/asset/0xa7d8d9ef8d8ce8992df33d8b8cf4aebabd5bd270/26000331
@@ -139,12 +140,57 @@ type Collection struct {
 	Slug                  string                  `json:"slug"`
 	ImageURL              string                  `json:"image_url"`
 }
+type ChainIdentifier string
+
+const (
+	ChainIdentifierEthereum ChainIdentifier = "ethereum"
+	ChainIdentifierPolygon  ChainIdentifier = "matic"
+	ChainIdentifierOptimism ChainIdentifier = "optimism"
+	ChainIdentifierArbitrum ChainIdentifier = "arbitrum"
+)
+
+func (c ChainIdentifier) String() string {
+	return string(c)
+}
+
+func (c ChainIdentifier) Chain() persist.Chain {
+	switch c {
+	case ChainIdentifierEthereum:
+		return persist.ChainETH
+	case ChainIdentifierPolygon:
+		return persist.ChainPolygon
+	case ChainIdentifierOptimism:
+		return persist.ChainOptimism
+	case ChainIdentifierArbitrum:
+		return persist.ChainArbitrum
+	default:
+		panic(fmt.Sprintf("unknown chain identifier: %s", c))
+	}
+}
+
+func chainIdentifierFromChain(c persist.Chain) ChainIdentifier {
+	switch c {
+	case persist.ChainETH:
+		return ChainIdentifierEthereum
+	case persist.ChainPolygon:
+		return ChainIdentifierPolygon
+	case persist.ChainOptimism:
+		return ChainIdentifierOptimism
+	case persist.ChainArbitrum:
+		return ChainIdentifierArbitrum
+	default:
+		panic(fmt.Sprintf("unknown chain: %d", c))
+	}
+}
 
 // Contract represents an NFT contract from Opensea
 type Contract struct {
-	Collection Collection              `json:"collection"`
-	Address    persist.EthereumAddress `json:"address"`
-	Symbol     string                  `json:"symbol"`
+	Collection      Collection              `json:"collection"`
+	Address         persist.EthereumAddress `json:"address"`
+	Symbol          string                  `json:"symbol"`
+	Name            string                  `json:"name"`
+	SchemaName      string                  `json:"schema_name"`
+	ChainIdentifier ChainIdentifier         `json:"chain_identifier"`
 }
 
 type assetsReceieved struct {
@@ -158,18 +204,19 @@ type ErrNoAssetsForWallets struct {
 }
 
 // NewProvider creates a new provider for opensea
-func NewProvider(ethClient *ethclient.Client, httpClient *http.Client) *Provider {
+func NewProvider(ethClient *ethclient.Client, httpClient *http.Client, chain persist.Chain) *Provider {
 	client = httpClient
 	return &Provider{
 		httpClient: httpClient,
 		ethClient:  ethClient,
+		chain:      chain,
 	}
 }
 
 // GetBlockchainInfo returns Ethereum blockchain info
 func (p *Provider) GetBlockchainInfo(context.Context) (multichain.BlockchainInfo, error) {
 	return multichain.BlockchainInfo{
-		Chain:   persist.ChainETH,
+		Chain:   p.chain,
 		ChainID: 0,
 	}, nil
 }
@@ -182,7 +229,7 @@ func (p *Provider) GetTokensByWalletAddress(ctx context.Context, address persist
 		streamAssetsForWallet(ctx, persist.EthereumAddress(address), assetsChan)
 	}()
 
-	return assetsToTokens(ctx, address, assetsChan, p.ethClient)
+	return assetsToTokens(ctx, address, assetsChan, p.ethClient, p.chain)
 }
 
 // GetTokensByContractAddress returns a list of tokens for a contract address
@@ -192,7 +239,7 @@ func (p *Provider) GetTokensByContractAddress(ctx context.Context, address persi
 		defer close(assetsChan)
 		streamAssetsForContract(ctx, persist.EthereumAddress(address), assetsChan)
 	}()
-	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient)
+	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient, p.chain)
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
@@ -210,7 +257,7 @@ func (p *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, owner
 		defer close(assetsChan)
 		streamAssetsForContractAddressAndOwner(ctx, persist.EthereumAddress(owner), persist.EthereumAddress(address), assetsChan)
 	}()
-	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient)
+	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient, p.chain)
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
@@ -228,7 +275,7 @@ func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, ti multichai
 		defer close(assetsChan)
 		streamAssetsForTokenIdentifiers(ctx, persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID.Base10String()), assetsChan)
 	}()
-	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient)
+	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient, p.chain)
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
@@ -245,7 +292,7 @@ func (p *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, ti m
 		defer close(assetsChan)
 		streamAssetsForTokenIdentifiersAndOwner(ctx, persist.EthereumAddress(ownerAddress), persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID.Base10String()), assetsChan)
 	}()
-	tokens, contracts, err := assetsToTokens(ctx, ownerAddress, assetsChan, p.ethClient)
+	tokens, contracts, err := assetsToTokens(ctx, ownerAddress, assetsChan, p.ethClient, p.chain)
 	if err != nil {
 		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
 	}
@@ -571,7 +618,7 @@ func assetsByChildContract(ctx context.Context, assetsChan <-chan assetsReceieve
 				return nil, err
 			}
 
-			parentAddress := asset.Contract.ContractAddress
+			parentAddress := asset.Contract.Address
 
 			// Found a new parent
 			if _, seen := parents[parentAddress]; !seen {
@@ -621,13 +668,13 @@ func (e unknownContractSchemaError) Error() string {
 }
 
 func tokenTypeFromAsset(asset Asset) (persist.TokenType, error) {
-	switch asset.Contract.ContractSchemaName {
+	switch asset.Contract.SchemaName {
 	case "ERC721", "CRYPTOPUNKS":
 		return persist.TokenTypeERC721, nil
 	case "ERC1155":
 		return persist.TokenTypeERC1155, nil
 	default:
-		return "", unknownContractSchemaError{asset.Contract.ContractSchemaName.String()}
+		return "", unknownContractSchemaError{asset.Contract.SchemaName}
 	}
 }
 
@@ -648,7 +695,7 @@ func assetToToken(asset Asset, block persist.BlockNumber, tokenOwner persist.Add
 		FallbackMedia: persist.FallbackMedia{
 			ImageURL: persist.NullString(firstNonEmptyString(asset.ImagePreviewURL, asset.ImageThumbnailURL, asset.ImageURL)),
 		},
-		ContractAddress: persist.Address(asset.Contract.ContractAddress.String()),
+		ContractAddress: persist.Address(asset.Contract.Address.String()),
 		ExternalURL:     asset.ExternalURL,
 		BlockNumber:     block,
 		TokenMetadata:   metadataFromAsset(asset),
@@ -665,7 +712,7 @@ func metadataFromAsset(asset Asset) persist.TokenMetadata {
 		"animation_url": asset.AnimationOriginalURL,
 	}
 	// ENS
-	if asset.Contract.ContractAddress == eth.EnsAddress {
+	if asset.Contract.Address == eth.EnsAddress {
 		m["profile_image"] = fmt.Sprintf("https://metadata.ens.domains/mainnet/avatar/%s", asset.Name)
 	}
 	return m
@@ -673,19 +720,19 @@ func metadataFromAsset(asset Asset) persist.TokenMetadata {
 
 func contractFromAsset(asset Asset, block persist.BlockNumber) multichain.ChainAgnosticContract {
 	return multichain.ChainAgnosticContract{
-		Address: persist.Address(asset.Contract.ContractAddress.String()),
+		Address: persist.Address(asset.Contract.Address.String()),
 		Descriptors: multichain.ChainAgnosticContractDescriptors{
-			Symbol:          asset.Contract.ContractSymbol.String(),
-			Name:            asset.Contract.ContractName.String(),
+			Symbol:          asset.Contract.Symbol,
+			Name:            asset.Contract.Name,
 			CreatorAddress:  persist.Address(asset.Collection.PayoutAddress),
 			Description:     asset.Collection.Description,
-			ProfileImageURL: firstNonEmptyString(asset.Collection.ImageURL, asset.Contract.ContractImage.String()),
+			ProfileImageURL: asset.Collection.ImageURL,
 		},
 		LatestBlock: block,
 	}
 }
 
-func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsChan <-chan assetsReceieved, ethClient *ethclient.Client) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsChan <-chan assetsReceieved, ethClient *ethclient.Client, chain persist.Chain) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	block, err := ethClient.BlockNumber(ctx)
 	if err != nil {
 		return nil, nil, err
@@ -708,8 +755,11 @@ func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsCha
 			}
 			for _, n := range assetsReceived.assets {
 				nft := n
+				if nft.Contract.ChainIdentifier.Chain() != chain {
+					continue
+				}
 				wp.Go(func(ctx context.Context) error {
-					contract, ok := seenContracts.LoadOrStore(nft.Contract.ContractAddress.String(), contractFromAsset(nft, persist.BlockNumber(block)))
+					contract, ok := seenContracts.LoadOrStore(nft.Contract.Address.String(), contractFromAsset(nft, persist.BlockNumber(block)))
 					if !ok {
 						contractsChan <- contract.(multichain.ChainAgnosticContract)
 					} else {
