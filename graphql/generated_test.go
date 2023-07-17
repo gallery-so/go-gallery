@@ -7020,12 +7020,18 @@ func __marshaltrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEv
 
 // trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodePost includes the requested fields of the GraphQL type Post.
 type trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodePost struct {
-	Typename *string `json:"__typename"`
+	Typename *string      `json:"__typename"`
+	Dbid     persist.DBID `json:"dbid"`
 }
 
 // GetTypename returns trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodePost.Typename, and is useful for accessing the field via an interface.
 func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodePost) GetTypename() *string {
 	return v.Typename
+}
+
+// GetDbid returns trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodePost.Dbid, and is useful for accessing the field via an interface.
+func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodePost) GetDbid() persist.DBID {
+	return v.Dbid
 }
 
 // trendingUsersQueryResponse is returned by trendingUsersQuery on success.
@@ -11341,6 +11347,9 @@ query trendingFeedQuery ($last: Int) {
 					message
 				}
 				... on FeedEvent {
+					dbid
+				}
+				... on Post {
 					dbid
 				}
 			}

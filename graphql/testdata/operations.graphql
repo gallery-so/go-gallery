@@ -154,6 +154,9 @@ query trendingFeedQuery($last: Int) {
         ... on FeedEvent {
           dbid
         }
+        ... on Post {
+          dbid
+        }
       }
     }
   }

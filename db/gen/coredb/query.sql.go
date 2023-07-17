@@ -3458,30 +3458,49 @@ func (q *Queries) GetTopCollectionsForCommunity(ctx context.Context, arg GetTopC
 }
 
 const getTrendingFeedEventIDs = `-- name: GetTrendingFeedEventIDs :many
-select fe.id, fe.created_at, count(distinct c.id) + count(distinct a.id) interactions
+select fe.id, fe.feed_entity_type, fe.created_at, count(distinct c.id) + count(distinct a.id) interactions
 from feed_entities fe
-left join comments c on fe.id = c.feed_event_id and not c.deleted
-left join admires a on fe.id = a.feed_event_id and not a.deleted
+left join comments c on case
+    when fe.feed_entity_type = $1 then fe.id = c.feed_event_id
+    when fe.feed_entity_type = $2 then fe.id = c.post_id
+    else 0 = 1 end
+    and not c.deleted
+left join admires a on case
+    when fe.feed_entity_type = $1 then fe.id = a.feed_event_id
+    when fe.feed_entity_type = $2 then fe.id = a.post_id
+    else 0 = 1 end
+    and not a.deleted
 left join feed_events e on fe.feed_entity_type = $1 and fe.id = e.id
-where fe.created_at >= $2 and not (e.action = any($3::varchar[]))
-group by fe.id, fe.created_at
+where fe.created_at >= $3
+    and case when fe.feed_entity_type = $1
+        then not (e.action = any($4::varchar[]))
+        else 1 = 1
+        end
+group by fe.id, fe.feed_entity_type, fe.created_at
 order by fe.created_at desc
 `
 
 type GetTrendingFeedEventIDsParams struct {
-	FeedEventType       int32     `json:"feed_event_type"`
+	FeedEntityType      int32     `json:"feed_entity_type"`
+	PostEntityType      int32     `json:"post_entity_type"`
 	WindowEnd           time.Time `json:"window_end"`
 	ExcludedFeedActions []string  `json:"excluded_feed_actions"`
 }
 
 type GetTrendingFeedEventIDsRow struct {
-	ID           persist.DBID `json:"id"`
-	CreatedAt    time.Time    `json:"created_at"`
-	Interactions int32        `json:"interactions"`
+	ID             persist.DBID `json:"id"`
+	FeedEntityType int32        `json:"feed_entity_type"`
+	CreatedAt      time.Time    `json:"created_at"`
+	Interactions   int32        `json:"interactions"`
 }
 
 func (q *Queries) GetTrendingFeedEventIDs(ctx context.Context, arg GetTrendingFeedEventIDsParams) ([]GetTrendingFeedEventIDsRow, error) {
-	rows, err := q.db.Query(ctx, getTrendingFeedEventIDs, arg.FeedEventType, arg.WindowEnd, arg.ExcludedFeedActions)
+	rows, err := q.db.Query(ctx, getTrendingFeedEventIDs,
+		arg.FeedEntityType,
+		arg.PostEntityType,
+		arg.WindowEnd,
+		arg.ExcludedFeedActions,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -3489,7 +3508,12 @@ func (q *Queries) GetTrendingFeedEventIDs(ctx context.Context, arg GetTrendingFe
 	var items []GetTrendingFeedEventIDsRow
 	for rows.Next() {
 		var i GetTrendingFeedEventIDsRow
-		if err := rows.Scan(&i.ID, &i.CreatedAt, &i.Interactions); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.FeedEntityType,
+			&i.CreatedAt,
+			&i.Interactions,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

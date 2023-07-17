@@ -309,7 +309,8 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 		calcFunc := func(ctx context.Context) ([]persist.DBID, error) {
 			trendData, err := api.queries.GetTrendingFeedEventIDs(ctx, db.GetTrendingFeedEventIDsParams{
 				WindowEnd:           time.Now().Add(-time.Duration(72 * time.Hour)),
-				FeedEventType:       persist.FeedEventTypeTag,
+				FeedEntityType:      persist.FeedEventTypeTag,
+				PostEntityType:      persist.PostTypeTag,
 				ExcludedFeedActions: []string{string(persist.ActionUserCreated), string(persist.ActionUserFollowedUsers)},
 			})
 			if err != nil {
@@ -317,9 +318,10 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 			}
 
 			h := heap{}
+			now := time.Now()
 
 			for _, event := range trendData {
-				score := timeFactor(event.CreatedAt) * float64(event.Interactions)
+				score := timeFactor(now, event.CreatedAt) * float64(event.Interactions)
 				node := heapNode{id: event.ID, score: score}
 
 				// Add first 100 numbers in the heap
@@ -506,10 +508,9 @@ func feedEntityToTypedType(ctx context.Context, d *dataloader.Loaders, ids []db.
 	return entities, nil
 }
 
-func timeFactor(t time.Time) float64 {
+func timeFactor(t0, t1 time.Time) float64 {
 	lambda := 1.0 / 100_000
-	now := time.Now()
-	age := now.Sub(t).Seconds()
+	age := t0.Sub(t1).Seconds()
 	return 1 * math.Pow(math.E, (-lambda*age))
 }
 
