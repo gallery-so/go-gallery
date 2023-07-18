@@ -4133,10 +4133,14 @@ func (q *Queries) GetUsersByPositionPaginate(ctx context.Context, arg GetUsersBy
 }
 
 const getUsersForWallets = `-- name: GetUsersForWallets :many
-select wallets.id, wallets.created_at, wallets.last_updated, wallets.deleted, wallets.version, wallets.address, wallets.wallet_type, wallets.chain, users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id
-from unnest($1::varchar[]) as unnest_wallet_address, unnest($2::int[]) as unnest_chain
-join wallets on unnest_wallet_address = wallets.address and unnest_chain = wallets.chain
-join users on wallets.id = any(users.wallets)
+WITH params AS (
+    SELECT unnest($1::varchar[]) as address, unnest($2::int[]) as chain
+)
+SELECT wallets.id, wallets.created_at, wallets.last_updated, wallets.deleted, wallets.version, wallets.address, wallets.wallet_type, wallets.chain, users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id
+FROM wallets 
+JOIN users ON wallets.id = any(users.wallets)
+JOIN params ON wallets.address = params.address AND wallets.chain = params.chain
+WHERE not wallets.deleted AND not users.deleted
 `
 
 type GetUsersForWalletsParams struct {

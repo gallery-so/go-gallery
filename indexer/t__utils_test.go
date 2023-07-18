@@ -13,11 +13,13 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/jackc/pgx/v4/pgxpool"
 	migrate "github.com/mikeydub/go-gallery/db"
+	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/db/gen/indexerdb"
 	"github.com/mikeydub/go-gallery/docker"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
+	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -40,7 +42,7 @@ var allLogs = func() []types.Log {
 	return logs
 }()
 
-func setupTest(t *testing.T) (*assert.Assertions, *sql.DB, *pgxpool.Pool) {
+func setupTest(t *testing.T) (*assert.Assertions, *sql.DB, *pgxpool.Pool, *pgxpool.Pool) {
 	SetDefaults()
 	LoadConfigFile("indexer-server", "local")
 	ValidateEnv()
@@ -50,12 +52,20 @@ func setupTest(t *testing.T) (*assert.Assertions, *sql.DB, *pgxpool.Pool) {
 		t.Fatal(err)
 	}
 
+	r2, err := docker.StartPostgres()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	hostAndPort := strings.Split(r.GetHostPort("5432/tcp"), ":")
 	t.Setenv("POSTGRES_HOST", hostAndPort[0])
 	t.Setenv("POSTGRES_PORT", hostAndPort[1])
 
+	hostAndPort2 := strings.Split(r2.GetHostPort("5432/tcp"), ":")
+
 	db := postgres.MustCreateClient()
 	pgx := postgres.NewPgxClient()
+	pgx2 := postgres.NewPgxClient(postgres.WithHost(hostAndPort2[0]), postgres.WithPort(5432))
 	migrate, err := migrate.RunMigration(db, "./db/migrations/indexer")
 	if err != nil {
 		t.Fatalf("failed to seed db: %s", err)
@@ -65,17 +75,18 @@ func setupTest(t *testing.T) (*assert.Assertions, *sql.DB, *pgxpool.Pool) {
 		r.Close()
 	})
 
-	return assert.New(t), db, pgx
+	return assert.New(t), db, pgx, pgx2
 }
 
-func newMockIndexer(db *sql.DB, pool *pgxpool.Pool) *indexer {
+func newMockIndexer(db *sql.DB, pool, pool2 *pgxpool.Pool) *indexer {
 	start := uint64(testBlockFrom)
 	end := uint64(testBlockTo)
 	rpcEnabled = true
 	ethClient := rpc.NewEthSocketClient()
-	queries := indexerdb.New(pool)
+	iQueries := indexerdb.New(pool)
+	bQueries := coredb.New(pool2)
 
-	i := newIndexer(ethClient, &http.Client{Timeout: 10 * time.Minute}, nil, nil, nil, queries, nil, nil, postgres.NewTokenRepository(db), postgres.NewContractRepository(db), persist.ChainETH, defaultTransferEvents, func(ctx context.Context, curBlock, nextBlock *big.Int, topics [][]common.Hash) ([]types.Log, error) {
+	i := newIndexer(ethClient, &http.Client{Timeout: 10 * time.Minute}, nil, nil, nil, iQueries, bQueries, task.NewClient(context.Background()), postgres.NewTokenRepository(db), postgres.NewContractRepository(db), persist.ChainETH, defaultTransferEvents, func(ctx context.Context, curBlock, nextBlock *big.Int, topics [][]common.Hash) ([]types.Log, error) {
 		transferAgainLogs := []types.Log{{
 			Address:     common.HexToAddress("0x0c2ee19b2a89943066c2dc7f1bddcc907f614033"),
 			Topics:      []common.Hash{common.HexToHash("0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"), common.HexToHash(testAddress), common.HexToHash("0x0000000000000000000000008914496dc01efcc49a2fa340331fb90969b6f1d2"), common.HexToHash("0x00000000000000000000000000000000000000000000000000000000000000d9")},

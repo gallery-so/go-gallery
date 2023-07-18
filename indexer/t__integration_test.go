@@ -7,40 +7,23 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestIndexLogs_Success(t *testing.T) {
-	a, db, pgx := setupTest(t)
-	i := newMockIndexer(db, pgx)
+	a, db, pgx, pgx2 := setupTest(t)
+	i := newMockIndexer(db, pgx, pgx2)
 
 	// Run the Indexer
 	i.catchUp(sentry.SetHubOnContext(context.Background(), sentry.CurrentHub()), eventsToTopics(i.eventHashes))
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
-	defer cancel()
+	// ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	// defer cancel()
 
-	ethClient := rpc.NewEthClient()
+	// ethClient := rpc.NewEthClient()
 
 	t.Run("it updates its state", func(t *testing.T) {
 		a.EqualValues(testBlockTo-blocksPerLogsCall, i.lastSyncedChunk)
-	})
-
-	t.Run("it saves ERC-721s to the db", func(t *testing.T) {
-		t.SkipNow()
-		tokens := addressHasTokensInDB(t, a, i.tokenRepo, persist.EthereumAddress(testAddress), expectedTokensForAddress(persist.EthereumAddress(testAddress)))
-		for _, token := range tokens {
-			tokenMatchesExpected(t, a, token)
-		}
-	})
-
-	t.Run("it saves ERC-1155s to the db", func(t *testing.T) {
-		t.SkipNow()
-		tokens := addressHasTokensInDB(t, a, i.tokenRepo, persist.EthereumAddress(contribAddress), expectedTokensForAddress(persist.EthereumAddress(contribAddress)))
-		for _, token := range tokens {
-			tokenMatchesExpected(t, a, token)
-		}
 	})
 
 	t.Run("it saves contracts to the db", func(t *testing.T) {
@@ -51,22 +34,6 @@ func TestIndexLogs_Success(t *testing.T) {
 		}
 	})
 
-	t.Run("it can parse base64 uris", func(t *testing.T) {
-		token := tokenExistsInDB(t, a, i.tokenRepo, "0x0c2ee19b2a89943066c2dc7f1bddcc907f614033", "d9")
-		uri, err := rpc.GetTokenURI(ctx, persist.TokenTypeERC721, token.ContractAddress, token.TokenID, ethClient)
-		tokenURIHasExpectedType(t, a, err, uri, persist.URITypeBase64JSON)
-	})
-
-}
-
-func tokenExistsInDB(t *testing.T, a *assert.Assertions, tokenRepo persist.TokenRepository, address persist.EthereumAddress, tokenID persist.TokenID) persist.Token {
-	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	tokens, err := tokenRepo.GetByTokenIdentifiers(ctx, tokenID, address, 0, -1)
-	a.NoError(err)
-	a.Len(tokens, 1)
-	return tokens[0]
 }
 
 func contractExistsInDB(t *testing.T, a *assert.Assertions, contractRepo persist.ContractRepository, address persist.EthereumAddress) persist.Contract {

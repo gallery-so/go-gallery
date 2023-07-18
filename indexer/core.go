@@ -55,7 +55,7 @@ func coreInit(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) (*gin.Engin
 	s := rpc.NewStorageClient(context.Background())
 	tokenRepo, contractRepo := newRepos(s)
 	iQueries := indexerdb.New(postgres.NewPgxClient())
-	bQueries := coredb.New(postgres.NewPgxClient(postgres.WithHost(env.GetString("BACKEND_POSTGRES_HOST")), postgres.WithUser(env.GetString("BACKEND_POSTGRES_USER")), postgres.WithPassword(env.GetString("BACKEND_POSTGRES_PASSWORD"))))
+	bQueries := coredb.New(postgres.NewPgxClient(postgres.WithHost(env.GetString("BACKEND_POSTGRES_HOST")), postgres.WithUser(env.GetString("BACKEND_POSTGRES_USER")), postgres.WithPassword(env.GetString("BACKEND_POSTGRES_PASSWORD")), postgres.WithPort(env.GetInt("BACKEND_POSTGRES_PORT"))))
 	tClient := task.NewClient(context.Background())
 	ethClient := rpc.NewEthSocketClient()
 	ipfsClient := ipfs.NewShell()
@@ -149,7 +149,7 @@ func SetDefaults() {
 	viper.SetDefault("ALCHEMY_API_URL", "")
 	viper.SetDefault("ALCHEMY_NFT_API_URL", "")
 	viper.SetDefault("TASK_QUEUE_HOST", "localhost:8123")
-	viper.SetDefault("TOKEN_PROCESSING_QUEUE", "token-processing")
+	viper.SetDefault("TOKEN_PROCESSING_QUEUE", "projects/gallery-local/locations/here/queues/token-processing")
 	viper.SetDefault("TOKEN_PROCESSING_URL", "http://localhost:6500")
 	viper.AutomaticEnv()
 }

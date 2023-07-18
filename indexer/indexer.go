@@ -94,6 +94,20 @@ func (o contractAtBlock) OrderInfo() blockchainOrderInfo {
 	return o.boi
 }
 
+type tokenAtBlock struct {
+	ti    persist.EthereumTokenIdentifiers
+	boi   blockchainOrderInfo
+	token persist.Token
+}
+
+func (o tokenAtBlock) TokenIdentifiers() persist.EthereumTokenIdentifiers {
+	return o.ti
+}
+
+func (o tokenAtBlock) OrderInfo() blockchainOrderInfo {
+	return o.boi
+}
+
 type getLogsFunc func(ctx context.Context, curBlock, nextBlock *big.Int, topics [][]common.Hash) ([]types.Log, error)
 
 // indexer is the indexer for the blockchain that uses JSON RPC to scan through logs and process them
@@ -296,7 +310,7 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 	startTime := time.Now()
 	transfers := make(chan []transfersAtBlock)
 	plugins := NewTransferPlugins(ctx)
-	enabledPlugins := []chan<- TransferPluginMsg{plugins.contracts.in}
+	enabledPlugins := []chan<- TransferPluginMsg{plugins.contracts.in, plugins.tokens.in}
 
 	statsID, err := i.queries.InsertStatistic(ctx, indexerdb.InsertStatisticParams{ID: persist.GenerateID(), BlockStart: start, BlockEnd: start + blocksPerLogsCall})
 	if err != nil {
@@ -312,7 +326,7 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 		i.processLogs(ctx, transfers, logs)
 	}()
 	go i.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transfers, enabledPlugins, statsID)
-	i.processTokens(ctx, plugins.contracts.out, statsID)
+	i.processTokens(ctx, plugins.tokens.out, plugins.contracts.out, statsID)
 
 	err = i.queries.UpdateStatisticSuccess(ctx, indexerdb.UpdateStatisticSuccessParams{ID: statsID, Success: true, ProcessingTimeSeconds: sql.NullInt64{Int64: int64(time.Since(startTime) / time.Second), Valid: true}})
 	if err != nil {
@@ -347,7 +361,7 @@ func (i *indexer) startNewBlocksPipeline(ctx context.Context, topics [][]common.
 
 	go i.pollNewLogs(sentryutil.NewSentryHubContext(ctx), transfers, topics, mostRecentBlock, statsID)
 	go i.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transfers, enabledPlugins, statsID)
-	i.processTokens(ctx, plugins.contracts.out, statsID)
+	i.processTokens(ctx, plugins.tokens.out, plugins.contracts.out, statsID)
 
 }
 
@@ -707,25 +721,28 @@ func (i *indexer) processTransfers(ctx context.Context, transfers []transfersAtB
 
 // TOKENS FUNCS ---------------------------------------------------------------
 
-func (i *indexer) processTokens(ctx context.Context, contractsOut <-chan contractAtBlock, statsID persist.DBID) {
+func (i *indexer) processTokens(ctx context.Context, tokensOut <-chan tokenAtBlock, contractsOut <-chan contractAtBlock, statsID persist.DBID) {
 
 	wg := &sync.WaitGroup{}
 	mu := &sync.Mutex{}
 
 	contractsMap := make(map[persist.EthereumTokenIdentifiers]contractAtBlock)
+	tokensMap := make(map[persist.EthereumTokenIdentifiers]tokenAtBlock)
 
 	RunTransferPluginReceiver(ctx, wg, mu, contractsPluginReceiver, contractsOut, contractsMap)
+	RunTransferPluginReceiver(ctx, wg, mu, tokensPluginReceiver, tokensOut, tokensMap)
 
 	wg.Wait()
 
 	contracts := contractsAtBlockToContracts(contractsMap)
+	tokens := tokensAtBlockToTokens(tokensMap)
 
 	i.queries.UpdateStatisticTotalTokensAndContracts(ctx, indexerdb.UpdateStatisticTotalTokensAndContractsParams{
 		TotalContracts: sql.NullInt64{Int64: int64(len(contracts)), Valid: true},
 		ID:             statsID,
 	})
 
-	i.runDBHooks(ctx, contracts, []persist.Token{}, statsID)
+	i.runDBHooks(ctx, contracts, tokens, statsID)
 }
 
 func contractsAtBlockToContracts(contractsAtBlock map[persist.EthereumTokenIdentifiers]contractAtBlock) []persist.Contract {
@@ -741,6 +758,25 @@ func contractsAtBlockToContracts(contractsAtBlock map[persist.EthereumTokenIdent
 	return contracts
 }
 
+func tokensAtBlockToTokens(tokensAtBlock map[persist.EthereumTokenIdentifiers]tokenAtBlock) []persist.Token {
+	tokens := make([]persist.Token, 0, len(tokensAtBlock))
+	seen := make(map[persist.TokenUniqueIdentifiers]bool)
+	for _, token := range tokensAtBlock {
+		tids := persist.TokenUniqueIdentifiers{
+			Chain:           token.token.Chain,
+			ContractAddress: persist.Address(token.token.ContractAddress),
+			TokenID:         token.token.TokenID,
+			OwnerAddress:    persist.Address(token.token.OwnerAddress),
+		}
+		if seen[tids] {
+			continue
+		}
+		tokens = append(tokens, token.token)
+		seen[tids] = true
+	}
+	return tokens
+}
+
 func (i *indexer) runDBHooks(ctx context.Context, contracts []persist.Contract, tokens []persist.Token, statsID persist.DBID) {
 	defer recoverAndWait(ctx)
 
@@ -749,14 +785,20 @@ func (i *indexer) runDBHooks(ctx context.Context, contracts []persist.Contract, 
 	for _, hook := range i.contractDBHooks {
 		hook := hook
 		wp.Submit(func() {
-			hook(ctx, contracts, statsID)
+			err := hook(ctx, contracts, statsID)
+			if err != nil {
+				logger.For(ctx).WithError(err).Error("Failed to run contract db hook")
+			}
 		})
 	}
 
 	for _, hook := range i.tokenDBHooks {
 		hook := hook
 		wp.Submit(func() {
-			hook(ctx, tokens, statsID)
+			err := hook(ctx, tokens, statsID)
+			if err != nil {
+				logger.For(ctx).WithError(err).Error("Failed to run token db hook")
+			}
 		})
 	}
 
@@ -764,6 +806,10 @@ func (i *indexer) runDBHooks(ctx context.Context, contracts []persist.Contract, 
 }
 
 func contractsPluginReceiver(cur contractAtBlock, inc contractAtBlock) contractAtBlock {
+	return inc
+}
+
+func tokensPluginReceiver(cur tokenAtBlock, inc tokenAtBlock) tokenAtBlock {
 	return inc
 }
 

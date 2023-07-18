@@ -42,12 +42,14 @@ func newContractHooks(queries *indexerdb.Queries, repo persist.ContractRepositor
 func newTokenHooks(tasks *gcptasks.Client, bQueries *coredb.Queries) []DBHook[persist.Token] {
 	return []DBHook[persist.Token]{
 		func(ctx context.Context, it []persist.Token, statsID persist.DBID) error {
+
 			wallets, _ := util.Map(it, func(t persist.Token) (string, error) {
 				return t.OwnerAddress.String(), nil
 			})
 			chains, _ := util.Map(it, func(t persist.Token) (int32, error) {
 				return int32(t.Chain), nil
 			})
+
 			users, err := bQueries.GetUsersForWallets(ctx, coredb.GetUsersForWalletsParams{
 				WalletAddresses: wallets,
 				Chains:          chains,
@@ -63,12 +65,13 @@ func newTokenHooks(tasks *gcptasks.Client, bQueries *coredb.Queries) []DBHook[pe
 
 			tokensForUser := make(map[persist.DBID][]persist.TokenUniqueIdentifiers)
 			for _, t := range it {
-				if u, ok := addressToUser[persist.NewChainAddress(persist.Address(t.OwnerAddress), t.Chain)]; ok {
+				ca := persist.NewChainAddress(persist.Address(t.OwnerAddress.String()), t.Chain)
+				if u, ok := addressToUser[ca]; ok {
 					tokensForUser[u] = append(tokensForUser[u], persist.TokenUniqueIdentifiers{
 						Chain:           t.Chain,
 						ContractAddress: persist.Address(t.ContractAddress),
 						TokenID:         t.TokenID,
-						OwnerAddress:    persist.Address(t.OwnerAddress),
+						OwnerAddress:    persist.Address(t.OwnerAddress.String()),
 					})
 				}
 			}

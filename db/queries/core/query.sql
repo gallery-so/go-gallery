@@ -1443,7 +1443,12 @@ limit 1;
 select now()::timestamptz;
 
 -- name: GetUsersForWallets :many
-select sqlc.embed(wallets), sqlc.embed(users)
-from unnest(@wallet_addresses::varchar[]) as unnest_wallet_address, unnest(@chains::int[]) as unnest_chain
-join wallets on unnest_wallet_address = wallets.address and unnest_chain = wallets.chain
-join users on wallets.id = any(users.wallets);
+WITH params AS (
+    SELECT unnest(@wallet_addresses::varchar[]) as address, unnest(@chains::int[]) as chain
+)
+SELECT sqlc.embed(wallets), sqlc.embed(users)
+FROM wallets 
+JOIN users ON wallets.id = any(users.wallets)
+JOIN params ON wallets.address = params.address AND wallets.chain = params.chain
+WHERE not wallets.deleted AND not users.deleted;
+
