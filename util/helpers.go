@@ -229,6 +229,25 @@ func Dedupe[T comparable](src []T, filterInPlace bool) []T {
 	return result
 }
 
+// DedupeCustom removes duplicate elements from a slice, preserving the order of the remaining elements, while allowing for custom comparison logic
+func DedupeCustom[T any, Q comparable](src []T, generateComparable func(x T) Q, filterInPlace bool) []T {
+	var result []T
+	if filterInPlace {
+		result = src[:0]
+	} else {
+		result = make([]T, 0, len(src))
+	}
+	seen := make(map[Q]bool)
+	for _, x := range src {
+		c := generateComparable(x)
+		if !seen[c] {
+			result = append(result, x)
+			seen[c] = true
+		}
+	}
+	return result
+}
+
 func Contains[T comparable](s []T, str T) bool {
 	for _, v := range s {
 		if v == str {

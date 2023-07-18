@@ -1441,3 +1441,9 @@ limit 1;
 
 -- name: GetCurrentTime :one
 select now()::timestamptz;
+
+-- name: GetUsersForWallets :many
+select sqlc.embed(wallets), sqlc.embed(users)
+from unnest(@wallet_addresses::varchar[]) as unnest_wallet_address, unnest(@chains::int[]) as unnest_chain
+join wallets on unnest_wallet_address = wallets.address and unnest_chain = wallets.chain
+join users on wallets.id = any(users.wallets);

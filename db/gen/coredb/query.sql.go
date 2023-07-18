@@ -4132,6 +4132,70 @@ func (q *Queries) GetUsersByPositionPaginate(ctx context.Context, arg GetUsersBy
 	return items, nil
 }
 
+const getUsersForWallets = `-- name: GetUsersForWallets :many
+select wallets.id, wallets.created_at, wallets.last_updated, wallets.deleted, wallets.version, wallets.address, wallets.wallet_type, wallets.chain, users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id
+from unnest($1::varchar[]) as unnest_wallet_address, unnest($2::int[]) as unnest_chain
+join wallets on unnest_wallet_address = wallets.address and unnest_chain = wallets.chain
+join users on wallets.id = any(users.wallets)
+`
+
+type GetUsersForWalletsParams struct {
+	WalletAddresses []string `json:"wallet_addresses"`
+	Chains          []int32  `json:"chains"`
+}
+
+type GetUsersForWalletsRow struct {
+	Wallet Wallet `json:"wallet"`
+	User   User   `json:"user"`
+}
+
+func (q *Queries) GetUsersForWallets(ctx context.Context, arg GetUsersForWalletsParams) ([]GetUsersForWalletsRow, error) {
+	rows, err := q.db.Query(ctx, getUsersForWallets, arg.WalletAddresses, arg.Chains)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetUsersForWalletsRow
+	for rows.Next() {
+		var i GetUsersForWalletsRow
+		if err := rows.Scan(
+			&i.Wallet.ID,
+			&i.Wallet.CreatedAt,
+			&i.Wallet.LastUpdated,
+			&i.Wallet.Deleted,
+			&i.Wallet.Version,
+			&i.Wallet.Address,
+			&i.Wallet.WalletType,
+			&i.Wallet.Chain,
+			&i.User.ID,
+			&i.User.Deleted,
+			&i.User.Version,
+			&i.User.LastUpdated,
+			&i.User.CreatedAt,
+			&i.User.Username,
+			&i.User.UsernameIdempotent,
+			&i.User.Wallets,
+			&i.User.Bio,
+			&i.User.Traits,
+			&i.User.Universal,
+			&i.User.NotificationSettings,
+			&i.User.EmailVerified,
+			&i.User.EmailUnsubscriptions,
+			&i.User.FeaturedGallery,
+			&i.User.PrimaryWalletID,
+			&i.User.UserExperiences,
+			&i.User.ProfileImageID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getUsersWithEmailNotificationsOn = `-- name: GetUsersWithEmailNotificationsOn :many
 select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, pii_email_address, pii_socials from pii.user_view
     where (email_unsubscriptions->>'all' = 'false' or email_unsubscriptions->>'all' is null)
