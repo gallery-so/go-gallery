@@ -206,10 +206,11 @@ func newTokensPlugin(ctx context.Context) tokenTransfersPlugin {
 				panic(err)
 			}
 			ids := persist.TokenUniqueIdentifiers{
+				// TODO currently this can only be ETH but we should transition away from persist.EthereumAddress and hard coded ETH on the indexer if we could see ourselves indexing other EVMs
 				Chain:           persist.ChainETH,
 				ContractAddress: persist.Address(contract),
 				TokenID:         tokenID,
-				OwnerAddress:    persist.Address(msg.transfer.To),
+				OwnerAddress:    persist.Address(msg.transfer.To.String()),
 			}
 			if seenTokens[ids] {
 				continue
