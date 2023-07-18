@@ -4,6 +4,7 @@ import (
 	heappkg "container/heap"
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"math"
 	"time"
@@ -18,7 +19,7 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/recommend"
+	"github.com/mikeydub/go-gallery/service/recommend/koala"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -320,7 +321,7 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 			now := time.Now()
 
 			for _, e := range entities {
-				score := timeFactor(now, e.CreatedAt) * float64(e.Interactions)
+				score := timeFactor(e.CreatedAt, now) * float64(e.Interactions)
 				node := heapItem{id: e.ID, score: score}
 
 				// Add first 100 numbers in the heap
@@ -413,10 +414,7 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, userID persist.DBID, before,
 	var idToCursorPos = make(map[persist.DBID]int)
 
 	for _, p := range posts {
-		timeF := timeFactor(now, p.Post.CreatedAt)
-		engagementF := float64(p.Interactions)
-		personalizationF := personalizationFactor(ctx, nil, userID, p.Post)
-		score := timeF * engagementF * personalizationF
+		score := scorePost(ctx, userID, p.Post, now, int(p.Interactions))
 		node := heapItem{id: p.Post.ID, score: score}
 
 		if len(h) < 100 {
@@ -587,23 +585,21 @@ func feedEntityToTypedType(ctx context.Context, d *dataloader.Loaders, ids []db.
 	return entities, nil
 }
 
-func timeFactor(t0, t1 time.Time) float64 {
-	lambda := 1.0 / 100_000
-	age := t0.Sub(t1).Seconds()
-	return 1 * math.Pow(math.E, (-lambda*age))
+func scorePost(ctx context.Context, viewerID persist.DBID, post db.Post, t time.Time, interactions int) float64 {
+	timeF := timeFactor(post.CreatedAt, t)
+	engagementF := float64(interactions)
+	personalizationF, err := koala.For(ctx).RelevanceTo(viewerID, post)
+	if errors.Is(err, koala.ErrNoInputData) {
+		// Use a default value of 0.1 so that the post isn't completely penalized because of missing data.
+		personalizationF = 0.1
+	}
+	return timeF * engagementF * personalizationF
 }
 
-func personalizationFactor(ctx context.Context, p *recommend.Personalization, userID persist.DBID, post db.Post) (s float64) {
-	if len(post.ContractIds) == 0 {
-		return 1
-	}
-	for _, contractID := range post.ContractIds {
-		r := p.RelevanceTo(ctx, userID, post.ActorID, contractID)
-		if r > s {
-			s = r
-		}
-	}
-	return s
+func timeFactor(t0, t1 time.Time) float64 {
+	lambda := 1.0 / 100_000
+	age := t1.Sub(t0).Seconds()
+	return 1 * math.Pow(math.E, (-lambda*age))
 }
 
 type heapItem struct {

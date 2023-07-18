@@ -11,6 +11,40 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
+const getDisplayedContracts = `-- name: GetDisplayedContracts :many
+select user_id, contract_id, displayed
+from owned_contracts
+where contract_id not in (
+	select id from contracts where chain || ':' || address = any($1::varchar[])
+) and displayed
+`
+
+type GetDisplayedContractsRow struct {
+	UserID     persist.DBID `json:"user_id"`
+	ContractID persist.DBID `json:"contract_id"`
+	Displayed  bool         `json:"displayed"`
+}
+
+func (q *Queries) GetDisplayedContracts(ctx context.Context, excludedContracts []string) ([]GetDisplayedContractsRow, error) {
+	rows, err := q.db.Query(ctx, getDisplayedContracts, excludedContracts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetDisplayedContractsRow
+	for rows.Next() {
+		var i GetDisplayedContractsRow
+		if err := rows.Scan(&i.UserID, &i.ContractID, &i.Displayed); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getFollowEdgesByUserID = `-- name: GetFollowEdgesByUserID :many
 select id, follower, followee, deleted, created_at, last_updated from follows f where f.follower = $1 and f.deleted = false
 `
@@ -107,6 +141,34 @@ func (q *Queries) GetTopRecommendedUserIDs(ctx context.Context) ([]persist.DBID,
 			return nil, err
 		}
 		items = append(items, recommended_user_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getUserLabels = `-- name: GetUserLabels :many
+select follower id from follows where not deleted group by 1
+union
+select followee id from follows where not deleted group by 1
+union
+select user_id id from owned_contracts where displayed group by 1
+`
+
+func (q *Queries) GetUserLabels(ctx context.Context) ([]persist.DBID, error) {
+	rows, err := q.db.Query(ctx, getUserLabels)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []persist.DBID
+	for rows.Next() {
+		var id persist.DBID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

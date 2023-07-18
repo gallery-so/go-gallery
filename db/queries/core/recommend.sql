@@ -44,3 +44,17 @@ select recommended_user_id from top_recommended_users;
 
 -- name: GetFollowEdgesByUserID :many
 select * from follows f where f.follower = $1 and f.deleted = false;
+
+-- name: GetUserLabels :many
+select follower id from follows where not deleted group by 1
+union
+select followee id from follows where not deleted group by 1
+union
+select user_id id from owned_contracts where displayed group by 1;
+
+-- name: GetDisplayedContracts :many
+select user_id, contract_id, displayed
+from owned_contracts
+where contract_id not in (
+	select id from contracts where chain || ':' || address = any(@excluded_contracts::varchar[])
+) and displayed;

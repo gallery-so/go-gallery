@@ -143,8 +143,8 @@ func (r *Recommender) RecommendFromFollowing(ctx context.Context, userID persist
 	return recommendedIDs, nil
 }
 
-// Run is the main event loop that manages access to the currently loaded graph
-func (r *Recommender) Run(ctx context.Context, ticker *time.Ticker) {
+// Loop is the main event loop that manages access to the currently loaded graph
+func (r *Recommender) Loop(ctx context.Context, ticker *time.Ticker) {
 	r.LoadFunc(ctx)
 	go func() {
 		for {

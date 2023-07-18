@@ -33,6 +33,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
 	"github.com/mikeydub/go-gallery/service/recommend"
+	"github.com/mikeydub/go-gallery/service/recommend/koala"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
@@ -58,7 +59,8 @@ func Init() {
 	c := ClientInit(ctx)
 	provider, _ := NewMultichainProvider(ctx, SetDefaults)
 	recommender := recommend.NewRecommender(c.Queries)
-	router := CoreInit(c, provider, recommender)
+	k := koala.NewKoala(ctx, c.Queries)
+	router := CoreInit(ctx, c, provider, recommender, k)
 	http.Handle("/", router)
 }
 
@@ -105,7 +107,7 @@ func ClientInit(ctx context.Context) *Clients {
 
 // CoreInit initializes core server functionality. This is abstracted
 // so the test server can also utilize it
-func CoreInit(c *Clients, provider *multichain.Provider, recommender *recommend.Recommender) *gin.Engine {
+func CoreInit(ctx context.Context, c *Clients, provider *multichain.Provider, recommender *recommend.Recommender, k *koala.Koala) *gin.Engine {
 	logger.For(nil).Info("initializing server...")
 
 	if env.GetString("ENV") != "production" {
@@ -127,7 +129,8 @@ func CoreInit(c *Clients, provider *multichain.Provider, recommender *recommend.
 	socialCache := redis.NewCache(redis.SocialCache)
 	authRefreshCache := redis.NewCache(redis.AuthTokenForceRefreshCache)
 
-	recommender.Run(context.Background(), time.NewTicker(time.Hour))
+	recommender.Loop(ctx, time.NewTicker(time.Hour))
+	k.Loop(ctx, time.NewTicker(time.Minute*15))
 
 	return handlersInit(router, c.Repos, c.Queries, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, socialCache, authRefreshCache, c.MagicLinkClient, recommender)
 }
