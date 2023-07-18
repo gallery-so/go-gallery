@@ -912,10 +912,26 @@ update users set user_experiences = user_experiences || @experience where id = @
 select users.* from users join unnest(@user_ids::varchar[]) with ordinality t(id, pos) using (id) where deleted = false order by t.pos asc;
 
 -- name: GetTrendingFeedEventIDs :many
-select feed_events.id, feed_events.created_at, count(*)
-from events as interactions, feed_events
-where interactions.action IN ('CommentedOnFeedEvent', 'AdmiredFeedEvent') and interactions.created_at >= @window_end and interactions.feed_event_id is not null and interactions.feed_event_id = feed_events.id
-group by feed_events.id, feed_events.created_at;
+select fe.id, fe.feed_entity_type, fe.created_at, count(distinct c.id) + count(distinct a.id) interactions
+from feed_entities fe
+left join comments c on case
+    when fe.feed_entity_type = @feed_entity_type then fe.id = c.feed_event_id
+    when fe.feed_entity_type = @post_entity_type then fe.id = c.post_id
+    else 0 = 1 end
+    and not c.deleted
+left join admires a on case
+    when fe.feed_entity_type = @feed_entity_type then fe.id = a.feed_event_id
+    when fe.feed_entity_type = @post_entity_type then fe.id = a.post_id
+    else 0 = 1 end
+    and not a.deleted
+left join feed_events e on fe.feed_entity_type = @feed_entity_type and fe.id = e.id
+where fe.created_at >= @window_end
+    and case when fe.feed_entity_type = @feed_entity_type
+        then not (e.action = any(@excluded_feed_actions::varchar[]))
+        else 1 = 1
+        end
+group by fe.id, fe.feed_entity_type, fe.created_at
+order by fe.created_at desc;
 
 -- name: UpdateCollectionGallery :exec
 update collections set gallery_id = @gallery_id, last_updated = now() where id = @id and deleted = false;

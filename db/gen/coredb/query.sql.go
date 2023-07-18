@@ -3458,20 +3458,49 @@ func (q *Queries) GetTopCollectionsForCommunity(ctx context.Context, arg GetTopC
 }
 
 const getTrendingFeedEventIDs = `-- name: GetTrendingFeedEventIDs :many
-select feed_events.id, feed_events.created_at, count(*)
-from events as interactions, feed_events
-where interactions.action IN ('CommentedOnFeedEvent', 'AdmiredFeedEvent') and interactions.created_at >= $1 and interactions.feed_event_id is not null and interactions.feed_event_id = feed_events.id
-group by feed_events.id, feed_events.created_at
+select fe.id, fe.feed_entity_type, fe.created_at, count(distinct c.id) + count(distinct a.id) interactions
+from feed_entities fe
+left join comments c on case
+    when fe.feed_entity_type = $1 then fe.id = c.feed_event_id
+    when fe.feed_entity_type = $2 then fe.id = c.post_id
+    else 0 = 1 end
+    and not c.deleted
+left join admires a on case
+    when fe.feed_entity_type = $1 then fe.id = a.feed_event_id
+    when fe.feed_entity_type = $2 then fe.id = a.post_id
+    else 0 = 1 end
+    and not a.deleted
+left join feed_events e on fe.feed_entity_type = $1 and fe.id = e.id
+where fe.created_at >= $3
+    and case when fe.feed_entity_type = $1
+        then not (e.action = any($4::varchar[]))
+        else 1 = 1
+        end
+group by fe.id, fe.feed_entity_type, fe.created_at
+order by fe.created_at desc
 `
 
-type GetTrendingFeedEventIDsRow struct {
-	ID        persist.DBID `json:"id"`
-	CreatedAt time.Time    `json:"created_at"`
-	Count     int64        `json:"count"`
+type GetTrendingFeedEventIDsParams struct {
+	FeedEntityType      int32     `json:"feed_entity_type"`
+	PostEntityType      int32     `json:"post_entity_type"`
+	WindowEnd           time.Time `json:"window_end"`
+	ExcludedFeedActions []string  `json:"excluded_feed_actions"`
 }
 
-func (q *Queries) GetTrendingFeedEventIDs(ctx context.Context, windowEnd time.Time) ([]GetTrendingFeedEventIDsRow, error) {
-	rows, err := q.db.Query(ctx, getTrendingFeedEventIDs, windowEnd)
+type GetTrendingFeedEventIDsRow struct {
+	ID             persist.DBID `json:"id"`
+	FeedEntityType int32        `json:"feed_entity_type"`
+	CreatedAt      time.Time    `json:"created_at"`
+	Interactions   int32        `json:"interactions"`
+}
+
+func (q *Queries) GetTrendingFeedEventIDs(ctx context.Context, arg GetTrendingFeedEventIDsParams) ([]GetTrendingFeedEventIDsRow, error) {
+	rows, err := q.db.Query(ctx, getTrendingFeedEventIDs,
+		arg.FeedEntityType,
+		arg.PostEntityType,
+		arg.WindowEnd,
+		arg.ExcludedFeedActions,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -3479,7 +3508,12 @@ func (q *Queries) GetTrendingFeedEventIDs(ctx context.Context, windowEnd time.Ti
 	var items []GetTrendingFeedEventIDsRow
 	for rows.Next() {
 		var i GetTrendingFeedEventIDsRow
-		if err := rows.Scan(&i.ID, &i.CreatedAt, &i.Count); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.FeedEntityType,
+			&i.CreatedAt,
+			&i.Interactions,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

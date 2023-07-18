@@ -71,7 +71,7 @@ func testGraphQL(t *testing.T) {
 		{title: "update gallery and ensure name still gets set when not sent in update", run: testUpdateGalleryWithNoNameChange},
 		{title: "update gallery with a new collection", run: testUpdateGalleryWithNewCollection},
 		{title: "should get trending users", run: testTrendingUsers, fixtures: []fixture{usePostgres, useRedis}},
-		{title: "should get trending feed events", run: testTrendingFeedEvents},
+		{title: "should get trending feed events", run: testTrendingFeedEvents, fixtures: []fixture{usePostgres, useRedis}},
 		{title: "should delete a post", run: testDeletePost},
 		{title: "should get community with posts", run: testGetCommunity},
 		{title: "should delete collection in gallery update", run: testUpdateGalleryDeleteCollection},
@@ -736,20 +736,23 @@ func testTrendingFeedEvents(t *testing.T) {
 	ctx := context.Background()
 	userF := newUserWithFeedEntitiesFixture(t)
 	c := authedHandlerClient(t, userF.ID)
+	// four total interactions
 	admireFeedEvent(t, ctx, c, userF.FeedEventIDs[1])
 	commentOnFeedEvent(t, ctx, c, userF.FeedEventIDs[1], "a")
 	commentOnFeedEvent(t, ctx, c, userF.FeedEventIDs[1], "b")
 	commentOnFeedEvent(t, ctx, c, userF.FeedEventIDs[1], "c")
+	// three total interactions
 	admireFeedEvent(t, ctx, c, userF.FeedEventIDs[0])
 	commentOnFeedEvent(t, ctx, c, userF.FeedEventIDs[0], "a")
 	commentOnFeedEvent(t, ctx, c, userF.FeedEventIDs[0], "b")
-	admireFeedEvent(t, ctx, c, userF.FeedEventIDs[2])
-	// admire and comment on a post to ensure it works, but trending does not currently include posts so it should not affect anything in the result
+	// two total interactions
 	admirePost(t, ctx, c, userF.PostIDs[0])
 	commentOnPost(t, ctx, c, userF.PostIDs[0], "a")
-
+	// one total interactions
+	admireFeedEvent(t, ctx, c, userF.FeedEventIDs[2])
 	expected := []persist.DBID{
 		userF.FeedEventIDs[2],
+		userF.PostIDs[0],
 		userF.FeedEventIDs[0],
 		userF.FeedEventIDs[1],
 	}
@@ -1357,8 +1360,14 @@ func trendingFeedEvents(t *testing.T, ctx context.Context, c genql.Client, limit
 	require.NoError(t, err)
 	feedEvents := make([]persist.DBID, len(resp.TrendingFeed.Edges))
 	for i, event := range resp.TrendingFeed.Edges {
-		e := (*event.Node).(*trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent)
-		feedEvents[i] = e.Dbid
+		switch e := (*event.Node).(type) {
+		case *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent:
+			feedEvents[i] = e.Dbid
+		case *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodePost:
+			feedEvents[i] = e.Dbid
+		default:
+			panic("unknown event type")
+		}
 
 	}
 	return feedEvents
