@@ -415,6 +415,7 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, userID persist.DBID, before,
 
 	for _, p := range posts {
 		score := scorePost(ctx, userID, p.Post, now, int(p.Interactions))
+		fmt.Println(p.Post.ID, score)
 		node := heapItem{id: p.Post.ID, score: score}
 
 		if len(h) < 100 {
@@ -589,6 +590,7 @@ func scorePost(ctx context.Context, viewerID persist.DBID, post db.Post, t time.
 	timeF := timeFactor(post.CreatedAt, t)
 	engagementF := float64(interactions)
 	personalizationF, err := koala.For(ctx).RelevanceTo(viewerID, post)
+	fmt.Println("timeF", timeF, "engagementF", engagementF, "personalizationF", personalizationF)
 	if errors.Is(err, koala.ErrNoInputData) {
 		// Use a default value of 0.1 so that the post isn't completely penalized because of missing data.
 		personalizationF = 0.1

@@ -13,7 +13,7 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
-var contextKey = "recommend.instance"
+const contextKey = "recommend.instance"
 
 var metadataKey = struct{}{}
 

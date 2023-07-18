@@ -2442,6 +2442,7 @@ with post_ids as (
     from post_ids
     left join comments c on c.post_id = post_ids.id
     left join admires a on a.post_id = post_ids.id
+    group by post_ids.id
 )
 select posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, post_interactions.interactions
 from posts, post_ids, post_interactions

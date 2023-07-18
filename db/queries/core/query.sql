@@ -921,6 +921,7 @@ with post_ids as (
     from post_ids
     left join comments c on c.post_id = post_ids.id
     left join admires a on a.post_id = post_ids.id
+    group by post_ids.id
 )
 select sqlc.embed(posts), post_interactions.interactions
 from posts, post_ids, post_interactions

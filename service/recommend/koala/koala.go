@@ -16,8 +16,9 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
+const contextKey = "personalization.instance"
+
 var ErrNoInputData = errors.New("no personalization input data")
-var contextKey = "personalization.instance"
 var socialWeight = 1.0
 var relevanceWeight = 2.0
 var similarityWeight = 1.0
@@ -57,21 +58,17 @@ type Koala struct {
 
 func NewKoala(ctx context.Context, q *db.Queries) *Koala {
 	k := &Koala{q: q}
-	newMatrices(ctx, k)
+	userM, ratingM, displayM, simM, uL, cL := readMatrices(ctx, q)
+	k.update(userM, ratingM, displayM, simM, uL, cL)
 	return k
 }
 
-func newMatrices(ctx context.Context, k *Koala) {
-	uL := readUserLabels(ctx, k.q)
-	ratingM, displayM, cL := readContractMatrices(ctx, k.q, uL)
-	userM := readUserMatrix(ctx, k.q, uL)
-	simM := toSimMatrix(ratingM, userM)
-	k.userM = userM
-	k.ratingM = ratingM
-	k.displayM = displayM
-	k.simM = simM
-	k.uL = uL
-	k.cL = cL
+func readMatrices(ctx context.Context, q *db.Queries) (userM, ratingM, displayM, simM *sparse.CSR, uL, cL map[persist.DBID]int) {
+	uL = readUserLabels(ctx, q)
+	ratingM, displayM, cL = readContractMatrices(ctx, q, uL)
+	userM = readUserMatrix(ctx, q, uL)
+	simM = toSimMatrix(ratingM, userM)
+	return userM, ratingM, displayM, simM, uL, cL
 }
 
 func AddTo(c *gin.Context, k *Koala) {
@@ -84,8 +81,6 @@ func For(ctx context.Context) *Koala {
 }
 
 func (k *Koala) RelevanceTo(userID persist.DBID, post db.Post) (topS float64, err error) {
-	k.mu.Lock()
-	defer k.mu.Unlock()
 	if len(post.ContractIds) == 0 {
 		return k.scoreFeatures(userID, post.ActorID, "")
 	}
@@ -110,15 +105,16 @@ func (k *Koala) Loop(ctx context.Context, ticker *time.Ticker) {
 		for {
 			select {
 			case <-ticker.C:
-				k.mu.Lock()
-				defer k.mu.Unlock()
-				newMatrices(ctx, k)
+				userM, ratingM, displayM, simM, uL, cL := readMatrices(ctx, k.q)
+				k.update(userM, ratingM, displayM, simM, uL, cL)
 			}
 		}
 	}()
 }
 
 func (k *Koala) scoreFeatures(viewerID, queryID, contractID persist.DBID) (float64, error) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
 	vIdx, vOK := k.uL[viewerID]
 	qIdx, qOK := k.uL[queryID]
 	cIdx, cOK := k.cL[contractID]
@@ -141,6 +137,17 @@ func (k *Koala) scoreFeatures(viewerID, queryID, contractID persist.DBID) (float
 	similarityScore := calcSimilarityScore(k.simM, vIdx, qIdx)
 	score := ((socialWeight * socialScore) + (relevanceWeight * relevanceScore) + (similarityWeight * similarityScore)) / 3
 	return score, nil
+}
+
+func (k *Koala) update(userM, ratingM, displayM, simM *sparse.CSR, uL, cL map[persist.DBID]int) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	k.userM = userM
+	k.ratingM = ratingM
+	k.displayM = displayM
+	k.simM = simM
+	k.uL = uL
+	k.cL = cL
 }
 
 // calcSocialScore determines if vIdx is in the same friend circle as qIdx by running a DFS on userM
@@ -256,7 +263,7 @@ func readContractMatrices(ctx context.Context, q *db.Queries, uL map[persist.DBI
 	}
 	ratingM = dok.ToCSR()
 	displayM = dok.ToCSR()
-	displayMT := displayM.T().(*sparse.CSR).ToCSR()
+	displayMT := displayM.T().(*sparse.CSC).ToCSR()
 	displayMMT := &sparse.CSR{}
 	displayMMT.Mul(displayMT, displayM)
 	return ratingM, displayMMT, cL
