@@ -1868,6 +1868,11 @@ func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBloc
 	panic(fmt.Errorf("not implemented"))
 }
 
+// Author is the resolver for the author field.
+func (r *postResolver) Author(ctx context.Context, obj *model.Post) (*model.GalleryUser, error) {
+	return resolveGalleryUserByUserID(ctx, obj.AuthorID)
+}
+
 // Tokens is the resolver for the tokens field.
 func (r *postResolver) Tokens(ctx context.Context, obj *model.Post) ([]*model.Token, error) {
 	result := make([]*model.Token, len(obj.TokenIDs))

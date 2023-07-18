@@ -902,6 +902,9 @@ type Post implements Node @key(fields: "dbid") @goEmbedHelper {
   id: ID!
   dbid: DBID!
 
+  author: GalleryUser @goField(forceResolver: true)
+  creationTime: Time
+
   tokens: [Token] @goField(forceResolver: true)
 
   caption: String
