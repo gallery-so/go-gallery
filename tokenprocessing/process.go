@@ -178,7 +178,7 @@ func processOwnersForContractTokens(mc *multichain.Provider, contractRepo *postg
 	}
 }
 
-func processOwnersForUserTokens(mc *multichain.Provider, throttler *throttle.Locker) gin.HandlerFunc {
+func processOwnersForUserTokens(mc *multichain.Provider) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input task.TokenProcessingUserTokensMessage
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -186,15 +186,10 @@ func processOwnersForUserTokens(mc *multichain.Provider, throttler *throttle.Loc
 			return
 		}
 
-		lockID := fmt.Sprintf("%s-%+v", input.UserID, input.TokenIdentifiers)
-
-		// do not unlock, let expiry handle the unlock
-		logger.For(c).Infof("Processing: %s - Processing Tokens Refresh", lockID)
 		if err := mc.SyncTokensByUserIDTokenIdentifiers(c, input.UserID, input.TokenIdentifiers); err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
-		logger.For(c).Infof("Processing: %s - Finished Processing Collection Refresh", lockID)
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}

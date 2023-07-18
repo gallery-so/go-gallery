@@ -262,13 +262,13 @@ func (p *Provider) SyncTokensByUserID(ctx context.Context, userID persist.DBID, 
 		logger.For(ctx).Infof("syncing chain %d tokens for user %s wallets %s", c, user.Username, a)
 		chain := c
 		addresses := a
-		tokenFetchers := matchingProvidersForChain[TokensOwnerFetcher](p.Chains, chain)
+
 		for _, addr := range addresses {
 			addr := addr
 			chain := chain
 			wg.Go(func() {
-
 				subWg := &conc.WaitGroup{}
+				tokenFetchers := matchingProvidersForChain[TokensOwnerFetcher](p.Chains, chain)
 				for i, p := range tokenFetchers {
 					fetcher := p
 					priority := i
