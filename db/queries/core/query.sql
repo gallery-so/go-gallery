@@ -1442,7 +1442,7 @@ limit 1;
 -- name: GetCurrentTime :one
 select now()::timestamptz;
 
--- name: GetUsersForWallets :many
+-- name: GetUsersByWalletAddressesAndChains :many
 WITH params AS (
     SELECT unnest(@wallet_addresses::varchar[]) as address, unnest(@chains::int[]) as chain
 )

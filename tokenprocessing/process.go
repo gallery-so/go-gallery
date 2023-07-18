@@ -186,7 +186,7 @@ func processOwnersForUserTokens(mc *multichain.Provider) gin.HandlerFunc {
 			return
 		}
 
-		if err := mc.SyncTokensByUserIDTokenIdentifiers(c, input.UserID, input.TokenIdentifiers); err != nil {
+		if err := mc.SyncTokensByUserIDAndTokenIdentifiers(c, input.UserID, input.TokenIdentifiers); err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}

@@ -50,7 +50,8 @@ func newTokenHooks(tasks *gcptasks.Client, bQueries *coredb.Queries) []DBHook[pe
 				return int32(t.Chain), nil
 			})
 
-			users, err := bQueries.GetUsersForWallets(ctx, coredb.GetUsersForWalletsParams{
+			// get all gallery users associated with any of the tokens
+			users, err := bQueries.GetUsersByWalletAddressesAndChains(ctx, coredb.GetUsersByWalletAddressesAndChainsParams{
 				WalletAddresses: wallets,
 				Chains:          chains,
 			})
@@ -58,6 +59,7 @@ func newTokenHooks(tasks *gcptasks.Client, bQueries *coredb.Queries) []DBHook[pe
 				return err
 			}
 
+			// map the chain address to the user id
 			addressToUser := make(map[persist.ChainAddress]persist.DBID)
 			for _, u := range users {
 				addressToUser[persist.NewChainAddress(u.Wallet.Address, u.Wallet.Chain)] = u.User.ID
@@ -66,6 +68,7 @@ func newTokenHooks(tasks *gcptasks.Client, bQueries *coredb.Queries) []DBHook[pe
 			tokensForUser := make(map[persist.DBID][]persist.TokenUniqueIdentifiers)
 			for _, t := range it {
 				ca := persist.NewChainAddress(persist.Address(t.OwnerAddress.String()), t.Chain)
+				// check if the token corresponds to a user
 				if u, ok := addressToUser[ca]; ok {
 					tokensForUser[u] = append(tokensForUser[u], persist.TokenUniqueIdentifiers{
 						Chain:           t.Chain,
@@ -77,6 +80,7 @@ func newTokenHooks(tasks *gcptasks.Client, bQueries *coredb.Queries) []DBHook[pe
 			}
 
 			for userID, tids := range tokensForUser {
+				// send each token grouped by user ID to the task queue
 				err = task.CreateTaskForUserTokenProcessing(ctx, task.TokenProcessingUserTokensMessage{
 					UserID:           userID,
 					TokenIdentifiers: tids,

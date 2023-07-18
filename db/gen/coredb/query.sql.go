@@ -4132,7 +4132,7 @@ func (q *Queries) GetUsersByPositionPaginate(ctx context.Context, arg GetUsersBy
 	return items, nil
 }
 
-const getUsersForWallets = `-- name: GetUsersForWallets :many
+const getUsersByWalletAddressesAndChains = `-- name: GetUsersByWalletAddressesAndChains :many
 WITH params AS (
     SELECT unnest($1::varchar[]) as address, unnest($2::int[]) as chain
 )
@@ -4143,25 +4143,25 @@ JOIN params ON wallets.address = params.address AND wallets.chain = params.chain
 WHERE not wallets.deleted AND not users.deleted
 `
 
-type GetUsersForWalletsParams struct {
+type GetUsersByWalletAddressesAndChainsParams struct {
 	WalletAddresses []string `json:"wallet_addresses"`
 	Chains          []int32  `json:"chains"`
 }
 
-type GetUsersForWalletsRow struct {
+type GetUsersByWalletAddressesAndChainsRow struct {
 	Wallet Wallet `json:"wallet"`
 	User   User   `json:"user"`
 }
 
-func (q *Queries) GetUsersForWallets(ctx context.Context, arg GetUsersForWalletsParams) ([]GetUsersForWalletsRow, error) {
-	rows, err := q.db.Query(ctx, getUsersForWallets, arg.WalletAddresses, arg.Chains)
+func (q *Queries) GetUsersByWalletAddressesAndChains(ctx context.Context, arg GetUsersByWalletAddressesAndChainsParams) ([]GetUsersByWalletAddressesAndChainsRow, error) {
+	rows, err := q.db.Query(ctx, getUsersByWalletAddressesAndChains, arg.WalletAddresses, arg.Chains)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetUsersForWalletsRow
+	var items []GetUsersByWalletAddressesAndChainsRow
 	for rows.Next() {
-		var i GetUsersForWalletsRow
+		var i GetUsersByWalletAddressesAndChainsRow
 		if err := rows.Scan(
 			&i.Wallet.ID,
 			&i.Wallet.CreatedAt,

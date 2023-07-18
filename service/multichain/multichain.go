@@ -298,8 +298,8 @@ func (p *Provider) SyncTokensByUserID(ctx context.Context, userID persist.DBID, 
 	return p.receiveSyncedTokensForUser(ctx, user, chains, incomingTokens, incomingContracts, errChan)
 }
 
-// SyncTokensByUserIDTokenIdentifiers updates the media for specific tokens for a user
-func (p *Provider) SyncTokensByUserIDTokenIdentifiers(ctx context.Context, userID persist.DBID, tokenIdentifiers []persist.TokenUniqueIdentifiers) error {
+// SyncTokensByUserIDAndTokenIdentifiers updates the media for specific tokens for a user
+func (p *Provider) SyncTokensByUserIDAndTokenIdentifiers(ctx context.Context, userID persist.DBID, tokenIdentifiers []persist.TokenUniqueIdentifiers) error {
 
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"tids": tokenIdentifiers, "user_id": userID})
 
