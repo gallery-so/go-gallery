@@ -308,21 +308,36 @@ func (p *Provider) SyncTokensByUserIDTokenIdentifiers(ctx context.Context, userI
 		return err
 	}
 
+	chains, _ := util.Map(tokenIdentifiers, func(i persist.TokenUniqueIdentifiers) (persist.Chain, error) {
+		return i.Chain, nil
+	})
+
+	chains = util.Dedupe(chains, false)
+
+	matchingWallets := p.matchingWallets(user.Wallets, chains)
+
+	chainAddresses := map[persist.ChainAddress]bool{}
+	for chain, addresses := range matchingWallets {
+		for _, address := range addresses {
+			chainAddresses[persist.NewChainAddress(address, chain)] = true
+		}
+	}
+
 	errChan := make(chan error)
 	incomingTokens := make(chan chainTokens)
 	incomingContracts := make(chan chainContracts)
 	chainsToTokenIdentifiers := make(map[persist.Chain][]persist.TokenUniqueIdentifiers)
 	for _, tid := range tokenIdentifiers {
+		// check if the user owns the wallet that owns the token
+		if !chainAddresses[persist.NewChainAddress(tid.OwnerAddress, tid.Chain)] {
+			continue
+		}
 		chainsToTokenIdentifiers[tid.Chain] = append(chainsToTokenIdentifiers[tid.Chain], tid)
 	}
 
 	for c, a := range chainsToTokenIdentifiers {
 		chainsToTokenIdentifiers[c] = util.Dedupe(a, false)
 	}
-
-	chains, _ := util.Map(tokenIdentifiers, func(i persist.TokenUniqueIdentifiers) (persist.Chain, error) {
-		return i.Chain, nil
-	})
 
 	wg := &conc.WaitGroup{}
 	for c, t := range chainsToTokenIdentifiers {
