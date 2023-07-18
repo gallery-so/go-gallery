@@ -18,6 +18,7 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/recommend"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -171,7 +172,7 @@ func (api FeedAPI) GetRawEventById(ctx context.Context, eventID persist.DBID) (*
 	return &event, nil
 }
 
-func (api FeedAPI) PaginatePersonalFeed(ctx context.Context, before *string, after *string, first *int, last *int) ([]any, PageInfo, error) {
+func (api FeedAPI) PersonalFeed(ctx context.Context, before *string, after *string, first *int, last *int) ([]any, PageInfo, error) {
 	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return nil, PageInfo{}, err
@@ -214,7 +215,7 @@ func (api FeedAPI) PaginatePersonalFeed(ctx context.Context, before *string, aft
 	return paginator.paginate(before, after, first, last)
 }
 
-func (api FeedAPI) PaginateUserFeed(ctx context.Context, userID persist.DBID, before *string, after *string,
+func (api FeedAPI) UserFeed(ctx context.Context, userID persist.DBID, before *string, after *string,
 	first *int, last *int) ([]any, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
@@ -252,7 +253,7 @@ func (api FeedAPI) PaginateUserFeed(ctx context.Context, userID persist.DBID, be
 	return paginator.paginate(before, after, first, last)
 }
 
-func (api FeedAPI) PaginateGlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) ([]any, PageInfo, error) {
+func (api FeedAPI) GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) ([]any, PageInfo, error) {
 	// Validate
 	if err := validatePaginationParams(api.validator, first, last); err != nil {
 		return nil, PageInfo{}, err
@@ -283,18 +284,16 @@ func (api FeedAPI) PaginateGlobalFeed(ctx context.Context, before *string, after
 	return paginator.paginate(before, after, first, last)
 }
 
-func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, after *string, first *int, last *int) ([]any, PageInfo, error) {
+func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *string, first *int, last *int) ([]any, PageInfo, error) {
 	// Validate
 	if err := validatePaginationParams(api.validator, first, last); err != nil {
 		return nil, PageInfo{}, err
 	}
 
-	var (
-		err         error
-		trendingIDs []persist.DBID
-		paginator   = positionPaginator{}
-		lookup      = make(map[persist.DBID]int)
-	)
+	var err error
+	var trendingIDs []persist.DBID
+	var paginator = positionPaginator{}
+	var idToCursorPos = make(map[persist.DBID]int)
 
 	// If a cursor is provided, we can skip querying the cache
 	if before != nil {
@@ -307,7 +306,7 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 		}
 	} else {
 		calcFunc := func(ctx context.Context) ([]persist.DBID, error) {
-			trendData, err := api.queries.GetTrendingFeedEventIDs(ctx, db.GetTrendingFeedEventIDsParams{
+			entities, err := api.queries.GetLatestFeedEntities(ctx, db.GetLatestFeedEntitiesParams{
 				WindowEnd:           time.Now().Add(-time.Duration(72 * time.Hour)),
 				FeedEntityType:      persist.FeedEventTypeTag,
 				PostEntityType:      persist.PostTypeTag,
@@ -320,9 +319,9 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 			h := heap{}
 			now := time.Now()
 
-			for _, event := range trendData {
-				score := timeFactor(now, event.CreatedAt) * float64(event.Interactions)
-				node := heapNode{id: event.ID, score: score}
+			for _, e := range entities {
+				score := timeFactor(now, e.CreatedAt) * float64(e.Interactions)
+				node := heapItem{id: e.ID, score: score}
 
 				// Add first 100 numbers in the heap
 				if len(h) < 100 {
@@ -331,7 +330,7 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 				}
 
 				// If the score is greater than the smallest score in the heap, replace it
-				if score > h[0].(heapNode).score {
+				if score > h[0].(heapItem).score {
 					heappkg.Pop(&h)
 					heappkg.Push(&h, node)
 				}
@@ -340,7 +339,7 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 			trendingIDs := make([]persist.DBID, 100)
 
 			for len(h) > 0 {
-				node := heappkg.Pop(&h).(heapNode)
+				node := heappkg.Pop(&h).(heapItem)
 				trendingIDs = append(trendingIDs, node.id)
 			}
 
@@ -355,38 +354,118 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 		}
 	}
 
-	asStr := make([]string, len(trendingIDs))
+	idsAsStr := make([]string, len(trendingIDs))
 	for i, id := range trendingIDs {
 		// Postgres uses 1-based indexing
-		lookup[id] = i + 1
-		asStr[i] = id.String()
+		idToCursorPos[id] = i + 1
+		idsAsStr[i] = id.String()
 	}
 
 	queryFunc := func(params positionPagingParams) ([]any, error) {
-		keys, err := api.queries.PaginateTrendingFeed(ctx, db.PaginateTrendingFeedParams{
-			FeedEntityIds: asStr,
+		keys, err := api.queries.PaginateFeedEntities(ctx, db.PaginateFeedEntitiesParams{
+			FeedEntityIds: idsAsStr,
 			CurBeforePos:  params.CursorBeforePos,
 			CurAfterPos:   params.CursorAfterPos,
 			PagingForward: params.PagingForward,
 			Limit:         params.Limit,
 		})
-
-		events, err := feedEntityToTypedType(ctx, api.loaders, keys)
 		if err != nil {
 			return nil, err
 		}
-
-		return events, err
+		return feedEntityToTypedType(ctx, api.loaders, keys)
 	}
 
 	cursorFunc := func(node any) (int, []persist.DBID, error) {
 		_, id, err := feedCursor(node)
-		return lookup[id], trendingIDs, err
+		return idToCursorPos[id], trendingIDs, err
 	}
 
 	paginator.QueryFunc = queryFunc
 	paginator.CursorFunc = cursorFunc
+	return paginator.paginate(before, after, first, last)
+}
 
+func (api FeedAPI) CuratedFeed(ctx context.Context, userID persist.DBID, before, after *string, first, last *int) ([]any, PageInfo, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"userID": validate.WithTag(userID, "required"),
+	}); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	// TODO: Support feed events too
+	posts, err := api.queries.GetLatestPosts(ctx, db.GetLatestPostsParams{
+		WindowEnd: time.Now().Add(-time.Duration(72 * time.Hour)),
+	})
+	if err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	h := heap{}
+	now := time.Now()
+
+	var paginator = positionPaginator{}
+	var topPosts []persist.DBID
+	var idToCursorPos = make(map[persist.DBID]int)
+
+	for _, p := range posts {
+		timeF := timeFactor(now, p.Post.CreatedAt)
+		engagementF := float64(p.Interactions)
+		personalizationF := personalizationFactor(ctx, nil, userID, p.Post)
+		score := timeF * engagementF * personalizationF
+		node := heapItem{id: p.Post.ID, score: score}
+
+		if len(h) < 100 {
+			heappkg.Push(&h, heapItem{id: p.Post.ID, score: score})
+			continue
+		}
+
+		// If the score is greater than the smallest score in the heap, replace it
+		if score > h[0].(heapItem).score {
+			heappkg.Pop(&h)
+			heappkg.Push(&h, node)
+		}
+
+		topPosts = make([]persist.DBID, len(h))
+
+		for len(h) > 0 {
+			node := heappkg.Pop(&h).(heapItem)
+			topPosts = append(topPosts, node.id)
+		}
+	}
+
+	idsAsStr := make([]string, len(topPosts))
+	for i, id := range topPosts {
+		// Postgres uses 1-based indexing
+		idToCursorPos[id] = i + 1
+		idsAsStr[i] = id.String()
+	}
+
+	queryFunc := func(params positionPagingParams) ([]any, error) {
+		keys, err := api.queries.PaginateFeedEntities(ctx, db.PaginateFeedEntitiesParams{
+			FeedEntityIds: idsAsStr,
+			CurBeforePos:  params.CursorBeforePos,
+			CurAfterPos:   params.CursorAfterPos,
+			PagingForward: params.PagingForward,
+			Limit:         params.Limit,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return feedEntityToTypedType(ctx, api.loaders, keys)
+	}
+
+	cursorFunc := func(node any) (int, []persist.DBID, error) {
+		_, id, err := feedCursor(node)
+		return idToCursorPos[id], topPosts, err
+	}
+
+	paginator.QueryFunc = queryFunc
+	paginator.CursorFunc = cursorFunc
 	return paginator.paginate(before, after, first, last)
 }
 
@@ -514,7 +593,20 @@ func timeFactor(t0, t1 time.Time) float64 {
 	return 1 * math.Pow(math.E, (-lambda*age))
 }
 
-type heapNode struct {
+func personalizationFactor(ctx context.Context, p *recommend.Personalization, userID persist.DBID, post db.Post) (s float64) {
+	if len(post.ContractIds) == 0 {
+		return 1
+	}
+	for _, contractID := range post.ContractIds {
+		r := p.RelevanceTo(ctx, userID, post.ActorID, contractID)
+		if r > s {
+			s = r
+		}
+	}
+	return s
+}
+
+type heapItem struct {
 	id    persist.DBID
 	score float64
 }
@@ -527,7 +619,7 @@ func (h *heap) Push(s any)   { *h = append(*h, s) }
 
 func (h heap) Less(i, j int) bool {
 	// We want Pop to give us the highest, not lowest, score so we use greater than here.
-	return h[i].(heapNode).score > h[j].(heapNode).score
+	return h[i].(heapItem).score > h[j].(heapItem).score
 }
 
 func (h *heap) Pop() any {

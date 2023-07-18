@@ -1328,6 +1328,7 @@ type GalleryUser struct {
 	Followers                []*GalleryUser         `json:"followers"`
 	Following                []*GalleryUser         `json:"following"`
 	Feed                     *FeedConnection        `json:"feed"`
+	CuratedFeed              *FeedConnection        `json:"curatedFeed"`
 	SharedFollowers          *UsersConnection       `json:"sharedFollowers"`
 	SharedCommunities        *CommunitiesConnection `json:"sharedCommunities"`
 	CreatedCommunities       *CommunitiesConnection `json:"createdCommunities"`

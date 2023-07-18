@@ -111,6 +111,8 @@ type GalleryUser implements Node @goEmbedHelper {
   following: [GalleryUser] @goField(forceResolver: true)
   feed(before: String, after: String, first: Int, last: Int): FeedConnection
     @goField(forceResolver: true)
+  curatedFeed(before: String, after: String, first: Int, last: Int): FeedConnection
+    @goField(forceResolver: true)
   sharedFollowers(before: String, after: String, first: Int, last: Int): UsersConnection
     @authRequired
     @goField(forceResolver: true)
