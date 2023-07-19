@@ -660,6 +660,7 @@ func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (
 	return gallery, nil
 }
 
+
 func getExternalID(ctx context.Context) *string {
 	gc := util.MustGetGinContext(ctx)
 	if ip := net.ParseIP(gc.ClientIP()); ip != nil && !ip.IsPrivate() {
