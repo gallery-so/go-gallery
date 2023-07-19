@@ -257,7 +257,7 @@ func (p *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, owner
 		defer close(assetsChan)
 		streamAssetsForContractAddressAndOwner(ctx, persist.EthereumAddress(owner), persist.EthereumAddress(address), assetsChan)
 	}()
-	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient, p.chain)
+	tokens, contracts, err := assetsToTokens(ctx, owner, assetsChan, p.ethClient, p.chain)
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
