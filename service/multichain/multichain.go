@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"net/http"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -1299,7 +1300,11 @@ func (p *Provider) createUsersForTokens(ctx context.Context, tokens []chainToken
 							displayCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 							defer cancel()
 							display := resolver.GetDisplayNameByAddress(displayCtx, t.OwnerAddress)
-							if display != "" {
+
+							// if display is an empty address, this will return empty
+							displayCopy := strings.TrimLeft(display, "0x")
+							displayCopy = strings.TrimRight(displayCopy, "0")
+							if displayCopy != "" {
 								username = display
 								return true
 							}
