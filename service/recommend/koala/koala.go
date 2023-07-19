@@ -80,14 +80,14 @@ func For(ctx context.Context) *Koala {
 	return gc.Value(contextKey).(*Koala)
 }
 
-func (k *Koala) RelevanceTo(userID persist.DBID, post db.Post) (topS float64, err error) {
-	if len(post.ContractIds) == 0 {
-		return k.scoreFeatures(userID, post.ActorID, "")
+func (k *Koala) RelevanceTo(userID persist.DBID, e db.EntityScoringRow) (topS float64, err error) {
+	if len(e.ContractIds) == 0 {
+		return k.scoreFeatures(userID, e.ActorID, "")
 	}
 	var scored bool
 	var s float64
-	for _, contractID := range post.ContractIds {
-		s, err = k.scoreFeatures(userID, post.ActorID, contractID)
+	for _, contractID := range e.ContractIds {
+		s, err = k.scoreFeatures(userID, e.ActorID, contractID)
 		if err == nil && s > topS {
 			topS = s
 			scored = true

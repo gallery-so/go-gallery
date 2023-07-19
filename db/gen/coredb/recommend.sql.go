@@ -7,9 +7,79 @@ package coredb
 
 import (
 	"context"
+	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist"
 )
+
+const entityScoring = `-- name: EntityScoring :many
+with ids as (
+    select id, feed_entity_type, created_at
+    from feed_entities fe
+    where fe.created_at >= $1
+), selected_posts as (
+    select ids.id, ids.feed_entity_type, ids.created_at, p.actor_id, p.contract_ids, count(distinct c.id) + count(distinct a.id) interactions
+    from ids
+    join posts p on p.id = ids.id
+    left join comments c on c.post_id = ids.id
+    left join admires a on a.post_id = ids.id
+    where feed_entity_type = $2
+    group by ids.id, ids.feed_entity_type, ids.created_at, p.actor_id, p.contract_ids
+), selected_events as (
+    select ids.id, ids.feed_entity_type, ids.created_at, e.owner_id, null::varchar[] contract_ids, count(distinct c.id) + count(distinct a.id) interactions
+    from ids
+    join feed_events e on e.id = ids.id
+    left join comments c on c.feed_event_id = ids.id
+    left join admires a on a.feed_event_id = ids.id
+    where feed_entity_type = $3
+    group by ids.id, ids.feed_entity_type, ids.created_at, e.owner_id, null::varchar[]
+)
+select id, feed_entity_type, created_at, actor_id, contract_ids, interactions from selected_posts
+union all
+select id, feed_entity_type, created_at, owner_id, contract_ids, interactions from selected_events
+`
+
+type EntityScoringParams struct {
+	WindowEnd           time.Time `json:"window_end"`
+	PostEntityType      int32     `json:"post_entity_type"`
+	FeedEventEntityType int32     `json:"feed_event_entity_type"`
+}
+
+type EntityScoringRow struct {
+	ID             persist.DBID     `json:"id"`
+	FeedEntityType int32            `json:"feed_entity_type"`
+	CreatedAt      time.Time        `json:"created_at"`
+	ActorID        persist.DBID     `json:"actor_id"`
+	ContractIds    persist.DBIDList `json:"contract_ids"`
+	Interactions   int32            `json:"interactions"`
+}
+
+func (q *Queries) EntityScoring(ctx context.Context, arg EntityScoringParams) ([]EntityScoringRow, error) {
+	rows, err := q.db.Query(ctx, entityScoring, arg.WindowEnd, arg.PostEntityType, arg.FeedEventEntityType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []EntityScoringRow
+	for rows.Next() {
+		var i EntityScoringRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.FeedEntityType,
+			&i.CreatedAt,
+			&i.ActorID,
+			&i.ContractIds,
+			&i.Interactions,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
 
 const getDisplayedContracts = `-- name: GetDisplayedContracts :many
 select user_id, contract_id, displayed

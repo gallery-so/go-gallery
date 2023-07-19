@@ -321,7 +321,7 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 			now := time.Now()
 
 			for _, e := range entities {
-				score := timeFactor(e.CreatedAt, now) * float64(e.Interactions)
+				score := timeFactor(e.CreatedAt, now) * engagementFactor(int(e.Interactions))
 				node := heapItem{id: e.ID, score: score}
 
 				// Add first 100 numbers in the heap
@@ -398,60 +398,68 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, userID persist.DBID, before,
 		return nil, PageInfo{}, err
 	}
 
-	// TODO: Support feed events too
-	posts, err := api.queries.GetLatestPosts(ctx, db.GetLatestPostsParams{
-		WindowEnd: time.Now().Add(-time.Duration(72 * time.Hour)),
+	now := time.Now()
+	entities, err := api.queries.EntityScoring(ctx, db.EntityScoringParams{
+		PostEntityType:      persist.PostTypeTag,
+		FeedEventEntityType: persist.FeedEventTypeTag,
+		WindowEnd:           time.Now().Add(-time.Duration(30 * 24 * time.Hour)),
 	})
 	if err != nil {
 		return nil, PageInfo{}, err
 	}
 
 	h := heap{}
-	now := time.Now()
+	now = time.Now()
 
 	var paginator = positionPaginator{}
-	var topPosts []persist.DBID
 	var idToCursorPos = make(map[persist.DBID]int)
 
-	for _, p := range posts {
-		score := scorePost(ctx, userID, p.Post, now, int(p.Interactions))
-		fmt.Println(p.Post.ID, score)
-		node := heapItem{id: p.Post.ID, score: score}
-
+	for _, e := range entities {
+		scoreN := time.Now()
+		score := scorePost(ctx, userID, e, now, int(e.Interactions))
+		fmt.Println("scorePost took", time.Since(scoreN), "score", score)
+		node := heapItem{id: e.ID, score: score}
+		// Push the first 100 entities into the heap
 		if len(h) < 100 {
-			heappkg.Push(&h, heapItem{id: p.Post.ID, score: score})
+			heappkg.Push(&h, heapItem{id: e.ID, score: score})
 			continue
 		}
-
 		// If the score is greater than the smallest score in the heap, replace it
 		if score > h[0].(heapItem).score {
 			heappkg.Pop(&h)
 			heappkg.Push(&h, node)
 		}
-
-		topPosts = make([]persist.DBID, len(h))
-
-		for len(h) > 0 {
-			node := heappkg.Pop(&h).(heapItem)
-			topPosts = append(topPosts, node.id)
-		}
 	}
 
-	idsAsStr := make([]string, len(topPosts))
-	for i, id := range topPosts {
+	fmt.Println("heap took", time.Since(now))
+
+	topPosts := make([]persist.DBID, len(h))
+	topPostsAsStr := make([]string, len(h))
+
+	i := 0
+	for len(h) > 0 {
+		node := heappkg.Pop(&h).(heapItem)
 		// Postgres uses 1-based indexing
-		idToCursorPos[id] = i + 1
-		idsAsStr[i] = id.String()
+		idToCursorPos[node.id] = i + 1
+		topPosts[i] = node.id
+		topPostsAsStr[i] = node.id.String()
+		i++
 	}
 
 	queryFunc := func(params positionPagingParams) ([]any, error) {
 		keys, err := api.queries.PaginateFeedEntities(ctx, db.PaginateFeedEntitiesParams{
-			FeedEntityIds: idsAsStr,
+			FeedEntityIds: topPostsAsStr,
 			CurBeforePos:  params.CursorBeforePos,
 			CurAfterPos:   params.CursorAfterPos,
 			PagingForward: params.PagingForward,
 			Limit:         params.Limit,
 		})
+		fmt.Printf("ids %+v\n", topPostsAsStr)
+		fmt.Printf("cur before %+v\n", params.CursorBeforePos)
+		fmt.Printf("cur after %+v\n", params.CursorAfterPos)
+		fmt.Printf("paging forward%+v\n", params.PagingForward)
+		fmt.Printf("limit %+v\n", params.Limit)
+
 		if err != nil {
 			return nil, err
 		}
@@ -465,7 +473,10 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, userID persist.DBID, before,
 
 	paginator.QueryFunc = queryFunc
 	paginator.CursorFunc = cursorFunc
-	return paginator.paginate(before, after, first, last)
+	now = time.Now()
+	res, pageInfo, err := paginator.paginate(before, after, first, last)
+	fmt.Println("paginator took", time.Since(now))
+	return res, pageInfo, err
 }
 
 func (api FeedAPI) TrendingUsers(ctx context.Context, report model.Window) ([]db.User, error) {
@@ -586,11 +597,10 @@ func feedEntityToTypedType(ctx context.Context, d *dataloader.Loaders, ids []db.
 	return entities, nil
 }
 
-func scorePost(ctx context.Context, viewerID persist.DBID, post db.Post, t time.Time, interactions int) float64 {
-	timeF := timeFactor(post.CreatedAt, t)
-	engagementF := float64(interactions)
-	personalizationF, err := koala.For(ctx).RelevanceTo(viewerID, post)
-	fmt.Println("timeF", timeF, "engagementF", engagementF, "personalizationF", personalizationF)
+func scorePost(ctx context.Context, viewerID persist.DBID, e db.EntityScoringRow, t time.Time, interactions int) float64 {
+	timeF := timeFactor(e.CreatedAt, t)
+	engagementF := engagementFactor(interactions)
+	personalizationF, err := koala.For(ctx).RelevanceTo(viewerID, e)
 	if errors.Is(err, koala.ErrNoInputData) {
 		// Use a default value of 0.1 so that the post isn't completely penalized because of missing data.
 		personalizationF = 0.1
@@ -602,6 +612,10 @@ func timeFactor(t0, t1 time.Time) float64 {
 	lambda := 1.0 / 100_000
 	age := t1.Sub(t0).Seconds()
 	return 1 * math.Pow(math.E, (-lambda*age))
+}
+
+func engagementFactor(interactions int) float64 {
+	return 1.0 + float64(interactions)
 }
 
 type heapItem struct {

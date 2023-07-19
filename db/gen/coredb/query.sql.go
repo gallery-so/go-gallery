@@ -2432,64 +2432,6 @@ func (q *Queries) GetLatestFeedEntities(ctx context.Context, arg GetLatestFeedEn
 	return items, nil
 }
 
-const getLatestPosts = `-- name: GetLatestPosts :many
-with post_ids as (
-    select id
-    from posts p
-    where p.created_at >= $1 and not p.deleted and p.actor_id != $2
-), post_interactions as (
-    select post_ids.id, count(distinct c.id) + count(distinct a.id) interactions
-    from post_ids
-    left join comments c on c.post_id = post_ids.id
-    left join admires a on a.post_id = post_ids.id
-    group by post_ids.id
-)
-select posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, post_interactions.interactions
-from posts, post_ids, post_interactions
-where posts.id = post_ids.id and posts.id = post_interactions.id
-`
-
-type GetLatestPostsParams struct {
-	WindowEnd time.Time    `json:"window_end"`
-	ViewerID  persist.DBID `json:"viewer_id"`
-}
-
-type GetLatestPostsRow struct {
-	Post         Post  `json:"post"`
-	Interactions int32 `json:"interactions"`
-}
-
-func (q *Queries) GetLatestPosts(ctx context.Context, arg GetLatestPostsParams) ([]GetLatestPostsRow, error) {
-	rows, err := q.db.Query(ctx, getLatestPosts, arg.WindowEnd, arg.ViewerID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetLatestPostsRow
-	for rows.Next() {
-		var i GetLatestPostsRow
-		if err := rows.Scan(
-			&i.Post.ID,
-			&i.Post.Version,
-			&i.Post.TokenIds,
-			&i.Post.ContractIds,
-			&i.Post.ActorID,
-			&i.Post.Caption,
-			&i.Post.CreatedAt,
-			&i.Post.LastUpdated,
-			&i.Post.Deleted,
-			&i.Interactions,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getMembershipByMembershipId = `-- name: GetMembershipByMembershipId :one
 SELECT id, deleted, version, created_at, last_updated, token_id, name, asset_url, owners FROM membership WHERE id = $1 AND deleted = false
 `

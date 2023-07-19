@@ -911,22 +911,6 @@ update users set user_experiences = user_experiences || @experience where id = @
 -- name: GetTrendingUsersByIDs :many
 select users.* from users join unnest(@user_ids::varchar[]) with ordinality t(id, pos) using (id) where deleted = false order by t.pos asc;
 
--- name: GetLatestPosts :many
-with post_ids as (
-    select id
-    from posts p
-    where p.created_at >= @window_end and not p.deleted and p.actor_id != @viewer_id
-), post_interactions as (
-    select post_ids.id, count(distinct c.id) + count(distinct a.id) interactions
-    from post_ids
-    left join comments c on c.post_id = post_ids.id
-    left join admires a on a.post_id = post_ids.id
-    group by post_ids.id
-)
-select sqlc.embed(posts), post_interactions.interactions
-from posts, post_ids, post_interactions
-where posts.id = post_ids.id and posts.id = post_interactions.id;
-
 -- name: GetLatestFeedEntities :many
 select fe.id, fe.feed_entity_type, fe.created_at, count(distinct c.id) + count(distinct a.id) interactions
 from feed_entities fe
