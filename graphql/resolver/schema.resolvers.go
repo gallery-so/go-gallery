@@ -249,7 +249,7 @@ func (r *communityResolver) SubCommunities(ctx context.Context, obj *model.Commu
 
 // TokensInCommunity is the resolver for the tokensInCommunity field.
 func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokensConnection, error) {
-	onlyUsers := util.GetOptionalValue(onlyGalleryUsers, false)
+	onlyUsers := util.GetOptionalValue(onlyGalleryUsers, true)
 	forceRefresh := util.GetOptionalValue(obj.ForceRefresh, false)
 
 	if !onlyUsers {
@@ -264,7 +264,7 @@ func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Co
 
 // Owners is the resolver for the owners field.
 func (r *communityResolver) Owners(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokenHoldersConnection, error) {
-	onlyUsers := util.GetOptionalValue(onlyGalleryUsers, false)
+	onlyUsers := util.GetOptionalValue(onlyGalleryUsers, true)
 	forceRefresh := util.GetOptionalValue(obj.ForceRefresh, false)
 
 	if !onlyUsers {
