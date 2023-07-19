@@ -411,6 +411,10 @@ type ViewGalleryPayloadOrError interface {
 	IsViewGalleryPayloadOrError()
 }
 
+type ViewTokenPayloadOrError interface {
+	IsViewTokenPayloadOrError()
+}
+
 type ViewerGalleryByIDPayloadOrError interface {
 	IsViewerGalleryByIDPayloadOrError()
 }
@@ -875,6 +879,7 @@ func (ErrAuthenticationFailed) IsRemoveAdmirePayloadOrError()       {}
 func (ErrAuthenticationFailed) IsCommentOnFeedEventPayloadOrError() {}
 func (ErrAuthenticationFailed) IsRemoveCommentPayloadOrError()      {}
 func (ErrAuthenticationFailed) IsViewGalleryPayloadOrError()        {}
+func (ErrAuthenticationFailed) IsViewTokenPayloadOrError()          {}
 func (ErrAuthenticationFailed) IsSetProfileImagePayloadOrError()    {}
 func (ErrAuthenticationFailed) IsRemoveProfileImagePayloadOrError() {}
 
@@ -2403,6 +2408,12 @@ type ViewGalleryPayload struct {
 }
 
 func (ViewGalleryPayload) IsViewGalleryPayloadOrError() {}
+
+type ViewTokenPayload struct {
+	Token *Token `json:"token"`
+}
+
+func (ViewTokenPayload) IsViewTokenPayloadOrError() {}
 
 type Viewer struct {
 	HelperViewerData

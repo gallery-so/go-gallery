@@ -13,6 +13,7 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -515,4 +516,38 @@ func (api TokenAPI) GetTokenOwnershipByTokenID(ctx context.Context, tokenID pers
 	}
 
 	return api.loaders.TokenOwnershipByTokenID.Load(tokenID)
+}
+
+func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID) (db.Token, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"tokenID": validate.WithTag(tokenID, "required"),
+	}); err != nil {
+		return db.Token{}, err
+	}
+
+	token, err := api.loaders.TokenByTokenID.Load(tokenID)
+	if err != nil {
+		return db.Token{}, err
+	}
+
+	gc := util.MustGetGinContext(ctx)
+
+	if auth.GetUserAuthedFromCtx(gc) {
+		userID, err := getAuthenticatedUserID(ctx)
+		if err != nil {
+			return db.Token{}, err
+		}
+		_, err = dispatchEvent(ctx, db.Event{
+			ActorID:        persist.DBIDToNullStr(userID),
+			ResourceTypeID: persist.ResourceTypeToken,
+			SubjectID:      tokenID,
+			Action:         persist.ActionViewedToken,
+		}, api.validator, nil)
+		if err != nil {
+			return db.Token{}, err
+		}
+
+	} 
+	return token, nil
 }

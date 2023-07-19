@@ -27,6 +27,7 @@ const (
 	ActionCommentedOnFeedEvent            Action = "CommentedOnFeedEvent"
 	ActionCommentedOnPost                 Action = "CommentedOnPost"
 	ActionViewedGallery                   Action = "ViewedGallery"
+	ActionViewedToken                     Action = "ViewedToken"
 	ActionCollectionUpdated               Action = "CollectionUpdated"
 	ActionGalleryUpdated                  Action = "GalleryUpdated"
 	ActionGalleryInfoUpdated              Action = "GalleryInfoUpdated"

@@ -757,6 +757,14 @@ type __viewGalleryMutationInput struct {
 // GetGalleryId returns __viewGalleryMutationInput.GalleryId, and is useful for accessing the field via an interface.
 func (v *__viewGalleryMutationInput) GetGalleryId() persist.DBID { return v.GalleryId }
 
+// __viewTokenMutationInput is used internally by genqlient
+type __viewTokenMutationInput struct {
+	TokenID persist.DBID `json:"tokenID"`
+}
+
+// GetTokenID returns __viewTokenMutationInput.TokenID, and is useful for accessing the field via an interface.
+func (v *__viewTokenMutationInput) GetTokenID() persist.DBID { return v.TokenID }
+
 // addUserWalletMutationAddUserWalletAddUserWalletPayload includes the requested fields of the GraphQL type AddUserWalletPayload.
 type addUserWalletMutationAddUserWalletAddUserWalletPayload struct {
 	Typename *string                                                       `json:"__typename"`
@@ -8796,6 +8804,189 @@ func __marshalviewGalleryMutationViewGalleryViewGalleryPayloadOrError(v *viewGal
 	}
 }
 
+// viewTokenMutationResponse is returned by viewTokenMutation on success.
+type viewTokenMutationResponse struct {
+	ViewToken *viewTokenMutationViewTokenViewTokenPayloadOrError `json:"-"`
+}
+
+// GetViewToken returns viewTokenMutationResponse.ViewToken, and is useful for accessing the field via an interface.
+func (v *viewTokenMutationResponse) GetViewToken() *viewTokenMutationViewTokenViewTokenPayloadOrError {
+	return v.ViewToken
+}
+
+func (v *viewTokenMutationResponse) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*viewTokenMutationResponse
+		ViewToken json.RawMessage `json:"viewToken"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.viewTokenMutationResponse = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.ViewToken
+		src := firstPass.ViewToken
+		if len(src) != 0 && string(src) != "null" {
+			*dst = new(viewTokenMutationViewTokenViewTokenPayloadOrError)
+			err = __unmarshalviewTokenMutationViewTokenViewTokenPayloadOrError(
+				src, *dst)
+			if err != nil {
+				return fmt.Errorf(
+					"unable to unmarshal viewTokenMutationResponse.ViewToken: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshalviewTokenMutationResponse struct {
+	ViewToken json.RawMessage `json:"viewToken"`
+}
+
+func (v *viewTokenMutationResponse) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *viewTokenMutationResponse) __premarshalJSON() (*__premarshalviewTokenMutationResponse, error) {
+	var retval __premarshalviewTokenMutationResponse
+
+	{
+
+		dst := &retval.ViewToken
+		src := v.ViewToken
+		if src != nil {
+			var err error
+			*dst, err = __marshalviewTokenMutationViewTokenViewTokenPayloadOrError(
+				src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"unable to marshal viewTokenMutationResponse.ViewToken: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
+// viewTokenMutationViewTokenErrAuthenticationFailed includes the requested fields of the GraphQL type ErrAuthenticationFailed.
+type viewTokenMutationViewTokenErrAuthenticationFailed struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns viewTokenMutationViewTokenErrAuthenticationFailed.Typename, and is useful for accessing the field via an interface.
+func (v *viewTokenMutationViewTokenErrAuthenticationFailed) GetTypename() *string { return v.Typename }
+
+// GetMessage returns viewTokenMutationViewTokenErrAuthenticationFailed.Message, and is useful for accessing the field via an interface.
+func (v *viewTokenMutationViewTokenErrAuthenticationFailed) GetMessage() string { return v.Message }
+
+// viewTokenMutationViewTokenViewTokenPayload includes the requested fields of the GraphQL type ViewTokenPayload.
+type viewTokenMutationViewTokenViewTokenPayload struct {
+	Typename *string                                          `json:"__typename"`
+	Token    *viewTokenMutationViewTokenViewTokenPayloadToken `json:"token"`
+}
+
+// GetTypename returns viewTokenMutationViewTokenViewTokenPayload.Typename, and is useful for accessing the field via an interface.
+func (v *viewTokenMutationViewTokenViewTokenPayload) GetTypename() *string { return v.Typename }
+
+// GetToken returns viewTokenMutationViewTokenViewTokenPayload.Token, and is useful for accessing the field via an interface.
+func (v *viewTokenMutationViewTokenViewTokenPayload) GetToken() *viewTokenMutationViewTokenViewTokenPayloadToken {
+	return v.Token
+}
+
+// viewTokenMutationViewTokenViewTokenPayloadOrError includes the requested fields of the GraphQL interface ViewTokenPayloadOrError.
+//
+// viewTokenMutationViewTokenViewTokenPayloadOrError is implemented by the following types:
+// viewTokenMutationViewTokenErrAuthenticationFailed
+// viewTokenMutationViewTokenViewTokenPayload
+type viewTokenMutationViewTokenViewTokenPayloadOrError interface {
+	implementsGraphQLInterfaceviewTokenMutationViewTokenViewTokenPayloadOrError()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() *string
+}
+
+func (v *viewTokenMutationViewTokenErrAuthenticationFailed) implementsGraphQLInterfaceviewTokenMutationViewTokenViewTokenPayloadOrError() {
+}
+func (v *viewTokenMutationViewTokenViewTokenPayload) implementsGraphQLInterfaceviewTokenMutationViewTokenViewTokenPayloadOrError() {
+}
+
+func __unmarshalviewTokenMutationViewTokenViewTokenPayloadOrError(b []byte, v *viewTokenMutationViewTokenViewTokenPayloadOrError) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "ErrAuthenticationFailed":
+		*v = new(viewTokenMutationViewTokenErrAuthenticationFailed)
+		return json.Unmarshal(b, *v)
+	case "ViewTokenPayload":
+		*v = new(viewTokenMutationViewTokenViewTokenPayload)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing ViewTokenPayloadOrError.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for viewTokenMutationViewTokenViewTokenPayloadOrError: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshalviewTokenMutationViewTokenViewTokenPayloadOrError(v *viewTokenMutationViewTokenViewTokenPayloadOrError) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *viewTokenMutationViewTokenErrAuthenticationFailed:
+		typename = "ErrAuthenticationFailed"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewTokenMutationViewTokenErrAuthenticationFailed
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewTokenMutationViewTokenViewTokenPayload:
+		typename = "ViewTokenPayload"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewTokenMutationViewTokenViewTokenPayload
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for viewTokenMutationViewTokenViewTokenPayloadOrError: "%T"`, v)
+	}
+}
+
+// viewTokenMutationViewTokenViewTokenPayloadToken includes the requested fields of the GraphQL type Token.
+type viewTokenMutationViewTokenViewTokenPayloadToken struct {
+	Dbid persist.DBID `json:"dbid"`
+}
+
+// GetDbid returns viewTokenMutationViewTokenViewTokenPayloadToken.Dbid, and is useful for accessing the field via an interface.
+func (v *viewTokenMutationViewTokenViewTokenPayloadToken) GetDbid() persist.DBID { return v.Dbid }
+
 // viewerQueryResponse is returned by viewerQuery on success.
 type viewerQueryResponse struct {
 	Viewer *viewerQueryViewerViewerOrError `json:"-"`
@@ -11738,6 +11929,50 @@ func viewGalleryMutation(
 	var err error
 
 	var data viewGalleryMutationResponse
+	resp := &graphql.Response{Data: &data}
+
+	err = client.MakeRequest(
+		ctx,
+		req,
+		resp,
+	)
+
+	return &data, err
+}
+
+// The query or mutation executed by viewTokenMutation.
+const viewTokenMutation_Operation = `
+mutation viewTokenMutation ($tokenID: DBID!) {
+	viewToken(tokenID: $tokenID) {
+		__typename
+		... on Error {
+			__typename
+			message
+		}
+		... on ViewTokenPayload {
+			token {
+				dbid
+			}
+		}
+	}
+}
+`
+
+func viewTokenMutation(
+	ctx context.Context,
+	client graphql.Client,
+	tokenID persist.DBID,
+) (*viewTokenMutationResponse, error) {
+	req := &graphql.Request{
+		OpName: "viewTokenMutation",
+		Query:  viewTokenMutation_Operation,
+		Variables: &__viewTokenMutationInput{
+			TokenID: tokenID,
+		},
+	}
+	var err error
+
+	var data viewTokenMutationResponse
 	resp := &graphql.Response{Data: &data}
 
 	err = client.MakeRequest(

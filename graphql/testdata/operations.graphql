@@ -372,6 +372,20 @@ mutation viewGalleryMutation($galleryId: DBID!) {
   }
 }
 
+mutation viewTokenMutation($tokenID: DBID!) {
+  viewToken(tokenID: $tokenID) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on ViewTokenPayload {
+      token {
+        dbid
+      }
+    }
+  }
+}
+
 mutation updateGalleryMutation($input: UpdateGalleryInput!) {
   updateGallery(input: $input) {
     ... on UpdateGalleryPayload {
