@@ -40,7 +40,7 @@ var sharedContracts map[persist.ChainAddress]bool = map[persist.ChainAddress]boo
 var sharedContractsStr = keys(sharedContracts)
 
 type Koala struct {
-	// userM is a matrix of size u x u where a non-zero value at m[i][j] denotes an edge from user i to user j
+	// userM is a matrix of size u x u where a non-zero value at m[i][j] is an edge from user i to user j
 	userM *sparse.CSR
 	// ratingM is a matrix of size u x k where the value at m[i][j] is how many held tokens of community k are displayed by user j
 	ratingM *sparse.CSR

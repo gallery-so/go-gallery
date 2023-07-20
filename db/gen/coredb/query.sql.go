@@ -5001,12 +5001,19 @@ func (q *Queries) IsFeedUserActionBlocked(ctx context.Context, arg IsFeedUserAct
 }
 
 const paginateFeedEntities = `-- name: PaginateFeedEntities :many
-select id, feed_entity_type, created_at, actor_id from feed_entities join unnest($1::text[]) with ordinality t(id, pos) using(id)
-  where t.pos > $2::int
-  and t.pos < $3::int
-  order by case when $4::bool then t.pos end desc,
-          case when not $4::bool then t.pos end asc
-  limit $5
+select feed_entities.id, feed_entities.feed_entity_type, feed_entities.created_at, feed_entities.actor_id
+from feed_entities
+join unnest($1::text[]) with ordinality t(id, pos) using(id)
+where 
+    feed_entities.id = t.id
+    and t.pos > $2::int
+    and t.pos < $3::int
+    and case when $4::bool then t.pos > $5::int
+            when not $4::bool then t.pos <= $5::int end
+    -- and case when @paging_forward::bool then t.pos > @upper_bound::int
+    --         when not @paging_forward::bool then t.pos < @lower_bound::int end
+order by case when $4::bool then t.pos end desc,
+    case when not $4::bool then t.pos end asc
 `
 
 type PaginateFeedEntitiesParams struct {
@@ -5014,16 +5021,24 @@ type PaginateFeedEntitiesParams struct {
 	CurBeforePos  int32    `json:"cur_before_pos"`
 	CurAfterPos   int32    `json:"cur_after_pos"`
 	PagingForward bool     `json:"paging_forward"`
-	Limit         int32    `json:"limit"`
+	LimitPos      int32    `json:"limit_pos"`
 }
 
+// with t as (
+//
+//	select foo, pos
+//	from unnest(@feed_entity_ids::text[]) with ordinality as t(foo, pos)
+//
+// )
+// select feed_entities.*
+// from feed_entities join unnest(@feed_entity_ids::text[]) with ordinality t(id, pos) using(id)
 func (q *Queries) PaginateFeedEntities(ctx context.Context, arg PaginateFeedEntitiesParams) ([]FeedEntity, error) {
 	rows, err := q.db.Query(ctx, paginateFeedEntities,
 		arg.FeedEntityIds,
 		arg.CurBeforePos,
 		arg.CurAfterPos,
 		arg.PagingForward,
-		arg.Limit,
+		arg.LimitPos,
 	)
 	if err != nil {
 		return nil, err

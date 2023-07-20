@@ -363,12 +363,19 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 	}
 
 	queryFunc := func(params positionPagingParams) ([]any, error) {
+		var limitPos int32
+		if params.PagingForward {
+			postLen := int32(len(idsAsStr))
+			limitPos = min(postLen, params.CursorAfterPos) - params.Limit
+		} else {
+			limitPos = max(0, params.CursorBeforePos) + params.Limit
+		}
 		keys, err := api.queries.PaginateFeedEntities(ctx, db.PaginateFeedEntitiesParams{
 			FeedEntityIds: idsAsStr,
 			CurBeforePos:  params.CursorBeforePos,
 			CurAfterPos:   params.CursorAfterPos,
 			PagingForward: params.PagingForward,
-			Limit:         params.Limit,
+			LimitPos:      limitPos,
 		})
 		if err != nil {
 			return nil, err
@@ -439,6 +446,7 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, userID persist.DBID, before,
 	i := 0
 	for len(h) > 0 {
 		node := heappkg.Pop(&h).(heapItem)
+		fmt.Println("node", node.id, node.score)
 		// Postgres uses 1-based indexing
 		idToCursorPos[node.id] = i + 1
 		topPosts[i] = node.id
@@ -447,18 +455,63 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, userID persist.DBID, before,
 	}
 
 	queryFunc := func(params positionPagingParams) ([]any, error) {
+		var limitPos int32
+		if params.PagingForward {
+			postLen := int32(len(topPostsAsStr))
+			limitPos = min(postLen, params.CursorAfterPos) - params.Limit
+			// limitPos := min(int32(len(topPostsAsStr)), params.CursorAfterPos+params.Limit)
+			// limitPos = int32(len(topPostsAsStr))
+			// if params.CursorAfterPos < limitPos {
+			// 	limitPos = params.CursorAfterPos
+			// }
+			// limitPos -= params.Limit
+		} else {
+			limitPos = max(0, params.CursorBeforePos) + params.Limit
+		}
+		// fmt.Println("len", len(topPostsAsStr))
+		// var ub int32 = int32(len(topPostsAsStr))
+		// if params.CursorAfterPos < ub {
+		// 	ub = params.CursorAfterPos
+		// }
+
+		// fmt.Println("ub before", ub)
+
+		// var lb int32 = 0
+		// if params.CursorBeforePos > lb {
+		// 	lb = params.CursorBeforePos
+		// }
+		// fmt.Println("lb before", lb)
+
+		// ub -= params.Limit
+		// lb += params.Limit
+
 		keys, err := api.queries.PaginateFeedEntities(ctx, db.PaginateFeedEntitiesParams{
 			FeedEntityIds: topPostsAsStr,
 			CurBeforePos:  params.CursorBeforePos,
 			CurAfterPos:   params.CursorAfterPos,
 			PagingForward: params.PagingForward,
-			Limit:         params.Limit,
+			LimitPos:      limitPos,
 		})
-		fmt.Printf("ids %+v\n", topPostsAsStr)
-		fmt.Printf("cur before %+v\n", params.CursorBeforePos)
-		fmt.Printf("cur after %+v\n", params.CursorAfterPos)
-		fmt.Printf("paging forward%+v\n", params.PagingForward)
-		fmt.Printf("limit %+v\n", params.Limit)
+
+		fmt.Println("curbefore", params.CursorBeforePos)
+		fmt.Println("curafter", params.CursorAfterPos)
+		fmt.Println("limitpos", limitPos)
+		fmt.Println("PagingForward", params.PagingForward)
+		// keys, err := api.queries.PaginateFeedEntities(ctx, db.PaginateFeedEntitiesParams{
+		// 	FeedEntityIds: topPostsAsStr,
+		// 	CurBeforePos:  params.CursorBeforePos,
+		// 	CurAfterPos:   params.CursorAfterPos,
+		// 	PagingForward: params.PagingForward,
+		// 	UpperBound:    ub,
+		// 	LowerBound:    lb,
+		// })
+		// fmt.Printf("ids %+v\n", topPostsAsStr)
+		// fmt.Printf("cur before %+v\n", params.CursorBeforePos)
+		// fmt.Printf("cur after %+v\n", params.CursorAfterPos)
+		// fmt.Printf("paging forward %+v\n", params.PagingForward)
+		// fmt.Printf("limit %+v\n", params.Limit)
+		// fmt.Printf("ub %+v\n", ub)
+		// fmt.Printf("lb %+v\n", lb)
 
 		if err != nil {
 			return nil, err
@@ -641,4 +694,18 @@ func (h *heap) Pop() any {
 	old[n-1] = nil
 	*h = old[:n-1]
 	return item
+}
+
+func min(a, b int32) int32 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func max(a, b int32) int32 {
+	if a > b {
+		return a
+	}
+	return b
 }

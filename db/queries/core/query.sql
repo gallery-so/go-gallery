@@ -394,7 +394,6 @@ ORDER BY
     CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
 LIMIT sqlc.arg('limit');
 
-
 -- name: PaginatePersonalFeedByUserID :many
 select fe.* from feed_entities fe, follows fl
     where fl.deleted = false
@@ -418,12 +417,25 @@ ORDER BY
 LIMIT sqlc.arg('limit');
 
 -- name: PaginateFeedEntities :many
-select * from feed_entities join unnest(@feed_entity_ids::text[]) with ordinality t(id, pos) using(id)
-  where t.pos > @cur_before_pos::int
-  and t.pos < @cur_after_pos::int
-  order by case when @paging_forward::bool then t.pos end desc,
-          case when not @paging_forward::bool then t.pos end asc
-  limit sqlc.arg('limit');
+-- with t as (
+--     select foo, pos
+--     from unnest(@feed_entity_ids::text[]) with ordinality as t(foo, pos)
+-- )
+-- select feed_entities.*
+-- from feed_entities join unnest(@feed_entity_ids::text[]) with ordinality t(id, pos) using(id)
+select feed_entities.*
+from feed_entities
+join unnest(@feed_entity_ids::text[]) with ordinality t(id, pos) using(id)
+where 
+    feed_entities.id = t.id
+    and t.pos > @cur_before_pos::int
+    and t.pos < @cur_after_pos::int
+    and case when @paging_forward::bool then t.pos > @limit_pos::int
+            when not @paging_forward::bool then t.pos <= @limit_pos::int end
+    -- and case when @paging_forward::bool then t.pos > @upper_bound::int
+    --         when not @paging_forward::bool then t.pos < @lower_bound::int end
+order by case when @paging_forward::bool then t.pos end desc,
+    case when not @paging_forward::bool then t.pos end asc;
 
 -- name: PaginatePostsByContractID :batchmany
 SELECT posts.*
@@ -443,8 +455,6 @@ FROM posts
 JOIN tokens ON tokens.id = ANY(posts.token_ids)
 WHERE tokens.contract = sqlc.arg('contract')
 AND posts.deleted = false;
-
-
 
 -- name: GetFeedEventsByIds :many
 SELECT * FROM feed_events WHERE id = ANY(@ids::varchar(255)[]) AND deleted = false;
