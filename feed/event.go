@@ -91,7 +91,7 @@ func (b *EventBuilder) NewFeedEventFromEvent(ctx context.Context, event db.Event
 	if err != nil || blocked {
 		return nil, err
 	}
-	
+
 	if event.GroupID.String != "" {
 		// if the event is being dispatched immediately, ensure that it is not supposed to be group with other events that are being dispatched immediately
 		wait, err := b.queries.HasLaterGroupedEvent(ctx, db.HasLaterGroupedEventParams{
