@@ -286,7 +286,7 @@ func (api TokenAPI) SyncTokensAdmin(ctx context.Context, chains []persist.Chain,
 
 	defer api.throttler.Unlock(ctx, key)
 
-	if err := api.multichainProvider.SyncTokens(ctx, userID, chains); err != nil {
+	if err := api.multichainProvider.SyncTokensByUserID(ctx, userID, chains); err != nil {
 		// Wrap all OpenSea sync failures in a generic type that can be returned to the frontend as an expected error type
 		return ErrTokenRefreshFailed{Message: err.Error()}
 	}
@@ -308,7 +308,7 @@ func (api TokenAPI) SyncTokens(ctx context.Context, chains []persist.Chain) erro
 	}
 	defer api.throttler.Unlock(ctx, key)
 
-	err = api.multichainProvider.SyncTokens(ctx, userID, chains)
+	err = api.multichainProvider.SyncTokensByUserID(ctx, userID, chains)
 	if err != nil {
 		// Wrap all OpenSea sync failures in a generic type that can be returned to the frontend as an expected error type
 		return ErrTokenRefreshFailed{Message: err.Error()}

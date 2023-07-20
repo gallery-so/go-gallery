@@ -1441,3 +1441,14 @@ limit 1;
 
 -- name: GetCurrentTime :one
 select now()::timestamptz;
+
+-- name: GetUsersByWalletAddressesAndChains :many
+WITH params AS (
+    SELECT unnest(@wallet_addresses::varchar[]) as address, unnest(@chains::int[]) as chain
+)
+SELECT sqlc.embed(wallets), sqlc.embed(users)
+FROM wallets 
+JOIN users ON wallets.id = any(users.wallets)
+JOIN params ON wallets.address = params.address AND wallets.chain = params.chain
+WHERE not wallets.deleted AND not users.deleted;
+

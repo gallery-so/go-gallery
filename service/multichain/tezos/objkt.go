@@ -204,7 +204,7 @@ func (p *TezosObjktProvider) GetTokensByWalletAddress(ctx context.Context, owner
 	return returnTokens, returnContracts, nil
 }
 
-func (p *TezosObjktProvider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (p *TezosObjktProvider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
 		"contractAddress": tokenIdentifiers.ContractAddress,
 		"tokenID":         tokenIdentifiers.TokenID,

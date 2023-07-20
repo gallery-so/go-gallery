@@ -68,8 +68,8 @@ func (f SyncWithContractEvalFallbackProvider) GetTokensByContractAddress(ctx con
 	return tokens, agnosticContract, nil
 }
 
-func (f SyncWithContractEvalFallbackProvider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, id ChainAgnosticIdentifiers, address persist.Address) (ChainAgnosticToken, ChainAgnosticContract, error) {
-	token, contract, err := f.Primary.GetTokensByTokenIdentifiersAndOwner(ctx, id, address)
+func (f SyncWithContractEvalFallbackProvider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, id ChainAgnosticIdentifiers, address persist.Address) (ChainAgnosticToken, ChainAgnosticContract, error) {
+	token, contract, err := f.Primary.GetTokenByTokenIdentifiersAndOwner(ctx, id, address)
 	if err != nil {
 		return ChainAgnosticToken{}, ChainAgnosticContract{}, err
 	}
@@ -110,7 +110,7 @@ func (f SyncWithContractEvalFallbackProvider) resolveTokens(ctx context.Context,
 
 func (f *SyncWithContractEvalFallbackProvider) callFallback(ctx context.Context, primary ChainAgnosticToken) ChainAgnosticToken {
 	id := ChainAgnosticIdentifiers{primary.ContractAddress, primary.TokenID}
-	backup, _, err := f.Fallback.GetTokensByTokenIdentifiersAndOwner(ctx, id, primary.OwnerAddress)
+	backup, _, err := f.Fallback.GetTokenByTokenIdentifiersAndOwner(ctx, id, primary.OwnerAddress)
 	if err == nil && f.Eval(ctx, backup) {
 		return backup
 	}
@@ -140,11 +140,11 @@ func (f SyncFailureFallbackProvider) GetTokensByWalletAddress(ctx context.Contex
 	return tokens, contracts, nil
 }
 
-func (f SyncFailureFallbackProvider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, id ChainAgnosticIdentifiers, address persist.Address) (ChainAgnosticToken, ChainAgnosticContract, error) {
-	token, contract, err := f.Primary.GetTokensByTokenIdentifiersAndOwner(ctx, id, address)
+func (f SyncFailureFallbackProvider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, id ChainAgnosticIdentifiers, address persist.Address) (ChainAgnosticToken, ChainAgnosticContract, error) {
+	token, contract, err := f.Primary.GetTokenByTokenIdentifiersAndOwner(ctx, id, address)
 	if err != nil {
 		logger.For(ctx).WithError(err).Warn("failed to get token by token identifiers and owner from primary in failure fallback")
-		return f.Fallback.GetTokensByTokenIdentifiersAndOwner(ctx, id, address)
+		return f.Fallback.GetTokenByTokenIdentifiersAndOwner(ctx, id, address)
 	}
 	return token, contract, nil
 }

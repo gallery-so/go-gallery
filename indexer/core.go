@@ -8,6 +8,7 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/db/gen/indexerdb"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/middleware"
@@ -18,6 +19,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
@@ -52,7 +54,9 @@ func coreInit(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) (*gin.Engin
 
 	s := rpc.NewStorageClient(context.Background())
 	tokenRepo, contractRepo := newRepos(s)
-	queries := indexerdb.New(postgres.NewPgxClient())
+	iQueries := indexerdb.New(postgres.NewPgxClient())
+	bQueries := coredb.New(postgres.NewPgxClient(postgres.WithHost(env.GetString("BACKEND_POSTGRES_HOST")), postgres.WithUser(env.GetString("BACKEND_POSTGRES_USER")), postgres.WithPassword(env.GetString("BACKEND_POSTGRES_PASSWORD")), postgres.WithPort(env.GetInt("BACKEND_POSTGRES_PORT"))))
+	tClient := task.NewClient(context.Background())
 	ethClient := rpc.NewEthSocketClient()
 	ipfsClient := ipfs.NewShell()
 	arweaveClient := rpc.NewArweaveClient()
@@ -61,7 +65,7 @@ func coreInit(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) (*gin.Engin
 		rpcEnabled = true
 	}
 
-	i := newIndexer(ethClient, &http.Client{Timeout: 10 * time.Minute}, ipfsClient, arweaveClient, s, queries, tokenRepo, contractRepo, persist.Chain(env.GetInt("CHAIN")), defaultTransferEvents, nil, fromBlock, toBlock)
+	i := newIndexer(ethClient, &http.Client{Timeout: 10 * time.Minute}, ipfsClient, arweaveClient, s, iQueries, bQueries, tClient, tokenRepo, contractRepo, persist.Chain(env.GetInt("CHAIN")), defaultTransferEvents, nil, fromBlock, toBlock)
 
 	router := gin.Default()
 
@@ -88,7 +92,9 @@ func coreInitServer(quietLogs, enableRPC bool) *gin.Engine {
 
 	s := rpc.NewStorageClient(context.Background())
 	tokenRepo, contractRepo := newRepos(s)
-	queries := indexerdb.New(postgres.NewPgxClient())
+	iQueries := indexerdb.New(postgres.NewPgxClient())
+	bQueries := coredb.New(postgres.NewPgxClient(postgres.WithHost(env.GetString("BACKEND_POSTGRES_HOST")), postgres.WithUser(env.GetString("BACKEND_POSTGRES_USER")), postgres.WithPassword(env.GetString("BACKEND_POSTGRES_PASSWORD")), postgres.WithPort(env.GetInt("BACKEND_POSTGRES_PORT"))))
+	tClient := task.NewClient(context.Background())
 	ethClient := rpc.NewEthSocketClient()
 	ipfsClient := ipfs.NewShell()
 	arweaveClient := rpc.NewArweaveClient()
@@ -110,7 +116,7 @@ func coreInitServer(quietLogs, enableRPC bool) *gin.Engine {
 
 	httpClient := &http.Client{Timeout: 10 * time.Minute, Transport: tracing.NewTracingTransport(http.DefaultTransport, false)}
 
-	i := newIndexer(ethClient, httpClient, ipfsClient, arweaveClient, s, queries, tokenRepo, contractRepo, persist.Chain(env.GetInt("CHAIN")), defaultTransferEvents, nil, nil, nil)
+	i := newIndexer(ethClient, httpClient, ipfsClient, arweaveClient, s, iQueries, bQueries, tClient, tokenRepo, contractRepo, persist.Chain(env.GetInt("CHAIN")), defaultTransferEvents, nil, nil, nil)
 	return handlersInitServer(router, tokenRepo, contractRepo, ethClient, httpClient, ipfsClient, arweaveClient, s, i)
 }
 
@@ -130,6 +136,11 @@ func SetDefaults() {
 	viper.SetDefault("POSTGRES_USER", "postgres")
 	viper.SetDefault("POSTGRES_PASSWORD", "")
 	viper.SetDefault("POSTGRES_DB", "postgres")
+	viper.SetDefault("BACKEND_POSTGRES_HOST", "0.0.0.0")
+	viper.SetDefault("BACKEND_POSTGRES_PORT", 5432)
+	viper.SetDefault("BACKEND_POSTGRES_USER", "postgres")
+	viper.SetDefault("BACKEND_POSTGRES_PASSWORD", "")
+	viper.SetDefault("BACKEND_POSTGRES_DB", "postgres")
 	viper.SetDefault("ALLOWED_ORIGINS", "http://localhost:3000")
 	viper.SetDefault("REDIS_URL", "localhost:6379")
 	viper.SetDefault("SENTRY_DSN", "")
@@ -137,6 +148,9 @@ func SetDefaults() {
 	viper.SetDefault("VERSION", "")
 	viper.SetDefault("ALCHEMY_API_URL", "")
 	viper.SetDefault("ALCHEMY_NFT_API_URL", "")
+	viper.SetDefault("TASK_QUEUE_HOST", "localhost:8123")
+	viper.SetDefault("TOKEN_PROCESSING_QUEUE", "projects/gallery-local/locations/here/queues/token-processing")
+	viper.SetDefault("TOKEN_PROCESSING_URL", "http://localhost:6500")
 	viper.AutomaticEnv()
 }
 

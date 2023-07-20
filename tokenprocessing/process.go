@@ -178,6 +178,23 @@ func processOwnersForContractTokens(mc *multichain.Provider, contractRepo *postg
 	}
 }
 
+func processOwnersForUserTokens(mc *multichain.Provider) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var input task.TokenProcessingUserTokensMessage
+		if err := c.ShouldBindJSON(&input); err != nil {
+			util.ErrResponse(c, http.StatusOK, err)
+			return
+		}
+
+		if err := mc.SyncTokensByUserIDAndTokenIdentifiers(c, input.UserID, input.TokenIdentifiers); err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+	}
+}
+
 // detectSpamContracts refreshes the alchemy_spam_contracts table with marked contracts from Alchemy
 func detectSpamContracts(queries *coredb.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {

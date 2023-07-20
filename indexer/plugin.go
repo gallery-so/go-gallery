@@ -30,6 +30,7 @@ type TransferPluginMsg struct {
 // TransferPlugins are plugins that add contextual data to a transfer.
 type TransferPlugins struct {
 	contracts contractTransfersPlugin
+	tokens    tokenTransfersPlugin
 }
 
 type blockchainOrderInfo struct {
@@ -64,8 +65,10 @@ func startSpan(ctx context.Context, plugin, op string) (*sentry.Span, context.Co
 // The `in` channel is used to submit a transfer to a plugin, and the `out` channel is used to receive results from a plugin, if any.
 // A plugin can be stopped by closing its `in` channel, which finishes the plugin and lets receivers know that its done.
 func NewTransferPlugins(ctx context.Context) TransferPlugins {
+	ctx = sentryutil.NewSentryHubContext(ctx)
 	return TransferPlugins{
-		contracts: newContractsPlugin(sentryutil.NewSentryHubContext(ctx)),
+		contracts: newContractsPlugin(ctx),
+		tokens:    newTokensPlugin(ctx),
 	}
 }
 
@@ -130,7 +133,7 @@ func newContractsPlugin(ctx context.Context) contractTransfersPlugin {
 	out := make(chan contractAtBlock)
 
 	go func() {
-		span, _ := startSpan(ctx, "ownerPlugin", "handleBatch")
+		span, _ := startSpan(ctx, "contractTransfersPlugin", "handleBatch")
 		defer tracing.FinishSpan(span)
 		defer close(out)
 
@@ -147,7 +150,7 @@ func newContractsPlugin(ctx context.Context) contractTransfersPlugin {
 			msg := msg
 			wp.Submit(func() {
 
-				child := span.StartChild("plugin.ownerPlugin")
+				child := span.StartChild("plugin.contractTransfersPlugin")
 				child.Description = "handleMessage"
 
 				out <- contractAtBlock{
@@ -173,6 +176,80 @@ func newContractsPlugin(ctx context.Context) contractTransfersPlugin {
 	}()
 
 	return contractTransfersPlugin{
+		in:  in,
+		out: out,
+	}
+}
+
+type tokenTransfersPlugin struct {
+	in  chan TransferPluginMsg
+	out chan tokenAtBlock
+}
+
+func newTokensPlugin(ctx context.Context) tokenTransfersPlugin {
+	in := make(chan TransferPluginMsg)
+	out := make(chan tokenAtBlock)
+
+	go func() {
+		span, _ := startSpan(ctx, "tokenTransfersPlugin", "handleBatch")
+		defer tracing.FinishSpan(span)
+		defer close(out)
+
+		wp := workerpool.New(pluginPoolSize)
+
+		seenTokens := map[persist.TokenUniqueIdentifiers]bool{}
+
+		for msg := range in {
+
+			contract, tokenID, err := msg.key.GetParts()
+			if err != nil {
+				panic(err)
+			}
+			ids := persist.TokenUniqueIdentifiers{
+				// TODO currently this can only be ETH but we should transition away from persist.EthereumAddress and hard coded ETH on the indexer if we could see ourselves indexing other EVMs
+				Chain:           persist.ChainETH,
+				ContractAddress: persist.Address(contract),
+				TokenID:         tokenID,
+				OwnerAddress:    persist.Address(msg.transfer.To.String()),
+			}
+			if seenTokens[ids] {
+				continue
+			}
+
+			msg := msg
+			wp.Submit(func() {
+
+				child := span.StartChild("plugin.tokenTransfersPlugin")
+				child.Description = "handleMessage"
+
+				out <- tokenAtBlock{
+					ti: msg.key,
+					boi: blockchainOrderInfo{
+						blockNumber: msg.transfer.BlockNumber,
+						txIndex:     msg.transfer.TxIndex,
+					},
+					token: persist.Token{
+						TokenType:       msg.transfer.TokenType,
+						Chain:           persist.ChainETH,
+						TokenID:         tokenID,
+						OwnerAddress:    msg.transfer.To,
+						BlockNumber:     msg.transfer.BlockNumber,
+						ContractAddress: contract,
+						// Quantity: "1", we don't need this field right now but it might be necessary later if we start tracking any more data on tokens
+					},
+				}
+
+				tracing.FinishSpan(child)
+			})
+
+			seenTokens[ids] = true
+		}
+
+		wp.StopWait()
+		logger.For(ctx).Info("contracts plugin finished sending")
+	}()
+
+	return tokenTransfersPlugin{
 		in:  in,
 		out: out,
 	}

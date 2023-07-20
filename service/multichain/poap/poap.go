@@ -270,8 +270,8 @@ func (d *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, to
 	return firstToken.Descriptors, contract.Descriptors, nil
 }
 
-// GetTokensByTokenIdentifiersAndOwner retrieves tokens for a token identifiers and owner address
-func (d *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+// GetTokenByTokenIdentifiersAndOwner retrieves tokens for a token identifiers and owner address
+func (d *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	tid := tokenIdentifiers.TokenID
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/token/0x%s", d.apiURL, tid), nil)
