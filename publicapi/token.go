@@ -538,7 +538,7 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID) (db.Eve
 		if err != nil {
 			return db.Event{}, err
 		}
-		return *api.repos.EventRepository.Add(ctx, db.Event{
+		eventPtr, err := api.repos.EventRepository.Add(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		Action:         persist.ActionViewedToken,
 		ResourceTypeID: persist.ResourceTypeToken,
@@ -547,6 +547,10 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID) (db.Eve
 				TokenContractID:   token.contract.contractAddress,
 			},
 		})
+		if err != nil {
+			return db.Event{}, err
+		}
+		return *eventPtr
 	}
 	return db.Event{}, nil
 }

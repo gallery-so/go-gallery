@@ -381,6 +381,9 @@ mutation viewTokenMutation($tokenID: DBID!) {
     ... on ViewTokenPayload {
       token {
         dbid
+        contract {
+          contractAddress
+        }
       }
     }
   }
