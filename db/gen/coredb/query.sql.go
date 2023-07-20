@@ -4140,7 +4140,7 @@ SELECT wallets.id, wallets.created_at, wallets.last_updated, wallets.deleted, wa
 FROM wallets 
 JOIN users ON wallets.id = any(users.wallets)
 JOIN params ON wallets.address = params.address AND wallets.chain = params.chain
-WHERE not wallets.deleted AND not users.deleted
+WHERE not wallets.deleted AND not users.deleted and not users.universal
 `
 
 type GetUsersByWalletAddressesAndChainsParams struct {
