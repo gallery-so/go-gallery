@@ -186,6 +186,7 @@ func processOwnersForUserTokens(mc *multichain.Provider) gin.HandlerFunc {
 			return
 		}
 
+		logger.For(c).Infof("Processing: %s - Processing User Tokens Refresh (total: %d)", input.UserID, len(input.TokenIdentifiers))
 		if err := mc.SyncTokensByUserIDAndTokenIdentifiers(c, input.UserID, input.TokenIdentifiers); err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return

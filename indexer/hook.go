@@ -79,8 +79,10 @@ func newTokenHooks(tasks *gcptasks.Client, bQueries *coredb.Queries) []DBHook[pe
 				}
 			}
 
+			logger.For(ctx).Infof("submitting %d tasks to process tokens for users", len(tokensForUser))
 			for userID, tids := range tokensForUser {
 				// send each token grouped by user ID to the task queue
+				logger.For(ctx).Infof("submitting task for user %s with %d tokens", userID, len(tids))
 				err = task.CreateTaskForUserTokenProcessing(ctx, task.TokenProcessingUserTokensMessage{
 					UserID:           userID,
 					TokenIdentifiers: tids,
