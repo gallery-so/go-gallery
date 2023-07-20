@@ -88,6 +88,9 @@ func setDefaults() {
 	viper.SetDefault("ALCHEMY_NFT_API_URL", "")
 	viper.SetDefault("POAP_API_KEY", "")
 	viper.SetDefault("POAP_AUTH_TOKEN", "")
+	viper.SetDefault("TOKEN_PROCESSING_URL", "http://localhost:6500")
+	viper.SetDefault("TOKEN_PROCESSING_QUEUE", "projects/gallery-local/locations/here/queues/token-processing")
+	viper.SetDefault("TASK_QUEUE_HOST", "")
 
 	viper.AutomaticEnv()
 
