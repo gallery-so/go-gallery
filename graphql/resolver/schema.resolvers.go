@@ -1425,13 +1425,18 @@ func (r *mutationResolver) ViewGallery(ctx context.Context, galleryID persist.DB
 
 // ViewToken is the resolver for the viewToken field.
 func (r *mutationResolver) ViewToken(ctx context.Context, tokenID persist.DBID) (model.ViewTokenPayloadOrError, error) {
-	token, err := publicapi.For(ctx).Token.ViewToken(ctx, tokenID)
+	_, err := publicapi.For(ctx).Token.ViewToken(ctx, tokenID)
+	if err != nil {
+		return nil, err
+	}
+
+	token, err := resolveTokenByTokenID(ctx, tokenID)
 	if err != nil {
 		return nil, err
 	}
 
 	output := &model.ViewTokenPayload{
-		Token: tokenToModel(ctx, token, &tokenID),
+		Token: token,
 	}
 
 	return output, nil

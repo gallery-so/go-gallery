@@ -521,7 +521,7 @@ func (api TokenAPI) GetTokenOwnershipByTokenID(ctx context.Context, tokenID pers
 func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID) (db.Event, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"tokenID": validate.WithTag(token. ID, "required"),
+		"tokenID": validate.WithTag(tokenID, "required"),
 	}); err != nil {
 		return db.Event{}, err
 	}
@@ -538,19 +538,20 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID) (db.Eve
 		if err != nil {
 			return db.Event{}, err
 		}
+		fmt.Println("token.Contract", token.Contract)
 		eventPtr, err := api.repos.EventRepository.Add(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		Action:         persist.ActionViewedToken,
 		ResourceTypeID: persist.ResourceTypeToken,
 		CollectionID:   tokenID,
 		Data: persist.EventData{
-				TokenContractID:   token.contract.contractAddress,
+				TokenContractID: token.Contract,
 			},
 		})
 		if err != nil {
 			return db.Event{}, err
 		}
-		return *eventPtr
+		return *eventPtr, nil
 	}
 	return db.Event{}, nil
 }

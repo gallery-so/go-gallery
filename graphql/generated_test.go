@@ -8981,11 +8981,43 @@ func __marshalviewTokenMutationViewTokenViewTokenPayloadOrError(v *viewTokenMuta
 
 // viewTokenMutationViewTokenViewTokenPayloadToken includes the requested fields of the GraphQL type Token.
 type viewTokenMutationViewTokenViewTokenPayloadToken struct {
-	Dbid persist.DBID `json:"dbid"`
+	Dbid     persist.DBID                                             `json:"dbid"`
+	Contract *viewTokenMutationViewTokenViewTokenPayloadTokenContract `json:"contract"`
 }
 
 // GetDbid returns viewTokenMutationViewTokenViewTokenPayloadToken.Dbid, and is useful for accessing the field via an interface.
 func (v *viewTokenMutationViewTokenViewTokenPayloadToken) GetDbid() persist.DBID { return v.Dbid }
+
+// GetContract returns viewTokenMutationViewTokenViewTokenPayloadToken.Contract, and is useful for accessing the field via an interface.
+func (v *viewTokenMutationViewTokenViewTokenPayloadToken) GetContract() *viewTokenMutationViewTokenViewTokenPayloadTokenContract {
+	return v.Contract
+}
+
+// viewTokenMutationViewTokenViewTokenPayloadTokenContract includes the requested fields of the GraphQL type Contract.
+type viewTokenMutationViewTokenViewTokenPayloadTokenContract struct {
+	ContractAddress *viewTokenMutationViewTokenViewTokenPayloadTokenContractContractAddressChainAddress `json:"contractAddress"`
+}
+
+// GetContractAddress returns viewTokenMutationViewTokenViewTokenPayloadTokenContract.ContractAddress, and is useful for accessing the field via an interface.
+func (v *viewTokenMutationViewTokenViewTokenPayloadTokenContract) GetContractAddress() *viewTokenMutationViewTokenViewTokenPayloadTokenContractContractAddressChainAddress {
+	return v.ContractAddress
+}
+
+// viewTokenMutationViewTokenViewTokenPayloadTokenContractContractAddressChainAddress includes the requested fields of the GraphQL type ChainAddress.
+type viewTokenMutationViewTokenViewTokenPayloadTokenContractContractAddressChainAddress struct {
+	Address *string `json:"address"`
+	Chain   *Chain  `json:"chain"`
+}
+
+// GetAddress returns viewTokenMutationViewTokenViewTokenPayloadTokenContractContractAddressChainAddress.Address, and is useful for accessing the field via an interface.
+func (v *viewTokenMutationViewTokenViewTokenPayloadTokenContractContractAddressChainAddress) GetAddress() *string {
+	return v.Address
+}
+
+// GetChain returns viewTokenMutationViewTokenViewTokenPayloadTokenContractContractAddressChainAddress.Chain, and is useful for accessing the field via an interface.
+func (v *viewTokenMutationViewTokenViewTokenPayloadTokenContractContractAddressChainAddress) GetChain() *Chain {
+	return v.Chain
+}
 
 // viewerQueryResponse is returned by viewerQuery on success.
 type viewerQueryResponse struct {
@@ -11952,6 +11984,12 @@ mutation viewTokenMutation ($tokenID: DBID!) {
 		... on ViewTokenPayload {
 			token {
 				dbid
+				contract {
+					contractAddress {
+						address
+						chain
+					}
+				}
 			}
 		}
 	}
