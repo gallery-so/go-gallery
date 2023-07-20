@@ -333,6 +333,7 @@ func NewRepositories(pq *sql.DB, pgx *pgxpool.Pool) *Repositories {
 		WalletRepository:      NewWalletRepository(pq, queries),
 		AdmireRepository:      NewAdmireRepository(queries),
 		CommentRepository:     NewCommentRepository(pq, queries),
+		EventRepository:       NewEventRepository(pq, queries),
 	}
 }
 

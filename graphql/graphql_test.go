@@ -1316,6 +1316,14 @@ func viewGallery(t *testing.T, ctx context.Context, c genql.Client, galleryID pe
 	_ = (*resp.ViewGallery).(*viewGalleryMutationViewGalleryViewGalleryPayload)
 }
 
+// viewToken makes a GraphQL request to view a token
+func viewGallery(t *testing.T, ctx context.Context, c genql.Client, tokenID persist.DBID) {
+	t.Helper()
+	resp, err := viewTokenMutation(ctx, c, tokenID)
+	require.NoError(t, err)
+	_ = (*resp.ViewToken).(*viewTokenyMutationViewTokenViewTokenPayload)
+}
+
 // createCollection makes a GraphQL request to create a collection
 func createCollection(t *testing.T, ctx context.Context, c genql.Client, input CreateCollectionInput) persist.DBID {
 	t.Helper()

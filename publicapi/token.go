@@ -518,17 +518,17 @@ func (api TokenAPI) GetTokenOwnershipByTokenID(ctx context.Context, tokenID pers
 	return api.loaders.TokenOwnershipByTokenID.Load(tokenID)
 }
 
-func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID) (db.Token, error) {
+func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID) (db.Event, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"tokenID": validate.WithTag(tokenID, "required"),
+		"tokenID": validate.WithTag(token. ID, "required"),
 	}); err != nil {
-		return db.Token{}, err
+		return db.Event{}, err
 	}
 
 	token, err := api.loaders.TokenByTokenID.Load(tokenID)
 	if err != nil {
-		return db.Token{}, err
+		return db.Event{}, err
 	}
 
 	gc := util.MustGetGinContext(ctx)
@@ -536,17 +536,20 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID) (db.Tok
 	if auth.GetUserAuthedFromCtx(gc) {
 		userID, err := getAuthenticatedUserID(ctx)
 		if err != nil {
-			return db.Token{}, err
+			return db.Event{}, err
 		}
-		_, err = dispatchEvent(ctx, db.Event{
-			ActorID:        persist.DBIDToNullStr(userID),
-			ResourceTypeID: persist.ResourceTypeToken,
-			SubjectID:      tokenID,
-			Action:         persist.ActionViewedToken,
-		}, api.validator, nil)
-		if err != nil {
-			return db.Token{}, err
+		
+		return *api.repos.EventRepository.Add{ctx, db.Event{
+		ActorID:        persist.DBIDToNullStr(userID),
+		Action:         persist.ActionViewedToken,
+		ResourceTypeID: persist.ResourceTypeToken,
+		CollectionID:   tokenID,
+		Data: persist.EventData{
+			TokenContractID:   token.contractID,
+		},
 		}
+	}
+
 
 	} 
 	return token, nil
