@@ -1450,5 +1450,5 @@ SELECT sqlc.embed(wallets), sqlc.embed(users)
 FROM wallets 
 JOIN users ON wallets.id = any(users.wallets)
 JOIN params ON wallets.address = params.address AND wallets.chain = params.chain
-WHERE not wallets.deleted AND not users.deleted;
+WHERE not wallets.deleted AND not users.deleted and not users.universal;
 
