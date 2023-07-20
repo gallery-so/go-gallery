@@ -538,7 +538,6 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID) (db.Eve
 		if err != nil {
 			return db.Event{}, err
 		}
-		fmt.Println("token.Contract", token.Contract)
 		eventPtr, err := api.repos.EventRepository.Add(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		Action:         persist.ActionViewedToken,
