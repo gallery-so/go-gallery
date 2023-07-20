@@ -295,7 +295,7 @@ func (p *Provider) SyncTokensByUserID(ctx context.Context, userID persist.DBID, 
 		wg.Wait()
 	}()
 
-	return p.receiveSyncedTokensForUser(ctx, user, chains, incomingTokens, incomingContracts, errChan)
+	return p.receiveSyncedTokensForUser(ctx, user, chains, incomingTokens, incomingContracts, errChan, true)
 }
 
 // SyncTokensByUserIDAndTokenIdentifiers updates the media for specific tokens for a user
@@ -395,10 +395,10 @@ func (p *Provider) SyncTokensByUserIDAndTokenIdentifiers(ctx context.Context, us
 		wg.Wait()
 	}()
 
-	return p.receiveSyncedTokensForUser(ctx, user, chains, incomingTokens, incomingContracts, errChan)
+	return p.receiveSyncedTokensForUser(ctx, user, chains, incomingTokens, incomingContracts, errChan, false)
 }
 
-func (p *Provider) receiveSyncedTokensForUser(ctx context.Context, user persist.User, chains []persist.Chain, incomingTokens chan chainTokens, incomingContracts chan chainContracts, errChan chan error) error {
+func (p *Provider) receiveSyncedTokensForUser(ctx context.Context, user persist.User, chains []persist.Chain, incomingTokens chan chainTokens, incomingContracts chan chainContracts, errChan chan error, replace bool) error {
 	tokensFromProviders := make([]chainTokens, 0, len(user.Wallets))
 	contractsFromProviders := make([]chainContracts, 0, len(user.Wallets))
 
@@ -435,7 +435,11 @@ outer:
 		return err
 	}
 
-	_, err = p.ReplaceHolderTokensForUser(ctx, tokensFromProviders, persistedContracts, user, chains)
+	if replace {
+		_, err = p.ReplaceHolderTokensForUser(ctx, tokensFromProviders, persistedContracts, user, chains)
+	} else {
+		_, err = p.AddHolderTokensToUser(ctx, tokensFromProviders, persistedContracts, user, chains)
+	}
 	return err
 }
 

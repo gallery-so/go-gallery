@@ -787,7 +787,7 @@ func (i *indexer) runDBHooks(ctx context.Context, contracts []persist.Contract, 
 		wp.Submit(func() {
 			err := hook(ctx, contracts, statsID)
 			if err != nil {
-				logger.For(ctx).WithError(err).Error("Failed to run contract db hook")
+				logger.For(ctx).WithError(err).Errorf("Failed to run contract db hook %s", err)
 			}
 		})
 	}
@@ -797,7 +797,7 @@ func (i *indexer) runDBHooks(ctx context.Context, contracts []persist.Contract, 
 		wp.Submit(func() {
 			err := hook(ctx, tokens, statsID)
 			if err != nil {
-				logger.For(ctx).WithError(err).Error("Failed to run token db hook")
+				logger.For(ctx).WithError(err).Errorf("Failed to run token db hook %s", err)
 			}
 		})
 	}
