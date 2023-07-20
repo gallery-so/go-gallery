@@ -49,6 +49,7 @@
 //go:generate go run github.com/gallery-so/dataloaden ContractCreatorLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.ContractCreator
 //go:generate go run github.com/gallery-so/dataloaden TokensLoaderByUserIDAndFilters github.com/mikeydub/go-gallery/db/gen/coredb.GetTokensByUserIdBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.Token
 //go:generate go run github.com/gallery-so/dataloaden ProfileImageLoaderByID github.com/mikeydub/go-gallery/db/gen/coredb.GetProfileImageByIDParams github.com/mikeydub/go-gallery/db/gen/coredb.ProfileImage
+//go:generate go run github.com/gallery-so/dataloaden GalleryTokenPreviewsByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.TokenMedia
 
 package dataloader
 
@@ -139,6 +140,7 @@ type Loaders struct {
 	TokenOwnershipByTokenID                  *TokenOwnershipLoaderByID
 	ContractCreatorByContractID              *ContractCreatorLoaderByID
 	ProfileImageByID                         *ProfileImageLoaderByID
+	GalleryTokenPreviewsByID                 *GalleryTokenPreviewsByID
 }
 
 func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loaders {
@@ -344,6 +346,8 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 	loaders.ContractCreatorByContractID = NewContractCreatorLoaderByID(defaults, loadContractCreatorByContractID(q), ContractCreatorLoaderByIDCacheSubscriptions{})
 
 	loaders.ProfileImageByID = NewProfileImageLoaderByID(defaults, loadProfileImageByID(q), ProfileImageLoaderByIDCacheSubscriptions{})
+
+	loaders.GalleryTokenPreviewsByID = NewGalleryTokenPreviewsByID(defaults, loadGalleryTokenPreviewsByID(q))
 
 	return loaders
 }
@@ -1401,6 +1405,25 @@ func loadProfileImageByID(q *db.Queries) func(context.Context, []db.GetProfileIm
 				err = persist.ErrProfileImageNotFound{Err: err, ProfileImageID: params[i].ID}
 			}
 			results[i], errors[i] = media, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadGalleryTokenPreviewsByID(q *db.Queries) func(context.Context, []persist.DBID) ([][]db.TokenMedia, []error) {
+	return func(ctx context.Context, keys []persist.DBID) ([][]db.TokenMedia, []error) {
+		results := make([][]db.TokenMedia, len(keys))
+		errors := make([]error, len(keys))
+
+		b := q.GetGalleryTokenMediasByGalleryIDBatch(ctx, keys)
+		defer b.Close()
+
+		b.Query(func(i int, medias []db.TokenMedia, err error) {
+			if err == pgx.ErrNoRows {
+				err = persist.ErrGalleryNotFound{ID: keys[i]}
+			}
+			results[i], errors[i] = medias, err
 		})
 
 		return results, errors

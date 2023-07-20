@@ -824,16 +824,29 @@ update galleries set collections = @collections, last_updated = now() where gall
 -- name: UpdateUserFeaturedGallery :exec
 update users set featured_gallery = @gallery_id, last_updated = now() from galleries where users.id = @user_id and galleries.id = @gallery_id and galleries.owner_user_id = @user_id and galleries.deleted = false;
 
--- name: GetGalleryTokenMediasByGalleryID :many
-select m.* from collections c, galleries g, token_medias m, users u, tokens t
-    left join contract_creators cc on t.contract = cc.contract_id
-    where g.id = $1 and c.id = any(g.collections) and t.id = any(c.nfts)
-      and u.id = g.owner_user_id
-      and ((cc.creator_user_id = u.id) or (t.owned_by_wallets && u.wallets))
-      and t.deleted = false and g.deleted = false and c.deleted = false
-      and (length(m.media->>'thumbnail_url'::varchar) > 0 or length(m.media->>'media_url'::varchar) > 0)
-      and t.token_media_id = m.id and m.deleted = false and m.active
-    order by array_position(g.collections, c.id),array_position(c.nfts, t.id) limit $2;
+-- name: GetGalleryTokenMediasByGalleryIDBatch :batchmany
+with picked_content as (
+	select t.id, t.token_media_id
+	from galleries g, collections c, tokens t, token_medias tm
+	where
+		g.id = $1
+		and c.id = any(g.collections[:8])
+		and t.id = any(c.nfts[:8])
+		and t.token_media_id = tm.id
+		and not g.deleted
+		and not c.deleted
+		and not t.deleted
+		and not tm.deleted
+		and tm.active
+		and (length(tm.media ->> 'thumbnail_url'::varchar) > 0 or length(tm.media ->> 'media_url'::varchar) > 0)
+	order by array_position(g.collections, c.id) , array_position(c.nfts, t.id)
+)
+select tm.*
+from picked_content, token_medias tm, token_ownership tko
+where
+	picked_content.token_media_id = tm.id
+	and picked_content.id = tko.token_id and (tko.is_creator or tko.is_holder)
+limit 4;
 
 -- name: GetTokenByTokenIdentifiers :one
 select * from tokens where tokens.token_id = @token_hex and contract = (select contracts.id from contracts where contracts.address = @contract_address) and tokens.chain = @chain and tokens.deleted = false;
