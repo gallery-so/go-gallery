@@ -418,12 +418,10 @@ ORDER BY
 LIMIT sqlc.arg('limit');
 
 -- name: PaginateTrendingFeed :many
-select * from feed_entities join unnest(@feed_entity_ids::text[]) with ordinality t(id, pos) using(id)
-  where t.pos > @cur_before_pos::int
-  and t.pos < @cur_after_pos::int
-  order by case when @paging_forward::bool then t.pos end desc,
-          case when not @paging_forward::bool then t.pos end asc
-  limit sqlc.arg('limit');
+select *
+from feed_entities join unnest(@feed_entity_ids::text[]) with ordinality t(id, pos) using(id)
+order by case when @paging_forward::bool then t.pos end desc,
+    case when not @paging_forward::bool then t.pos end asc;
 
 -- name: PaginatePostsByContractID :batchmany
 SELECT posts.*
@@ -924,27 +922,30 @@ update users set user_experiences = user_experiences || @experience where id = @
 -- name: GetTrendingUsersByIDs :many
 select users.* from users join unnest(@user_ids::varchar[]) with ordinality t(id, pos) using (id) where deleted = false order by t.pos asc;
 
--- name: GetTrendingFeedEventIDs :many
-select fe.id, fe.feed_entity_type, fe.created_at, count(distinct c.id) + count(distinct a.id) interactions
-from feed_entities fe
-left join comments c on case
-    when fe.feed_entity_type = @feed_entity_type then fe.id = c.feed_event_id
-    when fe.feed_entity_type = @post_entity_type then fe.id = c.post_id
-    else 0 = 1 end
-    and not c.deleted
-left join admires a on case
-    when fe.feed_entity_type = @feed_entity_type then fe.id = a.feed_event_id
-    when fe.feed_entity_type = @post_entity_type then fe.id = a.post_id
-    else 0 = 1 end
-    and not a.deleted
-left join feed_events e on fe.feed_entity_type = @feed_entity_type and fe.id = e.id
-where fe.created_at >= @window_end
-    and case when fe.feed_entity_type = @feed_entity_type
-        then not (e.action = any(@excluded_feed_actions::varchar[]))
-        else 1 = 1
-        end
-group by fe.id, fe.feed_entity_type, fe.created_at
-order by fe.created_at desc;
+-- name: GetLatestFeedEntities :many
+with ids as (
+    select id, feed_entity_type, created_at
+    from feed_entities fe
+    where fe.created_at >= @window_end
+), selected_posts as (
+    select ids.id, ids.feed_entity_type, ids.created_at, count(distinct c.id) + count(distinct a.id) interactions
+    from ids
+    join posts p on p.id = ids.id and feed_entity_type = @post_entity_type
+    left join comments c on c.post_id = ids.id
+    left join admires a on a.post_id = ids.id
+    group by ids.id, ids.feed_entity_type, ids.created_at
+), selected_events as (
+    select ids.id, ids.feed_entity_type, ids.created_at, count(distinct c.id) + count(distinct a.id) interactions
+    from ids
+    join feed_events e on e.id = ids.id and feed_entity_type = @feed_event_entity_type
+    left join comments c on c.feed_event_id = ids.id
+    left join admires a on a.feed_event_id = ids.id
+    where not (action = any(@excluded_feed_actions::varchar[]))
+    group by ids.id, ids.feed_entity_type, ids.created_at
+)
+select * from selected_posts
+union all
+select * from selected_events;
 
 -- name: UpdateCollectionGallery :exec
 update collections set gallery_id = @gallery_id, last_updated = now() where id = @id and deleted = false;

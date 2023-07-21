@@ -2313,6 +2313,76 @@ func (q *Queries) GetLastFeedEventForUser(ctx context.Context, arg GetLastFeedEv
 	return i, err
 }
 
+const getLatestFeedEntities = `-- name: GetLatestFeedEntities :many
+with ids as (
+    select id, feed_entity_type, created_at
+    from feed_entities fe
+    where fe.created_at >= $1
+), selected_posts as (
+    select ids.id, ids.feed_entity_type, ids.created_at, count(distinct c.id) + count(distinct a.id) interactions
+    from ids
+    join posts p on p.id = ids.id and feed_entity_type = $2
+    left join comments c on c.post_id = ids.id
+    left join admires a on a.post_id = ids.id
+    group by ids.id, ids.feed_entity_type, ids.created_at
+), selected_events as (
+    select ids.id, ids.feed_entity_type, ids.created_at, count(distinct c.id) + count(distinct a.id) interactions
+    from ids
+    join feed_events e on e.id = ids.id and feed_entity_type = $3
+    left join comments c on c.feed_event_id = ids.id
+    left join admires a on a.feed_event_id = ids.id
+    where not (action = any($4::varchar[]))
+    group by ids.id, ids.feed_entity_type, ids.created_at
+)
+select id, feed_entity_type, created_at, interactions from selected_posts
+union all
+select id, feed_entity_type, created_at, interactions from selected_events
+`
+
+type GetLatestFeedEntitiesParams struct {
+	WindowEnd           time.Time `json:"window_end"`
+	PostEntityType      int32     `json:"post_entity_type"`
+	FeedEventEntityType int32     `json:"feed_event_entity_type"`
+	ExcludedFeedActions []string  `json:"excluded_feed_actions"`
+}
+
+type GetLatestFeedEntitiesRow struct {
+	ID             persist.DBID `json:"id"`
+	FeedEntityType int32        `json:"feed_entity_type"`
+	CreatedAt      time.Time    `json:"created_at"`
+	Interactions   int32        `json:"interactions"`
+}
+
+func (q *Queries) GetLatestFeedEntities(ctx context.Context, arg GetLatestFeedEntitiesParams) ([]GetLatestFeedEntitiesRow, error) {
+	rows, err := q.db.Query(ctx, getLatestFeedEntities,
+		arg.WindowEnd,
+		arg.PostEntityType,
+		arg.FeedEventEntityType,
+		arg.ExcludedFeedActions,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetLatestFeedEntitiesRow
+	for rows.Next() {
+		var i GetLatestFeedEntitiesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.FeedEntityType,
+			&i.CreatedAt,
+			&i.Interactions,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getMembershipByMembershipId = `-- name: GetMembershipByMembershipId :one
 SELECT id, deleted, version, created_at, last_updated, token_id, name, asset_url, owners FROM membership WHERE id = $1 AND deleted = false
 `
@@ -3398,73 +3468,6 @@ func (q *Queries) GetTopCollectionsForCommunity(ctx context.Context, arg GetTopC
 			return nil, err
 		}
 		items = append(items, id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getTrendingFeedEventIDs = `-- name: GetTrendingFeedEventIDs :many
-select fe.id, fe.feed_entity_type, fe.created_at, count(distinct c.id) + count(distinct a.id) interactions
-from feed_entities fe
-left join comments c on case
-    when fe.feed_entity_type = $1 then fe.id = c.feed_event_id
-    when fe.feed_entity_type = $2 then fe.id = c.post_id
-    else 0 = 1 end
-    and not c.deleted
-left join admires a on case
-    when fe.feed_entity_type = $1 then fe.id = a.feed_event_id
-    when fe.feed_entity_type = $2 then fe.id = a.post_id
-    else 0 = 1 end
-    and not a.deleted
-left join feed_events e on fe.feed_entity_type = $1 and fe.id = e.id
-where fe.created_at >= $3
-    and case when fe.feed_entity_type = $1
-        then not (e.action = any($4::varchar[]))
-        else 1 = 1
-        end
-group by fe.id, fe.feed_entity_type, fe.created_at
-order by fe.created_at desc
-`
-
-type GetTrendingFeedEventIDsParams struct {
-	FeedEntityType      int32     `json:"feed_entity_type"`
-	PostEntityType      int32     `json:"post_entity_type"`
-	WindowEnd           time.Time `json:"window_end"`
-	ExcludedFeedActions []string  `json:"excluded_feed_actions"`
-}
-
-type GetTrendingFeedEventIDsRow struct {
-	ID             persist.DBID `json:"id"`
-	FeedEntityType int32        `json:"feed_entity_type"`
-	CreatedAt      time.Time    `json:"created_at"`
-	Interactions   int32        `json:"interactions"`
-}
-
-func (q *Queries) GetTrendingFeedEventIDs(ctx context.Context, arg GetTrendingFeedEventIDsParams) ([]GetTrendingFeedEventIDsRow, error) {
-	rows, err := q.db.Query(ctx, getTrendingFeedEventIDs,
-		arg.FeedEntityType,
-		arg.PostEntityType,
-		arg.WindowEnd,
-		arg.ExcludedFeedActions,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetTrendingFeedEventIDsRow
-	for rows.Next() {
-		var i GetTrendingFeedEventIDsRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.FeedEntityType,
-			&i.CreatedAt,
-			&i.Interactions,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -5124,30 +5127,19 @@ func (q *Queries) PaginatePersonalFeedByUserID(ctx context.Context, arg Paginate
 }
 
 const paginateTrendingFeed = `-- name: PaginateTrendingFeed :many
-select id, feed_entity_type, created_at, actor_id from feed_entities join unnest($1::text[]) with ordinality t(id, pos) using(id)
-  where t.pos > $2::int
-  and t.pos < $3::int
-  order by case when $4::bool then t.pos end desc,
-          case when not $4::bool then t.pos end asc
-  limit $5
+select id, feed_entity_type, created_at, actor_id
+from feed_entities join unnest($1::text[]) with ordinality t(id, pos) using(id)
+order by case when $2::bool then t.pos end desc,
+    case when not $2::bool then t.pos end asc
 `
 
 type PaginateTrendingFeedParams struct {
 	FeedEntityIds []string `json:"feed_entity_ids"`
-	CurBeforePos  int32    `json:"cur_before_pos"`
-	CurAfterPos   int32    `json:"cur_after_pos"`
 	PagingForward bool     `json:"paging_forward"`
-	Limit         int32    `json:"limit"`
 }
 
 func (q *Queries) PaginateTrendingFeed(ctx context.Context, arg PaginateTrendingFeedParams) ([]FeedEntity, error) {
-	rows, err := q.db.Query(ctx, paginateTrendingFeed,
-		arg.FeedEntityIds,
-		arg.CurBeforePos,
-		arg.CurAfterPos,
-		arg.PagingForward,
-		arg.Limit,
-	)
+	rows, err := q.db.Query(ctx, paginateTrendingFeed, arg.FeedEntityIds, arg.PagingForward)
 	if err != nil {
 		return nil, err
 	}

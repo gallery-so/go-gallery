@@ -307,9 +307,9 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 		}
 	} else {
 		calcFunc := func(ctx context.Context) ([]persist.DBID, error) {
-			trendData, err := api.queries.GetTrendingFeedEventIDs(ctx, db.GetTrendingFeedEventIDsParams{
+			trendData, err := api.queries.GetLatestFeedEntities(ctx, db.GetLatestFeedEntitiesParams{
 				WindowEnd:           time.Now().Add(-time.Duration(72 * time.Hour)),
-				FeedEntityType:      persist.FeedEventTypeTag,
+				FeedEventEntityType: persist.FeedEventTypeTag,
 				PostEntityType:      persist.PostTypeTag,
 				ExcludedFeedActions: []string{string(persist.ActionUserCreated), string(persist.ActionUserFollowedUsers)},
 			})
@@ -337,11 +337,13 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 				}
 			}
 
-			trendingIDs := make([]persist.DBID, 100)
+			trendingIDs := make([]persist.DBID, len(h))
 
+			i := 0
 			for len(h) > 0 {
 				node := heappkg.Pop(&h).(heapNode)
-				trendingIDs = append(trendingIDs, node.id)
+				trendingIDs[i] = node.id
+				i++
 			}
 
 			return trendingIDs, nil
@@ -362,13 +364,39 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 		asStr[i] = id.String()
 	}
 
+	min := func(a, b int32) int32 {
+		if a < b {
+			return a
+		}
+		return b
+	}
+
+	max := func(a, b int32) int32 {
+		if a > b {
+			return a
+		}
+		return b
+	}
+
 	queryFunc := func(params positionPagingParams) ([]any, error) {
+		// Restrict cursors to actual size of the slice
+		curBeforePos := max(params.CursorBeforePos, 0)
+		curAfterPos := min(params.CursorAfterPos-1, int32(len(asStr)))
+		var idsToQuery []string
+
+		if params.PagingForward {
+			// If paging forward, we extend from the after cursor up to the limit or to the before cursor, whatever is larger
+			limitPos := max(curAfterPos-params.Limit, curBeforePos)
+			idsToQuery = asStr[limitPos:curAfterPos]
+		} else {
+			// If paging backwards, we extend from the before cursor up to the limit or to the after cursor, whatever is smaller
+			limitPos := min(curBeforePos+params.Limit, curAfterPos)
+			idsToQuery = asStr[curBeforePos:limitPos]
+		}
+
 		keys, err := api.queries.PaginateTrendingFeed(ctx, db.PaginateTrendingFeedParams{
-			FeedEntityIds: asStr,
-			CurBeforePos:  params.CursorBeforePos,
-			CurAfterPos:   params.CursorAfterPos,
+			FeedEntityIds: idsToQuery,
 			PagingForward: params.PagingForward,
-			Limit:         params.Limit,
 		})
 
 		events, err := feedEntityToTypedType(ctx, api.loaders, keys)
@@ -386,7 +414,6 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 
 	paginator.QueryFunc = queryFunc
 	paginator.CursorFunc = cursorFunc
-
 	return paginator.paginate(before, after, first, last)
 }
 
