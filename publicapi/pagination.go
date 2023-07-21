@@ -768,11 +768,11 @@ func (p *positionPaginator) paginate(before *string, after *string, first *int, 
 	}
 
 	cursorFunc := func(node any) (string, error) {
-		pos, nodeID, err := p.CursorFunc(node)
+		pos, nodeIDs, err := p.CursorFunc(node)
 		if err != nil {
 			return "", err
 		}
-		return p.encodeCursor(pos, nodeID)
+		return p.encodeCursor(pos, nodeIDs)
 	}
 
 	paginator := keysetPaginator{
