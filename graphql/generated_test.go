@@ -8892,6 +8892,18 @@ func (v *viewTokenMutationViewTokenErrAuthenticationFailed) GetTypename() *strin
 // GetMessage returns viewTokenMutationViewTokenErrAuthenticationFailed.Message, and is useful for accessing the field via an interface.
 func (v *viewTokenMutationViewTokenErrAuthenticationFailed) GetMessage() string { return v.Message }
 
+// viewTokenMutationViewTokenErrTokenNotFound includes the requested fields of the GraphQL type ErrTokenNotFound.
+type viewTokenMutationViewTokenErrTokenNotFound struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns viewTokenMutationViewTokenErrTokenNotFound.Typename, and is useful for accessing the field via an interface.
+func (v *viewTokenMutationViewTokenErrTokenNotFound) GetTypename() *string { return v.Typename }
+
+// GetMessage returns viewTokenMutationViewTokenErrTokenNotFound.Message, and is useful for accessing the field via an interface.
+func (v *viewTokenMutationViewTokenErrTokenNotFound) GetMessage() string { return v.Message }
+
 // viewTokenMutationViewTokenViewTokenPayload includes the requested fields of the GraphQL type ViewTokenPayload.
 type viewTokenMutationViewTokenViewTokenPayload struct {
 	Typename *string                                          `json:"__typename"`
@@ -8910,6 +8922,7 @@ func (v *viewTokenMutationViewTokenViewTokenPayload) GetToken() *viewTokenMutati
 //
 // viewTokenMutationViewTokenViewTokenPayloadOrError is implemented by the following types:
 // viewTokenMutationViewTokenErrAuthenticationFailed
+// viewTokenMutationViewTokenErrTokenNotFound
 // viewTokenMutationViewTokenViewTokenPayload
 type viewTokenMutationViewTokenViewTokenPayloadOrError interface {
 	implementsGraphQLInterfaceviewTokenMutationViewTokenViewTokenPayloadOrError()
@@ -8918,6 +8931,8 @@ type viewTokenMutationViewTokenViewTokenPayloadOrError interface {
 }
 
 func (v *viewTokenMutationViewTokenErrAuthenticationFailed) implementsGraphQLInterfaceviewTokenMutationViewTokenViewTokenPayloadOrError() {
+}
+func (v *viewTokenMutationViewTokenErrTokenNotFound) implementsGraphQLInterfaceviewTokenMutationViewTokenViewTokenPayloadOrError() {
 }
 func (v *viewTokenMutationViewTokenViewTokenPayload) implementsGraphQLInterfaceviewTokenMutationViewTokenViewTokenPayloadOrError() {
 }
@@ -8938,6 +8953,9 @@ func __unmarshalviewTokenMutationViewTokenViewTokenPayloadOrError(b []byte, v *v
 	switch tn.TypeName {
 	case "ErrAuthenticationFailed":
 		*v = new(viewTokenMutationViewTokenErrAuthenticationFailed)
+		return json.Unmarshal(b, *v)
+	case "ErrTokenNotFound":
+		*v = new(viewTokenMutationViewTokenErrTokenNotFound)
 		return json.Unmarshal(b, *v)
 	case "ViewTokenPayload":
 		*v = new(viewTokenMutationViewTokenViewTokenPayload)
@@ -8961,6 +8979,14 @@ func __marshalviewTokenMutationViewTokenViewTokenPayloadOrError(v *viewTokenMuta
 		result := struct {
 			TypeName string `json:"__typename"`
 			*viewTokenMutationViewTokenErrAuthenticationFailed
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewTokenMutationViewTokenErrTokenNotFound:
+		typename = "ErrTokenNotFound"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewTokenMutationViewTokenErrTokenNotFound
 		}{typename, v}
 		return json.Marshal(result)
 	case *viewTokenMutationViewTokenViewTokenPayload:

@@ -9554,7 +9554,7 @@ type ViewTokenPayload {
   token: Token
 }
 
-union ViewTokenPayloadOrError = ViewTokenPayload | ErrAuthenticationFailed
+union ViewTokenPayloadOrError = ViewTokenPayload | ErrAuthenticationFailed | ErrTokenNotFound
 
 input VerifyEmailInput {
   token: String! @scrub
@@ -59691,6 +59691,13 @@ func (ec *executionContext) _ViewTokenPayloadOrError(ctx context.Context, sel as
 			return graphql.Null
 		}
 		return ec._ErrAuthenticationFailed(ctx, sel, obj)
+	case model.ErrTokenNotFound:
+		return ec._ErrTokenNotFound(ctx, sel, &obj)
+	case *model.ErrTokenNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrTokenNotFound(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -62448,7 +62455,7 @@ func (ec *executionContext) _ErrSyncFailed(ctx context.Context, sel ast.Selectio
 	return out
 }
 
-var errTokenNotFoundImplementors = []string{"ErrTokenNotFound", "TokenByIdOrError", "Error", "CollectionTokenByIdOrError", "SetProfileImagePayloadOrError"}
+var errTokenNotFoundImplementors = []string{"ErrTokenNotFound", "TokenByIdOrError", "Error", "CollectionTokenByIdOrError", "ViewTokenPayloadOrError", "SetProfileImagePayloadOrError"}
 
 func (ec *executionContext) _ErrTokenNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrTokenNotFound) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errTokenNotFoundImplementors)

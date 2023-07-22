@@ -1894,7 +1894,7 @@ type ViewTokenPayload {
   token: Token
 }
 
-union ViewTokenPayloadOrError = ViewTokenPayload | ErrAuthenticationFailed
+union ViewTokenPayloadOrError = ViewTokenPayload | ErrAuthenticationFailed | ErrTokenNotFound
 
 input VerifyEmailInput {
   token: String! @scrub

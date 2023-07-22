@@ -1130,6 +1130,7 @@ type ErrTokenNotFound struct {
 func (ErrTokenNotFound) IsTokenByIDOrError()              {}
 func (ErrTokenNotFound) IsError()                         {}
 func (ErrTokenNotFound) IsCollectionTokenByIDOrError()    {}
+func (ErrTokenNotFound) IsViewTokenPayloadOrError()       {}
 func (ErrTokenNotFound) IsSetProfileImagePayloadOrError() {}
 
 type ErrUnknownAction struct {
