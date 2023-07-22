@@ -40,7 +40,7 @@ func TestMain(t *testing.T) {
 		{
 			title:    "test GraphQL",
 			run:      testGraphQL,
-			fixtures: []fixture{useDefaultEnv, usePostgres, useRedis, useTokenQueue, useNotificationTopics},
+			fixtures: []fixture{useDefaultEnv, usePostgres, useRedis, useTokenQueue, useTokenProcessing, useNotificationTopics},
 		},
 		{
 			title:    "test syncing tokens",
@@ -79,14 +79,11 @@ func testGraphQL(t *testing.T) {
 		{title: "should create gallery", run: testCreateGallery},
 		{title: "should move collection to new gallery", run: testMoveCollection},
 		{title: "should connect social account", run: testConnectSocialAccount},
+		{title: "should view a token", run: testViewToken}
 	}
 	for _, test := range tests {
 		t.Run(test.title, testWithFixtures(test.run, test.fixtures...))
 	}
-	const newTest = testCase{
-		title: "should view a token", run: testViewToken,
-	}
-	t.Run("should view a token", testWithFixtures(newTest.run, newTest.fixtures...))
 }
 
 func testTokenSyncs(t *testing.T) {
