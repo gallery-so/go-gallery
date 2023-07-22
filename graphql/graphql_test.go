@@ -665,20 +665,18 @@ func testViewsAreRolledUp(t *testing.T) {
 	bob := newUserFixture(t)
 	alice := newUserFixture(t)
 	cat := newUserWithTokensFixture(t)
-	damon := newUserWithTokensFixture(t)
 	ctx := context.Background()
 	// bob views gallery
 	client := authedServerClient(t, serverF.URL, bob.ID)
 	viewGallery(t, ctx, client, userF.GalleryID)
-	responseCatToken := viewToken(t, ctx, client, cat.TokenIDs[0])
+	responseBobViewToken := viewToken(t, ctx, client, cat.TokenIDs[0])
 	// // alice views gallery
 	client = authedServerClient(t, serverF.URL, alice.ID)
 	viewGallery(t, ctx, client, userF.GalleryID)
-	responseDamonToken := viewToken(t, ctx, client, damon.TokenIDs[0])
-	responseCatToken := viewToken(t, ctx, client, cat.TokenIDs[0])
+	responseAliceViewToken := viewToken(t, ctx, client, cat.TokenIDs[0])
 
-	assert.NotEmpty(t, responseCatToken)
-	assert.NotEmpty(t, responseDamonToken)
+	assert.NotEmpty(t, responseBobViewToken)
+	assert.NotEmpty(t, responseAliceViewToken)
 	// TODO: Actually verify that the views get rolled up
 }
 
