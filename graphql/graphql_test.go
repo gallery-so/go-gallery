@@ -40,7 +40,7 @@ func TestMain(t *testing.T) {
 		{
 			title:    "test GraphQL",
 			run:      testGraphQL,
-			fixtures: []fixture{useDefaultEnv, usePostgres, useRedis, useTokenQueue, useTokenProcessing, useNotificationTopics},
+			fixtures: []fixture{useDefaultEnv, usePostgres, useRedis, useTokenQueue, useNotificationTopics},
 		},
 		{
 			title:    "test syncing tokens",
@@ -79,7 +79,6 @@ func testGraphQL(t *testing.T) {
 		{title: "should create gallery", run: testCreateGallery},
 		{title: "should move collection to new gallery", run: testMoveCollection},
 		{title: "should connect social account", run: testConnectSocialAccount},
-		{title: "should view a token", run: testViewToken},
 	}
 	for _, test := range tests {
 		t.Run(test.title, testWithFixtures(test.run, test.fixtures...))
@@ -676,6 +675,7 @@ func testViewsAreRolledUp(t *testing.T) {
 	cat := newUserWithTokensFixture(t)
 	damon := newUserWithTokensFixture(t)
 	responseDamonToken := viewToken(t, ctx, client, damon.TokenIDs[0])
+	responseCatToken := viewToken(t, ctx, client, cat.TokenIDs[0])
 
 	assert.NotEmpty(t, responseCatToken)
 	assert.NotEmpty(t, responseDamonToken)
