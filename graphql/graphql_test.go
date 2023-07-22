@@ -673,7 +673,6 @@ func testViewsAreRolledUp(t *testing.T) {
 	client = authedServerClient(t, serverF.URL, alice.ID)
 	viewGallery(t, ctx, client, userF.GalleryID)
 
-
 	// TODO: Actually verify that the views get rolled up
 }
 
@@ -1216,8 +1215,8 @@ func testSyncShouldProcessMedia(t *testing.T) {
 }
 
 func testViewToken(t *testing.T) {
-	serverF := newServerFixture(t)
 	ctx := context.Background()
+	serverF := newServerFixture(t)
 	userF := newUserFixture(t)
 	bob := newUserWithTokensFixture(t)
 	alice := newUserWithTokensFixture(t)
