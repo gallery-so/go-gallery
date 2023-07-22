@@ -86,7 +86,7 @@ func testGraphQL(t *testing.T) {
 	const newTest = testCase{
 		title: "should view a token", run: testViewToken,
 	}
-	t.run("should view a token", testWithFixtures(newTest.run, newTest.fixtures...))
+	t.Run("should view a token", testWithFixtures(newTest.run, newTest.fixtures...))
 }
 
 func testTokenSyncs(t *testing.T) {
