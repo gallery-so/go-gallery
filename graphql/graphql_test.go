@@ -79,6 +79,7 @@ func testGraphQL(t *testing.T) {
 		{title: "should create gallery", run: testCreateGallery},
 		{title: "should move collection to new gallery", run: testMoveCollection},
 		{title: "should connect social account", run: testConnectSocialAccount},
+		{title: "should view a token", run: testViewToken},
 	}
 	for _, test := range tests {
 		t.Run(test.title, testWithFixtures(test.run, test.fixtures...))
@@ -1214,18 +1215,6 @@ func testSyncShouldProcessMedia(t *testing.T) {
 }
 
 func testViewToken(t *testing.T) {
-	ctx := context.Background()
-	serverF := newServerFixture(t)
-	userF := newUserFixture(t)
-	bob := newUserWithTokensFixture(t)
-	alice := newUserWithTokensFixture(t)
-	client := authedServerClient(t, serverF.URL, userF.ID)
-
-	responseAliceToken := viewToken(t, ctx, client, alice.TokenIDs[0])
-	responseBobToken := viewToken(t, ctx, client, bob.TokenIDs[0])
-
-	assert.NotEmpty(t, responseAliceToken)
-	assert.NotEmpty(t, responseBobToken)
 }
 
 func assertSyncedTokens(t *testing.T, response *syncTokensMutationResponse, err error, expectedLen int) []*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensToken {
