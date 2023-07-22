@@ -664,6 +664,8 @@ func testViewsAreRolledUp(t *testing.T) {
 	userF := newUserFixture(t)
 	bob := newUserFixture(t)
 	alice := newUserFixture(t)
+	cat := newUserWithTokensFixture(t)
+	damon := newUserWithTokensFixture(t)
 	ctx := context.Background()
 	// bob views gallery
 	client := authedServerClient(t, serverF.URL, bob.ID)
@@ -672,8 +674,6 @@ func testViewsAreRolledUp(t *testing.T) {
 	// // alice views gallery
 	client = authedServerClient(t, serverF.URL, alice.ID)
 	viewGallery(t, ctx, client, userF.GalleryID)
-	cat := newUserWithTokensFixture(t)
-	damon := newUserWithTokensFixture(t)
 	responseDamonToken := viewToken(t, ctx, client, damon.TokenIDs[0])
 	responseCatToken := viewToken(t, ctx, client, cat.TokenIDs[0])
 
