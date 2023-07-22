@@ -83,7 +83,10 @@ func testGraphQL(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.title, testWithFixtures(test.run, test.fixtures...))
 	}
-	t.run("should view a token", testWithFixtures(test.run, text.fixtures...))
+	const newTest = testCase{
+		title: "should view a token", run: testViewToken,
+	}
+	t.run("should view a token", testWithFixtures(newTest.run, newTest.fixtures...))
 }
 
 func testTokenSyncs(t *testing.T) {
