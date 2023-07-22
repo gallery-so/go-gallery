@@ -79,7 +79,7 @@ func testGraphQL(t *testing.T) {
 		{title: "should create gallery", run: testCreateGallery},
 		{title: "should move collection to new gallery", run: testMoveCollection},
 		{title: "should connect social account", run: testConnectSocialAccount},
-		{title: "should view a token", run: testViewToken}
+		{title: "should view a token", run: testViewToken},
 	}
 	for _, test := range tests {
 		t.Run(test.title, testWithFixtures(test.run, test.fixtures...))
@@ -669,10 +669,16 @@ func testViewsAreRolledUp(t *testing.T) {
 	// bob views gallery
 	client := authedServerClient(t, serverF.URL, bob.ID)
 	viewGallery(t, ctx, client, userF.GalleryID)
+	responseCatToken := viewToken(t, ctx, client, cat.TokenIDs[0])
 	// // alice views gallery
 	client = authedServerClient(t, serverF.URL, alice.ID)
 	viewGallery(t, ctx, client, userF.GalleryID)
+	cat := newUserWithTokensFixture(t)
+	damon := newUserWithTokensFixture(t)
+	responseDamonToken := viewToken(t, ctx, client, damon.TokenIDs[0])
 
+	assert.NotEmpty(t, responseCatToken)
+	assert.NotEmpty(t, responseDamonToken)
 	// TODO: Actually verify that the views get rolled up
 }
 
@@ -1212,9 +1218,6 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		assert.Equal(t, string(persist.MediaTypeImage), *media.MediaType)
 		assert.NotEmpty(t, *media.MediaURL)
 	})
-}
-
-func testViewToken(t *testing.T) {
 }
 
 func assertSyncedTokens(t *testing.T, response *syncTokensMutationResponse, err error, expectedLen int) []*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensToken {
