@@ -79,6 +79,7 @@ func testGraphQL(t *testing.T) {
 		{title: "should create gallery", run: testCreateGallery},
 		{title: "should move collection to new gallery", run: testMoveCollection},
 		{title: "should connect social account", run: testConnectSocialAccount},
+		{title: "should view a token", run: testViewToken},
 	}
 	for _, test := range tests {
 		t.Run(test.title, testWithFixtures(test.run, test.fixtures...))
@@ -672,6 +673,7 @@ func testViewsAreRolledUp(t *testing.T) {
 	client = authedServerClient(t, serverF.URL, alice.ID)
 	viewGallery(t, ctx, client, userF.GalleryID)
 
+
 	// TODO: Actually verify that the views get rolled up
 }
 
@@ -1213,6 +1215,21 @@ func testSyncShouldProcessMedia(t *testing.T) {
 	})
 }
 
+func testViewToken(t *testing.T) {
+	serverF := newServerFixture(t)
+	ctx := context.Background()
+	userF := newUserFixture(t)
+	bob := newUserWithTokensFixture(t)
+	alice := newUserWithTokensFixture(t)
+	client := authedServerClient(t, serverF.URL, userF.ID)
+
+	responseAliceToken := viewToken(t, ctx, client, alice.TokenIDs[0])
+	responseBobToken := viewToken(t, ctx, client, bob.TokenIDs[0])
+
+	assert.NotEmpty(t, responseAliceToken)
+	assert.NotEmpty(t, responseBobToken)
+}
+
 func assertSyncedTokens(t *testing.T, response *syncTokensMutationResponse, err error, expectedLen int) []*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensToken {
 	t.Helper()
 	require.NoError(t, err)
@@ -1317,11 +1334,12 @@ func viewGallery(t *testing.T, ctx context.Context, c genql.Client, galleryID pe
 }
 
 // viewToken makes a GraphQL request to view a token
-func viewToken(t *testing.T, ctx context.Context, c genql.Client, tokenID persist.DBID) {
+func viewToken(t *testing.T, ctx context.Context, c genql.Client, tokenID persist.DBID) *viewTokenMutationViewTokenViewTokenPayload {
 	t.Helper()
 	resp, err := viewTokenMutation(ctx, c, tokenID)
 	require.NoError(t, err)
-	_ = (*resp.ViewToken).(*viewTokenMutationViewTokenViewTokenPayload)
+	payload := (*resp.ViewToken).(*viewTokenMutationViewTokenViewTokenPayload)
+	return payload
 }
 
 // createCollection makes a GraphQL request to create a collection
