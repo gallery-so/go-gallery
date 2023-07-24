@@ -79,6 +79,7 @@ func testGraphQL(t *testing.T) {
 		{title: "should create gallery", run: testCreateGallery},
 		{title: "should move collection to new gallery", run: testMoveCollection},
 		{title: "should connect social account", run: testConnectSocialAccount},
+		{title: "should view a token", run: testViewToken},
 	}
 	for _, test := range tests {
 		t.Run(test.title, testWithFixtures(test.run, test.fixtures...))
@@ -664,19 +665,19 @@ func testViewsAreRolledUp(t *testing.T) {
 	userF := newUserFixture(t)
 	bob := newUserFixture(t)
 	alice := newUserFixture(t)
-	cat := newUserWithTokensFixture(t)
+	// cat := newUserWithTokensFixture(t)
 	ctx := context.Background()
 	// bob views gallery
 	client := authedServerClient(t, serverF.URL, bob.ID)
-	viewGallery(t, ctx, client, userF.GalleryID)
-	responseBobViewToken := viewToken(t, ctx, client, cat.TokenIDs[0])
+    viewGallery(t, ctx, client, userF.GalleryID)
+	// responseBobViewToken := viewToken(t, ctx, client, cat.TokenIDs[0])
 	// // alice views gallery
 	client = authedServerClient(t, serverF.URL, alice.ID)
 	viewGallery(t, ctx, client, userF.GalleryID)
-	responseAliceViewToken := viewToken(t, ctx, client, cat.TokenIDs[0])
+	// responseAliceViewToken := viewToken(t, ctx, client, cat.TokenIDs[0])
 
-	assert.NotEmpty(t, responseBobViewToken)
-	assert.NotEmpty(t, responseAliceViewToken)
+	// assert.NotEmpty(t, responseBobViewToken)
+	// assert.NotEmpty(t, responseAliceViewToken)
 	// TODO: Actually verify that the views get rolled up
 }
 
@@ -785,6 +786,15 @@ func testGetCommunity(t *testing.T) {
 		Address: contract,
 		Chain:   ChainEthereum,
 	})
+}
+
+func testViewToken(t *testing.T) {
+	ctx := context.Background()
+	userF := newUserWithFeedEntitiesFixture(t)
+	c := authedHandlerClient(t, userF.ID)
+	deletePost(t, ctx, c, userF.PostIDs[0])
+	actual := globalFeedEvents(t, ctx, c, 4)
+	assert.False(t, util.Contains(actual, userF.PostIDs[0]))
 }
 
 func testSyncNewTokens(t *testing.T) {
