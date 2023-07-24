@@ -1,7 +1,9 @@
 package persist
 
+type FeedEntityType int
+
 const (
-	FeedEventTypeTag = iota
+	FeedEventTypeTag FeedEntityType = iota
 	PostTypeTag
 )
 

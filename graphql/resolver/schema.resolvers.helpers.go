@@ -709,7 +709,9 @@ func postsToConnection(ctx context.Context, posts []db.Post, contractID persist.
 			Node: &model.Post{
 				HelperPostData: model.HelperPostData{
 					TokenIDs: post.TokenIds,
+					AuthorID: post.ActorID,
 				},
+				CreationTime: &post.CreatedAt,
 				Dbid:         post.ID,
 				Tokens:       nil, // handled by dedicated resolver
 				Caption:      caption,
@@ -1281,9 +1283,11 @@ func feedEntityToModel(event any) (model.FeedEventOrError, error) {
 		return &model.Post{
 			HelperPostData: model.HelperPostData{
 				TokenIDs: event.TokenIds,
+				AuthorID: event.ActorID,
 			},
-			Dbid:    event.ID,
-			Caption: captionVal,
+			CreationTime: &event.CreatedAt,
+			Dbid:         event.ID,
+			Caption:      captionVal,
 		}, nil
 	case db.FeedEvent:
 		var groupID sql.NullString
@@ -1591,9 +1595,11 @@ func postToModel(event *db.Post) (*model.Post, error) {
 	return &model.Post{
 		HelperPostData: model.HelperPostData{
 			TokenIDs: event.TokenIds,
+			AuthorID: event.ActorID,
 		},
-		Dbid:    event.ID,
-		Caption: captionVal,
+		Dbid:         event.ID,
+		CreationTime: &event.CreatedAt,
+		Caption:      captionVal,
 	}, nil
 
 }

@@ -1623,6 +1623,100 @@ func (b *GetGalleryByIdBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getGalleryTokenMediasByGalleryIDBatch = `-- name: GetGalleryTokenMediasByGalleryIDBatch :batchmany
+with picked_content as (
+	select t.id, t.token_media_id
+	from galleries g, collections c, tokens t, token_medias tm
+	where
+		g.id = $1
+		and c.id = any(g.collections[:8])
+		and t.id = any(c.nfts[:8])
+		and t.token_media_id = tm.id
+		and not g.deleted
+		and not c.deleted
+		and not t.deleted
+		and not tm.deleted
+		and tm.active
+		and (length(tm.media ->> 'thumbnail_url'::varchar) > 0 or length(tm.media ->> 'media_url'::varchar) > 0)
+	order by array_position(g.collections, c.id) , array_position(c.nfts, t.id)
+)
+select tm.id, tm.created_at, tm.last_updated, tm.version, tm.contract_id, tm.token_id, tm.chain, tm.active, tm.metadata, tm.media, tm.name, tm.description, tm.processing_job_id, tm.deleted
+from picked_content, token_medias tm, token_ownership tko
+where
+	picked_content.token_media_id = tm.id
+	and picked_content.id = tko.token_id and (tko.is_creator or tko.is_holder)
+limit 4
+`
+
+type GetGalleryTokenMediasByGalleryIDBatchBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+func (q *Queries) GetGalleryTokenMediasByGalleryIDBatch(ctx context.Context, id []persist.DBID) *GetGalleryTokenMediasByGalleryIDBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range id {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(getGalleryTokenMediasByGalleryIDBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetGalleryTokenMediasByGalleryIDBatchBatchResults{br, len(id), false}
+}
+
+func (b *GetGalleryTokenMediasByGalleryIDBatchBatchResults) Query(f func(int, []TokenMedia, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var items []TokenMedia
+		if b.closed {
+			if f != nil {
+				f(t, items, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		err := func() error {
+			rows, err := b.br.Query()
+			defer rows.Close()
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var i TokenMedia
+				if err := rows.Scan(
+					&i.ID,
+					&i.CreatedAt,
+					&i.LastUpdated,
+					&i.Version,
+					&i.ContractID,
+					&i.TokenID,
+					&i.Chain,
+					&i.Active,
+					&i.Metadata,
+					&i.Media,
+					&i.Name,
+					&i.Description,
+					&i.ProcessingJobID,
+					&i.Deleted,
+				); err != nil {
+					return err
+				}
+				items = append(items, i)
+			}
+			return rows.Err()
+		}()
+		if f != nil {
+			f(t, items, err)
+		}
+	}
+}
+
+func (b *GetGalleryTokenMediasByGalleryIDBatchBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const getMediaByTokenID = `-- name: GetMediaByTokenID :batchone
 select m.id, m.created_at, m.last_updated, m.version, m.contract_id, m.token_id, m.chain, m.active, m.metadata, m.media, m.name, m.description, m.processing_job_id, m.deleted
 from token_medias m
@@ -4137,99 +4231,6 @@ func (b *PaginateInteractionsByPostIDBatchBatchResults) Query(f func(int, []Pagi
 }
 
 func (b *PaginateInteractionsByPostIDBatchBatchResults) Close() error {
-	b.closed = true
-	return b.br.Close()
-}
-
-const paginatePostsByContractID = `-- name: PaginatePostsByContractID :batchmany
-SELECT posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted
-FROM posts
-WHERE $1 = ANY(posts.contract_ids)
-AND posts.deleted = false
-AND (posts.created_at, posts.id) < ($2, $3)
-AND (posts.created_at, posts.id) > ($4, $5)
-ORDER BY 
-    CASE WHEN $6::bool THEN (posts.created_at, posts.id) END ASC,
-    CASE WHEN NOT $6::bool THEN (posts.created_at, posts.id) END DESC
-LIMIT $7
-`
-
-type PaginatePostsByContractIDBatchResults struct {
-	br     pgx.BatchResults
-	tot    int
-	closed bool
-}
-
-type PaginatePostsByContractIDParams struct {
-	ContractID    persist.DBID `json:"contract_id"`
-	CurBeforeTime time.Time    `json:"cur_before_time"`
-	CurBeforeID   persist.DBID `json:"cur_before_id"`
-	CurAfterTime  time.Time    `json:"cur_after_time"`
-	CurAfterID    persist.DBID `json:"cur_after_id"`
-	PagingForward bool         `json:"paging_forward"`
-	Limit         int32        `json:"limit"`
-}
-
-func (q *Queries) PaginatePostsByContractID(ctx context.Context, arg []PaginatePostsByContractIDParams) *PaginatePostsByContractIDBatchResults {
-	batch := &pgx.Batch{}
-	for _, a := range arg {
-		vals := []interface{}{
-			a.ContractID,
-			a.CurBeforeTime,
-			a.CurBeforeID,
-			a.CurAfterTime,
-			a.CurAfterID,
-			a.PagingForward,
-			a.Limit,
-		}
-		batch.Queue(paginatePostsByContractID, vals...)
-	}
-	br := q.db.SendBatch(ctx, batch)
-	return &PaginatePostsByContractIDBatchResults{br, len(arg), false}
-}
-
-func (b *PaginatePostsByContractIDBatchResults) Query(f func(int, []Post, error)) {
-	defer b.br.Close()
-	for t := 0; t < b.tot; t++ {
-		var items []Post
-		if b.closed {
-			if f != nil {
-				f(t, items, ErrBatchAlreadyClosed)
-			}
-			continue
-		}
-		err := func() error {
-			rows, err := b.br.Query()
-			defer rows.Close()
-			if err != nil {
-				return err
-			}
-			for rows.Next() {
-				var i Post
-				if err := rows.Scan(
-					&i.ID,
-					&i.Version,
-					&i.TokenIds,
-					&i.ContractIds,
-					&i.ActorID,
-					&i.Caption,
-					&i.CreatedAt,
-					&i.LastUpdated,
-					&i.Deleted,
-				); err != nil {
-					return err
-				}
-				items = append(items, i)
-			}
-			return rows.Err()
-		}()
-		if f != nil {
-			f(t, items, err)
-		}
-	}
-}
-
-func (b *PaginatePostsByContractIDBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }

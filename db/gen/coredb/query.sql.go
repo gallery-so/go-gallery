@@ -2194,58 +2194,6 @@ func (q *Queries) GetGalleryIDByCollectionID(ctx context.Context, id persist.DBI
 	return gallery_id, err
 }
 
-const getGalleryTokenMediasByGalleryID = `-- name: GetGalleryTokenMediasByGalleryID :many
-select m.id, m.created_at, m.last_updated, m.version, m.contract_id, m.token_id, m.chain, m.active, m.metadata, m.media, m.name, m.description, m.processing_job_id, m.deleted from collections c, galleries g, token_medias m, users u, tokens t
-    left join contract_creators cc on t.contract = cc.contract_id
-    where g.id = $1 and c.id = any(g.collections) and t.id = any(c.nfts)
-      and u.id = g.owner_user_id
-      and ((cc.creator_user_id = u.id) or (t.owned_by_wallets && u.wallets))
-      and t.deleted = false and g.deleted = false and c.deleted = false
-      and (length(m.media->>'thumbnail_url'::varchar) > 0 or length(m.media->>'media_url'::varchar) > 0)
-      and t.token_media_id = m.id and m.deleted = false and m.active
-    order by array_position(g.collections, c.id),array_position(c.nfts, t.id) limit $2
-`
-
-type GetGalleryTokenMediasByGalleryIDParams struct {
-	ID    persist.DBID `json:"id"`
-	Limit int32        `json:"limit"`
-}
-
-func (q *Queries) GetGalleryTokenMediasByGalleryID(ctx context.Context, arg GetGalleryTokenMediasByGalleryIDParams) ([]TokenMedia, error) {
-	rows, err := q.db.Query(ctx, getGalleryTokenMediasByGalleryID, arg.ID, arg.Limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []TokenMedia
-	for rows.Next() {
-		var i TokenMedia
-		if err := rows.Scan(
-			&i.ID,
-			&i.CreatedAt,
-			&i.LastUpdated,
-			&i.Version,
-			&i.ContractID,
-			&i.TokenID,
-			&i.Chain,
-			&i.Active,
-			&i.Metadata,
-			&i.Media,
-			&i.Name,
-			&i.Description,
-			&i.ProcessingJobID,
-			&i.Deleted,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getLastFeedEventForCollection = `-- name: GetLastFeedEventForCollection :one
 select id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption, group_id from feed_events where deleted = false
     and owner_id = $1
@@ -2363,73 +2311,6 @@ func (q *Queries) GetLastFeedEventForUser(ctx context.Context, arg GetLastFeedEv
 		&i.GroupID,
 	)
 	return i, err
-}
-
-const getLatestFeedEntities = `-- name: GetLatestFeedEntities :many
-select fe.id, fe.feed_entity_type, fe.created_at, count(distinct c.id) + count(distinct a.id) interactions
-from feed_entities fe
-left join comments c on case
-    when fe.feed_entity_type = $1 then fe.id = c.feed_event_id
-    when fe.feed_entity_type = $2 then fe.id = c.post_id
-    else 0 = 1 end
-    and not c.deleted
-left join admires a on case
-    when fe.feed_entity_type = $1 then fe.id = a.feed_event_id
-    when fe.feed_entity_type = $2 then fe.id = a.post_id
-    else 0 = 1 end
-    and not a.deleted
-left join feed_events e on fe.feed_entity_type = $1 and fe.id = e.id
-where fe.created_at >= $3
-    and case when fe.feed_entity_type = $1
-        then not (e.action = any($4::varchar[]))
-        else 1 = 1
-        end
-group by fe.id, fe.feed_entity_type, fe.created_at
-order by fe.created_at desc
-`
-
-type GetLatestFeedEntitiesParams struct {
-	FeedEntityType      int32     `json:"feed_entity_type"`
-	PostEntityType      int32     `json:"post_entity_type"`
-	WindowEnd           time.Time `json:"window_end"`
-	ExcludedFeedActions []string  `json:"excluded_feed_actions"`
-}
-
-type GetLatestFeedEntitiesRow struct {
-	ID             persist.DBID `json:"id"`
-	FeedEntityType int32        `json:"feed_entity_type"`
-	CreatedAt      time.Time    `json:"created_at"`
-	Interactions   int32        `json:"interactions"`
-}
-
-func (q *Queries) GetLatestFeedEntities(ctx context.Context, arg GetLatestFeedEntitiesParams) ([]GetLatestFeedEntitiesRow, error) {
-	rows, err := q.db.Query(ctx, getLatestFeedEntities,
-		arg.FeedEntityType,
-		arg.PostEntityType,
-		arg.WindowEnd,
-		arg.ExcludedFeedActions,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetLatestFeedEntitiesRow
-	for rows.Next() {
-		var i GetLatestFeedEntitiesRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.FeedEntityType,
-			&i.CreatedAt,
-			&i.Interactions,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const getMembershipByMembershipId = `-- name: GetMembershipByMembershipId :one
@@ -4132,6 +4013,74 @@ func (q *Queries) GetUsersByPositionPaginate(ctx context.Context, arg GetUsersBy
 	return items, nil
 }
 
+const getUsersByWalletAddressesAndChains = `-- name: GetUsersByWalletAddressesAndChains :many
+WITH params AS (
+    SELECT unnest($1::varchar[]) as address, unnest($2::int[]) as chain
+)
+SELECT wallets.id, wallets.created_at, wallets.last_updated, wallets.deleted, wallets.version, wallets.address, wallets.wallet_type, wallets.chain, users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id
+FROM wallets 
+JOIN users ON wallets.id = any(users.wallets)
+JOIN params ON wallets.address = params.address AND wallets.chain = params.chain
+WHERE not wallets.deleted AND not users.deleted and not users.universal
+`
+
+type GetUsersByWalletAddressesAndChainsParams struct {
+	WalletAddresses []string `json:"wallet_addresses"`
+	Chains          []int32  `json:"chains"`
+}
+
+type GetUsersByWalletAddressesAndChainsRow struct {
+	Wallet Wallet `json:"wallet"`
+	User   User   `json:"user"`
+}
+
+func (q *Queries) GetUsersByWalletAddressesAndChains(ctx context.Context, arg GetUsersByWalletAddressesAndChainsParams) ([]GetUsersByWalletAddressesAndChainsRow, error) {
+	rows, err := q.db.Query(ctx, getUsersByWalletAddressesAndChains, arg.WalletAddresses, arg.Chains)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetUsersByWalletAddressesAndChainsRow
+	for rows.Next() {
+		var i GetUsersByWalletAddressesAndChainsRow
+		if err := rows.Scan(
+			&i.Wallet.ID,
+			&i.Wallet.CreatedAt,
+			&i.Wallet.LastUpdated,
+			&i.Wallet.Deleted,
+			&i.Wallet.Version,
+			&i.Wallet.Address,
+			&i.Wallet.WalletType,
+			&i.Wallet.Chain,
+			&i.User.ID,
+			&i.User.Deleted,
+			&i.User.Version,
+			&i.User.LastUpdated,
+			&i.User.CreatedAt,
+			&i.User.Username,
+			&i.User.UsernameIdempotent,
+			&i.User.Wallets,
+			&i.User.Bio,
+			&i.User.Traits,
+			&i.User.Universal,
+			&i.User.NotificationSettings,
+			&i.User.EmailVerified,
+			&i.User.EmailUnsubscriptions,
+			&i.User.FeaturedGallery,
+			&i.User.PrimaryWalletID,
+			&i.User.UserExperiences,
+			&i.User.ProfileImageID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getUsersWithEmailNotificationsOn = `-- name: GetUsersWithEmailNotificationsOn :many
 select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, pii_email_address, pii_socials from pii.user_view
     where (email_unsubscriptions->>'all' = 'false' or email_unsubscriptions->>'all' is null)
@@ -4998,69 +4947,6 @@ func (q *Queries) IsFeedUserActionBlocked(ctx context.Context, arg IsFeedUserAct
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
-}
-
-const paginateFeedEntities = `-- name: PaginateFeedEntities :many
-select feed_entities.id, feed_entities.feed_entity_type, feed_entities.created_at, feed_entities.actor_id
-from feed_entities
-join unnest($1::text[]) with ordinality t(id, pos) using(id)
-where 
-    feed_entities.id = t.id
-    and t.pos > $2::int
-    and t.pos < $3::int
-    and case when $4::bool then t.pos > $5::int
-            when not $4::bool then t.pos <= $5::int end
-    -- and case when @paging_forward::bool then t.pos > @upper_bound::int
-    --         when not @paging_forward::bool then t.pos < @lower_bound::int end
-order by case when $4::bool then t.pos end desc,
-    case when not $4::bool then t.pos end asc
-`
-
-type PaginateFeedEntitiesParams struct {
-	FeedEntityIds []string `json:"feed_entity_ids"`
-	CurBeforePos  int32    `json:"cur_before_pos"`
-	CurAfterPos   int32    `json:"cur_after_pos"`
-	PagingForward bool     `json:"paging_forward"`
-	LimitPos      int32    `json:"limit_pos"`
-}
-
-// with t as (
-//
-//	select foo, pos
-//	from unnest(@feed_entity_ids::text[]) with ordinality as t(foo, pos)
-//
-// )
-// select feed_entities.*
-// from feed_entities join unnest(@feed_entity_ids::text[]) with ordinality t(id, pos) using(id)
-func (q *Queries) PaginateFeedEntities(ctx context.Context, arg PaginateFeedEntitiesParams) ([]FeedEntity, error) {
-	rows, err := q.db.Query(ctx, paginateFeedEntities,
-		arg.FeedEntityIds,
-		arg.CurBeforePos,
-		arg.CurAfterPos,
-		arg.PagingForward,
-		arg.LimitPos,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []FeedEntity
-	for rows.Next() {
-		var i FeedEntity
-		if err := rows.Scan(
-			&i.ID,
-			&i.FeedEntityType,
-			&i.CreatedAt,
-			&i.ActorID,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const paginateGlobalFeed = `-- name: PaginateGlobalFeed :many

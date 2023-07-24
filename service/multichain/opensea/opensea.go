@@ -257,7 +257,7 @@ func (p *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, owner
 		defer close(assetsChan)
 		streamAssetsForContractAddressAndOwner(ctx, persist.EthereumAddress(owner), persist.EthereumAddress(address), assetsChan)
 	}()
-	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient, p.chain)
+	tokens, contracts, err := assetsToTokens(ctx, owner, assetsChan, p.ethClient, p.chain)
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
@@ -286,7 +286,7 @@ func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, ti multichai
 	return tokens, contract, nil
 }
 
-func (p *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (p *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
@@ -911,7 +911,7 @@ func paginateAssets(req *http.Request, outCh chan assetsReceieved) {
 func setPagingParams(url *url.URL) {
 	query := url.Query()
 	query.Set("order_direction", "desc")
-	query.Set("limit", "50")
+	query.Set("limit", "200")
 	url.RawQuery = query.Encode()
 }
 

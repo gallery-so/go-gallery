@@ -147,6 +147,7 @@ type HelperEnsProfileImageData struct {
 
 type HelperPostData struct {
 	TokenIDs persist.DBIDList
+	AuthorID persist.DBID
 }
 
 type ErrInvalidIDFormat struct {

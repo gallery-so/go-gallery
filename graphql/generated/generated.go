@@ -862,8 +862,10 @@ type ComplexityRoot struct {
 
 	Post struct {
 		Admires      func(childComplexity int, before *string, after *string, first *int, last *int) int
+		Author       func(childComplexity int) int
 		Caption      func(childComplexity int) int
 		Comments     func(childComplexity int, before *string, after *string, first *int, last *int) int
+		CreationTime func(childComplexity int) int
 		Dbid         func(childComplexity int) int
 		ID           func(childComplexity int) int
 		Interactions func(childComplexity int, before *string, after *string, first *int, last *int) int
@@ -951,6 +953,7 @@ type ComplexityRoot struct {
 		GlobalFeed                 func(childComplexity int, before *string, after *string, first *int, last *int) int
 		MembershipTiers            func(childComplexity int, forceRefresh *bool) int
 		Node                       func(childComplexity int, id model.GqlID) int
+		PostByID                   func(childComplexity int, id persist.DBID) int
 		SearchCommunities          func(childComplexity int, query string, limit *int, nameWeight *float64, descriptionWeight *float64, poapAddressWeight *float64) int
 		SearchGalleries            func(childComplexity int, query string, limit *int, nameWeight *float64, descriptionWeight *float64) int
 		SearchUsers                func(childComplexity int, query string, limit *int, usernameWeight *float64, bioWeight *float64) int
@@ -1664,6 +1667,8 @@ type OwnerAtBlockResolver interface {
 	Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error)
 }
 type PostResolver interface {
+	Author(ctx context.Context, obj *model.Post) (*model.GalleryUser, error)
+
 	Tokens(ctx context.Context, obj *model.Post) ([]*model.Token, error)
 
 	Admires(ctx context.Context, obj *model.Post, before *string, after *string, first *int, last *int) (*model.PostAdmiresConnection, error)
@@ -1692,6 +1697,7 @@ type QueryResolver interface {
 	GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
 	TrendingFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
 	FeedEventByID(ctx context.Context, id persist.DBID) (model.FeedEventByIDOrError, error)
+	PostByID(ctx context.Context, id persist.DBID) (model.PostOrError, error)
 	GetMerchTokens(ctx context.Context, wallet persist.Address) (model.MerchTokensPayloadOrError, error)
 	GalleryByID(ctx context.Context, id persist.DBID) (model.GalleryByIDPayloadOrError, error)
 	ViewerGalleryByID(ctx context.Context, id persist.DBID) (model.ViewerGalleryByIDPayloadOrError, error)
@@ -5184,6 +5190,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Post.Admires(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
+	case "Post.author":
+		if e.complexity.Post.Author == nil {
+			break
+		}
+
+		return e.complexity.Post.Author(childComplexity), true
+
 	case "Post.caption":
 		if e.complexity.Post.Caption == nil {
 			break
@@ -5202,6 +5215,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Post.Comments(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
+
+	case "Post.creationTime":
+		if e.complexity.Post.CreationTime == nil {
+			break
+		}
+
+		return e.complexity.Post.CreationTime(childComplexity), true
 
 	case "Post.dbid":
 		if e.complexity.Post.Dbid == nil {
@@ -5593,6 +5613,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.Node(childComplexity, args["id"].(model.GqlID)), true
+
+	case "Query.postById":
+		if e.complexity.Query.PostByID == nil {
+			break
+		}
+
+		args, err := ec.field_Query_postById_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.PostByID(childComplexity, args["id"].(persist.DBID)), true
 
 	case "Query.searchCommunities":
 		if e.complexity.Query.SearchCommunities == nil {
@@ -8535,6 +8567,9 @@ type Post implements Node @key(fields: "dbid") @goEmbedHelper {
   id: ID!
   dbid: DBID!
 
+  author: GalleryUser @goField(forceResolver: true)
+  creationTime: Time
+
   tokens: [Token] @goField(forceResolver: true)
 
   caption: String
@@ -8815,6 +8850,7 @@ type Query {
   # Paging forward i.e. providing the ` + "`" + `first` + "`" + ` argument will return events in order of descending popularity.
   trendingFeed(before: String, after: String, first: Int, last: Int): FeedConnection
   feedEventById(id: DBID!): FeedEventByIdOrError
+  postById(id: DBID!): PostOrError
   getMerchTokens(wallet: Address!): MerchTokensPayloadOrError
   galleryById(id: DBID!): GalleryByIdPayloadOrError
   viewerGalleryById(id: DBID!): ViewerGalleryByIdPayloadOrError
@@ -12255,6 +12291,21 @@ func (ec *executionContext) field_Query_node_args(ctx context.Context, rawArgs m
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_postById_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.DBID
+	if tmp, ok := rawArgs["id"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Query_searchCommunities_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -13832,6 +13883,10 @@ func (ec *executionContext) fieldContext_AdmirePostPayload_post(ctx context.Cont
 				return ec.fieldContext_Post_id(ctx, field)
 			case "dbid":
 				return ec.fieldContext_Post_dbid(ctx, field)
+			case "author":
+				return ec.fieldContext_Post_author(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Post_creationTime(ctx, field)
 			case "tokens":
 				return ec.fieldContext_Post_tokens(ctx, field)
 			case "caption":
@@ -17882,6 +17937,10 @@ func (ec *executionContext) fieldContext_CommentOnPostPayload_post(ctx context.C
 				return ec.fieldContext_Post_id(ctx, field)
 			case "dbid":
 				return ec.fieldContext_Post_dbid(ctx, field)
+			case "author":
+				return ec.fieldContext_Post_author(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Post_creationTime(ctx, field)
 			case "tokens":
 				return ec.fieldContext_Post_tokens(ctx, field)
 			case "caption":
@@ -20866,6 +20925,10 @@ func (ec *executionContext) fieldContext_Entity_findPostByDbid(ctx context.Conte
 				return ec.fieldContext_Post_id(ctx, field)
 			case "dbid":
 				return ec.fieldContext_Post_dbid(ctx, field)
+			case "author":
+				return ec.fieldContext_Post_author(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Post_creationTime(ctx, field)
 			case "tokens":
 				return ec.fieldContext_Post_tokens(ctx, field)
 			case "caption":
@@ -35603,6 +35666,138 @@ func (ec *executionContext) fieldContext_Post_dbid(ctx context.Context, field gr
 	return fc, nil
 }
 
+func (ec *executionContext) _Post_author(ctx context.Context, field graphql.CollectedField, obj *model.Post) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Post_author(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Post().Author(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.GalleryUser)
+	fc.Result = res
+	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Post_author(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Post",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_GalleryUser_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_GalleryUser_dbid(ctx, field)
+			case "username":
+				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
+			case "bio":
+				return ec.fieldContext_GalleryUser_bio(ctx, field)
+			case "traits":
+				return ec.fieldContext_GalleryUser_traits(ctx, field)
+			case "universal":
+				return ec.fieldContext_GalleryUser_universal(ctx, field)
+			case "roles":
+				return ec.fieldContext_GalleryUser_roles(ctx, field)
+			case "socialAccounts":
+				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
+			case "tokens":
+				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensByChain":
+				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
+			case "wallets":
+				return ec.fieldContext_GalleryUser_wallets(ctx, field)
+			case "primaryWallet":
+				return ec.fieldContext_GalleryUser_primaryWallet(ctx, field)
+			case "featuredGallery":
+				return ec.fieldContext_GalleryUser_featuredGallery(ctx, field)
+			case "galleries":
+				return ec.fieldContext_GalleryUser_galleries(ctx, field)
+			case "badges":
+				return ec.fieldContext_GalleryUser_badges(ctx, field)
+			case "isAuthenticatedUser":
+				return ec.fieldContext_GalleryUser_isAuthenticatedUser(ctx, field)
+			case "followers":
+				return ec.fieldContext_GalleryUser_followers(ctx, field)
+			case "following":
+				return ec.fieldContext_GalleryUser_following(ctx, field)
+			case "feed":
+				return ec.fieldContext_GalleryUser_feed(ctx, field)
+			case "sharedFollowers":
+				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
+			case "sharedCommunities":
+				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Post_creationTime(ctx context.Context, field graphql.CollectedField, obj *model.Post) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Post_creationTime(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreationTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Post_creationTime(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Post",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Post_tokens(ctx context.Context, field graphql.CollectedField, obj *model.Post) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Post_tokens(ctx, field)
 	if err != nil {
@@ -36102,6 +36297,10 @@ func (ec *executionContext) fieldContext_PostAdmireEdge_post(ctx context.Context
 				return ec.fieldContext_Post_id(ctx, field)
 			case "dbid":
 				return ec.fieldContext_Post_dbid(ctx, field)
+			case "author":
+				return ec.fieldContext_Post_author(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Post_creationTime(ctx, field)
 			case "tokens":
 				return ec.fieldContext_Post_tokens(ctx, field)
 			case "caption":
@@ -36366,6 +36565,10 @@ func (ec *executionContext) fieldContext_PostCommentEdge_post(ctx context.Contex
 				return ec.fieldContext_Post_id(ctx, field)
 			case "dbid":
 				return ec.fieldContext_Post_dbid(ctx, field)
+			case "author":
+				return ec.fieldContext_Post_author(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Post_creationTime(ctx, field)
 			case "tokens":
 				return ec.fieldContext_Post_tokens(ctx, field)
 			case "caption":
@@ -36803,6 +37006,10 @@ func (ec *executionContext) fieldContext_PostInteractionsEdge_post(ctx context.C
 				return ec.fieldContext_Post_id(ctx, field)
 			case "dbid":
 				return ec.fieldContext_Post_dbid(ctx, field)
+			case "author":
+				return ec.fieldContext_Post_author(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Post_creationTime(ctx, field)
 			case "tokens":
 				return ec.fieldContext_Post_tokens(ctx, field)
 			case "caption":
@@ -36865,6 +37072,10 @@ func (ec *executionContext) fieldContext_PostTokensPayload_post(ctx context.Cont
 				return ec.fieldContext_Post_id(ctx, field)
 			case "dbid":
 				return ec.fieldContext_Post_dbid(ctx, field)
+			case "author":
+				return ec.fieldContext_Post_author(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Post_creationTime(ctx, field)
 			case "tokens":
 				return ec.fieldContext_Post_tokens(ctx, field)
 			case "caption":
@@ -38493,6 +38704,58 @@ func (ec *executionContext) fieldContext_Query_feedEventById(ctx context.Context
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_postById(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_postById(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().PostByID(rctx, fc.Args["id"].(persist.DBID))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.PostOrError)
+	fc.Result = res
+	return ec.marshalOPostOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_postById(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type PostOrError does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_postById_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_getMerchTokens(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Query_getMerchTokens(ctx, field)
 	if err != nil {
@@ -39908,6 +40171,10 @@ func (ec *executionContext) fieldContext_RemoveAdmirePayload_post(ctx context.Co
 				return ec.fieldContext_Post_id(ctx, field)
 			case "dbid":
 				return ec.fieldContext_Post_dbid(ctx, field)
+			case "author":
+				return ec.fieldContext_Post_author(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Post_creationTime(ctx, field)
 			case "tokens":
 				return ec.fieldContext_Post_tokens(ctx, field)
 			case "caption":
@@ -40091,6 +40358,10 @@ func (ec *executionContext) fieldContext_RemoveCommentPayload_post(ctx context.C
 				return ec.fieldContext_Post_id(ctx, field)
 			case "dbid":
 				return ec.fieldContext_Post_dbid(ctx, field)
+			case "author":
+				return ec.fieldContext_Post_author(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Post_creationTime(ctx, field)
 			case "tokens":
 				return ec.fieldContext_Post_tokens(ctx, field)
 			case "caption":
@@ -42071,6 +42342,10 @@ func (ec *executionContext) fieldContext_SomeoneAdmiredYourPostNotification_post
 				return ec.fieldContext_Post_id(ctx, field)
 			case "dbid":
 				return ec.fieldContext_Post_dbid(ctx, field)
+			case "author":
+				return ec.fieldContext_Post_author(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Post_creationTime(ctx, field)
 			case "tokens":
 				return ec.fieldContext_Post_tokens(ctx, field)
 			case "caption":
@@ -42785,6 +43060,10 @@ func (ec *executionContext) fieldContext_SomeoneCommentedOnYourPostNotification_
 				return ec.fieldContext_Post_id(ctx, field)
 			case "dbid":
 				return ec.fieldContext_Post_dbid(ctx, field)
+			case "author":
+				return ec.fieldContext_Post_author(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Post_creationTime(ctx, field)
 			case "tokens":
 				return ec.fieldContext_Post_tokens(ctx, field)
 			case "caption":
@@ -64931,6 +65210,27 @@ func (ec *executionContext) _Post(ctx context.Context, sel ast.SelectionSet, obj
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&invalids, 1)
 			}
+		case "author":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Post_author(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "creationTime":
+
+			out.Values[i] = ec._Post_creationTime(ctx, field, obj)
+
 		case "tokens":
 			field := field
 
@@ -65790,6 +66090,26 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_feedEventById(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return rrm(innerCtx)
+			})
+		case "postById":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_postById(ctx, field)
 				return res
 			}
 

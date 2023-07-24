@@ -1562,6 +1562,8 @@ func (PDFMedia) IsMedia()        {}
 type Post struct {
 	HelperPostData
 	Dbid         persist.DBID                `json:"dbid"`
+	Author       *GalleryUser                `json:"author"`
+	CreationTime *time.Time                  `json:"creationTime"`
 	Tokens       []*Token                    `json:"tokens"`
 	Caption      *string                     `json:"caption"`
 	Admires      *PostAdmiresConnection      `json:"admires"`

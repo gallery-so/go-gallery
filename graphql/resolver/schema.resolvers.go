@@ -186,7 +186,7 @@ func (r *commentOnPostPayloadResolver) Comment(ctx context.Context, obj *model.C
 
 // ReplyToComment is the resolver for the replyToComment field.
 func (r *commentOnPostPayloadResolver) ReplyToComment(ctx context.Context, obj *model.CommentOnPostPayload) (*model.Comment, error) {
-	panic(fmt.Errorf("not implemented: ReplyToComment - replyToComment"))
+	return resolveCommentByCommentID(ctx, obj.ReplyToComment.Dbid)
 }
 
 // Creator is the resolver for the creator field.
@@ -249,7 +249,7 @@ func (r *communityResolver) SubCommunities(ctx context.Context, obj *model.Commu
 
 // TokensInCommunity is the resolver for the tokensInCommunity field.
 func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokensConnection, error) {
-	onlyUsers := util.GetOptionalValue(onlyGalleryUsers, false)
+	onlyUsers := util.GetOptionalValue(onlyGalleryUsers, true)
 	forceRefresh := util.GetOptionalValue(obj.ForceRefresh, false)
 
 	if !onlyUsers {
@@ -264,7 +264,7 @@ func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Co
 
 // Owners is the resolver for the owners field.
 func (r *communityResolver) Owners(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokenHoldersConnection, error) {
-	onlyUsers := util.GetOptionalValue(onlyGalleryUsers, false)
+	onlyUsers := util.GetOptionalValue(onlyGalleryUsers, true)
 	forceRefresh := util.GetOptionalValue(obj.ForceRefresh, false)
 
 	if !onlyUsers {
@@ -1886,6 +1886,11 @@ func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBloc
 	panic(fmt.Errorf("not implemented"))
 }
 
+// Author is the resolver for the author field.
+func (r *postResolver) Author(ctx context.Context, obj *model.Post) (*model.GalleryUser, error) {
+	return resolveGalleryUserByUserID(ctx, obj.AuthorID)
+}
+
 // Tokens is the resolver for the tokens field.
 func (r *postResolver) Tokens(ctx context.Context, obj *model.Post) ([]*model.Token, error) {
 	result := make([]*model.Token, len(obj.TokenIDs))
@@ -2150,6 +2155,11 @@ func (r *queryResolver) TrendingFeed(ctx context.Context, before *string, after 
 // FeedEventByID is the resolver for the feedEventById field.
 func (r *queryResolver) FeedEventByID(ctx context.Context, id persist.DBID) (model.FeedEventByIDOrError, error) {
 	return resolveFeedEventByEventID(ctx, id)
+}
+
+// PostByID is the resolver for the postById field.
+func (r *queryResolver) PostByID(ctx context.Context, id persist.DBID) (model.PostOrError, error) {
+	return resolvePostByPostID(ctx, id)
 }
 
 // GetMerchTokens is the resolver for the getMerchTokens field.

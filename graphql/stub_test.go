@@ -47,7 +47,7 @@ func (p stubProvider) GetTokensByContractAddressAndOwner(ctx context.Context, ow
 	panic("not implemented")
 }
 
-func (p stubProvider) GetTokensByTokenIdentifiersAndOwner(context.Context, multichain.ChainAgnosticIdentifiers, persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (p stubProvider) GetTokenByTokenIdentifiersAndOwner(context.Context, multichain.ChainAgnosticIdentifiers, persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	panic("not implemented")
 }
 

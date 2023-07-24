@@ -149,7 +149,7 @@ func (p *Provider) GetTokensByWalletAddress(ctx context.Context, address persist
 	return p.ownedTokensToChainAgnosticTokens(ctx, address, tokens)
 }
 
-func (p *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, tids multichain.ChainAgnosticIdentifiers, owner persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (p *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, tids multichain.ChainAgnosticIdentifiers, owner persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	owners, err := p.getOwnersPaginate(ctx, tids, "")
 	if err != nil {
 

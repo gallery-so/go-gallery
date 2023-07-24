@@ -291,38 +291,39 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 		return nil, PageInfo{}, err
 	}
 
-	var err error
-	var trendingIDs []persist.DBID
-	var paginator = positionPaginator{}
-	var idToCursorPos = make(map[persist.DBID]int)
+	var (
+		err           error
+		paginator     feedPaginator
+		entityTypes   []persist.FeedEntityType
+		entityIDs     []persist.DBID
+		entityIDToPos = make(map[persist.DBID]int)
+	)
 
-	// If a cursor is provided, we can skip querying the cache
-	if before != nil {
-		if _, trendingIDs, err = paginator.decodeCursor(*before); err != nil {
-			return nil, PageInfo{}, err
-		}
-	} else if after != nil {
-		if _, trendingIDs, err = paginator.decodeCursor(*after); err != nil {
-			return nil, PageInfo{}, err
-		}
-	} else {
-		calcFunc := func(ctx context.Context) ([]persist.DBID, error) {
-			entities, err := api.queries.GetLatestFeedEntities(ctx, db.GetLatestFeedEntitiesParams{
+	hasCursors := before != nil || after != nil
+
+	if !hasCursors {
+		calcFunc := func(ctx context.Context) ([]persist.FeedEntityType, []persist.DBID, error) {
+			trendData, err := api.queries.GetLatestFeedEntities(ctx, db.GetLatestFeedEntitiesParams{
 				WindowEnd:           time.Now().Add(-time.Duration(72 * time.Hour)),
-				FeedEntityType:      persist.FeedEventTypeTag,
-				PostEntityType:      persist.PostTypeTag,
+				FeedEventEntityType: int32(persist.FeedEventTypeTag),
+				PostEntityType:      int32(persist.PostTypeTag),
 				ExcludedFeedActions: []string{string(persist.ActionUserCreated), string(persist.ActionUserFollowedUsers)},
 			})
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 
 			h := heap{}
 			now := time.Now()
 
-			for _, e := range entities {
+			for _, event := range trendData {
+				score := timeFactor(now, event.CreatedAt) * float64(event.Interactions)
 				score := timeFactor(e.CreatedAt, now) * engagementFactor(int(e.Interactions))
-				node := heapItem{id: e.ID, score: score}
+				node := feedNode{
+					id:    event.ID,
+					score: score,
+					typ:   persist.FeedEntityType(event.FeedEntityType),
+				}
 
 				// Add first 100 numbers in the heap
 				if len(h) < 100 {
@@ -331,61 +332,67 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 				}
 
 				// If the score is greater than the smallest score in the heap, replace it
-				if score > h[0].(heapItem).score {
+				if score > h[0].(feedNode).score {
 					heappkg.Pop(&h)
 					heappkg.Push(&h, node)
 				}
 			}
 
-			trendingIDs := make([]persist.DBID, 100)
+			entityTypes = make([]persist.FeedEntityType, len(h))
+			entityIDs = make([]persist.DBID, len(h))
 
+			i := 0
 			for len(h) > 0 {
-				node := heappkg.Pop(&h).(heapItem)
-				trendingIDs = append(trendingIDs, node.id)
+				node := heappkg.Pop(&h).(feedNode)
+				entityTypes[i] = node.typ
+				entityIDs[i] = node.id
+				i++
 			}
 
-			return trendingIDs, nil
+			return entityTypes, entityIDs, nil
 		}
 
-		l := newDBIDCache(api.cache, "trending:feedEvents", time.Minute*10, calcFunc)
+		l := newFeedCache(api.cache, calcFunc)
 
-		trendingIDs, err = l.Load(ctx)
+		entityTypes, entityIDs, err = l.Load(ctx)
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
 	}
 
-	idsAsStr := make([]string, len(trendingIDs))
-	for i, id := range trendingIDs {
+	for i, id := range entityIDs {
 		// Postgres uses 1-based indexing
-		idToCursorPos[id] = i + 1
-		idsAsStr[i] = id.String()
+		entityIDToPos[id] = i + 1
 	}
 
-	queryFunc := func(params positionPagingParams) ([]any, error) {
-		var limitPos int32
+	queryFunc := func(params feedPagingParams) ([]any, error) {
+		if !hasCursors {
+			params.EntityTypes = entityTypes
+			params.EntityIDs = entityIDs
+		}
+
+		// Restrict cursors to actual size of the slice
+		curBeforePos := max(params.CurBeforePos, 0)
+		curAfterPos := min(params.CurAfterPos-1, len(params.EntityIDs))
+
 		if params.PagingForward {
-			postLen := int32(len(idsAsStr))
-			limitPos = min(postLen, params.CursorAfterPos) - params.Limit
+			// If paging forward, we extend from the after cursor up to the limit or to the before cursor, whatever is larger
+			limitPos := max(curAfterPos-int(params.Limit), curBeforePos)
+			params.EntityTypes = params.EntityTypes[limitPos:curAfterPos]
+			params.EntityIDs = params.EntityIDs[limitPos:curAfterPos]
 		} else {
-			limitPos = max(0, params.CursorBeforePos) + params.Limit
+			// If paging backwards, we extend from the before cursor up to the limit or to the after cursor, whatever is smaller
+			limitPos := min(curBeforePos+int(params.Limit), curAfterPos)
+			params.EntityTypes = params.EntityTypes[curBeforePos:limitPos]
+			params.EntityIDs = params.EntityIDs[curBeforePos:limitPos]
 		}
-		keys, err := api.queries.PaginateFeedEntities(ctx, db.PaginateFeedEntitiesParams{
-			FeedEntityIds: idsAsStr,
-			CurBeforePos:  params.CursorBeforePos,
-			CurAfterPos:   params.CursorAfterPos,
-			PagingForward: params.PagingForward,
-			LimitPos:      limitPos,
-		})
-		if err != nil {
-			return nil, err
-		}
-		return feedEntityToTypedType(ctx, api.loaders, keys)
+
+		return loadFeedEntities(ctx, api.loaders, params.EntityTypes, params.EntityIDs)
 	}
 
-	cursorFunc := func(node any) (int, []persist.DBID, error) {
+	cursorFunc := func(node any) (int, []persist.FeedEntityType, []persist.DBID, error) {
 		_, id, err := feedCursor(node)
-		return idToCursorPos[id], trendingIDs, err
+		return entityIDToPos[id], entityTypes, entityIDs, err
 	}
 
 	paginator.QueryFunc = queryFunc
@@ -577,18 +584,31 @@ func feedCursor(i interface{}) (time.Time, persist.DBID, error) {
 	return time.Time{}, "", fmt.Errorf("interface{} is not a feed entity: %T", i)
 }
 
-func feedEntityToTypedType(ctx context.Context, d *dataloader.Loaders, ids []db.FeedEntity) ([]any, error) {
+func feedEntityToTypedType(ctx context.Context, d *dataloader.Loaders, entities []db.FeedEntity) ([]any, error) {
+	idTypes := make([]persist.FeedEntityType, len(entities))
+	entityIDs := make([]persist.DBID, len(entities))
+	for i := 0; i < len(entities); i++ {
+		idTypes[i] = persist.FeedEntityType(entities[i].FeedEntityType)
+		entityIDs[i] = entities[i].ID
+	}
+	return loadFeedEntities(ctx, d, idTypes, entityIDs)
+}
+
+func loadFeedEntities(ctx context.Context, d *dataloader.Loaders, typs []persist.FeedEntityType, ids []persist.DBID) ([]any, error) {
+	if len(typs) != len(ids) {
+		panic("length of types and ids must be equal")
+	}
 	entities := make([]any, len(ids))
 	feedEventIDs := make([]persist.DBID, 0, len(ids))
 	postIDs := make([]persist.DBID, 0, len(ids))
-	for _, id := range ids {
-		switch id.FeedEntityType {
+	for i := 0; i < len(typs); i++ {
+		switch persist.FeedEntityType(typs[i]) {
 		case persist.FeedEventTypeTag:
-			feedEventIDs = append(feedEventIDs, id.ID)
+			feedEventIDs = append(feedEventIDs, ids[i])
 		case persist.PostTypeTag:
-			postIDs = append(postIDs, id.ID)
+			postIDs = append(postIDs, ids[i])
 		default:
-			return nil, fmt.Errorf("unknown feed entity type %d", id.FeedEntityType)
+			return nil, fmt.Errorf("unknown feed entity type %d", typs[i])
 		}
 	}
 
@@ -627,7 +647,7 @@ func feedEntityToTypedType(ctx context.Context, d *dataloader.Loaders, ids []db.
 			}
 
 			for j, id := range ids {
-				if it, ok := idsToFeedEvents[id.ID]; ok {
+				if it, ok := idsToFeedEvents[id]; ok {
 					entities[j] = it
 				}
 			}
@@ -638,7 +658,7 @@ func feedEntityToTypedType(ctx context.Context, d *dataloader.Loaders, ids []db.
 			}
 
 			for j, id := range ids {
-				if it, ok := idsToFeedPosts[id.ID]; ok {
+				if it, ok := idsToFeedPosts[id]; ok {
 					entities[j] = it
 				}
 			}
@@ -671,9 +691,18 @@ func engagementFactor(interactions int) float64 {
 	return 1.0 + float64(interactions)
 }
 
-type heapItem struct {
+type priorityNode interface {
+	Score() float64
+}
+
+type feedNode struct {
 	id    persist.DBID
+	typ   persist.FeedEntityType
 	score float64
+}
+
+func (f feedNode) Score() float64 {
+	return f.score
 }
 
 type heap []any
@@ -684,7 +713,7 @@ func (h *heap) Push(s any)   { *h = append(*h, s) }
 
 func (h heap) Less(i, j int) bool {
 	// We want Pop to give us the highest, not lowest, score so we use greater than here.
-	return h[i].(heapItem).score > h[j].(heapItem).score
+	return h[i].(priorityNode).Score() > h[j].(priorityNode).Score()
 }
 
 func (h *heap) Pop() any {
@@ -696,14 +725,163 @@ func (h *heap) Pop() any {
 	return item
 }
 
-func min(a, b int32) int32 {
+type feedPagingParams struct {
+	CurBeforePos  int
+	CurAfterPos   int
+	PagingForward bool
+	Limit         int
+	EntityTypes   []persist.FeedEntityType
+	EntityIDs     []persist.DBID
+}
+
+type feedPaginator struct {
+	QueryFunc  func(params feedPagingParams) ([]any, error)
+	CursorFunc func(node any) (pos int, feedEntityType []persist.FeedEntityType, ids []persist.DBID, err error)
+	CountFunc  func() (count int, err error)
+}
+
+func (p *feedPaginator) encodeCursor(pos int, typ []persist.FeedEntityType, ids []persist.DBID) (string, error) {
+	if len(typ) != len(ids) {
+		panic("type and ids must be the same length")
+	}
+	encoder := newCursorEncoder()
+	encoder.appendInt64(int64(pos))
+	encoder.appendInt64(int64(len(ids)))
+	for i := range typ {
+		encoder.appendInt64(int64(typ[i]))
+		encoder.appendDBID(ids[i])
+	}
+	return encoder.AsBase64(), nil
+}
+
+func (p *feedPaginator) decodeCursor(cursor string) (pos int, typs []persist.FeedEntityType, ids []persist.DBID, err error) {
+	decoder, err := newCursorDecoder(cursor)
+	if err != nil {
+		return 0, nil, nil, err
+	}
+
+	curPos, err := decoder.readInt64()
+	if err != nil {
+		return 0, nil, nil, err
+	}
+
+	totalItems, err := decoder.readInt64()
+	if err != nil {
+		return 0, nil, nil, err
+	}
+
+	typs = make([]persist.FeedEntityType, totalItems)
+	ids = make([]persist.DBID, totalItems)
+
+	for i := 0; i < int(totalItems); i++ {
+		typ, err := decoder.readInt64()
+		if err != nil {
+			return 0, nil, nil, err
+		}
+
+		id, err := decoder.readDBID()
+		if err != nil {
+			return 0, nil, nil, err
+		}
+
+		typs[i] = persist.FeedEntityType(typ)
+		ids[i] = id
+	}
+
+	return int(curPos), typs, ids, nil
+}
+
+func (p *feedPaginator) paginate(before, after *string, first, last *int) ([]any, PageInfo, error) {
+	queryFunc := func(limit int32, pagingForward bool) ([]any, error) {
+		args := feedPagingParams{
+			Limit:         int(limit),
+			CurBeforePos:  defaultCursorBeforePosition,
+			CurAfterPos:   defaultCursorAfterPosition,
+			PagingForward: pagingForward,
+		}
+
+		if before != nil {
+			curBeforePos, typs, ids, err := p.decodeCursor(*before)
+			if err != nil {
+				return nil, err
+			}
+			args.CurBeforePos = curBeforePos
+			args.EntityTypes = typs
+			args.EntityIDs = ids
+		}
+
+		if after != nil {
+			curAfterPos, typs, ids, err := p.decodeCursor(*after)
+			if err != nil {
+				return nil, err
+			}
+			args.CurAfterPos = curAfterPos
+			args.EntityTypes = typs
+			args.EntityIDs = ids
+		}
+
+		return p.QueryFunc(args)
+	}
+
+	cursorFunc := func(node any) (string, error) {
+		pos, typs, ids, err := p.CursorFunc(node)
+		if err != nil {
+			return "", err
+		}
+		return p.encodeCursor(pos, typs, ids)
+	}
+
+	paginator := keysetPaginator{
+		QueryFunc:  queryFunc,
+		CursorFunc: cursorFunc,
+		CountFunc:  p.CountFunc,
+	}
+
+	return paginator.paginate(before, after, first, last)
+}
+
+type feedCache struct {
+	*redis.LazyCache
+	CalcFunc func(context.Context) ([]persist.FeedEntityType, []persist.DBID, error)
+}
+
+func newFeedCache(cache *redis.Cache, f func(context.Context) ([]persist.FeedEntityType, []persist.DBID, error)) *feedCache {
+	return &feedCache{
+		LazyCache: &redis.LazyCache{
+			Cache: cache,
+			Key:   "trending:feedEvents",
+			TTL:   time.Minute * 10,
+			CalcFunc: func(ctx context.Context) ([]byte, error) {
+				types, ids, err := f(ctx)
+				if err != nil {
+					return nil, err
+				}
+				var p feedPaginator
+				b, err := p.encodeCursor(0, types, ids)
+				return []byte(b), err
+			},
+		},
+	}
+}
+
+func (f feedCache) Load(ctx context.Context) ([]persist.FeedEntityType, []persist.DBID, error) {
+	b, err := f.LazyCache.Load(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	var p feedPaginator
+	_, types, ids, err := p.decodeCursor(string(b))
+	return types, ids, err
+}
+
+func min(a, b int) int {
 	if a < b {
 		return a
 	}
 	return b
 }
 
-func max(a, b int32) int32 {
+func max(a, b int) int {
 	if a > b {
 		return a
 	}

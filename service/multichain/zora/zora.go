@@ -179,7 +179,7 @@ func (d *Provider) getTokensWithRequest(ctx context.Context, req string, owner, 
 	return tokens, contracts, nil
 }
 
-func (d *Provider) GetTokensByTokenIdentifiersAndOwner(context.Context, multichain.ChainAgnosticIdentifiers, persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetTokenByTokenIdentifiersAndOwner(context.Context, multichain.ChainAgnosticIdentifiers, persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	panic("implement me")
 }
 

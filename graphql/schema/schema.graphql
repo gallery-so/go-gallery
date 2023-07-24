@@ -904,6 +904,9 @@ type Post implements Node @key(fields: "dbid") @goEmbedHelper {
   id: ID!
   dbid: DBID!
 
+  author: GalleryUser @goField(forceResolver: true)
+  creationTime: Time
+
   tokens: [Token] @goField(forceResolver: true)
 
   caption: String
@@ -1184,6 +1187,7 @@ type Query {
   # Paging forward i.e. providing the `first` argument will return events in order of descending popularity.
   trendingFeed(before: String, after: String, first: Int, last: Int): FeedConnection
   feedEventById(id: DBID!): FeedEventByIdOrError
+  postById(id: DBID!): PostOrError
   getMerchTokens(wallet: Address!): MerchTokensPayloadOrError
   galleryById(id: DBID!): GalleryByIdPayloadOrError
   viewerGalleryById(id: DBID!): ViewerGalleryByIdPayloadOrError

@@ -9,7 +9,6 @@ import (
 	"net"
 
 	"github.com/jackc/pgtype"
-	"github.com/jackc/pgx/v4"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -469,14 +468,8 @@ func (api GalleryAPI) GetTokenPreviewsByGalleryID(ctx context.Context, galleryID
 		return nil, err
 	}
 
-	medias, err := api.queries.GetGalleryTokenMediasByGalleryID(ctx, db.GetGalleryTokenMediasByGalleryIDParams{
-		ID:    galleryID,
-		Limit: 4,
-	})
+	medias, err := api.loaders.GalleryTokenPreviewsByID.Load(galleryID)
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, nil
-		}
 		return nil, err
 	}
 
