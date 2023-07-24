@@ -30,12 +30,14 @@ const (
 	ActionCollectionUpdated               Action = "CollectionUpdated"
 	ActionGalleryUpdated                  Action = "GalleryUpdated"
 	ActionGalleryInfoUpdated              Action = "GalleryInfoUpdated"
+	ActionNewTokensReceived               Action = "NewTokensReceived"
 )
 
 type EventData struct {
 	UserBio                             string            `json:"user_bio"`
 	UserFollowedBack                    bool              `json:"user_followed_back"`
 	UserRefollowed                      bool              `json:"user_refollowed"`
+	NewTokenIDs                         DBIDList          `json:"new_token_ids"`
 	TokenCollectorsNote                 string            `json:"token_collectors_note"`
 	TokenCollectionID                   DBID              `json:"token_collection_id"`
 	CollectionTokenIDs                  DBIDList          `json:"collection_token_ids"`

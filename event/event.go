@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/mikeydub/go-gallery/env"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
@@ -58,10 +59,65 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 	sender.addDelayedHandler(notifications, persist.ActionAdmiredFeedEvent, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionViewedGallery, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionCommentedOnFeedEvent, notificationHandler)
+	sender.addDelayedHandler(notifications, persist.ActionNewTokensReceived, notificationHandler)
 
 	sender.feed = feed
 	sender.notifications = notifications
 	ctx.Set(eventSenderContextKey, &sender)
+}
+
+func DispatchEvent(ctx context.Context, evt db.Event, v *validator.Validate, caption *string) (*db.FeedEvent, error) {
+	ctx = sentryutil.NewSentryHubGinContext(ctx)
+	if err := v.Struct(evt); err != nil {
+		return nil, err
+	}
+
+	if caption != nil {
+		evt.Caption = persist.StrPtrToNullStr(caption)
+		return DispatchImmediate(ctx, []db.Event{evt})
+	}
+
+	go PushEvent(ctx, evt)
+	return nil, nil
+}
+
+func DispatchEvents(ctx context.Context, evts []db.Event, v *validator.Validate, editID *string, caption *string) (*db.FeedEvent, error) {
+
+	if len(evts) == 0 {
+		return nil, nil
+	}
+
+	ctx = sentryutil.NewSentryHubGinContext(ctx)
+	for i, evt := range evts {
+		evt.GroupID = persist.StrPtrToNullStr(editID)
+		if err := v.Struct(evt); err != nil {
+			return nil, err
+		}
+		evts[i] = evt
+	}
+
+	if caption != nil {
+		for i, evt := range evts {
+			evt.Caption = persist.StrPtrToNullStr(caption)
+			evts[i] = evt
+		}
+		return DispatchImmediate(ctx, evts)
+	}
+
+	for _, evt := range evts {
+		go PushEvent(ctx, evt)
+	}
+	return nil, nil
+}
+
+func PushEvent(ctx context.Context, evt db.Event) {
+	if hub := sentryutil.SentryHubFromContext(ctx); hub != nil {
+		sentryutil.SetEventContext(hub.Scope(), persist.NullStrToDBID(evt.ActorID), evt.SubjectID, evt.Action)
+	}
+	if err := DispatchDelayed(ctx, evt); err != nil {
+		logger.For(ctx).Error(err)
+		sentryutil.ReportError(ctx, err)
+	}
 }
 
 // DispatchDelayed sends the event to all of its registered handlers.
@@ -380,7 +436,7 @@ func (h notificationHandler) handleDelayed(ctx context.Context, persistedEvent d
 	}
 
 	// Don't notify the user on self events
-	if persist.DBID(persist.NullStrToStr(persistedEvent.ActorID)) == owner {
+	if persist.DBID(persist.NullStrToStr(persistedEvent.ActorID)) == owner && persistedEvent.Action != persist.ActionNewTokensReceived {
 		return nil
 	}
 
@@ -420,6 +476,10 @@ func (h notificationHandler) createNotificationDataForEvent(event db.Event) (dat
 		}
 		data.FollowedBack = persist.NullBool(event.Data.UserFollowedBack)
 		data.Refollowed = persist.NullBool(event.Data.UserRefollowed)
+	case persist.ActionNewTokensReceived:
+		data.NewTokenIDs = event.Data.NewTokenIDs
+	default:
+		logger.For(nil).Debugf("no notification data for event: %s", event.Action)
 	}
 	return
 }

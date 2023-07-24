@@ -7,6 +7,7 @@ type NotificationData struct {
 	AdmirerIDs        []DBID   `json:"admirer_ids,omitempty"`
 	FollowedBack      NullBool `json:"followed_back,omitempty"`
 	Refollowed        NullBool `json:"refollowed,omitempty"`
+	NewTokenIDs       []DBID   `json:"new_token_ids,omitempty"`
 }
 
 func (n NotificationData) Validate() NotificationData {
@@ -15,6 +16,7 @@ func (n NotificationData) Validate() NotificationData {
 	result.FollowerIDs = uniqueDBIDs(n.FollowerIDs)
 	result.AuthedViewerIDs = uniqueDBIDs(n.AuthedViewerIDs)
 	result.UnauthedViewerIDs = uniqueStrings(n.UnauthedViewerIDs)
+	result.NewTokenIDs = uniqueDBIDs(n.NewTokenIDs)
 
 	return result
 }
@@ -27,6 +29,7 @@ func (n NotificationData) Concat(other NotificationData) NotificationData {
 	result.UnauthedViewerIDs = append(other.UnauthedViewerIDs, n.UnauthedViewerIDs...)
 	result.FollowedBack = other.FollowedBack || n.FollowedBack
 	result.Refollowed = other.Refollowed || n.Refollowed
+	result.NewTokenIDs = append(other.NewTokenIDs, n.NewTokenIDs...)
 
 	return result.Validate()
 }

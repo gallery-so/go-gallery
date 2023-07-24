@@ -8,8 +8,10 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/sourcegraph/conc/pool"
 
@@ -178,7 +180,7 @@ func processOwnersForContractTokens(mc *multichain.Provider, contractRepo *postg
 	}
 }
 
-func processOwnersForUserTokens(mc *multichain.Provider) gin.HandlerFunc {
+func processOwnersForUserTokens(mc *multichain.Provider, validator *validator.Validate) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input task.TokenProcessingUserTokensMessage
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -187,9 +189,30 @@ func processOwnersForUserTokens(mc *multichain.Provider) gin.HandlerFunc {
 		}
 
 		logger.For(c).WithFields(logrus.Fields{"user_id": input.UserID, "total_tokens": len(input.TokenIdentifiers), "token_ids": input.TokenIdentifiers}).Infof("Processing: %s - Processing User Tokens Refresh (total: %d)", input.UserID, len(input.TokenIdentifiers))
-		if err := mc.SyncTokensByUserIDAndTokenIdentifiers(c, input.UserID, input.TokenIdentifiers); err != nil {
+		newTokens, err := mc.SyncTokensByUserIDAndTokenIdentifiers(c, input.UserID, input.TokenIdentifiers)
+		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
+		}
+
+		if len(newTokens) > 0 {
+			tokenIDs, _ := util.Map(newTokens, func(t persist.TokenGallery) (persist.DBID, error) {
+				return t.ID, nil
+			})
+			_, err = event.DispatchEvent(c, coredb.Event{
+				ID:             persist.GenerateID(),
+				ActorID:        persist.DBIDToNullStr(input.UserID),
+				ResourceTypeID: persist.ResourceTypeUser,
+				SubjectID:      input.UserID,
+				UserID:         input.UserID,
+				Action:         persist.ActionNewTokensReceived,
+				Data: persist.EventData{
+					NewTokenIDs: tokenIDs,
+				},
+			}, validator, nil)
+			if err != nil {
+				logger.For(c).Errorf("error dispatching event: %s", err)
+			}
 		}
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})

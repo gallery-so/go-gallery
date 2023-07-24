@@ -85,6 +85,14 @@ SELECT * FROM tokens WHERE id = $1 AND deleted = false;
 -- name: GetTokenByIdBatch :batchone
 SELECT * FROM tokens WHERE id = $1 AND deleted = false;
 
+-- name: GetTokensByIdsPaginate :many
+SELECT * FROM tokens WHERE id = ANY(@token_ids) AND deleted = false
+    AND (created_at, id) < (@cur_before_time, @cur_before_id)
+    AND (created_at, id) > (@cur_after_time, @cur_after_id)
+    ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
+    LIMIT $1;
+
 -- name: GetTokenByHolderIdContractAddressAndTokenIdBatch :batchone
 select t.*
 from tokens t
@@ -629,7 +637,7 @@ INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id,
 -- name: CreateCommentNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, comment_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), $6) RETURNING *;
 
--- name: CreateFollowNotification :one
+-- name: CreateSimpleNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids) VALUES ($1, $2, $3, $4, $5) RETURNING *;
 
 -- name: CreateViewGalleryNotification :one

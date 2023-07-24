@@ -123,6 +123,7 @@ func New(queries *db.Queries, pub *pubsub.Client, taskClient *cloudtasks.Client,
 	// grouped notification actions
 	notifDispatcher.AddHandler(persist.ActionUserFollowedUsers, group)
 	notifDispatcher.AddHandler(persist.ActionAdmiredFeedEvent, group)
+	notifDispatcher.AddHandler(persist.ActionNewTokensReceived, group)
 
 	// single notification actions (default)
 	notifDispatcher.AddHandler(persist.ActionCommentedOnFeedEvent, def)
@@ -616,6 +617,8 @@ func updateAndPublishNotif(ctx context.Context, notif db.Notification, mostRecen
 		amount = int32(len(resultData.AuthedViewerIDs) + len(resultData.UnauthedViewerIDs))
 	case persist.ActionUserFollowedUsers:
 		amount = int32(len(resultData.FollowerIDs))
+	case persist.ActionNewTokensReceived:
+		amount = int32(len(resultData.NewTokenIDs))
 	default:
 		amount = mostRecentNotif.Amount + notif.Amount
 	}
@@ -698,8 +701,8 @@ func addNotification(ctx context.Context, notif db.Notification, queries *db.Que
 			Post:      sql.NullString{String: notif.PostID.String(), Valid: true},
 			CommentID: notif.CommentID,
 		})
-	case persist.ActionUserFollowedUsers:
-		return queries.CreateFollowNotification(ctx, db.CreateFollowNotificationParams{
+	case persist.ActionUserFollowedUsers, persist.ActionNewTokensReceived:
+		return queries.CreateSimpleNotification(ctx, db.CreateSimpleNotificationParams{
 			ID:       id,
 			OwnerID:  notif.OwnerID,
 			Action:   notif.Action,

@@ -652,47 +652,6 @@ func (q *Queries) CreateFeedEvent(ctx context.Context, arg CreateFeedEventParams
 	return i, err
 }
 
-const createFollowNotification = `-- name: CreateFollowNotification :one
-INSERT INTO notifications (id, owner_id, action, data, event_ids) VALUES ($1, $2, $3, $4, $5) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id
-`
-
-type CreateFollowNotificationParams struct {
-	ID       persist.DBID             `json:"id"`
-	OwnerID  persist.DBID             `json:"owner_id"`
-	Action   persist.Action           `json:"action"`
-	Data     persist.NotificationData `json:"data"`
-	EventIds persist.DBIDList         `json:"event_ids"`
-}
-
-func (q *Queries) CreateFollowNotification(ctx context.Context, arg CreateFollowNotificationParams) (Notification, error) {
-	row := q.db.QueryRow(ctx, createFollowNotification,
-		arg.ID,
-		arg.OwnerID,
-		arg.Action,
-		arg.Data,
-		arg.EventIds,
-	)
-	var i Notification
-	err := row.Scan(
-		&i.ID,
-		&i.Deleted,
-		&i.OwnerID,
-		&i.Version,
-		&i.LastUpdated,
-		&i.CreatedAt,
-		&i.Action,
-		&i.Data,
-		&i.EventIds,
-		&i.FeedEventID,
-		&i.CommentID,
-		&i.GalleryID,
-		&i.Seen,
-		&i.Amount,
-		&i.PostID,
-	)
-	return i, err
-}
-
 const createGalleryEvent = `-- name: CreateGalleryEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, gallery_id, subject_id, data, external_id, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, $9) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id
 `
@@ -792,6 +751,47 @@ func (q *Queries) CreatePushTokenForUser(ctx context.Context, arg CreatePushToke
 		&i.PushToken,
 		&i.CreatedAt,
 		&i.Deleted,
+	)
+	return i, err
+}
+
+const createSimpleNotification = `-- name: CreateSimpleNotification :one
+INSERT INTO notifications (id, owner_id, action, data, event_ids) VALUES ($1, $2, $3, $4, $5) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id
+`
+
+type CreateSimpleNotificationParams struct {
+	ID       persist.DBID             `json:"id"`
+	OwnerID  persist.DBID             `json:"owner_id"`
+	Action   persist.Action           `json:"action"`
+	Data     persist.NotificationData `json:"data"`
+	EventIds persist.DBIDList         `json:"event_ids"`
+}
+
+func (q *Queries) CreateSimpleNotification(ctx context.Context, arg CreateSimpleNotificationParams) (Notification, error) {
+	row := q.db.QueryRow(ctx, createSimpleNotification,
+		arg.ID,
+		arg.OwnerID,
+		arg.Action,
+		arg.Data,
+		arg.EventIds,
+	)
+	var i Notification
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.OwnerID,
+		&i.Version,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.Action,
+		&i.Data,
+		&i.EventIds,
+		&i.FeedEventID,
+		&i.CommentID,
+		&i.GalleryID,
+		&i.Seen,
+		&i.Amount,
+		&i.PostID,
 	)
 	return i, err
 }
@@ -3383,6 +3383,80 @@ func (q *Queries) GetTokensByContractIdPaginate(ctx context.Context, arg GetToke
 		arg.CurBeforeTime,
 		arg.CurBeforeID,
 		arg.CurAfterUniversal,
+		arg.CurAfterTime,
+		arg.CurAfterID,
+		arg.PagingForward,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Token
+	for rows.Next() {
+		var i Token
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Name,
+			&i.Description,
+			&i.CollectorsNote,
+			&i.Media,
+			&i.TokenUri,
+			&i.TokenType,
+			&i.TokenID,
+			&i.Quantity,
+			&i.OwnershipHistory,
+			&i.TokenMetadata,
+			&i.ExternalUrl,
+			&i.BlockNumber,
+			&i.OwnerUserID,
+			&i.OwnedByWallets,
+			&i.Chain,
+			&i.Contract,
+			&i.IsUserMarkedSpam,
+			&i.IsProviderMarkedSpam,
+			&i.LastSynced,
+			&i.FallbackMedia,
+			&i.TokenMediaID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTokensByIdsPaginate = `-- name: GetTokensByIdsPaginate :many
+SELECT id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id FROM tokens WHERE id = ANY($2) AND deleted = false
+    AND (created_at, id) < ($3, $4)
+    AND (created_at, id) > ($5, $6)
+    ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT $7::bool THEN (created_at, id) END DESC
+    LIMIT $1
+`
+
+type GetTokensByIdsPaginateParams struct {
+	Limit         int32            `json:"limit"`
+	TokenIds      persist.DBIDList `json:"token_ids"`
+	CurBeforeTime time.Time        `json:"cur_before_time"`
+	CurBeforeID   persist.DBID     `json:"cur_before_id"`
+	CurAfterTime  time.Time        `json:"cur_after_time"`
+	CurAfterID    persist.DBID     `json:"cur_after_id"`
+	PagingForward bool             `json:"paging_forward"`
+}
+
+func (q *Queries) GetTokensByIdsPaginate(ctx context.Context, arg GetTokensByIdsPaginateParams) ([]Token, error) {
+	rows, err := q.db.Query(ctx, getTokensByIdsPaginate,
+		arg.Limit,
+		arg.TokenIds,
+		arg.CurBeforeTime,
+		arg.CurBeforeID,
 		arg.CurAfterTime,
 		arg.CurAfterID,
 		arg.PagingForward,

@@ -1863,6 +1863,11 @@ func (r *mutationResolver) GenerateQRCodeLoginToken(ctx context.Context) (model.
 	}, nil
 }
 
+// Tokens is the resolver for the tokens field.
+func (r *newTokensNotificationResolver) Tokens(ctx context.Context, obj *model.NewTokensNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationTokensConnection, error) {
+	return resolveGroupNotificationTokensConnectionByTokenIDs(ctx, obj.HelperNewTokensNotificationData.NotificationData.NewTokenIDs, before, after, first, last)
+}
+
 // Owner is the resolver for the owner field.
 func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error) {
 	panic(fmt.Errorf("not implemented"))
@@ -2815,6 +2820,11 @@ func (r *Resolver) GalleryUser() generated.GalleryUserResolver { return &gallery
 // Mutation returns generated.MutationResolver implementation.
 func (r *Resolver) Mutation() generated.MutationResolver { return &mutationResolver{r} }
 
+// NewTokensNotification returns generated.NewTokensNotificationResolver implementation.
+func (r *Resolver) NewTokensNotification() generated.NewTokensNotificationResolver {
+	return &newTokensNotificationResolver{r}
+}
+
 // OwnerAtBlock returns generated.OwnerAtBlockResolver implementation.
 func (r *Resolver) OwnerAtBlock() generated.OwnerAtBlockResolver { return &ownerAtBlockResolver{r} }
 
@@ -2958,6 +2968,7 @@ type galleryInfoUpdatedFeedEventDataResolver struct{ *Resolver }
 type galleryUpdatedFeedEventDataResolver struct{ *Resolver }
 type galleryUserResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
+type newTokensNotificationResolver struct{ *Resolver }
 type ownerAtBlockResolver struct{ *Resolver }
 type postResolver struct{ *Resolver }
 type previewURLSetResolver struct{ *Resolver }

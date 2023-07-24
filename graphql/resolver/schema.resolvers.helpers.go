@@ -124,6 +124,16 @@ var nodeFetcher = model.NodeFetcher{
 
 		return &notifConverted, nil
 	},
+	OnNewTokensNotification: func(ctx context.Context, dbid persist.DBID) (*model.NewTokensNotification, error) {
+		notif, err := resolveNotificationByID(ctx, dbid)
+		if err != nil {
+			return nil, err
+		}
+
+		notifConverted := notif.(model.NewTokensNotification)
+
+		return &notifConverted, nil
+	},
 }
 
 var defaultTokenSettings = persist.CollectionTokenSettings{}
@@ -942,6 +952,19 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 			Gallery:            nil, // handled by dedicated resolver
 			NonUserViewerCount: &nonCount,
 		}, nil
+	case persist.ActionNewTokensReceived:
+		return model.NewTokensNotification{
+			HelperNewTokensNotificationData: model.HelperNewTokensNotificationData{
+				OwnerID:          notif.OwnerID,
+				NotificationData: notif.Data,
+			},
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
+			Count:        &amount,
+			Tokens:       nil, // handled by dedicated resolver
+		}, nil
 	default:
 		return nil, fmt.Errorf("unknown notification action: %s", notif.Action)
 	}
@@ -1057,9 +1080,33 @@ func resolveGroupNotificationUsersConnectionByUserIDs(ctx context.Context, userI
 	return &model.GroupNotificationUsersConnection{
 		Edges:    edges,
 		PageInfo: pageInfoToModel(ctx, pageInfo),
-		HelperGroupNotificationUsersConnectionData: model.HelperGroupNotificationUsersConnectionData{
-			UserIDs: userIDs,
-		},
+	}, nil
+}
+
+func resolveGroupNotificationTokensConnectionByTokenIDs(ctx context.Context, TokenIDs persist.DBIDList, before *string, after *string, first *int, last *int) (*model.GroupNotificationTokensConnection, error) {
+	if len(TokenIDs) == 0 {
+		return &model.GroupNotificationTokensConnection{
+			Edges:    []*model.GroupNotificationTokenEdge{},
+			PageInfo: &model.PageInfo{},
+		}, nil
+	}
+	tokens, pageInfo, err := publicapi.For(ctx).Token.GetTokensByIDsPaginate(ctx, TokenIDs, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	edges := make([]*model.GroupNotificationTokenEdge, len(tokens))
+
+	for i, token := range tokens {
+		edges[i] = &model.GroupNotificationTokenEdge{
+			Node:   tokenToModel(ctx, token, nil),
+			Cursor: nil,
+		}
+	}
+
+	return &model.GroupNotificationTokensConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}, nil
 }
 

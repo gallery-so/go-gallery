@@ -64,6 +64,7 @@ type ResolverRoot interface {
 	GalleryUpdatedFeedEventData() GalleryUpdatedFeedEventDataResolver
 	GalleryUser() GalleryUserResolver
 	Mutation() MutationResolver
+	NewTokensNotification() NewTokensNotificationResolver
 	OwnerAtBlock() OwnerAtBlockResolver
 	Post() PostResolver
 	PreviewURLSet() PreviewURLSetResolver
@@ -644,6 +645,16 @@ type ComplexityRoot struct {
 		PreviewURLs      func(childComplexity int) int
 	}
 
+	GroupNotificationTokenEdge struct {
+		Cursor func(childComplexity int) int
+		Node   func(childComplexity int) int
+	}
+
+	GroupNotificationTokensConnection struct {
+		Edges    func(childComplexity int) int
+		PageInfo func(childComplexity int) int
+	}
+
 	GroupNotificationUserEdge struct {
 		Cursor func(childComplexity int) int
 		Node   func(childComplexity int) int
@@ -816,6 +827,16 @@ type ComplexityRoot struct {
 		VerifyEmail                     func(childComplexity int, input model.VerifyEmailInput) int
 		VerifyEmailMagicLink            func(childComplexity int, input model.VerifyEmailMagicLinkInput) int
 		ViewGallery                     func(childComplexity int, galleryID persist.DBID) int
+	}
+
+	NewTokensNotification struct {
+		Count        func(childComplexity int) int
+		CreationTime func(childComplexity int) int
+		Dbid         func(childComplexity int) int
+		ID           func(childComplexity int) int
+		Seen         func(childComplexity int) int
+		Tokens       func(childComplexity int, before *string, after *string, first *int, last *int) int
+		UpdatedTime  func(childComplexity int) int
 	}
 
 	NotificationEdge struct {
@@ -1660,6 +1681,9 @@ type MutationResolver interface {
 	UpdateUserExperience(ctx context.Context, input model.UpdateUserExperienceInput) (model.UpdateUserExperiencePayloadOrError, error)
 	MoveCollectionToGallery(ctx context.Context, input *model.MoveCollectionToGalleryInput) (model.MoveCollectionToGalleryPayloadOrError, error)
 	GenerateQRCodeLoginToken(ctx context.Context) (model.GenerateQRCodeLoginTokenPayloadOrError, error)
+}
+type NewTokensNotificationResolver interface {
+	Tokens(ctx context.Context, obj *model.NewTokensNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationTokensConnection, error)
 }
 type OwnerAtBlockResolver interface {
 	Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error)
@@ -3807,6 +3831,34 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.GltfMedia.PreviewURLs(childComplexity), true
 
+	case "GroupNotificationTokenEdge.cursor":
+		if e.complexity.GroupNotificationTokenEdge.Cursor == nil {
+			break
+		}
+
+		return e.complexity.GroupNotificationTokenEdge.Cursor(childComplexity), true
+
+	case "GroupNotificationTokenEdge.node":
+		if e.complexity.GroupNotificationTokenEdge.Node == nil {
+			break
+		}
+
+		return e.complexity.GroupNotificationTokenEdge.Node(childComplexity), true
+
+	case "GroupNotificationTokensConnection.edges":
+		if e.complexity.GroupNotificationTokensConnection.Edges == nil {
+			break
+		}
+
+		return e.complexity.GroupNotificationTokensConnection.Edges(childComplexity), true
+
+	case "GroupNotificationTokensConnection.pageInfo":
+		if e.complexity.GroupNotificationTokensConnection.PageInfo == nil {
+			break
+		}
+
+		return e.complexity.GroupNotificationTokensConnection.PageInfo(childComplexity), true
+
 	case "GroupNotificationUserEdge.cursor":
 		if e.complexity.GroupNotificationUserEdge.Cursor == nil {
 			break
@@ -5002,6 +5054,60 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.ViewGallery(childComplexity, args["galleryId"].(persist.DBID)), true
+
+	case "NewTokensNotification.count":
+		if e.complexity.NewTokensNotification.Count == nil {
+			break
+		}
+
+		return e.complexity.NewTokensNotification.Count(childComplexity), true
+
+	case "NewTokensNotification.creationTime":
+		if e.complexity.NewTokensNotification.CreationTime == nil {
+			break
+		}
+
+		return e.complexity.NewTokensNotification.CreationTime(childComplexity), true
+
+	case "NewTokensNotification.dbid":
+		if e.complexity.NewTokensNotification.Dbid == nil {
+			break
+		}
+
+		return e.complexity.NewTokensNotification.Dbid(childComplexity), true
+
+	case "NewTokensNotification.id":
+		if e.complexity.NewTokensNotification.ID == nil {
+			break
+		}
+
+		return e.complexity.NewTokensNotification.ID(childComplexity), true
+
+	case "NewTokensNotification.seen":
+		if e.complexity.NewTokensNotification.Seen == nil {
+			break
+		}
+
+		return e.complexity.NewTokensNotification.Seen(childComplexity), true
+
+	case "NewTokensNotification.tokens":
+		if e.complexity.NewTokensNotification.Tokens == nil {
+			break
+		}
+
+		args, err := ec.field_NewTokensNotification_tokens_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.NewTokensNotification.Tokens(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
+
+	case "NewTokensNotification.updatedTime":
+		if e.complexity.NewTokensNotification.UpdatedTime == nil {
+			break
+		}
+
+		return e.complexity.NewTokensNotification.UpdatedTime(childComplexity), true
 
 	case "NotificationEdge.cursor":
 		if e.complexity.NotificationEdge.Cursor == nil {
@@ -9422,8 +9528,18 @@ type GroupNotificationUserEdge {
   cursor: String
 }
 
-type GroupNotificationUsersConnection @goEmbedHelper {
+type GroupNotificationUsersConnection {
   edges: [GroupNotificationUserEdge]
+  pageInfo: PageInfo
+}
+
+type GroupNotificationTokenEdge {
+  node: Token
+  cursor: String
+}
+
+type GroupNotificationTokensConnection {
+  edges: [GroupNotificationTokenEdge]
   pageInfo: PageInfo
 }
 
@@ -9528,6 +9644,18 @@ type SomeoneViewedYourGalleryNotification implements Notification & Node & Group
   # count of unique non-user viewers
   nonUserViewerCount: Int
   gallery: Gallery @goField(forceResolver: true)
+}
+
+type NewTokensNotification implements Notification & Node & GroupedNotification @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+  count: Int
+
+  tokens(before: String, after: String, first: Int, last: Int): GroupNotificationTokensConnection
+    @goField(forceResolver: true)
 }
 
 type ClearAllNotificationsPayload {
@@ -11879,6 +12007,48 @@ func (ec *executionContext) field_Mutation_viewGallery_args(ctx context.Context,
 		}
 	}
 	args["galleryId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_NewTokensNotification_tokens_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *string
+	if tmp, ok := rawArgs["before"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
+		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["before"] = arg0
+	var arg1 *string
+	if tmp, ok := rawArgs["after"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
+		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["after"] = arg1
+	var arg2 *int
+	if tmp, ok := rawArgs["first"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
+		arg2, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["first"] = arg2
+	var arg3 *int
+	if tmp, ok := rawArgs["last"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("last"))
+		arg3, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["last"] = arg3
 	return args, nil
 }
 
@@ -27116,6 +27286,246 @@ func (ec *executionContext) fieldContext_GltfMedia_fallbackMedia(ctx context.Con
 	return fc, nil
 }
 
+func (ec *executionContext) _GroupNotificationTokenEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.GroupNotificationTokenEdge) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_GroupNotificationTokenEdge_node(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Node, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Token)
+	fc.Result = res
+	return ec.marshalOToken2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐToken(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_GroupNotificationTokenEdge_node(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GroupNotificationTokenEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Token_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Token_dbid(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Token_creationTime(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Token_lastUpdated(ctx, field)
+			case "collectorsNote":
+				return ec.fieldContext_Token_collectorsNote(ctx, field)
+			case "media":
+				return ec.fieldContext_Token_media(ctx, field)
+			case "tokenType":
+				return ec.fieldContext_Token_tokenType(ctx, field)
+			case "chain":
+				return ec.fieldContext_Token_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Token_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Token_description(ctx, field)
+			case "tokenId":
+				return ec.fieldContext_Token_tokenId(ctx, field)
+			case "quantity":
+				return ec.fieldContext_Token_quantity(ctx, field)
+			case "owner":
+				return ec.fieldContext_Token_owner(ctx, field)
+			case "ownedByWallets":
+				return ec.fieldContext_Token_ownedByWallets(ctx, field)
+			case "ownershipHistory":
+				return ec.fieldContext_Token_ownershipHistory(ctx, field)
+			case "ownerIsHolder":
+				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
+			case "ownerIsCreator":
+				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "tokenMetadata":
+				return ec.fieldContext_Token_tokenMetadata(ctx, field)
+			case "contract":
+				return ec.fieldContext_Token_contract(ctx, field)
+			case "community":
+				return ec.fieldContext_Token_community(ctx, field)
+			case "externalUrl":
+				return ec.fieldContext_Token_externalUrl(ctx, field)
+			case "blockNumber":
+				return ec.fieldContext_Token_blockNumber(ctx, field)
+			case "isSpamByUser":
+				return ec.fieldContext_Token_isSpamByUser(ctx, field)
+			case "isSpamByProvider":
+				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
+			case "creatorAddress":
+				return ec.fieldContext_Token_creatorAddress(ctx, field)
+			case "openseaCollectionName":
+				return ec.fieldContext_Token_openseaCollectionName(ctx, field)
+			case "openseaId":
+				return ec.fieldContext_Token_openseaId(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Token", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GroupNotificationTokenEdge_cursor(ctx context.Context, field graphql.CollectedField, obj *model.GroupNotificationTokenEdge) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_GroupNotificationTokenEdge_cursor(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Cursor, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_GroupNotificationTokenEdge_cursor(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GroupNotificationTokenEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GroupNotificationTokensConnection_edges(ctx context.Context, field graphql.CollectedField, obj *model.GroupNotificationTokensConnection) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_GroupNotificationTokensConnection_edges(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Edges, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.GroupNotificationTokenEdge)
+	fc.Result = res
+	return ec.marshalOGroupNotificationTokenEdge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGroupNotificationTokenEdge(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_GroupNotificationTokensConnection_edges(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GroupNotificationTokensConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "node":
+				return ec.fieldContext_GroupNotificationTokenEdge_node(ctx, field)
+			case "cursor":
+				return ec.fieldContext_GroupNotificationTokenEdge_cursor(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type GroupNotificationTokenEdge", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GroupNotificationTokensConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *model.GroupNotificationTokensConnection) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_GroupNotificationTokensConnection_pageInfo(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PageInfo, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.PageInfo)
+	fc.Result = res
+	return ec.marshalOPageInfo2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPageInfo(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_GroupNotificationTokensConnection_pageInfo(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GroupNotificationTokensConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "total":
+				return ec.fieldContext_PageInfo_total(ctx, field)
+			case "size":
+				return ec.fieldContext_PageInfo_size(ctx, field)
+			case "hasPreviousPage":
+				return ec.fieldContext_PageInfo_hasPreviousPage(ctx, field)
+			case "hasNextPage":
+				return ec.fieldContext_PageInfo_hasNextPage(ctx, field)
+			case "startCursor":
+				return ec.fieldContext_PageInfo_startCursor(ctx, field)
+			case "endCursor":
+				return ec.fieldContext_PageInfo_endCursor(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PageInfo", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _GroupNotificationUserEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.GroupNotificationUserEdge) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_GroupNotificationUserEdge_node(ctx, field)
 	if err != nil {
@@ -34416,6 +34826,316 @@ func (ec *executionContext) fieldContext_Mutation_generateQRCodeLoginToken(ctx c
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type GenerateQRCodeLoginTokenPayloadOrError does not have child fields")
 		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NewTokensNotification_id(ctx context.Context, field graphql.CollectedField, obj *model.NewTokensNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_NewTokensNotification_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID(), nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.GqlID)
+	fc.Result = res
+	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_NewTokensNotification_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NewTokensNotification",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NewTokensNotification_dbid(ctx context.Context, field graphql.CollectedField, obj *model.NewTokensNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_NewTokensNotification_dbid(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dbid, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(persist.DBID)
+	fc.Result = res
+	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_NewTokensNotification_dbid(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NewTokensNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DBID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NewTokensNotification_seen(ctx context.Context, field graphql.CollectedField, obj *model.NewTokensNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_NewTokensNotification_seen(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Seen, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_NewTokensNotification_seen(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NewTokensNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NewTokensNotification_creationTime(ctx context.Context, field graphql.CollectedField, obj *model.NewTokensNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_NewTokensNotification_creationTime(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreationTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_NewTokensNotification_creationTime(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NewTokensNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NewTokensNotification_updatedTime(ctx context.Context, field graphql.CollectedField, obj *model.NewTokensNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_NewTokensNotification_updatedTime(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UpdatedTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_NewTokensNotification_updatedTime(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NewTokensNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NewTokensNotification_count(ctx context.Context, field graphql.CollectedField, obj *model.NewTokensNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_NewTokensNotification_count(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Count, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*int)
+	fc.Result = res
+	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_NewTokensNotification_count(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NewTokensNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NewTokensNotification_tokens(ctx context.Context, field graphql.CollectedField, obj *model.NewTokensNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_NewTokensNotification_tokens(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.NewTokensNotification().Tokens(rctx, obj, fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.GroupNotificationTokensConnection)
+	fc.Result = res
+	return ec.marshalOGroupNotificationTokensConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGroupNotificationTokensConnection(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_NewTokensNotification_tokens(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NewTokensNotification",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "edges":
+				return ec.fieldContext_GroupNotificationTokensConnection_edges(ctx, field)
+			case "pageInfo":
+				return ec.fieldContext_GroupNotificationTokensConnection_pageInfo(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type GroupNotificationTokensConnection", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_NewTokensNotification_tokens_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
 	}
 	return fc, nil
 }
@@ -57312,6 +58032,13 @@ func (ec *executionContext) _GroupedNotification(ctx context.Context, sel ast.Se
 			return graphql.Null
 		}
 		return ec._SomeoneViewedYourGalleryNotification(ctx, sel, obj)
+	case model.NewTokensNotification:
+		return ec._NewTokensNotification(ctx, sel, &obj)
+	case *model.NewTokensNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._NewTokensNotification(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -57835,6 +58562,13 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 			return graphql.Null
 		}
 		return ec._SomeoneViewedYourGalleryNotification(ctx, sel, obj)
+	case model.NewTokensNotification:
+		return ec._NewTokensNotification(ctx, sel, &obj)
+	case *model.NewTokensNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._NewTokensNotification(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -57898,6 +58632,13 @@ func (ec *executionContext) _Notification(ctx context.Context, sel ast.Selection
 			return graphql.Null
 		}
 		return ec._SomeoneViewedYourGalleryNotification(ctx, sel, obj)
+	case model.NewTokensNotification:
+		return ec._NewTokensNotification(ctx, sel, &obj)
+	case *model.NewTokensNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._NewTokensNotification(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -63721,6 +64462,64 @@ func (ec *executionContext) _GltfMedia(ctx context.Context, sel ast.SelectionSet
 	return out
 }
 
+var groupNotificationTokenEdgeImplementors = []string{"GroupNotificationTokenEdge"}
+
+func (ec *executionContext) _GroupNotificationTokenEdge(ctx context.Context, sel ast.SelectionSet, obj *model.GroupNotificationTokenEdge) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, groupNotificationTokenEdgeImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("GroupNotificationTokenEdge")
+		case "node":
+
+			out.Values[i] = ec._GroupNotificationTokenEdge_node(ctx, field, obj)
+
+		case "cursor":
+
+			out.Values[i] = ec._GroupNotificationTokenEdge_cursor(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var groupNotificationTokensConnectionImplementors = []string{"GroupNotificationTokensConnection"}
+
+func (ec *executionContext) _GroupNotificationTokensConnection(ctx context.Context, sel ast.SelectionSet, obj *model.GroupNotificationTokensConnection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, groupNotificationTokensConnectionImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("GroupNotificationTokensConnection")
+		case "edges":
+
+			out.Values[i] = ec._GroupNotificationTokensConnection_edges(ctx, field, obj)
+
+		case "pageInfo":
+
+			out.Values[i] = ec._GroupNotificationTokensConnection_pageInfo(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var groupNotificationUserEdgeImplementors = []string{"GroupNotificationUserEdge"}
 
 func (ec *executionContext) _GroupNotificationUserEdge(ctx context.Context, sel ast.SelectionSet, obj *model.GroupNotificationUserEdge) graphql.Marshaler {
@@ -64734,6 +65533,74 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 				return ec._Mutation_generateQRCodeLoginToken(ctx, field)
 			})
 
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var newTokensNotificationImplementors = []string{"NewTokensNotification", "Notification", "Node", "GroupedNotification"}
+
+func (ec *executionContext) _NewTokensNotification(ctx context.Context, sel ast.SelectionSet, obj *model.NewTokensNotification) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, newTokensNotificationImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("NewTokensNotification")
+		case "id":
+
+			out.Values[i] = ec._NewTokensNotification_id(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "dbid":
+
+			out.Values[i] = ec._NewTokensNotification_dbid(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "seen":
+
+			out.Values[i] = ec._NewTokensNotification_seen(ctx, field, obj)
+
+		case "creationTime":
+
+			out.Values[i] = ec._NewTokensNotification_creationTime(ctx, field, obj)
+
+		case "updatedTime":
+
+			out.Values[i] = ec._NewTokensNotification_updatedTime(ctx, field, obj)
+
+		case "count":
+
+			out.Values[i] = ec._NewTokensNotification_count(ctx, field, obj)
+
+		case "tokens":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._NewTokensNotification_tokens(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -72702,6 +73569,61 @@ func (ec *executionContext) unmarshalOGnosisSafeAuth2ᚖgithubᚗcomᚋmikeydub�
 	}
 	res, err := ec.unmarshalInputGnosisSafeAuth(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOGroupNotificationTokenEdge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGroupNotificationTokenEdge(ctx context.Context, sel ast.SelectionSet, v []*model.GroupNotificationTokenEdge) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalOGroupNotificationTokenEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGroupNotificationTokenEdge(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	return ret
+}
+
+func (ec *executionContext) marshalOGroupNotificationTokenEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGroupNotificationTokenEdge(ctx context.Context, sel ast.SelectionSet, v *model.GroupNotificationTokenEdge) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._GroupNotificationTokenEdge(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOGroupNotificationTokensConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGroupNotificationTokensConnection(ctx context.Context, sel ast.SelectionSet, v *model.GroupNotificationTokensConnection) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._GroupNotificationTokensConnection(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOGroupNotificationUserEdge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGroupNotificationUserEdge(ctx context.Context, sel ast.SelectionSet, v []*model.GroupNotificationUserEdge) graphql.Marshaler {

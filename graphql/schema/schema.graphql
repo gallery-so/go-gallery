@@ -1773,8 +1773,18 @@ type GroupNotificationUserEdge {
   cursor: String
 }
 
-type GroupNotificationUsersConnection @goEmbedHelper {
+type GroupNotificationUsersConnection {
   edges: [GroupNotificationUserEdge]
+  pageInfo: PageInfo
+}
+
+type GroupNotificationTokenEdge {
+  node: Token
+  cursor: String
+}
+
+type GroupNotificationTokensConnection {
+  edges: [GroupNotificationTokenEdge]
   pageInfo: PageInfo
 }
 
@@ -1879,6 +1889,18 @@ type SomeoneViewedYourGalleryNotification implements Notification & Node & Group
   # count of unique non-user viewers
   nonUserViewerCount: Int
   gallery: Gallery @goField(forceResolver: true)
+}
+
+type NewTokensNotification implements Notification & Node & GroupedNotification @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+  count: Int
+
+  tokens(before: String, after: String, first: Int, last: Int): GroupNotificationTokensConnection
+    @goField(forceResolver: true)
 }
 
 type ClearAllNotificationsPayload {
