@@ -291,12 +291,15 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 
 	var (
 		err           error
+		paginator     feedPaginator
 		entityTypes   []persist.FeedEntityType
 		entityIDs     []persist.DBID
 		entityIDToPos = make(map[persist.DBID]int)
 	)
 
-	if before == nil && after == nil {
+	hasCursors := before != nil || after != nil
+
+	if !hasCursors {
 		calcFunc := func(ctx context.Context) ([]persist.FeedEntityType, []persist.DBID, error) {
 			trendData, err := api.queries.GetLatestFeedEntities(ctx, db.GetLatestFeedEntitiesParams{
 				WindowEnd:           time.Now().Add(-time.Duration(72 * time.Hour)),
@@ -360,8 +363,7 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 	}
 
 	queryFunc := func(params feedPagingParams) ([]any, error) {
-		// Check if no cursors are provided and update params with data from the cache
-		if len(params.EntityTypes) == 0 {
+		if !hasCursors {
 			params.EntityTypes = entityTypes
 			params.EntityIDs = entityIDs
 		}
@@ -390,7 +392,6 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 		return entityIDToPos[id], entityTypes, entityIDs, err
 	}
 
-	var paginator feedPaginator
 	paginator.QueryFunc = queryFunc
 	paginator.CursorFunc = cursorFunc
 	return paginator.paginate(before, after, first, last)
