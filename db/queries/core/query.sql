@@ -417,12 +417,6 @@ ORDER BY
     CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
 LIMIT sqlc.arg('limit');
 
--- name: PaginateTrendingFeed :many
-select *
-from feed_entities join unnest(@feed_entity_ids::text[]) with ordinality t(id, pos) using(id)
-order by case when @paging_forward::bool then t.pos end desc,
-    case when not @paging_forward::bool then t.pos end asc;
-
 -- name: PaginatePostsByContractID :batchmany
 SELECT posts.*
 FROM posts

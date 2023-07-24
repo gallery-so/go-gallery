@@ -47,8 +47,6 @@ sql:
         output_models_file_name: 'models_gen.go'
         emit_json_tags: true
         overrides:
-          - db_type: 'feed_entity'
-            go_type: 'github.com/mikeydub/go-gallery/service/persist.FeedEntity'
           # Overrides are prioritized from top to bottom, so if we need to override one of the * entries (like *.id),
           # the override should come _before_ the * entry
           # Users (and pii.user_view)
