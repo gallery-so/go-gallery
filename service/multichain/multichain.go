@@ -632,8 +632,9 @@ func (p *Provider) processTokensForOwnersOfContract(ctx context.Context, contrac
 	}
 
 	persistedTokens, err := p.Repos.TokenRepository.BulkUpsertTokensOfContract(ctx, contractID, tokensToUpsert, postgres.UpsertOptions{
-		UpsertingCreatorTokens: false,
-		SkipDelete:             false,
+		SetHolderFields:  true,
+		SetCreatorFields: false,
+		SkipDelete:       false,
 	})
 	if err != nil {
 		return err
@@ -671,24 +672,27 @@ func (p *Provider) processTokensForOwnersOfContract(ctx context.Context, contrac
 // AddHolderTokensToUser will append to a user's existing holder tokens
 func (p *Provider) AddHolderTokensToUser(ctx context.Context, tokensFromProviders []chainTokens, contracts []persist.ContractGallery, user persist.User, chains []persist.Chain) ([]persist.TokenGallery, error) {
 	return p.processTokensForUser(ctx, tokensFromProviders, contracts, user, chains, postgres.UpsertOptions{
-		UpsertingCreatorTokens: false,
-		SkipDelete:             true,
+		SetHolderFields:  true,
+		SetCreatorFields: false,
+		SkipDelete:       true,
 	})
 }
 
 // ReplaceCreatorTokensForUser will replace a user's existing creator tokens with the new tokens
 func (p *Provider) ReplaceCreatorTokensForUser(ctx context.Context, tokensFromProviders []chainTokens, contracts []persist.ContractGallery, user persist.User, chains []persist.Chain) ([]persist.TokenGallery, error) {
 	return p.processTokensForUser(ctx, tokensFromProviders, contracts, user, chains, postgres.UpsertOptions{
-		UpsertingCreatorTokens: true,
-		SkipDelete:             false,
+		SetHolderFields:  false,
+		SetCreatorFields: true,
+		SkipDelete:       false,
 	})
 }
 
 // ReplaceHolderTokensForUser will replace a user's existing holder tokens with the new tokens
 func (p *Provider) ReplaceHolderTokensForUser(ctx context.Context, tokensFromProviders []chainTokens, contracts []persist.ContractGallery, user persist.User, chains []persist.Chain) ([]persist.TokenGallery, error) {
 	return p.processTokensForUser(ctx, tokensFromProviders, contracts, user, chains, postgres.UpsertOptions{
-		UpsertingCreatorTokens: false,
-		SkipDelete:             false,
+		SetHolderFields:  true,
+		SetCreatorFields: false,
+		SkipDelete:       false,
 	})
 }
 
@@ -1434,6 +1438,7 @@ func tokensToNewDedupedTokens(tokens []chainTokens, contracts []persist.Contract
 	seenQuantities := make(map[persist.TokenIdentifiers]persist.HexString)
 	addressToWallets := make(map[string]persist.Wallet)
 	tokenDBIDToAddress := make(map[persist.DBID]persist.Address)
+	createdContracts := make(map[persist.Address]bool)
 
 	for _, wallet := range ownerUser.Wallets {
 		// could a normalized address ever overlap with the normalized address of another chain?
@@ -1445,6 +1450,32 @@ func tokensToNewDedupedTokens(tokens []chainTokens, contracts []persist.Contract
 		return tokens[i].priority < tokens[j].priority
 	})
 
+	for _, contract := range contracts {
+		// If the contract has an override creator, use that to determine whether this user is the contract's creator
+		contractAddress := persist.Address(contract.Chain.NormalizeAddress(contract.Address))
+		if contract.OverrideCreatorUserID != "" {
+			createdContracts[contractAddress] = contract.OverrideCreatorUserID == ownerUser.ID
+			continue
+		}
+
+		// If the contract doesn't have an override creator, use the first non-empty value in
+		// (ownerAddress, creatorAddress) to determine the creator address. If this user
+		// has a wallet matching the creator address, they're the creator of the contract.
+		creatorAddress := contract.OwnerAddress
+		if creatorAddress == "" {
+			creatorAddress = contract.CreatorAddress
+		}
+
+		if wallet, ok := addressToWallets[contract.Chain.NormalizeAddress(creatorAddress)]; ok {
+			// TODO: Figure out the implication for L2 chains here. Might want a function like
+			// Chain.IsCompatibleWith(Chain) to determine whether a wallet on one chain can claim
+			// ownership of a contract on a different chain.
+			createdContracts[contractAddress] = wallet.Chain == contract.Chain
+		} else {
+			createdContracts[contractAddress] = false
+		}
+	}
+
 	for _, chainToken := range tokens {
 		for _, token := range chainToken.tokens {
 
@@ -1455,6 +1486,7 @@ func tokensToNewDedupedTokens(tokens []chainTokens, contracts []persist.Contract
 			ti := persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID, chainToken.chain)
 			existingToken, seen := seenTokens[ti]
 
+			contractAddress := chainToken.chain.NormalizeAddress(token.ContractAddress)
 			candidateToken := persist.TokenGallery{
 				TokenType:            token.TokenType,
 				Chain:                chainToken.chain,
@@ -1465,10 +1497,11 @@ func tokensToNewDedupedTokens(tokens []chainTokens, contracts []persist.Contract
 				OwnerUserID:          ownerUser.ID,
 				FallbackMedia:        token.FallbackMedia,
 				TokenMetadata:        token.TokenMetadata,
-				Contract:             addressToDBID[chainToken.chain.NormalizeAddress(token.ContractAddress)],
+				Contract:             addressToDBID[contractAddress],
 				ExternalURL:          persist.NullString(token.ExternalURL),
 				BlockNumber:          token.BlockNumber,
 				IsProviderMarkedSpam: token.IsSpam,
+				IsCreatorToken:       createdContracts[persist.Address(contractAddress)],
 			}
 
 			// If we've never seen the incoming token before, then add it.

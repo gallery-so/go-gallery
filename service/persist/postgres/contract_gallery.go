@@ -170,6 +170,8 @@ func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, pContracts 
 		(*c).CreationTime = upserted[i].CreatedAt
 		(*c).CreatorAddress = upserted[i].CreatorAddress
 		(*c).ParentID = upserted[i].ParentID
+		(*c).OwnerAddress = upserted[i].OwnerAddress
+		(*c).OverrideCreatorUserID = upserted[i].OverrideCreatorUserID
 	}
 
 	return contracts, nil

@@ -464,6 +464,8 @@ type Token struct {
 	LastSynced           time.Time                  `json:"last_synced"`
 	FallbackMedia        persist.FallbackMedia      `json:"fallback_media"`
 	TokenMediaID         persist.DBID               `json:"token_media_id"`
+	IsCreatorToken       bool                       `json:"is_creator_token"`
+	IsHolderToken        bool                       `json:"is_holder_token"`
 }
 
 type TokenMedia struct {
