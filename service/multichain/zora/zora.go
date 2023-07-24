@@ -339,7 +339,7 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 		return multichain.ChainAgnosticContract{}, fmt.Errorf("no contract found for address %s", addr.String())
 	}
 
-	return d.contractToChainAgnostic(ctx, resp.Collections.Nodes[0])
+	return d.contractToChainAgnostic(ctx, resp.Collections.Nodes[0]), nil
 
 }
 
@@ -416,12 +416,7 @@ func (d *Provider) tokensToChainAgnostic(ctx context.Context, tokens []token, ow
 			continue
 		}
 
-		contract, err := d.contractToChainAgnostic(ctx, token.TokenContract)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		contracts[token.TokenContract.CollectionAddress] = contract
+		contracts[token.TokenContract.CollectionAddress] = d.contractToChainAgnostic(ctx, token.TokenContract)
 
 	}
 
@@ -431,11 +426,8 @@ func (d *Provider) tokensToChainAgnostic(ctx context.Context, tokens []token, ow
 
 }
 
-func (d *Provider) contractToChainAgnostic(ctx context.Context, contract tokenContract) (multichain.ChainAgnosticContract, error) {
-	creator, err := d.getContractCreator(ctx, persist.Address(strings.ToLower(contract.CollectionAddress)))
-	if err != nil {
-		return multichain.ChainAgnosticContract{}, err
-	}
+func (d *Provider) contractToChainAgnostic(ctx context.Context, contract tokenContract) multichain.ChainAgnosticContract {
+	creator, _ := d.getContractCreator(ctx, persist.Address(strings.ToLower(contract.CollectionAddress)))
 
 	return multichain.ChainAgnosticContract{
 		Descriptors: multichain.ChainAgnosticContractDescriptors{
@@ -445,7 +437,7 @@ func (d *Provider) contractToChainAgnostic(ctx context.Context, contract tokenCo
 			CreatorAddress: creator,
 		},
 		Address: persist.Address(strings.ToLower(contract.CollectionAddress)),
-	}, nil
+	}
 }
 
 func (d *Provider) getContractCreator(ctx context.Context, address persist.Address) (persist.Address, error) {
