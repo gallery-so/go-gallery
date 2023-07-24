@@ -5126,43 +5126,6 @@ func (q *Queries) PaginatePersonalFeedByUserID(ctx context.Context, arg Paginate
 	return items, nil
 }
 
-const paginateTrendingFeed = `-- name: PaginateTrendingFeed :many
-select id, feed_entity_type, created_at, actor_id
-from feed_entities join unnest($1::text[]) with ordinality t(id, pos) using(id)
-order by case when $2::bool then t.pos end desc,
-    case when not $2::bool then t.pos end asc
-`
-
-type PaginateTrendingFeedParams struct {
-	FeedEntityIds []string `json:"feed_entity_ids"`
-	PagingForward bool     `json:"paging_forward"`
-}
-
-func (q *Queries) PaginateTrendingFeed(ctx context.Context, arg PaginateTrendingFeedParams) ([]FeedEntity, error) {
-	rows, err := q.db.Query(ctx, paginateTrendingFeed, arg.FeedEntityIds, arg.PagingForward)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []FeedEntity
-	for rows.Next() {
-		var i FeedEntity
-		if err := rows.Scan(
-			&i.ID,
-			&i.FeedEntityType,
-			&i.CreatedAt,
-			&i.ActorID,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const paginateUserFeedByUserID = `-- name: PaginateUserFeedByUserID :many
 SELECT id, feed_entity_type, created_at, actor_id from feed_entities
 WHERE actor_id = $1

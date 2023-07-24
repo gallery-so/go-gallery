@@ -643,9 +643,7 @@ func (p *feedPaginator) paginate(before, after *string, first, last *int) ([]any
 		}
 
 		if before != nil {
-			now := time.Now()
 			curBeforePos, typs, ids, err := p.decodeCursor(*before)
-			fmt.Printf("took %s to decode cursor\n", time.Since(now))
 			if err != nil {
 				return nil, err
 			}
