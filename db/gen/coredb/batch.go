@@ -4234,3 +4234,96 @@ func (b *PaginateInteractionsByPostIDBatchBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }
+
+const paginatePostsByContractID = `-- name: PaginatePostsByContractID :batchmany
+SELECT posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted
+FROM posts
+WHERE $1 = ANY(posts.contract_ids)
+AND posts.deleted = false
+AND (posts.created_at, posts.id) < ($2, $3)
+AND (posts.created_at, posts.id) > ($4, $5)
+ORDER BY
+    CASE WHEN $6::bool THEN (posts.created_at, posts.id) END ASC,
+    CASE WHEN NOT $6::bool THEN (posts.created_at, posts.id) END DESC
+LIMIT $7
+`
+
+type PaginatePostsByContractIDBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type PaginatePostsByContractIDParams struct {
+	ContractID    persist.DBID `json:"contract_id"`
+	CurBeforeTime time.Time    `json:"cur_before_time"`
+	CurBeforeID   persist.DBID `json:"cur_before_id"`
+	CurAfterTime  time.Time    `json:"cur_after_time"`
+	CurAfterID    persist.DBID `json:"cur_after_id"`
+	PagingForward bool         `json:"paging_forward"`
+	Limit         int32        `json:"limit"`
+}
+
+func (q *Queries) PaginatePostsByContractID(ctx context.Context, arg []PaginatePostsByContractIDParams) *PaginatePostsByContractIDBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.ContractID,
+			a.CurBeforeTime,
+			a.CurBeforeID,
+			a.CurAfterTime,
+			a.CurAfterID,
+			a.PagingForward,
+			a.Limit,
+		}
+		batch.Queue(paginatePostsByContractID, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &PaginatePostsByContractIDBatchResults{br, len(arg), false}
+}
+
+func (b *PaginatePostsByContractIDBatchResults) Query(f func(int, []Post, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var items []Post
+		if b.closed {
+			if f != nil {
+				f(t, items, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		err := func() error {
+			rows, err := b.br.Query()
+			defer rows.Close()
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var i Post
+				if err := rows.Scan(
+					&i.ID,
+					&i.Version,
+					&i.TokenIds,
+					&i.ContractIds,
+					&i.ActorID,
+					&i.Caption,
+					&i.CreatedAt,
+					&i.LastUpdated,
+					&i.Deleted,
+				); err != nil {
+					return err
+				}
+				items = append(items, i)
+			}
+			return rows.Err()
+		}()
+		if f != nil {
+			f(t, items, err)
+		}
+	}
+}
+
+func (b *PaginatePostsByContractIDBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}

@@ -303,7 +303,7 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 
 	if !hasCursors {
 		calcFunc := func(ctx context.Context) ([]persist.FeedEntityType, []persist.DBID, error) {
-			trendData, err := api.queries.GetLatestFeedEntities(ctx, db.GetLatestFeedEntitiesParams{
+			trendData, err := api.queries.FeedEntityScoring(ctx, db.FeedEntityScoringParams{
 				WindowEnd:           time.Now().Add(-time.Duration(72 * time.Hour)),
 				FeedEventEntityType: int32(persist.FeedEventTypeTag),
 				PostEntityType:      int32(persist.PostTypeTag),
@@ -317,8 +317,7 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 			now := time.Now()
 
 			for _, event := range trendData {
-				score := timeFactor(now, event.CreatedAt) * float64(event.Interactions)
-				score := timeFactor(e.CreatedAt, now) * engagementFactor(int(e.Interactions))
+				score := timeFactor(event.CreatedAt, now) * engagementFactor(int(event.Interactions))
 				node := feedNode{
 					id:    event.ID,
 					score: score,
@@ -344,6 +343,8 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 			i := 0
 			for len(h) > 0 {
 				node := heappkg.Pop(&h).(feedNode)
+				// Postgres uses 1-based indexing
+				entityIDToPos[node.id] = i + 1
 				entityTypes[i] = node.typ
 				entityIDs[i] = node.id
 				i++
@@ -358,11 +359,6 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
-	}
-
-	for i, id := range entityIDs {
-		// Postgres uses 1-based indexing
-		entityIDToPos[id] = i + 1
 	}
 
 	queryFunc := func(params feedPagingParams) ([]any, error) {
@@ -412,131 +408,97 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, userID persist.DBID, before,
 		return nil, PageInfo{}, err
 	}
 
-	now := time.Now()
-	entities, err := api.queries.EntityScoring(ctx, db.EntityScoringParams{
-		PostEntityType:      persist.PostTypeTag,
-		FeedEventEntityType: persist.FeedEventTypeTag,
-		WindowEnd:           time.Now().Add(-time.Duration(30 * 24 * time.Hour)),
-	})
-	if err != nil {
-		return nil, PageInfo{}, err
-	}
+	var (
+		paginator     feedPaginator
+		entityTypes   []persist.FeedEntityType
+		entityIDs     []persist.DBID
+		entityIDToPos = make(map[persist.DBID]int)
+	)
 
-	h := heap{}
-	now = time.Now()
+	hasCursors := before != nil || after != nil
 
-	var paginator = positionPaginator{}
-	var idToCursorPos = make(map[persist.DBID]int)
-
-	for _, e := range entities {
-		scoreN := time.Now()
-		score := scorePost(ctx, userID, e, now, int(e.Interactions))
-		fmt.Println("scorePost took", time.Since(scoreN), "score", score)
-		node := heapItem{id: e.ID, score: score}
-		// Push the first 100 entities into the heap
-		if len(h) < 100 {
-			heappkg.Push(&h, heapItem{id: e.ID, score: score})
-			continue
-		}
-		// If the score is greater than the smallest score in the heap, replace it
-		if score > h[0].(heapItem).score {
-			heappkg.Pop(&h)
-			heappkg.Push(&h, node)
-		}
-	}
-
-	fmt.Println("heap took", time.Since(now))
-
-	topPosts := make([]persist.DBID, len(h))
-	topPostsAsStr := make([]string, len(h))
-
-	i := 0
-	for len(h) > 0 {
-		node := heappkg.Pop(&h).(heapItem)
-		fmt.Println("node", node.id, node.score)
-		// Postgres uses 1-based indexing
-		idToCursorPos[node.id] = i + 1
-		topPosts[i] = node.id
-		topPostsAsStr[i] = node.id.String()
-		i++
-	}
-
-	queryFunc := func(params positionPagingParams) ([]any, error) {
-		var limitPos int32
-		if params.PagingForward {
-			postLen := int32(len(topPostsAsStr))
-			limitPos = min(postLen, params.CursorAfterPos) - params.Limit
-			// limitPos := min(int32(len(topPostsAsStr)), params.CursorAfterPos+params.Limit)
-			// limitPos = int32(len(topPostsAsStr))
-			// if params.CursorAfterPos < limitPos {
-			// 	limitPos = params.CursorAfterPos
-			// }
-			// limitPos -= params.Limit
-		} else {
-			limitPos = max(0, params.CursorBeforePos) + params.Limit
-		}
-		// fmt.Println("len", len(topPostsAsStr))
-		// var ub int32 = int32(len(topPostsAsStr))
-		// if params.CursorAfterPos < ub {
-		// 	ub = params.CursorAfterPos
-		// }
-
-		// fmt.Println("ub before", ub)
-
-		// var lb int32 = 0
-		// if params.CursorBeforePos > lb {
-		// 	lb = params.CursorBeforePos
-		// }
-		// fmt.Println("lb before", lb)
-
-		// ub -= params.Limit
-		// lb += params.Limit
-
-		keys, err := api.queries.PaginateFeedEntities(ctx, db.PaginateFeedEntitiesParams{
-			FeedEntityIds: topPostsAsStr,
-			CurBeforePos:  params.CursorBeforePos,
-			CurAfterPos:   params.CursorAfterPos,
-			PagingForward: params.PagingForward,
-			LimitPos:      limitPos,
+	if !hasCursors {
+		trendData, err := api.queries.FeedEntityScoring(ctx, db.FeedEntityScoringParams{
+			WindowEnd:           time.Now().Add(-time.Duration(72 * time.Hour)),
+			PostEntityType:      int32(persist.PostTypeTag),
+			FeedEventEntityType: int32(persist.FeedEventTypeTag),
+			ExcludedFeedActions: []string{string(persist.ActionUserCreated), string(persist.ActionUserFollowedUsers)},
 		})
-
-		fmt.Println("curbefore", params.CursorBeforePos)
-		fmt.Println("curafter", params.CursorAfterPos)
-		fmt.Println("limitpos", limitPos)
-		fmt.Println("PagingForward", params.PagingForward)
-		// keys, err := api.queries.PaginateFeedEntities(ctx, db.PaginateFeedEntitiesParams{
-		// 	FeedEntityIds: topPostsAsStr,
-		// 	CurBeforePos:  params.CursorBeforePos,
-		// 	CurAfterPos:   params.CursorAfterPos,
-		// 	PagingForward: params.PagingForward,
-		// 	UpperBound:    ub,
-		// 	LowerBound:    lb,
-		// })
-		// fmt.Printf("ids %+v\n", topPostsAsStr)
-		// fmt.Printf("cur before %+v\n", params.CursorBeforePos)
-		// fmt.Printf("cur after %+v\n", params.CursorAfterPos)
-		// fmt.Printf("paging forward %+v\n", params.PagingForward)
-		// fmt.Printf("limit %+v\n", params.Limit)
-		// fmt.Printf("ub %+v\n", ub)
-		// fmt.Printf("lb %+v\n", lb)
-
 		if err != nil {
-			return nil, err
+			return nil, PageInfo{}, err
 		}
-		return feedEntityToTypedType(ctx, api.loaders, keys)
+
+		h := heap{}
+		now := time.Now()
+
+		for _, event := range trendData {
+			score := scorePost(ctx, userID, event, now, int(event.Interactions))
+			node := feedNode{
+				id:    event.ID,
+				score: score,
+				typ:   persist.FeedEntityType(event.FeedEntityType),
+			}
+
+			// Add first 100 numbers in the heap
+			if len(h) < 100 {
+				heappkg.Push(&h, node)
+				continue
+			}
+
+			// If the score is greater than the smallest score in the heap, replace it
+			if score > h[0].(feedNode).score {
+				heappkg.Pop(&h)
+				heappkg.Push(&h, node)
+			}
+		}
+
+		entityTypes = make([]persist.FeedEntityType, len(h))
+		entityIDs = make([]persist.DBID, len(h))
+
+		i := 0
+		for len(h) > 0 {
+			node := heappkg.Pop(&h).(feedNode)
+			// Postgres uses 1-based indexing
+			entityIDToPos[node.id] = i + 1
+			entityTypes[i] = node.typ
+			entityIDs[i] = node.id
+			i++
+		}
 	}
 
-	cursorFunc := func(node any) (int, []persist.DBID, error) {
+	queryFunc := func(params feedPagingParams) ([]any, error) {
+		if !hasCursors {
+			params.EntityTypes = entityTypes
+			params.EntityIDs = entityIDs
+		}
+
+		// Restrict cursors to actual size of the slice
+		curBeforePos := max(params.CurBeforePos, 0)
+		curAfterPos := min(params.CurAfterPos-1, len(params.EntityIDs))
+
+		if params.PagingForward {
+			// If paging forward, we extend from the after cursor up to the limit or to the before cursor, whatever is larger
+			limitPos := max(curAfterPos-int(params.Limit), curBeforePos)
+			params.EntityTypes = params.EntityTypes[limitPos:curAfterPos]
+			params.EntityIDs = params.EntityIDs[limitPos:curAfterPos]
+		} else {
+			// If paging backwards, we extend from the before cursor up to the limit or to the after cursor, whatever is smaller
+			limitPos := min(curBeforePos+int(params.Limit), curAfterPos)
+			params.EntityTypes = params.EntityTypes[curBeforePos:limitPos]
+			params.EntityIDs = params.EntityIDs[curBeforePos:limitPos]
+		}
+
+		return loadFeedEntities(ctx, api.loaders, params.EntityTypes, params.EntityIDs)
+	}
+
+	cursorFunc := func(node any) (int, []persist.FeedEntityType, []persist.DBID, error) {
 		_, id, err := feedCursor(node)
-		return idToCursorPos[id], topPosts, err
+		return entityIDToPos[id], entityTypes, entityIDs, err
 	}
 
 	paginator.QueryFunc = queryFunc
 	paginator.CursorFunc = cursorFunc
-	now = time.Now()
-	res, pageInfo, err := paginator.paginate(before, after, first, last)
-	fmt.Println("paginator took", time.Since(now))
-	return res, pageInfo, err
+	return paginator.paginate(before, after, first, last)
 }
 
 func (api FeedAPI) TrendingUsers(ctx context.Context, report model.Window) ([]db.User, error) {
@@ -670,7 +632,7 @@ func loadFeedEntities(ctx context.Context, d *dataloader.Loaders, typs []persist
 	return entities, nil
 }
 
-func scorePost(ctx context.Context, viewerID persist.DBID, e db.EntityScoringRow, t time.Time, interactions int) float64 {
+func scorePost(ctx context.Context, viewerID persist.DBID, e db.FeedEntityScoringRow, t time.Time, interactions int) float64 {
 	timeF := timeFactor(e.CreatedAt, t)
 	engagementF := engagementFactor(interactions)
 	personalizationF, err := koala.For(ctx).RelevanceTo(viewerID, e)

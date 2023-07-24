@@ -80,7 +80,7 @@ func For(ctx context.Context) *Koala {
 	return gc.Value(contextKey).(*Koala)
 }
 
-func (k *Koala) RelevanceTo(userID persist.DBID, e db.EntityScoringRow) (topS float64, err error) {
+func (k *Koala) RelevanceTo(userID persist.DBID, e db.FeedEntityScoringRow) (topS float64, err error) {
 	if len(e.ContractIds) == 0 {
 		return k.scoreFeatures(userID, e.ActorID, "")
 	}

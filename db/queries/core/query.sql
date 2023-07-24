@@ -416,13 +416,14 @@ ORDER BY
     CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
 LIMIT sqlc.arg('limit');
 
+-- name: PaginatePostsByContractID :batchmany
 SELECT posts.*
 FROM posts
 WHERE sqlc.arg('contract_id') = ANY(posts.contract_ids)
 AND posts.deleted = false
 AND (posts.created_at, posts.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
 AND (posts.created_at, posts.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
-ORDER BY 
+ORDER BY
     CASE WHEN sqlc.arg('paging_forward')::bool THEN (posts.created_at, posts.id) END ASC,
     CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (posts.created_at, posts.id) END DESC
 LIMIT sqlc.arg('limit');
