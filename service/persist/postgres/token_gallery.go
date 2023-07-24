@@ -384,6 +384,7 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 		params.Contract = append(params.Contract, t.Contract.String())
 		appendBool(&params.IsProviderMarkedSpam, t.IsProviderMarkedSpam, &errors)
 		params.TokenUri = append(params.TokenUri, "")
+		params.IsCreatorToken = append(params.IsCreatorToken, t.IsCreatorToken)
 
 		// Defer error checking until now to keep the code above from being
 		// littered with multiline "if" statements
