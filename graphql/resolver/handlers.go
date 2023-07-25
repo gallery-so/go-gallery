@@ -35,7 +35,7 @@ import (
 const scrubText = "<scrubbed>"
 const scrubDirectiveName = "scrub"
 
-var gqlRequestIdContextKey struct{}
+const gqlRequestIdContextKey = "graphql.gqlRequestId"
 
 const noCachePublicAPIContextKey = "graphql.noCachePublicAPI"
 const maxSentryDataLength = 8 * 1024
