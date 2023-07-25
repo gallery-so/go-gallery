@@ -785,9 +785,9 @@ func testGetCommunity(t *testing.T) {
 
 func testViewToken(t *testing.T) {
 	ctx := context.Background()
-	userF := newUserFixture(t)
-	bob := newUserWithTokensFixture(t)
-	alice := newUserWithTokensFixture(t)
+	userF := newUserWithTokensFixture(t)
+	alice := newUserFixture(t)
+	bob := newUserFixture(t)
 	c := authedHandlerClient(t, userF.ID)
 
 	c2 := authedHandlerClient(t, alice.ID)
@@ -823,10 +823,10 @@ func testViewToken(t *testing.T) {
 	assert.Len(t, colPay.Collection.Tokens, 1)
 
 	responseAliceViewToken := viewToken(t, ctx, c2, userF.TokenIDs[0],  colPay.Collection.Dbid)
-	responseBobViewoken := viewToken(t, ctx, c3, userF.TokenIDs[0],  colPay.Collection.Dbid)
+	responseBobViewToken := viewToken(t, ctx, c3, userF.TokenIDs[0],  colPay.Collection.Dbid)
 
-	assert.NotEmpty(t, responseAliceToken)
-	assert.NotEmpty(t, responseBobToken)}
+	assert.NotEmpty(t, responseAliceViewToken)
+	assert.NotEmpty(t, responseBobViewToken)}
 
 func testSyncNewTokens(t *testing.T) {
 	userF := newUserFixture(t)
