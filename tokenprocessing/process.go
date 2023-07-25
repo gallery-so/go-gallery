@@ -214,10 +214,10 @@ func processOwnersForUserTokens(mc *multichain.Provider, queries *coredb.Queries
 				}
 
 				// verify the total is less than or equal to the total in the db
-				// if curTotal.BigInt().Cmp(token.Quantity.BigInt()) > 0 {
-				// 	logger.For(c).Errorf("error: total quantity of tokens in db is greater than total quantity of tokens on chain")
-				// 	continue
-				// }
+				if curTotal.BigInt().Cmp(token.Quantity.BigInt()) > 0 {
+					logger.For(c).Errorf("error: total quantity of tokens in db is greater than total quantity of tokens on chain")
+					continue
+				}
 
 				// one event per token identifier (grouping ERC-1155s)
 				_, err = event.DispatchEvent(c, coredb.Event{

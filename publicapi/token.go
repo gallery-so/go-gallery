@@ -194,69 +194,6 @@ func (api TokenAPI) GetTokensByIDs(ctx context.Context, tokenIDs []persist.DBID)
 	return foundTokens, nil
 }
 
-func (api TokenAPI) GetTokensByIDsPaginate(ctx context.Context, tokenIDs []persist.DBID, before, after *string, first, last *int) ([]db.Token, PageInfo, error) {
-	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"tokenIDs": validate.WithTag(tokenIDs, "required"),
-	}); err != nil {
-		return nil, PageInfo{}, err
-	}
-
-	if err := validatePaginationParams(api.validator, first, last); err != nil {
-		return nil, PageInfo{}, err
-	}
-
-	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-
-		tokens, err := api.queries.GetTokensByIdsPaginate(ctx, db.GetTokensByIdsPaginateParams{
-			Limit:         params.Limit,
-			TokenIds:      tokenIDs,
-			CurBeforeTime: params.CursorBeforeTime,
-			CurBeforeID:   params.CursorBeforeID,
-			CurAfterTime:  params.CursorAfterTime,
-			CurAfterID:    params.CursorAfterID,
-			PagingForward: params.PagingForward,
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		interfaces := make([]interface{}, len(tokens))
-		for i, token := range tokens {
-			interfaces[i] = token
-		}
-
-		return interfaces, nil
-	}
-
-	countFunc := func() (int, error) {
-		return len(tokenIDs), nil
-	}
-
-	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
-		if token, ok := i.(db.Token); ok {
-			return token.CreatedAt, token.ID, nil
-		}
-		return time.Time{}, "", fmt.Errorf("interface{} is not an token")
-	}
-
-	paginator := timeIDPaginator{
-		QueryFunc:  queryFunc,
-		CursorFunc: cursorFunc,
-		CountFunc:  countFunc,
-	}
-
-	results, pageInfo, err := paginator.paginate(before, after, first, last)
-
-	tokens := make([]db.Token, len(results))
-	for i, result := range results {
-		if token, ok := result.(db.Token); ok {
-			tokens[i] = token
-		}
-	}
-
-	return tokens, pageInfo, err
-}
-
 // GetNewTokensByFeedEventID returns new tokens added to a collection from an event.
 // Since its possible for tokens to be deleted, the return size may not be the same size of
 // the tokens added, so the caller should handle the matching of arguments to response if used in that context.

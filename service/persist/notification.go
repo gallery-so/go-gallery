@@ -11,7 +11,7 @@ type NotificationData struct {
 	AdmirerIDs        []DBID    `json:"admirer_ids,omitempty"`
 	FollowedBack      NullBool  `json:"followed_back,omitempty"`
 	Refollowed        NullBool  `json:"refollowed,omitempty"`
-	NewTokenID        DBID      `json:"new_token_ids,omitempty"`
+	NewTokenID        DBID      `json:"new_token_id,omitempty"`
 	NewTokenQuantity  HexString `json:"new_token_quantity,omitempty"`
 }
 
