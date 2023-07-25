@@ -1890,17 +1890,15 @@ type ViewGalleryPayload {
 
 union ViewGalleryPayloadOrError = ViewGalleryPayload | ErrAuthenticationFailed
 
-
-input ViewTokenInput {
-  tokenId: DBID!
-  collectionId: DBID!
-}
-
 type ViewTokenPayload {
   token: Token
 }
 
-union ViewTokenPayloadOrError = ViewTokenPayload | ErrAuthenticationFailed | ErrTokenNotFound | ErrGalleryNotFound
+union ViewTokenPayloadOrError =
+    ViewTokenPayload
+ | ErrAuthenticationFailed
+ | ErrTokenNotFound
+ | ErrGalleryNotFound
 
 input VerifyEmailInput {
   token: String! @scrub

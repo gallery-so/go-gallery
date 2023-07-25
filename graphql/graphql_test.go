@@ -789,10 +789,8 @@ func testViewToken(t *testing.T) {
 	alice := newUserFixture(t)
 	bob := newUserFixture(t)
 	c := authedHandlerClient(t, userF.ID)
-
 	c2 := authedHandlerClient(t, alice.ID)
 	c3 := authedHandlerClient(t, bob.ID)
-
 
 	colResp, err := createCollectionMutation(ctx, c, CreateCollectionInput{
 		GalleryId:      userF.GalleryID,
@@ -824,7 +822,6 @@ func testViewToken(t *testing.T) {
 
 	responseAliceViewToken := viewToken(t, ctx, c2, userF.TokenIDs[0],  colPay.Collection.Dbid)
 	responseBobViewToken := viewToken(t, ctx, c3, userF.TokenIDs[0],  colPay.Collection.Dbid)
-
 	assert.NotEmpty(t, responseAliceViewToken)
 	assert.NotEmpty(t, responseBobViewToken)}
 
