@@ -668,8 +668,8 @@ func testViewsAreRolledUp(t *testing.T) {
 	ctx := context.Background()
 	// bob views gallery
 	client := authedServerClient(t, serverF.URL, bob.ID)
-    viewGallery(t, ctx, client, userF.GalleryID)
-	// alice views gallery
+	viewGallery(t, ctx, client, userF.GalleryID)
+	// // alice views gallery
 	client = authedServerClient(t, serverF.URL, alice.ID)
 	viewGallery(t, ctx, client, userF.GalleryID)
 
@@ -790,11 +790,40 @@ func testViewToken(t *testing.T) {
 	alice := newUserWithTokensFixture(t)
 	c := authedHandlerClient(t, userF.ID)
 
-
 	c2 := authedHandlerClient(t, alice.ID)
 	c3 := authedHandlerClient(t, bob.ID)
-	responseAliceToken := viewToken(t, ctx, client, alice.TokenIDs[0], alice.GalleryID)
-	responseBobToken := viewToken(t, ctx, client, bob.TokenIDs[0], bob.GalleryID)
+
+
+	colResp, err := createCollectionMutation(ctx, c, CreateCollectionInput{
+		GalleryId:      userF.GalleryID,
+		Name:           "newCollection",
+		CollectorsNote: "this is a note",
+		Tokens:         userF.TokenIDs[:1],
+		Layout: CollectionLayoutInput{
+			Sections: []int{0},
+			SectionLayout: []CollectionSectionLayoutInput{
+				{
+					Columns:    0,
+					Whitespace: []int{},
+				},
+			},
+		},
+		TokenSettings: []CollectionTokenSettingsInput{
+			{
+				TokenId:    userF.TokenIDs[0],
+				RenderLive: false,
+			},
+		},
+		Caption: nil,
+	})
+
+	require.NoError(t, err)
+	colPay := (*colResp.CreateCollection).(*createCollectionMutationCreateCollectionCreateCollectionPayload)
+	assert.NotEmpty(t, colPay.Collection.Dbid)
+	assert.Len(t, colPay.Collection.Tokens, 1)
+
+	responseAliceViewToken := viewToken(t, ctx, c2, userF.TokenIDs[0],  colPay.Collection.Dbid)
+	responseBobViewoken := viewToken(t, ctx, c3, userF.TokenIDs[0],  colPay.Collection.Dbid)
 
 	assert.NotEmpty(t, responseAliceToken)
 	assert.NotEmpty(t, responseBobToken)}

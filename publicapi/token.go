@@ -518,7 +518,10 @@ func (api TokenAPI) GetTokenOwnershipByTokenID(ctx context.Context, tokenID pers
 	return api.loaders.TokenOwnershipByTokenID.Load(tokenID)
 }
 
-func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, galleryID persist.DBID) (db.Event, error) {
+func (api TokenAPI) ViewToken(ctx context.Context, db.ViewTokenInput{
+			GalleryID:   update.GalleryID,
+			Collections: asList,
+		})) (db.Event, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"tokenID": validate.WithTag(tokenID, "required"),
@@ -526,12 +529,13 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, gallery
 		return db.Event{}, err
 	}
 
+
 	token, err := api.loaders.TokenByTokenID.Load(tokenID)
 	if err != nil {
 		return db.Event{}, err
 	}
 
-	galleryID, err := api.queries.GetGalleryIDByCollectionID(ctx, token.CollectionID)
+	galleryID, err := api.queries.GetGalleryIDByCollectionID(ctx, collectionID)
 	if err != nil {
 		return db.Event{}, err
 	}
@@ -548,7 +552,7 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, gallery
 		Action:         persist.ActionViewedToken,
 		ResourceTypeID: persist.ResourceTypeToken,
 		TokenID:        tokenID,
-		CollectionID:   token.CollectionID,
+		CollectionID:   collectionID,
 		GalleryID:      galleryID,
 		SubjectID:      tokenID,
 		Data: persist.EventData{

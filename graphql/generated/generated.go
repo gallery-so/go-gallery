@@ -816,7 +816,7 @@ type ComplexityRoot struct {
 		VerifyEmail                     func(childComplexity int, input model.VerifyEmailInput) int
 		VerifyEmailMagicLink            func(childComplexity int, input model.VerifyEmailMagicLinkInput) int
 		ViewGallery                     func(childComplexity int, galleryID persist.DBID) int
-		ViewToken                       func(childComplexity int, tokenID persist.DBID) int
+		ViewToken                       func(childComplexity int, input model.ViewTokenInput) int
 	}
 
 	NotificationEdge struct {
@@ -1636,7 +1636,7 @@ type MutationResolver interface {
 	PostTokens(ctx context.Context, input model.PostTokensInput) (model.PostTokensPayloadOrError, error)
 	DeletePost(ctx context.Context, postID persist.DBID) (model.DeletePostPayloadOrError, error)
 	ViewGallery(ctx context.Context, galleryID persist.DBID) (model.ViewGalleryPayloadOrError, error)
-	ViewToken(ctx context.Context, tokenID persist.DBID) (model.ViewTokenPayloadOrError, error)
+	ViewToken(ctx context.Context, input model.ViewTokenInput) (model.ViewTokenPayloadOrError, error)
 	UpdateGallery(ctx context.Context, input model.UpdateGalleryInput) (model.UpdateGalleryPayloadOrError, error)
 	PublishGallery(ctx context.Context, input model.PublishGalleryInput) (model.PublishGalleryPayloadOrError, error)
 	CreateGallery(ctx context.Context, input model.CreateGalleryInput) (model.CreateGalleryPayloadOrError, error)
@@ -5017,7 +5017,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.ViewToken(childComplexity, args["tokenID"].(persist.DBID)), true
+		return e.complexity.Mutation.ViewToken(childComplexity, args["input"].(model.ViewTokenInput)), true
 
 	case "NotificationEdge.cursor":
 		if e.complexity.NotificationEdge.Cursor == nil {
@@ -7580,6 +7580,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputUploadPersistedQueriesInput,
 		ec.unmarshalInputVerifyEmailInput,
 		ec.unmarshalInputVerifyEmailMagicLinkInput,
+		ec.unmarshalInputViewTokenInput,
 		ec.unmarshalInputtopCollectionsForCommunityInput,
 	)
 	first := true
@@ -9550,11 +9551,17 @@ type ViewGalleryPayload {
 
 union ViewGalleryPayloadOrError = ViewGalleryPayload | ErrAuthenticationFailed
 
+
+input ViewTokenInput {
+  tokenId: DBID!
+  collectionId: DBID!
+}
+
 type ViewTokenPayload {
   token: Token
 }
 
-union ViewTokenPayloadOrError = ViewTokenPayload | ErrAuthenticationFailed | ErrTokenNotFound
+union ViewTokenPayloadOrError = ViewTokenPayload | ErrAuthenticationFailed | ErrTokenNotFound | ErrGalleryNotFound
 
 input VerifyEmailInput {
   token: String! @scrub
@@ -10090,7 +10097,7 @@ type Mutation {
   deletePost(postId: DBID!): DeletePostPayloadOrError @authRequired
 
   viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
-  viewToken(tokenID: DBID!): ViewTokenPayloadOrError
+  viewToken(input: ViewTokenInput!): ViewTokenPayloadOrError
 
   updateGallery(input: UpdateGalleryInput!): UpdateGalleryPayloadOrError @authRequired
   publishGallery(input: PublishGalleryInput!): PublishGalleryPayloadOrError @authRequired
@@ -11902,15 +11909,15 @@ func (ec *executionContext) field_Mutation_viewGallery_args(ctx context.Context,
 func (ec *executionContext) field_Mutation_viewToken_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 persist.DBID
-	if tmp, ok := rawArgs["tokenID"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("tokenID"))
-		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+	var arg0 model.ViewTokenInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNViewTokenInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewTokenInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["tokenID"] = arg0
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -32523,7 +32530,7 @@ func (ec *executionContext) _Mutation_viewToken(ctx context.Context, field graph
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().ViewToken(rctx, fc.Args["tokenID"].(persist.DBID))
+		return ec.resolvers.Mutation().ViewToken(rctx, fc.Args["input"].(model.ViewTokenInput))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -56174,6 +56181,44 @@ func (ec *executionContext) unmarshalInputVerifyEmailMagicLinkInput(ctx context.
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputViewTokenInput(ctx context.Context, obj interface{}) (model.ViewTokenInput, error) {
+	var it model.ViewTokenInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"tokenId", "collectionId"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "tokenId":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("tokenId"))
+			data, err := ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.TokenID = data
+		case "collectionId":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("collectionId"))
+			data, err := ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.CollectionID = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputtopCollectionsForCommunityInput(ctx context.Context, obj interface{}) (model.TopCollectionsForCommunityInput, error) {
 	var it model.TopCollectionsForCommunityInput
 	asMap := map[string]interface{}{}
@@ -59698,6 +59743,13 @@ func (ec *executionContext) _ViewTokenPayloadOrError(ctx context.Context, sel as
 			return graphql.Null
 		}
 		return ec._ErrTokenNotFound(ctx, sel, obj)
+	case model.ErrGalleryNotFound:
+		return ec._ErrGalleryNotFound(ctx, sel, &obj)
+	case *model.ErrGalleryNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrGalleryNotFound(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -62147,7 +62199,7 @@ func (ec *executionContext) _ErrFeedEventNotFound(ctx context.Context, sel ast.S
 	return out
 }
 
-var errGalleryNotFoundImplementors = []string{"ErrGalleryNotFound", "Error", "GalleryByIdPayloadOrError", "ViewerGalleryByIdPayloadOrError"}
+var errGalleryNotFoundImplementors = []string{"ErrGalleryNotFound", "Error", "GalleryByIdPayloadOrError", "ViewerGalleryByIdPayloadOrError", "ViewTokenPayloadOrError"}
 
 func (ec *executionContext) _ErrGalleryNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrGalleryNotFound) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errGalleryNotFoundImplementors)
@@ -70858,6 +70910,11 @@ func (ec *executionContext) unmarshalNVerifyEmailInput2githubᚗcomᚋmikeydub�
 
 func (ec *executionContext) unmarshalNVerifyEmailMagicLinkInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐVerifyEmailMagicLinkInput(ctx context.Context, v interface{}) (model.VerifyEmailMagicLinkInput, error) {
 	res, err := ec.unmarshalInputVerifyEmailMagicLinkInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNViewTokenInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewTokenInput(ctx context.Context, v interface{}) (model.ViewTokenInput, error) {
+	res, err := ec.unmarshalInputViewTokenInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
