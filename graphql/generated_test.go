@@ -759,11 +759,15 @@ func (v *__viewGalleryMutationInput) GetGalleryId() persist.DBID { return v.Gall
 
 // __viewTokenMutationInput is used internally by genqlient
 type __viewTokenMutationInput struct {
-	TokenID persist.DBID `json:"tokenID"`
+	TokenID      persist.DBID `json:"tokenID"`
+	CollectionID persist.DBID `json:"collectionID"`
 }
 
 // GetTokenID returns __viewTokenMutationInput.TokenID, and is useful for accessing the field via an interface.
 func (v *__viewTokenMutationInput) GetTokenID() persist.DBID { return v.TokenID }
+
+// GetCollectionID returns __viewTokenMutationInput.CollectionID, and is useful for accessing the field via an interface.
+func (v *__viewTokenMutationInput) GetCollectionID() persist.DBID { return v.CollectionID }
 
 // addUserWalletMutationAddUserWalletAddUserWalletPayload includes the requested fields of the GraphQL type AddUserWalletPayload.
 type addUserWalletMutationAddUserWalletAddUserWalletPayload struct {
@@ -8892,6 +8896,18 @@ func (v *viewTokenMutationViewTokenErrAuthenticationFailed) GetTypename() *strin
 // GetMessage returns viewTokenMutationViewTokenErrAuthenticationFailed.Message, and is useful for accessing the field via an interface.
 func (v *viewTokenMutationViewTokenErrAuthenticationFailed) GetMessage() string { return v.Message }
 
+// viewTokenMutationViewTokenErrGalleryNotFound includes the requested fields of the GraphQL type ErrGalleryNotFound.
+type viewTokenMutationViewTokenErrGalleryNotFound struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns viewTokenMutationViewTokenErrGalleryNotFound.Typename, and is useful for accessing the field via an interface.
+func (v *viewTokenMutationViewTokenErrGalleryNotFound) GetTypename() *string { return v.Typename }
+
+// GetMessage returns viewTokenMutationViewTokenErrGalleryNotFound.Message, and is useful for accessing the field via an interface.
+func (v *viewTokenMutationViewTokenErrGalleryNotFound) GetMessage() string { return v.Message }
+
 // viewTokenMutationViewTokenErrTokenNotFound includes the requested fields of the GraphQL type ErrTokenNotFound.
 type viewTokenMutationViewTokenErrTokenNotFound struct {
 	Typename *string `json:"__typename"`
@@ -8922,6 +8938,7 @@ func (v *viewTokenMutationViewTokenViewTokenPayload) GetToken() *viewTokenMutati
 //
 // viewTokenMutationViewTokenViewTokenPayloadOrError is implemented by the following types:
 // viewTokenMutationViewTokenErrAuthenticationFailed
+// viewTokenMutationViewTokenErrGalleryNotFound
 // viewTokenMutationViewTokenErrTokenNotFound
 // viewTokenMutationViewTokenViewTokenPayload
 type viewTokenMutationViewTokenViewTokenPayloadOrError interface {
@@ -8931,6 +8948,8 @@ type viewTokenMutationViewTokenViewTokenPayloadOrError interface {
 }
 
 func (v *viewTokenMutationViewTokenErrAuthenticationFailed) implementsGraphQLInterfaceviewTokenMutationViewTokenViewTokenPayloadOrError() {
+}
+func (v *viewTokenMutationViewTokenErrGalleryNotFound) implementsGraphQLInterfaceviewTokenMutationViewTokenViewTokenPayloadOrError() {
 }
 func (v *viewTokenMutationViewTokenErrTokenNotFound) implementsGraphQLInterfaceviewTokenMutationViewTokenViewTokenPayloadOrError() {
 }
@@ -8953,6 +8972,9 @@ func __unmarshalviewTokenMutationViewTokenViewTokenPayloadOrError(b []byte, v *v
 	switch tn.TypeName {
 	case "ErrAuthenticationFailed":
 		*v = new(viewTokenMutationViewTokenErrAuthenticationFailed)
+		return json.Unmarshal(b, *v)
+	case "ErrGalleryNotFound":
+		*v = new(viewTokenMutationViewTokenErrGalleryNotFound)
 		return json.Unmarshal(b, *v)
 	case "ErrTokenNotFound":
 		*v = new(viewTokenMutationViewTokenErrTokenNotFound)
@@ -8979,6 +9001,14 @@ func __marshalviewTokenMutationViewTokenViewTokenPayloadOrError(v *viewTokenMuta
 		result := struct {
 			TypeName string `json:"__typename"`
 			*viewTokenMutationViewTokenErrAuthenticationFailed
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewTokenMutationViewTokenErrGalleryNotFound:
+		typename = "ErrGalleryNotFound"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewTokenMutationViewTokenErrGalleryNotFound
 		}{typename, v}
 		return json.Marshal(result)
 	case *viewTokenMutationViewTokenErrTokenNotFound:
@@ -12000,8 +12030,8 @@ func viewGalleryMutation(
 
 // The query or mutation executed by viewTokenMutation.
 const viewTokenMutation_Operation = `
-mutation viewTokenMutation ($tokenID: DBID!) {
-	viewToken(tokenID: $tokenID) {
+mutation viewTokenMutation ($tokenID: DBID!, $collectionID: DBID!) {
+	viewToken(tokenID: $tokenID, collectionID: $collectionID) {
 		__typename
 		... on Error {
 			__typename
@@ -12026,12 +12056,14 @@ func viewTokenMutation(
 	ctx context.Context,
 	client graphql.Client,
 	tokenID persist.DBID,
+	collectionID persist.DBID,
 ) (*viewTokenMutationResponse, error) {
 	req := &graphql.Request{
 		OpName: "viewTokenMutation",
 		Query:  viewTokenMutation_Operation,
 		Variables: &__viewTokenMutationInput{
-			TokenID: tokenID,
+			TokenID:      tokenID,
+			CollectionID: collectionID,
 		},
 	}
 	var err error

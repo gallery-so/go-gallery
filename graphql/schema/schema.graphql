@@ -2436,7 +2436,7 @@ type Mutation {
   deletePost(postId: DBID!): DeletePostPayloadOrError @authRequired
 
   viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
-  viewToken(input: ViewTokenInput!): ViewTokenPayloadOrError
+  viewToken(tokenID: DBID!, collectionID: DBID!): ViewTokenPayloadOrError
 
   updateGallery(input: UpdateGalleryInput!): UpdateGalleryPayloadOrError @authRequired
   publishGallery(input: PublishGalleryInput!): PublishGalleryPayloadOrError @authRequired

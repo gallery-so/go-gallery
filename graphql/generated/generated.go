@@ -816,7 +816,7 @@ type ComplexityRoot struct {
 		VerifyEmail                     func(childComplexity int, input model.VerifyEmailInput) int
 		VerifyEmailMagicLink            func(childComplexity int, input model.VerifyEmailMagicLinkInput) int
 		ViewGallery                     func(childComplexity int, galleryID persist.DBID) int
-		ViewToken                       func(childComplexity int, input model.ViewTokenInput) int
+		ViewToken                       func(childComplexity int, tokenID persist.DBID, collectionID persist.DBID) int
 	}
 
 	NotificationEdge struct {
@@ -1636,7 +1636,7 @@ type MutationResolver interface {
 	PostTokens(ctx context.Context, input model.PostTokensInput) (model.PostTokensPayloadOrError, error)
 	DeletePost(ctx context.Context, postID persist.DBID) (model.DeletePostPayloadOrError, error)
 	ViewGallery(ctx context.Context, galleryID persist.DBID) (model.ViewGalleryPayloadOrError, error)
-	ViewToken(ctx context.Context, input model.ViewTokenInput) (model.ViewTokenPayloadOrError, error)
+	ViewToken(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (model.ViewTokenPayloadOrError, error)
 	UpdateGallery(ctx context.Context, input model.UpdateGalleryInput) (model.UpdateGalleryPayloadOrError, error)
 	PublishGallery(ctx context.Context, input model.PublishGalleryInput) (model.PublishGalleryPayloadOrError, error)
 	CreateGallery(ctx context.Context, input model.CreateGalleryInput) (model.CreateGalleryPayloadOrError, error)
@@ -5017,7 +5017,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.ViewToken(childComplexity, args["input"].(model.ViewTokenInput)), true
+		return e.complexity.Mutation.ViewToken(childComplexity, args["tokenID"].(persist.DBID), args["collectionID"].(persist.DBID)), true
 
 	case "NotificationEdge.cursor":
 		if e.complexity.NotificationEdge.Cursor == nil {
@@ -10097,7 +10097,7 @@ type Mutation {
   deletePost(postId: DBID!): DeletePostPayloadOrError @authRequired
 
   viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
-  viewToken(input: ViewTokenInput!): ViewTokenPayloadOrError
+  viewToken(tokenID: DBID!, collectionID: DBID!): ViewTokenPayloadOrError
 
   updateGallery(input: UpdateGalleryInput!): UpdateGalleryPayloadOrError @authRequired
   publishGallery(input: PublishGalleryInput!): PublishGalleryPayloadOrError @authRequired
@@ -11909,15 +11909,24 @@ func (ec *executionContext) field_Mutation_viewGallery_args(ctx context.Context,
 func (ec *executionContext) field_Mutation_viewToken_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 model.ViewTokenInput
-	if tmp, ok := rawArgs["input"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
-		arg0, err = ec.unmarshalNViewTokenInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewTokenInput(ctx, tmp)
+	var arg0 persist.DBID
+	if tmp, ok := rawArgs["tokenID"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("tokenID"))
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["input"] = arg0
+	args["tokenID"] = arg0
+	var arg1 persist.DBID
+	if tmp, ok := rawArgs["collectionID"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("collectionID"))
+		arg1, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["collectionID"] = arg1
 	return args, nil
 }
 
@@ -32530,7 +32539,7 @@ func (ec *executionContext) _Mutation_viewToken(ctx context.Context, field graph
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().ViewToken(rctx, fc.Args["input"].(model.ViewTokenInput))
+		return ec.resolvers.Mutation().ViewToken(rctx, fc.Args["tokenID"].(persist.DBID), fc.Args["collectionID"].(persist.DBID))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -70910,11 +70919,6 @@ func (ec *executionContext) unmarshalNVerifyEmailInput2githubᚗcomᚋmikeydub�
 
 func (ec *executionContext) unmarshalNVerifyEmailMagicLinkInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐVerifyEmailMagicLinkInput(ctx context.Context, v interface{}) (model.VerifyEmailMagicLinkInput, error) {
 	res, err := ec.unmarshalInputVerifyEmailMagicLinkInput(ctx, v)
-	return res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) unmarshalNViewTokenInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewTokenInput(ctx context.Context, v interface{}) (model.ViewTokenInput, error) {
-	res, err := ec.unmarshalInputViewTokenInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
