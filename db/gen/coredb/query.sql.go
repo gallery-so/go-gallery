@@ -5344,6 +5344,47 @@ func (q *Queries) RemoveSocialFromUser(ctx context.Context, arg RemoveSocialFrom
 	return err
 }
 
+const removeStaleCreatorStatusFromTokens = `-- name: RemoveStaleCreatorStatusFromTokens :exec
+with created_contracts as (
+    select contract_id, creator_user_id, chain, creator_address from contract_creators where creator_user_id = $1
+)
+update tokens
+    set is_creator_token = false,
+        last_updated = now()
+    where owner_user_id = $1
+      and is_creator_token = true
+      and not exists(select 1 from created_contracts where created_contracts.contract_id = tokens.contract)
+      and not deleted
+`
+
+func (q *Queries) RemoveStaleCreatorStatusFromTokens(ctx context.Context, userID persist.DBID) error {
+	_, err := q.db.Exec(ctx, removeStaleCreatorStatusFromTokens, userID)
+	return err
+}
+
+const removeWalletFromTokens = `-- name: RemoveWalletFromTokens :exec
+update tokens t
+    set owned_by_wallets = array_remove(owned_by_wallets, $1::varchar),
+        last_updated = now()
+    from users u
+    where u.id = $2
+      and t.owner_user_id = u.id
+      and t.owned_by_wallets @> array[$1::varchar]
+      and not u.wallets @> array[$1::varchar]
+      and not u.deleted
+      and not t.deleted
+`
+
+type RemoveWalletFromTokensParams struct {
+	WalletID string       `json:"wallet_id"`
+	UserID   persist.DBID `json:"user_id"`
+}
+
+func (q *Queries) RemoveWalletFromTokens(ctx context.Context, arg RemoveWalletFromTokensParams) error {
+	_, err := q.db.Exec(ctx, removeWalletFromTokens, arg.WalletID, arg.UserID)
+	return err
+}
+
 const setContractOverrideCreator = `-- name: SetContractOverrideCreator :exec
 update contracts set override_creator_user_id = $1, last_updated = now() where id = $2 and deleted = false
 `

@@ -1468,3 +1468,27 @@ from contracts c
 where c.override_creator_user_id = @user_id
   and c.chain = any(@chains::int[])
   and c.deleted = false;
+
+-- name: RemoveWalletFromTokens :exec
+update tokens t
+    set owned_by_wallets = array_remove(owned_by_wallets, @wallet_id::varchar),
+        last_updated = now()
+    from users u
+    where u.id = @user_id
+      and t.owner_user_id = u.id
+      and t.owned_by_wallets @> array[@wallet_id::varchar]
+      and not u.wallets @> array[@wallet_id::varchar]
+      and not u.deleted
+      and not t.deleted;
+
+-- name: RemoveStaleCreatorStatusFromTokens :exec
+with created_contracts as (
+    select * from contract_creators where creator_user_id = @user_id
+)
+update tokens
+    set is_creator_token = false,
+        last_updated = now()
+    where owner_user_id = @user_id
+      and is_creator_token = true
+      and not exists(select 1 from created_contracts where created_contracts.contract_id = tokens.contract)
+      and not deleted;
