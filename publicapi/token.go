@@ -544,7 +544,6 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID) (db.Eve
 			ResourceTypeID: persist.ResourceTypeToken,
 			SubjectID:      tokenID,
 			TokenID:        tokenID,
-			// CollectionID:   tokenID,
 			Data: persist.EventData{
 				TokenContractID: token.Contract,
 			},
