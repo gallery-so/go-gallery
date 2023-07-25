@@ -8039,6 +8039,7 @@ enum Chain {
   Tezos
   POAP
   Zora
+  Base
 }
 
 enum TokenOwnershipType {

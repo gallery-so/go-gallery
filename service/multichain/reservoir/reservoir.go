@@ -138,9 +138,9 @@ func NewProvider(chain persist.Chain, httpClient *http.Client) *Provider {
 	case persist.ChainArbitrum:
 		apiURL = "https://api-arbitrum-nova.reservoir.tools"
 	case persist.ChainZora:
-		apiURL = "https://api-zora-testnet.reservoir.tools"
+		apiURL = "https://api-zora.reservoir.tools"
 	case persist.ChainBase:
-		apiURL = "https://api-base-goerli.reservoir.tools"
+		apiURL = "https://api-base.reservoir.tools"
 	}
 
 	if apiURL == "" {
