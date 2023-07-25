@@ -222,6 +222,7 @@ func SetDefaults() {
 	viper.SetDefault("PUSH_NOTIFICATIONS_SECRET", "push-notifications-secret")
 	viper.SetDefault("ZORA_API_KEY", "")
 	viper.SetDefault("GOLDSKY_API_KEY", "")
+	viper.SetDefault("RESERVOIR_API_KEY", "")
 
 	viper.AutomaticEnv()
 
