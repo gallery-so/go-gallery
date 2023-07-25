@@ -123,10 +123,10 @@ func New(queries *db.Queries, pub *pubsub.Client, taskClient *cloudtasks.Client,
 	// grouped notification actions
 	notifDispatcher.AddHandler(persist.ActionUserFollowedUsers, group)
 	notifDispatcher.AddHandler(persist.ActionAdmiredFeedEvent, group)
-	notifDispatcher.AddHandler(persist.ActionNewTokensReceived, group)
 
 	// single notification actions (default)
 	notifDispatcher.AddHandler(persist.ActionCommentedOnFeedEvent, def)
+	notifDispatcher.AddHandler(persist.ActionNewTokensReceived, def)
 
 	// viewed notifications are handled separately
 	notifDispatcher.AddHandler(persist.ActionViewedGallery, view)

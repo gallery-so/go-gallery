@@ -196,22 +196,31 @@ func processOwnersForUserTokens(mc *multichain.Provider, validator *validator.Va
 		}
 
 		if len(newTokens) > 0 {
-			tokenIDs, _ := util.Map(newTokens, func(t persist.TokenGallery) (persist.DBID, error) {
-				return t.ID, nil
-			})
-			_, err = event.DispatchEvent(c, coredb.Event{
-				ID:             persist.GenerateID(),
-				ActorID:        persist.DBIDToNullStr(input.UserID),
-				ResourceTypeID: persist.ResourceTypeUser,
-				SubjectID:      input.UserID,
-				UserID:         input.UserID,
-				Action:         persist.ActionNewTokensReceived,
-				Data: persist.EventData{
-					NewTokenIDs: tokenIDs,
-				},
-			}, validator, nil)
-			if err != nil {
-				logger.For(c).Errorf("error dispatching event: %s", err)
+
+			grouped := map[persist.TokenIdentifiers][]persist.TokenGallery{}
+			for _, t := range newTokens {
+				grouped[t.TokenIdentifiers()] = append(grouped[t.TokenIdentifiers()], t)
+			}
+			for _, tokens := range grouped {
+				tokenIDs, _ := util.Map(tokens, func(t persist.TokenGallery) (persist.DBID, error) {
+					return t.ID, nil
+				})
+
+				// one event per token identifier (grouping ERC-1155s)
+				_, err = event.DispatchEvent(c, coredb.Event{
+					ID:             persist.GenerateID(),
+					ActorID:        persist.DBIDToNullStr(input.UserID),
+					ResourceTypeID: persist.ResourceTypeUser,
+					SubjectID:      input.UserID,
+					UserID:         input.UserID,
+					Action:         persist.ActionNewTokensReceived,
+					Data: persist.EventData{
+						NewTokenIDs: tokenIDs,
+					},
+				}, validator, nil)
+				if err != nil {
+					logger.For(c).Errorf("error dispatching event: %s", err)
+				}
 			}
 		}
 
