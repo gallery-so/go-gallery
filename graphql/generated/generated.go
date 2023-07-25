@@ -610,7 +610,7 @@ type ComplexityRoot struct {
 		CreatedCommunities       func(childComplexity int, input model.CreatedCommunitiesInput, before *string, after *string, first *int, last *int) int
 		Dbid                     func(childComplexity int) int
 		FeaturedGallery          func(childComplexity int) int
-		Feed                     func(childComplexity int, before *string, after *string, first *int, last *int) int
+		Feed                     func(childComplexity int, before *string, after *string, first *int, last *int, includePosts bool) int
 		Followers                func(childComplexity int) int
 		Following                func(childComplexity int) int
 		Galleries                func(childComplexity int) int
@@ -949,7 +949,7 @@ type ComplexityRoot struct {
 		GalleryOfTheWeekWinners    func(childComplexity int) int
 		GeneralAllowlist           func(childComplexity int) int
 		GetMerchTokens             func(childComplexity int, wallet persist.Address) int
-		GlobalFeed                 func(childComplexity int, before *string, after *string, first *int, last *int) int
+		GlobalFeed                 func(childComplexity int, before *string, after *string, first *int, last *int, includePosts bool) int
 		MembershipTiers            func(childComplexity int, forceRefresh *bool) int
 		Node                       func(childComplexity int, id model.GqlID) int
 		PostByID                   func(childComplexity int, id persist.DBID) int
@@ -960,7 +960,7 @@ type ComplexityRoot struct {
 		SocialQueries              func(childComplexity int) int
 		TokenByID                  func(childComplexity int, id persist.DBID) int
 		TopCollectionsForCommunity func(childComplexity int, input model.TopCollectionsForCommunityInput, before *string, after *string, first *int, last *int) int
-		TrendingFeed               func(childComplexity int, before *string, after *string, first *int, last *int) int
+		TrendingFeed               func(childComplexity int, before *string, after *string, first *int, last *int, includePosts bool) int
 		TrendingUsers              func(childComplexity int, input model.TrendingUsersInput) int
 		UserByAddress              func(childComplexity int, chainAddress persist.ChainAddress) int
 		UserByID                   func(childComplexity int, id persist.DBID) int
@@ -1583,7 +1583,7 @@ type GalleryUserResolver interface {
 
 	Followers(ctx context.Context, obj *model.GalleryUser) ([]*model.GalleryUser, error)
 	Following(ctx context.Context, obj *model.GalleryUser) ([]*model.GalleryUser, error)
-	Feed(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
+	Feed(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int, includePosts bool) (*model.FeedConnection, error)
 	SharedFollowers(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.UsersConnection, error)
 	SharedCommunities(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error)
 	CreatedCommunities(ctx context.Context, obj *model.GalleryUser, input model.CreatedCommunitiesInput, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error)
@@ -1692,8 +1692,8 @@ type QueryResolver interface {
 	CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool) (model.CommunityByAddressOrError, error)
 	GeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error)
 	GalleryOfTheWeekWinners(ctx context.Context) ([]*model.GalleryUser, error)
-	GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
-	TrendingFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
+	GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int, includePosts bool) (*model.FeedConnection, error)
+	TrendingFeed(ctx context.Context, before *string, after *string, first *int, last *int, includePosts bool) (*model.FeedConnection, error)
 	FeedEventByID(ctx context.Context, id persist.DBID) (model.FeedEventByIDOrError, error)
 	PostByID(ctx context.Context, id persist.DBID) (model.PostOrError, error)
 	GetMerchTokens(ctx context.Context, wallet persist.Address) (model.MerchTokensPayloadOrError, error)
@@ -3610,7 +3610,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.GalleryUser.Feed(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
+		return e.complexity.GalleryUser.Feed(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int), args["includePosts"].(bool)), true
 
 	case "GalleryUser.followers":
 		if e.complexity.GalleryUser.Followers == nil {
@@ -5574,7 +5574,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.GlobalFeed(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
+		return e.complexity.Query.GlobalFeed(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int), args["includePosts"].(bool)), true
 
 	case "Query.membershipTiers":
 		if e.complexity.Query.MembershipTiers == nil {
@@ -5701,7 +5701,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.TrendingFeed(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
+		return e.complexity.Query.TrendingFeed(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int), args["includePosts"].(bool)), true
 
 	case "Query.trendingUsers":
 		if e.complexity.Query.TrendingUsers == nil {
@@ -7758,7 +7758,7 @@ type GalleryUser implements Node @goEmbedHelper {
   isAuthenticatedUser: Boolean
   followers: [GalleryUser] @goField(forceResolver: true)
   following: [GalleryUser] @goField(forceResolver: true)
-  feed(before: String, after: String, first: Int, last: Int): FeedConnection
+  feed(before: String, after: String, first: Int, last: Int, includePosts: Boolean! = false): FeedConnection
     @goField(forceResolver: true)
   sharedFollowers(before: String, after: String, first: Int, last: Int): UsersConnection
     @authRequired
@@ -8830,9 +8830,9 @@ type Query {
   ): CommunityByAddressOrError
   generalAllowlist: [ChainAddress!]
   galleryOfTheWeekWinners: [GalleryUser!]
-  globalFeed(before: String, after: String, first: Int, last: Int): FeedConnection
+  globalFeed(before: String, after: String, first: Int, last: Int, includePosts: Boolean! = false): FeedConnection
   # Paging forward i.e. providing the ` + "`" + `first` + "`" + ` argument will return events in order of descending popularity.
-  trendingFeed(before: String, after: String, first: Int, last: Int): FeedConnection
+  trendingFeed(before: String, after: String, first: Int, last: Int, includePosts: Boolean! = false): FeedConnection
   feedEventById(id: DBID!): FeedEventByIdOrError
   postById(id: DBID!): PostOrError
   getMerchTokens(wallet: Address!): MerchTokensPayloadOrError
@@ -10643,6 +10643,15 @@ func (ec *executionContext) field_GalleryUser_feed_args(ctx context.Context, raw
 		}
 	}
 	args["last"] = arg3
+	var arg4 bool
+	if tmp, ok := rawArgs["includePosts"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("includePosts"))
+		arg4, err = ec.unmarshalNBoolean2bool(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["includePosts"] = arg4
 	return args, nil
 }
 
@@ -12200,6 +12209,15 @@ func (ec *executionContext) field_Query_globalFeed_args(ctx context.Context, raw
 		}
 	}
 	args["last"] = arg3
+	var arg4 bool
+	if tmp, ok := rawArgs["includePosts"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("includePosts"))
+		arg4, err = ec.unmarshalNBoolean2bool(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["includePosts"] = arg4
 	return args, nil
 }
 
@@ -12548,6 +12566,15 @@ func (ec *executionContext) field_Query_trendingFeed_args(ctx context.Context, r
 		}
 	}
 	args["last"] = arg3
+	var arg4 bool
+	if tmp, ok := rawArgs["includePosts"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("includePosts"))
+		arg4, err = ec.unmarshalNBoolean2bool(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["includePosts"] = arg4
 	return args, nil
 }
 
@@ -26536,7 +26563,7 @@ func (ec *executionContext) _GalleryUser_feed(ctx context.Context, field graphql
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.GalleryUser().Feed(rctx, obj, fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
+		return ec.resolvers.GalleryUser().Feed(rctx, obj, fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int), fc.Args["includePosts"].(bool))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -38398,7 +38425,7 @@ func (ec *executionContext) _Query_globalFeed(ctx context.Context, field graphql
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().GlobalFeed(rctx, fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
+		return ec.resolvers.Query().GlobalFeed(rctx, fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int), fc.Args["includePosts"].(bool))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -38456,7 +38483,7 @@ func (ec *executionContext) _Query_trendingFeed(ctx context.Context, field graph
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().TrendingFeed(rctx, fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
+		return ec.resolvers.Query().TrendingFeed(rctx, fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int), fc.Args["includePosts"].(bool))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
