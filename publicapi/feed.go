@@ -373,30 +373,31 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 			entityIDToPos[id] = i
 		}
 
-		curBeforePos := max(params.CurBeforePos, 0)
-		curAfterPos := min(params.CurAfterPos, len(entityTypes))
+		queryTypes := append([]persist.FeedEntityType{}, entityTypes...)
+		queryIDs := append([]persist.DBID{}, entityIDs...)
 
-		var subTypes []persist.FeedEntityType
-		var subIDs []persist.DBID
+		curBeforePos := max(params.CurBeforePos, 0)
+		curAfterPos := min(params.CurAfterPos, len(queryIDs))
+		var limitPos int
 
 		if params.PagingForward {
 			// If paging forward, we extend from the after cursor up to the limit or to the before cursor, whatever is larger
 			// Plus one because curAfterPos is the index of the last node fetched, and we want to skip it
-			limitPos := max(curAfterPos-int(params.Limit)+1, curBeforePos)
-			subTypes = entityTypes[limitPos:curAfterPos]
-			subIDs = entityIDs[limitPos:curAfterPos]
+			limitPos = max(curAfterPos-int(params.Limit)+1, curBeforePos)
+			queryTypes = queryTypes[limitPos:curAfterPos]
+			queryIDs = queryIDs[limitPos:curAfterPos]
 		} else {
 			// If paging backwards, we extend from the before cursor up to the limit or to the after cursor, whatever is smaller
-			limitPos := min(curBeforePos+int(params.Limit), curAfterPos)
+			limitPos = min(curBeforePos+int(params.Limit), curAfterPos)
 			// Add one if curBeforePos is set, because we want to skip it
 			if params.CurBeforePos != -1 {
 				curBeforePos++
 			}
-			subTypes = entityTypes[curBeforePos:limitPos]
-			subIDs = entityIDs[curBeforePos:limitPos]
+			queryTypes = queryTypes[curBeforePos:limitPos]
+			queryIDs = queryIDs[curBeforePos:limitPos]
 		}
 
-		return loadFeedEntities(ctx, api.loaders, subTypes, subIDs)
+		return loadFeedEntities(ctx, api.loaders, queryTypes, queryIDs)
 	}
 
 	cursorFunc := func(node any) (int, []persist.FeedEntityType, []persist.DBID, error) {
@@ -705,9 +706,9 @@ type feedCache struct {
 }
 
 func newFeedCache(cache *redis.Cache, includePosts bool, f func(context.Context) ([]persist.FeedEntityType, []persist.DBID, error)) *feedCache {
-	key := "trending:feedEvents"
-	if includePosts {
-		key += ":all"
+	key := "trending:feedEvents:all"
+	if !includePosts {
+		key = "trending:feedEvents:noPosts"
 	}
 	return &feedCache{
 		LazyCache: &redis.LazyCache{
