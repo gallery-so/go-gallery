@@ -665,19 +665,14 @@ func testViewsAreRolledUp(t *testing.T) {
 	userF := newUserFixture(t)
 	bob := newUserFixture(t)
 	alice := newUserFixture(t)
-	// cat := newUserWithTokensFixture(t)
 	ctx := context.Background()
 	// bob views gallery
 	client := authedServerClient(t, serverF.URL, bob.ID)
     viewGallery(t, ctx, client, userF.GalleryID)
-	// responseBobViewToken := viewToken(t, ctx, client, cat.TokenIDs[0])
-	// // alice views gallery
+	// alice views gallery
 	client = authedServerClient(t, serverF.URL, alice.ID)
 	viewGallery(t, ctx, client, userF.GalleryID)
-	// responseAliceViewToken := viewToken(t, ctx, client, cat.TokenIDs[0])
 
-	// assert.NotEmpty(t, responseBobViewToken)
-	// assert.NotEmpty(t, responseAliceViewToken)
 	// TODO: Actually verify that the views get rolled up
 }
 
@@ -790,12 +785,19 @@ func testGetCommunity(t *testing.T) {
 
 func testViewToken(t *testing.T) {
 	ctx := context.Background()
-	userF := newUserWithFeedEntitiesFixture(t)
+	userF := newUserFixture(t)
+	bob := newUserWithTokensFixture(t)
+	alice := newUserWithTokensFixture(t)
 	c := authedHandlerClient(t, userF.ID)
-	deletePost(t, ctx, c, userF.PostIDs[0])
-	actual := globalFeedEvents(t, ctx, c, 4)
-	assert.False(t, util.Contains(actual, userF.PostIDs[0]))
-}
+
+
+	c2 := authedHandlerClient(t, alice.ID)
+	c3 := authedHandlerClient(t, bob.ID)
+	responseAliceToken := viewToken(t, ctx, client, alice.TokenIDs[0], alice.GalleryID)
+	responseBobToken := viewToken(t, ctx, client, bob.TokenIDs[0], bob.GalleryID)
+
+	assert.NotEmpty(t, responseAliceToken)
+	assert.NotEmpty(t, responseBobToken)}
 
 func testSyncNewTokens(t *testing.T) {
 	userF := newUserFixture(t)
