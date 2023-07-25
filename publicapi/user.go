@@ -1,10 +1,12 @@
 package publicapi
 
 import (
+	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/task"
 	"strconv"
 	"strings"
 	"time"
@@ -56,6 +58,7 @@ type UserAPI struct {
 	arweaveClient      *goar.Client
 	storageClient      *storage.Client
 	multichainProvider *multichain.Provider
+	taskClient         *gcptasks.Client
 }
 
 func (api UserAPI) GetLoggedInUserId(ctx context.Context) persist.DBID {
@@ -348,6 +351,18 @@ func (api UserAPI) RemoveWalletsFromUser(ctx context.Context, walletIDs []persis
 	err = user.RemoveWalletsFromUser(ctx, userID, walletIDs, api.repos.UserRepository)
 	if err != nil {
 		return err
+	}
+
+	walletRemovalMessage := task.TokenProcessingWalletRemovalMessage{
+		UserID:    userID,
+		WalletIDs: walletIDs,
+	}
+
+	err = task.CreateTaskForWalletRemoval(ctx, walletRemovalMessage, api.taskClient)
+	if err != nil {
+		// Just log the error here. No need to return it -- the actual wallet removal DID succeed,
+		// but tokens owned by the affected wallets won't be updated until the user's next sync.
+		logger.For(ctx).WithError(err).Error("failed to create task to process wallet removal")
 	}
 
 	return nil
