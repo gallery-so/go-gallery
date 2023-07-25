@@ -963,7 +963,7 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 			CreationTime: &notif.CreatedAt,
 			UpdatedTime:  &notif.LastUpdated,
 			Count:        &amount,
-			Tokens:       nil, // handled by dedicated resolver
+			Token:        nil, // handled by dedicated resolver
 		}, nil
 	default:
 		return nil, fmt.Errorf("unknown notification action: %s", notif.Action)
@@ -1078,33 +1078,6 @@ func resolveGroupNotificationUsersConnectionByUserIDs(ctx context.Context, userI
 	}
 
 	return &model.GroupNotificationUsersConnection{
-		Edges:    edges,
-		PageInfo: pageInfoToModel(ctx, pageInfo),
-	}, nil
-}
-
-func resolveGroupNotificationTokensConnectionByTokenIDs(ctx context.Context, TokenIDs persist.DBIDList, before *string, after *string, first *int, last *int) (*model.GroupNotificationTokensConnection, error) {
-	if len(TokenIDs) == 0 {
-		return &model.GroupNotificationTokensConnection{
-			Edges:    []*model.GroupNotificationTokenEdge{},
-			PageInfo: &model.PageInfo{},
-		}, nil
-	}
-	tokens, pageInfo, err := publicapi.For(ctx).Token.GetTokensByIDsPaginate(ctx, TokenIDs, before, after, first, last)
-	if err != nil {
-		return nil, err
-	}
-
-	edges := make([]*model.GroupNotificationTokenEdge, len(tokens))
-
-	for i, token := range tokens {
-		edges[i] = &model.GroupNotificationTokenEdge{
-			Node:   tokenToModel(ctx, token, nil),
-			Cursor: nil,
-		}
-	}
-
-	return &model.GroupNotificationTokensConnection{
 		Edges:    edges,
 		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}, nil
@@ -1908,7 +1881,7 @@ func tokenToModel(ctx context.Context, token db.Token, collectionID *persist.DBI
 		Description:      &token.Description.String,
 		OwnedByWallets:   nil, // handled by dedicated resolver
 		TokenID:          util.ToPointer(token.TokenID.String()),
-		Quantity:         &token.Quantity.String,
+		Quantity:         util.ToPointer(token.Quantity.String()),
 		Owner:            nil, // handled by dedicated resolver
 		OwnershipHistory: nil, // TODO: later
 		TokenMetadata:    &metadataString,

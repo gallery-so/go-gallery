@@ -180,7 +180,7 @@ func processOwnersForContractTokens(mc *multichain.Provider, contractRepo *postg
 	}
 }
 
-func processOwnersForUserTokens(mc *multichain.Provider, validator *validator.Validate) gin.HandlerFunc {
+func processOwnersForUserTokens(mc *multichain.Provider, queries *coredb.Queries, validator *validator.Validate) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input task.TokenProcessingUserTokensMessage
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -189,7 +189,7 @@ func processOwnersForUserTokens(mc *multichain.Provider, validator *validator.Va
 		}
 
 		logger.For(c).WithFields(logrus.Fields{"user_id": input.UserID, "total_tokens": len(input.TokenIdentifiers), "token_ids": input.TokenIdentifiers}).Infof("Processing: %s - Processing User Tokens Refresh (total: %d)", input.UserID, len(input.TokenIdentifiers))
-		newTokens, err := mc.SyncTokensByUserIDAndTokenIdentifiers(c, input.UserID, input.TokenIdentifiers)
+		newTokens, err := mc.SyncTokensByUserIDAndTokenIdentifiers(c, input.UserID, util.MapKeys(input.TokenIdentifiers))
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -197,25 +197,40 @@ func processOwnersForUserTokens(mc *multichain.Provider, validator *validator.Va
 
 		if len(newTokens) > 0 {
 
-			grouped := map[persist.TokenIdentifiers][]persist.TokenGallery{}
-			for _, t := range newTokens {
-				grouped[t.TokenIdentifiers()] = append(grouped[t.TokenIdentifiers()], t)
-			}
-			for _, tokens := range grouped {
-				tokenIDs, _ := util.Map(tokens, func(t persist.TokenGallery) (persist.DBID, error) {
-					return t.ID, nil
-				})
+			for _, token := range newTokens {
+				var curTotal persist.HexString
+				dbUniqueTokenIDs, err := queries.GetUniqueTokenIdentifiersByTokenID(c, token.ID)
+				if err != nil {
+					logger.For(c).Errorf("error getting unique token identifiers: %s", err)
+					continue
+				}
+				for _, q := range dbUniqueTokenIDs.OwnerAddresses {
+					curTotal = input.TokenIdentifiers[persist.TokenUniqueIdentifiers{
+						Chain:           dbUniqueTokenIDs.Chain,
+						ContractAddress: dbUniqueTokenIDs.ContractAddress,
+						TokenID:         dbUniqueTokenIDs.TokenID,
+						OwnerAddress:    persist.Address(q),
+					}].Add(curTotal)
+				}
+
+				// verify the total is less than or equal to the total in the db
+				// if curTotal.BigInt().Cmp(token.Quantity.BigInt()) > 0 {
+				// 	logger.For(c).Errorf("error: total quantity of tokens in db is greater than total quantity of tokens on chain")
+				// 	continue
+				// }
 
 				// one event per token identifier (grouping ERC-1155s)
 				_, err = event.DispatchEvent(c, coredb.Event{
 					ID:             persist.GenerateID(),
 					ActorID:        persist.DBIDToNullStr(input.UserID),
-					ResourceTypeID: persist.ResourceTypeUser,
-					SubjectID:      input.UserID,
+					ResourceTypeID: persist.ResourceTypeToken,
+					SubjectID:      token.ID,
 					UserID:         input.UserID,
+					TokenID:        token.ID,
 					Action:         persist.ActionNewTokensReceived,
 					Data: persist.EventData{
-						NewTokenIDs: tokenIDs,
+						NewTokenID:       token.ID,
+						NewTokenQuantity: curTotal,
 					},
 				}, validator, nil)
 				if err != nil {

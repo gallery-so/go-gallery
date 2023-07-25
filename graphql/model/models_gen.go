@@ -1365,16 +1365,6 @@ type GnosisSafeAuth struct {
 	Nonce   string          `json:"nonce"`
 }
 
-type GroupNotificationTokenEdge struct {
-	Node   *Token  `json:"node"`
-	Cursor *string `json:"cursor"`
-}
-
-type GroupNotificationTokensConnection struct {
-	Edges    []*GroupNotificationTokenEdge `json:"edges"`
-	PageInfo *PageInfo                     `json:"pageInfo"`
-}
-
 type GroupNotificationUserEdge struct {
 	Node   *GalleryUser `json:"node"`
 	Cursor *string      `json:"cursor"`
@@ -1513,12 +1503,12 @@ func (MoveCollectionToGalleryPayload) IsMoveCollectionToGalleryPayloadOrError() 
 
 type NewTokensNotification struct {
 	HelperNewTokensNotificationData
-	Dbid         persist.DBID                       `json:"dbid"`
-	Seen         *bool                              `json:"seen"`
-	CreationTime *time.Time                         `json:"creationTime"`
-	UpdatedTime  *time.Time                         `json:"updatedTime"`
-	Count        *int                               `json:"count"`
-	Tokens       *GroupNotificationTokensConnection `json:"tokens"`
+	Dbid         persist.DBID `json:"dbid"`
+	Seen         *bool        `json:"seen"`
+	CreationTime *time.Time   `json:"creationTime"`
+	UpdatedTime  *time.Time   `json:"updatedTime"`
+	Count        *int         `json:"count"`
+	Token        *Token       `json:"token"`
 }
 
 func (NewTokensNotification) IsNotification()        {}

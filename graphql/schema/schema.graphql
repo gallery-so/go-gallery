@@ -1778,16 +1778,6 @@ type GroupNotificationUsersConnection {
   pageInfo: PageInfo
 }
 
-type GroupNotificationTokenEdge {
-  node: Token
-  cursor: String
-}
-
-type GroupNotificationTokensConnection {
-  edges: [GroupNotificationTokenEdge]
-  pageInfo: PageInfo
-}
-
 type SomeoneFollowedYouNotification implements Notification & Node & GroupedNotification
   @goEmbedHelper {
   id: ID!
@@ -1891,7 +1881,7 @@ type SomeoneViewedYourGalleryNotification implements Notification & Node & Group
   gallery: Gallery @goField(forceResolver: true)
 }
 
-type NewTokensNotification implements Notification & Node & GroupedNotification @goEmbedHelper {
+type NewTokensNotification implements Notification & GroupedNotification & Node @goEmbedHelper {
   id: ID!
   dbid: DBID!
   seen: Boolean
@@ -1899,8 +1889,7 @@ type NewTokensNotification implements Notification & Node & GroupedNotification 
   updatedTime: Time
   count: Int
 
-  tokens(before: String, after: String, first: Int, last: Int): GroupNotificationTokensConnection
-    @goField(forceResolver: true)
+  token: Token @goField(forceResolver: true)
 }
 
 type ClearAllNotificationsPayload {

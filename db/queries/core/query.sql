@@ -298,7 +298,7 @@ select t.* from tokens t
 INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8) RETURNING *;
 
 -- name: CreateTokenEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data, group_id, caption, gallery_id, collection_id) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, $9, $10) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data, group_id, caption, gallery_id, collection_id) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, sqlc.narg('gallery'), sqlc.narg('collection')) RETURNING *;
 
 -- name: CreateCollectionEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data, caption, group_id, gallery_id) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, $9) RETURNING *;
@@ -626,6 +626,17 @@ select * from notifications
     order by created_at desc
     limit 1;
 
+-- name: GetMostRecentNotificationByOwnerIDTokenIDForAction :one
+select * from notifications
+    where owner_id = $1
+    and token_id = $2
+    and action = $3
+    and deleted = false
+    and (not @only_for_feed_event::bool or feed_event_id = $4)
+    and (not @only_for_post::bool or post_id = $5)
+    order by created_at desc
+    limit 1;
+
 -- name: GetNotificationsByOwnerIDForActionAfter :many
 SELECT * FROM notifications
     WHERE owner_id = $1 AND action = $2 AND deleted = false AND created_at > @created_after
@@ -639,6 +650,9 @@ INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id,
 
 -- name: CreateSimpleNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids) VALUES ($1, $2, $3, $4, $5) RETURNING *;
+
+-- name: CreateTokenNotification :one
+INSERT INTO notifications (id, owner_id, action, data, event_ids, token_id, amount) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
 
 -- name: CreateViewGalleryNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids, gallery_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;
@@ -1468,3 +1482,8 @@ JOIN users ON wallets.id = any(users.wallets)
 JOIN params ON wallets.address = params.address AND wallets.chain = params.chain
 WHERE not wallets.deleted AND not users.deleted and not users.universal;
 
+-- name: GetUniqueTokenIdentifiersByTokenID :one
+select tokens.token_id, contracts.address as contract_address, contracts.chain, tokens.quantity, array_agg(wallets.address)::varchar[] as owner_addresses from tokens
+join contracts on tokens.contract = contracts.id
+join wallets on wallets.id = any(tokens.owned_by_wallets)
+where tokens.id = $1 and not tokens.deleted and not contracts.deleted and not wallets.deleted group by (tokens.token_id, contracts.address, contracts.chain, tokens.quantity) limit 1;

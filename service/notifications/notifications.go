@@ -118,6 +118,7 @@ func New(queries *db.Queries, pub *pubsub.Client, taskClient *cloudtasks.Client,
 
 	def := defaultNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
 	group := groupedNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
+	tokenIDGrouped := tokenIDGroupedNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
 	view := viewedNotificationHandler{queries: queries, pubSub: pub, taskClient: taskClient, limiter: limiter}
 
 	// grouped notification actions
@@ -126,7 +127,9 @@ func New(queries *db.Queries, pub *pubsub.Client, taskClient *cloudtasks.Client,
 
 	// single notification actions (default)
 	notifDispatcher.AddHandler(persist.ActionCommentedOnFeedEvent, def)
-	notifDispatcher.AddHandler(persist.ActionNewTokensReceived, def)
+
+	// notification actions that are grouped by token id
+	notifDispatcher.AddHandler(persist.ActionNewTokensReceived, tokenIDGrouped)
 
 	// viewed notifications are handled separately
 	notifDispatcher.AddHandler(persist.ActionViewedGallery, view)
@@ -238,6 +241,38 @@ func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notific
 	curNotif, _ = h.queries.GetMostRecentNotificationByOwnerIDForAction(ctx, db.GetMostRecentNotificationByOwnerIDForActionParams{
 		OwnerID:          notif.OwnerID,
 		Action:           notif.Action,
+		OnlyForFeedEvent: onlyForFeed,
+		FeedEventID:      notif.FeedEventID,
+		PostID:           notif.PostID,
+		OnlyForPost:      onlyForPost,
+	})
+
+	if time.Since(curNotif.CreatedAt) < groupedWindow {
+		logger.For(ctx).Infof("grouping notification %s: %s-%s", curNotif.ID, notif.Action, notif.OwnerID)
+		return updateAndPublishNotif(ctx, notif, curNotif, h.queries, h.pubSub, h.taskClient, h.limiter)
+	}
+	logger.For(ctx).Infof("not grouping notification: %s-%s", notif.Action, notif.OwnerID)
+	return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub, h.taskClient, h.limiter)
+
+}
+
+type tokenIDGroupedNotificationHandler struct {
+	queries    *db.Queries
+	pubSub     *pubsub.Client
+	taskClient *cloudtasks.Client
+	limiter    *pushLimiter
+}
+
+func (h tokenIDGroupedNotificationHandler) Handle(ctx context.Context, notif db.Notification) error {
+	var curNotif db.Notification
+
+	// Bucket notifications on the feed event if it has one
+	onlyForFeed := notif.FeedEventID != ""
+	onlyForPost := notif.PostID != ""
+	curNotif, _ = h.queries.GetMostRecentNotificationByOwnerIDTokenIDForAction(ctx, db.GetMostRecentNotificationByOwnerIDTokenIDForActionParams{
+		OwnerID:          notif.OwnerID,
+		Action:           notif.Action,
+		TokenID:          notif.TokenID,
 		OnlyForFeedEvent: onlyForFeed,
 		FeedEventID:      notif.FeedEventID,
 		PostID:           notif.PostID,
@@ -618,7 +653,7 @@ func updateAndPublishNotif(ctx context.Context, notif db.Notification, mostRecen
 	case persist.ActionUserFollowedUsers:
 		amount = int32(len(resultData.FollowerIDs))
 	case persist.ActionNewTokensReceived:
-		amount = int32(len(resultData.NewTokenIDs))
+		amount = int32(resultData.NewTokenQuantity.BigInt().Uint64())
 	default:
 		amount = mostRecentNotif.Amount + notif.Amount
 	}
@@ -701,7 +736,7 @@ func addNotification(ctx context.Context, notif db.Notification, queries *db.Que
 			Post:      sql.NullString{String: notif.PostID.String(), Valid: true},
 			CommentID: notif.CommentID,
 		})
-	case persist.ActionUserFollowedUsers, persist.ActionNewTokensReceived:
+	case persist.ActionUserFollowedUsers:
 		return queries.CreateSimpleNotification(ctx, db.CreateSimpleNotificationParams{
 			ID:       id,
 			OwnerID:  notif.OwnerID,
@@ -718,7 +753,17 @@ func addNotification(ctx context.Context, notif db.Notification, queries *db.Que
 			EventIds:  notif.EventIds,
 			GalleryID: notif.GalleryID,
 		})
-
+	case persist.ActionNewTokensReceived:
+		amount := notif.Data.NewTokenQuantity.BigInt().Int64()
+		return queries.CreateTokenNotification(ctx, db.CreateTokenNotificationParams{
+			ID:       id,
+			OwnerID:  notif.OwnerID,
+			Action:   notif.Action,
+			Data:     notif.Data,
+			EventIds: notif.EventIds,
+			TokenID:  notif.TokenID,
+			Amount:   int32(amount),
+		})
 	default:
 		return db.Notification{}, fmt.Errorf("unknown notification action: %s", notif.Action)
 	}

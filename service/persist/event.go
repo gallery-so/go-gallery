@@ -37,7 +37,8 @@ type EventData struct {
 	UserBio                             string            `json:"user_bio"`
 	UserFollowedBack                    bool              `json:"user_followed_back"`
 	UserRefollowed                      bool              `json:"user_refollowed"`
-	NewTokenIDs                         DBIDList          `json:"new_token_ids"`
+	NewTokenID                          DBID              `json:"new_token_id"`
+	NewTokenQuantity                    HexString         `json:"new_token_quantity"`
 	TokenCollectorsNote                 string            `json:"token_collectors_note"`
 	TokenCollectionID                   DBID              `json:"token_collection_id"`
 	CollectionTokenIDs                  DBIDList          `json:"collection_token_ids"`

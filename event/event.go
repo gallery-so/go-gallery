@@ -454,6 +454,7 @@ func (h notificationHandler) handleDelayed(ctx context.Context, persistedEvent d
 		FeedEventID: persistedEvent.FeedEventID,
 		PostID:      persistedEvent.PostID,
 		CommentID:   persistedEvent.CommentID,
+		TokenID:     persistedEvent.TokenID,
 	})
 }
 
@@ -477,7 +478,8 @@ func (h notificationHandler) createNotificationDataForEvent(event db.Event) (dat
 		data.FollowedBack = persist.NullBool(event.Data.UserFollowedBack)
 		data.Refollowed = persist.NullBool(event.Data.UserRefollowed)
 	case persist.ActionNewTokensReceived:
-		data.NewTokenIDs = event.Data.NewTokenIDs
+		data.NewTokenID = event.Data.NewTokenID
+		data.NewTokenQuantity = event.Data.NewTokenQuantity
 	default:
 		logger.For(nil).Debugf("no notification data for event: %s", event.Action)
 	}
@@ -506,6 +508,8 @@ func (h notificationHandler) findOwnerForNotificationFromEvent(event db.Event) (
 		return feedEvent.OwnerID, nil
 	case persist.ResourceTypeUser:
 		return event.SubjectID, nil
+	case persist.ResourceTypeToken:
+		return persist.DBID(event.ActorID.String), nil
 	}
 
 	return "", fmt.Errorf("no owner found for event: %s", event.Action)

@@ -1863,9 +1863,9 @@ func (r *mutationResolver) GenerateQRCodeLoginToken(ctx context.Context) (model.
 	}, nil
 }
 
-// Tokens is the resolver for the tokens field.
-func (r *newTokensNotificationResolver) Tokens(ctx context.Context, obj *model.NewTokensNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationTokensConnection, error) {
-	return resolveGroupNotificationTokensConnectionByTokenIDs(ctx, obj.HelperNewTokensNotificationData.NotificationData.NewTokenIDs, before, after, first, last)
+// Token is the resolver for the token field.
+func (r *newTokensNotificationResolver) Token(ctx context.Context, obj *model.NewTokensNotification) (*model.Token, error) {
+	return resolveTokenByTokenID(ctx, obj.NotificationData.NewTokenID)
 }
 
 // Owner is the resolver for the owner field.
