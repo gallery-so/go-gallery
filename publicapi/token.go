@@ -518,17 +518,14 @@ func (api TokenAPI) GetTokenOwnershipByTokenID(ctx context.Context, tokenID pers
 	return api.loaders.TokenOwnershipByTokenID.Load(tokenID)
 }
 
-func (api TokenAPI) ViewToken(ctx context.Context, db.ViewTokenInput{
-			GalleryID:   update.GalleryID,
-			Collections: asList,
-		})) (db.Event, error) {
+func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (db.Event, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"tokenID": validate.WithTag(tokenID, "required"),
+		"tokenID": 		validate.WithTag(tokenID, "required"),
+		"collectionID": validate.WithTag(collectionID, "required"),
 	}); err != nil {
 		return db.Event{}, err
 	}
-
 
 	token, err := api.loaders.TokenByTokenID.Load(tokenID)
 	if err != nil {

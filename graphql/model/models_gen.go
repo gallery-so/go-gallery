@@ -2210,11 +2210,6 @@ type UpdateGalleryCollectionsPayload struct {
 	Gallery *Gallery `json:"gallery"`
 }
 
-type ViewTokenInput struct {
-	GalleryID    persist.DBID   `json:"galleryId"`
-	CollectionID persist.DBID   `json:"collectionID"`
-}
-
 func (UpdateGalleryCollectionsPayload) IsUpdateGalleryCollectionsPayloadOrError() {}
 
 type UpdateGalleryHiddenInput struct {

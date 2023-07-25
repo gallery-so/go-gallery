@@ -1363,9 +1363,9 @@ func viewGallery(t *testing.T, ctx context.Context, c genql.Client, galleryID pe
 }
 
 // viewToken makes a GraphQL request to view a token
-func viewToken(t *testing.T, ctx context.Context, c genql.Client, tokenID persist.DBID) *viewTokenMutationViewTokenViewTokenPayload {
+func viewToken(t *testing.T, ctx context.Context, c genql.Client, tokenID persist.DBID, collectionID persist.DBID) *viewTokenMutationViewTokenViewTokenPayload {
 	t.Helper()
-	resp, err := viewTokenMutation(ctx, c, tokenID)
+	resp, err := viewTokenMutation(ctx, c, tokenID, collectionID)
 	require.NoError(t, err)
 	payload := (*resp.ViewToken).(*viewTokenMutationViewTokenViewTokenPayload)
 	return payload
