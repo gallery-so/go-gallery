@@ -580,7 +580,7 @@ func (r *galleryUserResolver) Feed(ctx context.Context, obj *model.GalleryUser, 
 
 // CuratedFeed is the resolver for the curatedFeed field.
 func (r *galleryUserResolver) CuratedFeed(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
-	events, pageInfo, err := publicapi.For(ctx).Feed.CuratedFeed(ctx, obj.Dbid, before, after, first, last)
+	events, pageInfo, err := publicapi.For(ctx).Feed.CuratedFeed(ctx, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}
@@ -2136,7 +2136,7 @@ func (r *queryResolver) GlobalFeed(ctx context.Context, before *string, after *s
 
 // TrendingFeed is the resolver for the trendingFeed field.
 func (r *queryResolver) TrendingFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
-	events, pageInfo, err := publicapi.For(ctx).Feed.TrendingFeed(ctx, before, after, first, last)
+	events, pageInfo, err := publicapi.For(ctx).Feed.CuratedFeed(ctx, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}

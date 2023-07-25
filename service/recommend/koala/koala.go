@@ -81,13 +81,15 @@ func For(ctx context.Context) *Koala {
 }
 
 func (k *Koala) RelevanceTo(userID persist.DBID, e db.FeedEntityScoringRow) (topS float64, err error) {
+	type matrixPos [2]int
 	if len(e.ContractIds) == 0 {
 		return k.scoreFeatures(userID, e.ActorID, "")
 	}
 	var scored bool
 	var s float64
+	var socialMemo map[matrixPos]float64 = make(map[matrixPos]float64)
 	for _, contractID := range e.ContractIds {
-		s, err = k.scoreFeatures(userID, e.ActorID, contractID)
+		s, err = k.scoreFeatures(userID, e.ActorID, contractID, socialMemo)
 		if err == nil && s > topS {
 			topS = s
 			scored = true
@@ -112,30 +114,37 @@ func (k *Koala) Loop(ctx context.Context, ticker *time.Ticker) {
 	}()
 }
 
-func (k *Koala) scoreFeatures(viewerID, queryID, contractID persist.DBID) (float64, error) {
+func (k *Koala) scoreFeatures(viewerID, queryID, contractID persist.DBID, socialMemo map[matrixPos]float64) (float64, error) {
 	k.mu.Lock()
 	defer k.mu.Unlock()
 	vIdx, vOK := k.uL[viewerID]
 	qIdx, qOK := k.uL[queryID]
 	cIdx, cOK := k.cL[contractID]
+
 	// Nothing to compute
-	if (!vOK || !qOK) && !cOK {
+	if !vOK {
+		// fmt.Println("[koala] no data to compute")
 		return 0, ErrNoInputData
 	}
-	// If vIdx or qIdx not in the matrix, compute the relevance score
-	if (!vOK || !qOK) && cOK {
-		return calcRelevanceScore(k.ratingM, k.displayM, vIdx, cIdx), nil
+	// Compute the relevance score
+	if cOK && !qOK {
+		score := calcRelevanceScore(k.ratingM, k.displayM, vIdx, cIdx)
+		// fmt.Println("[koala] relevance score:", score)
+		return score, nil
 	}
-	// If cIdx not in the matrix, compute the social and similarity scores
-	if (vOK && qOK) && !cOK {
+	// Compute social and similarity scores
+	if qOK && !cOK {
 		socialScore := calcSocialScore(k.userM, vIdx, qIdx)
 		similarityScore := calcSimilarityScore(k.simM, vIdx, qIdx)
-		return ((socialWeight * socialScore) + (similarityWeight * similarityScore)) / 2, nil
+		score := (socialWeight * socialScore) + (similarityWeight * similarityScore)
+		// fmt.Println("[koala] social score:", socialScore, "similarity score:", similarityScore, "full score:", score)
+		return score, nil
 	}
 	socialScore := calcSocialScore(k.userM, vIdx, qIdx)
 	relevanceScore := calcRelevanceScore(k.ratingM, k.displayM, vIdx, cIdx)
 	similarityScore := calcSimilarityScore(k.simM, vIdx, qIdx)
-	score := ((socialWeight * socialScore) + (relevanceWeight * relevanceScore) + (similarityWeight * similarityScore)) / 3
+	score := (socialWeight * socialScore) + (relevanceWeight * relevanceScore) + (similarityWeight * similarityScore)
+	// fmt.Println("[koala] social score:", socialScore, "relevance score:", relevanceScore, "similarity score:", similarityScore, "full score:", score)
 	return score, nil
 }
 
@@ -150,14 +159,17 @@ func (k *Koala) update(userM, ratingM, displayM, simM *sparse.CSR, uL, cL map[pe
 	k.cL = cL
 }
 
-// calcSocialScore determines if vIdx is in the same friend circle as qIdx by running a DFS on userM
+// calcSocialScore determines if vIdx is in the same friend circle as qIdx by running a bfs on userM
 func calcSocialScore(userM *sparse.CSR, vIdx, qIdx int) float64 {
-	n, _ := userM.Dims()
-	return dfs(userM, n, vIdx, qIdx)
+	// now := time.Now()
+	score := bfs(userM, vIdx, qIdx)
+	// fmt.Printf("social score took %s\n", time.Since(now))
+	return score
 }
 
 // calcRelavanceScore computes the relevance of cIdx to vIdx's held tokens
 func calcRelevanceScore(ratingM, displayM *sparse.CSR, vIdx, cIdx int) float64 {
+	// now := time.Now()
 	var top float64
 	v := ratingM.RowView(vIdx).(*sparse.Vector)
 	v.DoNonZero(func(i int, j int, v float64) {
@@ -166,34 +178,75 @@ func calcRelevanceScore(ratingM, displayM *sparse.CSR, vIdx, cIdx int) float64 {
 			top = s
 		}
 	})
+	// fmt.Printf("relevance score took %s\n", time.Since(now))
 	return top
 }
 
 // calcSimilarityScore computes the similarity of vIdx and qIdx based on their interactions with other users
 func calcSimilarityScore(simM *sparse.CSR, vIdx, qIdx int) float64 {
+	// now := time.Now()
 	v1 := simM.RowView(vIdx).(*sparse.Vector)
 	v2 := simM.RowView(qIdx).(*sparse.Vector)
-	return cosineSimilarity(v1, v2)
+	score := cosineSimilarity(v1, v2)
+	// fmt.Printf("similarity score took %s\n", time.Since(now))
+	return score
 }
 
-func dfs(m *sparse.CSR, n, vIdx, qIdx int) float64 {
-	visits := make([]int, n)
-	s := stack{}
-	s.Push(vIdx)
-	for len(s) > 0 {
-		cur := s.Pop()
+type idLookup struct {
+	R []int `json:"r"`
+}
+
+func newIdLookup() idLookup {
+	return idLookup{
+		R: make([]int, 1),
+	}
+}
+
+func (n idLookup) Get(idx int) int {
+	if idx >= len(n.R) {
+		return 0
+	}
+	return n.R[idx]
+}
+
+func (n *idLookup) Set(idx int, i int) {
+	appendVal(&n.R, idx, i)
+}
+
+func extendBy[T any](s *[]T, i int) {
+	if i+1 > cap(*s) {
+		cp := make([]T, i*2, i*2)
+		copy(cp, *s)
+		*s = cp
+	}
+}
+
+func appendVal[T any](s *[]T, i int, v T) {
+	extendBy(s, i)
+	(*s)[i] = v
+}
+
+func bfs(m *sparse.CSR, vIdx, qIdx int) float64 {
+	q := queue{}
+	q.Push(vIdx)
+	depth := newIdLookup()
+	visited := newIdLookup()
+	for len(q) > 0 {
+		cur := q.Pop()
 		if cur == qIdx {
 			return 1
 		}
-		if visits[cur] == 0 {
-			visits[cur] = 1
-			neighbors := m.RowView(cur).(*sparse.Vector)
-			neighbors.DoNonZero(func(i int, j int, v float64) {
-				if visits[i] == 0 {
-					s.Push(i)
-				}
-			})
+		if depth.Get(cur) > 5 {
+			return 0
 		}
+		neighbors := m.RowView(cur).(*sparse.Vector)
+		neighbors.DoNonZero(func(i int, j int, v float64) {
+			if visited.Get(i) == 0 {
+				visited.Set(i, 1)
+				depth.Set(i, depth.Get(cur)+1)
+				q.Push(i)
+			}
+		})
 	}
 	return 0
 }
@@ -207,18 +260,18 @@ func cosineSimilarity(v1, v2 mat.Vector) float64 {
 	return sparse.Dot(v1, v2) / (sparse.Norm(v1, 2) * sparse.Norm(v2, 2))
 }
 
-type stack []int
+type queue []int
 
-func (s *stack) Pop() int {
-	old := *s
-	n := len(old)
-	x := old[n-1]
-	*s = old[:n-1]
-	return x
+func (q *queue) Push(i int) {
+	*q = append(*q, i)
 }
 
-func (s *stack) Push(i int) {
-	*s = append(*s, i)
+func (q *queue) Pop() int {
+	old := *q
+	x := old[0]
+	old[0] = 0
+	*q = old[1:]
+	return x
 }
 
 func readUserLabels(ctx context.Context, q *db.Queries) map[persist.DBID]int {

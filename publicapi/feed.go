@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
+	"runtime/pprof"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -308,12 +310,13 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 				FeedEventEntityType: int32(persist.FeedEventTypeTag),
 				PostEntityType:      int32(persist.PostTypeTag),
 				ExcludedFeedActions: []string{string(persist.ActionUserCreated), string(persist.ActionUserFollowedUsers)},
+				ExcludeViewer:       false, // Viewer's post can be included in the trending feed
 			})
 			if err != nil {
 				return nil, nil, err
 			}
 
-			h := heap{}
+			h := &heap{}
 			now := time.Now()
 
 			for _, event := range trendData {
@@ -325,29 +328,29 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 				}
 
 				// Add first 100 numbers in the heap
-				if len(h) < 100 {
-					heappkg.Push(&h, node)
+				if len(*h) < 100 {
+					heappkg.Push(h, node)
 					continue
 				}
 
 				// If the score is greater than the smallest score in the heap, replace it
-				if score > h[0].(feedNode).score {
-					heappkg.Pop(&h)
-					heappkg.Push(&h, node)
+				if score > (*h)[0].(feedNode).score {
+					heappkg.Pop(h)
+					heappkg.Push(h, node)
 				}
 			}
 
-			entityTypes = make([]persist.FeedEntityType, len(h))
-			entityIDs = make([]persist.DBID, len(h))
+			entityTypes = make([]persist.FeedEntityType, h.Len())
+			entityIDs = make([]persist.DBID, h.Len())
 
-			i := 0
-			for len(h) > 0 {
-				node := heappkg.Pop(&h).(feedNode)
+			i := h.Len() - 1
+			for h.Len() > 0 {
+				node := heappkg.Pop(h).(feedNode)
 				// Postgres uses 1-based indexing
 				entityIDToPos[node.id] = i + 1
 				entityTypes[i] = node.typ
 				entityIDs[i] = node.id
-				i++
+				i--
 			}
 
 			return entityTypes, entityIDs, nil
@@ -396,11 +399,10 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 	return paginator.paginate(before, after, first, last)
 }
 
-func (api FeedAPI) CuratedFeed(ctx context.Context, userID persist.DBID, before, after *string, first, last *int) ([]any, PageInfo, error) {
+func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first, last *int) ([]any, PageInfo, error) {
 	// Validate
-	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"userID": validate.WithTag(userID, "required"),
-	}); err != nil {
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
 		return nil, PageInfo{}, err
 	}
 
@@ -423,16 +425,96 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, userID persist.DBID, before,
 			PostEntityType:      int32(persist.PostTypeTag),
 			FeedEventEntityType: int32(persist.FeedEventTypeTag),
 			ExcludedFeedActions: []string{string(persist.ActionUserCreated), string(persist.ActionUserFollowedUsers)},
+			ExcludeViewer:       true,
+			ViewerID:            userID.String(),
 		})
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
 
-		h := heap{}
-		now := time.Now()
+		h := &heap{}
+
+		eventIDs := make([]persist.DBID, 0)
+		tokenIDs := make([]persist.DBID, 0)
 
 		for _, event := range trendData {
-			score := scorePost(ctx, userID, event, now, int(event.Interactions))
+			if event.FeedEntityType == int32(persist.FeedEventTypeTag) {
+				eventIDs = append(eventIDs, event.ID)
+			}
+		}
+
+		events, errs := api.loaders.FeedEventByFeedEventID.LoadAll(eventIDs)
+		for _, err := range errs {
+			if err != nil {
+				panic(err)
+			}
+		}
+
+		eventIDToEvent := make(map[persist.DBID]db.FeedEvent)
+		for _, event := range events {
+			eventIDToEvent[event.ID] = event
+			if event.Data.TokenID != "" {
+				tokenIDs = append(tokenIDs, event.Data.TokenID)
+			}
+			if event.Data.TokenCollectionID != "" {
+				tokenIDs = append(tokenIDs, event.Data.TokenCollectionID)
+			}
+			for _, tokenID := range event.Data.CollectionTokenIDs {
+				tokenIDs = append(tokenIDs, tokenID)
+			}
+			for _, tIDs := range event.Data.GalleryNewCollectionTokenIDs {
+				for _, tokenID := range tIDs {
+					tokenIDs = append(tokenIDs, tokenID)
+				}
+			}
+		}
+
+		tokens, errs := api.loaders.TokenByTokenID.LoadAll(tokenIDs)
+		for _, err := range errs {
+			if err != nil && !util.ErrorAs[persist.ErrTokenNotFoundByID](err) {
+				panic(err)
+			}
+		}
+
+		tokenToContractID := make(map[persist.DBID]persist.DBID)
+		for _, token := range tokens {
+			tokenToContractID[token.ID] = token.Contract
+		}
+
+		if cpuprofile != "" {
+			f, err := os.Create(cpuprofile)
+			if err != nil {
+				panic(err)
+			}
+			pprof.StartCPUProfile(f)
+			defer pprof.StopCPUProfile()
+		}
+
+		now := time.Now()
+		for _, event := range trendData {
+			e := eventIDToEvent[event.ID]
+			if event.FeedEntityType == int32(persist.FeedEventTypeTag) {
+				if contractID := tokenToContractID[e.Data.TokenID]; contractID != "" {
+					event.ContractIds = append(event.ContractIds, contractID)
+				}
+				if contractID := tokenToContractID[e.Data.TokenCollectionID]; contractID != "" {
+					event.ContractIds = append(event.ContractIds, contractID)
+				}
+				for _, tokenID := range e.Data.CollectionTokenIDs {
+					if contractID := tokenToContractID[tokenID]; contractID != "" {
+						event.ContractIds = append(event.ContractIds, contractID)
+					}
+				}
+				for _, tIDs := range e.Data.GalleryNewCollectionTokenIDs {
+					for _, tokenID := range tIDs {
+						if contractID := tokenToContractID[tokenID]; contractID != "" {
+							event.ContractIds = append(event.ContractIds, contractID)
+						}
+					}
+				}
+			}
+
+			score := scoreFeedEntity(ctx, userID, event, now, int(event.Interactions))
 			node := feedNode{
 				id:    event.ID,
 				score: score,
@@ -440,29 +522,29 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, userID persist.DBID, before,
 			}
 
 			// Add first 100 numbers in the heap
-			if len(h) < 100 {
-				heappkg.Push(&h, node)
+			if len(*h) < 100 {
+				heappkg.Push(h, node)
 				continue
 			}
 
-			// If the score is greater than the smallest score in the heap, replace it
-			if score > h[0].(feedNode).score {
-				heappkg.Pop(&h)
-				heappkg.Push(&h, node)
+			if score > (*h)[0].(feedNode).score {
+				heappkg.Pop(h)
+				heappkg.Push(h, node)
 			}
 		}
+		fmt.Println("took", time.Since(now))
 
-		entityTypes = make([]persist.FeedEntityType, len(h))
-		entityIDs = make([]persist.DBID, len(h))
+		entityTypes = make([]persist.FeedEntityType, h.Len())
+		entityIDs = make([]persist.DBID, h.Len())
 
-		i := 0
-		for len(h) > 0 {
-			node := heappkg.Pop(&h).(feedNode)
+		i := h.Len() - 1
+		for h.Len() > 0 {
+			node := heappkg.Pop(h).(feedNode)
 			// Postgres uses 1-based indexing
 			entityIDToPos[node.id] = i + 1
 			entityTypes[i] = node.typ
 			entityIDs[i] = node.id
-			i++
+			i--
 		}
 	}
 
@@ -632,7 +714,7 @@ func loadFeedEntities(ctx context.Context, d *dataloader.Loaders, typs []persist
 	return entities, nil
 }
 
-func scorePost(ctx context.Context, viewerID persist.DBID, e db.FeedEntityScoringRow, t time.Time, interactions int) float64 {
+func scoreFeedEntity(ctx context.Context, viewerID persist.DBID, e db.FeedEntityScoringRow, t time.Time, interactions int) float64 {
 	timeF := timeFactor(e.CreatedAt, t)
 	engagementF := engagementFactor(interactions)
 	personalizationF, err := koala.For(ctx).RelevanceTo(viewerID, e)
@@ -674,8 +756,7 @@ func (h heap) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
 func (h *heap) Push(s any)   { *h = append(*h, s) }
 
 func (h heap) Less(i, j int) bool {
-	// We want Pop to give us the highest, not lowest, score so we use greater than here.
-	return h[i].(priorityNode).Score() > h[j].(priorityNode).Score()
+	return h[i].(priorityNode).Score() < h[j].(priorityNode).Score()
 }
 
 func (h *heap) Pop() any {
@@ -849,3 +930,8 @@ func max(a, b int) int {
 	}
 	return b
 }
+
+var (
+	cpuprofile string = "koala.prof"
+	memprofile string = "koala.mprof"
+)

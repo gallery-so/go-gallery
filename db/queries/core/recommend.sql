@@ -63,7 +63,7 @@ where contract_id not in (
 with ids as (
     select id, feed_entity_type, created_at
     from feed_entities fe
-    where fe.created_at >= @window_end
+    where fe.created_at >= @window_end and (not @exclude_viewer::bool or fe.actor_id != @viewer_id::varchar)
 ), selected_posts as (
     select ids.id, ids.feed_entity_type, ids.created_at, p.actor_id, p.contract_ids, count(distinct c.id) + count(distinct a.id) interactions
     from ids
@@ -77,7 +77,7 @@ with ids as (
     join feed_events e on e.id = ids.id and feed_entity_type = @feed_event_entity_type
     left join comments c on c.feed_event_id = ids.id
     left join admires a on a.feed_event_id = ids.id
-    where not (action = any(@excluded_feed_actions::varchar[]))
+    where not action = any(@excluded_feed_actions::varchar[])
     group by ids.id, ids.feed_entity_type, ids.created_at, e.owner_id, null::varchar[]
 )
 select * from selected_posts
