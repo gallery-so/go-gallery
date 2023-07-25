@@ -757,7 +757,7 @@ func testTrendingFeedEvents(t *testing.T) {
 		userF.FeedEventIDs[1],
 	}
 
-	actual := trendingFeedEvents(t, ctx, c, 10)
+	actual := trendingFeedEvents(t, ctx, c, 10, true)
 
 	assert.Equal(t, expected, actual)
 }
@@ -767,7 +767,7 @@ func testDeletePost(t *testing.T) {
 	userF := newUserWithFeedEntitiesFixture(t)
 	c := authedHandlerClient(t, userF.ID)
 	deletePost(t, ctx, c, userF.PostIDs[0])
-	actual := globalFeedEvents(t, ctx, c, 4)
+	actual := globalFeedEvents(t, ctx, c, 4, true)
 	assert.False(t, util.Contains(actual, userF.PostIDs[0]))
 }
 
@@ -1334,9 +1334,9 @@ func createPost(t *testing.T, ctx context.Context, c genql.Client, input PostTok
 }
 
 // globalFeedEvents makes a GraphQL request to return existing feed events
-func globalFeedEvents(t *testing.T, ctx context.Context, c genql.Client, limit int) []persist.DBID {
+func globalFeedEvents(t *testing.T, ctx context.Context, c genql.Client, limit int, includePosts bool) []persist.DBID {
 	t.Helper()
-	resp, err := globalFeedQuery(ctx, c, &limit)
+	resp, err := globalFeedQuery(ctx, c, &limit, includePosts)
 	require.NoError(t, err)
 	feedEntities := make([]persist.DBID, len(resp.GlobalFeed.Edges))
 	for i, event := range resp.GlobalFeed.Edges {
@@ -1354,9 +1354,9 @@ func globalFeedEvents(t *testing.T, ctx context.Context, c genql.Client, limit i
 }
 
 // trendingFeedEvents makes a GraphQL request to return trending feedEvents
-func trendingFeedEvents(t *testing.T, ctx context.Context, c genql.Client, limit int) []persist.DBID {
+func trendingFeedEvents(t *testing.T, ctx context.Context, c genql.Client, limit int, includePosts bool) []persist.DBID {
 	t.Helper()
-	resp, err := trendingFeedQuery(ctx, c, &limit)
+	resp, err := trendingFeedQuery(ctx, c, &limit, includePosts)
 	require.NoError(t, err)
 	feedEvents := make([]persist.DBID, len(resp.TrendingFeed.Edges))
 	for i, event := range resp.TrendingFeed.Edges {
