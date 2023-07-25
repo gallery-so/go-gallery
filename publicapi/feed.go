@@ -290,11 +290,10 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 	}
 
 	var (
-		err           error
-		paginator     feedPaginator
-		entityTypes   []persist.FeedEntityType
-		entityIDs     []persist.DBID
-		entityIDToPos = make(map[persist.DBID]int)
+		err         error
+		paginator   feedPaginator
+		entityTypes []persist.FeedEntityType
+		entityIDs   []persist.DBID
 	)
 
 	hasCursors := before != nil || after != nil
@@ -357,39 +356,51 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 		}
 	}
 
-	for i, id := range entityIDs {
-		// Postgres uses 1-based indexing
-		entityIDToPos[id] = i + 1
-	}
+	entityIDToPos := make(map[persist.DBID]int)
 
 	queryFunc := func(params feedPagingParams) ([]any, error) {
-		if !hasCursors {
-			params.EntityTypes = entityTypes
-			params.EntityIDs = entityIDs
+		if hasCursors {
+			entityTypes = params.EntityTypes
+			entityIDs = params.EntityIDs
 		}
 
-		// Restrict cursors to actual size of the slice
+		for i, id := range entityIDs {
+			entityIDToPos[id] = i
+		}
+
 		curBeforePos := max(params.CurBeforePos, 0)
-		curAfterPos := min(params.CurAfterPos-1, len(params.EntityIDs))
+		curAfterPos := min(params.CurAfterPos, len(entityTypes))
+
+		var subTypes []persist.FeedEntityType
+		var subIDs []persist.DBID
 
 		if params.PagingForward {
 			// If paging forward, we extend from the after cursor up to the limit or to the before cursor, whatever is larger
-			limitPos := max(curAfterPos-int(params.Limit), curBeforePos)
-			params.EntityTypes = params.EntityTypes[limitPos:curAfterPos]
-			params.EntityIDs = params.EntityIDs[limitPos:curAfterPos]
+			// Plus one because curAfterPos is the index of the last node fetched, and we want to skip it
+			limitPos := max(curAfterPos-int(params.Limit)+1, curBeforePos)
+			subTypes = entityTypes[limitPos:curAfterPos]
+			subIDs = entityIDs[limitPos:curAfterPos]
 		} else {
 			// If paging backwards, we extend from the before cursor up to the limit or to the after cursor, whatever is smaller
 			limitPos := min(curBeforePos+int(params.Limit), curAfterPos)
-			params.EntityTypes = params.EntityTypes[curBeforePos:limitPos]
-			params.EntityIDs = params.EntityIDs[curBeforePos:limitPos]
+			// Add one if curBeforePos is set, because we want to skip it
+			if params.CurBeforePos != -1 {
+				curBeforePos++
+			}
+			subTypes = entityTypes[curBeforePos:limitPos]
+			subIDs = entityIDs[curBeforePos:limitPos]
 		}
 
-		return loadFeedEntities(ctx, api.loaders, params.EntityTypes, params.EntityIDs)
+		return loadFeedEntities(ctx, api.loaders, subTypes, subIDs)
 	}
 
 	cursorFunc := func(node any) (int, []persist.FeedEntityType, []persist.DBID, error) {
 		_, id, err := feedCursor(node)
-		return entityIDToPos[id], entityTypes, entityIDs, err
+		pos, ok := entityIDToPos[id]
+		if !ok {
+			panic(fmt.Sprintf("could not find position for id=%s", id))
+		}
+		return pos, entityTypes, entityIDs, err
 	}
 
 	paginator.QueryFunc = queryFunc
