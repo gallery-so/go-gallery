@@ -9021,7 +9021,13 @@ func (v *viewTokenMutationViewTokenViewTokenPayloadToken) GetContract() *viewTok
 
 // viewTokenMutationViewTokenViewTokenPayloadTokenContract includes the requested fields of the GraphQL type Contract.
 type viewTokenMutationViewTokenViewTokenPayloadTokenContract struct {
+	Dbid            persist.DBID                                                                        `json:"dbid"`
 	ContractAddress *viewTokenMutationViewTokenViewTokenPayloadTokenContractContractAddressChainAddress `json:"contractAddress"`
+}
+
+// GetDbid returns viewTokenMutationViewTokenViewTokenPayloadTokenContract.Dbid, and is useful for accessing the field via an interface.
+func (v *viewTokenMutationViewTokenViewTokenPayloadTokenContract) GetDbid() persist.DBID {
+	return v.Dbid
 }
 
 // GetContractAddress returns viewTokenMutationViewTokenViewTokenPayloadTokenContract.ContractAddress, and is useful for accessing the field via an interface.
@@ -12011,6 +12017,7 @@ mutation viewTokenMutation ($tokenID: DBID!) {
 			token {
 				dbid
 				contract {
+					dbid
 					contractAddress {
 						address
 						chain

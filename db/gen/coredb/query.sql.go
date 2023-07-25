@@ -458,11 +458,11 @@ type CreateCollectionEventParams struct {
 	ActorID        sql.NullString       `json:"actor_id"`
 	Action         persist.Action       `json:"action"`
 	ResourceTypeID persist.ResourceType `json:"resource_type_id"`
-	CollectionID   persist.DBID         `json:"collection_id"`
+	CollectionID   sql.NullString       `json:"collection_id"`
 	Data           persist.EventData    `json:"data"`
 	Caption        sql.NullString       `json:"caption"`
 	GroupID        sql.NullString       `json:"group_id"`
-	GalleryID      persist.DBID         `json:"gallery_id"`
+	GalleryID      sql.NullString       `json:"gallery_id"`
 }
 
 func (q *Queries) CreateCollectionEvent(ctx context.Context, arg CreateCollectionEventParams) (Event, error) {
@@ -702,7 +702,7 @@ type CreateGalleryEventParams struct {
 	ActorID        sql.NullString       `json:"actor_id"`
 	Action         persist.Action       `json:"action"`
 	ResourceTypeID persist.ResourceType `json:"resource_type_id"`
-	GalleryID      persist.DBID         `json:"gallery_id"`
+	GalleryID      sql.NullString       `json:"gallery_id"`
 	Data           persist.EventData    `json:"data"`
 	ExternalID     sql.NullString       `json:"external_id"`
 	GroupID        sql.NullString       `json:"group_id"`
@@ -809,8 +809,8 @@ type CreateTokenEventParams struct {
 	Data           persist.EventData    `json:"data"`
 	GroupID        sql.NullString       `json:"group_id"`
 	Caption        sql.NullString       `json:"caption"`
-	GalleryID      persist.DBID         `json:"gallery_id"`
-	CollectionID   persist.DBID         `json:"collection_id"`
+	GalleryID      sql.NullString       `json:"gallery_id"`
+	CollectionID   sql.NullString       `json:"collection_id"`
 }
 
 func (q *Queries) CreateTokenEvent(ctx context.Context, arg CreateTokenEventParams) (Event, error) {
@@ -2131,7 +2131,7 @@ type GetGalleryEventsInWindowParams struct {
 	ID             persist.DBID       `json:"id"`
 	Secs           float64            `json:"secs"`
 	Actions        persist.ActionList `json:"actions"`
-	GalleryID      persist.DBID       `json:"gallery_id"`
+	GalleryID      sql.NullString     `json:"gallery_id"`
 	IncludeSubject bool               `json:"include_subject"`
 }
 
@@ -4877,7 +4877,7 @@ select exists(
 
 type IsActorGalleryActiveParams struct {
 	ActorID     sql.NullString `json:"actor_id"`
-	GalleryID   persist.DBID   `json:"gallery_id"`
+	GalleryID   sql.NullString `json:"gallery_id"`
 	WindowStart time.Time      `json:"window_start"`
 	WindowEnd   time.Time      `json:"window_end"`
 }

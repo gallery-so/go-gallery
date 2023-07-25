@@ -146,6 +146,10 @@ sql:
             go_type: 'database/sql.NullString'
           - column: 'events.group_id'
             go_type: 'database/sql.NullString'
+          - column: 'events.collection_id'
+            go_type: 'database/sql.NullString'
+          - column: 'events.gallery_id'
+            go_type: 'database/sql.NullString'
 
           # Comments
           - column: 'comments.reply_to'

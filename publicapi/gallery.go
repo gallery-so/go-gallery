@@ -131,8 +131,8 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 			Action:         persist.ActionCollectionCreated,
 			ResourceTypeID: persist.ResourceTypeCollection,
 			SubjectID:      collectionID,
-			CollectionID:   collectionID,
-			GalleryID:      update.GalleryID,
+			CollectionID:   util.ToNullString(collectionID.String(), true),
+			GalleryID:      util.ToNullString(update.GalleryID.String(), true),
 			Data: persist.EventData{
 				CollectionTokenIDs:       c.Tokens,
 				CollectionCollectorsNote: c.CollectorsNote,
@@ -178,7 +178,7 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 			ActorID:        persist.DBIDToNullStr(userID),
 			Action:         persist.ActionGalleryInfoUpdated,
 			ResourceTypeID: persist.ResourceTypeGallery,
-			GalleryID:      update.GalleryID,
+			GalleryID:      util.ToNullString(update.GalleryID.String(), true),
 			SubjectID:      update.GalleryID,
 		}
 
@@ -309,8 +309,8 @@ func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, actor, g
 				ResourceTypeID: persist.ResourceTypeCollection,
 				SubjectID:      collection.Dbid,
 				Action:         persist.ActionCollectorsNoteAddedToCollection,
-				CollectionID:   collection.Dbid,
-				GalleryID:      gallery,
+				CollectionID:   util.ToNullString(collection.Dbid.String(), true),
+				GalleryID:      util.ToNullString(gallery.String(), true),
 				Data: persist.EventData{
 					CollectionCollectorsNote: collection.CollectorsNote,
 				},
@@ -352,8 +352,8 @@ func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, actor, g
 				SubjectID:      collection.Dbid,
 				Action:         persist.ActionTokensAddedToCollection,
 				ActorID:        persist.DBIDToNullStr(actor),
-				CollectionID:   collection.Dbid,
-				GalleryID:      gallery,
+				CollectionID:   util.ToNullString(collection.Dbid.String(), true),
+				GalleryID:      util.ToNullString(gallery.String(), true),
 				Data: persist.EventData{
 					CollectionTokenIDs: diff,
 				},
@@ -638,7 +638,7 @@ func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (
 				ResourceTypeID: persist.ResourceTypeGallery,
 				SubjectID:      galleryID,
 				Action:         persist.ActionViewedGallery,
-				GalleryID:      galleryID,
+				GalleryID:      util.ToNullString(galleryID.String(), true),
 			}, api.validator, nil)
 			if err != nil {
 				return db.Gallery{}, err
@@ -649,7 +649,7 @@ func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (
 			ResourceTypeID: persist.ResourceTypeGallery,
 			SubjectID:      galleryID,
 			Action:         persist.ActionViewedGallery,
-			GalleryID:      galleryID,
+			GalleryID:      util.ToNullString(galleryID.String(), true),
 			ExternalID:     persist.StrPtrToNullStr(getExternalID(ctx)),
 		}, api.validator, nil)
 		if err != nil {

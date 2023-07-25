@@ -223,7 +223,8 @@ func (b *EventBuilder) createGalleryUpdatedFeedEvent(ctx context.Context, event 
 	if event.GroupID.String != "" {
 		events, err = b.queries.GetEventsInGroup(ctx, event.GroupID)
 	} else {
-		events, err = b.eventRepo.EventsInWindowForGallery(ctx, event.ID, event.GalleryID, env.GetInt("FEED_WINDOW_SIZE"), groupingConfig[persist.ActionGalleryUpdated], false)
+		galleryID := persist.DBID(event.GalleryID.String)
+		events, err = b.eventRepo.EventsInWindowForGallery(ctx, event.ID, galleryID, env.GetInt("FEED_WINDOW_SIZE"), groupingConfig[persist.ActionGalleryUpdated], false)
 	}
 	if err != nil {
 		return nil, err

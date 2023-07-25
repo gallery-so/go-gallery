@@ -7,6 +7,7 @@ import (
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/util"
 )
 
 type EventRepository struct {
@@ -72,7 +73,7 @@ func (r *EventRepository) AddCollectionEvent(ctx context.Context, event db.Event
 		ActorID:        event.ActorID,
 		Action:         event.Action,
 		ResourceTypeID: event.ResourceTypeID,
-		CollectionID:   event.SubjectID,
+		CollectionID:   util.ToNullString(event.SubjectID.String(), true),
 		Data:           event.Data,
 		Caption:        event.Caption,
 		GroupID:        event.GroupID,
@@ -199,6 +200,6 @@ func (r *EventRepository) EventsInWindowForGallery(ctx context.Context, eventID,
 		Secs:           float64(windowSeconds),
 		Actions:        actions,
 		IncludeSubject: includeSubject,
-		GalleryID:      galleryID,
+		GalleryID:      util.ToNullString(galleryID.String(), true),
 	})
 }

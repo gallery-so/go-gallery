@@ -382,6 +382,7 @@ mutation viewTokenMutation($tokenID: DBID!) {
       token {
         dbid
         contract {
+          dbid
           contractAddress {
             address
             chain

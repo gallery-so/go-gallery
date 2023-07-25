@@ -127,6 +127,7 @@ func (c *combinedGalleryEvent) merge(eventsAsc []db.Event) *combinedGalleryEvent
 	// first group collection events by coll id
 	collectionEvents := make(map[persist.DBID][]db.Event)
 	for _, event := range eventsAsc {
+		collectionID := persist.DBID(event.CollectionID.String)
 		if event.GroupID.Valid {
 			if c.groupID != nil && *c.groupID != event.GroupID.String {
 				logger.For(context.Background()).Errorf("group id mismatch: %s != %s", *c.groupID, event.GroupID.String)
@@ -138,7 +139,7 @@ func (c *combinedGalleryEvent) merge(eventsAsc []db.Event) *combinedGalleryEvent
 			c.actorID = persist.DBID(event.ActorID.String)
 		}
 		if c.galleryID == "" {
-			c.galleryID = event.GalleryID
+			c.galleryID = persist.DBID(event.GalleryID.String)
 		}
 		if event.Caption.String != "" {
 			c.caption = &event.Caption.String
@@ -154,15 +155,15 @@ func (c *combinedGalleryEvent) merge(eventsAsc []db.Event) *combinedGalleryEvent
 		} else if event.Action == persist.ActionCollectorsNoteAddedToToken {
 			if c.tokenCollectorsNotes == nil {
 				c.tokenCollectorsNotes = make(map[persist.DBID]map[persist.DBID]string)
-				c.tokenCollectorsNotes[event.CollectionID] = make(map[persist.DBID]string)
-			} else if c.tokenCollectorsNotes[event.CollectionID] == nil {
-				c.tokenCollectorsNotes[event.CollectionID] = make(map[persist.DBID]string)
+				c.tokenCollectorsNotes[collectionID] = make(map[persist.DBID]string)
+			} else if c.tokenCollectorsNotes[collectionID] == nil {
+				c.tokenCollectorsNotes[collectionID] = make(map[persist.DBID]string)
 			}
-			c.tokenCollectorsNotes[event.CollectionID][event.TokenID] = event.Data.TokenCollectorsNote
+			c.tokenCollectorsNotes[collectionID][event.TokenID] = event.Data.TokenCollectorsNote
 			continue
 		}
 
-		collectionEvents[event.CollectionID] = append(collectionEvents[event.CollectionID], event)
+		collectionEvents[collectionID] = append(collectionEvents[collectionID], event)
 	}
 
 	mergedCollEvents := make([]*combinedCollectionEvent, 0, len(collectionEvents))
@@ -172,20 +173,21 @@ func (c *combinedGalleryEvent) merge(eventsAsc []db.Event) *combinedGalleryEvent
 	}
 
 	for _, collEvent := range mergedCollEvents {
+		collectionID := persist.DBID(collEvent.event.CollectionID.String)
 		if collEvent.event.Data.CollectionCollectorsNote != "" {
 			if c.collectionCollectorsNotes == nil {
 				c.collectionCollectorsNotes = make(map[persist.DBID]string)
 			}
-			c.collectionCollectorsNotes[collEvent.event.CollectionID] = collEvent.event.Data.CollectionCollectorsNote
+			c.collectionCollectorsNotes[collectionID] = collEvent.event.Data.CollectionCollectorsNote
 		}
 		if collEvent.event.Data.CollectionTokenIDs != nil {
 			if c.tokensAdded == nil {
 				c.tokensAdded = make(map[persist.DBID]persist.DBIDList)
 			}
-			c.tokensAdded[collEvent.event.CollectionID] = collEvent.event.Data.CollectionTokenIDs
+			c.tokensAdded[collectionID] = collEvent.event.Data.CollectionTokenIDs
 		}
 		if collEvent.isNewCollection {
-			c.newCollections = append(c.newCollections, collEvent.event.CollectionID)
+			c.newCollections = append(c.newCollections, collectionID)
 		}
 
 		if collEvent.event.Caption.String != "" {

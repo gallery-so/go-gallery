@@ -111,13 +111,13 @@ type Event struct {
 	SubjectID      persist.DBID         `json:"subject_id"`
 	UserID         persist.DBID         `json:"user_id"`
 	TokenID        persist.DBID         `json:"token_id"`
-	CollectionID   persist.DBID         `json:"collection_id"`
+	CollectionID   sql.NullString       `json:"collection_id"`
 	Action         persist.Action       `json:"action"`
 	Data           persist.EventData    `json:"data"`
 	Deleted        bool                 `json:"deleted"`
 	LastUpdated    time.Time            `json:"last_updated"`
 	CreatedAt      time.Time            `json:"created_at"`
-	GalleryID      persist.DBID         `json:"gallery_id"`
+	GalleryID      sql.NullString       `json:"gallery_id"`
 	CommentID      persist.DBID         `json:"comment_id"`
 	AdmireID       persist.DBID         `json:"admire_id"`
 	FeedEventID    persist.DBID         `json:"feed_event_id"`

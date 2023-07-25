@@ -11,9 +11,9 @@ import (
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
+	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -463,8 +463,8 @@ func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, c
 		Action:         persist.ActionCollectorsNoteAddedToToken,
 		ResourceTypeID: persist.ResourceTypeToken,
 		TokenID:        tokenID,
-		CollectionID:   collectionID,
-		GalleryID:      galleryID,
+		CollectionID:   util.ToNullString(collectionID.String(), true),
+		GalleryID:      util.ToNullString(galleryID.String(), true),
 		SubjectID:      tokenID,
 		Data: persist.EventData{
 			TokenCollectionID:   collectionID,
@@ -539,11 +539,13 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID) (db.Eve
 			return db.Event{}, err
 		}
 		eventPtr, err := api.repos.EventRepository.Add(ctx, db.Event{
-		ActorID:        persist.DBIDToNullStr(userID),
-		Action:         persist.ActionViewedToken,
-		ResourceTypeID: persist.ResourceTypeToken,
-		CollectionID:   tokenID,
-		Data: persist.EventData{
+			ActorID:        persist.DBIDToNullStr(userID),
+			Action:         persist.ActionViewedToken,
+			ResourceTypeID: persist.ResourceTypeToken,
+			SubjectID:      tokenID,
+			TokenID:        tokenID,
+			// CollectionID:   tokenID,
+			Data: persist.EventData{
 				TokenContractID: token.Contract,
 			},
 		})

@@ -394,7 +394,7 @@ func (h notificationHandler) handleDelayed(ctx context.Context, persistedEvent d
 		Action:      persistedEvent.Action,
 		Data:        h.createNotificationDataForEvent(persistedEvent),
 		EventIds:    persist.DBIDList{persistedEvent.ID},
-		GalleryID:   persistedEvent.GalleryID,
+		GalleryID:   persist.DBID(persistedEvent.GalleryID.String),
 		FeedEventID: persistedEvent.FeedEventID,
 		PostID:      persistedEvent.PostID,
 		CommentID:   persistedEvent.CommentID,
@@ -427,7 +427,7 @@ func (h notificationHandler) createNotificationDataForEvent(event db.Event) (dat
 func (h notificationHandler) findOwnerForNotificationFromEvent(event db.Event) (persist.DBID, error) {
 	switch event.ResourceTypeID {
 	case persist.ResourceTypeGallery:
-		gallery, err := h.dataloaders.GalleryByGalleryID.Load(event.GalleryID)
+		gallery, err := h.dataloaders.GalleryByGalleryID.Load(persist.DBID(event.GalleryID.String))
 		if err != nil {
 			return "", err
 		}

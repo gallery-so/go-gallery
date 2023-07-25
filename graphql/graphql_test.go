@@ -669,7 +669,7 @@ func testViewsAreRolledUp(t *testing.T) {
 	ctx := context.Background()
 	// bob views gallery
 	client := authedServerClient(t, serverF.URL, bob.ID)
-    viewGallery(t, ctx, client, userF.GalleryID)
+	viewGallery(t, ctx, client, userF.GalleryID)
 	// responseBobViewToken := viewToken(t, ctx, client, cat.TokenIDs[0])
 	// // alice views gallery
 	client = authedServerClient(t, serverF.URL, alice.ID)
@@ -790,11 +790,9 @@ func testGetCommunity(t *testing.T) {
 
 func testViewToken(t *testing.T) {
 	ctx := context.Background()
-	userF := newUserWithFeedEntitiesFixture(t)
+	userF := newUserWithTokensFixture(t)
 	c := authedHandlerClient(t, userF.ID)
-	deletePost(t, ctx, c, userF.PostIDs[0])
-	actual := globalFeedEvents(t, ctx, c, 4)
-	assert.False(t, util.Contains(actual, userF.PostIDs[0]))
+	viewToken(t, ctx, c, userF.TokenIDs[0])
 }
 
 func testSyncNewTokens(t *testing.T) {
