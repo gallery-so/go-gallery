@@ -1896,9 +1896,9 @@ type ViewTokenPayload {
 
 union ViewTokenPayloadOrError =
     ViewTokenPayload
- | ErrAuthenticationFailed
- | ErrTokenNotFound
- | ErrGalleryNotFound
+  | ErrAuthenticationFailed
+  | ErrTokenNotFound
+  | ErrGalleryNotFound
 
 input VerifyEmailInput {
   token: String! @scrub
