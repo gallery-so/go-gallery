@@ -292,10 +292,11 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 	}
 
 	var (
-		err         error
-		paginator   feedPaginator
-		entityTypes []persist.FeedEntityType
-		entityIDs   []persist.DBID
+		err           error
+		paginator     feedPaginator
+		entityTypes   []persist.FeedEntityType
+		entityIDs     []persist.DBID
+		entityIDToPos = make(map[persist.DBID]int)
 	)
 
 	hasCursors := before != nil || after != nil
@@ -359,7 +360,118 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 		}
 	}
 
-	entityIDToPos := make(map[persist.DBID]int)
+	queryFunc := func(params feedPagingParams) ([]any, error) {
+		if hasCursors {
+			entityTypes = params.EntityTypes
+			entityIDs = params.EntityIDs
+		}
+
+		for i, id := range entityIDs {
+			entityIDToPos[id] = i
+		}
+
+		curBeforePos := max(params.CurBeforePos, 0)
+		curAfterPos := min(params.CurAfterPos, len(entityTypes))
+
+		var subTypes []persist.FeedEntityType
+		var subIDs []persist.DBID
+
+		if params.PagingForward {
+			// If paging forward, we extend from the after cursor up to the limit or to the before cursor, whatever is larger
+			// Plus one because curAfterPos is the index of the last node fetched, and we want to skip it
+			limitPos := max(curAfterPos-int(params.Limit)+1, curBeforePos)
+			subTypes = entityTypes[limitPos:curAfterPos]
+			subIDs = entityIDs[limitPos:curAfterPos]
+		} else {
+			// If paging backwards, we extend from the before cursor up to the limit or to the after cursor, whatever is smaller
+			limitPos := min(curBeforePos+int(params.Limit), curAfterPos)
+			// Add one if curBeforePos is set, because we want to skip it
+			if params.CurBeforePos != -1 {
+				curBeforePos++
+			}
+			subTypes = entityTypes[curBeforePos:limitPos]
+			subIDs = entityIDs[curBeforePos:limitPos]
+		}
+
+		return loadFeedEntities(ctx, api.loaders, subTypes, subIDs)
+	}
+
+	cursorFunc := func(node any) (int, []persist.FeedEntityType, []persist.DBID, error) {
+		_, id, err := feedCursor(node)
+		pos, ok := entityIDToPos[id]
+		if !ok {
+			panic(fmt.Sprintf("could not find position for id=%s", id))
+		}
+		return pos, entityTypes, entityIDs, err
+	}
+
+	paginator.QueryFunc = queryFunc
+	paginator.CursorFunc = cursorFunc
+	return paginator.paginate(before, after, first, last)
+}
+
+func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first, last *int) ([]any, PageInfo, error) {
+	// Validate
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	var (
+		paginator     feedPaginator
+		entityTypes   []persist.FeedEntityType
+		entityIDs     []persist.DBID
+		entityIDToPos = make(map[persist.DBID]int)
+	)
+
+	hasCursors := before != nil || after != nil
+
+	if !hasCursors {
+		trendData, err := api.queries.FeedEntityScoring(ctx, db.FeedEntityScoringParams{
+			WindowEnd:           time.Now().Add(-time.Duration(72 * time.Hour)),
+			PostEntityType:      int32(persist.PostTypeTag),
+			FeedEventEntityType: int32(persist.FeedEventTypeTag),
+			ExcludedFeedActions: []string{string(persist.ActionUserCreated), string(persist.ActionUserFollowedUsers)},
+		})
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+
+		h := &heap{}
+		now := time.Now()
+
+		for _, event := range trendData {
+			score := scoreFeedEntity(ctx, userID, event, now, int(event.Interactions))
+			node := feedNode{id: event.ID, score: score, typ: persist.FeedEntityType(event.FeedEntityType)}
+
+			// Add first 100 numbers in the heap
+			if h.Len() < 100 {
+				heappkg.Push(h, node)
+				continue
+			}
+
+			// If the score is greater than the smallest score in the heap, replace it
+			if score > (*h)[0].(feedNode).score {
+				heappkg.Pop(h)
+				heappkg.Push(h, node)
+			}
+		}
+
+		entityTypes = make([]persist.FeedEntityType, h.Len())
+		entityIDs = make([]persist.DBID, h.Len())
+
+		i := h.Len() - 1
+		for h.Len() > 0 {
+			node := heappkg.Pop(h).(feedNode)
+			entityTypes[i] = node.typ
+			entityIDs[i] = node.id
+			i--
+		}
+	}
 
 	queryFunc := func(params feedPagingParams) ([]any, error) {
 		if hasCursors {
