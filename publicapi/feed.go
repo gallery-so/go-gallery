@@ -292,11 +292,10 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 	}
 
 	var (
-		err           error
-		paginator     feedPaginator
-		entityTypes   []persist.FeedEntityType
-		entityIDs     []persist.DBID
-		entityIDToPos = make(map[persist.DBID]int)
+		err         error
+		paginator   feedPaginator
+		entityTypes []persist.FeedEntityType
+		entityIDs   []persist.DBID
 	)
 
 	hasCursors := before != nil || after != nil
@@ -344,8 +343,6 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 			i := h.Len() - 1
 			for h.Len() > 0 {
 				node := heappkg.Pop(h).(feedNode)
-				// Postgres uses 1-based indexing
-				entityIDToPos[node.id] = i + 1
 				entityTypes[i] = node.typ
 				entityIDs[i] = node.id
 				i--
@@ -362,210 +359,51 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 		}
 	}
 
+	entityIDToPos := make(map[persist.DBID]int)
+
 	queryFunc := func(params feedPagingParams) ([]any, error) {
-		if !hasCursors {
-			params.EntityTypes = entityTypes
-			params.EntityIDs = entityIDs
+		if hasCursors {
+			entityTypes = params.EntityTypes
+			entityIDs = params.EntityIDs
 		}
 
-		// Restrict cursors to actual size of the slice
+		for i, id := range entityIDs {
+			entityIDToPos[id] = i
+		}
+
 		curBeforePos := max(params.CurBeforePos, 0)
-		curAfterPos := min(params.CurAfterPos-1, len(params.EntityIDs))
+		curAfterPos := min(params.CurAfterPos, len(entityTypes))
+
+		var subTypes []persist.FeedEntityType
+		var subIDs []persist.DBID
 
 		if params.PagingForward {
 			// If paging forward, we extend from the after cursor up to the limit or to the before cursor, whatever is larger
-			limitPos := max(curAfterPos-int(params.Limit), curBeforePos)
-			params.EntityTypes = params.EntityTypes[limitPos:curAfterPos]
-			params.EntityIDs = params.EntityIDs[limitPos:curAfterPos]
+			// Plus one because curAfterPos is the index of the last node fetched, and we want to skip it
+			limitPos := max(curAfterPos-int(params.Limit)+1, curBeforePos)
+			subTypes = entityTypes[limitPos:curAfterPos]
+			subIDs = entityIDs[limitPos:curAfterPos]
 		} else {
 			// If paging backwards, we extend from the before cursor up to the limit or to the after cursor, whatever is smaller
 			limitPos := min(curBeforePos+int(params.Limit), curAfterPos)
-			params.EntityTypes = params.EntityTypes[curBeforePos:limitPos]
-			params.EntityIDs = params.EntityIDs[curBeforePos:limitPos]
+			// Add one if curBeforePos is set, because we want to skip it
+			if params.CurBeforePos != -1 {
+				curBeforePos++
+			}
+			subTypes = entityTypes[curBeforePos:limitPos]
+			subIDs = entityIDs[curBeforePos:limitPos]
 		}
 
-		return loadFeedEntities(ctx, api.loaders, params.EntityTypes, params.EntityIDs)
+		return loadFeedEntities(ctx, api.loaders, subTypes, subIDs)
 	}
 
 	cursorFunc := func(node any) (int, []persist.FeedEntityType, []persist.DBID, error) {
 		_, id, err := feedCursor(node)
-		return entityIDToPos[id], entityTypes, entityIDs, err
-	}
-
-	paginator.QueryFunc = queryFunc
-	paginator.CursorFunc = cursorFunc
-	return paginator.paginate(before, after, first, last)
-}
-
-func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first, last *int) ([]any, PageInfo, error) {
-	// Validate
-	userID, err := getAuthenticatedUserID(ctx)
-	if err != nil {
-		return nil, PageInfo{}, err
-	}
-
-	if err := validatePaginationParams(api.validator, first, last); err != nil {
-		return nil, PageInfo{}, err
-	}
-
-	var (
-		paginator     feedPaginator
-		entityTypes   []persist.FeedEntityType
-		entityIDs     []persist.DBID
-		entityIDToPos = make(map[persist.DBID]int)
-	)
-
-	hasCursors := before != nil || after != nil
-
-	if !hasCursors {
-		trendData, err := api.queries.FeedEntityScoring(ctx, db.FeedEntityScoringParams{
-			WindowEnd:           time.Now().Add(-time.Duration(72 * time.Hour)),
-			PostEntityType:      int32(persist.PostTypeTag),
-			FeedEventEntityType: int32(persist.FeedEventTypeTag),
-			ExcludedFeedActions: []string{string(persist.ActionUserCreated), string(persist.ActionUserFollowedUsers)},
-			ExcludeViewer:       true,
-			ViewerID:            userID.String(),
-		})
-		if err != nil {
-			return nil, PageInfo{}, err
+		pos, ok := entityIDToPos[id]
+		if !ok {
+			panic(fmt.Sprintf("could not find position for id=%s", id))
 		}
-
-		h := &heap{}
-
-		eventIDs := make([]persist.DBID, 0)
-		tokenIDs := make([]persist.DBID, 0)
-
-		for _, event := range trendData {
-			if event.FeedEntityType == int32(persist.FeedEventTypeTag) {
-				eventIDs = append(eventIDs, event.ID)
-			}
-		}
-
-		events, errs := api.loaders.FeedEventByFeedEventID.LoadAll(eventIDs)
-		for _, err := range errs {
-			if err != nil {
-				panic(err)
-			}
-		}
-
-		eventIDToEvent := make(map[persist.DBID]db.FeedEvent)
-		for _, event := range events {
-			eventIDToEvent[event.ID] = event
-			if event.Data.TokenID != "" {
-				tokenIDs = append(tokenIDs, event.Data.TokenID)
-			}
-			if event.Data.TokenCollectionID != "" {
-				tokenIDs = append(tokenIDs, event.Data.TokenCollectionID)
-			}
-			for _, tokenID := range event.Data.CollectionTokenIDs {
-				tokenIDs = append(tokenIDs, tokenID)
-			}
-			for _, tIDs := range event.Data.GalleryNewCollectionTokenIDs {
-				for _, tokenID := range tIDs {
-					tokenIDs = append(tokenIDs, tokenID)
-				}
-			}
-		}
-
-		tokens, errs := api.loaders.TokenByTokenID.LoadAll(tokenIDs)
-		for _, err := range errs {
-			if err != nil && !util.ErrorAs[persist.ErrTokenNotFoundByID](err) {
-				panic(err)
-			}
-		}
-
-		tokenToContractID := make(map[persist.DBID]persist.DBID)
-		for _, token := range tokens {
-			tokenToContractID[token.ID] = token.Contract
-		}
-
-		now := time.Now()
-		for _, event := range trendData {
-			e := eventIDToEvent[event.ID]
-			if event.FeedEntityType == int32(persist.FeedEventTypeTag) {
-				if contractID := tokenToContractID[e.Data.TokenID]; contractID != "" {
-					event.ContractIds = append(event.ContractIds, contractID)
-				}
-				if contractID := tokenToContractID[e.Data.TokenCollectionID]; contractID != "" {
-					event.ContractIds = append(event.ContractIds, contractID)
-				}
-				for _, tokenID := range e.Data.CollectionTokenIDs {
-					if contractID := tokenToContractID[tokenID]; contractID != "" {
-						event.ContractIds = append(event.ContractIds, contractID)
-					}
-				}
-				for _, tIDs := range e.Data.GalleryNewCollectionTokenIDs {
-					for _, tokenID := range tIDs {
-						if contractID := tokenToContractID[tokenID]; contractID != "" {
-							event.ContractIds = append(event.ContractIds, contractID)
-						}
-					}
-				}
-			}
-
-			score := scoreFeedEntity(ctx, userID, event, now, int(event.Interactions))
-
-			node := feedNode{
-				id:    event.ID,
-				score: score,
-				typ:   persist.FeedEntityType(event.FeedEntityType),
-			}
-
-			// Add first 100 numbers in the heap
-			if h.Len() < 100 {
-				heappkg.Push(h, node)
-				continue
-			}
-
-			if score > (*h)[0].(feedNode).score {
-				heappkg.Pop(h)
-				heappkg.Push(h, node)
-			}
-		}
-		fmt.Printf("took %s to process %d events\n", time.Since(now), len(trendData))
-
-		entityTypes = make([]persist.FeedEntityType, h.Len())
-		entityIDs = make([]persist.DBID, h.Len())
-
-		i := h.Len() - 1
-		for h.Len() > 0 {
-			node := heappkg.Pop(h).(feedNode)
-			// Postgres uses 1-based indexing
-			entityIDToPos[node.id] = i + 1
-			entityTypes[i] = node.typ
-			entityIDs[i] = node.id
-			i--
-		}
-	}
-
-	queryFunc := func(params feedPagingParams) ([]any, error) {
-		if !hasCursors {
-			params.EntityTypes = entityTypes
-			params.EntityIDs = entityIDs
-		}
-
-		// Restrict cursors to actual size of the slice
-		curBeforePos := max(params.CurBeforePos, 0)
-		curAfterPos := min(params.CurAfterPos-1, len(params.EntityIDs))
-
-		if params.PagingForward {
-			// If paging forward, we extend from the after cursor up to the limit or to the before cursor, whatever is larger
-			limitPos := max(curAfterPos-int(params.Limit), curBeforePos)
-			params.EntityTypes = params.EntityTypes[limitPos:curAfterPos]
-			params.EntityIDs = params.EntityIDs[limitPos:curAfterPos]
-		} else {
-			// If paging backwards, we extend from the before cursor up to the limit or to the after cursor, whatever is smaller
-			limitPos := min(curBeforePos+int(params.Limit), curAfterPos)
-			params.EntityTypes = params.EntityTypes[curBeforePos:limitPos]
-			params.EntityIDs = params.EntityIDs[curBeforePos:limitPos]
-		}
-
-		return loadFeedEntities(ctx, api.loaders, params.EntityTypes, params.EntityIDs)
-	}
-
-	cursorFunc := func(node any) (int, []persist.FeedEntityType, []persist.DBID, error) {
-		_, id, err := feedCursor(node)
-		return entityIDToPos[id], entityTypes, entityIDs, err
+		return pos, entityTypes, entityIDs, err
 	}
 
 	paginator.QueryFunc = queryFunc
