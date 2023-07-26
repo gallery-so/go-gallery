@@ -403,6 +403,13 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 			limitIdx := max(len(queryTypes)-params.Limit, 0)
 			queryTypes = queryTypes[limitIdx:]
 			queryIDs = queryIDs[limitIdx:]
+			// This is a hack: the underlying keyset paginator assumes
+			// that the extra result is at the end of the slice, so
+			// we just move it to the end.
+			if len(queryTypes) > 0 {
+				queryTypes = append(queryTypes[1:], queryTypes[0])
+				queryIDs = append(queryIDs[1:], queryIDs[0])
+			}
 		} else {
 			// Index from the left
 			limitIdx := min(params.Limit, len(queryTypes))
