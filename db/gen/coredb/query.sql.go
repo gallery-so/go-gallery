@@ -1726,7 +1726,7 @@ func (q *Queries) GetContractsByTokenIDs(ctx context.Context, tokenIds persist.D
 }
 
 const getCreatedContractsByUserID = `-- name: GetCreatedContractsByUserID :many
-select c.contract, c.contract, c.contract, c.contract, c.contract, c.contract, c.contract, c.contract, c.contract, c.contract, c.contract, c.contract, c.contract, c.contract, c.contract, c.contract, c.contract, c.contract as contract,
+select c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id,
        w.id as wallet_id,
        false as is_override_creator
 from users u, contracts c, wallets w
@@ -1741,7 +1741,7 @@ where u.id = $1
 
 union all
 
-select c.contract, c.contract, c.contract, c.contract, c.contract, c.contract, c.contract, c.contract, c.contract, c.contract, c.contract, c.contract, c.contract, c.contract, c.contract, c.contract, c.contract, c.contract as contract,
+select c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id,
        null as wallet_id,
        true as is_override_creator
 from contracts c

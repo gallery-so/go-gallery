@@ -1446,7 +1446,7 @@ select * from unnest(@contract_ids::text[]) as ids
                   join contract_creators cc on cc.contract_id = ids;
 
 -- name: GetCreatedContractsByUserID :many
-select sqlc.embed(c) as contract,
+select sqlc.embed(c),
        w.id as wallet_id,
        false as is_override_creator
 from users u, contracts c, wallets w
@@ -1461,7 +1461,7 @@ where u.id = @user_id
 
 union all
 
-select sqlc.embed(c) as contract,
+select sqlc.embed(c),
        null as wallet_id,
        true as is_override_creator
 from contracts c
