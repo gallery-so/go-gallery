@@ -9,8 +9,10 @@ import (
 	"strings"
 
 	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/util"
 )
 
 func init() {
@@ -112,7 +114,7 @@ type TokenWithOwnership struct {
 	Ownership Ownership `json:"ownership"`
 }
 
-type UserTokensResponse struct {
+type TokensResponse struct {
 	Tokens       []TokenWithOwnership `json:"tokens"`
 	Continuation string               `json:"continuation"`
 }
@@ -207,7 +209,7 @@ func (d *Provider) getTokensByWalletAddressPaginate(ctx context.Context, addr pe
 		return nil, err
 	}
 
-	var result UserTokensResponse
+	var result TokensResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
@@ -242,7 +244,7 @@ func (d *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, token
 		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
 	}
 
-	var result UserTokensResponse
+	var result TokensResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
 	}
@@ -256,6 +258,131 @@ func (d *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, token
 		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, ErrTokenNotFoundByIdentifiers{ContractAddress: tokenIdentifiers.ContractAddress, TokenID: TokenID(tokenIdentifiers.TokenID.Base10String()), OwnerAddress: ownerAddress}
 	}
 	return t[0], c[0], nil
+}
+
+/*
+{
+  "animation_url": null,
+  "external_app_url": "https://l2marathon.com/",
+  "id": "1",
+  "image_url": "https://l2marathon.com/nft/ultra-runner.jpg",
+  "is_unique": true,
+  "metadata": {
+    "description": "Complete the Layer2 Ultra Marathon by bridging Ultra Runner ONFTs with LayerZero.",
+    "external_url": "https://l2marathon.com/",
+    "image": "https://l2marathon.com/nft/ultra-runner.jpg",
+    "name": "Ultra Runner #1"
+  },
+  "owner": {
+    "hash": "0x5137eEDb91A5f2cC68e86DcA15AD5C2b541654F8",
+    "implementation_name": null,
+    "is_contract": true,
+    "is_verified": null,
+    "name": null,
+    "private_tags": [],
+    "public_tags": [],
+    "watchlist_names": []
+  },
+  "token": {
+    "address": "0x5137eEDb91A5f2cC68e86DcA15AD5C2b541654F8",
+    "circulating_market_cap": null,
+    "decimals": null,
+    "exchange_rate": null,
+    "holders": "610",
+    "icon_url": null,
+    "name": "UltraMarathon",
+    "symbol": "UltraRunner",
+    "total_supply": null,
+    "type": "ERC-721"
+  }
+}
+*/
+
+type BlockScoutTokenResponse struct {
+	AnimationURL   string                `json:"animation_url"`
+	ExternalAppURL string                `json:"external_app_url"`
+	ID             string                `json:"id"`
+	ImageURL       string                `json:"image_url"`
+	IsUnique       bool                  `json:"is_unique"`
+	Metadata       persist.TokenMetadata `json:"metadata"`
+}
+
+func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
+	meta, err := d.reservoirMetadata(ctx, ti)
+	if err == nil {
+		return meta, nil
+	}
+	logger.For(ctx).Infof("reservoir metadata error: %s", err)
+	meta, err = d.blockScoutMetadata(ctx, ti)
+	if err != nil {
+		logger.For(ctx).Infof("blockscout metadata error: %s", err)
+		return nil, err
+	}
+
+	return meta, nil
+}
+
+func (d *Provider) reservoirMetadata(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
+	u := fmt.Sprintf("%s/tokens/v6", d.apiURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("x-api-key", d.apiKey)
+	q := req.URL.Query()
+	q.Add("tokens", fmt.Sprintf("%s:%s", ti.ContractAddress, ti.TokenID.Base10String()))
+
+	resp, err := d.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var res TokensResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, err
+	}
+
+	if len(res.Tokens) == 0 {
+		return nil, ErrTokenNotFoundByIdentifiers{ContractAddress: ti.ContractAddress, TokenID: TokenID(ti.TokenID.Base10String())}
+	}
+	meta := res.Tokens[0].Token.Metadata
+	if _, ok := util.FindFirstFieldFromMap(meta, "image", "image_url", "imageURL").(string); !ok {
+		meta["image_url"] = res.Tokens[0].Token.Image
+	}
+	return meta, nil
+}
+
+func (d *Provider) blockScoutMetadata(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
+	u := fmt.Sprintf("https://base.blockscout.com/api/v2/tokens/%s/instances/%s", ti.ContractAddress, ti.TokenID.Base10String())
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := d.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var res BlockScoutTokenResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, err
+	}
+
+	if len(res.Metadata) == 0 {
+		return nil, ErrTokenNotFoundByIdentifiers{ContractAddress: ti.ContractAddress, TokenID: TokenID(ti.TokenID.Base10String())}
+	}
+
+	if _, ok := util.FindFirstFieldFromMap(res.Metadata, "image", "image_url", "imageURL").(string); !ok {
+		res.Metadata["image_url"] = res.ImageURL
+	}
+
+	if _, ok := util.FindFirstFieldFromMap(res.Metadata, "animation", "animation_url").(string); !ok {
+		res.Metadata["animation_url"] = res.AnimationURL
+	}
+
+	return res.Metadata, nil
 }
 
 func tokensWithOwnershipToAgnosticTokens(tokens []TokenWithOwnership, ownerAddress persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract) {
