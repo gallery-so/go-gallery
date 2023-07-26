@@ -81,15 +81,14 @@ func For(ctx context.Context) *Koala {
 }
 
 func (k *Koala) RelevanceTo(userID persist.DBID, e db.FeedEntityScoringRow) (topS float64, err error) {
-	type matrixPos [2]int
 	if len(e.ContractIds) == 0 {
 		return k.scoreFeatures(userID, e.ActorID, "")
 	}
 	var scored bool
 	var s float64
-	var socialMemo map[matrixPos]float64 = make(map[matrixPos]float64)
+
 	for _, contractID := range e.ContractIds {
-		s, err = k.scoreFeatures(userID, e.ActorID, contractID, socialMemo)
+		s, err = k.scoreFeatures(userID, e.ActorID, contractID)
 		if err == nil && s > topS {
 			topS = s
 			scored = true
@@ -114,7 +113,7 @@ func (k *Koala) Loop(ctx context.Context, ticker *time.Ticker) {
 	}()
 }
 
-func (k *Koala) scoreFeatures(viewerID, queryID, contractID persist.DBID, socialMemo map[matrixPos]float64) (float64, error) {
+func (k *Koala) scoreFeatures(viewerID, queryID, contractID persist.DBID) (float64, error) {
 	k.mu.Lock()
 	defer k.mu.Unlock()
 	vIdx, vOK := k.uL[viewerID]
@@ -123,13 +122,11 @@ func (k *Koala) scoreFeatures(viewerID, queryID, contractID persist.DBID, social
 
 	// Nothing to compute
 	if !vOK {
-		// fmt.Println("[koala] no data to compute")
 		return 0, ErrNoInputData
 	}
 	// Compute the relevance score
 	if cOK && !qOK {
 		score := calcRelevanceScore(k.ratingM, k.displayM, vIdx, cIdx)
-		// fmt.Println("[koala] relevance score:", score)
 		return score, nil
 	}
 	// Compute social and similarity scores
@@ -137,14 +134,12 @@ func (k *Koala) scoreFeatures(viewerID, queryID, contractID persist.DBID, social
 		socialScore := calcSocialScore(k.userM, vIdx, qIdx)
 		similarityScore := calcSimilarityScore(k.simM, vIdx, qIdx)
 		score := (socialWeight * socialScore) + (similarityWeight * similarityScore)
-		// fmt.Println("[koala] social score:", socialScore, "similarity score:", similarityScore, "full score:", score)
 		return score, nil
 	}
 	socialScore := calcSocialScore(k.userM, vIdx, qIdx)
 	relevanceScore := calcRelevanceScore(k.ratingM, k.displayM, vIdx, cIdx)
 	similarityScore := calcSimilarityScore(k.simM, vIdx, qIdx)
 	score := (socialWeight * socialScore) + (relevanceWeight * relevanceScore) + (similarityWeight * similarityScore)
-	// fmt.Println("[koala] social score:", socialScore, "relevance score:", relevanceScore, "similarity score:", similarityScore, "full score:", score)
 	return score, nil
 }
 
@@ -161,34 +156,29 @@ func (k *Koala) update(userM, ratingM, displayM, simM *sparse.CSR, uL, cL map[pe
 
 // calcSocialScore determines if vIdx is in the same friend circle as qIdx by running a bfs on userM
 func calcSocialScore(userM *sparse.CSR, vIdx, qIdx int) float64 {
-	// now := time.Now()
 	score := bfs(userM, vIdx, qIdx)
-	// fmt.Printf("social score took %s\n", time.Since(now))
 	return score
 }
 
 // calcRelavanceScore computes the relevance of cIdx to vIdx's held tokens
 func calcRelevanceScore(ratingM, displayM *sparse.CSR, vIdx, cIdx int) float64 {
-	// now := time.Now()
-	var top float64
+	var t float64
 	v := ratingM.RowView(vIdx).(*sparse.Vector)
+	cDisplayed := displayM.At(cIdx, cIdx)
 	v.DoNonZero(func(i int, j int, v float64) {
-		s := jaccardIndex(displayM, i, cIdx)
-		if s > top {
-			top = s
-		}
+		t += jaccardIndex(displayM, i, cIdx, cDisplayed)
 	})
-	// fmt.Printf("relevance score took %s\n", time.Since(now))
-	return top
+	if v.NNZ() == 0 {
+		return 0
+	}
+	return t / float64(v.NNZ())
 }
 
 // calcSimilarityScore computes the similarity of vIdx and qIdx based on their interactions with other users
 func calcSimilarityScore(simM *sparse.CSR, vIdx, qIdx int) float64 {
-	// now := time.Now()
 	v1 := simM.RowView(vIdx).(*sparse.Vector)
 	v2 := simM.RowView(qIdx).(*sparse.Vector)
 	score := cosineSimilarity(v1, v2)
-	// fmt.Printf("similarity score took %s\n", time.Since(now))
 	return score
 }
 
@@ -234,9 +224,9 @@ func bfs(m *sparse.CSR, vIdx, qIdx int) float64 {
 	for len(q) > 0 {
 		cur := q.Pop()
 		if cur == qIdx {
-			return 1
+			return 1 / float64(depth.Get(cur))
 		}
-		if depth.Get(cur) > 5 {
+		if depth.Get(cur) > 4 {
 			return 0
 		}
 		neighbors := m.RowView(cur).(*sparse.Vector)
@@ -252,8 +242,9 @@ func bfs(m *sparse.CSR, vIdx, qIdx int) float64 {
 }
 
 // jaccardIndex computes overlap divided by the union of two sets
-func jaccardIndex(m *sparse.CSR, a, b int) float64 {
-	return m.At(a, b) / (m.At(a, a) + m.At(b, b) - m.At(a, b))
+func jaccardIndex(m *sparse.CSR, a int, b int, cVal float64) float64 {
+	u := m.At(a, b)
+	return u / (m.At(a, a) + cVal - u)
 }
 
 func cosineSimilarity(v1, v2 mat.Vector) float64 {

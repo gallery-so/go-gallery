@@ -7,8 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"os"
-	"runtime/pprof"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -328,7 +326,7 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 				}
 
 				// Add first 100 numbers in the heap
-				if len(*h) < 100 {
+				if h.Len() < 100 {
 					heappkg.Push(h, node)
 					continue
 				}
@@ -481,15 +479,6 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 			tokenToContractID[token.ID] = token.Contract
 		}
 
-		if cpuprofile != "" {
-			f, err := os.Create(cpuprofile)
-			if err != nil {
-				panic(err)
-			}
-			pprof.StartCPUProfile(f)
-			defer pprof.StopCPUProfile()
-		}
-
 		now := time.Now()
 		for _, event := range trendData {
 			e := eventIDToEvent[event.ID]
@@ -515,6 +504,7 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 			}
 
 			score := scoreFeedEntity(ctx, userID, event, now, int(event.Interactions))
+
 			node := feedNode{
 				id:    event.ID,
 				score: score,
@@ -522,7 +512,7 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 			}
 
 			// Add first 100 numbers in the heap
-			if len(*h) < 100 {
+			if h.Len() < 100 {
 				heappkg.Push(h, node)
 				continue
 			}
@@ -532,7 +522,7 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 				heappkg.Push(h, node)
 			}
 		}
-		fmt.Println("took", time.Since(now))
+		fmt.Printf("took %s to process %d events\n", time.Since(now), len(trendData))
 
 		entityTypes = make([]persist.FeedEntityType, h.Len())
 		entityIDs = make([]persist.DBID, h.Len())
@@ -715,9 +705,24 @@ func loadFeedEntities(ctx context.Context, d *dataloader.Loaders, typs []persist
 }
 
 func scoreFeedEntity(ctx context.Context, viewerID persist.DBID, e db.FeedEntityScoringRow, t time.Time, interactions int) float64 {
-	timeF := timeFactor(e.CreatedAt, t)
-	engagementF := engagementFactor(interactions)
+	// timeF := timeFactor(e.CreatedAt, t)
+	timeF := 1.0
+	// engagementF := engagementFactor(interactions)
+	engagementF := 1.0
 	personalizationF, err := koala.For(ctx).RelevanceTo(viewerID, e)
+	if errors.Is(err, koala.ErrNoInputData) {
+		// Use a default value of 0.1 so that the post isn't completely penalized because of missing data.
+		personalizationF = 0.1
+	}
+	return timeF * engagementF * personalizationF
+}
+
+func ScoreFeedEntity(k *koala.Koala, viewerID persist.DBID, e db.FeedEntityScoringRow, t time.Time, interactions int) float64 {
+	// timeF := timeFactor(e.CreatedAt, t)
+	timeF := 1.0
+	// engagementF := engagementFactor(interactions)
+	engagementF := 1.0
+	personalizationF, err := k.RelevanceTo(viewerID, e)
 	if errors.Is(err, koala.ErrNoInputData) {
 		// Use a default value of 0.1 so that the post isn't completely penalized because of missing data.
 		personalizationF = 0.1
