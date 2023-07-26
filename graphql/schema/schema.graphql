@@ -428,8 +428,8 @@ type Token implements Node @goEmbedHelper {
   owner: GalleryUser @goField(forceResolver: true)
   ownedByWallets: [Wallet] @goField(forceResolver: true)
   ownershipHistory: [OwnerAtBlock]
-  ownerIsHolder: Boolean @goField(forceResolver: true)
-  ownerIsCreator: Boolean @goField(forceResolver: true)
+  ownerIsHolder: Boolean
+  ownerIsCreator: Boolean
   tokenMetadata: String # source is map[string]interface{} on backend, not sure what best format is here
   contract: Contract @goField(forceResolver: true)
   community: Community @goField(forceResolver: true)

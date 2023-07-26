@@ -1362,17 +1362,12 @@ func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID, w
 
 	// Set the profile image to reference a token
 	if tokenID != nil {
-		o, err := For(ctx).Token.GetTokenOwnershipByTokenID(ctx, *tokenID)
-
-		if util.ErrorAs[persist.ErrTokenOwnershipNotFound](err) {
-			return ErrProfileImageNotTokenOwner
-		}
-
+		t, err := For(ctx).Token.GetTokenById(ctx, *tokenID)
 		if err != nil {
 			return err
 		}
 
-		if o.OwnerUserID != userID {
+		if t.OwnerUserID != userID || (!t.IsHolderToken && !t.IsCreatorToken) {
 			return ErrProfileImageNotTokenOwner
 		}
 
@@ -1380,7 +1375,7 @@ func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID, w
 			TokenSourceType: persist.ProfileImageSourceToken,
 			ProfileID:       persist.GenerateID(),
 			UserID:          userID,
-			TokenID:         o.TokenID,
+			TokenID:         t.ID,
 		})
 	}
 

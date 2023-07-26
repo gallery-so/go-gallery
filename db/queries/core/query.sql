@@ -1519,3 +1519,14 @@ update tokens
       and is_creator_token = true
       and not exists(select 1 from created_contracts where created_contracts.contract_id = tokens.contract)
       and not deleted;
+
+-- name: DeleteTokensOfOwnerBeforeTimestamp :execrows
+update tokens t
+    set owned_by_wallets = case when @remove_holder_status::bool then '{}' else owned_by_wallets end,
+        is_creator_token = case when @remove_creator_status::bool then false else is_creator_token end,
+        last_updated = now()
+    where owner_user_id = @user_id
+      and (cardinality(@chains::int[]) = 0 or chain = any(@chains))
+      and deleted = false
+      and ((@remove_holder_status and is_holder_token) or (@remove_creator_status and is_creator_token))
+      and last_synced < @timestamp;
