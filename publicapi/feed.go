@@ -215,7 +215,7 @@ func (api FeedAPI) PaginatePersonalFeed(ctx context.Context, before *string, aft
 }
 
 func (api FeedAPI) PaginateUserFeed(ctx context.Context, userID persist.DBID, before *string, after *string,
-	first *int, last *int) ([]any, PageInfo, error) {
+	first *int, last *int, includePosts bool) ([]any, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userID": validate.WithTag(userID, "required"),
@@ -229,13 +229,15 @@ func (api FeedAPI) PaginateUserFeed(ctx context.Context, userID persist.DBID, be
 
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
 		keys, err := api.queries.PaginateUserFeedByUserID(ctx, db.PaginateUserFeedByUserIDParams{
-			OwnerID:       userID,
-			Limit:         params.Limit,
-			CurBeforeTime: params.CursorBeforeTime,
-			CurBeforeID:   params.CursorBeforeID,
-			CurAfterTime:  params.CursorAfterTime,
-			CurAfterID:    params.CursorAfterID,
-			PagingForward: params.PagingForward,
+			OwnerID:        userID,
+			Limit:          params.Limit,
+			CurBeforeTime:  params.CursorBeforeTime,
+			CurBeforeID:    params.CursorBeforeID,
+			CurAfterTime:   params.CursorAfterTime,
+			CurAfterID:     params.CursorAfterID,
+			PagingForward:  params.PagingForward,
+			IncludePosts:   includePosts,
+			PostEntityType: int32(persist.PostTypeTag),
 		})
 		if err != nil {
 			return nil, err
@@ -252,7 +254,7 @@ func (api FeedAPI) PaginateUserFeed(ctx context.Context, userID persist.DBID, be
 	return paginator.paginate(before, after, first, last)
 }
 
-func (api FeedAPI) PaginateGlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) ([]any, PageInfo, error) {
+func (api FeedAPI) PaginateGlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int, includePosts bool) ([]any, PageInfo, error) {
 	// Validate
 	if err := validatePaginationParams(api.validator, first, last); err != nil {
 		return nil, PageInfo{}, err
@@ -260,12 +262,14 @@ func (api FeedAPI) PaginateGlobalFeed(ctx context.Context, before *string, after
 
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
 		keys, err := api.queries.PaginateGlobalFeed(ctx, db.PaginateGlobalFeedParams{
-			Limit:         params.Limit,
-			CurBeforeTime: params.CursorBeforeTime,
-			CurBeforeID:   params.CursorBeforeID,
-			CurAfterTime:  params.CursorAfterTime,
-			CurAfterID:    params.CursorAfterID,
-			PagingForward: params.PagingForward,
+			Limit:          params.Limit,
+			CurBeforeTime:  params.CursorBeforeTime,
+			CurBeforeID:    params.CursorBeforeID,
+			CurAfterTime:   params.CursorAfterTime,
+			CurAfterID:     params.CursorAfterID,
+			PagingForward:  params.PagingForward,
+			IncludePosts:   includePosts,
+			PostEntityType: int32(persist.PostTypeTag),
 		})
 
 		if err != nil {
@@ -283,7 +287,7 @@ func (api FeedAPI) PaginateGlobalFeed(ctx context.Context, before *string, after
 	return paginator.paginate(before, after, first, last)
 }
 
-func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, after *string, first *int, last *int) ([]any, PageInfo, error) {
+func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, after *string, first *int, last *int, includePosts bool) ([]any, PageInfo, error) {
 	// Validate
 	if err := validatePaginationParams(api.validator, first, last); err != nil {
 		return nil, PageInfo{}, err
@@ -305,6 +309,7 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 				FeedEventEntityType: int32(persist.FeedEventTypeTag),
 				PostEntityType:      int32(persist.PostTypeTag),
 				ExcludedFeedActions: []string{string(persist.ActionUserCreated), string(persist.ActionUserFollowedUsers)},
+				IncludePosts:        includePosts,
 			})
 			if err != nil {
 				return nil, nil, err
@@ -348,7 +353,7 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 			return entityTypes, entityIDs, nil
 		}
 
-		l := newFeedCache(api.cache, calcFunc)
+		l := newFeedCache(api.cache, includePosts, calcFunc)
 
 		entityTypes, entityIDs, err = l.Load(ctx)
 		if err != nil {
@@ -368,30 +373,31 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 			entityIDToPos[id] = i
 		}
 
-		curBeforePos := max(params.CurBeforePos, 0)
-		curAfterPos := min(params.CurAfterPos, len(entityTypes))
+		queryTypes := append([]persist.FeedEntityType{}, entityTypes...)
+		queryIDs := append([]persist.DBID{}, entityIDs...)
 
-		var subTypes []persist.FeedEntityType
-		var subIDs []persist.DBID
+		curBeforePos := max(params.CurBeforePos, 0)
+		curAfterPos := min(params.CurAfterPos, len(queryIDs))
+		var limitPos int
 
 		if params.PagingForward {
 			// If paging forward, we extend from the after cursor up to the limit or to the before cursor, whatever is larger
 			// Plus one because curAfterPos is the index of the last node fetched, and we want to skip it
-			limitPos := max(curAfterPos-int(params.Limit)+1, curBeforePos)
-			subTypes = entityTypes[limitPos:curAfterPos]
-			subIDs = entityIDs[limitPos:curAfterPos]
+			limitPos = max(curAfterPos-int(params.Limit)+1, curBeforePos)
+			queryTypes = queryTypes[limitPos:curAfterPos]
+			queryIDs = queryIDs[limitPos:curAfterPos]
 		} else {
 			// If paging backwards, we extend from the before cursor up to the limit or to the after cursor, whatever is smaller
-			limitPos := min(curBeforePos+int(params.Limit), curAfterPos)
+			limitPos = min(curBeforePos+int(params.Limit), curAfterPos)
 			// Add one if curBeforePos is set, because we want to skip it
 			if params.CurBeforePos != -1 {
 				curBeforePos++
 			}
-			subTypes = entityTypes[curBeforePos:limitPos]
-			subIDs = entityIDs[curBeforePos:limitPos]
+			queryTypes = queryTypes[curBeforePos:limitPos]
+			queryIDs = queryIDs[curBeforePos:limitPos]
 		}
 
-		return loadFeedEntities(ctx, api.loaders, subTypes, subIDs)
+		return loadFeedEntities(ctx, api.loaders, queryTypes, queryIDs)
 	}
 
 	cursorFunc := func(node any) (int, []persist.FeedEntityType, []persist.DBID, error) {
@@ -699,11 +705,15 @@ type feedCache struct {
 	CalcFunc func(context.Context) ([]persist.FeedEntityType, []persist.DBID, error)
 }
 
-func newFeedCache(cache *redis.Cache, f func(context.Context) ([]persist.FeedEntityType, []persist.DBID, error)) *feedCache {
+func newFeedCache(cache *redis.Cache, includePosts bool, f func(context.Context) ([]persist.FeedEntityType, []persist.DBID, error)) *feedCache {
+	key := "trending:feedEvents:all"
+	if !includePosts {
+		key = "trending:feedEvents:noPosts"
+	}
 	return &feedCache{
 		LazyCache: &redis.LazyCache{
 			Cache: cache,
-			Key:   "trending:feedEvents",
+			Key:   key,
 			TTL:   time.Minute * 10,
 			CalcFunc: func(ctx context.Context) ([]byte, error) {
 				types, ids, err := f(ctx)

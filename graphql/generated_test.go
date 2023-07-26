@@ -621,11 +621,15 @@ func (v *__getAuthNonceMutationInput) GetInput() ChainAddressInput { return v.In
 
 // __globalFeedQueryInput is used internally by genqlient
 type __globalFeedQueryInput struct {
-	First *int `json:"first"`
+	First        *int `json:"first"`
+	IncludePosts bool `json:"includePosts"`
 }
 
 // GetFirst returns __globalFeedQueryInput.First, and is useful for accessing the field via an interface.
 func (v *__globalFeedQueryInput) GetFirst() *int { return v.First }
+
+// GetIncludePosts returns __globalFeedQueryInput.IncludePosts, and is useful for accessing the field via an interface.
+func (v *__globalFeedQueryInput) GetIncludePosts() bool { return v.IncludePosts }
 
 // __loginMutationInput is used internally by genqlient
 type __loginMutationInput struct {
@@ -685,11 +689,15 @@ func (v *__tokenByIdQueryInput) GetId() persist.DBID { return v.Id }
 
 // __trendingFeedQueryInput is used internally by genqlient
 type __trendingFeedQueryInput struct {
-	Last *int `json:"last"`
+	Last         *int `json:"last"`
+	IncludePosts bool `json:"includePosts"`
 }
 
 // GetLast returns __trendingFeedQueryInput.Last, and is useful for accessing the field via an interface.
 func (v *__trendingFeedQueryInput) GetLast() *int { return v.Last }
+
+// GetIncludePosts returns __trendingFeedQueryInput.IncludePosts, and is useful for accessing the field via an interface.
+func (v *__trendingFeedQueryInput) GetIncludePosts() bool { return v.IncludePosts }
 
 // __trendingUsersQueryInput is used internally by genqlient
 type __trendingUsersQueryInput struct {
@@ -10863,8 +10871,8 @@ func getAuthNonceMutation(
 
 // The query or mutation executed by globalFeedQuery.
 const globalFeedQuery_Operation = `
-query globalFeedQuery ($first: Int) {
-	globalFeed(first: $first) {
+query globalFeedQuery ($first: Int, $includePosts: Boolean!) {
+	globalFeed(first: $first, includePosts: $includePosts) {
 		edges {
 			node {
 				__typename
@@ -10888,12 +10896,14 @@ func globalFeedQuery(
 	ctx context.Context,
 	client graphql.Client,
 	first *int,
+	includePosts bool,
 ) (*globalFeedQueryResponse, error) {
 	req := &graphql.Request{
 		OpName: "globalFeedQuery",
 		Query:  globalFeedQuery_Operation,
 		Variables: &__globalFeedQueryInput{
-			First: first,
+			First:        first,
+			IncludePosts: includePosts,
 		},
 	}
 	var err error
@@ -11337,8 +11347,8 @@ func tokenByIdQuery(
 
 // The query or mutation executed by trendingFeedQuery.
 const trendingFeedQuery_Operation = `
-query trendingFeedQuery ($last: Int) {
-	trendingFeed(last: $last) {
+query trendingFeedQuery ($last: Int, $includePosts: Boolean!) {
+	trendingFeed(last: $last, includePosts: $includePosts) {
 		edges {
 			node {
 				__typename
@@ -11362,12 +11372,14 @@ func trendingFeedQuery(
 	ctx context.Context,
 	client graphql.Client,
 	last *int,
+	includePosts bool,
 ) (*trendingFeedQueryResponse, error) {
 	req := &graphql.Request{
 		OpName: "trendingFeedQuery",
 		Query:  trendingFeedQuery_Operation,
 		Variables: &__trendingFeedQueryInput{
-			Last: last,
+			Last:         last,
+			IncludePosts: includePosts,
 		},
 	}
 	var err error

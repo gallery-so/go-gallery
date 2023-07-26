@@ -261,7 +261,7 @@ func newUserWithFeedEntitiesFixture(t *testing.T) userWithFeedEntititesFixture {
 		TokenIds: user.TokenIDs,
 		Caption:  util.ToPointer("this is a post caption"),
 	})
-	feedEvents := globalFeedEvents(t, ctx, c, 4)
+	feedEvents := globalFeedEvents(t, ctx, c, 4, true)
 	require.Len(t, feedEvents, 4)
 	return userWithFeedEntititesFixture{user, feedEvents, []persist.DBID{postID}}
 }
