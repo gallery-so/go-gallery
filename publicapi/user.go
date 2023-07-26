@@ -348,24 +348,24 @@ func (api UserAPI) RemoveWalletsFromUser(ctx context.Context, walletIDs []persis
 		return err
 	}
 
-	err = user.RemoveWalletsFromUser(ctx, userID, walletIDs, api.repos.UserRepository)
-	if err != nil {
-		return err
+	removedIDs, removalErr := user.RemoveWalletsFromUser(ctx, userID, walletIDs, api.repos.UserRepository)
+
+	// If any wallet IDs were successfully removed, we need to process those removals, even if we also
+	// encountered an error.
+	if len(removedIDs) > 0 {
+		walletRemovalMessage := task.TokenProcessingWalletRemovalMessage{
+			UserID:    userID,
+			WalletIDs: removedIDs,
+		}
+
+		if err := task.CreateTaskForWalletRemoval(ctx, walletRemovalMessage, api.taskClient); err != nil {
+			// Just log the error here. No need to return it -- the actual wallet removal DID succeed,
+			// but tokens owned by the affected wallets won't be updated until the user's next sync.
+			logger.For(ctx).WithError(err).Error("failed to create task to process wallet removal")
+		}
 	}
 
-	walletRemovalMessage := task.TokenProcessingWalletRemovalMessage{
-		UserID:    userID,
-		WalletIDs: walletIDs,
-	}
-
-	err = task.CreateTaskForWalletRemoval(ctx, walletRemovalMessage, api.taskClient)
-	if err != nil {
-		// Just log the error here. No need to return it -- the actual wallet removal DID succeed,
-		// but tokens owned by the affected wallets won't be updated until the user's next sync.
-		logger.For(ctx).WithError(err).Error("failed to create task to process wallet removal")
-	}
-
-	return nil
+	return removalErr
 }
 
 func (api UserAPI) AddSocialAccountToUser(ctx context.Context, authenticator socialauth.Authenticator, display bool) error {
