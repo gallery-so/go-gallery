@@ -7580,7 +7580,6 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputUploadPersistedQueriesInput,
 		ec.unmarshalInputVerifyEmailInput,
 		ec.unmarshalInputVerifyEmailMagicLinkInput,
-		ec.unmarshalInputViewTokenInput,
 		ec.unmarshalInputtopCollectionsForCommunityInput,
 	)
 	first := true
@@ -9551,17 +9550,15 @@ type ViewGalleryPayload {
 
 union ViewGalleryPayloadOrError = ViewGalleryPayload | ErrAuthenticationFailed
 
-
-input ViewTokenInput {
-  tokenId: DBID!
-  collectionId: DBID!
-}
-
 type ViewTokenPayload {
   token: Token
 }
 
-union ViewTokenPayloadOrError = ViewTokenPayload | ErrAuthenticationFailed | ErrTokenNotFound | ErrGalleryNotFound
+union ViewTokenPayloadOrError =
+    ViewTokenPayload
+  | ErrAuthenticationFailed
+  | ErrTokenNotFound
+  | ErrCollectionNotFound
 
 input VerifyEmailInput {
   token: String! @scrub
@@ -56190,44 +56187,6 @@ func (ec *executionContext) unmarshalInputVerifyEmailMagicLinkInput(ctx context.
 	return it, nil
 }
 
-func (ec *executionContext) unmarshalInputViewTokenInput(ctx context.Context, obj interface{}) (model.ViewTokenInput, error) {
-	var it model.ViewTokenInput
-	asMap := map[string]interface{}{}
-	for k, v := range obj.(map[string]interface{}) {
-		asMap[k] = v
-	}
-
-	fieldsInOrder := [...]string{"tokenId", "collectionId"}
-	for _, k := range fieldsInOrder {
-		v, ok := asMap[k]
-		if !ok {
-			continue
-		}
-		switch k {
-		case "tokenId":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("tokenId"))
-			data, err := ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.TokenID = data
-		case "collectionId":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("collectionId"))
-			data, err := ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.CollectionID = data
-		}
-	}
-
-	return it, nil
-}
-
 func (ec *executionContext) unmarshalInputtopCollectionsForCommunityInput(ctx context.Context, obj interface{}) (model.TopCollectionsForCommunityInput, error) {
 	var it model.TopCollectionsForCommunityInput
 	asMap := map[string]interface{}{}
@@ -59752,13 +59711,13 @@ func (ec *executionContext) _ViewTokenPayloadOrError(ctx context.Context, sel as
 			return graphql.Null
 		}
 		return ec._ErrTokenNotFound(ctx, sel, obj)
-	case model.ErrGalleryNotFound:
-		return ec._ErrGalleryNotFound(ctx, sel, &obj)
-	case *model.ErrGalleryNotFound:
+	case model.ErrCollectionNotFound:
+		return ec._ErrCollectionNotFound(ctx, sel, &obj)
+	case *model.ErrCollectionNotFound:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._ErrGalleryNotFound(ctx, sel, obj)
+		return ec._ErrCollectionNotFound(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -62068,7 +62027,7 @@ func (ec *executionContext) _ErrAuthenticationFailed(ctx context.Context, sel as
 	return out
 }
 
-var errCollectionNotFoundImplementors = []string{"ErrCollectionNotFound", "Error", "CollectionByIdOrError", "CollectionTokenByIdOrError", "DeleteCollectionPayloadOrError"}
+var errCollectionNotFoundImplementors = []string{"ErrCollectionNotFound", "Error", "CollectionByIdOrError", "CollectionTokenByIdOrError", "DeleteCollectionPayloadOrError", "ViewTokenPayloadOrError"}
 
 func (ec *executionContext) _ErrCollectionNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrCollectionNotFound) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errCollectionNotFoundImplementors)
@@ -62208,7 +62167,7 @@ func (ec *executionContext) _ErrFeedEventNotFound(ctx context.Context, sel ast.S
 	return out
 }
 
-var errGalleryNotFoundImplementors = []string{"ErrGalleryNotFound", "Error", "GalleryByIdPayloadOrError", "ViewerGalleryByIdPayloadOrError", "ViewTokenPayloadOrError"}
+var errGalleryNotFoundImplementors = []string{"ErrGalleryNotFound", "Error", "GalleryByIdPayloadOrError", "ViewerGalleryByIdPayloadOrError"}
 
 func (ec *executionContext) _ErrGalleryNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrGalleryNotFound) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errGalleryNotFoundImplementors)

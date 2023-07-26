@@ -891,6 +891,7 @@ func (ErrCollectionNotFound) IsError()                          {}
 func (ErrCollectionNotFound) IsCollectionByIDOrError()          {}
 func (ErrCollectionNotFound) IsCollectionTokenByIDOrError()     {}
 func (ErrCollectionNotFound) IsDeleteCollectionPayloadOrError() {}
+func (ErrCollectionNotFound) IsViewTokenPayloadOrError()        {}
 
 type ErrCommentNotFound struct {
 	Message string `json:"message"`
@@ -935,7 +936,6 @@ type ErrGalleryNotFound struct {
 func (ErrGalleryNotFound) IsError()                           {}
 func (ErrGalleryNotFound) IsGalleryByIDPayloadOrError()       {}
 func (ErrGalleryNotFound) IsViewerGalleryByIDPayloadOrError() {}
-func (ErrGalleryNotFound) IsViewTokenPayloadOrError()         {}
 
 type ErrInvalidInput struct {
 	Message    string   `json:"message"`
@@ -2410,11 +2410,6 @@ type ViewGalleryPayload struct {
 }
 
 func (ViewGalleryPayload) IsViewGalleryPayloadOrError() {}
-
-type ViewTokenInput struct {
-	TokenID      persist.DBID `json:"tokenId"`
-	CollectionID persist.DBID `json:"collectionId"`
-}
 
 type ViewTokenPayload struct {
 	Token *Token `json:"token"`

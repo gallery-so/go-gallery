@@ -532,7 +532,7 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collect
 		return db.Event{}, err
 	}
 
-	galleryID, err := api.queries.GetGalleryIDByCollectionID(ctx, collectionID)
+	currCol, err := api.queries.GetCollectionById(ctx, collectionID)
 	if err != nil {
 		return db.Event{}, err
 	}
@@ -550,7 +550,7 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collect
 		ResourceTypeID: persist.ResourceTypeToken,
 		TokenID:        tokenID,
 		CollectionID:   collectionID,
-		GalleryID:      galleryID,
+		GalleryID:      currCol.GalleryID,
 		SubjectID:      tokenID,
 		Data: persist.EventData{
 				TokenContractID: token.Contract,

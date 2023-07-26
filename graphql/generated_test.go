@@ -8896,17 +8896,17 @@ func (v *viewTokenMutationViewTokenErrAuthenticationFailed) GetTypename() *strin
 // GetMessage returns viewTokenMutationViewTokenErrAuthenticationFailed.Message, and is useful for accessing the field via an interface.
 func (v *viewTokenMutationViewTokenErrAuthenticationFailed) GetMessage() string { return v.Message }
 
-// viewTokenMutationViewTokenErrGalleryNotFound includes the requested fields of the GraphQL type ErrGalleryNotFound.
-type viewTokenMutationViewTokenErrGalleryNotFound struct {
+// viewTokenMutationViewTokenErrCollectionNotFound includes the requested fields of the GraphQL type ErrCollectionNotFound.
+type viewTokenMutationViewTokenErrCollectionNotFound struct {
 	Typename *string `json:"__typename"`
 	Message  string  `json:"message"`
 }
 
-// GetTypename returns viewTokenMutationViewTokenErrGalleryNotFound.Typename, and is useful for accessing the field via an interface.
-func (v *viewTokenMutationViewTokenErrGalleryNotFound) GetTypename() *string { return v.Typename }
+// GetTypename returns viewTokenMutationViewTokenErrCollectionNotFound.Typename, and is useful for accessing the field via an interface.
+func (v *viewTokenMutationViewTokenErrCollectionNotFound) GetTypename() *string { return v.Typename }
 
-// GetMessage returns viewTokenMutationViewTokenErrGalleryNotFound.Message, and is useful for accessing the field via an interface.
-func (v *viewTokenMutationViewTokenErrGalleryNotFound) GetMessage() string { return v.Message }
+// GetMessage returns viewTokenMutationViewTokenErrCollectionNotFound.Message, and is useful for accessing the field via an interface.
+func (v *viewTokenMutationViewTokenErrCollectionNotFound) GetMessage() string { return v.Message }
 
 // viewTokenMutationViewTokenErrTokenNotFound includes the requested fields of the GraphQL type ErrTokenNotFound.
 type viewTokenMutationViewTokenErrTokenNotFound struct {
@@ -8938,7 +8938,7 @@ func (v *viewTokenMutationViewTokenViewTokenPayload) GetToken() *viewTokenMutati
 //
 // viewTokenMutationViewTokenViewTokenPayloadOrError is implemented by the following types:
 // viewTokenMutationViewTokenErrAuthenticationFailed
-// viewTokenMutationViewTokenErrGalleryNotFound
+// viewTokenMutationViewTokenErrCollectionNotFound
 // viewTokenMutationViewTokenErrTokenNotFound
 // viewTokenMutationViewTokenViewTokenPayload
 type viewTokenMutationViewTokenViewTokenPayloadOrError interface {
@@ -8949,7 +8949,7 @@ type viewTokenMutationViewTokenViewTokenPayloadOrError interface {
 
 func (v *viewTokenMutationViewTokenErrAuthenticationFailed) implementsGraphQLInterfaceviewTokenMutationViewTokenViewTokenPayloadOrError() {
 }
-func (v *viewTokenMutationViewTokenErrGalleryNotFound) implementsGraphQLInterfaceviewTokenMutationViewTokenViewTokenPayloadOrError() {
+func (v *viewTokenMutationViewTokenErrCollectionNotFound) implementsGraphQLInterfaceviewTokenMutationViewTokenViewTokenPayloadOrError() {
 }
 func (v *viewTokenMutationViewTokenErrTokenNotFound) implementsGraphQLInterfaceviewTokenMutationViewTokenViewTokenPayloadOrError() {
 }
@@ -8973,8 +8973,8 @@ func __unmarshalviewTokenMutationViewTokenViewTokenPayloadOrError(b []byte, v *v
 	case "ErrAuthenticationFailed":
 		*v = new(viewTokenMutationViewTokenErrAuthenticationFailed)
 		return json.Unmarshal(b, *v)
-	case "ErrGalleryNotFound":
-		*v = new(viewTokenMutationViewTokenErrGalleryNotFound)
+	case "ErrCollectionNotFound":
+		*v = new(viewTokenMutationViewTokenErrCollectionNotFound)
 		return json.Unmarshal(b, *v)
 	case "ErrTokenNotFound":
 		*v = new(viewTokenMutationViewTokenErrTokenNotFound)
@@ -9003,12 +9003,12 @@ func __marshalviewTokenMutationViewTokenViewTokenPayloadOrError(v *viewTokenMuta
 			*viewTokenMutationViewTokenErrAuthenticationFailed
 		}{typename, v}
 		return json.Marshal(result)
-	case *viewTokenMutationViewTokenErrGalleryNotFound:
-		typename = "ErrGalleryNotFound"
+	case *viewTokenMutationViewTokenErrCollectionNotFound:
+		typename = "ErrCollectionNotFound"
 
 		result := struct {
 			TypeName string `json:"__typename"`
-			*viewTokenMutationViewTokenErrGalleryNotFound
+			*viewTokenMutationViewTokenErrCollectionNotFound
 		}{typename, v}
 		return json.Marshal(result)
 	case *viewTokenMutationViewTokenErrTokenNotFound:
