@@ -13,6 +13,7 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -286,7 +287,7 @@ func (api TokenAPI) SyncTokensAdmin(ctx context.Context, chains []persist.Chain,
 
 	defer api.throttler.Unlock(ctx, key)
 
-	if err := api.multichainProvider.SyncTokens(ctx, userID, chains); err != nil {
+	if err := api.multichainProvider.SyncTokensByUserID(ctx, userID, chains); err != nil {
 		// Wrap all OpenSea sync failures in a generic type that can be returned to the frontend as an expected error type
 		return ErrTokenRefreshFailed{Message: err.Error()}
 	}
@@ -308,7 +309,7 @@ func (api TokenAPI) SyncTokens(ctx context.Context, chains []persist.Chain) erro
 	}
 	defer api.throttler.Unlock(ctx, key)
 
-	err = api.multichainProvider.SyncTokens(ctx, userID, chains)
+	err = api.multichainProvider.SyncTokensByUserID(ctx, userID, chains)
 	if err != nil {
 		// Wrap all OpenSea sync failures in a generic type that can be returned to the frontend as an expected error type
 		return ErrTokenRefreshFailed{Message: err.Error()}
@@ -515,4 +516,50 @@ func (api TokenAPI) GetTokenOwnershipByTokenID(ctx context.Context, tokenID pers
 	}
 
 	return api.loaders.TokenOwnershipByTokenID.Load(tokenID)
+}
+
+func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (db.Event, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"tokenID": 		validate.WithTag(tokenID, "required"),
+		"collectionID": validate.WithTag(collectionID, "required"),
+	}); err != nil {
+		return db.Event{}, err
+	}
+
+	token, err := api.loaders.TokenByTokenID.Load(tokenID)
+	if err != nil {
+		return db.Event{}, err
+	}
+
+	currCol, err := api.queries.GetCollectionById(ctx, collectionID)
+	if err != nil {
+		return db.Event{}, err
+	}
+
+	gc := util.MustGetGinContext(ctx)
+
+	if auth.GetUserAuthedFromCtx(gc) {
+		userID, err := getAuthenticatedUserID(ctx)
+		if err != nil {
+			return db.Event{}, err
+		}
+		eventPtr, err := api.repos.EventRepository.Add(ctx, db.Event{
+		ActorID:        persist.DBIDToNullStr(userID),
+		Action:         persist.ActionViewedToken,
+		ResourceTypeID: persist.ResourceTypeToken,
+		TokenID:        tokenID,
+		CollectionID:   collectionID,
+		GalleryID:      currCol.GalleryID,
+		SubjectID:      tokenID,
+		Data: persist.EventData{
+				TokenContractID: token.Contract,
+			},
+		})
+		if err != nil {
+			return db.Event{}, err
+		}
+		return *eventPtr, nil
+	}
+	return db.Event{}, nil
 }

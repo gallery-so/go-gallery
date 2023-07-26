@@ -2,17 +2,16 @@ package redis
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
 	"time"
 
 	"github.com/bsm/redislock"
+	"github.com/go-redis/redis/v8"
 
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/tracing"
-
-	"github.com/go-redis/redis/v8"
+	"github.com/mikeydub/go-gallery/util"
 )
 
 type ErrKeyNotFound struct {
@@ -281,8 +280,7 @@ func (l LazyCache) Load(ctx context.Context) ([]byte, error) {
 	if err == nil {
 		return b, nil
 	}
-	var errMiss ErrKeyNotFound
-	if !errors.As(err, &errMiss) {
+	if !util.ErrorAs[ErrKeyNotFound](err) {
 		return nil, err
 	}
 	b, err = l.CalcFunc(ctx)

@@ -186,7 +186,7 @@ func (r *commentOnPostPayloadResolver) Comment(ctx context.Context, obj *model.C
 
 // ReplyToComment is the resolver for the replyToComment field.
 func (r *commentOnPostPayloadResolver) ReplyToComment(ctx context.Context, obj *model.CommentOnPostPayload) (*model.Comment, error) {
-	panic(fmt.Errorf("not implemented: ReplyToComment - replyToComment"))
+	return resolveCommentByCommentID(ctx, obj.ReplyToComment.Dbid)
 }
 
 // Creator is the resolver for the creator field.
@@ -249,7 +249,7 @@ func (r *communityResolver) SubCommunities(ctx context.Context, obj *model.Commu
 
 // TokensInCommunity is the resolver for the tokensInCommunity field.
 func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokensConnection, error) {
-	onlyUsers := util.GetOptionalValue(onlyGalleryUsers, false)
+	onlyUsers := util.GetOptionalValue(onlyGalleryUsers, true)
 	forceRefresh := util.GetOptionalValue(obj.ForceRefresh, false)
 
 	if !onlyUsers {
@@ -264,7 +264,7 @@ func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Co
 
 // Owners is the resolver for the owners field.
 func (r *communityResolver) Owners(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokenHoldersConnection, error) {
-	onlyUsers := util.GetOptionalValue(onlyGalleryUsers, false)
+	onlyUsers := util.GetOptionalValue(onlyGalleryUsers, true)
 	forceRefresh := util.GetOptionalValue(obj.ForceRefresh, false)
 
 	if !onlyUsers {
@@ -561,8 +561,8 @@ func (r *galleryUserResolver) Following(ctx context.Context, obj *model.GalleryU
 }
 
 // Feed is the resolver for the feed field.
-func (r *galleryUserResolver) Feed(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
-	events, pageInfo, err := publicapi.For(ctx).Feed.PaginateUserFeed(ctx, obj.Dbid, before, after, first, last)
+func (r *galleryUserResolver) Feed(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int, includePosts bool) (*model.FeedConnection, error) {
+	events, pageInfo, err := publicapi.For(ctx).Feed.PaginateUserFeed(ctx, obj.Dbid, before, after, first, last, includePosts)
 	if err != nil {
 		return nil, err
 	}
@@ -1423,6 +1423,25 @@ func (r *mutationResolver) ViewGallery(ctx context.Context, galleryID persist.DB
 	return output, nil
 }
 
+// ViewToken is the resolver for the viewToken field.
+func (r *mutationResolver) ViewToken(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (model.ViewTokenPayloadOrError, error) {
+	_, err := publicapi.For(ctx).Token.ViewToken(ctx, tokenID, collectionID)
+	if err != nil {
+		return nil, err
+	}
+
+	token, err := resolveTokenByTokenID(ctx, tokenID)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.ViewTokenPayload{
+		Token: token,
+	}
+
+	return output, nil
+}
+
 // UpdateGallery is the resolver for the updateGallery field.
 func (r *mutationResolver) UpdateGallery(ctx context.Context, input model.UpdateGalleryInput) (model.UpdateGalleryPayloadOrError, error) {
 	res, err := publicapi.For(ctx).Gallery.UpdateGallery(ctx, input)
@@ -1868,6 +1887,11 @@ func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBloc
 	panic(fmt.Errorf("not implemented"))
 }
 
+// Author is the resolver for the author field.
+func (r *postResolver) Author(ctx context.Context, obj *model.Post) (*model.GalleryUser, error) {
+	return resolveGalleryUserByUserID(ctx, obj.AuthorID)
+}
+
 // Tokens is the resolver for the tokens field.
 func (r *postResolver) Tokens(ctx context.Context, obj *model.Post) ([]*model.Token, error) {
 	result := make([]*model.Token, len(obj.TokenIDs))
@@ -2094,8 +2118,8 @@ func (r *queryResolver) GalleryOfTheWeekWinners(ctx context.Context) ([]*model.G
 }
 
 // GlobalFeed is the resolver for the globalFeed field.
-func (r *queryResolver) GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
-	events, pageInfo, err := publicapi.For(ctx).Feed.PaginateGlobalFeed(ctx, before, after, first, last)
+func (r *queryResolver) GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int, includePosts bool) (*model.FeedConnection, error) {
+	events, pageInfo, err := publicapi.For(ctx).Feed.PaginateGlobalFeed(ctx, before, after, first, last, includePosts)
 	if err != nil {
 		return nil, err
 	}
@@ -2112,8 +2136,8 @@ func (r *queryResolver) GlobalFeed(ctx context.Context, before *string, after *s
 }
 
 // TrendingFeed is the resolver for the trendingFeed field.
-func (r *queryResolver) TrendingFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
-	events, pageInfo, err := publicapi.For(ctx).Feed.PaginateTrendingFeed(ctx, before, after, first, last)
+func (r *queryResolver) TrendingFeed(ctx context.Context, before *string, after *string, first *int, last *int, includePosts bool) (*model.FeedConnection, error) {
+	events, pageInfo, err := publicapi.For(ctx).Feed.PaginateTrendingFeed(ctx, before, after, first, last, includePosts)
 	if err != nil {
 		return nil, err
 	}
@@ -2132,6 +2156,11 @@ func (r *queryResolver) TrendingFeed(ctx context.Context, before *string, after 
 // FeedEventByID is the resolver for the feedEventById field.
 func (r *queryResolver) FeedEventByID(ctx context.Context, id persist.DBID) (model.FeedEventByIDOrError, error) {
 	return resolveFeedEventByEventID(ctx, id)
+}
+
+// PostByID is the resolver for the postById field.
+func (r *queryResolver) PostByID(ctx context.Context, id persist.DBID) (model.PostOrError, error) {
+	return resolvePostByPostID(ctx, id)
 }
 
 // GetMerchTokens is the resolver for the getMerchTokens field.

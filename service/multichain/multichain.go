@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"net/http"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -157,7 +158,7 @@ type Verifier interface {
 // TokensOwnerFetcher supports fetching tokens for syncing
 type TokensOwnerFetcher interface {
 	GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
-	GetTokensByTokenIdentifiersAndOwner(context.Context, ChainAgnosticIdentifiers, persist.Address) (ChainAgnosticToken, ChainAgnosticContract, error)
+	GetTokenByTokenIdentifiersAndOwner(context.Context, ChainAgnosticIdentifiers, persist.Address) (ChainAgnosticToken, ChainAgnosticContract, error)
 }
 
 type TokensContractFetcher interface {
@@ -242,8 +243,8 @@ func (p *Provider) matchingWallets(wallets []persist.Wallet, chains []persist.Ch
 	return matches
 }
 
-// SyncTokens updates the media for all tokens for a user
-func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains []persist.Chain) error {
+// SyncTokensByUserID updates the media for all tokens for a user
+func (p *Provider) SyncTokensByUserID(ctx context.Context, userID persist.DBID, chains []persist.Chain) error {
 
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"user_id": userID, "chains": chains})
 
@@ -257,18 +258,18 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 	incomingContracts := make(chan chainContracts)
 	chainsToAddresses := p.matchingWallets(user.Wallets, chains)
 
-	wg := conc.WaitGroup{}
+	wg := &conc.WaitGroup{}
 	for c, a := range chainsToAddresses {
 		logger.For(ctx).Infof("syncing chain %d tokens for user %s wallets %s", c, user.Username, a)
 		chain := c
 		addresses := a
+
 		for _, addr := range addresses {
 			addr := addr
 			chain := chain
-
 			wg.Go(func() {
-				tokenFetchers := matchingProvidersForChain[TokensOwnerFetcher](p.Chains, chain)
 				subWg := &conc.WaitGroup{}
+				tokenFetchers := matchingProvidersForChain[TokensOwnerFetcher](p.Chains, chain)
 				for i, p := range tokenFetchers {
 					fetcher := p
 					priority := i
@@ -295,6 +296,110 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 		wg.Wait()
 	}()
 
+	return p.receiveSyncedTokensForUser(ctx, user, chains, incomingTokens, incomingContracts, errChan, true)
+}
+
+// SyncTokensByUserIDAndTokenIdentifiers updates the media for specific tokens for a user
+func (p *Provider) SyncTokensByUserIDAndTokenIdentifiers(ctx context.Context, userID persist.DBID, tokenIdentifiers []persist.TokenUniqueIdentifiers) error {
+
+	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"tids": tokenIdentifiers, "user_id": userID})
+
+	user, err := p.Repos.UserRepository.GetByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	chains, _ := util.Map(tokenIdentifiers, func(i persist.TokenUniqueIdentifiers) (persist.Chain, error) {
+		return i.Chain, nil
+	})
+
+	chains = util.Dedupe(chains, false)
+
+	matchingWallets := p.matchingWallets(user.Wallets, chains)
+
+	chainAddresses := map[persist.ChainAddress]bool{}
+	for chain, addresses := range matchingWallets {
+		for _, address := range addresses {
+			chainAddresses[persist.NewChainAddress(address, chain)] = true
+		}
+	}
+
+	errChan := make(chan error)
+	incomingTokens := make(chan chainTokens)
+	incomingContracts := make(chan chainContracts)
+	chainsToTokenIdentifiers := make(map[persist.Chain][]persist.TokenUniqueIdentifiers)
+	for _, tid := range tokenIdentifiers {
+		// check if the user owns the wallet that owns the token
+		if !chainAddresses[persist.NewChainAddress(tid.OwnerAddress, tid.Chain)] {
+			continue
+		}
+		chainsToTokenIdentifiers[tid.Chain] = append(chainsToTokenIdentifiers[tid.Chain], tid)
+	}
+
+	for c, a := range chainsToTokenIdentifiers {
+		chainsToTokenIdentifiers[c] = util.Dedupe(a, false)
+	}
+
+	wg := &conc.WaitGroup{}
+	for c, t := range chainsToTokenIdentifiers {
+		logger.For(ctx).Infof("syncing %d chain %d tokens for user %s", len(t), c, user.Username)
+		chain := c
+		tids := t
+		tokenFetchers := matchingProvidersForChain[TokensOwnerFetcher](p.Chains, chain)
+		wg.Go(func() {
+			subWg := &conc.WaitGroup{}
+			for i, p := range tokenFetchers {
+				incomingAgnosticTokens := make(chan ChainAgnosticToken)
+				incomingAgnosticContracts := make(chan ChainAgnosticContract)
+				innerErrChan := make(chan error)
+				tokens := make([]ChainAgnosticToken, 0, len(tids))
+				contracts := make([]ChainAgnosticContract, 0, len(tids))
+				fetcher := p
+				priority := i
+				for _, tid := range tids {
+					tid := tid
+					subWg.Go(func() {
+						token, contract, err := fetcher.GetTokenByTokenIdentifiersAndOwner(ctx, ChainAgnosticIdentifiers{
+							ContractAddress: tid.ContractAddress,
+							TokenID:         tid.TokenID,
+						}, tid.OwnerAddress)
+						if err != nil {
+							innerErrChan <- err
+							return
+						}
+						incomingAgnosticTokens <- token
+						incomingAgnosticContracts <- contract
+					})
+				}
+				for i := 0; i < len(tids)*2; i++ {
+					select {
+					case token := <-incomingAgnosticTokens:
+						tokens = append(tokens, token)
+					case contract := <-incomingAgnosticContracts:
+						contracts = append(contracts, contract)
+					case err := <-innerErrChan:
+						errChan <- errWithPriority{err: err, priority: priority}
+						return
+					}
+				}
+				incomingTokens <- chainTokens{chain: chain, tokens: tokens, priority: priority}
+				incomingContracts <- chainContracts{chain: chain, contracts: contracts, priority: priority}
+			}
+			subWg.Wait()
+		})
+
+	}
+
+	go func() {
+		defer close(incomingTokens)
+		defer close(incomingContracts)
+		wg.Wait()
+	}()
+
+	return p.receiveSyncedTokensForUser(ctx, user, chains, incomingTokens, incomingContracts, errChan, false)
+}
+
+func (p *Provider) receiveSyncedTokensForUser(ctx context.Context, user persist.User, chains []persist.Chain, incomingTokens chan chainTokens, incomingContracts chan chainContracts, errChan chan error, replace bool) error {
 	tokensFromProviders := make([]chainTokens, 0, len(user.Wallets))
 	contractsFromProviders := make([]chainContracts, 0, len(user.Wallets))
 
@@ -331,7 +436,11 @@ outer:
 		return err
 	}
 
-	_, err = p.ReplaceHolderTokensForUser(ctx, tokensFromProviders, persistedContracts, user, chains)
+	if replace {
+		_, err = p.ReplaceHolderTokensForUser(ctx, tokensFromProviders, persistedContracts, user, chains)
+	} else {
+		_, err = p.AddHolderTokensToUser(ctx, tokensFromProviders, persistedContracts, user, chains)
+	}
 	return err
 }
 
@@ -1207,13 +1316,6 @@ func (p *Provider) SyncContractsOwnedByUser(ctx context.Context, userID persist.
 
 }
 
-type tokenUniqueIdentifiers struct {
-	chain        persist.Chain
-	contract     persist.Address
-	tokenID      persist.TokenID
-	ownerAddress persist.Address
-}
-
 type tokenForUser struct {
 	userID   persist.DBID
 	token    ChainAgnosticToken
@@ -1225,7 +1327,7 @@ type tokenForUser struct {
 func (p *Provider) createUsersForTokens(ctx context.Context, tokens []chainTokens, chain persist.Chain) (map[persist.DBID][]chainTokens, map[persist.DBID]persist.User, error) {
 	users := map[persist.DBID]persist.User{}
 	userTokens := map[persist.DBID]map[int]chainTokens{}
-	seenTokens := map[tokenUniqueIdentifiers]bool{}
+	seenTokens := map[persist.TokenUniqueIdentifiers]bool{}
 
 	userChan := make(chan persist.User)
 	tokensForUserChan := make(chan tokenForUser)
@@ -1289,7 +1391,7 @@ func (p *Provider) createUsersForTokens(ctx context.Context, tokens []chainToken
 			if agnosticToken.OwnerAddress == "" {
 				continue
 			}
-			tid := tokenUniqueIdentifiers{chain: chainToken.chain, contract: agnosticToken.ContractAddress, tokenID: agnosticToken.TokenID, ownerAddress: agnosticToken.OwnerAddress}
+			tid := persist.TokenUniqueIdentifiers{Chain: chainToken.chain, ContractAddress: agnosticToken.ContractAddress, TokenID: agnosticToken.TokenID, OwnerAddress: agnosticToken.OwnerAddress}
 			if seenTokens[tid] {
 				continue
 			}
@@ -1305,7 +1407,11 @@ func (p *Provider) createUsersForTokens(ctx context.Context, tokens []chainToken
 							displayCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 							defer cancel()
 							display := resolver.GetDisplayNameByAddress(displayCtx, t.OwnerAddress)
-							if display != "" {
+
+							// if display is an empty address, this will return empty
+							displayCopy := strings.TrimLeft(display, "0x")
+							displayCopy = strings.TrimRight(displayCopy, "0")
+							if displayCopy != "" {
 								username = display
 								return true
 							}

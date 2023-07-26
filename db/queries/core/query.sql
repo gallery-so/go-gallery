@@ -386,9 +386,11 @@ select exists(
 );
 
 -- name: PaginateGlobalFeed :many
-SELECT * FROM feed_entities
+SELECT *
+FROM feed_entities
 WHERE (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
         AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+        AND (@include_posts::bool OR feed_entity_type != @post_entity_type)
 ORDER BY 
     CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
     CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
@@ -408,22 +410,16 @@ order by
 limit sqlc.arg('limit');
 
 -- name: PaginateUserFeedByUserID :many
-SELECT * from feed_entities
+SELECT *
+FROM feed_entities
 WHERE actor_id = sqlc.arg('owner_id')
         AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
         AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+        AND (@include_posts::bool OR feed_entity_type != @post_entity_type)
 ORDER BY 
     CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
     CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
 LIMIT sqlc.arg('limit');
-
--- name: PaginateTrendingFeed :many
-select * from feed_entities join unnest(@feed_entity_ids::text[]) with ordinality t(id, pos) using(id)
-  where t.pos > @cur_before_pos::int
-  and t.pos < @cur_after_pos::int
-  order by case when @paging_forward::bool then t.pos end desc,
-          case when not @paging_forward::bool then t.pos end asc
-  limit sqlc.arg('limit');
 
 -- name: PaginatePostsByContractID :batchmany
 SELECT posts.*
@@ -824,16 +820,29 @@ update galleries set collections = @collections, last_updated = now() where gall
 -- name: UpdateUserFeaturedGallery :exec
 update users set featured_gallery = @gallery_id, last_updated = now() from galleries where users.id = @user_id and galleries.id = @gallery_id and galleries.owner_user_id = @user_id and galleries.deleted = false;
 
--- name: GetGalleryTokenMediasByGalleryID :many
-select m.* from collections c, galleries g, token_medias m, users u, tokens t
-    left join contract_creators cc on t.contract = cc.contract_id
-    where g.id = $1 and c.id = any(g.collections) and t.id = any(c.nfts)
-      and u.id = g.owner_user_id
-      and ((cc.creator_user_id = u.id) or (t.owned_by_wallets && u.wallets))
-      and t.deleted = false and g.deleted = false and c.deleted = false
-      and (length(m.media->>'thumbnail_url'::varchar) > 0 or length(m.media->>'media_url'::varchar) > 0)
-      and t.token_media_id = m.id and m.deleted = false and m.active
-    order by array_position(g.collections, c.id),array_position(c.nfts, t.id) limit $2;
+-- name: GetGalleryTokenMediasByGalleryIDBatch :batchmany
+with picked_content as (
+	select t.id, t.token_media_id
+	from galleries g, collections c, tokens t, token_medias tm
+	where
+		g.id = $1
+		and c.id = any(g.collections[:8])
+		and t.id = any(c.nfts[:8])
+		and t.token_media_id = tm.id
+		and not g.deleted
+		and not c.deleted
+		and not t.deleted
+		and not tm.deleted
+		and tm.active
+		and (length(tm.media ->> 'thumbnail_url'::varchar) > 0 or length(tm.media ->> 'media_url'::varchar) > 0)
+	order by array_position(g.collections, c.id) , array_position(c.nfts, t.id)
+)
+select tm.*
+from picked_content, token_medias tm, token_ownership tko
+where
+	picked_content.token_media_id = tm.id
+	and picked_content.id = tko.token_id and (tko.is_creator or tko.is_holder)
+limit 4;
 
 -- name: GetTokenByTokenIdentifiers :one
 select * from tokens where tokens.token_id = @token_hex and contract = (select contracts.id from contracts where contracts.address = @contract_address) and tokens.chain = @chain and tokens.deleted = false;
@@ -911,11 +920,31 @@ update users set user_experiences = user_experiences || @experience where id = @
 -- name: GetTrendingUsersByIDs :many
 select users.* from users join unnest(@user_ids::varchar[]) with ordinality t(id, pos) using (id) where deleted = false order by t.pos asc;
 
--- name: GetTrendingFeedEventIDs :many
-select feed_events.id, feed_events.created_at, count(*)
-from events as interactions, feed_events
-where interactions.action IN ('CommentedOnFeedEvent', 'AdmiredFeedEvent') and interactions.created_at >= @window_end and interactions.feed_event_id is not null and interactions.feed_event_id = feed_events.id
-group by feed_events.id, feed_events.created_at;
+-- name: GetLatestFeedEntities :many
+with ids as (
+    select id, feed_entity_type, created_at
+    from feed_entities fe
+    where fe.created_at >= @window_end
+        and (@include_posts::bool or feed_entity_type != @post_entity_type)
+), selected_posts as (
+    select ids.id, ids.feed_entity_type, ids.created_at, count(distinct c.id) + count(distinct a.id) interactions
+    from ids
+    join posts p on p.id = ids.id and feed_entity_type = @post_entity_type
+    left join comments c on c.post_id = ids.id
+    left join admires a on a.post_id = ids.id
+    group by ids.id, ids.feed_entity_type, ids.created_at
+), selected_events as (
+    select ids.id, ids.feed_entity_type, ids.created_at, count(distinct c.id) + count(distinct a.id) interactions
+    from ids
+    join feed_events e on e.id = ids.id and feed_entity_type = @feed_event_entity_type
+    left join comments c on c.feed_event_id = ids.id
+    left join admires a on a.feed_event_id = ids.id
+    where not (action = any(@excluded_feed_actions::varchar[]))
+    group by ids.id, ids.feed_entity_type, ids.created_at
+)
+select * from selected_posts
+union all
+select * from selected_events;
 
 -- name: UpdateCollectionGallery :exec
 update collections set gallery_id = @gallery_id, last_updated = now() where id = @id and deleted = false;
@@ -1419,6 +1448,16 @@ limit 1;
 
 -- name: GetCurrentTime :one
 select now()::timestamptz;
+
+-- name: GetUsersByWalletAddressesAndChains :many
+WITH params AS (
+    SELECT unnest(@wallet_addresses::varchar[]) as address, unnest(@chains::int[]) as chain
+)
+SELECT sqlc.embed(wallets), sqlc.embed(users)
+FROM wallets 
+JOIN users ON wallets.id = any(users.wallets)
+JOIN params ON wallets.address = params.address AND wallets.chain = params.chain
+WHERE not wallets.deleted AND not users.deleted and not users.universal;
 
 -- name: GetContractCreatorsByContractIDs :many
 with contract_creators as (

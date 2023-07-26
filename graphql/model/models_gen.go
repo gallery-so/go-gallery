@@ -411,6 +411,10 @@ type ViewGalleryPayloadOrError interface {
 	IsViewGalleryPayloadOrError()
 }
 
+type ViewTokenPayloadOrError interface {
+	IsViewTokenPayloadOrError()
+}
+
 type ViewerGalleryByIDPayloadOrError interface {
 	IsViewerGalleryByIDPayloadOrError()
 }
@@ -875,6 +879,7 @@ func (ErrAuthenticationFailed) IsRemoveAdmirePayloadOrError()       {}
 func (ErrAuthenticationFailed) IsCommentOnFeedEventPayloadOrError() {}
 func (ErrAuthenticationFailed) IsRemoveCommentPayloadOrError()      {}
 func (ErrAuthenticationFailed) IsViewGalleryPayloadOrError()        {}
+func (ErrAuthenticationFailed) IsViewTokenPayloadOrError()          {}
 func (ErrAuthenticationFailed) IsSetProfileImagePayloadOrError()    {}
 func (ErrAuthenticationFailed) IsRemoveProfileImagePayloadOrError() {}
 
@@ -886,6 +891,7 @@ func (ErrCollectionNotFound) IsError()                          {}
 func (ErrCollectionNotFound) IsCollectionByIDOrError()          {}
 func (ErrCollectionNotFound) IsCollectionTokenByIDOrError()     {}
 func (ErrCollectionNotFound) IsDeleteCollectionPayloadOrError() {}
+func (ErrCollectionNotFound) IsViewTokenPayloadOrError()        {}
 
 type ErrCommentNotFound struct {
 	Message string `json:"message"`
@@ -1125,6 +1131,7 @@ type ErrTokenNotFound struct {
 func (ErrTokenNotFound) IsTokenByIDOrError()              {}
 func (ErrTokenNotFound) IsError()                         {}
 func (ErrTokenNotFound) IsCollectionTokenByIDOrError()    {}
+func (ErrTokenNotFound) IsViewTokenPayloadOrError()       {}
 func (ErrTokenNotFound) IsSetProfileImagePayloadOrError() {}
 
 type ErrUnknownAction struct {
@@ -1561,6 +1568,8 @@ func (PDFMedia) IsMedia()        {}
 type Post struct {
 	HelperPostData
 	Dbid         persist.DBID                `json:"dbid"`
+	Author       *GalleryUser                `json:"author"`
+	CreationTime *time.Time                  `json:"creationTime"`
 	Tokens       []*Token                    `json:"tokens"`
 	Caption      *string                     `json:"caption"`
 	Admires      *PostAdmiresConnection      `json:"admires"`
@@ -2401,6 +2410,12 @@ type ViewGalleryPayload struct {
 }
 
 func (ViewGalleryPayload) IsViewGalleryPayloadOrError() {}
+
+type ViewTokenPayload struct {
+	Token *Token `json:"token"`
+}
+
+func (ViewTokenPayload) IsViewTokenPayloadOrError() {}
 
 type Viewer struct {
 	HelperViewerData

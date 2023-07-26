@@ -81,6 +81,13 @@ type TokenIdentifiers struct {
 	Chain           Chain   `json:"chain"`
 }
 
+type TokenUniqueIdentifiers struct {
+	Chain           Chain   `json:"chain"`
+	ContractAddress Address `json:"contract_address"`
+	TokenID         TokenID `json:"token_id"`
+	OwnerAddress    Address `json:"owner_address"`
+}
+
 // ContractIdentifiers represents a unique identifier for a contract
 type ContractIdentifiers struct {
 	ContractAddress Address `json:"contract_address"`

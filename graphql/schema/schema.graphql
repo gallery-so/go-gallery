@@ -109,8 +109,13 @@ type GalleryUser implements Node @goEmbedHelper {
   isAuthenticatedUser: Boolean
   followers: [GalleryUser] @goField(forceResolver: true)
   following: [GalleryUser] @goField(forceResolver: true)
-  feed(before: String, after: String, first: Int, last: Int): FeedConnection
-    @goField(forceResolver: true)
+  feed(
+    before: String
+    after: String
+    first: Int
+    last: Int
+    includePosts: Boolean! = false
+  ): FeedConnection @goField(forceResolver: true)
   sharedFollowers(before: String, after: String, first: Int, last: Int): UsersConnection
     @authRequired
     @goField(forceResolver: true)
@@ -902,6 +907,9 @@ type Post implements Node @key(fields: "dbid") @goEmbedHelper {
   id: ID!
   dbid: DBID!
 
+  author: GalleryUser @goField(forceResolver: true)
+  creationTime: Time
+
   tokens: [Token] @goField(forceResolver: true)
 
   caption: String
@@ -1178,10 +1186,23 @@ type Query {
   ): CommunityByAddressOrError
   generalAllowlist: [ChainAddress!]
   galleryOfTheWeekWinners: [GalleryUser!]
-  globalFeed(before: String, after: String, first: Int, last: Int): FeedConnection
+  globalFeed(
+    before: String
+    after: String
+    first: Int
+    last: Int
+    includePosts: Boolean! = false
+  ): FeedConnection
   # Paging forward i.e. providing the `first` argument will return events in order of descending popularity.
-  trendingFeed(before: String, after: String, first: Int, last: Int): FeedConnection
+  trendingFeed(
+    before: String
+    after: String
+    first: Int
+    last: Int
+    includePosts: Boolean! = false
+  ): FeedConnection
   feedEventById(id: DBID!): FeedEventByIdOrError
+  postById(id: DBID!): PostOrError
   getMerchTokens(wallet: Address!): MerchTokensPayloadOrError
   galleryById(id: DBID!): GalleryByIdPayloadOrError
   viewerGalleryById(id: DBID!): ViewerGalleryByIdPayloadOrError
@@ -1887,6 +1908,16 @@ type ViewGalleryPayload {
 
 union ViewGalleryPayloadOrError = ViewGalleryPayload | ErrAuthenticationFailed
 
+type ViewTokenPayload {
+  token: Token
+}
+
+union ViewTokenPayloadOrError =
+    ViewTokenPayload
+  | ErrAuthenticationFailed
+  | ErrTokenNotFound
+  | ErrCollectionNotFound
+
 input VerifyEmailInput {
   token: String! @scrub
 }
@@ -2421,6 +2452,7 @@ type Mutation {
   deletePost(postId: DBID!): DeletePostPayloadOrError @authRequired
 
   viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
+  viewToken(tokenID: DBID!, collectionID: DBID!): ViewTokenPayloadOrError
 
   updateGallery(input: UpdateGalleryInput!): UpdateGalleryPayloadOrError @authRequired
   publishGallery(input: PublishGalleryInput!): PublishGalleryPayloadOrError @authRequired

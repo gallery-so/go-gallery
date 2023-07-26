@@ -44,6 +44,11 @@ type TokenProcessingContractTokensMessage struct {
 	ForceRefresh bool         `json:"force_refresh"`
 }
 
+type TokenProcessingUserTokensMessage struct {
+	UserID           persist.DBID                     `json:"user_id" binding:"required"`
+	TokenIdentifiers []persist.TokenUniqueIdentifiers `json:"token_identifiers" binding:"required"`
+}
+
 type TokenProcessingWalletRemovalMessage struct {
 	UserID    persist.DBID   `json:"user_id" binding:"required"`
 	WalletIDs []persist.DBID `json:"wallet_ids" binding:"required"`
@@ -210,6 +215,37 @@ func CreateTaskForContractOwnerProcessing(ctx context.Context, message TokenProc
 			HttpRequest: &taskspb.HttpRequest{
 				HttpMethod: taskspb.HttpMethod_POST,
 				Url:        fmt.Sprintf("%s/owners/process/contract", env.GetString("TOKEN_PROCESSING_URL")),
+				Headers: map[string]string{
+					"Content-type": "application/json",
+					"sentry-trace": span.TraceID.String(),
+				},
+			},
+		},
+	}
+
+	body, err := json.Marshal(message)
+	if err != nil {
+		return err
+	}
+
+	return submitHttpTask(ctx, client, queue, task, body)
+}
+
+func CreateTaskForUserTokenProcessing(ctx context.Context, message TokenProcessingUserTokensMessage, client *gcptasks.Client) error {
+	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForUserTokenProcessing")
+	defer tracing.FinishSpan(span)
+
+	tracing.AddEventDataToSpan(span, map[string]interface{}{
+		"User ID": message.UserID,
+	})
+
+	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
+
+	task := &taskspb.Task{
+		MessageType: &taskspb.Task_HttpRequest{
+			HttpRequest: &taskspb.HttpRequest{
+				HttpMethod: taskspb.HttpMethod_POST,
+				Url:        fmt.Sprintf("%s/owners/process/user", env.GetString("TOKEN_PROCESSING_URL")),
 				Headers: map[string]string{
 					"Content-type": "application/json",
 					"sentry-trace": span.TraceID.String(),

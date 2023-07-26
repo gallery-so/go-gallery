@@ -483,7 +483,7 @@ func (d *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, owner
 	return cTokens, cContracts[0], nil
 }
 
-func (d *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	tokens, contract, err := d.getTokenWithMetadata(ctx, tokenIdentifiers, true, 0)
 	if err != nil {
 		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
@@ -760,9 +760,6 @@ func alchemyTokenToChainAgnosticToken(owner persist.EthereumAddress, token Token
 		OwnerAddress:    persist.Address(owner),
 		ContractAddress: persist.Address(token.Contract.Address),
 		ExternalURL:     token.Metadata.ExternalURL,
-		FallbackMedia: persist.FallbackMedia{
-			ImageURL: persist.NullString(token.Metadata.Image),
-		},
 	}
 
 	isSpam, err := strconv.ParseBool(token.SpamInfo.IsSpam)
