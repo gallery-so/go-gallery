@@ -79,6 +79,7 @@ func testGraphQL(t *testing.T) {
 		{title: "should create gallery", run: testCreateGallery},
 		{title: "should move collection to new gallery", run: testMoveCollection},
 		{title: "should connect social account", run: testConnectSocialAccount},
+		{title: "should view a token", run: testViewToken},
 	}
 	for _, test := range tests {
 		t.Run(test.title, testWithFixtures(test.run, test.fixtures...))
@@ -782,6 +783,48 @@ func testGetCommunity(t *testing.T) {
 	})
 }
 
+func testViewToken(t *testing.T) {
+	ctx := context.Background()
+	userF := newUserWithTokensFixture(t)
+	alice := newUserFixture(t)
+	bob := newUserFixture(t)
+	c := authedHandlerClient(t, userF.ID)
+	c2 := authedHandlerClient(t, alice.ID)
+	c3 := authedHandlerClient(t, bob.ID)
+
+	colResp, err := createCollectionMutation(ctx, c, CreateCollectionInput{
+		GalleryId:      userF.GalleryID,
+		Name:           "newCollection",
+		CollectorsNote: "this is a note",
+		Tokens:         userF.TokenIDs[:1],
+		Layout: CollectionLayoutInput{
+			Sections: []int{0},
+			SectionLayout: []CollectionSectionLayoutInput{
+				{
+					Columns:    0,
+					Whitespace: []int{},
+				},
+			},
+		},
+		TokenSettings: []CollectionTokenSettingsInput{
+			{
+				TokenId:    userF.TokenIDs[0],
+				RenderLive: false,
+			},
+		},
+		Caption: nil,
+	})
+
+	require.NoError(t, err)
+	colPay := (*colResp.CreateCollection).(*createCollectionMutationCreateCollectionCreateCollectionPayload)
+	assert.NotEmpty(t, colPay.Collection.Dbid)
+	assert.Len(t, colPay.Collection.Tokens, 1)
+
+	responseAliceViewToken := viewToken(t, ctx, c2, userF.TokenIDs[0],  colPay.Collection.Dbid)
+	responseBobViewToken := viewToken(t, ctx, c3, userF.TokenIDs[0],  colPay.Collection.Dbid)
+	assert.NotEmpty(t, responseAliceViewToken)
+	assert.NotEmpty(t, responseBobViewToken)}
+
 func testSyncNewTokens(t *testing.T) {
 	userF := newUserFixture(t)
 	provider := defaultStubProvider(userF.Wallet.Address)
@@ -1314,6 +1357,15 @@ func viewGallery(t *testing.T, ctx context.Context, c genql.Client, galleryID pe
 	resp, err := viewGalleryMutation(ctx, c, galleryID)
 	require.NoError(t, err)
 	_ = (*resp.ViewGallery).(*viewGalleryMutationViewGalleryViewGalleryPayload)
+}
+
+// viewToken makes a GraphQL request to view a token
+func viewToken(t *testing.T, ctx context.Context, c genql.Client, tokenID persist.DBID, collectionID persist.DBID) *viewTokenMutationViewTokenViewTokenPayload {
+	t.Helper()
+	resp, err := viewTokenMutation(ctx, c, tokenID, collectionID)
+	require.NoError(t, err)
+	payload := (*resp.ViewToken).(*viewTokenMutationViewTokenViewTokenPayload)
+	return payload
 }
 
 // createCollection makes a GraphQL request to create a collection
