@@ -8,5 +8,7 @@ alter table tokens add column if not exists is_holder_token boolean not null
     generated always as (cardinality(owned_by_wallets) > 0)
     stored;
 
-create index if not exists tokens_is_creator_token_idx on tokens (is_creator_token) where deleted = false;
-create index if not exists tokens_is_holder_token_idx on tokens (is_holder_token) where deleted = false;
+create index if not exists tokens_owner_user_id_is_creator_token_idx on tokens (owner_user_id, is_creator_token) where deleted = false;
+create index if not exists tokens_owner_user_id_is_holder_token_idx on tokens (owner_user_id, is_holder_token) where deleted = false;
+
+drop view if exists token_ownership;

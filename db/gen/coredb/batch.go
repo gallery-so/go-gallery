@@ -1624,14 +1624,15 @@ func (b *GetGalleryByIdBatchBatchResults) Close() error {
 }
 
 const getGalleryTokenMediasByGalleryIDBatch = `-- name: GetGalleryTokenMediasByGalleryIDBatch :batchmany
-with picked_content as (
-	select t.id, t.token_media_id
+select tm.id, tm.created_at, tm.last_updated, tm.version, tm.contract_id, tm.token_id, tm.chain, tm.active, tm.metadata, tm.media, tm.name, tm.description, tm.processing_job_id, tm.deleted
 	from galleries g, collections c, tokens t, token_medias tm
 	where
 		g.id = $1
 		and c.id = any(g.collections[:8])
 		and t.id = any(c.nfts[:8])
 		and t.token_media_id = tm.id
+	    and t.owner_user_id = g.owner_user_id
+	    and (t.is_holder_token or t.is_creator_token)
 		and not g.deleted
 		and not c.deleted
 		and not t.deleted
@@ -1639,13 +1640,7 @@ with picked_content as (
 		and tm.active
 		and (length(tm.media ->> 'thumbnail_url'::varchar) > 0 or length(tm.media ->> 'media_url'::varchar) > 0)
 	order by array_position(g.collections, c.id) , array_position(c.nfts, t.id)
-)
-select tm.id, tm.created_at, tm.last_updated, tm.version, tm.contract_id, tm.token_id, tm.chain, tm.active, tm.metadata, tm.media, tm.name, tm.description, tm.processing_job_id, tm.deleted
-from picked_content, token_medias tm, token_ownership tko
-where
-	picked_content.token_media_id = tm.id
-	and picked_content.id = tko.token_id and (tko.is_creator or tko.is_holder)
-limit 4
+	limit 4
 `
 
 type GetGalleryTokenMediasByGalleryIDBatchBatchResults struct {
@@ -2757,10 +2752,9 @@ const getTokensByCollectionIdBatch = `-- name: GetTokensByCollectionIdBatch :bat
 select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id, t.is_creator_token, t.is_holder_token from collections c,
     unnest(c.nfts) with ordinality as u(nft_id, nft_ord)
     join tokens t on t.id = u.nft_id
-    join token_ownership o on o.token_id = u.nft_id
     where c.id = $1
       and c.owner_user_id = t.owner_user_id
-      and c.owner_user_id = o.owner_user_id
+      and (t.is_holder_token or t.is_creator_token)
       and c.deleted = false
       and t.deleted = false
     order by u.nft_ord
@@ -2858,9 +2852,9 @@ func (b *GetTokensByCollectionIdBatchBatchResults) Close() error {
 
 const getTokensByUserIdAndChainBatch = `-- name: GetTokensByUserIdAndChainBatch :batchmany
 select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id, t.is_creator_token, t.is_holder_token from tokens t
-    join token_ownership o on t.id = o.token_id and t.owner_user_id = o.owner_user_id
     where t.owner_user_id = $1
       and t.chain = $2
+      and (t.is_holder_token or t.is_creator_token)
       and t.deleted = false
     order by t.created_at desc, t.name desc, t.id desc
 `
@@ -2956,10 +2950,9 @@ func (b *GetTokensByUserIdAndChainBatchBatchResults) Close() error {
 
 const getTokensByUserIdBatch = `-- name: GetTokensByUserIdBatch :batchmany
 select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id, t.is_creator_token, t.is_holder_token from tokens t
-    join token_ownership o on t.id = o.token_id and t.owner_user_id = o.owner_user_id
     where t.owner_user_id = $1
       and t.deleted = false
-      and (($2::bool and o.is_holder) or ($3::bool and o.is_creator))
+      and (($2::bool and t.is_holder_token) or ($3::bool and t.is_creator_token))
     order by t.created_at desc, t.name desc, t.id desc
 `
 

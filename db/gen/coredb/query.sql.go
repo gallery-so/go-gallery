@@ -3420,37 +3420,6 @@ func (q *Queries) GetTokenOwnerByID(ctx context.Context, id persist.DBID) (User,
 	return i, err
 }
 
-const getTokenOwnershipByIds = `-- name: GetTokenOwnershipByIds :many
-select o.token_id, o.owner_user_id, o.is_holder, o.is_creator
-    from unnest($1::text[]) as t(id)
-        join token_ownership o on o.token_id = t.id
-`
-
-func (q *Queries) GetTokenOwnershipByIds(ctx context.Context, tokenIds []string) ([]TokenOwnership, error) {
-	rows, err := q.db.Query(ctx, getTokenOwnershipByIds, tokenIds)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []TokenOwnership
-	for rows.Next() {
-		var i TokenOwnership
-		if err := rows.Scan(
-			&i.TokenID,
-			&i.OwnerUserID,
-			&i.IsHolder,
-			&i.IsCreator,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getTokensByContractIdPaginate = `-- name: GetTokensByContractIdPaginate :many
 SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id, t.is_creator_token, t.is_holder_token FROM tokens t
     JOIN users u ON u.id = t.owner_user_id

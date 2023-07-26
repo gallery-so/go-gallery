@@ -510,13 +510,6 @@ type TokenMediasNoValidationRule struct {
 	Reason      string       `json:"reason"`
 }
 
-type TokenOwnership struct {
-	TokenID     persist.DBID `json:"token_id"`
-	OwnerUserID persist.DBID `json:"owner_user_id"`
-	IsHolder    bool         `json:"is_holder"`
-	IsCreator   bool         `json:"is_creator"`
-}
-
 type TokenProcessingJob struct {
 	ID               persist.DBID             `json:"id"`
 	CreatedAt        time.Time                `json:"created_at"`

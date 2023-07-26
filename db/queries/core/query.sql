@@ -95,19 +95,13 @@ where t.owner_user_id = @holder_id and t.token_id = @token_id and c.address = @c
 select t.* from collections c,
     unnest(c.nfts) with ordinality as u(nft_id, nft_ord)
     join tokens t on t.id = u.nft_id
-    join token_ownership o on o.token_id = u.nft_id
     where c.id = sqlc.arg('collection_id')
       and c.owner_user_id = t.owner_user_id
-      and c.owner_user_id = o.owner_user_id
+      and (t.is_holder_token or t.is_creator_token)
       and c.deleted = false
       and t.deleted = false
     order by u.nft_ord
     limit sqlc.narg('limit');
-
--- name: GetTokenOwnershipByIds :many
-select o.*
-    from unnest(@token_ids::text[]) as t(id)
-        join token_ownership o on o.token_id = t.id;
 
 -- name: GetContractCreatorsByIds :many
 select o.*
@@ -272,17 +266,16 @@ SELECT (MEDIA->>'thumbnail_url')::varchar as thumbnail_url FROM tokens WHERE CON
 
 -- name: GetTokensByUserIdBatch :batchmany
 select t.* from tokens t
-    join token_ownership o on t.id = o.token_id and t.owner_user_id = o.owner_user_id
     where t.owner_user_id = @owner_user_id
       and t.deleted = false
-      and ((@include_holder::bool and o.is_holder) or (@include_creator::bool and o.is_creator))
+      and ((@include_holder::bool and t.is_holder_token) or (@include_creator::bool and t.is_creator_token))
     order by t.created_at desc, t.name desc, t.id desc;
 
 -- name: GetTokensByUserIdAndChainBatch :batchmany
 select t.* from tokens t
-    join token_ownership o on t.id = o.token_id and t.owner_user_id = o.owner_user_id
     where t.owner_user_id = $1
       and t.chain = $2
+      and (t.is_holder_token or t.is_creator_token)
       and t.deleted = false
     order by t.created_at desc, t.name desc, t.id desc;
 
@@ -821,14 +814,15 @@ update galleries set collections = @collections, last_updated = now() where gall
 update users set featured_gallery = @gallery_id, last_updated = now() from galleries where users.id = @user_id and galleries.id = @gallery_id and galleries.owner_user_id = @user_id and galleries.deleted = false;
 
 -- name: GetGalleryTokenMediasByGalleryIDBatch :batchmany
-with picked_content as (
-	select t.id, t.token_media_id
+select tm.*
 	from galleries g, collections c, tokens t, token_medias tm
 	where
 		g.id = $1
 		and c.id = any(g.collections[:8])
 		and t.id = any(c.nfts[:8])
 		and t.token_media_id = tm.id
+	    and t.owner_user_id = g.owner_user_id
+	    and (t.is_holder_token or t.is_creator_token)
 		and not g.deleted
 		and not c.deleted
 		and not t.deleted
@@ -836,13 +830,7 @@ with picked_content as (
 		and tm.active
 		and (length(tm.media ->> 'thumbnail_url'::varchar) > 0 or length(tm.media ->> 'media_url'::varchar) > 0)
 	order by array_position(g.collections, c.id) , array_position(c.nfts, t.id)
-)
-select tm.*
-from picked_content, token_medias tm, token_ownership tko
-where
-	picked_content.token_media_id = tm.id
-	and picked_content.id = tko.token_id and (tko.is_creator or tko.is_holder)
-limit 4;
+	limit 4;
 
 -- name: GetTokenByTokenIdentifiers :one
 select * from tokens where tokens.token_id = @token_hex and contract = (select contracts.id from contracts where contracts.address = @contract_address) and tokens.chain = @chain and tokens.deleted = false;
