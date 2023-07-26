@@ -16,21 +16,24 @@ const feedEntityScoring = `-- name: FeedEntityScoring :many
 with ids as (
     select id, feed_entity_type, created_at
     from feed_entities fe
-    where fe.created_at >= $1 and (not $2::bool or fe.actor_id != $3::varchar)
+    where 
+      fe.created_at >= $1
+      and (not $2::bool or fe.actor_id != $3::varchar)
+      and ($4::bool or feed_entity_type != $5)
 ), selected_posts as (
     select ids.id, ids.feed_entity_type, ids.created_at, p.actor_id, p.contract_ids, count(distinct c.id) + count(distinct a.id) interactions
     from ids
-    join posts p on p.id = ids.id and feed_entity_type = $4
+    join posts p on p.id = ids.id and feed_entity_type = $5
     left join comments c on c.post_id = ids.id
     left join admires a on a.post_id = ids.id
     group by ids.id, ids.feed_entity_type, ids.created_at, p.actor_id, p.contract_ids
 ), selected_events as (
     select ids.id, ids.feed_entity_type, ids.created_at, e.owner_id, null::varchar[] contract_ids, count(distinct c.id) + count(distinct a.id) interactions
     from ids
-    join feed_events e on e.id = ids.id and feed_entity_type = $5
+    join feed_events e on e.id = ids.id and feed_entity_type = $6
     left join comments c on c.feed_event_id = ids.id
     left join admires a on a.feed_event_id = ids.id
-    where not action = any($6::varchar[])
+    where not action = any($7::varchar[])
     group by ids.id, ids.feed_entity_type, ids.created_at, e.owner_id, null::varchar[]
 )
 select id, feed_entity_type, created_at, actor_id, contract_ids, interactions from selected_posts
@@ -42,6 +45,7 @@ type FeedEntityScoringParams struct {
 	WindowEnd           time.Time `json:"window_end"`
 	ExcludeViewer       bool      `json:"exclude_viewer"`
 	ViewerID            string    `json:"viewer_id"`
+	IncludePosts        bool      `json:"include_posts"`
 	PostEntityType      int32     `json:"post_entity_type"`
 	FeedEventEntityType int32     `json:"feed_event_entity_type"`
 	ExcludedFeedActions []string  `json:"excluded_feed_actions"`
@@ -61,6 +65,7 @@ func (q *Queries) FeedEntityScoring(ctx context.Context, arg FeedEntityScoringPa
 		arg.WindowEnd,
 		arg.ExcludeViewer,
 		arg.ViewerID,
+		arg.IncludePosts,
 		arg.PostEntityType,
 		arg.FeedEventEntityType,
 		arg.ExcludedFeedActions,

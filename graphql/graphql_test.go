@@ -79,6 +79,7 @@ func testGraphQL(t *testing.T) {
 		{title: "should create gallery", run: testCreateGallery},
 		{title: "should move collection to new gallery", run: testMoveCollection},
 		{title: "should connect social account", run: testConnectSocialAccount},
+		{title: "should view a token", run: testViewToken},
 	}
 	for _, test := range tests {
 		t.Run(test.title, testWithFixtures(test.run, test.fixtures...))
@@ -757,7 +758,7 @@ func testTrendingFeedEvents(t *testing.T) {
 		userF.FeedEventIDs[1],
 	}
 
-	actual := trendingFeedEvents(t, ctx, c, 10)
+	actual := trendingFeedEvents(t, ctx, c, 10, true)
 
 	assert.Equal(t, expected, actual)
 }
@@ -767,7 +768,7 @@ func testDeletePost(t *testing.T) {
 	userF := newUserWithFeedEntitiesFixture(t)
 	c := authedHandlerClient(t, userF.ID)
 	deletePost(t, ctx, c, userF.PostIDs[0])
-	actual := globalFeedEvents(t, ctx, c, 4)
+	actual := globalFeedEvents(t, ctx, c, 4, true)
 	assert.False(t, util.Contains(actual, userF.PostIDs[0]))
 }
 
@@ -781,6 +782,48 @@ func testGetCommunity(t *testing.T) {
 		Chain:   ChainEthereum,
 	})
 }
+
+func testViewToken(t *testing.T) {
+	ctx := context.Background()
+	userF := newUserWithTokensFixture(t)
+	alice := newUserFixture(t)
+	bob := newUserFixture(t)
+	c := authedHandlerClient(t, userF.ID)
+	c2 := authedHandlerClient(t, alice.ID)
+	c3 := authedHandlerClient(t, bob.ID)
+
+	colResp, err := createCollectionMutation(ctx, c, CreateCollectionInput{
+		GalleryId:      userF.GalleryID,
+		Name:           "newCollection",
+		CollectorsNote: "this is a note",
+		Tokens:         userF.TokenIDs[:1],
+		Layout: CollectionLayoutInput{
+			Sections: []int{0},
+			SectionLayout: []CollectionSectionLayoutInput{
+				{
+					Columns:    0,
+					Whitespace: []int{},
+				},
+			},
+		},
+		TokenSettings: []CollectionTokenSettingsInput{
+			{
+				TokenId:    userF.TokenIDs[0],
+				RenderLive: false,
+			},
+		},
+		Caption: nil,
+	})
+
+	require.NoError(t, err)
+	colPay := (*colResp.CreateCollection).(*createCollectionMutationCreateCollectionCreateCollectionPayload)
+	assert.NotEmpty(t, colPay.Collection.Dbid)
+	assert.Len(t, colPay.Collection.Tokens, 1)
+
+	responseAliceViewToken := viewToken(t, ctx, c2, userF.TokenIDs[0],  colPay.Collection.Dbid)
+	responseBobViewToken := viewToken(t, ctx, c3, userF.TokenIDs[0],  colPay.Collection.Dbid)
+	assert.NotEmpty(t, responseAliceViewToken)
+	assert.NotEmpty(t, responseBobViewToken)}
 
 func testSyncNewTokens(t *testing.T) {
 	userF := newUserFixture(t)
@@ -1316,6 +1359,15 @@ func viewGallery(t *testing.T, ctx context.Context, c genql.Client, galleryID pe
 	_ = (*resp.ViewGallery).(*viewGalleryMutationViewGalleryViewGalleryPayload)
 }
 
+// viewToken makes a GraphQL request to view a token
+func viewToken(t *testing.T, ctx context.Context, c genql.Client, tokenID persist.DBID, collectionID persist.DBID) *viewTokenMutationViewTokenViewTokenPayload {
+	t.Helper()
+	resp, err := viewTokenMutation(ctx, c, tokenID, collectionID)
+	require.NoError(t, err)
+	payload := (*resp.ViewToken).(*viewTokenMutationViewTokenViewTokenPayload)
+	return payload
+}
+
 // createCollection makes a GraphQL request to create a collection
 func createCollection(t *testing.T, ctx context.Context, c genql.Client, input CreateCollectionInput) persist.DBID {
 	t.Helper()
@@ -1334,9 +1386,9 @@ func createPost(t *testing.T, ctx context.Context, c genql.Client, input PostTok
 }
 
 // globalFeedEvents makes a GraphQL request to return existing feed events
-func globalFeedEvents(t *testing.T, ctx context.Context, c genql.Client, limit int) []persist.DBID {
+func globalFeedEvents(t *testing.T, ctx context.Context, c genql.Client, limit int, includePosts bool) []persist.DBID {
 	t.Helper()
-	resp, err := globalFeedQuery(ctx, c, &limit)
+	resp, err := globalFeedQuery(ctx, c, &limit, includePosts)
 	require.NoError(t, err)
 	feedEntities := make([]persist.DBID, len(resp.GlobalFeed.Edges))
 	for i, event := range resp.GlobalFeed.Edges {
@@ -1354,9 +1406,9 @@ func globalFeedEvents(t *testing.T, ctx context.Context, c genql.Client, limit i
 }
 
 // trendingFeedEvents makes a GraphQL request to return trending feedEvents
-func trendingFeedEvents(t *testing.T, ctx context.Context, c genql.Client, limit int) []persist.DBID {
+func trendingFeedEvents(t *testing.T, ctx context.Context, c genql.Client, limit int, includePosts bool) []persist.DBID {
 	t.Helper()
-	resp, err := trendingFeedQuery(ctx, c, &limit)
+	resp, err := trendingFeedQuery(ctx, c, &limit, includePosts)
 	require.NoError(t, err)
 	feedEvents := make([]persist.DBID, len(resp.TrendingFeed.Edges))
 	for i, event := range resp.TrendingFeed.Edges {

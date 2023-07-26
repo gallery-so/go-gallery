@@ -411,6 +411,10 @@ type ViewGalleryPayloadOrError interface {
 	IsViewGalleryPayloadOrError()
 }
 
+type ViewTokenPayloadOrError interface {
+	IsViewTokenPayloadOrError()
+}
+
 type ViewerGalleryByIDPayloadOrError interface {
 	IsViewerGalleryByIDPayloadOrError()
 }
@@ -875,6 +879,7 @@ func (ErrAuthenticationFailed) IsRemoveAdmirePayloadOrError()       {}
 func (ErrAuthenticationFailed) IsCommentOnFeedEventPayloadOrError() {}
 func (ErrAuthenticationFailed) IsRemoveCommentPayloadOrError()      {}
 func (ErrAuthenticationFailed) IsViewGalleryPayloadOrError()        {}
+func (ErrAuthenticationFailed) IsViewTokenPayloadOrError()          {}
 func (ErrAuthenticationFailed) IsSetProfileImagePayloadOrError()    {}
 func (ErrAuthenticationFailed) IsRemoveProfileImagePayloadOrError() {}
 
@@ -886,6 +891,7 @@ func (ErrCollectionNotFound) IsError()                          {}
 func (ErrCollectionNotFound) IsCollectionByIDOrError()          {}
 func (ErrCollectionNotFound) IsCollectionTokenByIDOrError()     {}
 func (ErrCollectionNotFound) IsDeleteCollectionPayloadOrError() {}
+func (ErrCollectionNotFound) IsViewTokenPayloadOrError()        {}
 
 type ErrCommentNotFound struct {
 	Message string `json:"message"`
@@ -1125,6 +1131,7 @@ type ErrTokenNotFound struct {
 func (ErrTokenNotFound) IsTokenByIDOrError()              {}
 func (ErrTokenNotFound) IsError()                         {}
 func (ErrTokenNotFound) IsCollectionTokenByIDOrError()    {}
+func (ErrTokenNotFound) IsViewTokenPayloadOrError()       {}
 func (ErrTokenNotFound) IsSetProfileImagePayloadOrError() {}
 
 type ErrUnknownAction struct {
@@ -1328,7 +1335,6 @@ type GalleryUser struct {
 	Followers                []*GalleryUser         `json:"followers"`
 	Following                []*GalleryUser         `json:"following"`
 	Feed                     *FeedConnection        `json:"feed"`
-	CuratedFeed              *FeedConnection        `json:"curatedFeed"`
 	SharedFollowers          *UsersConnection       `json:"sharedFollowers"`
 	SharedCommunities        *CommunitiesConnection `json:"sharedCommunities"`
 	CreatedCommunities       *CommunitiesConnection `json:"createdCommunities"`
@@ -2404,6 +2410,12 @@ type ViewGalleryPayload struct {
 }
 
 func (ViewGalleryPayload) IsViewGalleryPayloadOrError() {}
+
+type ViewTokenPayload struct {
+	Token *Token `json:"token"`
+}
+
+func (ViewTokenPayload) IsViewTokenPayloadOrError() {}
 
 type Viewer struct {
 	HelperViewerData

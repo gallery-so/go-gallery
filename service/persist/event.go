@@ -27,6 +27,7 @@ const (
 	ActionCommentedOnFeedEvent            Action = "CommentedOnFeedEvent"
 	ActionCommentedOnPost                 Action = "CommentedOnPost"
 	ActionViewedGallery                   Action = "ViewedGallery"
+	ActionViewedToken                     Action = "ViewedToken"
 	ActionCollectionUpdated               Action = "CollectionUpdated"
 	ActionGalleryUpdated                  Action = "GalleryUpdated"
 	ActionGalleryInfoUpdated              Action = "GalleryInfoUpdated"
@@ -38,6 +39,7 @@ type EventData struct {
 	UserRefollowed                      bool              `json:"user_refollowed"`
 	TokenCollectorsNote                 string            `json:"token_collectors_note"`
 	TokenCollectionID                   DBID              `json:"token_collection_id"`
+	TokenContractID                     DBID              `json:"token_contract_id"`
 	CollectionTokenIDs                  DBIDList          `json:"collection_token_ids"`
 	CollectionCollectorsNote            string            `json:"collection_collectors_note"`
 	GalleryName                         *string           `json:"gallery_name"`
