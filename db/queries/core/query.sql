@@ -177,7 +177,7 @@ displayed as (
     and tokens.contract = contracts.id
     and collections.owner_user_id = tokens.owner_user_id
     and galleries.owner_user_id = tokens.owner_user_id
-    and (tokens.is_holder_token or tokens.is_creator_token)
+    and tokens.displayable
     and tokens.deleted = false
     and galleries.deleted = false
     and contracts.deleted = false
@@ -224,7 +224,7 @@ join users on users.id = tokens.owner_user_id
 join contracts on tokens.contract = contracts.id
 where (contracts.id = @id or contracts.parent_id = @id)
   and (not @gallery_users_only::bool or users.universal = false) and tokens.deleted = false and contracts.deleted = false
-  and (tokens.is_holder_token or tokens.is_creator_token);
+  and tokens.displayable;
 
 -- name: GetOwnersByContractIdBatchPaginate :batchmany
 -- Note: sqlc has trouble recognizing that the output of the "select distinct" subquery below will
@@ -250,7 +250,7 @@ select count(distinct users.id) from users, tokens, contracts
     where (contracts.id = @id or contracts.parent_id = @id)
     and tokens.contract = contracts.id
     and tokens.owner_user_id = users.id
-    and (tokens.is_holder_token or tokens.is_creator_token)
+    and tokens.displayable
     and (not @gallery_users_only::bool or users.universal = false)
     and tokens.deleted = false and users.deleted = false and contracts.deleted = false;
 
@@ -840,7 +840,7 @@ select * from tokens
     where tokens.token_id = @token_hex
       and contract = (select contracts.id from contracts where contracts.address = @contract_address)
       and tokens.chain = @chain and tokens.deleted = false
-      and (tokens.is_holder_token or tokens.is_creator_token);
+      and tokens.displayable;
 
 -- name: DeleteCollections :exec
 update collections set deleted = true, last_updated = now() where id = any(@ids::varchar[]);

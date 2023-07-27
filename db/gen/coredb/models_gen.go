@@ -466,6 +466,7 @@ type Token struct {
 	TokenMediaID         persist.DBID               `json:"token_media_id"`
 	IsCreatorToken       bool                       `json:"is_creator_token"`
 	IsHolderToken        bool                       `json:"is_holder_token"`
+	Displayable          bool                       `json:"displayable"`
 }
 
 type TokenMedia struct {
