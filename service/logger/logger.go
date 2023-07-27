@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-var loggerContextKey struct{}
+const loggerContextKey = "logger.logger"
 
 var defaultLogger = logrus.New()
 var defaultEntry = logrus.NewEntry(defaultLogger)

@@ -561,8 +561,8 @@ func (r *galleryUserResolver) Following(ctx context.Context, obj *model.GalleryU
 }
 
 // Feed is the resolver for the feed field.
-func (r *galleryUserResolver) Feed(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
-	events, pageInfo, err := publicapi.For(ctx).Feed.PaginateUserFeed(ctx, obj.Dbid, before, after, first, last)
+func (r *galleryUserResolver) Feed(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int, includePosts bool) (*model.FeedConnection, error) {
+	events, pageInfo, err := publicapi.For(ctx).Feed.PaginateUserFeed(ctx, obj.Dbid, before, after, first, last, includePosts)
 	if err != nil {
 		return nil, err
 	}
@@ -1423,6 +1423,25 @@ func (r *mutationResolver) ViewGallery(ctx context.Context, galleryID persist.DB
 	return output, nil
 }
 
+// ViewToken is the resolver for the viewToken field.
+func (r *mutationResolver) ViewToken(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (model.ViewTokenPayloadOrError, error) {
+	_, err := publicapi.For(ctx).Token.ViewToken(ctx, tokenID, collectionID)
+	if err != nil {
+		return nil, err
+	}
+
+	token, err := resolveTokenByTokenID(ctx, tokenID)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.ViewTokenPayload{
+		Token: token,
+	}
+
+	return output, nil
+}
+
 // UpdateGallery is the resolver for the updateGallery field.
 func (r *mutationResolver) UpdateGallery(ctx context.Context, input model.UpdateGalleryInput) (model.UpdateGalleryPayloadOrError, error) {
 	res, err := publicapi.For(ctx).Gallery.UpdateGallery(ctx, input)
@@ -2104,8 +2123,8 @@ func (r *queryResolver) GalleryOfTheWeekWinners(ctx context.Context) ([]*model.G
 }
 
 // GlobalFeed is the resolver for the globalFeed field.
-func (r *queryResolver) GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
-	events, pageInfo, err := publicapi.For(ctx).Feed.PaginateGlobalFeed(ctx, before, after, first, last)
+func (r *queryResolver) GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int, includePosts bool) (*model.FeedConnection, error) {
+	events, pageInfo, err := publicapi.For(ctx).Feed.PaginateGlobalFeed(ctx, before, after, first, last, includePosts)
 	if err != nil {
 		return nil, err
 	}
@@ -2122,8 +2141,8 @@ func (r *queryResolver) GlobalFeed(ctx context.Context, before *string, after *s
 }
 
 // TrendingFeed is the resolver for the trendingFeed field.
-func (r *queryResolver) TrendingFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
-	events, pageInfo, err := publicapi.For(ctx).Feed.PaginateTrendingFeed(ctx, before, after, first, last)
+func (r *queryResolver) TrendingFeed(ctx context.Context, before *string, after *string, first *int, last *int, includePosts bool) (*model.FeedConnection, error) {
+	events, pageInfo, err := publicapi.For(ctx).Feed.PaginateTrendingFeed(ctx, before, after, first, last, includePosts)
 	if err != nil {
 		return nil, err
 	}

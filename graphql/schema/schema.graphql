@@ -109,8 +109,13 @@ type GalleryUser implements Node @goEmbedHelper {
   isAuthenticatedUser: Boolean
   followers: [GalleryUser] @goField(forceResolver: true)
   following: [GalleryUser] @goField(forceResolver: true)
-  feed(before: String, after: String, first: Int, last: Int): FeedConnection
-    @goField(forceResolver: true)
+  feed(
+    before: String
+    after: String
+    first: Int
+    last: Int
+    includePosts: Boolean! = false
+  ): FeedConnection @goField(forceResolver: true)
   sharedFollowers(before: String, after: String, first: Int, last: Int): UsersConnection
     @authRequired
     @goField(forceResolver: true)
@@ -390,6 +395,7 @@ enum Chain {
   Tezos
   POAP
   Zora
+  Base
 }
 
 enum TokenOwnershipType {
@@ -619,6 +625,8 @@ type NotificationsConnection @goEmbedHelper {
 
 enum SocialAccountType {
   Twitter
+  Farcaster
+  Lens
 }
 
 interface SocialAccount {
@@ -629,6 +637,7 @@ interface SocialAccount {
 
 type SocialAccounts {
   twitter: TwitterSocialAccount
+  farcaster: FarcasterSocialAccount
 }
 
 type TwitterSocialAccount implements SocialAccount {
@@ -637,6 +646,16 @@ type TwitterSocialAccount implements SocialAccount {
   name: String!
   username: String!
   profileImageURL: String!
+  display: Boolean!
+}
+
+type FarcasterSocialAccount implements SocialAccount {
+  type: SocialAccountType!
+  social_id: String!
+  name: String!
+  username: String!
+  profileImageURL: String!
+  bio: String!
   display: Boolean!
 }
 
@@ -1181,9 +1200,21 @@ type Query {
   ): CommunityByAddressOrError
   generalAllowlist: [ChainAddress!]
   galleryOfTheWeekWinners: [GalleryUser!]
-  globalFeed(before: String, after: String, first: Int, last: Int): FeedConnection
+  globalFeed(
+    before: String
+    after: String
+    first: Int
+    last: Int
+    includePosts: Boolean! = false
+  ): FeedConnection
   # Paging forward i.e. providing the `first` argument will return events in order of descending popularity.
-  trendingFeed(before: String, after: String, first: Int, last: Int): FeedConnection
+  trendingFeed(
+    before: String
+    after: String
+    first: Int
+    last: Int
+    includePosts: Boolean! = false
+  ): FeedConnection
   feedEventById(id: DBID!): FeedEventByIdOrError
   postById(id: DBID!): PostOrError
   getMerchTokens(wallet: Address!): MerchTokensPayloadOrError
@@ -1902,6 +1933,16 @@ type ViewGalleryPayload {
 
 union ViewGalleryPayloadOrError = ViewGalleryPayload | ErrAuthenticationFailed
 
+type ViewTokenPayload {
+  token: Token
+}
+
+union ViewTokenPayloadOrError =
+    ViewTokenPayload
+  | ErrAuthenticationFailed
+  | ErrTokenNotFound
+  | ErrCollectionNotFound
+
 input VerifyEmailInput {
   token: String! @scrub
 }
@@ -2436,6 +2477,7 @@ type Mutation {
   deletePost(postId: DBID!): DeletePostPayloadOrError @authRequired
 
   viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
+  viewToken(tokenID: DBID!, collectionID: DBID!): ViewTokenPayloadOrError
 
   updateGallery(input: UpdateGalleryInput!): UpdateGalleryPayloadOrError @authRequired
   publishGallery(input: PublishGalleryInput!): PublishGalleryPayloadOrError @authRequired

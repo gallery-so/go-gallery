@@ -342,7 +342,7 @@ func (i *indexer) startNewBlocksPipeline(ctx context.Context, topics [][]common.
 
 	transfers := make(chan []transfersAtBlock)
 	plugins := NewTransferPlugins(ctx)
-	enabledPlugins := []chan<- TransferPluginMsg{plugins.contracts.in}
+	enabledPlugins := []chan<- TransferPluginMsg{plugins.contracts.in, plugins.tokens.in}
 
 	mostRecentBlock, err := rpc.RetryGetBlockNumber(ctx, i.ethClient)
 	if err != nil {

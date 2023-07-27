@@ -492,6 +492,16 @@ type ComplexityRoot struct {
 		MediaURL  func(childComplexity int) int
 	}
 
+	FarcasterSocialAccount struct {
+		Bio             func(childComplexity int) int
+		Display         func(childComplexity int) int
+		Name            func(childComplexity int) int
+		ProfileImageURL func(childComplexity int) int
+		SocialID        func(childComplexity int) int
+		Type            func(childComplexity int) int
+		Username        func(childComplexity int) int
+	}
+
 	FeedConnection struct {
 		Edges    func(childComplexity int) int
 		PageInfo func(childComplexity int) int
@@ -611,7 +621,7 @@ type ComplexityRoot struct {
 		CreatedCommunities       func(childComplexity int, input model.CreatedCommunitiesInput, before *string, after *string, first *int, last *int) int
 		Dbid                     func(childComplexity int) int
 		FeaturedGallery          func(childComplexity int) int
-		Feed                     func(childComplexity int, before *string, after *string, first *int, last *int) int
+		Feed                     func(childComplexity int, before *string, after *string, first *int, last *int, includePosts bool) int
 		Followers                func(childComplexity int) int
 		Following                func(childComplexity int) int
 		Galleries                func(childComplexity int) int
@@ -817,6 +827,7 @@ type ComplexityRoot struct {
 		VerifyEmail                     func(childComplexity int, input model.VerifyEmailInput) int
 		VerifyEmailMagicLink            func(childComplexity int, input model.VerifyEmailMagicLinkInput) int
 		ViewGallery                     func(childComplexity int, galleryID persist.DBID) int
+		ViewToken                       func(childComplexity int, tokenID persist.DBID, collectionID persist.DBID) int
 	}
 
 	NewTokensNotification struct {
@@ -960,7 +971,7 @@ type ComplexityRoot struct {
 		GalleryOfTheWeekWinners    func(childComplexity int) int
 		GeneralAllowlist           func(childComplexity int) int
 		GetMerchTokens             func(childComplexity int, wallet persist.Address) int
-		GlobalFeed                 func(childComplexity int, before *string, after *string, first *int, last *int) int
+		GlobalFeed                 func(childComplexity int, before *string, after *string, first *int, last *int, includePosts bool) int
 		MembershipTiers            func(childComplexity int, forceRefresh *bool) int
 		Node                       func(childComplexity int, id model.GqlID) int
 		PostByID                   func(childComplexity int, id persist.DBID) int
@@ -971,7 +982,7 @@ type ComplexityRoot struct {
 		SocialQueries              func(childComplexity int) int
 		TokenByID                  func(childComplexity int, id persist.DBID) int
 		TopCollectionsForCommunity func(childComplexity int, input model.TopCollectionsForCommunityInput, before *string, after *string, first *int, last *int) int
-		TrendingFeed               func(childComplexity int, before *string, after *string, first *int, last *int) int
+		TrendingFeed               func(childComplexity int, before *string, after *string, first *int, last *int, includePosts bool) int
 		TrendingUsers              func(childComplexity int, input model.TrendingUsersInput) int
 		UserByAddress              func(childComplexity int, chainAddress persist.ChainAddress) int
 		UserByID                   func(childComplexity int, id persist.DBID) int
@@ -1054,7 +1065,8 @@ type ComplexityRoot struct {
 	}
 
 	SocialAccounts struct {
-		Twitter func(childComplexity int) int
+		Farcaster func(childComplexity int) int
+		Twitter   func(childComplexity int) int
 	}
 
 	SocialConnection struct {
@@ -1439,6 +1451,10 @@ type ComplexityRoot struct {
 		Gallery func(childComplexity int) int
 	}
 
+	ViewTokenPayload struct {
+		Token func(childComplexity int) int
+	}
+
 	Viewer struct {
 		Email                func(childComplexity int) int
 		Feed                 func(childComplexity int, before *string, after *string, first *int, last *int) int
@@ -1594,7 +1610,7 @@ type GalleryUserResolver interface {
 
 	Followers(ctx context.Context, obj *model.GalleryUser) ([]*model.GalleryUser, error)
 	Following(ctx context.Context, obj *model.GalleryUser) ([]*model.GalleryUser, error)
-	Feed(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
+	Feed(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int, includePosts bool) (*model.FeedConnection, error)
 	SharedFollowers(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.UsersConnection, error)
 	SharedCommunities(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error)
 	CreatedCommunities(ctx context.Context, obj *model.GalleryUser, input model.CreatedCommunitiesInput, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error)
@@ -1643,6 +1659,7 @@ type MutationResolver interface {
 	PostTokens(ctx context.Context, input model.PostTokensInput) (model.PostTokensPayloadOrError, error)
 	DeletePost(ctx context.Context, postID persist.DBID) (model.DeletePostPayloadOrError, error)
 	ViewGallery(ctx context.Context, galleryID persist.DBID) (model.ViewGalleryPayloadOrError, error)
+	ViewToken(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (model.ViewTokenPayloadOrError, error)
 	UpdateGallery(ctx context.Context, input model.UpdateGalleryInput) (model.UpdateGalleryPayloadOrError, error)
 	PublishGallery(ctx context.Context, input model.PublishGalleryInput) (model.PublishGalleryPayloadOrError, error)
 	CreateGallery(ctx context.Context, input model.CreateGalleryInput) (model.CreateGalleryPayloadOrError, error)
@@ -1706,8 +1723,8 @@ type QueryResolver interface {
 	CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool) (model.CommunityByAddressOrError, error)
 	GeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error)
 	GalleryOfTheWeekWinners(ctx context.Context) ([]*model.GalleryUser, error)
-	GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
-	TrendingFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
+	GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int, includePosts bool) (*model.FeedConnection, error)
+	TrendingFeed(ctx context.Context, before *string, after *string, first *int, last *int, includePosts bool) (*model.FeedConnection, error)
 	FeedEventByID(ctx context.Context, id persist.DBID) (model.FeedEventByIDOrError, error)
 	PostByID(ctx context.Context, id persist.DBID) (model.PostOrError, error)
 	GetMerchTokens(ctx context.Context, wallet persist.Address) (model.MerchTokensPayloadOrError, error)
@@ -3125,6 +3142,55 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.FallbackMedia.MediaURL(childComplexity), true
 
+	case "FarcasterSocialAccount.bio":
+		if e.complexity.FarcasterSocialAccount.Bio == nil {
+			break
+		}
+
+		return e.complexity.FarcasterSocialAccount.Bio(childComplexity), true
+
+	case "FarcasterSocialAccount.display":
+		if e.complexity.FarcasterSocialAccount.Display == nil {
+			break
+		}
+
+		return e.complexity.FarcasterSocialAccount.Display(childComplexity), true
+
+	case "FarcasterSocialAccount.name":
+		if e.complexity.FarcasterSocialAccount.Name == nil {
+			break
+		}
+
+		return e.complexity.FarcasterSocialAccount.Name(childComplexity), true
+
+	case "FarcasterSocialAccount.profileImageURL":
+		if e.complexity.FarcasterSocialAccount.ProfileImageURL == nil {
+			break
+		}
+
+		return e.complexity.FarcasterSocialAccount.ProfileImageURL(childComplexity), true
+
+	case "FarcasterSocialAccount.social_id":
+		if e.complexity.FarcasterSocialAccount.SocialID == nil {
+			break
+		}
+
+		return e.complexity.FarcasterSocialAccount.SocialID(childComplexity), true
+
+	case "FarcasterSocialAccount.type":
+		if e.complexity.FarcasterSocialAccount.Type == nil {
+			break
+		}
+
+		return e.complexity.FarcasterSocialAccount.Type(childComplexity), true
+
+	case "FarcasterSocialAccount.username":
+		if e.complexity.FarcasterSocialAccount.Username == nil {
+			break
+		}
+
+		return e.complexity.FarcasterSocialAccount.Username(childComplexity), true
+
 	case "FeedConnection.edges":
 		if e.complexity.FeedConnection.Edges == nil {
 			break
@@ -3624,7 +3690,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.GalleryUser.Feed(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
+		return e.complexity.GalleryUser.Feed(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int), args["includePosts"].(bool)), true
 
 	case "GalleryUser.followers":
 		if e.complexity.GalleryUser.Followers == nil {
@@ -5017,6 +5083,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.ViewGallery(childComplexity, args["galleryId"].(persist.DBID)), true
 
+	case "Mutation.viewToken":
+		if e.complexity.Mutation.ViewToken == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_viewToken_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.ViewToken(childComplexity, args["tokenID"].(persist.DBID), args["collectionID"].(persist.DBID)), true
+
 	case "NewTokensNotification.count":
 		if e.complexity.NewTokensNotification.Count == nil {
 			break
@@ -5637,7 +5715,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.GlobalFeed(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
+		return e.complexity.Query.GlobalFeed(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int), args["includePosts"].(bool)), true
 
 	case "Query.membershipTiers":
 		if e.complexity.Query.MembershipTiers == nil {
@@ -5764,7 +5842,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.TrendingFeed(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
+		return e.complexity.Query.TrendingFeed(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int), args["includePosts"].(bool)), true
 
 	case "Query.trendingUsers":
 		if e.complexity.Query.TrendingUsers == nil {
@@ -6022,6 +6100,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.SetSpamPreferencePayload.Tokens(childComplexity), true
+
+	case "SocialAccounts.farcaster":
+		if e.complexity.SocialAccounts.Farcaster == nil {
+			break
+		}
+
+		return e.complexity.SocialAccounts.Farcaster(childComplexity), true
 
 	case "SocialAccounts.twitter":
 		if e.complexity.SocialAccounts.Twitter == nil {
@@ -7432,6 +7517,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ViewGalleryPayload.Gallery(childComplexity), true
 
+	case "ViewTokenPayload.token":
+		if e.complexity.ViewTokenPayload.Token == nil {
+			break
+		}
+
+		return e.complexity.ViewTokenPayload.Token(childComplexity), true
+
 	case "Viewer.email":
 		if e.complexity.Viewer.Email == nil {
 			break
@@ -7821,8 +7913,13 @@ type GalleryUser implements Node @goEmbedHelper {
   isAuthenticatedUser: Boolean
   followers: [GalleryUser] @goField(forceResolver: true)
   following: [GalleryUser] @goField(forceResolver: true)
-  feed(before: String, after: String, first: Int, last: Int): FeedConnection
-    @goField(forceResolver: true)
+  feed(
+    before: String
+    after: String
+    first: Int
+    last: Int
+    includePosts: Boolean! = false
+  ): FeedConnection @goField(forceResolver: true)
   sharedFollowers(before: String, after: String, first: Int, last: Int): UsersConnection
     @authRequired
     @goField(forceResolver: true)
@@ -8102,6 +8199,7 @@ enum Chain {
   Tezos
   POAP
   Zora
+  Base
 }
 
 enum TokenOwnershipType {
@@ -8331,6 +8429,8 @@ type NotificationsConnection @goEmbedHelper {
 
 enum SocialAccountType {
   Twitter
+  Farcaster
+  Lens
 }
 
 interface SocialAccount {
@@ -8341,6 +8441,7 @@ interface SocialAccount {
 
 type SocialAccounts {
   twitter: TwitterSocialAccount
+  farcaster: FarcasterSocialAccount
 }
 
 type TwitterSocialAccount implements SocialAccount {
@@ -8349,6 +8450,16 @@ type TwitterSocialAccount implements SocialAccount {
   name: String!
   username: String!
   profileImageURL: String!
+  display: Boolean!
+}
+
+type FarcasterSocialAccount implements SocialAccount {
+  type: SocialAccountType!
+  social_id: String!
+  name: String!
+  username: String!
+  profileImageURL: String!
+  bio: String!
   display: Boolean!
 }
 
@@ -8893,9 +9004,21 @@ type Query {
   ): CommunityByAddressOrError
   generalAllowlist: [ChainAddress!]
   galleryOfTheWeekWinners: [GalleryUser!]
-  globalFeed(before: String, after: String, first: Int, last: Int): FeedConnection
+  globalFeed(
+    before: String
+    after: String
+    first: Int
+    last: Int
+    includePosts: Boolean! = false
+  ): FeedConnection
   # Paging forward i.e. providing the ` + "`" + `first` + "`" + ` argument will return events in order of descending popularity.
-  trendingFeed(before: String, after: String, first: Int, last: Int): FeedConnection
+  trendingFeed(
+    before: String
+    after: String
+    first: Int
+    last: Int
+    includePosts: Boolean! = false
+  ): FeedConnection
   feedEventById(id: DBID!): FeedEventByIdOrError
   postById(id: DBID!): PostOrError
   getMerchTokens(wallet: Address!): MerchTokensPayloadOrError
@@ -9614,6 +9737,16 @@ type ViewGalleryPayload {
 
 union ViewGalleryPayloadOrError = ViewGalleryPayload | ErrAuthenticationFailed
 
+type ViewTokenPayload {
+  token: Token
+}
+
+union ViewTokenPayloadOrError =
+    ViewTokenPayload
+  | ErrAuthenticationFailed
+  | ErrTokenNotFound
+  | ErrCollectionNotFound
+
 input VerifyEmailInput {
   token: String! @scrub
 }
@@ -10148,6 +10281,7 @@ type Mutation {
   deletePost(postId: DBID!): DeletePostPayloadOrError @authRequired
 
   viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
+  viewToken(tokenID: DBID!, collectionID: DBID!): ViewTokenPayloadOrError
 
   updateGallery(input: UpdateGalleryInput!): UpdateGalleryPayloadOrError @authRequired
   publishGallery(input: PublishGalleryInput!): PublishGalleryPayloadOrError @authRequired
@@ -10717,6 +10851,15 @@ func (ec *executionContext) field_GalleryUser_feed_args(ctx context.Context, raw
 		}
 	}
 	args["last"] = arg3
+	var arg4 bool
+	if tmp, ok := rawArgs["includePosts"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("includePosts"))
+		arg4, err = ec.unmarshalNBoolean2bool(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["includePosts"] = arg4
 	return args, nil
 }
 
@@ -11956,6 +12099,30 @@ func (ec *executionContext) field_Mutation_viewGallery_args(ctx context.Context,
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_viewToken_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.DBID
+	if tmp, ok := rawArgs["tokenID"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("tokenID"))
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["tokenID"] = arg0
+	var arg1 persist.DBID
+	if tmp, ok := rawArgs["collectionID"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("collectionID"))
+		arg1, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["collectionID"] = arg1
+	return args, nil
+}
+
 func (ec *executionContext) field_Post_admires_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -12274,6 +12441,15 @@ func (ec *executionContext) field_Query_globalFeed_args(ctx context.Context, raw
 		}
 	}
 	args["last"] = arg3
+	var arg4 bool
+	if tmp, ok := rawArgs["includePosts"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("includePosts"))
+		arg4, err = ec.unmarshalNBoolean2bool(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["includePosts"] = arg4
 	return args, nil
 }
 
@@ -12622,6 +12798,15 @@ func (ec *executionContext) field_Query_trendingFeed_args(ctx context.Context, r
 		}
 	}
 	args["last"] = arg3
+	var arg4 bool
+	if tmp, ok := rawArgs["includePosts"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("includePosts"))
+		arg4, err = ec.unmarshalNBoolean2bool(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["includePosts"] = arg4
 	return args, nil
 }
 
@@ -22273,6 +22458,314 @@ func (ec *executionContext) fieldContext_FallbackMedia_mediaType(ctx context.Con
 	return fc, nil
 }
 
+func (ec *executionContext) _FarcasterSocialAccount_type(ctx context.Context, field graphql.CollectedField, obj *model.FarcasterSocialAccount) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FarcasterSocialAccount_type(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Type, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(persist.SocialProvider)
+	fc.Result = res
+	return ec.marshalNSocialAccountType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐSocialProvider(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FarcasterSocialAccount_type(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FarcasterSocialAccount",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type SocialAccountType does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FarcasterSocialAccount_social_id(ctx context.Context, field graphql.CollectedField, obj *model.FarcasterSocialAccount) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FarcasterSocialAccount_social_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SocialID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FarcasterSocialAccount_social_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FarcasterSocialAccount",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FarcasterSocialAccount_name(ctx context.Context, field graphql.CollectedField, obj *model.FarcasterSocialAccount) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FarcasterSocialAccount_name(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Name, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FarcasterSocialAccount_name(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FarcasterSocialAccount",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FarcasterSocialAccount_username(ctx context.Context, field graphql.CollectedField, obj *model.FarcasterSocialAccount) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FarcasterSocialAccount_username(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Username, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FarcasterSocialAccount_username(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FarcasterSocialAccount",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FarcasterSocialAccount_profileImageURL(ctx context.Context, field graphql.CollectedField, obj *model.FarcasterSocialAccount) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FarcasterSocialAccount_profileImageURL(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ProfileImageURL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FarcasterSocialAccount_profileImageURL(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FarcasterSocialAccount",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FarcasterSocialAccount_bio(ctx context.Context, field graphql.CollectedField, obj *model.FarcasterSocialAccount) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FarcasterSocialAccount_bio(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Bio, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FarcasterSocialAccount_bio(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FarcasterSocialAccount",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FarcasterSocialAccount_display(ctx context.Context, field graphql.CollectedField, obj *model.FarcasterSocialAccount) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FarcasterSocialAccount_display(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Display, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FarcasterSocialAccount_display(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FarcasterSocialAccount",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _FeedConnection_edges(ctx context.Context, field graphql.CollectedField, obj *model.FeedConnection) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_FeedConnection_edges(ctx, field)
 	if err != nil {
@@ -25919,6 +26412,8 @@ func (ec *executionContext) fieldContext_GalleryUser_socialAccounts(ctx context.
 			switch field.Name {
 			case "twitter":
 				return ec.fieldContext_SocialAccounts_twitter(ctx, field)
+			case "farcaster":
+				return ec.fieldContext_SocialAccounts_farcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type SocialAccounts", field.Name)
 		},
@@ -26610,7 +27105,7 @@ func (ec *executionContext) _GalleryUser_feed(ctx context.Context, field graphql
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.GalleryUser().Feed(rctx, obj, fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
+		return ec.resolvers.GalleryUser().Feed(rctx, obj, fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int), fc.Args["includePosts"].(bool))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -32560,6 +33055,58 @@ func (ec *executionContext) fieldContext_Mutation_viewGallery(ctx context.Contex
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_viewGallery_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_viewToken(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_viewToken(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().ViewToken(rctx, fc.Args["tokenID"].(persist.DBID), fc.Args["collectionID"].(persist.DBID))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.ViewTokenPayloadOrError)
+	fc.Result = res
+	return ec.marshalOViewTokenPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewTokenPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_viewToken(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ViewTokenPayloadOrError does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_viewToken_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return
 	}
@@ -38821,7 +39368,7 @@ func (ec *executionContext) _Query_globalFeed(ctx context.Context, field graphql
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().GlobalFeed(rctx, fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
+		return ec.resolvers.Query().GlobalFeed(rctx, fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int), fc.Args["includePosts"].(bool))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -38879,7 +39426,7 @@ func (ec *executionContext) _Query_trendingFeed(ctx context.Context, field graph
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().TrendingFeed(rctx, fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
+		return ec.resolvers.Query().TrendingFeed(rctx, fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int), fc.Args["includePosts"].(bool))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -41277,6 +41824,63 @@ func (ec *executionContext) fieldContext_SocialAccounts_twitter(ctx context.Cont
 				return ec.fieldContext_TwitterSocialAccount_display(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type TwitterSocialAccount", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SocialAccounts_farcaster(ctx context.Context, field graphql.CollectedField, obj *model.SocialAccounts) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SocialAccounts_farcaster(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Farcaster, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.FarcasterSocialAccount)
+	fc.Result = res
+	return ec.marshalOFarcasterSocialAccount2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFarcasterSocialAccount(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SocialAccounts_farcaster(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SocialAccounts",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "type":
+				return ec.fieldContext_FarcasterSocialAccount_type(ctx, field)
+			case "social_id":
+				return ec.fieldContext_FarcasterSocialAccount_social_id(ctx, field)
+			case "name":
+				return ec.fieldContext_FarcasterSocialAccount_name(ctx, field)
+			case "username":
+				return ec.fieldContext_FarcasterSocialAccount_username(ctx, field)
+			case "profileImageURL":
+				return ec.fieldContext_FarcasterSocialAccount_profileImageURL(ctx, field)
+			case "bio":
+				return ec.fieldContext_FarcasterSocialAccount_bio(ctx, field)
+			case "display":
+				return ec.fieldContext_FarcasterSocialAccount_display(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type FarcasterSocialAccount", field.Name)
 		},
 	}
 	return fc, nil
@@ -51282,6 +51886,103 @@ func (ec *executionContext) fieldContext_ViewGalleryPayload_gallery(ctx context.
 	return fc, nil
 }
 
+func (ec *executionContext) _ViewTokenPayload_token(ctx context.Context, field graphql.CollectedField, obj *model.ViewTokenPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ViewTokenPayload_token(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Token, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Token)
+	fc.Result = res
+	return ec.marshalOToken2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐToken(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ViewTokenPayload_token(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ViewTokenPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Token_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Token_dbid(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Token_creationTime(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Token_lastUpdated(ctx, field)
+			case "collectorsNote":
+				return ec.fieldContext_Token_collectorsNote(ctx, field)
+			case "media":
+				return ec.fieldContext_Token_media(ctx, field)
+			case "tokenType":
+				return ec.fieldContext_Token_tokenType(ctx, field)
+			case "chain":
+				return ec.fieldContext_Token_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Token_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Token_description(ctx, field)
+			case "tokenId":
+				return ec.fieldContext_Token_tokenId(ctx, field)
+			case "quantity":
+				return ec.fieldContext_Token_quantity(ctx, field)
+			case "owner":
+				return ec.fieldContext_Token_owner(ctx, field)
+			case "ownedByWallets":
+				return ec.fieldContext_Token_ownedByWallets(ctx, field)
+			case "ownershipHistory":
+				return ec.fieldContext_Token_ownershipHistory(ctx, field)
+			case "ownerIsHolder":
+				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
+			case "ownerIsCreator":
+				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "tokenMetadata":
+				return ec.fieldContext_Token_tokenMetadata(ctx, field)
+			case "contract":
+				return ec.fieldContext_Token_contract(ctx, field)
+			case "community":
+				return ec.fieldContext_Token_community(ctx, field)
+			case "externalUrl":
+				return ec.fieldContext_Token_externalUrl(ctx, field)
+			case "blockNumber":
+				return ec.fieldContext_Token_blockNumber(ctx, field)
+			case "isSpamByUser":
+				return ec.fieldContext_Token_isSpamByUser(ctx, field)
+			case "isSpamByProvider":
+				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
+			case "creatorAddress":
+				return ec.fieldContext_Token_creatorAddress(ctx, field)
+			case "openseaCollectionName":
+				return ec.fieldContext_Token_openseaCollectionName(ctx, field)
+			case "openseaId":
+				return ec.fieldContext_Token_openseaId(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Token", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Viewer_id(ctx context.Context, field graphql.CollectedField, obj *model.Viewer) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Viewer_id(ctx, field)
 	if err != nil {
@@ -51455,6 +52156,8 @@ func (ec *executionContext) fieldContext_Viewer_socialAccounts(ctx context.Conte
 			switch field.Name {
 			case "twitter":
 				return ec.fieldContext_SocialAccounts_twitter(ctx, field)
+			case "farcaster":
+				return ec.fieldContext_SocialAccounts_farcaster(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type SocialAccounts", field.Name)
 		},
@@ -59004,6 +59707,13 @@ func (ec *executionContext) _SocialAccount(ctx context.Context, sel ast.Selectio
 			return graphql.Null
 		}
 		return ec._TwitterSocialAccount(ctx, sel, obj)
+	case model.FarcasterSocialAccount:
+		return ec._FarcasterSocialAccount(ctx, sel, &obj)
+	case *model.FarcasterSocialAccount:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._FarcasterSocialAccount(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -59998,6 +60708,43 @@ func (ec *executionContext) _ViewGalleryPayloadOrError(ctx context.Context, sel 
 			return graphql.Null
 		}
 		return ec._ErrAuthenticationFailed(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _ViewTokenPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.ViewTokenPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.ViewTokenPayload:
+		return ec._ViewTokenPayload(ctx, sel, &obj)
+	case *model.ViewTokenPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ViewTokenPayload(ctx, sel, obj)
+	case model.ErrAuthenticationFailed:
+		return ec._ErrAuthenticationFailed(ctx, sel, &obj)
+	case *model.ErrAuthenticationFailed:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrAuthenticationFailed(ctx, sel, obj)
+	case model.ErrTokenNotFound:
+		return ec._ErrTokenNotFound(ctx, sel, &obj)
+	case *model.ErrTokenNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrTokenNotFound(ctx, sel, obj)
+	case model.ErrCollectionNotFound:
+		return ec._ErrCollectionNotFound(ctx, sel, &obj)
+	case *model.ErrCollectionNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrCollectionNotFound(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -62279,7 +63026,7 @@ func (ec *executionContext) _ErrAdmireNotFound(ctx context.Context, sel ast.Sele
 	return out
 }
 
-var errAuthenticationFailedImplementors = []string{"ErrAuthenticationFailed", "AddUserWalletPayloadOrError", "Error", "LoginPayloadOrError", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "ViewGalleryPayloadOrError", "SetProfileImagePayloadOrError", "RemoveProfileImagePayloadOrError"}
+var errAuthenticationFailedImplementors = []string{"ErrAuthenticationFailed", "AddUserWalletPayloadOrError", "Error", "LoginPayloadOrError", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "ViewGalleryPayloadOrError", "ViewTokenPayloadOrError", "SetProfileImagePayloadOrError", "RemoveProfileImagePayloadOrError"}
 
 func (ec *executionContext) _ErrAuthenticationFailed(ctx context.Context, sel ast.SelectionSet, obj *model.ErrAuthenticationFailed) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errAuthenticationFailedImplementors)
@@ -62307,7 +63054,7 @@ func (ec *executionContext) _ErrAuthenticationFailed(ctx context.Context, sel as
 	return out
 }
 
-var errCollectionNotFoundImplementors = []string{"ErrCollectionNotFound", "Error", "CollectionByIdOrError", "CollectionTokenByIdOrError", "DeleteCollectionPayloadOrError"}
+var errCollectionNotFoundImplementors = []string{"ErrCollectionNotFound", "Error", "CollectionByIdOrError", "CollectionTokenByIdOrError", "DeleteCollectionPayloadOrError", "ViewTokenPayloadOrError"}
 
 func (ec *executionContext) _ErrCollectionNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrCollectionNotFound) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errCollectionNotFoundImplementors)
@@ -62755,7 +63502,7 @@ func (ec *executionContext) _ErrSyncFailed(ctx context.Context, sel ast.Selectio
 	return out
 }
 
-var errTokenNotFoundImplementors = []string{"ErrTokenNotFound", "TokenByIdOrError", "Error", "CollectionTokenByIdOrError", "SetProfileImagePayloadOrError"}
+var errTokenNotFoundImplementors = []string{"ErrTokenNotFound", "TokenByIdOrError", "Error", "CollectionTokenByIdOrError", "ViewTokenPayloadOrError", "SetProfileImagePayloadOrError"}
 
 func (ec *executionContext) _ErrTokenNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrTokenNotFound) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errTokenNotFoundImplementors)
@@ -62913,6 +63660,76 @@ func (ec *executionContext) _FallbackMedia(ctx context.Context, sel ast.Selectio
 
 			out.Values[i] = ec._FallbackMedia_mediaType(ctx, field, obj)
 
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var farcasterSocialAccountImplementors = []string{"FarcasterSocialAccount", "SocialAccount"}
+
+func (ec *executionContext) _FarcasterSocialAccount(ctx context.Context, sel ast.SelectionSet, obj *model.FarcasterSocialAccount) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, farcasterSocialAccountImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("FarcasterSocialAccount")
+		case "type":
+
+			out.Values[i] = ec._FarcasterSocialAccount_type(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "social_id":
+
+			out.Values[i] = ec._FarcasterSocialAccount_social_id(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "name":
+
+			out.Values[i] = ec._FarcasterSocialAccount_name(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "username":
+
+			out.Values[i] = ec._FarcasterSocialAccount_username(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "profileImageURL":
+
+			out.Values[i] = ec._FarcasterSocialAccount_profileImageURL(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "bio":
+
+			out.Values[i] = ec._FarcasterSocialAccount_bio(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "display":
+
+			out.Values[i] = ec._FarcasterSocialAccount_display(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -65008,6 +65825,12 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_viewGallery(ctx, field)
+			})
+
+		case "viewToken":
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_viewToken(ctx, field)
 			})
 
 		case "updateGallery":
@@ -67224,6 +68047,10 @@ func (ec *executionContext) _SocialAccounts(ctx context.Context, sel ast.Selecti
 		case "twitter":
 
 			out.Values[i] = ec._SocialAccounts_twitter(ctx, field, obj)
+
+		case "farcaster":
+
+			out.Values[i] = ec._SocialAccounts_farcaster(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -69826,6 +70653,31 @@ func (ec *executionContext) _ViewGalleryPayload(ctx context.Context, sel ast.Sel
 		case "gallery":
 
 			out.Values[i] = ec._ViewGalleryPayload_gallery(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var viewTokenPayloadImplementors = []string{"ViewTokenPayload", "ViewTokenPayloadOrError"}
+
+func (ec *executionContext) _ViewTokenPayload(ctx context.Context, sel ast.SelectionSet, obj *model.ViewTokenPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, viewTokenPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ViewTokenPayload")
+		case "token":
+
+			out.Values[i] = ec._ViewTokenPayload_token(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -72617,6 +73469,13 @@ func (ec *executionContext) marshalOFallbackMedia2ᚖgithubᚗcomᚋmikeydubᚋg
 	return ec._FallbackMedia(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalOFarcasterSocialAccount2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFarcasterSocialAccount(ctx context.Context, sel ast.SelectionSet, v *model.FarcasterSocialAccount) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._FarcasterSocialAccount(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOFeedConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedConnection(ctx context.Context, sel ast.SelectionSet, v *model.FeedConnection) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -75166,6 +76025,13 @@ func (ec *executionContext) marshalOViewGalleryPayloadOrError2githubᚗcomᚋmik
 		return graphql.Null
 	}
 	return ec._ViewGalleryPayloadOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOViewTokenPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewTokenPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.ViewTokenPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._ViewTokenPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx context.Context, sel ast.SelectionSet, v *model.Viewer) graphql.Marshaler {

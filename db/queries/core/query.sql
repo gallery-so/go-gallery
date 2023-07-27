@@ -386,9 +386,11 @@ select exists(
 );
 
 -- name: PaginateGlobalFeed :many
-SELECT * FROM feed_entities
+SELECT *
+FROM feed_entities
 WHERE (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
         AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+        AND (@include_posts::bool OR feed_entity_type != @post_entity_type)
 ORDER BY 
     CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
     CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
@@ -408,10 +410,12 @@ order by
 limit sqlc.arg('limit');
 
 -- name: PaginateUserFeedByUserID :many
-SELECT * from feed_entities
+SELECT *
+FROM feed_entities
 WHERE actor_id = sqlc.arg('owner_id')
         AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
         AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+        AND (@include_posts::bool OR feed_entity_type != @post_entity_type)
 ORDER BY 
     CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
     CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
@@ -935,6 +939,7 @@ with ids as (
     select id, feed_entity_type, created_at
     from feed_entities fe
     where fe.created_at >= @window_end
+        and (@include_posts::bool or feed_entity_type != @post_entity_type)
 ), selected_posts as (
     select ids.id, ids.feed_entity_type, ids.created_at, count(distinct c.id) + count(distinct a.id) interactions
     from ids

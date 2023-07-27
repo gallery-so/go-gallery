@@ -411,6 +411,10 @@ type ViewGalleryPayloadOrError interface {
 	IsViewGalleryPayloadOrError()
 }
 
+type ViewTokenPayloadOrError interface {
+	IsViewTokenPayloadOrError()
+}
+
 type ViewerGalleryByIDPayloadOrError interface {
 	IsViewerGalleryByIDPayloadOrError()
 }
@@ -875,6 +879,7 @@ func (ErrAuthenticationFailed) IsRemoveAdmirePayloadOrError()       {}
 func (ErrAuthenticationFailed) IsCommentOnFeedEventPayloadOrError() {}
 func (ErrAuthenticationFailed) IsRemoveCommentPayloadOrError()      {}
 func (ErrAuthenticationFailed) IsViewGalleryPayloadOrError()        {}
+func (ErrAuthenticationFailed) IsViewTokenPayloadOrError()          {}
 func (ErrAuthenticationFailed) IsSetProfileImagePayloadOrError()    {}
 func (ErrAuthenticationFailed) IsRemoveProfileImagePayloadOrError() {}
 
@@ -886,6 +891,7 @@ func (ErrCollectionNotFound) IsError()                          {}
 func (ErrCollectionNotFound) IsCollectionByIDOrError()          {}
 func (ErrCollectionNotFound) IsCollectionTokenByIDOrError()     {}
 func (ErrCollectionNotFound) IsDeleteCollectionPayloadOrError() {}
+func (ErrCollectionNotFound) IsViewTokenPayloadOrError()        {}
 
 type ErrCommentNotFound struct {
 	Message string `json:"message"`
@@ -1125,6 +1131,7 @@ type ErrTokenNotFound struct {
 func (ErrTokenNotFound) IsTokenByIDOrError()              {}
 func (ErrTokenNotFound) IsError()                         {}
 func (ErrTokenNotFound) IsCollectionTokenByIDOrError()    {}
+func (ErrTokenNotFound) IsViewTokenPayloadOrError()       {}
 func (ErrTokenNotFound) IsSetProfileImagePayloadOrError() {}
 
 type ErrUnknownAction struct {
@@ -1169,6 +1176,18 @@ type FallbackMedia struct {
 	MediaURL  *string `json:"mediaURL"`
 	MediaType *string `json:"mediaType"`
 }
+
+type FarcasterSocialAccount struct {
+	Type            persist.SocialProvider `json:"type"`
+	SocialID        string                 `json:"social_id"`
+	Name            string                 `json:"name"`
+	Username        string                 `json:"username"`
+	ProfileImageURL string                 `json:"profileImageURL"`
+	Bio             string                 `json:"bio"`
+	Display         bool                   `json:"display"`
+}
+
+func (FarcasterSocialAccount) IsSocialAccount() {}
 
 type FeedConnection struct {
 	Edges    []*FeedEdge `json:"edges"`
@@ -1796,7 +1815,8 @@ type SetSpamPreferencePayload struct {
 func (SetSpamPreferencePayload) IsSetSpamPreferencePayloadOrError() {}
 
 type SocialAccounts struct {
-	Twitter *TwitterSocialAccount `json:"twitter"`
+	Twitter   *TwitterSocialAccount   `json:"twitter"`
+	Farcaster *FarcasterSocialAccount `json:"farcaster"`
 }
 
 type SocialAuthMechanism struct {
@@ -2416,6 +2436,12 @@ type ViewGalleryPayload struct {
 }
 
 func (ViewGalleryPayload) IsViewGalleryPayloadOrError() {}
+
+type ViewTokenPayload struct {
+	Token *Token `json:"token"`
+}
+
+func (ViewTokenPayload) IsViewTokenPayloadOrError() {}
 
 type Viewer struct {
 	HelperViewerData
