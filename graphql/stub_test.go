@@ -135,7 +135,7 @@ func newStubRecommender(t *testing.T, userIDs []persist.DBID) *recommend.Recomme
 	}
 }
 
-// newStubKoala returns a recommender that returns a canned set of recommendations
+// newStubKoala returns a stub of the koala recommender
 func newStubKoala(t *testing.T) *koala.Koala {
 	return &koala.Koala{}
 }
