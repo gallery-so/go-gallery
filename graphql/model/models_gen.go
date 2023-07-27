@@ -1177,6 +1177,18 @@ type FallbackMedia struct {
 	MediaType *string `json:"mediaType"`
 }
 
+type FarcasterSocialAccount struct {
+	Type            persist.SocialProvider `json:"type"`
+	SocialID        string                 `json:"social_id"`
+	Name            string                 `json:"name"`
+	Username        string                 `json:"username"`
+	ProfileImageURL string                 `json:"profileImageURL"`
+	Bio             string                 `json:"bio"`
+	Display         bool                   `json:"display"`
+}
+
+func (FarcasterSocialAccount) IsSocialAccount() {}
+
 type FeedConnection struct {
 	Edges    []*FeedEdge `json:"edges"`
 	PageInfo *PageInfo   `json:"pageInfo"`
@@ -1790,7 +1802,8 @@ type SetSpamPreferencePayload struct {
 func (SetSpamPreferencePayload) IsSetSpamPreferencePayloadOrError() {}
 
 type SocialAccounts struct {
-	Twitter *TwitterSocialAccount `json:"twitter"`
+	Twitter   *TwitterSocialAccount   `json:"twitter"`
+	Farcaster *FarcasterSocialAccount `json:"farcaster"`
 }
 
 type SocialAuthMechanism struct {
