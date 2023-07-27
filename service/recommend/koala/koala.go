@@ -180,24 +180,22 @@ func calcSimilarityScore(simM *sparse.CSR, vIdx, qIdx int) float64 {
 }
 
 type idLookup struct {
-	R []int `json:"r"`
+	l []int
 }
 
 func newIdLookup() idLookup {
-	return idLookup{
-		R: make([]int, 1),
-	}
+	return idLookup{l: make([]int, 1)}
 }
 
 func (n idLookup) Get(idx int) int {
-	if idx >= len(n.R) {
+	if idx >= len(n.l) {
 		return 0
 	}
-	return n.R[idx]
+	return n.l[idx]
 }
 
 func (n *idLookup) Set(idx int, i int) {
-	appendVal(&n.R, idx, i)
+	appendVal(&n.l, idx, i)
 }
 
 func extendBy[T any](s *[]T, i int) {
@@ -279,7 +277,7 @@ func readContractMatrices(ctx context.Context, q *db.Queries, uL map[persist.DBI
 		excludedContracts[i] = c.String()
 		i++
 	}
-	contracts, err := q.GetDisplayedContracts(ctx, excludedContracts)
+	contracts, err := q.GetContractLabels(ctx, excludedContracts)
 	check(err)
 	var cIdx int
 	cL = make(map[persist.DBID]int, len(contracts))
@@ -364,11 +362,11 @@ func mustGet[K comparable, T any](m map[K]T, k K) T {
 }
 
 func keys(m map[persist.ChainAddress]bool) []string {
-	r := make([]string, len(m))
+	l := make([]string, len(m))
 	i := 0
 	for k := range m {
-		r[i] = k.String()
+		l[i] = k.String()
 		i++
 	}
-	return r
+	return l
 }

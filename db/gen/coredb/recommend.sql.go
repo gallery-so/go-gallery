@@ -99,7 +99,7 @@ const getDisplayedContracts = `-- name: GetDisplayedContracts :many
 select user_id, contract_id, displayed
 from owned_contracts
 where contract_id not in (
-select id from contracts where chain || ':' || address = any($1::varchar[])
+  select id from contracts where chain || ':' || address = any($1::varchar[])
 ) and displayed
 `
 
