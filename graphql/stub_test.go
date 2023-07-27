@@ -18,6 +18,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/recommend"
+	"github.com/mikeydub/go-gallery/service/recommend/koala"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/tokenprocessing"
 	"github.com/mikeydub/go-gallery/util"
@@ -132,6 +133,11 @@ func newStubRecommender(t *testing.T, userIDs []persist.DBID) *recommend.Recomme
 		LoadFunc:      func(context.Context) {},
 		BootstrapFunc: func(context.Context) ([]persist.DBID, error) { return userIDs, nil },
 	}
+}
+
+// newStubKoala returns a recommender that returns a canned set of recommendations
+func newStubKoala(t *testing.T) *koala.Koala {
+	return &koala.Koala{}
 }
 
 // sendTokensRecorder records tokenprocessing messages
