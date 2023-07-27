@@ -86,6 +86,8 @@ with ids as (
       select f.id feed_event_id, c.id contract_id
       from ids,
         feed_events f,
+        -- The only event that we currently store with token ids is the 'GalleryUpdated' event
+        -- which includes the 'gallery_new_token_ids' field
         lateral jsonb_each((data->>'gallery_new_token_ids')::jsonb) x(key, value),
         jsonb_array_elements_text(x.value) tid(id),
         tokens t,

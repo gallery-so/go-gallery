@@ -39,15 +39,15 @@ var sharedContractsStr = keys(sharedContracts)
 type Koala struct {
 	// userM is a matrix of size u x u where a non-zero value at m[i][j] is an edge from user i to user j
 	userM *sparse.CSR
-	// ratingM is a matrix of size u x k where the value at m[i][j] is how many held tokens of community k are displayed by user j
+	// ratingM is a matrix of size u x k where the value at m[i][j] is how many held tokens of community j are displayed by user i
 	ratingM *sparse.CSR
 	// displayM is matrix of size k x k where the value at m[i][j] is how many tokens of community i are displayed with community j
 	displayM *sparse.CSR
 	// simM is a matrix of size u x u where the value at m[i][j] is a combined value of follows and common tokens displayed by user i and user j
 	simM *sparse.CSR
-	// lookup of user id to index in the matrix
+	// lookup of user ID to index in the matrix
 	uL map[persist.DBID]int
-	// lookup of contract id to index in the matrix
+	// lookup of contract ID to index in the matrix
 	cL map[persist.DBID]int
 	mu sync.RWMutex
 	q  *db.Queries
@@ -57,14 +57,6 @@ func NewKoala(ctx context.Context, q *db.Queries) *Koala {
 	k := &Koala{q: q}
 	k.update(ctx)
 	return k
-}
-
-func readMatrices(ctx context.Context, q *db.Queries) (userM, ratingM, displayM, simM *sparse.CSR, uL, cL map[persist.DBID]int) {
-	uL = readUserLabels(ctx, q)
-	ratingM, displayM, cL = readContractMatrices(ctx, q, uL)
-	userM = readUserMatrix(ctx, q, uL)
-	simM = toSimMatrix(ratingM, userM)
-	return userM, ratingM, displayM, simM, uL, cL
 }
 
 func AddTo(c *gin.Context, k *Koala) {
@@ -90,7 +82,7 @@ func (k *Koala) RelevanceTo(userID persist.DBID, e db.FeedEntityScoringRow) (flo
 		if relevanceScore == 1 {
 			break
 		}
-		if s, _ := k.scoreRelevancy(userID, contractID); s > relevanceScore {
+		if s, _ := k.scoreRelevance(userID, contractID); s > relevanceScore {
 			relevanceScore = s
 		}
 	}
@@ -126,13 +118,21 @@ func (k *Koala) scoreEdge(viewerID, queryID persist.DBID) (float64, error) {
 	return socialScore + similarityScore, nil
 }
 
-func (k *Koala) scoreRelevancy(viewerID, contractID persist.DBID) (float64, error) {
+func (k *Koala) scoreRelevance(viewerID, contractID persist.DBID) (float64, error) {
 	vIdx, vOK := k.uL[viewerID]
 	cIdx, cOK := k.cL[contractID]
 	if !vOK || !cOK {
 		return 0, ErrNoInputData
 	}
 	return calcRelevanceScore(k.ratingM, k.displayM, vIdx, cIdx), nil
+}
+
+func readMatrices(ctx context.Context, q *db.Queries) (userM, ratingM, displayM, simM *sparse.CSR, uL, cL map[persist.DBID]int) {
+	uL = readUserLabels(ctx, q)
+	ratingM, displayM, cL = readContractMatrices(ctx, q, uL)
+	userM = readUserMatrix(ctx, q, uL)
+	simM = toSimMatrix(ratingM, userM)
+	return userM, ratingM, displayM, simM, uL, cL
 }
 
 func (k *Koala) update(ctx context.Context) {
@@ -178,6 +178,9 @@ func calcSimilarityScore(simM *sparse.CSR, vIdx, qIdx int) float64 {
 	return score
 }
 
+// idLookup uses a slice to lookup a value by its index
+// Its purpose is to avoid using a map because indexing a slice is suprisingly much quicker than a map lookup.
+// It should be pretty space efficient: with one million users, it should take only 1 million * 1 byte = 1MB of memory.
 type idLookup struct {
 	l []int8
 }
@@ -198,8 +201,8 @@ func (n *idLookup) Set(idx int, i int8) {
 }
 
 func extendBy[T any](s *[]T, i int) {
-	if i+1 > cap(*s) {
-		cp := make([]T, i*2, i*2)
+	if newSize := i + 1; newSize > cap(*s) {
+		cp := make([]T, newSize*2, newSize*2)
 		copy(cp, *s)
 		*s = cp
 	}
