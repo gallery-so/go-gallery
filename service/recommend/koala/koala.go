@@ -1,24 +1,18 @@
+//go:build !norec
+// +build !norec
+
 package koala
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"sync"
-	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/james-bowman/sparse"
 	"gonum.org/v1/gonum/mat"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/util"
 )
-
-const contextKey = "personalization.instance"
-
-var ErrNoInputData = errors.New("no personalization input data")
 
 // sharedContracts are excluded because of their low specificity
 var sharedContracts map[persist.ChainAddress]bool = map[persist.ChainAddress]bool{
@@ -36,36 +30,10 @@ var sharedContracts map[persist.ChainAddress]bool = map[persist.ChainAddress]boo
 }
 var sharedContractsStr = keys(sharedContracts)
 
-type Koala struct {
-	// userM is a matrix of size u x u where a non-zero value at m[i][j] is an edge from user i to user j
-	userM *sparse.CSR
-	// ratingM is a matrix of size u x k where the value at m[i][j] is how many held tokens of community j are displayed by user i
-	ratingM *sparse.CSR
-	// displayM is matrix of size k x k where the value at m[i][j] is how many tokens of community i are displayed with community j
-	displayM *sparse.CSR
-	// simM is a matrix of size u x u where the value at m[i][j] is a combined value of follows and common tokens displayed by user i and user j
-	simM *sparse.CSR
-	// lookup of user ID to index in the matrix
-	uL map[persist.DBID]int
-	// lookup of contract ID to index in the matrix
-	cL map[persist.DBID]int
-	mu sync.RWMutex
-	q  *db.Queries
-}
-
 func NewKoala(ctx context.Context, q *db.Queries) *Koala {
 	k := &Koala{q: q}
 	k.update(ctx)
 	return k
-}
-
-func AddTo(c *gin.Context, k *Koala) {
-	c.Set(contextKey, k)
-}
-
-func For(ctx context.Context) *Koala {
-	gc := util.MustGetGinContext(ctx)
-	return gc.Value(contextKey).(*Koala)
 }
 
 func (k *Koala) RelevanceTo(userID persist.DBID, e db.FeedEntityScoringRow) (float64, error) {
@@ -93,18 +61,6 @@ func (k *Koala) RelevanceTo(userID persist.DBID, e db.FeedEntityScoringRow) (flo
 	}
 
 	return relevanceScore + edgeScore, nil
-}
-
-// Loop is the main event loop that updates the personalization matrices
-func (k *Koala) Loop(ctx context.Context, ticker *time.Ticker) {
-	go func() {
-		for {
-			select {
-			case <-ticker.C:
-				k.update(ctx)
-			}
-		}
-	}()
 }
 
 func (k *Koala) scoreEdge(viewerID, queryID persist.DBID) (float64, error) {
