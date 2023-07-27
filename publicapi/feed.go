@@ -294,10 +294,11 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 	}
 
 	var (
-		err         error
-		paginator   feedPaginator
-		entityTypes []persist.FeedEntityType
-		entityIDs   []persist.DBID
+		err           error
+		paginator     feedPaginator
+		entityTypes   []persist.FeedEntityType
+		entityIDs     []persist.DBID
+		entityIDToPos = make(map[persist.DBID]int)
 	)
 
 	hasCursors := before != nil || after != nil
@@ -361,40 +362,59 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 		}
 	}
 
-	entityIDToPos := make(map[persist.DBID]int)
-
 	queryFunc := func(params feedPagingParams) ([]any, error) {
 		if hasCursors {
 			entityTypes = params.EntityTypes
 			entityIDs = params.EntityIDs
 		}
-
 		for i, id := range entityIDs {
 			entityIDToPos[id] = i
 		}
 
+		// Copy slices since they will be modified in place
 		queryTypes := append([]persist.FeedEntityType{}, entityTypes...)
 		queryIDs := append([]persist.DBID{}, entityIDs...)
 
-		curBeforePos := max(params.CurBeforePos, 0)
+		// Restrict cursor positions to the length of the IDs
+		curBeforePos := params.CurBeforePos + 1
 		curAfterPos := min(params.CurAfterPos, len(queryIDs))
-		var limitPos int
 
-		if params.PagingForward {
-			// If paging forward, we extend from the after cursor up to the limit or to the before cursor, whatever is larger
-			// Plus one because curAfterPos is the index of the last node fetched, and we want to skip it
-			limitPos = max(curAfterPos-int(params.Limit)+1, curBeforePos)
-			queryTypes = queryTypes[limitPos:curAfterPos]
-			queryIDs = queryIDs[limitPos:curAfterPos]
-		} else {
-			// If paging backwards, we extend from the before cursor up to the limit or to the after cursor, whatever is smaller
-			limitPos = min(curBeforePos+int(params.Limit), curAfterPos)
-			// Add one if curBeforePos is set, because we want to skip it
-			if params.CurBeforePos != -1 {
-				curBeforePos++
+		// Subset to bounds of the cursors
+		queryTypes = queryTypes[curBeforePos:curAfterPos]
+		queryIDs = queryIDs[curBeforePos:curAfterPos]
+
+		// Filter slices in place
+		if !includePosts {
+			idx := 0
+			for i := range queryTypes {
+				if queryTypes[i] != persist.PostTypeTag {
+					queryTypes[idx] = queryTypes[i]
+					queryIDs[idx] = queryIDs[i]
+					idx++
+				}
 			}
-			queryTypes = queryTypes[curBeforePos:limitPos]
-			queryIDs = queryIDs[curBeforePos:limitPos]
+			queryTypes = queryTypes[:idx]
+			queryIDs = queryIDs[:idx]
+		}
+
+		// Index up to the limit
+		if params.PagingForward {
+			// Index from the right
+			limitIdx := max(len(queryTypes)-params.Limit, 0)
+			queryTypes = queryTypes[limitIdx:]
+			queryIDs = queryIDs[limitIdx:]
+			// This is a hack: the underlying keyset paginator assumes
+			// that the extra result is at the end of the slice, so
+			// we just move it to the end.
+			if len(queryTypes) > 0 {
+				queryTypes = append(queryTypes[1:], queryTypes[0])
+				queryIDs = append(queryIDs[1:], queryIDs[0])
+			}
+		} else {
+			// Index from the left
+			limitIdx := min(params.Limit, len(queryTypes))
+			queryTypes = queryTypes[:limitIdx]
+			queryIDs = queryIDs[:limitIdx]
 		}
 
 		return loadFeedEntities(ctx, api.loaders, queryTypes, queryIDs)
