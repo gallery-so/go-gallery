@@ -320,7 +320,7 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 			if err != nil {
 				return nil, nil, err
 			}
-			entityTypes, entityIDs = api.topNEntities(ctx, 100, trendData, func(e db.FeedEntityScoringRow) float64 {
+			entityTypes, entityIDs = api.scoreFeedEntities(ctx, trendData, func(e db.FeedEntityScoringRow) float64 {
 				return timeFactor(e.CreatedAt, now) * engagementFactor(int(e.Interactions))
 			})
 			return entityTypes, entityIDs, nil
@@ -444,7 +444,7 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 			return nil, PageInfo{}, err
 		}
 
-		entityTypes, entityIDs = api.topNEntities(ctx, 100, trendData, func(e db.FeedEntityScoringRow) float64 {
+		entityTypes, entityIDs = api.scoreFeedEntities(ctx, trendData, func(e db.FeedEntityScoringRow) float64 {
 			k := koala.For(ctx)
 			return scoreFeedEntity(k, userID, e, now, int(e.Interactions))
 		})
@@ -653,7 +653,7 @@ func loadFeedEntities(ctx context.Context, d *dataloader.Loaders, typs []persist
 	return entities, nil
 }
 
-func (api FeedAPI) topNEntities(ctx context.Context, n int, trendData []db.FeedEntityScoringRow, scoreF func(db.FeedEntityScoringRow) float64) ([]persist.FeedEntityType, []persist.DBID) {
+func (api FeedAPI) scoreFeedEntities(ctx context.Context, trendData []db.FeedEntityScoringRow, scoreF func(db.FeedEntityScoringRow) float64) ([]persist.FeedEntityType, []persist.DBID) {
 	h := &heap{}
 
 	for _, event := range trendData {
@@ -664,8 +664,8 @@ func (api FeedAPI) topNEntities(ctx context.Context, n int, trendData []db.FeedE
 			typ:   persist.FeedEntityType(event.FeedEntityType),
 		}
 
-		// Add first N numbers in the heap
-		if h.Len() < n {
+		// Add first 100 items in the heap
+		if h.Len() < 100 {
 			heappkg.Push(h, node)
 			continue
 		}
