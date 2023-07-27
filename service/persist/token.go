@@ -101,13 +101,15 @@ const (
 	ChainPOAP
 	// ChainZora represents the Zora blockchain
 	ChainZora
+	// ChainBase represents the base chain
+	ChainBase
 
 	// MaxChainValue is the highest valid chain value, and should always be updated to
 	// point to the most recently added chain type.
-	MaxChainValue = ChainZora
+	MaxChainValue = ChainBase
 )
 
-var AllChains = []Chain{ChainETH, ChainArbitrum, ChainPolygon, ChainOptimism, ChainTezos, ChainPOAP, ChainZora}
+var AllChains = []Chain{ChainETH, ChainArbitrum, ChainPolygon, ChainOptimism, ChainTezos, ChainPOAP, ChainZora, ChainBase}
 
 const (
 	// URITypeIPFS represents an IPFS URI
@@ -475,6 +477,8 @@ func (c *Chain) UnmarshalJSON(data []byte) error {
 			*c = ChainPOAP
 		case "zora":
 			*c = ChainZora
+		case "base":
+			*c = ChainBase
 		}
 		return nil
 	}
@@ -504,6 +508,8 @@ func (c *Chain) UnmarshalGQL(v interface{}) error {
 		*c = ChainPOAP
 	case "zora":
 		*c = ChainZora
+	case "base":
+		*c = ChainBase
 	}
 	return nil
 }
@@ -525,6 +531,8 @@ func (c Chain) MarshalGQL(w io.Writer) {
 		w.Write([]byte(`"Optimism"`))
 	case ChainZora:
 		w.Write([]byte(`"Zora"`))
+	case ChainBase:
+		w.Write([]byte(`"Base"`))
 	}
 }
 
