@@ -80,16 +80,16 @@ SELECT c.* FROM galleries g, unnest(g.collections)
     WHERE g.id = $1 AND g.deleted = false AND c.deleted = false ORDER BY x.coll_ord;
 
 -- name: GetTokenById :one
-SELECT * FROM tokens WHERE id = $1 AND deleted = false;
+select * from tokens where id = $1 and displayable and deleted = false;
 
 -- name: GetTokenByIdBatch :batchone
-SELECT * FROM tokens WHERE id = $1 AND deleted = false;
+select * from tokens where id = $1 and displayable and deleted = false;
 
 -- name: GetTokenByHolderIdContractAddressAndTokenIdBatch :batchone
 select t.*
 from tokens t
 join contracts c on t.contract = c.id
-where t.owner_user_id = @holder_id and t.token_id = @token_id and c.address = @contract_address and c.chain = @chain and not t.deleted and not c.deleted;
+where t.owner_user_id = @holder_id and t.token_id = @token_id and c.address = @contract_address and c.chain = @chain and t.displayable and not t.deleted and not c.deleted;
 
 -- name: GetTokensByCollectionIdBatch :batchmany
 select t.* from collections c,
@@ -97,7 +97,7 @@ select t.* from collections c,
     join tokens t on t.id = u.nft_id
     where c.id = sqlc.arg('collection_id')
       and c.owner_user_id = t.owner_user_id
-      and (t.is_holder_token or t.is_creator_token)
+      and t.displayable
       and c.deleted = false
       and t.deleted = false
     order by u.nft_ord
@@ -109,11 +109,11 @@ select o.*
         join contract_creators o on o.contract_id = c.id;
 
 -- name: GetNewTokensByFeedEventIdBatch :batchmany
-WITH new_tokens AS (
-    SELECT added.id, row_number() OVER () added_order
-    FROM (SELECT jsonb_array_elements_text(data -> 'collection_new_token_ids') id FROM feed_events f WHERE f.id = $1 AND f.deleted = false) added
+with new_tokens as (
+    select added.id, row_number() over () added_order
+    from (select jsonb_array_elements_text(data -> 'collection_new_token_ids') id from feed_events f where f.id = $1 and f.deleted = false) added
 )
-SELECT t.* FROM new_tokens a JOIN tokens t ON a.id = t.id AND t.deleted = false ORDER BY a.added_order;
+select t.* from new_tokens a join tokens t on a.id = t.id and t.displayable and t.deleted = false order by a.added_order;
 
 -- name: GetMembershipByMembershipId :one
 SELECT * FROM membership WHERE id = $1 AND deleted = false;
@@ -200,22 +200,23 @@ SELECT u.* FROM follows f
     ORDER BY f.last_updated DESC;
 
 -- name: GetTokensByWalletIdsBatch :batchmany
-SELECT * FROM tokens WHERE owned_by_wallets && $1 AND deleted = false
-    ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
+select * from tokens where owned_by_wallets && $1 and displayable and deleted = false
+    order by tokens.created_at desc, tokens.name desc, tokens.id desc;
 
 -- name: GetTokensByContractIdPaginate :many
-SELECT t.* FROM tokens t
-    JOIN users u ON u.id = t.owner_user_id
-    JOIN contracts c ON t.contract = c.id
-    WHERE (c.id = $1 OR c.parent_id = $1)
-    AND t.deleted = false
-    AND c.deleted = false
-    AND (NOT @gallery_users_only::bool OR u.universal = false)
-    AND (u.universal,t.created_at,t.id) < (@cur_before_universal, @cur_before_time::timestamptz, @cur_before_id)
-    AND (u.universal,t.created_at,t.id) > (@cur_after_universal, @cur_after_time::timestamptz, @cur_after_id)
-    ORDER BY CASE WHEN @paging_forward::bool THEN (u.universal,t.created_at,t.id) END ASC,
-             CASE WHEN NOT @paging_forward::bool THEN (u.universal,t.created_at,t.id) END DESC
-    LIMIT $2;
+select t.* from tokens t
+    join users u on u.id = t.owner_user_id
+    join contracts c on t.contract = c.id
+    where (c.id = $1 or c.parent_id = $1)
+    and t.displayable
+    and t.deleted = false
+    and c.deleted = false
+    and (not @gallery_users_only::bool or u.universal = false)
+    and (u.universal,t.created_at,t.id) < (@cur_before_universal, @cur_before_time::timestamptz, @cur_before_id)
+    and (u.universal,t.created_at,t.id) > (@cur_after_universal, @cur_after_time::timestamptz, @cur_after_id)
+    order by case when @paging_forward::bool then (u.universal,t.created_at,t.id) end asc,
+             case when not @paging_forward::bool then (u.universal,t.created_at,t.id) end desc
+    limit $2;
 
 -- name: CountTokensByContractId :one
 select count(*)
@@ -235,6 +236,7 @@ where (contracts.id = @id or contracts.parent_id = @id)
 select users.* from (
     select distinct on (u.id) u.* from users u, tokens t, contracts c
         where t.owner_user_id = u.id
+        and t.displayable
         and t.contract = c.id and (c.id = @id or c.parent_id = @id)
         and (not @gallery_users_only::bool or u.universal = false)
         and t.deleted = false and u.deleted = false and c.deleted = false
@@ -255,22 +257,23 @@ select count(distinct users.id) from users, tokens, contracts
     and tokens.deleted = false and users.deleted = false and contracts.deleted = false;
 
 -- name: GetTokenOwnerByID :one
-SELECT u.* FROM tokens t
-    JOIN users u ON u.id = t.owner_user_id
-    WHERE t.id = $1 AND t.deleted = false AND u.deleted = false;
+select u.* from tokens t
+    join users u on u.id = t.owner_user_id
+    where t.id = $1 and t.displayable and t.deleted = false and u.deleted = false;
 
 -- name: GetTokenOwnerByIDBatch :batchone
-SELECT u.* FROM tokens t
-    JOIN users u ON u.id = t.owner_user_id
-    WHERE t.id = $1 AND t.deleted = false AND u.deleted = false;
+select u.* from tokens t
+    join users u on u.id = t.owner_user_id
+    where t.id = $1 and t.displayable and t.deleted = false and u.deleted = false;
 
 -- name: GetPreviewURLsByContractIdAndUserId :many
-SELECT (MEDIA->>'thumbnail_url')::varchar as thumbnail_url FROM tokens WHERE CONTRACT = $1 AND DELETED = false AND OWNER_USER_ID = $2 AND LENGTH(MEDIA->>'thumbnail_url'::varchar) > 0 ORDER BY ID LIMIT 3;
+select (media->>'thumbnail_url')::varchar as thumbnail_url from tokens where contract = $1 and displayable and deleted = false and owner_user_id = $2 and length(media->>'thumbnail_url'::varchar) > 0 order by id limit 3;
 
 -- name: GetTokensByUserIdBatch :batchmany
 select t.* from tokens t
     where t.owner_user_id = @owner_user_id
       and t.deleted = false
+      and t.displayable
       and ((@include_holder::bool and t.is_holder_token) or (@include_creator::bool and t.is_creator_token))
     order by t.created_at desc, t.name desc, t.id desc;
 
@@ -278,7 +281,7 @@ select t.* from tokens t
 select t.* from tokens t
     where t.owner_user_id = $1
       and t.chain = $2
-      and (t.is_holder_token or t.is_creator_token)
+      and t.displayable
       and t.deleted = false
     order by t.created_at desc, t.name desc, t.id desc;
 
@@ -430,13 +433,10 @@ ORDER BY
 LIMIT sqlc.arg('limit');
 
 -- name: CountPostsByContractID :one
-SELECT COUNT(*)
-FROM posts
-JOIN tokens ON tokens.id = ANY(posts.token_ids)
-WHERE tokens.contract = sqlc.arg('contract')
-AND posts.deleted = false;
-
-
+select count(*)
+from posts
+where sqlc.arg('contract') = any(posts.contract_ids)
+and posts.deleted = false;
 
 -- name: GetFeedEventsByIds :many
 SELECT * FROM feed_events WHERE id = ANY(@ids::varchar(255)[]) AND deleted = false;
@@ -779,6 +779,7 @@ with membership_roles(role) as (
             and token_id = any(@membership_token_ids::varchar[])
             and contract = (select id from contracts where address = @membership_address and contracts.chain = @chain and contracts.deleted = false)
             and exists(select 1 from users where id = @user_id and email_verified = 1 and deleted = false)
+            and displayable
             and deleted = false
     ) then @granted_membership_role else null end)::varchar
 )
@@ -793,7 +794,7 @@ update merch set redeemed = true, token_id = @token_hex, last_updated = now() wh
 select discount_code from merch where token_id = @token_hex and redeemed = true and deleted = false;
 
 -- name: GetUserOwnsTokenByIdentifiers :one
-select exists(select 1 from tokens where owner_user_id = @user_id and token_id = @token_hex and contract = @contract and chain = @chain and deleted = false) as owns_token;
+select exists(select 1 from tokens where owner_user_id = @user_id and token_id = @token_hex and contract = @contract and chain = @chain and displayable and deleted = false) as owns_token;
 
 -- name: UpdateGalleryHidden :one
 update galleries set hidden = @hidden, last_updated = now() where id = @id and deleted = false returning *;
@@ -825,7 +826,7 @@ select tm.*
 		and t.id = any(c.nfts[:8])
 		and t.token_media_id = tm.id
 	    and t.owner_user_id = g.owner_user_id
-	    and (t.is_holder_token or t.is_creator_token)
+	    and t.displayable
 		and not g.deleted
 		and not c.deleted
 		and not t.deleted
@@ -1348,14 +1349,25 @@ insert into sessions (id, user_id,
 update sessions set invalidated = true, active_until = least(active_until, now()), last_updated = now() where id = @id and deleted = false and invalidated = false;
 
 -- name: UpdateTokenMetadataFieldsByTokenIdentifiers :exec
-update tokens set name = @name, description = @description, last_updated = now() where token_id = @token_id and contract = (select id from contracts where address = @contract_address) and deleted = false;
+update tokens
+    set name = @name,
+        description = @description,
+        last_updated = now()
+    where token_id = @token_id
+      and contract = (select id from contracts where address = @contract_address)
+      and deleted = false;
 
 -- name: GetTopCollectionsForCommunity :many
 with contract_tokens as (
 	select t.id, t.owner_user_id
 	from tokens t
 	join contracts c on t.contract = c.id
-	where not t.deleted and not c.deleted and t.contract = c.id and c.chain = $1 and c.address = $2
+	where not t.deleted
+	  and not c.deleted
+	  and t.contract = c.id
+	  and t.displayable
+	  and c.chain = $1
+	  and c.address = $2
 ),
 ranking as (
 	select col.id, rank() over (order by count(col.id) desc, col.created_at desc) score
@@ -1420,7 +1432,7 @@ where pfp.id = @id
 		when source_type = @ens_source_type
 		then exists(select 1 from wallets w where w.id = wallet_id and not w.deleted)
 		when source_type = @token_source_type
-		then exists(select 1 from tokens t where t.id = token_id and not t.deleted)
+		then exists(select 1 from tokens t where t.id = token_id and t.displayable and not t.deleted)
 		else
 		0 = 1
 	end;

@@ -181,14 +181,13 @@ func (q *Queries) CountOwnersByContractId(ctx context.Context, arg CountOwnersBy
 }
 
 const countPostsByContractID = `-- name: CountPostsByContractID :one
-SELECT COUNT(*)
-FROM posts
-JOIN tokens ON tokens.id = ANY(posts.token_ids)
-WHERE tokens.contract = $1
-AND posts.deleted = false
+select count(*)
+from posts
+where $1 = any(posts.contract_ids)
+and posts.deleted = false
 `
 
-func (q *Queries) CountPostsByContractID(ctx context.Context, contract persist.DBID) (int64, error) {
+func (q *Queries) CountPostsByContractID(ctx context.Context, contract []string) (int64, error) {
 	row := q.db.QueryRow(ctx, countPostsByContractID, contract)
 	var count int64
 	err := row.Scan(&count)
@@ -2848,7 +2847,7 @@ func (q *Queries) GetPostsByIds(ctx context.Context, ids []string) ([]Post, erro
 }
 
 const getPreviewURLsByContractIdAndUserId = `-- name: GetPreviewURLsByContractIdAndUserId :many
-SELECT (MEDIA->>'thumbnail_url')::varchar as thumbnail_url FROM tokens WHERE CONTRACT = $1 AND DELETED = false AND OWNER_USER_ID = $2 AND LENGTH(MEDIA->>'thumbnail_url'::varchar) > 0 ORDER BY ID LIMIT 3
+select (media->>'thumbnail_url')::varchar as thumbnail_url from tokens where contract = $1 and displayable and deleted = false and owner_user_id = $2 and length(media->>'thumbnail_url'::varchar) > 0 order by id limit 3
 `
 
 type GetPreviewURLsByContractIdAndUserIdParams struct {
@@ -3345,7 +3344,7 @@ func (q *Queries) GetSocialsByUserID(ctx context.Context, id persist.DBID) (pers
 }
 
 const getTokenById = `-- name: GetTokenById :one
-SELECT id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id, is_creator_token, is_holder_token, displayable FROM tokens WHERE id = $1 AND deleted = false
+select id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id, is_creator_token, is_holder_token, displayable from tokens where id = $1 and displayable and deleted = false
 `
 
 func (q *Queries) GetTokenById(ctx context.Context, id persist.DBID) (Token, error) {
@@ -3437,9 +3436,9 @@ func (q *Queries) GetTokenByTokenIdentifiers(ctx context.Context, arg GetTokenBy
 }
 
 const getTokenOwnerByID = `-- name: GetTokenOwnerByID :one
-SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id FROM tokens t
-    JOIN users u ON u.id = t.owner_user_id
-    WHERE t.id = $1 AND t.deleted = false AND u.deleted = false
+select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id from tokens t
+    join users u on u.id = t.owner_user_id
+    where t.id = $1 and t.displayable and t.deleted = false and u.deleted = false
 `
 
 func (q *Queries) GetTokenOwnerByID(ctx context.Context, id persist.DBID) (User, error) {
@@ -3469,18 +3468,19 @@ func (q *Queries) GetTokenOwnerByID(ctx context.Context, id persist.DBID) (User,
 }
 
 const getTokensByContractIdPaginate = `-- name: GetTokensByContractIdPaginate :many
-SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id, t.is_creator_token, t.is_holder_token, t.displayable FROM tokens t
-    JOIN users u ON u.id = t.owner_user_id
-    JOIN contracts c ON t.contract = c.id
-    WHERE (c.id = $1 OR c.parent_id = $1)
-    AND t.deleted = false
-    AND c.deleted = false
-    AND (NOT $3::bool OR u.universal = false)
-    AND (u.universal,t.created_at,t.id) < ($4, $5::timestamptz, $6)
-    AND (u.universal,t.created_at,t.id) > ($7, $8::timestamptz, $9)
-    ORDER BY CASE WHEN $10::bool THEN (u.universal,t.created_at,t.id) END ASC,
-             CASE WHEN NOT $10::bool THEN (u.universal,t.created_at,t.id) END DESC
-    LIMIT $2
+select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id, t.is_creator_token, t.is_holder_token, t.displayable from tokens t
+    join users u on u.id = t.owner_user_id
+    join contracts c on t.contract = c.id
+    where (c.id = $1 or c.parent_id = $1)
+    and t.displayable
+    and t.deleted = false
+    and c.deleted = false
+    and (not $3::bool or u.universal = false)
+    and (u.universal,t.created_at,t.id) < ($4, $5::timestamptz, $6)
+    and (u.universal,t.created_at,t.id) > ($7, $8::timestamptz, $9)
+    order by case when $10::bool then (u.universal,t.created_at,t.id) end asc,
+             case when not $10::bool then (u.universal,t.created_at,t.id) end desc
+    limit $2
 `
 
 type GetTokensByContractIdPaginateParams struct {
@@ -3562,7 +3562,12 @@ with contract_tokens as (
 	select t.id, t.owner_user_id
 	from tokens t
 	join contracts c on t.contract = c.id
-	where not t.deleted and not c.deleted and t.contract = c.id and c.chain = $1 and c.address = $2
+	where not t.deleted
+	  and not c.deleted
+	  and t.contract = c.id
+	  and t.displayable
+	  and c.chain = $1
+	  and c.address = $2
 ),
 ranking as (
 	select col.id, rank() over (order by count(col.id) desc, col.created_at desc) score
@@ -3842,7 +3847,7 @@ func (q *Queries) GetUserNotifications(ctx context.Context, arg GetUserNotificat
 }
 
 const getUserOwnsTokenByIdentifiers = `-- name: GetUserOwnsTokenByIdentifiers :one
-select exists(select 1 from tokens where owner_user_id = $1 and token_id = $2 and contract = $3 and chain = $4 and deleted = false) as owns_token
+select exists(select 1 from tokens where owner_user_id = $1 and token_id = $2 and contract = $3 and chain = $4 and displayable and deleted = false) as owns_token
 `
 
 type GetUserOwnsTokenByIdentifiersParams struct {
@@ -3873,6 +3878,7 @@ with membership_roles(role) as (
             and token_id = any($2::varchar[])
             and contract = (select id from contracts where address = $3 and contracts.chain = $4 and contracts.deleted = false)
             and exists(select 1 from users where id = $1 and email_verified = 1 and deleted = false)
+            and displayable
             and deleted = false
     ) then $5 else null end)::varchar
 )
@@ -5768,7 +5774,13 @@ func (q *Queries) UpdatePushTickets(ctx context.Context, arg UpdatePushTicketsPa
 }
 
 const updateTokenMetadataFieldsByTokenIdentifiers = `-- name: UpdateTokenMetadataFieldsByTokenIdentifiers :exec
-update tokens set name = $1, description = $2, last_updated = now() where token_id = $3 and contract = (select id from contracts where address = $4) and deleted = false
+update tokens
+    set name = $1,
+        description = $2,
+        last_updated = now()
+    where token_id = $3
+      and contract = (select id from contracts where address = $4)
+      and deleted = false
 `
 
 type UpdateTokenMetadataFieldsByTokenIdentifiersParams struct {
