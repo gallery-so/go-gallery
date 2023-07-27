@@ -66,17 +66,23 @@ func newTokenHooks(tasks *gcptasks.Client, bQueries *coredb.Queries) []DBHook[pe
 				addressToUser[persist.NewChainAddress(u.Wallet.Address, u.Wallet.Chain)] = u.User.ID
 			}
 
-			tokensForUser := make(map[persist.DBID][]persist.TokenUniqueIdentifiers)
+			tokensForUser := make(map[persist.DBID]map[persist.TokenUniqueIdentifiers]persist.HexString)
 			for _, t := range it {
 				ca := persist.NewChainAddress(persist.Address(t.OwnerAddress.String()), t.Chain)
 				// check if the token corresponds to a user
 				if u, ok := addressToUser[ca]; ok {
-					tokensForUser[u] = append(tokensForUser[u], persist.TokenUniqueIdentifiers{
+					if _, ok := tokensForUser[u]; !ok {
+						tokensForUser[u] = make(map[persist.TokenUniqueIdentifiers]persist.HexString)
+					}
+					cur := tokensForUser[u]
+					cur[persist.TokenUniqueIdentifiers{
 						Chain:           t.Chain,
 						ContractAddress: persist.Address(t.ContractAddress),
 						TokenID:         t.TokenID,
 						OwnerAddress:    persist.Address(t.OwnerAddress.String()),
-					})
+					}] = t.Quantity
+
+					tokensForUser[u] = cur
 				}
 			}
 

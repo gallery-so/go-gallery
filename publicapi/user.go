@@ -21,6 +21,7 @@ import (
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/auth"
@@ -441,7 +442,7 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 	}
 
 	// Send event
-	_, err = dispatchEvent(ctx, db.Event{
+	_, err = event.DispatchEvent(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		Action:         persist.ActionUserCreated,
 		ResourceTypeID: persist.ResourceTypeUser,
@@ -975,7 +976,7 @@ func dispatchFollowEventToFeed(ctx context.Context, api UserAPI, curUserID persi
 		return
 	}
 
-	pushEvent(ctx, db.Event{
+	event.PushEvent(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(curUserID),
 		Action:         persist.ActionUserFollowedUsers,
 		ResourceTypeID: persist.ResourceTypeUser,

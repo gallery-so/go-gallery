@@ -286,7 +286,7 @@ func seedFollowNotif(ctx context.Context, t *testing.T, q *coredb.Queries, repos
 		t.Fatalf("failed to create admire event: %s", err)
 	}
 
-	followNotif, err = q.CreateFollowNotification(ctx, coredb.CreateFollowNotificationParams{
+	followNotif, err = q.CreateSimpleNotification(ctx, coredb.CreateSimpleNotificationParams{
 		ID:       persist.GenerateID(),
 		OwnerID:  userID,
 		Action:   persist.ActionUserFollowedUsers,

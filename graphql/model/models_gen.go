@@ -1390,7 +1390,6 @@ type GroupNotificationUserEdge struct {
 }
 
 type GroupNotificationUsersConnection struct {
-	HelperGroupNotificationUsersConnectionData
 	Edges    []*GroupNotificationUserEdge `json:"edges"`
 	PageInfo *PageInfo                    `json:"pageInfo"`
 }
@@ -1520,6 +1519,20 @@ type MoveCollectionToGalleryPayload struct {
 }
 
 func (MoveCollectionToGalleryPayload) IsMoveCollectionToGalleryPayloadOrError() {}
+
+type NewTokensNotification struct {
+	HelperNewTokensNotificationData
+	Dbid         persist.DBID `json:"dbid"`
+	Seen         *bool        `json:"seen"`
+	CreationTime *time.Time   `json:"creationTime"`
+	UpdatedTime  *time.Time   `json:"updatedTime"`
+	Count        *int         `json:"count"`
+	Token        *Token       `json:"token"`
+}
+
+func (NewTokensNotification) IsNotification()        {}
+func (NewTokensNotification) IsNode()                {}
+func (NewTokensNotification) IsGroupedNotification() {}
 
 type NotificationEdge struct {
 	Node   Notification `json:"node"`

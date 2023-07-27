@@ -44,9 +44,36 @@ type TokenProcessingContractTokensMessage struct {
 	ForceRefresh bool         `json:"force_refresh"`
 }
 
+type TokenIdentifiersQuantities map[persist.TokenUniqueIdentifiers]persist.HexString
+
+func (t TokenIdentifiersQuantities) MarshalJSON() ([]byte, error) {
+	m := make(map[string]string)
+	for k, v := range t {
+		m[k.String()] = v.String()
+	}
+	return json.Marshal(m)
+}
+
+func (t *TokenIdentifiersQuantities) UnmarshalJSON(b []byte) error {
+	m := make(map[string]string)
+	if err := json.Unmarshal(b, &m); err != nil {
+		return err
+	}
+	result := make(TokenIdentifiersQuantities)
+	for k, v := range m {
+		identifiers, err := persist.TokenUniqueIdentifiersFromString(k)
+		if err != nil {
+			return err
+		}
+		result[identifiers] = persist.HexString(v)
+	}
+	*t = result
+	return nil
+}
+
 type TokenProcessingUserTokensMessage struct {
-	UserID           persist.DBID                     `json:"user_id" binding:"required"`
-	TokenIdentifiers []persist.TokenUniqueIdentifiers `json:"token_identifiers" binding:"required"`
+	UserID           persist.DBID               `json:"user_id" binding:"required"`
+	TokenIdentifiers TokenIdentifiersQuantities `json:"token_identifiers" binding:"required"`
 }
 
 type ValidateNFTsMessage struct {

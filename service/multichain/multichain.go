@@ -44,6 +44,7 @@ type Provider struct {
 	Queries *db.Queries
 	Cache   *redis.Cache
 	Chains  map[persist.Chain][]any
+
 	// some chains use the addresses of other chains, this will map of chain we want tokens from => chain that's address will be used for lookup
 	WalletOverrides WalletOverrideMap
 	SendTokens      SendTokens
@@ -296,17 +297,18 @@ func (p *Provider) SyncTokensByUserID(ctx context.Context, userID persist.DBID, 
 		wg.Wait()
 	}()
 
-	return p.receiveSyncedTokensForUser(ctx, user, chains, incomingTokens, incomingContracts, errChan, true)
+	_, err = p.receiveSyncedTokensForUser(ctx, user, chains, incomingTokens, incomingContracts, errChan, true)
+	return err
 }
 
 // SyncTokensByUserIDAndTokenIdentifiers updates the media for specific tokens for a user
-func (p *Provider) SyncTokensByUserIDAndTokenIdentifiers(ctx context.Context, userID persist.DBID, tokenIdentifiers []persist.TokenUniqueIdentifiers) error {
+func (p *Provider) SyncTokensByUserIDAndTokenIdentifiers(ctx context.Context, userID persist.DBID, tokenIdentifiers []persist.TokenUniqueIdentifiers) ([]persist.TokenGallery, error) {
 
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"tids": tokenIdentifiers, "user_id": userID})
 
 	user, err := p.Repos.UserRepository.GetByID(ctx, userID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	chains, _ := util.Map(tokenIdentifiers, func(i persist.TokenUniqueIdentifiers) (persist.Chain, error) {
@@ -399,7 +401,7 @@ func (p *Provider) SyncTokensByUserIDAndTokenIdentifiers(ctx context.Context, us
 	return p.receiveSyncedTokensForUser(ctx, user, chains, incomingTokens, incomingContracts, errChan, false)
 }
 
-func (p *Provider) receiveSyncedTokensForUser(ctx context.Context, user persist.User, chains []persist.Chain, incomingTokens chan chainTokens, incomingContracts chan chainContracts, errChan chan error, replace bool) error {
+func (p *Provider) receiveSyncedTokensForUser(ctx context.Context, user persist.User, chains []persist.Chain, incomingTokens chan chainTokens, incomingContracts chan chainContracts, errChan chan error, replace bool) ([]persist.TokenGallery, error) {
 	tokensFromProviders := make([]chainTokens, 0, len(user.Wallets))
 	contractsFromProviders := make([]chainContracts, 0, len(user.Wallets))
 
@@ -418,14 +420,14 @@ outer:
 			}
 			contractsFromProviders = append(contractsFromProviders, incomingContracts)
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil, ctx.Err()
 		case err := <-errChan:
 			logger.For(ctx).Errorf("error while syncing tokens for user %s: %s", user.Username, err)
 			errs = append(errs, err)
 		}
 	}
 	if len(errs) > 0 && len(tokensFromProviders) == 0 {
-		return util.MultiErr(errs)
+		return nil, util.MultiErr(errs)
 	}
 	if !util.AllEqual(util.MapValues(discrepencyLog)) {
 		logger.For(ctx).Debugf("discrepency: %+v", discrepencyLog)
@@ -433,15 +435,20 @@ outer:
 
 	persistedContracts, err := p.processContracts(ctx, contractsFromProviders, false)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
+	var newTokens []persist.TokenGallery
 	if replace {
-		_, err = p.ReplaceHolderTokensForUser(ctx, tokensFromProviders, persistedContracts, user, chains)
+		_, newTokens, err = p.ReplaceHolderTokensForUser(ctx, tokensFromProviders, persistedContracts, user, chains)
 	} else {
-		_, err = p.AddHolderTokensToUser(ctx, tokensFromProviders, persistedContracts, user, chains)
+		_, newTokens, err = p.AddHolderTokensToUser(ctx, tokensFromProviders, persistedContracts, user, chains)
 	}
-	return err
+	if err != nil {
+		return nil, err
+	}
+
+	return newTokens, nil
 }
 
 // SyncCreatedTokens updates tokens created by a user
@@ -556,7 +563,7 @@ outer:
 		return err
 	}
 
-	_, err = p.ReplaceCreatorTokensForUser(ctx, tokensFromProviders, persistedContracts, user, chains)
+	_, _, err = p.ReplaceCreatorTokensForUser(ctx, tokensFromProviders, persistedContracts, user, chains)
 	return err
 }
 
@@ -776,7 +783,7 @@ func (p *Provider) processTokensForOwnersOfContract(ctx context.Context, contrac
 }
 
 // AddHolderTokensToUser will append to a user's existing holder tokens
-func (p *Provider) AddHolderTokensToUser(ctx context.Context, tokensFromProviders []chainTokens, contracts []persist.ContractGallery, user persist.User, chains []persist.Chain) ([]persist.TokenGallery, error) {
+func (p *Provider) AddHolderTokensToUser(ctx context.Context, tokensFromProviders []chainTokens, contracts []persist.ContractGallery, user persist.User, chains []persist.Chain) ([]persist.TokenGallery, []persist.TokenGallery, error) {
 	return p.processTokensForUser(ctx, tokensFromProviders, contracts, user, chains, postgres.UpsertOptions{
 		UpsertingCreatorTokens: false,
 		SkipDelete:             true,
@@ -784,7 +791,7 @@ func (p *Provider) AddHolderTokensToUser(ctx context.Context, tokensFromProvider
 }
 
 // ReplaceCreatorTokensForUser will replace a user's existing creator tokens with the new tokens
-func (p *Provider) ReplaceCreatorTokensForUser(ctx context.Context, tokensFromProviders []chainTokens, contracts []persist.ContractGallery, user persist.User, chains []persist.Chain) ([]persist.TokenGallery, error) {
+func (p *Provider) ReplaceCreatorTokensForUser(ctx context.Context, tokensFromProviders []chainTokens, contracts []persist.ContractGallery, user persist.User, chains []persist.Chain) ([]persist.TokenGallery, []persist.TokenGallery, error) {
 	return p.processTokensForUser(ctx, tokensFromProviders, contracts, user, chains, postgres.UpsertOptions{
 		UpsertingCreatorTokens: true,
 		SkipDelete:             false,
@@ -792,24 +799,24 @@ func (p *Provider) ReplaceCreatorTokensForUser(ctx context.Context, tokensFromPr
 }
 
 // ReplaceHolderTokensForUser will replace a user's existing holder tokens with the new tokens
-func (p *Provider) ReplaceHolderTokensForUser(ctx context.Context, tokensFromProviders []chainTokens, contracts []persist.ContractGallery, user persist.User, chains []persist.Chain) ([]persist.TokenGallery, error) {
+func (p *Provider) ReplaceHolderTokensForUser(ctx context.Context, tokensFromProviders []chainTokens, contracts []persist.ContractGallery, user persist.User, chains []persist.Chain) ([]persist.TokenGallery, []persist.TokenGallery, error) {
 	return p.processTokensForUser(ctx, tokensFromProviders, contracts, user, chains, postgres.UpsertOptions{
 		UpsertingCreatorTokens: false,
 		SkipDelete:             false,
 	})
 }
 
-func (p *Provider) processTokensForUser(ctx context.Context, tokensFromProviders []chainTokens, contracts []persist.ContractGallery, user persist.User, chains []persist.Chain, options postgres.UpsertOptions) ([]persist.TokenGallery, error) {
+func (p *Provider) processTokensForUser(ctx context.Context, tokensFromProviders []chainTokens, contracts []persist.ContractGallery, user persist.User, chains []persist.Chain, options postgres.UpsertOptions) ([]persist.TokenGallery, []persist.TokenGallery, error) {
 	dedupedTokens, newTokens, err := p.prepTokensForTokenProcessing(ctx, tokensFromProviders, contracts, user)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	logger.For(ctx).Infof("%d new tokens and %d deduped tokens for user %s", len(newTokens), len(dedupedTokens), user.ID)
 
 	persistedTokens, err := p.Repos.TokenRepository.BulkUpsertByOwnerUserID(ctx, user.ID, chains, dedupedTokens, options)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	logger.For(ctx).Infof("%d persisted tokens for user %s", len(persistedTokens), user.ID)
@@ -822,7 +829,11 @@ func (p *Provider) processTokensForUser(ctx context.Context, tokensFromProviders
 	}
 
 	err = p.sendTokensToTokenProcessing(ctx, user.ID, tokenIDs, chains)
-	return persistedTokens, err
+
+	newGalleryTokens := util.Filter(persistedTokens, func(t persist.TokenGallery) bool {
+		return newTokens[t.TokenIdentifiers()]
+	}, false)
+	return persistedTokens, newGalleryTokens, err
 }
 
 func (p *Provider) sendTokensToTokenProcessing(ctx context.Context, userID persist.DBID, tokens []persist.DBID, chains []persist.Chain) error {
@@ -935,7 +946,11 @@ func (p *Provider) GetTokensOfContractForWallet(ctx context.Context, contractAdd
 		return nil, err
 	}
 
-	return p.AddHolderTokensToUser(ctx, tokensFromProviders, persistedContracts, user, []persist.Chain{wallet.Chain()})
+	allTokens, _, err := p.AddHolderTokensToUser(ctx, tokensFromProviders, persistedContracts, user, []persist.Chain{wallet.Chain()})
+	if err != nil {
+		return nil, err
+	}
+	return allTokens, nil
 }
 
 type FieldRequirementLevel int
