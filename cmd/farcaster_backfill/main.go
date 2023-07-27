@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/farcaster"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -33,7 +34,7 @@ func main() {
 
 	neynar := farcaster.NewNeynarAPI(&http.Client{Timeout: 10 * time.Second})
 
-	// queries := coredb.New(pg)
+	queries := coredb.New(pg)
 
 	ctx := context.Background()
 
@@ -45,7 +46,7 @@ func main() {
 
 	logrus.Infof("got all wallets and users...")
 
-	p := pool.New().WithMaxGoroutines(10).WithErrors()
+	p := pool.New().WithMaxGoroutines(20).WithErrors()
 
 	for rows.Next() {
 		var userID persist.DBID
@@ -65,23 +66,22 @@ func main() {
 			}
 			logrus.Infof("got user %s %s %s %s", u.Username, u.DisplayName, u.Pfp.URL, u.Profile.Bio.Text)
 
-			return nil
-			// return queries.AddSocialToUser(ctx, coredb.AddSocialToUserParams{
-			// 	UserID: userID,
-			// 	Socials: persist.Socials{
-			// 		persist.SocialProviderFarcaster: persist.SocialUserIdentifiers{
-			// 			Provider: persist.SocialProviderFarcaster,
-			// 			ID:       u.Fid,
-			// 			Display:  true,
-			// 			Metadata: map[string]interface{}{
-			// 				"username":          u.Username,
-			// 				"name":              u.DisplayName,
-			// 				"profile_image_url": u.Pfp.URL,
-			// 				"bio":               u.Profile.Bio.Text,
-			// 			},
-			// 		},
-			// 	},
-			// })
+			return queries.AddSocialToUser(ctx, coredb.AddSocialToUserParams{
+				UserID: userID,
+				Socials: persist.Socials{
+					persist.SocialProviderFarcaster: persist.SocialUserIdentifiers{
+						Provider: persist.SocialProviderFarcaster,
+						ID:       u.Fid,
+						Display:  true,
+						Metadata: map[string]interface{}{
+							"username":          u.Username,
+							"name":              u.DisplayName,
+							"profile_image_url": u.Pfp.URL,
+							"bio":               u.Profile.Bio.Text,
+						},
+					},
+				},
+			})
 
 		})
 
@@ -101,7 +101,7 @@ func setDefaults() {
 	viper.SetDefault("POSTGRES_USER", "gallery_backend")
 	viper.SetDefault("POSTGRES_PASSWORD", "")
 	viper.SetDefault("POSTGRES_DB", "postgres")
-	viper.SetDefault("NEYNAR_API_KEY", "PURPLE")
+	viper.SetDefault("NEYNAR_API_KEY", "")
 
 	viper.AutomaticEnv()
 

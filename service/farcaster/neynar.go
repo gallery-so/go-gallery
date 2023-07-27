@@ -66,10 +66,8 @@ type NeynarUser struct {
 }
 
 type NeynarUserByVerificationResponse struct {
-	Result struct {
-		User struct {
-			User NeynarUser `json:"user"`
-		} `json:"user"`
+	Result *struct {
+		User NeynarUser `json:"user"`
 	} `json:"result"`
 }
 
@@ -94,6 +92,9 @@ func (n *NeynarAPI) UserByAddress(ctx context.Context, address persist.Address) 
 	if err := json.NewDecoder(resp.Body).Decode(&neynarResp); err != nil {
 		return NeynarUser{}, err
 	}
+	if neynarResp.Result == nil {
+		return NeynarUser{}, fmt.Errorf("no result for %s", address)
+	}
 
-	return neynarResp.Result.User.User, nil
+	return neynarResp.Result.User, nil
 }
