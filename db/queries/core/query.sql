@@ -177,6 +177,7 @@ displayed as (
     and tokens.contract = contracts.id
     and collections.owner_user_id = tokens.owner_user_id
     and galleries.owner_user_id = tokens.owner_user_id
+    and (tokens.is_holder_token or tokens.is_creator_token)
     and tokens.deleted = false
     and galleries.deleted = false
     and contracts.deleted = false
@@ -217,12 +218,13 @@ SELECT t.* FROM tokens t
     LIMIT $2;
 
 -- name: CountTokensByContractId :one
-SELECT count(*)
-FROM tokens
-JOIN users ON users.id = tokens.owner_user_id
-JOIN contracts ON tokens.contract = contracts.id
-WHERE (contracts.id = @id OR contracts.parent_id = @id)
-  AND (NOT @gallery_users_only::bool OR users.universal = false) AND tokens.deleted = false AND contracts.deleted = false;
+select count(*)
+from tokens
+join users on users.id = tokens.owner_user_id
+join contracts on tokens.contract = contracts.id
+where (contracts.id = @id or contracts.parent_id = @id)
+  and (not @gallery_users_only::bool or users.universal = false) and tokens.deleted = false and contracts.deleted = false
+  and (tokens.is_holder_token or tokens.is_creator_token);
 
 -- name: GetOwnersByContractIdBatchPaginate :batchmany
 -- Note: sqlc has trouble recognizing that the output of the "select distinct" subquery below will
@@ -244,12 +246,13 @@ select users.* from (
 
 
 -- name: CountOwnersByContractId :one
-SELECT count(DISTINCT users.id) FROM users, tokens, contracts
-    WHERE (contracts.id = @id or contracts.parent_id = @id)
-    AND tokens.contract = contracts.id
-    AND tokens.owner_user_id = users.id
-    AND (NOT @gallery_users_only::bool OR users.universal = false)
-    AND tokens.deleted = false AND users.deleted = false AND contracts.deleted = false;
+select count(distinct users.id) from users, tokens, contracts
+    where (contracts.id = @id or contracts.parent_id = @id)
+    and tokens.contract = contracts.id
+    and tokens.owner_user_id = users.id
+    and (tokens.is_holder_token or tokens.is_creator_token)
+    and (not @gallery_users_only::bool or users.universal = false)
+    and tokens.deleted = false and users.deleted = false and contracts.deleted = false;
 
 -- name: GetTokenOwnerByID :one
 SELECT u.* FROM tokens t
@@ -833,7 +836,11 @@ select tm.*
 	limit 4;
 
 -- name: GetTokenByTokenIdentifiers :one
-select * from tokens where tokens.token_id = @token_hex and contract = (select contracts.id from contracts where contracts.address = @contract_address) and tokens.chain = @chain and tokens.deleted = false;
+select * from tokens
+    where tokens.token_id = @token_hex
+      and contract = (select contracts.id from contracts where contracts.address = @contract_address)
+      and tokens.chain = @chain and tokens.deleted = false
+      and (tokens.is_holder_token or tokens.is_creator_token);
 
 -- name: DeleteCollections :exec
 update collections set deleted = true, last_updated = now() where id = any(@ids::varchar[]);
@@ -1262,22 +1269,22 @@ update push_notification_tickets t set check_after = updates.check_after, num_ch
 select * from push_notification_tickets where check_after <= now() and deleted = false limit sqlc.arg('limit');
 
 -- name: GetAllTokensWithContractsByIDs :many
-SELECT
+select
     tokens.*,
     contracts.*,
     (
-        SELECT wallets.address
-        FROM wallets
-        WHERE wallets.id = ANY(tokens.owned_by_wallets) and wallets.deleted = false
-        LIMIT 1
-    ) AS wallet_address
-FROM tokens
-JOIN contracts ON contracts.id = tokens.contract
-LEFT JOIN token_medias on token_medias.id = tokens.token_media_id
-WHERE tokens.deleted = false
-AND (tokens.token_media_id IS NULL or token_medias.active = false)
-AND tokens.id >= @start_id AND tokens.id < @end_id
-ORDER BY tokens.id;
+        select wallets.address
+        from wallets
+        where wallets.id = any(tokens.owned_by_wallets) and wallets.deleted = false
+        limit 1
+    ) as wallet_address
+from tokens
+join contracts on contracts.id = tokens.contract
+left join token_medias on token_medias.id = tokens.token_media_id
+where tokens.deleted = false
+and (tokens.token_media_id is null or token_medias.active = false)
+and tokens.id >= @start_id and tokens.id < @end_id
+order by tokens.id;
 
 -- name: GetMissingThumbnailTokensByIDRange :many
 SELECT

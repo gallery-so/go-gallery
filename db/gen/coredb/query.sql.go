@@ -159,12 +159,13 @@ func (q *Queries) ClearNotificationsForUser(ctx context.Context, ownerID persist
 }
 
 const countOwnersByContractId = `-- name: CountOwnersByContractId :one
-SELECT count(DISTINCT users.id) FROM users, tokens, contracts
-    WHERE (contracts.id = $1 or contracts.parent_id = $1)
-    AND tokens.contract = contracts.id
-    AND tokens.owner_user_id = users.id
-    AND (NOT $2::bool OR users.universal = false)
-    AND tokens.deleted = false AND users.deleted = false AND contracts.deleted = false
+select count(distinct users.id) from users, tokens, contracts
+    where (contracts.id = $1 or contracts.parent_id = $1)
+    and tokens.contract = contracts.id
+    and tokens.owner_user_id = users.id
+    and (tokens.is_holder_token or tokens.is_creator_token)
+    and (not $2::bool or users.universal = false)
+    and tokens.deleted = false and users.deleted = false and contracts.deleted = false
 `
 
 type CountOwnersByContractIdParams struct {
@@ -272,12 +273,13 @@ func (q *Queries) CountSocialConnections(ctx context.Context, arg CountSocialCon
 }
 
 const countTokensByContractId = `-- name: CountTokensByContractId :one
-SELECT count(*)
-FROM tokens
-JOIN users ON users.id = tokens.owner_user_id
-JOIN contracts ON tokens.contract = contracts.id
-WHERE (contracts.id = $1 OR contracts.parent_id = $1)
-  AND (NOT $2::bool OR users.universal = false) AND tokens.deleted = false AND contracts.deleted = false
+select count(*)
+from tokens
+join users on users.id = tokens.owner_user_id
+join contracts on tokens.contract = contracts.id
+where (contracts.id = $1 or contracts.parent_id = $1)
+  and (not $2::bool or users.universal = false) and tokens.deleted = false and contracts.deleted = false
+  and (tokens.is_holder_token or tokens.is_creator_token)
 `
 
 type CountTokensByContractIdParams struct {
@@ -1174,22 +1176,22 @@ func (q *Queries) GetAllTimeTrendingUserIDs(ctx context.Context, limit int32) ([
 }
 
 const getAllTokensWithContractsByIDs = `-- name: GetAllTokensWithContractsByIDs :many
-SELECT
+select
     tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id, tokens.is_creator_token, tokens.is_holder_token,
     contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id,
     (
-        SELECT wallets.address
-        FROM wallets
-        WHERE wallets.id = ANY(tokens.owned_by_wallets) and wallets.deleted = false
-        LIMIT 1
-    ) AS wallet_address
-FROM tokens
-JOIN contracts ON contracts.id = tokens.contract
-LEFT JOIN token_medias on token_medias.id = tokens.token_media_id
-WHERE tokens.deleted = false
-AND (tokens.token_media_id IS NULL or token_medias.active = false)
-AND tokens.id >= $1 AND tokens.id < $2
-ORDER BY tokens.id
+        select wallets.address
+        from wallets
+        where wallets.id = any(tokens.owned_by_wallets) and wallets.deleted = false
+        limit 1
+    ) as wallet_address
+from tokens
+join contracts on contracts.id = tokens.contract
+left join token_medias on token_medias.id = tokens.token_media_id
+where tokens.deleted = false
+and (tokens.token_media_id is null or token_medias.active = false)
+and tokens.id >= $1 and tokens.id < $2
+order by tokens.id
 `
 
 type GetAllTokensWithContractsByIDsParams struct {
@@ -3377,7 +3379,11 @@ func (q *Queries) GetTokenById(ctx context.Context, id persist.DBID) (Token, err
 }
 
 const getTokenByTokenIdentifiers = `-- name: GetTokenByTokenIdentifiers :one
-select id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id, is_creator_token, is_holder_token from tokens where tokens.token_id = $1 and contract = (select contracts.id from contracts where contracts.address = $2) and tokens.chain = $3 and tokens.deleted = false
+select id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id, is_creator_token, is_holder_token from tokens
+    where tokens.token_id = $1
+      and contract = (select contracts.id from contracts where contracts.address = $2)
+      and tokens.chain = $3 and tokens.deleted = false
+      and (tokens.is_holder_token or tokens.is_creator_token)
 `
 
 type GetTokenByTokenIdentifiersParams struct {

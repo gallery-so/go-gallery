@@ -1033,6 +1033,7 @@ displayed as (
     and tokens.contract = contracts.id
     and collections.owner_user_id = tokens.owner_user_id
     and galleries.owner_user_id = tokens.owner_user_id
+    and (tokens.is_holder_token or tokens.is_creator_token)
     and tokens.deleted = false
     and galleries.deleted = false
     and contracts.deleted = false
