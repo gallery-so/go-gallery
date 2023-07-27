@@ -79,23 +79,29 @@ func For(ctx context.Context) *Koala {
 	return gc.Value(contextKey).(*Koala)
 }
 
-func (k *Koala) RelevanceTo(userID persist.DBID, e db.FeedEntityScoringRow) (topS float64, err error) {
+func (k *Koala) RelevanceTo(userID persist.DBID, e db.FeedEntityScoringRow) (float64, error) {
+	k.mu.RLock()
+	defer k.mu.RUnlock()
+
 	if len(e.ContractIds) == 0 {
-		return k.scoreFeatures(userID, e.ActorID, "")
+		return k.scoreEdge(userID, e.ActorID)
 	}
-	var scored bool
-	var s float64
+
+	var relevanceScore float64
 	for _, contractID := range e.ContractIds {
-		s, err = k.scoreFeatures(userID, e.ActorID, contractID)
-		if err == nil && s > topS {
-			topS = s
-			scored = true
+		if relevanceScore == 1 {
+			break
+		}
+		if s, _ := k.scoreRelevancy(userID, contractID); s > relevanceScore {
+			relevanceScore = s
 		}
 	}
-	if scored {
-		return topS, nil
+
+	edgeScore, err := k.scoreEdge(userID, e.ActorID)
+	if err != nil {
+		return relevanceScore, err
 	}
-	return 0, err
+	return relevanceScore + edgeScore, nil
 }
 
 // Loop is the main event loop that updates the personalization matrices
@@ -110,33 +116,24 @@ func (k *Koala) Loop(ctx context.Context, ticker *time.Ticker) {
 	}()
 }
 
-func (k *Koala) scoreFeatures(viewerID, queryID, contractID persist.DBID) (float64, error) {
-	k.mu.RLock()
-	defer k.mu.RUnlock()
+func (k *Koala) scoreEdge(viewerID, queryID persist.DBID) (float64, error) {
 	vIdx, vOK := k.uL[viewerID]
 	qIdx, qOK := k.uL[queryID]
-	cIdx, cOK := k.cL[contractID]
-	// Nothing to compute
-	if !vOK {
+	if !vOK || !qOK {
 		return 0, ErrNoInputData
 	}
-	// Compute the relevance score
-	if cOK && !qOK {
-		score := calcRelevanceScore(k.ratingM, k.displayM, vIdx, cIdx)
-		return score, nil
-	}
-	// Compute social and similarity scores
-	if qOK && !cOK {
-		socialScore := calcSocialScore(k.userM, vIdx, qIdx)
-		similarityScore := calcSimilarityScore(k.simM, vIdx, qIdx)
-		score := (socialWeight * socialScore) + (similarityWeight * similarityScore)
-		return score, nil
-	}
 	socialScore := calcSocialScore(k.userM, vIdx, qIdx)
-	relevanceScore := calcRelevanceScore(k.ratingM, k.displayM, vIdx, cIdx)
 	similarityScore := calcSimilarityScore(k.simM, vIdx, qIdx)
-	score := (socialWeight * socialScore) + (relevanceWeight * relevanceScore) + (similarityWeight * similarityScore)
-	return score, nil
+	return socialScore + similarityScore, nil
+}
+
+func (k *Koala) scoreRelevancy(viewerID, contractID persist.DBID) (float64, error) {
+	vIdx, vOK := k.uL[viewerID]
+	cIdx, cOK := k.cL[contractID]
+	if !vOK || !cOK {
+		return 0, ErrNoInputData
+	}
+	return calcRelevanceScore(k.ratingM, k.displayM, vIdx, cIdx), nil
 }
 
 func (k *Koala) update(ctx context.Context) {
@@ -159,16 +156,19 @@ func calcSocialScore(userM *sparse.CSR, vIdx, qIdx int) float64 {
 
 // calcRelavanceScore computes the relevance of cIdx to vIdx's held tokens
 func calcRelevanceScore(ratingM, displayM *sparse.CSR, vIdx, cIdx int) float64 {
-	v := ratingM.RowView(vIdx).(*sparse.Vector)
-	cDisplayed := displayM.At(cIdx, cIdx)
 	var t float64
+	cDisplayed := displayM.At(cIdx, cIdx)
+	v := ratingM.RowView(vIdx).(*sparse.Vector)
 	v.DoNonZero(func(i int, j int, v float64) {
-		t += jaccardIndex(displayM, i, cIdx, cDisplayed)
+		// Max score is 1, we can't exit early but we can skip the calculation
+		if t == 1 {
+			return
+		}
+		if s := jaccardIndex(displayM, i, cIdx, cDisplayed); s > t {
+			t = s
+		}
 	})
-	if v.NNZ() == 0 {
-		return 0
-	}
-	return t / float64(v.NNZ())
+	return t
 }
 
 // calcSimilarityScore computes the similarity of vIdx and qIdx based on their interactions with other users

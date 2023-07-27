@@ -95,7 +95,7 @@ func (q *Queries) FeedEntityScoring(ctx context.Context, arg FeedEntityScoringPa
 	return items, nil
 }
 
-const getDisplayedContracts = `-- name: GetDisplayedContracts :many
+const getContractLabels = `-- name: GetContractLabels :many
 select user_id, contract_id, displayed
 from owned_contracts
 where contract_id not in (
@@ -103,21 +103,21 @@ where contract_id not in (
 ) and displayed
 `
 
-type GetDisplayedContractsRow struct {
+type GetContractLabelsRow struct {
 	UserID     persist.DBID `json:"user_id"`
 	ContractID persist.DBID `json:"contract_id"`
 	Displayed  bool         `json:"displayed"`
 }
 
-func (q *Queries) GetDisplayedContracts(ctx context.Context, excludedContracts []string) ([]GetDisplayedContractsRow, error) {
-	rows, err := q.db.Query(ctx, getDisplayedContracts, excludedContracts)
+func (q *Queries) GetContractLabels(ctx context.Context, excludedContracts []string) ([]GetContractLabelsRow, error) {
+	rows, err := q.db.Query(ctx, getContractLabels, excludedContracts)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetDisplayedContractsRow
+	var items []GetContractLabelsRow
 	for rows.Next() {
-		var i GetDisplayedContractsRow
+		var i GetContractLabelsRow
 		if err := rows.Scan(&i.UserID, &i.ContractID, &i.Displayed); err != nil {
 			return nil, err
 		}

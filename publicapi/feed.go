@@ -443,7 +443,9 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
+
 		addContractIDstoFeedEvents(api.loaders, trendData)
+
 		entityTypes, entityIDs = api.topNEntities(ctx, 100, trendData, func(e db.FeedEntityScoringRow) float64 {
 			k := koala.For(ctx)
 			return scoreFeedEntity(k, userID, e, now, int(e.Interactions))

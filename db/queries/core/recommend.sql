@@ -52,7 +52,7 @@ select followee id from follows where not deleted group by 1
 union
 select user_id id from owned_contracts where displayed group by 1;
 
--- name: GetDisplayedContracts :many
+-- name: GetContractLabels :many
 select user_id, contract_id, displayed
 from owned_contracts
 where contract_id not in (
