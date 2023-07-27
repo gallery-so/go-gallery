@@ -445,7 +445,8 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 		}
 		addContractIDstoFeedEvents(api.loaders, trendData)
 		entityTypes, entityIDs = api.topNEntities(ctx, 100, trendData, func(e db.FeedEntityScoringRow) float64 {
-			return scoreFeedEntity(ctx, userID, e, now, int(e.Interactions))
+			k := koala.For(ctx)
+			return scoreFeedEntity(k, userID, e, now, int(e.Interactions))
 		})
 	}
 
@@ -692,23 +693,12 @@ func (api FeedAPI) topNEntities(ctx context.Context, n int, trendData []db.FeedE
 	return entityTypes, entityIDs
 }
 
-func scoreFeedEntity(ctx context.Context, viewerID persist.DBID, e db.FeedEntityScoringRow, t time.Time, interactions int) float64 {
-	timeF := timeFactor(e.CreatedAt, t)
-	engagementF := engagementFactor(interactions)
-	personalizationF, err := koala.For(ctx).RelevanceTo(viewerID, e)
-	if errors.Is(err, koala.ErrNoInputData) {
-		// Use a default value of 0.1 so that the post isn't completely penalized because of missing data.
-		personalizationF = 0.1
-	}
-	return timeF * engagementF * personalizationF
-}
-
-func ScoreFeedEntity(k *koala.Koala, viewerID persist.DBID, e db.FeedEntityScoringRow, t time.Time, interactions int) float64 {
+func scoreFeedEntity(k *koala.Koala, viewerID persist.DBID, e db.FeedEntityScoringRow, t time.Time, interactions int) float64 {
 	timeF := timeFactor(e.CreatedAt, t)
 	engagementF := engagementFactor(interactions)
 	personalizationF, err := k.RelevanceTo(viewerID, e)
 	if errors.Is(err, koala.ErrNoInputData) {
-		// Use a default value of 0.1 so that the post isn't completely penalized because of missing data.
+		// Use a default value of 0.1 so that it isn't completely penalized because of missing data.
 		personalizationF = 0.1
 	}
 	return timeF * engagementF * personalizationF

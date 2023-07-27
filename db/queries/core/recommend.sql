@@ -56,7 +56,7 @@ select user_id id from owned_contracts where displayed group by 1;
 select user_id, contract_id, displayed
 from owned_contracts
 where contract_id not in (
-select id from contracts where chain || ':' || address = any(@excluded_contracts::varchar[])
+  select id from contracts where chain || ':' || address = any(@excluded_contracts::varchar[])
 ) and displayed;
 
 -- name: FeedEntityScoring :many
