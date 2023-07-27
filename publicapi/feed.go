@@ -444,7 +444,7 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 			return nil, PageInfo{}, err
 		}
 
-		addContractIDstoFeedEvents(api.loaders, trendData)
+		// addContractIDstoFeedEvents(api.loaders, trendData)
 
 		entityTypes, entityIDs = api.topNEntities(ctx, 100, trendData, func(e db.FeedEntityScoringRow) float64 {
 			k := koala.For(ctx)
@@ -914,91 +914,4 @@ func max(a, b int) int {
 		return a
 	}
 	return b
-}
-
-// addContractIDstoFeedEvents adds contract IDs to feed events so they can be fully scored
-func addContractIDstoFeedEvents(d *dataloader.Loaders, trendData []db.FeedEntityScoringRow) {
-	feedEventIDs := make([]persist.DBID, 0, len(trendData))
-	tokenIDs := make([]persist.DBID, 0)
-
-	for _, event := range trendData {
-		if event.FeedEntityType == int32(persist.FeedEventTypeTag) {
-			feedEventIDs = append(feedEventIDs, event.ID)
-		}
-	}
-
-	// Filter in place
-	feedEvents, errs := d.FeedEventByFeedEventID.LoadAll(feedEventIDs)
-	idx := 0
-	for i, err := range errs {
-		if err == nil {
-			feedEvents[idx] = feedEvents[i]
-			idx++
-		} else {
-			fmt.Println(err)
-		}
-	}
-	feedEvents = feedEvents[:idx]
-
-	eventIDToEvent := make(map[persist.DBID]db.FeedEvent)
-
-	for _, event := range feedEvents {
-		eventIDToEvent[event.ID] = event
-		if event.Data.TokenID != "" {
-			tokenIDs = append(tokenIDs, event.Data.TokenID)
-		}
-		if event.Data.TokenCollectionID != "" {
-			tokenIDs = append(tokenIDs, event.Data.TokenCollectionID)
-		}
-		for _, tokenID := range event.Data.CollectionTokenIDs {
-			tokenIDs = append(tokenIDs, tokenID)
-		}
-		for _, tIDs := range event.Data.GalleryNewCollectionTokenIDs {
-			for _, tokenID := range tIDs {
-				tokenIDs = append(tokenIDs, tokenID)
-			}
-		}
-	}
-
-	// Filter in place
-	tokens, errs := d.TokenByTokenID.LoadAll(tokenIDs)
-	idx = 0
-	for i, err := range errs {
-		if err == nil {
-			tokens[idx] = tokens[i]
-			idx++
-		} else {
-			fmt.Println(err)
-		}
-	}
-	tokens = tokens[:idx]
-
-	tokenToContractID := make(map[persist.DBID]persist.DBID)
-	for _, token := range tokens {
-		tokenToContractID[token.ID] = token.Contract
-	}
-
-	for i, event := range trendData {
-		e := eventIDToEvent[event.ID]
-		if event.FeedEntityType == int32(persist.FeedEventTypeTag) {
-			if contractID := tokenToContractID[e.Data.TokenID]; contractID != "" {
-				trendData[i].ContractIds = append(trendData[i].ContractIds, contractID)
-			}
-			if contractID := tokenToContractID[e.Data.TokenCollectionID]; contractID != "" {
-				trendData[i].ContractIds = append(trendData[i].ContractIds, contractID)
-			}
-			for _, tokenID := range e.Data.CollectionTokenIDs {
-				if contractID := tokenToContractID[tokenID]; contractID != "" {
-					trendData[i].ContractIds = append(trendData[i].ContractIds, contractID)
-				}
-			}
-			for _, tIDs := range e.Data.GalleryNewCollectionTokenIDs {
-				for _, tokenID := range tIDs {
-					if contractID := tokenToContractID[tokenID]; contractID != "" {
-						trendData[i].ContractIds = append(trendData[i].ContractIds, contractID)
-					}
-				}
-			}
-		}
-	}
 }

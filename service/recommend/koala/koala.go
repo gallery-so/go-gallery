@@ -19,9 +19,6 @@ import (
 const contextKey = "personalization.instance"
 
 var ErrNoInputData = errors.New("no personalization input data")
-var socialWeight = 1.0
-var relevanceWeight = 1.0
-var similarityWeight = 1.0
 
 // sharedContracts are excluded because of their low specificity
 var sharedContracts map[persist.ChainAddress]bool = map[persist.ChainAddress]bool{
@@ -88,6 +85,7 @@ func (k *Koala) RelevanceTo(userID persist.DBID, e db.FeedEntityScoringRow) (flo
 	}
 
 	var relevanceScore float64
+
 	for _, contractID := range e.ContractIds {
 		if relevanceScore == 1 {
 			break
@@ -101,6 +99,7 @@ func (k *Koala) RelevanceTo(userID persist.DBID, e db.FeedEntityScoringRow) (flo
 	if err != nil {
 		return relevanceScore, err
 	}
+
 	return relevanceScore + edgeScore, nil
 }
 
@@ -180,21 +179,21 @@ func calcSimilarityScore(simM *sparse.CSR, vIdx, qIdx int) float64 {
 }
 
 type idLookup struct {
-	l []int
+	l []int8
 }
 
 func newIdLookup() idLookup {
-	return idLookup{l: make([]int, 1)}
+	return idLookup{l: make([]int8, 1)}
 }
 
-func (n idLookup) Get(idx int) int {
+func (n idLookup) Get(idx int) int8 {
 	if idx >= len(n.l) {
 		return 0
 	}
 	return n.l[idx]
 }
 
-func (n *idLookup) Set(idx int, i int) {
+func (n *idLookup) Set(idx int, i int8) {
 	appendVal(&n.l, idx, i)
 }
 

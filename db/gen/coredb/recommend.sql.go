@@ -14,31 +14,64 @@ import (
 
 const feedEntityScoring = `-- name: FeedEntityScoring :many
 with ids as (
-    select id, feed_entity_type, created_at
+    select id, feed_entity_type, created_at, actor_id
     from feed_entities fe
     where 
       fe.created_at >= $1
       and ($2::bool or fe.actor_id != $3::varchar)
       and ($4::bool or feed_entity_type != $5)
 ), selected_posts as (
-    select ids.id, ids.feed_entity_type, ids.created_at, p.actor_id, p.contract_ids, count(distinct c.id) + count(distinct a.id) interactions
+    select
+      ids.id,
+      ids.feed_entity_type,
+      ids.created_at,
+      p.actor_id,
+      p.contract_ids,
+      count(distinct c.id) + count(distinct a.id) interactions
     from ids
     join posts p on p.id = ids.id and feed_entity_type = $5
     left join comments c on c.post_id = ids.id
     left join admires a on a.post_id = ids.id
     group by ids.id, ids.feed_entity_type, ids.created_at, p.actor_id, p.contract_ids
+), feed_event_contract_ids as (
+    select t.feed_event_id feed_event_id, array_agg(t.contract_id) contract_ids
+    from (
+      select f.id feed_event_id, c.id contract_id
+      from ids,
+        feed_events f,
+        lateral jsonb_each((data->>'gallery_new_token_ids')::jsonb) x(key, value),
+        jsonb_array_elements_text(x.value) tid(id),
+        tokens t,
+        contracts c
+      where
+        ids.id = f.id
+        and feed_entity_type = $6
+        and tid.id = t.id
+        and c.id = t.contract
+        and not t.deleted
+        and not c.deleted
+      group by 1, 2
+    ) t
+    group by 1
 ), selected_events as (
-    select ids.id, ids.feed_entity_type, ids.created_at, e.owner_id, null::varchar[] contract_ids, count(distinct c.id) + count(distinct a.id) interactions
+    select
+      ids.id,
+      ids.feed_entity_type,
+      ids.created_at,
+      ids.actor_id,
+      feed_event_contract_ids.contract_ids,
+      count(distinct c.id) + count(distinct a.id) interactions
     from ids
     join feed_events e on e.id = ids.id and feed_entity_type = $6
     left join comments c on c.feed_event_id = ids.id
     left join admires a on a.feed_event_id = ids.id
+    left join feed_event_contract_ids on feed_event_contract_ids.feed_event_id = ids.id
     where not action = any($7::varchar[])
-    group by ids.id, ids.feed_entity_type, ids.created_at, e.owner_id, null::varchar[]
+    group by ids.id, ids.feed_entity_type, ids.created_at, ids.actor_id, feed_event_contract_ids.contract_ids
 )
 select id, feed_entity_type, created_at, actor_id, contract_ids, interactions from selected_posts
 union all
-select id, feed_entity_type, created_at, owner_id, contract_ids, interactions from selected_events
+select id, feed_entity_type, created_at, actor_id, contract_ids, interactions from selected_events
 `
 
 type FeedEntityScoringParams struct {
