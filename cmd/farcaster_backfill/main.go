@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"os"
 	"time"
@@ -24,12 +23,6 @@ func main() {
 
 	setDefaults()
 
-	start := time.Now()
-	defer func() {
-		elapsed := time.Since(start)
-		fmt.Printf("Took %s", elapsed)
-	}()
-
 	pg := postgres.NewPgxClient()
 
 	neynar := farcaster.NewNeynarAPI(&http.Client{Timeout: 10 * time.Second})
@@ -43,8 +36,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
-	logrus.Infof("got all wallets and users...")
 
 	p := pool.New().WithMaxGoroutines(20).WithErrors()
 
