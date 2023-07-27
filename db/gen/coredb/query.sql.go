@@ -187,8 +187,8 @@ where $1 = any(posts.contract_ids)
 and posts.deleted = false
 `
 
-func (q *Queries) CountPostsByContractID(ctx context.Context, contract []string) (int64, error) {
-	row := q.db.QueryRow(ctx, countPostsByContractID, contract)
+func (q *Queries) CountPostsByContractID(ctx context.Context, contractID persist.DBID) (int64, error) {
+	row := q.db.QueryRow(ctx, countPostsByContractID, contractID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err

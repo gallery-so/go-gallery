@@ -435,7 +435,7 @@ LIMIT sqlc.arg('limit');
 -- name: CountPostsByContractID :one
 select count(*)
 from posts
-where sqlc.arg('contract') = any(posts.contract_ids)
+where sqlc.arg('contract_id') = any(posts.contract_ids)
 and posts.deleted = false;
 
 -- name: GetFeedEventsByIds :many
