@@ -178,7 +178,7 @@ func (s *SocialProvider) Scan(src interface{}) error {
 
 func (s SocialProvider) IsValid() bool {
 	switch s {
-	case SocialProviderTwitter:
+	case SocialProviderTwitter, SocialProviderFarcaster, SocialProviderLens:
 		return true
 	default:
 		return false
