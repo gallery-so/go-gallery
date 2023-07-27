@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	// "os"
+	"os"
 	"time"
 
 	"github.com/everFinance/goar"
@@ -228,19 +228,16 @@ func SetDefaults() {
 
 	viper.AutomaticEnv()
 
-	envFile := util.ResolveEnvFile("backend", "dev")
-	util.LoadEncryptedEnvFile(envFile)
-
-	// XXX if env.GetString("ENV") != "local" {
-	// XXX 	logger.For(nil).Info("running in non-local environment, skipping environment configuration")
-	// XXX } else {
-	// XXX 	fi := "local"
-	// XXX 	if len(os.Args) > 1 {
-	// XXX 		fi = os.Args[1]
-	// XXX 	}
-	// XXX 	envFile := util.ResolveEnvFile("backend", fi)
-	// XXX 	util.LoadEncryptedEnvFile(envFile)
-	// XXX }
+	if env.GetString("ENV") != "local" {
+		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
+	} else {
+		fi := "local"
+		if len(os.Args) > 1 {
+			fi = os.Args[1]
+		}
+		envFile := util.ResolveEnvFile("backend", fi)
+		util.LoadEncryptedEnvFile(envFile)
+	}
 
 	if env.GetString("ENV") != "local" {
 		util.VarNotSetTo("IMGIX_SECRET", "")

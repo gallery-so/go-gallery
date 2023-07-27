@@ -18,7 +18,7 @@ with ids as (
     from feed_entities fe
     where 
       fe.created_at >= $1
-      and (not $2::bool or fe.actor_id != $3::varchar)
+      and ($2::bool or fe.actor_id != $3::varchar)
       and ($4::bool or feed_entity_type != $5)
 ), selected_posts as (
     select ids.id, ids.feed_entity_type, ids.created_at, p.actor_id, p.contract_ids, count(distinct c.id) + count(distinct a.id) interactions
@@ -43,7 +43,7 @@ select id, feed_entity_type, created_at, owner_id, contract_ids, interactions fr
 
 type FeedEntityScoringParams struct {
 	WindowEnd           time.Time `json:"window_end"`
-	ExcludeViewer       bool      `json:"exclude_viewer"`
+	IncludeViewer       bool      `json:"include_viewer"`
 	ViewerID            string    `json:"viewer_id"`
 	IncludePosts        bool      `json:"include_posts"`
 	PostEntityType      int32     `json:"post_entity_type"`
@@ -63,7 +63,7 @@ type FeedEntityScoringRow struct {
 func (q *Queries) FeedEntityScoring(ctx context.Context, arg FeedEntityScoringParams) ([]FeedEntityScoringRow, error) {
 	rows, err := q.db.Query(ctx, feedEntityScoring,
 		arg.WindowEnd,
-		arg.ExcludeViewer,
+		arg.IncludeViewer,
 		arg.ViewerID,
 		arg.IncludePosts,
 		arg.PostEntityType,
@@ -99,7 +99,7 @@ const getDisplayedContracts = `-- name: GetDisplayedContracts :many
 select user_id, contract_id, displayed
 from owned_contracts
 where contract_id not in (
-	select id from contracts where chain || ':' || address = any($1::varchar[])
+select id from contracts where chain || ':' || address = any($1::varchar[])
 ) and displayed
 `
 

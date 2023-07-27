@@ -56,7 +56,7 @@ select user_id id from owned_contracts where displayed group by 1;
 select user_id, contract_id, displayed
 from owned_contracts
 where contract_id not in (
-	select id from contracts where chain || ':' || address = any(@excluded_contracts::varchar[])
+select id from contracts where chain || ':' || address = any(@excluded_contracts::varchar[])
 ) and displayed;
 
 -- name: FeedEntityScoring :many
@@ -65,7 +65,7 @@ with ids as (
     from feed_entities fe
     where 
       fe.created_at >= @window_end
-      and (not @exclude_viewer::bool or fe.actor_id != @viewer_id::varchar)
+      and (@include_viewer::bool or fe.actor_id != @viewer_id::varchar)
       and (@include_posts::bool or feed_entity_type != @post_entity_type)
 ), selected_posts as (
     select ids.id, ids.feed_entity_type, ids.created_at, p.actor_id, p.contract_ids, count(distinct c.id) + count(distinct a.id) interactions

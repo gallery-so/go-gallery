@@ -20,10 +20,10 @@ const contextKey = "personalization.instance"
 
 var ErrNoInputData = errors.New("no personalization input data")
 var socialWeight = 1.0
-var relevanceWeight = 2.0
+var relevanceWeight = 1.0
 var similarityWeight = 1.0
 
-// sharedContracts are excluded from the personalization metrix because of their low specificity
+// sharedContracts are excluded because of their low specificity
 var sharedContracts map[persist.ChainAddress]bool = map[persist.ChainAddress]bool{
 	persist.NewChainAddress("KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton", persist.ChainTezos):     true, // hic et nunc NFTs
 	persist.NewChainAddress("KT1GBZmSxmnKJXGMdMLbugPfLyUPmuLSMwKS", persist.ChainTezos):     true, // Tezos Domains NameRegistry
@@ -52,14 +52,13 @@ type Koala struct {
 	uL map[persist.DBID]int
 	// lookup of contract id to index in the matrix
 	cL map[persist.DBID]int
-	mu sync.Mutex
+	mu sync.RWMutex
 	q  *db.Queries
 }
 
 func NewKoala(ctx context.Context, q *db.Queries) *Koala {
 	k := &Koala{q: q}
-	userM, ratingM, displayM, simM, uL, cL := readMatrices(ctx, q)
-	k.update(userM, ratingM, displayM, simM, uL, cL)
+	k.update(ctx)
 	return k
 }
 
@@ -86,7 +85,6 @@ func (k *Koala) RelevanceTo(userID persist.DBID, e db.FeedEntityScoringRow) (top
 	}
 	var scored bool
 	var s float64
-
 	for _, contractID := range e.ContractIds {
 		s, err = k.scoreFeatures(userID, e.ActorID, contractID)
 		if err == nil && s > topS {
@@ -106,20 +104,18 @@ func (k *Koala) Loop(ctx context.Context, ticker *time.Ticker) {
 		for {
 			select {
 			case <-ticker.C:
-				userM, ratingM, displayM, simM, uL, cL := readMatrices(ctx, k.q)
-				k.update(userM, ratingM, displayM, simM, uL, cL)
+				k.update(ctx)
 			}
 		}
 	}()
 }
 
 func (k *Koala) scoreFeatures(viewerID, queryID, contractID persist.DBID) (float64, error) {
-	k.mu.Lock()
-	defer k.mu.Unlock()
+	k.mu.RLock()
+	defer k.mu.RUnlock()
 	vIdx, vOK := k.uL[viewerID]
 	qIdx, qOK := k.uL[queryID]
 	cIdx, cOK := k.cL[contractID]
-
 	// Nothing to compute
 	if !vOK {
 		return 0, ErrNoInputData
@@ -143,7 +139,8 @@ func (k *Koala) scoreFeatures(viewerID, queryID, contractID persist.DBID) (float
 	return score, nil
 }
 
-func (k *Koala) update(userM, ratingM, displayM, simM *sparse.CSR, uL, cL map[persist.DBID]int) {
+func (k *Koala) update(ctx context.Context) {
+	userM, ratingM, displayM, simM, uL, cL := readMatrices(ctx, k.q)
 	k.mu.Lock()
 	defer k.mu.Unlock()
 	k.userM = userM
@@ -162,9 +159,9 @@ func calcSocialScore(userM *sparse.CSR, vIdx, qIdx int) float64 {
 
 // calcRelavanceScore computes the relevance of cIdx to vIdx's held tokens
 func calcRelevanceScore(ratingM, displayM *sparse.CSR, vIdx, cIdx int) float64 {
-	var t float64
 	v := ratingM.RowView(vIdx).(*sparse.Vector)
 	cDisplayed := displayM.At(cIdx, cIdx)
+	var t float64
 	v.DoNonZero(func(i int, j int, v float64) {
 		t += jaccardIndex(displayM, i, cIdx, cDisplayed)
 	})

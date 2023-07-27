@@ -305,6 +305,8 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 
 	hasCursors := before != nil || after != nil
 
+	now := time.Now()
+
 	if !hasCursors {
 		calcFunc := func(ctx context.Context) ([]persist.FeedEntityType, []persist.DBID, error) {
 			trendData, err := api.queries.FeedEntityScoring(ctx, db.FeedEntityScoringParams{
@@ -312,48 +314,15 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 				FeedEventEntityType: int32(persist.FeedEventTypeTag),
 				PostEntityType:      int32(persist.PostTypeTag),
 				ExcludedFeedActions: []string{string(persist.ActionUserCreated), string(persist.ActionUserFollowedUsers)},
-				ExcludeViewer:       false, // Viewer's post can be included in the trending feed
+				IncludeViewer:       true,
 				IncludePosts:        includePosts,
 			})
 			if err != nil {
 				return nil, nil, err
 			}
-
-			h := &heap{}
-			now := time.Now()
-
-			for _, event := range trendData {
-				score := timeFactor(event.CreatedAt, now) * engagementFactor(int(event.Interactions))
-				node := feedNode{
-					id:    event.ID,
-					score: score,
-					typ:   persist.FeedEntityType(event.FeedEntityType),
-				}
-
-				// Add first 100 numbers in the heap
-				if h.Len() < 100 {
-					heappkg.Push(h, node)
-					continue
-				}
-
-				// If the score is greater than the smallest score in the heap, replace it
-				if score > (*h)[0].(feedNode).score {
-					heappkg.Pop(h)
-					heappkg.Push(h, node)
-				}
-			}
-
-			entityTypes = make([]persist.FeedEntityType, h.Len())
-			entityIDs = make([]persist.DBID, h.Len())
-
-			i := h.Len() - 1
-			for h.Len() > 0 {
-				node := heappkg.Pop(h).(feedNode)
-				entityTypes[i] = node.typ
-				entityIDs[i] = node.id
-				i--
-			}
-
+			entityTypes, entityIDs = api.topNEntities(ctx, 100, trendData, func(e db.FeedEntityScoringRow) float64 {
+				return timeFactor(e.CreatedAt, now) * engagementFactor(int(e.Interactions))
+			})
 			return entityTypes, entityIDs, nil
 		}
 
@@ -363,6 +332,121 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
+	}
+
+	queryFunc := func(params feedPagingParams) ([]any, error) {
+		if hasCursors {
+			entityTypes = params.EntityTypes
+			entityIDs = params.EntityIDs
+		}
+		for i, id := range entityIDs {
+			entityIDToPos[id] = i
+		}
+
+		// Copy slices since they will be modified in place
+		queryTypes := append([]persist.FeedEntityType{}, entityTypes...)
+		queryIDs := append([]persist.DBID{}, entityIDs...)
+
+		// Restrict cursor positions to the length of the IDs
+		curBeforePos := params.CurBeforePos + 1
+		curAfterPos := min(params.CurAfterPos, len(queryIDs))
+
+		// Subset to bounds of the cursors
+		queryTypes = queryTypes[curBeforePos:curAfterPos]
+		queryIDs = queryIDs[curBeforePos:curAfterPos]
+
+		// Filter slices in place
+		if !includePosts {
+			idx := 0
+			for i := range queryTypes {
+				if queryTypes[i] != persist.PostTypeTag {
+					queryTypes[idx] = queryTypes[i]
+					queryIDs[idx] = queryIDs[i]
+					idx++
+				}
+			}
+			queryTypes = queryTypes[:idx]
+			queryIDs = queryIDs[:idx]
+		}
+
+		// Index up to the limit
+		if params.PagingForward {
+			// Index from the right
+			limitIdx := max(len(queryTypes)-params.Limit, 0)
+			queryTypes = queryTypes[limitIdx:]
+			queryIDs = queryIDs[limitIdx:]
+			// This is a hack: the underlying keyset paginator assumes
+			// that the extra result is at the end of the slice, so
+			// we just move it to the end.
+			if len(queryTypes) > 0 {
+				queryTypes = append(queryTypes[1:], queryTypes[0])
+				queryIDs = append(queryIDs[1:], queryIDs[0])
+			}
+		} else {
+			// Index from the left
+			limitIdx := min(params.Limit, len(queryTypes))
+			queryTypes = queryTypes[:limitIdx]
+			queryIDs = queryIDs[:limitIdx]
+		}
+
+		return loadFeedEntities(ctx, api.loaders, queryTypes, queryIDs)
+	}
+
+	cursorFunc := func(node any) (int, []persist.FeedEntityType, []persist.DBID, error) {
+		_, id, err := feedCursor(node)
+		pos, ok := entityIDToPos[id]
+		if !ok {
+			panic(fmt.Sprintf("could not find position for id=%s", id))
+		}
+		return pos, entityTypes, entityIDs, err
+	}
+
+	paginator.QueryFunc = queryFunc
+	paginator.CursorFunc = cursorFunc
+	return paginator.paginate(before, after, first, last)
+}
+
+func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first, last *int, includePosts bool) ([]any, PageInfo, error) {
+	// Validate
+	userID, _ := getAuthenticatedUserID(ctx)
+
+	// Fallback to trending if no user
+	if userID == "" {
+		return api.TrendingFeed(ctx, before, after, first, last, includePosts)
+	}
+
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	var (
+		paginator     feedPaginator
+		entityTypes   []persist.FeedEntityType
+		entityIDs     []persist.DBID
+		entityIDToPos = make(map[persist.DBID]int)
+	)
+
+	hasCursors := before != nil || after != nil
+
+	now := time.Now()
+
+	if !hasCursors {
+		trendData, err := api.queries.FeedEntityScoring(ctx, db.FeedEntityScoringParams{
+			WindowEnd:           time.Now().Add(-time.Duration(72 * time.Hour)),
+			PostEntityType:      int32(persist.PostTypeTag),
+			FeedEventEntityType: int32(persist.FeedEventTypeTag),
+			ExcludedFeedActions: []string{string(persist.ActionUserCreated), string(persist.ActionUserFollowedUsers)},
+			IncludeViewer:       false,
+			ViewerID:            userID.String(),
+			IncludePosts:        includePosts,
+		})
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+		addContractIDstoFeedEvents(api.loaders, trendData)
+		entityTypes, entityIDs = api.topNEntities(ctx, 100, trendData, func(e db.FeedEntityScoringRow) float64 {
+			return scoreFeedEntity(ctx, userID, e, now, int(e.Interactions))
+		})
 	}
 
 	queryFunc := func(params feedPagingParams) ([]any, error) {
@@ -568,11 +652,49 @@ func loadFeedEntities(ctx context.Context, d *dataloader.Loaders, typs []persist
 	return entities, nil
 }
 
+func (api FeedAPI) topNEntities(ctx context.Context, n int, trendData []db.FeedEntityScoringRow, scoreF func(db.FeedEntityScoringRow) float64) ([]persist.FeedEntityType, []persist.DBID) {
+	h := &heap{}
+
+	for _, event := range trendData {
+		score := scoreF(event)
+		node := feedNode{
+			id:    event.ID,
+			score: score,
+			typ:   persist.FeedEntityType(event.FeedEntityType),
+		}
+
+		// Add first N numbers in the heap
+		if h.Len() < n {
+			heappkg.Push(h, node)
+			continue
+		}
+
+		// If the score is greater than the smallest score in the heap, replace it
+		if score > (*h)[0].(feedNode).score {
+			heappkg.Pop(h)
+			heappkg.Push(h, node)
+		}
+	}
+
+	entityTypes := make([]persist.FeedEntityType, h.Len())
+	entityIDs := make([]persist.DBID, h.Len())
+
+	// Pop returns the smallest score first, so we reverse the order
+	// such that the highest score is first
+	i := h.Len() - 1
+	for h.Len() > 0 {
+		node := heappkg.Pop(h).(feedNode)
+		entityTypes[i] = node.typ
+		entityIDs[i] = node.id
+		i--
+	}
+
+	return entityTypes, entityIDs
+}
+
 func scoreFeedEntity(ctx context.Context, viewerID persist.DBID, e db.FeedEntityScoringRow, t time.Time, interactions int) float64 {
-	// timeF := timeFactor(e.CreatedAt, t)
-	timeF := 1.0
-	// engagementF := engagementFactor(interactions)
-	engagementF := 1.0
+	timeF := timeFactor(e.CreatedAt, t)
+	engagementF := engagementFactor(interactions)
 	personalizationF, err := koala.For(ctx).RelevanceTo(viewerID, e)
 	if errors.Is(err, koala.ErrNoInputData) {
 		// Use a default value of 0.1 so that the post isn't completely penalized because of missing data.
@@ -582,10 +704,8 @@ func scoreFeedEntity(ctx context.Context, viewerID persist.DBID, e db.FeedEntity
 }
 
 func ScoreFeedEntity(k *koala.Koala, viewerID persist.DBID, e db.FeedEntityScoringRow, t time.Time, interactions int) float64 {
-	// timeF := timeFactor(e.CreatedAt, t)
-	timeF := 1.0
-	// engagementF := engagementFactor(interactions)
-	engagementF := 1.0
+	timeF := timeFactor(e.CreatedAt, t)
+	engagementF := engagementFactor(interactions)
 	personalizationF, err := k.RelevanceTo(viewerID, e)
 	if errors.Is(err, koala.ErrNoInputData) {
 		// Use a default value of 0.1 so that the post isn't completely penalized because of missing data.
@@ -804,7 +924,89 @@ func max(a, b int) int {
 	return b
 }
 
-var (
-	cpuprofile string = "koala.prof"
-	memprofile string = "koala.mprof"
-)
+// addContractIDstoFeedEvents adds contract IDs to feed events so they can be fully scored
+func addContractIDstoFeedEvents(d *dataloader.Loaders, trendData []db.FeedEntityScoringRow) {
+	feedEventIDs := make([]persist.DBID, 0, len(trendData))
+	tokenIDs := make([]persist.DBID, 0)
+
+	for _, event := range trendData {
+		if event.FeedEntityType == int32(persist.FeedEventTypeTag) {
+			feedEventIDs = append(feedEventIDs, event.ID)
+		}
+	}
+
+	// Filter in place
+	feedEvents, errs := d.FeedEventByFeedEventID.LoadAll(feedEventIDs)
+	idx := 0
+	for i, err := range errs {
+		if err == nil {
+			feedEvents[idx] = feedEvents[i]
+			idx++
+		} else {
+			fmt.Println(err)
+		}
+	}
+	feedEvents = feedEvents[:idx]
+
+	eventIDToEvent := make(map[persist.DBID]db.FeedEvent)
+
+	for _, event := range feedEvents {
+		eventIDToEvent[event.ID] = event
+		if event.Data.TokenID != "" {
+			tokenIDs = append(tokenIDs, event.Data.TokenID)
+		}
+		if event.Data.TokenCollectionID != "" {
+			tokenIDs = append(tokenIDs, event.Data.TokenCollectionID)
+		}
+		for _, tokenID := range event.Data.CollectionTokenIDs {
+			tokenIDs = append(tokenIDs, tokenID)
+		}
+		for _, tIDs := range event.Data.GalleryNewCollectionTokenIDs {
+			for _, tokenID := range tIDs {
+				tokenIDs = append(tokenIDs, tokenID)
+			}
+		}
+	}
+
+	// Filter in place
+	tokens, errs := d.TokenByTokenID.LoadAll(tokenIDs)
+	idx = 0
+	for i, err := range errs {
+		if err == nil {
+			tokens[idx] = tokens[i]
+			idx++
+		} else {
+			fmt.Println(err)
+		}
+	}
+	tokens = tokens[:idx]
+
+	tokenToContractID := make(map[persist.DBID]persist.DBID)
+	for _, token := range tokens {
+		tokenToContractID[token.ID] = token.Contract
+	}
+
+	for i, event := range trendData {
+		e := eventIDToEvent[event.ID]
+		if event.FeedEntityType == int32(persist.FeedEventTypeTag) {
+			if contractID := tokenToContractID[e.Data.TokenID]; contractID != "" {
+				trendData[i].ContractIds = append(trendData[i].ContractIds, contractID)
+			}
+			if contractID := tokenToContractID[e.Data.TokenCollectionID]; contractID != "" {
+				trendData[i].ContractIds = append(trendData[i].ContractIds, contractID)
+			}
+			for _, tokenID := range e.Data.CollectionTokenIDs {
+				if contractID := tokenToContractID[tokenID]; contractID != "" {
+					trendData[i].ContractIds = append(trendData[i].ContractIds, contractID)
+				}
+			}
+			for _, tIDs := range e.Data.GalleryNewCollectionTokenIDs {
+				for _, tokenID := range tIDs {
+					if contractID := tokenToContractID[tokenID]; contractID != "" {
+						trendData[i].ContractIds = append(trendData[i].ContractIds, contractID)
+					}
+				}
+			}
+		}
+	}
+}
