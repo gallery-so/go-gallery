@@ -26,11 +26,15 @@ type SocialUserIdentifiers struct {
 type SocialProvider string
 
 const (
-	SocialProviderTwitter SocialProvider = "Twitter"
+	SocialProviderTwitter   SocialProvider = "Twitter"
+	SocialProviderFarcaster SocialProvider = "Farcaster"
+	SocialProviderLens      SocialProvider = "Lens"
 )
 
 var AllSocialProviders = []SocialProvider{
 	SocialProviderTwitter,
+	SocialProviderFarcaster,
+	SocialProviderLens,
 }
 
 // User represents a user with all of their addresses

@@ -625,6 +625,8 @@ type NotificationsConnection @goEmbedHelper {
 
 enum SocialAccountType {
   Twitter
+  Farcaster
+  Lens
 }
 
 interface SocialAccount {
@@ -635,6 +637,7 @@ interface SocialAccount {
 
 type SocialAccounts {
   twitter: TwitterSocialAccount
+  farcaster: FarcasterSocialAccount
 }
 
 type TwitterSocialAccount implements SocialAccount {
@@ -643,6 +646,16 @@ type TwitterSocialAccount implements SocialAccount {
   name: String!
   username: String!
   profileImageURL: String!
+  display: Boolean!
+}
+
+type FarcasterSocialAccount implements SocialAccount {
+  type: SocialAccountType!
+  social_id: String!
+  name: String!
+  username: String!
+  profileImageURL: String!
+  bio: String!
   display: Boolean!
 }
 

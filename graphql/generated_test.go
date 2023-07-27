@@ -355,7 +355,9 @@ const (
 type SocialAccountType string
 
 const (
-	SocialAccountTypeTwitter SocialAccountType = "Twitter"
+	SocialAccountTypeTwitter   SocialAccountType = "Twitter"
+	SocialAccountTypeFarcaster SocialAccountType = "Farcaster"
+	SocialAccountTypeLens      SocialAccountType = "Lens"
 )
 
 type SocialAuthMechanism struct {
