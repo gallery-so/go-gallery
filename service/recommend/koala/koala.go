@@ -123,7 +123,15 @@ func calcRelevanceScore(ratingM, displayM *sparse.CSR, vIdx, cIdx int) float64 {
 			t = s
 		}
 	})
-	// Scale factor up 10
+	// 0.02 is the average overlap of displayed tokens between two communities. It's interpretation is
+	// on average 2% of the the tokens from both communities are displayed together. This is an approximation,
+	// a better way would be to calculate the average overlap of this community to all other communities, since
+	// it is possible that a community is shared frequently with all other communities, but this would require
+	// computing the score for every community, which is expensive.
+	//
+	// Dividing by this value creates an index where a score above 0.02 over indexes and is a value greater than
+	// 1. This means that the a score of 1 gets scaled to 50. This is a pretty massive boost, and we may want to clamp
+	// this value to some max.
 	return t / 0.02
 }
 
@@ -178,7 +186,7 @@ func bfs(m *sparse.CSR, vIdx, qIdx int) float64 {
 	for len(q) > 0 {
 		cur := q.Pop()
 		if cur == qIdx {
-			return 1 / float64(depth.Get(cur))
+			return 1
 		}
 		if depth.Get(cur) > 4 {
 			return 0
@@ -195,7 +203,7 @@ func bfs(m *sparse.CSR, vIdx, qIdx int) float64 {
 	return 0
 }
 
-// jaccardIndex computes overlap divided by the union of two sets
+// jaccardIndex computes intersection divided by the union of two sets
 func jaccardIndex(m *sparse.CSR, a int, b int, cVal float64) float64 {
 	u := m.At(a, b)
 	return u / (m.At(a, a) + cVal - u)
