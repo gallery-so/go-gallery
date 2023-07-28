@@ -2160,10 +2160,10 @@ select id, user_id, token_id, source_type, deleted, created_at, last_updated, wa
 where pfp.id = $1
 	and not deleted
 	and case
-		when source_type = $2
-		then exists(select 1 from wallets w where w.id = wallet_id and not w.deleted)
-		when source_type = $3
-		then exists(select 1 from tokens t where t.id = token_id and t.displayable and not t.deleted)
+		when pfp.source_type = $2
+		then exists(select 1 from wallets w where w.id = pfp.wallet_id and not w.deleted)
+		when pfp.source_type = $3
+		then exists(select 1 from tokens t where t.id = pfp.token_id and t.displayable and not t.deleted)
 		else
 		0 = 1
 	end
