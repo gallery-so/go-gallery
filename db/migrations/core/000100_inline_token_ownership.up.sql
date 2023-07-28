@@ -17,5 +17,3 @@ create index if not exists tokens_owner_user_id_is_holder_token_idx on tokens (o
 create index if not exists tokens_owner_user_id_displayable_idx on tokens (owner_user_id, displayable) where deleted = false;
 
 drop view if exists token_ownership;
-
-select count(*) from tokens;
