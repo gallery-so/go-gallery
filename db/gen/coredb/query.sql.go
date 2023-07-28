@@ -3762,7 +3762,7 @@ select tokens.token_id, contracts.address as contract_address, contracts.chain, 
 from tokens
 join contracts on tokens.contract = contracts.id
 join wallets on wallets.id = any(tokens.owned_by_wallets)
-where tokens.id = $1 and not tokens.deleted and not contracts.deleted and not wallets.deleted 
+where tokens.id = $1 and tokens.displayable and not tokens.deleted and not contracts.deleted and not wallets.deleted
 group by (tokens.token_id, contracts.address, contracts.chain, tokens.quantity) limit 1
 `
 
