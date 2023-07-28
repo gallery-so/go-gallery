@@ -124,10 +124,10 @@ func calcRelevanceScore(ratingM, displayM *sparse.CSR, vIdx, cIdx int) float64 {
 		}
 	})
 	// 0.02 is the average overlap of displayed tokens between two communities. It's interpretation is
-	// on average 2% of the the tokens from both communities are displayed together. This is an approximation,
+	// on average 2% of the the tokens any two communities are displayed together. This is an approximation,
 	// a better way would be to calculate the average overlap of this community to all other communities, since
 	// it is possible that a community is shared frequently with all other communities, but this would require
-	// computing the score for every community, which is expensive.
+	// computing the score for every community.
 	//
 	// Dividing by this value creates an index where a score above 0.02 over indexes and is a value greater than
 	// 1. This means that the a score of 1 gets scaled to 50. This is a pretty massive boost, and we may want to clamp
