@@ -314,6 +314,40 @@ func processToken(ctx context.Context, tp *tokenProcessor, token persist.TokenGa
 	return tp.ProcessTokenPipeline(ctx, token, contract, cause, addPipelineRunOptions(contract)...)
 }
 
+func processWalletRemoval(queries *coredb.Queries) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var input task.TokenProcessingWalletRemovalMessage
+		if err := c.ShouldBindJSON(&input); err != nil {
+			util.ErrResponse(c, http.StatusOK, err)
+			return
+		}
+
+		logger.For(c).Infof("Processing wallet removal: UserID=%s, WalletIDs=%v", input.UserID, input.WalletIDs)
+
+		// We never actually remove multiple wallets at a time, but our API does allow it. If we do end up
+		// processing multiple wallet removals, we'll just process them in a loop here, because tuning the
+		// underlying query to handle multiple wallet removals at a time is difficult.
+		for _, walletID := range input.WalletIDs {
+			err := queries.RemoveWalletFromTokens(c, coredb.RemoveWalletFromTokensParams{
+				WalletID: walletID.String(),
+				UserID:   input.UserID,
+			})
+
+			if err != nil {
+				util.ErrResponse(c, http.StatusInternalServerError, err)
+				return
+			}
+		}
+
+		if err := queries.RemoveStaleCreatorStatusFromTokens(c, input.UserID); err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+	}
+}
+
 // addPipelineRunOptions adds pipeline options for specific contracts
 func addPipelineRunOptions(contract persist.ContractGallery) (opts []PipelineOption) {
 	if contract.Address == eth.EnsAddress {
