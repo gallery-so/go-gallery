@@ -475,7 +475,11 @@ func (u *UserRepository) RemoveWallet(pCtx context.Context, pUserID persist.DBID
 		return false, err
 	}
 
-	return true, tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
 
 // Delete deletes the user with the given ID
