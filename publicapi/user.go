@@ -1,10 +1,12 @@
 package publicapi
 
 import (
+	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/task"
 	"strconv"
 	"strings"
 	"time"
@@ -21,6 +23,7 @@ import (
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/auth"
@@ -56,6 +59,7 @@ type UserAPI struct {
 	arweaveClient      *goar.Client
 	storageClient      *storage.Client
 	multichainProvider *multichain.Provider
+	taskClient         *gcptasks.Client
 }
 
 func (api UserAPI) GetLoggedInUserId(ctx context.Context) persist.DBID {
@@ -345,12 +349,24 @@ func (api UserAPI) RemoveWalletsFromUser(ctx context.Context, walletIDs []persis
 		return err
 	}
 
-	err = user.RemoveWalletsFromUser(ctx, userID, walletIDs, api.repos.UserRepository)
-	if err != nil {
-		return err
+	removedIDs, removalErr := user.RemoveWalletsFromUser(ctx, userID, walletIDs, api.repos.UserRepository)
+
+	// If any wallet IDs were successfully removed, we need to process those removals, even if we also
+	// encountered an error.
+	if len(removedIDs) > 0 {
+		walletRemovalMessage := task.TokenProcessingWalletRemovalMessage{
+			UserID:    userID,
+			WalletIDs: removedIDs,
+		}
+
+		if err := task.CreateTaskForWalletRemoval(ctx, walletRemovalMessage, api.taskClient); err != nil {
+			// Just log the error here. No need to return it -- the actual wallet removal DID succeed,
+			// but tokens owned by the affected wallets won't be updated until the user's next sync.
+			logger.For(ctx).WithError(err).Error("failed to create task to process wallet removal")
+		}
 	}
 
-	return nil
+	return removalErr
 }
 
 func (api UserAPI) AddSocialAccountToUser(ctx context.Context, authenticator socialauth.Authenticator, display bool) error {
@@ -441,7 +457,7 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 	}
 
 	// Send event
-	_, err = dispatchEvent(ctx, db.Event{
+	_, err = event.DispatchEvent(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		Action:         persist.ActionUserCreated,
 		ResourceTypeID: persist.ResourceTypeUser,
@@ -975,7 +991,7 @@ func dispatchFollowEventToFeed(ctx context.Context, api UserAPI, curUserID persi
 		return
 	}
 
-	pushEvent(ctx, db.Event{
+	event.PushEvent(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(curUserID),
 		Action:         persist.ActionUserFollowedUsers,
 		ResourceTypeID: persist.ResourceTypeUser,
@@ -1029,29 +1045,9 @@ func (api UserAPI) GetSocials(ctx context.Context, userID persist.DBID) (*model.
 	result := &model.SocialAccounts{}
 
 	for prov, social := range socials {
-		switch prov {
-		case persist.SocialProviderTwitter:
-			logger.For(ctx).Infof("found twitter social account: %+v", social)
-			t := &model.TwitterSocialAccount{
-				Type:     prov,
-				Display:  social.Display,
-				SocialID: social.ID,
-			}
-			name, ok := social.Metadata["name"].(string)
-			if ok {
-				t.Name = name
-			}
-			username, ok := social.Metadata["username"].(string)
-			if ok {
-				t.Username = username
-			}
-			profile, ok := social.Metadata["profile_image_url"].(string)
-			if ok {
-				t.ProfileImageURL = profile
-			}
-			result.Twitter = t
-		default:
-			return nil, fmt.Errorf("unknown social provider %s", prov)
+		err := assignSocialToModel(ctx, prov, social, result)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -1074,33 +1070,68 @@ func (api UserAPI) GetDisplayedSocials(ctx context.Context, userID persist.DBID)
 	result := &model.SocialAccounts{}
 
 	for prov, social := range socials {
-		switch prov {
-		case persist.SocialProviderTwitter:
-			logger.For(ctx).Infof("found twitter social account: %+v", social)
-			t := &model.TwitterSocialAccount{
-				Type:     prov,
-				Display:  social.Display,
-				SocialID: social.ID,
-			}
-			name, ok := social.Metadata["name"].(string)
-			if ok {
-				t.Name = name
-			}
-			username, ok := social.Metadata["username"].(string)
-			if ok {
-				t.Username = username
-			}
-			profile, ok := social.Metadata["profile_image_url"].(string)
-			if ok {
-				t.ProfileImageURL = profile
-			}
-			result.Twitter = t
-		default:
-			return nil, fmt.Errorf("unknown social provider %s", prov)
+		if !social.Display {
+			continue
+		}
+		err := assignSocialToModel(ctx, prov, social, result)
+		if err != nil {
+			return nil, err
 		}
 	}
 
 	return result, nil
+}
+
+func assignSocialToModel(ctx context.Context, prov persist.SocialProvider, social persist.SocialUserIdentifiers, result *model.SocialAccounts) error {
+	switch prov {
+	case persist.SocialProviderTwitter:
+		logger.For(ctx).Infof("found twitter social account: %+v", social)
+		t := &model.TwitterSocialAccount{
+			Type:     prov,
+			Display:  social.Display,
+			SocialID: social.ID,
+		}
+		name, ok := social.Metadata["name"].(string)
+		if ok {
+			t.Name = name
+		}
+		username, ok := social.Metadata["username"].(string)
+		if ok {
+			t.Username = username
+		}
+		profile, ok := social.Metadata["profile_image_url"].(string)
+		if ok {
+			t.ProfileImageURL = profile
+		}
+		result.Twitter = t
+	case persist.SocialProviderFarcaster:
+		logger.For(ctx).Infof("found farcaster social account: %+v", social)
+		f := &model.FarcasterSocialAccount{
+			Type:     prov,
+			Display:  social.Display,
+			SocialID: social.ID,
+		}
+		name, ok := social.Metadata["name"].(string)
+		if ok {
+			f.Name = name
+		}
+		username, ok := social.Metadata["username"].(string)
+		if ok {
+			f.Username = username
+		}
+		profile, ok := social.Metadata["profile_image_url"].(string)
+		if ok {
+			f.ProfileImageURL = profile
+		}
+		bio, ok := social.Metadata["bio"].(string)
+		if ok {
+			f.Bio = bio
+		}
+		result.Farcaster = f
+	default:
+		return fmt.Errorf("unknown social provider %s", prov)
+	}
+	return nil
 }
 
 func (api UserAPI) UpdateUserSocialDisplayed(ctx context.Context, socialType persist.SocialProvider, displayed bool) error {
@@ -1347,17 +1378,12 @@ func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID, w
 
 	// Set the profile image to reference a token
 	if tokenID != nil {
-		o, err := For(ctx).Token.GetTokenOwnershipByTokenID(ctx, *tokenID)
-
-		if util.ErrorAs[persist.ErrTokenOwnershipNotFound](err) {
-			return ErrProfileImageNotTokenOwner
-		}
-
+		t, err := For(ctx).Token.GetTokenById(ctx, *tokenID)
 		if err != nil {
 			return err
 		}
 
-		if o.OwnerUserID != userID {
+		if t.OwnerUserID != userID || (!t.IsHolderToken && !t.IsCreatorToken) {
 			return ErrProfileImageNotTokenOwner
 		}
 
@@ -1365,7 +1391,7 @@ func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID, w
 			TokenSourceType: persist.ProfileImageSourceToken,
 			ProfileID:       persist.GenerateID(),
 			UserID:          userID,
-			TokenID:         o.TokenID,
+			TokenID:         t.ID,
 		})
 	}
 

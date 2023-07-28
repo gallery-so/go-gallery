@@ -24,7 +24,6 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/auth"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
@@ -75,7 +74,7 @@ func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Rep
 		Auth:          &AuthAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multiChainProvider: multichainProvider, magicLinkClient: magicClient, oneTimeLoginCache: redis.NewCache(redis.OneTimeLoginCache), authRefreshCache: authRefreshCache},
 		Collection:    &CollectionAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Gallery:       &GalleryAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
-		User:          &UserAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, ipfsClient: ipfsClient, arweaveClient: arweaveClient, storageClient: storageClient, multichainProvider: multichainProvider},
+		User:          &UserAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, ipfsClient: ipfsClient, arweaveClient: arweaveClient, storageClient: storageClient, multichainProvider: multichainProvider, taskClient: taskClient},
 		Contract:      &ContractAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, taskClient: taskClient},
 		Token:         &TokenAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, throttler: throttler},
 		Wallet:        &WalletAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider},
@@ -131,60 +130,6 @@ func getUserRoles(ctx context.Context) []persist.Role {
 
 func publishEventGroup(ctx context.Context, groupID string, action persist.Action, caption *string) (*db.FeedEvent, error) {
 	return event.DispatchGroup(sentryutil.NewSentryHubGinContext(ctx), groupID, action, caption)
-}
-
-func dispatchEvent(ctx context.Context, evt db.Event, v *validator.Validate, caption *string) (*db.FeedEvent, error) {
-	ctx = sentryutil.NewSentryHubGinContext(ctx)
-	if err := v.Struct(evt); err != nil {
-		return nil, err
-	}
-
-	if caption != nil {
-		evt.Caption = persist.StrPtrToNullStr(caption)
-		return event.DispatchImmediate(ctx, []db.Event{evt})
-	}
-
-	go pushEvent(ctx, evt)
-	return nil, nil
-}
-
-func dispatchEvents(ctx context.Context, evts []db.Event, v *validator.Validate, editID *string, caption *string) (*db.FeedEvent, error) {
-
-	if len(evts) == 0 {
-		return nil, nil
-	}
-
-	ctx = sentryutil.NewSentryHubGinContext(ctx)
-	for i, evt := range evts {
-		evt.GroupID = persist.StrPtrToNullStr(editID)
-		if err := v.Struct(evt); err != nil {
-			return nil, err
-		}
-		evts[i] = evt
-	}
-
-	if caption != nil {
-		for i, evt := range evts {
-			evt.Caption = persist.StrPtrToNullStr(caption)
-			evts[i] = evt
-		}
-		return event.DispatchImmediate(ctx, evts)
-	}
-
-	for _, evt := range evts {
-		go pushEvent(ctx, evt)
-	}
-	return nil, nil
-}
-
-func pushEvent(ctx context.Context, evt db.Event) {
-	if hub := sentryutil.SentryHubFromContext(ctx); hub != nil {
-		sentryutil.SetEventContext(hub.Scope(), persist.NullStrToDBID(evt.ActorID), evt.SubjectID, evt.Action)
-	}
-	if err := event.DispatchDelayed(ctx, evt); err != nil {
-		logger.For(ctx).Error(err)
-		sentryutil.ReportError(ctx, err)
-	}
 }
 
 // dbidCache is a lazy cache that stores DBIDs from expensive queries

@@ -55,6 +55,7 @@ const (
 	ChainTezos    Chain = "Tezos"
 	ChainPoap     Chain = "POAP"
 	ChainZora     Chain = "Zora"
+	ChainBase     Chain = "Base"
 )
 
 type ChainAddressInput struct {
@@ -354,7 +355,9 @@ const (
 type SocialAccountType string
 
 const (
-	SocialAccountTypeTwitter SocialAccountType = "Twitter"
+	SocialAccountTypeTwitter   SocialAccountType = "Twitter"
+	SocialAccountTypeFarcaster SocialAccountType = "Farcaster"
+	SocialAccountTypeLens      SocialAccountType = "Lens"
 )
 
 type SocialAuthMechanism struct {

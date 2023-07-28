@@ -119,7 +119,7 @@ func (q *Queries) BlockUserFromFeed(ctx context.Context, arg BlockUserFromFeedPa
 }
 
 const clearNotificationsForUser = `-- name: ClearNotificationsForUser :many
-UPDATE notifications SET seen = true WHERE owner_id = $1 AND seen = false RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id
+UPDATE notifications SET seen = true WHERE owner_id = $1 AND seen = false RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id
 `
 
 func (q *Queries) ClearNotificationsForUser(ctx context.Context, ownerID persist.DBID) ([]Notification, error) {
@@ -147,6 +147,7 @@ func (q *Queries) ClearNotificationsForUser(ctx context.Context, ownerID persist
 			&i.Seen,
 			&i.Amount,
 			&i.PostID,
+			&i.TokenID,
 		); err != nil {
 			return nil, err
 		}
@@ -159,12 +160,13 @@ func (q *Queries) ClearNotificationsForUser(ctx context.Context, ownerID persist
 }
 
 const countOwnersByContractId = `-- name: CountOwnersByContractId :one
-SELECT count(DISTINCT users.id) FROM users, tokens, contracts
-    WHERE (contracts.id = $1 or contracts.parent_id = $1)
-    AND tokens.contract = contracts.id
-    AND tokens.owner_user_id = users.id
-    AND (NOT $2::bool OR users.universal = false)
-    AND tokens.deleted = false AND users.deleted = false AND contracts.deleted = false
+select count(distinct users.id) from users, tokens, contracts
+    where (contracts.id = $1 or contracts.parent_id = $1)
+    and tokens.contract = contracts.id
+    and tokens.owner_user_id = users.id
+    and tokens.displayable
+    and (not $2::bool or users.universal = false)
+    and tokens.deleted = false and users.deleted = false and contracts.deleted = false
 `
 
 type CountOwnersByContractIdParams struct {
@@ -180,15 +182,14 @@ func (q *Queries) CountOwnersByContractId(ctx context.Context, arg CountOwnersBy
 }
 
 const countPostsByContractID = `-- name: CountPostsByContractID :one
-SELECT COUNT(*)
-FROM posts
-JOIN tokens ON tokens.id = ANY(posts.token_ids)
-WHERE tokens.contract = $1
-AND posts.deleted = false
+select count(*)
+from posts
+where $1 = any(posts.contract_ids)
+and posts.deleted = false
 `
 
-func (q *Queries) CountPostsByContractID(ctx context.Context, contract persist.DBID) (int64, error) {
-	row := q.db.QueryRow(ctx, countPostsByContractID, contract)
+func (q *Queries) CountPostsByContractID(ctx context.Context, contractID persist.DBID) (int64, error) {
+	row := q.db.QueryRow(ctx, countPostsByContractID, contractID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -272,12 +273,13 @@ func (q *Queries) CountSocialConnections(ctx context.Context, arg CountSocialCon
 }
 
 const countTokensByContractId = `-- name: CountTokensByContractId :one
-SELECT count(*)
-FROM tokens
-JOIN users ON users.id = tokens.owner_user_id
-JOIN contracts ON tokens.contract = contracts.id
-WHERE (contracts.id = $1 OR contracts.parent_id = $1)
-  AND (NOT $2::bool OR users.universal = false) AND tokens.deleted = false AND contracts.deleted = false
+select count(*)
+from tokens
+join users on users.id = tokens.owner_user_id
+join contracts on tokens.contract = contracts.id
+where (contracts.id = $1 or contracts.parent_id = $1)
+  and (not $2::bool or users.universal = false) and tokens.deleted = false and contracts.deleted = false
+  and tokens.displayable
 `
 
 type CountTokensByContractIdParams struct {
@@ -372,7 +374,7 @@ func (q *Queries) CreateAdmireEvent(ctx context.Context, arg CreateAdmireEventPa
 }
 
 const createAdmireNotification = `-- name: CreateAdmireNotification :one
-INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id
+INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id
 `
 
 type CreateAdmireNotificationParams struct {
@@ -412,6 +414,7 @@ func (q *Queries) CreateAdmireNotification(ctx context.Context, arg CreateAdmire
 		&i.Seen,
 		&i.Amount,
 		&i.PostID,
+		&i.TokenID,
 	)
 	return i, err
 }
@@ -562,7 +565,7 @@ func (q *Queries) CreateCommentEvent(ctx context.Context, arg CreateCommentEvent
 }
 
 const createCommentNotification = `-- name: CreateCommentNotification :one
-INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, comment_id) VALUES ($1, $2, $3, $4, $5, $7, $8, $6) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id
+INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, comment_id) VALUES ($1, $2, $3, $4, $5, $7, $8, $6) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id
 `
 
 type CreateCommentNotificationParams struct {
@@ -604,6 +607,7 @@ func (q *Queries) CreateCommentNotification(ctx context.Context, arg CreateComme
 		&i.Seen,
 		&i.Amount,
 		&i.PostID,
+		&i.TokenID,
 	)
 	return i, err
 }
@@ -648,47 +652,6 @@ func (q *Queries) CreateFeedEvent(ctx context.Context, arg CreateFeedEventParams
 		&i.CreatedAt,
 		&i.Caption,
 		&i.GroupID,
-	)
-	return i, err
-}
-
-const createFollowNotification = `-- name: CreateFollowNotification :one
-INSERT INTO notifications (id, owner_id, action, data, event_ids) VALUES ($1, $2, $3, $4, $5) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id
-`
-
-type CreateFollowNotificationParams struct {
-	ID       persist.DBID             `json:"id"`
-	OwnerID  persist.DBID             `json:"owner_id"`
-	Action   persist.Action           `json:"action"`
-	Data     persist.NotificationData `json:"data"`
-	EventIds persist.DBIDList         `json:"event_ids"`
-}
-
-func (q *Queries) CreateFollowNotification(ctx context.Context, arg CreateFollowNotificationParams) (Notification, error) {
-	row := q.db.QueryRow(ctx, createFollowNotification,
-		arg.ID,
-		arg.OwnerID,
-		arg.Action,
-		arg.Data,
-		arg.EventIds,
-	)
-	var i Notification
-	err := row.Scan(
-		&i.ID,
-		&i.Deleted,
-		&i.OwnerID,
-		&i.Version,
-		&i.LastUpdated,
-		&i.CreatedAt,
-		&i.Action,
-		&i.Data,
-		&i.EventIds,
-		&i.FeedEventID,
-		&i.CommentID,
-		&i.GalleryID,
-		&i.Seen,
-		&i.Amount,
-		&i.PostID,
 	)
 	return i, err
 }
@@ -796,6 +759,48 @@ func (q *Queries) CreatePushTokenForUser(ctx context.Context, arg CreatePushToke
 	return i, err
 }
 
+const createSimpleNotification = `-- name: CreateSimpleNotification :one
+INSERT INTO notifications (id, owner_id, action, data, event_ids) VALUES ($1, $2, $3, $4, $5) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id
+`
+
+type CreateSimpleNotificationParams struct {
+	ID       persist.DBID             `json:"id"`
+	OwnerID  persist.DBID             `json:"owner_id"`
+	Action   persist.Action           `json:"action"`
+	Data     persist.NotificationData `json:"data"`
+	EventIds persist.DBIDList         `json:"event_ids"`
+}
+
+func (q *Queries) CreateSimpleNotification(ctx context.Context, arg CreateSimpleNotificationParams) (Notification, error) {
+	row := q.db.QueryRow(ctx, createSimpleNotification,
+		arg.ID,
+		arg.OwnerID,
+		arg.Action,
+		arg.Data,
+		arg.EventIds,
+	)
+	var i Notification
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.OwnerID,
+		&i.Version,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.Action,
+		&i.Data,
+		&i.EventIds,
+		&i.FeedEventID,
+		&i.CommentID,
+		&i.GalleryID,
+		&i.Seen,
+		&i.Amount,
+		&i.PostID,
+		&i.TokenID,
+	)
+	return i, err
+}
+
 const createTokenEvent = `-- name: CreateTokenEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data, group_id, caption, gallery_id, collection_id) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, $9, $10) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id
 `
@@ -809,8 +814,8 @@ type CreateTokenEventParams struct {
 	Data           persist.EventData    `json:"data"`
 	GroupID        sql.NullString       `json:"group_id"`
 	Caption        sql.NullString       `json:"caption"`
-	GalleryID      persist.DBID         `json:"gallery_id"`
-	CollectionID   persist.DBID         `json:"collection_id"`
+	Gallery        sql.NullString       `json:"gallery"`
+	Collection     sql.NullString       `json:"collection"`
 }
 
 func (q *Queries) CreateTokenEvent(ctx context.Context, arg CreateTokenEventParams) (Event, error) {
@@ -823,8 +828,8 @@ func (q *Queries) CreateTokenEvent(ctx context.Context, arg CreateTokenEventPara
 		arg.Data,
 		arg.GroupID,
 		arg.Caption,
-		arg.GalleryID,
-		arg.CollectionID,
+		arg.Gallery,
+		arg.Collection,
 	)
 	var i Event
 	err := row.Scan(
@@ -849,6 +854,52 @@ func (q *Queries) CreateTokenEvent(ctx context.Context, arg CreateTokenEventPara
 		&i.Caption,
 		&i.GroupID,
 		&i.PostID,
+	)
+	return i, err
+}
+
+const createTokenNotification = `-- name: CreateTokenNotification :one
+INSERT INTO notifications (id, owner_id, action, data, event_ids, token_id, amount) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id
+`
+
+type CreateTokenNotificationParams struct {
+	ID       persist.DBID             `json:"id"`
+	OwnerID  persist.DBID             `json:"owner_id"`
+	Action   persist.Action           `json:"action"`
+	Data     persist.NotificationData `json:"data"`
+	EventIds persist.DBIDList         `json:"event_ids"`
+	TokenID  persist.DBID             `json:"token_id"`
+	Amount   int32                    `json:"amount"`
+}
+
+func (q *Queries) CreateTokenNotification(ctx context.Context, arg CreateTokenNotificationParams) (Notification, error) {
+	row := q.db.QueryRow(ctx, createTokenNotification,
+		arg.ID,
+		arg.OwnerID,
+		arg.Action,
+		arg.Data,
+		arg.EventIds,
+		arg.TokenID,
+		arg.Amount,
+	)
+	var i Notification
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.OwnerID,
+		&i.Version,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.Action,
+		&i.Data,
+		&i.EventIds,
+		&i.FeedEventID,
+		&i.CommentID,
+		&i.GalleryID,
+		&i.Seen,
+		&i.Amount,
+		&i.PostID,
+		&i.TokenID,
 	)
 	return i, err
 }
@@ -907,7 +958,7 @@ func (q *Queries) CreateUserEvent(ctx context.Context, arg CreateUserEventParams
 }
 
 const createViewGalleryNotification = `-- name: CreateViewGalleryNotification :one
-INSERT INTO notifications (id, owner_id, action, data, event_ids, gallery_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id
+INSERT INTO notifications (id, owner_id, action, data, event_ids, gallery_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id
 `
 
 type CreateViewGalleryNotificationParams struct {
@@ -945,6 +996,7 @@ func (q *Queries) CreateViewGalleryNotification(ctx context.Context, arg CreateV
 		&i.Seen,
 		&i.Amount,
 		&i.PostID,
+		&i.TokenID,
 	)
 	return i, err
 }
@@ -974,6 +1026,40 @@ update push_notification_tokens set deleted = true where id = any($1) and delete
 func (q *Queries) DeletePushTokensByIDs(ctx context.Context, ids persist.DBIDList) error {
 	_, err := q.db.Exec(ctx, deletePushTokensByIDs, ids)
 	return err
+}
+
+const deleteTokensOfOwnerBeforeTimestamp = `-- name: DeleteTokensOfOwnerBeforeTimestamp :execrows
+update tokens t
+    set owned_by_wallets = case when $1::bool then '{}' else owned_by_wallets end,
+        is_creator_token = case when $2::bool then false else is_creator_token end,
+        last_updated = now()
+    where owner_user_id = $3
+      and (cardinality($4::int[]) = 0 or chain = any($4))
+      and deleted = false
+      and (($1 and is_holder_token) or ($2 and is_creator_token))
+      and last_synced < $5
+`
+
+type DeleteTokensOfOwnerBeforeTimestampParams struct {
+	RemoveHolderStatus  bool         `json:"remove_holder_status"`
+	RemoveCreatorStatus bool         `json:"remove_creator_status"`
+	UserID              persist.DBID `json:"user_id"`
+	Chains              []int32      `json:"chains"`
+	Timestamp           time.Time    `json:"timestamp"`
+}
+
+func (q *Queries) DeleteTokensOfOwnerBeforeTimestamp(ctx context.Context, arg DeleteTokensOfOwnerBeforeTimestampParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteTokensOfOwnerBeforeTimestamp,
+		arg.RemoveHolderStatus,
+		arg.RemoveCreatorStatus,
+		arg.UserID,
+		arg.Chains,
+		arg.Timestamp,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const deleteUserByID = `-- name: DeleteUserByID :exec
@@ -1140,22 +1226,22 @@ func (q *Queries) GetAllTimeTrendingUserIDs(ctx context.Context, limit int32) ([
 }
 
 const getAllTokensWithContractsByIDs = `-- name: GetAllTokensWithContractsByIDs :many
-SELECT
-    tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id,
+select
+    tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id, tokens.is_creator_token, tokens.is_holder_token, tokens.displayable,
     contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id,
     (
-        SELECT wallets.address
-        FROM wallets
-        WHERE wallets.id = ANY(tokens.owned_by_wallets) and wallets.deleted = false
-        LIMIT 1
-    ) AS wallet_address
-FROM tokens
-JOIN contracts ON contracts.id = tokens.contract
-LEFT JOIN token_medias on token_medias.id = tokens.token_media_id
-WHERE tokens.deleted = false
-AND (tokens.token_media_id IS NULL or token_medias.active = false)
-AND tokens.id >= $1 AND tokens.id < $2
-ORDER BY tokens.id
+        select wallets.address
+        from wallets
+        where wallets.id = any(tokens.owned_by_wallets) and wallets.deleted = false
+        limit 1
+    ) as wallet_address
+from tokens
+join contracts on contracts.id = tokens.contract
+left join token_medias on token_medias.id = tokens.token_media_id
+where tokens.deleted = false
+and (tokens.token_media_id is null or token_medias.active = false)
+and tokens.id >= $1 and tokens.id < $2
+order by tokens.id
 `
 
 type GetAllTokensWithContractsByIDsParams struct {
@@ -1176,7 +1262,7 @@ type GetAllTokensWithContractsByIDsRow struct {
 	TokenUri               sql.NullString             `json:"token_uri"`
 	TokenType              sql.NullString             `json:"token_type"`
 	TokenID                persist.TokenID            `json:"token_id"`
-	Quantity               sql.NullString             `json:"quantity"`
+	Quantity               persist.HexString          `json:"quantity"`
 	OwnershipHistory       persist.AddressAtBlockList `json:"ownership_history"`
 	TokenMetadata          persist.TokenMetadata      `json:"token_metadata"`
 	ExternalUrl            sql.NullString             `json:"external_url"`
@@ -1190,6 +1276,9 @@ type GetAllTokensWithContractsByIDsRow struct {
 	LastSynced             time.Time                  `json:"last_synced"`
 	FallbackMedia          persist.FallbackMedia      `json:"fallback_media"`
 	TokenMediaID           persist.DBID               `json:"token_media_id"`
+	IsCreatorToken         bool                       `json:"is_creator_token"`
+	IsHolderToken          bool                       `json:"is_holder_token"`
+	Displayable            bool                       `json:"displayable"`
 	ID_2                   persist.DBID               `json:"id_2"`
 	Deleted_2              bool                       `json:"deleted_2"`
 	Version_2              sql.NullInt32              `json:"version_2"`
@@ -1247,6 +1336,9 @@ func (q *Queries) GetAllTokensWithContractsByIDs(ctx context.Context, arg GetAll
 			&i.LastSynced,
 			&i.FallbackMedia,
 			&i.TokenMediaID,
+			&i.IsCreatorToken,
+			&i.IsHolderToken,
+			&i.Displayable,
 			&i.ID_2,
 			&i.Deleted_2,
 			&i.Version_2,
@@ -1544,6 +1636,66 @@ func (q *Queries) GetContractByID(ctx context.Context, id persist.DBID) (Contrac
 	return i, err
 }
 
+const getContractCreatorsByContractIDs = `-- name: GetContractCreatorsByContractIDs :many
+with contract_creators as (
+    select c.id as contract_id,
+           u.id as creator_user_id,
+           c.chain as chain,
+           coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) as creator_address,
+           w.id as creator_wallet_id
+    from contracts c
+             left join wallets w on
+                w.deleted = false and
+                w.chain = c.chain and
+                coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) = w.address
+             left join users u on
+                u.deleted = false and
+                (
+                        (c.override_creator_user_id is not null and c.override_creator_user_id = u.id)
+                        or
+                        (c.override_creator_user_id is null and w.address is not null and array[w.id] <@ u.wallets)
+                    )
+    where c.deleted = false
+      and (u.id is not null or coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) is not null)
+)
+select contract_id, creator_user_id, chain, creator_address, creator_wallet_id from unnest($1::text[]) as ids
+                  join contract_creators cc on cc.contract_id = ids
+`
+
+type GetContractCreatorsByContractIDsRow struct {
+	ContractID      persist.DBID    `json:"contract_id"`
+	CreatorUserID   persist.DBID    `json:"creator_user_id"`
+	Chain           persist.Chain   `json:"chain"`
+	CreatorAddress  persist.Address `json:"creator_address"`
+	CreatorWalletID persist.DBID    `json:"creator_wallet_id"`
+}
+
+func (q *Queries) GetContractCreatorsByContractIDs(ctx context.Context, contractIds []string) ([]GetContractCreatorsByContractIDsRow, error) {
+	rows, err := q.db.Query(ctx, getContractCreatorsByContractIDs, contractIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetContractCreatorsByContractIDsRow
+	for rows.Next() {
+		var i GetContractCreatorsByContractIDsRow
+		if err := rows.Scan(
+			&i.ContractID,
+			&i.CreatorUserID,
+			&i.Chain,
+			&i.CreatorAddress,
+			&i.CreatorWalletID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getContractCreatorsByIds = `-- name: GetContractCreatorsByIds :many
 select o.contract_id, o.creator_user_id, o.chain, o.creator_address
     from unnest($1::text[]) as c(id)
@@ -1662,10 +1814,28 @@ func (q *Queries) GetContractsByTokenIDs(ctx context.Context, tokenIds persist.D
 }
 
 const getCreatedContractsByUserID = `-- name: GetCreatedContractsByUserID :many
-select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id
-from contracts
-     join contract_creators on contracts.id = contract_creators.contract_id and contract_creators.creator_user_id = $1
-where contracts.chain = any($2::int[])
+select c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id,
+       w.id as wallet_id,
+       false as is_override_creator
+from users u, contracts c, wallets w
+where u.id = $1
+  and c.chain = any($2::int[])
+  and w.id = any(u.wallets) and coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) = w.address
+  and c.chain = w.chain
+  and u.deleted = false
+  and c.deleted = false
+  and w.deleted = false
+  and c.override_creator_user_id is null
+
+union all
+
+select c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id,
+       null as wallet_id,
+       true as is_override_creator
+from contracts c
+where c.override_creator_user_id = $1
+  and c.chain = any($2::int[])
+  and c.deleted = false
 `
 
 type GetCreatedContractsByUserIDParams struct {
@@ -1673,34 +1843,42 @@ type GetCreatedContractsByUserIDParams struct {
 	Chains []int32      `json:"chains"`
 }
 
-func (q *Queries) GetCreatedContractsByUserID(ctx context.Context, arg GetCreatedContractsByUserIDParams) ([]Contract, error) {
+type GetCreatedContractsByUserIDRow struct {
+	Contract          Contract     `json:"contract"`
+	WalletID          persist.DBID `json:"wallet_id"`
+	IsOverrideCreator bool         `json:"is_override_creator"`
+}
+
+func (q *Queries) GetCreatedContractsByUserID(ctx context.Context, arg GetCreatedContractsByUserIDParams) ([]GetCreatedContractsByUserIDRow, error) {
 	rows, err := q.db.Query(ctx, getCreatedContractsByUserID, arg.UserID, arg.Chains)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Contract
+	var items []GetCreatedContractsByUserIDRow
 	for rows.Next() {
-		var i Contract
+		var i GetCreatedContractsByUserIDRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.Deleted,
-			&i.Version,
-			&i.CreatedAt,
-			&i.LastUpdated,
-			&i.Name,
-			&i.Symbol,
-			&i.Address,
-			&i.CreatorAddress,
-			&i.Chain,
-			&i.ProfileBannerUrl,
-			&i.ProfileImageUrl,
-			&i.BadgeUrl,
-			&i.Description,
-			&i.OwnerAddress,
-			&i.IsProviderMarkedSpam,
-			&i.ParentID,
-			&i.OverrideCreatorUserID,
+			&i.Contract.ID,
+			&i.Contract.Deleted,
+			&i.Contract.Version,
+			&i.Contract.CreatedAt,
+			&i.Contract.LastUpdated,
+			&i.Contract.Name,
+			&i.Contract.Symbol,
+			&i.Contract.Address,
+			&i.Contract.CreatorAddress,
+			&i.Contract.Chain,
+			&i.Contract.ProfileBannerUrl,
+			&i.Contract.ProfileImageUrl,
+			&i.Contract.BadgeUrl,
+			&i.Contract.Description,
+			&i.Contract.OwnerAddress,
+			&i.Contract.IsProviderMarkedSpam,
+			&i.Contract.ParentID,
+			&i.Contract.OverrideCreatorUserID,
+			&i.WalletID,
+			&i.IsOverrideCreator,
 		); err != nil {
 			return nil, err
 		}
@@ -2347,7 +2525,7 @@ func (q *Queries) GetMerchDiscountCodeByTokenID(ctx context.Context, tokenHex pe
 
 const getMissingThumbnailTokensByIDRange = `-- name: GetMissingThumbnailTokensByIDRange :many
 SELECT
-    tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id,
+    tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id, tokens.is_creator_token, tokens.is_holder_token, tokens.displayable,
     contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id,
     (
         SELECT wallets.address
@@ -2380,7 +2558,7 @@ type GetMissingThumbnailTokensByIDRangeRow struct {
 	TokenUri               sql.NullString             `json:"token_uri"`
 	TokenType              sql.NullString             `json:"token_type"`
 	TokenID                persist.TokenID            `json:"token_id"`
-	Quantity               sql.NullString             `json:"quantity"`
+	Quantity               persist.HexString          `json:"quantity"`
 	OwnershipHistory       persist.AddressAtBlockList `json:"ownership_history"`
 	TokenMetadata          persist.TokenMetadata      `json:"token_metadata"`
 	ExternalUrl            sql.NullString             `json:"external_url"`
@@ -2394,6 +2572,9 @@ type GetMissingThumbnailTokensByIDRangeRow struct {
 	LastSynced             time.Time                  `json:"last_synced"`
 	FallbackMedia          persist.FallbackMedia      `json:"fallback_media"`
 	TokenMediaID           persist.DBID               `json:"token_media_id"`
+	IsCreatorToken         bool                       `json:"is_creator_token"`
+	IsHolderToken          bool                       `json:"is_holder_token"`
+	Displayable            bool                       `json:"displayable"`
 	ID_2                   persist.DBID               `json:"id_2"`
 	Deleted_2              bool                       `json:"deleted_2"`
 	Version_2              sql.NullInt32              `json:"version_2"`
@@ -2451,6 +2632,9 @@ func (q *Queries) GetMissingThumbnailTokensByIDRange(ctx context.Context, arg Ge
 			&i.LastSynced,
 			&i.FallbackMedia,
 			&i.TokenMediaID,
+			&i.IsCreatorToken,
+			&i.IsHolderToken,
+			&i.Displayable,
 			&i.ID_2,
 			&i.Deleted_2,
 			&i.Version_2,
@@ -2482,7 +2666,7 @@ func (q *Queries) GetMissingThumbnailTokensByIDRange(ctx context.Context, arg Ge
 }
 
 const getMostRecentNotificationByOwnerIDForAction = `-- name: GetMostRecentNotificationByOwnerIDForAction :one
-select id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id from notifications
+select id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id from notifications
     where owner_id = $1
     and action = $2
     and deleted = false
@@ -2527,12 +2711,67 @@ func (q *Queries) GetMostRecentNotificationByOwnerIDForAction(ctx context.Contex
 		&i.Seen,
 		&i.Amount,
 		&i.PostID,
+		&i.TokenID,
+	)
+	return i, err
+}
+
+const getMostRecentNotificationByOwnerIDTokenIDForAction = `-- name: GetMostRecentNotificationByOwnerIDTokenIDForAction :one
+select id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id from notifications
+    where owner_id = $1
+    and token_id = $2
+    and action = $3
+    and deleted = false
+    and (not $6::bool or feed_event_id = $4)
+    and (not $7::bool or post_id = $5)
+    order by created_at desc
+    limit 1
+`
+
+type GetMostRecentNotificationByOwnerIDTokenIDForActionParams struct {
+	OwnerID          persist.DBID   `json:"owner_id"`
+	TokenID          persist.DBID   `json:"token_id"`
+	Action           persist.Action `json:"action"`
+	FeedEventID      persist.DBID   `json:"feed_event_id"`
+	PostID           persist.DBID   `json:"post_id"`
+	OnlyForFeedEvent bool           `json:"only_for_feed_event"`
+	OnlyForPost      bool           `json:"only_for_post"`
+}
+
+func (q *Queries) GetMostRecentNotificationByOwnerIDTokenIDForAction(ctx context.Context, arg GetMostRecentNotificationByOwnerIDTokenIDForActionParams) (Notification, error) {
+	row := q.db.QueryRow(ctx, getMostRecentNotificationByOwnerIDTokenIDForAction,
+		arg.OwnerID,
+		arg.TokenID,
+		arg.Action,
+		arg.FeedEventID,
+		arg.PostID,
+		arg.OnlyForFeedEvent,
+		arg.OnlyForPost,
+	)
+	var i Notification
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.OwnerID,
+		&i.Version,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.Action,
+		&i.Data,
+		&i.EventIds,
+		&i.FeedEventID,
+		&i.CommentID,
+		&i.GalleryID,
+		&i.Seen,
+		&i.Amount,
+		&i.PostID,
+		&i.TokenID,
 	)
 	return i, err
 }
 
 const getNotificationByID = `-- name: GetNotificationByID :one
-SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id FROM notifications WHERE id = $1 AND deleted = false
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id FROM notifications WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetNotificationByID(ctx context.Context, id persist.DBID) (Notification, error) {
@@ -2554,12 +2793,13 @@ func (q *Queries) GetNotificationByID(ctx context.Context, id persist.DBID) (Not
 		&i.Seen,
 		&i.Amount,
 		&i.PostID,
+		&i.TokenID,
 	)
 	return i, err
 }
 
 const getNotificationsByOwnerIDForActionAfter = `-- name: GetNotificationsByOwnerIDForActionAfter :many
-SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id FROM notifications
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id FROM notifications
     WHERE owner_id = $1 AND action = $2 AND deleted = false AND created_at > $3
     ORDER BY created_at DESC
 `
@@ -2595,6 +2835,7 @@ func (q *Queries) GetNotificationsByOwnerIDForActionAfter(ctx context.Context, a
 			&i.Seen,
 			&i.Amount,
 			&i.PostID,
+			&i.TokenID,
 		); err != nil {
 			return nil, err
 		}
@@ -2641,7 +2882,7 @@ func (q *Queries) GetPostsByIds(ctx context.Context, ids []string) ([]Post, erro
 }
 
 const getPreviewURLsByContractIdAndUserId = `-- name: GetPreviewURLsByContractIdAndUserId :many
-SELECT (MEDIA->>'thumbnail_url')::varchar as thumbnail_url FROM tokens WHERE CONTRACT = $1 AND DELETED = false AND OWNER_USER_ID = $2 AND LENGTH(MEDIA->>'thumbnail_url'::varchar) > 0 ORDER BY ID LIMIT 3
+select (media->>'thumbnail_url')::varchar as thumbnail_url from tokens where contract = $1 and displayable and deleted = false and owner_user_id = $2 and length(media->>'thumbnail_url'::varchar) > 0 order by id limit 3
 `
 
 type GetPreviewURLsByContractIdAndUserIdParams struct {
@@ -2747,7 +2988,7 @@ func (q *Queries) GetPushTokensByUserID(ctx context.Context, userID persist.DBID
 }
 
 const getRecentUnseenNotifications = `-- name: GetRecentUnseenNotifications :many
-SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false and created_at > $2 order by created_at desc limit $3
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false and created_at > $2 order by created_at desc limit $3
 `
 
 type GetRecentUnseenNotificationsParams struct {
@@ -2781,6 +3022,7 @@ func (q *Queries) GetRecentUnseenNotifications(ctx context.Context, arg GetRecen
 			&i.Seen,
 			&i.Amount,
 			&i.PostID,
+			&i.TokenID,
 		); err != nil {
 			return nil, err
 		}
@@ -2805,7 +3047,7 @@ func (q *Queries) GetReprocessJobRangeByID(ctx context.Context, id int) (Reproce
 
 const getSVGTokensWithContractsByIDs = `-- name: GetSVGTokensWithContractsByIDs :many
 SELECT
-    tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id,
+    tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id, tokens.is_creator_token, tokens.is_holder_token, tokens.displayable,
     contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id,
     (
         SELECT wallets.address
@@ -2841,7 +3083,7 @@ type GetSVGTokensWithContractsByIDsRow struct {
 	TokenUri               sql.NullString             `json:"token_uri"`
 	TokenType              sql.NullString             `json:"token_type"`
 	TokenID                persist.TokenID            `json:"token_id"`
-	Quantity               sql.NullString             `json:"quantity"`
+	Quantity               persist.HexString          `json:"quantity"`
 	OwnershipHistory       persist.AddressAtBlockList `json:"ownership_history"`
 	TokenMetadata          persist.TokenMetadata      `json:"token_metadata"`
 	ExternalUrl            sql.NullString             `json:"external_url"`
@@ -2855,6 +3097,9 @@ type GetSVGTokensWithContractsByIDsRow struct {
 	LastSynced             time.Time                  `json:"last_synced"`
 	FallbackMedia          persist.FallbackMedia      `json:"fallback_media"`
 	TokenMediaID           persist.DBID               `json:"token_media_id"`
+	IsCreatorToken         bool                       `json:"is_creator_token"`
+	IsHolderToken          bool                       `json:"is_holder_token"`
+	Displayable            bool                       `json:"displayable"`
 	ID_2                   persist.DBID               `json:"id_2"`
 	Deleted_2              bool                       `json:"deleted_2"`
 	Version_2              sql.NullInt32              `json:"version_2"`
@@ -2912,6 +3157,9 @@ func (q *Queries) GetSVGTokensWithContractsByIDs(ctx context.Context, arg GetSVG
 			&i.LastSynced,
 			&i.FallbackMedia,
 			&i.TokenMediaID,
+			&i.IsCreatorToken,
+			&i.IsHolderToken,
+			&i.Displayable,
 			&i.ID_2,
 			&i.Deleted_2,
 			&i.Version_2,
@@ -3132,7 +3380,7 @@ func (q *Queries) GetSocialsByUserID(ctx context.Context, id persist.DBID) (pers
 }
 
 const getTokenById = `-- name: GetTokenById :one
-SELECT id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id FROM tokens WHERE id = $1 AND deleted = false
+select id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id, is_creator_token, is_holder_token, displayable from tokens where id = $1 and displayable and deleted = false
 `
 
 func (q *Queries) GetTokenById(ctx context.Context, id persist.DBID) (Token, error) {
@@ -3165,12 +3413,19 @@ func (q *Queries) GetTokenById(ctx context.Context, id persist.DBID) (Token, err
 		&i.LastSynced,
 		&i.FallbackMedia,
 		&i.TokenMediaID,
+		&i.IsCreatorToken,
+		&i.IsHolderToken,
+		&i.Displayable,
 	)
 	return i, err
 }
 
 const getTokenByTokenIdentifiers = `-- name: GetTokenByTokenIdentifiers :one
-select id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id from tokens where tokens.token_id = $1 and contract = (select contracts.id from contracts where contracts.address = $2) and tokens.chain = $3 and tokens.deleted = false
+select id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id, is_creator_token, is_holder_token, displayable from tokens
+    where tokens.token_id = $1
+      and contract = (select contracts.id from contracts where contracts.address = $2)
+      and tokens.chain = $3 and tokens.deleted = false
+      and tokens.displayable
 `
 
 type GetTokenByTokenIdentifiersParams struct {
@@ -3209,14 +3464,17 @@ func (q *Queries) GetTokenByTokenIdentifiers(ctx context.Context, arg GetTokenBy
 		&i.LastSynced,
 		&i.FallbackMedia,
 		&i.TokenMediaID,
+		&i.IsCreatorToken,
+		&i.IsHolderToken,
+		&i.Displayable,
 	)
 	return i, err
 }
 
 const getTokenOwnerByID = `-- name: GetTokenOwnerByID :one
-SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id FROM tokens t
-    JOIN users u ON u.id = t.owner_user_id
-    WHERE t.id = $1 AND t.deleted = false AND u.deleted = false
+select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id from tokens t
+    join users u on u.id = t.owner_user_id
+    where t.id = $1 and t.displayable and t.deleted = false and u.deleted = false
 `
 
 func (q *Queries) GetTokenOwnerByID(ctx context.Context, id persist.DBID) (User, error) {
@@ -3245,50 +3503,20 @@ func (q *Queries) GetTokenOwnerByID(ctx context.Context, id persist.DBID) (User,
 	return i, err
 }
 
-const getTokenOwnershipByIds = `-- name: GetTokenOwnershipByIds :many
-select o.token_id, o.owner_user_id, o.is_holder, o.is_creator
-    from unnest($1::text[]) as t(id)
-        join token_ownership o on o.token_id = t.id
-`
-
-func (q *Queries) GetTokenOwnershipByIds(ctx context.Context, tokenIds []string) ([]TokenOwnership, error) {
-	rows, err := q.db.Query(ctx, getTokenOwnershipByIds, tokenIds)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []TokenOwnership
-	for rows.Next() {
-		var i TokenOwnership
-		if err := rows.Scan(
-			&i.TokenID,
-			&i.OwnerUserID,
-			&i.IsHolder,
-			&i.IsCreator,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getTokensByContractIdPaginate = `-- name: GetTokensByContractIdPaginate :many
-SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id FROM tokens t
-    JOIN users u ON u.id = t.owner_user_id
-    JOIN contracts c ON t.contract = c.id
-    WHERE (c.id = $1 OR c.parent_id = $1)
-    AND t.deleted = false
-    AND c.deleted = false
-    AND (NOT $3::bool OR u.universal = false)
-    AND (u.universal,t.created_at,t.id) < ($4, $5::timestamptz, $6)
-    AND (u.universal,t.created_at,t.id) > ($7, $8::timestamptz, $9)
-    ORDER BY CASE WHEN $10::bool THEN (u.universal,t.created_at,t.id) END ASC,
-             CASE WHEN NOT $10::bool THEN (u.universal,t.created_at,t.id) END DESC
-    LIMIT $2
+select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id, t.is_creator_token, t.is_holder_token, t.displayable from tokens t
+    join users u on u.id = t.owner_user_id
+    join contracts c on t.contract = c.id
+    where (c.id = $1 or c.parent_id = $1)
+    and t.displayable
+    and t.deleted = false
+    and c.deleted = false
+    and (not $3::bool or u.universal = false)
+    and (u.universal,t.created_at,t.id) < ($4, $5::timestamptz, $6)
+    and (u.universal,t.created_at,t.id) > ($7, $8::timestamptz, $9)
+    order by case when $10::bool then (u.universal,t.created_at,t.id) end asc,
+             case when not $10::bool then (u.universal,t.created_at,t.id) end desc
+    limit $2
 `
 
 type GetTokensByContractIdPaginateParams struct {
@@ -3351,6 +3579,9 @@ func (q *Queries) GetTokensByContractIdPaginate(ctx context.Context, arg GetToke
 			&i.LastSynced,
 			&i.FallbackMedia,
 			&i.TokenMediaID,
+			&i.IsCreatorToken,
+			&i.IsHolderToken,
+			&i.Displayable,
 		); err != nil {
 			return nil, err
 		}
@@ -3367,7 +3598,12 @@ with contract_tokens as (
 	select t.id, t.owner_user_id
 	from tokens t
 	join contracts c on t.contract = c.id
-	where not t.deleted and not c.deleted and t.contract = c.id and c.chain = $1 and c.address = $2
+	where not t.deleted
+	  and not c.deleted
+	  and t.contract = c.id
+	  and t.displayable
+	  and c.chain = $1
+	  and c.address = $2
 ),
 ranking as (
 	select col.id, rank() over (order by count(col.id) desc, col.created_at desc) score
@@ -3446,6 +3682,36 @@ func (q *Queries) GetTrendingUsersByIDs(ctx context.Context, userIds []string) (
 		return nil, err
 	}
 	return items, nil
+}
+
+const getUniqueTokenIdentifiersByTokenID = `-- name: GetUniqueTokenIdentifiersByTokenID :one
+select tokens.token_id, contracts.address as contract_address, contracts.chain, tokens.quantity, array_agg(wallets.address)::varchar[] as owner_addresses 
+from tokens
+join contracts on tokens.contract = contracts.id
+join wallets on wallets.id = any(tokens.owned_by_wallets)
+where tokens.id = $1 and tokens.displayable and not tokens.deleted and not contracts.deleted and not wallets.deleted
+group by (tokens.token_id, contracts.address, contracts.chain, tokens.quantity) limit 1
+`
+
+type GetUniqueTokenIdentifiersByTokenIDRow struct {
+	TokenID         persist.TokenID   `json:"token_id"`
+	ContractAddress persist.Address   `json:"contract_address"`
+	Chain           persist.Chain     `json:"chain"`
+	Quantity        persist.HexString `json:"quantity"`
+	OwnerAddresses  []string          `json:"owner_addresses"`
+}
+
+func (q *Queries) GetUniqueTokenIdentifiersByTokenID(ctx context.Context, id persist.DBID) (GetUniqueTokenIdentifiersByTokenIDRow, error) {
+	row := q.db.QueryRow(ctx, getUniqueTokenIdentifiersByTokenID, id)
+	var i GetUniqueTokenIdentifiersByTokenIDRow
+	err := row.Scan(
+		&i.TokenID,
+		&i.ContractAddress,
+		&i.Chain,
+		&i.Quantity,
+		&i.OwnerAddresses,
+	)
+	return i, err
 }
 
 const getUserById = `-- name: GetUserById :one
@@ -3584,7 +3850,7 @@ func (q *Queries) GetUserExperiencesByUserID(ctx context.Context, id persist.DBI
 }
 
 const getUserNotifications = `-- name: GetUserNotifications :many
-SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id FROM notifications WHERE owner_id = $1 AND deleted = false
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id FROM notifications WHERE owner_id = $1 AND deleted = false
     AND (created_at, id) < ($3, $4)
     AND (created_at, id) > ($5, $6)
     ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
@@ -3635,6 +3901,7 @@ func (q *Queries) GetUserNotifications(ctx context.Context, arg GetUserNotificat
 			&i.Seen,
 			&i.Amount,
 			&i.PostID,
+			&i.TokenID,
 		); err != nil {
 			return nil, err
 		}
@@ -3647,7 +3914,7 @@ func (q *Queries) GetUserNotifications(ctx context.Context, arg GetUserNotificat
 }
 
 const getUserOwnsTokenByIdentifiers = `-- name: GetUserOwnsTokenByIdentifiers :one
-select exists(select 1 from tokens where owner_user_id = $1 and token_id = $2 and contract = $3 and chain = $4 and deleted = false) as owns_token
+select exists(select 1 from tokens where owner_user_id = $1 and token_id = $2 and contract = $3 and chain = $4 and displayable and deleted = false) as owns_token
 `
 
 type GetUserOwnsTokenByIdentifiersParams struct {
@@ -3678,6 +3945,7 @@ with membership_roles(role) as (
             and token_id = any($2::varchar[])
             and contract = (select id from contracts where address = $3 and contracts.chain = $4 and contracts.deleted = false)
             and exists(select 1 from users where id = $1 and email_verified = 1 and deleted = false)
+            and displayable
             and deleted = false
     ) then $5 else null end)::varchar
 )
@@ -3721,7 +3989,7 @@ func (q *Queries) GetUserRolesByUserId(ctx context.Context, arg GetUserRolesByUs
 }
 
 const getUserUnseenNotifications = `-- name: GetUserUnseenNotifications :many
-SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false
     AND (created_at, id) < ($3, $4)
     AND (created_at, id) > ($5, $6)
     ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
@@ -3772,6 +4040,7 @@ func (q *Queries) GetUserUnseenNotifications(ctx context.Context, arg GetUserUns
 			&i.Seen,
 			&i.Amount,
 			&i.PostID,
+			&i.TokenID,
 		); err != nil {
 			return nil, err
 		}
@@ -5187,6 +5456,47 @@ func (q *Queries) RemoveSocialFromUser(ctx context.Context, arg RemoveSocialFrom
 	return err
 }
 
+const removeStaleCreatorStatusFromTokens = `-- name: RemoveStaleCreatorStatusFromTokens :exec
+with created_contracts as (
+    select contract_id, creator_user_id, chain, creator_address from contract_creators where creator_user_id = $1
+)
+update tokens
+    set is_creator_token = false,
+        last_updated = now()
+    where owner_user_id = $1
+      and is_creator_token = true
+      and not exists(select 1 from created_contracts where created_contracts.contract_id = tokens.contract)
+      and not deleted
+`
+
+func (q *Queries) RemoveStaleCreatorStatusFromTokens(ctx context.Context, userID persist.DBID) error {
+	_, err := q.db.Exec(ctx, removeStaleCreatorStatusFromTokens, userID)
+	return err
+}
+
+const removeWalletFromTokens = `-- name: RemoveWalletFromTokens :exec
+update tokens t
+    set owned_by_wallets = array_remove(owned_by_wallets, $1::varchar),
+        last_updated = now()
+    from users u
+    where u.id = $2
+      and t.owner_user_id = u.id
+      and t.owned_by_wallets @> array[$1::varchar]
+      and not u.wallets @> array[$1::varchar]
+      and not u.deleted
+      and not t.deleted
+`
+
+type RemoveWalletFromTokensParams struct {
+	WalletID string       `json:"wallet_id"`
+	UserID   persist.DBID `json:"user_id"`
+}
+
+func (q *Queries) RemoveWalletFromTokens(ctx context.Context, arg RemoveWalletFromTokensParams) error {
+	_, err := q.db.Exec(ctx, removeWalletFromTokens, arg.WalletID, arg.UserID)
+	return err
+}
+
 const setContractOverrideCreator = `-- name: SetContractOverrideCreator :exec
 update contracts set override_creator_user_id = $1, last_updated = now() where id = $2 and deleted = false
 `
@@ -5532,7 +5842,13 @@ func (q *Queries) UpdatePushTickets(ctx context.Context, arg UpdatePushTicketsPa
 }
 
 const updateTokenMetadataFieldsByTokenIdentifiers = `-- name: UpdateTokenMetadataFieldsByTokenIdentifiers :exec
-update tokens set name = $1, description = $2, last_updated = now() where token_id = $3 and contract = (select id from contracts where address = $4) and deleted = false
+update tokens
+    set name = $1,
+        description = $2,
+        last_updated = now()
+    where token_id = $3
+      and contract = (select id from contracts where address = $4)
+      and deleted = false
 `
 
 type UpdateTokenMetadataFieldsByTokenIdentifiersParams struct {

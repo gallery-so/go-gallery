@@ -8,8 +8,10 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/sourcegraph/conc/pool"
 
@@ -178,7 +180,7 @@ func processOwnersForContractTokens(mc *multichain.Provider, contractRepo *postg
 	}
 }
 
-func processOwnersForUserTokens(mc *multichain.Provider) gin.HandlerFunc {
+func processOwnersForUserTokens(mc *multichain.Provider, queries *coredb.Queries, validator *validator.Validate) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input task.TokenProcessingUserTokensMessage
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -187,9 +189,54 @@ func processOwnersForUserTokens(mc *multichain.Provider) gin.HandlerFunc {
 		}
 
 		logger.For(c).WithFields(logrus.Fields{"user_id": input.UserID, "total_tokens": len(input.TokenIdentifiers), "token_ids": input.TokenIdentifiers}).Infof("Processing: %s - Processing User Tokens Refresh (total: %d)", input.UserID, len(input.TokenIdentifiers))
-		if err := mc.SyncTokensByUserIDAndTokenIdentifiers(c, input.UserID, input.TokenIdentifiers); err != nil {
+		newTokens, err := mc.SyncTokensByUserIDAndTokenIdentifiers(c, input.UserID, util.MapKeys(input.TokenIdentifiers))
+		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
+		}
+
+		if len(newTokens) > 0 {
+
+			for _, token := range newTokens {
+				var curTotal persist.HexString
+				dbUniqueTokenIDs, err := queries.GetUniqueTokenIdentifiersByTokenID(c, token.ID)
+				if err != nil {
+					logger.For(c).Errorf("error getting unique token identifiers: %s", err)
+					continue
+				}
+				for _, q := range dbUniqueTokenIDs.OwnerAddresses {
+					curTotal = input.TokenIdentifiers[persist.TokenUniqueIdentifiers{
+						Chain:           dbUniqueTokenIDs.Chain,
+						ContractAddress: dbUniqueTokenIDs.ContractAddress,
+						TokenID:         dbUniqueTokenIDs.TokenID,
+						OwnerAddress:    persist.Address(q),
+					}].Add(curTotal)
+				}
+
+				// verify the total is less than or equal to the total in the db
+				if curTotal.BigInt().Cmp(token.Quantity.BigInt()) > 0 {
+					logger.For(c).Errorf("error: total quantity of tokens in db is greater than total quantity of tokens on chain")
+					continue
+				}
+
+				// one event per token identifier (grouping ERC-1155s)
+				_, err = event.DispatchEvent(c, coredb.Event{
+					ID:             persist.GenerateID(),
+					ActorID:        persist.DBIDToNullStr(input.UserID),
+					ResourceTypeID: persist.ResourceTypeToken,
+					SubjectID:      token.ID,
+					UserID:         input.UserID,
+					TokenID:        token.ID,
+					Action:         persist.ActionNewTokensReceived,
+					Data: persist.EventData{
+						NewTokenID:       token.ID,
+						NewTokenQuantity: curTotal,
+					},
+				}, validator, nil)
+				if err != nil {
+					logger.For(c).Errorf("error dispatching event: %s", err)
+				}
+			}
 		}
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
@@ -265,6 +312,40 @@ func detectSpamContracts(queries *coredb.Queries) gin.HandlerFunc {
 
 func processToken(ctx context.Context, tp *tokenProcessor, token persist.TokenGallery, contract persist.ContractGallery, cause persist.ProcessingCause) (coredb.TokenMedia, error) {
 	return tp.ProcessTokenPipeline(ctx, token, contract, cause, addPipelineRunOptions(contract)...)
+}
+
+func processWalletRemoval(queries *coredb.Queries) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var input task.TokenProcessingWalletRemovalMessage
+		if err := c.ShouldBindJSON(&input); err != nil {
+			util.ErrResponse(c, http.StatusOK, err)
+			return
+		}
+
+		logger.For(c).Infof("Processing wallet removal: UserID=%s, WalletIDs=%v", input.UserID, input.WalletIDs)
+
+		// We never actually remove multiple wallets at a time, but our API does allow it. If we do end up
+		// processing multiple wallet removals, we'll just process them in a loop here, because tuning the
+		// underlying query to handle multiple wallet removals at a time is difficult.
+		for _, walletID := range input.WalletIDs {
+			err := queries.RemoveWalletFromTokens(c, coredb.RemoveWalletFromTokensParams{
+				WalletID: walletID.String(),
+				UserID:   input.UserID,
+			})
+
+			if err != nil {
+				util.ErrResponse(c, http.StatusInternalServerError, err)
+				return
+			}
+		}
+
+		if err := queries.RemoveStaleCreatorStatusFromTokens(c, input.UserID); err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+	}
 }
 
 // addPipelineRunOptions adds pipeline options for specific contracts

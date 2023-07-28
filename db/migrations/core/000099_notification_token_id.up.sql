@@ -1,0 +1,1 @@
+alter table notifications add column token_id varchar(255) references tokens(id);

@@ -7,6 +7,7 @@ import (
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/util"
 )
 
 type EventRepository struct {
@@ -51,6 +52,8 @@ func (r *EventRepository) AddUserEvent(ctx context.Context, event db.Event) (*db
 }
 
 func (r *EventRepository) AddTokenEvent(ctx context.Context, event db.Event) (*db.Event, error) {
+	gid := util.StringToPointerIfNotEmpty(event.GalleryID.String())
+	cid := util.StringToPointerIfNotEmpty(event.CollectionID.String())
 	event, err := r.Queries.CreateTokenEvent(ctx, db.CreateTokenEventParams{
 		ID:             persist.GenerateID(),
 		ActorID:        event.ActorID,
@@ -60,8 +63,8 @@ func (r *EventRepository) AddTokenEvent(ctx context.Context, event db.Event) (*d
 		Data:           event.Data,
 		GroupID:        event.GroupID,
 		Caption:        event.Caption,
-		GalleryID:      event.GalleryID,
-		CollectionID:   event.CollectionID,
+		Gallery:        persist.StrPtrToNullStr(gid),
+		Collection:     persist.StrPtrToNullStr(cid),
 	})
 	return &event, err
 }

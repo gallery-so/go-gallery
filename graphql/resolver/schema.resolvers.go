@@ -1882,6 +1882,11 @@ func (r *mutationResolver) GenerateQRCodeLoginToken(ctx context.Context) (model.
 	}, nil
 }
 
+// Token is the resolver for the token field.
+func (r *newTokensNotificationResolver) Token(ctx context.Context, obj *model.NewTokensNotification) (*model.Token, error) {
+	return resolveTokenByTokenID(ctx, obj.NotificationData.NewTokenID)
+}
+
 // Owner is the resolver for the owner field.
 func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error) {
 	panic(fmt.Errorf("not implemented"))
@@ -2544,32 +2549,6 @@ func (r *tokenResolver) OwnedByWallets(ctx context.Context, obj *model.Token) ([
 	return wallets, nil
 }
 
-// OwnerIsHolder is the resolver for the ownerIsHolder field.
-func (r *tokenResolver) OwnerIsHolder(ctx context.Context, obj *model.Token) (*bool, error) {
-	ownership, err := publicapi.For(ctx).Token.GetTokenOwnershipByTokenID(ctx, obj.Dbid)
-	if err != nil {
-		if _, ok := err.(persist.ErrTokenOwnershipNotFound); ok {
-			return util.ToPointer(false), nil
-		}
-		return nil, err
-	}
-
-	return util.ToPointer(ownership.IsHolder), nil
-}
-
-// OwnerIsCreator is the resolver for the ownerIsCreator field.
-func (r *tokenResolver) OwnerIsCreator(ctx context.Context, obj *model.Token) (*bool, error) {
-	ownership, err := publicapi.For(ctx).Token.GetTokenOwnershipByTokenID(ctx, obj.Dbid)
-	if err != nil {
-		if _, ok := err.(persist.ErrTokenOwnershipNotFound); ok {
-			return util.ToPointer(false), nil
-		}
-		return nil, err
-	}
-
-	return util.ToPointer(ownership.IsCreator), nil
-}
-
 // Contract is the resolver for the contract field.
 func (r *tokenResolver) Contract(ctx context.Context, obj *model.Token) (*model.Contract, error) {
 	return resolveContractByTokenID(ctx, obj.Dbid)
@@ -2852,6 +2831,11 @@ func (r *Resolver) GalleryUser() generated.GalleryUserResolver { return &gallery
 // Mutation returns generated.MutationResolver implementation.
 func (r *Resolver) Mutation() generated.MutationResolver { return &mutationResolver{r} }
 
+// NewTokensNotification returns generated.NewTokensNotificationResolver implementation.
+func (r *Resolver) NewTokensNotification() generated.NewTokensNotificationResolver {
+	return &newTokensNotificationResolver{r}
+}
+
 // OwnerAtBlock returns generated.OwnerAtBlockResolver implementation.
 func (r *Resolver) OwnerAtBlock() generated.OwnerAtBlockResolver { return &ownerAtBlockResolver{r} }
 
@@ -2995,6 +2979,7 @@ type galleryInfoUpdatedFeedEventDataResolver struct{ *Resolver }
 type galleryUpdatedFeedEventDataResolver struct{ *Resolver }
 type galleryUserResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
+type newTokensNotificationResolver struct{ *Resolver }
 type ownerAtBlockResolver struct{ *Resolver }
 type postResolver struct{ *Resolver }
 type previewURLSetResolver struct{ *Resolver }

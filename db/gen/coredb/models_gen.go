@@ -277,6 +277,7 @@ type Notification struct {
 	Seen        bool                     `json:"seen"`
 	Amount      int32                    `json:"amount"`
 	PostID      persist.DBID             `json:"post_id"`
+	TokenID     persist.DBID             `json:"token_id"`
 }
 
 type OwnedContract struct {
@@ -450,7 +451,7 @@ type Token struct {
 	TokenUri             sql.NullString             `json:"token_uri"`
 	TokenType            sql.NullString             `json:"token_type"`
 	TokenID              persist.TokenID            `json:"token_id"`
-	Quantity             sql.NullString             `json:"quantity"`
+	Quantity             persist.HexString          `json:"quantity"`
 	OwnershipHistory     persist.AddressAtBlockList `json:"ownership_history"`
 	TokenMetadata        persist.TokenMetadata      `json:"token_metadata"`
 	ExternalUrl          sql.NullString             `json:"external_url"`
@@ -464,6 +465,9 @@ type Token struct {
 	LastSynced           time.Time                  `json:"last_synced"`
 	FallbackMedia        persist.FallbackMedia      `json:"fallback_media"`
 	TokenMediaID         persist.DBID               `json:"token_media_id"`
+	IsCreatorToken       bool                       `json:"is_creator_token"`
+	IsHolderToken        bool                       `json:"is_holder_token"`
+	Displayable          bool                       `json:"displayable"`
 }
 
 type TokenMedia struct {
@@ -506,13 +510,6 @@ type TokenMediasNoValidationRule struct {
 	LastUpdated time.Time    `json:"last_updated"`
 	IsValid     bool         `json:"is_valid"`
 	Reason      string       `json:"reason"`
-}
-
-type TokenOwnership struct {
-	TokenID     persist.DBID `json:"token_id"`
-	OwnerUserID persist.DBID `json:"owner_user_id"`
-	IsHolder    bool         `json:"is_holder"`
-	IsCreator   bool         `json:"is_creator"`
 }
 
 type TokenProcessingJob struct {

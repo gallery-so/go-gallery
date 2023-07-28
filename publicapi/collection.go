@@ -3,10 +3,12 @@ package publicapi
 import (
 	"context"
 	"fmt"
-	"github.com/mikeydub/go-gallery/util"
 	"math"
 	"strings"
 	"time"
+
+	"github.com/mikeydub/go-gallery/event"
+	"github.com/mikeydub/go-gallery/util"
 
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/validate"
@@ -254,7 +256,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 	}
 
 	// Send event
-	feedEvent, err := dispatchEvent(ctx, db.Event{
+	feedEvent, err := event.DispatchEvent(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		Action:         persist.ActionCollectionCreated,
 		ResourceTypeID: persist.ResourceTypeCollection,
@@ -326,7 +328,7 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 	}
 
 	// Send event
-	_, err = dispatchEvent(ctx, db.Event{
+	_, err = event.DispatchEvent(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		Action:         persist.ActionCollectorsNoteAddedToCollection,
 		ResourceTypeID: persist.ResourceTypeCollection,
@@ -400,7 +402,7 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 	}
 
 	// Send event
-	return dispatchEvent(ctx, db.Event{
+	return event.DispatchEvent(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		Action:         persist.ActionTokensAddedToCollection,
 		ResourceTypeID: persist.ResourceTypeCollection,

@@ -44,9 +44,41 @@ type TokenProcessingContractTokensMessage struct {
 	ForceRefresh bool         `json:"force_refresh"`
 }
 
+type TokenIdentifiersQuantities map[persist.TokenUniqueIdentifiers]persist.HexString
+
+func (t TokenIdentifiersQuantities) MarshalJSON() ([]byte, error) {
+	m := make(map[string]string)
+	for k, v := range t {
+		m[k.String()] = v.String()
+	}
+	return json.Marshal(m)
+}
+
+func (t *TokenIdentifiersQuantities) UnmarshalJSON(b []byte) error {
+	m := make(map[string]string)
+	if err := json.Unmarshal(b, &m); err != nil {
+		return err
+	}
+	result := make(TokenIdentifiersQuantities)
+	for k, v := range m {
+		identifiers, err := persist.TokenUniqueIdentifiersFromString(k)
+		if err != nil {
+			return err
+		}
+		result[identifiers] = persist.HexString(v)
+	}
+	*t = result
+	return nil
+}
+
 type TokenProcessingUserTokensMessage struct {
-	UserID           persist.DBID                     `json:"user_id" binding:"required"`
-	TokenIdentifiers []persist.TokenUniqueIdentifiers `json:"token_identifiers" binding:"required"`
+	UserID           persist.DBID               `json:"user_id" binding:"required"`
+	TokenIdentifiers TokenIdentifiersQuantities `json:"token_identifiers" binding:"required"`
+}
+
+type TokenProcessingWalletRemovalMessage struct {
+	UserID    persist.DBID   `json:"user_id" binding:"required"`
+	WalletIDs []persist.DBID `json:"wallet_ids" binding:"required"`
 }
 
 type ValidateNFTsMessage struct {
@@ -241,6 +273,38 @@ func CreateTaskForUserTokenProcessing(ctx context.Context, message TokenProcessi
 			HttpRequest: &taskspb.HttpRequest{
 				HttpMethod: taskspb.HttpMethod_POST,
 				Url:        fmt.Sprintf("%s/owners/process/user", env.GetString("TOKEN_PROCESSING_URL")),
+				Headers: map[string]string{
+					"Content-type": "application/json",
+					"sentry-trace": span.TraceID.String(),
+				},
+			},
+		},
+	}
+
+	body, err := json.Marshal(message)
+	if err != nil {
+		return err
+	}
+
+	return submitHttpTask(ctx, client, queue, task, body)
+}
+
+func CreateTaskForWalletRemoval(ctx context.Context, message TokenProcessingWalletRemovalMessage, client *gcptasks.Client) error {
+	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForWalletRemoval")
+	defer tracing.FinishSpan(span)
+
+	tracing.AddEventDataToSpan(span, map[string]interface{}{
+		"User ID":    message.UserID,
+		"Wallet IDs": message.WalletIDs,
+	})
+
+	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
+
+	task := &taskspb.Task{
+		MessageType: &taskspb.Task_HttpRequest{
+			HttpRequest: &taskspb.HttpRequest{
+				HttpMethod: taskspb.HttpMethod_POST,
+				Url:        fmt.Sprintf("%s/owners/process/wallet-removal", env.GetString("TOKEN_PROCESSING_URL")),
 				Headers: map[string]string{
 					"Content-type": "application/json",
 					"sentry-trace": span.TraceID.String(),

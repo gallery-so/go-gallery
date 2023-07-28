@@ -10,6 +10,7 @@ import (
 
 	"github.com/jackc/pgtype"
 	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/util"
@@ -224,7 +225,7 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 	if update.Caption != nil && *update.Caption == "" {
 		update.Caption = nil
 	}
-	_, err = dispatchEvents(ctx, events, api.validator, update.EditID, nil)
+	_, err = event.DispatchEvents(ctx, events, api.validator, update.EditID, nil)
 	if err != nil {
 		return db.Gallery{}, err
 	}
@@ -626,7 +627,7 @@ func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (
 		if gallery.OwnerUserID != userID {
 			// only view gallery if the user hasn't already viewed it in this most recent notification period
 
-			_, err = dispatchEvent(ctx, db.Event{
+			_, err = event.DispatchEvent(ctx, db.Event{
 				ActorID:        persist.DBIDToNullStr(userID),
 				ResourceTypeID: persist.ResourceTypeGallery,
 				SubjectID:      galleryID,
@@ -638,7 +639,7 @@ func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (
 			}
 		}
 	} else {
-		_, err := dispatchEvent(ctx, db.Event{
+		_, err := event.DispatchEvent(ctx, db.Event{
 			ResourceTypeID: persist.ResourceTypeGallery,
 			SubjectID:      galleryID,
 			Action:         persist.ActionViewedGallery,
