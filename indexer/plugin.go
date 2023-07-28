@@ -212,7 +212,8 @@ func newTokensPlugin(ctx context.Context) tokenTransfersPlugin {
 				TokenID:         tokenID,
 				OwnerAddress:    persist.Address(msg.transfer.To.String()),
 			}
-			if seenTokens[ids] {
+
+			if seenTokens[ids] && msg.transfer.TokenType != persist.TokenTypeERC1155 {
 				continue
 			}
 
@@ -235,7 +236,7 @@ func newTokensPlugin(ctx context.Context) tokenTransfersPlugin {
 						OwnerAddress:    msg.transfer.To,
 						BlockNumber:     msg.transfer.BlockNumber,
 						ContractAddress: contract,
-						// Quantity: "1", we don't need this field right now but it might be necessary later if we start tracking any more data on tokens
+						Quantity:        "1",
 					},
 				}
 

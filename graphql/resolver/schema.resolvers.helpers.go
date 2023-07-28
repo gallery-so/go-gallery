@@ -124,6 +124,16 @@ var nodeFetcher = model.NodeFetcher{
 
 		return &notifConverted, nil
 	},
+	OnNewTokensNotification: func(ctx context.Context, dbid persist.DBID) (*model.NewTokensNotification, error) {
+		notif, err := resolveNotificationByID(ctx, dbid)
+		if err != nil {
+			return nil, err
+		}
+
+		notifConverted := notif.(model.NewTokensNotification)
+
+		return &notifConverted, nil
+	},
 }
 
 var defaultTokenSettings = persist.CollectionTokenSettings{}
@@ -942,6 +952,19 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 			Gallery:            nil, // handled by dedicated resolver
 			NonUserViewerCount: &nonCount,
 		}, nil
+	case persist.ActionNewTokensReceived:
+		return model.NewTokensNotification{
+			HelperNewTokensNotificationData: model.HelperNewTokensNotificationData{
+				OwnerID:          notif.OwnerID,
+				NotificationData: notif.Data,
+			},
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
+			Count:        &amount,
+			Token:        nil, // handled by dedicated resolver
+		}, nil
 	default:
 		return nil, fmt.Errorf("unknown notification action: %s", notif.Action)
 	}
@@ -1057,9 +1080,6 @@ func resolveGroupNotificationUsersConnectionByUserIDs(ctx context.Context, userI
 	return &model.GroupNotificationUsersConnection{
 		Edges:    edges,
 		PageInfo: pageInfoToModel(ctx, pageInfo),
-		HelperGroupNotificationUsersConnectionData: model.HelperGroupNotificationUsersConnectionData{
-			UserIDs: userIDs,
-		},
 	}, nil
 }
 
@@ -1861,7 +1881,7 @@ func tokenToModel(ctx context.Context, token db.Token, collectionID *persist.DBI
 		Description:      &token.Description.String,
 		OwnedByWallets:   nil, // handled by dedicated resolver
 		TokenID:          util.ToPointer(token.TokenID.String()),
-		Quantity:         &token.Quantity.String,
+		Quantity:         util.ToPointer(token.Quantity.String()),
 		Owner:            nil, // handled by dedicated resolver
 		OwnershipHistory: nil, // TODO: later
 		OwnerIsHolder:    &token.IsHolderToken,

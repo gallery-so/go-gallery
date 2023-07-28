@@ -23,6 +23,7 @@ import (
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/auth"
@@ -456,7 +457,7 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 	}
 
 	// Send event
-	_, err = dispatchEvent(ctx, db.Event{
+	_, err = event.DispatchEvent(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		Action:         persist.ActionUserCreated,
 		ResourceTypeID: persist.ResourceTypeUser,
@@ -990,7 +991,7 @@ func dispatchFollowEventToFeed(ctx context.Context, api UserAPI, curUserID persi
 		return
 	}
 
-	pushEvent(ctx, db.Event{
+	event.PushEvent(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(curUserID),
 		Action:         persist.ActionUserFollowedUsers,
 		ResourceTypeID: persist.ResourceTypeUser,
@@ -1044,29 +1045,9 @@ func (api UserAPI) GetSocials(ctx context.Context, userID persist.DBID) (*model.
 	result := &model.SocialAccounts{}
 
 	for prov, social := range socials {
-		switch prov {
-		case persist.SocialProviderTwitter:
-			logger.For(ctx).Infof("found twitter social account: %+v", social)
-			t := &model.TwitterSocialAccount{
-				Type:     prov,
-				Display:  social.Display,
-				SocialID: social.ID,
-			}
-			name, ok := social.Metadata["name"].(string)
-			if ok {
-				t.Name = name
-			}
-			username, ok := social.Metadata["username"].(string)
-			if ok {
-				t.Username = username
-			}
-			profile, ok := social.Metadata["profile_image_url"].(string)
-			if ok {
-				t.ProfileImageURL = profile
-			}
-			result.Twitter = t
-		default:
-			return nil, fmt.Errorf("unknown social provider %s", prov)
+		err := assignSocialToModel(ctx, prov, social, result)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -1089,33 +1070,68 @@ func (api UserAPI) GetDisplayedSocials(ctx context.Context, userID persist.DBID)
 	result := &model.SocialAccounts{}
 
 	for prov, social := range socials {
-		switch prov {
-		case persist.SocialProviderTwitter:
-			logger.For(ctx).Infof("found twitter social account: %+v", social)
-			t := &model.TwitterSocialAccount{
-				Type:     prov,
-				Display:  social.Display,
-				SocialID: social.ID,
-			}
-			name, ok := social.Metadata["name"].(string)
-			if ok {
-				t.Name = name
-			}
-			username, ok := social.Metadata["username"].(string)
-			if ok {
-				t.Username = username
-			}
-			profile, ok := social.Metadata["profile_image_url"].(string)
-			if ok {
-				t.ProfileImageURL = profile
-			}
-			result.Twitter = t
-		default:
-			return nil, fmt.Errorf("unknown social provider %s", prov)
+		if !social.Display {
+			continue
+		}
+		err := assignSocialToModel(ctx, prov, social, result)
+		if err != nil {
+			return nil, err
 		}
 	}
 
 	return result, nil
+}
+
+func assignSocialToModel(ctx context.Context, prov persist.SocialProvider, social persist.SocialUserIdentifiers, result *model.SocialAccounts) error {
+	switch prov {
+	case persist.SocialProviderTwitter:
+		logger.For(ctx).Infof("found twitter social account: %+v", social)
+		t := &model.TwitterSocialAccount{
+			Type:     prov,
+			Display:  social.Display,
+			SocialID: social.ID,
+		}
+		name, ok := social.Metadata["name"].(string)
+		if ok {
+			t.Name = name
+		}
+		username, ok := social.Metadata["username"].(string)
+		if ok {
+			t.Username = username
+		}
+		profile, ok := social.Metadata["profile_image_url"].(string)
+		if ok {
+			t.ProfileImageURL = profile
+		}
+		result.Twitter = t
+	case persist.SocialProviderFarcaster:
+		logger.For(ctx).Infof("found farcaster social account: %+v", social)
+		f := &model.FarcasterSocialAccount{
+			Type:     prov,
+			Display:  social.Display,
+			SocialID: social.ID,
+		}
+		name, ok := social.Metadata["name"].(string)
+		if ok {
+			f.Name = name
+		}
+		username, ok := social.Metadata["username"].(string)
+		if ok {
+			f.Username = username
+		}
+		profile, ok := social.Metadata["profile_image_url"].(string)
+		if ok {
+			f.ProfileImageURL = profile
+		}
+		bio, ok := social.Metadata["bio"].(string)
+		if ok {
+			f.Bio = bio
+		}
+		result.Farcaster = f
+	default:
+		return fmt.Errorf("unknown social provider %s", prov)
+	}
+	return nil
 }
 
 func (api UserAPI) UpdateUserSocialDisplayed(ctx context.Context, socialType persist.SocialProvider, displayed bool) error {

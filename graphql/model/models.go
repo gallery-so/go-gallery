@@ -53,10 +53,6 @@ type HelperCollectionCreatedFeedEventDataData struct {
 	CollectionID persist.DBID
 }
 
-type HelperGroupNotificationUsersConnectionData struct {
-	UserIDs persist.DBIDList
-}
-
 type HelperGalleryUserData struct {
 	UserID            persist.DBID
 	FeaturedGalleryID *persist.DBID
@@ -102,6 +98,11 @@ type HelperSomeoneAdmiredYourFeedEventNotificationData struct {
 type HelperSomeoneAdmiredYourPostNotificationData struct {
 	OwnerID          persist.DBID
 	PostID           persist.DBID
+	NotificationData persist.NotificationData
+}
+
+type HelperNewTokensNotificationData struct {
+	OwnerID          persist.DBID
 	NotificationData persist.NotificationData
 }
 

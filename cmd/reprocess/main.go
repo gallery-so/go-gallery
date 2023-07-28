@@ -139,7 +139,7 @@ func main() {
 			Description:      persist.NullString(row.Description.String),
 			TokenURI:         persist.TokenURI(row.TokenUri.String),
 			TokenID:          row.TokenID,
-			Quantity:         persist.HexString(row.Quantity.String),
+			Quantity:         row.Quantity,
 			OwnerUserID:      row.OwnerUserID,
 			OwnedByWallets:   wallets,
 			OwnershipHistory: row.OwnershipHistory,

@@ -10,18 +10,21 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/metric"
 	"github.com/mikeydub/go-gallery/service/multichain"
+	"github.com/mikeydub/go-gallery/service/notifications"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/redis"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/validate"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -39,7 +42,7 @@ func InitServer() {
 	http.Handle("/", router)
 }
 
-func CoreInitServer(c *server.Clients, mc *multichain.Provider) *gin.Engine {
+func CoreInitServer(clients *server.Clients, mc *multichain.Provider) *gin.Engine {
 	InitSentry()
 	logger.InitWithGCPDefaults()
 
@@ -48,6 +51,12 @@ func CoreInitServer(c *server.Clients, mc *multichain.Provider) *gin.Engine {
 	router := gin.Default()
 
 	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger())
+
+	notificationsHandler := notifications.New(clients.Queries, clients.PubSubClient, clients.TaskClient, redis.NewLockClient(redis.NewCache(redis.NotificationLockCache)))
+
+	router.Use(func(c *gin.Context) {
+		event.AddTo(c, false, notificationsHandler, clients.Queries, clients.TaskClient)
+	})
 
 	if env.GetString("ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
@@ -58,9 +67,9 @@ func CoreInitServer(c *server.Clients, mc *multichain.Provider) *gin.Engine {
 
 	t := newThrottler()
 
-	tp := NewTokenProcessor(c.Queries, c.EthClient, mc, c.IPFSClient, c.ArweaveClient, c.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), c.Repos.TokenRepository, metric.NewLogMetricReporter())
+	tp := NewTokenProcessor(clients.Queries, clients.EthClient, mc, clients.IPFSClient, clients.ArweaveClient, clients.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), clients.Repos.TokenRepository, metric.NewLogMetricReporter())
 
-	return handlersInitServer(router, tp, mc, c.Repos, t)
+	return handlersInitServer(router, tp, mc, clients.Repos, t, validate.WithCustomValidators())
 }
 
 func setDefaults() {
@@ -91,6 +100,11 @@ func setDefaults() {
 	viper.SetDefault("TOKEN_PROCESSING_URL", "http://localhost:6500")
 	viper.SetDefault("TOKEN_PROCESSING_QUEUE", "projects/gallery-local/locations/here/queues/token-processing")
 	viper.SetDefault("TASK_QUEUE_HOST", "")
+	viper.SetDefault("PUBSUB_EMULATOR_HOST", "")
+	viper.SetDefault("PUBSUB_TOPIC_NEW_NOTIFICATIONS", "dev-new-notifications")
+	viper.SetDefault("PUBSUB_TOPIC_UPDATED_NOTIFICATIONS", "dev-updated-notifications")
+	viper.SetDefault("PUBSUB_SUB_NEW_NOTIFICATIONS", "dev-new-notifications-sub")
+	viper.SetDefault("PUBSUB_SUB_UPDATED_NOTIFICATIONS", "dev-updated-notifications-sub")
 
 	viper.AutomaticEnv()
 

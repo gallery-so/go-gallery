@@ -395,6 +395,7 @@ enum Chain {
   Tezos
   POAP
   Zora
+  Base
 }
 
 enum TokenOwnershipType {
@@ -624,6 +625,8 @@ type NotificationsConnection @goEmbedHelper {
 
 enum SocialAccountType {
   Twitter
+  Farcaster
+  Lens
 }
 
 interface SocialAccount {
@@ -634,6 +637,7 @@ interface SocialAccount {
 
 type SocialAccounts {
   twitter: TwitterSocialAccount
+  farcaster: FarcasterSocialAccount
 }
 
 type TwitterSocialAccount implements SocialAccount {
@@ -642,6 +646,16 @@ type TwitterSocialAccount implements SocialAccount {
   name: String!
   username: String!
   profileImageURL: String!
+  display: Boolean!
+}
+
+type FarcasterSocialAccount implements SocialAccount {
+  type: SocialAccountType!
+  social_id: String!
+  name: String!
+  username: String!
+  profileImageURL: String!
+  bio: String!
   display: Boolean!
 }
 
@@ -1790,7 +1804,7 @@ type GroupNotificationUserEdge {
   cursor: String
 }
 
-type GroupNotificationUsersConnection @goEmbedHelper {
+type GroupNotificationUsersConnection {
   edges: [GroupNotificationUserEdge]
   pageInfo: PageInfo
 }
@@ -1896,6 +1910,17 @@ type SomeoneViewedYourGalleryNotification implements Notification & Node & Group
   # count of unique non-user viewers
   nonUserViewerCount: Int
   gallery: Gallery @goField(forceResolver: true)
+}
+
+type NewTokensNotification implements Notification & GroupedNotification & Node @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+  count: Int
+
+  token: Token @goField(forceResolver: true)
 }
 
 type ClearAllNotificationsPayload {

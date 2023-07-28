@@ -277,6 +277,7 @@ type Notification struct {
 	Seen        bool                     `json:"seen"`
 	Amount      int32                    `json:"amount"`
 	PostID      persist.DBID             `json:"post_id"`
+	TokenID     persist.DBID             `json:"token_id"`
 }
 
 type OwnedContract struct {
@@ -450,7 +451,7 @@ type Token struct {
 	TokenUri             sql.NullString             `json:"token_uri"`
 	TokenType            sql.NullString             `json:"token_type"`
 	TokenID              persist.TokenID            `json:"token_id"`
-	Quantity             sql.NullString             `json:"quantity"`
+	Quantity             persist.HexString          `json:"quantity"`
 	OwnershipHistory     persist.AddressAtBlockList `json:"ownership_history"`
 	TokenMetadata        persist.TokenMetadata      `json:"token_metadata"`
 	ExternalUrl          sql.NullString             `json:"external_url"`

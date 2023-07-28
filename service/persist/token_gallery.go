@@ -63,7 +63,7 @@ func (l *AddressAtBlockList) Scan(value interface{}) error {
 	return pq.Array(l).Scan(value)
 }
 
-// TokenIdentifiers returns the unique identifier for a token
+// TokenIdentifiers returns the identifiers for a token
 func (t TokenGallery) TokenIdentifiers() TokenIdentifiers {
 	return NewTokenIdentifiers(Address(t.Contract), t.TokenID, t.Chain)
 }
@@ -214,6 +214,27 @@ func (t *TokenIdentifiers) Scan(i interface{}) error {
 		Chain:           Chain(chain),
 	}
 	return nil
+}
+
+func (t TokenUniqueIdentifiers) String() string {
+	return fmt.Sprintf("%s+%s+%s+%d", t.Chain.NormalizeAddress(t.ContractAddress), t.TokenID, t.Chain.NormalizeAddress(t.OwnerAddress), t.Chain)
+}
+
+func TokenUniqueIdentifiersFromString(s string) (TokenUniqueIdentifiers, error) {
+	res := strings.Split(s, "+")
+	if len(res) != 4 {
+		return TokenUniqueIdentifiers{}, fmt.Errorf("invalid token unique identifiers: %v", s)
+	}
+	chain, err := strconv.Atoi(res[3])
+	if err != nil {
+		return TokenUniqueIdentifiers{}, err
+	}
+	return TokenUniqueIdentifiers{
+		TokenID:         TokenID(res[1]),
+		ContractAddress: Address(res[0]),
+		Chain:           Chain(chain),
+		OwnerAddress:    Address(res[2]),
+	}, nil
 }
 
 // NewContractIdentifiers creates a new contract identifiers

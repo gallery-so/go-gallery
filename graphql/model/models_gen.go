@@ -1177,6 +1177,18 @@ type FallbackMedia struct {
 	MediaType *string `json:"mediaType"`
 }
 
+type FarcasterSocialAccount struct {
+	Type            persist.SocialProvider `json:"type"`
+	SocialID        string                 `json:"social_id"`
+	Name            string                 `json:"name"`
+	Username        string                 `json:"username"`
+	ProfileImageURL string                 `json:"profileImageURL"`
+	Bio             string                 `json:"bio"`
+	Display         bool                   `json:"display"`
+}
+
+func (FarcasterSocialAccount) IsSocialAccount() {}
+
 type FeedConnection struct {
 	Edges    []*FeedEdge `json:"edges"`
 	PageInfo *PageInfo   `json:"pageInfo"`
@@ -1378,7 +1390,6 @@ type GroupNotificationUserEdge struct {
 }
 
 type GroupNotificationUsersConnection struct {
-	HelperGroupNotificationUsersConnectionData
 	Edges    []*GroupNotificationUserEdge `json:"edges"`
 	PageInfo *PageInfo                    `json:"pageInfo"`
 }
@@ -1508,6 +1519,20 @@ type MoveCollectionToGalleryPayload struct {
 }
 
 func (MoveCollectionToGalleryPayload) IsMoveCollectionToGalleryPayloadOrError() {}
+
+type NewTokensNotification struct {
+	HelperNewTokensNotificationData
+	Dbid         persist.DBID `json:"dbid"`
+	Seen         *bool        `json:"seen"`
+	CreationTime *time.Time   `json:"creationTime"`
+	UpdatedTime  *time.Time   `json:"updatedTime"`
+	Count        *int         `json:"count"`
+	Token        *Token       `json:"token"`
+}
+
+func (NewTokensNotification) IsNotification()        {}
+func (NewTokensNotification) IsNode()                {}
+func (NewTokensNotification) IsGroupedNotification() {}
 
 type NotificationEdge struct {
 	Node   Notification `json:"node"`
@@ -1790,7 +1815,8 @@ type SetSpamPreferencePayload struct {
 func (SetSpamPreferencePayload) IsSetSpamPreferencePayloadOrError() {}
 
 type SocialAccounts struct {
-	Twitter *TwitterSocialAccount `json:"twitter"`
+	Twitter   *TwitterSocialAccount   `json:"twitter"`
+	Farcaster *FarcasterSocialAccount `json:"farcaster"`
 }
 
 type SocialAuthMechanism struct {
