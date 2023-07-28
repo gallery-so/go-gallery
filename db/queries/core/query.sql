@@ -1571,3 +1571,6 @@ update tokens t
       and deleted = false
       and ((@remove_holder_status and is_holder_token) or (@remove_creator_status and is_creator_token))
       and last_synced < @timestamp;
+
+-- name: IsMemberOfCommunity :one
+select exists (select * from tokens where not deleted and displayable and owner_user_id = @user_id and contract = @contract_id limit 1) is_member;

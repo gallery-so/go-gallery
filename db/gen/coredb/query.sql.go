@@ -5291,6 +5291,22 @@ func (q *Queries) IsFeedUserActionBlocked(ctx context.Context, arg IsFeedUserAct
 	return exists, err
 }
 
+const isMemberOfCommunity = `-- name: IsMemberOfCommunity :one
+select exists (select id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id, is_creator_token, is_holder_token, displayable from tokens where not deleted and displayable and owner_user_id = $1 and contract = $2 limit 1) is_member
+`
+
+type IsMemberOfCommunityParams struct {
+	UserID     persist.DBID `json:"user_id"`
+	ContractID persist.DBID `json:"contract_id"`
+}
+
+func (q *Queries) IsMemberOfCommunity(ctx context.Context, arg IsMemberOfCommunityParams) (bool, error) {
+	row := q.db.QueryRow(ctx, isMemberOfCommunity, arg.UserID, arg.ContractID)
+	var is_member bool
+	err := row.Scan(&is_member)
+	return is_member, err
+}
+
 const paginateGlobalFeed = `-- name: PaginateGlobalFeed :many
 SELECT id, feed_entity_type, created_at, actor_id
 FROM feed_entities
