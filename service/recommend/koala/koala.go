@@ -123,7 +123,8 @@ func calcRelevanceScore(ratingM, displayM *sparse.CSR, vIdx, cIdx int) float64 {
 			t = s
 		}
 	})
-	return t
+	// Scale factor up 10
+	return t / 0.1
 }
 
 // calcSimilarityScore computes the similarity of vIdx and qIdx based on their interactions with other users
