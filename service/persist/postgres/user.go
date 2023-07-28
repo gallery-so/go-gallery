@@ -448,38 +448,33 @@ func (u *UserRepository) AddWallet(pCtx context.Context, pUserID persist.DBID, p
 	return nil
 }
 
-// RemoveWallet removes the specified wallet from a user. Returns true if the wallet exists and was successfully removed,
-// false if the wallet does not exist or an error was encountered.
-func (u *UserRepository) RemoveWallet(pCtx context.Context, pUserID persist.DBID, pWalletID persist.DBID) (bool, error) {
+// RemoveWallet removes an address from user
+func (u *UserRepository) RemoveWallet(pCtx context.Context, pUserID persist.DBID, pWalletID persist.DBID) error {
 	tx, err := u.db.BeginTx(pCtx, nil)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	defer tx.Rollback()
 
 	res, err := tx.StmtContext(pCtx, u.removeWalletFromUserStmt).ExecContext(pCtx, pWalletID, pUserID)
 	if err != nil {
-		return false, err
+		return err
 	}
 	rows, err := res.RowsAffected()
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	if rows == 0 {
-		return false, nil
+		return nil
 	}
 
 	if _, err := tx.StmtContext(pCtx, u.deleteWalletStmt).ExecContext(pCtx, pWalletID); err != nil {
-		return false, err
+		return err
 	}
 
-	if err := tx.Commit(); err != nil {
-		return false, err
-	}
-
-	return true, nil
+	return tx.Commit()
 }
 
 // Delete deletes the user with the given ID

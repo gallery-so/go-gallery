@@ -43,7 +43,6 @@ type TokenGallery struct {
 	OwnerUserID      DBID
 	OwnedByWallets   []Wallet         `json:"owned_by_wallets"`
 	OwnershipHistory []AddressAtBlock `json:"previous_owners"`
-	IsCreatorToken   bool             `json:"is_creator_token"`
 	TokenMetadata    TokenMetadata    `json:"metadata"`
 	Contract         DBID             `json:"contract"`
 

@@ -136,37 +136,29 @@ func CreateUser(ctx context.Context, authenticator auth.Authenticator, username 
 	return userID, galleryID, nil
 }
 
-// RemoveWalletsFromUser removes wallets from a user in the DB, and returns the IDs of the wallets that were removed.
-// The set of removed IDs is valid even in cases where this function returns an error; it will contain the IDs of wallets
-// that were successfully removed before the error occurred.
-func RemoveWalletsFromUser(pCtx context.Context, pUserID persist.DBID, pWalletIDs []persist.DBID, userRepo *postgres.UserRepository) ([]persist.DBID, error) {
-	removedIDs := make([]persist.DBID, 0, len(pWalletIDs))
-
+// RemoveWalletsFromUser removes any amount of addresses from a user in the DB
+func RemoveWalletsFromUser(pCtx context.Context, pUserID persist.DBID, pWalletIDs []persist.DBID, userRepo *postgres.UserRepository) error {
 	user, err := userRepo.GetByID(pCtx, pUserID)
 	if err != nil {
-		return removedIDs, err
+		return err
 	}
 
 	for _, walletID := range pWalletIDs {
 		if user.PrimaryWalletID.String() == walletID.String() {
-			return removedIDs, errUserCannotRemovePrimaryWallet
+			return errUserCannotRemovePrimaryWallet
 		}
 	}
 
 	if len(user.Wallets) <= len(pWalletIDs) {
-		return removedIDs, errUserCannotRemoveAllWallets
+		return errUserCannotRemoveAllWallets
 	}
-
 	for _, walletID := range pWalletIDs {
-		removed, err := userRepo.RemoveWallet(pCtx, pUserID, walletID)
-		if err != nil {
-			return removedIDs, err
-		} else if removed {
-			removedIDs = append(removedIDs, walletID)
+		if err := userRepo.RemoveWallet(pCtx, pUserID, walletID); err != nil {
+			return err
 		}
 	}
 
-	return removedIDs, nil
+	return nil
 }
 
 // AddWalletToUser adds a single wallet to a user in the DB because a signature needs to be provided and validated per address

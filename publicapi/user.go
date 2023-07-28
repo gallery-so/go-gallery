@@ -1,12 +1,10 @@
 package publicapi
 
 import (
-	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/task"
 	"strconv"
 	"strings"
 	"time"
@@ -59,7 +57,6 @@ type UserAPI struct {
 	arweaveClient      *goar.Client
 	storageClient      *storage.Client
 	multichainProvider *multichain.Provider
-	taskClient         *gcptasks.Client
 }
 
 func (api UserAPI) GetLoggedInUserId(ctx context.Context) persist.DBID {
@@ -349,24 +346,12 @@ func (api UserAPI) RemoveWalletsFromUser(ctx context.Context, walletIDs []persis
 		return err
 	}
 
-	removedIDs, removalErr := user.RemoveWalletsFromUser(ctx, userID, walletIDs, api.repos.UserRepository)
-
-	// If any wallet IDs were successfully removed, we need to process those removals, even if we also
-	// encountered an error.
-	if len(removedIDs) > 0 {
-		walletRemovalMessage := task.TokenProcessingWalletRemovalMessage{
-			UserID:    userID,
-			WalletIDs: removedIDs,
-		}
-
-		if err := task.CreateTaskForWalletRemoval(ctx, walletRemovalMessage, api.taskClient); err != nil {
-			// Just log the error here. No need to return it -- the actual wallet removal DID succeed,
-			// but tokens owned by the affected wallets won't be updated until the user's next sync.
-			logger.For(ctx).WithError(err).Error("failed to create task to process wallet removal")
-		}
+	err = user.RemoveWalletsFromUser(ctx, userID, walletIDs, api.repos.UserRepository)
+	if err != nil {
+		return err
 	}
 
-	return removalErr
+	return nil
 }
 
 func (api UserAPI) AddSocialAccountToUser(ctx context.Context, authenticator socialauth.Authenticator, display bool) error {
@@ -1378,12 +1363,17 @@ func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID, w
 
 	// Set the profile image to reference a token
 	if tokenID != nil {
-		t, err := For(ctx).Token.GetTokenById(ctx, *tokenID)
+		o, err := For(ctx).Token.GetTokenOwnershipByTokenID(ctx, *tokenID)
+
+		if util.ErrorAs[persist.ErrTokenOwnershipNotFound](err) {
+			return ErrProfileImageNotTokenOwner
+		}
+
 		if err != nil {
 			return err
 		}
 
-		if t.OwnerUserID != userID || (!t.IsHolderToken && !t.IsCreatorToken) {
+		if o.OwnerUserID != userID {
 			return ErrProfileImageNotTokenOwner
 		}
 
@@ -1391,7 +1381,7 @@ func (api UserAPI) SetProfileImage(ctx context.Context, tokenID *persist.DBID, w
 			TokenSourceType: persist.ProfileImageSourceToken,
 			ProfileID:       persist.GenerateID(),
 			UserID:          userID,
-			TokenID:         t.ID,
+			TokenID:         o.TokenID,
 		})
 	}
 

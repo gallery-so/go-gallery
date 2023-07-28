@@ -12,9 +12,9 @@ import (
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
-	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -508,10 +508,21 @@ func (api TokenAPI) MediaByTokenID(ctx context.Context, tokenID persist.DBID) (d
 	return api.loaders.MediaByTokenID.Load(tokenID)
 }
 
+func (api TokenAPI) GetTokenOwnershipByTokenID(ctx context.Context, tokenID persist.DBID) (db.TokenOwnership, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"tokenID": validate.WithTag(tokenID, "required"),
+	}); err != nil {
+		return db.TokenOwnership{}, err
+	}
+
+	return api.loaders.TokenOwnershipByTokenID.Load(tokenID)
+}
+
 func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (db.Event, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"tokenID":      validate.WithTag(tokenID, "required"),
+		"tokenID": 		validate.WithTag(tokenID, "required"),
 		"collectionID": validate.WithTag(collectionID, "required"),
 	}); err != nil {
 		return db.Event{}, err
@@ -535,14 +546,14 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collect
 			return db.Event{}, err
 		}
 		eventPtr, err := api.repos.EventRepository.Add(ctx, db.Event{
-			ActorID:        persist.DBIDToNullStr(userID),
-			Action:         persist.ActionViewedToken,
-			ResourceTypeID: persist.ResourceTypeToken,
-			TokenID:        tokenID,
-			CollectionID:   collectionID,
-			GalleryID:      currCol.GalleryID,
-			SubjectID:      tokenID,
-			Data: persist.EventData{
+		ActorID:        persist.DBIDToNullStr(userID),
+		Action:         persist.ActionViewedToken,
+		ResourceTypeID: persist.ResourceTypeToken,
+		TokenID:        tokenID,
+		CollectionID:   collectionID,
+		GalleryID:      currCol.GalleryID,
+		SubjectID:      tokenID,
+		Data: persist.EventData{
 				TokenContractID: token.Contract,
 			},
 		})
