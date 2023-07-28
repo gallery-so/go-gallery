@@ -60,7 +60,7 @@ func (k *Koala) RelevanceTo(userID persist.DBID, e db.FeedEntityScoringRow) (flo
 		return relevanceScore, err
 	}
 
-	return relevanceScore + edgeScore, nil
+	return relevanceScore * edgeScore, nil
 }
 
 func (k *Koala) scoreEdge(viewerID, queryID persist.DBID) (float64, error) {
@@ -124,7 +124,7 @@ func calcRelevanceScore(ratingM, displayM *sparse.CSR, vIdx, cIdx int) float64 {
 		}
 	})
 	// Scale factor up 10
-	return t / 0.1
+	return t / 0.02
 }
 
 // calcSimilarityScore computes the similarity of vIdx and qIdx based on their interactions with other users
