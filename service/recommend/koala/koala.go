@@ -60,7 +60,7 @@ func (k *Koala) RelevanceTo(userID persist.DBID, e db.FeedEntityScoringRow) (flo
 		return relevanceScore, err
 	}
 
-	return relevanceScore * edgeScore, nil
+	return relevanceScore + edgeScore, nil
 }
 
 func (k *Koala) scoreEdge(viewerID, queryID persist.DBID) (float64, error) {
@@ -112,27 +112,18 @@ func calcSocialScore(userM *sparse.CSR, vIdx, qIdx int) float64 {
 // calcRelavanceScore computes the relevance of cIdx to vIdx's held tokens
 func calcRelevanceScore(ratingM, displayM *sparse.CSR, vIdx, cIdx int) float64 {
 	var t float64
-	cDisplayed := displayM.At(cIdx, cIdx)
+	bSize := displayM.At(cIdx, cIdx)
 	v := ratingM.RowView(vIdx).(*sparse.Vector)
 	v.DoNonZero(func(i int, j int, v float64) {
 		// Max score is 1, we can't exit early but we can skip the calculation
 		if t == 1 {
 			return
 		}
-		if s := jaccardIndex(displayM, i, cIdx, cDisplayed); s > t {
+		if s := overlapIndex(displayM, i, cIdx, bSize); s > t {
 			t = s
 		}
 	})
-	// 0.02 is the average overlap of displayed tokens between two communities. It's interpretation is
-	// on average 2% of the the tokens any two communities are displayed together. This is an approximation,
-	// a better way would be to calculate the average overlap of this community to all other communities, since
-	// it is possible that a community is shared frequently with all other communities, but this would require
-	// computing the score for every community.
-	//
-	// Dividing by this value creates an index where a score above 0.02 over indexes and is a value greater than
-	// 1. This means that the a score of 1 gets scaled to 50. This is a pretty massive boost, and we may want to clamp
-	// this value to some max.
-	return t / 0.02
+	return t
 }
 
 // calcSimilarityScore computes the similarity of vIdx and qIdx based on their interactions with other users
@@ -188,7 +179,7 @@ func bfs(m *sparse.CSR, vIdx, qIdx int) float64 {
 		if cur == qIdx {
 			return 1
 		}
-		if depth.Get(cur) > 4 {
+		if depth.Get(cur) > 3 {
 			return 0
 		}
 		neighbors := m.RowView(cur).(*sparse.Vector)
@@ -203,10 +194,12 @@ func bfs(m *sparse.CSR, vIdx, qIdx int) float64 {
 	return 0
 }
 
-// jaccardIndex computes intersection divided by the union of two sets
-func jaccardIndex(m *sparse.CSR, a int, b int, cVal float64) float64 {
-	u := m.At(a, b)
-	return u / (m.At(a, a) + cVal - u)
+// overlapIndex computes the intersection divided by the size of the smaller set
+func overlapIndex(m *sparse.CSR, a int, b int, bSize float64) float64 {
+	if aSize := m.At(a, a); aSize < bSize {
+		bSize = aSize
+	}
+	return m.At(a, b) / bSize
 }
 
 func cosineSimilarity(v1, v2 mat.Vector) float64 {

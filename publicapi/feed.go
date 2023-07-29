@@ -711,7 +711,7 @@ func timeFactor(t0, t1 time.Time) float64 {
 }
 
 func engagementFactor(interactions int) float64 {
-	return 1.0 + float64(interactions)
+	return math.Log1p(float64(interactions))
 }
 
 type priorityNode interface {
