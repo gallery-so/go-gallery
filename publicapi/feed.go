@@ -320,9 +320,14 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 			if err != nil {
 				return nil, nil, err
 			}
-			entityTypes, entityIDs = api.scoreFeedEntities(ctx, trendData, func(e db.FeedEntityScoringRow) float64 {
-				return timeFactor(e.CreatedAt, now) * engagementFactor(int(e.Interactions))
-			})
+			entityTypes, entityIDs = func() ([]persist.FeedEntityType, []persist.DBID) {
+				k := koala.For(ctx)
+				k.Mu.RLock()
+				defer k.Mu.RUnlock()
+				return api.scoreFeedEntities(ctx, trendData, func(e db.FeedEntityScoringRow) float64 {
+					return timeFactor(e.CreatedAt, now) * engagementFactor(int(e.Interactions))
+				})
+			}()
 			return entityTypes, entityIDs, nil
 		}
 
@@ -491,6 +496,7 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 			limitIdx := max(len(queryTypes)-params.Limit, 0)
 			queryTypes = queryTypes[limitIdx:]
 			queryIDs = queryIDs[limitIdx:]
+			// TODO: Replace this to not use the keyset pagiantor
 			// This is a hack: the underlying keyset paginator assumes
 			// that the extra result is at the end of the slice, so
 			// we just move it to the end.

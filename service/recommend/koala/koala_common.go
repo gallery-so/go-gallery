@@ -31,7 +31,7 @@ type Koala struct {
 	uL map[persist.DBID]int
 	// lookup of contract ID to index in the matrix
 	cL map[persist.DBID]int
-	mu sync.RWMutex
+	Mu sync.RWMutex
 	q  *db.Queries
 }
 

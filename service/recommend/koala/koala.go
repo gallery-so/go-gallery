@@ -37,9 +37,6 @@ func NewKoala(ctx context.Context, q *db.Queries) *Koala {
 }
 
 func (k *Koala) RelevanceTo(userID persist.DBID, e db.FeedEntityScoringRow) (float64, error) {
-	k.mu.RLock()
-	defer k.mu.RUnlock()
-
 	if len(e.ContractIds) == 0 {
 		return k.scoreEdge(userID, e.ActorID)
 	}
@@ -93,8 +90,8 @@ func readMatrices(ctx context.Context, q *db.Queries) (userM, ratingM, displayM,
 
 func (k *Koala) update(ctx context.Context) {
 	userM, ratingM, displayM, simM, uL, cL := readMatrices(ctx, k.q)
-	k.mu.Lock()
-	defer k.mu.Unlock()
+	k.Mu.Lock()
+	defer k.Mu.Unlock()
 	k.userM = userM
 	k.ratingM = ratingM
 	k.displayM = displayM
