@@ -540,13 +540,15 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, mediaTyp
 				logger.For(ctx).Errorf("error unescaping uri: %s", err)
 				asString = turi.String()
 			}
-			idx := strings.IndexByte(asString, ',')
-			if idx == -1 {
-				buf := bytes.NewBuffer(util.RemoveBOM([]byte(asString)))
-				readerChan <- util.NewFileHeaderReader(buf, bufSize)
-				return
+			if strings.HasPrefix(asString, "data:") {
+				idx := strings.IndexByte(asString, ',')
+				if idx != -1 {
+					buf := bytes.NewBuffer(util.RemoveBOM([]byte(asString[idx+1:])))
+					readerChan <- util.NewFileHeaderReader(buf, bufSize)
+					return
+				}
 			}
-			buf := bytes.NewBuffer(util.RemoveBOM([]byte(asString[idx+1:])))
+			buf := bytes.NewBuffer(util.RemoveBOM([]byte(asString)))
 			readerChan <- util.NewFileHeaderReader(buf, bufSize)
 		default:
 			buf := bytes.NewBuffer([]byte(turi))
