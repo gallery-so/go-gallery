@@ -403,15 +403,14 @@ func newMultichainSet(
 
 // defaultWalletOverrides is a wire provider for wallet overrides
 func defaultWalletOverrides() multichain.WalletOverrideMap {
-	var evmWalletChains = []persist.Chain{persist.ChainETH, persist.ChainOptimism, persist.ChainPolygon, persist.ChainArbitrum, persist.ChainPOAP, persist.ChainZora, persist.ChainBase}
 	return multichain.WalletOverrideMap{
-		persist.ChainPOAP:     evmWalletChains,
-		persist.ChainOptimism: evmWalletChains,
-		persist.ChainPolygon:  evmWalletChains,
-		persist.ChainArbitrum: evmWalletChains,
-		persist.ChainETH:      evmWalletChains,
-		persist.ChainZora:     evmWalletChains,
-		persist.ChainBase:     evmWalletChains,
+		persist.ChainPOAP:     persist.EVMChains,
+		persist.ChainOptimism: persist.EVMChains,
+		persist.ChainPolygon:  persist.EVMChains,
+		persist.ChainArbitrum: persist.EVMChains,
+		persist.ChainETH:      persist.EVMChains,
+		persist.ChainZora:     persist.EVMChains,
+		persist.ChainBase:     persist.EVMChains,
 	}
 }
 
