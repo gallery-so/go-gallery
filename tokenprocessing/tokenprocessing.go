@@ -101,6 +101,7 @@ func setDefaults() {
 	viper.SetDefault("TOKEN_PROCESSING_URL", "http://localhost:6500")
 	viper.SetDefault("TOKEN_PROCESSING_QUEUE", "projects/gallery-local/locations/here/queues/token-processing")
 	viper.SetDefault("TASK_QUEUE_HOST", "")
+	viper.SetDefault("GOOGLE_CLOUD_PROJECT", "gallery-dev-322005")
 	viper.SetDefault("PUBSUB_EMULATOR_HOST", "")
 	viper.SetDefault("PUBSUB_TOPIC_NEW_NOTIFICATIONS", "dev-new-notifications")
 	viper.SetDefault("PUBSUB_TOPIC_UPDATED_NOTIFICATIONS", "dev-updated-notifications")

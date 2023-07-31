@@ -396,7 +396,7 @@ func (n *NotificationHandlers) subscribe(ctx context.Context, topic, name string
 func (n *NotificationHandlers) receiveNewNotificationsFromPubSub() {
 	sub, err := n.subscribe(context.Background(), env.GetString("PUBSUB_TOPIC_NEW_NOTIFICATIONS"), fmt.Sprintf("new-notifications-%s", persist.GenerateID()))
 	if err != nil {
-		logger.For(nil).Errorf("error creating updated notifications subscription: %s", err)
+		logger.For(nil).Errorf("error creating new notifications subscription: %s", err)
 		panic(err)
 	}
 
