@@ -1113,6 +1113,30 @@ func assignSocialToModel(ctx context.Context, prov persist.SocialProvider, socia
 			f.Bio = bio
 		}
 		result.Farcaster = f
+	case persist.SocialProviderLens:
+		logger.For(ctx).Infof("found lens social account: %+v", social)
+		l := &model.LensSocialAccount{
+			Type:     prov,
+			Display:  social.Display,
+			SocialID: social.ID,
+		}
+		name, ok := social.Metadata["name"].(string)
+		if ok {
+			l.Name = name
+		}
+		username, ok := social.Metadata["username"].(string)
+		if ok {
+			l.Username = username
+		}
+		profile, ok := social.Metadata["profile_image_url"].(string)
+		if ok {
+			l.ProfileImageURL = profile
+		}
+		bio, ok := social.Metadata["bio"].(string)
+		if ok {
+			l.Bio = bio
+		}
+		result.Lens = l
 	default:
 		return fmt.Errorf("unknown social provider %s", prov)
 	}
