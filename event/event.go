@@ -469,7 +469,7 @@ func (h notificationHandler) createNotificationDataForEvent(event db.Event) (dat
 		if event.ExternalID.String != "" {
 			data.UnauthedViewerIDs = []string{persist.NullStrToStr(event.ExternalID)}
 		}
-	case persist.ActionAdmiredFeedEvent:
+	case persist.ActionAdmiredFeedEvent, persist.ActionAdmiredPost:
 		if event.ActorID.String != "" {
 			data.AdmirerIDs = []persist.DBID{persist.NullStrToDBID(event.ActorID)}
 		}
@@ -497,17 +497,34 @@ func (h notificationHandler) findOwnerForNotificationFromEvent(event db.Event) (
 		}
 		return gallery.OwnerUserID, nil
 	case persist.ResourceTypeComment:
-		feedEvent, err := h.dataloaders.FeedEventByFeedEventID.Load(event.FeedEventID)
-		if err != nil {
-			return "", err
+		if event.FeedEventID != "" {
+			feedEvent, err := h.dataloaders.FeedEventByFeedEventID.Load(event.FeedEventID)
+			if err != nil {
+				return "", err
+			}
+			return feedEvent.OwnerID, nil
+		} else if event.PostID != "" {
+			post, err := h.dataloaders.PostByPostID.Load(event.PostID)
+			if err != nil {
+				return "", err
+			}
+			return post.ActorID, nil
 		}
-		return feedEvent.OwnerID, nil
+
 	case persist.ResourceTypeAdmire:
-		feedEvent, err := h.dataloaders.FeedEventByFeedEventID.Load(event.FeedEventID)
-		if err != nil {
-			return "", err
+		if event.FeedEventID != "" {
+			feedEvent, err := h.dataloaders.FeedEventByFeedEventID.Load(event.FeedEventID)
+			if err != nil {
+				return "", err
+			}
+			return feedEvent.OwnerID, nil
+		} else if event.PostID != "" {
+			post, err := h.dataloaders.PostByPostID.Load(event.PostID)
+			if err != nil {
+				return "", err
+			}
+			return post.ActorID, nil
 		}
-		return feedEvent.OwnerID, nil
 	case persist.ResourceTypeUser:
 		return event.SubjectID, nil
 	case persist.ResourceTypeToken:
