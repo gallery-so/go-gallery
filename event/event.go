@@ -57,8 +57,10 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 	notificationHandler := newNotificationHandler(notif, disableDataloaderCaching, queries)
 	sender.addDelayedHandler(notifications, persist.ActionUserFollowedUsers, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionAdmiredFeedEvent, notificationHandler)
+	sender.addDelayedHandler(notifications, persist.ActionAdmiredPost, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionViewedGallery, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionCommentedOnFeedEvent, notificationHandler)
+	sender.addDelayedHandler(notifications, persist.ActionCommentedOnPost, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionNewTokensReceived, notificationHandler)
 
 	sender.feed = feed

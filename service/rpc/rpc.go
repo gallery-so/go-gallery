@@ -567,7 +567,9 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, mediaTyp
 			return nil, mediaType, err
 		}
 		uriType := persist.TokenURI(h).Type()
+		logger.For(ctx).Debugf("uriType for recurse: %s", uriType)
 		if recurseRawReturns && uriType.IsRaw() {
+			logger.For(ctx).Infof("recurseRawReturns is true, recursing on raw uri: %s", util.TruncateWithEllipsis(string(h), 50))
 			full := &bytes.Buffer{}
 			_, err := io.Copy(full, reader)
 			if err != nil {
