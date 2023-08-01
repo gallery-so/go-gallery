@@ -49,11 +49,12 @@ const args = [
 
 process.on('unhandledRejection', (reason, p) => {
   console.error('Unhandled Rejection at:', p, 'reason:', reason);
-  // Application specific logging, throwing an error, or other logic here
+  console.log('Unhandled Rejection at:', p, 'reason:', reason);
 });
 
 process.on('uncaughtException', (err, origin) => {
   console.error(`Caught exception: ${err}\n` + `Exception origin: ${origin}`);
+  console.log(`Caught exception: ${err}\n` + `Exception origin: ${origin}`);
 });
 
 async function createAnimation() {
