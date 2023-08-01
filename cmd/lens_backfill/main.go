@@ -30,7 +30,7 @@ func main() {
 
 	ctx := context.Background()
 
-	ctag, err := pg.Exec(ctx, `update contracts set is_provider_marked_spam = true where deleted = false and lower(name) like '%.lens-follower';`)
+	ctag, err := pg.Exec(ctx, `update contracts set is_provider_marked_spam = true where deleted = false and lower(name) like '%.lens-follower' and chain = 2;`)
 	if err != nil {
 		panic(err)
 	}
@@ -38,7 +38,7 @@ func main() {
 	logrus.Infof("marked %d contracts as spam", ctag.RowsAffected())
 
 	// get every wallet with their owner user ID
-	rows, err := pg.Query(ctx, `select u.id, w.address from users u join wallets w on w.id = any(u.wallets) where u.deleted = false and w.chain = 0 and w.deleted = false and u.universal = false order by u.created_at desc;`)
+	rows, err := pg.Query(ctx, `select u.id, w.address from pii.user_view u join wallets w on w.id = any(u.wallets) where u.deleted = false and w.chain = 0 and w.deleted = false and u.universal = false and u.pii_socials->>'Lens' is null order by u.created_at desc;`)
 	if err != nil {
 		panic(err)
 	}
