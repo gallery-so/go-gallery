@@ -38,7 +38,7 @@ func main() {
 	logrus.Infof("marked %d contracts as spam", ctag.RowsAffected())
 
 	// get every wallet with their owner user ID
-	rows, err := pg.Query(ctx, `select u.id, w.address from pii.user_view u join wallets w on w.id = any(u.wallets) where u.deleted = false and w.chain = 0 and w.deleted = false and u.universal = false and u.pii_socials->>'Lens' is null order by u.created_at desc;`)
+	rows, err := pg.Query(ctx, `select u.id, w.address from pii.user_view u join wallets w on w.id = any(u.wallets) where u.deleted = false and w.chain = 0 and w.deleted = false and u.universal = false and u.pii_socials->>'Lens' is null order by u.created_at asc;`)
 	if err != nil {
 		panic(err)
 	}
@@ -60,7 +60,7 @@ func main() {
 			if err != nil {
 				logrus.Error(err)
 				if strings.Contains(err.Error(), "too many requests") {
-					time.Sleep(2 * time.Minute)
+					time.Sleep(4 * time.Minute)
 					u, err = l.DefaultProfileByAddress(ctx, walletAddress)
 					if err != nil {
 						logrus.Error(err)
