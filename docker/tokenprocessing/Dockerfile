@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM golang:1.19-bullseye
+FROM golang:1.19-bookworm
 
 ARG VERSION
 ARG FFMPEG_VERSION
@@ -27,7 +27,7 @@ RUN node -v
 RUN npm -v
 
 RUN apt-get update \
-    && apt-get install -y wget gnupg \
+    && apt-get install -y wget gnupg ca-certificates \
     && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
     && sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list' \
     && apt-get update \
@@ -53,7 +53,6 @@ RUN go build -o ./bin/tokenprocessing ./cmd/tokenprocessing/main.go
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD true
 ENV PUPPETEER_CACHE_FOLDER=/tmp/puppeteer_cache
 RUN mkdir -p /tmp/puppeteer_cache && chown -R nobody:nogroup /tmp/puppeteer_cache
-
 
 ENV VERSION=$VERSION
 USER nobody

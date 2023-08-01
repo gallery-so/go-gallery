@@ -45,6 +45,7 @@ const args = [
   '--disable-software-rasterizer',
   '--disable-gpu',
   '--disable-gpu-compositing',
+  '--disable-inotify',
 ];
 
 process.on('unhandledRejection', (reason, p) => {
