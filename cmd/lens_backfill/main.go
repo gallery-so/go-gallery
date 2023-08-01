@@ -60,6 +60,7 @@ func main() {
 			if err != nil {
 				logrus.Error(err)
 				if strings.Contains(err.Error(), "too many requests") {
+					time.Sleep(2 * time.Minute)
 					u, err = l.DefaultProfileByAddress(ctx, walletAddress)
 					if err != nil {
 						logrus.Error(err)
