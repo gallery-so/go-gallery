@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -58,10 +59,13 @@ func main() {
 			u, err := l.DefaultProfileByAddress(ctx, walletAddress)
 			if err != nil {
 				logrus.Error(err)
-				time.Sleep(15 * time.Second)
-				u, err = l.DefaultProfileByAddress(ctx, walletAddress)
-				if err != nil {
-					logrus.Error(err)
+				if strings.Contains(err.Error(), "too many requests") {
+					u, err = l.DefaultProfileByAddress(ctx, walletAddress)
+					if err != nil {
+						logrus.Error(err)
+						return nil
+					}
+				} else {
 					return nil
 				}
 			}
