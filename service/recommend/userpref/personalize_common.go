@@ -1,4 +1,4 @@
-package koala
+package userpref
 
 import (
 	"context"
@@ -18,7 +18,7 @@ const contextKey = "personalization.instance"
 
 var ErrNoInputData = errors.New("no personalization input data")
 
-type Koala struct {
+type Personalization struct {
 	// userM is a matrix of size u x u where a non-zero value at m[i][j] is an edge from user i to user j
 	userM *sparse.CSR
 	// ratingM is a matrix of size u x k where the value at m[i][j] is how many held tokens of community j are displayed by user i
@@ -35,17 +35,17 @@ type Koala struct {
 	q  *db.Queries
 }
 
-func AddTo(c *gin.Context, k *Koala) {
+func AddTo(c *gin.Context, k *Personalization) {
 	c.Set(contextKey, k)
 }
 
-func For(ctx context.Context) *Koala {
+func For(ctx context.Context) *Personalization {
 	gc := util.MustGetGinContext(ctx)
-	return gc.Value(contextKey).(*Koala)
+	return gc.Value(contextKey).(*Personalization)
 }
 
 // Loop is the main event loop that updates the personalization matrices
-func (k *Koala) Loop(ctx context.Context, ticker *time.Ticker) {
+func (k *Personalization) Loop(ctx context.Context, ticker *time.Ticker) {
 	go func() {
 		for {
 			select {

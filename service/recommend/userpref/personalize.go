@@ -1,7 +1,7 @@
 //go:build !norec
 // +build !norec
 
-package koala
+package userpref
 
 import (
 	"context"
@@ -30,13 +30,13 @@ var sharedContracts map[persist.ChainAddress]bool = map[persist.ChainAddress]boo
 }
 var sharedContractsStr = keys(sharedContracts)
 
-func NewKoala(ctx context.Context, q *db.Queries) *Koala {
-	k := &Koala{q: q}
+func NewPersonalization(ctx context.Context, q *db.Queries) *Personalization {
+	k := &Personalization{q: q}
 	k.update(ctx)
 	return k
 }
 
-func (k *Koala) RelevanceTo(userID persist.DBID, e db.FeedEntityScoringRow) (float64, error) {
+func (k *Personalization) RelevanceTo(userID persist.DBID, e db.FeedEntityScoringRow) (float64, error) {
 	if len(e.ContractIds) == 0 {
 		return k.scoreEdge(userID, e.ActorID)
 	}
@@ -60,7 +60,7 @@ func (k *Koala) RelevanceTo(userID persist.DBID, e db.FeedEntityScoringRow) (flo
 	return relevanceScore + edgeScore, nil
 }
 
-func (k *Koala) scoreEdge(viewerID, queryID persist.DBID) (float64, error) {
+func (k *Personalization) scoreEdge(viewerID, queryID persist.DBID) (float64, error) {
 	vIdx, vOK := k.uL[viewerID]
 	qIdx, qOK := k.uL[queryID]
 	if !vOK || !qOK {
@@ -71,7 +71,7 @@ func (k *Koala) scoreEdge(viewerID, queryID persist.DBID) (float64, error) {
 	return socialScore + similarityScore, nil
 }
 
-func (k *Koala) scoreRelevance(viewerID, contractID persist.DBID) (float64, error) {
+func (k *Personalization) scoreRelevance(viewerID, contractID persist.DBID) (float64, error) {
 	vIdx, vOK := k.uL[viewerID]
 	cIdx, cOK := k.cL[contractID]
 	if !vOK || !cOK {
@@ -88,7 +88,7 @@ func readMatrices(ctx context.Context, q *db.Queries) (userM, ratingM, displayM,
 	return userM, ratingM, displayM, simM, uL, cL
 }
 
-func (k *Koala) update(ctx context.Context) {
+func (k *Personalization) update(ctx context.Context) {
 	userM, ratingM, displayM, simM, uL, cL := readMatrices(ctx, k.q)
 	k.Mu.Lock()
 	defer k.Mu.Unlock()

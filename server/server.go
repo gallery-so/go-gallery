@@ -33,7 +33,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
 	"github.com/mikeydub/go-gallery/service/recommend"
-	"github.com/mikeydub/go-gallery/service/recommend/koala"
+	"github.com/mikeydub/go-gallery/service/recommend/userpref"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
@@ -59,8 +59,8 @@ func Init() {
 	c := ClientInit(ctx)
 	provider, _ := NewMultichainProvider(ctx, SetDefaults)
 	recommender := recommend.NewRecommender(c.Queries)
-	k := koala.NewKoala(ctx, c.Queries)
-	router := CoreInit(ctx, c, provider, recommender, k)
+	p := userpref.NewPersonalization(ctx, c.Queries)
+	router := CoreInit(ctx, c, provider, recommender, p)
 	http.Handle("/", router)
 }
 
@@ -107,7 +107,7 @@ func ClientInit(ctx context.Context) *Clients {
 
 // CoreInit initializes core server functionality. This is abstracted
 // so the test server can also utilize it
-func CoreInit(ctx context.Context, c *Clients, provider *multichain.Provider, recommender *recommend.Recommender, k *koala.Koala) *gin.Engine {
+func CoreInit(ctx context.Context, c *Clients, provider *multichain.Provider, recommender *recommend.Recommender, p *userpref.Personalization) *gin.Engine {
 	logger.For(nil).Info("initializing server...")
 
 	if env.GetString("ENV") != "production" {
@@ -130,9 +130,9 @@ func CoreInit(ctx context.Context, c *Clients, provider *multichain.Provider, re
 	authRefreshCache := redis.NewCache(redis.AuthTokenForceRefreshCache)
 
 	recommender.Loop(ctx, time.NewTicker(time.Hour))
-	k.Loop(ctx, time.NewTicker(time.Minute*15))
+	p.Loop(ctx, time.NewTicker(time.Minute*15))
 
-	return handlersInit(router, c.Repos, c.Queries, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, socialCache, authRefreshCache, c.MagicLinkClient, recommender, k)
+	return handlersInit(router, c.Repos, c.Queries, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, socialCache, authRefreshCache, c.MagicLinkClient, recommender, p)
 }
 
 func newSecretsClient() *secretmanager.Client {

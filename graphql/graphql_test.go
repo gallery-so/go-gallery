@@ -175,8 +175,8 @@ func testSuggestedUsersForViewer(t *testing.T) {
 		userB.ID,
 		userC.ID,
 	})
-	k := newStubKoala(t)
-	handler := server.CoreInit(ctx, clients, provider, recommender, k)
+	p := newStubPersonaliztion(t)
+	handler := server.CoreInit(ctx, clients, provider, recommender, p)
 	c := customHandlerClient(t, handler, withJWTOpt(t, userF.ID))
 
 	response, err := viewerQuery(ctx, c)
@@ -1529,8 +1529,8 @@ func defaultHandler(t *testing.T) http.Handler {
 	c := server.ClientInit(ctx)
 	p, cleanup := server.NewMultichainProvider(ctx, server.SetDefaults)
 	r := newStubRecommender(t, []persist.DBID{})
-	k := newStubKoala(t)
-	handler := server.CoreInit(ctx, c, p, r, k)
+	pnl := newStubPersonaliztion(t)
+	handler := server.CoreInit(ctx, c, p, r, pnl)
 	t.Cleanup(func() {
 		c.Close()
 		cleanup()
@@ -1544,9 +1544,9 @@ func handlerWithProviders(t *testing.T, sendTokens multichain.SendTokens, provid
 	c := server.ClientInit(context.Background())
 	provider := newMultichainProvider(c, sendTokens, providers)
 	recommender := newStubRecommender(t, []persist.DBID{})
-	k := newStubKoala(t)
+	p := newStubPersonaliztion(t)
 	t.Cleanup(c.Close)
-	return server.CoreInit(ctx, c, &provider, recommender, k)
+	return server.CoreInit(ctx, c, &provider, recommender, p)
 }
 
 // newMultichainProvider a new multichain provider configured with the given providers

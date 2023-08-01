@@ -18,7 +18,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/recommend"
-	"github.com/mikeydub/go-gallery/service/recommend/koala"
+	"github.com/mikeydub/go-gallery/service/recommend/userpref"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/tokenprocessing"
 	"github.com/mikeydub/go-gallery/util"
@@ -135,9 +135,9 @@ func newStubRecommender(t *testing.T, userIDs []persist.DBID) *recommend.Recomme
 	}
 }
 
-// newStubKoala returns a stub of the koala recommender
-func newStubKoala(t *testing.T) *koala.Koala {
-	return &koala.Koala{}
+// newStubPersonalization returns a stub of the personalization service
+func newStubPersonaliztion(t *testing.T) *userpref.Personalization {
+	return &userpref.Personalization{}
 }
 
 // sendTokensRecorder records tokenprocessing messages

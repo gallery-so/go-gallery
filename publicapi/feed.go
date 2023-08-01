@@ -19,7 +19,7 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/recommend/koala"
+	"github.com/mikeydub/go-gallery/service/recommend/userpref"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -320,14 +320,9 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 			if err != nil {
 				return nil, nil, err
 			}
-			entityTypes, entityIDs = func() ([]persist.FeedEntityType, []persist.DBID) {
-				k := koala.For(ctx)
-				k.Mu.RLock()
-				defer k.Mu.RUnlock()
-				return api.scoreFeedEntities(ctx, trendData, func(e db.FeedEntityScoringRow) float64 {
-					return timeFactor(e.CreatedAt, now) * engagementFactor(int(e.Interactions))
-				})
-			}()
+			entityTypes, entityIDs = api.scoreFeedEntities(ctx, trendData, func(e db.FeedEntityScoringRow) float64 {
+				return timeFactor(e.CreatedAt, now) * engagementFactor(int(e.Interactions))
+			})
 			return entityTypes, entityIDs, nil
 		}
 
@@ -449,10 +444,14 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 			return nil, PageInfo{}, err
 		}
 
-		entityTypes, entityIDs = api.scoreFeedEntities(ctx, trendData, func(e db.FeedEntityScoringRow) float64 {
-			k := koala.For(ctx)
-			return scoreFeedEntity(k, userID, e, now, int(e.Interactions))
-		})
+		entityTypes, entityIDs = func() ([]persist.FeedEntityType, []persist.DBID) {
+			p := userpref.For(ctx)
+			p.Mu.RLock()
+			defer p.Mu.RUnlock()
+			return api.scoreFeedEntities(ctx, trendData, func(e db.FeedEntityScoringRow) float64 {
+				return scoreFeedEntity(p, userID, e, now, int(e.Interactions))
+			})
+		}()
 	}
 
 	queryFunc := func(params feedPagingParams) ([]any, error) {
@@ -699,11 +698,11 @@ func (api FeedAPI) scoreFeedEntities(ctx context.Context, trendData []db.FeedEnt
 	return entityTypes, entityIDs
 }
 
-func scoreFeedEntity(k *koala.Koala, viewerID persist.DBID, e db.FeedEntityScoringRow, t time.Time, interactions int) float64 {
+func scoreFeedEntity(p *userpref.Personalization, viewerID persist.DBID, e db.FeedEntityScoringRow, t time.Time, interactions int) float64 {
 	timeF := timeFactor(e.CreatedAt, t)
 	engagementF := engagementFactor(interactions)
-	personalizationF, err := k.RelevanceTo(viewerID, e)
-	if errors.Is(err, koala.ErrNoInputData) {
+	personalizationF, err := p.RelevanceTo(viewerID, e)
+	if errors.Is(err, userpref.ErrNoInputData) {
 		// Use a default value of 0.1 so that it isn't completely penalized because of missing data.
 		personalizationF = 0.1
 	}
