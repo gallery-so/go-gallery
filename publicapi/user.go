@@ -1030,10 +1030,7 @@ func (api UserAPI) GetSocials(ctx context.Context, userID persist.DBID) (*model.
 	result := &model.SocialAccounts{}
 
 	for prov, social := range socials {
-		err := assignSocialToModel(ctx, prov, social, result)
-		if err != nil {
-			return nil, err
-		}
+		assignSocialToModel(ctx, prov, social, result)
 	}
 
 	return result, nil
@@ -1058,16 +1055,14 @@ func (api UserAPI) GetDisplayedSocials(ctx context.Context, userID persist.DBID)
 		if !social.Display {
 			continue
 		}
-		err := assignSocialToModel(ctx, prov, social, result)
-		if err != nil {
-			return nil, err
-		}
+		assignSocialToModel(ctx, prov, social, result)
+
 	}
 
 	return result, nil
 }
 
-func assignSocialToModel(ctx context.Context, prov persist.SocialProvider, social persist.SocialUserIdentifiers, result *model.SocialAccounts) error {
+func assignSocialToModel(ctx context.Context, prov persist.SocialProvider, social persist.SocialUserIdentifiers, result *model.SocialAccounts) {
 	switch prov {
 	case persist.SocialProviderTwitter:
 		logger.For(ctx).Infof("found twitter social account: %+v", social)
@@ -1114,9 +1109,8 @@ func assignSocialToModel(ctx context.Context, prov persist.SocialProvider, socia
 		}
 		result.Farcaster = f
 	default:
-		return fmt.Errorf("unknown social provider %s", prov)
+		logger.For(ctx).Errorf("unknown social provider %s", prov)
 	}
-	return nil
 }
 
 func (api UserAPI) UpdateUserSocialDisplayed(ctx context.Context, socialType persist.SocialProvider, displayed bool) error {
