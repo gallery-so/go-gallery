@@ -47,6 +47,15 @@ const args = [
   '--disable-gpu-compositing',
 ];
 
+process.on('unhandledRejection', (reason, p) => {
+  console.error('Unhandled Rejection at:', p, 'reason:', reason);
+  // Application specific logging, throwing an error, or other logic here
+});
+
+process.on('uncaughtException', (err, origin) => {
+  console.error(`Caught exception: ${err}\n` + `Exception origin: ${origin}`);
+});
+
 async function createAnimation() {
   const url = process.argv[2];
   const browser = await puppeteer.launch({
