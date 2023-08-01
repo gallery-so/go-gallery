@@ -9,9 +9,22 @@ RUN apt-get update && \
     apt-get install -y ffmpeg=$FFMPEG_VERSION imagemagick curl xz-utils && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Node.js and npm
-RUN curl -fsSL https://deb.nodesource.com/setup_16.x | bash - && \
-    apt-get install -y nodejs
+ENV NVM_DIR /usr/local/nvm
+ENV NODE_VERSION 20.5.0
+
+RUN mkdir -p $NVM_DIR \
+    && curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash \
+    && . $NVM_DIR/nvm.sh \
+    && nvm install $NODE_VERSION \
+    && nvm alias default $NODE_VERSION \
+    && nvm use default
+
+ENV NODE_PATH $NVM_DIR/versions/node/v$NODE_VERSION/lib/node_modules
+ENV PATH $NVM_DIR/versions/node/v$NODE_VERSION/bin:$PATH
+
+# Verify installation
+RUN node -v
+RUN npm -v
 
 RUN apt-get update \
     && apt-get install -y wget gnupg \
@@ -33,11 +46,8 @@ RUN go mod download
 
 # Copy the rest of the application
 COPY . /app
-
 RUN npm ci
 RUN go build -o ./bin/tokenprocessing ./cmd/tokenprocessing/main.go
-
-# Run everything after as non-privileged user.
 
 # Tell Puppeteer to skip installing Chrome. We'll be using the installed package.
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD true
