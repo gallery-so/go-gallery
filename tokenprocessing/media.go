@@ -724,7 +724,7 @@ func rasterizeAndCacheSVGMedia(ctx context.Context, svgURL string, tids persist.
 	output, err := cmd.Output()
 	if err != nil {
 		persist.FailStep(subMeta.SVGRasterize)
-		return nil, fmt.Errorf("could not rasterize svg: %s", err)
+		return nil, fmt.Errorf("could not rasterize svg: %s (%s)", err, string(output))
 	}
 
 	objects := make([]cachedMediaObject, 0, 2)

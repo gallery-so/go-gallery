@@ -11,9 +11,7 @@ RUN apt-get update && \
 
 # Install Node.js and npm
 RUN curl -fsSL https://deb.nodesource.com/setup_16.x | bash - && \
-    apt-get install -y nodejs && \
-    npm install -g npm@9.8.1 && \
-    npm --version && node --version
+    apt-get install -y nodejs
 
 # Install certs
 ADD root-certs /usr/local/share/ca-certificates/
