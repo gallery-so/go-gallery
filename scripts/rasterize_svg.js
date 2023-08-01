@@ -61,6 +61,7 @@ process.on('uncaughtException', (err, origin) => {
 async function createAnimation() {
   const url = process.argv[2];
   const browser = await puppeteer.launch({
+    executablePath: 'google-chrome-stable',
     headless: 'new',
     args: args,
   });
