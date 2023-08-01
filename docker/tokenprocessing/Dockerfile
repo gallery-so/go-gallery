@@ -51,6 +51,9 @@ RUN go build -o ./bin/tokenprocessing ./cmd/tokenprocessing/main.go
 
 # Tell Puppeteer to skip installing Chrome. We'll be using the installed package.
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD true
+ENV PUPPETEER_CACHE_FOLDER=/tmp/puppeteer_cache
+RUN mkdir -p /tmp/puppeteer_cache && chown -R nobody:nogroup /tmp/puppeteer_cache
+
 
 ENV VERSION=$VERSION
 USER nobody
