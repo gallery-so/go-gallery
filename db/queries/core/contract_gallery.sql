@@ -11,6 +11,7 @@ insert into contracts(id, deleted, version, created_at, address, symbol, name, o
     , unnest(@chain::int[])
     , unnest(@description::varchar[])
     , unnest(@profile_image_url::varchar[])
+    , unnest(@provider_marked_spam::bool[])
 )
 on conflict (chain, address) where parent_id is null
 do update set symbol = excluded.symbol

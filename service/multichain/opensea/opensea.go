@@ -683,6 +683,10 @@ func assetToToken(asset Asset, block persist.BlockNumber, tokenOwner persist.Add
 	if err != nil {
 		return multichain.ChainAgnosticToken{}, err
 	}
+	isSpam := util.ToPointer(false)
+	if contractNameIsSpam(asset.Contract.Name) {
+		isSpam = util.ToPointer(true)
+	}
 	return multichain.ChainAgnosticToken{
 		TokenType: tokenType,
 		Descriptors: multichain.ChainAgnosticTokenDescriptors{
@@ -700,7 +704,7 @@ func assetToToken(asset Asset, block persist.BlockNumber, tokenOwner persist.Add
 		BlockNumber:     block,
 		TokenMetadata:   metadataFromAsset(asset),
 		Quantity:        "1",
-		IsSpam:          util.ToPointer(false), // OpenSea filters spam on their side
+		IsSpam:          isSpam, // OpenSea filters spam on their side
 	}, nil
 }
 
@@ -719,6 +723,10 @@ func metadataFromAsset(asset Asset) persist.TokenMetadata {
 }
 
 func contractFromAsset(asset Asset, block persist.BlockNumber) multichain.ChainAgnosticContract {
+	isSpam := util.ToPointer(false)
+	if contractNameIsSpam(asset.Contract.Name) {
+		isSpam = util.ToPointer(true)
+	}
 	return multichain.ChainAgnosticContract{
 		Address: persist.Address(asset.Contract.Address.String()),
 		Descriptors: multichain.ChainAgnosticContractDescriptors{
@@ -728,6 +736,7 @@ func contractFromAsset(asset Asset, block persist.BlockNumber) multichain.ChainA
 			Description:     asset.Collection.Description,
 			ProfileImageURL: asset.Collection.ImageURL,
 		},
+		IsSpam:      isSpam,
 		LatestBlock: block,
 	}
 }
@@ -822,6 +831,10 @@ func contractToContract(ctx context.Context, openseaContract Contract, ethClient
 	if err != nil {
 		return multichain.ChainAgnosticContract{}, err
 	}
+	isSpam := util.ToPointer(false)
+	if contractNameIsSpam(openseaContract.Name) {
+		isSpam = util.ToPointer(true)
+	}
 	return multichain.ChainAgnosticContract{
 		Address: persist.Address(openseaContract.Address.String()),
 		Descriptors: multichain.ChainAgnosticContractDescriptors{
@@ -830,6 +843,7 @@ func contractToContract(ctx context.Context, openseaContract Contract, ethClient
 			CreatorAddress: persist.Address(openseaContract.Collection.PayoutAddress),
 		},
 
+		IsSpam:      isSpam,
 		LatestBlock: persist.BlockNumber(block),
 	}, nil
 }
@@ -943,4 +957,8 @@ func setTokenID(url *url.URL, tokenID TokenID) {
 	query := url.Query()
 	query.Add("token_ids", string(tokenID))
 	url.RawQuery = query.Encode()
+}
+
+func contractNameIsSpam(name string) bool {
+	return strings.HasSuffix(strings.ToLower(name), ".lens-follower")
 }

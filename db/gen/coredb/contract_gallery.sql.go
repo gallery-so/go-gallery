@@ -105,6 +105,7 @@ insert into contracts(id, deleted, version, created_at, address, symbol, name, o
     , unnest($7::int[])
     , unnest($8::varchar[])
     , unnest($9::varchar[])
+    , unnest($10::bool[])
 )
 on conflict (chain, address) where parent_id is null
 do update set symbol = excluded.symbol
@@ -112,7 +113,7 @@ do update set symbol = excluded.symbol
   , name = excluded.name
   , owner_address =
       case
-          when nullif(contracts.owner_address, '') is null or ($10::bool and nullif (excluded.owner_address, '') is not null)
+          when nullif(contracts.owner_address, '') is null or ($11::bool and nullif (excluded.owner_address, '') is not null)
             then excluded.owner_address
           else
             contracts.owner_address
@@ -134,6 +135,7 @@ type UpsertParentContractsParams struct {
 	Chain                    []int32  `json:"chain"`
 	Description              []string `json:"description"`
 	ProfileImageUrl          []string `json:"profile_image_url"`
+	ProviderMarkedSpam       []bool   `json:"provider_marked_spam"`
 	CanOverwriteOwnerAddress bool     `json:"can_overwrite_owner_address"`
 }
 
@@ -148,6 +150,7 @@ func (q *Queries) UpsertParentContracts(ctx context.Context, arg UpsertParentCon
 		arg.Chain,
 		arg.Description,
 		arg.ProfileImageUrl,
+		arg.ProviderMarkedSpam,
 		arg.CanOverwriteOwnerAddress,
 	)
 	if err != nil {

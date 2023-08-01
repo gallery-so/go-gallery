@@ -29,13 +29,20 @@ func main() {
 
 	ctx := context.Background()
 
+	ctag, err := pg.Exec(ctx, `update contracts set is_provider_marked_spam = true where deleted = false and lower(name) like '%.lens-follower';`)
+	if err != nil {
+		panic(err)
+	}
+
+	logrus.Infof("marked %d contracts as spam", ctag.RowsAffected())
+
 	// get every wallet with their owner user ID
 	rows, err := pg.Query(ctx, `select u.id, w.address from users u join wallets w on w.id = any(u.wallets) where u.deleted = false and w.chain = 0 and w.deleted = false and u.universal = false order by u.created_at desc;`)
 	if err != nil {
 		panic(err)
 	}
 
-	p := pool.New().WithMaxGoroutines(10).WithErrors()
+	p := pool.New().WithMaxGoroutines(3).WithErrors()
 
 	for rows.Next() {
 		var userID persist.DBID
@@ -51,7 +58,12 @@ func main() {
 			u, err := l.DefaultProfileByAddress(ctx, walletAddress)
 			if err != nil {
 				logrus.Error(err)
-				return nil
+				time.Sleep(15 * time.Second)
+				u, err = l.DefaultProfileByAddress(ctx, walletAddress)
+				if err != nil {
+					logrus.Error(err)
+					return nil
+				}
 			}
 			logrus.Infof("got user %s %s %s %s", u.Name, u.Handle, u.Picture.Optimized.URL, u.Bio)
 			return queries.AddSocialToUser(ctx, coredb.AddSocialToUserParams{
