@@ -47,6 +47,10 @@ func NewClient(ctx context.Context) *pubsub.Client {
 		}
 	}
 
+	if projectID == "" {
+		panic("GOOGLE_CLOUD_PROJECT env var not set")
+	}
+
 	pub, err := pubsub.NewClient(ctx, projectID, options...)
 	if err != nil {
 		panic(err)
