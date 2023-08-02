@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v4"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/lens"
@@ -36,11 +37,20 @@ func main() {
 	}
 
 	logrus.Infof("marked %d contracts as spam", ctag.RowsAffected())
+	var rows pgx.Rows
 
-	// get every wallet with their owner user ID
-	rows, err := pg.Query(ctx, `select u.id, w.address from pii.user_view u join wallets w on w.id = any(u.wallets) where u.deleted = false and w.chain = 0 and w.deleted = false and u.universal = false and u.pii_socials->>'Lens' is null order by u.created_at asc;`)
-	if err != nil {
-		panic(err)
+	if env.GetString("START_ID") != "" {
+		// get every wallet with their owner user ID
+		rows, err = pg.Query(ctx, `select u.id, w.address from pii.user_view u join wallets w on w.id = any(u.wallets) where u.deleted = false and w.chain = 0 and w.deleted = false and u.universal = false and u.pii_socials->>'Lens' is null and u.id < $1 order by u.created_at desc;`, env.GetString("START_ID"))
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		// get every wallet with their owner user ID
+		rows, err = pg.Query(ctx, `select u.id, w.address from pii.user_view u join wallets w on w.id = any(u.wallets) where u.deleted = false and w.chain = 0 and w.deleted = false and u.universal = false and u.pii_socials->>'Lens' is null order by u.created_at desc;`)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	p := pool.New().WithMaxGoroutines(3).WithErrors()
@@ -106,6 +116,7 @@ func setDefaults() {
 	viper.SetDefault("POSTGRES_USER", "gallery_backend")
 	viper.SetDefault("POSTGRES_PASSWORD", "")
 	viper.SetDefault("POSTGRES_DB", "postgres")
+	viper.SetDefault("START_ID", "")
 
 	viper.AutomaticEnv()
 
