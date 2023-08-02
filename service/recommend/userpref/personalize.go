@@ -243,11 +243,6 @@ func readMatrices(ctx context.Context, q *db.Queries) *personalizationMatrices {
 	}
 }
 
-type loadStatus struct {
-	UpdatedAt redisTs
-	Key       string
-}
-
 type redisTs time.Time
 
 func (r redisTs) MarshalBinary() ([]byte, error) {
