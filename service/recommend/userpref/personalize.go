@@ -6,12 +6,15 @@ package userpref
 import (
 	"context"
 	"fmt"
+	"time"
 
+	redispkg "github.com/go-redis/redis/v8"
 	"github.com/james-bowman/sparse"
-	"gonum.org/v1/gonum/mat"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/redis"
+	"github.com/mikeydub/go-gallery/util"
 )
 
 // sharedContracts are excluded because of their low specificity
@@ -28,7 +31,6 @@ var sharedContracts map[persist.ChainAddress]bool = map[persist.ChainAddress]boo
 	persist.NewChainAddress("0x2a46f2ffd99e19a89476e2f62270e0a35bbf0756", persist.ChainETH): true, // MakersTokenV2
 	persist.NewChainAddress("0x22c1f6050e56d2876009903609a2cc3fef83b415", persist.ChainETH): true, // POAP
 }
-var sharedContractsStr = keys(sharedContracts)
 
 func NewPersonalization(ctx context.Context, q *db.Queries) *Personalization {
 	k := &Personalization{q: q}
@@ -36,9 +38,11 @@ func NewPersonalization(ctx context.Context, q *db.Queries) *Personalization {
 	return k
 }
 
-func (k *Personalization) RelevanceTo(userID persist.DBID, e db.FeedEntityScoringRow) (float64, error) {
-	if len(e.ContractIds) == 0 {
-		return k.scoreEdge(userID, e.ActorID)
+func (p *Personalization) RelevanceTo(userID persist.DBID, e db.FeedEntityScoringRow) (float64, error) {
+	// We don't have personalization data for this user yet
+	_, vOK := p.pM.uL[userID]
+	if !vOK {
+		return 0, ErrNoInputData
 	}
 
 	var relevanceScore float64
@@ -47,57 +51,182 @@ func (k *Personalization) RelevanceTo(userID persist.DBID, e db.FeedEntityScorin
 		if relevanceScore == 1 {
 			break
 		}
-		if s, _ := k.scoreRelevance(userID, contractID); s > relevanceScore {
+		if s, _ := p.scoreRelevance(userID, contractID); s > relevanceScore {
 			relevanceScore = s
 		}
 	}
 
-	edgeScore, err := k.scoreEdge(userID, e.ActorID)
-	if err != nil {
-		return relevanceScore, err
-	}
-
+	edgeScore, _ := p.scoreEdge(userID, e.ActorID)
 	return relevanceScore + edgeScore, nil
 }
 
-func (k *Personalization) scoreEdge(viewerID, queryID persist.DBID) (float64, error) {
-	vIdx, vOK := k.uL[viewerID]
-	qIdx, qOK := k.uL[queryID]
+func (p *Personalization) scoreEdge(viewerID, queryID persist.DBID) (float64, error) {
+	vIdx, vOK := p.pM.uL[viewerID]
+	qIdx, qOK := p.pM.uL[queryID]
 	if !vOK || !qOK {
 		return 0, ErrNoInputData
 	}
-	socialScore := calcSocialScore(k.userM, vIdx, qIdx)
-	similarityScore := calcSimilarityScore(k.simM, vIdx, qIdx)
+	socialScore := calcSocialScore(p.pM.userM, vIdx, qIdx)
+	similarityScore := calcSimilarityScore(p.pM.simM, vIdx, qIdx)
 	return socialScore + similarityScore, nil
 }
 
-func (k *Personalization) scoreRelevance(viewerID, contractID persist.DBID) (float64, error) {
-	vIdx, vOK := k.uL[viewerID]
-	cIdx, cOK := k.cL[contractID]
+func (p *Personalization) scoreRelevance(viewerID, contractID persist.DBID) (float64, error) {
+	vIdx, vOK := p.pM.uL[viewerID]
+	cIdx, cOK := p.pM.cL[contractID]
 	if !vOK || !cOK {
 		return 0, ErrNoInputData
 	}
-	return calcRelevanceScore(k.ratingM, k.displayM, vIdx, cIdx), nil
+	return calcRelevanceScore(p.pM.ratingM, p.pM.displayM, vIdx, cIdx), nil
 }
 
-func readMatrices(ctx context.Context, q *db.Queries) (userM, ratingM, displayM, simM *sparse.CSR, uL, cL map[persist.DBID]int) {
-	uL = readUserLabels(ctx, q)
-	ratingM, displayM, cL = readContractMatrices(ctx, q, uL)
-	userM = readUserMatrix(ctx, q, uL)
-	simM = toSimMatrix(ratingM, userM)
-	return userM, ratingM, displayM, simM, uL, cL
+func readMatrices(ctx context.Context, q *db.Queries) *personalizationMatrices {
+	uL := readUserLabels(ctx, q)
+	ratingM, displayM, cL := readContractMatrices(ctx, q, uL)
+	userM := readUserMatrix(ctx, q, uL)
+	simM := toSimMatrix(ratingM, userM)
+	return &personalizationMatrices{
+		userM:    userM,
+		ratingM:  ratingM,
+		displayM: displayM,
+		simM:     simM,
+		uL:       uL,
+		cL:       cL,
+	}
 }
 
-func (k *Personalization) update(ctx context.Context) {
-	userM, ratingM, displayM, simM, uL, cL := readMatrices(ctx, k.q)
-	k.Mu.Lock()
-	defer k.Mu.Unlock()
-	k.userM = userM
-	k.ratingM = ratingM
-	k.displayM = displayM
-	k.simM = simM
-	k.uL = uL
-	k.cL = cL
+// Reference to actual data keys stored in redis
+const referenceKey = "personalization:refs"
+
+// maxStaleness is the maximum amount of time that can pass before the data is considered stale
+var maxStaleness = time.Hour
+
+type loadStatus struct {
+	UpdatedAt redisTs
+	Key       string
+}
+
+type redisTs time.Time
+
+func (r redisTs) MarshalBinary() ([]byte, error) {
+	s := time.Time(r).Format(time.RFC3339)
+	return []byte(s), nil
+}
+
+func (r *redisTs) UnmarshalBinary(data []byte) error {
+	t, err := time.Parse(time.RFC3339, string(data))
+	*r = redisTs(t)
+	return err
+}
+
+func (p *Personalization) updateMatrices(m *personalizationMatrices, ts time.Time) {
+	p.Mu.Lock()
+	defer p.Mu.Unlock()
+	p.pM = m
+	p.LastUpdated = ts
+}
+
+func (p *Personalization) update(ctx context.Context) {
+	var curTs redisTs
+
+	err := p.r.HGetScan(ctx, referenceKey, "updated_at", &curTs)
+	// Unknown error, just panic
+	if err != nil && !util.ErrorAs[redis.ErrKeyNotFound](err) {
+		panic(err)
+	}
+	// There is no data in redis, so we need to add it
+	if util.ErrorAs[redis.ErrKeyNotFound](err) {
+		p.readWriteToCache(ctx)
+		return
+	}
+	// We have no data yet, so just load what exists
+	if p.LastUpdated.IsZero() {
+		p.readCache(ctx)
+		return
+	}
+
+	staleAt := p.LastUpdated.Add(maxStaleness)
+	// Data is still considered fresh
+	if staleAt.After(time.Now()) {
+		return
+	}
+	// What's in the cache is still fresh, so just read from redis
+	if staleAt.After(time.Time(curTs)) {
+		p.readCache(ctx)
+	}
+	// Data is stale, so we'll need to load new data
+	p.readWriteToCache(ctx)
+}
+
+func (p *Personalization) readCache(ctx context.Context) {
+	var curStatus *loadStatus
+	var m *personalizationMatrices
+	mustTransaction(p.r, ctx, func(tx *redispkg.Tx) error {
+		err := tx.HGet(ctx, referenceKey, "updated_at").Scan(curStatus.UpdatedAt)
+		if err != nil && err != redispkg.Nil {
+			return err
+		}
+		err = tx.HGet(ctx, referenceKey, "key_name").Scan(curStatus.Key)
+		if err != nil && err != redispkg.Nil {
+			return err
+		}
+		return tx.Get(ctx, curStatus.Key).Scan(m)
+	})
+
+	p.updateMatrices(m, time.Time(curStatus.UpdatedAt))
+}
+
+func mustTransaction(r *redis.Cache, ctx context.Context, fn func(*redispkg.Tx) error) {
+	// Retry transaction up to maxTries
+	var tries int
+	maxTries := 3
+	for ; tries < maxTries; tries++ {
+		err := r.Watch(ctx, fn, referenceKey)
+		if err == nil {
+			return
+		}
+		// If the transaction fails, we'll just try again
+		if err == redispkg.TxFailedErr {
+			continue
+		}
+		// Something else went wrong, we'll need to check where it failed and clean up references if necessary
+		panic(err)
+	}
+	panic(fmt.Sprintf("failed to update personalization data after %d tries", maxTries))
+}
+
+func (p *Personalization) readWriteToCache(ctx context.Context) {
+	refreshedMatrices := readMatrices(ctx, p.q)
+	loadKey := referenceKey + ":" + persist.GenerateID().String()
+	loadTime := time.Now()
+	// Conditionally update referenceKey and add loadKey if the referenceKey is older than the data we just pulled
+	mustTransaction(p.r, ctx, func(tx *redispkg.Tx) error {
+		// Check for the referenceKey again because another process may have updated it since the check above
+		var cur *loadStatus
+		err := tx.HGet(ctx, referenceKey, "updated_at").Scan(cur.UpdatedAt)
+		if err != nil && err != redispkg.Nil {
+			return err
+		}
+		err = tx.HGet(ctx, referenceKey, "key_name").Scan(cur.Key)
+		if err != nil && err != redispkg.Nil {
+			return err
+		}
+		// If the referenceKey is newer than the data, then we don't need to update
+		if cur != nil && time.Time(cur.UpdatedAt).After(loadTime) {
+			return nil
+		}
+		err = tx.Set(ctx, loadKey, refreshedMatrices, 0).Err()
+		if err != nil {
+			return err
+		}
+		err = tx.HSet(ctx, referenceKey, "updated_at", loadTime, "key_name", loadKey).Err()
+		if err != nil {
+			return err
+		}
+		// Delete the pointer to the old data. This should be safe since redis is single-threaded and the key is read atomically by reference
+		return tx.Del(ctx, cur.Key).Err()
+	})
+	p.updateMatrices(refreshedMatrices, loadTime)
 }
 
 // calcSocialScore determines if vIdx is in the same friend circle as qIdx by running a bfs on userM
@@ -109,47 +238,44 @@ func calcSocialScore(userM *sparse.CSR, vIdx, qIdx int) float64 {
 // calcRelavanceScore computes the relevance of cIdx to vIdx's held tokens
 func calcRelevanceScore(ratingM, displayM *sparse.CSR, vIdx, cIdx int) float64 {
 	var t float64
-	bSize := displayM.At(cIdx, cIdx)
 	v := ratingM.RowView(vIdx).(*sparse.Vector)
+	contractCardinality := displayM.At(cIdx, cIdx)
 	v.DoNonZero(func(i int, j int, v float64) {
 		// Max score is 1, we can't exit early but we can skip the calculation
 		if t == 1 {
 			return
 		}
-		if s := overlapIndex(displayM, i, cIdx, bSize); s > t {
+		if s := overlapIndex(displayM.At(i, cIdx), displayM.At(i, i), contractCardinality); s > t {
 			t = s
 		}
 	})
-	return t
+	return t / 0.05
 }
 
 // calcSimilarityScore computes the similarity of vIdx and qIdx based on their interactions with other users
 func calcSimilarityScore(simM *sparse.CSR, vIdx, qIdx int) float64 {
-	v1 := simM.RowView(vIdx).(*sparse.Vector)
-	v2 := simM.RowView(qIdx).(*sparse.Vector)
-	score := cosineSimilarity(v1, v2)
-	return score
+	return overlapIndex(simM.At(vIdx, qIdx), simM.At(vIdx, vIdx), simM.At(qIdx, qIdx))
 }
 
 // idLookup uses a slice to lookup a value by its index
 // Its purpose is to avoid using a map because indexing a slice is suprisingly much quicker than a map lookup.
-// It should be pretty space efficient: with one million users, it should take only 1 million * 1 byte = 1MB of memory.
+// It should be pretty space efficient: with one million users, it should take: 1 million users * 1 byte = 1MB of memory.
 type idLookup struct {
-	l []int8
+	l []uint8
 }
 
 func newIdLookup() idLookup {
-	return idLookup{l: make([]int8, 1)}
+	return idLookup{l: make([]uint8, 1)}
 }
 
-func (n idLookup) Get(idx int) int8 {
+func (n idLookup) Get(idx int) uint8 {
 	if idx >= len(n.l) {
 		return 0
 	}
 	return n.l[idx]
 }
 
-func (n *idLookup) Set(idx int, i int8) {
+func (n *idLookup) Set(idx int, i uint8) {
 	appendVal(&n.l, idx, i)
 }
 
@@ -191,16 +317,12 @@ func bfs(m *sparse.CSR, vIdx, qIdx int) float64 {
 	return 0
 }
 
-// overlapIndex computes the intersection divided by the size of the smaller set
-func overlapIndex(m *sparse.CSR, a int, b int, bSize float64) float64 {
-	if aSize := m.At(a, a); aSize < bSize {
-		bSize = aSize
+func overlapIndex(unionAB, cardA, cardB float64) float64 {
+	minCard := cardA
+	if cardB < cardA {
+		minCard = cardB
 	}
-	return m.At(a, b) / bSize
-}
-
-func cosineSimilarity(v1, v2 mat.Vector) float64 {
-	return sparse.Dot(v1, v2) / (sparse.Norm(v1, 2) * sparse.Norm(v2, 2))
+	return unionAB / minCard
 }
 
 type queue []int
@@ -316,14 +438,4 @@ func mustGet[K comparable, T any](m map[K]T, k K) T {
 		panic(fmt.Sprintf("key %v not found in map", k))
 	}
 	return v
-}
-
-func keys(m map[persist.ChainAddress]bool) []string {
-	l := make([]string, len(m))
-	i := 0
-	for k := range m {
-		l[i] = k.String()
-		i++
-	}
-	return l
 }

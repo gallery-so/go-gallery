@@ -57,6 +57,7 @@ var (
 	FeedCache                         = CacheConfig{database: feed, keyPrefix: "", displayName: "feed"}
 	SocialCache                       = CacheConfig{database: social, keyPrefix: "", displayName: "social"}
 	SearchCache                       = CacheConfig{keyPrefix: "search", displayName: "search"}
+	UserPrefCache                     = CacheConfig{keyPrefix: "userpref", displayName: "userPref"}
 )
 
 func newClient(db redisDB, traceName string) *redis.Client {
@@ -176,7 +177,36 @@ func (c *Cache) Get(pCtx context.Context, key string) ([]byte, error) {
 	return bs, nil
 }
 
-// Delete deletes a value from the redis cache
+// GetScan gets a value from the redis cache and stores it to dest
+func (c *Cache) GetScan(ctx context.Context, key string, dest any) error {
+	return c.client.Get(ctx, c.getPrefixedKey(key)).Scan(dest)
+}
+
+// GetFieldRef returns the contents of a key stored as a reference in a hash field
+func (c *Cache) GetFromField(ctx context.Context, key, field string) (any, error) {
+	return readReferenceScript.Run(ctx, c.scripter, []string{key}, field).Result()
+}
+
+// Watch watches a set of keys for changes, and executes fn. It closes the transaction
+// when fn exists. Watch returns a redis.TxFailedErr if the transaction failed.
+func (c *Cache) Watch(ctx context.Context, fn func(*redis.Tx) error, keys ...string) error {
+	return c.client.Watch(ctx, fn, c.getPrefixedKeys(keys)...)
+}
+
+// HSet sets a value of a hash field
+func (c *Cache) HSet(ctx context.Context, key string, values ...any) error {
+	return c.client.HSet(ctx, c.getPrefixedKey(key), values).Err()
+}
+
+// HGet sets dest to the value of a hash field
+func (c *Cache) HGetScan(ctx context.Context, key, field string, dest any) error {
+	err := c.client.HGet(ctx, c.getPrefixedKey(key), field).Scan(dest)
+	if err == redis.Nil {
+		return ErrKeyNotFound{Key: fmt.Sprintf("%s.%s", key, field)}
+	}
+	return err
+}
+
 func (c *Cache) Delete(pCtx context.Context, key string) error {
 	return c.client.Del(pCtx, c.getPrefixedKey(key)).Err()
 }
@@ -261,6 +291,17 @@ if currentTimestamp == false or tonumber(currentTimestamp) < tonumber(newTimesta
 end
 
 return 0
+`)
+
+var readReferenceScript = redis.NewScript(`
+local key = KEYS[1]
+local field = ARGV[1]
+local fieldRef = redis.call('HGET', key, field)
+if fieldRef then
+	local value = redis.call('GET', fieldRef)
+	return value
+end
+return nil
 `)
 
 // LazyCache implements a lazy loading cache that stores data only when it is requested

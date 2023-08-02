@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -661,14 +662,27 @@ func loadFeedEntities(ctx context.Context, d *dataloader.Loaders, typs []persist
 func (api FeedAPI) scoreFeedEntities(ctx context.Context, trendData []db.FeedEntityScoringRow, scoreF func(db.FeedEntityScoringRow) float64) ([]persist.FeedEntityType, []persist.DBID) {
 	h := &heap{}
 
-	for _, event := range trendData {
-		score := scoreF(event)
-		node := feedNode{
-			id:    event.ID,
-			score: score,
-			typ:   persist.FeedEntityType(event.FeedEntityType),
-		}
+	var wg sync.WaitGroup
 
+	scores := make([]feedNode, len(trendData))
+
+	for i, event := range trendData {
+		i := i
+		event := event
+		go func() {
+			defer wg.Done()
+			score := scoreF(event)
+			scores[i] = feedNode{
+				id:    event.ID,
+				score: score,
+				typ:   persist.FeedEntityType(event.FeedEntityType),
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	for _, node := range scores {
 		// Add first 100 items in the heap
 		if h.Len() < 100 {
 			heappkg.Push(h, node)
@@ -676,7 +690,7 @@ func (api FeedAPI) scoreFeedEntities(ctx context.Context, trendData []db.FeedEnt
 		}
 
 		// If the score is greater than the smallest score in the heap, replace it
-		if score > (*h)[0].(feedNode).score {
+		if node.score > (*h)[0].(feedNode).score {
 			heappkg.Pop(h)
 			heappkg.Push(h, node)
 		}
