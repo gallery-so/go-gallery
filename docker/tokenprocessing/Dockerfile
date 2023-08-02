@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM golang:1.19-bookworm
+FROM golang:1.19-bullseye
 
 ARG VERSION
 ARG FFMPEG_VERSION
