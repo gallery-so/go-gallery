@@ -8538,6 +8538,7 @@ enum UserExperienceType {
   EmailUpsell
   MerchStoreUpsell
   MaintenanceFeb2023
+  MaintenanceAug2023
   TwitterConnectionOnboardingUpsell
   UpsellMintMemento4
   UpsellGallerySelects1

@@ -490,6 +490,7 @@ const (
 	UserExperienceTypeEmailupsell                       UserExperienceType = "EmailUpsell"
 	UserExperienceTypeMerchstoreupsell                  UserExperienceType = "MerchStoreUpsell"
 	UserExperienceTypeMaintenancefeb2023                UserExperienceType = "MaintenanceFeb2023"
+	UserExperienceTypeMaintenanceaug2023                UserExperienceType = "MaintenanceAug2023"
 	UserExperienceTypeTwitterconnectiononboardingupsell UserExperienceType = "TwitterConnectionOnboardingUpsell"
 	UserExperienceTypeUpsellmintmemento4                UserExperienceType = "UpsellMintMemento4"
 	UserExperienceTypeUpsellgalleryselects1             UserExperienceType = "UpsellGallerySelects1"
