@@ -29,7 +29,7 @@ DOCKER_PUSH          = docker push $(IMAGE_TAG)
 DOCKER_DIR           := ./docker
 DOCKER_CONTEXT       := .
 DOCKER_REGISTRY      := us-east1-docker.pkg.dev
-FFMPEG_VERSION       = 7:4.3.6-0+deb11u1
+FFMPEG_VERSION       = 7:5.1.3-1
 
 # Environments
 DEV     := dev
