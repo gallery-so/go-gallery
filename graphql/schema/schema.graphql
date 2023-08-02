@@ -638,6 +638,7 @@ interface SocialAccount {
 type SocialAccounts {
   twitter: TwitterSocialAccount
   farcaster: FarcasterSocialAccount
+  lens: LensSocialAccount
 }
 
 type TwitterSocialAccount implements SocialAccount {
@@ -650,6 +651,15 @@ type TwitterSocialAccount implements SocialAccount {
 }
 
 type FarcasterSocialAccount implements SocialAccount {
+  type: SocialAccountType!
+  social_id: String!
+  name: String!
+  username: String!
+  profileImageURL: String!
+  bio: String!
+  display: Boolean!
+}
+type LensSocialAccount implements SocialAccount {
   type: SocialAccountType!
   social_id: String!
   name: String!

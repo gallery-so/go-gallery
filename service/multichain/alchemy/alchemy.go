@@ -767,6 +767,8 @@ func alchemyTokenToChainAgnosticToken(owner persist.EthereumAddress, token Token
 		t.IsSpam = &isSpam
 	}
 
+	contractSpam := contractNameIsSpam(token.ContractMetadata.Name)
+
 	return t, multichain.ChainAgnosticContract{
 		Address: persist.Address(token.Contract.Address),
 		Descriptors: multichain.ChainAgnosticContractDescriptors{
@@ -774,6 +776,7 @@ func alchemyTokenToChainAgnosticToken(owner persist.EthereumAddress, token Token
 			Name:           token.ContractMetadata.Name,
 			CreatorAddress: persist.Address(token.ContractMetadata.ContractDeployer),
 		},
+		IsSpam: &contractSpam,
 	}
 }
 
@@ -811,4 +814,8 @@ func alchemyTokenToMetadata(token Token) persist.TokenMetadata {
 		metadata["image_url"] = token.Metadata.Image
 	}
 	return metadata
+}
+
+func contractNameIsSpam(name string) bool {
+	return strings.HasSuffix(strings.ToLower(name), ".lens-follower")
 }

@@ -1446,6 +1446,18 @@ type JSONMedia struct {
 func (JSONMedia) IsMediaSubtype() {}
 func (JSONMedia) IsMedia()        {}
 
+type LensSocialAccount struct {
+	Type            persist.SocialProvider `json:"type"`
+	SocialID        string                 `json:"social_id"`
+	Name            string                 `json:"name"`
+	Username        string                 `json:"username"`
+	ProfileImageURL string                 `json:"profileImageURL"`
+	Bio             string                 `json:"bio"`
+	Display         bool                   `json:"display"`
+}
+
+func (LensSocialAccount) IsSocialAccount() {}
+
 type LoginPayload struct {
 	UserID *persist.DBID `json:"userId"`
 	Viewer *Viewer       `json:"viewer"`
@@ -1817,6 +1829,7 @@ func (SetSpamPreferencePayload) IsSetSpamPreferencePayloadOrError() {}
 type SocialAccounts struct {
 	Twitter   *TwitterSocialAccount   `json:"twitter"`
 	Farcaster *FarcasterSocialAccount `json:"farcaster"`
+	Lens      *LensSocialAccount      `json:"lens"`
 }
 
 type SocialAuthMechanism struct {

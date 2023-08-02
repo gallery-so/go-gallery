@@ -88,6 +88,7 @@ type ChainAgnosticAddressAtBlock struct {
 type ChainAgnosticContract struct {
 	Descriptors ChainAgnosticContractDescriptors `json:"descriptors"`
 	Address     persist.Address                  `json:"address"`
+	IsSpam      *bool                            `json:"is_spam"`
 
 	LatestBlock persist.BlockNumber `json:"latest_block"`
 }
@@ -1662,6 +1663,7 @@ type contractMetadata struct {
 	OwnerAddress    persist.Address
 	ProfileImageURL string
 	Description     string
+	IsSpam          bool
 }
 
 func contractsToNewDedupedContracts(contracts []chainContracts) []persist.ContractGallery {
@@ -1690,6 +1692,10 @@ func contractsToNewDedupedContracts(contracts []chainContracts) []persist.Contra
 			if contract.Descriptors.ProfileImageURL != "" {
 				meta.ProfileImageURL = contract.Descriptors.ProfileImageURL
 			}
+			if contract.IsSpam != nil && *contract.IsSpam {
+				// only one provider needs to mark it as spam for it to be spam
+				meta.IsSpam = true
+			}
 			contractMetadatas[persist.NewChainAddress(contract.Address, chainContract.chain)] = meta
 		}
 	}
@@ -1697,13 +1703,14 @@ func contractsToNewDedupedContracts(contracts []chainContracts) []persist.Contra
 	res := make([]persist.ContractGallery, 0, len(contractMetadatas))
 	for address, meta := range contractMetadatas {
 		res = append(res, persist.ContractGallery{
-			Chain:           address.Chain(),
-			Address:         address.Address(),
-			Symbol:          persist.NullString(meta.Symbol),
-			Name:            persist.NullString(meta.Name),
-			ProfileImageURL: persist.NullString(meta.ProfileImageURL),
-			OwnerAddress:    meta.OwnerAddress,
-			Description:     persist.NullString(meta.Description),
+			Chain:                address.Chain(),
+			Address:              address.Address(),
+			Symbol:               persist.NullString(meta.Symbol),
+			Name:                 persist.NullString(meta.Name),
+			ProfileImageURL:      persist.NullString(meta.ProfileImageURL),
+			OwnerAddress:         meta.OwnerAddress,
+			Description:          persist.NullString(meta.Description),
+			IsProviderMarkedSpam: meta.IsSpam,
 		})
 	}
 	return res

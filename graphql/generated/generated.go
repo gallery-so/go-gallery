@@ -705,6 +705,16 @@ type ComplexityRoot struct {
 		PreviewURLs      func(childComplexity int) int
 	}
 
+	LensSocialAccount struct {
+		Bio             func(childComplexity int) int
+		Display         func(childComplexity int) int
+		Name            func(childComplexity int) int
+		ProfileImageURL func(childComplexity int) int
+		SocialID        func(childComplexity int) int
+		Type            func(childComplexity int) int
+		Username        func(childComplexity int) int
+	}
+
 	LoginPayload struct {
 		UserID func(childComplexity int) int
 		Viewer func(childComplexity int) int
@@ -1067,6 +1077,7 @@ type ComplexityRoot struct {
 
 	SocialAccounts struct {
 		Farcaster func(childComplexity int) int
+		Lens      func(childComplexity int) int
 		Twitter   func(childComplexity int) int
 	}
 
@@ -4092,6 +4103,55 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.JsonMedia.PreviewURLs(childComplexity), true
 
+	case "LensSocialAccount.bio":
+		if e.complexity.LensSocialAccount.Bio == nil {
+			break
+		}
+
+		return e.complexity.LensSocialAccount.Bio(childComplexity), true
+
+	case "LensSocialAccount.display":
+		if e.complexity.LensSocialAccount.Display == nil {
+			break
+		}
+
+		return e.complexity.LensSocialAccount.Display(childComplexity), true
+
+	case "LensSocialAccount.name":
+		if e.complexity.LensSocialAccount.Name == nil {
+			break
+		}
+
+		return e.complexity.LensSocialAccount.Name(childComplexity), true
+
+	case "LensSocialAccount.profileImageURL":
+		if e.complexity.LensSocialAccount.ProfileImageURL == nil {
+			break
+		}
+
+		return e.complexity.LensSocialAccount.ProfileImageURL(childComplexity), true
+
+	case "LensSocialAccount.social_id":
+		if e.complexity.LensSocialAccount.SocialID == nil {
+			break
+		}
+
+		return e.complexity.LensSocialAccount.SocialID(childComplexity), true
+
+	case "LensSocialAccount.type":
+		if e.complexity.LensSocialAccount.Type == nil {
+			break
+		}
+
+		return e.complexity.LensSocialAccount.Type(childComplexity), true
+
+	case "LensSocialAccount.username":
+		if e.complexity.LensSocialAccount.Username == nil {
+			break
+		}
+
+		return e.complexity.LensSocialAccount.Username(childComplexity), true
+
 	case "LoginPayload.userId":
 		if e.complexity.LoginPayload.UserID == nil {
 			break
@@ -6121,6 +6181,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.SocialAccounts.Farcaster(childComplexity), true
+
+	case "SocialAccounts.lens":
+		if e.complexity.SocialAccounts.Lens == nil {
+			break
+		}
+
+		return e.complexity.SocialAccounts.Lens(childComplexity), true
 
 	case "SocialAccounts.twitter":
 		if e.complexity.SocialAccounts.Twitter == nil {
@@ -8456,6 +8523,7 @@ interface SocialAccount {
 type SocialAccounts {
   twitter: TwitterSocialAccount
   farcaster: FarcasterSocialAccount
+  lens: LensSocialAccount
 }
 
 type TwitterSocialAccount implements SocialAccount {
@@ -8468,6 +8536,15 @@ type TwitterSocialAccount implements SocialAccount {
 }
 
 type FarcasterSocialAccount implements SocialAccount {
+  type: SocialAccountType!
+  social_id: String!
+  name: String!
+  username: String!
+  profileImageURL: String!
+  bio: String!
+  display: Boolean!
+}
+type LensSocialAccount implements SocialAccount {
   type: SocialAccountType!
   social_id: String!
   name: String!
@@ -26487,6 +26564,8 @@ func (ec *executionContext) fieldContext_GalleryUser_socialAccounts(ctx context.
 				return ec.fieldContext_SocialAccounts_twitter(ctx, field)
 			case "farcaster":
 				return ec.fieldContext_SocialAccounts_farcaster(ctx, field)
+			case "lens":
+				return ec.fieldContext_SocialAccounts_lens(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type SocialAccounts", field.Name)
 		},
@@ -29158,6 +29237,314 @@ func (ec *executionContext) fieldContext_JsonMedia_fallbackMedia(ctx context.Con
 				return ec.fieldContext_FallbackMedia_mediaType(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FallbackMedia", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _LensSocialAccount_type(ctx context.Context, field graphql.CollectedField, obj *model.LensSocialAccount) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_LensSocialAccount_type(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Type, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(persist.SocialProvider)
+	fc.Result = res
+	return ec.marshalNSocialAccountType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐSocialProvider(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_LensSocialAccount_type(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "LensSocialAccount",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type SocialAccountType does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _LensSocialAccount_social_id(ctx context.Context, field graphql.CollectedField, obj *model.LensSocialAccount) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_LensSocialAccount_social_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SocialID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_LensSocialAccount_social_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "LensSocialAccount",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _LensSocialAccount_name(ctx context.Context, field graphql.CollectedField, obj *model.LensSocialAccount) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_LensSocialAccount_name(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Name, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_LensSocialAccount_name(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "LensSocialAccount",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _LensSocialAccount_username(ctx context.Context, field graphql.CollectedField, obj *model.LensSocialAccount) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_LensSocialAccount_username(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Username, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_LensSocialAccount_username(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "LensSocialAccount",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _LensSocialAccount_profileImageURL(ctx context.Context, field graphql.CollectedField, obj *model.LensSocialAccount) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_LensSocialAccount_profileImageURL(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ProfileImageURL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_LensSocialAccount_profileImageURL(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "LensSocialAccount",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _LensSocialAccount_bio(ctx context.Context, field graphql.CollectedField, obj *model.LensSocialAccount) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_LensSocialAccount_bio(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Bio, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_LensSocialAccount_bio(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "LensSocialAccount",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _LensSocialAccount_display(ctx context.Context, field graphql.CollectedField, obj *model.LensSocialAccount) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_LensSocialAccount_display(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Display, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_LensSocialAccount_display(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "LensSocialAccount",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
 		},
 	}
 	return fc, nil
@@ -42017,6 +42404,63 @@ func (ec *executionContext) fieldContext_SocialAccounts_farcaster(ctx context.Co
 	return fc, nil
 }
 
+func (ec *executionContext) _SocialAccounts_lens(ctx context.Context, field graphql.CollectedField, obj *model.SocialAccounts) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SocialAccounts_lens(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Lens, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.LensSocialAccount)
+	fc.Result = res
+	return ec.marshalOLensSocialAccount2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐLensSocialAccount(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SocialAccounts_lens(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SocialAccounts",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "type":
+				return ec.fieldContext_LensSocialAccount_type(ctx, field)
+			case "social_id":
+				return ec.fieldContext_LensSocialAccount_social_id(ctx, field)
+			case "name":
+				return ec.fieldContext_LensSocialAccount_name(ctx, field)
+			case "username":
+				return ec.fieldContext_LensSocialAccount_username(ctx, field)
+			case "profileImageURL":
+				return ec.fieldContext_LensSocialAccount_profileImageURL(ctx, field)
+			case "bio":
+				return ec.fieldContext_LensSocialAccount_bio(ctx, field)
+			case "display":
+				return ec.fieldContext_LensSocialAccount_display(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type LensSocialAccount", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _SocialConnection_id(ctx context.Context, field graphql.CollectedField, obj *model.SocialConnection) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_SocialConnection_id(ctx, field)
 	if err != nil {
@@ -52289,6 +52733,8 @@ func (ec *executionContext) fieldContext_Viewer_socialAccounts(ctx context.Conte
 				return ec.fieldContext_SocialAccounts_twitter(ctx, field)
 			case "farcaster":
 				return ec.fieldContext_SocialAccounts_farcaster(ctx, field)
+			case "lens":
+				return ec.fieldContext_SocialAccounts_lens(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type SocialAccounts", field.Name)
 		},
@@ -59845,6 +60291,13 @@ func (ec *executionContext) _SocialAccount(ctx context.Context, sel ast.Selectio
 			return graphql.Null
 		}
 		return ec._FarcasterSocialAccount(ctx, sel, obj)
+	case model.LensSocialAccount:
+		return ec._LensSocialAccount(ctx, sel, &obj)
+	case *model.LensSocialAccount:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._LensSocialAccount(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -65376,6 +65829,76 @@ func (ec *executionContext) _JsonMedia(ctx context.Context, sel ast.SelectionSet
 	return out
 }
 
+var lensSocialAccountImplementors = []string{"LensSocialAccount", "SocialAccount"}
+
+func (ec *executionContext) _LensSocialAccount(ctx context.Context, sel ast.SelectionSet, obj *model.LensSocialAccount) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, lensSocialAccountImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("LensSocialAccount")
+		case "type":
+
+			out.Values[i] = ec._LensSocialAccount_type(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "social_id":
+
+			out.Values[i] = ec._LensSocialAccount_social_id(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "name":
+
+			out.Values[i] = ec._LensSocialAccount_name(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "username":
+
+			out.Values[i] = ec._LensSocialAccount_username(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "profileImageURL":
+
+			out.Values[i] = ec._LensSocialAccount_profileImageURL(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "bio":
+
+			out.Values[i] = ec._LensSocialAccount_bio(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "display":
+
+			out.Values[i] = ec._LensSocialAccount_display(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var loginPayloadImplementors = []string{"LoginPayload", "LoginPayloadOrError"}
 
 func (ec *executionContext) _LoginPayload(ctx context.Context, sel ast.SelectionSet, obj *model.LoginPayload) graphql.Marshaler {
@@ -68202,6 +68725,10 @@ func (ec *executionContext) _SocialAccounts(ctx context.Context, sel ast.Selecti
 		case "farcaster":
 
 			out.Values[i] = ec._SocialAccounts_farcaster(ctx, field, obj)
+
+		case "lens":
+
+			out.Values[i] = ec._SocialAccounts_lens(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -74341,6 +74868,13 @@ func (ec *executionContext) marshalOInteraction2githubᚗcomᚋmikeydubᚋgoᚑg
 		return graphql.Null
 	}
 	return ec._Interaction(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOLensSocialAccount2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐLensSocialAccount(ctx context.Context, sel ast.SelectionSet, v *model.LensSocialAccount) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._LensSocialAccount(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOLoginPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐLoginPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.LoginPayloadOrError) graphql.Marshaler {
