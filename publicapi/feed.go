@@ -433,7 +433,7 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 
 	if !hasCursors {
 		trendData, err := api.queries.FeedEntityScoring(ctx, db.FeedEntityScoringParams{
-			WindowEnd:           time.Now().Add(-time.Duration(72 * time.Hour)),
+			WindowEnd:           time.Now().Add(-time.Duration(7 * 24 * time.Hour)),
 			PostEntityType:      int32(persist.PostTypeTag),
 			FeedEventEntityType: int32(persist.FeedEventTypeTag),
 			ExcludedFeedActions: []string{string(persist.ActionUserCreated), string(persist.ActionUserFollowedUsers)},
@@ -669,6 +669,7 @@ func (api FeedAPI) scoreFeedEntities(ctx context.Context, trendData []db.FeedEnt
 	for i, event := range trendData {
 		i := i
 		event := event
+		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			score := scoreF(event)

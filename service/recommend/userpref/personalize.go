@@ -1,13 +1,16 @@
-//go:build !norec
-// +build !norec
-
 package userpref
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"sync"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	redispkg "github.com/go-redis/redis/v8"
 	"github.com/james-bowman/sparse"
 
@@ -16,6 +19,13 @@ import (
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/util"
 )
+
+const (
+	referenceKey = "personalization:refs" // Reference to the keys that store the actual data
+	contextKey   = "personalization.instance"
+)
+
+var ErrNoInputData = errors.New("no personalization input data")
 
 // sharedContracts are excluded because of their low specificity
 var sharedContracts map[persist.ChainAddress]bool = map[persist.ChainAddress]bool{
@@ -32,8 +42,145 @@ var sharedContracts map[persist.ChainAddress]bool = map[persist.ChainAddress]boo
 	persist.NewChainAddress("0x22c1f6050e56d2876009903609a2cc3fef83b415", persist.ChainETH): true, // POAP
 }
 
+type personalizationMatrices struct {
+	// userM is a matrix of size u x u where a non-zero value at m[i][j] is an edge from user i to user j
+	userM *sparse.CSR
+	// ratingM is a matrix of size u x k where the value at m[i][j] is how many held tokens of community j are displayed by user i
+	ratingM *sparse.CSR
+	// displayM is matrix of size k x k where the value at m[i][j] is how many tokens of community i are displayed with community j
+	displayM *sparse.CSR
+	// simM is a matrix of size u x u where the value at m[i][j] is a combined value of follows and common tokens displayed by user i and user j
+	simM *sparse.CSR
+	// lookup of user ID to index in the matrix
+	uL map[persist.DBID]int
+	// lookup of contract ID to index in the matrix
+	cL map[persist.DBID]int
+	// lastUpdated is the time the matrices were last updated
+	lastUpdated time.Time
+}
+
+func (p personalizationMatrices) MarshalBinary() ([]byte, error) {
+	var dataBuf []byte
+	appendTime(&dataBuf, p.lastUpdated)
+	appendMatrix(&dataBuf, p.userM)
+	appendMatrix(&dataBuf, p.ratingM)
+	appendMatrix(&dataBuf, p.displayM)
+	appendMatrix(&dataBuf, p.simM)
+	appendJSON(&dataBuf, p.uL)
+	appendJSON(&dataBuf, p.cL)
+	return dataBuf, nil
+}
+
+func (p *personalizationMatrices) UnmarshalBinary(data []byte) error {
+	reader := bytes.NewReader(data)
+	t := readTime(reader)
+	userM := readMatrix(reader)
+	ratingM := readMatrix(reader)
+	displayM := readMatrix(reader)
+	simM := readMatrix(reader)
+	uL := readJSON(reader)
+	cL := readJSON(reader)
+	p.lastUpdated = t
+	p.userM = userM
+	p.ratingM = ratingM
+	p.displayM = displayM
+	p.simM = simM
+	p.uL = uL
+	p.cL = cL
+	return nil
+}
+
+func appendMatrix(buf *[]byte, m *sparse.CSR) {
+	byt, err := m.MarshalBinary()
+	check(err)
+	appendTo(buf, byt)
+}
+
+func appendJSON(buf *[]byte, l map[persist.DBID]int) {
+	byt, err := json.Marshal(l)
+	check(err)
+	appendTo(buf, byt)
+}
+
+func appendTime(buf *[]byte, t time.Time) {
+	byt, err := t.MarshalBinary()
+	check(err)
+	appendTo(buf, byt)
+}
+
+func readMatrix(r *bytes.Reader) *sparse.CSR {
+	buf := readTo(r)
+	var m sparse.CSR
+	err := m.UnmarshalBinary(buf)
+	check(err)
+	return &m
+}
+
+func readJSON(r *bytes.Reader) map[persist.DBID]int {
+	buf := readTo(r)
+	var l map[persist.DBID]int
+	err := json.Unmarshal(buf, &l)
+	check(err)
+	return l
+}
+
+func readTime(r *bytes.Reader) time.Time {
+	buf := readTo(r)
+	t := time.Time{}
+	err := t.UnmarshalBinary(buf)
+	check(err)
+	return t
+}
+
+func appendTo(buf *[]byte, byt []byte) {
+	tmp := make([]byte, binary.MaxVarintLen64)
+	bytesWritten := binary.PutUvarint(tmp, uint64(len(byt)))
+	*buf = append(*buf, tmp[:bytesWritten]...)
+	*buf = append(*buf, byt...)
+}
+
+func readTo(r *bytes.Reader) []byte {
+	l, err := binary.ReadUvarint(r)
+	check(err)
+
+	buf := make([]byte, l)
+	_, err = r.Read(buf)
+	check(err)
+	return buf
+}
+
+type Personalization struct {
+	// Handles concurrent access to the matrices
+	Mu sync.RWMutex
+	// LastUpdated is the time the matrices were last updated
+	pM *personalizationMatrices
+	q  *db.Queries
+	r  *redis.Cache
+}
+
+func AddTo(c *gin.Context, k *Personalization) {
+	c.Set(contextKey, k)
+}
+
+func For(ctx context.Context) *Personalization {
+	gc := util.MustGetGinContext(ctx)
+	return gc.Value(contextKey).(*Personalization)
+}
+
+// Loop is the main event loop that updates the personalization matrices
+func (k *Personalization) Loop(ctx context.Context, ticker *time.Ticker) {
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				k.update(ctx)
+			}
+		}
+	}()
+}
+
 func NewPersonalization(ctx context.Context, q *db.Queries) *Personalization {
-	k := &Personalization{q: q}
+	k := &Personalization{q: q, r: redis.NewCache(redis.UserPrefCache)}
 	k.update(ctx)
 	return k
 }
@@ -86,20 +233,15 @@ func readMatrices(ctx context.Context, q *db.Queries) *personalizationMatrices {
 	userM := readUserMatrix(ctx, q, uL)
 	simM := toSimMatrix(ratingM, userM)
 	return &personalizationMatrices{
-		userM:    userM,
-		ratingM:  ratingM,
-		displayM: displayM,
-		simM:     simM,
-		uL:       uL,
-		cL:       cL,
+		userM:       userM,
+		ratingM:     ratingM,
+		displayM:    displayM,
+		simM:        simM,
+		uL:          uL,
+		cL:          cL,
+		lastUpdated: time.Now(),
 	}
 }
-
-// Reference to actual data keys stored in redis
-const referenceKey = "personalization:refs"
-
-// maxStaleness is the maximum amount of time that can pass before the data is considered stale
-var maxStaleness = time.Hour
 
 type loadStatus struct {
 	UpdatedAt redisTs
@@ -119,11 +261,10 @@ func (r *redisTs) UnmarshalBinary(data []byte) error {
 	return err
 }
 
-func (p *Personalization) updateMatrices(m *personalizationMatrices, ts time.Time) {
+func (p *Personalization) updateMatrices(m *personalizationMatrices) {
 	p.Mu.Lock()
 	defer p.Mu.Unlock()
 	p.pM = m
-	p.LastUpdated = ts
 }
 
 func (p *Personalization) update(ctx context.Context) {
@@ -138,12 +279,12 @@ func (p *Personalization) update(ctx context.Context) {
 		return
 	}
 
-	if p.LastUpdated.IsZero() {
+	if p.pM == nil {
 		p.readCache(ctx)
 		return
 	}
 
-	staleAt := p.LastUpdated.Add(maxStaleness)
+	staleAt := p.pM.lastUpdated.Add(time.Hour)
 
 	if staleAt.After(time.Now()) {
 		return
@@ -155,24 +296,6 @@ func (p *Personalization) update(ctx context.Context) {
 	}
 
 	p.readWriteToCache(ctx)
-}
-
-func (p *Personalization) readCache(ctx context.Context) {
-	var curStatus *loadStatus
-	var m *personalizationMatrices
-	mustTransaction(p.r, ctx, func(tx *redispkg.Tx) error {
-		err := tx.HGet(ctx, referenceKey, "updated_at").Scan(curStatus.UpdatedAt)
-		if err != nil && err != redispkg.Nil {
-			return err
-		}
-		err = tx.HGet(ctx, referenceKey, "key_name").Scan(curStatus.Key)
-		if err != nil && err != redispkg.Nil {
-			return err
-		}
-		return tx.Get(ctx, curStatus.Key).Scan(m)
-	})
-
-	p.updateMatrices(m, time.Time(curStatus.UpdatedAt))
 }
 
 func mustTransaction(r *redis.Cache, ctx context.Context, fn func(*redispkg.Tx) error) {
@@ -194,38 +317,54 @@ func mustTransaction(r *redis.Cache, ctx context.Context, fn func(*redispkg.Tx) 
 	panic(fmt.Sprintf("failed to update personalization data after %d tries", maxTries))
 }
 
+func (p *Personalization) readCache(ctx context.Context) {
+	b, err := p.r.GetFromField(ctx, referenceKey, "key_name")
+	check(err)
+	var m personalizationMatrices
+	m.UnmarshalBinary([]byte(b.(string)))
+	p.updateMatrices(&m)
+}
+
 func (p *Personalization) readWriteToCache(ctx context.Context) {
-	refreshedMatrices := readMatrices(ctx, p.q)
-	loadKey := referenceKey + ":" + persist.GenerateID().String()
-	loadTime := time.Now()
-	// Conditionally update referenceKey and add loadKey if the referenceKey is older than the data we just pulled
+	matrices := readMatrices(ctx, p.q)
+	refKey := p.r.GetPrefixedKey(referenceKey)
+	loadKey := refKey + ":" + persist.GenerateID().String()
+	// Conditionally update referenceKey and add loadKey if the referenceKey is older than the data that was pulled
+	// TODO: This can be replaced with a lua script
 	mustTransaction(p.r, ctx, func(tx *redispkg.Tx) error {
 		// Check for the referenceKey again because another process may have updated it since the check above
-		var cur *loadStatus
-		err := tx.HGet(ctx, referenceKey, "updated_at").Scan(cur.UpdatedAt)
+		var curTs redisTs
+		var curKey string
+
+		err := tx.HGet(ctx, refKey, "updated_at").Scan(&curTs)
 		if err != nil && err != redispkg.Nil {
 			return err
 		}
-		err = tx.HGet(ctx, referenceKey, "key_name").Scan(cur.Key)
+
+		err = tx.HGet(ctx, refKey, "key_name").Scan(curKey)
 		if err != nil && err != redispkg.Nil {
 			return err
 		}
+
 		// If the referenceKey is newer than the data, then we don't need to update
-		if cur != nil && time.Time(cur.UpdatedAt).After(loadTime) {
+		if t := time.Time(curTs); !t.IsZero() && t.After(matrices.lastUpdated) {
 			return nil
 		}
-		err = tx.Set(ctx, loadKey, refreshedMatrices, 0).Err()
+
+		err = tx.Set(ctx, loadKey, matrices, 0).Err()
 		if err != nil {
 			return err
 		}
-		err = tx.HSet(ctx, referenceKey, "updated_at", loadTime, "key_name", loadKey).Err()
+
+		err = tx.HSet(ctx, refKey, map[string]any{"updated_at": redisTs(matrices.lastUpdated), "key_name": loadKey}).Err()
 		if err != nil {
 			return err
 		}
+
 		// Delete the pointer to the old data. This should be safe since redis is single-threaded and the key is read atomically by reference
-		return tx.Del(ctx, cur.Key).Err()
+		return tx.Del(ctx, curKey).Err()
 	})
-	p.updateMatrices(refreshedMatrices, loadTime)
+	p.updateMatrices(matrices)
 }
 
 // calcSocialScore determines if vIdx is in the same friend circle as qIdx by running a bfs on userM
