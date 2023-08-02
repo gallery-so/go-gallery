@@ -16,7 +16,6 @@ const args = [
   '--disable-client-side-phishing-detection',
   '--disable-component-update',
   '--disable-default-apps',
-  '--disable-dev-shm-usage',
   '--disable-domain-reliability',
   '--disable-extensions',
   '--disable-features=AudioServiceOutOfProcess',
@@ -46,11 +45,23 @@ const args = [
   '--disable-software-rasterizer',
   '--disable-gpu',
   '--disable-gpu-compositing',
+  '--disable-inotify',
 ];
+
+process.on('unhandledRejection', (reason, p) => {
+  console.error('Unhandled Rejection at:', p, 'reason:', reason);
+  console.log('Unhandled Rejection at:', p, 'reason:', reason);
+});
+
+process.on('uncaughtException', (err, origin) => {
+  console.error(`Caught exception: ${err}\n` + `Exception origin: ${origin}`);
+  console.log(`Caught exception: ${err}\n` + `Exception origin: ${origin}`);
+});
 
 async function createAnimation() {
   const url = process.argv[2];
   const browser = await puppeteer.launch({
+    executablePath: 'google-chrome-stable',
     headless: 'new',
     args: args,
   });

@@ -110,6 +110,16 @@ const (
 )
 
 var AllChains = []Chain{ChainETH, ChainArbitrum, ChainPolygon, ChainOptimism, ChainTezos, ChainPOAP, ChainZora, ChainBase}
+var EvmChains = util.MapKeys(evmChains)
+var evmChains map[Chain]bool = map[Chain]bool{
+	ChainETH:      true,
+	ChainOptimism: true,
+	ChainPolygon:  true,
+	ChainArbitrum: true,
+	ChainPOAP:     true,
+	ChainZora:     true,
+	ChainBase:     true,
+}
 
 const (
 	// URITypeIPFS represents an IPFS URI
@@ -420,12 +430,10 @@ func (e ErrTokenNotFoundByIdentifiers) Error() string {
 
 // NormalizeAddress normalizes an address for the given chain
 func (c Chain) NormalizeAddress(addr Address) string {
-	switch c {
-	case ChainETH:
+	if evmChains[c] {
 		return strings.ToLower(addr.String())
-	default:
-		return addr.String()
 	}
+	return addr.String()
 }
 
 // BaseKeywords are the keywords that are default for discovering media for a given chain
@@ -1010,6 +1018,14 @@ func (t TokenOwnershipType) MarshalGQL(w io.Writer) {
 	case TokenOwnershipTypeCreator:
 		w.Write([]byte(`"creator"`))
 	}
+}
+
+type ErrTokenOwnershipNotFound struct {
+	TokenID DBID
+}
+
+func (e ErrTokenOwnershipNotFound) Error() string {
+	return fmt.Sprintf("TokenOwnership not found for tokenID %s", e.TokenID)
 }
 
 type ErrContractCreatorNotFound struct {

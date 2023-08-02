@@ -1795,6 +1795,9 @@ type TokenResolver interface {
 	Owner(ctx context.Context, obj *model.Token) (*model.GalleryUser, error)
 	OwnedByWallets(ctx context.Context, obj *model.Token) ([]*model.Wallet, error)
 
+	OwnerIsHolder(ctx context.Context, obj *model.Token) (*bool, error)
+	OwnerIsCreator(ctx context.Context, obj *model.Token) (*bool, error)
+
 	Contract(ctx context.Context, obj *model.Token) (*model.Contract, error)
 	Community(ctx context.Context, obj *model.Token) (*model.Community, error)
 }
@@ -8244,8 +8247,8 @@ type Token implements Node @goEmbedHelper {
   owner: GalleryUser @goField(forceResolver: true)
   ownedByWallets: [Wallet] @goField(forceResolver: true)
   ownershipHistory: [OwnerAtBlock]
-  ownerIsHolder: Boolean
-  ownerIsCreator: Boolean
+  ownerIsHolder: Boolean @goField(forceResolver: true)
+  ownerIsCreator: Boolean @goField(forceResolver: true)
   tokenMetadata: String # source is map[string]interface{} on backend, not sure what best format is here
   contract: Contract @goField(forceResolver: true)
   community: Community @goField(forceResolver: true)
@@ -46698,7 +46701,7 @@ func (ec *executionContext) _Token_ownerIsHolder(ctx context.Context, field grap
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.OwnerIsHolder, nil
+		return ec.resolvers.Token().OwnerIsHolder(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -46716,8 +46719,8 @@ func (ec *executionContext) fieldContext_Token_ownerIsHolder(ctx context.Context
 	fc = &graphql.FieldContext{
 		Object:     "Token",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Boolean does not have child fields")
 		},
@@ -46739,7 +46742,7 @@ func (ec *executionContext) _Token_ownerIsCreator(ctx context.Context, field gra
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.OwnerIsCreator, nil
+		return ec.resolvers.Token().OwnerIsCreator(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -46757,8 +46760,8 @@ func (ec *executionContext) fieldContext_Token_ownerIsCreator(ctx context.Contex
 	fc = &graphql.FieldContext{
 		Object:     "Token",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Boolean does not have child fields")
 		},
@@ -69287,13 +69290,39 @@ func (ec *executionContext) _Token(ctx context.Context, sel ast.SelectionSet, ob
 			out.Values[i] = ec._Token_ownershipHistory(ctx, field, obj)
 
 		case "ownerIsHolder":
+			field := field
 
-			out.Values[i] = ec._Token_ownerIsHolder(ctx, field, obj)
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Token_ownerIsHolder(ctx, field, obj)
+				return res
+			}
 
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "ownerIsCreator":
+			field := field
 
-			out.Values[i] = ec._Token_ownerIsCreator(ctx, field, obj)
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Token_ownerIsCreator(ctx, field, obj)
+				return res
+			}
 
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "tokenMetadata":
 
 			out.Values[i] = ec._Token_tokenMetadata(ctx, field, obj)

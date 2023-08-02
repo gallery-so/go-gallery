@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -724,19 +723,20 @@ func rasterizeAndCacheSVGMedia(ctx context.Context, svgURL string, tids persist.
 	output, err := cmd.Output()
 	if err != nil {
 		persist.FailStep(subMeta.SVGRasterize)
-		return nil, fmt.Errorf("could not rasterize svg: %s", err)
+		return nil, fmt.Errorf("could not rasterize svg: %s (%s)", err, string(output))
 	}
 
 	objects := make([]cachedMediaObject, 0, 2)
 
 	lines := strings.Split(string(output), "\n")
 	if len(lines) < 2 {
-		log.Fatal("Not enough output from script")
+		persist.FailStep(subMeta.SVGRasterize)
+		return nil, fmt.Errorf("could not rasterize svg: %s", string(output))
 	}
 
 	if lines[0] != "PNG" {
 		persist.FailStep(subMeta.SVGRasterize)
-		return nil, fmt.Errorf("could not rasterize svg: %s", lines[0])
+		return nil, fmt.Errorf("could not rasterize svg: %s (%s)", lines[0], string(output))
 	}
 	pngData := lines[1]
 

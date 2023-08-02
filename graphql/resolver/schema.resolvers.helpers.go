@@ -1884,8 +1884,6 @@ func tokenToModel(ctx context.Context, token db.Token, collectionID *persist.DBI
 		Quantity:         util.ToPointer(token.Quantity.String()),
 		Owner:            nil, // handled by dedicated resolver
 		OwnershipHistory: nil, // TODO: later
-		OwnerIsHolder:    &token.IsHolderToken,
-		OwnerIsCreator:   &token.IsCreatorToken,
 		TokenMetadata:    &metadataString,
 		Contract:         nil, // handled by dedicated resolver
 		ExternalURL:      &token.ExternalUrl.String,

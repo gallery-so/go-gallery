@@ -508,6 +508,17 @@ func (api TokenAPI) MediaByTokenID(ctx context.Context, tokenID persist.DBID) (d
 	return api.loaders.MediaByTokenID.Load(tokenID)
 }
 
+func (api TokenAPI) GetTokenOwnershipByTokenID(ctx context.Context, tokenID persist.DBID) (db.TokenOwnership, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"tokenID": validate.WithTag(tokenID, "required"),
+	}); err != nil {
+		return db.TokenOwnership{}, err
+	}
+
+	return api.loaders.TokenOwnershipByTokenID.Load(tokenID)
+}
+
 func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (db.Event, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{

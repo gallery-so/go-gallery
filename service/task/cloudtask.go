@@ -76,11 +76,6 @@ type TokenProcessingUserTokensMessage struct {
 	TokenIdentifiers TokenIdentifiersQuantities `json:"token_identifiers" binding:"required"`
 }
 
-type TokenProcessingWalletRemovalMessage struct {
-	UserID    persist.DBID   `json:"user_id" binding:"required"`
-	WalletIDs []persist.DBID `json:"wallet_ids" binding:"required"`
-}
-
 type ValidateNFTsMessage struct {
 	OwnerAddress persist.EthereumAddress `json:"wallet"`
 }
@@ -273,38 +268,6 @@ func CreateTaskForUserTokenProcessing(ctx context.Context, message TokenProcessi
 			HttpRequest: &taskspb.HttpRequest{
 				HttpMethod: taskspb.HttpMethod_POST,
 				Url:        fmt.Sprintf("%s/owners/process/user", env.GetString("TOKEN_PROCESSING_URL")),
-				Headers: map[string]string{
-					"Content-type": "application/json",
-					"sentry-trace": span.TraceID.String(),
-				},
-			},
-		},
-	}
-
-	body, err := json.Marshal(message)
-	if err != nil {
-		return err
-	}
-
-	return submitHttpTask(ctx, client, queue, task, body)
-}
-
-func CreateTaskForWalletRemoval(ctx context.Context, message TokenProcessingWalletRemovalMessage, client *gcptasks.Client) error {
-	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForWalletRemoval")
-	defer tracing.FinishSpan(span)
-
-	tracing.AddEventDataToSpan(span, map[string]interface{}{
-		"User ID":    message.UserID,
-		"Wallet IDs": message.WalletIDs,
-	})
-
-	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
-
-	task := &taskspb.Task{
-		MessageType: &taskspb.Task_HttpRequest{
-			HttpRequest: &taskspb.HttpRequest{
-				HttpMethod: taskspb.HttpMethod_POST,
-				Url:        fmt.Sprintf("%s/owners/process/wallet-removal", env.GetString("TOKEN_PROCESSING_URL")),
 				Headers: map[string]string{
 					"Content-type": "application/json",
 					"sentry-trace": span.TraceID.String(),

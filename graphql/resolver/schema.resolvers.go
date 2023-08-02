@@ -2549,6 +2549,32 @@ func (r *tokenResolver) OwnedByWallets(ctx context.Context, obj *model.Token) ([
 	return wallets, nil
 }
 
+// OwnerIsHolder is the resolver for the ownerIsHolder field.
+func (r *tokenResolver) OwnerIsHolder(ctx context.Context, obj *model.Token) (*bool, error) {
+	ownership, err := publicapi.For(ctx).Token.GetTokenOwnershipByTokenID(ctx, obj.Dbid)
+	if err != nil {
+		if _, ok := err.(persist.ErrTokenOwnershipNotFound); ok {
+			return util.ToPointer(false), nil
+		}
+		return nil, err
+	}
+
+	return util.ToPointer(ownership.IsHolder), nil
+}
+
+// OwnerIsCreator is the resolver for the ownerIsCreator field.
+func (r *tokenResolver) OwnerIsCreator(ctx context.Context, obj *model.Token) (*bool, error) {
+	ownership, err := publicapi.For(ctx).Token.GetTokenOwnershipByTokenID(ctx, obj.Dbid)
+	if err != nil {
+		if _, ok := err.(persist.ErrTokenOwnershipNotFound); ok {
+			return util.ToPointer(false), nil
+		}
+		return nil, err
+	}
+
+	return util.ToPointer(ownership.IsCreator), nil
+}
+
 // Contract is the resolver for the contract field.
 func (r *tokenResolver) Contract(ctx context.Context, obj *model.Token) (*model.Contract, error) {
 	return resolveContractByTokenID(ctx, obj.Dbid)

@@ -246,61 +246,69 @@ func processOwnersForUserTokens(mc *multichain.Provider, queries *coredb.Queries
 // detectSpamContracts refreshes the alchemy_spam_contracts table with marked contracts from Alchemy
 func detectSpamContracts(queries *coredb.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		alchemyURL, err := url.Parse(env.GetString("ALCHEMY_NFT_API_URL"))
-		if err != nil {
-			panic(err)
-		}
-
-		spamEndpoint := alchemyURL.JoinPath("getSpamContracts")
-
-		req, err := http.NewRequestWithContext(c, http.MethodGet, spamEndpoint.String(), nil)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-
-		req.Header.Add("accept", "application/json")
-
-		resp, err := retry.RetryRequest(http.DefaultClient, req)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			util.ErrResponse(c, http.StatusInternalServerError, util.BodyAsError(resp))
-			return
-		}
-
-		body := struct {
-			Contracts []persist.Address `json:"contractAddresses"`
-		}{}
-
-		err = json.NewDecoder(resp.Body).Decode(&body)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-
-		params := coredb.InsertSpamContractsParams{}
+		var params coredb.InsertSpamContractsParams
 
 		now := time.Now()
 
-		for _, contract := range body.Contracts {
-			params.ID = append(params.ID, persist.GenerateID().String())
-			params.Chain = append(params.Chain, int32(persist.ChainETH))
-			params.Address = append(params.Address, persist.ChainETH.NormalizeAddress(contract))
-			params.CreatedAt = append(params.CreatedAt, now)
-			params.IsSpam = append(params.IsSpam, true)
+		for _, source := range []struct {
+			Chain    persist.Chain
+			Endpoint string
+		}{
+			{persist.ChainETH, env.GetString("ALCHEMY_ETH_NFT_API_URL")},
+			{persist.ChainPolygon, env.GetString("ALCHEMY_POLYGON_NFT_API_URL")},
+		} {
+			url, err := url.Parse(source.Endpoint)
+			if err != nil {
+				panic(err)
+			}
+
+			spamEndpoint := url.JoinPath("getSpamContracts")
+
+			req, err := http.NewRequestWithContext(c, http.MethodGet, spamEndpoint.String(), nil)
+			if err != nil {
+				util.ErrResponse(c, http.StatusInternalServerError, err)
+				return
+			}
+
+			req.Header.Add("accept", "application/json")
+
+			resp, err := retry.RetryRequest(http.DefaultClient, req)
+			if err != nil {
+				util.ErrResponse(c, http.StatusInternalServerError, err)
+				return
+			}
+
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusOK {
+				util.ErrResponse(c, http.StatusInternalServerError, util.BodyAsError(resp))
+				return
+			}
+
+			body := struct {
+				Contracts []persist.Address `json:"contractAddresses"`
+			}{}
+
+			err = json.NewDecoder(resp.Body).Decode(&body)
+			if err != nil {
+				util.ErrResponse(c, http.StatusInternalServerError, err)
+				return
+			}
+
+			for _, contract := range body.Contracts {
+				params.ID = append(params.ID, persist.GenerateID().String())
+				params.Chain = append(params.Chain, int32(source.Chain))
+				params.Address = append(params.Address, source.Chain.NormalizeAddress(contract))
+				params.CreatedAt = append(params.CreatedAt, now)
+				params.IsSpam = append(params.IsSpam, true)
+			}
+
+			if len(params.Address) == 0 {
+				panic("no spam contracts found")
+			}
 		}
 
-		if len(params.Address) == 0 {
-			panic("no spam contracts found")
-		}
-
-		err = queries.InsertSpamContracts(c, params)
+		err := queries.InsertSpamContracts(c, params)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -312,40 +320,6 @@ func detectSpamContracts(queries *coredb.Queries) gin.HandlerFunc {
 
 func processToken(ctx context.Context, tp *tokenProcessor, token persist.TokenGallery, contract persist.ContractGallery, cause persist.ProcessingCause) (coredb.TokenMedia, error) {
 	return tp.ProcessTokenPipeline(ctx, token, contract, cause, addPipelineRunOptions(contract)...)
-}
-
-func processWalletRemoval(queries *coredb.Queries) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var input task.TokenProcessingWalletRemovalMessage
-		if err := c.ShouldBindJSON(&input); err != nil {
-			util.ErrResponse(c, http.StatusOK, err)
-			return
-		}
-
-		logger.For(c).Infof("Processing wallet removal: UserID=%s, WalletIDs=%v", input.UserID, input.WalletIDs)
-
-		// We never actually remove multiple wallets at a time, but our API does allow it. If we do end up
-		// processing multiple wallet removals, we'll just process them in a loop here, because tuning the
-		// underlying query to handle multiple wallet removals at a time is difficult.
-		for _, walletID := range input.WalletIDs {
-			err := queries.RemoveWalletFromTokens(c, coredb.RemoveWalletFromTokensParams{
-				WalletID: walletID.String(),
-				UserID:   input.UserID,
-			})
-
-			if err != nil {
-				util.ErrResponse(c, http.StatusInternalServerError, err)
-				return
-			}
-		}
-
-		if err := queries.RemoveStaleCreatorStatusFromTokens(c, input.UserID); err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-
-		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
-	}
 }
 
 // addPipelineRunOptions adds pipeline options for specific contracts
