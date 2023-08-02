@@ -683,10 +683,7 @@ func assetToToken(asset Asset, block persist.BlockNumber, tokenOwner persist.Add
 	if err != nil {
 		return multichain.ChainAgnosticToken{}, err
 	}
-	isSpam := util.ToPointer(false)
-	if contractNameIsSpam(asset.Contract.Name) {
-		isSpam = util.ToPointer(true)
-	}
+
 	return multichain.ChainAgnosticToken{
 		TokenType: tokenType,
 		Descriptors: multichain.ChainAgnosticTokenDescriptors{
@@ -704,7 +701,6 @@ func assetToToken(asset Asset, block persist.BlockNumber, tokenOwner persist.Add
 		BlockNumber:     block,
 		TokenMetadata:   metadataFromAsset(asset),
 		Quantity:        "1",
-		IsSpam:          isSpam, // OpenSea filters spam on their side
 	}, nil
 }
 
@@ -723,10 +719,8 @@ func metadataFromAsset(asset Asset) persist.TokenMetadata {
 }
 
 func contractFromAsset(asset Asset, block persist.BlockNumber) multichain.ChainAgnosticContract {
-	isSpam := util.ToPointer(false)
-	if contractNameIsSpam(asset.Contract.Name) {
-		isSpam = util.ToPointer(true)
-	}
+	isSpam := contractNameIsSpam(asset.Contract.Name)
+
 	return multichain.ChainAgnosticContract{
 		Address: persist.Address(asset.Contract.Address.String()),
 		Descriptors: multichain.ChainAgnosticContractDescriptors{
@@ -736,7 +730,7 @@ func contractFromAsset(asset Asset, block persist.BlockNumber) multichain.ChainA
 			Description:     asset.Collection.Description,
 			ProfileImageURL: asset.Collection.ImageURL,
 		},
-		IsSpam:      isSpam,
+		IsSpam:      &isSpam,
 		LatestBlock: block,
 	}
 }
@@ -831,10 +825,8 @@ func contractToContract(ctx context.Context, openseaContract Contract, ethClient
 	if err != nil {
 		return multichain.ChainAgnosticContract{}, err
 	}
-	isSpam := util.ToPointer(false)
-	if contractNameIsSpam(openseaContract.Name) {
-		isSpam = util.ToPointer(true)
-	}
+	isSpam := contractNameIsSpam(openseaContract.Name)
+
 	return multichain.ChainAgnosticContract{
 		Address: persist.Address(openseaContract.Address.String()),
 		Descriptors: multichain.ChainAgnosticContractDescriptors{
@@ -843,7 +835,7 @@ func contractToContract(ctx context.Context, openseaContract Contract, ethClient
 			CreatorAddress: persist.Address(openseaContract.Collection.PayoutAddress),
 		},
 
-		IsSpam:      isSpam,
+		IsSpam:      &isSpam,
 		LatestBlock: persist.BlockNumber(block),
 	}, nil
 }

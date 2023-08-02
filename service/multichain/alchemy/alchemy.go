@@ -767,11 +767,7 @@ func alchemyTokenToChainAgnosticToken(owner persist.EthereumAddress, token Token
 		t.IsSpam = &isSpam
 	}
 
-	contractSpam := false
-	if contractNameIsSpam(token.ContractMetadata.Name) {
-		t.IsSpam = util.ToPointer(true)
-		contractSpam = true
-	}
+	contractSpam := contractNameIsSpam(token.ContractMetadata.Name)
 
 	return t, multichain.ChainAgnosticContract{
 		Address: persist.Address(token.Contract.Address),
