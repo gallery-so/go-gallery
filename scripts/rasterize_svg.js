@@ -27,7 +27,7 @@ const args = [
   '--disable-print-preview',
   '--disable-prompt-on-repost',
   '--disable-renderer-backgrounding',
-  '--disable-setuid-sandbox',
+  // '--disable-setuid-sandbox',
   '--disable-speech-api',
   '--disable-sync',
   '--hide-scrollbars',
@@ -61,8 +61,8 @@ process.on('uncaughtException', (err, origin) => {
 async function createAnimation() {
   const url = process.argv[2];
   const browser = await puppeteer.launch({
-    executablePath: 'google-chrome-stable',
-    headless: 'new',
+    // executablePath: 'google-chrome-stable',
+    headless: true,
     args: args,
   });
   const page = await browser.newPage();

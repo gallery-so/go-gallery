@@ -40,7 +40,6 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd -r pptruser && useradd -rm -g pptruser -G audio,video pptruser
 
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD true
 ENV PUPPETEER_CACHE_FOLDER=/app/puppeteer_cache
 RUN mkdir -p /app/puppeteer_cache && chown -R nobody:nogroup /app/puppeteer_cache
 
