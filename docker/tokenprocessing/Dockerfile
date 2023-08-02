@@ -41,7 +41,7 @@ RUN apt-get update \
     && groupadd -r pptruser && useradd -rm -g pptruser -G audio,video pptruser
 
 ENV PUPPETEER_CACHE_FOLDER=/app/puppeteer_cache
-RUN mkdir -p /app/puppeteer_cache && chown -R nobody:nogroup /app/puppeteer_cache
+RUN mkdir -p /app/puppeteer_cache && chown -R pptruser:pptruser /app/puppeteer_cache
 
 # Install certs
 ADD root-certs /usr/local/share/ca-certificates/
