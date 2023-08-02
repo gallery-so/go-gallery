@@ -130,31 +130,30 @@ func (p *Personalization) update(ctx context.Context) {
 	var curTs redisTs
 
 	err := p.r.HGetScan(ctx, referenceKey, "updated_at", &curTs)
-	// Unknown error, just panic
 	if err != nil && !util.ErrorAs[redis.ErrKeyNotFound](err) {
 		panic(err)
 	}
-	// There is no data in redis, so we need to add it
 	if util.ErrorAs[redis.ErrKeyNotFound](err) {
 		p.readWriteToCache(ctx)
 		return
 	}
-	// We have no data yet, so just load what exists
+
 	if p.LastUpdated.IsZero() {
 		p.readCache(ctx)
 		return
 	}
 
 	staleAt := p.LastUpdated.Add(maxStaleness)
-	// Data is still considered fresh
+
 	if staleAt.After(time.Now()) {
 		return
 	}
-	// What's in the cache is still fresh, so just read from redis
+
 	if staleAt.After(time.Time(curTs)) {
 		p.readCache(ctx)
+		return
 	}
-	// Data is stale, so we'll need to load new data
+
 	p.readWriteToCache(ctx)
 }
 
