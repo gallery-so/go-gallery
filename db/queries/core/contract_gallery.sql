@@ -1,5 +1,5 @@
 -- name: UpsertParentContracts :many
-insert into contracts(id, deleted, version, created_at, address, symbol, name, owner_address, chain, description, profile_image_url) (
+insert into contracts(id, deleted, version, created_at, address, symbol, name, owner_address, chain, description, profile_image_url, is_provider_marked_spam) (
   select unnest(@ids::varchar[])
     , false
     , unnest(@version::int[])
