@@ -2556,6 +2556,9 @@ func (r *tokenResolver) OwnedByWallets(ctx context.Context, obj *model.Token) ([
 
 // Contract is the resolver for the contract field.
 func (r *tokenResolver) Contract(ctx context.Context, obj *model.Token) (*model.Contract, error) {
+	if obj.HelperTokenData.Token.Contract != "" {
+		return resolveContractByContractID(ctx, obj.HelperTokenData.Token.Contract)
+	}
 	return resolveContractByTokenID(ctx, obj.Dbid)
 }
 
