@@ -15,6 +15,7 @@ import (
 	"github.com/james-bowman/sparse"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/util"
@@ -269,12 +270,15 @@ func (p *Personalization) update(ctx context.Context) {
 	if err != nil && !util.ErrorAs[redis.ErrKeyNotFound](err) {
 		panic(err)
 	}
+
 	if util.ErrorAs[redis.ErrKeyNotFound](err) {
+		logger.For(ctx).Infof("no personalization data found in cache, updating from db")
 		p.readWriteToCache(ctx)
 		return
 	}
 
 	if p.pM == nil {
+		logger.For(ctx).Infof("no personalization data loaded prior, reading from cache")
 		p.readCache(ctx)
 		return
 	}
@@ -282,14 +286,17 @@ func (p *Personalization) update(ctx context.Context) {
 	staleAt := p.pM.lastUpdated.Add(time.Hour)
 
 	if staleAt.After(time.Now()) {
+		logger.For(ctx).Infof("personalization data is still fresh, skipping update")
 		return
 	}
 
 	if staleAt.After(time.Time(curTs)) {
+		logger.For(ctx).Infof("personalization data is stale, reading from cache")
 		p.readCache(ctx)
 		return
 	}
 
+	logger.For(ctx).Infof("personalization cached data is stale, updating from db")
 	p.readWriteToCache(ctx)
 }
 
