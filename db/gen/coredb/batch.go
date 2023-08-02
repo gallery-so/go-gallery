@@ -4244,7 +4244,7 @@ WHERE $1 = ANY(posts.contract_ids)
 AND posts.deleted = false
 AND (posts.created_at, posts.id) < ($2, $3)
 AND (posts.created_at, posts.id) > ($4, $5)
-ORDER BY 
+ORDER BY
     CASE WHEN $6::bool THEN (posts.created_at, posts.id) END ASC,
     CASE WHEN NOT $6::bool THEN (posts.created_at, posts.id) END DESC
 LIMIT $7

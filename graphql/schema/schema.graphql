@@ -1216,6 +1216,13 @@ type Query {
     last: Int
     includePosts: Boolean! = false
   ): FeedConnection
+  curatedFeed(
+    before: String
+    after: String
+    first: Int
+    last: Int
+    includePosts: Boolean! = false
+  ): FeedConnection
   feedEventById(id: DBID!): FeedEventByIdOrError
   postById(id: DBID!): PostOrError
   getMerchTokens(wallet: Address!): MerchTokensPayloadOrError

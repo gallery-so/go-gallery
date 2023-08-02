@@ -65,11 +65,13 @@ require (
 	github.com/ertan/go-farcaster v1.0.0-beta
 	github.com/golang-jwt/jwt/v5 v5.0.0
 	github.com/google/wire v0.5.0
+	github.com/james-bowman/sparse v0.0.0-20210729090128-1e6c7dd483e9
 	github.com/jinzhu/copier v0.3.5
 	github.com/sourcegraph/conc v0.3.0
 	github.com/wealdtech/go-ens/v3 v3.5.5
 	go.mozilla.org/sops/v3 v3.7.3
 	golang.org/x/term v0.8.0
+	gonum.org/v1/gonum v0.13.0
 )
 
 require (

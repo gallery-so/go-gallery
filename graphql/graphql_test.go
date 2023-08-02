@@ -175,7 +175,8 @@ func testSuggestedUsersForViewer(t *testing.T) {
 		userB.ID,
 		userC.ID,
 	})
-	handler := server.CoreInit(clients, provider, recommender)
+	p := newStubPersonaliztion(t)
+	handler := server.CoreInit(ctx, clients, provider, recommender, p)
 	c := customHandlerClient(t, handler, withJWTOpt(t, userF.ID))
 
 	response, err := viewerQuery(ctx, c)
@@ -820,10 +821,11 @@ func testViewToken(t *testing.T) {
 	assert.NotEmpty(t, colPay.Collection.Dbid)
 	assert.Len(t, colPay.Collection.Tokens, 1)
 
-	responseAliceViewToken := viewToken(t, ctx, c2, userF.TokenIDs[0],  colPay.Collection.Dbid)
-	responseBobViewToken := viewToken(t, ctx, c3, userF.TokenIDs[0],  colPay.Collection.Dbid)
+	responseAliceViewToken := viewToken(t, ctx, c2, userF.TokenIDs[0], colPay.Collection.Dbid)
+	responseBobViewToken := viewToken(t, ctx, c3, userF.TokenIDs[0], colPay.Collection.Dbid)
 	assert.NotEmpty(t, responseAliceViewToken)
-	assert.NotEmpty(t, responseBobViewToken)}
+	assert.NotEmpty(t, responseBobViewToken)
+}
 
 func testSyncNewTokens(t *testing.T) {
 	userF := newUserFixture(t)
@@ -1527,7 +1529,8 @@ func defaultHandler(t *testing.T) http.Handler {
 	c := server.ClientInit(ctx)
 	p, cleanup := server.NewMultichainProvider(ctx, server.SetDefaults)
 	r := newStubRecommender(t, []persist.DBID{})
-	handler := server.CoreInit(c, p, r)
+	pnl := newStubPersonaliztion(t)
+	handler := server.CoreInit(ctx, c, p, r, pnl)
 	t.Cleanup(func() {
 		c.Close()
 		cleanup()
@@ -1537,11 +1540,13 @@ func defaultHandler(t *testing.T) http.Handler {
 
 // handlerWithProviders returns a GraphQL http.Handler
 func handlerWithProviders(t *testing.T, sendTokens multichain.SendTokens, providers ...any) http.Handler {
+	ctx := context.Background()
 	c := server.ClientInit(context.Background())
 	provider := newMultichainProvider(c, sendTokens, providers)
 	recommender := newStubRecommender(t, []persist.DBID{})
+	p := newStubPersonaliztion(t)
 	t.Cleanup(c.Close)
-	return server.CoreInit(c, &provider, recommender)
+	return server.CoreInit(ctx, c, &provider, recommender, p)
 }
 
 // newMultichainProvider a new multichain provider configured with the given providers
