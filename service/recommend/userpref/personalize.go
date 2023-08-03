@@ -264,40 +264,40 @@ func (p *Personalization) updateMatrices(m *personalizationMatrices) {
 }
 
 func (p *Personalization) update(ctx context.Context) {
-	var curTs redisTs
+	// var curTs redisTs
 
-	err := p.r.HGetScan(ctx, referenceKey, "updated_at", &curTs)
-	if err != nil && !util.ErrorAs[redis.ErrKeyNotFound](err) {
-		panic(err)
-	}
+	// err := p.r.HGetScan(ctx, referenceKey, "updated_at", &curTs)
+	// if err != nil && !util.ErrorAs[redis.ErrKeyNotFound](err) {
+	// 	panic(err)
+	// }
 
-	if util.ErrorAs[redis.ErrKeyNotFound](err) {
-		logger.For(ctx).Infof("no personalization data found in cache, updating from db")
-		p.readWriteToCache(ctx)
-		return
-	}
+	// if util.ErrorAs[redis.ErrKeyNotFound](err) {
+	// 	logger.For(ctx).Infof("no personalization data found in cache, updating from db")
+	// 	p.readWriteToCache(ctx)
+	// 	return
+	// }
 
-	if p.pM == nil {
-		logger.For(ctx).Infof("no personalization data loaded prior, reading from cache")
-		p.readCache(ctx)
-		return
-	}
+	// if p.pM == nil {
+	// 	logger.For(ctx).Infof("no personalization data loaded prior, reading from cache")
+	// 	p.readCache(ctx)
+	// 	return
+	// }
 
-	staleAt := p.pM.lastUpdated.Add(time.Hour)
+	// staleAt := p.pM.lastUpdated.Add(time.Hour)
 
-	if staleAt.After(time.Now()) {
-		logger.For(ctx).Infof("personalization data is still fresh, skipping update")
-		return
-	}
+	// if staleAt.After(time.Now()) {
+	// 	logger.For(ctx).Infof("personalization data is still fresh, skipping update")
+	// 	return
+	// }
 
-	if staleAt.After(time.Time(curTs)) {
-		logger.For(ctx).Infof("personalization data is stale, reading from cache")
-		p.readCache(ctx)
-		return
-	}
+	// if staleAt.After(time.Time(curTs)) {
+	// 	logger.For(ctx).Infof("personalization data is stale, reading from cache")
+	// 	p.readCache(ctx)
+	// 	return
+	// }
 
-	logger.For(ctx).Infof("personalization cached data is stale, updating from db")
-	p.readWriteToCache(ctx)
+	// logger.For(ctx).Infof("personalization cached data is stale, updating from db")
+	// p.readWriteToCache(ctx)
 }
 
 func mustTransaction(r *redis.Cache, ctx context.Context, fn func(*redispkg.Tx) error) {
