@@ -2,7 +2,6 @@ package userpref
 
 import (
 	"bytes"
-	"compress/gzip"
 	"context"
 	"encoding/binary"
 	"encoding/json"
@@ -20,6 +19,7 @@ import (
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/store"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -160,7 +160,7 @@ type Personalization struct {
 	Mu sync.RWMutex
 	pM *personalizationMatrices
 	q  *db.Queries
-	s  storager
+	b  store.BucketStorer
 }
 
 func AddTo(c *gin.Context, k *Personalization) {
@@ -183,8 +183,8 @@ func (k *Personalization) Loop(ctx context.Context, ticker *time.Ticker) {
 }
 
 func NewPersonalization(ctx context.Context, q *db.Queries, c *storage.Client) *Personalization {
-	s := storager{c: c, b: c.Bucket(env.GetString("GCLOUD_USER_PREF_BUCKET"))}
-	k := &Personalization{q: q, s: s}
+	b := store.NewBucketStorer(c, env.GetString("GCLOUD_USER_PREF_BUCKET"))
+	k := &Personalization{q: q, b: b}
 	k.update(ctx)
 	return k
 }
@@ -253,43 +253,8 @@ func (p *Personalization) updateMatrices(m *personalizationMatrices) {
 	p.pM = m
 }
 
-type storager struct {
-	c *storage.Client
-	b *storage.BucketHandle
-}
-
-func (s storager) Metadata(ctx context.Context, objName string) (*storage.ObjectAttrs, error) {
-	o := s.b.Object(objName)
-	return o.Attrs(ctx)
-}
-
-func (s storager) Reader(ctx context.Context, objName string) (io.ReadCloser, error) {
-	o := s.b.Object(objName)
-	return o.NewReader(ctx)
-}
-
-func (s storager) Write(ctx context.Context, objName string, b []byte) error {
-	w := s.writer(ctx, objName)
-	w.ObjectAttrs.ContentType = "application/octet-stream"
-	w.ObjectAttrs.ContentEncoding = "gzip"
-	gz := gzip.NewWriter(w)
-	buf := bytes.NewReader(b)
-	if _, err := io.Copy(gz, buf); err != nil {
-		return err
-	}
-	if err := gz.Close(); err != nil {
-		return err
-	}
-	return w.Close()
-}
-
-func (s storager) writer(ctx context.Context, objName string) *storage.Writer {
-	o := s.b.Object(objName)
-	return o.NewWriter(ctx)
-}
-
 func (p *Personalization) update(ctx context.Context) {
-	curObj, err := p.s.Metadata(ctx, gcpObjectName)
+	curObj, err := p.b.Metadata(ctx, gcpObjectName)
 	if err != nil && err != storage.ErrObjectNotExist {
 		panic(err)
 	}
@@ -326,7 +291,7 @@ func (p *Personalization) update(ctx context.Context) {
 }
 
 func (p *Personalization) readCache(ctx context.Context) {
-	r, err := p.s.Reader(ctx, gcpObjectName)
+	r, err := p.b.Reader(ctx, gcpObjectName)
 	check(err)
 	defer r.Close()
 	var m personalizationMatrices
@@ -338,7 +303,7 @@ func (p *Personalization) updateCache(ctx context.Context) {
 	m := readMatrices(ctx, p.q)
 	b, err := m.MarshalBinary()
 	check(err)
-	err = p.s.Write(ctx, gcpObjectName, b)
+	_, err = p.b.WriteGzip(ctx, gcpObjectName, b, store.ObjAttrsOptions.WithContentType("application/octect-stream"))
 	check(err)
 	p.updateMatrices(&m)
 }
