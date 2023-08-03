@@ -59,7 +59,7 @@ func Init() {
 	c := ClientInit(ctx)
 	provider, _ := NewMultichainProvider(ctx, SetDefaults)
 	recommender := recommend.NewRecommender(c.Queries)
-	p := userpref.NewPersonalization(ctx, c.Queries)
+	p := userpref.NewPersonalization(ctx, c.Queries, c.StorageClient)
 	router := CoreInit(ctx, c, provider, recommender, p)
 	http.Handle("/", router)
 }

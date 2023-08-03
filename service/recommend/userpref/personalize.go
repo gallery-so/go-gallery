@@ -2,27 +2,30 @@ package userpref
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"sync"
 	"time"
 
+	"cloud.google.com/go/storage"
 	"github.com/gin-gonic/gin"
-	redispkg "github.com/go-redis/redis/v8"
 	"github.com/james-bowman/sparse"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/util"
 )
 
 const (
-	referenceKey = "personalization:refs" // Reference to the keys that store the actual data
-	contextKey   = "personalization.instance"
+	contextKey    = "personalization.instance"
+	gcpObjectName = "personalization_matrices.bin.gz"
 )
 
 var ErrNoInputData = errors.New("no personalization input data")
@@ -60,26 +63,26 @@ type personalizationMatrices struct {
 }
 
 func (p personalizationMatrices) MarshalBinary() ([]byte, error) {
-	var dataBuf []byte
-	appendTime(&dataBuf, p.lastUpdated)
-	appendMatrix(&dataBuf, p.userM)
-	appendMatrix(&dataBuf, p.ratingM)
-	appendMatrix(&dataBuf, p.displayM)
-	appendMatrix(&dataBuf, p.simM)
-	appendJSON(&dataBuf, p.uL)
-	appendJSON(&dataBuf, p.cL)
-	return dataBuf, nil
+	var buf []byte
+	appendTime(&buf, p.lastUpdated)
+	appendMatrix(&buf, p.userM)
+	appendMatrix(&buf, p.ratingM)
+	appendMatrix(&buf, p.displayM)
+	appendMatrix(&buf, p.simM)
+	appendJSON(&buf, p.uL)
+	appendJSON(&buf, p.cL)
+	return buf, nil
 }
 
-func (p *personalizationMatrices) UnmarshalBinary(data []byte) error {
-	reader := bytes.NewReader(data)
-	t := readTime(reader)
-	userM := readMatrix(reader)
-	ratingM := readMatrix(reader)
-	displayM := readMatrix(reader)
-	simM := readMatrix(reader)
-	uL := readJSON(reader)
-	cL := readJSON(reader)
+func (p *personalizationMatrices) UnmarshalBinary(data []byte) {
+	r := bytes.NewReader(data)
+	t := readTime(r)
+	userM := readMatrix(r)
+	ratingM := readMatrix(r)
+	displayM := readMatrix(r)
+	simM := readMatrix(r)
+	uL := readJSON(r)
+	cL := readJSON(r)
 	p.lastUpdated = t
 	p.userM = userM
 	p.ratingM = ratingM
@@ -87,7 +90,12 @@ func (p *personalizationMatrices) UnmarshalBinary(data []byte) error {
 	p.simM = simM
 	p.uL = uL
 	p.cL = cL
-	return nil
+}
+
+func (p *personalizationMatrices) UnmarshalBinaryFrom(r io.Reader) {
+	b, err := io.ReadAll(r)
+	check(err)
+	p.UnmarshalBinary(b)
 }
 
 func appendMatrix(buf *[]byte, m *sparse.CSR) {
@@ -142,7 +150,6 @@ func appendTo(buf *[]byte, byt []byte) {
 func readTo(r *bytes.Reader) []byte {
 	l, err := binary.ReadUvarint(r)
 	check(err)
-
 	buf := make([]byte, l)
 	_, err = r.Read(buf)
 	check(err)
@@ -150,12 +157,10 @@ func readTo(r *bytes.Reader) []byte {
 }
 
 type Personalization struct {
-	// Handles concurrent access to the matrices
 	Mu sync.RWMutex
-	// LastUpdated is the time the matrices were last updated
 	pM *personalizationMatrices
 	q  *db.Queries
-	r  *redis.Cache
+	s  storager
 }
 
 func AddTo(c *gin.Context, k *Personalization) {
@@ -171,16 +176,15 @@ func For(ctx context.Context) *Personalization {
 func (k *Personalization) Loop(ctx context.Context, ticker *time.Ticker) {
 	go func() {
 		for {
-			select {
-			case <-ticker.C:
-				k.update(ctx)
-			}
+			<-ticker.C
+			k.update(ctx)
 		}
 	}()
 }
 
-func NewPersonalization(ctx context.Context, q *db.Queries) *Personalization {
-	k := &Personalization{q: q, r: redis.NewCache(redis.UserPrefCache)}
+func NewPersonalization(ctx context.Context, q *db.Queries, c *storage.Client) *Personalization {
+	s := storager{c: c, b: c.Bucket(env.GetString("GCLOUD_USER_PREF_BUCKET"))}
+	k := &Personalization{q: q, s: s}
 	k.update(ctx)
 	return k
 }
@@ -227,12 +231,12 @@ func (p *Personalization) scoreRelevance(viewerID, contractID persist.DBID) (flo
 	return calcRelevanceScore(p.pM.ratingM, p.pM.displayM, vIdx, cIdx), nil
 }
 
-func readMatrices(ctx context.Context, q *db.Queries) *personalizationMatrices {
+func readMatrices(ctx context.Context, q *db.Queries) personalizationMatrices {
 	uL := readUserLabels(ctx, q)
 	ratingM, displayM, cL := readContractMatrices(ctx, q, uL)
 	userM := readUserMatrix(ctx, q, uL)
 	simM := toSimMatrix(ratingM, userM)
-	return &personalizationMatrices{
+	return personalizationMatrices{
 		userM:       userM,
 		ratingM:     ratingM,
 		displayM:    displayM,
@@ -243,129 +247,100 @@ func readMatrices(ctx context.Context, q *db.Queries) *personalizationMatrices {
 	}
 }
 
-type redisTs time.Time
-
-func (r redisTs) MarshalBinary() ([]byte, error) {
-	s := time.Time(r).Format(time.RFC3339)
-	return []byte(s), nil
-}
-
-func (r *redisTs) UnmarshalBinary(data []byte) error {
-	t, err := time.Parse(time.RFC3339, string(data))
-	*r = redisTs(t)
-	return err
-}
-
 func (p *Personalization) updateMatrices(m *personalizationMatrices) {
 	p.Mu.Lock()
 	defer p.Mu.Unlock()
 	p.pM = m
 }
 
-func (p *Personalization) update(ctx context.Context) {
-	// var curTs redisTs
-
-	// err := p.r.HGetScan(ctx, referenceKey, "updated_at", &curTs)
-	// if err != nil && !util.ErrorAs[redis.ErrKeyNotFound](err) {
-	// 	panic(err)
-	// }
-
-	// if util.ErrorAs[redis.ErrKeyNotFound](err) {
-	// 	logger.For(ctx).Infof("no personalization data found in cache, updating from db")
-	// 	p.readWriteToCache(ctx)
-	// 	return
-	// }
-
-	// if p.pM == nil {
-	// 	logger.For(ctx).Infof("no personalization data loaded prior, reading from cache")
-	// 	p.readCache(ctx)
-	// 	return
-	// }
-
-	// staleAt := p.pM.lastUpdated.Add(time.Hour)
-
-	// if staleAt.After(time.Now()) {
-	// 	logger.For(ctx).Infof("personalization data is still fresh, skipping update")
-	// 	return
-	// }
-
-	// if staleAt.After(time.Time(curTs)) {
-	// 	logger.For(ctx).Infof("personalization data is stale, reading from cache")
-	// 	p.readCache(ctx)
-	// 	return
-	// }
-
-	// logger.For(ctx).Infof("personalization cached data is stale, updating from db")
-	// p.readWriteToCache(ctx)
+type storager struct {
+	c *storage.Client
+	b *storage.BucketHandle
 }
 
-func mustTransaction(r *redis.Cache, ctx context.Context, fn func(*redispkg.Tx) error) {
-	// Retry transaction up to maxTries
-	var tries int
-	maxTries := 3
-	for ; tries < maxTries; tries++ {
-		err := r.Watch(ctx, fn, referenceKey)
-		if err == nil {
-			return
-		}
-		// If the transaction fails, we'll just try again
-		if err == redispkg.TxFailedErr {
-			continue
-		}
-		// Something else went wrong, we'll need to check where it failed and clean up references if necessary
+func (s storager) Metadata(ctx context.Context, objName string) (*storage.ObjectAttrs, error) {
+	o := s.b.Object(objName)
+	return o.Attrs(ctx)
+}
+
+func (s storager) Reader(ctx context.Context, objName string) (io.ReadCloser, error) {
+	o := s.b.Object(objName)
+	return o.NewReader(ctx)
+}
+
+func (s storager) Write(ctx context.Context, objName string, b []byte) error {
+	w := s.writer(ctx, objName)
+	w.ObjectAttrs.ContentType = "application/octet-stream"
+	w.ObjectAttrs.ContentEncoding = "gzip"
+	gz := gzip.NewWriter(w)
+	buf := bytes.NewReader(b)
+	if _, err := io.Copy(gz, buf); err != nil {
+		return err
+	}
+	if err := gz.Close(); err != nil {
+		return err
+	}
+	return w.Close()
+}
+
+func (s storager) writer(ctx context.Context, objName string) *storage.Writer {
+	o := s.b.Object(objName)
+	return o.NewWriter(ctx)
+}
+
+func (p *Personalization) update(ctx context.Context) {
+	curObj, err := p.s.Metadata(ctx, gcpObjectName)
+	if err != nil && err != storage.ErrObjectNotExist {
 		panic(err)
 	}
-	panic(fmt.Sprintf("failed to update personalization data after %d tries", maxTries))
+
+	if err == storage.ErrObjectNotExist {
+		logger.For(ctx).Infof("no data found in cache, updating the cache")
+		p.updateCache(ctx)
+		return
+	}
+
+	if p.pM == nil {
+		logger.For(ctx).Infof("no data loaded, reading from cache")
+		p.readCache(ctx)
+		return
+	}
+
+	staleAt := p.pM.lastUpdated.Add(time.Hour)
+
+	if staleAt.After(time.Now()) {
+		logger.For(ctx).Infof("data is still fresh, skipping update")
+		return
+	}
+
+	checkOK(curObj != nil, "curObj is unexpectedly nil")
+
+	if staleAt.After(curObj.Updated) {
+		logger.For(ctx).Infof("personalization data is stale, reading from cache")
+		p.readCache(ctx)
+		return
+	}
+
+	logger.For(ctx).Infof("cached data is stale, updating the cache")
+	p.updateCache(ctx)
 }
 
 func (p *Personalization) readCache(ctx context.Context) {
-	b, err := p.r.GetFromField(ctx, referenceKey, "key_name")
+	r, err := p.s.Reader(ctx, gcpObjectName)
 	check(err)
+	defer r.Close()
 	var m personalizationMatrices
-	m.UnmarshalBinary([]byte(b.(string)))
+	m.UnmarshalBinaryFrom(r)
 	p.updateMatrices(&m)
 }
 
-func (p *Personalization) readWriteToCache(ctx context.Context) {
-	matrices := readMatrices(ctx, p.q)
-	refKey := p.r.GetPrefixedKey(referenceKey)
-	loadKey := refKey + ":" + persist.GenerateID().String()
-	// Conditionally update referenceKey and add loadKey if the referenceKey is older than the data that was pulled
-	// TODO: This can be replaced with a lua script
-	mustTransaction(p.r, ctx, func(tx *redispkg.Tx) error {
-		// Check for the referenceKey again because another process may have updated it since the check above
-		var curTs redisTs
-		var curKey string
-
-		err := tx.HGet(ctx, refKey, "updated_at").Scan(&curTs)
-		if err != nil && err != redispkg.Nil {
-			return err
-		}
-
-		err = tx.HGet(ctx, refKey, "key_name").Scan(curKey)
-		if err != nil && err != redispkg.Nil {
-			return err
-		}
-
-		// If the referenceKey is newer than the data, then we don't need to update
-		if t := time.Time(curTs); !t.IsZero() && t.After(matrices.lastUpdated) {
-			return nil
-		}
-
-		err = tx.Set(ctx, loadKey, matrices, 0).Err()
-		if err != nil {
-			return err
-		}
-
-		err = tx.HSet(ctx, refKey, map[string]any{"updated_at": redisTs(matrices.lastUpdated), "key_name": loadKey}).Err()
-		if err != nil {
-			return err
-		}
-
-		// Delete the pointer to the old data. This should be safe since redis is single-threaded and the key is read atomically by reference
-		return tx.Del(ctx, curKey).Err()
-	})
-	p.updateMatrices(matrices)
+func (p *Personalization) updateCache(ctx context.Context) {
+	m := readMatrices(ctx, p.q)
+	b, err := m.MarshalBinary()
+	check(err)
+	err = p.s.Write(ctx, gcpObjectName, b)
+	check(err)
+	p.updateMatrices(&m)
 }
 
 // calcSocialScore determines if vIdx is in the same friend circle as qIdx by running a bfs on userM
@@ -420,7 +395,7 @@ func (n *idLookup) Set(idx int, i uint8) {
 
 func extendBy[T any](s *[]T, i int) {
 	if newSize := i + 1; newSize > cap(*s) {
-		cp := make([]T, newSize*2, newSize*2)
+		cp := make([]T, newSize*2)
 		copy(cp, *s)
 		*s = cp
 	}
