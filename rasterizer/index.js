@@ -1,11 +1,9 @@
-const puppeteer = require('puppeteer');
 const PNG = require('pngjs').PNG;
 const GIFEncoder = require('gifencoder');
 const pixelmatch = require('pixelmatch');
-const fs = require('fs');
-
-const totalFrames = 30;
-const idealDelay = 30;
+const express = require('express');
+const { Cluster } = require('puppeteer-cluster');
+const app = express();
 
 const args = [
   '--autoplay-policy=user-gesture-required',
@@ -47,6 +45,48 @@ const args = [
   '--disable-inotify',
 ];
 
+(async () => {
+  console.log('Launching cluster');
+  const cluster = await Cluster.launch({
+    concurrency: Cluster.CONCURRENCY_CONTEXT,
+    maxConcurrency: 10,
+    puppeteerOptions: {
+      args,
+      headless: 'new',
+    },
+  });
+
+  await cluster.task(async ({ page, data: url }) => {
+    return await createAnimation(page, url);
+  });
+  app.listen(3000, async () => {
+    console.log('Listening on port 3000');
+  });
+
+  app.get('/rasterize', async (req, res) => {
+    if (!req.query.url) {
+      res.send('No url provided');
+      return;
+    }
+    console.log('Requesting ' + req.query.url);
+    try {
+      const result = await cluster.execute(req.query.url);
+      const j = {};
+      j['png'] = result[0];
+      if (result.length > 1) {
+        j['gif'] = result[1];
+      }
+      res.status(200).send(j);
+    } catch (e) {
+      console.log(e);
+      res.status(400).send('error: ', e);
+    }
+  });
+})();
+
+const totalFrames = 30;
+const idealDelay = 30;
+
 process.on('unhandledRejection', (reason, p) => {
   console.error('Unhandled Rejection at:', p, 'reason:', reason);
   console.log('Unhandled Rejection at:', p, 'reason:', reason);
@@ -57,13 +97,7 @@ process.on('uncaughtException', (err, origin) => {
   console.log(`Caught exception: ${err}\n` + `Exception origin: ${origin}`);
 });
 
-async function createAnimation() {
-  const url = process.argv[2];
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: args,
-  });
-  const page = await browser.newPage();
+async function createAnimation(page, url) {
   await page.goto(url);
 
   let svgDimensions = await page.evaluate(() => {
@@ -72,10 +106,16 @@ async function createAnimation() {
     if (svg) {
       // If viewBox is available, use it
       if (svg.viewBox && svg.viewBox.baseVal) {
+        console.log(
+          `url ${url} viewbox ${svg.viewBox.baseVal.width} ${svg.viewBox.baseVal.height}`
+        );
         return { width: svg.viewBox.baseVal.width, height: svg.viewBox.baseVal.height };
       }
       // If width and height are available, use them
       else if (svg.width && svg.height) {
+        console.log(
+          `url ${url} width ${svg.width.baseVal.value} height ${svg.height.baseVal.value}`
+        );
         return { width: svg.width.baseVal.value, height: svg.height.baseVal.value };
       }
       // If none are available, throw error
@@ -134,10 +174,13 @@ async function createAnimation() {
     }
   }
 
+  const result = [];
+
   const pngBuffer = PNG.sync.write(frames[0]);
-  console.log('PNG');
-  console.log(Buffer.from(pngBuffer).toString('base64'));
-  if (process.argv.length > 3 && process.argv[3]) fs.writeFileSync('test.png', pngBuffer);
+  result.push(Buffer.from(pngBuffer).toString('base64'));
+
+  console.log(`url ${url} wrote png`);
+  console.log(`url ${url} isStatic: ${isStatic}`);
 
   if (!isStatic) {
     // If frames are different, save a gif as well
@@ -146,9 +189,8 @@ async function createAnimation() {
     let gifBuffer = Buffer.alloc(0);
     stream.on('data', (chunk) => (gifBuffer = Buffer.concat([gifBuffer, chunk])));
     stream.on('end', () => {
-      console.log('GIF');
-      console.log(gifBuffer.toString('base64'));
-      if (process.argv.length > 3 && process.argv[3]) fs.writeFileSync('test.gif', gifBuffer);
+      result.push(gifBuffer.toString('base64'));
+      console.log(`url ${url} wrote gif`);
     });
 
     encoder.start();
@@ -163,7 +205,5 @@ async function createAnimation() {
     encoder.finish();
   }
 
-  await browser.close();
+  return result;
 }
-
-createAnimation();

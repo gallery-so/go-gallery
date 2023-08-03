@@ -67,7 +67,7 @@ func CoreInitServer(clients *server.Clients, mc *multichain.Provider) *gin.Engin
 
 	t := newThrottler()
 
-	tp := NewTokenProcessor(clients.Queries, clients.EthClient, mc, clients.IPFSClient, clients.ArweaveClient, clients.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), clients.Repos.TokenRepository, metric.NewLogMetricReporter())
+	tp := NewTokenProcessor(clients.Queries, clients.EthClient, clients.HTTPClient, mc, clients.IPFSClient, clients.ArweaveClient, clients.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), clients.Repos.TokenRepository, metric.NewLogMetricReporter())
 
 	return handlersInitServer(router, tp, mc, clients.Repos, t, validate.WithCustomValidators())
 }
@@ -107,6 +107,7 @@ func setDefaults() {
 	viper.SetDefault("PUBSUB_TOPIC_UPDATED_NOTIFICATIONS", "dev-updated-notifications")
 	viper.SetDefault("PUBSUB_SUB_NEW_NOTIFICATIONS", "dev-new-notifications-sub")
 	viper.SetDefault("PUBSUB_SUB_UPDATED_NOTIFICATIONS", "dev-updated-notifications-sub")
+	viper.SetDefault("RASTERIZER_URL", "http://localhost:3000")
 
 	viper.AutomaticEnv()
 

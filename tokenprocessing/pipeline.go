@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -25,6 +26,7 @@ import (
 type tokenProcessor struct {
 	queries       *coredb.Queries
 	ethClient     *ethclient.Client
+	httpClient    *http.Client
 	mc            *multichain.Provider
 	ipfsClient    *shell.Shell
 	arweaveClient *goar.Client
@@ -34,11 +36,12 @@ type tokenProcessor struct {
 	mr            metric.MetricReporter
 }
 
-func NewTokenProcessor(queries *coredb.Queries, ethClient *ethclient.Client, mc *multichain.Provider, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, tokenRepo *postgres.TokenGalleryRepository, mr metric.MetricReporter) *tokenProcessor {
+func NewTokenProcessor(queries *coredb.Queries, ethClient *ethclient.Client, httpClient *http.Client, mc *multichain.Provider, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, tokenRepo *postgres.TokenGalleryRepository, mr metric.MetricReporter) *tokenProcessor {
 	return &tokenProcessor{
 		queries:       queries,
 		ethClient:     ethClient,
 		mc:            mc,
+		httpClient:    httpClient,
 		ipfsClient:    ipfsClient,
 		arweaveClient: arweaveClient,
 		stg:           stg,
