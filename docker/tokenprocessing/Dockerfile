@@ -20,7 +20,6 @@ RUN go mod download
 
 # Copy the rest of the application
 COPY . /app
-RUN npm ci
 RUN go build -o ./bin/tokenprocessing ./cmd/tokenprocessing/main.go
 
 ENV VERSION=$VERSION
