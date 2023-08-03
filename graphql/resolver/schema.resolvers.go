@@ -633,6 +633,11 @@ func (r *galleryUserResolver) CreatedCommunities(ctx context.Context, obj *model
 	}, nil
 }
 
+// IsMemberOfCommunity is the resolver for the isMemberOfCommunity field.
+func (r *galleryUserResolver) IsMemberOfCommunity(ctx context.Context, obj *model.GalleryUser, communityID persist.DBID) (bool, error) {
+	return publicapi.For(ctx).User.IsMemberOfCommunity(ctx, obj.Dbid, communityID)
+}
+
 // AddUserWallet is the resolver for the addUserWallet field.
 func (r *mutationResolver) AddUserWallet(ctx context.Context, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) (model.AddUserWalletPayloadOrError, error) {
 	api := publicapi.For(ctx)

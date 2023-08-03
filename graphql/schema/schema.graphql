@@ -129,6 +129,7 @@ type GalleryUser implements Node @goEmbedHelper {
     first: Int
     last: Int
   ): CommunitiesConnection @goField(forceResolver: true)
+  isMemberOfCommunity(communityID: DBID!): Boolean! @goField(forceResolver: true)
 }
 
 type Wallet implements Node {

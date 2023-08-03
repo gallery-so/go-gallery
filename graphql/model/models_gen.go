@@ -1350,6 +1350,7 @@ type GalleryUser struct {
 	SharedFollowers          *UsersConnection       `json:"sharedFollowers"`
 	SharedCommunities        *CommunitiesConnection `json:"sharedCommunities"`
 	CreatedCommunities       *CommunitiesConnection `json:"createdCommunities"`
+	IsMemberOfCommunity      bool                   `json:"isMemberOfCommunity"`
 }
 
 func (GalleryUser) IsNode()                              {}
