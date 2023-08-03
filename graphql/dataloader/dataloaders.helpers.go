@@ -4,6 +4,8 @@ import (
 	"context"
 	"sync"
 	"time"
+
+	"github.com/mikeydub/go-gallery/service/tracing"
 )
 
 type settings struct {
@@ -57,6 +59,41 @@ func (s settings) getMaxBatchOne() int {
 
 func (s settings) getMaxBatchMany() int {
 	return s.maxBatchMany
+}
+
+func defaultSettings(ctx context.Context, disableCaching bool, subscriptionRegistry *[]any, mutexRegistry *[]*sync.Mutex) settings {
+	return settings{
+		ctx:                  ctx,
+		maxBatchOne:          100,
+		maxBatchMany:         10,
+		waitTime:             2 * time.Millisecond,
+		disableCaching:       disableCaching,
+		publishResults:       true,
+		preFetchHook:         tracing.DataloaderPreFetchHook,
+		postFetchHook:        tracing.DataloaderPostFetchHook,
+		subscriptionRegistry: subscriptionRegistry,
+		mutexRegistry:        mutexRegistry,
+	}
+}
+
+func settingsWithOptions(ctx context.Context, disableCaching bool, subscriptionRegistry *[]any, mutexRegistry *[]*sync.Mutex, opts ...func(*settings)) settings {
+	s := defaultSettings(ctx, disableCaching, subscriptionRegistry, mutexRegistry)
+	for _, opt := range opts {
+		opt(&s)
+	}
+	return s
+}
+
+func withMaxBatchOne(batchSize int) func(*settings) {
+	return func(s *settings) {
+		s.maxBatchOne = batchSize
+	}
+}
+
+func withWaitTime(t time.Duration) func(*settings) {
+	return func(s *settings) {
+		s.waitTime = t
+	}
 }
 
 func withContext(ctx context.Context) func(interface {

@@ -45,7 +45,6 @@
 //go:generate go run github.com/gallery-so/dataloaden SharedFollowersLoaderByIDs github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedFollowersBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedFollowersBatchPaginateRow
 //go:generate go run github.com/gallery-so/dataloaden SharedContractsLoaderByIDs github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedContractsBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedContractsBatchPaginateRow
 //go:generate go run github.com/gallery-so/dataloaden MediaLoaderByTokenID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.TokenMedia
-//go:generate go run github.com/gallery-so/dataloaden TokenOwnershipLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.TokenOwnership
 //go:generate go run github.com/gallery-so/dataloaden ContractCreatorLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.ContractCreator
 //go:generate go run github.com/gallery-so/dataloaden TokensLoaderByUserIDAndFilters github.com/mikeydub/go-gallery/db/gen/coredb.GetTokensByUserIdBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.Token
 //go:generate go run github.com/gallery-so/dataloaden ProfileImageLoaderByID github.com/mikeydub/go-gallery/db/gen/coredb.GetProfileImageByIDParams github.com/mikeydub/go-gallery/db/gen/coredb.ProfileImage
@@ -60,8 +59,6 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/util"
-
-	"github.com/mikeydub/go-gallery/service/tracing"
 
 	"github.com/jackc/pgx/v4"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -137,7 +134,6 @@ type Loaders struct {
 	AdmireByActorIDAndFeedEventID            *AdmireLoaderByActorAndFeedEvent
 	AdmireByActorIDAndPostID                 *AdmireLoaderByActorAndPost
 	MediaByTokenID                           *MediaLoaderByTokenID
-	TokenOwnershipByTokenID                  *TokenOwnershipLoaderByID
 	ContractCreatorByContractID              *ContractCreatorLoaderByID
 	ProfileImageByID                         *ProfileImageLoaderByID
 	GalleryTokenPreviewsByID                 *GalleryTokenPreviewsByID
@@ -146,19 +142,7 @@ type Loaders struct {
 func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loaders {
 	subscriptionRegistry := make([]interface{}, 0)
 	mutexRegistry := make([]*sync.Mutex, 0)
-
-	defaults := settings{
-		ctx:                  ctx,
-		maxBatchOne:          100,
-		maxBatchMany:         10,
-		waitTime:             2 * time.Millisecond,
-		disableCaching:       disableCaching,
-		publishResults:       true,
-		preFetchHook:         tracing.DataloaderPreFetchHook,
-		postFetchHook:        tracing.DataloaderPostFetchHook,
-		subscriptionRegistry: &subscriptionRegistry,
-		mutexRegistry:        &mutexRegistry,
-	}
+	defaults := defaultSettings(ctx, disableCaching, &subscriptionRegistry, &mutexRegistry)
 
 	//---------------------------------------------------------------------------------------------------
 	// HOW TO ADD A NEW DATALOADER
@@ -269,9 +253,11 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 
 	loaders.NewTokensByFeedEventID = NewTokensLoaderByID(defaults, loadNewTokensByFeedEventID(q))
 
-	loaders.ContractByContractID = NewContractLoaderByID(defaults, loadContractByContractID(q), ContractLoaderByIDCacheSubscriptions{
-		AutoCacheWithKey: func(contract db.Contract) persist.DBID { return contract.ID },
-	})
+	loaders.ContractByContractID = NewContractLoaderByID(
+		settingsWithOptions(ctx, disableCaching, &subscriptionRegistry, &mutexRegistry, withMaxBatchOne(500), withWaitTime(5*time.Millisecond)),
+		loadContractByContractID(q),
+		ContractLoaderByIDCacheSubscriptions{AutoCacheWithKey: func(contract db.Contract) persist.DBID { return contract.ID }},
+	)
 
 	loaders.ContractByChainAddress = NewContractLoaderByChainAddress(defaults, loadContractByChainAddress(q), ContractLoaderByChainAddressCacheSubscriptions{
 		AutoCacheWithKey: func(contract db.Contract) persist.ChainAddress {
@@ -337,11 +323,10 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 		AutoCacheWithKey: func(notification db.Notification) persist.DBID { return notification.ID },
 	})
 
-	loaders.MediaByTokenID = NewMediaLoaderByTokenID(defaults, loadMediaByTokenID(q), MediaLoaderByTokenIDCacheSubscriptions{
-		AutoCacheWithKey: func(media db.TokenMedia) persist.DBID { return media.ID },
-	})
-
-	loaders.TokenOwnershipByTokenID = NewTokenOwnershipLoaderByID(defaults, loadTokenOwnershipByTokenID(q), TokenOwnershipLoaderByIDCacheSubscriptions{})
+	loaders.MediaByTokenID = NewMediaLoaderByTokenID(
+		settingsWithOptions(ctx, disableCaching, &subscriptionRegistry, &mutexRegistry, withMaxBatchOne(500), withWaitTime(5*time.Millisecond)),
+		loadMediaByTokenID(q),
+		MediaLoaderByTokenIDCacheSubscriptions{AutoCacheWithKey: func(media db.TokenMedia) persist.DBID { return media.ID }})
 
 	loaders.ContractCreatorByContractID = NewContractCreatorLoaderByID(defaults, loadContractCreatorByContractID(q), ContractCreatorLoaderByIDCacheSubscriptions{})
 
@@ -1357,22 +1342,6 @@ func loadMediaByTokenID(q *db.Queries) func(context.Context, []persist.DBID) ([]
 		})
 
 		return results, errors
-	}
-}
-
-func loadTokenOwnershipByTokenID(q *db.Queries) func(ctx context.Context, keys []persist.DBID) ([]db.TokenOwnership, []error) {
-	return func(ctx context.Context, tokenIDs []persist.DBID) ([]db.TokenOwnership, []error) {
-		rows, err := q.GetTokenOwnershipByIds(ctx, util.StringersToStrings(tokenIDs))
-		if err != nil {
-			return emptyResultsWithError[db.TokenOwnership](len(tokenIDs), err)
-		}
-
-		keyFunc := func(row db.TokenOwnership) persist.DBID { return row.TokenID }
-		onNotFound := func(tokenID persist.DBID) (db.TokenOwnership, error) {
-			return db.TokenOwnership{}, persist.ErrTokenOwnershipNotFound{TokenID: tokenID}
-		}
-
-		return fillUnnestedJoinResults(tokenIDs, rows, keyFunc, onNotFound)
 	}
 }
 

@@ -627,6 +627,7 @@ type ComplexityRoot struct {
 		Galleries                func(childComplexity int) int
 		ID                       func(childComplexity int) int
 		IsAuthenticatedUser      func(childComplexity int) int
+		IsMemberOfCommunity      func(childComplexity int, communityID persist.DBID) int
 		PotentialEnsProfileImage func(childComplexity int) int
 		PrimaryWallet            func(childComplexity int) int
 		ProfileImage             func(childComplexity int) int
@@ -1626,6 +1627,7 @@ type GalleryUserResolver interface {
 	SharedFollowers(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.UsersConnection, error)
 	SharedCommunities(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error)
 	CreatedCommunities(ctx context.Context, obj *model.GalleryUser, input model.CreatedCommunitiesInput, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error)
+	IsMemberOfCommunity(ctx context.Context, obj *model.GalleryUser, communityID persist.DBID) (bool, error)
 }
 type MutationResolver interface {
 	AddUserWallet(ctx context.Context, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) (model.AddUserWalletPayloadOrError, error)
@@ -1805,9 +1807,6 @@ type TokenResolver interface {
 
 	Owner(ctx context.Context, obj *model.Token) (*model.GalleryUser, error)
 	OwnedByWallets(ctx context.Context, obj *model.Token) ([]*model.Wallet, error)
-
-	OwnerIsHolder(ctx context.Context, obj *model.Token) (*bool, error)
-	OwnerIsCreator(ctx context.Context, obj *model.Token) (*bool, error)
 
 	Contract(ctx context.Context, obj *model.Token) (*model.Contract, error)
 	Community(ctx context.Context, obj *model.Token) (*model.Community, error)
@@ -3739,6 +3738,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.GalleryUser.IsAuthenticatedUser(childComplexity), true
+
+	case "GalleryUser.isMemberOfCommunity":
+		if e.complexity.GalleryUser.IsMemberOfCommunity == nil {
+			break
+		}
+
+		args, err := ec.field_GalleryUser_isMemberOfCommunity_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.GalleryUser.IsMemberOfCommunity(childComplexity, args["communityID"].(persist.DBID)), true
 
 	case "GalleryUser.potentialEnsProfileImage":
 		if e.complexity.GalleryUser.PotentialEnsProfileImage == nil {
@@ -8014,6 +8025,7 @@ type GalleryUser implements Node @goEmbedHelper {
     first: Int
     last: Int
   ): CommunitiesConnection @goField(forceResolver: true)
+  isMemberOfCommunity(communityID: DBID!): Boolean! @goField(forceResolver: true)
 }
 
 type Wallet implements Node {
@@ -8314,8 +8326,8 @@ type Token implements Node @goEmbedHelper {
   owner: GalleryUser @goField(forceResolver: true)
   ownedByWallets: [Wallet] @goField(forceResolver: true)
   ownershipHistory: [OwnerAtBlock]
-  ownerIsHolder: Boolean @goField(forceResolver: true)
-  ownerIsCreator: Boolean @goField(forceResolver: true)
+  ownerIsHolder: Boolean
+  ownerIsCreator: Boolean
   tokenMetadata: String # source is map[string]interface{} on backend, not sure what best format is here
   contract: Contract @goField(forceResolver: true)
   community: Community @goField(forceResolver: true)
@@ -10959,6 +10971,21 @@ func (ec *executionContext) field_GalleryUser_feed_args(ctx context.Context, raw
 		}
 	}
 	args["includePosts"] = arg4
+	return args, nil
+}
+
+func (ec *executionContext) field_GalleryUser_isMemberOfCommunity_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.DBID
+	if tmp, ok := rawArgs["communityID"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("communityID"))
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["communityID"] = arg0
 	return args, nil
 }
 
@@ -13682,6 +13709,8 @@ func (ec *executionContext) fieldContext_AdminAddWalletPayload_user(ctx context.
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
 			case "createdCommunities":
 				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -13943,6 +13972,8 @@ func (ec *executionContext) fieldContext_Admire_admirer(ctx context.Context, fie
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
 			case "createdCommunities":
 				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -14900,6 +14931,8 @@ func (ec *executionContext) fieldContext_BanUserFromFeedPayload_user(ctx context
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
 			case "createdCommunities":
 				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -15797,6 +15830,8 @@ func (ec *executionContext) fieldContext_CollectionCreatedFeedEventData_owner(ct
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
 			case "createdCommunities":
 				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -16726,6 +16761,8 @@ func (ec *executionContext) fieldContext_CollectionUpdatedFeedEventData_owner(ct
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
 			case "createdCommunities":
 				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -17157,6 +17194,8 @@ func (ec *executionContext) fieldContext_CollectorsNoteAddedToCollectionFeedEven
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
 			case "createdCommunities":
 				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -17432,6 +17471,8 @@ func (ec *executionContext) fieldContext_CollectorsNoteAddedToTokenFeedEventData
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
 			case "createdCommunities":
 				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -17883,6 +17924,8 @@ func (ec *executionContext) fieldContext_Comment_commenter(ctx context.Context, 
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
 			case "createdCommunities":
 				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -24466,6 +24509,8 @@ func (ec *executionContext) fieldContext_FollowInfo_user(ctx context.Context, fi
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
 			case "createdCommunities":
 				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -24661,6 +24706,8 @@ func (ec *executionContext) fieldContext_FollowUserPayload_user(ctx context.Cont
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
 			case "createdCommunities":
 				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -25400,6 +25447,8 @@ func (ec *executionContext) fieldContext_Gallery_owner(ctx context.Context, fiel
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
 			case "createdCommunities":
 				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -25593,6 +25642,8 @@ func (ec *executionContext) fieldContext_GalleryInfoUpdatedFeedEventData_owner(c
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
 			case "createdCommunities":
 				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -25909,6 +25960,8 @@ func (ec *executionContext) fieldContext_GalleryUpdatedFeedEventData_owner(ctx c
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
 			case "createdCommunities":
 				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -27145,6 +27198,8 @@ func (ec *executionContext) fieldContext_GalleryUser_followers(ctx context.Conte
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
 			case "createdCommunities":
 				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -27236,6 +27291,8 @@ func (ec *executionContext) fieldContext_GalleryUser_following(ctx context.Conte
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
 			case "createdCommunities":
 				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -27509,6 +27566,61 @@ func (ec *executionContext) fieldContext_GalleryUser_createdCommunities(ctx cont
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_GalleryUser_createdCommunities_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GalleryUser_isMemberOfCommunity(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.GalleryUser().IsMemberOfCommunity(rctx, obj, fc.Args["communityID"].(persist.DBID))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_GalleryUser_isMemberOfCommunity(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GalleryUser",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_GalleryUser_isMemberOfCommunity_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return
 	}
@@ -27921,6 +28033,8 @@ func (ec *executionContext) fieldContext_GroupNotificationUserEdge_node(ctx cont
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
 			case "createdCommunities":
 				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -37032,6 +37146,8 @@ func (ec *executionContext) fieldContext_Post_author(ctx context.Context, field 
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
 			case "createdCommunities":
 				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -39332,6 +39448,8 @@ func (ec *executionContext) fieldContext_Query_usersWithTrait(ctx context.Contex
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
 			case "createdCommunities":
 				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -39807,6 +39925,8 @@ func (ec *executionContext) fieldContext_Query_galleryOfTheWeekWinners(ctx conte
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
 			case "createdCommunities":
 				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -42125,6 +42245,8 @@ func (ec *executionContext) fieldContext_SetCommunityOverrideCreatorPayload_user
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
 			case "createdCommunities":
 				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -42589,6 +42711,8 @@ func (ec *executionContext) fieldContext_SocialConnection_galleryUser(ctx contex
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
 			case "createdCommunities":
 				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -47023,6 +47147,8 @@ func (ec *executionContext) fieldContext_Token_owner(ctx context.Context, field 
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
 			case "createdCommunities":
 				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -47146,7 +47272,7 @@ func (ec *executionContext) _Token_ownerIsHolder(ctx context.Context, field grap
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Token().OwnerIsHolder(rctx, obj)
+		return obj.OwnerIsHolder, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -47164,8 +47290,8 @@ func (ec *executionContext) fieldContext_Token_ownerIsHolder(ctx context.Context
 	fc = &graphql.FieldContext{
 		Object:     "Token",
 		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
+		IsMethod:   false,
+		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Boolean does not have child fields")
 		},
@@ -47187,7 +47313,7 @@ func (ec *executionContext) _Token_ownerIsCreator(ctx context.Context, field gra
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Token().OwnerIsCreator(rctx, obj)
+		return obj.OwnerIsCreator, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -47205,8 +47331,8 @@ func (ec *executionContext) fieldContext_Token_ownerIsCreator(ctx context.Contex
 	fc = &graphql.FieldContext{
 		Object:     "Token",
 		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
+		IsMethod:   false,
+		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Boolean does not have child fields")
 		},
@@ -48012,6 +48138,8 @@ func (ec *executionContext) fieldContext_TokenHolder_user(ctx context.Context, f
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
 			case "createdCommunities":
 				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -48482,6 +48610,8 @@ func (ec *executionContext) fieldContext_TokensAddedToCollectionFeedEventData_ow
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
 			case "createdCommunities":
 				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -48872,6 +49002,8 @@ func (ec *executionContext) fieldContext_TrendingUsersPayload_users(ctx context.
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
 			case "createdCommunities":
 				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -49227,6 +49359,8 @@ func (ec *executionContext) fieldContext_UnbanUserFromFeedPayload_user(ctx conte
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
 			case "createdCommunities":
 				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -49381,6 +49515,8 @@ func (ec *executionContext) fieldContext_UnfollowUserPayload_user(ctx context.Co
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
 			case "createdCommunities":
 				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -51047,6 +51183,8 @@ func (ec *executionContext) fieldContext_UserCreatedFeedEventData_owner(ctx cont
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
 			case "createdCommunities":
 				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -51179,6 +51317,8 @@ func (ec *executionContext) fieldContext_UserEdge_node(ctx context.Context, fiel
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
 			case "createdCommunities":
 				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -51569,6 +51709,8 @@ func (ec *executionContext) fieldContext_UserFollowedUsersFeedEventData_owner(ct
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
 			case "createdCommunities":
 				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -51748,6 +51890,8 @@ func (ec *executionContext) fieldContext_UserSearchResult_user(ctx context.Conte
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
 			case "createdCommunities":
 				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -52686,6 +52830,8 @@ func (ec *executionContext) fieldContext_Viewer_user(ctx context.Context, field 
 				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
 			case "createdCommunities":
 				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
@@ -65482,6 +65628,26 @@ func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionS
 				return innerFunc(ctx)
 
 			})
+		case "isMemberOfCommunity":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._GalleryUser_isMemberOfCommunity(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -69818,39 +69984,13 @@ func (ec *executionContext) _Token(ctx context.Context, sel ast.SelectionSet, ob
 			out.Values[i] = ec._Token_ownershipHistory(ctx, field, obj)
 
 		case "ownerIsHolder":
-			field := field
 
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Token_ownerIsHolder(ctx, field, obj)
-				return res
-			}
+			out.Values[i] = ec._Token_ownerIsHolder(ctx, field, obj)
 
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
-
-			})
 		case "ownerIsCreator":
-			field := field
 
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Token_ownerIsCreator(ctx, field, obj)
-				return res
-			}
+			out.Values[i] = ec._Token_ownerIsCreator(ctx, field, obj)
 
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
-
-			})
 		case "tokenMetadata":
 
 			out.Values[i] = ec._Token_tokenMetadata(ctx, field, obj)

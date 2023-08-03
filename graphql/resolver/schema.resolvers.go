@@ -633,6 +633,11 @@ func (r *galleryUserResolver) CreatedCommunities(ctx context.Context, obj *model
 	}, nil
 }
 
+// IsMemberOfCommunity is the resolver for the isMemberOfCommunity field.
+func (r *galleryUserResolver) IsMemberOfCommunity(ctx context.Context, obj *model.GalleryUser, communityID persist.DBID) (bool, error) {
+	return publicapi.For(ctx).User.IsMemberOfCommunity(ctx, obj.Dbid, communityID)
+}
+
 // AddUserWallet is the resolver for the addUserWallet field.
 func (r *mutationResolver) AddUserWallet(ctx context.Context, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) (model.AddUserWalletPayloadOrError, error) {
 	api := publicapi.For(ctx)
@@ -2549,34 +2554,11 @@ func (r *tokenResolver) OwnedByWallets(ctx context.Context, obj *model.Token) ([
 	return wallets, nil
 }
 
-// OwnerIsHolder is the resolver for the ownerIsHolder field.
-func (r *tokenResolver) OwnerIsHolder(ctx context.Context, obj *model.Token) (*bool, error) {
-	ownership, err := publicapi.For(ctx).Token.GetTokenOwnershipByTokenID(ctx, obj.Dbid)
-	if err != nil {
-		if _, ok := err.(persist.ErrTokenOwnershipNotFound); ok {
-			return util.ToPointer(false), nil
-		}
-		return nil, err
-	}
-
-	return util.ToPointer(ownership.IsHolder), nil
-}
-
-// OwnerIsCreator is the resolver for the ownerIsCreator field.
-func (r *tokenResolver) OwnerIsCreator(ctx context.Context, obj *model.Token) (*bool, error) {
-	ownership, err := publicapi.For(ctx).Token.GetTokenOwnershipByTokenID(ctx, obj.Dbid)
-	if err != nil {
-		if _, ok := err.(persist.ErrTokenOwnershipNotFound); ok {
-			return util.ToPointer(false), nil
-		}
-		return nil, err
-	}
-
-	return util.ToPointer(ownership.IsCreator), nil
-}
-
 // Contract is the resolver for the contract field.
 func (r *tokenResolver) Contract(ctx context.Context, obj *model.Token) (*model.Contract, error) {
+	if obj.HelperTokenData.Token.Contract != "" {
+		return resolveContractByContractID(ctx, obj.HelperTokenData.Token.Contract)
+	}
 	return resolveContractByTokenID(ctx, obj.Dbid)
 }
 
