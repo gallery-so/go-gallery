@@ -19,14 +19,31 @@ func NewBucketStorer(c *storage.Client, bucketName string) BucketStorer {
 	return BucketStorer{c.Bucket(string(bucketName))}
 }
 
+func (s BucketStorer) Exists(ctx context.Context, objName string) (bool, error) {
+	_, err := s.Metadata(ctx, objName)
+	if err != storage.ErrObjectNotExist {
+		return false, err
+	}
+	return err != storage.ErrObjectNotExist, nil
+}
+
 func (s BucketStorer) Metadata(ctx context.Context, objName string) (*storage.ObjectAttrs, error) {
 	o := s.b.Object(objName)
 	return o.Attrs(ctx)
 }
 
-func (s BucketStorer) Reader(ctx context.Context, objName string) (io.ReadCloser, error) {
+func (s BucketStorer) NewReader(ctx context.Context, objName string) (io.ReadCloser, error) {
 	o := s.b.Object(objName)
 	return o.NewReader(ctx)
+}
+
+func (s BucketStorer) NewWriter(ctx context.Context, objName string, opts ...func(*storage.ObjectAttrs)) *storage.Writer {
+	o := s.b.Object(objName)
+	w := o.NewWriter(ctx)
+	for _, opt := range opts {
+		opt(&w.ObjectAttrs)
+	}
+	return w
 }
 
 func (s BucketStorer) Write(ctx context.Context, objName string, b []byte, opts ...func(*storage.ObjectAttrs)) (int, error) {
@@ -55,15 +72,6 @@ func (s BucketStorer) WriteGzip(ctx context.Context, objName string, b []byte, o
 
 	err = w.Close()
 	return int(n), err
-}
-
-func (s BucketStorer) NewWriter(ctx context.Context, objName string, opts ...func(*storage.ObjectAttrs)) *storage.Writer {
-	o := s.b.Object(objName)
-	w := o.NewWriter(ctx)
-	for _, opt := range opts {
-		opt(&w.ObjectAttrs)
-	}
-	return w
 }
 
 type objectAttrsOptions struct{}

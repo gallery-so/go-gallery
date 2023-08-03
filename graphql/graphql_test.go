@@ -71,7 +71,7 @@ func testGraphQL(t *testing.T) {
 		{title: "update gallery and ensure name still gets set when not sent in update", run: testUpdateGalleryWithNoNameChange},
 		{title: "update gallery with a new collection", run: testUpdateGalleryWithNewCollection},
 		{title: "should get trending users", run: testTrendingUsers, fixtures: []fixture{usePostgres, useRedis}},
-		{title: "should get trending feed events", run: testTrendingFeedEvents, fixtures: []fixture{usePostgres, useRedis}},
+		{title: "should get trending feed events", run: testTrendingFeedEvents},
 		{title: "should delete a post", run: testDeletePost},
 		{title: "should get community with posts", run: testGetCommunity},
 		{title: "should delete collection in gallery update", run: testUpdateGalleryDeleteCollection},
@@ -759,7 +759,7 @@ func testTrendingFeedEvents(t *testing.T) {
 		userF.FeedEventIDs[1],
 	}
 
-	actual := trendingFeedEvents(t, ctx, c, 10, true)
+	actual := trendingFeedEvents(t, ctx, c, 4, true)
 
 	assert.Equal(t, expected, actual)
 }

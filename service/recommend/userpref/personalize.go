@@ -291,7 +291,7 @@ func (p *Personalization) update(ctx context.Context) {
 }
 
 func (p *Personalization) readCache(ctx context.Context) {
-	r, err := p.b.Reader(ctx, gcpObjectName)
+	r, err := p.b.NewReader(ctx, gcpObjectName)
 	check(err)
 	defer r.Close()
 	var m personalizationMatrices
