@@ -20,6 +20,7 @@ insert into tokens
   , block_number
   , owner_user_id
   , owned_by_wallets
+  , is_creator_token
   , chain
   , contract
   , is_provider_marked_spam
@@ -39,14 +40,15 @@ insert into tokens
     , token_type
     , token_id
     , quantity
-    , case when @upserting_creator_tokens::bool then '{}' else ownership_history[ownership_history_start_idx::int:ownership_history_end_idx::int] end
+    , case when @set_holder_fields::bool then ownership_history[ownership_history_start_idx::int:ownership_history_end_idx::int] else '{}' end
     , media
     , fallback_media
     , token_metadata
     , external_url
     , block_number
     , owner_user_id
-    , case when @upserting_creator_tokens then '{}' else owned_by_wallets[owned_by_wallets_start_idx::int:owned_by_wallets_end_idx::int] end
+    , case when @set_holder_fields then owned_by_wallets[owned_by_wallets_start_idx::int:owned_by_wallets_end_idx::int] else '{}' end
+    , case when @set_creator_fields::bool then is_creator_token else false end
     , chain
     , contract
     , is_provider_marked_spam
@@ -81,6 +83,7 @@ insert into tokens
       , @owned_by_wallets::varchar[] as owned_by_wallets
       , unnest(@owned_by_wallets_start_idx::int[]) as owned_by_wallets_start_idx
       , unnest(@owned_by_wallets_end_idx::int[]) as owned_by_wallets_end_idx
+      , unnest(@is_creator_token::bool[]) as is_creator_token
       , unnest(@is_provider_marked_spam::bool[]) as is_provider_marked_spam
       , unnest(@token_uri::varchar[]) as token_uri
       , unnest(@token_id::varchar[]) as token_id
@@ -95,8 +98,9 @@ do update set
   , description = excluded.description
   , token_uri = excluded.token_uri
   , quantity = excluded.quantity
-  , owned_by_wallets = case when @upserting_creator_tokens then tokens.owned_by_wallets else excluded.owned_by_wallets end
-  , ownership_history = case when @upserting_creator_tokens then tokens.ownership_history else tokens.ownership_history || excluded.ownership_history end
+  , owned_by_wallets = case when @set_holder_fields then excluded.owned_by_wallets else tokens.owned_by_wallets end
+  , ownership_history = case when @set_holder_fields then tokens.ownership_history || excluded.ownership_history else tokens.ownership_history end
+  , is_creator_token = case when @set_creator_fields then excluded.is_creator_token else tokens.is_creator_token end
   , fallback_media = excluded.fallback_media
   , token_metadata = excluded.token_metadata
   , external_url = excluded.external_url
