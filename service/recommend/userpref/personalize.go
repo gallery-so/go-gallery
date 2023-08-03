@@ -303,7 +303,7 @@ func (p *Personalization) updateCache(ctx context.Context) {
 	m := readMatrices(ctx, p.q)
 	b, err := m.MarshalBinary()
 	check(err)
-	_, err = p.b.WriteGzip(ctx, gcpObjectName, b, store.ObjAttrsOptions.WithContentType("application/octect-stream"))
+	_, err = p.b.WriteGzip(ctx, gcpObjectName, b, store.ObjAttrsOptions.WithContentType("application/octet-stream"))
 	check(err)
 	p.updateMatrices(&m)
 }
