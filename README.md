@@ -20,7 +20,7 @@ $ go get -u=patch -d ./...
 $ go build -o ./bin/main ./cmd/server/main.go
 ```
 
-This will generate a binary within `./bin/main`. To run the binary, simply:
+This will generate a binary within `./bin/main`. To run the binary, simply run:
 
 ```bash
 $ ./bin/main
@@ -124,7 +124,8 @@ This is available for live environments:
 ```bash
 $ curl api.gallery.so/alive
 ```
-```
+
+````
 
 ## Testing
 
@@ -132,7 +133,7 @@ Run all tests in current directory and all of its subdirectories:
 
 ```bash
 $ go test ./...
-```
+````
 
 Run all tests in subdirectory (e.g. /server):
 
@@ -141,6 +142,7 @@ $ go test ./server/...
 ```
 
 Run a specific test by passing including the `-run` flag. The example will run GraphQL tests under the `TestMain` suite that start with "should get trending".
+
 ```bash
 go test -run=TestMain/"test GraphQL"/"should get trending" ./graphql
 ```
