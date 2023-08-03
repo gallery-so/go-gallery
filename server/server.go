@@ -175,6 +175,7 @@ func SetDefaults() {
 	viper.SetDefault("IPFS_PROJECT_ID", "")
 	viper.SetDefault("IPFS_PROJECT_SECRET", "")
 	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "dev-token-content")
+	viper.SetDefault("GCLOUD_USER_PREF_BUCKET", "dev-user-pref")
 	viper.SetDefault("REDIS_URL", "localhost:6379")
 	viper.SetDefault("PREMIUM_CONTRACT_ADDRESS", "0xe01569ca9b39e55bc7c0dfa09f05fa15cb4c7698=[0,1,2,3,4,5,6,7,8]")
 	viper.SetDefault("RPC_URL", "https://eth-goerli.g.alchemy.com/v2/_2u--i79yarLYdOT4Bgydqa0dBceVRLD")
