@@ -4,8 +4,10 @@ import (
 	heappkg "container/heap"
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -18,6 +20,7 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/recommend/userpref"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -171,7 +174,7 @@ func (api FeedAPI) GetRawEventById(ctx context.Context, eventID persist.DBID) (*
 	return &event, nil
 }
 
-func (api FeedAPI) PaginatePersonalFeed(ctx context.Context, before *string, after *string, first *int, last *int) ([]any, PageInfo, error) {
+func (api FeedAPI) PersonalFeed(ctx context.Context, before *string, after *string, first *int, last *int) ([]any, PageInfo, error) {
 	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return nil, PageInfo{}, err
@@ -214,7 +217,7 @@ func (api FeedAPI) PaginatePersonalFeed(ctx context.Context, before *string, aft
 	return paginator.paginate(before, after, first, last)
 }
 
-func (api FeedAPI) PaginateUserFeed(ctx context.Context, userID persist.DBID, before *string, after *string,
+func (api FeedAPI) UserFeed(ctx context.Context, userID persist.DBID, before *string, after *string,
 	first *int, last *int, includePosts bool) ([]any, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
@@ -254,7 +257,7 @@ func (api FeedAPI) PaginateUserFeed(ctx context.Context, userID persist.DBID, be
 	return paginator.paginate(before, after, first, last)
 }
 
-func (api FeedAPI) PaginateGlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int, includePosts bool) ([]any, PageInfo, error) {
+func (api FeedAPI) GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int, includePosts bool) ([]any, PageInfo, error) {
 	// Validate
 	if err := validatePaginationParams(api.validator, first, last); err != nil {
 		return nil, PageInfo{}, err
@@ -287,7 +290,7 @@ func (api FeedAPI) PaginateGlobalFeed(ctx context.Context, before *string, after
 	return paginator.paginate(before, after, first, last)
 }
 
-func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, after *string, first *int, last *int, includePosts bool) ([]any, PageInfo, error) {
+func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *string, first *int, last *int, includePosts bool) ([]any, PageInfo, error) {
 	// Validate
 	if err := validatePaginationParams(api.validator, first, last); err != nil {
 		return nil, PageInfo{}, err
@@ -303,54 +306,24 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 
 	hasCursors := before != nil || after != nil
 
+	now := time.Now()
+
 	if !hasCursors {
 		calcFunc := func(ctx context.Context) ([]persist.FeedEntityType, []persist.DBID, error) {
-			trendData, err := api.queries.GetLatestFeedEntities(ctx, db.GetLatestFeedEntitiesParams{
-				WindowEnd:           time.Now().Add(-time.Duration(72 * time.Hour)),
+			trendData, err := api.queries.FeedEntityScoring(ctx, db.FeedEntityScoringParams{
+				WindowEnd:           time.Now().Add(-time.Duration(3 * 24 * time.Hour)),
 				FeedEventEntityType: int32(persist.FeedEventTypeTag),
 				PostEntityType:      int32(persist.PostTypeTag),
 				ExcludedFeedActions: []string{string(persist.ActionUserCreated), string(persist.ActionUserFollowedUsers)},
+				IncludeViewer:       true,
 				IncludePosts:        includePosts,
 			})
 			if err != nil {
 				return nil, nil, err
 			}
-
-			h := heap{}
-			now := time.Now()
-
-			for _, event := range trendData {
-				score := timeFactor(now, event.CreatedAt) * float64(event.Interactions)
-				node := feedNode{
-					id:    event.ID,
-					score: score,
-					typ:   persist.FeedEntityType(event.FeedEntityType),
-				}
-
-				// Add first 100 numbers in the heap
-				if len(h) < 100 {
-					heappkg.Push(&h, node)
-					continue
-				}
-
-				// If the score is greater than the smallest score in the heap, replace it
-				if score > h[0].(feedNode).score {
-					heappkg.Pop(&h)
-					heappkg.Push(&h, node)
-				}
-			}
-
-			entityTypes = make([]persist.FeedEntityType, len(h))
-			entityIDs = make([]persist.DBID, len(h))
-
-			i := 0
-			for len(h) > 0 {
-				node := heappkg.Pop(&h).(feedNode)
-				entityTypes[i] = node.typ
-				entityIDs[i] = node.id
-				i++
-			}
-
+			entityTypes, entityIDs = api.scoreFeedEntities(ctx, trendData, func(e db.FeedEntityScoringRow) float64 {
+				return timeFactor(e.CreatedAt, now) * engagementFactor(int(e.Interactions))
+			})
 			return entityTypes, entityIDs, nil
 		}
 
@@ -403,6 +376,128 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 			limitIdx := max(len(queryTypes)-params.Limit, 0)
 			queryTypes = queryTypes[limitIdx:]
 			queryIDs = queryIDs[limitIdx:]
+			// TODO: Replace this to not use the keyset pagiantor
+			// This is a hack: the underlying keyset paginator assumes
+			// that the extra result is at the end of the slice, so
+			// we just move it to the end.
+			if len(queryTypes) > 0 {
+				queryTypes = append(queryTypes[1:], queryTypes[0])
+				queryIDs = append(queryIDs[1:], queryIDs[0])
+			}
+		} else {
+			// Index from the left
+			limitIdx := min(params.Limit, len(queryTypes))
+			queryTypes = queryTypes[:limitIdx]
+			queryIDs = queryIDs[:limitIdx]
+		}
+
+		return loadFeedEntities(ctx, api.loaders, queryTypes, queryIDs)
+	}
+
+	cursorFunc := func(node any) (int, []persist.FeedEntityType, []persist.DBID, error) {
+		_, id, err := feedCursor(node)
+		pos, ok := entityIDToPos[id]
+		if !ok {
+			panic(fmt.Sprintf("could not find position for id=%s", id))
+		}
+		return pos, entityTypes, entityIDs, err
+	}
+
+	paginator.QueryFunc = queryFunc
+	paginator.CursorFunc = cursorFunc
+	return paginator.paginate(before, after, first, last)
+}
+
+func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first, last *int, includePosts bool) ([]any, PageInfo, error) {
+	// Validate
+	userID, _ := getAuthenticatedUserID(ctx)
+
+	// Fallback to trending if no user
+	if userID == "" {
+		return api.TrendingFeed(ctx, before, after, first, last, includePosts)
+	}
+
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	var (
+		paginator     feedPaginator
+		entityTypes   []persist.FeedEntityType
+		entityIDs     []persist.DBID
+		entityIDToPos = make(map[persist.DBID]int)
+	)
+
+	hasCursors := before != nil || after != nil
+
+	now := time.Now()
+
+	if !hasCursors {
+		trendData, err := api.queries.FeedEntityScoring(ctx, db.FeedEntityScoringParams{
+			WindowEnd:           time.Now().Add(-time.Duration(7 * 24 * time.Hour)),
+			PostEntityType:      int32(persist.PostTypeTag),
+			FeedEventEntityType: int32(persist.FeedEventTypeTag),
+			ExcludedFeedActions: []string{string(persist.ActionUserCreated), string(persist.ActionUserFollowedUsers)},
+			IncludeViewer:       false,
+			ViewerID:            userID.String(),
+			IncludePosts:        includePosts,
+		})
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+
+		entityTypes, entityIDs = func() ([]persist.FeedEntityType, []persist.DBID) {
+			p := userpref.For(ctx)
+			p.Mu.RLock()
+			defer p.Mu.RUnlock()
+			return api.scoreFeedEntities(ctx, trendData, func(e db.FeedEntityScoringRow) float64 {
+				return scoreFeedEntity(p, userID, e, now, int(e.Interactions))
+			})
+		}()
+	}
+
+	queryFunc := func(params feedPagingParams) ([]any, error) {
+		if hasCursors {
+			entityTypes = params.EntityTypes
+			entityIDs = params.EntityIDs
+		}
+		for i, id := range entityIDs {
+			entityIDToPos[id] = i
+		}
+
+		// Copy slices since they will be modified in place
+		queryTypes := append([]persist.FeedEntityType{}, entityTypes...)
+		queryIDs := append([]persist.DBID{}, entityIDs...)
+
+		// Restrict cursor positions to the length of the IDs
+		curBeforePos := params.CurBeforePos + 1
+		curAfterPos := min(params.CurAfterPos, len(queryIDs))
+
+		// Subset to bounds of the cursors
+		queryTypes = queryTypes[curBeforePos:curAfterPos]
+		queryIDs = queryIDs[curBeforePos:curAfterPos]
+
+		// Filter slices in place
+		if !includePosts {
+			idx := 0
+			for i := range queryTypes {
+				if queryTypes[i] != persist.PostTypeTag {
+					queryTypes[idx] = queryTypes[i]
+					queryIDs[idx] = queryIDs[i]
+					idx++
+				}
+			}
+			queryTypes = queryTypes[:idx]
+			queryIDs = queryIDs[:idx]
+		}
+
+		// Index up to the limit
+		if params.PagingForward {
+			// Index from the right
+			limitIdx := max(len(queryTypes)-params.Limit, 0)
+			queryTypes = queryTypes[limitIdx:]
+			queryIDs = queryIDs[limitIdx:]
+			// TODO: Replace this to not use the keyset pagiantor
 			// This is a hack: the underlying keyset paginator assumes
 			// that the extra result is at the end of the slice, so
 			// we just move it to the end.
@@ -565,10 +660,79 @@ func loadFeedEntities(ctx context.Context, d *dataloader.Loaders, typs []persist
 	return entities, nil
 }
 
+func (api FeedAPI) scoreFeedEntities(ctx context.Context, trendData []db.FeedEntityScoringRow, scoreF func(db.FeedEntityScoringRow) float64) ([]persist.FeedEntityType, []persist.DBID) {
+	h := &heap{}
+
+	var wg sync.WaitGroup
+
+	scores := make([]feedNode, len(trendData))
+
+	for i, event := range trendData {
+		i := i
+		event := event
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			score := scoreF(event)
+			scores[i] = feedNode{
+				id:    event.ID,
+				score: score,
+				typ:   persist.FeedEntityType(event.FeedEntityType),
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	for _, node := range scores {
+		// Add first 100 items in the heap
+		if h.Len() < 100 {
+			heappkg.Push(h, node)
+			continue
+		}
+
+		// If the score is greater than the smallest score in the heap, replace it
+		if node.score > (*h)[0].(feedNode).score {
+			heappkg.Pop(h)
+			heappkg.Push(h, node)
+		}
+	}
+
+	entityTypes := make([]persist.FeedEntityType, h.Len())
+	entityIDs := make([]persist.DBID, h.Len())
+
+	// Pop returns the smallest score first, so we reverse the order
+	// such that the highest score is first
+	i := h.Len() - 1
+	for h.Len() > 0 {
+		node := heappkg.Pop(h).(feedNode)
+		entityTypes[i] = node.typ
+		entityIDs[i] = node.id
+		i--
+	}
+
+	return entityTypes, entityIDs
+}
+
+func scoreFeedEntity(p *userpref.Personalization, viewerID persist.DBID, e db.FeedEntityScoringRow, t time.Time, interactions int) float64 {
+	timeF := timeFactor(e.CreatedAt, t)
+	engagementF := engagementFactor(interactions)
+	personalizationF, err := p.RelevanceTo(viewerID, e)
+	if errors.Is(err, userpref.ErrNoInputData) {
+		// Use a default value of 0.1 so that it isn't completely penalized because of missing data.
+		personalizationF = 0.1
+	}
+	return timeF * engagementF * personalizationF
+}
+
 func timeFactor(t0, t1 time.Time) float64 {
 	lambda := 1.0 / 100_000
-	age := t0.Sub(t1).Seconds()
+	age := t1.Sub(t0).Seconds()
 	return 1 * math.Pow(math.E, (-lambda*age))
+}
+
+func engagementFactor(interactions int) float64 {
+	return math.Log1p(float64(interactions))
 }
 
 type priorityNode interface {
@@ -592,8 +756,7 @@ func (h heap) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
 func (h *heap) Push(s any)   { *h = append(*h, s) }
 
 func (h heap) Less(i, j int) bool {
-	// We want Pop to give us the highest, not lowest, score so we use greater than here.
-	return h[i].(priorityNode).Score() > h[j].(priorityNode).Score()
+	return h[i].(priorityNode).Score() < h[j].(priorityNode).Score()
 }
 
 func (h *heap) Pop() any {

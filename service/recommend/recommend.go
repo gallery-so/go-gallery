@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -19,13 +20,9 @@ var metadataKey = struct{}{}
 
 var currentGraph sync.Map
 
-func AddTo(c *gin.Context, r *Recommender) {
-	c.Set(contextKey, r)
-}
-
-func For(ctx context.Context) *Recommender {
-	gc := util.MustGetGinContext(ctx)
-	return gc.Value(contextKey).(*Recommender)
+type saveMsg struct {
+	nodeID         persist.DBID
+	recommendedIDs []persist.DBID
 }
 
 type Recommender struct {
@@ -34,6 +31,15 @@ type Recommender struct {
 	SaveResultFunc func(ctx context.Context, userID persist.DBID, recommendedIDs []persist.DBID) error
 	BootstrapFunc  func(ctx context.Context) ([]persist.DBID, error)
 	saveCh         chan saveMsg
+}
+
+func AddTo(c *gin.Context, r *Recommender) {
+	c.Set(contextKey, r)
+}
+
+func For(ctx context.Context) *Recommender {
+	gc := util.MustGetGinContext(ctx)
+	return gc.Value(contextKey).(*Recommender)
 }
 
 func NewRecommender(queries *db.Queries) *Recommender {
@@ -143,8 +149,8 @@ func (r *Recommender) RecommendFromFollowing(ctx context.Context, userID persist
 	return recommendedIDs, nil
 }
 
-// Run is the main event loop that manages access to the currently loaded graph
-func (r *Recommender) Run(ctx context.Context, ticker *time.Ticker) {
+// Loop is the main event loop that manages access to the currently loaded graph
+func (r *Recommender) Loop(ctx context.Context, ticker *time.Ticker) {
 	r.LoadFunc(ctx)
 	go func() {
 		for {
@@ -158,11 +164,6 @@ func (r *Recommender) Run(ctx context.Context, ticker *time.Ticker) {
 			}
 		}
 	}()
-}
-
-type saveMsg struct {
-	nodeID         persist.DBID
-	recommendedIDs []persist.DBID
 }
 
 func (r *Recommender) readNeighbors(ctx context.Context, nodeID persist.DBID) []persist.DBID {

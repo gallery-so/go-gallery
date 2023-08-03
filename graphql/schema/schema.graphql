@@ -638,6 +638,7 @@ interface SocialAccount {
 type SocialAccounts {
   twitter: TwitterSocialAccount
   farcaster: FarcasterSocialAccount
+  lens: LensSocialAccount
 }
 
 type TwitterSocialAccount implements SocialAccount {
@@ -650,6 +651,15 @@ type TwitterSocialAccount implements SocialAccount {
 }
 
 type FarcasterSocialAccount implements SocialAccount {
+  type: SocialAccountType!
+  social_id: String!
+  name: String!
+  username: String!
+  profileImageURL: String!
+  bio: String!
+  display: Boolean!
+}
+type LensSocialAccount implements SocialAccount {
   type: SocialAccountType!
   social_id: String!
   name: String!
@@ -734,6 +744,7 @@ enum UserExperienceType {
   EmailUpsell
   MerchStoreUpsell
   MaintenanceFeb2023
+  MaintenanceAug2023
   TwitterConnectionOnboardingUpsell
   UpsellMintMemento4
   UpsellGallerySelects1
@@ -1209,6 +1220,13 @@ type Query {
   ): FeedConnection
   # Paging forward i.e. providing the `first` argument will return events in order of descending popularity.
   trendingFeed(
+    before: String
+    after: String
+    first: Int
+    last: Int
+    includePosts: Boolean! = false
+  ): FeedConnection
+  curatedFeed(
     before: String
     after: String
     first: Int

@@ -246,61 +246,69 @@ func processOwnersForUserTokens(mc *multichain.Provider, queries *coredb.Queries
 // detectSpamContracts refreshes the alchemy_spam_contracts table with marked contracts from Alchemy
 func detectSpamContracts(queries *coredb.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		alchemyURL, err := url.Parse(env.GetString("ALCHEMY_NFT_API_URL"))
-		if err != nil {
-			panic(err)
-		}
-
-		spamEndpoint := alchemyURL.JoinPath("getSpamContracts")
-
-		req, err := http.NewRequestWithContext(c, http.MethodGet, spamEndpoint.String(), nil)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-
-		req.Header.Add("accept", "application/json")
-
-		resp, err := retry.RetryRequest(http.DefaultClient, req)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			util.ErrResponse(c, http.StatusInternalServerError, util.BodyAsError(resp))
-			return
-		}
-
-		body := struct {
-			Contracts []persist.Address `json:"contractAddresses"`
-		}{}
-
-		err = json.NewDecoder(resp.Body).Decode(&body)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-
-		params := coredb.InsertSpamContractsParams{}
+		var params coredb.InsertSpamContractsParams
 
 		now := time.Now()
 
-		for _, contract := range body.Contracts {
-			params.ID = append(params.ID, persist.GenerateID().String())
-			params.Chain = append(params.Chain, int32(persist.ChainETH))
-			params.Address = append(params.Address, persist.ChainETH.NormalizeAddress(contract))
-			params.CreatedAt = append(params.CreatedAt, now)
-			params.IsSpam = append(params.IsSpam, true)
+		for _, source := range []struct {
+			Chain    persist.Chain
+			Endpoint string
+		}{
+			{persist.ChainETH, env.GetString("ALCHEMY_ETH_NFT_API_URL")},
+			{persist.ChainPolygon, env.GetString("ALCHEMY_POLYGON_NFT_API_URL")},
+		} {
+			url, err := url.Parse(source.Endpoint)
+			if err != nil {
+				panic(err)
+			}
+
+			spamEndpoint := url.JoinPath("getSpamContracts")
+
+			req, err := http.NewRequestWithContext(c, http.MethodGet, spamEndpoint.String(), nil)
+			if err != nil {
+				util.ErrResponse(c, http.StatusInternalServerError, err)
+				return
+			}
+
+			req.Header.Add("accept", "application/json")
+
+			resp, err := retry.RetryRequest(http.DefaultClient, req)
+			if err != nil {
+				util.ErrResponse(c, http.StatusInternalServerError, err)
+				return
+			}
+
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusOK {
+				util.ErrResponse(c, http.StatusInternalServerError, util.BodyAsError(resp))
+				return
+			}
+
+			body := struct {
+				Contracts []persist.Address `json:"contractAddresses"`
+			}{}
+
+			err = json.NewDecoder(resp.Body).Decode(&body)
+			if err != nil {
+				util.ErrResponse(c, http.StatusInternalServerError, err)
+				return
+			}
+
+			for _, contract := range body.Contracts {
+				params.ID = append(params.ID, persist.GenerateID().String())
+				params.Chain = append(params.Chain, int32(source.Chain))
+				params.Address = append(params.Address, source.Chain.NormalizeAddress(contract))
+				params.CreatedAt = append(params.CreatedAt, now)
+				params.IsSpam = append(params.IsSpam, true)
+			}
+
+			if len(params.Address) == 0 {
+				panic("no spam contracts found")
+			}
 		}
 
-		if len(params.Address) == 0 {
-			panic("no spam contracts found")
-		}
-
-		err = queries.InsertSpamContracts(c, params)
+		err := queries.InsertSpamContracts(c, params)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return

@@ -21,7 +21,7 @@ func main() {
 
 	pgClient := postgres.MustCreateClient()
 
-	rows, err := pgClient.Query("select tokens.id from tokens where tokens.contract = '240KyCCvlcRt9GjrDRAH9MTieGF' order by tokens.last_updated desc;")
+	rows, err := pgClient.Query("select tokens.id from tokens where tokens.owner_user_id = '24DZnxmFR43gwRJU35O2oxepKbB' and chain = 2 order by tokens.last_updated desc;")
 	if err != nil {
 		panic(err)
 	}

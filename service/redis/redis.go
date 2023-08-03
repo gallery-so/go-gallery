@@ -57,6 +57,7 @@ var (
 	FeedCache                         = CacheConfig{database: feed, keyPrefix: "", displayName: "feed"}
 	SocialCache                       = CacheConfig{database: social, keyPrefix: "", displayName: "social"}
 	SearchCache                       = CacheConfig{keyPrefix: "search", displayName: "search"}
+	UserPrefCache                     = CacheConfig{keyPrefix: "userpref", displayName: "userPref"}
 )
 
 func newClient(db redisDB, traceName string) *redis.Client {
@@ -111,13 +112,13 @@ func NewCache(config CacheConfig) *Cache {
 
 // Set sets a value in the redis cache
 func (c *Cache) Set(pCtx context.Context, key string, value []byte, expiration time.Duration) error {
-	return c.client.Set(pCtx, c.getPrefixedKey(key), value, expiration).Err()
+	return c.client.Set(pCtx, c.GetPrefixedKey(key), value, expiration).Err()
 }
 
 // SetNX sets a value in the redis cache if it doesn't already exist. Returns true if the key did not
 // already exist and was set, false if the key did exist and therefore was not set.
 func (c *Cache) SetNX(pCtx context.Context, key string, value []byte, expiration time.Duration) (bool, error) {
-	cmd := c.client.SetNX(pCtx, c.getPrefixedKey(key), value, expiration)
+	cmd := c.client.SetNX(pCtx, c.GetPrefixedKey(key), value, expiration)
 
 	err := cmd.Err()
 	if err != nil {
@@ -133,7 +134,7 @@ func (c *Cache) SetTime(ctx context.Context, key string, value time.Time, expira
 	unixTimestamp := value.Unix()
 
 	if !onlyIfLater {
-		return c.client.Set(ctx, c.getPrefixedKey(key), unixTimestamp, expiration).Err()
+		return c.client.Set(ctx, c.GetPrefixedKey(key), unixTimestamp, expiration).Err()
 	}
 
 	unixExpiration := time.Now().Add(expiration).Unix()
@@ -148,7 +149,7 @@ func (c *Cache) SetTime(ctx context.Context, key string, value time.Time, expira
 }
 
 func (c *Cache) GetTime(ctx context.Context, key string) (time.Time, error) {
-	result, err := c.client.Get(ctx, c.getPrefixedKey(key)).Result()
+	result, err := c.client.Get(ctx, c.GetPrefixedKey(key)).Result()
 	if err != nil {
 		if err == redis.Nil {
 			return time.Time{}, ErrKeyNotFound{Key: key}
@@ -166,7 +167,7 @@ func (c *Cache) GetTime(ctx context.Context, key string) (time.Time, error) {
 
 // Get gets a value from the redis cache
 func (c *Cache) Get(pCtx context.Context, key string) ([]byte, error) {
-	bs, err := c.client.Get(pCtx, c.getPrefixedKey(key)).Bytes()
+	bs, err := c.client.Get(pCtx, c.GetPrefixedKey(key)).Bytes()
 	if err != nil {
 		if err == redis.Nil {
 			return nil, ErrKeyNotFound{Key: key}
@@ -176,9 +177,37 @@ func (c *Cache) Get(pCtx context.Context, key string) ([]byte, error) {
 	return bs, nil
 }
 
-// Delete deletes a value from the redis cache
+// GetFieldRef returns the contents of a key stored as a reference in a hash field
+func (c *Cache) GetFromField(ctx context.Context, key, field string) (any, error) {
+	r, err := readReferenceScript.Run(ctx, c.scripter, []string{key}, field).Result()
+	if err == redis.Nil {
+		return r, ErrKeyNotFound{Key: fmt.Sprintf("%s.%s", key, field)}
+	}
+	return r, err
+}
+
+// Watch watches a set of keys for changes, and executes fn. It closes the transaction
+// when fn exists. Watch returns a redis.TxFailedErr if the transaction failed.
+func (c *Cache) Watch(ctx context.Context, fn func(*redis.Tx) error, keys ...string) error {
+	return c.client.Watch(ctx, fn, c.getPrefixedKeys(keys)...)
+}
+
+// HSet sets a value of a hash field
+func (c *Cache) HSet(ctx context.Context, key string, values ...any) error {
+	return c.client.HSet(ctx, c.GetPrefixedKey(key), values).Err()
+}
+
+// HGet sets dest to the value of a hash field
+func (c *Cache) HGetScan(ctx context.Context, key, field string, dest any) error {
+	err := c.client.HGet(ctx, c.GetPrefixedKey(key), field).Scan(dest)
+	if err == redis.Nil {
+		return ErrKeyNotFound{Key: fmt.Sprintf("%s.%s", key, field)}
+	}
+	return err
+}
+
 func (c *Cache) Delete(pCtx context.Context, key string) error {
-	return c.client.Del(pCtx, c.getPrefixedKey(key)).Err()
+	return c.client.Del(pCtx, c.GetPrefixedKey(key)).Err()
 }
 
 // Close closes the underlying redis client
@@ -186,7 +215,7 @@ func (c *Cache) Close() error {
 	return c.client.Close()
 }
 
-func (c *Cache) getPrefixedKey(key string) string {
+func (c *Cache) GetPrefixedKey(key string) string {
 	if c.keyPrefix == "" {
 		return key
 	}
@@ -243,7 +272,7 @@ type redislockCacheClient struct {
 }
 
 func (r *redislockCacheClient) SetNX(ctx context.Context, key string, value interface{}, expiration time.Duration) *redis.BoolCmd {
-	return r.cache.client.SetNX(ctx, r.cache.getPrefixedKey(key), value, expiration)
+	return r.cache.client.SetNX(ctx, r.cache.GetPrefixedKey(key), value, expiration)
 }
 
 // Scripts
@@ -261,6 +290,17 @@ if currentTimestamp == false or tonumber(currentTimestamp) < tonumber(newTimesta
 end
 
 return 0
+`)
+
+var readReferenceScript = redis.NewScript(`
+local key = KEYS[1]
+local field = ARGV[1]
+local fieldRef = redis.call('HGET', key, field)
+if fieldRef then
+	local value = redis.call('GET', fieldRef)
+	return value
+end
+return nil
 `)
 
 // LazyCache implements a lazy loading cache that stores data only when it is requested

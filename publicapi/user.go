@@ -1045,10 +1045,7 @@ func (api UserAPI) GetSocials(ctx context.Context, userID persist.DBID) (*model.
 	result := &model.SocialAccounts{}
 
 	for prov, social := range socials {
-		err := assignSocialToModel(ctx, prov, social, result)
-		if err != nil {
-			return nil, err
-		}
+		assignSocialToModel(ctx, prov, social, result)
 	}
 
 	return result, nil
@@ -1073,16 +1070,14 @@ func (api UserAPI) GetDisplayedSocials(ctx context.Context, userID persist.DBID)
 		if !social.Display {
 			continue
 		}
-		err := assignSocialToModel(ctx, prov, social, result)
-		if err != nil {
-			return nil, err
-		}
+		assignSocialToModel(ctx, prov, social, result)
+
 	}
 
 	return result, nil
 }
 
-func assignSocialToModel(ctx context.Context, prov persist.SocialProvider, social persist.SocialUserIdentifiers, result *model.SocialAccounts) error {
+func assignSocialToModel(ctx context.Context, prov persist.SocialProvider, social persist.SocialUserIdentifiers, result *model.SocialAccounts) {
 	switch prov {
 	case persist.SocialProviderTwitter:
 		logger.For(ctx).Infof("found twitter social account: %+v", social)
@@ -1128,10 +1123,33 @@ func assignSocialToModel(ctx context.Context, prov persist.SocialProvider, socia
 			f.Bio = bio
 		}
 		result.Farcaster = f
+	case persist.SocialProviderLens:
+		logger.For(ctx).Infof("found lens social account: %+v", social)
+		l := &model.LensSocialAccount{
+			Type:     prov,
+			Display:  social.Display,
+			SocialID: social.ID,
+		}
+		name, ok := social.Metadata["name"].(string)
+		if ok {
+			l.Name = name
+		}
+		username, ok := social.Metadata["username"].(string)
+		if ok {
+			l.Username = username
+		}
+		profile, ok := social.Metadata["profile_image_url"].(string)
+		if ok {
+			l.ProfileImageURL = profile
+		}
+		bio, ok := social.Metadata["bio"].(string)
+		if ok {
+			l.Bio = bio
+		}
+		result.Lens = l
 	default:
-		return fmt.Errorf("unknown social provider %s", prov)
+		logger.For(ctx).Errorf("unknown social provider %s", prov)
 	}
-	return nil
 }
 
 func (api UserAPI) UpdateUserSocialDisplayed(ctx context.Context, socialType persist.SocialProvider, displayed bool) error {

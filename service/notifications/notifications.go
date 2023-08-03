@@ -124,9 +124,11 @@ func New(queries *db.Queries, pub *pubsub.Client, taskClient *cloudtasks.Client,
 	// grouped notification actions
 	notifDispatcher.AddHandler(persist.ActionUserFollowedUsers, group)
 	notifDispatcher.AddHandler(persist.ActionAdmiredFeedEvent, group)
+	notifDispatcher.AddHandler(persist.ActionAdmiredPost, group)
 
 	// single notification actions (default)
 	notifDispatcher.AddHandler(persist.ActionCommentedOnFeedEvent, def)
+	notifDispatcher.AddHandler(persist.ActionCommentedOnPost, def)
 
 	// notification actions that are grouped by token id
 	notifDispatcher.AddHandler(persist.ActionNewTokensReceived, tokenIDGrouped)
@@ -396,7 +398,7 @@ func (n *NotificationHandlers) subscribe(ctx context.Context, topic, name string
 func (n *NotificationHandlers) receiveNewNotificationsFromPubSub() {
 	sub, err := n.subscribe(context.Background(), env.GetString("PUBSUB_TOPIC_NEW_NOTIFICATIONS"), fmt.Sprintf("new-notifications-%s", persist.GenerateID()))
 	if err != nil {
-		logger.For(nil).Errorf("error creating updated notifications subscription: %s", err)
+		logger.For(nil).Errorf("error creating new notifications subscription: %s", err)
 		panic(err)
 	}
 
@@ -646,7 +648,7 @@ func updateAndPublishNotif(ctx context.Context, notif db.Notification, mostRecen
 	var amount = notif.Amount
 	resultData := mostRecentNotif.Data.Concat(notif.Data)
 	switch notif.Action {
-	case persist.ActionAdmiredFeedEvent:
+	case persist.ActionAdmiredFeedEvent, persist.ActionAdmiredPost:
 		amount = int32(len(resultData.AdmirerIDs))
 	case persist.ActionViewedGallery:
 		amount = int32(len(resultData.AuthedViewerIDs) + len(resultData.UnauthedViewerIDs))

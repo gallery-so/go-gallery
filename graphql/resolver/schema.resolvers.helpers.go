@@ -882,7 +882,7 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 		return model.SomeoneAdmiredYourPostNotification{
 			HelperSomeoneAdmiredYourPostNotificationData: model.HelperSomeoneAdmiredYourPostNotificationData{
 				OwnerID:          notif.OwnerID,
-				PostID:           notif.FeedEventID,
+				PostID:           notif.PostID,
 				NotificationData: notif.Data,
 			},
 			Dbid:         notif.ID,

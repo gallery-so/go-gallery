@@ -1446,6 +1446,18 @@ type JSONMedia struct {
 func (JSONMedia) IsMediaSubtype() {}
 func (JSONMedia) IsMedia()        {}
 
+type LensSocialAccount struct {
+	Type            persist.SocialProvider `json:"type"`
+	SocialID        string                 `json:"social_id"`
+	Name            string                 `json:"name"`
+	Username        string                 `json:"username"`
+	ProfileImageURL string                 `json:"profileImageURL"`
+	Bio             string                 `json:"bio"`
+	Display         bool                   `json:"display"`
+}
+
+func (LensSocialAccount) IsSocialAccount() {}
+
 type LoginPayload struct {
 	UserID *persist.DBID `json:"userId"`
 	Viewer *Viewer       `json:"viewer"`
@@ -1817,6 +1829,7 @@ func (SetSpamPreferencePayload) IsSetSpamPreferencePayloadOrError() {}
 type SocialAccounts struct {
 	Twitter   *TwitterSocialAccount   `json:"twitter"`
 	Farcaster *FarcasterSocialAccount `json:"farcaster"`
+	Lens      *LensSocialAccount      `json:"lens"`
 }
 
 type SocialAuthMechanism struct {
@@ -2659,6 +2672,7 @@ const (
 	UserExperienceTypeEmailUpsell                       UserExperienceType = "EmailUpsell"
 	UserExperienceTypeMerchStoreUpsell                  UserExperienceType = "MerchStoreUpsell"
 	UserExperienceTypeMaintenanceFeb2023                UserExperienceType = "MaintenanceFeb2023"
+	UserExperienceTypeMaintenanceAug2023                UserExperienceType = "MaintenanceAug2023"
 	UserExperienceTypeTwitterConnectionOnboardingUpsell UserExperienceType = "TwitterConnectionOnboardingUpsell"
 	UserExperienceTypeUpsellMintMemento4                UserExperienceType = "UpsellMintMemento4"
 	UserExperienceTypeUpsellGallerySelects1             UserExperienceType = "UpsellGallerySelects1"
@@ -2672,6 +2686,7 @@ var AllUserExperienceType = []UserExperienceType{
 	UserExperienceTypeEmailUpsell,
 	UserExperienceTypeMerchStoreUpsell,
 	UserExperienceTypeMaintenanceFeb2023,
+	UserExperienceTypeMaintenanceAug2023,
 	UserExperienceTypeTwitterConnectionOnboardingUpsell,
 	UserExperienceTypeUpsellMintMemento4,
 	UserExperienceTypeUpsellGallerySelects1,
@@ -2682,7 +2697,7 @@ var AllUserExperienceType = []UserExperienceType{
 
 func (e UserExperienceType) IsValid() bool {
 	switch e {
-	case UserExperienceTypeMultiGalleryAnnouncement, UserExperienceTypeEmailUpsell, UserExperienceTypeMerchStoreUpsell, UserExperienceTypeMaintenanceFeb2023, UserExperienceTypeTwitterConnectionOnboardingUpsell, UserExperienceTypeUpsellMintMemento4, UserExperienceTypeUpsellGallerySelects1, UserExperienceTypeMobileUpsell1, UserExperienceTypeMobileBetaUpsell, UserExperienceTypeUpsellMintMemento5:
+	case UserExperienceTypeMultiGalleryAnnouncement, UserExperienceTypeEmailUpsell, UserExperienceTypeMerchStoreUpsell, UserExperienceTypeMaintenanceFeb2023, UserExperienceTypeMaintenanceAug2023, UserExperienceTypeTwitterConnectionOnboardingUpsell, UserExperienceTypeUpsellMintMemento4, UserExperienceTypeUpsellGallerySelects1, UserExperienceTypeMobileUpsell1, UserExperienceTypeMobileBetaUpsell, UserExperienceTypeUpsellMintMemento5:
 		return true
 	}
 	return false
