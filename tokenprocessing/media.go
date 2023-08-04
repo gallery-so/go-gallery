@@ -26,6 +26,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/googleapi"
 
+	"cloud.google.com/go/compute/metadata"
 	"cloud.google.com/go/storage"
 	"github.com/everFinance/goar"
 	shell "github.com/ipfs/go-ipfs-api"
@@ -724,11 +725,16 @@ func rasterizeAndCacheSVGMedia(ctx context.Context, svgURL string, tids persist.
 	traceCallback, ctx := persist.TrackStepStatus(ctx, subMeta.SVGRasterize, "SVGRasterize")
 	defer traceCallback()
 
+	idToken, err := metadata.Get(fmt.Sprintf("instance/service-accounts/default/identity?audience=%s", env.GetString("RASTERIZER_URL")))
+	if err != nil {
+		return nil, fmt.Errorf("metadata.Get: failed to query id_token: %v", err)
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/rasterize?url=%s", env.GetString("RASTERIZER_URL"), svgURL), nil)
 	if err != nil {
 		persist.FailStep(subMeta.SVGRasterize)
 		return nil, err
 	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", idToken))
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
