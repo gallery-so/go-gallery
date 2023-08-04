@@ -2567,6 +2567,22 @@ func (r *tokenResolver) Community(ctx context.Context, obj *model.Token) (*model
 	return resolveCommunityByTokenID(ctx, obj.Dbid)
 }
 
+// IsSpamByProvider is the resolver for the isSpamByProvider field.
+func (r *tokenResolver) IsSpamByProvider(ctx context.Context, obj *model.Token) (*bool, error) {
+	var c *model.Contract
+	var err error
+	if obj.Token.Contract != "" {
+		c, err = resolveContractByContractID(ctx, obj.Token.Contract)
+	} else {
+		c, err = resolveContractByTokenID(ctx, obj.Dbid)
+	}
+	if err != nil {
+		return nil, err
+	}
+	isSpam := (c.IsSpam != nil && *c.IsSpam) || (obj.IsSpamByProvider != nil && *obj.IsSpamByProvider)
+	return &isSpam, nil
+}
+
 // Wallets is the resolver for the wallets field.
 func (r *tokenHolderResolver) Wallets(ctx context.Context, obj *model.TokenHolder) ([]*model.Wallet, error) {
 	wallets := make([]*model.Wallet, 0, len(obj.WalletIds))
