@@ -73,9 +73,6 @@ const args = [
     await page.goto(url);
     return await createAnimation(page);
   });
-  app.listen(3000, async () => {
-    console.log('Listening on port 3000');
-  });
 
   app.get('/rasterize', async (req, res) => {
     if (!req.query.url) {
@@ -98,6 +95,10 @@ const args = [
       console.log(e);
       res.status(400).send('error' + e);
     }
+  });
+
+  app.listen(3000, async () => {
+    console.log('Listening on port 3000');
   });
 })();
 
