@@ -90,7 +90,9 @@ const args = [
       j['png'] = result[0];
       if (result.length > 1) {
         j['gif'] = result[1];
+        console.log(`Returning ${j['gif'].length} bytes for gif: ${url}`);
       }
+      console.log(`Returning ${j['png'].length} bytes for thumbnail: ${url}`);
       res.status(200).send(j);
     } catch (e) {
       console.log(e);
