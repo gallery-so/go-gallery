@@ -57,7 +57,8 @@ const args = [
   });
 
   await cluster.task(async ({ page, data: url }) => {
-    return await createAnimation(page, url);
+    await page.goto(url);
+    return await createAnimation(page);
   });
   app.listen(3000, async () => {
     console.log('Listening on port 3000');
@@ -65,12 +66,13 @@ const args = [
 
   app.get('/rasterize', async (req, res) => {
     if (!req.query.url) {
-      res.send('No url provided');
+      res.status(400).send('no url provided');
       return;
     }
-    console.log('Requesting ' + req.query.url);
+    const url = req.query.url;
+    console.log('Requesting ' + url);
     try {
-      const result = await cluster.execute(req.query.url);
+      const result = await cluster.execute(url);
       const j = {};
       j['png'] = result[0];
       if (result.length > 1) {
@@ -79,7 +81,7 @@ const args = [
       res.status(200).send(j);
     } catch (e) {
       console.log(e);
-      res.status(400).send('error: ', e);
+      res.status(400).send('error' + e);
     }
   });
 })();
@@ -97,25 +99,17 @@ process.on('uncaughtException', (err, origin) => {
   console.log(`Caught exception: ${err}\n` + `Exception origin: ${origin}`);
 });
 
-async function createAnimation(page, url) {
-  await page.goto(url);
-
+async function createAnimation(page) {
   let svgDimensions = await page.evaluate(() => {
     let svg = document.querySelector('svg');
 
     if (svg) {
       // If viewBox is available, use it
       if (svg.viewBox && svg.viewBox.baseVal) {
-        console.log(
-          `url ${url} viewbox ${svg.viewBox.baseVal.width} ${svg.viewBox.baseVal.height}`
-        );
         return { width: svg.viewBox.baseVal.width, height: svg.viewBox.baseVal.height };
       }
       // If width and height are available, use them
       else if (svg.width && svg.height) {
-        console.log(
-          `url ${url} width ${svg.width.baseVal.value} height ${svg.height.baseVal.value}`
-        );
         return { width: svg.width.baseVal.value, height: svg.height.baseVal.value };
       }
       // If none are available, throw error
@@ -179,9 +173,6 @@ async function createAnimation(page, url) {
   const pngBuffer = PNG.sync.write(frames[0]);
   result.push(Buffer.from(pngBuffer).toString('base64'));
 
-  console.log(`url ${url} wrote png`);
-  console.log(`url ${url} isStatic: ${isStatic}`);
-
   if (!isStatic) {
     // If frames are different, save a gif as well
     const encoder = new GIFEncoder(frames[0].width, frames[0].height);
@@ -190,7 +181,6 @@ async function createAnimation(page, url) {
     stream.on('data', (chunk) => (gifBuffer = Buffer.concat([gifBuffer, chunk])));
     stream.on('end', () => {
       result.push(gifBuffer.toString('base64'));
-      console.log(`url ${url} wrote gif`);
     });
 
     encoder.start();
