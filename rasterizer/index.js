@@ -50,6 +50,7 @@ const args = [
   const cluster = await Cluster.launch({
     concurrency: Cluster.CONCURRENCY_PAGE,
     maxConcurrency: 10,
+    timeout: 600000,
     puppeteerOptions: {
       args,
       headless: 'new',
