@@ -1810,6 +1810,8 @@ type TokenResolver interface {
 
 	Contract(ctx context.Context, obj *model.Token) (*model.Contract, error)
 	Community(ctx context.Context, obj *model.Token) (*model.Community, error)
+
+	IsSpamByProvider(ctx context.Context, obj *model.Token) (*bool, error)
 }
 type TokenHolderResolver interface {
 	Wallets(ctx context.Context, obj *model.TokenHolder) ([]*model.Wallet, error)
@@ -8334,7 +8336,7 @@ type Token implements Node @goEmbedHelper {
   externalUrl: String
   blockNumber: String # source is uint64
   isSpamByUser: Boolean
-  isSpamByProvider: Boolean
+  isSpamByProvider: Boolean @goField(forceResolver: true)
   # These are subject to change; unlike the other fields, they aren't present on the current persist.Token
   # struct and may ultimately end up elsewhere
   creatorAddress: ChainAddress
@@ -47664,7 +47666,7 @@ func (ec *executionContext) _Token_isSpamByProvider(ctx context.Context, field g
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.IsSpamByProvider, nil
+		return ec.resolvers.Token().IsSpamByProvider(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -47682,8 +47684,8 @@ func (ec *executionContext) fieldContext_Token_isSpamByProvider(ctx context.Cont
 	fc = &graphql.FieldContext{
 		Object:     "Token",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Boolean does not have child fields")
 		},
@@ -70042,9 +70044,22 @@ func (ec *executionContext) _Token(ctx context.Context, sel ast.SelectionSet, ob
 			out.Values[i] = ec._Token_isSpamByUser(ctx, field, obj)
 
 		case "isSpamByProvider":
+			field := field
 
-			out.Values[i] = ec._Token_isSpamByProvider(ctx, field, obj)
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Token_isSpamByProvider(ctx, field, obj)
+				return res
+			}
 
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "creatorAddress":
 
 			out.Values[i] = ec._Token_creatorAddress(ctx, field, obj)
