@@ -15,8 +15,8 @@ create view feed_entity_score_view as (
   selected_events as (
       select feed_events.id, feed_events.created_at, feed_events.owner_id actor_id, feed_events.action, count(distinct comments.id) + count(distinct admires.id) interactions
       from feed_events
-      left join comments on comments.post_id = feed_events.id
-      left join admires on admires.post_id = feed_events.id
+      left join comments on comments.feed_event_id = feed_events.id
+      left join admires on admires.feed_event_id = feed_events.id
       where feed_events.created_at >= (select ts from report_after)
       group by feed_events.id, feed_events.created_at, feed_events.owner_id, feed_events.action
   ),
@@ -60,6 +60,7 @@ create materialized view feed_entity_scores as (
 );
 
 create unique index feed_entity_scores_id on feed_entity_scores(id);
+create index feed_entity_scores_created_at on feed_entity_scores(created_at);
 create index feed_entity_scores_actor_id on feed_entity_scores(actor_id);
 create index feed_entity_scores_entity_type_action on feed_entity_scores(feed_entity_type, action);
 

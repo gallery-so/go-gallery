@@ -311,6 +311,7 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 	if !hasCursors {
 		calcFunc := func(ctx context.Context) ([]persist.FeedEntityType, []persist.DBID, error) {
 			trendData, err := api.queries.GetFeedEntityScores(ctx, db.GetFeedEntityScoresParams{
+				WindowEnd:           time.Now().Add(-time.Duration(3 * 24 * time.Hour)),
 				PostEntityType:      int32(persist.PostTypeTag),
 				ExcludedFeedActions: []string{string(persist.ActionUserCreated), string(persist.ActionUserFollowedUsers)},
 				IncludeViewer:       true,
@@ -432,6 +433,7 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 
 	if !hasCursors {
 		trendData, err := api.queries.GetFeedEntityScores(ctx, db.GetFeedEntityScoresParams{
+			WindowEnd:           time.Now().Add(-time.Duration(7 * 24 * time.Hour)),
 			PostEntityType:      int32(persist.PostTypeTag),
 			ExcludedFeedActions: []string{string(persist.ActionUserCreated), string(persist.ActionUserFollowedUsers)},
 			IncludeViewer:       false,

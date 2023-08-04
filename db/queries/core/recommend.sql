@@ -60,16 +60,19 @@ where contract_id not in (
 ) and displayed;
 
 -- name: GetFeedEntityScores :many
-with report as (select last_updated from feed_entity_scores limit 1)
+with refreshed as (
+  select greatest((select last_updated from feed_entity_scores limit 1), now() - interval '3 day') last_updated
+)
 select *
 from feed_entity_scores f1
 where (@include_viewer::bool or f1.actor_id != @viewer_id)
+  and f1.created_at > @window_end::timestamptz
   and (@include_posts::bool or f1.feed_entity_type != @post_entity_type)
   and (f1.action != any(@excluded_feed_actions::varchar[]))
-union all
+union
 select *
 from feed_entity_score_view f2
-where created_at > (select last_updated from report)
+where created_at > (select last_updated from refreshed limit 1)
   and (@include_viewer::bool or f2.actor_id != @viewer_id)
   and (@include_posts::bool or f2.feed_entity_type != @post_entity_type)
   and (f2.action != any(@excluded_feed_actions::varchar[]));
