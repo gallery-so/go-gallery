@@ -49,7 +49,7 @@ create view feed_entity_score_view as (
 
   union all
 
-  select id, created_at, actor_id, 'how-are-you-today', contract_ids, interactions, 1 feed_entity_type, now()::timestamptz as last_updated
+  select id, created_at, actor_id, '', contract_ids, interactions, 1 feed_entity_type, now()::timestamptz as last_updated
   from selected_posts
 );
 
@@ -59,6 +59,8 @@ create materialized view feed_entity_scores as (
   select * from feed_entity_score_view where created_at >= now() - interval '7 day'
 );
 
+create unique index feed_entity_scores_id on feed_entity_scores(id);
 create index feed_entity_scores_actor_id on feed_entity_scores(actor_id);
-create index feed_entity_scores_action on feed_entity_scores(action);
-create index feed_entity_scores_entity_type on feed_entity_scores(feed_entity_type);
+create index feed_entity_scores_entity_type_action on feed_entity_scores(feed_entity_type, action);
+
+select cron.schedule('refresh-feed-entity-scores', '30 * * * *', 'refresh materialized view concurrently feed_entity_scores with data');
