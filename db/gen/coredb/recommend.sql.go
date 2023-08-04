@@ -46,12 +46,19 @@ func (q *Queries) GetContractLabels(ctx context.Context, excludedContracts []str
 }
 
 const getFeedEntityScores = `-- name: GetFeedEntityScores :many
+with report as (select last_updated from feed_entity_scores limit 1)
 select id, created_at, actor_id, action, contract_ids, interactions, feed_entity_type, last_updated
-from feed_entity_scores
-where 
-  ($1::bool or actor_id != $2)
-  and ($3::bool or feed_entity_type != $4)
-  and (action != any($5::varchar[]) or action is null)
+from feed_entity_scores f1
+where ($1::bool or f1.actor_id != $2)
+  and ($3::bool or f1.feed_entity_type != $4)
+  and (f1.action != any($5::varchar[]))
+union all
+select id, created_at, actor_id, action, contract_ids, interactions, feed_entity_type, last_updated
+from feed_entity_score_view f2
+where created_at > (select last_updated from report)
+  and ($1::bool or f2.actor_id != $2)
+  and ($3::bool or f2.feed_entity_type != $4)
+  and (f2.action != any($5::varchar[]))
 `
 
 type GetFeedEntityScoresParams struct {

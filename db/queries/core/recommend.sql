@@ -60,9 +60,16 @@ where contract_id not in (
 ) and displayed;
 
 -- name: GetFeedEntityScores :many
+with report as (select last_updated from feed_entity_scores limit 1)
 select *
-from feed_entity_scores
-where 
-  (@include_viewer::bool or actor_id != @viewer_id)
-  and (@include_posts::bool or feed_entity_type != @post_entity_type)
-  and (action != any(@excluded_feed_actions::varchar[]) or action is null);
+from feed_entity_scores f1
+where (@include_viewer::bool or f1.actor_id != @viewer_id)
+  and (@include_posts::bool or f1.feed_entity_type != @post_entity_type)
+  and (f1.action != any(@excluded_feed_actions::varchar[]))
+union all
+select *
+from feed_entity_score_view f2
+where created_at > (select last_updated from report)
+  and (@include_viewer::bool or f2.actor_id != @viewer_id)
+  and (@include_posts::bool or f2.feed_entity_type != @post_entity_type)
+  and (f2.action != any(@excluded_feed_actions::varchar[]));

@@ -1,4 +1,4 @@
-create materialized view feed_entity_scores as (
+create view feed_entity_score_view as (
   with report_after as (
     select now() - interval '7 day' ts
   ),
@@ -49,8 +49,14 @@ create materialized view feed_entity_scores as (
 
   union all
 
-  select id, created_at, actor_id, null, contract_ids, interactions, 1 feed_entity_type, now()::timestamptz as last_updated
+  select id, created_at, actor_id, 'how-are-you-today', contract_ids, interactions, 1 feed_entity_type, now()::timestamptz as last_updated
   from selected_posts
+);
+
+drop materialized view if exists feed_entity_scores;
+
+create materialized view feed_entity_scores as (
+  select * from feed_entity_score_view where created_at >= now() - interval '7 day'
 );
 
 create index feed_entity_scores_actor_id on feed_entity_scores(actor_id);

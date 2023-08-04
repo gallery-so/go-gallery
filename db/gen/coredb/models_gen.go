@@ -154,6 +154,17 @@ type FeedEntityScore struct {
 	LastUpdated    time.Time        `json:"last_updated"`
 }
 
+type FeedEntityScoreView struct {
+	ID             persist.DBID     `json:"id"`
+	CreatedAt      time.Time        `json:"created_at"`
+	ActorID        persist.DBID     `json:"actor_id"`
+	Action         persist.Action   `json:"action"`
+	ContractIds    persist.DBIDList `json:"contract_ids"`
+	Interactions   int32            `json:"interactions"`
+	FeedEntityType int32            `json:"feed_entity_type"`
+	LastUpdated    time.Time        `json:"last_updated"`
+}
+
 type FeedEvent struct {
 	ID          persist.DBID          `json:"id"`
 	Version     int32                 `json:"version"`
