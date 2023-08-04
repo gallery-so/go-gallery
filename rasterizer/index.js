@@ -51,10 +51,22 @@ const args = [
     concurrency: Cluster.CONCURRENCY_PAGE,
     maxConcurrency: 10,
     timeout: 600000,
+    retryDelay: 3000,
+    retryLimit: 3,
     puppeteerOptions: {
       args,
       headless: 'new',
     },
+  });
+
+  cluster.on('taskerror', (err, data, willRetry) => {
+    if (willRetry) {
+      console.warn(
+        `Encountered an error while screenshotting ${data}. ${err.message}\nThis job will be retried`
+      );
+    } else {
+      console.error(`Failed to screenshot ${data}: ${err.message}`);
+    }
   });
 
   await cluster.task(async ({ page, data: url }) => {
