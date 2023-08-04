@@ -48,7 +48,7 @@ const args = [
 (async () => {
   console.log('Launching cluster');
   const cluster = await Cluster.launch({
-    concurrency: Cluster.CONCURRENCY_CONTEXT,
+    concurrency: Cluster.CONCURRENCY_PAGE,
     maxConcurrency: 10,
     puppeteerOptions: {
       args,
