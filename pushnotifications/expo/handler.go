@@ -126,7 +126,7 @@ func (b *messageBatch) startTimer(l *PushNotificationHandler) {
 }
 
 func (b *messageBatch) end(h *PushNotificationHandler) {
-	h.sendMessageBatch(b.messages)
+	b.errors = h.sendMessageBatch(b.messages)
 	close(b.done)
 }
 
@@ -191,7 +191,7 @@ func (h *PushNotificationHandler) sendMessageBatch(messages []PushMessage) []err
 
 		// Get this message's position in the original slice of messages and use that for error indexing
 		errIndex := dbidToMessageIndex[message.pushTokenID]
-		e := response.GetError()
+		e := response.GetError(ctx)
 		errs[errIndex] = e
 
 		if e == ErrDeviceNotRegistered {
@@ -301,7 +301,7 @@ func processTicketReceipts(ctx context.Context, tickets []db.PushNotificationTic
 			continue
 		}
 
-		err := receipt.GetError()
+		err := receipt.GetError(ctx)
 		if err == nil {
 			// If we got a receipt and there wasn't an error, the message was delivered, and we don't need to check again.
 			params.Status[i] = "delivered"

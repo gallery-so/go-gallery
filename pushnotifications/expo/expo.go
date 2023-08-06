@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/getsentry/sentry-go"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
@@ -55,25 +56,30 @@ type GetReceiptsRequest struct {
 
 type GetReceiptsResponse struct {
 	Data   map[string]PushReceipt `json:"data"`
-	Errors []map[string]string    `json:"errors"`
+	Errors []RequestError         `json:"errors"`
 }
 
 type SendMessagesResponse struct {
-	Data   []PushTicket        `json:"data"`
-	Errors []map[string]string `json:"errors"`
+	Data   []PushTicket   `json:"data"`
+	Errors []RequestError `json:"errors"`
 }
 
 type PushReceipt struct {
-	Status  string            `json:"status"`
-	Message string            `json:"message"`
-	Details map[string]string `json:"details"`
+	Status  string         `json:"status"`
+	Message string         `json:"message"`
+	Details map[string]any `json:"details"`
 }
 
 type PushTicket struct {
-	TicketID string            `json:"id"`
-	Status   string            `json:"status"`
-	Message  string            `json:"message"`
-	Details  map[string]string `json:"details"`
+	TicketID string         `json:"id"`
+	Status   string         `json:"status"`
+	Message  string         `json:"message"`
+	Details  map[string]any `json:"details"`
+}
+
+type RequestError struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
 }
 
 type PushError struct {
@@ -90,18 +96,28 @@ func newPushError(code string) *PushError {
 
 // GetError gets the error for the ticket, if any. Returns nil if no error.
 // See: https://docs.expo.dev/push-notifications/sending-notifications/#push-ticket-errors
-func (t PushTicket) GetError() error {
+func (t PushTicket) GetError(ctx context.Context) error {
 	if t.Status != StatusError {
 		return nil
 	}
 
-	code := t.Details["error"]
+	code, ok := t.Details["error"].(string)
+	if !ok {
+		err := fmt.Errorf("invalid push error type: expected a string, got: %v", t.Details["error"])
+		logger.For(ctx).Error(err)
+		return err
+	}
 
 	err := findErrorByCode(code, []*PushError{
 		ErrDeviceNotRegistered,
 	})
 
 	if err != nil {
+		if message, ok := t.Details["message"]; ok {
+			if messageStr, ok := message.(string); ok {
+				logger.For(ctx).Infof("found details for push ticket error %s: %s", code, messageStr)
+			}
+		}
 		return err
 	}
 
@@ -110,12 +126,17 @@ func (t PushTicket) GetError() error {
 
 // GetError gets the error for the receipt, if any. Returns nil if no error.
 // See: https://docs.expo.dev/push-notifications/sending-notifications#push-receipt-errors
-func (t PushReceipt) GetError() error {
+func (t PushReceipt) GetError(ctx context.Context) error {
 	if t.Status != StatusError {
 		return nil
 	}
 
-	code := t.Details["error"]
+	code, ok := t.Details["error"].(string)
+	if !ok {
+		err := fmt.Errorf("invalid push error type: expected a string, got: %v", t.Details["error"])
+		logger.For(ctx).Error(err)
+		return err
+	}
 
 	err := findErrorByCode(code, []*PushError{
 		ErrDeviceNotRegistered,
@@ -126,6 +147,11 @@ func (t PushReceipt) GetError() error {
 	})
 
 	if err != nil {
+		if message, ok := t.Details["message"]; ok {
+			if messageStr, ok := message.(string); ok {
+				logger.For(ctx).Infof("found details for push receipt error %s: %s", code, messageStr)
+			}
+		}
 		return err
 	}
 
@@ -150,14 +176,14 @@ func findErrorByCode(errorString string, errs []*PushError) error {
 	return nil
 }
 
-func getResponseError(errs []map[string]string) error {
+func getResponseError(errs []RequestError) error {
 	if len(errs) == 0 {
 		return nil
 	}
 
 	// Find a known error type if we can
 	for _, e := range errs {
-		code := e["code"]
+		code := e.Code
 
 		err := findErrorByCode(code, []*PushError{
 			ErrTooManyRequests,
@@ -172,7 +198,7 @@ func getResponseError(errs []map[string]string) error {
 	}
 
 	// Otherwise just return the first error
-	return errors.New("unknown error: " + errs[0]["code"])
+	return errors.New("unknown error: " + errs[0].Code + ": " + errs[0].Message)
 }
 
 // PushMessage is an Expo-formatted push message.
