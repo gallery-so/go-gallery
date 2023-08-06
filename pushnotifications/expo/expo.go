@@ -113,6 +113,11 @@ func (t PushTicket) GetError(ctx context.Context) error {
 	})
 
 	if err != nil {
+		if message, ok := t.Details["message"]; ok {
+			if messageStr, ok := message.(string); ok {
+				logger.For(ctx).Infof("found details for push ticket error %s: %s", code, messageStr)
+			}
+		}
 		return err
 	}
 
@@ -142,6 +147,11 @@ func (t PushReceipt) GetError(ctx context.Context) error {
 	})
 
 	if err != nil {
+		if message, ok := t.Details["message"]; ok {
+			if messageStr, ok := message.(string); ok {
+				logger.For(ctx).Infof("found details for push receipt error %s: %s", code, messageStr)
+			}
+		}
 		return err
 	}
 
@@ -188,7 +198,7 @@ func getResponseError(errs []RequestError) error {
 	}
 
 	// Otherwise just return the first error
-	return errors.New("unknown error: " + errs[0].Code)
+	return errors.New("unknown error: " + errs[0].Code + ": " + errs[0].Message)
 }
 
 // PushMessage is an Expo-formatted push message.
