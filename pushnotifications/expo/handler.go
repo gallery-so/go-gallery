@@ -136,12 +136,14 @@ func (h *PushNotificationHandler) sendMessageBatch(messages []PushMessage) []err
 		"batchSize":      len(messages),
 	})
 
+	dbids, _ := util.Map(messages, func(m PushMessage) (string, error) { return m.pushTokenID.String(), nil })
+	logger.For(ctx).WithField("pushTokenDBIDs", dbids).Info("Sending push notification batch with size: %d", len(messages))
+
 	dbidToMessageIndex := make(map[persist.DBID]int)
 	for i, message := range messages {
 		dbidToMessageIndex[message.pushTokenID] = i
 	}
 
-	dbids, _ := util.Map(messages, func(m PushMessage) (string, error) { return m.pushTokenID.String(), nil })
 	tokens, err := h.queries.GetPushTokensByIDs(ctx, dbids)
 
 	if (err == nil && len(tokens) == 0) || err == pgx.ErrNoRows {
