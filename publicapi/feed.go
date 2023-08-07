@@ -720,7 +720,7 @@ func scoreFeedEntity(p *userpref.Personalization, viewerID persist.DBID, e db.Fe
 		// Use a default value of 0.1 so that it isn't completely penalized because of missing data.
 		personalizationF = 0.1
 	}
-	return timeF * engagementF * personalizationF
+	return timeF * (1 + engagementF) * (1 + personalizationF)
 }
 
 func timeFactor(t0, t1 time.Time) float64 {
@@ -730,7 +730,7 @@ func timeFactor(t0, t1 time.Time) float64 {
 }
 
 func engagementFactor(interactions int) float64 {
-	return math.Log1p(float64(interactions))
+	return float64(interactions)
 }
 
 type priorityNode interface {
