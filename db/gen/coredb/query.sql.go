@@ -4863,7 +4863,7 @@ func (q *Queries) HasLaterGroupedEvent(ctx context.Context, arg HasLaterGroupedE
 }
 
 const insertExternalSocialConnectionsForUser = `-- name: InsertExternalSocialConnectionsForUser :many
-insert into external_social_connections (id, social_account_type, follower_id, followee_id) select (id, social_account_type, follower_id, followee_id) from (select unnest($1::varchar[]) as id, $2::varchar as social_account_type, $3::varchar as follower_id, unnest($4::varchar[]) as followee_id) bulk_insert returning id, version, social_account_type, follower_id, followee_id, created_at, last_updated, deleted
+insert into pii.external_social_connections (id, social_account_type, follower_id, followee_id) select (id, social_account_type, follower_id, followee_id) from (select unnest($1::varchar[]) as id, $2::varchar as social_account_type, $3::varchar as follower_id, unnest($4::varchar[]) as followee_id) bulk_insert returning id, version, social_account_type, follower_id, followee_id, created_at, last_updated, deleted
 `
 
 type InsertExternalSocialConnectionsForUserParams struct {
@@ -4873,7 +4873,7 @@ type InsertExternalSocialConnectionsForUserParams struct {
 	FolloweeIds       []string `json:"followee_ids"`
 }
 
-func (q *Queries) InsertExternalSocialConnectionsForUser(ctx context.Context, arg InsertExternalSocialConnectionsForUserParams) ([]ExternalSocialConnection, error) {
+func (q *Queries) InsertExternalSocialConnectionsForUser(ctx context.Context, arg InsertExternalSocialConnectionsForUserParams) ([]PiiExternalSocialConnection, error) {
 	rows, err := q.db.Query(ctx, insertExternalSocialConnectionsForUser,
 		arg.Ids,
 		arg.SocialAccountType,
@@ -4884,9 +4884,9 @@ func (q *Queries) InsertExternalSocialConnectionsForUser(ctx context.Context, ar
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ExternalSocialConnection
+	var items []PiiExternalSocialConnection
 	for rows.Next() {
-		var i ExternalSocialConnection
+		var i PiiExternalSocialConnection
 		if err := rows.Scan(
 			&i.ID,
 			&i.Version,
