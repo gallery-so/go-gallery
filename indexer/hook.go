@@ -77,7 +77,7 @@ func newTokenHooks(tasks *gcptasks.Client, bQueries *coredb.Queries) []DBHook[pe
 					cur := tokensForUser[u]
 					cur[persist.TokenUniqueIdentifiers{
 						Chain:           t.Chain,
-						ContractAddress: persist.Address(t.ContractAddress),
+						ContractAddress: persist.Address(t.ContractAddress.String()),
 						TokenID:         t.TokenID,
 						OwnerAddress:    persist.Address(t.OwnerAddress.String()),
 					}] = t.Quantity
@@ -88,6 +88,9 @@ func newTokenHooks(tasks *gcptasks.Client, bQueries *coredb.Queries) []DBHook[pe
 
 			logger.For(ctx).Infof("submitting %d tasks to process tokens for users", len(tokensForUser))
 			for userID, tids := range tokensForUser {
+				for t, q := range tids {
+					logger.For(ctx).WithFields(logrus.Fields{"user_id": userID, "token_id": t.TokenID, "quantity": q}).Debug("token for user")
+				}
 				// send each token grouped by user ID to the task queue
 				logger.For(ctx).WithFields(logrus.Fields{"user_id": userID, "token_count": len(tids)}).Infof("submitting task for user %s with %d tokens", userID, len(tids))
 				err = task.CreateTaskForUserTokenProcessing(ctx, task.TokenProcessingUserTokensMessage{
