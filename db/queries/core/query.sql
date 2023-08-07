@@ -1547,3 +1547,6 @@ update tokens t
 
 -- name: IsMemberOfCommunity :one
 select exists (select * from tokens where not deleted and displayable and owner_user_id = @user_id and contract = @contract_id limit 1) is_member;
+
+-- name: TestLabels :one
+select 1 limit 1;

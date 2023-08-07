@@ -1,0 +1,8 @@
+migration:
+  - db/migrations/**
+
+query:
+  - db/queries/**
+
+schema:
+  - graphql/schema/**
