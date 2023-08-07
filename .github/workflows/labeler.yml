@@ -8,5 +8,4 @@ jobs:
       pull-requests: write
     runs-on: ubuntu-latest
     steps:
-      - name: 'Add PR labels'
       - uses: actions/labeler@v4
