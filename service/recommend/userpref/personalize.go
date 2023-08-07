@@ -189,7 +189,7 @@ func NewPersonalization(ctx context.Context, q *db.Queries, c *storage.Client) *
 	return k
 }
 
-func (p *Personalization) RelevanceTo(userID persist.DBID, e db.FeedEntityScoringRow) (float64, error) {
+func (p *Personalization) RelevanceTo(userID persist.DBID, e db.FeedEntityScore) (float64, error) {
 	// We don't have personalization data for this user yet
 	_, vOK := p.pM.uL[userID]
 	if !vOK {

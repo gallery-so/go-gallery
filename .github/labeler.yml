@@ -1,0 +1,11 @@
+migration:
+  - db/migrations/**
+
+query:
+  - db/queries/**
+
+dataloader:
+  - graphql/dataloader/**
+
+schema:
+  - graphql/schema/**
