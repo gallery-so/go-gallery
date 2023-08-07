@@ -144,7 +144,6 @@ func main() {
 			OwnedByWallets:   wallets,
 			OwnershipHistory: row.OwnershipHistory,
 			IsCreatorToken:   row.IsCreatorToken,
-			TokenMetadata:    row.TokenMetadata,
 			Contract:         row.Contract,
 			ExternalURL:      persist.NullString(row.ExternalUrl.String),
 			BlockNumber:      persist.BlockNumber(row.BlockNumber.Int64),

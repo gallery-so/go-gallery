@@ -13,9 +13,7 @@ insert into tokens
   , token_id
   , quantity
   , ownership_history
-  , media
   , fallback_media
-  , token_metadata
   , external_url
   , block_number
   , owner_user_id
@@ -41,9 +39,7 @@ insert into tokens
     , token_id
     , quantity
     , case when @set_holder_fields::bool then ownership_history[ownership_history_start_idx::int:ownership_history_end_idx::int] else '{}' end
-    , media
     , fallback_media
-    , token_metadata
     , external_url
     , block_number
     , owner_user_id
@@ -74,9 +70,7 @@ insert into tokens
       , @ownership_history::jsonb[] as ownership_history
       , unnest(@ownership_history_start_idx::int[]) as ownership_history_start_idx
       , unnest(@ownership_history_end_idx::int[]) as ownership_history_end_idx
-      , unnest(@media::jsonb[]) as media
       , unnest(@fallback_media::jsonb[]) as fallback_media
-      , unnest(@token_metadata::jsonb[]) as token_metadata
       , unnest(@external_url::varchar[]) as external_url
       , unnest(@block_number::bigint[]) as block_number
       , unnest(@owner_user_id::varchar[]) as owner_user_id
@@ -102,7 +96,6 @@ do update set
   , ownership_history = case when @set_holder_fields then tokens.ownership_history || excluded.ownership_history else tokens.ownership_history end
   , is_creator_token = case when @set_creator_fields then excluded.is_creator_token else tokens.is_creator_token end
   , fallback_media = excluded.fallback_media
-  , token_metadata = excluded.token_metadata
   , external_url = excluded.external_url
   , block_number = excluded.block_number
   , version = excluded.version

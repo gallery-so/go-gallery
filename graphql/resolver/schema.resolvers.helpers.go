@@ -1853,8 +1853,7 @@ func tokenHolderToModel(ctx context.Context, tokenHolder persist.TokenHolder) *m
 
 func tokenToModel(ctx context.Context, token db.Token, collectionID *persist.DBID) *model.Token {
 	chain := token.Chain
-	metadata, _ := token.TokenMetadata.MarshalJSON()
-	metadataString := string(metadata)
+
 	blockNumber := fmt.Sprint(token.BlockNumber.Int64)
 	tokenType := model.TokenType(token.TokenType.String)
 
@@ -1886,7 +1885,6 @@ func tokenToModel(ctx context.Context, token db.Token, collectionID *persist.DBI
 		OwnershipHistory: nil, // TODO: later
 		OwnerIsHolder:    &token.IsHolderToken,
 		OwnerIsCreator:   &token.IsCreatorToken,
-		TokenMetadata:    &metadataString,
 		Contract:         nil, // handled by dedicated resolver
 		ExternalURL:      &token.ExternalUrl.String,
 		BlockNumber:      &blockNumber, // TODO: later

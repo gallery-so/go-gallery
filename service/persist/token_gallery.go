@@ -25,7 +25,6 @@ type TokenGallery struct {
 	LastSynced time.Time `json:"last_synced"`
 
 	CollectorsNote NullString    `json:"collectors_note"`
-	Media          Media         `json:"media"`
 	TokenMedia     Media         `json:"token_media"`
 	TokenMediaID   DBID          `json:"token_media_id"`
 	FallbackMedia  FallbackMedia `json:"fallback_media"`
@@ -101,61 +100,10 @@ type TokenUpdateInfoInput struct {
 	CollectorsNote NullString `json:"collectors_note"`
 }
 
-// TokenUpdateAllURIDerivedFieldsInput represents an update to any field that can be derived from the token URI, including the metadata itself and tokenURI where the metadata is hosted
-type TokenUpdateAllURIDerivedFieldsInput struct {
-	LastUpdated time.Time `json:"last_updated"`
-
-	Media       Media         `json:"media"`
-	Metadata    TokenMetadata `json:"token_metadata"`
-	TokenURI    TokenURI      `json:"token_uri"`
-	Name        NullString    `json:"name"`
-	Description NullString    `json:"description"`
-}
-
-type TokenUpdateAllMetadataFieldsInput struct {
-	LastUpdated time.Time `json:"last_updated"`
-
-	Metadata    TokenMetadata `json:"token_metadata"`
-	TokenURI    TokenURI      `json:"token_uri"`
-	Name        NullString    `json:"name"`
-	Description NullString    `json:"description"`
-}
-
-type TokenUpdateMetadataFieldsInput struct {
-	LastUpdated time.Time `json:"last_updated"`
-
-	Metadata TokenMetadata `json:"token_metadata"`
-	TokenURI TokenURI      `json:"token_uri"`
-}
-
-// TokenUpdateURIInput represents an update to just a token's URI field
-type TokenUpdateURIInput struct {
-	LastUpdated time.Time `json:"last_updated"`
-
-	TokenURI TokenURI `json:"token_uri"`
-}
-
-// TokenUpdateMediaInput represents an update to just a token's media fields
-type TokenUpdateMediaInput struct {
-	LastUpdated time.Time `json:"last_updated"`
-
-	Media Media `json:"media"`
-}
-
-// TokenUpdateMetadataDerivedFieldsInput represents an update to any field that can be derived from the token metadata
-type TokenUpdateMetadataDerivedFieldsInput struct {
-	LastUpdated time.Time `json:"last_updated"`
-
-	Name        NullString `json:"name"`
-	Description NullString `json:"description"`
-}
-
 // TokenGalleryRepository represents a repository for interacting with persisted tokens
 type TokenGalleryRepository interface {
 	GetByUserID(context.Context, DBID, int64, int64) ([]TokenGallery, error)
 	GetByTokenIdentifiers(context.Context, TokenID, Address, Chain, int64, int64) ([]TokenGallery, error)
-	GetByFullIdentifiers(context.Context, TokenID, Address, Chain, DBID) (TokenGallery, error)
-	GetByTokenID(context.Context, TokenID, int64, int64) ([]TokenGallery, error)
 	BulkUpsertByOwnerUserID(context.Context, DBID, []Chain, []TokenGallery, bool) ([]TokenGallery, error)
 	BulkUpsertTokensOfContract(context.Context, DBID, []TokenGallery, bool) ([]TokenGallery, error)
 	UpdateByID(context.Context, DBID, DBID, interface{}) error

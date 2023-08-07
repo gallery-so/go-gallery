@@ -5,8 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/mikeydub/go-gallery/util"
 	"time"
+
+	"github.com/mikeydub/go-gallery/util"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 
@@ -17,27 +18,22 @@ import (
 
 // TokenGalleryRepository represents a postgres repository for tokens
 type TokenGalleryRepository struct {
-	db                                                    *sql.DB
-	queries                                               *db.Queries
-	getByID                                               *sql.Stmt
-	getByUserIDStmt                                       *sql.Stmt
-	getByUserIDPaginateStmt                               *sql.Stmt
-	getByTokenIDStmt                                      *sql.Stmt
-	getByTokenIDPaginateStmt                              *sql.Stmt
-	getByTokenIdentifiersStmt                             *sql.Stmt
-	getByTokenIdentifiersPaginateStmt                     *sql.Stmt
-	getByFullIdentifiersStmt                              *sql.Stmt
-	updateInfoStmt                                        *sql.Stmt
-	updateMediaStmt                                       *sql.Stmt
-	updateInfoByTokenIdentifiersUnsafeStmt                *sql.Stmt
-	updateAllURIDerivedFieldsByTokenIdentifiersUnsafeStmt *sql.Stmt
-	updateAllMetadataFieldsByTokenIdentifiersUnsafeStmt   *sql.Stmt
-	updateMediaByTokenIdentifiersUnsafeStmt               *sql.Stmt
-	updateMetadataFieldsByTokenIdentifiersUnsafeStmt      *sql.Stmt
-	getContractByAddressStmt                              *sql.Stmt
-	setTokensAsUserMarkedSpamStmt                         *sql.Stmt
-	checkOwnTokensStmt                                    *sql.Stmt
-	deleteTokensOfContractBeforeTimeStampStmt             *sql.Stmt
+	db                      *sql.DB
+	queries                 *db.Queries
+	getByID                 *sql.Stmt
+	getByUserIDStmt         *sql.Stmt
+	getByUserIDPaginateStmt *sql.Stmt
+
+	getByTokenIdentifiersStmt         *sql.Stmt
+	getByTokenIdentifiersPaginateStmt *sql.Stmt
+
+	updateInfoStmt                         *sql.Stmt
+	updateInfoByTokenIdentifiersUnsafeStmt *sql.Stmt
+
+	getContractByAddressStmt                  *sql.Stmt
+	setTokensAsUserMarkedSpamStmt             *sql.Stmt
+	checkOwnTokensStmt                        *sql.Stmt
+	deleteTokensOfContractBeforeTimeStampStmt *sql.Stmt
 }
 
 var errTokensNotOwnedByUser = errors.New("not all tokens are owned by user")
@@ -48,49 +44,25 @@ func NewTokenGalleryRepository(db *sql.DB, queries *db.Queries) *TokenGalleryRep
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	getByIDStmt, err := db.PrepareContext(ctx, `SELECT tokens.ID,COLLECTORS_NOTE,tokens.MEDIA,token_medias.MEDIA as token_media,token_medias.ID AS token_media_id,TOKEN_TYPE,tokens.CHAIN,tokens.NAME,tokens.DESCRIPTION,tokens.TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT,tokens.EXTERNAL_URL,BLOCK_NUMBER,tokens.VERSION,tokens.CREATED_AT,tokens.LAST_UPDATED,IS_USER_MARKED_SPAM,IS_PROVIDER_MARKED_SPAM FROM tokens LEFT JOIN token_medias ON token_medias.ID = tokens.TOKEN_MEDIA_ID WHERE tokens.ID = $1 AND tokens.DISPLAYABLE AND tokens.DELETED = false;`)
+	getByIDStmt, err := db.PrepareContext(ctx, `SELECT tokens.ID,COLLECTORS_NOTE,token_medias.MEDIA as token_media,TOKEN_MEDIA_ID,TOKEN_TYPE,tokens.CHAIN,token_medias.NAME,token_medias.DESCRIPTION,tokens.TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,token_medias.METADATA as token_metadata,CONTRACT,tokens.EXTERNAL_URL,BLOCK_NUMBER,tokens.VERSION,tokens.CREATED_AT,tokens.LAST_UPDATED,IS_USER_MARKED_SPAM,IS_PROVIDER_MARKED_SPAM FROM tokens LEFT JOIN token_medias ON token_medias.ID = tokens.TOKEN_MEDIA_ID WHERE tokens.ID = $1 AND tokens.DISPLAYABLE AND tokens.DELETED = false;`)
 	checkNoErr(err)
 
-	getByUserIDStmt, err := db.PrepareContext(ctx, `SELECT tokens.ID,COLLECTORS_NOTE,token_medias.MEDIA,TOKEN_MEDIA_ID,TOKEN_TYPE,tokens.CHAIN,tokens.NAME,tokens.DESCRIPTION,tokens.TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT,EXTERNAL_URL,BLOCK_NUMBER,tokens.VERSION,tokens.CREATED_AT,tokens.LAST_UPDATED,IS_USER_MARKED_SPAM,IS_PROVIDER_MARKED_SPAM FROM tokens LEFT JOIN token_medias ON token_medias.ID = tokens.TOKEN_MEDIA_ID WHERE OWNER_USER_ID = $1 AND tokens.DISPLAYABLE AND tokens.DELETED = false ORDER BY BLOCK_NUMBER DESC;`)
+	getByUserIDStmt, err := db.PrepareContext(ctx, `SELECT tokens.ID,COLLECTORS_NOTE,token_medias.MEDIA,TOKEN_MEDIA_ID,TOKEN_TYPE,tokens.CHAIN,token_medias.NAME,token_medias.DESCRIPTION,tokens.TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,token_medias.METADATA as token_metadata,CONTRACT,EXTERNAL_URL,BLOCK_NUMBER,tokens.VERSION,tokens.CREATED_AT,tokens.LAST_UPDATED,IS_USER_MARKED_SPAM,IS_PROVIDER_MARKED_SPAM FROM tokens LEFT JOIN token_medias ON token_medias.ID = tokens.TOKEN_MEDIA_ID WHERE OWNER_USER_ID = $1 AND tokens.DISPLAYABLE AND tokens.DELETED = false ORDER BY BLOCK_NUMBER DESC;`)
 	checkNoErr(err)
 
-	getByUserIDPaginateStmt, err := db.PrepareContext(ctx, `SELECT tokens.ID,COLLECTORS_NOTE,token_medias.MEDIA,TOKEN_MEDIA_ID,TOKEN_TYPE,tokens.CHAIN,tokens.NAME,tokens.DESCRIPTION,tokens.TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT,EXTERNAL_URL,BLOCK_NUMBER,tokens.VERSION,tokens.CREATED_AT,tokens.LAST_UPDATED,IS_USER_MARKED_SPAM,IS_PROVIDER_MARKED_SPAM FROM tokens LEFT JOIN token_medias ON token_medias.ID = tokens.TOKEN_MEDIA_ID WHERE OWNER_USER_ID = $1 AND tokens.DISPLAYABLE AND tokens.DELETED = false ORDER BY BLOCK_NUMBER DESC LIMIT $2 OFFSET $3;`)
+	getByUserIDPaginateStmt, err := db.PrepareContext(ctx, `SELECT tokens.ID,COLLECTORS_NOTE,token_medias.MEDIA as token_media,TOKEN_MEDIA_ID,TOKEN_TYPE,tokens.CHAIN,token_medias.NAME,token_medias.DESCRIPTION,tokens.TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,token_medias.METADATA as token_metadata,CONTRACT,EXTERNAL_URL,BLOCK_NUMBER,tokens.VERSION,tokens.CREATED_AT,tokens.LAST_UPDATED,IS_USER_MARKED_SPAM,IS_PROVIDER_MARKED_SPAM FROM tokens LEFT JOIN token_medias ON token_medias.ID = tokens.TOKEN_MEDIA_ID WHERE OWNER_USER_ID = $1 AND tokens.DISPLAYABLE AND tokens.DELETED = false ORDER BY BLOCK_NUMBER DESC LIMIT $2 OFFSET $3;`)
 	checkNoErr(err)
 
-	getByTokenIDStmt, err := db.PrepareContext(ctx, `SELECT ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED,IS_USER_MARKED_SPAM,IS_PROVIDER_MARKED_SPAM FROM tokens WHERE TOKEN_ID = $1 AND DISPLAYABLE AND DELETED = false ORDER BY BLOCK_NUMBER DESC;`)
+	getByTokenIdentifiersStmt, err := db.PrepareContext(ctx, `SELECT tokens.ID,COLLECTORS_NOTE,token_medias.MEDIA as token_media,TOKEN_MEDIA_ID,TOKEN_TYPE,tokens.CHAIN,token_medias.NAME,token_medias.DESCRIPTION,tokens.TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,token_medias.METADATA as token_metadata,CONTRACT,EXTERNAL_URL,BLOCK_NUMBER,tokens.VERSION,tokens.CREATED_AT,tokens.LAST_UPDATED,IS_USER_MARKED_SPAM,IS_PROVIDER_MARKED_SPAM FROM tokens LEFT JOIN token_medias ON token_medias.ID = tokens.TOKEN_MEDIA_ID WHERE tokens.TOKEN_ID = $1 AND CONTRACT = $2 AND DISPLAYABLE AND tokens.DELETED = false ORDER BY BLOCK_NUMBER DESC;`)
 	checkNoErr(err)
 
-	getByTokenIDPaginateStmt, err := db.PrepareContext(ctx, `SELECT ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED,IS_USER_MARKED_SPAM,IS_PROVIDER_MARKED_SPAM FROM tokens WHERE TOKEN_ID = $1 AND DISPLAYABLE AND DELETED = false ORDER BY BLOCK_NUMBER DESC LIMIT $2 OFFSET $3;`)
-	checkNoErr(err)
-
-	getByTokenIdentifiersStmt, err := db.PrepareContext(ctx, `SELECT ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED,IS_USER_MARKED_SPAM,IS_PROVIDER_MARKED_SPAM FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT = $2 AND DISPLAYABLE AND DELETED = false ORDER BY BLOCK_NUMBER DESC;`)
-	checkNoErr(err)
-
-	getByTokenIdentifiersPaginateStmt, err := db.PrepareContext(ctx, `SELECT ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED,IS_USER_MARKED_SPAM,IS_PROVIDER_MARKED_SPAM FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT = $2 AND DISPLAYABLE AND DELETED = false ORDER BY BLOCK_NUMBER DESC LIMIT $3 OFFSET $4;`)
-	checkNoErr(err)
-
-	getByFullIdentifiersStmt, err := db.PrepareContext(ctx, `SELECT tokens.ID,COLLECTORS_NOTE,tokens.MEDIA,token_medias.MEDIA as token_media,token_medias.ID AS token_media_id,TOKEN_TYPE,tokens.CHAIN,tokens.NAME,tokens.DESCRIPTION,tokens.TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT,tokens.EXTERNAL_URL,BLOCK_NUMBER,tokens.VERSION,tokens.CREATED_AT,tokens.LAST_UPDATED,IS_USER_MARKED_SPAM,IS_PROVIDER_MARKED_SPAM FROM tokens LEFT JOIN token_medias ON token_medias.ID = tokens.TOKEN_MEDIA_ID WHERE tokens.TOKEN_ID = $1 AND tokens.CONTRACT = $2 AND tokens.OWNER_USER_ID = $3 AND tokens.DISPLAYABLE AND tokens.DELETED = false ORDER BY BLOCK_NUMBER DESC;`)
+	getByTokenIdentifiersPaginateStmt, err := db.PrepareContext(ctx, `SELECT tokens.ID,COLLECTORS_NOTE,token_medias.MEDIA as token_media,TOKEN_MEDIA_ID,TOKEN_TYPE,tokens.CHAIN,token_medias.NAME,token_medias.DESCRIPTION,tokens.TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,token_medias.METADATA as token_metadata,CONTRACT,EXTERNAL_URL,BLOCK_NUMBER,tokens.VERSION,tokens.CREATED_AT,tokens.LAST_UPDATED,IS_USER_MARKED_SPAM,IS_PROVIDER_MARKED_SPAM FROM tokens LEFT JOIN token_medias ON token_medias.ID = tokens.TOKEN_MEDIA_ID WHERE tokens.TOKEN_ID = $1 AND CONTRACT = $2 AND DISPLAYABLE AND tokens.DELETED = false ORDER BY BLOCK_NUMBER DESC LIMIT $3 OFFSET $4;`)
 	checkNoErr(err)
 
 	updateInfoStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET COLLECTORS_NOTE = $1, LAST_UPDATED = $2 WHERE ID = $3 AND OWNER_USER_ID = $4;`)
 	checkNoErr(err)
 
-	updateMediaStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET MEDIA = $1, TOKEN_URI = '', TOKEN_METADATA = $2, LAST_UPDATED = $3 WHERE ID = $4 AND OWNER_USER_ID = $5;`)
-	checkNoErr(err)
-
 	updateInfoByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET COLLECTORS_NOTE = $1, LAST_UPDATED = $2 WHERE TOKEN_ID = $3 AND CONTRACT = $4 AND DELETED = false;`)
-	checkNoErr(err)
-
-	updateURIDerivedFieldsByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET MEDIA = $1, TOKEN_URI = '', TOKEN_METADATA = $2, NAME = $3, DESCRIPTION = $4, LAST_UPDATED = $5 WHERE TOKEN_ID = $6 AND CONTRACT = $7 AND DELETED = false;`)
-	checkNoErr(err)
-
-	updateAllMetadataFieldsByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET TOKEN_URI = '', TOKEN_METADATA = $1, NAME = $2, DESCRIPTION = $3, LAST_UPDATED = $4 WHERE TOKEN_ID = $5 AND CONTRACT = $6 AND DELETED = false;`)
-	checkNoErr(err)
-
-	updateMediaByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET MEDIA = $1, LAST_UPDATED = $2 WHERE TOKEN_ID = $3 AND CONTRACT = $4 AND DELETED = false;`)
-	checkNoErr(err)
-
-	updateMetadataFieldsByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET NAME = $1, DESCRIPTION = $2, LAST_UPDATED = $3 WHERE TOKEN_ID = $4 AND CONTRACT = $5 AND DELETED = false;`)
 	checkNoErr(err)
 
 	getContractByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID FROM contracts WHERE ADDRESS = $1 AND CHAIN = $2 AND DELETED = false;`)
@@ -106,27 +78,22 @@ func NewTokenGalleryRepository(db *sql.DB, queries *db.Queries) *TokenGalleryRep
 	checkNoErr(err)
 
 	return &TokenGalleryRepository{
-		db:                                     db,
-		queries:                                queries,
-		getByID:                                getByIDStmt,
-		getByUserIDStmt:                        getByUserIDStmt,
-		getByUserIDPaginateStmt:                getByUserIDPaginateStmt,
-		getByTokenIdentifiersStmt:              getByTokenIdentifiersStmt,
-		getByTokenIdentifiersPaginateStmt:      getByTokenIdentifiersPaginateStmt,
-		updateInfoStmt:                         updateInfoStmt,
-		updateMediaStmt:                        updateMediaStmt,
+		db:                                db,
+		queries:                           queries,
+		getByID:                           getByIDStmt,
+		getByUserIDStmt:                   getByUserIDStmt,
+		getByUserIDPaginateStmt:           getByUserIDPaginateStmt,
+		getByTokenIdentifiersStmt:         getByTokenIdentifiersStmt,
+		getByTokenIdentifiersPaginateStmt: getByTokenIdentifiersPaginateStmt,
+		updateInfoStmt:                    updateInfoStmt,
+
 		updateInfoByTokenIdentifiersUnsafeStmt: updateInfoByTokenIdentifiersUnsafeStmt,
-		updateAllURIDerivedFieldsByTokenIdentifiersUnsafeStmt: updateURIDerivedFieldsByTokenIdentifiersUnsafeStmt,
-		updateMediaByTokenIdentifiersUnsafeStmt:               updateMediaByTokenIdentifiersUnsafeStmt,
-		updateMetadataFieldsByTokenIdentifiersUnsafeStmt:      updateMetadataFieldsByTokenIdentifiersUnsafeStmt,
-		getByTokenIDStmt:                                    getByTokenIDStmt,
-		getByTokenIDPaginateStmt:                            getByTokenIDPaginateStmt,
-		getContractByAddressStmt:                            getContractByAddressStmt,
-		setTokensAsUserMarkedSpamStmt:                       setTokensAsUserMarkedSpamStmt,
-		checkOwnTokensStmt:                                  checkOwnTokensStmt,
-		getByFullIdentifiersStmt:                            getByFullIdentifiersStmt,
-		deleteTokensOfContractBeforeTimeStampStmt:           deleteTokensOfContractBeforeTimeStampStmt,
-		updateAllMetadataFieldsByTokenIdentifiersUnsafeStmt: updateAllMetadataFieldsByTokenIdentifiersUnsafeStmt,
+
+		getContractByAddressStmt:      getContractByAddressStmt,
+		setTokensAsUserMarkedSpamStmt: setTokensAsUserMarkedSpamStmt,
+		checkOwnTokensStmt:            checkOwnTokensStmt,
+
+		deleteTokensOfContractBeforeTimeStampStmt: deleteTokensOfContractBeforeTimeStampStmt,
 	}
 
 }
@@ -134,7 +101,7 @@ func NewTokenGalleryRepository(db *sql.DB, queries *db.Queries) *TokenGalleryRep
 // GetByID gets a token by its DBID
 func (t *TokenGalleryRepository) GetByID(pCtx context.Context, tokenID persist.DBID) (persist.TokenGallery, error) {
 	token := persist.TokenGallery{}
-	err := t.getByID.QueryRowContext(pCtx, tokenID).Scan(&token.ID, &token.CollectorsNote, &token.Media, &token.TokenMedia, &token.TokenMediaID, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerUserID, pq.Array(&token.OwnedByWallets), pq.Array(&token.OwnershipHistory), &token.TokenMetadata, &token.Contract, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated, &token.IsUserMarkedSpam, &token.IsProviderMarkedSpam)
+	err := t.getByID.QueryRowContext(pCtx, tokenID).Scan(&token.ID, &token.CollectorsNote, &token.TokenMedia, &token.TokenMediaID, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerUserID, pq.Array(&token.OwnedByWallets), pq.Array(&token.OwnershipHistory), &token.TokenMetadata, &token.Contract, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated, &token.IsUserMarkedSpam, &token.IsProviderMarkedSpam)
 	if err != nil {
 		return persist.TokenGallery{}, err
 	}
@@ -158,7 +125,7 @@ func (t *TokenGalleryRepository) GetByUserID(pCtx context.Context, pUserID persi
 	tokens := make([]persist.TokenGallery, 0, 10)
 	for rows.Next() {
 		token := persist.TokenGallery{}
-		if err := rows.Scan(&token.ID, &token.CollectorsNote, &token.Media, &token.TokenMediaID, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerUserID, pq.Array(&token.OwnedByWallets), pq.Array(&token.OwnershipHistory), &token.TokenMetadata, &token.Contract, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated, &token.IsUserMarkedSpam, &token.IsProviderMarkedSpam); err != nil {
+		if err := rows.Scan(&token.ID, &token.CollectorsNote, &token.TokenMedia, &token.TokenMediaID, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerUserID, pq.Array(&token.OwnedByWallets), pq.Array(&token.OwnershipHistory), &token.TokenMetadata, &token.Contract, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated, &token.IsUserMarkedSpam, &token.IsProviderMarkedSpam); err != nil {
 			return nil, err
 		}
 		tokens = append(tokens, token)
@@ -195,7 +162,7 @@ func (t *TokenGalleryRepository) GetByTokenIdentifiers(pCtx context.Context, pTo
 	tokens := make([]persist.TokenGallery, 0, 10)
 	for rows.Next() {
 		token := persist.TokenGallery{}
-		if err := rows.Scan(&token.ID, &token.CollectorsNote, &token.Media, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerUserID, pq.Array(&token.OwnedByWallets), pq.Array(&token.OwnershipHistory), &token.TokenMetadata, &token.Contract, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated, &token.IsUserMarkedSpam, &token.IsProviderMarkedSpam); err != nil {
+		if err := rows.Scan(&token.ID, &token.CollectorsNote, &token.TokenMedia, &token.TokenMediaID, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerUserID, pq.Array(&token.OwnedByWallets), pq.Array(&token.OwnershipHistory), &token.TokenMetadata, &token.Contract, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated, &token.IsUserMarkedSpam, &token.IsProviderMarkedSpam); err != nil {
 			return nil, err
 		}
 		tokens = append(tokens, token)
@@ -207,58 +174,6 @@ func (t *TokenGalleryRepository) GetByTokenIdentifiers(pCtx context.Context, pTo
 
 	if len(tokens) == 0 {
 		return nil, persist.ErrTokenGalleryNotFoundByIdentifiers{TokenID: pTokenID, ContractAddress: pContractAddress, Chain: pChain}
-	}
-
-	return tokens, nil
-}
-
-// GetByFullIdentifiers gets a token by its token ID and contract address and chain and owner user ID
-func (t *TokenGalleryRepository) GetByFullIdentifiers(pCtx context.Context, pTokenID persist.TokenID, pContractAddress persist.Address, pChain persist.Chain, pUserID persist.DBID) (persist.TokenGallery, error) {
-
-	var contractID persist.DBID
-	err := t.getContractByAddressStmt.QueryRowContext(pCtx, pContractAddress, pChain).Scan(&contractID)
-	if err != nil {
-		return persist.TokenGallery{}, err
-	}
-
-	token := persist.TokenGallery{}
-	err = t.getByFullIdentifiersStmt.QueryRowContext(pCtx, pTokenID, contractID, pUserID).Scan(&token.ID, &token.CollectorsNote, &token.Media, &token.TokenMedia, &token.TokenMediaID, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerUserID, pq.Array(&token.OwnedByWallets), pq.Array(&token.OwnershipHistory), &token.TokenMetadata, &token.Contract, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated, &token.IsUserMarkedSpam, &token.IsProviderMarkedSpam)
-	if err != nil {
-		return persist.TokenGallery{}, err
-	}
-
-	return token, nil
-}
-
-// GetByTokenID retrieves all tokens associated with a contract
-func (t *TokenGalleryRepository) GetByTokenID(pCtx context.Context, pTokenID persist.TokenID, limit int64, page int64) ([]persist.TokenGallery, error) {
-	var rows *sql.Rows
-	var err error
-	if limit > 0 {
-		rows, err = t.getByTokenIDPaginateStmt.QueryContext(pCtx, pTokenID, limit, page*limit)
-	} else {
-		rows, err = t.getByTokenIDStmt.QueryContext(pCtx, pTokenID)
-	}
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	tokens := make([]persist.TokenGallery, 0, 10)
-	for rows.Next() {
-		token := persist.TokenGallery{}
-		if err := rows.Scan(&token.ID, &token.CollectorsNote, &token.Media, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerUserID, pq.Array(&token.OwnedByWallets), pq.Array(&token.OwnershipHistory), &token.TokenMetadata, &token.Contract, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated, &token.IsUserMarkedSpam, &token.IsProviderMarkedSpam); err != nil {
-			return nil, err
-		}
-		tokens = append(tokens, token)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	if len(tokens) == 0 {
-		return nil, persist.ErrTokensNotFoundByTokenID{TokenID: pTokenID}
 	}
 
 	return tokens, nil
@@ -353,9 +268,7 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 		params.TokenID = append(params.TokenID, t.TokenID.String())
 		params.Quantity = append(params.Quantity, t.Quantity.String())
 		InsertHelpers.AppendAddressAtBlock(&params.OwnershipHistory, t.OwnershipHistory, &params.OwnershipHistoryStartIdx, &params.OwnershipHistoryEndIdx, &errors)
-		appendJSONB(&params.Media, t.Media, &errors)
 		appendJSONB(&params.FallbackMedia, t.FallbackMedia, &errors)
-		appendJSONB(&params.TokenMetadata, t.TokenMetadata, &errors)
 		params.ExternalUrl = append(params.ExternalUrl, t.ExternalURL.String())
 		params.BlockNumber = append(params.BlockNumber, t.BlockNumber.BigInt().Int64())
 		params.OwnerUserID = append(params.OwnerUserID, t.OwnerUserID.String())
@@ -410,8 +323,6 @@ func (t *TokenGalleryRepository) UpdateByID(pCtx context.Context, pID persist.DB
 	switch errTyp := pUpdate.(type) {
 	case persist.TokenUpdateInfoInput:
 		res, err = t.updateInfoStmt.ExecContext(pCtx, errTyp.CollectorsNote, errTyp.LastUpdated, pID, pUserID)
-	case persist.TokenUpdateAllURIDerivedFieldsInput:
-		res, err = t.updateMediaStmt.ExecContext(pCtx, errTyp.Media, errTyp.Metadata, errTyp.LastUpdated, pID, pUserID)
 
 	default:
 		return fmt.Errorf("unsupported update type: %T", pUpdate)
@@ -442,14 +353,6 @@ func (t *TokenGalleryRepository) UpdateByTokenIdentifiersUnsafe(pCtx context.Con
 	switch errTyp := pUpdate.(type) {
 	case persist.TokenUpdateInfoInput:
 		res, err = t.updateInfoByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, errTyp.CollectorsNote, errTyp.LastUpdated, pTokenID, contractID)
-	case persist.TokenUpdateAllURIDerivedFieldsInput:
-		res, err = t.updateAllURIDerivedFieldsByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, errTyp.Media, errTyp.Metadata, errTyp.Name, errTyp.Description, errTyp.LastUpdated, pTokenID, contractID)
-	case persist.TokenUpdateAllMetadataFieldsInput:
-		res, err = t.updateAllMetadataFieldsByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, errTyp.Metadata, errTyp.Name, errTyp.Description, errTyp.LastUpdated, pTokenID, contractID)
-	case persist.TokenUpdateMediaInput:
-		res, err = t.updateMediaByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, errTyp.Media, errTyp.LastUpdated, pTokenID, contractID)
-	case persist.TokenUpdateMetadataDerivedFieldsInput:
-		res, err = t.updateMetadataFieldsByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, errTyp.Name, errTyp.Description, errTyp.LastUpdated, pTokenID, contractID)
 	default:
 		return fmt.Errorf("unsupported update type: %T", pUpdate)
 	}

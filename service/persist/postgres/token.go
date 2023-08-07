@@ -14,29 +14,27 @@ import (
 
 // TokenRepository represents a postgres repository for tokens
 type TokenRepository struct {
-	db                                                   *sql.DB
-	getByWalletStmt                                      *sql.Stmt
-	getByWalletPaginateStmt                              *sql.Stmt
-	getOwnedByContractStmt                               *sql.Stmt
-	getOwnedByContractPaginateStmt                       *sql.Stmt
-	getByContractStmt                                    *sql.Stmt
-	getByContractPaginateStmt                            *sql.Stmt
-	getByTokenIdentifiersStmt                            *sql.Stmt
-	getByTokenIdentifiersPaginateStmt                    *sql.Stmt
-	getByIdentifiersStmt                                 *sql.Stmt
-	getExistsByTokenIdentifiersStmt                      *sql.Stmt
-	getMetadataByTokenIdentifiersStmt                    *sql.Stmt
-	updateOwnerUnsafeStmt                                *sql.Stmt
-	updateBalanceUnsafeStmt                              *sql.Stmt
-	updateURIByTokenIdentifiersStmt                      *sql.Stmt
-	updateAllMetadataDerivedFieldsByTokenIdentifiersStmt *sql.Stmt
-	updateMetadataFieldByTokenIdentifiersStmt            *sql.Stmt
-	mostRecentBlockStmt                                  *sql.Stmt
-	upsert721Stmt                                        *sql.Stmt
-	upsert1155Stmt                                       *sql.Stmt
-	deleteStmt                                           *sql.Stmt
-	deleteByIDStmt                                       *sql.Stmt
-	getURIByTokenIdentifiersStmt                         *sql.Stmt
+	db                                *sql.DB
+	getByWalletStmt                   *sql.Stmt
+	getByWalletPaginateStmt           *sql.Stmt
+	getOwnedByContractStmt            *sql.Stmt
+	getOwnedByContractPaginateStmt    *sql.Stmt
+	getByContractStmt                 *sql.Stmt
+	getByContractPaginateStmt         *sql.Stmt
+	getByTokenIdentifiersStmt         *sql.Stmt
+	getByTokenIdentifiersPaginateStmt *sql.Stmt
+	getByIdentifiersStmt              *sql.Stmt
+	getExistsByTokenIdentifiersStmt   *sql.Stmt
+	getMetadataByTokenIdentifiersStmt *sql.Stmt
+	updateOwnerUnsafeStmt             *sql.Stmt
+	updateBalanceUnsafeStmt           *sql.Stmt
+
+	mostRecentBlockStmt          *sql.Stmt
+	upsert721Stmt                *sql.Stmt
+	upsert1155Stmt               *sql.Stmt
+	deleteStmt                   *sql.Stmt
+	deleteByIDStmt               *sql.Stmt
+	getURIByTokenIdentifiersStmt *sql.Stmt
 }
 
 // NewTokenRepository creates a new TokenRepository
@@ -83,15 +81,6 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 	updateBalanceUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET QUANTITY = $1, BLOCK_NUMBER = $2, LAST_UPDATED = now() WHERE ID = $3;`)
 	checkNoErr(err)
 
-	updateURIByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET TOKEN_URI = $1, LAST_UPDATED = $2 WHERE TOKEN_ID = $3 AND CONTRACT_ADDRESS = $4;`)
-	checkNoErr(err)
-
-	updateAllMetadataDerivedFieldsByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET NAME = $1, DESCRIPTION = $2, LAST_UPDATED = $3 WHERE TOKEN_ID = $4 AND CONTRACT_ADDRESS = $5 AND DELETED = false;`)
-	checkNoErr(err)
-
-	updateMetadataFieldsByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET TOKEN_URI = $1, TOKEN_METADATA = $2, LAST_UPDATED = $3 WHERE TOKEN_ID = $4 AND CONTRACT_ADDRESS = $5 AND DELETED = false;`)
-	checkNoErr(err)
-
 	// TODO doing this here because this will get moved to sqlc later
 	mostRecentBlockStmt, err := db.PrepareContext(ctx, `SELECT MAX(LATEST_BLOCK) FROM contracts;`)
 	checkNoErr(err)
@@ -124,17 +113,14 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 		getMetadataByTokenIdentifiersStmt: getMetadataByTokenIdentifiersStmt,
 		updateOwnerUnsafeStmt:             updateOwnerUnsafeStmt,
 		updateBalanceUnsafeStmt:           updateBalanceUnsafeStmt,
-		updateURIByTokenIdentifiersStmt:   updateURIByTokenIdentifiersUnsafeStmt,
-		updateAllMetadataDerivedFieldsByTokenIdentifiersStmt: updateAllMetadataDerivedFieldsByTokenIdentifiersUnsafeStmt,
-		mostRecentBlockStmt:                       mostRecentBlockStmt,
-		upsert721Stmt:                             upsert721Stmt,
-		upsert1155Stmt:                            upsert1155Stmt,
-		deleteStmt:                                deleteStmt,
-		deleteByIDStmt:                            deleteByIDStmt,
-		getByIdentifiersStmt:                      getByIdentifiersStmt,
-		getExistsByTokenIdentifiersStmt:           getExistsByTokenIdentifiersStmt,
-		getURIByTokenIdentifiersStmt:              getURIByTokenIdentifiersStmt,
-		updateMetadataFieldByTokenIdentifiersStmt: updateMetadataFieldsByTokenIdentifiersUnsafeStmt,
+		mostRecentBlockStmt:               mostRecentBlockStmt,
+		upsert721Stmt:                     upsert721Stmt,
+		upsert1155Stmt:                    upsert1155Stmt,
+		deleteStmt:                        deleteStmt,
+		deleteByIDStmt:                    deleteByIDStmt,
+		getByIdentifiersStmt:              getByIdentifiersStmt,
+		getExistsByTokenIdentifiersStmt:   getExistsByTokenIdentifiersStmt,
+		getURIByTokenIdentifiersStmt:      getURIByTokenIdentifiersStmt,
 	}
 
 }
@@ -480,34 +466,6 @@ func (t *TokenRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUp
 	}
 	if rowsAffected == 0 {
 		return persist.ErrTokenNotFoundByID{ID: pID}
-	}
-	return nil
-}
-
-// UpdateByTokenIdentifiers updates a token by its token identifiers without checking if it is owned by any given user
-func (t *TokenRepository) UpdateByTokenIdentifiers(pCtx context.Context, pTokenID persist.TokenID, pContractAddress persist.EthereumAddress, pUpdate interface{}) error {
-	var res sql.Result
-	var err error
-	switch update := pUpdate.(type) {
-	// this all makes me feel sticky because it is not doubled up on the UpdateByID method, but I am assuming that this will all become irrelevant soon with the sqlc refactor by ezra
-	case persist.TokenUpdateURIInput:
-		res, err = t.updateURIByTokenIdentifiersStmt.ExecContext(pCtx, update.TokenURI, update.LastUpdated, pTokenID, pContractAddress)
-	case persist.TokenUpdateMetadataDerivedFieldsInput:
-		res, err = t.updateAllMetadataDerivedFieldsByTokenIdentifiersStmt.ExecContext(pCtx, update.Name, update.Description, update.LastUpdated, pTokenID, pContractAddress)
-	case persist.TokenUpdateMetadataFieldsInput:
-		res, err = t.updateMetadataFieldByTokenIdentifiersStmt.ExecContext(pCtx, update.TokenURI, update.Metadata, update.LastUpdated, pTokenID, pContractAddress)
-	default:
-		return fmt.Errorf("unsupported update type: %T", pUpdate)
-	}
-	if err != nil {
-		return err
-	}
-	rowsAffected, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if rowsAffected == 0 {
-		return persist.ErrTokenNotFoundByTokenIdentifiers{TokenID: pTokenID, ContractAddress: pContractAddress}
 	}
 	return nil
 }

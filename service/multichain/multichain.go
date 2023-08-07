@@ -707,9 +707,9 @@ func (p *Provider) prepTokensForTokenProcessing(ctx context.Context, tokensFromP
 
 		// Add already existing media to the provider token if it exists so that
 		// we can display media for a token while it gets handled by tokenprocessing
-		if !token.Media.IsServable() && existingToken.Media.IsServable() {
+		if !token.TokenMedia.IsServable() && existingToken.TokenMedia.IsServable() {
 			// TODO remove
-			providerTokens[i].Media = existingToken.Media
+			providerTokens[i].TokenMedia = existingToken.TokenMedia
 		}
 
 		if !token.FallbackMedia.IsServable() && existingToken.FallbackMedia.IsServable() {
@@ -718,9 +718,9 @@ func (p *Provider) prepTokensForTokenProcessing(ctx context.Context, tokensFromP
 
 		// There's no available media for the token at this point, so set the state to syncing
 		// so we can show the loading state instead of a broken token while tokenprocessing handles it.
-		if !exists && !token.Media.IsServable() {
+		if !exists && !token.TokenMedia.IsServable() {
 			// TODO remove
-			providerTokens[i].Media = persist.Media{MediaType: persist.MediaTypeSyncing}
+			providerTokens[i].TokenMedia = persist.Media{MediaType: persist.MediaTypeSyncing}
 		}
 
 		if !exists || existingToken.TokenMediaID == "" {

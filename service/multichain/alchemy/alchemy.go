@@ -366,21 +366,6 @@ func (d *Provider) getOwnersForContract(ctx context.Context, contract persist.Et
 	return result.Owners, nil
 }
 
-// // GetTokenMetadataByTokenIdentifiers retrieves a token's metadata for a given contract address and token ID
-// func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
-// 	tokens, _, err := d.getTokenWithMetadata(ctx, ti, false, 0)
-// 	if err != nil {
-// 		return persist.TokenMetadata{}, err
-// 	}
-
-// 	if len(tokens) == 0 {
-// 		return persist.TokenMetadata{}, fmt.Errorf("no token found for contract address %s and token ID %s", ti.ContractAddress, ti.TokenID)
-// 	}
-
-// 	token := tokens[0]
-// 	return token.TokenMetadata, nil
-// }
-
 func (d *Provider) getTokenWithMetadata(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, forceRefresh bool, timeout time.Duration) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	if timeout == 0 {
 		timeout = (time.Second * 20) / time.Millisecond
