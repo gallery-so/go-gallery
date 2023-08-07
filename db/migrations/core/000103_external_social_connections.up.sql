@@ -9,4 +9,4 @@ create table if not exists external_social_connections (
     deleted boolean not null default false
 );
 
-create unique index if not exists external_social_connections_social_account_type_follower_social_id_idx on external_social_connections (social_account_type, follower_social_id) where (deleted = false);
+create unique index if not exists external_social_connections_social_account_type_follower_id_idx on external_social_connections (social_account_type, follower_id) where (deleted = false);
