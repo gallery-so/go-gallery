@@ -4,6 +4,8 @@ It will not conform to our rules around breaking changes.
 """
 directive @experimental on FIELD_DEFINITION
 
+# This is a comment
+
 # Use @goField(forceResolver: true) to lazily handle recursive or expensive fields that shouldn't be
 # resolved unless the caller asks for them
 directive @goField(
