@@ -310,9 +310,8 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 
 	if !hasCursors {
 		calcFunc := func(ctx context.Context) ([]persist.FeedEntityType, []persist.DBID, error) {
-			trendData, err := api.queries.FeedEntityScoring(ctx, db.FeedEntityScoringParams{
+			trendData, err := api.queries.GetFeedEntityScores(ctx, db.GetFeedEntityScoresParams{
 				WindowEnd:           time.Now().Add(-time.Duration(3 * 24 * time.Hour)),
-				FeedEventEntityType: int32(persist.FeedEventTypeTag),
 				PostEntityType:      int32(persist.PostTypeTag),
 				ExcludedFeedActions: []string{string(persist.ActionUserCreated), string(persist.ActionUserFollowedUsers)},
 				IncludeViewer:       true,
@@ -321,7 +320,7 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 			if err != nil {
 				return nil, nil, err
 			}
-			entityTypes, entityIDs = api.scoreFeedEntities(ctx, trendData, func(e db.FeedEntityScoringRow) float64 {
+			entityTypes, entityIDs = api.scoreFeedEntities(ctx, trendData, func(e db.FeedEntityScore) float64 {
 				return timeFactor(e.CreatedAt, now) * engagementFactor(int(e.Interactions))
 			})
 			return entityTypes, entityIDs, nil
@@ -433,13 +432,12 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 	now := time.Now()
 
 	if !hasCursors {
-		trendData, err := api.queries.FeedEntityScoring(ctx, db.FeedEntityScoringParams{
+		trendData, err := api.queries.GetFeedEntityScores(ctx, db.GetFeedEntityScoresParams{
 			WindowEnd:           time.Now().Add(-time.Duration(7 * 24 * time.Hour)),
 			PostEntityType:      int32(persist.PostTypeTag),
-			FeedEventEntityType: int32(persist.FeedEventTypeTag),
 			ExcludedFeedActions: []string{string(persist.ActionUserCreated), string(persist.ActionUserFollowedUsers)},
 			IncludeViewer:       false,
-			ViewerID:            userID.String(),
+			ViewerID:            userID,
 			IncludePosts:        includePosts,
 		})
 		if err != nil {
@@ -450,7 +448,7 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 			p := userpref.For(ctx)
 			p.Mu.RLock()
 			defer p.Mu.RUnlock()
-			return api.scoreFeedEntities(ctx, trendData, func(e db.FeedEntityScoringRow) float64 {
+			return api.scoreFeedEntities(ctx, trendData, func(e db.FeedEntityScore) float64 {
 				return scoreFeedEntity(p, userID, e, now, int(e.Interactions))
 			})
 		}()
@@ -660,7 +658,7 @@ func loadFeedEntities(ctx context.Context, d *dataloader.Loaders, typs []persist
 	return entities, nil
 }
 
-func (api FeedAPI) scoreFeedEntities(ctx context.Context, trendData []db.FeedEntityScoringRow, scoreF func(db.FeedEntityScoringRow) float64) ([]persist.FeedEntityType, []persist.DBID) {
+func (api FeedAPI) scoreFeedEntities(ctx context.Context, trendData []db.FeedEntityScore, scoreF func(db.FeedEntityScore) float64) ([]persist.FeedEntityType, []persist.DBID) {
 	h := &heap{}
 
 	var wg sync.WaitGroup
@@ -714,7 +712,7 @@ func (api FeedAPI) scoreFeedEntities(ctx context.Context, trendData []db.FeedEnt
 	return entityTypes, entityIDs
 }
 
-func scoreFeedEntity(p *userpref.Personalization, viewerID persist.DBID, e db.FeedEntityScoringRow, t time.Time, interactions int) float64 {
+func scoreFeedEntity(p *userpref.Personalization, viewerID persist.DBID, e db.FeedEntityScore, t time.Time, interactions int) float64 {
 	timeF := timeFactor(e.CreatedAt, t)
 	engagementF := engagementFactor(interactions)
 	personalizationF, err := p.RelevanceTo(viewerID, e)

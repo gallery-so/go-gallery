@@ -32,7 +32,7 @@ func (s BucketStorer) Metadata(ctx context.Context, objName string) (*storage.Ob
 	return o.Attrs(ctx)
 }
 
-func (s BucketStorer) NewReader(ctx context.Context, objName string) (io.ReadCloser, error) {
+func (s BucketStorer) NewReader(ctx context.Context, objName string) (*storage.Reader, error) {
 	o := s.b.Object(objName)
 	return o.NewReader(ctx)
 }
