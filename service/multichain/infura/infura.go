@@ -129,11 +129,12 @@ func NewProvider(httpClient *http.Client) *Provider {
 }
 
 // GetBlockchainInfo retrieves blockchain info for ETH
-func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.BlockchainInfo, error) {
+func (d *Provider) GetBlockchainInfo() multichain.BlockchainInfo {
 	return multichain.BlockchainInfo{
-		Chain:   persist.ChainETH,
-		ChainID: 0,
-	}, nil
+		Chain:      persist.ChainETH,
+		ChainID:    0,
+		ProviderID: 2,
+	}
 }
 
 func (p *Provider) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {

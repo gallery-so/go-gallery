@@ -132,12 +132,13 @@ func NewProvider(httpClient *http.Client) *Provider {
 }
 
 // GetBlockchainInfo retrieves blockchain info for ETH
-func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.BlockchainInfo, error) {
+func (d *Provider) GetBlockchainInfo() multichain.BlockchainInfo {
 
 	return multichain.BlockchainInfo{
-		Chain:   persist.ChainZora,
-		ChainID: 7777777,
-	}, nil
+		Chain:      persist.ChainZora,
+		ChainID:    7777777,
+		ProviderID: 7,
+	}
 }
 
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the zora Blockchain

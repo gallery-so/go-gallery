@@ -145,11 +145,12 @@ func NewProvider(httpClient *http.Client, apiKey string, authToken string) *Prov
 }
 
 // GetBlockchainInfo retrieves blockchain info for ETH
-func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.BlockchainInfo, error) {
+func (d *Provider) GetBlockchainInfo() multichain.BlockchainInfo {
 	return multichain.BlockchainInfo{
-		Chain:   persist.ChainPOAP,
-		ChainID: 0,
-	}, nil
+		Chain:      persist.ChainPOAP,
+		ChainID:    0,
+		ProviderID: 6,
+	}
 }
 
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the Poap Blockchain

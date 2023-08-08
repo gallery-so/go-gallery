@@ -100,11 +100,12 @@ func NewObjktProvider(ipfsGatewayURL string) *TezosObjktProvider {
 	}
 }
 
-func (p *TezosObjktProvider) GetBlockchainInfo(ctx context.Context) (multichain.BlockchainInfo, error) {
+func (p *TezosObjktProvider) GetBlockchainInfo() multichain.BlockchainInfo {
 	return multichain.BlockchainInfo{
-		Chain:   persist.ChainTezos,
-		ChainID: 0,
-	}, nil
+		Chain:      persist.ChainTezos,
+		ChainID:    0,
+		ProviderID: 4,
+	}
 }
 
 func (p *TezosObjktProvider) RefreshToken(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, owner persist.Address) error {

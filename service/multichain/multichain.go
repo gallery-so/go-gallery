@@ -52,8 +52,9 @@ type Provider struct {
 
 // BlockchainInfo retrieves blockchain info from all chains
 type BlockchainInfo struct {
-	Chain   persist.Chain `json:"chain_name"`
-	ChainID int           `json:"chain_id"`
+	Chain      persist.Chain `json:"chain_name"`
+	ChainID    int           `json:"chain_id"`
+	ProviderID int           `json:"provider_id"`
 }
 
 // ChainAgnosticToken is a token that is agnostic to the chain it is on
@@ -144,7 +145,7 @@ type errWithPriority struct {
 
 // Configurer maintains provider settings
 type Configurer interface {
-	GetBlockchainInfo(context.Context) (BlockchainInfo, error)
+	GetBlockchainInfo() BlockchainInfo
 }
 
 // NameResolver is able to resolve an address to a friendly display name
@@ -205,7 +206,13 @@ type WalletOverrideMap = map[persist.Chain][]persist.Chain
 // providersMatchingInterface returns providers that adhere to the given interface
 func providersMatchingInterface[T any](providers []any) []T {
 	matches := make([]T, 0)
+	seen := map[int]bool{}
 	for _, p := range providers {
+		if it, ok := p.(Configurer); ok && seen[it.GetBlockchainInfo().ProviderID] {
+			continue
+		} else if ok {
+			seen[it.GetBlockchainInfo().ProviderID] = true
+		}
 		if it, ok := p.(T); ok {
 			matches = append(matches, it)
 		}
@@ -213,8 +220,8 @@ func providersMatchingInterface[T any](providers []any) []T {
 	return matches
 }
 
-// matchingProvidersByChain returns providers that adhere to the given interface by chain
-func matchingProvidersByChain[T any](availableProviders map[persist.Chain][]any, requestedChains ...persist.Chain) map[persist.Chain][]T {
+// matchingProvidersByChains returns providers that adhere to the given interface by chain
+func matchingProvidersByChains[T any](availableProviders map[persist.Chain][]any, requestedChains ...persist.Chain) map[persist.Chain][]T {
 	matches := make(map[persist.Chain][]T, 0)
 	for _, chain := range requestedChains {
 		matching := providersMatchingInterface[T](availableProviders[chain])
@@ -224,7 +231,7 @@ func matchingProvidersByChain[T any](availableProviders map[persist.Chain][]any,
 }
 
 func matchingProvidersForChain[T any](availableProviders map[persist.Chain][]any, chain persist.Chain) []T {
-	return matchingProvidersByChain[T](availableProviders, chain)[chain]
+	return matchingProvidersByChains[T](availableProviders, chain)[chain]
 }
 
 // matchingWallets returns wallet addresses that belong to any of the passed chains
@@ -622,7 +629,7 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 		}
 	}
 
-	fetchers := matchingProvidersByChain[ChildContractFetcher](p.Chains, chains...)
+	fetchers := matchingProvidersByChains[ChildContractFetcher](p.Chains, chains...)
 	searchAddresses := p.matchingWallets(user.Wallets, chains)
 	providerPool := pool.NewWithResults[ProviderChildContractResult]().WithContext(ctx).WithCancelOnError()
 
@@ -1289,7 +1296,7 @@ func (p *Provider) SyncContractsOwnedByUser(ctx context.Context, userID persist.
 	}
 	contractsFromProviders := []chainContracts{}
 
-	contractFetchers := matchingProvidersByChain[ContractsFetcher](p.Chains, chains...)
+	contractFetchers := matchingProvidersByChains[ContractsFetcher](p.Chains, chains...)
 	searchAddresses := p.matchingWallets(user.Wallets, chains)
 	providerPool := pool.NewWithResults[ContractOwnerResult]().WithContext(ctx).WithCancelOnError()
 
