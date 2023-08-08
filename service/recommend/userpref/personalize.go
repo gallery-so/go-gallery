@@ -260,7 +260,6 @@ func (p *Personalization) update(ctx context.Context) {
 	}
 
 	if err == storage.ErrObjectNotExist {
-		logger.For(ctx).Infof("no data found in cache, updating the cache")
 		p.updateCache(ctx)
 		return
 	}
@@ -279,31 +278,35 @@ func (p *Personalization) update(ctx context.Context) {
 	}
 
 	if curObj.Updated.Before(staleAt) {
-		logger.For(ctx).Infof("cached data is stale, updating the cache")
 		p.updateCache(ctx)
 		return
 	}
 
-	logger.For(ctx).Infof("personalization data is stale, reading from cache")
 	p.readCache(ctx)
 }
 
 func (p *Personalization) readCache(ctx context.Context) {
+	logger.For(ctx).Infof("personalization data is stale, reading from cache")
+	now := time.Now()
 	r, err := p.b.NewReader(ctx, gcpObjectName)
 	check(err)
 	defer r.Close()
 	var m personalizationMatrices
 	m.UnmarshalBinaryFrom(r)
 	p.updateMatrices(&m)
+	logger.For(ctx).Infof("took %s to read from cache", time.Since(now))
 }
 
 func (p *Personalization) updateCache(ctx context.Context) {
+	logger.For(ctx).Infof("no data found in cache, updating the cache")
+	now := time.Now()
 	m := readMatrices(ctx, p.q)
 	b, err := m.MarshalBinary()
 	check(err)
 	_, err = p.b.WriteGzip(ctx, gcpObjectName, b, store.ObjAttrsOptions.WithContentType("application/octet-stream"))
 	check(err)
 	p.updateMatrices(&m)
+	logger.For(ctx).Infof("took %s to update the cache", time.Since(now))
 }
 
 // calcSocialScore determines if vIdx is in the same friend circle as qIdx by running a bfs on userM
