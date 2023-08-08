@@ -4264,6 +4264,55 @@ func (q *Queries) GetUsersByPositionPaginate(ctx context.Context, arg GetUsersBy
 	return items, nil
 }
 
+const getUsersBySocialIDs = `-- name: GetUsersBySocialIDs :many
+select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, pii_email_address, pii_socials from pii.user_view u where u.pii_socials->$1::varchar->>'id' = any($2::varchar[]) and not u.deleted and not u.universal
+`
+
+type GetUsersBySocialIDsParams struct {
+	SocialAccountType string   `json:"social_account_type"`
+	SocialIds         []string `json:"social_ids"`
+}
+
+func (q *Queries) GetUsersBySocialIDs(ctx context.Context, arg GetUsersBySocialIDsParams) ([]PiiUserView, error) {
+	rows, err := q.db.Query(ctx, getUsersBySocialIDs, arg.SocialAccountType, arg.SocialIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PiiUserView
+	for rows.Next() {
+		var i PiiUserView
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Username,
+			&i.UsernameIdempotent,
+			&i.Wallets,
+			&i.Bio,
+			&i.Traits,
+			&i.Universal,
+			&i.NotificationSettings,
+			&i.EmailVerified,
+			&i.EmailUnsubscriptions,
+			&i.FeaturedGallery,
+			&i.PrimaryWalletID,
+			&i.UserExperiences,
+			&i.PiiEmailAddress,
+			&i.PiiSocials,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getUsersByWalletAddressesAndChains = `-- name: GetUsersByWalletAddressesAndChains :many
 WITH params AS (
     SELECT unnest($1::varchar[]) as address, unnest($2::int[]) as chain
@@ -4793,6 +4842,51 @@ func (q *Queries) HasLaterGroupedEvent(ctx context.Context, arg HasLaterGroupedE
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const insertExternalSocialConnectionsForUser = `-- name: InsertExternalSocialConnectionsForUser :many
+insert into external_social_connections (id, social_account_type, follower_id, followee_id) select (id, social_account_type, follower_id, followee_id) from (select unnest($1::varchar[]) as id, $2::varchar as social_account_type, $3::varchar as follower_id, unnest($4::varchar[]) as followee_id) bulk_insert returning id, version, social_account_type, follower_id, followee_id, created_at, last_updated, deleted
+`
+
+type InsertExternalSocialConnectionsForUserParams struct {
+	Ids               []string `json:"ids"`
+	SocialAccountType string   `json:"social_account_type"`
+	FollowerID        string   `json:"follower_id"`
+	FolloweeIds       []string `json:"followee_ids"`
+}
+
+func (q *Queries) InsertExternalSocialConnectionsForUser(ctx context.Context, arg InsertExternalSocialConnectionsForUserParams) ([]ExternalSocialConnection, error) {
+	rows, err := q.db.Query(ctx, insertExternalSocialConnectionsForUser,
+		arg.Ids,
+		arg.SocialAccountType,
+		arg.FollowerID,
+		arg.FolloweeIds,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ExternalSocialConnection
+	for rows.Next() {
+		var i ExternalSocialConnection
+		if err := rows.Scan(
+			&i.ID,
+			&i.Version,
+			&i.SocialAccountType,
+			&i.FollowerID,
+			&i.FolloweeID,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Deleted,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const insertPost = `-- name: InsertPost :one

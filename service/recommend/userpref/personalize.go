@@ -278,16 +278,14 @@ func (p *Personalization) update(ctx context.Context) {
 		return
 	}
 
-	checkOK(curObj != nil, "curObj is unexpectedly nil")
-
-	if staleAt.After(curObj.Updated) {
-		logger.For(ctx).Infof("personalization data is stale, reading from cache")
-		p.readCache(ctx)
+	if curObj.Updated.Before(staleAt) {
+		logger.For(ctx).Infof("cached data is stale, updating the cache")
+		p.updateCache(ctx)
 		return
 	}
 
-	logger.For(ctx).Infof("cached data is stale, updating the cache")
-	p.updateCache(ctx)
+	logger.For(ctx).Infof("personalization data is stale, reading from cache")
+	p.readCache(ctx)
 }
 
 func (p *Personalization) readCache(ctx context.Context) {
@@ -328,7 +326,7 @@ func calcRelevanceScore(ratingM, displayM *sparse.CSR, vIdx, cIdx int) float64 {
 			t = s
 		}
 	})
-	return t / 0.05
+	return t
 }
 
 // calcSimilarityScore computes the similarity of vIdx and qIdx based on their interactions with other users
