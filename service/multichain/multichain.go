@@ -208,13 +208,24 @@ func providersMatchingInterface[T any](providers []any) []T {
 	matches := make([]T, 0)
 	seen := map[int]bool{}
 	for _, p := range providers {
-		if it, ok := p.(Configurer); ok && seen[it.GetBlockchainInfo().ProviderID] {
+
+		if conf, ok := p.(Configurer); ok && seen[conf.GetBlockchainInfo().ProviderID] {
 			continue
 		} else if ok {
-			seen[it.GetBlockchainInfo().ProviderID] = true
+			seen[conf.GetBlockchainInfo().ProviderID] = true
 		}
-		if it, ok := p.(T); ok {
-			matches = append(matches, it)
+
+		if match, ok := p.(T); ok {
+			matches = append(matches, match)
+
+			// if the provider has subproviders, make sure we don't add them later
+			if ps, ok := p.(ProviderSupplier); ok {
+				for _, sp := range ps.GetSubproviders() {
+					if conf, ok := sp.(Configurer); ok {
+						seen[conf.GetBlockchainInfo().ProviderID] = true
+					}
+				}
+			}
 		}
 	}
 	return matches
