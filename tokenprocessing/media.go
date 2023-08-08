@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
@@ -1069,7 +1070,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 			result = append(result, liveObj)
 		}
 
-	} else if mediaType == persist.MediaTypeSVG {
+	} else if mediaType == persist.MediaTypeSVG && tids.ContractAddress != eth.PunkAddress {
 		timeBeforeCache := time.Now()
 		obj, err := rasterizeAndCacheSVGMedia(pCtx, obj.storageURL(bucket), tids, bucket, mediaURL, httpClient, storageClient, subMeta)
 		if err != nil {
