@@ -24,6 +24,12 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
+const (
+	engagementWeight      = 1.0
+	personalizationWeight = 1.0
+	timeWeight            = 1.0
+)
+
 type FeedAPI struct {
 	repos     *postgres.Repositories
 	queries   *db.Queries
@@ -321,7 +327,7 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 				return nil, nil, err
 			}
 			entityTypes, entityIDs = api.scoreFeedEntities(ctx, trendData, func(e db.FeedEntityScore) float64 {
-				return timeFactor(e.CreatedAt, now) * engagementFactor(int(e.Interactions))
+				return (timeWeight * timeFactor(e.CreatedAt, now)) * (engagementWeight * engagementFactor(int(e.Interactions)))
 			})
 			return entityTypes, entityIDs, nil
 		}
@@ -720,17 +726,17 @@ func scoreFeedEntity(p *userpref.Personalization, viewerID persist.DBID, e db.Fe
 		// Use a default value of 0.1 so that it isn't completely penalized because of missing data.
 		personalizationF = 0.1
 	}
-	return timeF * (1 + engagementF) * (1 + personalizationF)
+	return (timeWeight * timeF) * (1 + (engagementWeight * engagementF)) * (1 + (personalizationWeight * personalizationF))
 }
 
 func timeFactor(t0, t1 time.Time) float64 {
-	lambda := 1.0 / 100_000
-	age := t1.Sub(t0).Seconds()
-	return 1 * math.Pow(math.E, (-lambda*age))
+	lambda := 0.0005
+	age := t1.Sub(t0).Minutes()
+	return math.Pow(math.E, (-lambda * age))
 }
 
 func engagementFactor(interactions int) float64 {
-	return float64(interactions)
+	return 4 * math.Log1p(float64(interactions))
 }
 
 type priorityNode interface {

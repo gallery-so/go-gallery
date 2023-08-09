@@ -24,8 +24,10 @@ import (
 )
 
 const (
-	contextKey    = "personalization.instance"
-	gcpObjectName = "personalization_matrices.bin.gz"
+	contextKey      = "personalization.instance"
+	gcpObjectName   = "personalization_matrices.bin.gz"
+	edgeWeight      = 1.0
+	relevanceWeight = 1.0
 )
 
 var ErrNoInputData = errors.New("no personalization input data")
@@ -208,7 +210,7 @@ func (p *Personalization) RelevanceTo(userID persist.DBID, e db.FeedEntityScore)
 	}
 
 	edgeScore, _ := p.scoreEdge(userID, e.ActorID)
-	return relevanceScore + edgeScore, nil
+	return (relevanceWeight * (relevanceScore / 0.05)) + (edgeWeight * edgeScore), nil
 }
 
 func (p *Personalization) scoreEdge(viewerID, queryID persist.DBID) (float64, error) {
