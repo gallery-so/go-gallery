@@ -253,7 +253,9 @@ func (t *TokenGalleryRepository) GetByContractID(pCtx context.Context, pContract
 type TokenUpsertParams struct {
 	SetCreatorFields bool
 	SetHolderFields  bool
-	OptionalDelete   *TokenUpsertDeletionParams
+
+	// If OptionalDelete is nil, no delete will be performed
+	OptionalDelete *TokenUpsertDeletionParams
 }
 
 type TokenUpsertDeletionParams struct {
