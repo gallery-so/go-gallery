@@ -256,9 +256,9 @@ func (p *Personalization) updateMatrices(m *personalizationMatrices) {
 }
 
 func (p *Personalization) update(ctx context.Context) {
-	_, err := p.b.Metadata(ctx, gcpObjectName)
-	if err != nil && err != storage.ErrObjectNotExist {
-		panic(err)
+	exists, err := p.b.Exists(ctx, gcpObjectName)
+	if !exists || err != nil {
+		panic(fmt.Sprintf("personalization data does not exist: %s", err))
 	}
 
 	if p.pM == nil {

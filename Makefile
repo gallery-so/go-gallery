@@ -219,10 +219,16 @@ $(DEPLOY)-$(PROD)-check-push-tickets   : URI_NAME       := pushnotifications
 
 # Cloud Jobs
 $(DEPLOY)-%-userpref-job               : JOB_NAME       := userpref-upload
-$(DEPLOY)-%-userpref-job               : BASE_OPTIONS   := --tasks 1 --task-timeout 10m --parallelism 1 $(COMMAND)
+$(DEPLOY)-%-userpref-job               : BASE_OPTIONS   := --tasks 1 --task-timeout 10m --parallelism 1 $(COMMAND) --cpu 1 --memory 2G
 $(DEPLOY)-%-userpref-job               : REGION         := $(DEPLOY_REGION)
 $(DEPLOY)-%-userpref-job               : REPO           := backend
-$(DEPLOY)-$(DEV)-userpref-job          : JOB_OPTIONS    = $(BASE_OPTIONS) --command cmd/userpref/main.go --args dev-user-pref,personalization_matrices.bin.gz
+$(DEPLOY)-%-userpref-job               : CRON_PREFIX    := userpref-schedule
+$(DEPLOY)-%-userpref-job               : CRON_LOCATION  := $(DEPLOY_REGION)
+$(DEPLOY)-%-userpref-job               : CRON_SCHEDULE  := '0 * * * *'
+$(DEPLOY)-%-userpref-job               : CRON_URI       := https://$(DEPLOY_REGION)-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/$(GCP_PROJECT)/jobs/$(JOB_NAME):run
+$(DEPLOY)-%-userpref-job               : CRON_METHOD    := POST
+$(DEPLOY)-$(DEV)-userpref-job          : JOB_OPTIONS    = $(BASE_OPTIONS) --command ./cmd/userpref/main.go --args dev-user-pref,personalization_matrices.bin.gz
+$(DEPLOY)-$(PROD)-userpref-job         : JOB_OPTIONS    = $(BASE_OPTIONS) --command ./cmd/userpref/main.go --args prod-user-pref,personalization_matrices.bin.gz
 
 # Service name mappings
 $(PROMOTE)-%-backend                   : SERVICE := default
@@ -363,7 +369,7 @@ $(DEPLOY)-$(DEV)-routing-rules      : _set-project-$(ENV) _$(DEPLOY)-routing-rul
 $(DEPLOY)-$(DEV)-graphql-gateway    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-graphql-gateway
 $(DEPLOY)-$(DEV)-alchemy-spam       : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-alchemy-spam _$(CRON)-$(PAUSE)-alchemy-spam
 $(DEPLOY)-$(DEV)-check-push-tickets : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-check-push-tickets _$(CRON)-$(PAUSE)-check-push-tickets
-$(DEPLOY)-$(DEV)-userpref-job       : _set-project-$(ENV) _$(JOB)-$(DEPLOY)-userpref-job
+$(DEPLOY)-$(DEV)-userpref-job       : _set-project-$(ENV) _$(JOB)-$(DEPLOY)-userpref-job _$(CRON)-$(DEPLOY)-userpref-job _$(CRON)-$(PAUSE)-userpref-job
 
 # SANDBOX deployments
 $(DEPLOY)-$(SANDBOX)-backend      : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend # go server that uses dev upstream services
@@ -383,6 +389,7 @@ $(DEPLOY)-$(PROD)-routing-rules      : _set-project-$(ENV) _$(DEPLOY)-routing-ru
 $(DEPLOY)-$(PROD)-graphql-gateway    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-graphql-gateway
 $(DEPLOY)-$(PROD)-alchemy-spam       : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-alchemy-spam _$(CRON)-$(PAUSE)-alchemy-spam
 $(DEPLOY)-$(PROD)-check-push-tickets : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-check-push-tickets _$(CRON)-$(PAUSE)-check-push-tickets
+$(DEPLOY)-$(PROD)-userpref-job       : _set-project-$(ENV) _$(JOB)-$(DEPLOY)-userpref-job _$(CRON)-$(DEPLOY)-userpref-job _$(CRON)-$(PAUSE)-userpref-job
 
 # PROD promotions. Running these targets will migrate traffic to the specified version.
 # Example usage:
