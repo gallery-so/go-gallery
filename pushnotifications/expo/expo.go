@@ -102,25 +102,11 @@ func getErrorFromDetails(ctx context.Context, details map[string]any, knownError
 		return err
 	}
 
-	messageStr := ""
-	if message, ok := details["message"]; ok {
-		if messageStr, ok = message.(string); ok {
-			logger.For(ctx).Infof("found details for error %s: %s", code, messageStr)
-		}
-	}
-
-	err := findErrorByCode(code, knownErrors)
-
-	if err != nil {
+	if err := findErrorByCode(code, knownErrors); err != nil {
 		return err
 	}
 
-	errStr := "unknown error: " + code
-	if messageStr != "" {
-		errStr += " (" + messageStr + ")"
-	}
-
-	return errors.New(errStr)
+	return errors.New("unknown error: " + code)
 }
 
 // GetError gets the error for the ticket, if any. Returns nil if no error.
@@ -130,9 +116,19 @@ func (t PushTicket) GetError(ctx context.Context) error {
 		return nil
 	}
 
-	return getErrorFromDetails(ctx, t.Details, []*PushError{
+	err := getErrorFromDetails(ctx, t.Details, []*PushError{
 		ErrDeviceNotRegistered,
 	})
+
+	responsePayload := map[string]any{
+		"status":  t.Status,
+		"message": t.Message,
+		"details": t.Details,
+	}
+
+	logger.For(ctx).WithField("responsePayload", responsePayload).Infof("Push send error: %s", err)
+
+	return err
 }
 
 // GetError gets the error for the receipt, if any. Returns nil if no error.
@@ -142,13 +138,23 @@ func (t PushReceipt) GetError(ctx context.Context) error {
 		return nil
 	}
 
-	return getErrorFromDetails(ctx, t.Details, []*PushError{
+	err := getErrorFromDetails(ctx, t.Details, []*PushError{
 		ErrDeviceNotRegistered,
 		ErrMessageTooBig,
 		ErrMessageRateExceeded,
 		ErrMismatchSenderId,
 		ErrInvalidCredentials,
 	})
+
+	responsePayload := map[string]any{
+		"status":  t.Status,
+		"message": t.Message,
+		"details": t.Details,
+	}
+
+	logger.For(ctx).WithField("responsePayload", responsePayload).Infof("Push receipt error: %s", err)
+
+	return err
 }
 
 func (r *SendMessagesResponse) GetError() error {

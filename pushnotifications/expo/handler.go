@@ -191,13 +191,17 @@ func (h *PushNotificationHandler) sendMessageBatch(messages []PushMessage) []err
 	for i, response := range responses {
 		message := sendableMessages[i]
 
+		responseCtx := logger.NewContextWithFields(ctx, logrus.Fields{
+			"pushTicketID": response.TicketID,
+		})
+
 		// Get this message's position in the original slice of messages and use that for error indexing
 		errIndex := dbidToMessageIndex[message.pushTokenID]
-		e := response.GetError(ctx)
+		e := response.GetError(responseCtx)
 		errs[errIndex] = e
 
 		if e == ErrDeviceNotRegistered {
-			logger.For(ctx).WithError(e).Infof("Unregistering push token with DBID: %s", message.pushTokenID)
+			logger.For(responseCtx).WithError(e).Infof("Unregistering push token with DBID: %s", message.pushTokenID)
 			tokensToUnregister = append(tokensToUnregister, message.pushTokenID)
 		} else if e == nil {
 			ticketDBIDs = append(ticketDBIDs, persist.GenerateID().String())
