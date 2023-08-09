@@ -7,9 +7,52 @@ package coredb
 
 import (
 	"context"
+	"database/sql"
+	"time"
 
 	"github.com/jackc/pgtype"
 )
+
+const deleteTokensBeforeTimestamp = `-- name: DeleteTokensBeforeTimestamp :execrows
+update tokens t
+set owned_by_wallets = case when $1::bool then '{}' else owned_by_wallets end,
+    is_creator_token = case when $2::bool then false else is_creator_token end,
+    last_updated = now()
+where
+  -- Guard against only_from_user_id and only_from_contract_ids both being null/empty, as this would
+  -- result in deleting more tokens than intended.
+  ($3::text is not null or cardinality($4::text[]) > 0)
+  and ($3 is null or owner_user_id = $3)
+  and (cardinality($4) = 0 or contract = any($4))
+  and (cardinality($5::int[]) = 0 or chain = any($5))
+  and deleted = false
+  and (($1 and is_holder_token) or ($2 and is_creator_token))
+  and last_synced < $6
+`
+
+type DeleteTokensBeforeTimestampParams struct {
+	RemoveHolderStatus  bool           `json:"remove_holder_status"`
+	RemoveCreatorStatus bool           `json:"remove_creator_status"`
+	OnlyFromUserID      sql.NullString `json:"only_from_user_id"`
+	OnlyFromContractIds []string       `json:"only_from_contract_ids"`
+	OnlyFromChains      []int32        `json:"only_from_chains"`
+	Timestamp           time.Time      `json:"timestamp"`
+}
+
+func (q *Queries) DeleteTokensBeforeTimestamp(ctx context.Context, arg DeleteTokensBeforeTimestampParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteTokensBeforeTimestamp,
+		arg.RemoveHolderStatus,
+		arg.RemoveCreatorStatus,
+		arg.OnlyFromUserID,
+		arg.OnlyFromContractIds,
+		arg.OnlyFromChains,
+		arg.Timestamp,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
 
 const upsertTokens = `-- name: UpsertTokens :many
 insert into tokens

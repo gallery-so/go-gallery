@@ -1499,6 +1499,14 @@ where u.id = @user_id
   and c.deleted = false
   and w.deleted = false
   and c.override_creator_user_id is null
+  and (not @new_contracts_only::bool or not exists(
+    select 1 from tokens t
+        where t.owner_user_id = @user_id
+          and t.contract = c.id
+          and t.is_creator_token
+          and not t.deleted
+        )
+    )
 
 union all
 
@@ -1508,7 +1516,15 @@ select sqlc.embed(c),
 from contracts c
 where c.override_creator_user_id = @user_id
   and c.chain = any(@chains::int[])
-  and c.deleted = false;
+  and c.deleted = false
+  and (not @new_contracts_only::bool or not exists(
+    select 1 from tokens t
+        where t.owner_user_id = @user_id
+          and t.contract = c.id
+          and t.is_creator_token
+          and not t.deleted
+        )
+    );
 
 -- name: RemoveWalletFromTokens :exec
 update tokens t
@@ -1533,14 +1549,3 @@ update tokens
       and is_creator_token = true
       and not exists(select 1 from created_contracts where created_contracts.contract_id = tokens.contract)
       and not deleted;
-
--- name: DeleteTokensOfOwnerBeforeTimestamp :execrows
-update tokens t
-    set owned_by_wallets = case when @remove_holder_status::bool then '{}' else owned_by_wallets end,
-        is_creator_token = case when @remove_creator_status::bool then false else is_creator_token end,
-        last_updated = now()
-    where owner_user_id = @user_id
-      and (cardinality(@chains::int[]) = 0 or chain = any(@chains))
-      and deleted = false
-      and ((@remove_holder_status and is_holder_token) or (@remove_creator_status and is_creator_token))
-      and last_synced < @timestamp;

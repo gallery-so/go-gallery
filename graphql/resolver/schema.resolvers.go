@@ -972,19 +972,29 @@ func (r *mutationResolver) SyncTokens(ctx context.Context, chains []persist.Chai
 	return output, nil
 }
 
-// SyncCreatedTokens is the resolver for the syncCreatedTokens field.
-func (r *mutationResolver) SyncCreatedTokens(ctx context.Context, input model.SyncCreatedTokensInput) (model.SyncCreatedTokensPayloadOrError, error) {
+// SyncCreatedTokensForNewContracts is the resolver for the syncCreatedTokensForNewContracts field.
+func (r *mutationResolver) SyncCreatedTokensForNewContracts(ctx context.Context, input model.SyncCreatedTokensForNewContractsInput) (model.SyncCreatedTokensForNewContractsPayloadOrError, error) {
 	chains := input.IncludeChains
 	if input.IncludeChains == nil || len(input.IncludeChains) == 0 {
 		chains = persist.AllChains
 	}
 
-	err := publicapi.For(ctx).Token.SyncCreatedTokens(ctx, chains)
+	err := publicapi.For(ctx).Token.SyncCreatedTokensForNewContracts(ctx, chains)
 	if err != nil {
 		return nil, err
 	}
 
-	return &model.SyncCreatedTokensPayload{Viewer: resolveViewer(ctx)}, nil
+	return &model.SyncCreatedTokensForNewContractsPayload{Viewer: resolveViewer(ctx)}, nil
+}
+
+// SyncCreatedTokensForExistingContract is the resolver for the syncCreatedTokensForExistingContract field.
+func (r *mutationResolver) SyncCreatedTokensForExistingContract(ctx context.Context, input model.SyncCreatedTokensForExistingContractInput) (model.SyncCreatedTokensForExistingContractPayloadOrError, error) {
+	err := publicapi.For(ctx).Token.SyncCreatedTokensForExistingContract(ctx, input.ContractID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.SyncCreatedTokensForExistingContractPayload{Viewer: resolveViewer(ctx)}, nil
 }
 
 // RefreshToken is the resolver for the refreshToken field.

@@ -1028,40 +1028,6 @@ func (q *Queries) DeletePushTokensByIDs(ctx context.Context, ids persist.DBIDLis
 	return err
 }
 
-const deleteTokensOfOwnerBeforeTimestamp = `-- name: DeleteTokensOfOwnerBeforeTimestamp :execrows
-update tokens t
-    set owned_by_wallets = case when $1::bool then '{}' else owned_by_wallets end,
-        is_creator_token = case when $2::bool then false else is_creator_token end,
-        last_updated = now()
-    where owner_user_id = $3
-      and (cardinality($4::int[]) = 0 or chain = any($4))
-      and deleted = false
-      and (($1 and is_holder_token) or ($2 and is_creator_token))
-      and last_synced < $5
-`
-
-type DeleteTokensOfOwnerBeforeTimestampParams struct {
-	RemoveHolderStatus  bool         `json:"remove_holder_status"`
-	RemoveCreatorStatus bool         `json:"remove_creator_status"`
-	UserID              persist.DBID `json:"user_id"`
-	Chains              []int32      `json:"chains"`
-	Timestamp           time.Time    `json:"timestamp"`
-}
-
-func (q *Queries) DeleteTokensOfOwnerBeforeTimestamp(ctx context.Context, arg DeleteTokensOfOwnerBeforeTimestampParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteTokensOfOwnerBeforeTimestamp,
-		arg.RemoveHolderStatus,
-		arg.RemoveCreatorStatus,
-		arg.UserID,
-		arg.Chains,
-		arg.Timestamp,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
 const deleteUserByID = `-- name: DeleteUserByID :exec
 update users set deleted = true where id = $1
 `
@@ -1826,6 +1792,14 @@ where u.id = $1
   and c.deleted = false
   and w.deleted = false
   and c.override_creator_user_id is null
+  and (not $3::bool or not exists(
+    select 1 from tokens t
+        where t.owner_user_id = $1
+          and t.contract = c.id
+          and t.is_creator_token
+          and not t.deleted
+        )
+    )
 
 union all
 
@@ -1836,11 +1810,20 @@ from contracts c
 where c.override_creator_user_id = $1
   and c.chain = any($2::int[])
   and c.deleted = false
+  and (not $3::bool or not exists(
+    select 1 from tokens t
+        where t.owner_user_id = $1
+          and t.contract = c.id
+          and t.is_creator_token
+          and not t.deleted
+        )
+    )
 `
 
 type GetCreatedContractsByUserIDParams struct {
-	UserID persist.DBID `json:"user_id"`
-	Chains []int32      `json:"chains"`
+	UserID           persist.DBID `json:"user_id"`
+	Chains           []int32      `json:"chains"`
+	NewContractsOnly bool         `json:"new_contracts_only"`
 }
 
 type GetCreatedContractsByUserIDRow struct {
@@ -1850,7 +1833,7 @@ type GetCreatedContractsByUserIDRow struct {
 }
 
 func (q *Queries) GetCreatedContractsByUserID(ctx context.Context, arg GetCreatedContractsByUserIDParams) ([]GetCreatedContractsByUserIDRow, error) {
-	rows, err := q.db.Query(ctx, getCreatedContractsByUserID, arg.UserID, arg.Chains)
+	rows, err := q.db.Query(ctx, getCreatedContractsByUserID, arg.UserID, arg.Chains, arg.NewContractsOnly)
 	if err != nil {
 		return nil, err
 	}
