@@ -127,6 +127,17 @@ type Event struct {
 	PostID         persist.DBID         `json:"post_id"`
 }
 
+type ExternalSocialConnection struct {
+	ID                persist.DBID `json:"id"`
+	Version           int32        `json:"version"`
+	SocialAccountType string       `json:"social_account_type"`
+	FollowerID        persist.DBID `json:"follower_id"`
+	FolloweeID        persist.DBID `json:"followee_id"`
+	CreatedAt         time.Time    `json:"created_at"`
+	LastUpdated       time.Time    `json:"last_updated"`
+	Deleted           bool         `json:"deleted"`
+}
+
 type FeedBlocklist struct {
 	ID          persist.DBID   `json:"id"`
 	UserID      persist.DBID   `json:"user_id"`
