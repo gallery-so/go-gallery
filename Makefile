@@ -19,7 +19,7 @@ JOB                  := job
 DEPLOY_VERSION       := $(CURRENT_BRANCH)-$(CURRENT_COMMIT_HASH)
 SET_GCP_PROJECT      = gcloud config set project $(GCP_PROJECT)
 CLOUD_RUN_DEPLOY     = sops exec-file $(CONFIG_DIR)/$(SERVICE_FILE) 'gcloud run deploy $(DEPLOY_FLAGS) $(SERVICE) --env-vars-file {} --quiet'
-CLOUD_JOB_DEPLOY     = gcloud run jobs create $(JOB_NAME) --image $(IMAGE_TAG) --region $(REGION) $(JOB_OPTIONS)
+CLOUD_JOB_DEPLOY     = sops exec-file $(CONFIG_DIR)/$(SERVICE_FILE) 'gcloud run jobs update $(JOB_NAME) --image $(IMAGE_TAG) --set-cloudsql-instances $(SQL_INSTANCES) --region $(REGION) $(JOB_OPTIONS) --env-vars-file {} --quiet'
 SCHEDULER_DEPLOY     = gcloud scheduler jobs create http $(CRON_NAME) --location $(CRON_LOCATION) --schedule $(CRON_SCHEDULE) --uri $(CRON_URI) --http-method $(CRON_METHOD)
 CRON_NAME            = $(CRON_PREFIX)-$(DEPLOY_VERSION)
 BASE_DEPLOY_FLAGS    = --image $(IMAGE_TAG) $(RUN_PROMOTE_FLAGS) --concurrency $(CONCURRENCY) --cpu $(CPU) --memory $(MEMORY) --port $(PORT) --timeout $(TIMEOUT) --platform managed --revision-suffix $(CURRENT_COMMIT_HASH) --vpc-connector $(VPC_CONNECTOR) --vpc-egress private-ranges-only --set-cloudsql-instances $(SQL_INSTANCES) --region $(REGION) --allow-unauthenticated
@@ -93,6 +93,8 @@ $(DEPLOY)-$(PROD)-emails            : SERVICE_FILE := emails-server-env.yaml
 $(DEPLOY)-$(PROD)-routing-rules     : SERVICE_FILE := dispatch.yaml
 $(DEPLOY)-$(DEV)-graphql-gateway    : SERVICE_FILE := graphql-gateway.yml
 $(DEPLOY)-$(PROD)-graphql-gateway   : SERVICE_FILE := graphql-gateway.yml
+$(DEPLOY)-$(DEV)-userpref-upload    : SERVICE_FILE := userpref-upload.yaml
+$(DEPLOY)-$(PROD)-userpref-upload   : SERVICE_FILE := userpref-upload.yaml
 
 # Service to Sentry project mapping
 $(DEPLOY)-%-backend               : SENTRY_PROJECT := gallery-backend
@@ -104,6 +106,7 @@ $(DEPLOY)-%-dummymetadata         : SENTRY_PROJECT := dummymetadata
 $(DEPLOY)-%-feed                  : SENTRY_PROJECT := feed
 $(DEPLOY)-%-feedbot               : SENTRY_PROJECT := feedbot
 $(DEPLOY)-%-emails                : SENTRY_PROJECT := emails
+$(DEPLOY)-%-userpref-upload       : SENTRY_PROJECT := userpref
 
 # Docker builds
 $(DEPLOY)-%-tokenprocessing            : REPO           := tokenprocessing-v3
@@ -218,17 +221,18 @@ $(DEPLOY)-$(DEV)-check-push-tickets    : URI_NAME       := pushnotifications-dev
 $(DEPLOY)-$(PROD)-check-push-tickets   : URI_NAME       := pushnotifications
 
 # Cloud Jobs
-$(DEPLOY)-%-userpref-job               : JOB_NAME       := userpref-upload
-$(DEPLOY)-%-userpref-job               : BASE_OPTIONS   := --tasks 1 --task-timeout 10m --parallelism 1 $(COMMAND) --cpu 1 --memory 2G
-$(DEPLOY)-%-userpref-job               : REGION         := $(DEPLOY_REGION)
-$(DEPLOY)-%-userpref-job               : REPO           := backend
-$(DEPLOY)-%-userpref-job               : CRON_PREFIX    := userpref-schedule
-$(DEPLOY)-%-userpref-job               : CRON_LOCATION  := $(DEPLOY_REGION)
-$(DEPLOY)-%-userpref-job               : CRON_SCHEDULE  := '0 * * * *'
-$(DEPLOY)-%-userpref-job               : CRON_URI       := https://$(DEPLOY_REGION)-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/$(GCP_PROJECT)/jobs/$(JOB_NAME):run
-$(DEPLOY)-%-userpref-job               : CRON_METHOD    := POST
-$(DEPLOY)-$(DEV)-userpref-job          : JOB_OPTIONS    = $(BASE_OPTIONS) --command ./cmd/userpref/main.go --args dev-user-pref,personalization_matrices.bin.gz
-$(DEPLOY)-$(PROD)-userpref-job         : JOB_OPTIONS    = $(BASE_OPTIONS) --command ./cmd/userpref/main.go --args prod-user-pref,personalization_matrices.bin.gz
+$(DEPLOY)-%-userpref-upload            : JOB_NAME       := userpref-upload
+$(DEPLOY)-%-userpref-upload            : BASE_OPTIONS   := --tasks 1 --task-timeout 10m --parallelism 1 --cpu 1 --memory 2G
+$(DEPLOY)-%-userpref-upload            : REGION         := $(DEPLOY_REGION)
+$(DEPLOY)-%-userpref-upload            : REPO           := userpref
+$(DEPLOY)-%-userpref-upload            : CRON_PREFIX    := userpref-schedule
+$(DEPLOY)-%-userpref-upload            : CRON_LOCATION  := $(DEPLOY_REGION)
+$(DEPLOY)-%-userpref-upload            : CRON_SCHEDULE  := '0 * * * *'
+$(DEPLOY)-%-userpref-upload            : CRON_URI       = https://$(DEPLOY_REGION)-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/$(GCP_PROJECT)/jobs/$(JOB_NAME):run
+$(DEPLOY)-%-userpref-upload            : CRON_METHOD    := POST
+$(DEPLOY)-$(DEV)-userpref-upload       : JOB_OPTIONS    = $(BASE_OPTIONS) --args dev-user-pref,personalization_matrices.bin.gz
+$(DEPLOY)-$(PROD)-userpref-upload      : JOB_OPTIONS    = $(BASE_OPTIONS) --args prod-user-pref,personalization_matrices.bin.gz
+$(DEPLOY)-%-userpref-upload            : DOCKER_FILE    := $(DOCKER_DIR)/userpref/Dockerfile
 
 # Service name mappings
 $(PROMOTE)-%-backend                   : SERVICE := default
@@ -328,7 +332,9 @@ _$(CRON)-$(PAUSE)-%:
 		| xargs -I {} gcloud scheduler jobs pause --location $(DEPLOY_REGION) --quiet {}
 
 _$(JOB)-$(DEPLOY)-%:
-	@echo Creating job $(JOB_NAME)
+	@echo Deploying job $(JOB_NAME)
+	@$(DOCKER_BUILD)
+	@$(DOCKER_PUSH)
 	@$(CLOUD_JOB_DEPLOY)
 
 # Immediately migrates traffic to the input version
@@ -369,7 +375,7 @@ $(DEPLOY)-$(DEV)-routing-rules      : _set-project-$(ENV) _$(DEPLOY)-routing-rul
 $(DEPLOY)-$(DEV)-graphql-gateway    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-graphql-gateway
 $(DEPLOY)-$(DEV)-alchemy-spam       : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-alchemy-spam _$(CRON)-$(PAUSE)-alchemy-spam
 $(DEPLOY)-$(DEV)-check-push-tickets : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-check-push-tickets _$(CRON)-$(PAUSE)-check-push-tickets
-$(DEPLOY)-$(DEV)-userpref-job       : _set-project-$(ENV) _$(JOB)-$(DEPLOY)-userpref-job _$(CRON)-$(DEPLOY)-userpref-job _$(CRON)-$(PAUSE)-userpref-job
+$(DEPLOY)-$(DEV)-userpref-upload    : _set-project-$(ENV) _$(JOB)-$(DEPLOY)-userpref-upload _$(CRON)-$(DEPLOY)-userpref-upload _$(CRON)-$(PAUSE)-userpref-upload
 
 # SANDBOX deployments
 $(DEPLOY)-$(SANDBOX)-backend      : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend # go server that uses dev upstream services
@@ -389,7 +395,7 @@ $(DEPLOY)-$(PROD)-routing-rules      : _set-project-$(ENV) _$(DEPLOY)-routing-ru
 $(DEPLOY)-$(PROD)-graphql-gateway    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-graphql-gateway
 $(DEPLOY)-$(PROD)-alchemy-spam       : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-alchemy-spam _$(CRON)-$(PAUSE)-alchemy-spam
 $(DEPLOY)-$(PROD)-check-push-tickets : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-check-push-tickets _$(CRON)-$(PAUSE)-check-push-tickets
-$(DEPLOY)-$(PROD)-userpref-job       : _set-project-$(ENV) _$(JOB)-$(DEPLOY)-userpref-job _$(CRON)-$(DEPLOY)-userpref-job _$(CRON)-$(PAUSE)-userpref-job
+$(DEPLOY)-$(PROD)-userpref-upload    : _set-project-$(ENV) _$(JOB)-$(DEPLOY)-userpref-upload _$(CRON)-$(DEPLOY)-userpref-upload _$(CRON)-$(PAUSE)-userpref-upload
 
 # PROD promotions. Running these targets will migrate traffic to the specified version.
 # Example usage:
