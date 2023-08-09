@@ -1512,13 +1512,19 @@ type SyncTokensPayload {
   viewer: Viewer
 }
 
-union SyncCreatedTokensForNewContractsPayloadOrError = SyncCreatedTokensForNewContractsPayload | ErrNotAuthorized | ErrSyncFailed
+union SyncCreatedTokensForNewContractsPayloadOrError =
+    SyncCreatedTokensForNewContractsPayload
+  | ErrNotAuthorized
+  | ErrSyncFailed
 
 type SyncCreatedTokensForNewContractsPayload {
   viewer: Viewer
 }
 
-union SyncCreatedTokensForExistingContractPayloadOrError = SyncCreatedTokensForExistingContractPayload | ErrNotAuthorized | ErrSyncFailed
+union SyncCreatedTokensForExistingContractPayloadOrError =
+    SyncCreatedTokensForExistingContractPayload
+  | ErrNotAuthorized
+  | ErrSyncFailed
 
 type SyncCreatedTokensForExistingContractPayload {
   viewer: Viewer
@@ -2455,8 +2461,12 @@ type Mutation {
   setSpamPreference(input: SetSpamPreferenceInput!): SetSpamPreferencePayloadOrError @authRequired
 
   syncTokens(chains: [Chain!]): SyncTokensPayloadOrError @authRequired
-  syncCreatedTokensForNewContracts(input: SyncCreatedTokensForNewContractsInput!): SyncCreatedTokensForNewContractsPayloadOrError @authRequired
-  syncCreatedTokensForExistingContract(input: SyncCreatedTokensForExistingContractInput!): SyncCreatedTokensForExistingContractPayloadOrError @authRequired
+  syncCreatedTokensForNewContracts(
+    input: SyncCreatedTokensForNewContractsInput!
+  ): SyncCreatedTokensForNewContractsPayloadOrError @authRequired
+  syncCreatedTokensForExistingContract(
+    input: SyncCreatedTokensForExistingContractInput!
+  ): SyncCreatedTokensForExistingContractPayloadOrError @authRequired
   refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
   refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
   refreshContract(contractId: DBID!): RefreshContractPayloadOrError
