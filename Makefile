@@ -14,9 +14,12 @@ PROMOTE              := promote
 STOP                 := stop
 RELEASE              := release
 DOCKER               := docker
+CRON                 := cron
+JOB                  := job
 DEPLOY_VERSION       := $(CURRENT_BRANCH)-$(CURRENT_COMMIT_HASH)
 SET_GCP_PROJECT      = gcloud config set project $(GCP_PROJECT)
 CLOUD_RUN_DEPLOY     = sops exec-file $(CONFIG_DIR)/$(SERVICE_FILE) 'gcloud run deploy $(DEPLOY_FLAGS) $(SERVICE) --env-vars-file {} --quiet'
+CLOUD_JOB_DEPLOY     = gcloud run jobs create $(JOB_NAME) --image $(IMAGE_TAG) --region $(REGION) $(JOB_OPTIONS)
 SCHEDULER_DEPLOY     = gcloud scheduler jobs create http $(CRON_NAME) --location $(CRON_LOCATION) --schedule $(CRON_SCHEDULE) --uri $(CRON_URI) --http-method $(CRON_METHOD)
 CRON_NAME            = $(CRON_PREFIX)-$(DEPLOY_VERSION)
 BASE_DEPLOY_FLAGS    = --image $(IMAGE_TAG) $(RUN_PROMOTE_FLAGS) --concurrency $(CONCURRENCY) --cpu $(CPU) --memory $(MEMORY) --port $(PORT) --timeout $(TIMEOUT) --platform managed --revision-suffix $(CURRENT_COMMIT_HASH) --vpc-connector $(VPC_CONNECTOR) --vpc-egress private-ranges-only --set-cloudsql-instances $(SQL_INSTANCES) --region $(REGION) --allow-unauthenticated
@@ -214,6 +217,13 @@ $(DEPLOY)-%-check-push-tickets         : CRON_FLAGS     = --headers='Authorizati
 $(DEPLOY)-$(DEV)-check-push-tickets    : URI_NAME       := pushnotifications-dev
 $(DEPLOY)-$(PROD)-check-push-tickets   : URI_NAME       := pushnotifications
 
+# Cloud Jobs
+$(DEPLOY)-%-userpref-job               : JOB_NAME       := userpref-upload
+$(DEPLOY)-%-userpref-job               : BASE_OPTIONS   := --tasks 1 --task-timeout 10m --parallelism 1 $(COMMAND)
+$(DEPLOY)-%-userpref-job               : REGION         := $(DEPLOY_REGION)
+$(DEPLOY)-%-userpref-job               : REPO           := backend
+$(DEPLOY)-$(DEV)-userpref-job          : JOB_OPTIONS    = $(BASE_OPTIONS) --command cmd/userpref/main.go --args dev-user-pref,personalization_matrices.bin.gz
+
 # Service name mappings
 $(PROMOTE)-%-backend                   : SERVICE := default
 $(PROMOTE)-%-indexer                   : SERVICE := indexer
@@ -311,6 +321,10 @@ _$(CRON)-$(PAUSE)-%:
 		--format 'value(ID)' \
 		| xargs -I {} gcloud scheduler jobs pause --location $(DEPLOY_REGION) --quiet {}
 
+_$(JOB)-$(DEPLOY)-%:
+	@echo Creating job $(JOB_NAME)
+	@$(CLOUD_JOB_DEPLOY)
+
 # Immediately migrates traffic to the input version
 _$(PROMOTE)-%:
 	@version='$(version)'; \
@@ -349,6 +363,7 @@ $(DEPLOY)-$(DEV)-routing-rules      : _set-project-$(ENV) _$(DEPLOY)-routing-rul
 $(DEPLOY)-$(DEV)-graphql-gateway    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-graphql-gateway
 $(DEPLOY)-$(DEV)-alchemy-spam       : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-alchemy-spam _$(CRON)-$(PAUSE)-alchemy-spam
 $(DEPLOY)-$(DEV)-check-push-tickets : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-check-push-tickets _$(CRON)-$(PAUSE)-check-push-tickets
+$(DEPLOY)-$(DEV)-userpref-job       : _set-project-$(ENV) _$(JOB)-$(DEPLOY)-userpref-job
 
 # SANDBOX deployments
 $(DEPLOY)-$(SANDBOX)-backend      : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend # go server that uses dev upstream services
