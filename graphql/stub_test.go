@@ -32,6 +32,10 @@ type stubProvider struct {
 	FetchMetadata func() (persist.TokenMetadata, error)
 }
 
+func (p stubProvider) GetBlockchainInfo() multichain.BlockchainInfo {
+	return multichain.BlockchainInfo{}
+}
+
 func (p stubProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	return p.Tokens, p.Contracts, nil
 }

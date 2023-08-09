@@ -935,7 +935,7 @@ func testSyncShouldCombineProviders(t *testing.T) {
 
 	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum})
 
-	assertSyncedTokens(t, response, err, len(providerA.Tokens)+len(providerB.Tokens))
+	assertSyncedTokens(t, response, err, 4)
 }
 
 func testSyncShouldMergeDuplicatesInProvider(t *testing.T) {
