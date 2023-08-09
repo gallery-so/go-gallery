@@ -98,3 +98,39 @@ func (n *NeynarAPI) UserByAddress(ctx context.Context, address persist.Address) 
 
 	return neynarResp.Result.User, nil
 }
+
+type NeynarFollowingByUserIDResponse struct {
+	Result *struct {
+		Users []NeynarUser `json:"users"`
+	} `json:"result"`
+}
+
+func (n *NeynarAPI) FollowingByUserID(ctx context.Context, fid string) ([]NeynarUser, error) {
+	// e.g. https://api.neynar.com/v1/farcaster/following/?api_key={$api-key}&fid=3
+	u := fmt.Sprintf("%s/following/?api_key=%s&fid=%s", neynarBaseURL, n.apiKey, fid)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-api-key", n.apiKey)
+
+	resp, err := n.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	var neynarResp NeynarFollowingByUserIDResponse
+	if err := json.NewDecoder(resp.Body).Decode(&neynarResp); err != nil {
+		return nil, err
+	}
+
+	if neynarResp.Result == nil {
+		return nil, fmt.Errorf("no following result for %s", fid)
+	}
+
+	return neynarResp.Result.Users, nil
+}

@@ -39,7 +39,7 @@ func main() {
 
 	provider, cleanup := server.NewMultichainProvider(ctx, server.SetDefaults)
 	defer cleanup()
-	tp := tokenprocessing.NewTokenProcessor(clients.Queries, clients.EthClient, provider, clients.IPFSClient, clients.ArweaveClient, clients.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), clients.Repos.TokenRepository, metric.NewLogMetricReporter())
+	tp := tokenprocessing.NewTokenProcessor(clients.Queries, clients.EthClient, clients.HTTPClient, provider, clients.IPFSClient, clients.ArweaveClient, clients.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), clients.Repos.TokenRepository, metric.NewLogMetricReporter())
 
 	var rows []coredb.GetSVGTokensWithContractsByIDsRow
 	var err error

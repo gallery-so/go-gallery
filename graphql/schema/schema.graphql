@@ -129,6 +129,7 @@ type GalleryUser implements Node @goEmbedHelper {
     first: Int
     last: Int
   ): CommunitiesConnection @goField(forceResolver: true)
+  isMemberOfCommunity(communityID: DBID!): Boolean! @goField(forceResolver: true)
 }
 
 type Wallet implements Node {
@@ -441,7 +442,7 @@ type Token implements Node @goEmbedHelper {
   externalUrl: String
   blockNumber: String # source is uint64
   isSpamByUser: Boolean
-  isSpamByProvider: Boolean
+  isSpamByProvider: Boolean @goField(forceResolver: true)
   # These are subject to change; unlike the other fields, they aren't present on the current persist.Token
   # struct and may ultimately end up elsewhere
   creatorAddress: ChainAddress

@@ -24,6 +24,12 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
+const (
+	engagementWeight      = 1.0
+	personalizationWeight = 1.0
+	timeWeight            = 1.0
+)
+
 type FeedAPI struct {
 	repos     *postgres.Repositories
 	queries   *db.Queries
@@ -310,9 +316,8 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 
 	if !hasCursors {
 		calcFunc := func(ctx context.Context) ([]persist.FeedEntityType, []persist.DBID, error) {
-			trendData, err := api.queries.FeedEntityScoring(ctx, db.FeedEntityScoringParams{
+			trendData, err := api.queries.GetFeedEntityScores(ctx, db.GetFeedEntityScoresParams{
 				WindowEnd:           time.Now().Add(-time.Duration(3 * 24 * time.Hour)),
-				FeedEventEntityType: int32(persist.FeedEventTypeTag),
 				PostEntityType:      int32(persist.PostTypeTag),
 				ExcludedFeedActions: []string{string(persist.ActionUserCreated), string(persist.ActionUserFollowedUsers)},
 				IncludeViewer:       true,
@@ -321,8 +326,8 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 			if err != nil {
 				return nil, nil, err
 			}
-			entityTypes, entityIDs = api.scoreFeedEntities(ctx, trendData, func(e db.FeedEntityScoringRow) float64 {
-				return timeFactor(e.CreatedAt, now) * engagementFactor(int(e.Interactions))
+			entityTypes, entityIDs = api.scoreFeedEntities(ctx, trendData, func(e db.FeedEntityScore) float64 {
+				return (timeWeight * timeFactor(e.CreatedAt, now)) * (engagementWeight * engagementFactor(int(e.Interactions)))
 			})
 			return entityTypes, entityIDs, nil
 		}
@@ -433,13 +438,12 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 	now := time.Now()
 
 	if !hasCursors {
-		trendData, err := api.queries.FeedEntityScoring(ctx, db.FeedEntityScoringParams{
+		trendData, err := api.queries.GetFeedEntityScores(ctx, db.GetFeedEntityScoresParams{
 			WindowEnd:           time.Now().Add(-time.Duration(7 * 24 * time.Hour)),
 			PostEntityType:      int32(persist.PostTypeTag),
-			FeedEventEntityType: int32(persist.FeedEventTypeTag),
 			ExcludedFeedActions: []string{string(persist.ActionUserCreated), string(persist.ActionUserFollowedUsers)},
 			IncludeViewer:       false,
-			ViewerID:            userID.String(),
+			ViewerID:            userID,
 			IncludePosts:        includePosts,
 		})
 		if err != nil {
@@ -450,7 +454,7 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 			p := userpref.For(ctx)
 			p.Mu.RLock()
 			defer p.Mu.RUnlock()
-			return api.scoreFeedEntities(ctx, trendData, func(e db.FeedEntityScoringRow) float64 {
+			return api.scoreFeedEntities(ctx, trendData, func(e db.FeedEntityScore) float64 {
 				return scoreFeedEntity(p, userID, e, now, int(e.Interactions))
 			})
 		}()
@@ -660,7 +664,7 @@ func loadFeedEntities(ctx context.Context, d *dataloader.Loaders, typs []persist
 	return entities, nil
 }
 
-func (api FeedAPI) scoreFeedEntities(ctx context.Context, trendData []db.FeedEntityScoringRow, scoreF func(db.FeedEntityScoringRow) float64) ([]persist.FeedEntityType, []persist.DBID) {
+func (api FeedAPI) scoreFeedEntities(ctx context.Context, trendData []db.FeedEntityScore, scoreF func(db.FeedEntityScore) float64) ([]persist.FeedEntityType, []persist.DBID) {
 	h := &heap{}
 
 	var wg sync.WaitGroup
@@ -714,7 +718,7 @@ func (api FeedAPI) scoreFeedEntities(ctx context.Context, trendData []db.FeedEnt
 	return entityTypes, entityIDs
 }
 
-func scoreFeedEntity(p *userpref.Personalization, viewerID persist.DBID, e db.FeedEntityScoringRow, t time.Time, interactions int) float64 {
+func scoreFeedEntity(p *userpref.Personalization, viewerID persist.DBID, e db.FeedEntityScore, t time.Time, interactions int) float64 {
 	timeF := timeFactor(e.CreatedAt, t)
 	engagementF := engagementFactor(interactions)
 	personalizationF, err := p.RelevanceTo(viewerID, e)
@@ -722,17 +726,17 @@ func scoreFeedEntity(p *userpref.Personalization, viewerID persist.DBID, e db.Fe
 		// Use a default value of 0.1 so that it isn't completely penalized because of missing data.
 		personalizationF = 0.1
 	}
-	return timeF * engagementF * personalizationF
+	return (timeWeight * timeF) * (1 + (engagementWeight * engagementF)) * (1 + (personalizationWeight * personalizationF))
 }
 
 func timeFactor(t0, t1 time.Time) float64 {
-	lambda := 1.0 / 100_000
-	age := t1.Sub(t0).Seconds()
-	return 1 * math.Pow(math.E, (-lambda*age))
+	lambda := 0.0005
+	age := t1.Sub(t0).Minutes()
+	return math.Pow(math.E, (-lambda * age))
 }
 
 func engagementFactor(interactions int) float64 {
-	return math.Log1p(float64(interactions))
+	return 4 * math.Log1p(float64(interactions))
 }
 
 type priorityNode interface {

@@ -1549,3 +1549,12 @@ update tokens
       and is_creator_token = true
       and not exists(select 1 from created_contracts where created_contracts.contract_id = tokens.contract)
       and not deleted;
+      
+-- name: IsMemberOfCommunity :one
+select exists (select * from tokens where not deleted and displayable and owner_user_id = @user_id and contract = @contract_id limit 1) is_member;
+
+-- name: InsertExternalSocialConnectionsForUser :many
+insert into external_social_connections (id, social_account_type, follower_id, followee_id) select (id, social_account_type, follower_id, followee_id) from (select unnest(@ids::varchar[]) as id, @social_account_type::varchar as social_account_type, @follower_id::varchar as follower_id, unnest(@followee_ids::varchar[]) as followee_id) bulk_insert returning *;
+
+-- name: GetUsersBySocialIDs :many
+select * from pii.user_view u where u.pii_socials->sqlc.arg('social_account_type')::varchar->>'id' = any(@social_ids::varchar[]) and not u.deleted and not u.universal;

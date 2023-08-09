@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
@@ -26,6 +27,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/googleapi"
 
+	"cloud.google.com/go/compute/metadata"
 	"cloud.google.com/go/storage"
 	"github.com/everFinance/goar"
 	shell "github.com/ipfs/go-ipfs-api"
@@ -125,7 +127,7 @@ func cacheImageObjects(ctx context.Context, imageURL media.ImageURL, job *tokenP
 		ThumbnailGCP:                 &job.pipelineMetadata.ImageThumbnailGCP,
 		LiveRenderGCP:                &job.pipelineMetadata.ImageLiveRenderGCP,
 	}
-	return asyncCacheObjectsForURL(ctx, tids, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, objectTypeImage, string(imageURL), job.tp.tokenBucket, runMetadata)
+	return asyncCacheObjectsForURL(ctx, tids, job.tp.httpClient, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, objectTypeImage, string(imageURL), job.tp.tokenBucket, runMetadata)
 }
 
 func cacheAnimationObjects(ctx context.Context, animationURL media.AnimationURL, job *tokenProcessingJob) chan cacheResult {
@@ -141,7 +143,7 @@ func cacheAnimationObjects(ctx context.Context, animationURL media.AnimationURL,
 		ThumbnailGCP:                 &job.pipelineMetadata.AnimationThumbnailGCP,
 		LiveRenderGCP:                &job.pipelineMetadata.AnimationLiveRenderGCP,
 	}
-	return asyncCacheObjectsForURL(ctx, tids, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, objectTypeAnimation, string(animationURL), job.tp.tokenBucket, runMetadata)
+	return asyncCacheObjectsForURL(ctx, tids, job.tp.httpClient, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, objectTypeAnimation, string(animationURL), job.tp.tokenBucket, runMetadata)
 }
 
 func cacheProfileImageObjects(ctx context.Context, job *tokenProcessingJob, metadata persist.TokenMetadata) (chan cacheResult, error) {
@@ -165,7 +167,7 @@ func cacheProfileImageObjects(ctx context.Context, job *tokenProcessingJob, meta
 		ThumbnailGCP:                 &job.pipelineMetadata.ProfileImageThumbnailGCP,
 		LiveRenderGCP:                &job.pipelineMetadata.ProfileImageLiveRenderGCP,
 	}
-	return asyncCacheObjectsForURL(ctx, tids, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, objectTypeProfileImage, urlStr, job.tp.tokenBucket, runMetadata), nil
+	return asyncCacheObjectsForURL(ctx, tids, job.tp.httpClient, job.tp.stg, job.tp.arweaveClient, job.tp.ipfsClient, objectTypeProfileImage, urlStr, job.tp.tokenBucket, runMetadata), nil
 }
 
 func cacheOpenSeaObjects(ctx context.Context, job *tokenProcessingJob) ([]cachedMediaObject, error) {
@@ -181,7 +183,7 @@ func cacheOpenSeaObjects(ctx context.Context, job *tokenProcessingJob) ([]cached
 		ThumbnailGCP:                 &job.pipelineMetadata.AlternateThumbnailGCP,
 		LiveRenderGCP:                &job.pipelineMetadata.AlternateLiveRenderGCP,
 	}
-	return cacheObjectsFromOpensea(ctx, tids, objectTypeImage, job.tp.ipfsClient, job.tp.arweaveClient, job.tp.stg, job.tp.tokenBucket, runMetadata)
+	return cacheObjectsFromOpensea(ctx, tids, objectTypeImage, job.tp.httpClient, job.tp.ipfsClient, job.tp.arweaveClient, job.tp.stg, job.tp.tokenBucket, runMetadata)
 }
 
 func isCacheResultValid(err error, numObjects int) bool {
@@ -306,7 +308,7 @@ type cacheResult struct {
 	err           error
 }
 
-func asyncCacheObjectsForURL(ctx context.Context, tids persist.TokenIdentifiers, storageClient *storage.Client, arweaveClient *goar.Client, ipfsClient *shell.Shell, defaultObjectType objectType, mediaURL, bucket string, subMeta *cachePipelineMetadata) chan cacheResult {
+func asyncCacheObjectsForURL(ctx context.Context, tids persist.TokenIdentifiers, httpClient *http.Client, storageClient *storage.Client, arweaveClient *goar.Client, ipfsClient *shell.Shell, defaultObjectType objectType, mediaURL, bucket string, subMeta *cachePipelineMetadata) chan cacheResult {
 	resultCh := make(chan cacheResult)
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
 		"tokenURIType":      persist.TokenURI(mediaURL).Type(),
@@ -315,7 +317,7 @@ func asyncCacheObjectsForURL(ctx context.Context, tids persist.TokenIdentifiers,
 	})
 
 	go func() {
-		cachedObjects, err := cacheObjectsFromURL(ctx, tids, mediaURL, defaultObjectType, ipfsClient, arweaveClient, storageClient, bucket, subMeta, false)
+		cachedObjects, err := cacheObjectsFromURL(ctx, tids, mediaURL, defaultObjectType, httpClient, ipfsClient, arweaveClient, storageClient, bucket, subMeta, false)
 		if err == nil {
 			resultCh <- cacheResult{cachedObjects, err}
 			return
@@ -326,7 +328,7 @@ func asyncCacheObjectsForURL(ctx context.Context, tids persist.TokenIdentifiers,
 			if caught.Code == http.StatusTooManyRequests {
 				logger.For(ctx).Infof("rate limited by google, retrying in 30 seconds")
 				time.Sleep(time.Second * 30)
-				cachedObjects, err = cacheObjectsFromURL(ctx, tids, mediaURL, defaultObjectType, ipfsClient, arweaveClient, storageClient, bucket, subMeta, true)
+				cachedObjects, err = cacheObjectsFromURL(ctx, tids, mediaURL, defaultObjectType, httpClient, ipfsClient, arweaveClient, storageClient, bucket, subMeta, true)
 			}
 			resultCh <- cacheResult{cachedObjects, err}
 		default:
@@ -715,30 +717,48 @@ func cacheRawAnimationMedia(ctx context.Context, reader *util.FileHeaderReader, 
 	return object, nil
 }
 
-func rasterizeAndCacheSVGMedia(ctx context.Context, svgURL string, tids persist.TokenIdentifiers, bucket, ogURL string, client *storage.Client, subMeta *cachePipelineMetadata) ([]cachedMediaObject, error) {
+type rasterizeResponse struct {
+	PNG string  `json:"png"`
+	GIF *string `json:"gif"`
+}
+
+func rasterizeAndCacheSVGMedia(ctx context.Context, svgURL string, tids persist.TokenIdentifiers, bucket, ogURL string, httpClient *http.Client, client *storage.Client, subMeta *cachePipelineMetadata) ([]cachedMediaObject, error) {
 	traceCallback, ctx := persist.TrackStepStatus(ctx, subMeta.SVGRasterize, "SVGRasterize")
 	defer traceCallback()
 
-	cmd := exec.Command("node", "scripts/rasterize_svg.js", svgURL)
-	output, err := cmd.Output()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/rasterize?url=%s", env.GetString("RASTERIZER_URL"), svgURL), nil)
 	if err != nil {
 		persist.FailStep(subMeta.SVGRasterize)
-		return nil, fmt.Errorf("could not rasterize svg: %s (%s)", err, string(output))
+		return nil, err
+	}
+	idToken, _ := metadata.Get(fmt.Sprintf("instance/service-accounts/default/identity?audience=%s", env.GetString("RASTERIZER_URL")))
+	if idToken != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", idToken))
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		persist.FailStep(subMeta.SVGRasterize)
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		persist.FailStep(subMeta.SVGRasterize)
+		bs, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("rasterizer returned non-200 status code: %d (%s)", resp.StatusCode, string(bs))
+	}
+
+	var rasterizeResp rasterizeResponse
+	if err := json.NewDecoder(resp.Body).Decode(&rasterizeResp); err != nil {
+		persist.FailStep(subMeta.SVGRasterize)
+		return nil, err
 	}
 
 	objects := make([]cachedMediaObject, 0, 2)
 
-	lines := strings.Split(string(output), "\n")
-	if len(lines) < 2 {
-		persist.FailStep(subMeta.SVGRasterize)
-		return nil, fmt.Errorf("could not rasterize svg: %s", string(output))
-	}
-
-	if lines[0] != "PNG" {
-		persist.FailStep(subMeta.SVGRasterize)
-		return nil, fmt.Errorf("could not rasterize svg: %s (%s)", lines[0], string(output))
-	}
-	pngData := lines[1]
+	pngData := rasterizeResp.PNG
 
 	data, err := base64.StdEncoding.DecodeString(string(pngData))
 	if err != nil {
@@ -776,12 +796,8 @@ func rasterizeAndCacheSVGMedia(ctx context.Context, svgURL string, tids persist.
 
 	objects = append(objects, pngObject)
 
-	if len(lines) == 4 {
-		if lines[2] != "GIF" {
-			persist.FailStep(subMeta.SVGRasterize)
-			return nil, fmt.Errorf("could not rasterize svg: %s", lines[2])
-		}
-		gifData := lines[3]
+	if rasterizeResp.GIF != nil {
+		gifData := *rasterizeResp.GIF
 
 		data, err := base64.StdEncoding.DecodeString(string(gifData))
 		if err != nil {
@@ -905,7 +921,7 @@ func createLiveRenderAndCache(ctx context.Context, tids persist.TokenIdentifiers
 	return obj, nil
 }
 
-func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, mediaURL string, oType objectType, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, bucket string, subMeta *cachePipelineMetadata, isRecursive bool) ([]cachedMediaObject, error) {
+func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, mediaURL string, oType objectType, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, bucket string, subMeta *cachePipelineMetadata, isRecursive bool) ([]cachedMediaObject, error) {
 
 	asURI := persist.TokenURI(mediaURL)
 	timeBeforePredict := time.Now()
@@ -974,7 +990,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 		logger.For(pCtx).Infof("failed to get data from uri '%s' for '%s' because of (err: %s <%T>), trying opensea", mediaURL, tids, err, err)
 		defer traceCallback()
 
-		return cacheObjectsFromOpensea(pCtx, tids, oType, ipfsClient, arweaveClient, storageClient, bucket, subMeta)
+		return cacheObjectsFromOpensea(pCtx, tids, oType, httpClient, ipfsClient, arweaveClient, storageClient, bucket, subMeta)
 	}
 
 	if err != nil {
@@ -1054,9 +1070,9 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 			result = append(result, liveObj)
 		}
 
-	} else if mediaType == persist.MediaTypeSVG {
+	} else if mediaType == persist.MediaTypeSVG && tids.ContractAddress != eth.PunkAddress {
 		timeBeforeCache := time.Now()
-		obj, err := rasterizeAndCacheSVGMedia(pCtx, obj.storageURL(bucket), tids, bucket, mediaURL, storageClient, subMeta)
+		obj, err := rasterizeAndCacheSVGMedia(pCtx, obj.storageURL(bucket), tids, bucket, mediaURL, httpClient, storageClient, subMeta)
 		if err != nil {
 			logger.For(pCtx).Errorf("could not cache svg rasterization: %s", err)
 			// still return the original object as svg
@@ -1069,7 +1085,7 @@ func cacheObjectsFromURL(pCtx context.Context, tids persist.TokenIdentifiers, me
 	return result, nil
 }
 
-func cacheObjectsFromOpensea(pCtx context.Context, tids persist.TokenIdentifiers, oType objectType, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, bucket string, subMeta *cachePipelineMetadata) ([]cachedMediaObject, error) {
+func cacheObjectsFromOpensea(pCtx context.Context, tids persist.TokenIdentifiers, oType objectType, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, bucket string, subMeta *cachePipelineMetadata) ([]cachedMediaObject, error) {
 	assets, err := opensea.FetchAssetsForTokenIdentifiers(pCtx, persist.EthereumAddress(tids.ContractAddress), opensea.TokenID(tids.TokenID.Base10String()))
 	if err != nil || len(assets) == 0 {
 		return nil, errNoDataFromOpensea{err: err}
@@ -1084,7 +1100,7 @@ func cacheObjectsFromOpensea(pCtx context.Context, tids persist.TokenIdentifiers
 			continue
 		}
 
-		objects, err := cacheObjectsFromURL(pCtx, tids, firstNonEmptyURL, oType, ipfsClient, arweaveClient, storageClient, bucket, subMeta, true)
+		objects, err := cacheObjectsFromURL(pCtx, tids, firstNonEmptyURL, oType, httpClient, ipfsClient, arweaveClient, storageClient, bucket, subMeta, true)
 		if err != nil {
 			continue
 		}

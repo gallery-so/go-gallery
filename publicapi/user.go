@@ -1591,6 +1591,20 @@ func (api UserAPI) GetEnsProfileImageByUserID(ctx context.Context, userID persis
 	return a, nil
 }
 
+func (api UserAPI) IsMemberOfCommunity(ctx context.Context, userID persist.DBID, communityID persist.DBID) (bool, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"userID":      validate.WithTag(userID, "required"),
+		"communityID": validate.WithTag(communityID, "required"),
+	}); err != nil {
+		return false, err
+	}
+	return api.queries.IsMemberOfCommunity(ctx, db.IsMemberOfCommunityParams{
+		UserID:     userID,
+		ContractID: communityID,
+	})
+}
+
 func uriFromRecord(ctx context.Context, mc *multichain.Provider, r eth.AvatarRecord) (uri string, err error) {
 	switch u := r.(type) {
 	case nil:

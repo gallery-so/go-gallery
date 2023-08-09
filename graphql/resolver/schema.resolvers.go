@@ -633,6 +633,11 @@ func (r *galleryUserResolver) CreatedCommunities(ctx context.Context, obj *model
 	}, nil
 }
 
+// IsMemberOfCommunity is the resolver for the isMemberOfCommunity field.
+func (r *galleryUserResolver) IsMemberOfCommunity(ctx context.Context, obj *model.GalleryUser, communityID persist.DBID) (bool, error) {
+	return publicapi.For(ctx).User.IsMemberOfCommunity(ctx, obj.Dbid, communityID)
+}
+
 // AddUserWallet is the resolver for the addUserWallet field.
 func (r *mutationResolver) AddUserWallet(ctx context.Context, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) (model.AddUserWalletPayloadOrError, error) {
 	api := publicapi.For(ctx)
@@ -2561,12 +2566,31 @@ func (r *tokenResolver) OwnedByWallets(ctx context.Context, obj *model.Token) ([
 
 // Contract is the resolver for the contract field.
 func (r *tokenResolver) Contract(ctx context.Context, obj *model.Token) (*model.Contract, error) {
+	if obj.HelperTokenData.Token.Contract != "" {
+		return resolveContractByContractID(ctx, obj.HelperTokenData.Token.Contract)
+	}
 	return resolveContractByTokenID(ctx, obj.Dbid)
 }
 
 // Community is the resolver for the community field.
 func (r *tokenResolver) Community(ctx context.Context, obj *model.Token) (*model.Community, error) {
 	return resolveCommunityByTokenID(ctx, obj.Dbid)
+}
+
+// IsSpamByProvider is the resolver for the isSpamByProvider field.
+func (r *tokenResolver) IsSpamByProvider(ctx context.Context, obj *model.Token) (*bool, error) {
+	var c *model.Contract
+	var err error
+	if obj.Token.Contract != "" {
+		c, err = resolveContractByContractID(ctx, obj.Token.Contract)
+	} else {
+		c, err = resolveContractByTokenID(ctx, obj.Dbid)
+	}
+	if err != nil {
+		return nil, err
+	}
+	isSpam := (c.IsSpam != nil && *c.IsSpam) || (obj.IsSpamByProvider != nil && *obj.IsSpamByProvider)
+	return &isSpam, nil
 }
 
 // Wallets is the resolver for the wallets field.

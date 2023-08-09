@@ -12,124 +12,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-const feedEntityScoring = `-- name: FeedEntityScoring :many
-with ids as (
-    select id, feed_entity_type, created_at, actor_id
-    from feed_entities fe
-    where 
-      fe.created_at >= $1
-      and ($2::bool or fe.actor_id != $3::varchar)
-      and ($4::bool or feed_entity_type != $5)
-), selected_posts as (
-    select
-      ids.id,
-      ids.feed_entity_type,
-      ids.created_at,
-      p.actor_id,
-      p.contract_ids,
-      count(distinct c.id) + count(distinct a.id) interactions
-    from ids
-    join posts p on p.id = ids.id and feed_entity_type = $5
-    left join comments c on c.post_id = ids.id
-    left join admires a on a.post_id = ids.id
-    group by ids.id, ids.feed_entity_type, ids.created_at, p.actor_id, p.contract_ids
-), feed_event_contract_ids as (
-    select t.feed_event_id feed_event_id, array_agg(t.contract_id) contract_ids
-    from (
-      select f.id feed_event_id, c.id contract_id
-      from ids,
-        feed_events f,
-        -- The only event that we currently store with token ids is the 'GalleryUpdated' event
-        -- which includes the 'gallery_new_token_ids' field
-        lateral jsonb_each((data->>'gallery_new_token_ids')::jsonb) x(key, value),
-        jsonb_array_elements_text(x.value) tid(id),
-        tokens t,
-        contracts c
-      where
-        ids.id = f.id
-        and feed_entity_type = $6
-        and tid.id = t.id
-        and c.id = t.contract
-        and not t.deleted
-        and not c.deleted
-      group by 1, 2
-    ) t
-    group by 1
-), selected_events as (
-    select
-      ids.id,
-      ids.feed_entity_type,
-      ids.created_at,
-      ids.actor_id,
-      feed_event_contract_ids.contract_ids,
-      count(distinct c.id) + count(distinct a.id) interactions
-    from ids
-    join feed_events e on e.id = ids.id and feed_entity_type = $6
-    left join comments c on c.feed_event_id = ids.id
-    left join admires a on a.feed_event_id = ids.id
-    left join feed_event_contract_ids on feed_event_contract_ids.feed_event_id = ids.id
-    where not action = any($7::varchar[])
-    group by ids.id, ids.feed_entity_type, ids.created_at, ids.actor_id, feed_event_contract_ids.contract_ids
-)
-select id, feed_entity_type, created_at, actor_id, contract_ids, interactions from selected_posts
-union all
-select id, feed_entity_type, created_at, actor_id, contract_ids, interactions from selected_events
-`
-
-type FeedEntityScoringParams struct {
-	WindowEnd           time.Time `json:"window_end"`
-	IncludeViewer       bool      `json:"include_viewer"`
-	ViewerID            string    `json:"viewer_id"`
-	IncludePosts        bool      `json:"include_posts"`
-	PostEntityType      int32     `json:"post_entity_type"`
-	FeedEventEntityType int32     `json:"feed_event_entity_type"`
-	ExcludedFeedActions []string  `json:"excluded_feed_actions"`
-}
-
-type FeedEntityScoringRow struct {
-	ID             persist.DBID     `json:"id"`
-	FeedEntityType int32            `json:"feed_entity_type"`
-	CreatedAt      time.Time        `json:"created_at"`
-	ActorID        persist.DBID     `json:"actor_id"`
-	ContractIds    persist.DBIDList `json:"contract_ids"`
-	Interactions   int32            `json:"interactions"`
-}
-
-func (q *Queries) FeedEntityScoring(ctx context.Context, arg FeedEntityScoringParams) ([]FeedEntityScoringRow, error) {
-	rows, err := q.db.Query(ctx, feedEntityScoring,
-		arg.WindowEnd,
-		arg.IncludeViewer,
-		arg.ViewerID,
-		arg.IncludePosts,
-		arg.PostEntityType,
-		arg.FeedEventEntityType,
-		arg.ExcludedFeedActions,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []FeedEntityScoringRow
-	for rows.Next() {
-		var i FeedEntityScoringRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.FeedEntityType,
-			&i.CreatedAt,
-			&i.ActorID,
-			&i.ContractIds,
-			&i.Interactions,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getContractLabels = `-- name: GetContractLabels :many
 select user_id, contract_id, displayed
 from owned_contracts
@@ -154,6 +36,70 @@ func (q *Queries) GetContractLabels(ctx context.Context, excludedContracts []str
 	for rows.Next() {
 		var i GetContractLabelsRow
 		if err := rows.Scan(&i.UserID, &i.ContractID, &i.Displayed); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getFeedEntityScores = `-- name: GetFeedEntityScores :many
+with refreshed as (
+  select greatest((select last_updated from feed_entity_scores limit 1), $1::timestamptz) last_updated
+)
+select id, created_at, actor_id, action, contract_ids, interactions, feed_entity_type, last_updated
+from feed_entity_scores f1
+where f1.created_at > $1::timestamptz
+  and ($2::bool or f1.actor_id != $3)
+  and ($4::bool or f1.feed_entity_type != $5)
+  and not (f1.action = any($6::varchar[]))
+union
+select id, created_at, actor_id, action, contract_ids, interactions, feed_entity_type, last_updated
+from feed_entity_score_view f2
+where created_at > (select last_updated from refreshed limit 1)
+  and ($2::bool or f2.actor_id != $3)
+  and ($4::bool or f2.feed_entity_type != $5)
+  and not (f2.action = any($6::varchar[]))
+`
+
+type GetFeedEntityScoresParams struct {
+	WindowEnd           time.Time    `json:"window_end"`
+	IncludeViewer       bool         `json:"include_viewer"`
+	ViewerID            persist.DBID `json:"viewer_id"`
+	IncludePosts        bool         `json:"include_posts"`
+	PostEntityType      int32        `json:"post_entity_type"`
+	ExcludedFeedActions []string     `json:"excluded_feed_actions"`
+}
+
+func (q *Queries) GetFeedEntityScores(ctx context.Context, arg GetFeedEntityScoresParams) ([]FeedEntityScore, error) {
+	rows, err := q.db.Query(ctx, getFeedEntityScores,
+		arg.WindowEnd,
+		arg.IncludeViewer,
+		arg.ViewerID,
+		arg.IncludePosts,
+		arg.PostEntityType,
+		arg.ExcludedFeedActions,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []FeedEntityScore
+	for rows.Next() {
+		var i FeedEntityScore
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.ActorID,
+			&i.Action,
+			&i.ContractIds,
+			&i.Interactions,
+			&i.FeedEntityType,
+			&i.LastUpdated,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

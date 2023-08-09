@@ -247,7 +247,7 @@ func newTokensPlugin(ctx context.Context) tokenTransfersPlugin {
 		}
 
 		wp.StopWait()
-		logger.For(ctx).Info("contracts plugin finished sending")
+		logger.For(ctx).Info("tokens plugin finished sending")
 	}()
 
 	return tokenTransfersPlugin{
