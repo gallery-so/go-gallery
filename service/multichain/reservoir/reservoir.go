@@ -177,7 +177,7 @@ func (d *Provider) GetBlockchainInfo() multichain.BlockchainInfo {
 	return multichain.BlockchainInfo{
 		Chain:      d.chain,
 		ChainID:    chainID,
-		ProviderID: 8,
+		ProviderID: "reservoir",
 	}
 }
 

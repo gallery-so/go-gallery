@@ -218,7 +218,7 @@ func (p *Provider) GetBlockchainInfo(context.Context) (multichain.BlockchainInfo
 	return multichain.BlockchainInfo{
 		Chain:      p.chain,
 		ChainID:    0,
-		ProviderID: 0,
+		ProviderID: "opensea",
 	}, nil
 }
 

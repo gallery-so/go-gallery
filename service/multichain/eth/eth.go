@@ -51,7 +51,7 @@ func (d *Provider) GetBlockchainInfo() multichain.BlockchainInfo {
 	return multichain.BlockchainInfo{
 		Chain:      persist.ChainETH,
 		ChainID:    0,
-		ProviderID: 3,
+		ProviderID: "eth",
 	}
 }
 

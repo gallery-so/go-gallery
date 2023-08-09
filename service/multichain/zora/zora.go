@@ -137,7 +137,7 @@ func (d *Provider) GetBlockchainInfo() multichain.BlockchainInfo {
 	return multichain.BlockchainInfo{
 		Chain:      persist.ChainZora,
 		ChainID:    7777777,
-		ProviderID: 7,
+		ProviderID: "zora",
 	}
 }
 

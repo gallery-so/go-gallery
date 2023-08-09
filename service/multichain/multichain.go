@@ -54,7 +54,7 @@ type Provider struct {
 type BlockchainInfo struct {
 	Chain      persist.Chain `json:"chain_name"`
 	ChainID    int           `json:"chain_id"`
-	ProviderID int           `json:"provider_id"`
+	ProviderID string        `json:"provider_id"`
 }
 
 // ChainAgnosticToken is a token that is agnostic to the chain it is on
@@ -206,13 +206,15 @@ type WalletOverrideMap = map[persist.Chain][]persist.Chain
 // providersMatchingInterface returns providers that adhere to the given interface
 func providersMatchingInterface[T any](providers []any) []T {
 	matches := make([]T, 0)
-	seen := map[int]bool{}
+	seen := map[string]bool{}
 	for _, p := range providers {
 
 		if conf, ok := p.(Configurer); ok && seen[conf.GetBlockchainInfo().ProviderID] {
 			continue
 		} else if ok {
 			seen[conf.GetBlockchainInfo().ProviderID] = true
+		} else {
+			panic(fmt.Sprintf("provider %T does not implement Configurer", p))
 		}
 
 		if match, ok := p.(T); ok {
@@ -223,6 +225,8 @@ func providersMatchingInterface[T any](providers []any) []T {
 				for _, sp := range ps.GetSubproviders() {
 					if conf, ok := sp.(Configurer); ok {
 						seen[conf.GetBlockchainInfo().ProviderID] = true
+					} else {
+						panic(fmt.Sprintf("subprovider %T does not implement Configurer", sp))
 					}
 				}
 			}

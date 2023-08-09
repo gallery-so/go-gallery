@@ -104,7 +104,7 @@ func (p *TezosObjktProvider) GetBlockchainInfo() multichain.BlockchainInfo {
 	return multichain.BlockchainInfo{
 		Chain:      persist.ChainTezos,
 		ChainID:    0,
-		ProviderID: 4,
+		ProviderID: "objkt",
 	}
 }
 

@@ -149,7 +149,7 @@ func (d *Provider) GetBlockchainInfo() multichain.BlockchainInfo {
 	return multichain.BlockchainInfo{
 		Chain:      persist.ChainPOAP,
 		ChainID:    0,
-		ProviderID: 6,
+		ProviderID: "poap",
 	}
 }
 
