@@ -230,6 +230,7 @@ $(DEPLOY)-%-userpref-upload            : CRON_LOCATION  := $(DEPLOY_REGION)
 $(DEPLOY)-%-userpref-upload            : CRON_SCHEDULE  := '0 * * * *'
 $(DEPLOY)-%-userpref-upload            : CRON_URI       = https://$(DEPLOY_REGION)-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/$(GCP_PROJECT)/jobs/$(JOB_NAME):run
 $(DEPLOY)-%-userpref-upload            : CRON_METHOD    := POST
+$(DEPLOY)-%-userpref-upload            : CRON_FLAGS     = --oauth-service-account-email $(GCP_PROJECT_NUMBER)-compute@developer.gserviceaccount.com
 $(DEPLOY)-$(DEV)-userpref-upload       : JOB_OPTIONS    = $(BASE_OPTIONS) --args dev-user-pref,personalization_matrices.bin.gz
 $(DEPLOY)-$(PROD)-userpref-upload      : JOB_OPTIONS    = $(BASE_OPTIONS) --args prod-user-pref,personalization_matrices.bin.gz
 $(DEPLOY)-%-userpref-upload            : DOCKER_FILE    := $(DOCKER_DIR)/userpref/Dockerfile
