@@ -251,14 +251,14 @@ func (t *TokenGalleryRepository) GetByContractID(pCtx context.Context, pContract
 }
 
 type TokenUpsertParams struct {
-	SetHolderFields  bool
 	SetCreatorFields bool
+	SetHolderFields  bool
 	OptionalDelete   *TokenUpsertDeletionParams
 }
 
 type TokenUpsertDeletionParams struct {
-	DeleteHolderStatus  bool
 	DeleteCreatorStatus bool
+	DeleteHolderStatus  bool
 	OnlyFromUserID      *persist.DBID
 	OnlyFromContracts   []persist.DBID
 	OnlyFromChains      []persist.Chain
