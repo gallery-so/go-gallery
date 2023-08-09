@@ -47,11 +47,12 @@ func NewProvider(indexerBaseURL string, httpClient *http.Client, ec *ethclient.C
 }
 
 // GetBlockchainInfo retrieves blockchain info for ETH
-func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.BlockchainInfo, error) {
+func (d *Provider) GetBlockchainInfo() multichain.BlockchainInfo {
 	return multichain.BlockchainInfo{
-		Chain:   persist.ChainETH,
-		ChainID: 0,
-	}, nil
+		Chain:      persist.ChainETH,
+		ChainID:    0,
+		ProviderID: "eth",
+	}
 }
 
 // GetTokenMetadataByTokenIdentifiers retrieves a token's metadata for a given contract address and token ID

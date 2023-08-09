@@ -46,8 +46,8 @@ type SyncFailureSecondary interface {
 	TokenDescriptorsFetcher
 }
 
-func (f SyncWithContractEvalFallbackProvider) GetBlockchainInfo(ctx context.Context) (BlockchainInfo, error) {
-	return f.Primary.GetBlockchainInfo(ctx)
+func (f SyncWithContractEvalFallbackProvider) GetBlockchainInfo() BlockchainInfo {
+	return f.Primary.GetBlockchainInfo()
 }
 
 func (f SyncWithContractEvalFallbackProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]ChainAgnosticToken, []ChainAgnosticContract, error) {
@@ -126,8 +126,8 @@ func (f SyncWithContractEvalFallbackProvider) GetSubproviders() []any {
 	return []any{f.Primary, f.Fallback}
 }
 
-func (f SyncFailureFallbackProvider) GetBlockchainInfo(ctx context.Context) (BlockchainInfo, error) {
-	return f.Primary.GetBlockchainInfo(ctx)
+func (f SyncFailureFallbackProvider) GetBlockchainInfo() BlockchainInfo {
+	return f.Primary.GetBlockchainInfo()
 }
 
 func (f SyncFailureFallbackProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]ChainAgnosticToken, []ChainAgnosticContract, error) {

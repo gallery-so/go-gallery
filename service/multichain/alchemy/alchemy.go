@@ -214,7 +214,7 @@ func NewProvider(chain persist.Chain, httpClient *http.Client) *Provider {
 }
 
 // GetBlockchainInfo retrieves blockchain info for ETH
-func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.BlockchainInfo, error) {
+func (d *Provider) GetBlockchainInfo() multichain.BlockchainInfo {
 	chainID := 0
 	switch d.chain {
 	case persist.ChainOptimism:
@@ -223,9 +223,10 @@ func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.Blockchain
 		chainID = 137
 	}
 	return multichain.BlockchainInfo{
-		Chain:   d.chain,
-		ChainID: chainID,
-	}, nil
+		Chain:      d.chain,
+		ChainID:    chainID,
+		ProviderID: "alchemy",
+	}
 }
 
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the Ethereum Blockchain

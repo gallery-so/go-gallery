@@ -131,11 +131,12 @@ func NewProvider(tezosAPIUrl string, httpClient *http.Client) *Provider {
 }
 
 // GetBlockchainInfo retrieves blockchain info for Tezos
-func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.BlockchainInfo, error) {
+func (d *Provider) GetBlockchainInfo() multichain.BlockchainInfo {
 	return multichain.BlockchainInfo{
-		Chain:   persist.ChainTezos,
-		ChainID: 0,
-	}, nil
+		Chain:      persist.ChainTezos,
+		ChainID:    0,
+		ProviderID: "tezos",
+	}
 }
 
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the Tezos Blockchain
