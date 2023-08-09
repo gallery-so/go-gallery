@@ -6,6 +6,7 @@ package graphql
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -2552,6 +2553,20 @@ func (r *tokenResolver) OwnedByWallets(ctx context.Context, obj *model.Token) ([
 	}
 
 	return wallets, nil
+}
+
+// TokenMetadata is the resolver for the tokenMetadata field.
+func (r *tokenResolver) TokenMetadata(ctx context.Context, obj *model.Token) (*string, error) {
+	tokenMedia, err := publicapi.For(ctx).Token.MediaByTokenID(ctx, obj.Dbid)
+	if err != nil {
+		return nil, err
+	}
+	mar, err := json.Marshal(tokenMedia.Metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	return util.ToPointer(string(mar)), nil
 }
 
 // Contract is the resolver for the contract field.

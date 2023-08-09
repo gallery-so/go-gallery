@@ -2038,6 +2038,7 @@ type Token struct {
 	OwnershipHistory      []*OwnerAtBlock       `json:"ownershipHistory"`
 	OwnerIsHolder         *bool                 `json:"ownerIsHolder"`
 	OwnerIsCreator        *bool                 `json:"ownerIsCreator"`
+	TokenMetadata         *string               `json:"tokenMetadata"`
 	Contract              *Contract             `json:"contract"`
 	Community             *Community            `json:"community"`
 	ExternalURL           *string               `json:"externalUrl"`

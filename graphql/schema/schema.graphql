@@ -432,6 +432,7 @@ type Token implements Node @goEmbedHelper {
   ownershipHistory: [OwnerAtBlock]
   ownerIsHolder: Boolean
   ownerIsCreator: Boolean
+  tokenMetadata: String @goField(forceResolver: true)
   contract: Contract @goField(forceResolver: true)
   community: Community @goField(forceResolver: true)
   externalUrl: String

@@ -1246,6 +1246,7 @@ type ComplexityRoot struct {
 		OwnershipHistory      func(childComplexity int) int
 		Quantity              func(childComplexity int) int
 		TokenID               func(childComplexity int) int
+		TokenMetadata         func(childComplexity int) int
 		TokenType             func(childComplexity int) int
 	}
 
@@ -1807,6 +1808,7 @@ type TokenResolver interface {
 	Owner(ctx context.Context, obj *model.Token) (*model.GalleryUser, error)
 	OwnedByWallets(ctx context.Context, obj *model.Token) ([]*model.Wallet, error)
 
+	TokenMetadata(ctx context.Context, obj *model.Token) (*string, error)
 	Contract(ctx context.Context, obj *model.Token) (*model.Contract, error)
 	Community(ctx context.Context, obj *model.Token) (*model.Community, error)
 
@@ -7001,6 +7003,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Token.TokenID(childComplexity), true
 
+	case "Token.tokenMetadata":
+		if e.complexity.Token.TokenMetadata == nil {
+			break
+		}
+
+		return e.complexity.Token.TokenMetadata(childComplexity), true
+
 	case "Token.tokenType":
 		if e.complexity.Token.TokenType == nil {
 			break
@@ -8322,6 +8331,7 @@ type Token implements Node @goEmbedHelper {
   ownershipHistory: [OwnerAtBlock]
   ownerIsHolder: Boolean
   ownerIsCreator: Boolean
+  tokenMetadata: String @goField(forceResolver: true)
   contract: Contract @goField(forceResolver: true)
   community: Community @goField(forceResolver: true)
   externalUrl: String
@@ -15208,6 +15218,8 @@ func (ec *executionContext) fieldContext_ChainTokens_tokens(ctx context.Context,
 				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
 			case "ownerIsCreator":
 				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "tokenMetadata":
+				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
 				return ec.fieldContext_Token_contract(ctx, field)
 			case "community":
@@ -16410,6 +16422,8 @@ func (ec *executionContext) fieldContext_CollectionToken_token(ctx context.Conte
 				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
 			case "ownerIsCreator":
 				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "tokenMetadata":
+				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
 				return ec.fieldContext_Token_contract(ctx, field)
 			case "community":
@@ -21147,6 +21161,8 @@ func (ec *executionContext) fieldContext_EnsProfileImage_token(ctx context.Conte
 				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
 			case "ownerIsCreator":
 				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "tokenMetadata":
+				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
 				return ec.fieldContext_Token_contract(ctx, field)
 			case "community":
@@ -26683,6 +26699,8 @@ func (ec *executionContext) fieldContext_GalleryUser_tokens(ctx context.Context,
 				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
 			case "ownerIsCreator":
 				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "tokenMetadata":
+				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
 				return ec.fieldContext_Token_contract(ctx, field)
 			case "community":
@@ -35922,6 +35940,8 @@ func (ec *executionContext) fieldContext_NewTokensNotification_token(ctx context
 				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
 			case "ownerIsCreator":
 				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "tokenMetadata":
+				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
 				return ec.fieldContext_Token_contract(ctx, field)
 			case "community":
@@ -37249,6 +37269,8 @@ func (ec *executionContext) fieldContext_Post_tokens(ctx context.Context, field 
 				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
 			case "ownerIsCreator":
 				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "tokenMetadata":
+				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
 				return ec.fieldContext_Token_contract(ctx, field)
 			case "community":
@@ -41313,6 +41335,8 @@ func (ec *executionContext) fieldContext_RefreshTokenPayload_token(ctx context.C
 				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
 			case "ownerIsCreator":
 				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "tokenMetadata":
+				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
 				return ec.fieldContext_Token_contract(ctx, field)
 			case "community":
@@ -42366,6 +42390,8 @@ func (ec *executionContext) fieldContext_SetSpamPreferencePayload_tokens(ctx con
 				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
 			case "ownerIsCreator":
 				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "tokenMetadata":
+				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
 				return ec.fieldContext_Token_contract(ctx, field)
 			case "community":
@@ -47317,6 +47343,47 @@ func (ec *executionContext) fieldContext_Token_ownerIsCreator(ctx context.Contex
 	return fc, nil
 }
 
+func (ec *executionContext) _Token_tokenMetadata(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Token_tokenMetadata(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Token().TokenMetadata(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Token_tokenMetadata(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Token_contract(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Token_contract(ctx, field)
 	if err != nil {
@@ -47826,6 +47893,8 @@ func (ec *executionContext) fieldContext_TokenEdge_node(ctx context.Context, fie
 				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
 			case "ownerIsCreator":
 				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "tokenMetadata":
+				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
 				return ec.fieldContext_Token_contract(ctx, field)
 			case "community":
@@ -48392,6 +48461,8 @@ func (ec *executionContext) fieldContext_TokenProfileImage_token(ctx context.Con
 				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
 			case "ownerIsCreator":
 				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "tokenMetadata":
+				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
 				return ec.fieldContext_Token_contract(ctx, field)
 			case "community":
@@ -50796,6 +50867,8 @@ func (ec *executionContext) fieldContext_UpdateTokenInfoPayload_token(ctx contex
 				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
 			case "ownerIsCreator":
 				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "tokenMetadata":
+				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
 				return ec.fieldContext_Token_contract(ctx, field)
 			case "community":
@@ -52605,6 +52678,8 @@ func (ec *executionContext) fieldContext_ViewTokenPayload_token(ctx context.Cont
 				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
 			case "ownerIsCreator":
 				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "tokenMetadata":
+				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
 				return ec.fieldContext_Token_contract(ctx, field)
 			case "community":
@@ -53532,6 +53607,8 @@ func (ec *executionContext) fieldContext_Wallet_tokens(ctx context.Context, fiel
 				return ec.fieldContext_Token_ownerIsHolder(ctx, field)
 			case "ownerIsCreator":
 				return ec.fieldContext_Token_ownerIsCreator(ctx, field)
+			case "tokenMetadata":
+				return ec.fieldContext_Token_tokenMetadata(ctx, field)
 			case "contract":
 				return ec.fieldContext_Token_contract(ctx, field)
 			case "community":
@@ -69917,6 +69994,23 @@ func (ec *executionContext) _Token(ctx context.Context, sel ast.SelectionSet, ob
 
 			out.Values[i] = ec._Token_ownerIsCreator(ctx, field, obj)
 
+		case "tokenMetadata":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Token_tokenMetadata(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "contract":
 			field := field
 

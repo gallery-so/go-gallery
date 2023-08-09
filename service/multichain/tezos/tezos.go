@@ -607,6 +607,17 @@ func (d *Provider) GetDisplayNameByAddress(ctx context.Context, addr persist.Add
 	return resp.Data.Domains.Items[0].Name
 }
 
+func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
+	t, _, err := d.GetTokensByTokenIdentifiers(ctx, ti, 1, 0)
+	if err != nil {
+		return persist.TokenMetadata{}, err
+	}
+	if len(t) == 0 {
+		return persist.TokenMetadata{}, fmt.Errorf("no token found for %s", ti)
+	}
+	return t[0].TokenMetadata, nil
+}
+
 // RefreshToken refreshes the metadata for a given token.
 func (d *Provider) RefreshToken(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, owner persist.Address) error {
 	return nil
