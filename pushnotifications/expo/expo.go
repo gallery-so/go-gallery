@@ -94,6 +94,35 @@ func newPushError(code string) *PushError {
 	return &PushError{Code: code}
 }
 
+func getErrorFromDetails(ctx context.Context, details map[string]any, knownErrors []*PushError) error {
+	code, ok := details["error"].(string)
+	if !ok {
+		err := fmt.Errorf("invalid push error type: expected a string, got: %v", details["error"])
+		logger.For(ctx).Error(err)
+		return err
+	}
+
+	messageStr := ""
+	if message, ok := details["message"]; ok {
+		if messageStr, ok = message.(string); ok {
+			logger.For(ctx).Infof("found details for error %s: %s", code, messageStr)
+		}
+	}
+
+	err := findErrorByCode(code, knownErrors)
+
+	if err != nil {
+		return err
+	}
+
+	errStr := "unknown error: " + code
+	if messageStr != "" {
+		errStr += " (" + messageStr + ")"
+	}
+
+	return errors.New(errStr)
+}
+
 // GetError gets the error for the ticket, if any. Returns nil if no error.
 // See: https://docs.expo.dev/push-notifications/sending-notifications/#push-ticket-errors
 func (t PushTicket) GetError(ctx context.Context) error {
@@ -101,27 +130,9 @@ func (t PushTicket) GetError(ctx context.Context) error {
 		return nil
 	}
 
-	code, ok := t.Details["error"].(string)
-	if !ok {
-		err := fmt.Errorf("invalid push error type: expected a string, got: %v", t.Details["error"])
-		logger.For(ctx).Error(err)
-		return err
-	}
-
-	err := findErrorByCode(code, []*PushError{
+	return getErrorFromDetails(ctx, t.Details, []*PushError{
 		ErrDeviceNotRegistered,
 	})
-
-	if err != nil {
-		if message, ok := t.Details["message"]; ok {
-			if messageStr, ok := message.(string); ok {
-				logger.For(ctx).Infof("found details for push ticket error %s: %s", code, messageStr)
-			}
-		}
-		return err
-	}
-
-	return errors.New("unknown error: " + code)
 }
 
 // GetError gets the error for the receipt, if any. Returns nil if no error.
@@ -131,31 +142,13 @@ func (t PushReceipt) GetError(ctx context.Context) error {
 		return nil
 	}
 
-	code, ok := t.Details["error"].(string)
-	if !ok {
-		err := fmt.Errorf("invalid push error type: expected a string, got: %v", t.Details["error"])
-		logger.For(ctx).Error(err)
-		return err
-	}
-
-	err := findErrorByCode(code, []*PushError{
+	return getErrorFromDetails(ctx, t.Details, []*PushError{
 		ErrDeviceNotRegistered,
 		ErrMessageTooBig,
 		ErrMessageRateExceeded,
 		ErrMismatchSenderId,
 		ErrInvalidCredentials,
 	})
-
-	if err != nil {
-		if message, ok := t.Details["message"]; ok {
-			if messageStr, ok := message.(string); ok {
-				logger.For(ctx).Infof("found details for push receipt error %s: %s", code, messageStr)
-			}
-		}
-		return err
-	}
-
-	return errors.New("unknown error: " + code)
 }
 
 func (r *SendMessagesResponse) GetError() error {
