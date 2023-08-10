@@ -4845,21 +4845,25 @@ func (q *Queries) HasLaterGroupedEvent(ctx context.Context, arg HasLaterGroupedE
 }
 
 const insertExternalSocialConnectionsForUser = `-- name: InsertExternalSocialConnectionsForUser :many
-insert into external_social_connections (id, social_account_type, follower_id, followee_id) select (id, social_account_type, follower_id, followee_id) from (select unnest($1::varchar[]) as id, $2::varchar as social_account_type, $3::varchar as follower_id, unnest($4::varchar[]) as followee_id) bulk_insert returning id, version, social_account_type, follower_id, followee_id, created_at, last_updated, deleted
+insert into external_social_connections (id, social_account_type, follower_id, followee_id) 
+select id, $1::varchar, $2::varchar, followee_id
+from 
+(select unnest($3::varchar[]) as id, unnest($4::varchar[]) as followee_id) as bulk_upsert 
+returning id, version, social_account_type, follower_id, followee_id, created_at, last_updated, deleted
 `
 
 type InsertExternalSocialConnectionsForUserParams struct {
-	Ids               []string `json:"ids"`
 	SocialAccountType string   `json:"social_account_type"`
 	FollowerID        string   `json:"follower_id"`
+	Ids               []string `json:"ids"`
 	FolloweeIds       []string `json:"followee_ids"`
 }
 
 func (q *Queries) InsertExternalSocialConnectionsForUser(ctx context.Context, arg InsertExternalSocialConnectionsForUserParams) ([]ExternalSocialConnection, error) {
 	rows, err := q.db.Query(ctx, insertExternalSocialConnectionsForUser,
-		arg.Ids,
 		arg.SocialAccountType,
 		arg.FollowerID,
+		arg.Ids,
 		arg.FolloweeIds,
 	)
 	if err != nil {

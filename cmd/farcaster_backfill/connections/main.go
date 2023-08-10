@@ -61,6 +61,11 @@ func main() {
 				SocialAccountType: "Farcaster",
 				SocialIds:         fids,
 			})
+			if len(gus) == 0 {
+				logrus.Infof("no gallery users found for user %s (%s)", userID, fid)
+				return nil
+			}
+
 			logrus.Infof("got gallery user connections for user %s (%s) len: %d", userID, fid, len(gus))
 
 			ids, _ := util.Map(gus, func(i coredb.PiiUserView) (string, error) {
@@ -77,8 +82,8 @@ func main() {
 				FolloweeIds:       gfeids,
 			})
 			if err != nil {
-				logrus.Error(err)
-				return nil
+				logrus.Errorf("error inserting connections for user %s (%s): %s", userID.String(), fid, err.Error())
+				return err
 			}
 
 			return nil
