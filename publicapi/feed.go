@@ -726,17 +726,21 @@ func scoreFeedEntity(p *userpref.Personalization, viewerID persist.DBID, e db.Fe
 		// Use a default value of 0.1 so that it isn't completely penalized because of missing data.
 		personalizationF = 0.1
 	}
-	return (timeWeight * timeF) * (1 + (engagementWeight * engagementF)) * (1 + (personalizationWeight * personalizationF))
+	timeScore := timeWeight * timeF
+	engagementScore := timeScore * (1 + (engagementWeight * engagementF))
+	personalizationScore := timeScore * (1 + (personalizationWeight * personalizationF))
+	return engagementScore + personalizationScore
 }
 
 func timeFactor(t0, t1 time.Time) float64 {
-	lambda := 0.0005
+	lambda := 0.001 // half-life of 12 hours
 	age := t1.Sub(t0).Minutes()
-	return math.Pow(math.E, (-lambda * age))
+	tHalf := math.Ln2 / lambda
+	return 1 * math.Pow(2, -(age/tHalf))
 }
 
 func engagementFactor(interactions int) float64 {
-	return 4 * math.Log1p(float64(interactions))
+	return math.Sqrt(float64(interactions))
 }
 
 type priorityNode interface {

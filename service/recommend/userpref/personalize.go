@@ -278,7 +278,6 @@ func (p *Personalization) update(ctx context.Context) {
 }
 
 func (p *Personalization) readCache(ctx context.Context) {
-	logger.For(ctx).Infof("personalization data is stale, reading from cache")
 	now := time.Now()
 	r, err := p.b.NewReader(ctx, gcpObjectName)
 	check(err)
