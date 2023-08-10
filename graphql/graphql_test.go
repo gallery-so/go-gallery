@@ -860,7 +860,10 @@ func testSyncNewTokensMultichain(t *testing.T) {
 	userF := newUserFixture(t)
 	provider := defaultStubProvider(userF.Wallet.Address)
 	contract := multichain.ChainAgnosticContract{Address: "0x124", Descriptors: multichain.ChainAgnosticContractDescriptors{Name: "wow"}}
-	secondProvider := newStubProvider(withContractTokens(contract, userF.Wallet.Address, 10))
+	secondProvider := newStubProvider(
+		withContractTokens(contract, userF.Wallet.Address, 10),
+		withBlockchainInfo(multichain.BlockchainInfo{ProviderID: persist.GenerateID().String()}),
+	)
 	h := handlerWithProviders(t, sendTokensNOOP, provider, secondProvider)
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 	ctx := context.Background()
@@ -935,7 +938,7 @@ func testSyncShouldCombineProviders(t *testing.T) {
 
 	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum})
 
-	assertSyncedTokens(t, response, err, len(providerA.Tokens)+len(providerB.Tokens))
+	assertSyncedTokens(t, response, err, 4)
 }
 
 func testSyncShouldMergeDuplicatesInProvider(t *testing.T) {

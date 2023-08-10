@@ -3,7 +3,6 @@ package main
 
 import (
 	"context"
-	"os"
 	"time"
 
 	sentrypkg "github.com/getsentry/sentry-go"
@@ -33,8 +32,10 @@ var rootCmd = &cobra.Command{
 		now := time.Now()
 
 		if env.GetString("ENV") == "local" && envVar != "local" {
-			util.LoadEncryptedEnvFile(util.ResolveEnvFile("backend", envVar))
+			util.LoadEncryptedEnvFile(util.ResolveEnvFile("userpref-upload", envVar))
 		}
+
+		logger.For(ctx).Infof("uploading matrices to %s/%s", args[0], args[1])
 
 		n, err := upload(ctx, args[0], args[1])
 
@@ -81,22 +82,10 @@ func setDefaults() {
 	viper.SetDefault("POSTGRES_USER", "gallery_backend")
 	viper.SetDefault("POSTGRES_PASSWORD", "")
 	viper.SetDefault("POSTGRES_DB", "postgres")
-	viper.SetDefault("GCLOUD_USER_PREF_BUCKET", "dev-user-pref")
 	viper.SetDefault("SENTRY_DSN", "")
 	viper.SetDefault("SENTRY_TRACES_SAMPLE_RATE", "1.0")
 	viper.SetDefault("GAE_VERSION", "")
 	viper.AutomaticEnv()
-
-	if env.GetString("ENV") != "local" {
-		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
-	} else {
-		fi := "local"
-		if len(os.Args) > 1 {
-			fi = os.Args[1]
-		}
-		envFile := util.ResolveEnvFile("backend", fi)
-		util.LoadEncryptedEnvFile(envFile)
-	}
 }
 
 func initSentry() {
