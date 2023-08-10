@@ -24,10 +24,8 @@ import (
 )
 
 const (
-	contextKey      = "personalization.instance"
-	gcpObjectName   = "personalization_matrices.bin.gz"
-	edgeWeight      = 1.0
-	relevanceWeight = 1.0
+	contextKey    = "personalization.instance"
+	gcpObjectName = "personalization_matrices.bin.gz"
 )
 
 var ErrNoInputData = errors.New("no personalization input data")
@@ -210,7 +208,7 @@ func (p *Personalization) RelevanceTo(userID persist.DBID, e db.FeedEntityScore)
 	}
 
 	edgeScore, _ := p.scoreEdge(userID, e.ActorID)
-	return (relevanceWeight * (relevanceScore / 0.05)) + (edgeWeight * edgeScore), nil
+	return (relevanceScore * relevanceScore) + edgeScore, nil
 }
 
 func (p *Personalization) scoreEdge(viewerID, queryID persist.DBID) (float64, error) {
@@ -449,11 +447,22 @@ func readContractMatrices(ctx context.Context, q *db.Queries, uL map[persist.DBI
 func readUserMatrix(ctx context.Context, q *db.Queries, uL map[persist.DBID]int) *sparse.CSR {
 	follows, err := q.GetFollowGraphSource(ctx)
 	check(err)
+
+	externalFollows, err := q.GetExternalFollowGraphSource(ctx)
+	check(err)
+
 	dok := sparse.NewDOK(len(uL), len(uL))
 	userAdj := make(map[persist.DBID][]persist.DBID)
+
 	for _, f := range follows {
 		userAdj[f.Follower] = append(userAdj[f.Follower], f.Followee)
 	}
+
+	// It's fine if a user follows a user on Gallery and elsewhere, we'll only count the follow once
+	for _, f := range externalFollows {
+		userAdj[f.FollowerID] = append(userAdj[f.FollowerID], f.FolloweeID)
+	}
+
 	for uID, uIdx := range uL {
 		for _, followee := range userAdj[uID] {
 			followeeIdx := mustGet(uL, followee)
@@ -464,6 +473,7 @@ func readUserMatrix(ctx context.Context, q *db.Queries, uL map[persist.DBID]int)
 			dok.Set(uIdx, 0, 0)
 		}
 	}
+
 	return dok.ToCSR()
 }
 

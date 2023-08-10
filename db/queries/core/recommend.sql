@@ -5,20 +5,28 @@ select
 from
   follows,
   users as followers,
-  users as followees,
-  (
-    select owner_user_id
-    from collections
-    where cardinality(nfts) > 0 and deleted = false
-    group by owner_user_id
-  ) displaying
+  users as followees
 where
   follows.follower = followers.id
-  and follows.followee = displaying.owner_user_id
   and followers.deleted is false
   and follows.followee = followees.id
   and followees.deleted is false
   and follows.deleted = false;
+
+-- name: GetExternalFollowGraphSource :many
+select
+  external_social_connections.follower_id,
+  external_social_connections.followee_id
+from
+  external_social_connections,
+  users as followers,
+  users as followees
+where
+  external_social_connections.follower_id = followers.id
+  and followers.deleted is false
+  and external_social_connections.followee_id = followees.id
+  and followees.deleted is false
+  and external_social_connections.deleted = false;
 
 -- name: UpdatedRecommendationResults :exec
 insert into recommendation_results
@@ -49,6 +57,10 @@ select * from follows f where f.follower = $1 and f.deleted = false;
 select follower id from follows where not deleted group by 1
 union
 select followee id from follows where not deleted group by 1
+union
+select follower_id id from external_social_connections where not deleted group by 1
+union
+select followee_id id from external_social_connections where not deleted group by 1
 union
 select user_id id from owned_contracts where displayed group by 1;
 
