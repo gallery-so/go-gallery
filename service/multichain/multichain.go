@@ -786,11 +786,6 @@ func (p *Provider) processTokensForUsers(ctx context.Context, users map[persist.
 		logger.For(ctx).Infof("deleted %d tokens", numAffectedRows)
 	}
 
-	// Invariant to make sure that its safe to index persistedTokens
-	if len(tokensToUpsert) != len(persistedTokens) {
-		panic("expected the length of tokens inserted to match the input length")
-	}
-
 	newUserTokens := make(map[persist.DBID][]persist.TokenGallery)
 
 	errors := make([]error, 0)
@@ -1332,7 +1327,9 @@ outer:
 	}
 
 	_, _, err = p.processTokensForOwnersOfContract(ctx, persistedContracts[0], users, chainTokensForUsers, postgres.TokenUpsertParams{
-		SetHolderFields: true,
+		SetCreatorFields: false,
+		SetHolderFields:  true,
+		OptionalDelete:   nil,
 	})
 
 	return err
