@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
@@ -355,6 +356,7 @@ type TokenMetadata struct {
 func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
 	meta, err := p.getMetadata(ctx, ti, true)
 	if err != nil {
+		logger.For(ctx).Errorf("failed to get metadata for token %s: %s", ti.TokenID, err.Error())
 		return p.getMetadata(ctx, ti, false)
 	}
 	return meta, nil

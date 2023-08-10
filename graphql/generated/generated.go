@@ -1808,6 +1808,7 @@ type TokenResolver interface {
 	Owner(ctx context.Context, obj *model.Token) (*model.GalleryUser, error)
 	OwnedByWallets(ctx context.Context, obj *model.Token) ([]*model.Wallet, error)
 
+	TokenMetadata(ctx context.Context, obj *model.Token) (*string, error)
 	Contract(ctx context.Context, obj *model.Token) (*model.Contract, error)
 	Community(ctx context.Context, obj *model.Token) (*model.Community, error)
 
@@ -8330,7 +8331,7 @@ type Token implements Node @goEmbedHelper {
   ownershipHistory: [OwnerAtBlock]
   ownerIsHolder: Boolean
   ownerIsCreator: Boolean
-  tokenMetadata: String # source is map[string]interface{} on backend, not sure what best format is here
+  tokenMetadata: String @goField(forceResolver: true)
   contract: Contract @goField(forceResolver: true)
   community: Community @goField(forceResolver: true)
   externalUrl: String
@@ -47356,7 +47357,7 @@ func (ec *executionContext) _Token_tokenMetadata(ctx context.Context, field grap
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.TokenMetadata, nil
+		return ec.resolvers.Token().TokenMetadata(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -47374,8 +47375,8 @@ func (ec *executionContext) fieldContext_Token_tokenMetadata(ctx context.Context
 	fc = &graphql.FieldContext{
 		Object:     "Token",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
 		},
@@ -69994,9 +69995,22 @@ func (ec *executionContext) _Token(ctx context.Context, sel ast.SelectionSet, ob
 			out.Values[i] = ec._Token_ownerIsCreator(ctx, field, obj)
 
 		case "tokenMetadata":
+			field := field
 
-			out.Values[i] = ec._Token_tokenMetadata(ctx, field, obj)
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Token_tokenMetadata(ctx, field, obj)
+				return res
+			}
 
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "contract":
 			field := field
 

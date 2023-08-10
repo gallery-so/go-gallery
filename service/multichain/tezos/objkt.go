@@ -112,6 +112,19 @@ func (p *TezosObjktProvider) RefreshToken(ctx context.Context, ti multichain.Cha
 	return nil
 }
 
+func (p *TezosObjktProvider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
+	t, _, err := p.GetTokensByTokenIdentifiers(ctx, ti)
+	if err != nil {
+		return persist.TokenMetadata{}, err
+	}
+
+	if len(t) == 0 {
+		return persist.TokenMetadata{}, fmt.Errorf("token not found for %s", ti)
+	}
+
+	return t[0].TokenMetadata, nil
+}
+
 func (p *TezosObjktProvider) GetTokensByWalletAddress(ctx context.Context, ownerAddress persist.Address, maxLimit int, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"ownerAddress": ownerAddress})
 	tzOwnerAddress, err := toTzAddress(ownerAddress)
