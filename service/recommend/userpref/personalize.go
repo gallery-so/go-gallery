@@ -189,11 +189,11 @@ func NewPersonalization(ctx context.Context, q *db.Queries, c *storage.Client) *
 	return k
 }
 
-func (p *Personalization) RelevanceTo(userID persist.DBID, e db.FeedEntityScore) (float64, error) {
+func (p *Personalization) RelevanceTo(userID persist.DBID, e db.FeedEntityScore) float64 {
 	// We don't have personalization data for this user yet
 	_, vOK := p.pM.uL[userID]
 	if !vOK {
-		return 0, ErrNoInputData
+		return 0
 	}
 
 	var relevanceScore float64
@@ -208,7 +208,7 @@ func (p *Personalization) RelevanceTo(userID persist.DBID, e db.FeedEntityScore)
 	}
 
 	edgeScore, _ := p.scoreEdge(userID, e.ActorID)
-	return (relevanceScore * relevanceScore) + edgeScore, nil
+	return relevanceScore + edgeScore
 }
 
 func (p *Personalization) scoreEdge(viewerID, queryID persist.DBID) (float64, error) {
@@ -288,8 +288,7 @@ func (p *Personalization) readCache(ctx context.Context) {
 
 // calcSocialScore determines if vIdx is in the same friend circle as qIdx by running a bfs on userM
 func calcSocialScore(userM *sparse.CSR, vIdx, qIdx int) float64 {
-	score := bfs(userM, vIdx, qIdx)
-	return score
+	return bfs(userM, vIdx, qIdx)
 }
 
 // calcRelavanceScore computes the relevance of cIdx to vIdx's held tokens
@@ -357,9 +356,9 @@ func bfs(m *sparse.CSR, vIdx, qIdx int) float64 {
 	for len(q) > 0 {
 		cur := q.Pop()
 		if cur == qIdx {
-			return 1
+			return 1 / float64(depth.Get(cur))
 		}
-		if depth.Get(cur) > 3 {
+		if depth.Get(cur) > 4 {
 			return 0
 		}
 		neighbors := m.RowView(cur).(*sparse.Vector)
