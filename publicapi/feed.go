@@ -232,6 +232,11 @@ func (api FeedAPI) UserFeed(ctx context.Context, userID persist.DBID, before *st
 		return nil, PageInfo{}, err
 	}
 
+	// Include posts for admins always during the soft launch
+	if !includePosts {
+		includePosts = shouldShowPosts(ctx)
+	}
+
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
 		keys, err := api.queries.PaginateUserFeedByUserID(ctx, db.PaginateUserFeedByUserIDParams{
 			OwnerID:        userID,
@@ -263,6 +268,11 @@ func (api FeedAPI) GlobalFeed(ctx context.Context, before *string, after *string
 	// Validate
 	if err := validatePaginationParams(api.validator, first, last); err != nil {
 		return nil, PageInfo{}, err
+	}
+
+	// Include posts for admins always during the soft launch
+	if !includePosts {
+		includePosts = shouldShowPosts(ctx)
 	}
 
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
@@ -309,6 +319,11 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 	hasCursors := before != nil || after != nil
 
 	now := time.Now()
+
+	// Include posts for admins always during the soft launch
+	if !includePosts {
+		includePosts = shouldShowPosts(ctx)
+	}
 
 	if !hasCursors {
 		calcFunc := func(ctx context.Context) ([]persist.FeedEntityType, []persist.DBID, error) {
@@ -432,6 +447,11 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 	hasCursors := before != nil || after != nil
 
 	now := time.Now()
+
+	// Include posts for admins always during the soft launch
+	if !includePosts {
+		includePosts = shouldShowPosts(ctx)
+	}
 
 	if !hasCursors {
 		trendData, err := api.queries.GetFeedEntityScores(ctx, db.GetFeedEntityScoresParams{
@@ -954,4 +974,13 @@ func max(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func shouldShowPosts(ctx context.Context) bool {
+	for _, role := range getUserRoles(ctx) {
+		if role == persist.RoleAdmin || role == persist.RoleBetaTester {
+			return true
+		}
+	}
+	return false
 }
