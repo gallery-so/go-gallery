@@ -166,6 +166,7 @@ func tezosProvidersConfig(tezosProvider multichain.SyncWithContractEvalFallbackP
 	wire.Build(
 		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(tezosProvider)),
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(tezosProvider)),
+		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(tezosProvider)),
 		tezosRequirements,
 	)
 	return nil
@@ -175,8 +176,9 @@ func tezosProvidersConfig(tezosProvider multichain.SyncWithContractEvalFallbackP
 func tezosRequirements(
 	tof multichain.TokensOwnerFetcher,
 	toc multichain.TokensContractFetcher,
+	tmf multichain.TokenMetadataFetcher,
 ) tezosProviderList {
-	return tezosProviderList{tof, toc}
+	return tezosProviderList{tof, toc, tmf}
 }
 
 // optimismProviderSet is a wire injector that creates the set of Optimism providers
@@ -261,6 +263,7 @@ func poapProvidersConfig(poapProvider *poap.Provider) poapProviderList {
 		wire.Bind(new(multichain.NameResolver), util.ToPointer(poapProvider)),
 		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(poapProvider)),
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(poapProvider)),
+		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(poapProvider)),
 		poapRequirements,
 	)
 	return nil
@@ -271,8 +274,9 @@ func poapRequirements(
 	nr multichain.NameResolver,
 	tof multichain.TokensOwnerFetcher,
 	toc multichain.TokensContractFetcher,
+	tmf multichain.TokenMetadataFetcher,
 ) poapProviderList {
-	return poapProviderList{nr, tof, toc}
+	return poapProviderList{nr, tof, toc, tmf}
 }
 
 // zoraProviderSet is a wire injector that creates the set of zora providers
@@ -291,6 +295,7 @@ func zoraProvidersConfig(zoraProvider *zora.Provider) zoraProviderList {
 		wire.Bind(new(multichain.ContractsFetcher), util.ToPointer(zoraProvider)),
 		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(zoraProvider)),
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(zoraProvider)),
+		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(zoraProvider)),
 		zoraRequirements,
 	)
 	return nil
@@ -301,8 +306,9 @@ func zoraRequirements(
 	nr multichain.ContractsFetcher,
 	tof multichain.TokensOwnerFetcher,
 	toc multichain.TokensContractFetcher,
+	tmf multichain.TokenMetadataFetcher,
 ) zoraProviderList {
-	return zoraProviderList{nr, tof, toc}
+	return zoraProviderList{nr, tof, toc, tmf}
 }
 
 func baseProviderSet(*http.Client) baseProviderList {
@@ -404,13 +410,13 @@ func newMultichainSet(
 // defaultWalletOverrides is a wire provider for wallet overrides
 func defaultWalletOverrides() multichain.WalletOverrideMap {
 	return multichain.WalletOverrideMap{
-		persist.ChainPOAP:     persist.EVMChains,
-		persist.ChainOptimism: persist.EVMChains,
-		persist.ChainPolygon:  persist.EVMChains,
-		persist.ChainArbitrum: persist.EVMChains,
-		persist.ChainETH:      persist.EVMChains,
-		persist.ChainZora:     persist.EVMChains,
-		persist.ChainBase:     persist.EVMChains,
+		persist.ChainPOAP:     persist.EvmChains,
+		persist.ChainOptimism: persist.EvmChains,
+		persist.ChainPolygon:  persist.EvmChains,
+		persist.ChainArbitrum: persist.EvmChains,
+		persist.ChainETH:      persist.EvmChains,
+		persist.ChainZora:     persist.EvmChains,
+		persist.ChainBase:     persist.EvmChains,
 	}
 }
 
