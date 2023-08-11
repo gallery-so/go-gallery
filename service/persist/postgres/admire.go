@@ -20,7 +20,7 @@ func NewAdmireRepository(queries *db.Queries) *AdmireRepository {
 	}
 }
 
-func (a *AdmireRepository) CreateAdmire(ctx context.Context, feedEventID, postID, actorID persist.DBID) (persist.DBID, error) {
+func (a *AdmireRepository) CreateAdmire(ctx context.Context, feedEventID, postID, tokenID, actorID persist.DBID) (persist.DBID, error) {
 
 	var feedEventString sql.NullString
 	if feedEventID != "" {

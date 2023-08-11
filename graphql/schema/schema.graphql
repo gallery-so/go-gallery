@@ -2396,6 +2396,18 @@ type AdmirePostPayload {
 
 union AdmirePostPayloadOrError = AdmirePostPayload | ErrInvalidInput | ErrNotAuthorized
 
+type AdmireTokenPayload {
+  viewer: Viewer
+  token: Token
+  admire: Admire @goField(forceResolver: true)
+}
+
+union AdmireTokenPayloadOrError =
+    AdmireTokenPayload
+  | ErrTokenNotFound
+  | ErrCollectionNotFound
+  | ErrNotAuthorized
+
 type CommentOnPostPayload {
   viewer: Viewer
   post: Post @goField(forceResolver: true)
@@ -2479,6 +2491,8 @@ type Mutation {
     accountType: SocialAccountType!
   ): FollowAllSocialConnectionsPayloadOrError @authRequired
   unfollowUser(userId: DBID!): UnfollowUserPayloadOrError @authRequired
+
+  admireToken(tokenID: DBID!, collectionID: DBID!): AdmireTokenPayloadOrError @authRequired
 
   admireFeedEvent(feedEventId: DBID!): AdmireFeedEventPayloadOrError @authRequired
   admirePost(postId: DBID!): AdmirePostPayloadOrError @authRequired

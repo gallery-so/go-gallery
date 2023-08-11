@@ -25,6 +25,7 @@ type ErrAdmireNotFound struct {
 	ActorID     DBID
 	FeedEventID DBID
 	PostID      DBID
+	TokenID     DBID
 }
 
 func (e ErrAdmireNotFound) Error() string {
@@ -36,6 +37,7 @@ type ErrAdmireAlreadyExists struct {
 	ActorID     DBID
 	FeedEventID DBID
 	PostID      DBID
+	TokenID     DBID
 }
 
 func (e ErrAdmireAlreadyExists) Error() string {
