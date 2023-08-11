@@ -209,7 +209,7 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti mu
 		return persist.TokenMetadata{}, fmt.Errorf("error getting token from zora: %w", err)
 	}
 
-	return resp.Token.Metadata, nil
+	return resp.Token.Token.Metadata, nil
 }
 
 func (d *Provider) getTokensByWalletAddressPaginate(ctx context.Context, addr persist.Address, endCursor string) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
