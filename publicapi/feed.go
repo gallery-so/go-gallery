@@ -24,7 +24,7 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
-const tHalf = math.Ln2 / 0.001 // half-life of approx 12 hours
+const tHalf = math.Ln2 / 0.002 // half-life of approx 6 hours
 
 type FeedAPI struct {
 	repos     *postgres.Repositories
@@ -469,9 +469,16 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 			return api.scoreFeedEntities(ctx, 128, popular, func(e db.FeedEntityScore) float64 {
 				p := userpref.For(ctx)
 				score, err := p.RelevanceTo(userID, e)
+
 				if errors.Is(err, userpref.ErrNoInputData) {
 					return 0.1
 				}
+
+				// Boost newer posts a lot
+				if now.Sub(e.CreatedAt) < 4*time.Hour {
+					return 4 * score
+				}
+
 				return score
 			})
 		}()
