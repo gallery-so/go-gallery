@@ -4,7 +4,6 @@ import (
 	heappkg "container/heap"
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"math"
 	"sync"
@@ -322,9 +321,18 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 			if err != nil {
 				return nil, nil, err
 			}
-			entityTypes, entityIDs = api.scoreFeedEntities(ctx, 128, trendData, func(e db.FeedEntityScore) float64 {
+			scored := api.scoreFeedEntities(ctx, 128, trendData, func(e db.FeedEntityScore) float64 {
 				return timeWeightedEngagement(e.CreatedAt, now, int(e.Interactions))
 			})
+
+			entityTypes = make([]persist.FeedEntityType, len(scored))
+			entityIDs = make([]persist.DBID, len(scored))
+
+			for i, e := range scored {
+				entityTypes[i] = persist.FeedEntityType(e.FeedEntityType)
+				entityIDs[i] = e.ID
+			}
+
 			return entityTypes, entityIDs, nil
 		}
 
@@ -451,38 +459,61 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 			idToEntity[e.ID] = e
 		}
 
-		// First score on popular
-		_, entityIDs = api.scoreFeedEntities(ctx, 256, trendData, func(e db.FeedEntityScore) float64 {
-			return timeWeightedEngagement(e.CreatedAt, now, int(idToEntity[e.ID].Interactions))
-		})
+		// Get scores for all entities
+		engagementScores := make(map[persist.DBID]float64)
+		personalizationScores := make(map[persist.DBID]float64)
 
-		popular := make([]db.FeedEntityScore, len(entityIDs))
-		for i, id := range entityIDs {
-			popular[i] = idToEntity[id]
+		for _, e := range trendData {
+			// Boost new events
+			boost := 1.0
+			if now.Sub(e.CreatedAt) < 6*time.Hour {
+				boost *= 2.0
+			}
+			engagementScores[e.ID] = boost * (1 + timeWeightedEngagement(e.CreatedAt, now, int(idToEntity[e.ID].Interactions)))
+			personalizationScores[e.ID] = userpref.For(ctx).RelevanceTo(userID, e)
 		}
 
-		// Then score on relevance
-		entityTypes, entityIDs = func() ([]persist.FeedEntityType, []persist.DBID) {
-			p := userpref.For(ctx)
-			p.Mu.RLock()
-			defer p.Mu.RUnlock()
-			return api.scoreFeedEntities(ctx, 128, popular, func(e db.FeedEntityScore) float64 {
-				p := userpref.For(ctx)
-				score, err := p.RelevanceTo(userID, e)
+		// Rank by engagement first, then by personalization
+		topNByEngagement := api.scoreFeedEntities(ctx, 128, trendData, func(e db.FeedEntityScore) float64 { return engagementScores[e.ID] })
+		topNByEngagement = api.scoreFeedEntities(ctx, 128, topNByEngagement, func(e db.FeedEntityScore) float64 { return personalizationScores[e.ID] })
+		// Rank by personalization, then by engagement
+		topNByPersonalization := api.scoreFeedEntities(ctx, 128, trendData, func(e db.FeedEntityScore) float64 { return personalizationScores[e.ID] })
+		topNByPersonalization = api.scoreFeedEntities(ctx, 128, topNByPersonalization, func(e db.FeedEntityScore) float64 { return engagementScores[e.ID] })
 
-				if errors.Is(err, userpref.ErrNoInputData) {
-					return 0.1
-				}
+		// Get ranking of both
+		seen := make(map[persist.DBID]bool)
+		combined := make([]db.FeedEntityScore, 0)
+		engagementRank := make(map[persist.DBID]int)
+		personalizationRank := make(map[persist.DBID]int)
 
-				// Boost newer posts a lot
-				if now.Sub(e.CreatedAt) < 4*time.Hour {
-					return 4 * score
-				}
+		for i, e := range topNByEngagement {
+			engagementRank[e.ID] = len(topNByEngagement) - i
+			if !seen[e.ID] {
+				combined = append(combined, e)
+				seen[e.ID] = true
+			}
+		}
 
-				return score
-			})
-		}()
+		for i, e := range topNByPersonalization {
+			personalizationRank[e.ID] = len(topNByPersonalization) - i
+			if !seen[e.ID] {
+				combined = append(combined, e)
+				seen[e.ID] = true
+			}
+		}
 
+		// Score based on the average of the two rankings
+		interleaved := api.scoreFeedEntities(ctx, 128, combined, func(e db.FeedEntityScore) float64 {
+			return float64(engagementRank[e.ID]+personalizationRank[e.ID]) / 2.0
+		})
+
+		entityTypes = make([]persist.FeedEntityType, 0, len(interleaved))
+		entityIDs = make([]persist.DBID, 0, len(interleaved))
+
+		for _, e := range interleaved {
+			entityTypes = append(entityTypes, persist.FeedEntityType(e.FeedEntityType))
+			entityIDs = append(entityIDs, e.ID)
+		}
 	}
 
 	queryFunc := func(params feedPagingParams) ([]any, error) {
@@ -689,12 +720,17 @@ func loadFeedEntities(ctx context.Context, d *dataloader.Loaders, typs []persist
 	return entities, nil
 }
 
-func (api FeedAPI) scoreFeedEntities(ctx context.Context, n int, trendData []db.FeedEntityScore, scoreF func(db.FeedEntityScore) float64) ([]persist.FeedEntityType, []persist.DBID) {
+type scoredEntity struct {
+	e db.FeedEntityScore
+	s float64
+}
+
+func (api FeedAPI) scoreFeedEntities(ctx context.Context, n int, trendData []db.FeedEntityScore, scoreF func(db.FeedEntityScore) float64) []db.FeedEntityScore {
 	h := &heap{}
 
 	var wg sync.WaitGroup
 
-	scores := make([]feedNode, len(trendData))
+	scores := make([]entityScore, len(trendData))
 
 	for i, event := range trendData {
 		i := i
@@ -703,11 +739,7 @@ func (api FeedAPI) scoreFeedEntities(ctx context.Context, n int, trendData []db.
 		go func() {
 			defer wg.Done()
 			score := scoreF(event)
-			scores[i] = feedNode{
-				id:    event.ID,
-				score: score,
-				typ:   persist.FeedEntityType(event.FeedEntityType),
-			}
+			scores[i] = entityScore{FeedEntityScore: event, score: score}
 		}()
 	}
 
@@ -721,26 +753,24 @@ func (api FeedAPI) scoreFeedEntities(ctx context.Context, n int, trendData []db.
 		}
 
 		// If the score is greater than the smallest score in the heap, replace it
-		if node.score > (*h)[0].(feedNode).score {
+		if node.score > (*h)[0].(entityScore).score {
 			heappkg.Pop(h)
 			heappkg.Push(h, node)
 		}
 	}
 
-	entityTypes := make([]persist.FeedEntityType, h.Len())
-	entityIDs := make([]persist.DBID, h.Len())
+	scoredEntities := make([]db.FeedEntityScore, h.Len())
 
 	// Pop returns the smallest score first, so we reverse the order
 	// such that the highest score is first
 	i := h.Len() - 1
 	for h.Len() > 0 {
-		node := heappkg.Pop(h).(feedNode)
-		entityTypes[i] = node.typ
-		entityIDs[i] = node.id
+		node := heappkg.Pop(h).(entityScore)
+		scoredEntities[i] = node.FeedEntityScore
 		i--
 	}
 
-	return entityTypes, entityIDs
+	return scoredEntities
 }
 
 func timeFactor(t0, t1 time.Time) float64 {
@@ -760,13 +790,12 @@ type priorityNode interface {
 	Score() float64
 }
 
-type feedNode struct {
-	id    persist.DBID
-	typ   persist.FeedEntityType
+type entityScore struct {
+	db.FeedEntityScore
 	score float64
 }
 
-func (f feedNode) Score() float64 {
+func (f entityScore) Score() float64 {
 	return f.score
 }
 
