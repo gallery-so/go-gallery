@@ -19,6 +19,7 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/recommend"
 	"github.com/mikeydub/go-gallery/service/recommend/userpref"
 	"github.com/mikeydub/go-gallery/util"
 )
@@ -489,8 +490,9 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 			if now.Sub(e.CreatedAt) < 6*time.Hour {
 				boost *= 2.0
 			}
-			engagementScores[e.ID] = boost * (1 + timeWeightedEngagement(e.CreatedAt, now, int(idToEntity[e.ID].Interactions)))
-			personalizationScores[e.ID] = userpref.For(ctx).RelevanceTo(userID, e)
+			timeF := timeFactor(e.CreatedAt, now)
+			engagementScores[e.ID] = boost * timeF * (1 + engagementFactor(int(e.Interactions)))
+			personalizationScores[e.ID] = boost * timeF * userpref.For(ctx).RelevanceTo(userID, e)
 		}
 
 		// Rank by engagement first, then by personalization
@@ -526,6 +528,8 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 		interleaved := api.scoreFeedEntities(ctx, 128, combined, func(e db.FeedEntityScore) float64 {
 			return float64(engagementRank[e.ID]+personalizationRank[e.ID]) / 2.0
 		})
+
+		recommend.Shuffle(interleaved, 8)
 
 		entityTypes = make([]persist.FeedEntityType, 0, len(interleaved))
 		entityIDs = make([]persist.DBID, 0, len(interleaved))
