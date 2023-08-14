@@ -21,7 +21,7 @@ func main() {
 
 	pgClient := postgres.MustCreateClient()
 
-	rows, err := pgClient.Query("select tokens.id from tokens where tokens.owner_user_id = '24DZnxmFR43gwRJU35O2oxepKbB' and chain = 2 order by tokens.last_updated desc;")
+	rows, err := pgClient.Query("select tokens.id from tokens where owner_user_id = (select id from users where username_idempotent = 'pixelsushirobot') and chain = 4 order by tokens.last_updated desc limit 10;")
 	if err != nil {
 		panic(err)
 	}
