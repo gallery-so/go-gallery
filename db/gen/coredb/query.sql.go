@@ -1193,7 +1193,7 @@ func (q *Queries) GetAllTimeTrendingUserIDs(ctx context.Context, limit int32) ([
 
 const getAllTokensWithContractsByIDs = `-- name: GetAllTokensWithContractsByIDs :many
 select
-    tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id, tokens.is_creator_token, tokens.is_holder_token, tokens.displayable,
+    tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id, tokens.is_creator_token, tokens.is_holder_token, tokens.displayable,
     contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id,
     (
         select wallets.address
@@ -1224,13 +1224,11 @@ type GetAllTokensWithContractsByIDsRow struct {
 	Name                   sql.NullString             `json:"name"`
 	Description            sql.NullString             `json:"description"`
 	CollectorsNote         sql.NullString             `json:"collectors_note"`
-	Media                  persist.Media              `json:"media"`
 	TokenUri               sql.NullString             `json:"token_uri"`
 	TokenType              sql.NullString             `json:"token_type"`
 	TokenID                persist.TokenID            `json:"token_id"`
 	Quantity               persist.HexString          `json:"quantity"`
 	OwnershipHistory       persist.AddressAtBlockList `json:"ownership_history"`
-	TokenMetadata          persist.TokenMetadata      `json:"token_metadata"`
 	ExternalUrl            sql.NullString             `json:"external_url"`
 	BlockNumber            sql.NullInt64              `json:"block_number"`
 	OwnerUserID            persist.DBID               `json:"owner_user_id"`
@@ -1284,13 +1282,11 @@ func (q *Queries) GetAllTokensWithContractsByIDs(ctx context.Context, arg GetAll
 			&i.Name,
 			&i.Description,
 			&i.CollectorsNote,
-			&i.Media,
 			&i.TokenUri,
 			&i.TokenType,
 			&i.TokenID,
 			&i.Quantity,
 			&i.OwnershipHistory,
-			&i.TokenMetadata,
 			&i.ExternalUrl,
 			&i.BlockNumber,
 			&i.OwnerUserID,
@@ -2508,7 +2504,7 @@ func (q *Queries) GetMerchDiscountCodeByTokenID(ctx context.Context, tokenHex pe
 
 const getMissingThumbnailTokensByIDRange = `-- name: GetMissingThumbnailTokensByIDRange :many
 SELECT
-    tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id, tokens.is_creator_token, tokens.is_holder_token, tokens.displayable,
+    tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id, tokens.is_creator_token, tokens.is_holder_token, tokens.displayable,
     contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id,
     (
         SELECT wallets.address
@@ -2537,13 +2533,11 @@ type GetMissingThumbnailTokensByIDRangeRow struct {
 	Name                   sql.NullString             `json:"name"`
 	Description            sql.NullString             `json:"description"`
 	CollectorsNote         sql.NullString             `json:"collectors_note"`
-	Media                  persist.Media              `json:"media"`
 	TokenUri               sql.NullString             `json:"token_uri"`
 	TokenType              sql.NullString             `json:"token_type"`
 	TokenID                persist.TokenID            `json:"token_id"`
 	Quantity               persist.HexString          `json:"quantity"`
 	OwnershipHistory       persist.AddressAtBlockList `json:"ownership_history"`
-	TokenMetadata          persist.TokenMetadata      `json:"token_metadata"`
 	ExternalUrl            sql.NullString             `json:"external_url"`
 	BlockNumber            sql.NullInt64              `json:"block_number"`
 	OwnerUserID            persist.DBID               `json:"owner_user_id"`
@@ -2597,13 +2591,11 @@ func (q *Queries) GetMissingThumbnailTokensByIDRange(ctx context.Context, arg Ge
 			&i.Name,
 			&i.Description,
 			&i.CollectorsNote,
-			&i.Media,
 			&i.TokenUri,
 			&i.TokenType,
 			&i.TokenID,
 			&i.Quantity,
 			&i.OwnershipHistory,
-			&i.TokenMetadata,
 			&i.ExternalUrl,
 			&i.BlockNumber,
 			&i.OwnerUserID,
@@ -3030,7 +3022,7 @@ func (q *Queries) GetReprocessJobRangeByID(ctx context.Context, id int) (Reproce
 
 const getSVGTokensWithContractsByIDs = `-- name: GetSVGTokensWithContractsByIDs :many
 SELECT
-    tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id, tokens.is_creator_token, tokens.is_holder_token, tokens.displayable,
+    tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id, tokens.is_creator_token, tokens.is_holder_token, tokens.displayable,
     contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id,
     (
         SELECT wallets.address
@@ -3062,13 +3054,11 @@ type GetSVGTokensWithContractsByIDsRow struct {
 	Name                   sql.NullString             `json:"name"`
 	Description            sql.NullString             `json:"description"`
 	CollectorsNote         sql.NullString             `json:"collectors_note"`
-	Media                  persist.Media              `json:"media"`
 	TokenUri               sql.NullString             `json:"token_uri"`
 	TokenType              sql.NullString             `json:"token_type"`
 	TokenID                persist.TokenID            `json:"token_id"`
 	Quantity               persist.HexString          `json:"quantity"`
 	OwnershipHistory       persist.AddressAtBlockList `json:"ownership_history"`
-	TokenMetadata          persist.TokenMetadata      `json:"token_metadata"`
 	ExternalUrl            sql.NullString             `json:"external_url"`
 	BlockNumber            sql.NullInt64              `json:"block_number"`
 	OwnerUserID            persist.DBID               `json:"owner_user_id"`
@@ -3122,13 +3112,11 @@ func (q *Queries) GetSVGTokensWithContractsByIDs(ctx context.Context, arg GetSVG
 			&i.Name,
 			&i.Description,
 			&i.CollectorsNote,
-			&i.Media,
 			&i.TokenUri,
 			&i.TokenType,
 			&i.TokenID,
 			&i.Quantity,
 			&i.OwnershipHistory,
-			&i.TokenMetadata,
 			&i.ExternalUrl,
 			&i.BlockNumber,
 			&i.OwnerUserID,
@@ -3363,7 +3351,7 @@ func (q *Queries) GetSocialsByUserID(ctx context.Context, id persist.DBID) (pers
 }
 
 const getTokenById = `-- name: GetTokenById :one
-select id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id, is_creator_token, is_holder_token, displayable from tokens where id = $1 and displayable and deleted = false
+select id, deleted, version, created_at, last_updated, name, description, collectors_note, token_uri, token_type, token_id, quantity, ownership_history, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id, is_creator_token, is_holder_token, displayable from tokens where id = $1 and displayable and deleted = false
 `
 
 func (q *Queries) GetTokenById(ctx context.Context, id persist.DBID) (Token, error) {
@@ -3378,13 +3366,11 @@ func (q *Queries) GetTokenById(ctx context.Context, id persist.DBID) (Token, err
 		&i.Name,
 		&i.Description,
 		&i.CollectorsNote,
-		&i.Media,
 		&i.TokenUri,
 		&i.TokenType,
 		&i.TokenID,
 		&i.Quantity,
 		&i.OwnershipHistory,
-		&i.TokenMetadata,
 		&i.ExternalUrl,
 		&i.BlockNumber,
 		&i.OwnerUserID,
@@ -3404,7 +3390,7 @@ func (q *Queries) GetTokenById(ctx context.Context, id persist.DBID) (Token, err
 }
 
 const getTokenByTokenIdentifiers = `-- name: GetTokenByTokenIdentifiers :one
-select id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id, is_creator_token, is_holder_token, displayable from tokens
+select id, deleted, version, created_at, last_updated, name, description, collectors_note, token_uri, token_type, token_id, quantity, ownership_history, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id, is_creator_token, is_holder_token, displayable from tokens
     where tokens.token_id = $1
       and contract = (select contracts.id from contracts where contracts.address = $2)
       and tokens.chain = $3 and tokens.deleted = false
@@ -3429,13 +3415,11 @@ func (q *Queries) GetTokenByTokenIdentifiers(ctx context.Context, arg GetTokenBy
 		&i.Name,
 		&i.Description,
 		&i.CollectorsNote,
-		&i.Media,
 		&i.TokenUri,
 		&i.TokenType,
 		&i.TokenID,
 		&i.Quantity,
 		&i.OwnershipHistory,
-		&i.TokenMetadata,
 		&i.ExternalUrl,
 		&i.BlockNumber,
 		&i.OwnerUserID,
@@ -3487,7 +3471,7 @@ func (q *Queries) GetTokenOwnerByID(ctx context.Context, id persist.DBID) (User,
 }
 
 const getTokensByContractIdPaginate = `-- name: GetTokensByContractIdPaginate :many
-select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id, t.is_creator_token, t.is_holder_token, t.displayable from tokens t
+select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id, t.is_creator_token, t.is_holder_token, t.displayable from tokens t
     join users u on u.id = t.owner_user_id
     join contracts c on t.contract = c.id
     where (c.id = $1 or c.parent_id = $1)
@@ -3544,13 +3528,11 @@ func (q *Queries) GetTokensByContractIdPaginate(ctx context.Context, arg GetToke
 			&i.Name,
 			&i.Description,
 			&i.CollectorsNote,
-			&i.Media,
 			&i.TokenUri,
 			&i.TokenType,
 			&i.TokenID,
 			&i.Quantity,
 			&i.OwnershipHistory,
-			&i.TokenMetadata,
 			&i.ExternalUrl,
 			&i.BlockNumber,
 			&i.OwnerUserID,
@@ -4846,21 +4828,25 @@ func (q *Queries) HasLaterGroupedEvent(ctx context.Context, arg HasLaterGroupedE
 }
 
 const insertExternalSocialConnectionsForUser = `-- name: InsertExternalSocialConnectionsForUser :many
-insert into external_social_connections (id, social_account_type, follower_id, followee_id) select (id, social_account_type, follower_id, followee_id) from (select unnest($1::varchar[]) as id, $2::varchar as social_account_type, $3::varchar as follower_id, unnest($4::varchar[]) as followee_id) bulk_insert returning id, version, social_account_type, follower_id, followee_id, created_at, last_updated, deleted
+insert into external_social_connections (id, social_account_type, follower_id, followee_id) 
+select id, $1::varchar, $2::varchar, followee_id
+from 
+(select unnest($3::varchar[]) as id, unnest($4::varchar[]) as followee_id) as bulk_upsert 
+returning id, version, social_account_type, follower_id, followee_id, created_at, last_updated, deleted
 `
 
 type InsertExternalSocialConnectionsForUserParams struct {
-	Ids               []string `json:"ids"`
 	SocialAccountType string   `json:"social_account_type"`
 	FollowerID        string   `json:"follower_id"`
+	Ids               []string `json:"ids"`
 	FolloweeIds       []string `json:"followee_ids"`
 }
 
 func (q *Queries) InsertExternalSocialConnectionsForUser(ctx context.Context, arg InsertExternalSocialConnectionsForUserParams) ([]ExternalSocialConnection, error) {
 	rows, err := q.db.Query(ctx, insertExternalSocialConnectionsForUser,
-		arg.Ids,
 		arg.SocialAccountType,
 		arg.FollowerID,
+		arg.Ids,
 		arg.FolloweeIds,
 	)
 	if err != nil {
@@ -5296,7 +5282,7 @@ func (q *Queries) IsFeedUserActionBlocked(ctx context.Context, arg IsFeedUserAct
 }
 
 const isMemberOfCommunity = `-- name: IsMemberOfCommunity :one
-select exists (select id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id, is_creator_token, is_holder_token, displayable from tokens where not deleted and displayable and owner_user_id = $1 and contract = $2 limit 1) is_member
+select exists (select id, deleted, version, created_at, last_updated, name, description, collectors_note, token_uri, token_type, token_id, quantity, ownership_history, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id, is_creator_token, is_holder_token, displayable from tokens where not deleted and displayable and owner_user_id = $1 and contract = $2 limit 1) is_member
 `
 
 type IsMemberOfCommunityParams struct {

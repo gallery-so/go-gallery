@@ -21,7 +21,7 @@ func NewBucketStorer(c *storage.Client, bucketName string) BucketStorer {
 
 func (s BucketStorer) Exists(ctx context.Context, objName string) (bool, error) {
 	_, err := s.Metadata(ctx, objName)
-	if err != storage.ErrObjectNotExist {
+	if err != nil && err != storage.ErrObjectNotExist {
 		return false, err
 	}
 	return err != storage.ErrObjectNotExist, nil

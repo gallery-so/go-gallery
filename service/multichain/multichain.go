@@ -52,8 +52,9 @@ type Provider struct {
 
 // BlockchainInfo retrieves blockchain info from all chains
 type BlockchainInfo struct {
-	Chain   persist.Chain `json:"chain_name"`
-	ChainID int           `json:"chain_id"`
+	Chain      persist.Chain `json:"chain_name"`
+	ChainID    int           `json:"chain_id"`
+	ProviderID string        `json:"provider_id"`
 }
 
 // ChainAgnosticToken is a token that is agnostic to the chain it is on
@@ -144,7 +145,7 @@ type errWithPriority struct {
 
 // Configurer maintains provider settings
 type Configurer interface {
-	GetBlockchainInfo(context.Context) (BlockchainInfo, error)
+	GetBlockchainInfo() BlockchainInfo
 }
 
 // NameResolver is able to resolve an address to a friendly display name
@@ -205,16 +206,37 @@ type WalletOverrideMap = map[persist.Chain][]persist.Chain
 // providersMatchingInterface returns providers that adhere to the given interface
 func providersMatchingInterface[T any](providers []any) []T {
 	matches := make([]T, 0)
+	seen := map[string]bool{}
 	for _, p := range providers {
-		if it, ok := p.(T); ok {
-			matches = append(matches, it)
+
+		if conf, ok := p.(Configurer); ok && seen[conf.GetBlockchainInfo().ProviderID] {
+			continue
+		} else if ok {
+			seen[conf.GetBlockchainInfo().ProviderID] = true
+		} else {
+			panic(fmt.Sprintf("provider %T does not implement Configurer", p))
+		}
+
+		if match, ok := p.(T); ok {
+			matches = append(matches, match)
+
+			// if the provider has subproviders, make sure we don't add them later
+			if ps, ok := p.(ProviderSupplier); ok {
+				for _, sp := range ps.GetSubproviders() {
+					if conf, ok := sp.(Configurer); ok {
+						seen[conf.GetBlockchainInfo().ProviderID] = true
+					} else {
+						panic(fmt.Sprintf("subprovider %T does not implement Configurer", sp))
+					}
+				}
+			}
 		}
 	}
 	return matches
 }
 
-// matchingProvidersByChain returns providers that adhere to the given interface by chain
-func matchingProvidersByChain[T any](availableProviders map[persist.Chain][]any, requestedChains ...persist.Chain) map[persist.Chain][]T {
+// matchingProvidersByChains returns providers that adhere to the given interface by chain
+func matchingProvidersByChains[T any](availableProviders map[persist.Chain][]any, requestedChains ...persist.Chain) map[persist.Chain][]T {
 	matches := make(map[persist.Chain][]T, 0)
 	for _, chain := range requestedChains {
 		matching := providersMatchingInterface[T](availableProviders[chain])
@@ -224,7 +246,7 @@ func matchingProvidersByChain[T any](availableProviders map[persist.Chain][]any,
 }
 
 func matchingProvidersForChain[T any](availableProviders map[persist.Chain][]any, chain persist.Chain) []T {
-	return matchingProvidersByChain[T](availableProviders, chain)[chain]
+	return matchingProvidersByChains[T](availableProviders, chain)[chain]
 }
 
 // matchingWallets returns wallet addresses that belong to any of the passed chains
@@ -645,7 +667,7 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 		}
 	}
 
-	fetchers := matchingProvidersByChain[ChildContractFetcher](p.Chains, chains...)
+	fetchers := matchingProvidersByChains[ChildContractFetcher](p.Chains, chains...)
 	searchAddresses := p.matchingWallets(user.Wallets, chains)
 	providerPool := pool.NewWithResults[ProviderChildContractResult]().WithContext(ctx)
 
@@ -723,22 +745,8 @@ func (p *Provider) prepTokensForTokenProcessing(ctx context.Context, tokensFromP
 	for i, token := range providerTokens {
 		existingToken, exists := tokenLookup[token.TokenIdentifiers()]
 
-		// Add already existing media to the provider token if it exists so that
-		// we can display media for a token while it gets handled by tokenprocessing
-		if !token.Media.IsServable() && existingToken.Media.IsServable() {
-			// TODO remove
-			providerTokens[i].Media = existingToken.Media
-		}
-
 		if !token.FallbackMedia.IsServable() && existingToken.FallbackMedia.IsServable() {
 			providerTokens[i].FallbackMedia = existingToken.FallbackMedia
-		}
-
-		// There's no available media for the token at this point, so set the state to syncing
-		// so we can show the loading state instead of a broken token while tokenprocessing handles it.
-		if !exists && !token.Media.IsServable() {
-			// TODO remove
-			providerTokens[i].Media = persist.Media{MediaType: persist.MediaTypeSyncing}
 		}
 
 		if !exists || existingToken.TokenMediaID == "" {
@@ -1355,7 +1363,7 @@ func (p *Provider) SyncContractsOwnedByUser(ctx context.Context, userID persist.
 	}
 	contractsFromProviders := []chainContracts{}
 
-	contractFetchers := matchingProvidersByChain[ContractsFetcher](p.Chains, chains...)
+	contractFetchers := matchingProvidersByChains[ContractsFetcher](p.Chains, chains...)
 	searchAddresses := p.matchingWallets(user.Wallets, chains)
 	providerPool := pool.NewWithResults[ContractOwnerResult]().WithContext(ctx)
 

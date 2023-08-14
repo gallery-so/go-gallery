@@ -21,6 +21,7 @@ type SyncWithContractEvalPrimary interface {
 	TokensOwnerFetcher
 	TokensContractFetcher
 	TokenDescriptorsFetcher
+	TokenMetadataFetcher
 }
 
 type SyncWithContractEvalSecondary interface {
@@ -46,8 +47,8 @@ type SyncFailureSecondary interface {
 	TokenDescriptorsFetcher
 }
 
-func (f SyncWithContractEvalFallbackProvider) GetBlockchainInfo(ctx context.Context) (BlockchainInfo, error) {
-	return f.Primary.GetBlockchainInfo(ctx)
+func (f SyncWithContractEvalFallbackProvider) GetBlockchainInfo() BlockchainInfo {
+	return f.Primary.GetBlockchainInfo()
 }
 
 func (f SyncWithContractEvalFallbackProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]ChainAgnosticToken, []ChainAgnosticContract, error) {
@@ -74,7 +75,7 @@ func (f SyncWithContractEvalFallbackProvider) GetTokenByTokenIdentifiersAndOwner
 		return ChainAgnosticToken{}, ChainAgnosticContract{}, err
 	}
 	if !f.Eval(ctx, token) {
-		token.TokenMetadata = f.callFallback(ctx, token).TokenMetadata
+		token.TokenMetadata = f.callFallbackIdentifiers(ctx, token).TokenMetadata
 	}
 	return token, contract, nil
 }
@@ -98,7 +99,7 @@ func (f SyncWithContractEvalFallbackProvider) resolveTokens(ctx context.Context,
 			defer wg.Done()
 			usableTokens[i] = token
 			if !f.Eval(ctx, token) {
-				usableTokens[i].TokenMetadata = f.callFallback(ctx, token).TokenMetadata
+				usableTokens[i].TokenMetadata = f.callFallbackIdentifiers(ctx, token).TokenMetadata
 			}
 		}(i, token)
 	}
@@ -108,7 +109,7 @@ func (f SyncWithContractEvalFallbackProvider) resolveTokens(ctx context.Context,
 	return usableTokens
 }
 
-func (f *SyncWithContractEvalFallbackProvider) callFallback(ctx context.Context, primary ChainAgnosticToken) ChainAgnosticToken {
+func (f *SyncWithContractEvalFallbackProvider) callFallbackIdentifiers(ctx context.Context, primary ChainAgnosticToken) ChainAgnosticToken {
 	id := ChainAgnosticIdentifiers{primary.ContractAddress, primary.TokenID}
 	backup, _, err := f.Fallback.GetTokenByTokenIdentifiersAndOwner(ctx, id, primary.OwnerAddress)
 	if err == nil && f.Eval(ctx, backup) {
@@ -122,12 +123,16 @@ func (f SyncWithContractEvalFallbackProvider) GetTokenDescriptorsByTokenIdentifi
 	return f.Primary.GetTokenDescriptorsByTokenIdentifiers(ctx, id)
 }
 
+func (f SyncWithContractEvalFallbackProvider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, id ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
+	return f.Primary.GetTokenMetadataByTokenIdentifiers(ctx, id)
+}
+
 func (f SyncWithContractEvalFallbackProvider) GetSubproviders() []any {
 	return []any{f.Primary, f.Fallback}
 }
 
-func (f SyncFailureFallbackProvider) GetBlockchainInfo(ctx context.Context) (BlockchainInfo, error) {
-	return f.Primary.GetBlockchainInfo(ctx)
+func (f SyncFailureFallbackProvider) GetBlockchainInfo() BlockchainInfo {
+	return f.Primary.GetBlockchainInfo()
 }
 
 func (f SyncFailureFallbackProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]ChainAgnosticToken, []ChainAgnosticContract, error) {

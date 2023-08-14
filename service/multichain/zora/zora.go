@@ -73,6 +73,12 @@ type getTokensResponse struct {
 	} `json:"tokens"`
 }
 
+type getTokenResponse struct {
+	Token struct {
+		Token token `json:"token"`
+	}
+}
+
 type getContractCreatorResponse struct {
 	ZoraCreateContracts []struct {
 		Creator string `json:"creator"`
@@ -132,12 +138,13 @@ func NewProvider(httpClient *http.Client) *Provider {
 }
 
 // GetBlockchainInfo retrieves blockchain info for ETH
-func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.BlockchainInfo, error) {
+func (d *Provider) GetBlockchainInfo() multichain.BlockchainInfo {
 
 	return multichain.BlockchainInfo{
-		Chain:   persist.ChainZora,
-		ChainID: 7777777,
-	}, nil
+		Chain:      persist.ChainZora,
+		ChainID:    7777777,
+		ProviderID: "zora",
+	}
 }
 
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the zora Blockchain
@@ -181,6 +188,28 @@ func (d *Provider) getTokensWithRequest(ctx context.Context, req string, owner, 
 
 func (d *Provider) GetTokenByTokenIdentifiersAndOwner(context.Context, multichain.ChainAgnosticIdentifiers, persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	panic("implement me")
+}
+
+func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
+	treq := fmt.Sprintf(`query tokenByIdentifiers($address: String!, $tokenId: String!) {
+  token(token:{address: $address, tokenId: $tokenId}, network: {network:ZORA, chain: ZORA_MAINNET}) {
+    token {
+        metadata
+    }
+  }
+}`)
+
+	greq := graphql.NewRequest(treq)
+	greq.Var("address", ti.ContractAddress)
+	greq.Var("tokenId", ti.TokenID)
+
+	resp := getTokenResponse{}
+	err := d.zgql.Run(ctx, greq, &resp)
+	if err != nil {
+		return persist.TokenMetadata{}, fmt.Errorf("error getting token from zora: %w", err)
+	}
+
+	return resp.Token.Token.Metadata, nil
 }
 
 func (d *Provider) getTokensByWalletAddressPaginate(ctx context.Context, addr persist.Address, endCursor string) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {

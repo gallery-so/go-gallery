@@ -14,14 +14,9 @@ import (
 
 // CollectionTokenRepository is the repository for interacting with collections in a postgres database
 type CollectionTokenRepository struct {
-	db                      *sql.DB
-	queries                 *db.Queries
-	createStmt              *sql.Stmt
-	getByUserIDOwnerStmt    *sql.Stmt
-	getByUserIDOwnerRawStmt *sql.Stmt
-
-	getByIDOwnerStmt    *sql.Stmt
-	getByIDOwnerRawStmt *sql.Stmt
+	db         *sql.DB
+	queries    *db.Queries
+	createStmt *sql.Stmt
 
 	updateInfoStmt               *sql.Stmt
 	updateInfoUnsafeStmt         *sql.Stmt
@@ -44,27 +39,6 @@ func NewCollectionTokenRepository(db *sql.DB, queries *db.Queries) *CollectionTo
 	defer cancel()
 
 	createStmt, err := db.PrepareContext(ctx, `INSERT INTO collections (ID, VERSION, NAME, COLLECTORS_NOTE, OWNER_USER_ID, GALLERY_ID, LAYOUT, NFTS, HIDDEN, TOKEN_SETTINGS) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING ID;`)
-	checkNoErr(err)
-
-	getByUserIDOwnerStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.COLLECTORS_NOTE,
-		c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED,c.TOKEN_SETTINGS,
-		n.ID,n.OWNER_USER_ID,n.CHAIN,n.NAME,n.DESCRIPTION,n.TOKEN_TYPE,n.TOKEN_URI,n.TOKEN_ID,n.MEDIA,n.FALLBACK_MEDIA,n.TOKEN_METADATA,n.CONTRACT,n.CREATED_AT 
-		FROM collections c, unnest(c.NFTS) WITH ORDINALITY AS u(nft, ordinality) 
-		JOIN tokens n ON n.ID = nft
-		WHERE c.OWNER_USER_ID = $1 AND c.DELETED = false AND n.DISPLAYABLE and n.DELETED = false ORDER BY ordinality;`)
-	checkNoErr(err)
-	getByUserIDOwnerRawStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED FROM collections c WHERE c.OWNER_USER_ID = $1 AND c.DELETED = false;`)
-	checkNoErr(err)
-
-	getByIDOwnerStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.COLLECTORS_NOTE,
-		c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED,c.TOKEN_SETTINGS,
-		n.ID,n.OWNER_USER_ID,n.CHAIN,n.NAME,n.DESCRIPTION,n.TOKEN_TYPE,n.TOKEN_URI,n.TOKEN_ID,n.MEDIA,n.TOKEN_METADATA,n.CONTRACT,n.CREATED_AT 
-		FROM collections c, unnest(c.NFTS) WITH ORDINALITY AS u(nft, ordinality) 
-		JOIN tokens n ON n.ID = nft
-		WHERE c.ID = $1 AND c.DELETED = false AND n.DISPLAYABLE AND n.DELETED = false ORDER BY ordinality;`)
-	checkNoErr(err)
-
-	getByIDOwnerRawStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED,c.TOKEN_SETTINGS FROM collections c WHERE c.ID = $1 AND c.DELETED = false;`)
 	checkNoErr(err)
 
 	updateInfoStmt, err := db.PrepareContext(ctx, `UPDATE collections SET COLLECTORS_NOTE = $1, NAME = $2, LAST_UPDATED = $3 WHERE ID = $4 AND OWNER_USER_ID = $5;`)
@@ -99,7 +73,7 @@ func NewCollectionTokenRepository(db *sql.DB, queries *db.Queries) *CollectionTo
 	getUserWalletsStmt, err := db.PrepareContext(ctx, `SELECT wallets FROM users WHERE ID = $1;`)
 	checkNoErr(err)
 
-	return &CollectionTokenRepository{db: db, queries: queries, createStmt: createStmt, getByUserIDOwnerStmt: getByUserIDOwnerStmt, getByIDOwnerStmt: getByIDOwnerStmt, updateInfoStmt: updateInfoStmt, updateInfoUnsafeStmt: updateInfoUnsafeStmt, updateHiddenStmt: updateHiddenStmt, updateHiddenUnsafeStmt: updateHiddenUnsafeStmt, updateNFTsStmt: updateNFTsStmt, updateNFTsUnsafeStmt: updateNFTsUnsafeStmt, nftsToRemoveStmt: nftsToRemoveStmt, removeNFTFromCollectionsStmt: removeNFTFromCollectionsStmt, getNFTsForAddressStmt: getNFTsForAddressStmt, deleteCollectionStmt: deleteCollectionStmt, getUserWalletsStmt: getUserWalletsStmt, getByUserIDOwnerRawStmt: getByUserIDOwnerRawStmt, getByIDOwnerRawStmt: getByIDOwnerRawStmt}
+	return &CollectionTokenRepository{db: db, queries: queries, createStmt: createStmt, updateInfoStmt: updateInfoStmt, updateInfoUnsafeStmt: updateInfoUnsafeStmt, updateHiddenStmt: updateHiddenStmt, updateHiddenUnsafeStmt: updateHiddenUnsafeStmt, updateNFTsStmt: updateNFTsStmt, updateNFTsUnsafeStmt: updateNFTsUnsafeStmt, nftsToRemoveStmt: nftsToRemoveStmt, removeNFTFromCollectionsStmt: removeNFTFromCollectionsStmt, getNFTsForAddressStmt: getNFTsForAddressStmt, deleteCollectionStmt: deleteCollectionStmt, getUserWalletsStmt: getUserWalletsStmt}
 }
 
 // Create creates a new collection in the database

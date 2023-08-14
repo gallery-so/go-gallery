@@ -46,6 +46,47 @@ func (q *Queries) GetContractLabels(ctx context.Context, excludedContracts []str
 	return items, nil
 }
 
+const getExternalFollowGraphSource = `-- name: GetExternalFollowGraphSource :many
+select
+  external_social_connections.follower_id,
+  external_social_connections.followee_id
+from
+  external_social_connections,
+  users as followers,
+  users as followees
+where
+  external_social_connections.follower_id = followers.id
+  and followers.deleted is false
+  and external_social_connections.followee_id = followees.id
+  and followees.deleted is false
+  and external_social_connections.deleted = false
+`
+
+type GetExternalFollowGraphSourceRow struct {
+	FollowerID persist.DBID `json:"follower_id"`
+	FolloweeID persist.DBID `json:"followee_id"`
+}
+
+func (q *Queries) GetExternalFollowGraphSource(ctx context.Context) ([]GetExternalFollowGraphSourceRow, error) {
+	rows, err := q.db.Query(ctx, getExternalFollowGraphSource)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetExternalFollowGraphSourceRow
+	for rows.Next() {
+		var i GetExternalFollowGraphSourceRow
+		if err := rows.Scan(&i.FollowerID, &i.FolloweeID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getFeedEntityScores = `-- name: GetFeedEntityScores :many
 with refreshed as (
   select greatest((select last_updated from feed_entity_scores limit 1), $1::timestamptz) last_updated
@@ -148,16 +189,9 @@ select
 from
   follows,
   users as followers,
-  users as followees,
-  (
-    select owner_user_id
-    from collections
-    where cardinality(nfts) > 0 and deleted = false
-    group by owner_user_id
-  ) displaying
+  users as followees
 where
   follows.follower = followers.id
-  and follows.followee = displaying.owner_user_id
   and followers.deleted is false
   and follows.followee = followees.id
   and followees.deleted is false
@@ -217,6 +251,10 @@ const getUserLabels = `-- name: GetUserLabels :many
 select follower id from follows where not deleted group by 1
 union
 select followee id from follows where not deleted group by 1
+union
+select follower_id id from external_social_connections where not deleted group by 1
+union
+select followee_id id from external_social_connections where not deleted group by 1
 union
 select user_id id from owned_contracts where displayed group by 1
 `

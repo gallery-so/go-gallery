@@ -24,10 +24,8 @@ import (
 )
 
 const (
-	contextKey      = "personalization.instance"
-	gcpObjectName   = "personalization_matrices.bin.gz"
-	edgeWeight      = 1.0
-	relevanceWeight = 1.0
+	contextKey    = "personalization.instance"
+	gcpObjectName = "personalization_matrices.bin.gz"
 )
 
 var ErrNoInputData = errors.New("no personalization input data")
@@ -191,11 +189,11 @@ func NewPersonalization(ctx context.Context, q *db.Queries, c *storage.Client) *
 	return k
 }
 
-func (p *Personalization) RelevanceTo(userID persist.DBID, e db.FeedEntityScore) (float64, error) {
+func (p *Personalization) RelevanceTo(userID persist.DBID, e db.FeedEntityScore) float64 {
 	// We don't have personalization data for this user yet
 	_, vOK := p.pM.uL[userID]
 	if !vOK {
-		return 0, ErrNoInputData
+		return 0
 	}
 
 	var relevanceScore float64
@@ -210,7 +208,7 @@ func (p *Personalization) RelevanceTo(userID persist.DBID, e db.FeedEntityScore)
 	}
 
 	edgeScore, _ := p.scoreEdge(userID, e.ActorID)
-	return (relevanceWeight * (relevanceScore / 0.05)) + (edgeWeight * edgeScore), nil
+	return relevanceScore + edgeScore
 }
 
 func (p *Personalization) scoreEdge(viewerID, queryID persist.DBID) (float64, error) {
@@ -233,7 +231,7 @@ func (p *Personalization) scoreRelevance(viewerID, contractID persist.DBID) (flo
 	return calcRelevanceScore(p.pM.ratingM, p.pM.displayM, vIdx, cIdx), nil
 }
 
-func readMatrices(ctx context.Context, q *db.Queries) personalizationMatrices {
+func ReadMatrices(ctx context.Context, q *db.Queries) personalizationMatrices {
 	uL := readUserLabels(ctx, q)
 	ratingM, displayM, cL := readContractMatrices(ctx, q, uL)
 	userM := readUserMatrix(ctx, q, uL)
@@ -256,14 +254,9 @@ func (p *Personalization) updateMatrices(m *personalizationMatrices) {
 }
 
 func (p *Personalization) update(ctx context.Context) {
-	curObj, err := p.b.Metadata(ctx, gcpObjectName)
-	if err != nil && err != storage.ErrObjectNotExist {
-		panic(err)
-	}
-
-	if err == storage.ErrObjectNotExist {
-		p.updateCache(ctx)
-		return
+	exists, err := p.b.Exists(ctx, gcpObjectName)
+	if !exists || err != nil {
+		panic(fmt.Sprintf("personalization data does not exist: %s", err))
 	}
 
 	if p.pM == nil {
@@ -279,16 +272,10 @@ func (p *Personalization) update(ctx context.Context) {
 		return
 	}
 
-	if curObj.Updated.Before(staleAt) {
-		p.updateCache(ctx)
-		return
-	}
-
 	p.readCache(ctx)
 }
 
 func (p *Personalization) readCache(ctx context.Context) {
-	logger.For(ctx).Infof("personalization data is stale, reading from cache")
 	now := time.Now()
 	r, err := p.b.NewReader(ctx, gcpObjectName)
 	check(err)
@@ -299,22 +286,9 @@ func (p *Personalization) readCache(ctx context.Context) {
 	logger.For(ctx).Infof("took %s to read from cache", time.Since(now))
 }
 
-func (p *Personalization) updateCache(ctx context.Context) {
-	logger.For(ctx).Infof("no data found in cache, updating the cache")
-	now := time.Now()
-	m := readMatrices(ctx, p.q)
-	b, err := m.MarshalBinary()
-	check(err)
-	_, err = p.b.WriteGzip(ctx, gcpObjectName, b, store.ObjAttrsOptions.WithContentType("application/octet-stream"))
-	check(err)
-	p.updateMatrices(&m)
-	logger.For(ctx).Infof("took %s to update the cache", time.Since(now))
-}
-
 // calcSocialScore determines if vIdx is in the same friend circle as qIdx by running a bfs on userM
 func calcSocialScore(userM *sparse.CSR, vIdx, qIdx int) float64 {
-	score := bfs(userM, vIdx, qIdx)
-	return score
+	return bfs(userM, vIdx, qIdx)
 }
 
 // calcRelavanceScore computes the relevance of cIdx to vIdx's held tokens
@@ -382,9 +356,9 @@ func bfs(m *sparse.CSR, vIdx, qIdx int) float64 {
 	for len(q) > 0 {
 		cur := q.Pop()
 		if cur == qIdx {
-			return 1
+			return 1 / float64(depth.Get(cur))
 		}
-		if depth.Get(cur) > 3 {
+		if depth.Get(cur) > 4 {
 			return 0
 		}
 		neighbors := m.RowView(cur).(*sparse.Vector)
@@ -472,11 +446,22 @@ func readContractMatrices(ctx context.Context, q *db.Queries, uL map[persist.DBI
 func readUserMatrix(ctx context.Context, q *db.Queries, uL map[persist.DBID]int) *sparse.CSR {
 	follows, err := q.GetFollowGraphSource(ctx)
 	check(err)
+
+	externalFollows, err := q.GetExternalFollowGraphSource(ctx)
+	check(err)
+
 	dok := sparse.NewDOK(len(uL), len(uL))
 	userAdj := make(map[persist.DBID][]persist.DBID)
+
 	for _, f := range follows {
 		userAdj[f.Follower] = append(userAdj[f.Follower], f.Followee)
 	}
+
+	// It's fine if a user follows a user on Gallery and elsewhere, we'll only count the follow once
+	for _, f := range externalFollows {
+		userAdj[f.FollowerID] = append(userAdj[f.FollowerID], f.FolloweeID)
+	}
+
 	for uID, uIdx := range uL {
 		for _, followee := range userAdj[uID] {
 			followeeIdx := mustGet(uL, followee)
@@ -487,6 +472,7 @@ func readUserMatrix(ctx context.Context, q *db.Queries, uL map[persist.DBID]int)
 			dok.Set(uIdx, 0, 0)
 		}
 	}
+
 	return dok.ToCSR()
 }
 

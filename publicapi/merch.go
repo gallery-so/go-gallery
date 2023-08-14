@@ -199,9 +199,14 @@ func (api MerchAPI) GetMerchTokenByTokenID(ctx context.Context, tokenID persist.
 		default:
 			return nil, fmt.Errorf("unknown merch type for token %v", token.TokenID)
 		}
-	} else if token.TokenMetadata != nil && len(token.TokenMetadata) > 0 {
+	} else if token.TokenMediaID != "" {
+		med, err := api.loaders.MediaByTokenID.Load(token.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load media for token %v: %w", token.TokenID, err)
+		}
+		met := med.Metadata
 		// TokenURI should exist but since we have been talking about removing this field, I added this extra backup logic
-		asBytes, err := json.Marshal(token.TokenMetadata)
+		asBytes, err := json.Marshal(met)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal token metadata: %w", err)
 		}

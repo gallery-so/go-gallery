@@ -107,7 +107,7 @@ func tezosProviderSet(serverEnvInit envInit, client *http.Client) tezosProviderL
 
 // tezosProvidersConfig is a wire injector that binds multichain interfaces to their concrete Tezos implementations
 func tezosProvidersConfig(tezosProvider multichain.SyncWithContractEvalFallbackProvider) tezosProviderList {
-	serverTezosProviderList := tezosRequirements(tezosProvider, tezosProvider)
+	serverTezosProviderList := tezosRequirements(tezosProvider, tezosProvider, tezosProvider)
 	return serverTezosProviderList
 }
 
@@ -160,7 +160,7 @@ func poapProviderSet(serverEnvInit envInit, client *http.Client) poapProviderLis
 
 // poapProvidersConfig is a wire injector that binds multichain interfaces to their concrete POAP implementations
 func poapProvidersConfig(poapProvider *poap.Provider) poapProviderList {
-	serverPoapProviderList := poapRequirements(poapProvider, poapProvider, poapProvider)
+	serverPoapProviderList := poapRequirements(poapProvider, poapProvider, poapProvider, poapProvider)
 	return serverPoapProviderList
 }
 
@@ -173,7 +173,7 @@ func zoraProviderSet(serverEnvInit envInit, client *http.Client) zoraProviderLis
 
 // zoraProvidersConfig is a wire injector that binds multichain interfaces to their concrete zora implementations
 func zoraProvidersConfig(zoraProvider *zora.Provider) zoraProviderList {
-	serverZoraProviderList := zoraRequirements(zoraProvider, zoraProvider, zoraProvider)
+	serverZoraProviderList := zoraRequirements(zoraProvider, zoraProvider, zoraProvider, zoraProvider)
 	return serverZoraProviderList
 }
 
@@ -313,8 +313,9 @@ func ethRequirements(
 func tezosRequirements(
 	tof multichain.TokensOwnerFetcher,
 	toc multichain.TokensContractFetcher,
+	tmf multichain.TokenMetadataFetcher,
 ) tezosProviderList {
-	return tezosProviderList{tof, toc}
+	return tezosProviderList{tof, toc, tmf}
 }
 
 // optimismRequirements is the set of provider interfaces required for Optimism
@@ -340,8 +341,9 @@ func poapRequirements(
 	nr multichain.NameResolver,
 	tof multichain.TokensOwnerFetcher,
 	toc multichain.TokensContractFetcher,
+	tmf multichain.TokenMetadataFetcher,
 ) poapProviderList {
-	return poapProviderList{nr, tof, toc}
+	return poapProviderList{nr, tof, toc, tmf}
 }
 
 // zoraRequirements is the set of provider interfaces required for zora
@@ -349,8 +351,9 @@ func zoraRequirements(
 	nr multichain.ContractsFetcher,
 	tof multichain.TokensOwnerFetcher,
 	toc multichain.TokensContractFetcher,
+	tmf multichain.TokenMetadataFetcher,
 ) zoraProviderList {
-	return zoraProviderList{nr, tof, toc}
+	return zoraProviderList{nr, tof, toc, tmf}
 }
 
 // zoraRequirements is the set of provider interfaces required for zora
@@ -407,8 +410,7 @@ func newMultichainSet(
 
 // defaultWalletOverrides is a wire provider for wallet overrides
 func defaultWalletOverrides() multichain.WalletOverrideMap {
-	var evmWalletChains = []persist.Chain{persist.ChainETH, persist.ChainOptimism, persist.ChainPolygon, persist.ChainArbitrum, persist.ChainPOAP, persist.ChainZora, persist.ChainBase}
-	return multichain.WalletOverrideMap{persist.ChainPOAP: evmWalletChains, persist.ChainOptimism: evmWalletChains, persist.ChainPolygon: evmWalletChains, persist.ChainArbitrum: evmWalletChains, persist.ChainETH: evmWalletChains, persist.ChainZora: evmWalletChains, persist.ChainBase: evmWalletChains}
+	return multichain.WalletOverrideMap{persist.ChainPOAP: persist.EvmChains, persist.ChainOptimism: persist.EvmChains, persist.ChainPolygon: persist.EvmChains, persist.ChainArbitrum: persist.EvmChains, persist.ChainETH: persist.EvmChains, persist.ChainZora: persist.EvmChains, persist.ChainBase: persist.EvmChains}
 }
 
 func newIndexerProvider(e envInit, httpClient *http.Client, ethClient *ethclient.Client, taskClient *cloudtasks.Client) *eth.Provider {

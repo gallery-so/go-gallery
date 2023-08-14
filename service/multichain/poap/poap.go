@@ -145,11 +145,12 @@ func NewProvider(httpClient *http.Client, apiKey string, authToken string) *Prov
 }
 
 // GetBlockchainInfo retrieves blockchain info for ETH
-func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.BlockchainInfo, error) {
+func (d *Provider) GetBlockchainInfo() multichain.BlockchainInfo {
 	return multichain.BlockchainInfo{
-		Chain:   persist.ChainPOAP,
-		ChainID: 0,
-	}, nil
+		Chain:      persist.ChainPOAP,
+		ChainID:    0,
+		ProviderID: "poap",
+	}
 }
 
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the Poap Blockchain
@@ -343,6 +344,18 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 
 func (d *Provider) GetDisplayNameByAddress(ctx context.Context, addr persist.Address) string {
 	return addr.String()
+}
+
+func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
+	t, _, err := d.GetTokensByTokenIdentifiers(ctx, ti, 1, 0)
+	if err != nil {
+		return persist.TokenMetadata{}, err
+	}
+	if len(t) == 0 {
+		return persist.TokenMetadata{}, fmt.Errorf("no token found for %s", ti)
+	}
+
+	return t[0].TokenMetadata, nil
 }
 
 // we should assume when using this function that the array is all of the tokens un paginated and we will need to paginate it with the offset and limit

@@ -480,13 +480,11 @@ type Token struct {
 	Name                 sql.NullString             `json:"name"`
 	Description          sql.NullString             `json:"description"`
 	CollectorsNote       sql.NullString             `json:"collectors_note"`
-	Media                persist.Media              `json:"media"`
 	TokenUri             sql.NullString             `json:"token_uri"`
 	TokenType            sql.NullString             `json:"token_type"`
 	TokenID              persist.TokenID            `json:"token_id"`
 	Quantity             persist.HexString          `json:"quantity"`
 	OwnershipHistory     persist.AddressAtBlockList `json:"ownership_history"`
-	TokenMetadata        persist.TokenMetadata      `json:"token_metadata"`
 	ExternalUrl          sql.NullString             `json:"external_url"`
 	BlockNumber          sql.NullInt64              `json:"block_number"`
 	OwnerUserID          persist.DBID               `json:"owner_user_id"`

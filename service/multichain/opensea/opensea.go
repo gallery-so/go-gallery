@@ -214,11 +214,12 @@ func NewProvider(ethClient *ethclient.Client, httpClient *http.Client, chain per
 }
 
 // GetBlockchainInfo returns Ethereum blockchain info
-func (p *Provider) GetBlockchainInfo(context.Context) (multichain.BlockchainInfo, error) {
+func (p *Provider) GetBlockchainInfo() multichain.BlockchainInfo {
 	return multichain.BlockchainInfo{
-		Chain:   p.chain,
-		ChainID: 0,
-	}, nil
+		Chain:      p.chain,
+		ChainID:    0,
+		ProviderID: "opensea",
+	}
 }
 
 // GetTokensByWalletAddress returns a list of tokens for a wallet address

@@ -214,7 +214,7 @@ func NewProvider(chain persist.Chain, httpClient *http.Client) *Provider {
 }
 
 // GetBlockchainInfo retrieves blockchain info for ETH
-func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.BlockchainInfo, error) {
+func (d *Provider) GetBlockchainInfo() multichain.BlockchainInfo {
 	chainID := 0
 	switch d.chain {
 	case persist.ChainOptimism:
@@ -223,9 +223,10 @@ func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.Blockchain
 		chainID = 137
 	}
 	return multichain.BlockchainInfo{
-		Chain:   d.chain,
-		ChainID: chainID,
-	}, nil
+		Chain:      d.chain,
+		ChainID:    chainID,
+		ProviderID: "alchemy",
+	}
 }
 
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the Ethereum Blockchain
@@ -365,21 +366,6 @@ func (d *Provider) getOwnersForContract(ctx context.Context, contract persist.Et
 
 	return result.Owners, nil
 }
-
-// // GetTokenMetadataByTokenIdentifiers retrieves a token's metadata for a given contract address and token ID
-// func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
-// 	tokens, _, err := d.getTokenWithMetadata(ctx, ti, false, 0)
-// 	if err != nil {
-// 		return persist.TokenMetadata{}, err
-// 	}
-
-// 	if len(tokens) == 0 {
-// 		return persist.TokenMetadata{}, fmt.Errorf("no token found for contract address %s and token ID %s", ti.ContractAddress, ti.TokenID)
-// 	}
-
-// 	token := tokens[0]
-// 	return token.TokenMetadata, nil
-// }
 
 func (d *Provider) getTokenWithMetadata(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, forceRefresh bool, timeout time.Duration) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	if timeout == 0 {

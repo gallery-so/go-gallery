@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
@@ -129,11 +130,12 @@ func NewProvider(httpClient *http.Client) *Provider {
 }
 
 // GetBlockchainInfo retrieves blockchain info for ETH
-func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.BlockchainInfo, error) {
+func (d *Provider) GetBlockchainInfo() multichain.BlockchainInfo {
 	return multichain.BlockchainInfo{
-		Chain:   persist.ChainETH,
-		ChainID: 0,
-	}, nil
+		Chain:      persist.ChainETH,
+		ChainID:    0,
+		ProviderID: "infura",
+	}
 }
 
 func (p *Provider) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
@@ -354,6 +356,7 @@ type TokenMetadata struct {
 func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
 	meta, err := p.getMetadata(ctx, ti, true)
 	if err != nil {
+		logger.For(ctx).Errorf("failed to get metadata for token %s: %s", ti.TokenID, err.Error())
 		return p.getMetadata(ctx, ti, false)
 	}
 	return meta, nil

@@ -72,7 +72,7 @@ func NewRecommender(queries *db.Queries) *Recommender {
 		if err != nil {
 			return nil, err
 		}
-		shuffle(recommendedIDs)
+		Shuffle(recommendedIDs, 24)
 		return recommendedIDs, nil
 	}
 
@@ -122,7 +122,7 @@ func (r *Recommender) RecommendFromFollowingShuffled(ctx context.Context, userID
 	if err != nil {
 		return nil, err
 	}
-	shuffle(recommendedIDs)
+	Shuffle(recommendedIDs, 24)
 	return recommendedIDs, err
 }
 
@@ -182,18 +182,18 @@ func (r *Recommender) readMetadata(ctx context.Context) graphMetadata {
 	return val.(graphMetadata)
 }
 
-// shuffle shuffles IDs within partitions so that results are in a similar order.
-func shuffle(ids []persist.DBID) {
+// Shuffle shuffles IDs within partitions so that results are in a similar order.
+func Shuffle[T any](ids []T, n int) {
 	if len(ids) <= 1 {
 		return
 	}
 
-	size := 24
+	size := n
 	for len(ids) < size {
 		size /= 2
 	}
 
-	subset := make([]persist.DBID, size)
+	subset := make([]T, size)
 
 	for i := 0; i < len(ids); i += size {
 		end := i + size
