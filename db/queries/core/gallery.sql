@@ -29,7 +29,7 @@ select * from galleries g where g.owner_user_id = $1 and g.deleted = false order
 select (tm.media ->> 'thumbnail_url')::text from galleries g,
     unnest(g.collections) with ordinality as collection_ids(id, ord) inner join collections c on c.id = collection_ids.id and c.deleted = false,
     unnest(c.nfts) with ordinality as token_ids(id, ord) inner join tokens t on t.id = token_ids.id and t.displayable and t.deleted = false
-    inner join token_media tm on tm.token_id = t.id and tm.media ->> 'thumbnail_url' != ''
+    inner join token_medias tm on tm.token_id = t.id and tm.media ->> 'thumbnail_url' != ''
     where g.owner_user_id = $1 and g.deleted = false
     order by collection_ids.ord, token_ids.ord limit $2;
 
