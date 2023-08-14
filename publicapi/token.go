@@ -320,30 +320,46 @@ func (api TokenAPI) SyncTokens(ctx context.Context, chains []persist.Chain) erro
 }
 
 func (api TokenAPI) SyncCreatedTokensAdmin(ctx context.Context, includeChains []persist.Chain, userID persist.DBID) error {
-	key := fmt.Sprintf("sync:created:%s", userID.String())
+	key := fmt.Sprintf("sync:created:new-contracts:%s", userID.String())
 
 	if err := api.throttler.Lock(ctx, key); err != nil {
 		return ErrTokenRefreshFailed{Message: err.Error()}
 	}
 	defer api.throttler.Unlock(ctx, key)
 
-	return api.multichainProvider.SyncCreatedTokens(ctx, userID, includeChains)
+	return api.multichainProvider.SyncCreatedTokensForNewContracts(ctx, userID, includeChains)
 }
 
-func (api TokenAPI) SyncCreatedTokens(ctx context.Context, includeChains []persist.Chain) error {
+func (api TokenAPI) SyncCreatedTokensForNewContracts(ctx context.Context, includeChains []persist.Chain) error {
 	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
 
-	key := fmt.Sprintf("sync:created:%s", userID.String())
+	key := fmt.Sprintf("sync:created:new-contracts:%s", userID.String())
 
 	if err := api.throttler.Lock(ctx, key); err != nil {
 		return ErrTokenRefreshFailed{Message: err.Error()}
 	}
 	defer api.throttler.Unlock(ctx, key)
 
-	return api.multichainProvider.SyncCreatedTokens(ctx, userID, includeChains)
+	return api.multichainProvider.SyncCreatedTokensForNewContracts(ctx, userID, includeChains)
+}
+
+func (api TokenAPI) SyncCreatedTokensForExistingContract(ctx context.Context, contractID persist.DBID) error {
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return err
+	}
+
+	key := fmt.Sprintf("sync:created:contract:%s:%s", userID.String(), contractID.String())
+
+	if err := api.throttler.Lock(ctx, key); err != nil {
+		return ErrTokenRefreshFailed{Message: err.Error()}
+	}
+	defer api.throttler.Unlock(ctx, key)
+
+	return api.multichainProvider.SyncCreatedTokensForExistingContract(ctx, userID, contractID)
 }
 
 func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) error {

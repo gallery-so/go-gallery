@@ -183,6 +183,15 @@ func Map[T, U any](xs []T, f func(T) (U, error)) ([]U, error) {
 	return result, nil
 }
 
+// MapWithoutError applies a function to each element of a slice, returning a new slice of the same length.
+func MapWithoutError[T, U any](xs []T, f func(T) U) []U {
+	result := make([]U, len(xs))
+	for i, x := range xs {
+		result[i] = f(x)
+	}
+	return result
+}
+
 func MapKeys[T comparable, V any](m map[T]V) []T {
 	result := make([]T, 0, len(m))
 	for k := range m {

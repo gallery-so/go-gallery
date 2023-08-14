@@ -767,78 +767,79 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		AddRolesToUser                  func(childComplexity int, username string, roles []*persist.Role) int
-		AddUserWallet                   func(childComplexity int, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) int
-		AddWalletToUserUnchecked        func(childComplexity int, input model.AdminAddWalletInput) int
-		AdmireFeedEvent                 func(childComplexity int, feedEventID persist.DBID) int
-		AdmirePost                      func(childComplexity int, postID persist.DBID) int
-		BanUserFromFeed                 func(childComplexity int, username string, action string) int
-		ClearAllNotifications           func(childComplexity int) int
-		CommentOnFeedEvent              func(childComplexity int, feedEventID persist.DBID, replyToID *persist.DBID, comment string) int
-		CommentOnPost                   func(childComplexity int, postID persist.DBID, replyToID *persist.DBID, comment string) int
-		ConnectSocialAccount            func(childComplexity int, input model.SocialAuthMechanism, display bool) int
-		CreateCollection                func(childComplexity int, input model.CreateCollectionInput) int
-		CreateGallery                   func(childComplexity int, input model.CreateGalleryInput) int
-		CreateUser                      func(childComplexity int, authMechanism model.AuthMechanism, input model.CreateUserInput) int
-		DeleteCollection                func(childComplexity int, collectionID persist.DBID) int
-		DeleteGallery                   func(childComplexity int, galleryID persist.DBID) int
-		DeletePost                      func(childComplexity int, postID persist.DBID) int
-		DisconnectSocialAccount         func(childComplexity int, accountType persist.SocialProvider) int
-		FollowAllSocialConnections      func(childComplexity int, accountType persist.SocialProvider) int
-		FollowUser                      func(childComplexity int, userID persist.DBID) int
-		GenerateQRCodeLoginToken        func(childComplexity int) int
-		GetAuthNonce                    func(childComplexity int, chainAddress persist.ChainAddress) int
-		Login                           func(childComplexity int, authMechanism model.AuthMechanism) int
-		Logout                          func(childComplexity int, pushTokenToUnregister *string) int
-		MintPremiumCardToWallet         func(childComplexity int, input model.MintPremiumCardToWalletInput) int
-		MoveCollectionToGallery         func(childComplexity int, input *model.MoveCollectionToGalleryInput) int
-		PostTokens                      func(childComplexity int, input model.PostTokensInput) int
-		PreverifyEmail                  func(childComplexity int, input model.PreverifyEmailInput) int
-		PublishGallery                  func(childComplexity int, input model.PublishGalleryInput) int
-		RedeemMerch                     func(childComplexity int, input model.RedeemMerchInput) int
-		RefreshCollection               func(childComplexity int, collectionID persist.DBID) int
-		RefreshContract                 func(childComplexity int, contractID persist.DBID) int
-		RefreshToken                    func(childComplexity int, tokenID persist.DBID) int
-		RegisterUserPushToken           func(childComplexity int, pushToken string) int
-		RemoveAdmire                    func(childComplexity int, admireID persist.DBID) int
-		RemoveComment                   func(childComplexity int, commentID persist.DBID) int
-		RemoveProfileImage              func(childComplexity int) int
-		RemoveUserWallets               func(childComplexity int, walletIds []persist.DBID) int
-		ResendVerificationEmail         func(childComplexity int) int
-		RevokeRolesFromUser             func(childComplexity int, username string, roles []*persist.Role) int
-		SetCommunityOverrideCreator     func(childComplexity int, communityID persist.DBID, creatorUserID *persist.DBID) int
-		SetProfileImage                 func(childComplexity int, input model.SetProfileImageInput) int
-		SetSpamPreference               func(childComplexity int, input model.SetSpamPreferenceInput) int
-		SyncCreatedTokens               func(childComplexity int, input model.SyncCreatedTokensInput) int
-		SyncCreatedTokensForUsername    func(childComplexity int, username string, chains []persist.Chain) int
-		SyncTokens                      func(childComplexity int, chains []persist.Chain) int
-		SyncTokensForUsername           func(childComplexity int, username string, chains []persist.Chain) int
-		UnbanUserFromFeed               func(childComplexity int, username string) int
-		UnfollowUser                    func(childComplexity int, userID persist.DBID) int
-		UnregisterUserPushToken         func(childComplexity int, pushToken string) int
-		UnsubscribeFromEmailType        func(childComplexity int, input model.UnsubscribeFromEmailTypeInput) int
-		UpdateCollectionHidden          func(childComplexity int, input model.UpdateCollectionHiddenInput) int
-		UpdateCollectionInfo            func(childComplexity int, input model.UpdateCollectionInfoInput) int
-		UpdateCollectionTokens          func(childComplexity int, input model.UpdateCollectionTokensInput) int
-		UpdateEmail                     func(childComplexity int, input model.UpdateEmailInput) int
-		UpdateEmailNotificationSettings func(childComplexity int, input model.UpdateEmailNotificationSettingsInput) int
-		UpdateFeaturedGallery           func(childComplexity int, galleryID persist.DBID) int
-		UpdateGallery                   func(childComplexity int, input model.UpdateGalleryInput) int
-		UpdateGalleryCollections        func(childComplexity int, input model.UpdateGalleryCollectionsInput) int
-		UpdateGalleryHidden             func(childComplexity int, input model.UpdateGalleryHiddenInput) int
-		UpdateGalleryInfo               func(childComplexity int, input model.UpdateGalleryInfoInput) int
-		UpdateGalleryOrder              func(childComplexity int, input model.UpdateGalleryOrderInput) int
-		UpdateNotificationSettings      func(childComplexity int, settings *model.NotificationSettingsInput) int
-		UpdatePrimaryWallet             func(childComplexity int, walletID persist.DBID) int
-		UpdateSocialAccountDisplayed    func(childComplexity int, input model.UpdateSocialAccountDisplayedInput) int
-		UpdateTokenInfo                 func(childComplexity int, input model.UpdateTokenInfoInput) int
-		UpdateUserExperience            func(childComplexity int, input model.UpdateUserExperienceInput) int
-		UpdateUserInfo                  func(childComplexity int, input model.UpdateUserInfoInput) int
-		UploadPersistedQueries          func(childComplexity int, input *model.UploadPersistedQueriesInput) int
-		VerifyEmail                     func(childComplexity int, input model.VerifyEmailInput) int
-		VerifyEmailMagicLink            func(childComplexity int, input model.VerifyEmailMagicLinkInput) int
-		ViewGallery                     func(childComplexity int, galleryID persist.DBID) int
-		ViewToken                       func(childComplexity int, tokenID persist.DBID, collectionID persist.DBID) int
+		AddRolesToUser                       func(childComplexity int, username string, roles []*persist.Role) int
+		AddUserWallet                        func(childComplexity int, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) int
+		AddWalletToUserUnchecked             func(childComplexity int, input model.AdminAddWalletInput) int
+		AdmireFeedEvent                      func(childComplexity int, feedEventID persist.DBID) int
+		AdmirePost                           func(childComplexity int, postID persist.DBID) int
+		BanUserFromFeed                      func(childComplexity int, username string, action string) int
+		ClearAllNotifications                func(childComplexity int) int
+		CommentOnFeedEvent                   func(childComplexity int, feedEventID persist.DBID, replyToID *persist.DBID, comment string) int
+		CommentOnPost                        func(childComplexity int, postID persist.DBID, replyToID *persist.DBID, comment string) int
+		ConnectSocialAccount                 func(childComplexity int, input model.SocialAuthMechanism, display bool) int
+		CreateCollection                     func(childComplexity int, input model.CreateCollectionInput) int
+		CreateGallery                        func(childComplexity int, input model.CreateGalleryInput) int
+		CreateUser                           func(childComplexity int, authMechanism model.AuthMechanism, input model.CreateUserInput) int
+		DeleteCollection                     func(childComplexity int, collectionID persist.DBID) int
+		DeleteGallery                        func(childComplexity int, galleryID persist.DBID) int
+		DeletePost                           func(childComplexity int, postID persist.DBID) int
+		DisconnectSocialAccount              func(childComplexity int, accountType persist.SocialProvider) int
+		FollowAllSocialConnections           func(childComplexity int, accountType persist.SocialProvider) int
+		FollowUser                           func(childComplexity int, userID persist.DBID) int
+		GenerateQRCodeLoginToken             func(childComplexity int) int
+		GetAuthNonce                         func(childComplexity int, chainAddress persist.ChainAddress) int
+		Login                                func(childComplexity int, authMechanism model.AuthMechanism) int
+		Logout                               func(childComplexity int, pushTokenToUnregister *string) int
+		MintPremiumCardToWallet              func(childComplexity int, input model.MintPremiumCardToWalletInput) int
+		MoveCollectionToGallery              func(childComplexity int, input *model.MoveCollectionToGalleryInput) int
+		PostTokens                           func(childComplexity int, input model.PostTokensInput) int
+		PreverifyEmail                       func(childComplexity int, input model.PreverifyEmailInput) int
+		PublishGallery                       func(childComplexity int, input model.PublishGalleryInput) int
+		RedeemMerch                          func(childComplexity int, input model.RedeemMerchInput) int
+		RefreshCollection                    func(childComplexity int, collectionID persist.DBID) int
+		RefreshContract                      func(childComplexity int, contractID persist.DBID) int
+		RefreshToken                         func(childComplexity int, tokenID persist.DBID) int
+		RegisterUserPushToken                func(childComplexity int, pushToken string) int
+		RemoveAdmire                         func(childComplexity int, admireID persist.DBID) int
+		RemoveComment                        func(childComplexity int, commentID persist.DBID) int
+		RemoveProfileImage                   func(childComplexity int) int
+		RemoveUserWallets                    func(childComplexity int, walletIds []persist.DBID) int
+		ResendVerificationEmail              func(childComplexity int) int
+		RevokeRolesFromUser                  func(childComplexity int, username string, roles []*persist.Role) int
+		SetCommunityOverrideCreator          func(childComplexity int, communityID persist.DBID, creatorUserID *persist.DBID) int
+		SetProfileImage                      func(childComplexity int, input model.SetProfileImageInput) int
+		SetSpamPreference                    func(childComplexity int, input model.SetSpamPreferenceInput) int
+		SyncCreatedTokensForExistingContract func(childComplexity int, input model.SyncCreatedTokensForExistingContractInput) int
+		SyncCreatedTokensForNewContracts     func(childComplexity int, input model.SyncCreatedTokensForNewContractsInput) int
+		SyncCreatedTokensForUsername         func(childComplexity int, username string, chains []persist.Chain) int
+		SyncTokens                           func(childComplexity int, chains []persist.Chain) int
+		SyncTokensForUsername                func(childComplexity int, username string, chains []persist.Chain) int
+		UnbanUserFromFeed                    func(childComplexity int, username string) int
+		UnfollowUser                         func(childComplexity int, userID persist.DBID) int
+		UnregisterUserPushToken              func(childComplexity int, pushToken string) int
+		UnsubscribeFromEmailType             func(childComplexity int, input model.UnsubscribeFromEmailTypeInput) int
+		UpdateCollectionHidden               func(childComplexity int, input model.UpdateCollectionHiddenInput) int
+		UpdateCollectionInfo                 func(childComplexity int, input model.UpdateCollectionInfoInput) int
+		UpdateCollectionTokens               func(childComplexity int, input model.UpdateCollectionTokensInput) int
+		UpdateEmail                          func(childComplexity int, input model.UpdateEmailInput) int
+		UpdateEmailNotificationSettings      func(childComplexity int, input model.UpdateEmailNotificationSettingsInput) int
+		UpdateFeaturedGallery                func(childComplexity int, galleryID persist.DBID) int
+		UpdateGallery                        func(childComplexity int, input model.UpdateGalleryInput) int
+		UpdateGalleryCollections             func(childComplexity int, input model.UpdateGalleryCollectionsInput) int
+		UpdateGalleryHidden                  func(childComplexity int, input model.UpdateGalleryHiddenInput) int
+		UpdateGalleryInfo                    func(childComplexity int, input model.UpdateGalleryInfoInput) int
+		UpdateGalleryOrder                   func(childComplexity int, input model.UpdateGalleryOrderInput) int
+		UpdateNotificationSettings           func(childComplexity int, settings *model.NotificationSettingsInput) int
+		UpdatePrimaryWallet                  func(childComplexity int, walletID persist.DBID) int
+		UpdateSocialAccountDisplayed         func(childComplexity int, input model.UpdateSocialAccountDisplayedInput) int
+		UpdateTokenInfo                      func(childComplexity int, input model.UpdateTokenInfoInput) int
+		UpdateUserExperience                 func(childComplexity int, input model.UpdateUserExperienceInput) int
+		UpdateUserInfo                       func(childComplexity int, input model.UpdateUserInfoInput) int
+		UploadPersistedQueries               func(childComplexity int, input *model.UploadPersistedQueriesInput) int
+		VerifyEmail                          func(childComplexity int, input model.VerifyEmailInput) int
+		VerifyEmailMagicLink                 func(childComplexity int, input model.VerifyEmailMagicLinkInput) int
+		ViewGallery                          func(childComplexity int, galleryID persist.DBID) int
+		ViewToken                            func(childComplexity int, tokenID persist.DBID, collectionID persist.DBID) int
 	}
 
 	NewTokensNotification struct {
@@ -1186,12 +1187,16 @@ type ComplexityRoot struct {
 		NotificationUpdated func(childComplexity int) int
 	}
 
-	SyncCreatedTokensForUsernamePayload struct {
-		Message func(childComplexity int) int
+	SyncCreatedTokensForExistingContractPayload struct {
+		Viewer func(childComplexity int) int
 	}
 
-	SyncCreatedTokensPayload struct {
+	SyncCreatedTokensForNewContractsPayload struct {
 		Viewer func(childComplexity int) int
+	}
+
+	SyncCreatedTokensForUsernamePayload struct {
+		Message func(childComplexity int) int
 	}
 
 	SyncTokensForUsernamePayload struct {
@@ -1646,7 +1651,8 @@ type MutationResolver interface {
 	UpdateTokenInfo(ctx context.Context, input model.UpdateTokenInfoInput) (model.UpdateTokenInfoPayloadOrError, error)
 	SetSpamPreference(ctx context.Context, input model.SetSpamPreferenceInput) (model.SetSpamPreferencePayloadOrError, error)
 	SyncTokens(ctx context.Context, chains []persist.Chain) (model.SyncTokensPayloadOrError, error)
-	SyncCreatedTokens(ctx context.Context, input model.SyncCreatedTokensInput) (model.SyncCreatedTokensPayloadOrError, error)
+	SyncCreatedTokensForNewContracts(ctx context.Context, input model.SyncCreatedTokensForNewContractsInput) (model.SyncCreatedTokensForNewContractsPayloadOrError, error)
+	SyncCreatedTokensForExistingContract(ctx context.Context, input model.SyncCreatedTokensForExistingContractInput) (model.SyncCreatedTokensForExistingContractPayloadOrError, error)
 	RefreshToken(ctx context.Context, tokenID persist.DBID) (model.RefreshTokenPayloadOrError, error)
 	RefreshCollection(ctx context.Context, collectionID persist.DBID) (model.RefreshCollectionPayloadOrError, error)
 	RefreshContract(ctx context.Context, contractID persist.DBID) (model.RefreshContractPayloadOrError, error)
@@ -4811,17 +4817,29 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.SetSpamPreference(childComplexity, args["input"].(model.SetSpamPreferenceInput)), true
 
-	case "Mutation.syncCreatedTokens":
-		if e.complexity.Mutation.SyncCreatedTokens == nil {
+	case "Mutation.syncCreatedTokensForExistingContract":
+		if e.complexity.Mutation.SyncCreatedTokensForExistingContract == nil {
 			break
 		}
 
-		args, err := ec.field_Mutation_syncCreatedTokens_args(context.TODO(), rawArgs)
+		args, err := ec.field_Mutation_syncCreatedTokensForExistingContract_args(context.TODO(), rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.Mutation.SyncCreatedTokens(childComplexity, args["input"].(model.SyncCreatedTokensInput)), true
+		return e.complexity.Mutation.SyncCreatedTokensForExistingContract(childComplexity, args["input"].(model.SyncCreatedTokensForExistingContractInput)), true
+
+	case "Mutation.syncCreatedTokensForNewContracts":
+		if e.complexity.Mutation.SyncCreatedTokensForNewContracts == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_syncCreatedTokensForNewContracts_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.SyncCreatedTokensForNewContracts(childComplexity, args["input"].(model.SyncCreatedTokensForNewContractsInput)), true
 
 	case "Mutation.syncCreatedTokensForUsername":
 		if e.complexity.Mutation.SyncCreatedTokensForUsername == nil {
@@ -6716,19 +6734,26 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Subscription.NotificationUpdated(childComplexity), true
 
+	case "SyncCreatedTokensForExistingContractPayload.viewer":
+		if e.complexity.SyncCreatedTokensForExistingContractPayload.Viewer == nil {
+			break
+		}
+
+		return e.complexity.SyncCreatedTokensForExistingContractPayload.Viewer(childComplexity), true
+
+	case "SyncCreatedTokensForNewContractsPayload.viewer":
+		if e.complexity.SyncCreatedTokensForNewContractsPayload.Viewer == nil {
+			break
+		}
+
+		return e.complexity.SyncCreatedTokensForNewContractsPayload.Viewer(childComplexity), true
+
 	case "SyncCreatedTokensForUsernamePayload.message":
 		if e.complexity.SyncCreatedTokensForUsernamePayload.Message == nil {
 			break
 		}
 
 		return e.complexity.SyncCreatedTokensForUsernamePayload.Message(childComplexity), true
-
-	case "SyncCreatedTokensPayload.viewer":
-		if e.complexity.SyncCreatedTokensPayload.Viewer == nil {
-			break
-		}
-
-		return e.complexity.SyncCreatedTokensPayload.Viewer(childComplexity), true
 
 	case "SyncTokensForUsernamePayload.message":
 		if e.complexity.SyncTokensForUsernamePayload.Message == nil {
@@ -7797,7 +7822,8 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputSetProfileImageInput,
 		ec.unmarshalInputSetSpamPreferenceInput,
 		ec.unmarshalInputSocialAuthMechanism,
-		ec.unmarshalInputSyncCreatedTokensInput,
+		ec.unmarshalInputSyncCreatedTokensForExistingContractInput,
+		ec.unmarshalInputSyncCreatedTokensForNewContractsInput,
 		ec.unmarshalInputTrendingUsersInput,
 		ec.unmarshalInputTwitterAuth,
 		ec.unmarshalInputUnsubscribeFromEmailTypeInput,
@@ -8070,9 +8096,13 @@ input CreatedCommunitiesInput {
   includeChains: [Chain!]
 }
 
-input SyncCreatedTokensInput {
-  # When includeChains is empty, returns all communities from all chains.
+input SyncCreatedTokensForNewContractsInput {
+  # When includeChains is empty, syncs tokens on all chains.
   includeChains: [Chain!]
+}
+
+input SyncCreatedTokensForExistingContractInput {
+  contractId: DBID!
 }
 
 type Badge {
@@ -9407,9 +9437,15 @@ type SyncTokensPayload {
   viewer: Viewer
 }
 
-union SyncCreatedTokensPayloadOrError = SyncCreatedTokensPayload | ErrNotAuthorized | ErrSyncFailed
+union SyncCreatedTokensForNewContractsPayloadOrError = SyncCreatedTokensForNewContractsPayload | ErrNotAuthorized | ErrSyncFailed
 
-type SyncCreatedTokensPayload {
+type SyncCreatedTokensForNewContractsPayload {
+  viewer: Viewer
+}
+
+union SyncCreatedTokensForExistingContractPayloadOrError = SyncCreatedTokensForExistingContractPayload | ErrNotAuthorized | ErrSyncFailed
+
+type SyncCreatedTokensForExistingContractPayload {
   viewer: Viewer
 }
 
@@ -10344,7 +10380,8 @@ type Mutation {
   setSpamPreference(input: SetSpamPreferenceInput!): SetSpamPreferencePayloadOrError @authRequired
 
   syncTokens(chains: [Chain!]): SyncTokensPayloadOrError @authRequired
-  syncCreatedTokens(input: SyncCreatedTokensInput!): SyncCreatedTokensPayloadOrError @authRequired
+  syncCreatedTokensForNewContracts(input: SyncCreatedTokensForNewContractsInput!): SyncCreatedTokensForNewContractsPayloadOrError @authRequired
+  syncCreatedTokensForExistingContract(input: SyncCreatedTokensForExistingContractInput!): SyncCreatedTokensForExistingContractPayloadOrError @authRequired
   refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
   refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
   refreshContract(contractId: DBID!): RefreshContractPayloadOrError
@@ -11775,6 +11812,36 @@ func (ec *executionContext) field_Mutation_setSpamPreference_args(ctx context.Co
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_syncCreatedTokensForExistingContract_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.SyncCreatedTokensForExistingContractInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNSyncCreatedTokensForExistingContractInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSyncCreatedTokensForExistingContractInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_syncCreatedTokensForNewContracts_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.SyncCreatedTokensForNewContractsInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNSyncCreatedTokensForNewContractsInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSyncCreatedTokensForNewContractsInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_syncCreatedTokensForUsername_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -11796,21 +11863,6 @@ func (ec *executionContext) field_Mutation_syncCreatedTokensForUsername_args(ctx
 		}
 	}
 	args["chains"] = arg1
-	return args, nil
-}
-
-func (ec *executionContext) field_Mutation_syncCreatedTokens_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 model.SyncCreatedTokensInput
-	if tmp, ok := rawArgs["input"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
-		arg0, err = ec.unmarshalNSyncCreatedTokensInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSyncCreatedTokensInput(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["input"] = arg0
 	return args, nil
 }
 
@@ -31881,8 +31933,8 @@ func (ec *executionContext) fieldContext_Mutation_syncTokens(ctx context.Context
 	return fc, nil
 }
 
-func (ec *executionContext) _Mutation_syncCreatedTokens(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Mutation_syncCreatedTokens(ctx, field)
+func (ec *executionContext) _Mutation_syncCreatedTokensForNewContracts(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_syncCreatedTokensForNewContracts(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -31896,7 +31948,7 @@ func (ec *executionContext) _Mutation_syncCreatedTokens(ctx context.Context, fie
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().SyncCreatedTokens(rctx, fc.Args["input"].(model.SyncCreatedTokensInput))
+			return ec.resolvers.Mutation().SyncCreatedTokensForNewContracts(rctx, fc.Args["input"].(model.SyncCreatedTokensForNewContractsInput))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.AuthRequired == nil {
@@ -31912,10 +31964,10 @@ func (ec *executionContext) _Mutation_syncCreatedTokens(ctx context.Context, fie
 		if tmp == nil {
 			return nil, nil
 		}
-		if data, ok := tmp.(model.SyncCreatedTokensPayloadOrError); ok {
+		if data, ok := tmp.(model.SyncCreatedTokensForNewContractsPayloadOrError); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.SyncCreatedTokensPayloadOrError`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.SyncCreatedTokensForNewContractsPayloadOrError`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -31924,19 +31976,19 @@ func (ec *executionContext) _Mutation_syncCreatedTokens(ctx context.Context, fie
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(model.SyncCreatedTokensPayloadOrError)
+	res := resTmp.(model.SyncCreatedTokensForNewContractsPayloadOrError)
 	fc.Result = res
-	return ec.marshalOSyncCreatedTokensPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSyncCreatedTokensPayloadOrError(ctx, field.Selections, res)
+	return ec.marshalOSyncCreatedTokensForNewContractsPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSyncCreatedTokensForNewContractsPayloadOrError(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Mutation_syncCreatedTokens(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Mutation_syncCreatedTokensForNewContracts(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Mutation",
 		Field:      field,
 		IsMethod:   true,
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type SyncCreatedTokensPayloadOrError does not have child fields")
+			return nil, errors.New("field of type SyncCreatedTokensForNewContractsPayloadOrError does not have child fields")
 		},
 	}
 	defer func() {
@@ -31946,7 +31998,79 @@ func (ec *executionContext) fieldContext_Mutation_syncCreatedTokens(ctx context.
 		}
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_syncCreatedTokens_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+	if fc.Args, err = ec.field_Mutation_syncCreatedTokensForNewContracts_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_syncCreatedTokensForExistingContract(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_syncCreatedTokensForExistingContract(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().SyncCreatedTokensForExistingContract(rctx, fc.Args["input"].(model.SyncCreatedTokensForExistingContractInput))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.SyncCreatedTokensForExistingContractPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.SyncCreatedTokensForExistingContractPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.SyncCreatedTokensForExistingContractPayloadOrError)
+	fc.Result = res
+	return ec.marshalOSyncCreatedTokensForExistingContractPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSyncCreatedTokensForExistingContractPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_syncCreatedTokensForExistingContract(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type SyncCreatedTokensForExistingContractPayloadOrError does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_syncCreatedTokensForExistingContract_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return
 	}
@@ -45798,6 +45922,132 @@ func (ec *executionContext) fieldContext_Subscription_notificationUpdated(ctx co
 	return fc, nil
 }
 
+func (ec *executionContext) _SyncCreatedTokensForExistingContractPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.SyncCreatedTokensForExistingContractPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SyncCreatedTokensForExistingContractPayload_viewer(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Viewer, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Viewer)
+	fc.Result = res
+	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SyncCreatedTokensForExistingContractPayload_viewer(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SyncCreatedTokensForExistingContractPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Viewer_id(ctx, field)
+			case "user":
+				return ec.fieldContext_Viewer_user(ctx, field)
+			case "socialAccounts":
+				return ec.fieldContext_Viewer_socialAccounts(ctx, field)
+			case "viewerGalleries":
+				return ec.fieldContext_Viewer_viewerGalleries(ctx, field)
+			case "feed":
+				return ec.fieldContext_Viewer_feed(ctx, field)
+			case "email":
+				return ec.fieldContext_Viewer_email(ctx, field)
+			case "notifications":
+				return ec.fieldContext_Viewer_notifications(ctx, field)
+			case "notificationSettings":
+				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
+			case "userExperiences":
+				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SyncCreatedTokensForNewContractsPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.SyncCreatedTokensForNewContractsPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SyncCreatedTokensForNewContractsPayload_viewer(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Viewer, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Viewer)
+	fc.Result = res
+	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SyncCreatedTokensForNewContractsPayload_viewer(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SyncCreatedTokensForNewContractsPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Viewer_id(ctx, field)
+			case "user":
+				return ec.fieldContext_Viewer_user(ctx, field)
+			case "socialAccounts":
+				return ec.fieldContext_Viewer_socialAccounts(ctx, field)
+			case "viewerGalleries":
+				return ec.fieldContext_Viewer_viewerGalleries(ctx, field)
+			case "feed":
+				return ec.fieldContext_Viewer_feed(ctx, field)
+			case "email":
+				return ec.fieldContext_Viewer_email(ctx, field)
+			case "notifications":
+				return ec.fieldContext_Viewer_notifications(ctx, field)
+			case "notificationSettings":
+				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
+			case "userExperiences":
+				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _SyncCreatedTokensForUsernamePayload_message(ctx context.Context, field graphql.CollectedField, obj *model.SyncCreatedTokensForUsernamePayload) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_SyncCreatedTokensForUsernamePayload_message(ctx, field)
 	if err != nil {
@@ -45837,69 +46087,6 @@ func (ec *executionContext) fieldContext_SyncCreatedTokensForUsernamePayload_mes
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _SyncCreatedTokensPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.SyncCreatedTokensPayload) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_SyncCreatedTokensPayload_viewer(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Viewer, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.Viewer)
-	fc.Result = res
-	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_SyncCreatedTokensPayload_viewer(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "SyncCreatedTokensPayload",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_Viewer_id(ctx, field)
-			case "user":
-				return ec.fieldContext_Viewer_user(ctx, field)
-			case "socialAccounts":
-				return ec.fieldContext_Viewer_socialAccounts(ctx, field)
-			case "viewerGalleries":
-				return ec.fieldContext_Viewer_viewerGalleries(ctx, field)
-			case "feed":
-				return ec.fieldContext_Viewer_feed(ctx, field)
-			case "email":
-				return ec.fieldContext_Viewer_email(ctx, field)
-			case "notifications":
-				return ec.fieldContext_Viewer_notifications(ctx, field)
-			case "notificationSettings":
-				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
-			case "userExperiences":
-				return ec.fieldContext_Viewer_userExperiences(ctx, field)
-			case "suggestedUsers":
-				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
 	}
 	return fc, nil
@@ -56986,8 +57173,37 @@ func (ec *executionContext) unmarshalInputSocialAuthMechanism(ctx context.Contex
 	return it, nil
 }
 
-func (ec *executionContext) unmarshalInputSyncCreatedTokensInput(ctx context.Context, obj interface{}) (model.SyncCreatedTokensInput, error) {
-	var it model.SyncCreatedTokensInput
+func (ec *executionContext) unmarshalInputSyncCreatedTokensForExistingContractInput(ctx context.Context, obj interface{}) (model.SyncCreatedTokensForExistingContractInput, error) {
+	var it model.SyncCreatedTokensForExistingContractInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"contractId"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "contractId":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("contractId"))
+			data, err := ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ContractID = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputSyncCreatedTokensForNewContractsInput(ctx context.Context, obj interface{}) (model.SyncCreatedTokensForNewContractsInput, error) {
+	var it model.SyncCreatedTokensForNewContractsInput
 	asMap := map[string]interface{}{}
 	for k, v := range obj.(map[string]interface{}) {
 		asMap[k] = v
@@ -60505,17 +60721,17 @@ func (ec *executionContext) _SocialQueriesOrError(ctx context.Context, sel ast.S
 	}
 }
 
-func (ec *executionContext) _SyncCreatedTokensForUsernamePayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.SyncCreatedTokensForUsernamePayloadOrError) graphql.Marshaler {
+func (ec *executionContext) _SyncCreatedTokensForExistingContractPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.SyncCreatedTokensForExistingContractPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
-	case model.SyncCreatedTokensForUsernamePayload:
-		return ec._SyncCreatedTokensForUsernamePayload(ctx, sel, &obj)
-	case *model.SyncCreatedTokensForUsernamePayload:
+	case model.SyncCreatedTokensForExistingContractPayload:
+		return ec._SyncCreatedTokensForExistingContractPayload(ctx, sel, &obj)
+	case *model.SyncCreatedTokensForExistingContractPayload:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._SyncCreatedTokensForUsernamePayload(ctx, sel, obj)
+		return ec._SyncCreatedTokensForExistingContractPayload(ctx, sel, obj)
 	case model.ErrNotAuthorized:
 		return ec._ErrNotAuthorized(ctx, sel, &obj)
 	case *model.ErrNotAuthorized:
@@ -60535,17 +60751,47 @@ func (ec *executionContext) _SyncCreatedTokensForUsernamePayloadOrError(ctx cont
 	}
 }
 
-func (ec *executionContext) _SyncCreatedTokensPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.SyncCreatedTokensPayloadOrError) graphql.Marshaler {
+func (ec *executionContext) _SyncCreatedTokensForNewContractsPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.SyncCreatedTokensForNewContractsPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
-	case model.SyncCreatedTokensPayload:
-		return ec._SyncCreatedTokensPayload(ctx, sel, &obj)
-	case *model.SyncCreatedTokensPayload:
+	case model.SyncCreatedTokensForNewContractsPayload:
+		return ec._SyncCreatedTokensForNewContractsPayload(ctx, sel, &obj)
+	case *model.SyncCreatedTokensForNewContractsPayload:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._SyncCreatedTokensPayload(ctx, sel, obj)
+		return ec._SyncCreatedTokensForNewContractsPayload(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
+	case model.ErrSyncFailed:
+		return ec._ErrSyncFailed(ctx, sel, &obj)
+	case *model.ErrSyncFailed:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrSyncFailed(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _SyncCreatedTokensForUsernamePayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.SyncCreatedTokensForUsernamePayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.SyncCreatedTokensForUsernamePayload:
+		return ec._SyncCreatedTokensForUsernamePayload(ctx, sel, &obj)
+	case *model.SyncCreatedTokensForUsernamePayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SyncCreatedTokensForUsernamePayload(ctx, sel, obj)
 	case model.ErrNotAuthorized:
 		return ec._ErrNotAuthorized(ctx, sel, &obj)
 	case *model.ErrNotAuthorized:
@@ -64088,7 +64334,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "SocialQueriesOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "SyncTokensPayloadOrError", "SyncCreatedTokensPayloadOrError", "Error", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "SyncCreatedTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "UnbanUserFromFeedPayloadOrError", "SetCommunityOverrideCreatorPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "GenerateQRCodeLoginTokenPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "AdmirePostPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "SocialQueriesOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "SyncTokensPayloadOrError", "SyncCreatedTokensForNewContractsPayloadOrError", "SyncCreatedTokensForExistingContractPayloadOrError", "Error", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "SyncCreatedTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "UnbanUserFromFeedPayloadOrError", "SetCommunityOverrideCreatorPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "GenerateQRCodeLoginTokenPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "AdmirePostPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
@@ -64207,7 +64453,7 @@ func (ec *executionContext) _ErrSessionInvalidated(ctx context.Context, sel ast.
 	return out
 }
 
-var errSyncFailedImplementors = []string{"ErrSyncFailed", "SyncTokensPayloadOrError", "SyncCreatedTokensPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "SyncTokensForUsernamePayloadOrError", "SyncCreatedTokensForUsernamePayloadOrError"}
+var errSyncFailedImplementors = []string{"ErrSyncFailed", "SyncTokensPayloadOrError", "SyncCreatedTokensForNewContractsPayloadOrError", "SyncCreatedTokensForExistingContractPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "SyncTokensForUsernamePayloadOrError", "SyncCreatedTokensForUsernamePayloadOrError"}
 
 func (ec *executionContext) _ErrSyncFailed(ctx context.Context, sel ast.SelectionSet, obj *model.ErrSyncFailed) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errSyncFailedImplementors)
@@ -66488,10 +66734,16 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 				return ec._Mutation_syncTokens(ctx, field)
 			})
 
-		case "syncCreatedTokens":
+		case "syncCreatedTokensForNewContracts":
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_syncCreatedTokens(ctx, field)
+				return ec._Mutation_syncCreatedTokensForNewContracts(ctx, field)
+			})
+
+		case "syncCreatedTokensForExistingContract":
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_syncCreatedTokensForExistingContract(ctx, field)
 			})
 
 		case "refreshToken":
@@ -69675,6 +69927,56 @@ func (ec *executionContext) _Subscription(ctx context.Context, sel ast.Selection
 	}
 }
 
+var syncCreatedTokensForExistingContractPayloadImplementors = []string{"SyncCreatedTokensForExistingContractPayload", "SyncCreatedTokensForExistingContractPayloadOrError"}
+
+func (ec *executionContext) _SyncCreatedTokensForExistingContractPayload(ctx context.Context, sel ast.SelectionSet, obj *model.SyncCreatedTokensForExistingContractPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, syncCreatedTokensForExistingContractPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SyncCreatedTokensForExistingContractPayload")
+		case "viewer":
+
+			out.Values[i] = ec._SyncCreatedTokensForExistingContractPayload_viewer(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var syncCreatedTokensForNewContractsPayloadImplementors = []string{"SyncCreatedTokensForNewContractsPayload", "SyncCreatedTokensForNewContractsPayloadOrError"}
+
+func (ec *executionContext) _SyncCreatedTokensForNewContractsPayload(ctx context.Context, sel ast.SelectionSet, obj *model.SyncCreatedTokensForNewContractsPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, syncCreatedTokensForNewContractsPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SyncCreatedTokensForNewContractsPayload")
+		case "viewer":
+
+			out.Values[i] = ec._SyncCreatedTokensForNewContractsPayload_viewer(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var syncCreatedTokensForUsernamePayloadImplementors = []string{"SyncCreatedTokensForUsernamePayload", "SyncCreatedTokensForUsernamePayloadOrError"}
 
 func (ec *executionContext) _SyncCreatedTokensForUsernamePayload(ctx context.Context, sel ast.SelectionSet, obj *model.SyncCreatedTokensForUsernamePayload) graphql.Marshaler {
@@ -69692,31 +69994,6 @@ func (ec *executionContext) _SyncCreatedTokensForUsernamePayload(ctx context.Con
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
-var syncCreatedTokensPayloadImplementors = []string{"SyncCreatedTokensPayload", "SyncCreatedTokensPayloadOrError"}
-
-func (ec *executionContext) _SyncCreatedTokensPayload(ctx context.Context, sel ast.SelectionSet, obj *model.SyncCreatedTokensPayload) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, syncCreatedTokensPayloadImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("SyncCreatedTokensPayload")
-		case "viewer":
-
-			out.Values[i] = ec._SyncCreatedTokensPayload_viewer(ctx, field, obj)
-
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -72772,8 +73049,13 @@ func (ec *executionContext) marshalNString2ᚕstringᚄ(ctx context.Context, sel
 	return ret
 }
 
-func (ec *executionContext) unmarshalNSyncCreatedTokensInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSyncCreatedTokensInput(ctx context.Context, v interface{}) (model.SyncCreatedTokensInput, error) {
-	res, err := ec.unmarshalInputSyncCreatedTokensInput(ctx, v)
+func (ec *executionContext) unmarshalNSyncCreatedTokensForExistingContractInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSyncCreatedTokensForExistingContractInput(ctx context.Context, v interface{}) (model.SyncCreatedTokensForExistingContractInput, error) {
+	res, err := ec.unmarshalInputSyncCreatedTokensForExistingContractInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNSyncCreatedTokensForNewContractsInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSyncCreatedTokensForNewContractsInput(ctx context.Context, v interface{}) (model.SyncCreatedTokensForNewContractsInput, error) {
+	res, err := ec.unmarshalInputSyncCreatedTokensForNewContractsInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
@@ -76131,18 +76413,25 @@ func (ec *executionContext) marshalOString2ᚖstring(ctx context.Context, sel as
 	return res
 }
 
+func (ec *executionContext) marshalOSyncCreatedTokensForExistingContractPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSyncCreatedTokensForExistingContractPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.SyncCreatedTokensForExistingContractPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._SyncCreatedTokensForExistingContractPayloadOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOSyncCreatedTokensForNewContractsPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSyncCreatedTokensForNewContractsPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.SyncCreatedTokensForNewContractsPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._SyncCreatedTokensForNewContractsPayloadOrError(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOSyncCreatedTokensForUsernamePayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSyncCreatedTokensForUsernamePayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.SyncCreatedTokensForUsernamePayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
 	return ec._SyncCreatedTokensForUsernamePayloadOrError(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalOSyncCreatedTokensPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSyncCreatedTokensPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.SyncCreatedTokensPayloadOrError) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._SyncCreatedTokensPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOSyncTokensForUsernamePayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSyncTokensForUsernamePayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.SyncTokensForUsernamePayloadOrError) graphql.Marshaler {

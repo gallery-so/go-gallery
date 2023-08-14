@@ -23,6 +23,7 @@ type TokenGalleryRepository struct {
 	getByID                 *sql.Stmt
 	getByUserIDStmt         *sql.Stmt
 	getByUserIDPaginateStmt *sql.Stmt
+	getByContractIDStmt     *sql.Stmt
 
 	getByTokenIdentifiersStmt         *sql.Stmt
 	getByTokenIdentifiersPaginateStmt *sql.Stmt
@@ -51,6 +52,9 @@ func NewTokenGalleryRepository(db *sql.DB, queries *db.Queries) *TokenGalleryRep
 	checkNoErr(err)
 
 	getByUserIDPaginateStmt, err := db.PrepareContext(ctx, `SELECT tokens.ID,COLLECTORS_NOTE,token_medias.MEDIA as token_media,TOKEN_MEDIA_ID,TOKEN_TYPE,tokens.CHAIN,token_medias.NAME,token_medias.DESCRIPTION,tokens.TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,token_medias.METADATA as token_metadata,CONTRACT,EXTERNAL_URL,BLOCK_NUMBER,tokens.VERSION,tokens.CREATED_AT,tokens.LAST_UPDATED,IS_USER_MARKED_SPAM,IS_PROVIDER_MARKED_SPAM FROM tokens LEFT JOIN token_medias ON token_medias.ID = tokens.TOKEN_MEDIA_ID WHERE OWNER_USER_ID = $1 AND tokens.DISPLAYABLE AND tokens.DELETED = false ORDER BY BLOCK_NUMBER DESC LIMIT $2 OFFSET $3;`)
+	checkNoErr(err)
+
+	getByContractIDStmt, err := db.PrepareContext(ctx, `SELECT tokens.ID,COLLECTORS_NOTE,token_medias.MEDIA,TOKEN_MEDIA_ID,TOKEN_TYPE,tokens.CHAIN,token_medias.NAME,token_medias.DESCRIPTION,tokens.TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,token_medias.METADATA as token_metadata,CONTRACT,EXTERNAL_URL,BLOCK_NUMBER,tokens.VERSION,tokens.CREATED_AT,tokens.LAST_UPDATED,IS_USER_MARKED_SPAM,IS_PROVIDER_MARKED_SPAM FROM tokens LEFT JOIN token_medias ON token_medias.ID = tokens.TOKEN_MEDIA_ID WHERE tokens.CONTRACT = $1 AND tokens.DISPLAYABLE AND tokens.DELETED = false ORDER BY BLOCK_NUMBER DESC;`)
 	checkNoErr(err)
 
 	getByTokenIdentifiersStmt, err := db.PrepareContext(ctx, `SELECT tokens.ID,COLLECTORS_NOTE,token_medias.MEDIA as token_media,TOKEN_MEDIA_ID,TOKEN_TYPE,tokens.CHAIN,token_medias.NAME,token_medias.DESCRIPTION,tokens.TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,token_medias.METADATA as token_metadata,CONTRACT,EXTERNAL_URL,BLOCK_NUMBER,tokens.VERSION,tokens.CREATED_AT,tokens.LAST_UPDATED,IS_USER_MARKED_SPAM,IS_PROVIDER_MARKED_SPAM FROM tokens LEFT JOIN token_medias ON token_medias.ID = tokens.TOKEN_MEDIA_ID WHERE tokens.TOKEN_ID = $1 AND CONTRACT = $2 AND DISPLAYABLE AND tokens.DELETED = false ORDER BY BLOCK_NUMBER DESC;`)
@@ -83,6 +87,7 @@ func NewTokenGalleryRepository(db *sql.DB, queries *db.Queries) *TokenGalleryRep
 		getByID:                           getByIDStmt,
 		getByUserIDStmt:                   getByUserIDStmt,
 		getByUserIDPaginateStmt:           getByUserIDPaginateStmt,
+		getByContractIDStmt:               getByContractIDStmt,
 		getByTokenIdentifiersStmt:         getByTokenIdentifiersStmt,
 		getByTokenIdentifiersPaginateStmt: getByTokenIdentifiersPaginateStmt,
 		updateInfoStmt:                    updateInfoStmt,
@@ -179,61 +184,66 @@ func (t *TokenGalleryRepository) GetByTokenIdentifiers(pCtx context.Context, pTo
 	return tokens, nil
 }
 
-type UpsertOptions struct {
+// GetByContractID gets all tokens for a contract
+func (t *TokenGalleryRepository) GetByContractID(pCtx context.Context, pContractID persist.DBID) ([]persist.TokenGallery, error) {
+	rows, err := t.getByContractIDStmt.QueryContext(pCtx, pContractID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	tokens := make([]persist.TokenGallery, 0, 10)
+	for rows.Next() {
+		token := persist.TokenGallery{}
+		if err := rows.Scan(&token.ID, &token.CollectorsNote, &token.TokenMedia, &token.TokenMediaID, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerUserID, pq.Array(&token.OwnedByWallets), pq.Array(&token.OwnershipHistory), &token.TokenMetadata, &token.Contract, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated, &token.IsUserMarkedSpam, &token.IsProviderMarkedSpam); err != nil {
+			return nil, err
+		}
+		tokens = append(tokens, token)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return tokens, nil
+
+}
+
+type TokenUpsertParams struct {
 	SetCreatorFields bool
 	SetHolderFields  bool
-	SkipDelete       bool
+
+	// If OptionalDelete is nil, no delete will be performed
+	OptionalDelete *TokenUpsertDeletionParams
 }
 
-// BulkUpsertByOwnerUserID upserts multiple tokens for a user and removes any tokens that are not in the list
-func (t *TokenGalleryRepository) BulkUpsertByOwnerUserID(pCtx context.Context, ownerUserID persist.DBID, chains []persist.Chain, pTokens []persist.TokenGallery, options UpsertOptions) ([]persist.TokenGallery, error) {
-	now, persistedTokens, err := t.bulkUpsert(pCtx, pTokens, options.SetHolderFields, options.SetCreatorFields)
-	if err != nil {
-		return nil, err
-	}
-
-	// delete tokens of owner before timestamp
-
-	if !options.SkipDelete {
-		chainInts, _ := util.Map(chains, func(c persist.Chain) (int32, error) { return int32(c), nil })
-		rowsAffected, err := t.queries.DeleteTokensOfOwnerBeforeTimestamp(pCtx, db.DeleteTokensOfOwnerBeforeTimestampParams{
-			RemoveHolderStatus:  options.SetHolderFields,
-			RemoveCreatorStatus: options.SetCreatorFields,
-			UserID:              ownerUserID,
-			Chains:              chainInts,
-			Timestamp:           now,
-		})
-
-		if err != nil {
-			return nil, fmt.Errorf("failed to delete tokens: %w", err)
-		}
-
-		logger.For(pCtx).Infof("deleted %d tokens", rowsAffected)
-	}
-
-	return persistedTokens, nil
+type TokenUpsertDeletionParams struct {
+	DeleteCreatorStatus bool
+	DeleteHolderStatus  bool
+	OnlyFromUserID      *persist.DBID
+	OnlyFromContracts   []persist.DBID
+	OnlyFromChains      []persist.Chain
 }
 
-// BulkUpsertTokensOfContract upserts all tokens of a contract and deletes the old tokens
-func (t *TokenGalleryRepository) BulkUpsertTokensOfContract(pCtx context.Context, contractID persist.DBID, pTokens []persist.TokenGallery, options UpsertOptions) ([]persist.TokenGallery, error) {
-	now, persistedTokens, err := t.bulkUpsert(pCtx, pTokens, options.SetHolderFields, options.SetCreatorFields)
-	if err != nil {
-		return nil, err
+func (d *TokenUpsertDeletionParams) ToParams(upsertTime time.Time) db.DeleteTokensBeforeTimestampParams {
+	userID := ""
+	if d.OnlyFromUserID != nil {
+		userID = d.OnlyFromUserID.String()
 	}
 
-	// delete tokens of contract before timestamp
-	if !options.SkipDelete {
-		_, err = t.deleteTokensOfContractBeforeTimeStampStmt.ExecContext(pCtx, contractID, now)
-		if err != nil {
-			return nil, fmt.Errorf("failed to delete tokens: %w", err)
-		}
+	chains := util.MapWithoutError(d.OnlyFromChains, func(c persist.Chain) int32 { return int32(c) })
+	return db.DeleteTokensBeforeTimestampParams{
+		RemoveCreatorStatus: d.DeleteCreatorStatus,
+		RemoveHolderStatus:  d.DeleteHolderStatus,
+		OnlyFromUserID:      sql.NullString{String: userID, Valid: d.OnlyFromUserID != nil},
+		OnlyFromChains:      chains,
+		OnlyFromContractIds: util.StringersToStrings(d.OnlyFromContracts),
+		Timestamp:           upsertTime,
 	}
-
-	return persistedTokens, nil
 }
 
-func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []persist.TokenGallery, setHolderFields bool, setCreatorFields bool) (time.Time, []persist.TokenGallery, error) {
-	tokens, err := t.excludeZeroQuantityTokens(pCtx, pTokens)
+func (t *TokenGalleryRepository) UpsertTokens(ctx context.Context, pTokens []persist.TokenGallery, setCreatorFields bool, setHolderFields bool) (time.Time, []persist.TokenGallery, error) {
+	tokens, err := t.excludeZeroQuantityTokens(ctx, pTokens)
 	if err != nil {
 		return time.Time{}, nil, err
 	}
@@ -241,7 +251,7 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 	// If we're not upserting anything, we still need to return the current database time
 	// since it may be used by the caller and is assumed valid if err == nil
 	if len(tokens) == 0 {
-		currentTime, err := t.queries.GetCurrentTime(pCtx)
+		currentTime, err := t.queries.GetCurrentTime(ctx)
 		if err != nil {
 			return time.Time{}, nil, err
 		}
@@ -250,8 +260,8 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 
 	tokens = t.dedupeTokens(tokens)
 	params := db.UpsertTokensParams{
-		SetHolderFields:  setHolderFields,
 		SetCreatorFields: setCreatorFields,
+		SetHolderFields:  setHolderFields,
 		OwnedByWallets:   []string{},
 	}
 
@@ -286,7 +296,7 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 		}
 	}
 
-	upserted, err := t.queries.UpsertTokens(pCtx, params)
+	upserted, err := t.queries.UpsertTokens(ctx, params)
 	if err != nil {
 		return time.Time{}, nil, err
 	}

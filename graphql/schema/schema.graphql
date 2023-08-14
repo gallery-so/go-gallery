@@ -171,9 +171,13 @@ input CreatedCommunitiesInput {
   includeChains: [Chain!]
 }
 
-input SyncCreatedTokensInput {
-  # When includeChains is empty, returns all communities from all chains.
+input SyncCreatedTokensForNewContractsInput {
+  # When includeChains is empty, syncs tokens on all chains.
   includeChains: [Chain!]
+}
+
+input SyncCreatedTokensForExistingContractInput {
+  contractId: DBID!
 }
 
 type Badge {
@@ -1508,9 +1512,21 @@ type SyncTokensPayload {
   viewer: Viewer
 }
 
-union SyncCreatedTokensPayloadOrError = SyncCreatedTokensPayload | ErrNotAuthorized | ErrSyncFailed
+union SyncCreatedTokensForNewContractsPayloadOrError =
+    SyncCreatedTokensForNewContractsPayload
+  | ErrNotAuthorized
+  | ErrSyncFailed
 
-type SyncCreatedTokensPayload {
+type SyncCreatedTokensForNewContractsPayload {
+  viewer: Viewer
+}
+
+union SyncCreatedTokensForExistingContractPayloadOrError =
+    SyncCreatedTokensForExistingContractPayload
+  | ErrNotAuthorized
+  | ErrSyncFailed
+
+type SyncCreatedTokensForExistingContractPayload {
   viewer: Viewer
 }
 
@@ -2445,7 +2461,12 @@ type Mutation {
   setSpamPreference(input: SetSpamPreferenceInput!): SetSpamPreferencePayloadOrError @authRequired
 
   syncTokens(chains: [Chain!]): SyncTokensPayloadOrError @authRequired
-  syncCreatedTokens(input: SyncCreatedTokensInput!): SyncCreatedTokensPayloadOrError @authRequired
+  syncCreatedTokensForNewContracts(
+    input: SyncCreatedTokensForNewContractsInput!
+  ): SyncCreatedTokensForNewContractsPayloadOrError @authRequired
+  syncCreatedTokensForExistingContract(
+    input: SyncCreatedTokensForExistingContractInput!
+  ): SyncCreatedTokensForExistingContractPayloadOrError @authRequired
   refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
   refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
   refreshContract(contractId: DBID!): RefreshContractPayloadOrError
