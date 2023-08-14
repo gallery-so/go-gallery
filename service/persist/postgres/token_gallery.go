@@ -23,7 +23,7 @@ type TokenGalleryRepository struct {
 	getByID                 *sql.Stmt
 	getByUserIDStmt         *sql.Stmt
 	getByUserIDPaginateStmt *sql.Stmt
-	getByContractIDStmt                                   *sql.Stmt
+	getByContractIDStmt     *sql.Stmt
 
 	getByTokenIdentifiersStmt         *sql.Stmt
 	getByTokenIdentifiersPaginateStmt *sql.Stmt
@@ -54,10 +54,10 @@ func NewTokenGalleryRepository(db *sql.DB, queries *db.Queries) *TokenGalleryRep
 	getByUserIDPaginateStmt, err := db.PrepareContext(ctx, `SELECT tokens.ID,COLLECTORS_NOTE,token_medias.MEDIA as token_media,TOKEN_MEDIA_ID,TOKEN_TYPE,tokens.CHAIN,token_medias.NAME,token_medias.DESCRIPTION,tokens.TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,token_medias.METADATA as token_metadata,CONTRACT,EXTERNAL_URL,BLOCK_NUMBER,tokens.VERSION,tokens.CREATED_AT,tokens.LAST_UPDATED,IS_USER_MARKED_SPAM,IS_PROVIDER_MARKED_SPAM FROM tokens LEFT JOIN token_medias ON token_medias.ID = tokens.TOKEN_MEDIA_ID WHERE OWNER_USER_ID = $1 AND tokens.DISPLAYABLE AND tokens.DELETED = false ORDER BY BLOCK_NUMBER DESC LIMIT $2 OFFSET $3;`)
 	checkNoErr(err)
 
-	getByContractIDStmt, err := db.PrepareContext(ctx, `SELECT tokens.ID,COLLECTORS_NOTE,token_medias.MEDIA,TOKEN_MEDIA_ID,TOKEN_TYPE,tokens.CHAIN,tokens.NAME,tokens.DESCRIPTION,tokens.TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT,EXTERNAL_URL,BLOCK_NUMBER,tokens.VERSION,tokens.CREATED_AT,tokens.LAST_UPDATED,IS_USER_MARKED_SPAM,IS_PROVIDER_MARKED_SPAM FROM tokens LEFT JOIN token_medias ON token_medias.ID = tokens.TOKEN_MEDIA_ID WHERE tokens.CONTRACT = $1 AND tokens.DISPLAYABLE AND tokens.DELETED = false ORDER BY BLOCK_NUMBER DESC;`)
+	getByContractIDStmt, err := db.PrepareContext(ctx, `SELECT tokens.ID,COLLECTORS_NOTE,token_medias.MEDIA,TOKEN_MEDIA_ID,TOKEN_TYPE,tokens.CHAIN,token_medias.NAME,token_medias.DESCRIPTION,tokens.TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,token_medias.METADATA as token_metadata,CONTRACT,EXTERNAL_URL,BLOCK_NUMBER,tokens.VERSION,tokens.CREATED_AT,tokens.LAST_UPDATED,IS_USER_MARKED_SPAM,IS_PROVIDER_MARKED_SPAM FROM tokens LEFT JOIN token_medias ON token_medias.ID = tokens.TOKEN_MEDIA_ID WHERE tokens.CONTRACT = $1 AND tokens.DISPLAYABLE AND tokens.DELETED = false ORDER BY BLOCK_NUMBER DESC;`)
 	checkNoErr(err)
-    
-    getByTokenIdentifiersStmt, err := db.PrepareContext(ctx, `SELECT tokens.ID,COLLECTORS_NOTE,token_medias.MEDIA as token_media,TOKEN_MEDIA_ID,TOKEN_TYPE,tokens.CHAIN,token_medias.NAME,token_medias.DESCRIPTION,tokens.TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,token_medias.METADATA as token_metadata,CONTRACT,EXTERNAL_URL,BLOCK_NUMBER,tokens.VERSION,tokens.CREATED_AT,tokens.LAST_UPDATED,IS_USER_MARKED_SPAM,IS_PROVIDER_MARKED_SPAM FROM tokens LEFT JOIN token_medias ON token_medias.ID = tokens.TOKEN_MEDIA_ID WHERE tokens.TOKEN_ID = $1 AND CONTRACT = $2 AND DISPLAYABLE AND tokens.DELETED = false ORDER BY BLOCK_NUMBER DESC;`)
+
+	getByTokenIdentifiersStmt, err := db.PrepareContext(ctx, `SELECT tokens.ID,COLLECTORS_NOTE,token_medias.MEDIA as token_media,TOKEN_MEDIA_ID,TOKEN_TYPE,tokens.CHAIN,token_medias.NAME,token_medias.DESCRIPTION,tokens.TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,token_medias.METADATA as token_metadata,CONTRACT,EXTERNAL_URL,BLOCK_NUMBER,tokens.VERSION,tokens.CREATED_AT,tokens.LAST_UPDATED,IS_USER_MARKED_SPAM,IS_PROVIDER_MARKED_SPAM FROM tokens LEFT JOIN token_medias ON token_medias.ID = tokens.TOKEN_MEDIA_ID WHERE tokens.TOKEN_ID = $1 AND CONTRACT = $2 AND DISPLAYABLE AND tokens.DELETED = false ORDER BY BLOCK_NUMBER DESC;`)
 	checkNoErr(err)
 
 	getByTokenIdentifiersPaginateStmt, err := db.PrepareContext(ctx, `SELECT tokens.ID,COLLECTORS_NOTE,token_medias.MEDIA as token_media,TOKEN_MEDIA_ID,TOKEN_TYPE,tokens.CHAIN,token_medias.NAME,token_medias.DESCRIPTION,tokens.TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,token_medias.METADATA as token_metadata,CONTRACT,EXTERNAL_URL,BLOCK_NUMBER,tokens.VERSION,tokens.CREATED_AT,tokens.LAST_UPDATED,IS_USER_MARKED_SPAM,IS_PROVIDER_MARKED_SPAM FROM tokens LEFT JOIN token_medias ON token_medias.ID = tokens.TOKEN_MEDIA_ID WHERE tokens.TOKEN_ID = $1 AND CONTRACT = $2 AND DISPLAYABLE AND tokens.DELETED = false ORDER BY BLOCK_NUMBER DESC LIMIT $3 OFFSET $4;`)
@@ -87,7 +87,7 @@ func NewTokenGalleryRepository(db *sql.DB, queries *db.Queries) *TokenGalleryRep
 		getByID:                           getByIDStmt,
 		getByUserIDStmt:                   getByUserIDStmt,
 		getByUserIDPaginateStmt:           getByUserIDPaginateStmt,
-		getByContractIDStmt:                    getByContractIDStmt,
+		getByContractIDStmt:               getByContractIDStmt,
 		getByTokenIdentifiersStmt:         getByTokenIdentifiersStmt,
 		getByTokenIdentifiersPaginateStmt: getByTokenIdentifiersPaginateStmt,
 		updateInfoStmt:                    updateInfoStmt,
@@ -182,6 +182,31 @@ func (t *TokenGalleryRepository) GetByTokenIdentifiers(pCtx context.Context, pTo
 	}
 
 	return tokens, nil
+}
+
+// GetByContractID gets all tokens for a contract
+func (t *TokenGalleryRepository) GetByContractID(pCtx context.Context, pContractID persist.DBID) ([]persist.TokenGallery, error) {
+	rows, err := t.getByContractIDStmt.QueryContext(pCtx, pContractID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	tokens := make([]persist.TokenGallery, 0, 10)
+	for rows.Next() {
+		token := persist.TokenGallery{}
+		if err := rows.Scan(&token.ID, &token.CollectorsNote, &token.TokenMedia, &token.TokenMediaID, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerUserID, pq.Array(&token.OwnedByWallets), pq.Array(&token.OwnershipHistory), &token.TokenMetadata, &token.Contract, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated, &token.IsUserMarkedSpam, &token.IsProviderMarkedSpam); err != nil {
+			return nil, err
+		}
+		tokens = append(tokens, token)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return tokens, nil
+
 }
 
 type TokenUpsertParams struct {
