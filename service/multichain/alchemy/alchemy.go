@@ -417,13 +417,16 @@ func (d *Provider) getTokenWithMetadata(ctx context.Context, ti multichain.Chain
 func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
 	if d.chain == persist.ChainETH {
 		// don't use alchemy for ETH
-		return nil, nil
+		return nil, fmt.Errorf("not implemented")
 	}
 
 	cached, err := d.fetchMetadataFromCache(ctx, ti)
 	if cached != nil && err == nil {
+		logger.For(ctx).Infof("got cached metadata for %s", ti)
 		return cached, nil
 	}
+
+	logger.For(ctx).Infof("no cached metadata for %s", ti)
 
 	tokens, _, err := d.getTokenWithMetadata(ctx, ti, true, 0)
 	if err != nil {
