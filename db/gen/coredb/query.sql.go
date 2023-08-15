@@ -2857,7 +2857,7 @@ func (q *Queries) GetPostsByIds(ctx context.Context, ids []string) ([]Post, erro
 }
 
 const getPreviewURLsByContractIdAndUserId = `-- name: GetPreviewURLsByContractIdAndUserId :many
-select coalesce(nullif((media->>'thumbnail_url'), ''), nullif((media->>'media_url'), ''))::varchar as thumbnail_url from tokens where contract = $1 and displayable and deleted = false and owner_user_id = $2 and length(media->>'thumbnail_url'::varchar) > 0 order by id limit 3
+select coalesce(nullif((media->>'thumbnail_url'), ''), nullif((media->>'media_url'), ''))::varchar as thumbnail_url from tokens where (nullif((media->>'thumbnail_url'), '') is not null or media->>'media_type' = 'image') and contract = $1 and displayable and deleted = false and owner_user_id = $2 order by id limit 3
 `
 
 type GetPreviewURLsByContractIdAndUserIdParams struct {
