@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/validate"
@@ -100,7 +101,7 @@ func (api FeedAPI) GetPostById(ctx context.Context, postID persist.DBID) (*db.Po
 	return &post, nil
 }
 
-func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, caption *string) (persist.DBID, error) {
+func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, mentions []*model.MentionInput, caption *string) (persist.DBID, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"tokenIDs": validate.WithTag(tokenIDs, "required"),
@@ -141,6 +142,41 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, capt
 	if err != nil {
 		return "", err
 	}
+
+	if len(mentions) > 0 {
+		for _, mention := range mentions {
+			if mention == nil {
+				continue
+			}
+			switch {
+			case mention.UserID != nil:
+				_, err = event.DispatchEvent(ctx, db.Event{
+					ActorID:        persist.DBIDToNullStr(actorID),
+					ResourceTypeID: persist.ResourceTypeUser,
+					SubjectID:      *mention.UserID,
+					PostID:         id,
+					UserID:         *mention.UserID,
+					Action:         persist.ActionMentionUser,
+				}, api.validator, nil)
+				if err != nil {
+					return "", err
+				}
+			case mention.CommunityID != nil:
+				_, err = event.DispatchEvent(ctx, db.Event{
+					ActorID:        persist.DBIDToNullStr(actorID),
+					ResourceTypeID: persist.ResourceTypeContract,
+					SubjectID:      *mention.CommunityID,
+					PostID:         id,
+					ContractID:     *mention.CommunityID,
+					Action:         persist.ActionMentionCommunity,
+				}, api.validator, nil)
+
+			default:
+				return "", fmt.Errorf("invalid mention type: %+v", mention)
+			}
+		}
+	}
+
 	return id, nil
 }
 

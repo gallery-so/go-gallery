@@ -10560,6 +10560,7 @@ union RemoveProfileImagePayloadOrError =
 input PostTokensInput {
   tokenIds: [DBID!]
   caption: String
+  mentions: [MentionInput!]
 }
 
 type PostTokensPayload {
@@ -58258,7 +58259,7 @@ func (ec *executionContext) unmarshalInputPostTokensInput(ctx context.Context, o
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"tokenIds", "caption"}
+	fieldsInOrder := [...]string{"tokenIds", "caption", "mentions"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -58283,6 +58284,15 @@ func (ec *executionContext) unmarshalInputPostTokensInput(ctx context.Context, o
 				return it, err
 			}
 			it.Caption = data
+		case "mentions":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("mentions"))
+			data, err := ec.unmarshalOMentionInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMentionInputᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Mentions = data
 		}
 	}
 

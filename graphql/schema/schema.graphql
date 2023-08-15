@@ -2433,6 +2433,7 @@ union RemoveProfileImagePayloadOrError =
 input PostTokensInput {
   tokenIds: [DBID!]
   caption: String
+  mentions: [MentionInput!]
 }
 
 type PostTokensPayload {

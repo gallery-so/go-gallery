@@ -134,6 +134,34 @@ var nodeFetcher = model.NodeFetcher{
 
 		return &notifConverted, nil
 	},
+	OnSomeoneMentionedYouNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneMentionedYouNotification, error) {
+		notif, err := resolveNotificationByID(ctx, dbid)
+		if err != nil {
+			return nil, err
+		}
+
+		notifConverted := notif.(model.SomeoneMentionedYouNotification)
+
+		return &notifConverted, nil
+	},
+	OnSomeoneMentionedYourCommunityNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneMentionedYourCommunityNotification, error) {
+		notif, err := resolveNotificationByID(ctx, dbid)
+		if err != nil {
+			return nil, err
+		}
+		notifConverted := notif.(model.SomeoneMentionedYourCommunityNotification)
+
+		return &notifConverted, nil
+	},
+	OnSomeoneRepliedToYourCommentNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneRepliedToYourCommentNotification, error) {
+		notif, err := resolveNotificationByID(ctx, dbid)
+		if err != nil {
+			return nil, err
+		}
+		notifConverted := notif.(model.SomeoneRepliedToYourCommentNotification)
+
+		return &notifConverted, nil
+	},
 }
 
 var defaultTokenSettings = persist.CollectionTokenSettings{}

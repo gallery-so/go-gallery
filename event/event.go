@@ -442,6 +442,7 @@ func (h notificationHandler) handleDelayed(ctx context.Context, persistedEvent d
 
 	// Don't notify the user on self events
 	if persist.DBID(persist.NullStrToStr(persistedEvent.ActorID)) == owner && persistedEvent.Action != persist.ActionNewTokensReceived {
+
 		return nil
 	}
 
@@ -487,7 +488,7 @@ func (h notificationHandler) createNotificationDataForEvent(event db.Event) (dat
 		data.NewTokenID = event.Data.NewTokenID
 		data.NewTokenQuantity = event.Data.NewTokenQuantity
 	case persist.ActionReplyToComment:
-		data.OriginalCommentID = event.CommentID
+		data.OriginalCommentID = event.SubjectID
 	default:
 		logger.For(nil).Debugf("no notification data for event: %s", event.Action)
 	}
@@ -504,7 +505,7 @@ func (h notificationHandler) findOwnerForNotificationFromEvent(event db.Event) (
 		return gallery.OwnerUserID, nil
 	case persist.ResourceTypeComment:
 		if event.Action == persist.ActionReplyToComment {
-			comment, err := h.dataloaders.CommentByCommentID.Load(event.CommentID)
+			comment, err := h.dataloaders.CommentByCommentID.Load(event.SubjectID)
 			if err != nil {
 				return "", err
 			}

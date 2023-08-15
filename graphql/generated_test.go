@@ -298,6 +298,17 @@ type MagicLinkAuth struct {
 // GetToken returns MagicLinkAuth.Token, and is useful for accessing the field via an interface.
 func (v *MagicLinkAuth) GetToken() string { return v.Token }
 
+type MentionInput struct {
+	UserId      *persist.DBID `json:"userId"`
+	CommunityId *persist.DBID `json:"communityId"`
+}
+
+// GetUserId returns MentionInput.UserId, and is useful for accessing the field via an interface.
+func (v *MentionInput) GetUserId() *persist.DBID { return v.UserId }
+
+// GetCommunityId returns MentionInput.CommunityId, and is useful for accessing the field via an interface.
+func (v *MentionInput) GetCommunityId() *persist.DBID { return v.CommunityId }
+
 type MoveCollectionToGalleryInput struct {
 	SourceCollectionId persist.DBID `json:"sourceCollectionId"`
 	TargetGalleryId    persist.DBID `json:"targetGalleryId"`
@@ -321,6 +332,7 @@ func (v *OneTimeLoginTokenAuth) GetToken() string { return v.Token }
 type PostTokensInput struct {
 	TokenIds []persist.DBID `json:"tokenIds"`
 	Caption  *string        `json:"caption"`
+	Mentions []MentionInput `json:"mentions"`
 }
 
 // GetTokenIds returns PostTokensInput.TokenIds, and is useful for accessing the field via an interface.
@@ -328,6 +340,9 @@ func (v *PostTokensInput) GetTokenIds() []persist.DBID { return v.TokenIds }
 
 // GetCaption returns PostTokensInput.Caption, and is useful for accessing the field via an interface.
 func (v *PostTokensInput) GetCaption() *string { return v.Caption }
+
+// GetMentions returns PostTokensInput.Mentions, and is useful for accessing the field via an interface.
+func (v *PostTokensInput) GetMentions() []MentionInput { return v.Mentions }
 
 type PublishGalleryInput struct {
 	GalleryId persist.DBID `json:"galleryId"`

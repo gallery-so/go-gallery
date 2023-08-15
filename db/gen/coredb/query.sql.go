@@ -512,7 +512,7 @@ func (q *Queries) CreateCollectionEvent(ctx context.Context, arg CreateCollectio
 }
 
 const createCommentEvent = `-- name: CreateCommentEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, comment_id, feed_event_id, post_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $9, $10, $5, $6, $7, $8) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id, contract_id
+INSERT INTO events (id, actor_id, action, resource_type_id, comment_id, feed_event_id, post_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $10, $11, $6, $7, $8, $9) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id, contract_id
 `
 
 type CreateCommentEventParams struct {
@@ -521,6 +521,7 @@ type CreateCommentEventParams struct {
 	Action         persist.Action       `json:"action"`
 	ResourceTypeID persist.ResourceType `json:"resource_type_id"`
 	CommentID      persist.DBID         `json:"comment_id"`
+	SubjectID      persist.DBID         `json:"subject_id"`
 	Data           persist.EventData    `json:"data"`
 	GroupID        sql.NullString       `json:"group_id"`
 	Caption        sql.NullString       `json:"caption"`
@@ -535,6 +536,7 @@ func (q *Queries) CreateCommentEvent(ctx context.Context, arg CreateCommentEvent
 		arg.Action,
 		arg.ResourceTypeID,
 		arg.CommentID,
+		arg.SubjectID,
 		arg.Data,
 		arg.GroupID,
 		arg.Caption,
