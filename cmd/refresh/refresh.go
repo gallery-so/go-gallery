@@ -21,7 +21,7 @@ func main() {
 
 	pgClient := postgres.MustCreateClient()
 
-	rows, err := pgClient.Query("select tokens.id from tokens where chain = 4 order by tokens.last_updated desc limit 2500;")
+	rows, err := pgClient.Query("select tokens.id from tokens where chain = 3 and last_updated > now() - interval '3 days' order by tokens.last_updated desc;")
 	if err != nil {
 		panic(err)
 	}
