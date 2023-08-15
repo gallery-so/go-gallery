@@ -1958,6 +1958,43 @@ type NewTokensNotification implements Notification & GroupedNotification & Node 
   token: Token @goField(forceResolver: true)
 }
 
+type SomeoneRepliedToYourCommentNotification implements Notification & Node @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+
+  # Don't need a `who` here since the `comment` can provide that
+  comment: Comment @goField(forceResolver: true)
+  originalComment: Comment @goField(forceResolver: true)
+}
+
+type SomeoneMentionedYouNotification implements Notification & Node @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+
+  # Don't need a `who` here since the `comment` or `post` can provide that
+  comment: Comment @goField(forceResolver: true)
+  post: Post @goField(forceResolver: true)
+}
+
+type SomeoneMentionedYourCommunityNotification implements Notification & Node @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+
+  # Don't need a `who` here since the `comment` or `post` can provide that
+  comment: Comment @goField(forceResolver: true)
+  post: Post @goField(forceResolver: true)
+  community: Community @goField(forceResolver: true)
+}
+
 type ClearAllNotificationsPayload {
   notifications: [Notification]
 }
@@ -2427,6 +2464,11 @@ type DeletePostPayload {
 
 union DeletePostPayloadOrError = DeletePostPayload | ErrInvalidInput | ErrNotAuthorized
 
+input MentionInput {
+  userId: DBID
+  communityId: DBID
+}
+
 type Mutation {
   # User Mutations
   addUserWallet(
@@ -2508,10 +2550,15 @@ type Mutation {
     feedEventId: DBID!
     replyToID: DBID
     comment: String!
+    mentions: [MentionInput!]
   ): CommentOnFeedEventPayloadOrError @authRequired
   removeComment(commentId: DBID!): RemoveCommentPayloadOrError @authRequired
-  commentOnPost(postId: DBID!, replyToID: DBID, comment: String!): CommentOnPostPayloadOrError
-    @authRequired
+  commentOnPost(
+    postId: DBID!
+    replyToID: DBID
+    comment: String!
+    mentions: [MentionInput!]
+  ): CommentOnPostPayloadOrError @authRequired
 
   postTokens(input: PostTokensInput!): PostTokensPayloadOrError @authRequired
   deletePost(postId: DBID!): DeletePostPayloadOrError @authRequired

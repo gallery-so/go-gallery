@@ -80,6 +80,9 @@ type ResolverRoot interface {
 	SomeoneCommentedOnYourPostNotification() SomeoneCommentedOnYourPostNotificationResolver
 	SomeoneFollowedYouBackNotification() SomeoneFollowedYouBackNotificationResolver
 	SomeoneFollowedYouNotification() SomeoneFollowedYouNotificationResolver
+	SomeoneMentionedYouNotification() SomeoneMentionedYouNotificationResolver
+	SomeoneMentionedYourCommunityNotification() SomeoneMentionedYourCommunityNotificationResolver
+	SomeoneRepliedToYourCommentNotification() SomeoneRepliedToYourCommentNotificationResolver
 	SomeoneViewedYourGalleryNotification() SomeoneViewedYourGalleryNotificationResolver
 	Subscription() SubscriptionResolver
 	Token() TokenResolver
@@ -774,8 +777,8 @@ type ComplexityRoot struct {
 		AdmirePost                           func(childComplexity int, postID persist.DBID) int
 		BanUserFromFeed                      func(childComplexity int, username string, action string) int
 		ClearAllNotifications                func(childComplexity int) int
-		CommentOnFeedEvent                   func(childComplexity int, feedEventID persist.DBID, replyToID *persist.DBID, comment string) int
-		CommentOnPost                        func(childComplexity int, postID persist.DBID, replyToID *persist.DBID, comment string) int
+		CommentOnFeedEvent                   func(childComplexity int, feedEventID persist.DBID, replyToID *persist.DBID, comment string, mentions []*model.MentionInput) int
+		CommentOnPost                        func(childComplexity int, postID persist.DBID, replyToID *persist.DBID, comment string, mentions []*model.MentionInput) int
 		ConnectSocialAccount                 func(childComplexity int, input model.SocialAuthMechanism, display bool) int
 		CreateCollection                     func(childComplexity int, input model.CreateCollectionInput) int
 		CreateGallery                        func(childComplexity int, input model.CreateGalleryInput) int
@@ -1168,6 +1171,37 @@ type ComplexityRoot struct {
 		ID           func(childComplexity int) int
 		Seen         func(childComplexity int) int
 		UpdatedTime  func(childComplexity int) int
+	}
+
+	SomeoneMentionedYouNotification struct {
+		Comment      func(childComplexity int) int
+		CreationTime func(childComplexity int) int
+		Dbid         func(childComplexity int) int
+		ID           func(childComplexity int) int
+		Post         func(childComplexity int) int
+		Seen         func(childComplexity int) int
+		UpdatedTime  func(childComplexity int) int
+	}
+
+	SomeoneMentionedYourCommunityNotification struct {
+		Comment      func(childComplexity int) int
+		Community    func(childComplexity int) int
+		CreationTime func(childComplexity int) int
+		Dbid         func(childComplexity int) int
+		ID           func(childComplexity int) int
+		Post         func(childComplexity int) int
+		Seen         func(childComplexity int) int
+		UpdatedTime  func(childComplexity int) int
+	}
+
+	SomeoneRepliedToYourCommentNotification struct {
+		Comment         func(childComplexity int) int
+		CreationTime    func(childComplexity int) int
+		Dbid            func(childComplexity int) int
+		ID              func(childComplexity int) int
+		OriginalComment func(childComplexity int) int
+		Seen            func(childComplexity int) int
+		UpdatedTime     func(childComplexity int) int
 	}
 
 	SomeoneViewedYourGalleryNotification struct {
@@ -1673,9 +1707,9 @@ type MutationResolver interface {
 	AdmireFeedEvent(ctx context.Context, feedEventID persist.DBID) (model.AdmireFeedEventPayloadOrError, error)
 	AdmirePost(ctx context.Context, postID persist.DBID) (model.AdmirePostPayloadOrError, error)
 	RemoveAdmire(ctx context.Context, admireID persist.DBID) (model.RemoveAdmirePayloadOrError, error)
-	CommentOnFeedEvent(ctx context.Context, feedEventID persist.DBID, replyToID *persist.DBID, comment string) (model.CommentOnFeedEventPayloadOrError, error)
+	CommentOnFeedEvent(ctx context.Context, feedEventID persist.DBID, replyToID *persist.DBID, comment string, mentions []*model.MentionInput) (model.CommentOnFeedEventPayloadOrError, error)
 	RemoveComment(ctx context.Context, commentID persist.DBID) (model.RemoveCommentPayloadOrError, error)
-	CommentOnPost(ctx context.Context, postID persist.DBID, replyToID *persist.DBID, comment string) (model.CommentOnPostPayloadOrError, error)
+	CommentOnPost(ctx context.Context, postID persist.DBID, replyToID *persist.DBID, comment string, mentions []*model.MentionInput) (model.CommentOnPostPayloadOrError, error)
 	PostTokens(ctx context.Context, input model.PostTokensInput) (model.PostTokensPayloadOrError, error)
 	DeletePost(ctx context.Context, postID persist.DBID) (model.DeletePostPayloadOrError, error)
 	ViewGallery(ctx context.Context, galleryID persist.DBID) (model.ViewGalleryPayloadOrError, error)
@@ -1798,6 +1832,19 @@ type SomeoneFollowedYouBackNotificationResolver interface {
 }
 type SomeoneFollowedYouNotificationResolver interface {
 	Followers(ctx context.Context, obj *model.SomeoneFollowedYouNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error)
+}
+type SomeoneMentionedYouNotificationResolver interface {
+	Comment(ctx context.Context, obj *model.SomeoneMentionedYouNotification) (*model.Comment, error)
+	Post(ctx context.Context, obj *model.SomeoneMentionedYouNotification) (*model.Post, error)
+}
+type SomeoneMentionedYourCommunityNotificationResolver interface {
+	Comment(ctx context.Context, obj *model.SomeoneMentionedYourCommunityNotification) (*model.Comment, error)
+	Post(ctx context.Context, obj *model.SomeoneMentionedYourCommunityNotification) (*model.Post, error)
+	Community(ctx context.Context, obj *model.SomeoneMentionedYourCommunityNotification) (*model.Community, error)
+}
+type SomeoneRepliedToYourCommentNotificationResolver interface {
+	Comment(ctx context.Context, obj *model.SomeoneRepliedToYourCommentNotification) (*model.Comment, error)
+	OriginalComment(ctx context.Context, obj *model.SomeoneRepliedToYourCommentNotification) (*model.Comment, error)
 }
 type SomeoneViewedYourGalleryNotificationResolver interface {
 	UserViewers(ctx context.Context, obj *model.SomeoneViewedYourGalleryNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error)
@@ -4422,7 +4469,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.CommentOnFeedEvent(childComplexity, args["feedEventId"].(persist.DBID), args["replyToID"].(*persist.DBID), args["comment"].(string)), true
+		return e.complexity.Mutation.CommentOnFeedEvent(childComplexity, args["feedEventId"].(persist.DBID), args["replyToID"].(*persist.DBID), args["comment"].(string), args["mentions"].([]*model.MentionInput)), true
 
 	case "Mutation.commentOnPost":
 		if e.complexity.Mutation.CommentOnPost == nil {
@@ -4434,7 +4481,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.CommentOnPost(childComplexity, args["postId"].(persist.DBID), args["replyToID"].(*persist.DBID), args["comment"].(string)), true
+		return e.complexity.Mutation.CommentOnPost(childComplexity, args["postId"].(persist.DBID), args["replyToID"].(*persist.DBID), args["comment"].(string), args["mentions"].([]*model.MentionInput)), true
 
 	case "Mutation.connectSocialAccount":
 		if e.complexity.Mutation.ConnectSocialAccount == nil {
@@ -6652,6 +6699,160 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.SomeoneFollowedYouNotification.UpdatedTime(childComplexity), true
 
+	case "SomeoneMentionedYouNotification.comment":
+		if e.complexity.SomeoneMentionedYouNotification.Comment == nil {
+			break
+		}
+
+		return e.complexity.SomeoneMentionedYouNotification.Comment(childComplexity), true
+
+	case "SomeoneMentionedYouNotification.creationTime":
+		if e.complexity.SomeoneMentionedYouNotification.CreationTime == nil {
+			break
+		}
+
+		return e.complexity.SomeoneMentionedYouNotification.CreationTime(childComplexity), true
+
+	case "SomeoneMentionedYouNotification.dbid":
+		if e.complexity.SomeoneMentionedYouNotification.Dbid == nil {
+			break
+		}
+
+		return e.complexity.SomeoneMentionedYouNotification.Dbid(childComplexity), true
+
+	case "SomeoneMentionedYouNotification.id":
+		if e.complexity.SomeoneMentionedYouNotification.ID == nil {
+			break
+		}
+
+		return e.complexity.SomeoneMentionedYouNotification.ID(childComplexity), true
+
+	case "SomeoneMentionedYouNotification.post":
+		if e.complexity.SomeoneMentionedYouNotification.Post == nil {
+			break
+		}
+
+		return e.complexity.SomeoneMentionedYouNotification.Post(childComplexity), true
+
+	case "SomeoneMentionedYouNotification.seen":
+		if e.complexity.SomeoneMentionedYouNotification.Seen == nil {
+			break
+		}
+
+		return e.complexity.SomeoneMentionedYouNotification.Seen(childComplexity), true
+
+	case "SomeoneMentionedYouNotification.updatedTime":
+		if e.complexity.SomeoneMentionedYouNotification.UpdatedTime == nil {
+			break
+		}
+
+		return e.complexity.SomeoneMentionedYouNotification.UpdatedTime(childComplexity), true
+
+	case "SomeoneMentionedYourCommunityNotification.comment":
+		if e.complexity.SomeoneMentionedYourCommunityNotification.Comment == nil {
+			break
+		}
+
+		return e.complexity.SomeoneMentionedYourCommunityNotification.Comment(childComplexity), true
+
+	case "SomeoneMentionedYourCommunityNotification.community":
+		if e.complexity.SomeoneMentionedYourCommunityNotification.Community == nil {
+			break
+		}
+
+		return e.complexity.SomeoneMentionedYourCommunityNotification.Community(childComplexity), true
+
+	case "SomeoneMentionedYourCommunityNotification.creationTime":
+		if e.complexity.SomeoneMentionedYourCommunityNotification.CreationTime == nil {
+			break
+		}
+
+		return e.complexity.SomeoneMentionedYourCommunityNotification.CreationTime(childComplexity), true
+
+	case "SomeoneMentionedYourCommunityNotification.dbid":
+		if e.complexity.SomeoneMentionedYourCommunityNotification.Dbid == nil {
+			break
+		}
+
+		return e.complexity.SomeoneMentionedYourCommunityNotification.Dbid(childComplexity), true
+
+	case "SomeoneMentionedYourCommunityNotification.id":
+		if e.complexity.SomeoneMentionedYourCommunityNotification.ID == nil {
+			break
+		}
+
+		return e.complexity.SomeoneMentionedYourCommunityNotification.ID(childComplexity), true
+
+	case "SomeoneMentionedYourCommunityNotification.post":
+		if e.complexity.SomeoneMentionedYourCommunityNotification.Post == nil {
+			break
+		}
+
+		return e.complexity.SomeoneMentionedYourCommunityNotification.Post(childComplexity), true
+
+	case "SomeoneMentionedYourCommunityNotification.seen":
+		if e.complexity.SomeoneMentionedYourCommunityNotification.Seen == nil {
+			break
+		}
+
+		return e.complexity.SomeoneMentionedYourCommunityNotification.Seen(childComplexity), true
+
+	case "SomeoneMentionedYourCommunityNotification.updatedTime":
+		if e.complexity.SomeoneMentionedYourCommunityNotification.UpdatedTime == nil {
+			break
+		}
+
+		return e.complexity.SomeoneMentionedYourCommunityNotification.UpdatedTime(childComplexity), true
+
+	case "SomeoneRepliedToYourCommentNotification.comment":
+		if e.complexity.SomeoneRepliedToYourCommentNotification.Comment == nil {
+			break
+		}
+
+		return e.complexity.SomeoneRepliedToYourCommentNotification.Comment(childComplexity), true
+
+	case "SomeoneRepliedToYourCommentNotification.creationTime":
+		if e.complexity.SomeoneRepliedToYourCommentNotification.CreationTime == nil {
+			break
+		}
+
+		return e.complexity.SomeoneRepliedToYourCommentNotification.CreationTime(childComplexity), true
+
+	case "SomeoneRepliedToYourCommentNotification.dbid":
+		if e.complexity.SomeoneRepliedToYourCommentNotification.Dbid == nil {
+			break
+		}
+
+		return e.complexity.SomeoneRepliedToYourCommentNotification.Dbid(childComplexity), true
+
+	case "SomeoneRepliedToYourCommentNotification.id":
+		if e.complexity.SomeoneRepliedToYourCommentNotification.ID == nil {
+			break
+		}
+
+		return e.complexity.SomeoneRepliedToYourCommentNotification.ID(childComplexity), true
+
+	case "SomeoneRepliedToYourCommentNotification.originalComment":
+		if e.complexity.SomeoneRepliedToYourCommentNotification.OriginalComment == nil {
+			break
+		}
+
+		return e.complexity.SomeoneRepliedToYourCommentNotification.OriginalComment(childComplexity), true
+
+	case "SomeoneRepliedToYourCommentNotification.seen":
+		if e.complexity.SomeoneRepliedToYourCommentNotification.Seen == nil {
+			break
+		}
+
+		return e.complexity.SomeoneRepliedToYourCommentNotification.Seen(childComplexity), true
+
+	case "SomeoneRepliedToYourCommentNotification.updatedTime":
+		if e.complexity.SomeoneRepliedToYourCommentNotification.UpdatedTime == nil {
+			break
+		}
+
+		return e.complexity.SomeoneRepliedToYourCommentNotification.UpdatedTime(childComplexity), true
+
 	case "SomeoneViewedYourGalleryNotification.count":
 		if e.complexity.SomeoneViewedYourGalleryNotification.Count == nil {
 			break
@@ -7811,6 +8012,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputGalleryPositionInput,
 		ec.unmarshalInputGnosisSafeAuth,
 		ec.unmarshalInputMagicLinkAuth,
+		ec.unmarshalInputMentionInput,
 		ec.unmarshalInputMintPremiumCardToWalletInput,
 		ec.unmarshalInputMoveCollectionToGalleryInput,
 		ec.unmarshalInputNotificationSettingsInput,
@@ -9437,13 +9639,19 @@ type SyncTokensPayload {
   viewer: Viewer
 }
 
-union SyncCreatedTokensForNewContractsPayloadOrError = SyncCreatedTokensForNewContractsPayload | ErrNotAuthorized | ErrSyncFailed
+union SyncCreatedTokensForNewContractsPayloadOrError =
+    SyncCreatedTokensForNewContractsPayload
+  | ErrNotAuthorized
+  | ErrSyncFailed
 
 type SyncCreatedTokensForNewContractsPayload {
   viewer: Viewer
 }
 
-union SyncCreatedTokensForExistingContractPayloadOrError = SyncCreatedTokensForExistingContractPayload | ErrNotAuthorized | ErrSyncFailed
+union SyncCreatedTokensForExistingContractPayloadOrError =
+    SyncCreatedTokensForExistingContractPayload
+  | ErrNotAuthorized
+  | ErrSyncFailed
 
 type SyncCreatedTokensForExistingContractPayload {
   viewer: Viewer
@@ -9875,6 +10083,43 @@ type NewTokensNotification implements Notification & GroupedNotification & Node 
   count: Int
 
   token: Token @goField(forceResolver: true)
+}
+
+type SomeoneRepliedToYourCommentNotification implements Notification & Node @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+
+  # Don't need a ` + "`" + `who` + "`" + ` here since the ` + "`" + `comment` + "`" + ` can provide that
+  comment: Comment @goField(forceResolver: true)
+  originalComment: Comment @goField(forceResolver: true)
+}
+
+type SomeoneMentionedYouNotification implements Notification & Node @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+
+  # Don't need a ` + "`" + `who` + "`" + ` here since the ` + "`" + `comment` + "`" + ` or ` + "`" + `post` + "`" + ` can provide that
+  comment: Comment @goField(forceResolver: true)
+  post: Post @goField(forceResolver: true)
+}
+
+type SomeoneMentionedYourCommunityNotification implements Notification & Node @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+
+  # Don't need a ` + "`" + `who` + "`" + ` here since the ` + "`" + `comment` + "`" + ` or ` + "`" + `post` + "`" + ` can provide that
+  comment: Comment @goField(forceResolver: true)
+  post: Post @goField(forceResolver: true)
+  community: Community @goField(forceResolver: true)
 }
 
 type ClearAllNotificationsPayload {
@@ -10346,6 +10591,11 @@ type DeletePostPayload {
 
 union DeletePostPayloadOrError = DeletePostPayload | ErrInvalidInput | ErrNotAuthorized
 
+input MentionInput {
+  userId: DBID
+  communityId: DBID
+}
+
 type Mutation {
   # User Mutations
   addUserWallet(
@@ -10380,8 +10630,12 @@ type Mutation {
   setSpamPreference(input: SetSpamPreferenceInput!): SetSpamPreferencePayloadOrError @authRequired
 
   syncTokens(chains: [Chain!]): SyncTokensPayloadOrError @authRequired
-  syncCreatedTokensForNewContracts(input: SyncCreatedTokensForNewContractsInput!): SyncCreatedTokensForNewContractsPayloadOrError @authRequired
-  syncCreatedTokensForExistingContract(input: SyncCreatedTokensForExistingContractInput!): SyncCreatedTokensForExistingContractPayloadOrError @authRequired
+  syncCreatedTokensForNewContracts(
+    input: SyncCreatedTokensForNewContractsInput!
+  ): SyncCreatedTokensForNewContractsPayloadOrError @authRequired
+  syncCreatedTokensForExistingContract(
+    input: SyncCreatedTokensForExistingContractInput!
+  ): SyncCreatedTokensForExistingContractPayloadOrError @authRequired
   refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
   refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
   refreshContract(contractId: DBID!): RefreshContractPayloadOrError
@@ -10423,10 +10677,15 @@ type Mutation {
     feedEventId: DBID!
     replyToID: DBID
     comment: String!
+    mentions: [MentionInput!]
   ): CommentOnFeedEventPayloadOrError @authRequired
   removeComment(commentId: DBID!): RemoveCommentPayloadOrError @authRequired
-  commentOnPost(postId: DBID!, replyToID: DBID, comment: String!): CommentOnPostPayloadOrError
-    @authRequired
+  commentOnPost(
+    postId: DBID!
+    replyToID: DBID
+    comment: String!
+    mentions: [MentionInput!]
+  ): CommentOnPostPayloadOrError @authRequired
 
   postTokens(input: PostTokensInput!): PostTokensPayloadOrError @authRequired
   deletePost(postId: DBID!): DeletePostPayloadOrError @authRequired
@@ -11290,6 +11549,15 @@ func (ec *executionContext) field_Mutation_commentOnFeedEvent_args(ctx context.C
 		}
 	}
 	args["comment"] = arg2
+	var arg3 []*model.MentionInput
+	if tmp, ok := rawArgs["mentions"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("mentions"))
+		arg3, err = ec.unmarshalOMentionInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMentionInputᚄ(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["mentions"] = arg3
 	return args, nil
 }
 
@@ -11323,6 +11591,15 @@ func (ec *executionContext) field_Mutation_commentOnPost_args(ctx context.Contex
 		}
 	}
 	args["comment"] = arg2
+	var arg3 []*model.MentionInput
+	if tmp, ok := rawArgs["mentions"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("mentions"))
+		arg3, err = ec.unmarshalOMentionInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMentionInputᚄ(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["mentions"] = arg3
 	return args, nil
 }
 
@@ -33365,7 +33642,7 @@ func (ec *executionContext) _Mutation_commentOnFeedEvent(ctx context.Context, fi
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().CommentOnFeedEvent(rctx, fc.Args["feedEventId"].(persist.DBID), fc.Args["replyToID"].(*persist.DBID), fc.Args["comment"].(string))
+			return ec.resolvers.Mutation().CommentOnFeedEvent(rctx, fc.Args["feedEventId"].(persist.DBID), fc.Args["replyToID"].(*persist.DBID), fc.Args["comment"].(string), fc.Args["mentions"].([]*model.MentionInput))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.AuthRequired == nil {
@@ -33509,7 +33786,7 @@ func (ec *executionContext) _Mutation_commentOnPost(ctx context.Context, field g
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().CommentOnPost(rctx, fc.Args["postId"].(persist.DBID), fc.Args["replyToID"].(*persist.DBID), fc.Args["comment"].(string))
+			return ec.resolvers.Mutation().CommentOnPost(rctx, fc.Args["postId"].(persist.DBID), fc.Args["replyToID"].(*persist.DBID), fc.Args["comment"].(string), fc.Args["mentions"].([]*model.MentionInput))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.AuthRequired == nil {
@@ -45400,6 +45677,1074 @@ func (ec *executionContext) fieldContext_SomeoneFollowedYouNotification_follower
 	return fc, nil
 }
 
+func (ec *executionContext) _SomeoneMentionedYouNotification_id(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneMentionedYouNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneMentionedYouNotification_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID(), nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.GqlID)
+	fc.Result = res
+	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneMentionedYouNotification_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneMentionedYouNotification",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneMentionedYouNotification_dbid(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneMentionedYouNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneMentionedYouNotification_dbid(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dbid, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(persist.DBID)
+	fc.Result = res
+	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneMentionedYouNotification_dbid(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneMentionedYouNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DBID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneMentionedYouNotification_seen(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneMentionedYouNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneMentionedYouNotification_seen(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Seen, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneMentionedYouNotification_seen(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneMentionedYouNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneMentionedYouNotification_creationTime(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneMentionedYouNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneMentionedYouNotification_creationTime(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreationTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneMentionedYouNotification_creationTime(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneMentionedYouNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneMentionedYouNotification_updatedTime(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneMentionedYouNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneMentionedYouNotification_updatedTime(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UpdatedTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneMentionedYouNotification_updatedTime(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneMentionedYouNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneMentionedYouNotification_comment(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneMentionedYouNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneMentionedYouNotification_comment(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.SomeoneMentionedYouNotification().Comment(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Comment)
+	fc.Result = res
+	return ec.marshalOComment2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐComment(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneMentionedYouNotification_comment(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneMentionedYouNotification",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Comment_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Comment_dbid(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Comment_creationTime(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Comment_lastUpdated(ctx, field)
+			case "replyTo":
+				return ec.fieldContext_Comment_replyTo(ctx, field)
+			case "commenter":
+				return ec.fieldContext_Comment_commenter(ctx, field)
+			case "comment":
+				return ec.fieldContext_Comment_comment(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Comment", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneMentionedYouNotification_post(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneMentionedYouNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneMentionedYouNotification_post(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.SomeoneMentionedYouNotification().Post(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Post)
+	fc.Result = res
+	return ec.marshalOPost2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPost(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneMentionedYouNotification_post(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneMentionedYouNotification",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Post_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Post_dbid(ctx, field)
+			case "author":
+				return ec.fieldContext_Post_author(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Post_creationTime(ctx, field)
+			case "tokens":
+				return ec.fieldContext_Post_tokens(ctx, field)
+			case "caption":
+				return ec.fieldContext_Post_caption(ctx, field)
+			case "admires":
+				return ec.fieldContext_Post_admires(ctx, field)
+			case "comments":
+				return ec.fieldContext_Post_comments(ctx, field)
+			case "interactions":
+				return ec.fieldContext_Post_interactions(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Post_viewerAdmire(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneMentionedYourCommunityNotification_id(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneMentionedYourCommunityNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneMentionedYourCommunityNotification_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID(), nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.GqlID)
+	fc.Result = res
+	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneMentionedYourCommunityNotification_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneMentionedYourCommunityNotification",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneMentionedYourCommunityNotification_dbid(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneMentionedYourCommunityNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneMentionedYourCommunityNotification_dbid(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dbid, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(persist.DBID)
+	fc.Result = res
+	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneMentionedYourCommunityNotification_dbid(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneMentionedYourCommunityNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DBID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneMentionedYourCommunityNotification_seen(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneMentionedYourCommunityNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneMentionedYourCommunityNotification_seen(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Seen, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneMentionedYourCommunityNotification_seen(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneMentionedYourCommunityNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneMentionedYourCommunityNotification_creationTime(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneMentionedYourCommunityNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneMentionedYourCommunityNotification_creationTime(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreationTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneMentionedYourCommunityNotification_creationTime(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneMentionedYourCommunityNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneMentionedYourCommunityNotification_updatedTime(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneMentionedYourCommunityNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneMentionedYourCommunityNotification_updatedTime(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UpdatedTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneMentionedYourCommunityNotification_updatedTime(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneMentionedYourCommunityNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneMentionedYourCommunityNotification_comment(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneMentionedYourCommunityNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneMentionedYourCommunityNotification_comment(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.SomeoneMentionedYourCommunityNotification().Comment(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Comment)
+	fc.Result = res
+	return ec.marshalOComment2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐComment(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneMentionedYourCommunityNotification_comment(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneMentionedYourCommunityNotification",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Comment_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Comment_dbid(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Comment_creationTime(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Comment_lastUpdated(ctx, field)
+			case "replyTo":
+				return ec.fieldContext_Comment_replyTo(ctx, field)
+			case "commenter":
+				return ec.fieldContext_Comment_commenter(ctx, field)
+			case "comment":
+				return ec.fieldContext_Comment_comment(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Comment", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneMentionedYourCommunityNotification_post(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneMentionedYourCommunityNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneMentionedYourCommunityNotification_post(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.SomeoneMentionedYourCommunityNotification().Post(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Post)
+	fc.Result = res
+	return ec.marshalOPost2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPost(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneMentionedYourCommunityNotification_post(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneMentionedYourCommunityNotification",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Post_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Post_dbid(ctx, field)
+			case "author":
+				return ec.fieldContext_Post_author(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Post_creationTime(ctx, field)
+			case "tokens":
+				return ec.fieldContext_Post_tokens(ctx, field)
+			case "caption":
+				return ec.fieldContext_Post_caption(ctx, field)
+			case "admires":
+				return ec.fieldContext_Post_admires(ctx, field)
+			case "comments":
+				return ec.fieldContext_Post_comments(ctx, field)
+			case "interactions":
+				return ec.fieldContext_Post_interactions(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Post_viewerAdmire(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneMentionedYourCommunityNotification_community(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneMentionedYourCommunityNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneMentionedYourCommunityNotification_community(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.SomeoneMentionedYourCommunityNotification().Community(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Community)
+	fc.Result = res
+	return ec.marshalOCommunity2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunity(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneMentionedYourCommunityNotification_community(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneMentionedYourCommunityNotification",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "dbid":
+				return ec.fieldContext_Community_dbid(ctx, field)
+			case "id":
+				return ec.fieldContext_Community_id(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Community_lastUpdated(ctx, field)
+			case "contract":
+				return ec.fieldContext_Community_contract(ctx, field)
+			case "contractAddress":
+				return ec.fieldContext_Community_contractAddress(ctx, field)
+			case "creatorAddress":
+				return ec.fieldContext_Community_creatorAddress(ctx, field)
+			case "creator":
+				return ec.fieldContext_Community_creator(ctx, field)
+			case "chain":
+				return ec.fieldContext_Community_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Community_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Community_description(ctx, field)
+			case "previewImage":
+				return ec.fieldContext_Community_previewImage(ctx, field)
+			case "profileImageURL":
+				return ec.fieldContext_Community_profileImageURL(ctx, field)
+			case "profileBannerURL":
+				return ec.fieldContext_Community_profileBannerURL(ctx, field)
+			case "badgeURL":
+				return ec.fieldContext_Community_badgeURL(ctx, field)
+			case "parentCommunity":
+				return ec.fieldContext_Community_parentCommunity(ctx, field)
+			case "subCommunities":
+				return ec.fieldContext_Community_subCommunities(ctx, field)
+			case "tokensInCommunity":
+				return ec.fieldContext_Community_tokensInCommunity(ctx, field)
+			case "owners":
+				return ec.fieldContext_Community_owners(ctx, field)
+			case "posts":
+				return ec.fieldContext_Community_posts(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneRepliedToYourCommentNotification_id(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneRepliedToYourCommentNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneRepliedToYourCommentNotification_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID(), nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.GqlID)
+	fc.Result = res
+	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneRepliedToYourCommentNotification_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneRepliedToYourCommentNotification",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneRepliedToYourCommentNotification_dbid(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneRepliedToYourCommentNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneRepliedToYourCommentNotification_dbid(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dbid, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(persist.DBID)
+	fc.Result = res
+	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneRepliedToYourCommentNotification_dbid(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneRepliedToYourCommentNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DBID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneRepliedToYourCommentNotification_seen(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneRepliedToYourCommentNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneRepliedToYourCommentNotification_seen(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Seen, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneRepliedToYourCommentNotification_seen(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneRepliedToYourCommentNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneRepliedToYourCommentNotification_creationTime(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneRepliedToYourCommentNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneRepliedToYourCommentNotification_creationTime(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreationTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneRepliedToYourCommentNotification_creationTime(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneRepliedToYourCommentNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneRepliedToYourCommentNotification_updatedTime(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneRepliedToYourCommentNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneRepliedToYourCommentNotification_updatedTime(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UpdatedTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneRepliedToYourCommentNotification_updatedTime(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneRepliedToYourCommentNotification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneRepliedToYourCommentNotification_comment(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneRepliedToYourCommentNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneRepliedToYourCommentNotification_comment(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.SomeoneRepliedToYourCommentNotification().Comment(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Comment)
+	fc.Result = res
+	return ec.marshalOComment2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐComment(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneRepliedToYourCommentNotification_comment(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneRepliedToYourCommentNotification",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Comment_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Comment_dbid(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Comment_creationTime(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Comment_lastUpdated(ctx, field)
+			case "replyTo":
+				return ec.fieldContext_Comment_replyTo(ctx, field)
+			case "commenter":
+				return ec.fieldContext_Comment_commenter(ctx, field)
+			case "comment":
+				return ec.fieldContext_Comment_comment(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Comment", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SomeoneRepliedToYourCommentNotification_originalComment(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneRepliedToYourCommentNotification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SomeoneRepliedToYourCommentNotification_originalComment(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.SomeoneRepliedToYourCommentNotification().OriginalComment(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Comment)
+	fc.Result = res
+	return ec.marshalOComment2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐComment(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SomeoneRepliedToYourCommentNotification_originalComment(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SomeoneRepliedToYourCommentNotification",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Comment_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Comment_dbid(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Comment_creationTime(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Comment_lastUpdated(ctx, field)
+			case "replyTo":
+				return ec.fieldContext_Comment_replyTo(ctx, field)
+			case "commenter":
+				return ec.fieldContext_Comment_commenter(ctx, field)
+			case "comment":
+				return ec.fieldContext_Comment_comment(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Comment", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _SomeoneViewedYourGalleryNotification_id(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneViewedYourGalleryNotification) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_SomeoneViewedYourGalleryNotification_id(ctx, field)
 	if err != nil {
@@ -56707,6 +58052,44 @@ func (ec *executionContext) unmarshalInputMagicLinkAuth(ctx context.Context, obj
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputMentionInput(ctx context.Context, obj interface{}) (model.MentionInput, error) {
+	var it model.MentionInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"userId", "communityId"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "userId":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userId"))
+			data, err := ec.unmarshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.UserID = data
+		case "communityId":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("communityId"))
+			data, err := ec.unmarshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.CommunityID = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputMintPremiumCardToWalletInput(ctx context.Context, obj interface{}) (model.MintPremiumCardToWalletInput, error) {
 	var it model.MintPremiumCardToWalletInput
 	asMap := map[string]interface{}{}
@@ -59917,6 +61300,27 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 			return graphql.Null
 		}
 		return ec._NewTokensNotification(ctx, sel, obj)
+	case model.SomeoneRepliedToYourCommentNotification:
+		return ec._SomeoneRepliedToYourCommentNotification(ctx, sel, &obj)
+	case *model.SomeoneRepliedToYourCommentNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SomeoneRepliedToYourCommentNotification(ctx, sel, obj)
+	case model.SomeoneMentionedYouNotification:
+		return ec._SomeoneMentionedYouNotification(ctx, sel, &obj)
+	case *model.SomeoneMentionedYouNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SomeoneMentionedYouNotification(ctx, sel, obj)
+	case model.SomeoneMentionedYourCommunityNotification:
+		return ec._SomeoneMentionedYourCommunityNotification(ctx, sel, &obj)
+	case *model.SomeoneMentionedYourCommunityNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SomeoneMentionedYourCommunityNotification(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -59987,6 +61391,27 @@ func (ec *executionContext) _Notification(ctx context.Context, sel ast.Selection
 			return graphql.Null
 		}
 		return ec._NewTokensNotification(ctx, sel, obj)
+	case model.SomeoneRepliedToYourCommentNotification:
+		return ec._SomeoneRepliedToYourCommentNotification(ctx, sel, &obj)
+	case *model.SomeoneRepliedToYourCommentNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SomeoneRepliedToYourCommentNotification(ctx, sel, obj)
+	case model.SomeoneMentionedYouNotification:
+		return ec._SomeoneMentionedYouNotification(ctx, sel, &obj)
+	case *model.SomeoneMentionedYouNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SomeoneMentionedYouNotification(ctx, sel, obj)
+	case model.SomeoneMentionedYourCommunityNotification:
+		return ec._SomeoneMentionedYourCommunityNotification(ctx, sel, &obj)
+	case *model.SomeoneMentionedYourCommunityNotification:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SomeoneMentionedYourCommunityNotification(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -69816,6 +71241,266 @@ func (ec *executionContext) _SomeoneFollowedYouNotification(ctx context.Context,
 	return out
 }
 
+var someoneMentionedYouNotificationImplementors = []string{"SomeoneMentionedYouNotification", "Notification", "Node"}
+
+func (ec *executionContext) _SomeoneMentionedYouNotification(ctx context.Context, sel ast.SelectionSet, obj *model.SomeoneMentionedYouNotification) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, someoneMentionedYouNotificationImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SomeoneMentionedYouNotification")
+		case "id":
+
+			out.Values[i] = ec._SomeoneMentionedYouNotification_id(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "dbid":
+
+			out.Values[i] = ec._SomeoneMentionedYouNotification_dbid(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "seen":
+
+			out.Values[i] = ec._SomeoneMentionedYouNotification_seen(ctx, field, obj)
+
+		case "creationTime":
+
+			out.Values[i] = ec._SomeoneMentionedYouNotification_creationTime(ctx, field, obj)
+
+		case "updatedTime":
+
+			out.Values[i] = ec._SomeoneMentionedYouNotification_updatedTime(ctx, field, obj)
+
+		case "comment":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._SomeoneMentionedYouNotification_comment(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "post":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._SomeoneMentionedYouNotification_post(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var someoneMentionedYourCommunityNotificationImplementors = []string{"SomeoneMentionedYourCommunityNotification", "Notification", "Node"}
+
+func (ec *executionContext) _SomeoneMentionedYourCommunityNotification(ctx context.Context, sel ast.SelectionSet, obj *model.SomeoneMentionedYourCommunityNotification) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, someoneMentionedYourCommunityNotificationImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SomeoneMentionedYourCommunityNotification")
+		case "id":
+
+			out.Values[i] = ec._SomeoneMentionedYourCommunityNotification_id(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "dbid":
+
+			out.Values[i] = ec._SomeoneMentionedYourCommunityNotification_dbid(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "seen":
+
+			out.Values[i] = ec._SomeoneMentionedYourCommunityNotification_seen(ctx, field, obj)
+
+		case "creationTime":
+
+			out.Values[i] = ec._SomeoneMentionedYourCommunityNotification_creationTime(ctx, field, obj)
+
+		case "updatedTime":
+
+			out.Values[i] = ec._SomeoneMentionedYourCommunityNotification_updatedTime(ctx, field, obj)
+
+		case "comment":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._SomeoneMentionedYourCommunityNotification_comment(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "post":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._SomeoneMentionedYourCommunityNotification_post(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "community":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._SomeoneMentionedYourCommunityNotification_community(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var someoneRepliedToYourCommentNotificationImplementors = []string{"SomeoneRepliedToYourCommentNotification", "Notification", "Node"}
+
+func (ec *executionContext) _SomeoneRepliedToYourCommentNotification(ctx context.Context, sel ast.SelectionSet, obj *model.SomeoneRepliedToYourCommentNotification) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, someoneRepliedToYourCommentNotificationImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SomeoneRepliedToYourCommentNotification")
+		case "id":
+
+			out.Values[i] = ec._SomeoneRepliedToYourCommentNotification_id(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "dbid":
+
+			out.Values[i] = ec._SomeoneRepliedToYourCommentNotification_dbid(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "seen":
+
+			out.Values[i] = ec._SomeoneRepliedToYourCommentNotification_seen(ctx, field, obj)
+
+		case "creationTime":
+
+			out.Values[i] = ec._SomeoneRepliedToYourCommentNotification_creationTime(ctx, field, obj)
+
+		case "updatedTime":
+
+			out.Values[i] = ec._SomeoneRepliedToYourCommentNotification_updatedTime(ctx, field, obj)
+
+		case "comment":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._SomeoneRepliedToYourCommentNotification_comment(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "originalComment":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._SomeoneRepliedToYourCommentNotification_originalComment(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var someoneViewedYourGalleryNotificationImplementors = []string{"SomeoneViewedYourGalleryNotification", "Notification", "Node", "GroupedNotification"}
 
 func (ec *executionContext) _SomeoneViewedYourGalleryNotification(ctx context.Context, sel ast.SelectionSet, obj *model.SomeoneViewedYourGalleryNotification) graphql.Marshaler {
@@ -72856,6 +74541,11 @@ func (ec *executionContext) marshalNInt2ᚕintᚄ(ctx context.Context, sel ast.S
 	return ret
 }
 
+func (ec *executionContext) unmarshalNMentionInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMentionInput(ctx context.Context, v interface{}) (*model.MentionInput, error) {
+	res, err := ec.unmarshalInputMentionInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) marshalNMerchToken2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMerchToken(ctx context.Context, sel ast.SelectionSet, v *model.MerchToken) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
@@ -75410,6 +77100,26 @@ func (ec *executionContext) marshalOMembershipTier2ᚖgithubᚗcomᚋmikeydubᚋ
 		return graphql.Null
 	}
 	return ec._MembershipTier(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOMentionInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMentionInputᚄ(ctx context.Context, v interface{}) ([]*model.MentionInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var vSlice []interface{}
+	if v != nil {
+		vSlice = graphql.CoerceList(v)
+	}
+	var err error
+	res := make([]*model.MentionInput, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNMentionInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMentionInput(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
 }
 
 func (ec *executionContext) marshalOMerchToken2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMerchToken(ctx context.Context, sel ast.SelectionSet, v []*model.MerchToken) graphql.Marshaler {

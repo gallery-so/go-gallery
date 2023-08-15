@@ -965,6 +965,70 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 			Count:        &amount,
 			Token:        nil, // handled by dedicated resolver
 		}, nil
+	case persist.ActionReplyToComment:
+		return model.SomeoneRepliedToYourCommentNotification{
+			HelperSomeoneRepliedToYourCommentNotificationData: model.HelperSomeoneRepliedToYourCommentNotificationData{
+				OwnerID:          notif.OwnerID,
+				CommentID:        notif.CommentID,
+				NotificationData: notif.Data,
+			},
+			Dbid:            notif.ID,
+			Seen:            &notif.Seen,
+			CreationTime:    &notif.CreatedAt,
+			UpdatedTime:     &notif.LastUpdated,
+			Comment:         nil, // handled by dedicated resolver
+			OriginalComment: nil, // handled by dedicated resolver
+		}, nil
+	case persist.ActionMentionUser:
+		var postID *persist.DBID
+		var commentID *persist.DBID
+
+		if notif.PostID != "" {
+			postID = &notif.PostID
+		}
+		if notif.CommentID != "" {
+			commentID = &notif.CommentID
+		}
+		return model.SomeoneMentionedYouNotification{
+			HelperSomeoneMentionedYouNotificationData: model.HelperSomeoneMentionedYouNotificationData{
+				OwnerID:   notif.OwnerID,
+				PostID:    postID,
+				CommentID: commentID,
+			},
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
+			Post:         nil, // handled by dedicated resolver
+			Comment:      nil, // handled by dedicated resolver
+		}, nil
+
+	case persist.ActionMentionCommunity:
+		var postID *persist.DBID
+		var commentID *persist.DBID
+
+		if notif.PostID != "" {
+			postID = &notif.PostID
+		}
+		if notif.CommentID != "" {
+			commentID = &notif.CommentID
+		}
+		return model.SomeoneMentionedYourCommunityNotification{
+			HelperSomeoneMentionedYourCommunityNotificationData: model.HelperSomeoneMentionedYourCommunityNotificationData{
+				OwnerID:    notif.OwnerID,
+				ContractID: notif.CommentID,
+				PostID:     postID,
+				CommentID:  commentID,
+			},
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
+			Community:    nil, // handled by dedicated resolver
+			Comment:      nil, // handled by dedicated resolver
+			Post:         nil, // handled by dedicated resolver
+		}, nil
+
 	default:
 		return nil, fmt.Errorf("unknown notification action: %s", notif.Action)
 	}

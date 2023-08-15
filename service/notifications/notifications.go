@@ -129,6 +129,8 @@ func New(queries *db.Queries, pub *pubsub.Client, taskClient *cloudtasks.Client,
 	// single notification actions (default)
 	notifDispatcher.AddHandler(persist.ActionCommentedOnFeedEvent, def)
 	notifDispatcher.AddHandler(persist.ActionCommentedOnPost, def)
+	notifDispatcher.AddHandler(persist.ActionReplyToComment, def)
+	notifDispatcher.AddHandler(persist.ActionMentionUser, def)
 
 	// notification actions that are grouped by token id
 	notifDispatcher.AddHandler(persist.ActionNewTokensReceived, tokenIDGrouped)
@@ -765,6 +767,28 @@ func addNotification(ctx context.Context, notif db.Notification, queries *db.Que
 			EventIds: notif.EventIds,
 			TokenID:  notif.TokenID,
 			Amount:   int32(amount),
+		})
+	case persist.ActionReplyToComment:
+		return queries.CreateCommentNotification(ctx, db.CreateCommentNotificationParams{
+			ID:        id,
+			OwnerID:   notif.OwnerID,
+			Action:    notif.Action,
+			Data:      notif.Data,
+			EventIds:  notif.EventIds,
+			CommentID: notif.CommentID,
+			FeedEvent: util.ToNullString(notif.FeedEventID.String(), true),
+			Post:      util.ToNullString(notif.PostID.String(), true),
+		})
+	case persist.ActionMentionUser, persist.ActionMentionCommunity:
+		return queries.CreateMentionUserNotification(ctx, db.CreateMentionUserNotificationParams{
+			ID:        id,
+			OwnerID:   notif.OwnerID,
+			Action:    notif.Action,
+			Data:      notif.Data,
+			EventIds:  notif.EventIds,
+			FeedEvent: util.ToNullString(notif.FeedEventID.String(), true),
+			Post:      util.ToNullString(notif.PostID.String(), true),
+			Comment:   util.ToNullString(notif.CommentID.String(), true),
 		})
 	default:
 		return db.Notification{}, fmt.Errorf("unknown notification action: %s", notif.Action)

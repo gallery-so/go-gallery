@@ -125,6 +125,7 @@ type Event struct {
 	Caption        sql.NullString       `json:"caption"`
 	GroupID        sql.NullString       `json:"group_id"`
 	PostID         persist.DBID         `json:"post_id"`
+	ContractID     persist.DBID         `json:"contract_id"`
 }
 
 type ExternalSocialConnection struct {
@@ -311,6 +312,7 @@ type Notification struct {
 	Amount      int32                    `json:"amount"`
 	PostID      persist.DBID             `json:"post_id"`
 	TokenID     persist.DBID             `json:"token_id"`
+	ContractID  persist.DBID             `json:"contract_id"`
 }
 
 type OwnedContract struct {

@@ -17,6 +17,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
+	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -762,7 +763,7 @@ func (api InteractionAPI) GetCommentByID(ctx context.Context, commentID persist.
 	return &comment, nil
 }
 
-func (api InteractionAPI) CommentOnFeedEvent(ctx context.Context, feedEventID persist.DBID, replyToID *persist.DBID, comment string) (persist.DBID, error) {
+func (api InteractionAPI) CommentOnFeedEvent(ctx context.Context, feedEventID persist.DBID, replyToID *persist.DBID, mentions []*model.MentionInput, comment string) (persist.DBID, error) {
 	// Trim whitespace first, so comments consisting only of whitespace will fail
 	// the "required" validation below
 	comment = strings.TrimSpace(comment)
@@ -775,10 +776,10 @@ func (api InteractionAPI) CommentOnFeedEvent(ctx context.Context, feedEventID pe
 		return "", err
 	}
 
-	return api.comment(ctx, comment, feedEventID, "", replyToID)
+	return api.comment(ctx, comment, feedEventID, "", replyToID, mentions)
 }
 
-func (api InteractionAPI) CommentOnPost(ctx context.Context, postID persist.DBID, replyToID *persist.DBID, comment string) (persist.DBID, error) {
+func (api InteractionAPI) CommentOnPost(ctx context.Context, postID persist.DBID, replyToID *persist.DBID, mentions []*model.MentionInput, comment string) (persist.DBID, error) {
 	// Trim whitespace first, so comments consisting only of whitespace will fail
 	// the "required" validation below
 	comment = strings.TrimSpace(comment)
@@ -791,10 +792,10 @@ func (api InteractionAPI) CommentOnPost(ctx context.Context, postID persist.DBID
 		return "", err
 	}
 
-	return api.comment(ctx, comment, "", postID, replyToID)
+	return api.comment(ctx, comment, "", postID, replyToID, mentions)
 }
 
-func (api InteractionAPI) comment(ctx context.Context, comment string, feedEventID, postID persist.DBID, replyToID *persist.DBID) (persist.DBID, error) {
+func (api InteractionAPI) comment(ctx context.Context, comment string, feedEventID, postID persist.DBID, replyToID *persist.DBID, mentions []*model.MentionInput) (persist.DBID, error) {
 	actor, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return "", err
@@ -827,6 +828,60 @@ func (api InteractionAPI) comment(ctx context.Context, comment string, feedEvent
 	if err != nil {
 		return "", err
 	}
+
+	if len(mentions) > 0 {
+		for _, mention := range mentions {
+			if mention == nil {
+				continue
+			}
+			switch {
+			case mention.UserID != nil:
+				_, err = event.DispatchEvent(ctx, db.Event{
+					ActorID:        persist.DBIDToNullStr(actor),
+					ResourceTypeID: persist.ResourceTypeUser,
+					SubjectID:      *mention.UserID,
+					PostID:         postID,
+					FeedEventID:    feedEventID,
+					UserID:         *mention.UserID,
+					CommentID:      commentID,
+					Action:         persist.ActionMentionUser,
+				}, api.validator, nil)
+				if err != nil {
+					return "", err
+				}
+			case mention.CommunityID != nil:
+				_, err = event.DispatchEvent(ctx, db.Event{
+					ActorID:        persist.DBIDToNullStr(actor),
+					ResourceTypeID: persist.ResourceTypeContract,
+					SubjectID:      *mention.CommunityID,
+					PostID:         postID,
+					FeedEventID:    feedEventID,
+					ContractID:     *mention.CommunityID,
+					CommentID:      commentID,
+					Action:         persist.ActionMentionCommunity,
+				}, api.validator, nil)
+
+			default:
+				return "", fmt.Errorf("invalid mention type: %+v", mention)
+			}
+		}
+	}
+
+	if replyToID != nil {
+		_, err = event.DispatchEvent(ctx, db.Event{
+			ActorID:        persist.DBIDToNullStr(actor),
+			ResourceTypeID: persist.ResourceTypeComment,
+			SubjectID:      *replyToID,
+			PostID:         postID,
+			FeedEventID:    feedEventID,
+			CommentID:      commentID,
+			Action:         persist.ActionReplyToComment,
+		}, api.validator, nil)
+		if err != nil {
+			return "", err
+		}
+	}
+
 	return commentID, nil
 }
 

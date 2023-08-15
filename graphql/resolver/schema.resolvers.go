@@ -1328,8 +1328,8 @@ func (r *mutationResolver) RemoveAdmire(ctx context.Context, admireID persist.DB
 }
 
 // CommentOnFeedEvent is the resolver for the commentOnFeedEvent field.
-func (r *mutationResolver) CommentOnFeedEvent(ctx context.Context, feedEventID persist.DBID, replyToID *persist.DBID, comment string) (model.CommentOnFeedEventPayloadOrError, error) {
-	id, err := publicapi.For(ctx).Interaction.CommentOnFeedEvent(ctx, feedEventID, replyToID, comment)
+func (r *mutationResolver) CommentOnFeedEvent(ctx context.Context, feedEventID persist.DBID, replyToID *persist.DBID, comment string, mentions []*model.MentionInput) (model.CommentOnFeedEventPayloadOrError, error) {
+	id, err := publicapi.For(ctx).Interaction.CommentOnFeedEvent(ctx, feedEventID, replyToID, mentions, comment)
 	if err != nil {
 		return nil, err
 	}
@@ -1370,8 +1370,8 @@ func (r *mutationResolver) RemoveComment(ctx context.Context, commentID persist.
 }
 
 // CommentOnPost is the resolver for the commentOnPost field.
-func (r *mutationResolver) CommentOnPost(ctx context.Context, postID persist.DBID, replyToID *persist.DBID, comment string) (model.CommentOnPostPayloadOrError, error) {
-	id, err := publicapi.For(ctx).Interaction.CommentOnPost(ctx, postID, replyToID, comment)
+func (r *mutationResolver) CommentOnPost(ctx context.Context, postID persist.DBID, replyToID *persist.DBID, comment string, mentions []*model.MentionInput) (model.CommentOnPostPayloadOrError, error) {
+	id, err := publicapi.For(ctx).Interaction.CommentOnPost(ctx, postID, replyToID, mentions, comment)
 	if err != nil {
 		return nil, err
 	}
@@ -2494,6 +2494,53 @@ func (r *someoneFollowedYouNotificationResolver) Followers(ctx context.Context, 
 	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.NotificationData.FollowerIDs, before, after, first, last)
 }
 
+// Comment is the resolver for the comment field.
+func (r *someoneMentionedYouNotificationResolver) Comment(ctx context.Context, obj *model.SomeoneMentionedYouNotification) (*model.Comment, error) {
+	if obj.CommentID == nil {
+		return nil, nil
+	}
+	return resolveCommentByCommentID(ctx, *obj.CommentID)
+}
+
+// Post is the resolver for the post field.
+func (r *someoneMentionedYouNotificationResolver) Post(ctx context.Context, obj *model.SomeoneMentionedYouNotification) (*model.Post, error) {
+	if obj.PostID == nil {
+		return nil, nil
+	}
+	return resolvePostByPostID(ctx, *obj.PostID)
+}
+
+// Comment is the resolver for the comment field.
+func (r *someoneMentionedYourCommunityNotificationResolver) Comment(ctx context.Context, obj *model.SomeoneMentionedYourCommunityNotification) (*model.Comment, error) {
+	if obj.CommentID == nil {
+		return nil, nil
+	}
+	return resolveCommentByCommentID(ctx, *obj.CommentID)
+}
+
+// Post is the resolver for the post field.
+func (r *someoneMentionedYourCommunityNotificationResolver) Post(ctx context.Context, obj *model.SomeoneMentionedYourCommunityNotification) (*model.Post, error) {
+	if obj.PostID == nil {
+		return nil, nil
+	}
+	return resolvePostByPostID(ctx, *obj.PostID)
+}
+
+// Community is the resolver for the community field.
+func (r *someoneMentionedYourCommunityNotificationResolver) Community(ctx context.Context, obj *model.SomeoneMentionedYourCommunityNotification) (*model.Community, error) {
+	return resolveCommunityByID(ctx, obj.ContractID)
+}
+
+// Comment is the resolver for the comment field.
+func (r *someoneRepliedToYourCommentNotificationResolver) Comment(ctx context.Context, obj *model.SomeoneRepliedToYourCommentNotification) (*model.Comment, error) {
+	return resolveCommentByCommentID(ctx, obj.CommentID)
+}
+
+// OriginalComment is the resolver for the originalComment field.
+func (r *someoneRepliedToYourCommentNotificationResolver) OriginalComment(ctx context.Context, obj *model.SomeoneRepliedToYourCommentNotification) (*model.Comment, error) {
+	return resolveCommentByCommentID(ctx, obj.NotificationData.OriginalCommentID)
+}
+
 // UserViewers is the resolver for the userViewers field.
 func (r *someoneViewedYourGalleryNotificationResolver) UserViewers(ctx context.Context, obj *model.SomeoneViewedYourGalleryNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error) {
 	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.NotificationData.AuthedViewerIDs, before, after, first, last)
@@ -2950,6 +2997,21 @@ func (r *Resolver) SomeoneFollowedYouNotification() generated.SomeoneFollowedYou
 	return &someoneFollowedYouNotificationResolver{r}
 }
 
+// SomeoneMentionedYouNotification returns generated.SomeoneMentionedYouNotificationResolver implementation.
+func (r *Resolver) SomeoneMentionedYouNotification() generated.SomeoneMentionedYouNotificationResolver {
+	return &someoneMentionedYouNotificationResolver{r}
+}
+
+// SomeoneMentionedYourCommunityNotification returns generated.SomeoneMentionedYourCommunityNotificationResolver implementation.
+func (r *Resolver) SomeoneMentionedYourCommunityNotification() generated.SomeoneMentionedYourCommunityNotificationResolver {
+	return &someoneMentionedYourCommunityNotificationResolver{r}
+}
+
+// SomeoneRepliedToYourCommentNotification returns generated.SomeoneRepliedToYourCommentNotificationResolver implementation.
+func (r *Resolver) SomeoneRepliedToYourCommentNotification() generated.SomeoneRepliedToYourCommentNotificationResolver {
+	return &someoneRepliedToYourCommentNotificationResolver{r}
+}
+
 // SomeoneViewedYourGalleryNotification returns generated.SomeoneViewedYourGalleryNotificationResolver implementation.
 func (r *Resolver) SomeoneViewedYourGalleryNotification() generated.SomeoneViewedYourGalleryNotificationResolver {
 	return &someoneViewedYourGalleryNotificationResolver{r}
@@ -3044,6 +3106,9 @@ type someoneCommentedOnYourFeedEventNotificationResolver struct{ *Resolver }
 type someoneCommentedOnYourPostNotificationResolver struct{ *Resolver }
 type someoneFollowedYouBackNotificationResolver struct{ *Resolver }
 type someoneFollowedYouNotificationResolver struct{ *Resolver }
+type someoneMentionedYouNotificationResolver struct{ *Resolver }
+type someoneMentionedYourCommunityNotificationResolver struct{ *Resolver }
+type someoneRepliedToYourCommentNotificationResolver struct{ *Resolver }
 type someoneViewedYourGalleryNotificationResolver struct{ *Resolver }
 type subscriptionResolver struct{ *Resolver }
 type tokenResolver struct{ *Resolver }

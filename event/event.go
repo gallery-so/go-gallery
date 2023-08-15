@@ -61,6 +61,9 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 	sender.addDelayedHandler(notifications, persist.ActionViewedGallery, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionCommentedOnFeedEvent, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionCommentedOnPost, notificationHandler)
+	sender.addDelayedHandler(notifications, persist.ActionReplyToComment, notificationHandler)
+	sender.addDelayedHandler(notifications, persist.ActionMentionUser, notificationHandler)
+	sender.addDelayedHandler(notifications, persist.ActionMentionCommunity, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionNewTokensReceived, notificationHandler)
 
 	sender.feed = feed
@@ -457,6 +460,7 @@ func (h notificationHandler) handleDelayed(ctx context.Context, persistedEvent d
 		PostID:      persistedEvent.PostID,
 		CommentID:   persistedEvent.CommentID,
 		TokenID:     persistedEvent.TokenID,
+		ContractID:  persistedEvent.ContractID,
 	})
 }
 
@@ -482,6 +486,8 @@ func (h notificationHandler) createNotificationDataForEvent(event db.Event) (dat
 	case persist.ActionNewTokensReceived:
 		data.NewTokenID = event.Data.NewTokenID
 		data.NewTokenQuantity = event.Data.NewTokenQuantity
+	case persist.ActionReplyToComment:
+		data.OriginalCommentID = event.CommentID
 	default:
 		logger.For(nil).Debugf("no notification data for event: %s", event.Action)
 	}
@@ -497,6 +503,13 @@ func (h notificationHandler) findOwnerForNotificationFromEvent(event db.Event) (
 		}
 		return gallery.OwnerUserID, nil
 	case persist.ResourceTypeComment:
+		if event.Action == persist.ActionReplyToComment {
+			comment, err := h.dataloaders.CommentByCommentID.Load(event.CommentID)
+			if err != nil {
+				return "", err
+			}
+			return comment.ActorID, nil
+		}
 		if event.FeedEventID != "" {
 			feedEvent, err := h.dataloaders.FeedEventByFeedEventID.Load(event.FeedEventID)
 			if err != nil {
@@ -529,6 +542,19 @@ func (h notificationHandler) findOwnerForNotificationFromEvent(event db.Event) (
 		return event.SubjectID, nil
 	case persist.ResourceTypeToken:
 		return persist.DBID(event.ActorID.String), nil
+	case persist.ResourceTypeContract:
+		c, err := h.dataloaders.ContractByContractID.Load(event.ContractID)
+		if err != nil {
+			return "", err
+		}
+		u, err := h.dataloaders.UserByAddress.Load(db.GetUserByAddressBatchParams{
+			Address: c.Address,
+			Chain:   int32(c.Chain),
+		})
+		if err != nil {
+			return "", err
+		}
+		return u.ID, nil
 	}
 
 	return "", fmt.Errorf("no owner found for event: %s", event.Action)

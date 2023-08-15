@@ -106,6 +106,24 @@ type HelperNewTokensNotificationData struct {
 	NotificationData persist.NotificationData
 }
 
+type HelperSomeoneRepliedToYourCommentNotificationData struct {
+	OwnerID          persist.DBID
+	CommentID        persist.DBID
+	NotificationData persist.NotificationData
+}
+
+type HelperSomeoneMentionedYouNotificationData struct {
+	OwnerID   persist.DBID
+	PostID    *persist.DBID
+	CommentID *persist.DBID
+}
+type HelperSomeoneMentionedYourCommunityNotificationData struct {
+	OwnerID    persist.DBID
+	ContractID persist.DBID
+	PostID     *persist.DBID
+	CommentID  *persist.DBID
+}
+
 type HelperNotificationsConnectionData struct {
 	UserId persist.DBID
 }

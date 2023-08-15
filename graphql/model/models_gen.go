@@ -1496,6 +1496,11 @@ type MembershipTier struct {
 
 func (MembershipTier) IsNode() {}
 
+type MentionInput struct {
+	UserID      *persist.DBID `json:"userId"`
+	CommunityID *persist.DBID `json:"communityId"`
+}
+
 type MerchDiscountCode struct {
 	Code    string  `json:"code"`
 	TokenID *string `json:"tokenId"`
@@ -1957,6 +1962,46 @@ type SomeoneFollowedYouNotification struct {
 func (SomeoneFollowedYouNotification) IsNotification()        {}
 func (SomeoneFollowedYouNotification) IsNode()                {}
 func (SomeoneFollowedYouNotification) IsGroupedNotification() {}
+
+type SomeoneMentionedYouNotification struct {
+	HelperSomeoneMentionedYouNotificationData
+	Dbid         persist.DBID `json:"dbid"`
+	Seen         *bool        `json:"seen"`
+	CreationTime *time.Time   `json:"creationTime"`
+	UpdatedTime  *time.Time   `json:"updatedTime"`
+	Comment      *Comment     `json:"comment"`
+	Post         *Post        `json:"post"`
+}
+
+func (SomeoneMentionedYouNotification) IsNotification() {}
+func (SomeoneMentionedYouNotification) IsNode()         {}
+
+type SomeoneMentionedYourCommunityNotification struct {
+	HelperSomeoneMentionedYourCommunityNotificationData
+	Dbid         persist.DBID `json:"dbid"`
+	Seen         *bool        `json:"seen"`
+	CreationTime *time.Time   `json:"creationTime"`
+	UpdatedTime  *time.Time   `json:"updatedTime"`
+	Comment      *Comment     `json:"comment"`
+	Post         *Post        `json:"post"`
+	Community    *Community   `json:"community"`
+}
+
+func (SomeoneMentionedYourCommunityNotification) IsNotification() {}
+func (SomeoneMentionedYourCommunityNotification) IsNode()         {}
+
+type SomeoneRepliedToYourCommentNotification struct {
+	HelperSomeoneRepliedToYourCommentNotificationData
+	Dbid            persist.DBID `json:"dbid"`
+	Seen            *bool        `json:"seen"`
+	CreationTime    *time.Time   `json:"creationTime"`
+	UpdatedTime     *time.Time   `json:"updatedTime"`
+	Comment         *Comment     `json:"comment"`
+	OriginalComment *Comment     `json:"originalComment"`
+}
+
+func (SomeoneRepliedToYourCommentNotification) IsNotification() {}
+func (SomeoneRepliedToYourCommentNotification) IsNode()         {}
 
 type SomeoneViewedYourGalleryNotification struct {
 	HelperSomeoneViewedYourGalleryNotificationData
