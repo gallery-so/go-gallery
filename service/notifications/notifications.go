@@ -131,6 +131,7 @@ func New(queries *db.Queries, pub *pubsub.Client, taskClient *cloudtasks.Client,
 	notifDispatcher.AddHandler(persist.ActionCommentedOnPost, def)
 	notifDispatcher.AddHandler(persist.ActionReplyToComment, def)
 	notifDispatcher.AddHandler(persist.ActionMentionUser, def)
+	notifDispatcher.AddHandler(persist.ActionMentionCommunity, def)
 
 	// notification actions that are grouped by token id
 	notifDispatcher.AddHandler(persist.ActionNewTokensReceived, tokenIDGrouped)
@@ -779,7 +780,7 @@ func addNotification(ctx context.Context, notif db.Notification, queries *db.Que
 			FeedEvent: util.ToNullString(notif.FeedEventID.String(), true),
 			Post:      util.ToNullString(notif.PostID.String(), true),
 		})
-	case persist.ActionMentionUser, persist.ActionMentionCommunity:
+	case persist.ActionMentionUser:
 		return queries.CreateMentionUserNotification(ctx, db.CreateMentionUserNotificationParams{
 			ID:        id,
 			OwnerID:   notif.OwnerID,
@@ -789,6 +790,18 @@ func addNotification(ctx context.Context, notif db.Notification, queries *db.Que
 			FeedEvent: util.ToNullString(notif.FeedEventID.String(), true),
 			Post:      util.ToNullString(notif.PostID.String(), true),
 			Comment:   util.ToNullString(notif.CommentID.String(), true),
+		})
+	case persist.ActionMentionCommunity:
+		return queries.CreateContractNotification(ctx, db.CreateContractNotificationParams{
+			ID:         id,
+			OwnerID:    notif.OwnerID,
+			Action:     notif.Action,
+			Data:       notif.Data,
+			EventIds:   notif.EventIds,
+			FeedEvent:  util.ToNullString(notif.FeedEventID.String(), true),
+			Post:       util.ToNullString(notif.PostID.String(), true),
+			Comment:    util.ToNullString(notif.CommentID.String(), true),
+			ContractID: notif.ContractID,
 		})
 	default:
 		return db.Notification{}, fmt.Errorf("unknown notification action: %s", notif.Action)

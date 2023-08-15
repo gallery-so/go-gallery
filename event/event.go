@@ -435,14 +435,17 @@ func newNotificationHandler(notifiers *notifications.NotificationHandlers, disab
 }
 
 func (h notificationHandler) handleDelayed(ctx context.Context, persistedEvent db.Event) error {
-	owner, err := h.findOwnerForNotificationFromEvent(persistedEvent)
+	owner, err := h.findOwnerForNotificationFromEvent(ctx, persistedEvent)
 	if err != nil {
 		return err
 	}
 
+	if owner == "" {
+		return nil
+	}
+
 	// Don't notify the user on self events
 	if persist.DBID(persist.NullStrToStr(persistedEvent.ActorID)) == owner && persistedEvent.Action != persist.ActionNewTokensReceived {
-
 		return nil
 	}
 
@@ -495,7 +498,7 @@ func (h notificationHandler) createNotificationDataForEvent(event db.Event) (dat
 	return
 }
 
-func (h notificationHandler) findOwnerForNotificationFromEvent(event db.Event) (persist.DBID, error) {
+func (h notificationHandler) findOwnerForNotificationFromEvent(ctx context.Context, event db.Event) (persist.DBID, error) {
 	switch event.ResourceTypeID {
 	case persist.ResourceTypeGallery:
 		gallery, err := h.dataloaders.GalleryByGalleryID.Load(event.GalleryID)
@@ -549,11 +552,12 @@ func (h notificationHandler) findOwnerForNotificationFromEvent(event db.Event) (
 			return "", err
 		}
 		u, err := h.dataloaders.UserByAddress.Load(db.GetUserByAddressBatchParams{
-			Address: c.Address,
+			Address: c.OwnerAddress,
 			Chain:   int32(c.Chain),
 		})
 		if err != nil {
-			return "", err
+			logger.For(ctx).Warnf("error loading user by address: %s", err)
+			return "", nil
 		}
 		return u.ID, nil
 	}

@@ -1044,7 +1044,7 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 		return model.SomeoneMentionedYourCommunityNotification{
 			HelperSomeoneMentionedYourCommunityNotificationData: model.HelperSomeoneMentionedYourCommunityNotificationData{
 				OwnerID:    notif.OwnerID,
-				ContractID: notif.CommentID,
+				ContractID: notif.ContractID,
 				PostID:     postID,
 				CommentID:  commentID,
 			},
@@ -2015,8 +2015,8 @@ func communityToModel(ctx context.Context, community db.Contract, forceRefresh *
 
 	// TODO: Should this use CreatorAddress or OwnerAddress?
 	var creatorAddress *persist.ChainAddress
-	if community.CreatorAddress != "" {
-		chainAddress := persist.NewChainAddress(community.CreatorAddress, chain)
+	if community.OwnerAddress != "" {
+		chainAddress := persist.NewChainAddress(community.OwnerAddress, chain)
 		creatorAddress = &chainAddress
 	}
 
