@@ -107,6 +107,7 @@ func ethProviderSet(envInit, *cloudtasks.Client, *http.Client) ethProviderList {
 	wire.Build(
 		rpc.NewEthClient,
 		ethProvidersConfig,
+		newTokenProcessingCache,
 		wire.Value(persist.ChainETH),
 		// Add providers for Ethereum here
 		newIndexerProvider,
@@ -186,6 +187,7 @@ func optimismProviderSet(*http.Client) optimismProviderList {
 	wire.Build(
 		rpc.NewEthClient,
 		optimismProvidersConfig,
+		newTokenProcessingCache,
 		wire.Value(persist.ChainOptimism),
 		// Add providers for Optimism here
 		newOptimismProvider,
@@ -199,6 +201,7 @@ func optimismProvidersConfig(optimismProvider *optimismProvider, openseaProvier 
 	wire.Build(
 		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(optimismProvider)),
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(optimismProvider)),
+		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(optimismProvider)),
 		wire.Bind(new(multichain.OpenSeaChildContractFetcher), util.ToPointer(openseaProvier)),
 		optimismRequirements,
 	)
@@ -209,9 +212,10 @@ func optimismProvidersConfig(optimismProvider *optimismProvider, openseaProvier 
 func optimismRequirements(
 	tof multichain.TokensOwnerFetcher,
 	toc multichain.TokensContractFetcher,
+	tmf multichain.TokenMetadataFetcher,
 	opensea multichain.OpenSeaChildContractFetcher,
 ) optimismProviderList {
-	return optimismProviderList{tof, toc, opensea}
+	return optimismProviderList{tof, toc, tmf, opensea}
 }
 
 // arbitrumProviderSet is a wire injector that creates the set of Arbitrum providers
@@ -219,6 +223,7 @@ func arbitrumProviderSet(*http.Client) arbitrumProviderList {
 	wire.Build(
 		rpc.NewEthClient,
 		arbitrumProvidersConfig,
+		newTokenProcessingCache,
 		wire.Value(persist.ChainArbitrum),
 		// Add providers for Optimism here
 		newArbitrumProvider,
@@ -232,6 +237,7 @@ func arbitrumProvidersConfig(arbitrumProvider *arbitrumProvider, openseaProvider
 	wire.Build(
 		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(arbitrumProvider)),
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(arbitrumProvider)),
+		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(arbitrumProvider)),
 		wire.Bind(new(multichain.OpenSeaChildContractFetcher), util.ToPointer(openseaProvider)),
 		arbitrumRequirements,
 	)
@@ -242,9 +248,10 @@ func arbitrumProvidersConfig(arbitrumProvider *arbitrumProvider, openseaProvider
 func arbitrumRequirements(
 	tof multichain.TokensOwnerFetcher,
 	toc multichain.TokensContractFetcher,
+	tmf multichain.TokenMetadataFetcher,
 	opensea multichain.OpenSeaChildContractFetcher,
 ) arbitrumProviderList {
-	return arbitrumProviderList{tof, toc, opensea}
+	return arbitrumProviderList{tof, toc, tmf, opensea}
 }
 
 // poapProviderSet is a wire injector that creates the set of POAP providers
@@ -343,6 +350,7 @@ func polygonProviderSet(*http.Client) polygonProviderList {
 		rpc.NewEthClient,
 		polygonProvidersConfig,
 		wire.Value(persist.ChainPolygon),
+		newTokenProcessingCache,
 		// Add providers for Polygon here
 		newPolygonProvider,
 		opensea.NewProvider,
@@ -420,12 +428,12 @@ func defaultWalletOverrides() multichain.WalletOverrideMap {
 	}
 }
 
-func ethFallbackProvider(httpClient *http.Client) multichain.SyncFailureFallbackProvider {
+func ethFallbackProvider(httpClient *http.Client, r *redis.Cache) multichain.SyncFailureFallbackProvider {
 	wire.Build(
 		alchemy.NewProvider,
 		infura.NewProvider,
 		wire.Value(persist.ChainETH),
-		wire.Bind(new(multichain.SyncFailurePrimary), util.ToPointer(alchemy.NewProvider(persist.ChainETH, httpClient))),
+		wire.Bind(new(multichain.SyncFailurePrimary), util.ToPointer(alchemy.NewProvider(persist.ChainETH, httpClient, r))),
 		wire.Bind(new(multichain.SyncFailureSecondary), util.ToPointer(infura.NewProvider(httpClient))),
 		wire.Struct(new(multichain.SyncFailureFallbackProvider), "*"),
 	)
@@ -468,20 +476,24 @@ func newZoraProvider(e envInit, c *http.Client) *zora.Provider {
 	return zora.NewProvider(c)
 }
 
-func newOptimismProvider(c *http.Client) *optimismProvider {
-	return &optimismProvider{alchemy.NewProvider(persist.ChainOptimism, c)}
+func newOptimismProvider(c *http.Client, r *redis.Cache) *optimismProvider {
+	return &optimismProvider{alchemy.NewProvider(persist.ChainOptimism, c, r)}
 }
 
-func newPolygonProvider(c *http.Client) *polygonProvider {
-	return &polygonProvider{alchemy.NewProvider(persist.ChainPolygon, c)}
+func newPolygonProvider(c *http.Client, r *redis.Cache) *polygonProvider {
+	return &polygonProvider{alchemy.NewProvider(persist.ChainPolygon, c, r)}
 }
 
-func newArbitrumProvider(c *http.Client) *arbitrumProvider {
-	return &arbitrumProvider{alchemy.NewProvider(persist.ChainArbitrum, c)}
+func newArbitrumProvider(c *http.Client, r *redis.Cache) *arbitrumProvider {
+	return &arbitrumProvider{alchemy.NewProvider(persist.ChainArbitrum, c, r)}
 }
 
 func newCommunitiesCache() *redis.Cache {
 	return redis.NewCache(redis.CommunitiesCache)
+}
+
+func newTokenProcessingCache() *redis.Cache {
+	return redis.NewCache(redis.TokenProcessingMetadataCache)
 }
 
 func newSendTokensFunc(ctx context.Context, taskClient *cloudtasks.Client) multichain.SendTokens {

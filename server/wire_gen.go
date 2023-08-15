@@ -80,8 +80,9 @@ func ethProviderSet(serverEnvInit envInit, client *cloudtasks.Client, httpClient
 	provider := newIndexerProvider(serverEnvInit, httpClient, ethclientClient, client)
 	chain := _wireChainValue
 	openseaProvider := opensea.NewProvider(ethclientClient, httpClient, chain)
-	syncFailureFallbackProvider := ethFallbackProvider(httpClient)
-	alchemyProvider := alchemy.NewProvider(chain, httpClient)
+	cache := newTokenProcessingCache()
+	syncFailureFallbackProvider := ethFallbackProvider(httpClient, cache)
+	alchemyProvider := alchemy.NewProvider(chain, httpClient, cache)
 	serverEthProviderList := ethProvidersConfig(provider, openseaProvider, syncFailureFallbackProvider, alchemyProvider)
 	return serverEthProviderList
 }
@@ -113,7 +114,8 @@ func tezosProvidersConfig(tezosProvider multichain.SyncWithContractEvalFallbackP
 
 // optimismProviderSet is a wire injector that creates the set of Optimism providers
 func optimismProviderSet(client *http.Client) optimismProviderList {
-	serverOptimismProvider := newOptimismProvider(client)
+	cache := newTokenProcessingCache()
+	serverOptimismProvider := newOptimismProvider(client, cache)
 	ethclientClient := rpc.NewEthClient()
 	chain := _wirePersistChainValue
 	provider := opensea.NewProvider(ethclientClient, client, chain)
@@ -127,13 +129,14 @@ var (
 
 // optimismProvidersConfig is a wire injector that binds multichain interfaces to their concrete Optimism implementations
 func optimismProvidersConfig(optimismProvider2 *optimismProvider, openseaProvier *opensea.Provider) optimismProviderList {
-	serverOptimismProviderList := optimismRequirements(optimismProvider2, optimismProvider2, openseaProvier)
+	serverOptimismProviderList := optimismRequirements(optimismProvider2, optimismProvider2, optimismProvider2, openseaProvier)
 	return serverOptimismProviderList
 }
 
 // arbitrumProviderSet is a wire injector that creates the set of Arbitrum providers
 func arbitrumProviderSet(client *http.Client) arbitrumProviderList {
-	serverArbitrumProvider := newArbitrumProvider(client)
+	cache := newTokenProcessingCache()
+	serverArbitrumProvider := newArbitrumProvider(client, cache)
 	ethclientClient := rpc.NewEthClient()
 	chain := _wireChainValue2
 	provider := opensea.NewProvider(ethclientClient, client, chain)
@@ -147,7 +150,7 @@ var (
 
 // arbitrumProvidersConfig is a wire injector that binds multichain interfaces to their concrete Arbitrum implementations
 func arbitrumProvidersConfig(arbitrumProvider2 *arbitrumProvider, openseaProvider *opensea.Provider) arbitrumProviderList {
-	serverArbitrumProviderList := arbitrumRequirements(arbitrumProvider2, arbitrumProvider2, openseaProvider)
+	serverArbitrumProviderList := arbitrumRequirements(arbitrumProvider2, arbitrumProvider2, arbitrumProvider2, openseaProvider)
 	return serverArbitrumProviderList
 }
 
@@ -196,7 +199,8 @@ func baseProvidersConfig(baseProvider *reservoir.Provider) baseProviderList {
 
 // polygonProviderSet is a wire injector that creates the set of polygon providers
 func polygonProviderSet(client *http.Client) polygonProviderList {
-	serverPolygonProvider := newPolygonProvider(client)
+	cache := newTokenProcessingCache()
+	serverPolygonProvider := newPolygonProvider(client, cache)
 	ethclientClient := rpc.NewEthClient()
 	chain := _wireChainValue4
 	provider := opensea.NewProvider(ethclientClient, client, chain)
@@ -214,9 +218,9 @@ func polygonProvidersConfig(polygonProvider2 *polygonProvider, openseaProvider *
 	return serverPolygonProviderList
 }
 
-func ethFallbackProvider(httpClient *http.Client) multichain.SyncFailureFallbackProvider {
+func ethFallbackProvider(httpClient *http.Client, r *redis.Cache) multichain.SyncFailureFallbackProvider {
 	chain := _wireChainValue5
-	provider := alchemy.NewProvider(chain, httpClient)
+	provider := alchemy.NewProvider(chain, httpClient, r)
 	infuraProvider := infura.NewProvider(httpClient)
 	syncFailureFallbackProvider := multichain.SyncFailureFallbackProvider{
 		Primary:  provider,
@@ -321,19 +325,21 @@ func tezosRequirements(
 // optimismRequirements is the set of provider interfaces required for Optimism
 func optimismRequirements(
 	tof multichain.TokensOwnerFetcher,
-	toc multichain.TokensContractFetcher, opensea2 multichain.OpenSeaChildContractFetcher,
+	toc multichain.TokensContractFetcher,
+	tmf multichain.TokenMetadataFetcher, opensea2 multichain.OpenSeaChildContractFetcher,
 
 ) optimismProviderList {
-	return optimismProviderList{tof, toc, opensea2}
+	return optimismProviderList{tof, toc, tmf, opensea2}
 }
 
 // arbitrumRequirements is the set of provider interfaces required for Arbitrum
 func arbitrumRequirements(
 	tof multichain.TokensOwnerFetcher,
-	toc multichain.TokensContractFetcher, opensea2 multichain.OpenSeaChildContractFetcher,
+	toc multichain.TokensContractFetcher,
+	tmf multichain.TokenMetadataFetcher, opensea2 multichain.OpenSeaChildContractFetcher,
 
 ) arbitrumProviderList {
-	return arbitrumProviderList{tof, toc, opensea2}
+	return arbitrumProviderList{tof, toc, tmf, opensea2}
 }
 
 // poapRequirements is the set of provider interfaces required for POAP
@@ -439,20 +445,24 @@ func newZoraProvider(e envInit, c *http.Client) *zora.Provider {
 	return zora.NewProvider(c)
 }
 
-func newOptimismProvider(c *http.Client) *optimismProvider {
-	return &optimismProvider{alchemy.NewProvider(persist.ChainOptimism, c)}
+func newOptimismProvider(c *http.Client, r *redis.Cache) *optimismProvider {
+	return &optimismProvider{alchemy.NewProvider(persist.ChainOptimism, c, r)}
 }
 
-func newPolygonProvider(c *http.Client) *polygonProvider {
-	return &polygonProvider{alchemy.NewProvider(persist.ChainPolygon, c)}
+func newPolygonProvider(c *http.Client, r *redis.Cache) *polygonProvider {
+	return &polygonProvider{alchemy.NewProvider(persist.ChainPolygon, c, r)}
 }
 
-func newArbitrumProvider(c *http.Client) *arbitrumProvider {
-	return &arbitrumProvider{alchemy.NewProvider(persist.ChainArbitrum, c)}
+func newArbitrumProvider(c *http.Client, r *redis.Cache) *arbitrumProvider {
+	return &arbitrumProvider{alchemy.NewProvider(persist.ChainArbitrum, c, r)}
 }
 
 func newCommunitiesCache() *redis.Cache {
 	return redis.NewCache(redis.CommunitiesCache)
+}
+
+func newTokenProcessingCache() *redis.Cache {
+	return redis.NewCache(redis.TokenProcessingMetadataCache)
 }
 
 func newSendTokensFunc(ctx context.Context, taskClient *cloudtasks.Client) multichain.SendTokens {
