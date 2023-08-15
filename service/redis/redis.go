@@ -27,17 +27,17 @@ type CacheConfig struct {
 }
 
 const (
-	locks                   redisDB = 0
-	rateLimiters            redisDB = 1
-	communities             redisDB = 2
-	misc                    redisDB = 3
-	indexerServerThrottle   redisDB = 6
-	refreshNFTsThrottle     redisDB = 7
-	tokenProcessingThrottle redisDB = 8
-	emailThrottle           redisDB = 9
-	graphQLAPQ              redisDB = 12
-	feed                    redisDB = 13
-	social                  redisDB = 14
+	locks                 redisDB = 0
+	rateLimiters          redisDB = 1
+	communities           redisDB = 2
+	misc                  redisDB = 3
+	indexerServerThrottle redisDB = 6
+	refreshNFTsThrottle   redisDB = 7
+	tokenProcessing       redisDB = 8
+	emailThrottle         redisDB = 9
+	graphQLAPQ            redisDB = 12
+	feed                  redisDB = 13
+	social                redisDB = 14
 )
 
 // Every cache is uniquely defined by its database and key prefix. Display names are used for tracing.
@@ -51,7 +51,8 @@ var (
 	CommunitiesCache                  = CacheConfig{database: communities, keyPrefix: "", displayName: "communities"}
 	IndexerServerThrottleCache        = CacheConfig{database: indexerServerThrottle, keyPrefix: "", displayName: "indexerServerThrottle"}
 	RefreshNFTsThrottleCache          = CacheConfig{database: refreshNFTsThrottle, keyPrefix: "", displayName: "refreshNFTsThrottle"}
-	TokenProcessingThrottleCache      = CacheConfig{database: tokenProcessingThrottle, keyPrefix: "", displayName: "tokenProcessingThrottle"}
+	TokenProcessingThrottleCache      = CacheConfig{database: tokenProcessing, keyPrefix: "throttle", displayName: "tokenProcessingThrottle"}
+	TokenProcessingMetadataCache      = CacheConfig{database: tokenProcessing, keyPrefix: "metadata", displayName: "tokenProcessingMetadata"}
 	EmailThrottleCache                = CacheConfig{database: emailThrottle, keyPrefix: "", displayName: "emailThrottle"}
 	GraphQLAPQCache                   = CacheConfig{database: graphQLAPQ, keyPrefix: "", displayName: "graphQLAPQ"}
 	FeedCache                         = CacheConfig{database: feed, keyPrefix: "", displayName: "feed"}
