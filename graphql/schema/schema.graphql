@@ -2398,7 +2398,7 @@ union AdmirePostPayloadOrError = AdmirePostPayload | ErrInvalidInput | ErrNotAut
 
 type AdmireTokenPayload {
   viewer: Viewer
-  token: Token
+  token: Token @goField(forceResolver: true)
   admire: Admire @goField(forceResolver: true)
 }
 
@@ -2492,7 +2492,7 @@ type Mutation {
   ): FollowAllSocialConnectionsPayloadOrError @authRequired
   unfollowUser(userId: DBID!): UnfollowUserPayloadOrError @authRequired
 
-  admireToken(tokenID: DBID!, collectionID: DBID!): AdmireTokenPayloadOrError @authRequired
+  admireToken(tokenID: DBID!): AdmireTokenPayloadOrError @authRequired
 
   admireFeedEvent(feedEventId: DBID!): AdmireFeedEventPayloadOrError @authRequired
   admirePost(postId: DBID!): AdmirePostPayloadOrError @authRequired

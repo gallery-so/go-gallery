@@ -600,7 +600,7 @@ func (api InteractionAPI) GetAdmireByActorIDAndPostID(ctx context.Context, actor
 	return &admire, nil
 }
 
-func (api InteractionAPI) GetAdmireByActorIDAndTokenID(ctx context.Context, actorID persist.DBID, tokenID persist.DBID, ownerID persist.DBID) (*db.Admire, error) {
+func (api InteractionAPI) GetAdmireByActorIDAndTokenID(ctx context.Context, actorID persist.DBID, tokenID persist.DBI) (*db.Admire, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"actorID": validate.WithTag(actorID, "required"),
@@ -612,7 +612,6 @@ func (api InteractionAPI) GetAdmireByActorIDAndTokenID(ctx context.Context, acto
 	admire, err := api.loaders.AdmireByActorIDAndTokenID.Load(db.GetAdmireByActorIDAndTokenIDParams{
 		ActorID: actorID,
 		TokenID: tokenID,
-		OwnerID: ownerID,
 	})
 
 	if err != nil {
@@ -661,7 +660,7 @@ func (api InteractionAPI) AdmireFeedEvent(ctx context.Context, feedEventID persi
 		return "", err
 	}
 
-	admireID, err := api.repos.AdmireRepository.CreateAdmire(ctx, feedEventID, "", "", "", userID)
+	admireID, err := api.repos.AdmireRepository.CreateAdmire(ctx, feedEventID, "", userID)
 	if err != nil {
 		return "", err
 	}
@@ -681,11 +680,9 @@ func (api InteractionAPI) AdmireFeedEvent(ctx context.Context, feedEventID persi
 	return admireID, err
 }
 
-func (api InteractionAPI) AdmireToken(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID, ownerID persist.DBID) (persist.DBID, error) {
+func (api InteractionAPI) AdmireToken(ctx context.Context, tokenID persist.DBID) (persist.DBID, error) {
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"tokenID":      validate.WithTag(tokenID, "required"),
-		"collectionID": validate.WithTag(collectionID, "required"),
-		"ownerID":      validate.WithTag(ownerID, "required"),
 	}); err != nil {
 		return "", err
 	}
@@ -700,12 +697,7 @@ func (api InteractionAPI) AdmireToken(ctx context.Context, tokenID persist.DBID,
 		return "", err
 	}
 
-	currCol, err := api.queries.GetCollectionById(ctx, collectionID)
-	if err != nil {
-		return "", err
-	}
-
-	admire, err := api.GetAdmireByActorIDAndTokenID(ctx, userID, tokenID, ownerID)
+	admire, err := api.GetAdmireByActorIDAndTokenID(ctx, userID, tokenID)
 	if err == nil {
 		return "", persist.ErrAdmireAlreadyExists{AdmireID: admire.ID, ActorID: userID, TokenID: tokenID}
 	}
@@ -715,7 +707,7 @@ func (api InteractionAPI) AdmireToken(ctx context.Context, tokenID persist.DBID,
 		return "", err
 	}
 
-	admireID, err := api.repos.AdmireRepository.CreateAdmire(ctx, "", "", tokenID, ownerID, userID)
+	admireID, err := api.repos.AdmireRepository.CreateAdmire(ctx, "", "", tokenID, userID)
 	if err != nil {
 		return "", err
 	}
@@ -726,8 +718,6 @@ func (api InteractionAPI) AdmireToken(ctx context.Context, tokenID persist.DBID,
 		SubjectID:      tokenID,
 		TokenID:        tokenID,
 		AdmireID:       admireID,
-		CollectionID:   collectionID,
-		GalleryID:      currCol.GalleryID,
 		Action:         persist.ActionAdmiredToken,
 	}, api.validator, nil)
 	if err != nil {
@@ -760,7 +750,7 @@ func (api InteractionAPI) AdmirePost(ctx context.Context, postID persist.DBID) (
 		return "", err
 	}
 
-	admireID, err := api.repos.AdmireRepository.CreateAdmire(ctx, "", postID, "", "", userID)
+	admireID, err := api.repos.AdmireRepository.CreateAdmire(ctx, "", postID, "", userID)
 	if err != nil {
 		return "", err
 	}
