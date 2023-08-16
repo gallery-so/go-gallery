@@ -176,7 +176,7 @@ func (api FeedAPI) GetRawEventById(ctx context.Context, eventID persist.DBID) (*
 	return &event, nil
 }
 
-func (api FeedAPI) PersonalFeed(ctx context.Context, before *string, after *string, first *int, last *int) ([]any, PageInfo, error) {
+func (api FeedAPI) PersonalFeed(ctx context.Context, before *string, after *string, first *int, last *int, includePosts bool) ([]any, PageInfo, error) {
 	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return nil, PageInfo{}, err
@@ -193,15 +193,22 @@ func (api FeedAPI) PersonalFeed(ctx context.Context, before *string, after *stri
 		return nil, PageInfo{}, err
 	}
 
+	// Include posts for admins always during the soft launch
+	if !includePosts {
+		includePosts = shouldShowPosts(ctx)
+	}
+
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
 		keys, err := api.queries.PaginatePersonalFeedByUserID(ctx, db.PaginatePersonalFeedByUserIDParams{
-			Follower:      userID,
-			Limit:         params.Limit,
-			CurBeforeTime: params.CursorBeforeTime,
-			CurBeforeID:   params.CursorBeforeID,
-			CurAfterTime:  params.CursorAfterTime,
-			CurAfterID:    params.CursorAfterID,
-			PagingForward: params.PagingForward,
+			Follower:       userID,
+			Limit:          params.Limit,
+			CurBeforeTime:  params.CursorBeforeTime,
+			CurBeforeID:    params.CursorBeforeID,
+			CurAfterTime:   params.CursorAfterTime,
+			CurAfterID:     params.CursorAfterID,
+			PagingForward:  params.PagingForward,
+			IncludePosts:   includePosts,
+			PostEntityType: int32(persist.PostTypeTag),
 		})
 
 		if err != nil {

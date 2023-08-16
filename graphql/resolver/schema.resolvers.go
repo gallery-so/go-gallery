@@ -2708,8 +2708,8 @@ func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer)
 }
 
 // Feed is the resolver for the feed field.
-func (r *viewerResolver) Feed(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
-	events, pageInfo, err := publicapi.For(ctx).Feed.PersonalFeed(ctx, before, after, first, last)
+func (r *viewerResolver) Feed(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int, includePosts bool) (*model.FeedConnection, error) {
+	events, pageInfo, err := publicapi.For(ctx).Feed.PersonalFeed(ctx, before, after, first, last, includePosts)
 	if err != nil {
 		return nil, err
 	}
