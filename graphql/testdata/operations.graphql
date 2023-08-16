@@ -567,8 +567,8 @@ mutation updateSocialAccountDisplayed($input: UpdateSocialAccountDisplayedInput!
   }
 }
 
-mutation admireTokenMutation($tokenID: DBID!, $collectionID: DBID!) {
-  admireToken(tokenID: $tokenID, collectionID: $collectionID) {
+mutation admireTokenMutation($tokenID: DBID!) {
+  admireToken(tokenID: $tokenID) {
     ... on Error {
       __typename
       message

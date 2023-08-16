@@ -2405,7 +2405,6 @@ type AdmireTokenPayload {
 union AdmireTokenPayloadOrError =
     AdmireTokenPayload
   | ErrTokenNotFound
-  | ErrCollectionNotFound
   | ErrNotAuthorized
 
 type CommentOnPostPayload {

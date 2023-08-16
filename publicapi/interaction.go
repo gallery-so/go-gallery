@@ -600,27 +600,6 @@ func (api InteractionAPI) GetAdmireByActorIDAndPostID(ctx context.Context, actor
 	return &admire, nil
 }
 
-func (api InteractionAPI) GetAdmireByActorIDAndTokenID(ctx context.Context, actorID persist.DBID, tokenID persist.DBI) (*db.Admire, error) {
-	// Validate
-	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"actorID": validate.WithTag(actorID, "required"),
-		"tokenID": validate.WithTag(tokenID, "required"),
-	}); err != nil {
-		return nil, err
-	}
-
-	admire, err := api.loaders.AdmireByActorIDAndTokenID.Load(db.GetAdmireByActorIDAndTokenIDParams{
-		ActorID: actorID,
-		TokenID: tokenID,
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &admire, nil
-}
-
 func (api InteractionAPI) GetAdmireByID(ctx context.Context, admireID persist.DBID) (*db.Admire, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
@@ -660,7 +639,7 @@ func (api InteractionAPI) AdmireFeedEvent(ctx context.Context, feedEventID persi
 		return "", err
 	}
 
-	admireID, err := api.repos.AdmireRepository.CreateAdmire(ctx, feedEventID, "", userID)
+	admireID, err := api.repos.AdmireRepository.CreateAdmire(ctx, feedEventID, "", "", userID)
 	if err != nil {
 		return "", err
 	}
@@ -697,10 +676,12 @@ func (api InteractionAPI) AdmireToken(ctx context.Context, tokenID persist.DBID)
 		return "", err
 	}
 
+	/*
 	admire, err := api.GetAdmireByActorIDAndTokenID(ctx, userID, tokenID)
 	if err == nil {
 		return "", persist.ErrAdmireAlreadyExists{AdmireID: admire.ID, ActorID: userID, TokenID: tokenID}
 	}
+	*/
 
 	notFoundErr := persist.ErrAdmireNotFound{}
 	if !errors.As(err, &notFoundErr) {
@@ -712,6 +693,7 @@ func (api InteractionAPI) AdmireToken(ctx context.Context, tokenID persist.DBID)
 		return "", err
 	}
 
+	/*
 	_, err = event.DispatchEvent(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		ResourceTypeID: persist.ResourceTypeAdmire,
@@ -723,6 +705,7 @@ func (api InteractionAPI) AdmireToken(ctx context.Context, tokenID persist.DBID)
 	if err != nil {
 		return "", err
 	}
+	*/
 
 	return admireID, err
 }
