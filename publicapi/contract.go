@@ -330,8 +330,8 @@ func (api ContractAPI) GetCommunityPostsByContractID(ctx context.Context, contra
 
 	posts := make([]db.Post, len(results))
 	for i, result := range results {
-		if owner, ok := result.(db.Post); ok {
-			posts[i] = owner
+		if post, ok := result.(db.Post); ok {
+			posts[i] = post
 		}
 	}
 

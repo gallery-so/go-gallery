@@ -1509,7 +1509,7 @@ type ComplexityRoot struct {
 
 	Viewer struct {
 		Email                func(childComplexity int) int
-		Feed                 func(childComplexity int, before *string, after *string, first *int, last *int) int
+		Feed                 func(childComplexity int, before *string, after *string, first *int, last *int, includePosts bool) int
 		ID                   func(childComplexity int) int
 		NotificationSettings func(childComplexity int) int
 		Notifications        func(childComplexity int, before *string, after *string, first *int, last *int) int
@@ -1894,7 +1894,7 @@ type ViewerResolver interface {
 	User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error)
 	SocialAccounts(ctx context.Context, obj *model.Viewer) (*model.SocialAccounts, error)
 	ViewerGalleries(ctx context.Context, obj *model.Viewer) ([]*model.ViewerGallery, error)
-	Feed(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
+	Feed(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int, includePosts bool) (*model.FeedConnection, error)
 	Email(ctx context.Context, obj *model.Viewer) (*model.UserEmail, error)
 	Notifications(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.NotificationsConnection, error)
 	NotificationSettings(ctx context.Context, obj *model.Viewer) (*model.NotificationSettings, error)
@@ -7862,7 +7862,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Viewer.Feed(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
+		return e.complexity.Viewer.Feed(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int), args["includePosts"].(bool)), true
 
 	case "Viewer.id":
 		if e.complexity.Viewer.ID == nil {
@@ -8806,7 +8806,7 @@ type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
   user: GalleryUser @goField(forceResolver: true)
   socialAccounts: SocialAccounts @goField(forceResolver: true)
   viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
-  feed(before: String, after: String, first: Int, last: Int): FeedConnection
+  feed(before: String, after: String, first: Int, last: Int, includePosts: Boolean! = false): FeedConnection
     @goField(forceResolver: true)
 
   email: UserEmail @goField(forceResolver: true)
@@ -13770,6 +13770,15 @@ func (ec *executionContext) field_Viewer_feed_args(ctx context.Context, rawArgs 
 		}
 	}
 	args["last"] = arg3
+	var arg4 bool
+	if tmp, ok := rawArgs["includePosts"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("includePosts"))
+		arg4, err = ec.unmarshalNBoolean2bool(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["includePosts"] = arg4
 	return args, nil
 }
 
@@ -54483,7 +54492,7 @@ func (ec *executionContext) _Viewer_feed(ctx context.Context, field graphql.Coll
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Viewer().Feed(rctx, obj, fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
+		return ec.resolvers.Viewer().Feed(rctx, obj, fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int), fc.Args["includePosts"].(bool))
 	})
 	if err != nil {
 		ec.Error(ctx, err)

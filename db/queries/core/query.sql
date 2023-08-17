@@ -417,6 +417,7 @@ select fe.* from feed_entities fe, follows fl
       and fl.follower = sqlc.arg('follower')
       and (fe.created_at, fe.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
       and (fe.created_at, fe.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+      and (@include_posts::bool or feed_entity_type != @post_entity_type)
 order by
     case when sqlc.arg('paging_forward')::bool then (fe.created_at, fe.id) end asc,
     case when not sqlc.arg('paging_forward')::bool then (fe.created_at, fe.id) end desc

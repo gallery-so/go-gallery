@@ -61,6 +61,102 @@ func validatePaginationParams(validator *validator.Validate, first *int, last *i
 	return nil
 }
 
+func pageFrom[T any](allEdges []T, countF func() (int, error), cursorF func(T) (string, error), before, after *string, first, last *int) ([]T, PageInfo, error) {
+	cursorEdges, err := applyCursors(allEdges, cursorF, before, after)
+	if err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	edgesPaged, err := pageEdgesFrom(cursorEdges, cursorF, before, after, first, last)
+	if err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	pageInfo, err := pageInfoFrom(cursorEdges, edgesPaged, countF, cursorF, before, after, first, last)
+	return edgesPaged, pageInfo, err
+}
+
+func pageInfoFrom[T any](cursorEdges, edgesPaged []T, countF func() (int, error), cursorF func(T) (string, error), before, after *string, first, last *int) (pageInfo PageInfo, err error) {
+	if len(edgesPaged) > 0 {
+		firstNode := edgesPaged[0]
+		lastNode := edgesPaged[len(edgesPaged)-1]
+
+		pageInfo.StartCursor, err = cursorF(firstNode)
+		if err != nil {
+			return PageInfo{}, err
+		}
+
+		pageInfo.EndCursor, err = cursorF(lastNode)
+		if err != nil {
+			return PageInfo{}, err
+		}
+	}
+
+	if last != nil {
+		pageInfo.HasPreviousPage = len(cursorEdges) > *last
+	}
+
+	if first != nil {
+		pageInfo.HasNextPage = len(cursorEdges) > *first
+	}
+
+	if countF != nil {
+		total, err := countF()
+		if err != nil {
+			return PageInfo{}, err
+		}
+		pageInfo.Total = &total
+	}
+
+	pageInfo.Size = len(edgesPaged)
+
+	return pageInfo, nil
+}
+
+func pageEdgesFrom[T any](edges []T, cursorF func(T) (string, error), before, after *string, first, last *int) ([]T, error) {
+	if first != nil && len(edges) > *first {
+		return edges[:*first], nil
+	}
+
+	if last != nil && len(edges) > *last {
+		return edges[len(edges)-*last:], nil
+	}
+
+	return edges, nil
+}
+
+func applyCursors[T any](allEdges []T, cursorF func(T) (string, error), before, after *string) ([]T, error) {
+	edges := append([]T{}, allEdges...)
+
+	if after != nil {
+		for i, edge := range edges {
+			cur, err := cursorF(edge)
+			if err != nil {
+				return nil, err
+			}
+			if cur == *after {
+				edges = edges[i+1:]
+				break
+			}
+		}
+	}
+
+	if before != nil {
+		for i, edge := range edges {
+			cur, err := cursorF(edge)
+			if err != nil {
+				return nil, err
+			}
+			if cur == *before {
+				edges = edges[:i]
+				break
+			}
+		}
+	}
+
+	return edges, nil
+}
+
 // keysetPaginator is the base keyset pagination struct. You probably don't want to use this directly;
 // use a cursor-specific helper like timeIDPaginator.
 // For reasons to favor keyset pagination, see: https://www.citusdata.com/blog/2016/03/30/five-ways-to-paginate/
@@ -88,22 +184,8 @@ func (p *keysetPaginator) paginate(before *string, after *string, first *int, la
 	// Either first or last will be supplied (but not both). If first isn't nil, we're paging forward!
 	pagingForward := first != nil
 	results, err := p.QueryFunc(int32(limit), pagingForward)
-
 	if err != nil {
 		return nil, PageInfo{}, err
-	}
-
-	pageInfo := PageInfo{}
-
-	// We requested 1 more result than the caller asked for. If we got that extra element, remove it
-	// from our results and set HasNextPage to true.
-	if len(results) == limit {
-		results = results[:len(results)-1]
-		if first != nil {
-			pageInfo.HasNextPage = true
-		} else {
-			pageInfo.HasPreviousPage = true
-		}
 	}
 
 	// Reverse the slice if we're paginating backward. Keyset pagination requires our SQL queries to
@@ -116,34 +198,7 @@ func (p *keysetPaginator) paginate(before *string, after *string, first *int, la
 		}
 	}
 
-	// If a count function is supplied, fill in pageInfo.Total
-	if p.CountFunc != nil {
-		total, err := p.CountFunc()
-		if err != nil {
-			return nil, PageInfo{}, err
-		}
-		pageInfo.Total = &total
-	}
-
-	pageInfo.Size = len(results)
-
-	// If there are any results, encode start and end cursors
-	if len(results) > 0 {
-		firstNode := results[0]
-		lastNode := results[len(results)-1]
-
-		pageInfo.StartCursor, err = p.CursorFunc(firstNode)
-		if err != nil {
-			return nil, PageInfo{}, err
-		}
-
-		pageInfo.EndCursor, err = p.CursorFunc(lastNode)
-		if err != nil {
-			return nil, PageInfo{}, err
-		}
-	}
-
-	return results, pageInfo, err
+	return pageFrom(results, p.CountFunc, p.CursorFunc, before, after, first, last)
 }
 
 // timeIDPaginator paginates results using a cursor with a time.Time and a persist.DBID.
