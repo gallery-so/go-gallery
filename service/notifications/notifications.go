@@ -597,6 +597,8 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 			name = to.Name.String
 		}
 
+		name = util.TruncateWithEllipsis(name, 20)
+
 		if err := limiter.tryTokens(ctx, notif.OwnerID, notif.Data.NewTokenID); err != nil {
 			return task.PushNotificationMessage{}, err
 		}
