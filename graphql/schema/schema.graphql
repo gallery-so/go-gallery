@@ -2516,6 +2516,7 @@ type Mutation {
 
   admireFeedEvent(feedEventId: DBID!): AdmireFeedEventPayloadOrError @authRequired
   admirePost(postId: DBID!): AdmirePostPayloadOrError @authRequired
+  admireToken(tokenId: DBID!): AdmireTokenPayloadOrError @authRequired
   removeAdmire(admireId: DBID!): RemoveAdmirePayloadOrError @authRequired
   commentOnFeedEvent(
     feedEventId: DBID!

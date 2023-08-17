@@ -691,17 +691,19 @@ check later if admire already exists
 		return "", err
 	}
 
+	/*
+	   skip dispatching this event for now
 	_, err = event.DispatchEvent(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		ResourceTypeID: persist.ResourceTypeAdmire,
 		SubjectID:      tokenID,
 		TokenID:        tokenID,
 		AdmireID:       admireID,
-		Action:         persist.ActionAdmiredPost,
+		Action:         persist.ActionAdmiredToken,
 	}, api.validator, nil)
 	if err != nil {
 		return "", err
-	}
+	}*/
 
 	return admireID, err
 }
