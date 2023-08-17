@@ -1750,17 +1750,21 @@ func admireToModel(ctx context.Context, admire db.Admire) *model.Admire {
 // commentToModel converts a db.Admire to a model.Admire
 func commentToModel(ctx context.Context, comment db.Comment) *model.Comment {
 
-	var postID, feedEventID *persist.DBID
+	var postID, feedEventID, replyToID *persist.DBID
 	if comment.PostID != "" {
 		postID = &comment.PostID
 	}
 	if comment.FeedEventID != "" {
 		feedEventID = &comment.FeedEventID
 	}
+	if comment.ReplyTo != "" {
+		replyToID = &comment.ReplyTo
+	}
 	return &model.Comment{
 		HelperCommentData: model.HelperCommentData{
 			PostID:      postID,
 			FeedEventID: feedEventID,
+			ReplyToID:   replyToID,
 		},
 		Dbid:         comment.ID,
 		CreationTime: &comment.CreatedAt,

@@ -312,6 +312,8 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 
 	loaders.RepliesByCommentID = NewRepliesLoader(defaults, loadRepliesByCommentID(q))
 
+	loaders.RepliesCountByCommentID = NewIntLoaderByID(defaults, loadReplyCountByCommentID(q), IntLoaderByIDCacheSubscriptions{})
+
 	loaders.InteractionCountByFeedEventID = NewFeedEventInteractionCountLoader(defaults, loadInteractionCountByFeedEventID(q))
 
 	loaders.InteractionsByFeedEventID = NewFeedEventInteractionsLoader(defaults, loadInteractionsByFeedEventID(q))

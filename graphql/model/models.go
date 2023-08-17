@@ -61,6 +61,7 @@ type HelperGalleryUserData struct {
 type HelperCommentData struct {
 	PostID      *persist.DBID
 	FeedEventID *persist.DBID
+	ReplyToID   *persist.DBID
 }
 
 type HelperAdmireData struct {

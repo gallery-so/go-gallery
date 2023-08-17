@@ -164,7 +164,10 @@ func (r *collectorsNoteAddedToTokenFeedEventDataResolver) Token(ctx context.Cont
 
 // ReplyTo is the resolver for the replyTo field.
 func (r *commentResolver) ReplyTo(ctx context.Context, obj *model.Comment) (*model.Comment, error) {
-	return resolveCommentByCommentID(ctx, obj.ReplyTo.Dbid)
+	if obj.ReplyToID == nil {
+		return nil, nil
+	}
+	return resolveCommentByCommentID(ctx, *obj.ReplyToID)
 }
 
 // Commenter is the resolver for the commenter field.
