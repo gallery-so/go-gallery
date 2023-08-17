@@ -817,7 +817,7 @@ type Comment implements Node @goEmbedHelper {
     @goField(forceResolver: true)
   source: CommentSource @goField(forceResolver: true)
 
-  # deleted is included becasue we want still return deleted comments but render them differently
+  # deleted is included because we want to still return deleted comments to show on the frontend but render them differently
   deleted: Boolean
 }
 
