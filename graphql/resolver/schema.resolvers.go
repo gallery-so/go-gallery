@@ -2494,36 +2494,26 @@ func (r *someoneFollowedYouNotificationResolver) Followers(ctx context.Context, 
 	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.NotificationData.FollowerIDs, before, after, first, last)
 }
 
-// Comment is the resolver for the comment field.
-func (r *someoneMentionedYouNotificationResolver) Comment(ctx context.Context, obj *model.SomeoneMentionedYouNotification) (*model.Comment, error) {
-	if obj.CommentID == nil {
-		return nil, nil
+// MentionSource is the resolver for the mentionSource field.
+func (r *someoneMentionedYouNotificationResolver) MentionSource(ctx context.Context, obj *model.SomeoneMentionedYouNotification) (model.MentionSource, error) {
+	if obj.PostID != nil {
+		return resolvePostByPostID(ctx, *obj.PostID)
 	}
-	return resolveCommentByCommentID(ctx, *obj.CommentID)
+	if obj.CommentID != nil {
+		return resolveCommentByCommentID(ctx, *obj.CommentID)
+	}
+	return nil, fmt.Errorf("invalid mention source")
 }
 
-// Post is the resolver for the post field.
-func (r *someoneMentionedYouNotificationResolver) Post(ctx context.Context, obj *model.SomeoneMentionedYouNotification) (*model.Post, error) {
-	if obj.PostID == nil {
-		return nil, nil
+// MentionSource is the resolver for the mentionSource field.
+func (r *someoneMentionedYourCommunityNotificationResolver) MentionSource(ctx context.Context, obj *model.SomeoneMentionedYourCommunityNotification) (model.MentionSource, error) {
+	if obj.PostID != nil {
+		return resolvePostByPostID(ctx, *obj.PostID)
 	}
-	return resolvePostByPostID(ctx, *obj.PostID)
-}
-
-// Comment is the resolver for the comment field.
-func (r *someoneMentionedYourCommunityNotificationResolver) Comment(ctx context.Context, obj *model.SomeoneMentionedYourCommunityNotification) (*model.Comment, error) {
-	if obj.CommentID == nil {
-		return nil, nil
+	if obj.CommentID != nil {
+		return resolveCommentByCommentID(ctx, *obj.CommentID)
 	}
-	return resolveCommentByCommentID(ctx, *obj.CommentID)
-}
-
-// Post is the resolver for the post field.
-func (r *someoneMentionedYourCommunityNotificationResolver) Post(ctx context.Context, obj *model.SomeoneMentionedYourCommunityNotification) (*model.Post, error) {
-	if obj.PostID == nil {
-		return nil, nil
-	}
-	return resolvePostByPostID(ctx, *obj.PostID)
+	return nil, fmt.Errorf("invalid mention source")
 }
 
 // Community is the resolver for the community field.

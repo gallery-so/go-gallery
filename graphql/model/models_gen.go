@@ -158,6 +158,10 @@ type MediaSubtype interface {
 	IsMediaSubtype()
 }
 
+type MentionSource interface {
+	IsMentionSource()
+}
+
 type MerchTokensPayloadOrError interface {
 	IsMerchTokensPayloadOrError()
 }
@@ -637,8 +641,9 @@ type Comment struct {
 	Comment      *string      `json:"comment"`
 }
 
-func (Comment) IsNode()        {}
-func (Comment) IsInteraction() {}
+func (Comment) IsNode()          {}
+func (Comment) IsInteraction()   {}
+func (Comment) IsMentionSource() {}
 
 type CommentOnFeedEventPayload struct {
 	Viewer         *Viewer    `json:"viewer"`
@@ -1630,6 +1635,7 @@ type Post struct {
 func (Post) IsPostOrError()      {}
 func (Post) IsNode()             {}
 func (Post) IsFeedEventOrError() {}
+func (Post) IsMentionSource()    {}
 func (Post) IsEntity()           {}
 
 type PostAdmireEdge struct {
@@ -1966,12 +1972,11 @@ func (SomeoneFollowedYouNotification) IsGroupedNotification() {}
 
 type SomeoneMentionedYouNotification struct {
 	HelperSomeoneMentionedYouNotificationData
-	Dbid         persist.DBID `json:"dbid"`
-	Seen         *bool        `json:"seen"`
-	CreationTime *time.Time   `json:"creationTime"`
-	UpdatedTime  *time.Time   `json:"updatedTime"`
-	Comment      *Comment     `json:"comment"`
-	Post         *Post        `json:"post"`
+	Dbid          persist.DBID  `json:"dbid"`
+	Seen          *bool         `json:"seen"`
+	CreationTime  *time.Time    `json:"creationTime"`
+	UpdatedTime   *time.Time    `json:"updatedTime"`
+	MentionSource MentionSource `json:"mentionSource"`
 }
 
 func (SomeoneMentionedYouNotification) IsNotification() {}
@@ -1979,13 +1984,12 @@ func (SomeoneMentionedYouNotification) IsNode()         {}
 
 type SomeoneMentionedYourCommunityNotification struct {
 	HelperSomeoneMentionedYourCommunityNotificationData
-	Dbid         persist.DBID `json:"dbid"`
-	Seen         *bool        `json:"seen"`
-	CreationTime *time.Time   `json:"creationTime"`
-	UpdatedTime  *time.Time   `json:"updatedTime"`
-	Comment      *Comment     `json:"comment"`
-	Post         *Post        `json:"post"`
-	Community    *Community   `json:"community"`
+	Dbid          persist.DBID  `json:"dbid"`
+	Seen          *bool         `json:"seen"`
+	CreationTime  *time.Time    `json:"creationTime"`
+	UpdatedTime   *time.Time    `json:"updatedTime"`
+	MentionSource MentionSource `json:"mentionSource"`
+	Community     *Community    `json:"community"`
 }
 
 func (SomeoneMentionedYourCommunityNotification) IsNotification() {}

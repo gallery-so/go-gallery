@@ -440,6 +440,7 @@ func (h notificationHandler) handleDelayed(ctx context.Context, persistedEvent d
 		return err
 	}
 
+	// if no gallery user found to notify, don't notify (e.g. for mentions to community creators that are not gallery users)
 	if owner == "" {
 		return nil
 	}
@@ -547,19 +548,13 @@ func (h notificationHandler) findOwnerForNotificationFromEvent(ctx context.Conte
 	case persist.ResourceTypeToken:
 		return persist.DBID(event.ActorID.String), nil
 	case persist.ResourceTypeContract:
-		c, err := h.dataloaders.ContractByContractID.Load(event.ContractID)
-		if err != nil {
-			return "", err
-		}
-		u, err := h.dataloaders.UserByAddress.Load(db.GetUserByAddressBatchParams{
-			Address: c.OwnerAddress,
-			Chain:   int32(c.Chain),
-		})
-		if err != nil {
+
+		u, err := h.dataloaders.ContractCreatorByContractID.Load(event.ContractID)
+		if err != nil || u.CreatorUserID == "" {
 			logger.For(ctx).Warnf("error loading user by address: %s", err)
 			return "", nil
 		}
-		return u.ID, nil
+		return u.CreatorUserID, nil
 	}
 
 	return "", fmt.Errorf("no owner found for event: %s", event.Action)

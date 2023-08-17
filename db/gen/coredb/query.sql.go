@@ -318,7 +318,7 @@ func (q *Queries) CountUserUnseenNotifications(ctx context.Context, ownerID pers
 }
 
 const createAdmireEvent = `-- name: CreateAdmireEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, post_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $9, $10, $5, $6, $7, $8) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id, contract_id
+INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, post_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $10, $11, $6, $7, $8, $9) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id, contract_id
 `
 
 type CreateAdmireEventParams struct {
@@ -327,6 +327,7 @@ type CreateAdmireEventParams struct {
 	Action         persist.Action       `json:"action"`
 	ResourceTypeID persist.ResourceType `json:"resource_type_id"`
 	AdmireID       persist.DBID         `json:"admire_id"`
+	SubjectID      persist.DBID         `json:"subject_id"`
 	Data           persist.EventData    `json:"data"`
 	GroupID        sql.NullString       `json:"group_id"`
 	Caption        sql.NullString       `json:"caption"`
@@ -341,6 +342,7 @@ func (q *Queries) CreateAdmireEvent(ctx context.Context, arg CreateAdmireEventPa
 		arg.Action,
 		arg.ResourceTypeID,
 		arg.AdmireID,
+		arg.SubjectID,
 		arg.Data,
 		arg.GroupID,
 		arg.Caption,
@@ -1500,49 +1502,6 @@ func (q *Queries) GetAllTokensWithContractsByIDs(ctx context.Context, arg GetAll
 			&i.ParentID,
 			&i.OverrideCreatorUserID,
 			&i.WalletAddress,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getAllUsersByIDs = `-- name: GetAllUsersByIDs :many
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id FROM users WHERE username_idempotent = ANY($1::varchar[]) AND deleted = false
-`
-
-func (q *Queries) GetAllUsersByIDs(ctx context.Context, userIds []string) ([]User, error) {
-	rows, err := q.db.Query(ctx, getAllUsersByIDs, userIds)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []User
-	for rows.Next() {
-		var i User
-		if err := rows.Scan(
-			&i.ID,
-			&i.Deleted,
-			&i.Version,
-			&i.LastUpdated,
-			&i.CreatedAt,
-			&i.Username,
-			&i.UsernameIdempotent,
-			&i.Wallets,
-			&i.Bio,
-			&i.Traits,
-			&i.Universal,
-			&i.NotificationSettings,
-			&i.EmailVerified,
-			&i.EmailUnsubscriptions,
-			&i.FeaturedGallery,
-			&i.PrimaryWalletID,
-			&i.UserExperiences,
-			&i.ProfileImageID,
 		); err != nil {
 			return nil, err
 		}

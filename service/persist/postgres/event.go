@@ -107,6 +107,7 @@ func (r *EventRepository) AddAdmireEvent(ctx context.Context, event db.Event) (*
 		AdmireID:       event.AdmireID,
 		FeedEvent:      feedEventID,
 		Post:           postID,
+		SubjectID:      event.SubjectID,
 		Data:           event.Data,
 		GroupID:        event.GroupID,
 		Caption:        event.Caption,

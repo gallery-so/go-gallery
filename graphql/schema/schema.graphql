@@ -1975,6 +1975,8 @@ type SomeoneRepliedToYourCommentNotification implements Notification & Node @goE
   originalComment: Comment @goField(forceResolver: true)
 }
 
+union MentionSource = Comment | Post
+
 type SomeoneMentionedYouNotification implements Notification & Node @goEmbedHelper {
   id: ID!
   dbid: DBID!
@@ -1983,8 +1985,7 @@ type SomeoneMentionedYouNotification implements Notification & Node @goEmbedHelp
   updatedTime: Time
 
   # Don't need a `who` here since the `comment` or `post` can provide that
-  comment: Comment @goField(forceResolver: true)
-  post: Post @goField(forceResolver: true)
+  mentionSource: MentionSource @goField(forceResolver: true)
 }
 
 type SomeoneMentionedYourCommunityNotification implements Notification & Node @goEmbedHelper {
@@ -1995,8 +1996,7 @@ type SomeoneMentionedYourCommunityNotification implements Notification & Node @g
   updatedTime: Time
 
   # Don't need a `who` here since the `comment` or `post` can provide that
-  comment: Comment @goField(forceResolver: true)
-  post: Post @goField(forceResolver: true)
+  mentionSource: MentionSource @goField(forceResolver: true)
   community: Community @goField(forceResolver: true)
 }
 

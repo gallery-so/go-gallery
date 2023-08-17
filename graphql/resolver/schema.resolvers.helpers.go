@@ -54,114 +54,29 @@ var nodeFetcher = model.NodeFetcher{
 	OnCommunity: func(ctx context.Context, dbid persist.DBID) (*model.Community, error) {
 		return resolveCommunityByID(ctx, dbid)
 	},
-	OnSomeoneAdmiredYourFeedEventNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneAdmiredYourFeedEventNotification, error) {
-		notif, err := resolveNotificationByID(ctx, dbid)
-		if err != nil {
-			return nil, err
-		}
+	OnSomeoneAdmiredYourFeedEventNotification:     fetchNotificationByID[model.SomeoneAdmiredYourFeedEventNotification],
+	OnSomeoneCommentedOnYourFeedEventNotification: fetchNotificationByID[model.SomeoneCommentedOnYourFeedEventNotification],
+	OnSomeoneAdmiredYourPostNotification:          fetchNotificationByID[model.SomeoneAdmiredYourPostNotification],
+	OnSomeoneCommentedOnYourPostNotification:      fetchNotificationByID[model.SomeoneCommentedOnYourPostNotification],
+	OnSomeoneFollowedYouBackNotification:          fetchNotificationByID[model.SomeoneFollowedYouBackNotification],
+	OnSomeoneFollowedYouNotification:              fetchNotificationByID[model.SomeoneFollowedYouNotification],
+	OnSomeoneViewedYourGalleryNotification:        fetchNotificationByID[model.SomeoneViewedYourGalleryNotification],
+	OnNewTokensNotification:                       fetchNotificationByID[model.NewTokensNotification],
+	OnSomeoneMentionedYouNotification:             fetchNotificationByID[model.SomeoneMentionedYouNotification],
+	OnSomeoneMentionedYourCommunityNotification:   fetchNotificationByID[model.SomeoneMentionedYourCommunityNotification],
+	OnSomeoneRepliedToYourCommentNotification:     fetchNotificationByID[model.SomeoneRepliedToYourCommentNotification],
+}
 
-		notifConverted := notif.(model.SomeoneAdmiredYourFeedEventNotification)
+// T any is a notification type, will panic if it is not a notification type
+func fetchNotificationByID[T any](ctx context.Context, dbid persist.DBID) (*T, error) {
+	notif, err := resolveNotificationByID(ctx, dbid)
+	if err != nil {
+		return nil, err
+	}
 
-		return &notifConverted, nil
-	},
-	OnSomeoneCommentedOnYourFeedEventNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneCommentedOnYourFeedEventNotification, error) {
-		notif, err := resolveNotificationByID(ctx, dbid)
-		if err != nil {
-			return nil, err
-		}
+	notifConverted := notif.(T)
 
-		notifConverted := notif.(model.SomeoneCommentedOnYourFeedEventNotification)
-
-		return &notifConverted, nil
-	},
-	OnSomeoneAdmiredYourPostNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneAdmiredYourPostNotification, error) {
-		notif, err := resolveNotificationByID(ctx, dbid)
-		if err != nil {
-			return nil, err
-		}
-
-		notifConverted := notif.(model.SomeoneAdmiredYourPostNotification)
-
-		return &notifConverted, nil
-	},
-	OnSomeoneCommentedOnYourPostNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneCommentedOnYourPostNotification, error) {
-		notif, err := resolveNotificationByID(ctx, dbid)
-		if err != nil {
-			return nil, err
-		}
-
-		notifConverted := notif.(model.SomeoneCommentedOnYourPostNotification)
-
-		return &notifConverted, nil
-	},
-	OnSomeoneFollowedYouBackNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneFollowedYouBackNotification, error) {
-		notif, err := resolveNotificationByID(ctx, dbid)
-		if err != nil {
-			return nil, err
-		}
-
-		notifConverted := notif.(model.SomeoneFollowedYouBackNotification)
-
-		return &notifConverted, nil
-	},
-	OnSomeoneFollowedYouNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneFollowedYouNotification, error) {
-		notif, err := resolveNotificationByID(ctx, dbid)
-		if err != nil {
-			return nil, err
-		}
-
-		notifConverted := notif.(model.SomeoneFollowedYouNotification)
-
-		return &notifConverted, nil
-	},
-	OnSomeoneViewedYourGalleryNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneViewedYourGalleryNotification, error) {
-		notif, err := resolveNotificationByID(ctx, dbid)
-		if err != nil {
-			return nil, err
-		}
-
-		notifConverted := notif.(model.SomeoneViewedYourGalleryNotification)
-
-		return &notifConverted, nil
-	},
-	OnNewTokensNotification: func(ctx context.Context, dbid persist.DBID) (*model.NewTokensNotification, error) {
-		notif, err := resolveNotificationByID(ctx, dbid)
-		if err != nil {
-			return nil, err
-		}
-
-		notifConverted := notif.(model.NewTokensNotification)
-
-		return &notifConverted, nil
-	},
-	OnSomeoneMentionedYouNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneMentionedYouNotification, error) {
-		notif, err := resolveNotificationByID(ctx, dbid)
-		if err != nil {
-			return nil, err
-		}
-
-		notifConverted := notif.(model.SomeoneMentionedYouNotification)
-
-		return &notifConverted, nil
-	},
-	OnSomeoneMentionedYourCommunityNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneMentionedYourCommunityNotification, error) {
-		notif, err := resolveNotificationByID(ctx, dbid)
-		if err != nil {
-			return nil, err
-		}
-		notifConverted := notif.(model.SomeoneMentionedYourCommunityNotification)
-
-		return &notifConverted, nil
-	},
-	OnSomeoneRepliedToYourCommentNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneRepliedToYourCommentNotification, error) {
-		notif, err := resolveNotificationByID(ctx, dbid)
-		if err != nil {
-			return nil, err
-		}
-		notifConverted := notif.(model.SomeoneRepliedToYourCommentNotification)
-
-		return &notifConverted, nil
-	},
+	return &notifConverted, nil
 }
 
 var defaultTokenSettings = persist.CollectionTokenSettings{}
@@ -1028,12 +943,11 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 				PostID:    postID,
 				CommentID: commentID,
 			},
-			Dbid:         notif.ID,
-			Seen:         &notif.Seen,
-			CreationTime: &notif.CreatedAt,
-			UpdatedTime:  &notif.LastUpdated,
-			Post:         nil, // handled by dedicated resolver
-			Comment:      nil, // handled by dedicated resolver
+			Dbid:          notif.ID,
+			Seen:          &notif.Seen,
+			CreationTime:  &notif.CreatedAt,
+			UpdatedTime:   &notif.LastUpdated,
+			MentionSource: nil, // handled by dedicated resolver
 		}, nil
 
 	case persist.ActionMentionCommunity:
@@ -1053,13 +967,12 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 				PostID:     postID,
 				CommentID:  commentID,
 			},
-			Dbid:         notif.ID,
-			Seen:         &notif.Seen,
-			CreationTime: &notif.CreatedAt,
-			UpdatedTime:  &notif.LastUpdated,
-			Community:    nil, // handled by dedicated resolver
-			Comment:      nil, // handled by dedicated resolver
-			Post:         nil, // handled by dedicated resolver
+			Dbid:          notif.ID,
+			Seen:          &notif.Seen,
+			CreationTime:  &notif.CreatedAt,
+			UpdatedTime:   &notif.LastUpdated,
+			Community:     nil, // handled by dedicated resolver
+			MentionSource: nil, // handled by dedicated resolver
 		}, nil
 
 	default:
