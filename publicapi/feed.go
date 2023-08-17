@@ -309,6 +309,41 @@ func (api FeedAPI) GlobalFeed(ctx context.Context, before *string, after *string
 	return paginator.paginate(before, after, first, last)
 }
 
+type feedParams struct {
+	ExcludeUserID  persist.DBID
+	IncludePosts   bool
+	IncludeEvents  bool
+	ExcludeActions []persist.Action
+	FetchFrom      time.Duration
+}
+
+func fetchFeedEntities(ctx context.Context, queries *db.Queries, p feedParams) ([]db.FeedEntityScore, error) {
+	var q db.GetFeedEntityScoresParams
+
+	q.IncludeViewer = true
+	q.IncludePosts = true
+	q.IncludeEvents = true
+	q.WindowEnd = time.Now().Add(-p.FetchFrom)
+	q.ExcludedFeedActions = util.MapWithoutError(p.ExcludeActions, func(a persist.Action) string { return string(a) })
+
+	if !p.IncludePosts {
+		q.IncludePosts = false
+		q.PostEntityType = int32(persist.PostTypeTag)
+	}
+
+	if !p.IncludeEvents {
+		q.IncludeEvents = false
+		q.FeedEntityType = int32(persist.FeedEventTypeTag)
+	}
+
+	if p.ExcludeUserID != "" {
+		q.IncludeViewer = false
+		q.ViewerID = p.ExcludeUserID
+	}
+
+	return queries.GetFeedEntityScores(ctx, q)
+}
+
 func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *string, first *int, last *int, includePosts bool) ([]any, PageInfo, error) {
 	// Validate
 	if err := validatePaginationParams(api.validator, first, last); err != nil {
@@ -334,12 +369,11 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 
 	if !hasCursors {
 		calcFunc := func(ctx context.Context) ([]persist.FeedEntityType, []persist.DBID, error) {
-			trendData, err := api.queries.GetFeedEntityScores(ctx, db.GetFeedEntityScoresParams{
-				WindowEnd:           time.Now().Add(-time.Duration(3 * 24 * time.Hour)),
-				PostEntityType:      int32(persist.PostTypeTag),
-				ExcludedFeedActions: []string{string(persist.ActionUserCreated), string(persist.ActionUserFollowedUsers)},
-				IncludeViewer:       true,
-				IncludePosts:        includePosts,
+			trendData, err := fetchFeedEntities(ctx, api.queries, feedParams{
+				IncludePosts:   includePosts,
+				IncludeEvents:  true,
+				ExcludeActions: []persist.Action{persist.ActionUserCreated, persist.ActionUserFollowedUsers},
+				FetchFrom:      time.Duration(3 * 24 * time.Hour),
 			})
 			if err != nil {
 				return nil, nil, err
@@ -438,13 +472,12 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 	}
 
 	if !hasCursors {
-		trendData, err := api.queries.GetFeedEntityScores(ctx, db.GetFeedEntityScoresParams{
-			WindowEnd:           time.Now().Add(-time.Duration(7 * 24 * time.Hour)),
-			PostEntityType:      int32(persist.PostTypeTag),
-			ExcludedFeedActions: []string{string(persist.ActionUserCreated), string(persist.ActionUserFollowedUsers)},
-			IncludeViewer:       false,
-			ViewerID:            userID,
-			IncludePosts:        includePosts,
+		trendData, err := fetchFeedEntities(ctx, api.queries, feedParams{
+			IncludePosts:   includePosts,
+			IncludeEvents:  !includePosts,
+			ExcludeUserID:  userID,
+			ExcludeActions: []persist.Action{persist.ActionUserCreated, persist.ActionUserFollowedUsers},
+			FetchFrom:      time.Duration(7 * 24 * time.Hour),
 		})
 		if err != nil {
 			return nil, PageInfo{}, err
