@@ -31,6 +31,10 @@ type AdmirePostPayloadOrError interface {
 	IsAdmirePostPayloadOrError()
 }
 
+type AdmireTokenPayloadOrError interface {
+	IsAdmireTokenPayloadOrError()
+}
+
 type AuthorizationError interface {
 	IsAuthorizationError()
 }
@@ -470,6 +474,14 @@ type AdmirePostPayload struct {
 }
 
 func (AdmirePostPayload) IsAdmirePostPayloadOrError() {}
+
+type AdmireTokenPayload struct {
+	Viewer *Viewer `json:"viewer"`
+	Token  *Token  `json:"token"`
+	Admire *Admire `json:"admire"`
+}
+
+func (AdmireTokenPayload) IsAdmireTokenPayloadOrError() {}
 
 type AudioMedia struct {
 	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`
@@ -1008,6 +1020,7 @@ func (ErrInvalidInput) IsFollowAllSocialConnectionsPayloadOrError()      {}
 func (ErrInvalidInput) IsSetProfileImagePayloadOrError()                 {}
 func (ErrInvalidInput) IsPostTokensPayloadOrError()                      {}
 func (ErrInvalidInput) IsAdmirePostPayloadOrError()                      {}
+func (ErrInvalidInput) IsAdmireTokenPayloadOrError()                     {}
 func (ErrInvalidInput) IsCommentOnPostPayloadOrError()                   {}
 func (ErrInvalidInput) IsDeletePostPayloadOrError()                      {}
 
@@ -1090,6 +1103,7 @@ func (ErrNotAuthorized) IsGenerateQRCodeLoginTokenPayloadOrError()             {
 func (ErrNotAuthorized) IsSetProfileImagePayloadOrError()                      {}
 func (ErrNotAuthorized) IsPostTokensPayloadOrError()                           {}
 func (ErrNotAuthorized) IsAdmirePostPayloadOrError()                           {}
+func (ErrNotAuthorized) IsAdmireTokenPayloadOrError()                          {}
 func (ErrNotAuthorized) IsCommentOnPostPayloadOrError()                        {}
 func (ErrNotAuthorized) IsDeletePostPayloadOrError()                           {}
 

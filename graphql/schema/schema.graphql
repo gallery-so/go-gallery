@@ -2417,6 +2417,14 @@ type AdmirePostPayload {
 
 union AdmirePostPayloadOrError = AdmirePostPayload | ErrInvalidInput | ErrNotAuthorized
 
+type AdmireTokenPayload {
+  viewer: Viewer
+  token: Token @goField(forceResolver: true)
+  admire: Admire @goField(forceResolver: true)
+}
+
+union AdmireTokenPayloadOrError = AdmireTokenPayload | ErrInvalidInput | ErrNotAuthorized
+
 type CommentOnPostPayload {
   viewer: Viewer
   post: Post @goField(forceResolver: true)
