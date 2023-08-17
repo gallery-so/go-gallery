@@ -96,14 +96,15 @@ from feed_entity_scores f1
 where f1.created_at > $1::timestamptz
   and ($2::bool or f1.actor_id != $3)
   and ($4::bool or f1.feed_entity_type != $5)
-  and not (f1.action = any($6::varchar[]))
+  and ($6::bool or f1.feed_entity_type != $7)
+  and not (f1.action = any($8::varchar[]))
 union
 select id, created_at, actor_id, action, contract_ids, interactions, feed_entity_type, last_updated
 from feed_entity_score_view f2
 where created_at > (select last_updated from refreshed limit 1)
   and ($2::bool or f2.actor_id != $3)
   and ($4::bool or f2.feed_entity_type != $5)
-  and not (f2.action = any($6::varchar[]))
+  and not (f2.action = any($8::varchar[]))
 `
 
 type GetFeedEntityScoresParams struct {
@@ -112,6 +113,8 @@ type GetFeedEntityScoresParams struct {
 	ViewerID            persist.DBID `json:"viewer_id"`
 	IncludePosts        bool         `json:"include_posts"`
 	PostEntityType      int32        `json:"post_entity_type"`
+	IncludeEvents       bool         `json:"include_events"`
+	FeedEntityType      int32        `json:"feed_entity_type"`
 	ExcludedFeedActions []string     `json:"excluded_feed_actions"`
 }
 
@@ -122,6 +125,8 @@ func (q *Queries) GetFeedEntityScores(ctx context.Context, arg GetFeedEntityScor
 		arg.ViewerID,
 		arg.IncludePosts,
 		arg.PostEntityType,
+		arg.IncludeEvents,
+		arg.FeedEntityType,
 		arg.ExcludedFeedActions,
 	)
 	if err != nil {
