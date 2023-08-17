@@ -586,12 +586,6 @@ SELECT count(*) FROM comments WHERE post_id = sqlc.arg('post_id') AND reply_to i
 -- name: CountRepliesByCommentIDBatch :batchone
 SELECT count(*) FROM comments WHERE reply_to = sqlc.arg('comment_id');
 
--- name: GetCommentsByActorID :many
-SELECT * FROM comments WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC;
-
--- name: GetCommentsByActorIDBatch :batchmany
-SELECT * FROM comments WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC;
-
 -- name: GetUserNotifications :many
 SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false
     AND (created_at, id) < (@cur_before_time, @cur_before_id)
