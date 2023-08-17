@@ -111,7 +111,7 @@ func (b *CountAdmiresByPostIDBatchBatchResults) Close() error {
 }
 
 const countCommentsByFeedEventIDBatch = `-- name: CountCommentsByFeedEventIDBatch :batchone
-SELECT count(*) FROM comments WHERE feed_event_id = $1 AND deleted = false
+SELECT count(*) FROM comments WHERE feed_event_id = $1 AND reply_to is null
 `
 
 type CountCommentsByFeedEventIDBatchBatchResults struct {
@@ -156,7 +156,7 @@ func (b *CountCommentsByFeedEventIDBatchBatchResults) Close() error {
 }
 
 const countCommentsByPostIDBatch = `-- name: CountCommentsByPostIDBatch :batchone
-SELECT count(*) FROM comments WHERE post_id = $1 AND deleted = false
+SELECT count(*) FROM comments WHERE post_id = $1 AND reply_to is null
 `
 
 type CountCommentsByPostIDBatchBatchResults struct {
@@ -203,7 +203,7 @@ func (b *CountCommentsByPostIDBatchBatchResults) Close() error {
 const countInteractionsByFeedEventIDBatch = `-- name: CountInteractionsByFeedEventIDBatch :batchmany
 SELECT count(*), $1::int as tag FROM admires t WHERE $1 != 0 AND t.feed_event_id = $2 AND t.deleted = false
                                                         UNION
-SELECT count(*), $3::int as tag FROM comments t WHERE $3 != 0 AND t.feed_event_id = $2 AND t.deleted = false
+SELECT count(*), $3::int as tag FROM comments t WHERE $3 != 0 AND t.feed_event_id = $2 AND t.reply_to is null
 `
 
 type CountInteractionsByFeedEventIDBatchBatchResults struct {
@@ -276,7 +276,7 @@ func (b *CountInteractionsByFeedEventIDBatchBatchResults) Close() error {
 const countInteractionsByPostIDBatch = `-- name: CountInteractionsByPostIDBatch :batchmany
 SELECT count(*), $1::int as tag FROM admires t WHERE $1 != 0 AND t.post_id = $2 AND t.deleted = false
                                                         UNION
-SELECT count(*), $3::int as tag FROM comments t WHERE $3 != 0 AND t.post_id = $2 AND t.deleted = false
+SELECT count(*), $3::int as tag FROM comments t WHERE $3 != 0 AND t.post_id = $2 AND t.reply_to is null
 `
 
 type CountInteractionsByPostIDBatchBatchResults struct {
@@ -342,6 +342,51 @@ func (b *CountInteractionsByPostIDBatchBatchResults) Query(f func(int, []CountIn
 }
 
 func (b *CountInteractionsByPostIDBatchBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
+const countRepliesByCommentIDBatch = `-- name: CountRepliesByCommentIDBatch :batchone
+SELECT count(*) FROM comments WHERE reply_to = $1
+`
+
+type CountRepliesByCommentIDBatchBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+func (q *Queries) CountRepliesByCommentIDBatch(ctx context.Context, commentID []persist.DBID) *CountRepliesByCommentIDBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range commentID {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(countRepliesByCommentIDBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &CountRepliesByCommentIDBatchBatchResults{br, len(commentID), false}
+}
+
+func (b *CountRepliesByCommentIDBatchBatchResults) QueryRow(f func(int, int64, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var count int64
+		if b.closed {
+			if f != nil {
+				f(t, count, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		row := b.br.QueryRow()
+		err := row.Scan(&count)
+		if f != nil {
+			f(t, count, err)
+		}
+	}
+}
+
+func (b *CountRepliesByCommentIDBatchBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }
@@ -823,7 +868,7 @@ func (b *GetCollectionsByGalleryIdBatchBatchResults) Close() error {
 }
 
 const getCommentByCommentIDBatch = `-- name: GetCommentByCommentIDBatch :batchone
-SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id FROM comments WHERE id = $1 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id FROM comments WHERE id = $1
 `
 
 type GetCommentByCommentIDBatchBatchResults struct {
@@ -3867,7 +3912,7 @@ func (b *PaginateAdmiresByPostIDBatchBatchResults) Close() error {
 }
 
 const paginateCommentsByFeedEventIDBatch = `-- name: PaginateCommentsByFeedEventIDBatch :batchmany
-SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id FROM comments WHERE feed_event_id = $1 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id FROM comments WHERE feed_event_id = $1 AND reply_to is null
     AND (created_at, id) < ($2, $3)
     AND (created_at, id) > ($4, $5)
     ORDER BY CASE WHEN $6::bool THEN (created_at, id) END ASC,
@@ -3957,7 +4002,7 @@ func (b *PaginateCommentsByFeedEventIDBatchBatchResults) Close() error {
 }
 
 const paginateCommentsByPostIDBatch = `-- name: PaginateCommentsByPostIDBatch :batchmany
-SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id FROM comments WHERE post_id = $1 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id FROM comments WHERE post_id = $1 AND reply_to is null
     AND (created_at, id) < ($2, $3)
     AND (created_at, id) > ($4, $5)
     ORDER BY CASE WHEN $6::bool THEN (created_at, id) END ASC,
@@ -4051,7 +4096,7 @@ SELECT interactions.created_At, interactions.id, interactions.tag FROM (
     SELECT t.created_at, t.id, $1::int as tag FROM admires t WHERE $1 != 0 AND t.feed_event_id = $2 AND t.deleted = false
         AND ($1, t.created_at, t.id) < ($3::int, $4, $5) AND ($1, t.created_at, t.id) > ($6::int, $7, $8)
                                                                     UNION
-    SELECT t.created_at, t.id, $9::int as tag FROM comments t WHERE $9 != 0 AND t.feed_event_id = $2 AND t.deleted = false
+    SELECT t.created_at, t.id, $9::int as tag FROM comments t WHERE $9 != 0 AND t.feed_event_id = $2 AND t.reply_to is null
         AND ($9, t.created_at, t.id) < ($3::int, $4, $5) AND ($9, t.created_at, t.id) > ($6::int, $7, $8)
 ) as interactions
 
@@ -4149,7 +4194,7 @@ SELECT interactions.created_At, interactions.id, interactions.tag FROM (
     SELECT t.created_at, t.id, $1::int as tag FROM admires t WHERE $1 != 0 AND t.post_id = $2 AND t.deleted = false
         AND ($1, t.created_at, t.id) < ($3::int, $4, $5) AND ($1, t.created_at, t.id) > ($6::int, $7, $8)
                                                                     UNION
-    SELECT t.created_at, t.id, $9::int as tag FROM comments t WHERE $9 != 0 AND t.post_id = $2 AND t.deleted = false
+    SELECT t.created_at, t.id, $9::int as tag FROM comments t WHERE $9 != 0 AND t.post_id = $2 AND t.reply_to is null
         AND ($9, t.created_at, t.id) < ($3::int, $4, $5) AND ($9, t.created_at, t.id) > ($6::int, $7, $8)
 ) as interactions
 
@@ -4331,6 +4376,96 @@ func (b *PaginatePostsByContractIDBatchResults) Query(f func(int, []Post, error)
 }
 
 func (b *PaginatePostsByContractIDBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
+const paginateRepliesByCommentIDBatch = `-- name: PaginateRepliesByCommentIDBatch :batchmany
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id FROM comments WHERE reply_to = $1
+    AND (created_at, id) < ($2, $3)
+    AND (created_at, id) > ($4, $5)
+    ORDER BY CASE WHEN $6::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT $6::bool THEN (created_at, id) END DESC
+    LIMIT $7
+`
+
+type PaginateRepliesByCommentIDBatchBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type PaginateRepliesByCommentIDBatchParams struct {
+	CommentID     persist.DBID `json:"comment_id"`
+	CurBeforeTime time.Time    `json:"cur_before_time"`
+	CurBeforeID   persist.DBID `json:"cur_before_id"`
+	CurAfterTime  time.Time    `json:"cur_after_time"`
+	CurAfterID    persist.DBID `json:"cur_after_id"`
+	PagingForward bool         `json:"paging_forward"`
+	Limit         int32        `json:"limit"`
+}
+
+func (q *Queries) PaginateRepliesByCommentIDBatch(ctx context.Context, arg []PaginateRepliesByCommentIDBatchParams) *PaginateRepliesByCommentIDBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.CommentID,
+			a.CurBeforeTime,
+			a.CurBeforeID,
+			a.CurAfterTime,
+			a.CurAfterID,
+			a.PagingForward,
+			a.Limit,
+		}
+		batch.Queue(paginateRepliesByCommentIDBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &PaginateRepliesByCommentIDBatchBatchResults{br, len(arg), false}
+}
+
+func (b *PaginateRepliesByCommentIDBatchBatchResults) Query(f func(int, []Comment, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var items []Comment
+		if b.closed {
+			if f != nil {
+				f(t, items, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		err := func() error {
+			rows, err := b.br.Query()
+			defer rows.Close()
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var i Comment
+				if err := rows.Scan(
+					&i.ID,
+					&i.Version,
+					&i.FeedEventID,
+					&i.ActorID,
+					&i.ReplyTo,
+					&i.Comment,
+					&i.Deleted,
+					&i.CreatedAt,
+					&i.LastUpdated,
+					&i.PostID,
+				); err != nil {
+					return err
+				}
+				items = append(items, i)
+			}
+			return rows.Err()
+		}()
+		if f != nil {
+			f(t, items, err)
+		}
+	}
+}
+
+func (b *PaginateRepliesByCommentIDBatchBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }

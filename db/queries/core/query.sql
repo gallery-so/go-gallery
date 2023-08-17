@@ -545,16 +545,16 @@ SELECT * FROM admires WHERE post_id = sqlc.arg('post_id') AND deleted = false
 SELECT count(*) FROM admires WHERE post_id = $1 AND deleted = false;
 
 -- name: GetCommentByCommentID :one
-SELECT * FROM comments WHERE id = $1 AND deleted = false;
+SELECT * FROM comments WHERE id = $1;
 
 -- name: GetCommentsByCommentIDs :many
-SELECT * from comments WHERE id = ANY(@comment_ids) AND deleted = false;
+SELECT * from comments WHERE id = ANY(@comment_ids);
 
 -- name: GetCommentByCommentIDBatch :batchone
-SELECT * FROM comments WHERE id = $1 AND deleted = false;
+SELECT * FROM comments WHERE id = $1;
 
 -- name: PaginateCommentsByFeedEventIDBatch :batchmany
-SELECT * FROM comments WHERE feed_event_id = sqlc.arg('feed_event_id') AND deleted = false
+SELECT * FROM comments WHERE feed_event_id = sqlc.arg('feed_event_id') AND reply_to is null
     AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
     AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
     ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
@@ -562,10 +562,18 @@ SELECT * FROM comments WHERE feed_event_id = sqlc.arg('feed_event_id') AND delet
     LIMIT sqlc.arg('limit');
 
 -- name: CountCommentsByFeedEventIDBatch :batchone
-SELECT count(*) FROM comments WHERE feed_event_id = $1 AND deleted = false;
+SELECT count(*) FROM comments WHERE feed_event_id = sqlc.arg('feed_event_id') AND reply_to is null;
 
 -- name: PaginateCommentsByPostIDBatch :batchmany
-SELECT * FROM comments WHERE post_id = sqlc.arg('post_id') AND deleted = false
+SELECT * FROM comments WHERE post_id = sqlc.arg('post_id') AND reply_to is null
+    AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+    AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+    ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
+    LIMIT sqlc.arg('limit');
+
+-- name: PaginateRepliesByCommentIDBatch :batchmany
+SELECT * FROM comments WHERE reply_to = sqlc.arg('comment_id')
     AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
     AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
     ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
@@ -573,7 +581,10 @@ SELECT * FROM comments WHERE post_id = sqlc.arg('post_id') AND deleted = false
     LIMIT sqlc.arg('limit');
 
 -- name: CountCommentsByPostIDBatch :batchone
-SELECT count(*) FROM comments WHERE post_id = $1 AND deleted = false;
+SELECT count(*) FROM comments WHERE post_id = sqlc.arg('post_id') AND reply_to is null;
+
+-- name: CountRepliesByCommentIDBatch :batchone
+SELECT count(*) FROM comments WHERE reply_to = sqlc.arg('comment_id');
 
 -- name: GetCommentsByActorID :many
 SELECT * FROM comments WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC;
@@ -681,7 +692,7 @@ SELECT interactions.created_At, interactions.id, interactions.tag FROM (
     SELECT t.created_at, t.id, sqlc.arg('admire_tag')::int as tag FROM admires t WHERE sqlc.arg('admire_tag') != 0 AND t.feed_event_id = sqlc.arg('feed_event_id') AND t.deleted = false
         AND (sqlc.arg('admire_tag'), t.created_at, t.id) < (sqlc.arg('cur_before_tag')::int, sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (sqlc.arg('admire_tag'), t.created_at, t.id) > (sqlc.arg('cur_after_tag')::int, sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
                                                                     UNION
-    SELECT t.created_at, t.id, sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.arg('comment_tag') != 0 AND t.feed_event_id = sqlc.arg('feed_event_id') AND t.deleted = false
+    SELECT t.created_at, t.id, sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.arg('comment_tag') != 0 AND t.feed_event_id = sqlc.arg('feed_event_id') AND t.reply_to is null
         AND (sqlc.arg('comment_tag'), t.created_at, t.id) < (sqlc.arg('cur_before_tag')::int, sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (sqlc.arg('comment_tag'), t.created_at, t.id) > (sqlc.arg('cur_after_tag')::int, sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
 ) as interactions
 
@@ -692,14 +703,14 @@ LIMIT sqlc.arg('limit');
 -- name: CountInteractionsByFeedEventIDBatch :batchmany
 SELECT count(*), sqlc.arg('admire_tag')::int as tag FROM admires t WHERE sqlc.arg('admire_tag') != 0 AND t.feed_event_id = sqlc.arg('feed_event_id') AND t.deleted = false
                                                         UNION
-SELECT count(*), sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.arg('comment_tag') != 0 AND t.feed_event_id = sqlc.arg('feed_event_id') AND t.deleted = false;
+SELECT count(*), sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.arg('comment_tag') != 0 AND t.feed_event_id = sqlc.arg('feed_event_id') AND t.reply_to is null;
 
 -- name: PaginateInteractionsByPostIDBatch :batchmany
 SELECT interactions.created_At, interactions.id, interactions.tag FROM (
     SELECT t.created_at, t.id, sqlc.arg('admire_tag')::int as tag FROM admires t WHERE sqlc.arg('admire_tag') != 0 AND t.post_id = sqlc.arg('post_id') AND t.deleted = false
         AND (sqlc.arg('admire_tag'), t.created_at, t.id) < (sqlc.arg('cur_before_tag')::int, sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (sqlc.arg('admire_tag'), t.created_at, t.id) > (sqlc.arg('cur_after_tag')::int, sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
                                                                     UNION
-    SELECT t.created_at, t.id, sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.arg('comment_tag') != 0 AND t.post_id = sqlc.arg('post_id') AND t.deleted = false
+    SELECT t.created_at, t.id, sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.arg('comment_tag') != 0 AND t.post_id = sqlc.arg('post_id') AND t.reply_to is null
         AND (sqlc.arg('comment_tag'), t.created_at, t.id) < (sqlc.arg('cur_before_tag')::int, sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (sqlc.arg('comment_tag'), t.created_at, t.id) > (sqlc.arg('cur_after_tag')::int, sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
 ) as interactions
 
@@ -710,7 +721,7 @@ LIMIT sqlc.arg('limit');
 -- name: CountInteractionsByPostIDBatch :batchmany
 SELECT count(*), sqlc.arg('admire_tag')::int as tag FROM admires t WHERE sqlc.arg('admire_tag') != 0 AND t.post_id = sqlc.arg('post_id') AND t.deleted = false
                                                         UNION
-SELECT count(*), sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.arg('comment_tag') != 0 AND t.post_id = sqlc.arg('post_id') AND t.deleted = false;
+SELECT count(*), sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.arg('comment_tag') != 0 AND t.post_id = sqlc.arg('post_id') AND t.reply_to is null;
 
 -- name: GetAdmireByActorIDAndFeedEventID :batchone
 SELECT * FROM admires WHERE actor_id = $1 AND feed_event_id = $2 AND deleted = false;

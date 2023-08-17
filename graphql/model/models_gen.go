@@ -31,6 +31,10 @@ type AdmirePostPayloadOrError interface {
 	IsAdmirePostPayloadOrError()
 }
 
+type AdmireSource interface {
+	IsAdmireSource()
+}
+
 type AuthorizationError interface {
 	IsAuthorizationError()
 }
@@ -53,6 +57,14 @@ type CommentOnFeedEventPayloadOrError interface {
 
 type CommentOnPostPayloadOrError interface {
 	IsCommentOnPostPayloadOrError()
+}
+
+type CommentSource interface {
+	IsCommentSource()
+}
+
+type CommentsConnection interface {
+	IsCommentsConnection()
 }
 
 type CommunityByAddressOrError interface {
@@ -450,10 +462,12 @@ type AdminAddWalletPayload struct {
 func (AdminAddWalletPayload) IsAdminAddWalletPayloadOrError() {}
 
 type Admire struct {
+	HelperAdmireData
 	Dbid         persist.DBID `json:"dbid"`
 	CreationTime *time.Time   `json:"creationTime"`
 	LastUpdated  *time.Time   `json:"lastUpdated"`
 	Admirer      *GalleryUser `json:"admirer"`
+	Source       AdmireSource `json:"source"`
 }
 
 func (Admire) IsNode()        {}
@@ -633,12 +647,16 @@ type CollectorsNoteAddedToTokenFeedEventData struct {
 func (CollectorsNoteAddedToTokenFeedEventData) IsFeedEventData() {}
 
 type Comment struct {
-	Dbid         persist.DBID `json:"dbid"`
-	CreationTime *time.Time   `json:"creationTime"`
-	LastUpdated  *time.Time   `json:"lastUpdated"`
-	ReplyTo      *Comment     `json:"replyTo"`
-	Commenter    *GalleryUser `json:"commenter"`
-	Comment      *string      `json:"comment"`
+	HelperCommentData
+	Dbid         persist.DBID       `json:"dbid"`
+	CreationTime *time.Time         `json:"creationTime"`
+	LastUpdated  *time.Time         `json:"lastUpdated"`
+	ReplyTo      *Comment           `json:"replyTo"`
+	Commenter    *GalleryUser       `json:"commenter"`
+	Comment      *string            `json:"comment"`
+	Replies      CommentsConnection `json:"replies"`
+	Source       CommentSource      `json:"source"`
+	Deleted      *bool              `json:"deleted"`
 }
 
 func (Comment) IsNode()          {}
@@ -1221,6 +1239,8 @@ type FeedEvent struct {
 	HasViewerAdmiredEvent *bool                            `json:"hasViewerAdmiredEvent"`
 }
 
+func (FeedEvent) IsAdmireSource()         {}
+func (FeedEvent) IsCommentSource()        {}
 func (FeedEvent) IsNode()                 {}
 func (FeedEvent) IsFeedEventOrError()     {}
 func (FeedEvent) IsFeedEventByIDOrError() {}
@@ -1247,6 +1267,8 @@ type FeedEventCommentsConnection struct {
 	Edges    []*FeedEventCommentEdge `json:"edges"`
 	PageInfo *PageInfo               `json:"pageInfo"`
 }
+
+func (FeedEventCommentsConnection) IsCommentsConnection() {}
 
 type FeedEventInteractionsConnection struct {
 	Edges    []*FeedEventInteractionsEdge `json:"edges"`
@@ -1632,6 +1654,8 @@ type Post struct {
 	ViewerAdmire *Admire                     `json:"viewerAdmire"`
 }
 
+func (Post) IsAdmireSource()     {}
+func (Post) IsCommentSource()    {}
 func (Post) IsPostOrError()      {}
 func (Post) IsNode()             {}
 func (Post) IsFeedEventOrError() {}
@@ -1659,6 +1683,8 @@ type PostCommentsConnection struct {
 	Edges    []*PostCommentEdge `json:"edges"`
 	PageInfo *PageInfo          `json:"pageInfo"`
 }
+
+func (PostCommentsConnection) IsCommentsConnection() {}
 
 type PostEdge struct {
 	Node   PostOrError `json:"node"`

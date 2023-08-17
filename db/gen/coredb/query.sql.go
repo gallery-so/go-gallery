@@ -1624,7 +1624,7 @@ func (q *Queries) GetCollectionsByGalleryId(ctx context.Context, id persist.DBID
 }
 
 const getCommentByCommentID = `-- name: GetCommentByCommentID :one
-SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id FROM comments WHERE id = $1 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id FROM comments WHERE id = $1
 `
 
 func (q *Queries) GetCommentByCommentID(ctx context.Context, id persist.DBID) (Comment, error) {
@@ -1681,7 +1681,7 @@ func (q *Queries) GetCommentsByActorID(ctx context.Context, actorID persist.DBID
 }
 
 const getCommentsByCommentIDs = `-- name: GetCommentsByCommentIDs :many
-SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id from comments WHERE id = ANY($1) AND deleted = false
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id from comments WHERE id = ANY($1)
 `
 
 func (q *Queries) GetCommentsByCommentIDs(ctx context.Context, commentIds persist.DBIDList) ([]Comment, error) {

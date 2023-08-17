@@ -30,6 +30,18 @@ func (r *admireResolver) Admirer(ctx context.Context, obj *model.Admire) (*model
 	return resolveGalleryUserByUserID(ctx, obj.Admirer.Dbid)
 }
 
+// Source is the resolver for the source field.
+func (r *admireResolver) Source(ctx context.Context, obj *model.Admire) (model.AdmireSource, error) {
+	if obj.PostID != nil {
+		return resolvePostByPostID(ctx, *obj.PostID)
+	}
+	if obj.FeedEventID != nil {
+		return resolveFeedEventByEventID(ctx, *obj.FeedEventID)
+	}
+
+	return nil, fmt.Errorf("admire source not found")
+}
+
 // Admire is the resolver for the admire field.
 func (r *admireFeedEventPayloadResolver) Admire(ctx context.Context, obj *model.AdmireFeedEventPayload) (*model.Admire, error) {
 	return resolveAdmireByAdmireID(ctx, obj.Admire.Dbid)
@@ -158,6 +170,63 @@ func (r *commentResolver) ReplyTo(ctx context.Context, obj *model.Comment) (*mod
 // Commenter is the resolver for the commenter field.
 func (r *commentResolver) Commenter(ctx context.Context, obj *model.Comment) (*model.GalleryUser, error) {
 	return resolveGalleryUserByUserID(ctx, obj.Commenter.Dbid)
+}
+
+// Replies is the resolver for the replies field.
+func (r *commentResolver) Replies(ctx context.Context, obj *model.Comment, before *string, after *string, first *int, last *int) (model.CommentsConnection, error) {
+	comments, pageInfo, err := publicapi.For(ctx).Interaction.PaginateRepliesByCommentID(ctx, obj.Dbid, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	if obj.FeedEventID != nil {
+		var edges []*model.FeedEventCommentEdge
+		f, err := resolveFeedEventByEventID(ctx, *obj.FeedEventID)
+		if err != nil {
+			return nil, err
+		}
+		for _, comment := range comments {
+
+			edges = append(edges, &model.FeedEventCommentEdge{
+				Node:  commentToModel(ctx, comment),
+				Event: f,
+			})
+		}
+		return &model.FeedEventCommentsConnection{
+			Edges:    edges,
+			PageInfo: pageInfoToModel(ctx, pageInfo),
+		}, nil
+	} else if obj.PostID != nil {
+		var edges []*model.PostCommentEdge
+		post, err := resolvePostByPostID(ctx, *obj.PostID)
+		if err != nil {
+			return nil, err
+		}
+		for _, comment := range comments {
+			edges = append(edges, &model.PostCommentEdge{
+				Node: commentToModel(ctx, comment),
+				Post: post,
+			})
+		}
+		return &model.PostCommentsConnection{
+			Edges:    edges,
+			PageInfo: pageInfoToModel(ctx, pageInfo),
+		}, nil
+	}
+
+	return nil, fmt.Errorf("comment has no source")
+}
+
+// Source is the resolver for the source field.
+func (r *commentResolver) Source(ctx context.Context, obj *model.Comment) (model.CommentSource, error) {
+	if obj.PostID != nil {
+		return resolvePostByPostID(ctx, *obj.PostID)
+	}
+	if obj.FeedEventID != nil {
+		return resolveFeedEventByEventID(ctx, *obj.FeedEventID)
+	}
+
+	return nil, fmt.Errorf("comment has no source")
 }
 
 // Comment is the resolver for the comment field.

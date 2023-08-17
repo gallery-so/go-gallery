@@ -58,6 +58,16 @@ type HelperGalleryUserData struct {
 	FeaturedGalleryID *persist.DBID
 }
 
+type HelperCommentData struct {
+	PostID      *persist.DBID
+	FeedEventID *persist.DBID
+}
+
+type HelperAdmireData struct {
+	PostID      *persist.DBID
+	FeedEventID *persist.DBID
+}
+
 type HelperNotificationSettingsData struct {
 	UserId persist.DBID
 }

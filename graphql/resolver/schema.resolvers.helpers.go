@@ -1727,7 +1727,19 @@ func usersToEdges(ctx context.Context, users []db.User) []*model.UserEdge {
 // admireToModel converts a db.Admire to a model.Admire
 func admireToModel(ctx context.Context, admire db.Admire) *model.Admire {
 
+	var postID, feedEventID *persist.DBID
+	if admire.PostID != "" {
+		postID = &admire.PostID
+	}
+	if admire.FeedEventID != "" {
+		feedEventID = &admire.FeedEventID
+	}
+
 	return &model.Admire{
+		HelperAdmireData: model.HelperAdmireData{
+			PostID:      postID,
+			FeedEventID: feedEventID,
+		},
 		Dbid:         admire.ID,
 		CreationTime: &admire.CreatedAt,
 		LastUpdated:  &admire.LastUpdated,
@@ -1738,12 +1750,27 @@ func admireToModel(ctx context.Context, admire db.Admire) *model.Admire {
 // commentToModel converts a db.Admire to a model.Admire
 func commentToModel(ctx context.Context, comment db.Comment) *model.Comment {
 
+	var postID, feedEventID *persist.DBID
+	if comment.PostID != "" {
+		postID = &comment.PostID
+	}
+	if comment.FeedEventID != "" {
+		feedEventID = &comment.FeedEventID
+	}
 	return &model.Comment{
+		HelperCommentData: model.HelperCommentData{
+			PostID:      postID,
+			FeedEventID: feedEventID,
+		},
 		Dbid:         comment.ID,
 		CreationTime: &comment.CreatedAt,
 		LastUpdated:  &comment.LastUpdated,
 		Comment:      &comment.Comment,
 		Commenter:    &model.GalleryUser{Dbid: comment.ActorID}, // remaining fields handled by dedicated resolver
+		ReplyTo:      nil,                                       // handled by dedicated resolver
+		Replies:      nil,                                       // handled by dedicated resolver
+		Source:       nil,                                       // handled by dedicated resolver
+		Deleted:      &comment.Deleted,
 	}
 }
 
