@@ -784,6 +784,17 @@ func testGetCommunity(t *testing.T) {
 	})
 }
 
+func testAdmireToken(t *testing.T) {
+	ctx := context.Background()
+	alice := newUserWithTokensFixture(t)
+	userF := newUserFixture(t)
+	c := authedHandlerClient(t, userF.ID)
+
+	tokenResp, err := admireToken(t, ctx, c, alice.TokenIDs[0])
+
+	assert.NotEmpty(t, tokenResp)
+}
+
 func testViewToken(t *testing.T) {
 	ctx := context.Background()
 	userF := newUserWithTokensFixture(t)
@@ -1453,6 +1464,15 @@ func admirePost(t *testing.T, ctx context.Context, c genql.Client, postID persis
 	require.NoError(t, err)
 
 	_ = (*resp.AdmirePost).(*admirePostMutationAdmirePostAdmirePostPayload)
+}
+
+// admireToken makes a GraphQL request to admire a token
+func admireToken(t *testing.T, ctx context.Context, c genql.Client, tokenID persist.DBID) {
+	t.Helper()
+	resp, err := admireTokenMutation(ctx, c, tokenID)
+	require.NoError(t, err)
+
+	_ = (*resp.AdmireToken).(*admirePostMutationAdmireTokenAdmireTokenPayload)
 }
 
 // commentOnPost makes a GraphQL request to comment on a post

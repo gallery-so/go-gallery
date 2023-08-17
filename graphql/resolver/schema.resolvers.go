@@ -50,6 +50,16 @@ func (r *admirePostPayloadResolver) Admire(ctx context.Context, obj *model.Admir
 	return resolveAdmireByAdmireID(ctx, obj.Admire.Dbid)
 }
 
+// Token is the resolver for the token field.
+func (r *admireTokenPayloadResolver) Token(ctx context.Context, obj *model.AdmireTokenPayload) (*model.Token, error) {
+	panic(fmt.Errorf("not implemented: Token - token"))
+}
+
+// Admire is the resolver for the admire field.
+func (r *admireTokenPayloadResolver) Admire(ctx context.Context, obj *model.AdmireTokenPayload) (*model.Admire, error) {
+	panic(fmt.Errorf("not implemented: Admire - admire"))
+}
+
 // Gallery is the resolver for the gallery field.
 func (r *collectionResolver) Gallery(ctx context.Context, obj *model.Collection) (*model.Gallery, error) {
 	gallery, err := publicapi.For(ctx).Gallery.GetGalleryByCollectionId(ctx, obj.Dbid)
@@ -1305,6 +1315,11 @@ func (r *mutationResolver) AdmirePost(ctx context.Context, postID persist.DBID) 
 		Post:   &model.Post{Dbid: postID},
 	}
 	return output, nil
+}
+
+// AdmireToken is the resolver for the admireToken field.
+func (r *mutationResolver) AdmireToken(ctx context.Context, tokenID persist.DBID) (model.AdmireTokenPayloadOrError, error) {
+	panic(fmt.Errorf("not implemented: AdmireToken - admireToken"))
 }
 
 // RemoveAdmire is the resolver for the removeAdmire field.
@@ -2796,6 +2811,11 @@ func (r *Resolver) AdmirePostPayload() generated.AdmirePostPayloadResolver {
 	return &admirePostPayloadResolver{r}
 }
 
+// AdmireTokenPayload returns generated.AdmireTokenPayloadResolver implementation.
+func (r *Resolver) AdmireTokenPayload() generated.AdmireTokenPayloadResolver {
+	return &admireTokenPayloadResolver{r}
+}
+
 // Collection returns generated.CollectionResolver implementation.
 func (r *Resolver) Collection() generated.CollectionResolver { return &collectionResolver{r} }
 
@@ -3008,6 +3028,7 @@ func (r *Resolver) ChainPubKeyInput() generated.ChainPubKeyInputResolver {
 type admireResolver struct{ *Resolver }
 type admireFeedEventPayloadResolver struct{ *Resolver }
 type admirePostPayloadResolver struct{ *Resolver }
+type admireTokenPayloadResolver struct{ *Resolver }
 type collectionResolver struct{ *Resolver }
 type collectionCreatedFeedEventDataResolver struct{ *Resolver }
 type collectionTokenResolver struct{ *Resolver }
