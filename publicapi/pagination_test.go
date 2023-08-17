@@ -2,19 +2,37 @@ package publicapi
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 func TestMain(t *testing.T) {
 	t.Run("test cursor pagination", func(t *testing.T) {
+		t.Run("cursor encodes expected types", func(t *testing.T) {
+			_, err := pack(
+				time.Now(),
+				true,
+				1,
+				int64(1),
+				uint64(1),
+				"id",
+				persist.DBID("id"),
+				[]persist.DBID{"id0", "id1"},
+				[]persist.FeedEntityType{0, 1},
+			)
+			assert.NoError(t, err)
+		})
+
 		t.Run("cursor pagination returns expected edges", func(t *testing.T) {
 			t.Run("should return no edges if no edges", func(t *testing.T) {
 				edges := []string{}
 				first := 10
 				var last int
 
-				actual, _, err := pageFrom(edges, nil, identityCursor, nil, nil, &first, &last)
+				actual, _, err := pageFrom(edges, nil, stubbedCursor, nil, nil, &first, &last)
 				assert.NoError(t, err)
 				assert.Equal(t, 0, len(actual))
 			})
@@ -23,7 +41,7 @@ func TestMain(t *testing.T) {
 				edges := []string{"a", "b", "c", "d", "e"}
 				expected := []string{"a", "b", "c", "d", "e"}
 
-				actual, _, err := pageFrom(edges, nil, identityCursor, nil, nil, nil, nil)
+				actual, _, err := pageFrom(edges, nil, stubbedCursor, nil, nil, nil, nil)
 				assert.NoError(t, err)
 				assert.Equal(t, expected, actual)
 			})
@@ -32,7 +50,7 @@ func TestMain(t *testing.T) {
 				edges := []string{"a", "b", "c", "d", "e"}
 				first := 0
 
-				actual, _, err := pageFrom(edges, nil, identityCursor, nil, nil, &first, nil)
+				actual, _, err := pageFrom(edges, nil, stubbedCursor, nil, nil, &first, nil)
 				assert.NoError(t, err)
 				assert.Equal(t, 0, len(actual))
 			})
@@ -41,7 +59,7 @@ func TestMain(t *testing.T) {
 				edges := []string{"a", "b", "c", "d", "e"}
 				last := 0
 
-				actual, _, err := pageFrom(edges, nil, identityCursor, nil, nil, nil, &last)
+				actual, _, err := pageFrom(edges, nil, stubbedCursor, nil, nil, nil, &last)
 				assert.NoError(t, err)
 				assert.Equal(t, 0, len(actual))
 			})
@@ -51,7 +69,7 @@ func TestMain(t *testing.T) {
 				first := 2
 				expected := []string{"a", "b"}
 
-				actual, _, err := pageFrom(edges, nil, identityCursor, nil, nil, &first, nil)
+				actual, _, err := pageFrom(edges, nil, stubbedCursor, nil, nil, &first, nil)
 				assert.NoError(t, err)
 				assert.Equal(t, expected, actual)
 			})
@@ -61,7 +79,7 @@ func TestMain(t *testing.T) {
 				last := 2
 				expected := []string{"d", "e"}
 
-				actual, _, err := pageFrom(edges, nil, identityCursor, nil, nil, nil, &last)
+				actual, _, err := pageFrom(edges, nil, stubbedCursor, nil, nil, nil, &last)
 				assert.NoError(t, err)
 				assert.Equal(t, expected, actual)
 			})
@@ -72,7 +90,7 @@ func TestMain(t *testing.T) {
 				after := "b"
 				expected := []string{"c", "d"}
 
-				actual, _, err := pageFrom(edges, nil, identityCursor, nil, &after, &first, nil)
+				actual, _, err := pageFrom(edges, nil, stubbedCursor, nil, &after, &first, nil)
 				assert.NoError(t, err)
 				assert.Equal(t, expected, actual)
 			})
@@ -83,7 +101,7 @@ func TestMain(t *testing.T) {
 				before := "d"
 				expected := []string{"b", "c"}
 
-				actual, _, err := pageFrom(edges, nil, identityCursor, &before, nil, nil, &last)
+				actual, _, err := pageFrom(edges, nil, stubbedCursor, &before, nil, nil, &last)
 				assert.NoError(t, err)
 				assert.Equal(t, expected, actual)
 			})
@@ -95,7 +113,7 @@ func TestMain(t *testing.T) {
 				after := "a"
 				expected := []string{"c", "d"}
 
-				actual, _, err := pageFrom(edges, nil, identityCursor, &before, &after, nil, &last)
+				actual, _, err := pageFrom(edges, nil, stubbedCursor, &before, &after, nil, &last)
 				assert.NoError(t, err)
 				assert.Equal(t, expected, actual)
 			})
@@ -106,7 +124,7 @@ func TestMain(t *testing.T) {
 				edges := []string{}
 				first := 10
 
-				_, pageInfo, err := pageFrom(edges, nil, identityCursor, nil, nil, &first, nil)
+				_, pageInfo, err := pageFrom(edges, nil, stubbedCursor, nil, nil, &first, nil)
 				assert.NoError(t, err)
 				assert.Equal(t, 0, pageInfo.Size)
 				assert.Equal(t, false, pageInfo.HasPreviousPage)
@@ -119,7 +137,7 @@ func TestMain(t *testing.T) {
 				edges := []string{"a", "b", "c", "d", "e"}
 				first := 10
 
-				_, pageInfo, err := pageFrom(edges, nil, identityCursor, nil, nil, &first, nil)
+				_, pageInfo, err := pageFrom(edges, nil, stubbedCursor, nil, nil, &first, nil)
 				assert.NoError(t, err)
 				assert.Equal(t, 5, pageInfo.Size)
 				assert.Equal(t, false, pageInfo.HasPreviousPage)
@@ -132,7 +150,7 @@ func TestMain(t *testing.T) {
 				edges := []string{"a", "b", "c", "d", "e"}
 				first := 2
 
-				_, pageInfo, err := pageFrom(edges, nil, identityCursor, nil, nil, &first, nil)
+				_, pageInfo, err := pageFrom(edges, nil, stubbedCursor, nil, nil, &first, nil)
 				assert.NoError(t, err)
 				assert.Equal(t, 2, pageInfo.Size)
 				assert.Equal(t, false, pageInfo.HasPreviousPage)
@@ -145,7 +163,7 @@ func TestMain(t *testing.T) {
 				edges := []string{"a", "b", "c", "d", "e"}
 				last := 2
 
-				_, pageInfo, err := pageFrom(edges, nil, identityCursor, nil, nil, nil, &last)
+				_, pageInfo, err := pageFrom(edges, nil, stubbedCursor, nil, nil, nil, &last)
 				assert.NoError(t, err)
 				assert.Equal(t, 2, pageInfo.Size)
 				assert.Equal(t, true, pageInfo.HasPreviousPage)
@@ -158,7 +176,7 @@ func TestMain(t *testing.T) {
 
 	t.Run("test keyset pagination", func(t *testing.T) {
 		t.Run("should exclude extra edges", func(t *testing.T) {
-			p := newStubKeysetPaginator([]any{"a", "b", "c", "d", "e", "extra"})
+			p := newStubPaginator([]any{"a", "b", "c", "d", "e", "extra"})
 			expected := []string{"a", "b", "c", "d", "e"}
 			first := 5
 
@@ -174,7 +192,7 @@ func TestMain(t *testing.T) {
 		})
 
 		t.Run("should return expected page info when paging forward", func(t *testing.T) {
-			p := newStubKeysetPaginator([]any{"a", "b", "c", "d", "e", "extra"})
+			p := newStubPaginator([]any{"a", "b", "c", "d", "e", "extra"})
 			first := 5
 
 			_, pageInfo, err := p.paginate(nil, nil, &first, nil)
@@ -187,7 +205,7 @@ func TestMain(t *testing.T) {
 		})
 
 		t.Run("should return expected edge order when paging backwards", func(t *testing.T) {
-			p := newStubKeysetPaginator([]any{"e", "d", "c", "b", "a", "extra"})
+			p := newStubPaginator([]any{"e", "d", "c", "b", "a", "extra"})
 			expected := []string{"a", "b", "c", "d", "e"}
 			last := 5
 
@@ -203,7 +221,7 @@ func TestMain(t *testing.T) {
 		})
 
 		t.Run("should return expected page info when paging backwards", func(t *testing.T) {
-			p := newStubKeysetPaginator([]any{"e", "d", "c", "b", "a", "extra"})
+			p := newStubPaginator([]any{"e", "d", "c", "b", "a", "extra"})
 			last := 5
 
 			_, pageInfo, err := p.paginate(nil, nil, nil, &last)
@@ -217,20 +235,21 @@ func TestMain(t *testing.T) {
 	})
 }
 
-func identityCursor(s string) (string, error) {
-	return s, nil
-}
+type stubCursor struct{ ID string }
 
-func newStubKeysetPaginator(ret []any) keysetPaginator {
+func (p stubCursor) Pack() (string, error) { return p.ID, nil }
+func (p stubCursor) Unpack(s string) error { panic("not implemented") }
+
+var stubbedCursor = func(node any) (c cursorer, err error) { return stubCursor{ID: node.(string)}, nil }
+
+func newStubPaginator(ret []any) keysetPaginator {
 	var p keysetPaginator
 
 	p.QueryFunc = func(int32, bool) ([]any, error) {
 		return ret, nil
 	}
 
-	p.CursorFunc = func(a any) (string, error) {
-		return a.(string), nil
-	}
+	p.Cursorable = stubbedCursor
 
 	return p
 }

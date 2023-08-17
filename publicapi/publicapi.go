@@ -150,8 +150,8 @@ func newDBIDCache(cache *redis.Cache, key string, ttl time.Duration, f func(cont
 					return nil, err
 				}
 
-				var p positionPaginator
-				b, err := p.encodeCursor(0, ids)
+				cur := positionCursor{CurrentPosition: 0, IDs: ids}
+				b, err := cur.Pack()
 				return []byte(b), err
 			},
 		},
@@ -163,7 +163,7 @@ func (d dbidCache) Load(ctx context.Context) ([]persist.DBID, error) {
 	if err != nil {
 		return nil, err
 	}
-	var p positionPaginator
-	_, ids, err := p.decodeCursor(string(b))
-	return ids, err
+	var cur positionCursor
+	err = cur.Unpack(string(b))
+	return cur.IDs, err
 }
