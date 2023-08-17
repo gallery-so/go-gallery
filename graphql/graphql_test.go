@@ -80,6 +80,7 @@ func testGraphQL(t *testing.T) {
 		{title: "should move collection to new gallery", run: testMoveCollection},
 		{title: "should connect social account", run: testConnectSocialAccount},
 		{title: "should view a token", run: testViewToken},
+		{title: "should admire a token", run: testAdmireToken},
 	}
 	for _, test := range tests {
 		t.Run(test.title, testWithFixtures(test.run, test.fixtures...))
@@ -789,10 +790,7 @@ func testAdmireToken(t *testing.T) {
 	alice := newUserWithTokensFixture(t)
 	userF := newUserFixture(t)
 	c := authedHandlerClient(t, userF.ID)
-
-	tokenResp, err := admireToken(t, ctx, c, alice.TokenIDs[0])
-
-	assert.NotEmpty(t, tokenResp)
+	admireToken(t, ctx, c, alice.TokenIDs[0])
 }
 
 func testViewToken(t *testing.T) {
@@ -1472,7 +1470,7 @@ func admireToken(t *testing.T, ctx context.Context, c genql.Client, tokenID pers
 	resp, err := admireTokenMutation(ctx, c, tokenID)
 	require.NoError(t, err)
 
-	_ = (*resp.AdmireToken).(*admirePostMutationAdmireTokenAdmireTokenPayload)
+	_ = (*resp.AdmireToken).(*admireTokenMutationAdmireTokenAdmireTokenPayload)
 }
 
 // commentOnPost makes a GraphQL request to comment on a post
