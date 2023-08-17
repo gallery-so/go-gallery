@@ -80,6 +80,7 @@ from feed_entity_scores f1
 where f1.created_at > @window_end::timestamptz
   and (@include_viewer::bool or f1.actor_id != @viewer_id)
   and (@include_posts::bool or f1.feed_entity_type != @post_entity_type)
+  and (@include_events::bool or f1.feed_entity_type != @feed_entity_type)
   and not (f1.action = any(@excluded_feed_actions::varchar[]))
 union
 select *
