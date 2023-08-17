@@ -3447,6 +3447,32 @@ func (q *Queries) GetTokenByTokenIdentifiers(ctx context.Context, arg GetTokenBy
 	return i, err
 }
 
+const getTokenMediaByTokenId = `-- name: GetTokenMediaByTokenId :one
+select tm.id, tm.created_at, tm.last_updated, tm.version, tm.contract_id, tm.token_id, tm.chain, tm.active, tm.metadata, tm.media, tm.name, tm.description, tm.processing_job_id, tm.deleted from tokens join token_medias tm on tokens.id = tm.token_id where tokens.id = $1 and tokens.displayable and not tokens.deleted and not tm.deleted
+`
+
+func (q *Queries) GetTokenMediaByTokenId(ctx context.Context, id persist.DBID) (TokenMedia, error) {
+	row := q.db.QueryRow(ctx, getTokenMediaByTokenId, id)
+	var i TokenMedia
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.LastUpdated,
+		&i.Version,
+		&i.ContractID,
+		&i.TokenID,
+		&i.Chain,
+		&i.Active,
+		&i.Metadata,
+		&i.Media,
+		&i.Name,
+		&i.Description,
+		&i.ProcessingJobID,
+		&i.Deleted,
+	)
+	return i, err
+}
+
 const getTokenOwnerByID = `-- name: GetTokenOwnerByID :one
 select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id from tokens t
     join users u on u.id = t.owner_user_id
