@@ -235,6 +235,10 @@ func toRecord(r string) (AvatarRecord, error) {
 		return EnsHttpRecord{URL: r}, nil
 	case strings.HasPrefix(r, "ipfs://"):
 		return EnsIpfsRecord{URL: r}, nil
+	case strings.HasPrefix(r, "data:image/svg;base64"):
+		return EnsDataSvgBase64Record{URL: r}, nil
+	case strings.HasPrefix(r, "data:image/svg"):
+		return EnsDataSvgRecord{URL: r}, nil
 	case caip19AssetTypeWithAssetID.MatchString(r):
 		g := caip19AssetTypeWithAssetID.FindStringSubmatch(r)
 		return EnsTokenRecord{
@@ -259,6 +263,18 @@ type EnsHttpRecord struct {
 func (EnsHttpRecord) IsAvatarURI() {}
 
 type EnsIpfsRecord struct {
+	URL string
+}
+
+func (EnsDataSvgRecord) IsAvatarURI() {}
+
+type EnsDataSvgRecord struct {
+	URL string
+}
+
+func (EnsDataSvgBase64Record) IsAvatarURI() {}
+
+type EnsDataSvgBase64Record struct {
 	URL string
 }
 
