@@ -1612,6 +1612,7 @@ func (v *admireTokenMutationAdmireTokenAdmireTokenPayload) GetToken() *admireTok
 // admireTokenMutationAdmireTokenAdmireTokenPayload
 // admireTokenMutationAdmireTokenErrInvalidInput
 // admireTokenMutationAdmireTokenErrNotAuthorized
+// admireTokenMutationAdmireTokenErrTokenNotFound
 type admireTokenMutationAdmireTokenAdmireTokenPayloadOrError interface {
 	implementsGraphQLInterfaceadmireTokenMutationAdmireTokenAdmireTokenPayloadOrError()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
@@ -1623,6 +1624,8 @@ func (v *admireTokenMutationAdmireTokenAdmireTokenPayload) implementsGraphQLInte
 func (v *admireTokenMutationAdmireTokenErrInvalidInput) implementsGraphQLInterfaceadmireTokenMutationAdmireTokenAdmireTokenPayloadOrError() {
 }
 func (v *admireTokenMutationAdmireTokenErrNotAuthorized) implementsGraphQLInterfaceadmireTokenMutationAdmireTokenAdmireTokenPayloadOrError() {
+}
+func (v *admireTokenMutationAdmireTokenErrTokenNotFound) implementsGraphQLInterfaceadmireTokenMutationAdmireTokenAdmireTokenPayloadOrError() {
 }
 
 func __unmarshaladmireTokenMutationAdmireTokenAdmireTokenPayloadOrError(b []byte, v *admireTokenMutationAdmireTokenAdmireTokenPayloadOrError) error {
@@ -1647,6 +1650,9 @@ func __unmarshaladmireTokenMutationAdmireTokenAdmireTokenPayloadOrError(b []byte
 		return json.Unmarshal(b, *v)
 	case "ErrNotAuthorized":
 		*v = new(admireTokenMutationAdmireTokenErrNotAuthorized)
+		return json.Unmarshal(b, *v)
+	case "ErrTokenNotFound":
+		*v = new(admireTokenMutationAdmireTokenErrTokenNotFound)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -1683,6 +1689,14 @@ func __marshaladmireTokenMutationAdmireTokenAdmireTokenPayloadOrError(v *admireT
 		result := struct {
 			TypeName string `json:"__typename"`
 			*admireTokenMutationAdmireTokenErrNotAuthorized
+		}{typename, v}
+		return json.Marshal(result)
+	case *admireTokenMutationAdmireTokenErrTokenNotFound:
+		typename = "ErrTokenNotFound"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*admireTokenMutationAdmireTokenErrTokenNotFound
 		}{typename, v}
 		return json.Marshal(result)
 	case nil:
@@ -1724,6 +1738,18 @@ func (v *admireTokenMutationAdmireTokenErrNotAuthorized) GetTypename() *string {
 
 // GetMessage returns admireTokenMutationAdmireTokenErrNotAuthorized.Message, and is useful for accessing the field via an interface.
 func (v *admireTokenMutationAdmireTokenErrNotAuthorized) GetMessage() string { return v.Message }
+
+// admireTokenMutationAdmireTokenErrTokenNotFound includes the requested fields of the GraphQL type ErrTokenNotFound.
+type admireTokenMutationAdmireTokenErrTokenNotFound struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns admireTokenMutationAdmireTokenErrTokenNotFound.Typename, and is useful for accessing the field via an interface.
+func (v *admireTokenMutationAdmireTokenErrTokenNotFound) GetTypename() *string { return v.Typename }
+
+// GetMessage returns admireTokenMutationAdmireTokenErrTokenNotFound.Message, and is useful for accessing the field via an interface.
+func (v *admireTokenMutationAdmireTokenErrTokenNotFound) GetMessage() string { return v.Message }
 
 // admireTokenMutationResponse is returned by admireTokenMutation on success.
 type admireTokenMutationResponse struct {

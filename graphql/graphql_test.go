@@ -1470,6 +1470,7 @@ func admireToken(t *testing.T, ctx context.Context, c genql.Client, tokenID pers
 	resp, err := admireTokenMutation(ctx, c, tokenID)
 	require.NoError(t, err)
 
+	fmt.Println("resp", resp);
 	_ = (*resp.AdmireToken).(*admireTokenMutationAdmireTokenAdmireTokenPayload)
 }
 

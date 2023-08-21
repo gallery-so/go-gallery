@@ -1153,6 +1153,7 @@ func (ErrTokenNotFound) IsError()                         {}
 func (ErrTokenNotFound) IsCollectionTokenByIDOrError()    {}
 func (ErrTokenNotFound) IsViewTokenPayloadOrError()       {}
 func (ErrTokenNotFound) IsSetProfileImagePayloadOrError() {}
+func (ErrTokenNotFound) IsAdmireTokenPayloadOrError()     {}
 
 type ErrUnknownAction struct {
 	Message string `json:"message"`

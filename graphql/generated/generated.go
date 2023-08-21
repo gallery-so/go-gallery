@@ -10394,7 +10394,7 @@ type AdmireTokenPayload {
   admire: Admire @goField(forceResolver: true)
 }
 
-union AdmireTokenPayloadOrError = AdmireTokenPayload | ErrInvalidInput | ErrNotAuthorized
+union AdmireTokenPayloadOrError = AdmireTokenPayload | ErrTokenNotFound | ErrInvalidInput | ErrNotAuthorized
 
 type CommentOnPostPayload {
   viewer: Viewer
@@ -58729,6 +58729,13 @@ func (ec *executionContext) _AdmireTokenPayloadOrError(ctx context.Context, sel 
 			return graphql.Null
 		}
 		return ec._AdmireTokenPayload(ctx, sel, obj)
+	case model.ErrTokenNotFound:
+		return ec._ErrTokenNotFound(ctx, sel, &obj)
+	case *model.ErrTokenNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrTokenNotFound(ctx, sel, obj)
 	case model.ErrInvalidInput:
 		return ec._ErrInvalidInput(ctx, sel, &obj)
 	case *model.ErrInvalidInput:
@@ -64949,7 +64956,7 @@ func (ec *executionContext) _ErrSyncFailed(ctx context.Context, sel ast.Selectio
 	return out
 }
 
-var errTokenNotFoundImplementors = []string{"ErrTokenNotFound", "TokenByIdOrError", "Error", "CollectionTokenByIdOrError", "ViewTokenPayloadOrError", "SetProfileImagePayloadOrError"}
+var errTokenNotFoundImplementors = []string{"ErrTokenNotFound", "TokenByIdOrError", "Error", "CollectionTokenByIdOrError", "ViewTokenPayloadOrError", "SetProfileImagePayloadOrError", "AdmireTokenPayloadOrError"}
 
 func (ec *executionContext) _ErrTokenNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrTokenNotFound) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errTokenNotFoundImplementors)

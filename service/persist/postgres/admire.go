@@ -52,7 +52,7 @@ func (a *AdmireRepository) CreateAdmire(ctx context.Context, feedEventID, postID
 
 }
 
-func (a *AdmireRepository) CreateAdmireToken(ctx context.Context, tokenID, actorID persist.DBID) (persist.DBID, error) {
+func (a *AdmireRepository) CreateTokenAdmire(ctx context.Context, tokenID, actorID persist.DBID) (persist.DBID, error) {
 	var tokenString sql.NullString
 	if tokenID != "" {
 		tokenString = sql.NullString{
@@ -63,7 +63,7 @@ func (a *AdmireRepository) CreateAdmireToken(ctx context.Context, tokenID, actor
 
 	admireID, err := a.queries.CreateAdmire(ctx, db.CreateAdmireParams{
 		ID:        persist.GenerateID(),
-		Token:      tokenString,
+		Token:     tokenString,
 		ActorID:   actorID,
 	})
 

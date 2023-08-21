@@ -667,6 +667,11 @@ func (api InteractionAPI) AdmireToken(ctx context.Context, tokenID persist.DBID)
 		return "", err
 	}
 
+	_, err := api.loaders.TokenByTokenID.Load(tokenID)
+	if err != nil {
+		return "", err
+	}
+
 	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return "", err
@@ -686,7 +691,7 @@ check later if admire already exists
 	    **/
 
 
-	admireID, err := api.repos.AdmireRepository.CreateAdmireToken(ctx, tokenID, userID)
+	admireID, err := api.repos.AdmireRepository.CreateTokenAdmire(ctx, tokenID, userID)
 	if err != nil {
 		return "", err
 	}
@@ -704,7 +709,7 @@ check later if admire already exists
 	if err != nil {
 		return "", err
 	}*/
-
+	fmt.Println("admire ID hereeeeeeeeee", admireID);
 	return admireID, err
 }
 

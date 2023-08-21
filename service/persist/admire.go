@@ -17,7 +17,7 @@ type Admire struct {
 
 type AdmireRepository interface {
 	CreateAdmire(ctx context.Context, feedEventID DBID, actorID DBID) (DBID, error)
-	CreateAdmireToken(ctx context.Context, tokenID DBID) (DBID, error)
+	CreateTokenAdmire(ctx context.Context, tokenID DBID) (DBID, error)
 	RemoveAdmire(ctx context.Context, admireID DBID) error
 }
 
