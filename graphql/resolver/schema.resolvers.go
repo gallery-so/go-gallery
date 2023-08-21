@@ -52,12 +52,12 @@ func (r *admirePostPayloadResolver) Admire(ctx context.Context, obj *model.Admir
 
 // Token is the resolver for the token field.
 func (r *admireTokenPayloadResolver) Token(ctx context.Context, obj *model.AdmireTokenPayload) (*model.Token, error) {
-	panic(fmt.Errorf("not implemented: Token - token"))
+	return resolveTokenByTokenID(ctx, obj.Token.Dbid)
 }
 
 // Admire is the resolver for the admire field.
 func (r *admireTokenPayloadResolver) Admire(ctx context.Context, obj *model.AdmireTokenPayload) (*model.Admire, error) {
-	panic(fmt.Errorf("not implemented: Admire - admire"))
+	return resolveAdmireByAdmireID(ctx, obj.Admire.Dbid)
 }
 
 // Gallery is the resolver for the gallery field.

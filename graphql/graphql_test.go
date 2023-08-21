@@ -787,9 +787,9 @@ func testGetCommunity(t *testing.T) {
 
 func testAdmireToken(t *testing.T) {
 	ctx := context.Background()
-	alice := newUserWithTokensFixture(t)
 	userF := newUserFixture(t)
 	c := authedHandlerClient(t, userF.ID)
+	alice := newUserWithTokensFixture(t)
 	admireToken(t, ctx, c, alice.TokenIDs[0])
 }
 
