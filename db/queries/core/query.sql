@@ -82,6 +82,9 @@ SELECT c.* FROM galleries g, unnest(g.collections)
 -- name: GetTokenById :one
 select * from tokens where id = $1 and displayable and deleted = false;
 
+-- name: GetTokenMediaByTokenId :one
+select tm.* from tokens join token_medias tm on tokens.token_media_id = tm.id where tokens.id = $1 and tokens.displayable and not tokens.deleted and not tm.deleted;
+
 -- name: GetTokenByIdBatch :batchone
 select * from tokens where id = $1 and displayable and deleted = false;
 
