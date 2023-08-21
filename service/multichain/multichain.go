@@ -36,6 +36,12 @@ const staleCommunityTime = time.Minute * 30
 
 const maxCommunitySize = 10_000
 
+var contractNameBlacklist = map[string]bool{
+	"unidentified contract": true,
+	"unknown contract":      true,
+	"unknown":               true,
+}
+
 // SendTokens is called to process a user's batch of tokens
 type SendTokens func(context.Context, task.TokenProcessingUserMessage) error
 
@@ -185,6 +191,7 @@ type OpenSeaChildContractFetcher interface {
 
 // ContractRefresher supports refreshes of a contract
 type ContractRefresher interface {
+	ContractsFetcher
 	RefreshContract(context.Context, persist.Address) error
 }
 
@@ -1218,7 +1225,7 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 			}
 
 			// contract
-			if contract.Name != "" && finalContractDescriptors.Name == "" {
+			if (contract.Name != "" && !contractNameBlacklist[strings.ToLower(contract.Name)]) && finalContractDescriptors.Name == "" {
 				finalContractDescriptors.Name = contract.Name
 			}
 			if contract.Description != "" && finalContractDescriptors.Description == "" {
@@ -1260,12 +1267,20 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 // RefreshContract refreshes a contract on the given chain using the chain provider for that chain
 func (p *Provider) RefreshContract(ctx context.Context, ci persist.ContractIdentifiers) error {
 	contractRefreshers := matchingProvidersForChain[ContractRefresher](p.Chains, ci.Chain)
-	for _, refresher := range contractRefreshers {
+	var contracts []chainContracts
+	for i, refresher := range contractRefreshers {
 		if err := refresher.RefreshContract(ctx, ci.ContractAddress); err != nil {
 			return err
 		}
+		c, err := refresher.GetContractByAddress(ctx, ci.ContractAddress)
+		if err != nil {
+			return err
+		}
+		contracts = append(contracts, chainContracts{priority: i, chain: ci.Chain, contracts: []ChainAgnosticContract{c}})
 	}
-	return nil
+
+	_, err := p.processContracts(ctx, contracts, false)
+	return err
 }
 
 // RefreshTokensForContract refreshes all tokens in a given contract
@@ -1789,7 +1804,7 @@ func contractsToNewDedupedContracts(contracts []chainContracts) []persist.Contra
 			if contract.Descriptors.Symbol != "" {
 				meta.Symbol = contract.Descriptors.Symbol
 			}
-			if contract.Descriptors.Name != "" {
+			if contract.Descriptors.Name != "" && !contractNameBlacklist[strings.ToLower(contract.Descriptors.Name)] {
 				meta.Name = contract.Descriptors.Name
 			}
 			if contract.Descriptors.CreatorAddress != "" {
