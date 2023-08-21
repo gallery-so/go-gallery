@@ -12,18 +12,26 @@ import (
 func TestMain(t *testing.T) {
 	t.Run("test cursor pagination", func(t *testing.T) {
 		t.Run("cursor encodes expected types", func(t *testing.T) {
-			_, err := pack(
-				time.Now(),
-				true,
-				1,
-				int64(1),
-				uint64(1),
-				"id",
-				persist.DBID("id"),
-				[]persist.DBID{"id0", "id1"},
-				[]persist.FeedEntityType{0, 1},
-			)
-			assert.NoError(t, err)
+			types := []struct {
+				title string
+				typ   any
+			}{
+				{title: "can encode time", typ: time.Now()},
+				{title: "can encode bool", typ: true},
+				{title: "can encode int", typ: 1},
+				{title: "can encode int64", typ: int64(1)},
+				{title: "can encode uint64", typ: uint64(1)},
+				{title: "can encode stirng", typ: "id"},
+				{title: "can encode dbid", typ: persist.DBID("id")},
+				{title: "can encode slice of dbids", typ: []persist.DBID{"id0", "id1"}},
+				{title: "can encode slice of feed entity types", typ: []persist.FeedEntityType{0, 1}},
+			}
+			for _, typ := range types {
+				t.Run(typ.title, func(t *testing.T) {
+					_, err := pack(typ.typ)
+					assert.NoError(t, err)
+				})
+			}
 		})
 
 		t.Run("cursor pagination returns expected edges", func(t *testing.T) {

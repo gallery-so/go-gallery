@@ -237,8 +237,14 @@ type timeIDPagingParams struct {
 
 func (p *timeIDPaginator) paginate(before *string, after *string, first *int, last *int) ([]any, PageInfo, error) {
 	queryFunc := func(limit int32, pagingForward bool) ([]any, error) {
-		beforeCur := timeIDCursor{Time: defaultCursorBeforeTime, ID: defaultCursorBeforeID}
-		afterCur := timeIDCursor{Time: defaultCursorAfterTime, ID: defaultCursorAfterID}
+		beforeCur := timeIDCursor{
+			Time: defaultCursorBeforeTime,
+			ID:   defaultCursorBeforeID,
+		}
+		afterCur := timeIDCursor{
+			Time: defaultCursorAfterTime,
+			ID:   defaultCursorAfterID,
+		}
 
 		if before != nil {
 			if err := beforeCur.Unpack(*before); err != nil {
@@ -279,8 +285,14 @@ func (p *sharedFollowersPaginator) paginate(before *string, after *string, first
 	queryFunc := func(limit int32, pagingForward bool) ([]interface{}, error) {
 		// The shared followers query orders results in descending order when
 		// paging forward (vs. ascending order which is more typical).
-		beforeCur := timeIDCursor{Time: time.Date(1970, 1, 1, 1, 1, 1, 1, time.UTC), ID: defaultCursorBeforeID}
-		afterCur := timeIDCursor{Time: time.Date(3000, 1, 1, 1, 1, 1, 1, time.UTC), ID: defaultCursorAfterID}
+		beforeCur := timeIDCursor{
+			Time: time.Date(1970, 1, 1, 1, 1, 1, 1, time.UTC),
+			ID:   defaultCursorBeforeID,
+		}
+		afterCur := timeIDCursor{
+			Time: time.Date(3000, 1, 1, 1, 1, 1, 1, time.UTC),
+			ID:   defaultCursorAfterID,
+		}
 
 		if before != nil {
 			if err := beforeCur.Unpack(*before); err != nil {
@@ -346,8 +358,18 @@ type sharedContractsPaginator struct {
 
 func (p *sharedContractsPaginator) paginate(before *string, after *string, first *int, last *int) ([]interface{}, PageInfo, error) {
 	queryFunc := func(limit int32, pagingForward bool) ([]interface{}, error) {
-		beforeCur := boolBootIntIDCursor{Bool1: false, Bool2: false, Int: -1, ID: defaultCursorBeforeID}
-		afterCur := boolBootIntIDCursor{Bool1: true, Bool2: true, Int: math.MaxInt32, ID: defaultCursorAfterID}
+		beforeCur := boolBootIntIDCursor{
+			Bool1: false,
+			Bool2: false,
+			Int:   -1,
+			ID:    defaultCursorBeforeID,
+		}
+		afterCur := boolBootIntIDCursor{
+			Bool1: true,
+			Bool2: true,
+			Int:   math.MaxInt32,
+			ID:    defaultCursorAfterID,
+		}
 
 		if before != nil {
 			if err := beforeCur.Unpack(*before); err != nil {
@@ -411,8 +433,16 @@ type boolTimeIDPaginator struct {
 
 func (p *boolTimeIDPaginator) paginate(before *string, after *string, first *int, last *int) ([]interface{}, PageInfo, error) {
 	queryFunc := func(limit int32, pagingForward bool) ([]interface{}, error) {
-		beforeCur := boolTimeIDCursor{Bool: true, Time: defaultCursorBeforeTime, ID: defaultCursorBeforeID}
-		afterCur := boolTimeIDCursor{Bool: false, Time: defaultCursorAfterTime, ID: defaultCursorAfterID}
+		beforeCur := boolTimeIDCursor{
+			Bool: true,
+			Time: defaultCursorBeforeTime,
+			ID:   defaultCursorBeforeID,
+		}
+		afterCur := boolTimeIDCursor{
+			Bool: false,
+			Time: defaultCursorAfterTime,
+			ID:   defaultCursorAfterID,
+		}
 
 		if before != nil {
 			if err := beforeCur.Unpack(*before); err != nil {
@@ -561,8 +591,8 @@ func (p *positionPaginator) paginate(before *string, after *string, first *int, 
 			CurAfterPos:  defaultCursorAfterPosition,
 		}
 
-		beforeCur := positionCursor{}
-		afterCur := positionCursor{}
+		var beforeCur positionCursor
+		var afterCur positionCursor
 
 		for _, opt := range opts {
 			opt(&args)
@@ -628,8 +658,16 @@ type intTimeIDPagingParams struct {
 
 func (p *intTimeIDPaginator) paginate(before *string, after *string, first *int, last *int) ([]interface{}, PageInfo, error) {
 	queryFunc := func(limit int32, pagingForward bool) ([]interface{}, error) {
-		beforeCur := intTimeIDCursor{Int: math.MaxInt32, Time: defaultCursorBeforeTime, ID: defaultCursorBeforeID}
-		afterCur := intTimeIDCursor{Int: 0, Time: defaultCursorAfterTime, ID: defaultCursorAfterID}
+		beforeCur := intTimeIDCursor{
+			Int:  math.MaxInt32,
+			Time: defaultCursorBeforeTime,
+			ID:   defaultCursorBeforeID,
+		}
+		afterCur := intTimeIDCursor{
+			Int:  0,
+			Time: defaultCursorAfterTime,
+			ID:   defaultCursorAfterID,
+		}
 
 		if before != nil {
 			if err := beforeCur.Unpack(*before); err != nil {
