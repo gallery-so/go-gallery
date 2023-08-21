@@ -1774,7 +1774,7 @@ func commentToModel(ctx context.Context, comment db.Comment) *model.Comment {
 		ReplyTo:      nil,                                       // handled by dedicated resolver
 		Replies:      nil,                                       // handled by dedicated resolver
 		Source:       nil,                                       // handled by dedicated resolver
-		Deleted:      &comment.Deleted,
+		Deleted:      &comment.Removed,
 	}
 }
 

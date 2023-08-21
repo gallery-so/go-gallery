@@ -26,7 +26,7 @@ func NewCommentRepository(db *sql.DB, queries *db.Queries) *CommentRepository {
 	createStmt, err := db.PrepareContext(ctx, `INSERT INTO comments (ID, FEED_EVENT_ID, POST_ID, ACTOR_ID, REPLY_TO, COMMENT) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ID;`)
 	checkNoErr(err)
 
-	deleteStmt, err := db.PrepareContext(ctx, `UPDATE comments SET DELETED = TRUE WHERE ID = $1;`)
+	deleteStmt, err := db.PrepareContext(ctx, `UPDATE comments SET REMOVED = TRUE, COMMENT = 'comment removed' WHERE ID = $1;`)
 	checkNoErr(err)
 
 	return &CommentRepository{
