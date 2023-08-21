@@ -3448,7 +3448,7 @@ func (q *Queries) GetTokenByTokenIdentifiers(ctx context.Context, arg GetTokenBy
 }
 
 const getTokenMediaByTokenId = `-- name: GetTokenMediaByTokenId :one
-select tm.id, tm.created_at, tm.last_updated, tm.version, tm.contract_id, tm.token_id, tm.chain, tm.active, tm.metadata, tm.media, tm.name, tm.description, tm.processing_job_id, tm.deleted from tokens join token_medias tm on tokens.id = tm.token_id where tokens.id = $1 and tokens.displayable and not tokens.deleted and not tm.deleted
+select tm.id, tm.created_at, tm.last_updated, tm.version, tm.contract_id, tm.token_id, tm.chain, tm.active, tm.metadata, tm.media, tm.name, tm.description, tm.processing_job_id, tm.deleted from tokens join token_medias tm on tokens.token_media_id = tm.id where tokens.id = $1 and tokens.displayable and not tokens.deleted and not tm.deleted
 `
 
 func (q *Queries) GetTokenMediaByTokenId(ctx context.Context, id persist.DBID) (TokenMedia, error) {
