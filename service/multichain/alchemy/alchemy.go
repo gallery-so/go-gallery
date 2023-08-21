@@ -65,12 +65,17 @@ func (m *Metadata) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+type OpenseaCollection struct {
+	CollectionName string `json:"collectionName"`
+}
+
 type ContractMetadata struct {
-	Name             string                  `json:"name"`
-	Symbol           string                  `json:"symbol"`
-	TotalSupply      string                  `json:"totalSupply"`
-	TokenType        string                  `json:"tokenType"`
-	ContractDeployer persist.EthereumAddress `json:"contractDeployer"`
+	Name              string                  `json:"name"`
+	Symbol            string                  `json:"symbol"`
+	TotalSupply       string                  `json:"totalSupply"`
+	TokenType         string                  `json:"tokenType"`
+	ContractDeployer  persist.EthereumAddress `json:"contractDeployer"`
+	OpenseaCollection OpenseaCollection       `json:"openSea"`
 }
 
 type Contract struct {
