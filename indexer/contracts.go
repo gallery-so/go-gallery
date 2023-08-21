@@ -2,6 +2,7 @@ package indexer
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/multichain/alchemy"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/util"
@@ -93,8 +95,13 @@ func updateContractMetadata(contractsRepo persist.ContractRepository, ethClient 
 
 func updateMetadataForContract(c context.Context, input UpdateContractMetadataInput, ethClient *ethclient.Client, httpClient *http.Client, contractsRepo persist.ContractRepository) error {
 	newMetadata, err := rpc.GetTokenContractMetadata(c, input.Address, ethClient)
-	if err != nil {
-		return err
+	if err != nil || newMetadata.Name == "" {
+		alchMetadata, err := getAlchemyContractMetadata(c, httpClient, input.Address)
+		if err != nil {
+			return err
+		}
+		newMetadata.Name = util.FirstNonEmptyString(alchMetadata.Name, alchMetadata.OpenseaCollection.CollectionName)
+		newMetadata.Symbol = util.FirstNonEmptyString(alchMetadata.Symbol, newMetadata.Symbol)
 	}
 
 	latestBlock, err := ethClient.BlockNumber(c)
@@ -121,6 +128,32 @@ func updateMetadataForContract(c context.Context, input UpdateContractMetadataIn
 	// TODO creator address
 
 	return contractsRepo.UpdateByAddress(c, input.Address, up)
+}
+
+func getAlchemyContractMetadata(ctx context.Context, httpClient *http.Client, addr persist.EthereumAddress) (alchemy.ContractMetadata, error) {
+
+	u := fmt.Sprintf("%s/getContractMetadata", env.GetString("ALCHEMY_API_URL"))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return alchemy.ContractMetadata{}, err
+	}
+
+	q := req.URL.Query()
+	q.Add("contractAddress", string(addr))
+	req.URL.RawQuery = q.Encode()
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return alchemy.ContractMetadata{}, err
+	}
+
+	var metadata alchemy.GetContractMetadataResponse
+	err = json.NewDecoder(resp.Body).Decode(&metadata)
+	if err != nil {
+		return alchemy.ContractMetadata{}, err
+	}
+
+	return metadata.ContractMetadata, nil
 }
 
 func GetContractOwner(ctx context.Context, address persist.EthereumAddress, ethClient *ethclient.Client, httpClient *http.Client) (persist.EthereumAddress, persist.ContractOwnerMethod, error) {
