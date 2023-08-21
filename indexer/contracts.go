@@ -100,6 +100,9 @@ func updateMetadataForContract(c context.Context, input UpdateContractMetadataIn
 		if err != nil {
 			return err
 		}
+		if newMetadata == nil {
+			newMetadata = new(rpc.TokenContractMetadata)
+		}
 		newMetadata.Name = util.FirstNonEmptyString(alchMetadata.Name, alchMetadata.OpenseaCollection.CollectionName)
 		newMetadata.Symbol = util.FirstNonEmptyString(alchMetadata.Symbol, newMetadata.Symbol)
 	}
