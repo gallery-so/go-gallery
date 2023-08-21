@@ -12,7 +12,6 @@ type Admire struct {
 	LastUpdated time.Time `json:"last_updated"`
 	FeedEventID DBID      `json:"feed_event_id"`
 	ActorID     DBID      `json:"actor_id"`
-	TokenID     DBID      `json:"token_id"`
 	Deleted     bool      `json:"deleted"`
 }
 
@@ -39,7 +38,6 @@ type ErrAdmireAlreadyExists struct {
 	FeedEventID DBID
 	PostID      DBID
 }
-
 
 type ErrAdmireTokenAlreadyExists struct {
 	AdmireID    DBID
