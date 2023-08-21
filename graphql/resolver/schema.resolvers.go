@@ -1319,7 +1319,16 @@ func (r *mutationResolver) AdmirePost(ctx context.Context, postID persist.DBID) 
 
 // AdmireToken is the resolver for the admireToken field.
 func (r *mutationResolver) AdmireToken(ctx context.Context, tokenID persist.DBID) (model.AdmireTokenPayloadOrError, error) {
-	panic(fmt.Errorf("not implemented: AdmireToken - admireToken"))
+	id, err := publicapi.For(ctx).Interaction.AdmireToken(ctx, tokenID)
+	if err != nil {
+		return nil, err
+	}
+	output := &model.AdmireTokenPayload{
+		Viewer: resolveViewer(ctx),
+		Admire: &model.Admire{Dbid: id},
+		Token:  &model.Token{Dbid: tokenID},
+	}
+	return output, nil
 }
 
 // RemoveAdmire is the resolver for the removeAdmire field.
