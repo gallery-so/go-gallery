@@ -58,6 +58,7 @@ type Comment struct {
 	CreatedAt   time.Time    `json:"created_at"`
 	LastUpdated time.Time    `json:"last_updated"`
 	PostID      persist.DBID `json:"post_id"`
+	Removed     bool         `json:"removed"`
 }
 
 type Contract struct {

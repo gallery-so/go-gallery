@@ -208,8 +208,7 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 	return interactions, pageInfo, nil
 }
 
-func (api InteractionAPI) PaginateInteractionsByPostID(ctx context.Context, postID persist.DBID, before *string, after *string,
-	first *int, last *int) ([]interface{}, PageInfo, error) {
+func (api InteractionAPI) PaginateInteractionsByPostID(ctx context.Context, postID persist.DBID, before *string, after *string, first *int, last *int) ([]interface{}, PageInfo, error) {
 
 	err := api.validateInteractionParams(postID, first, last, "postID")
 	if err != nil {
@@ -367,8 +366,7 @@ func (api InteractionAPI) PaginateAdmiresByFeedEventID(ctx context.Context, feed
 	return admires, pageInfo, err
 }
 
-func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, feedEventID persist.DBID, before *string, after *string,
-	first *int, last *int) ([]db.Comment, PageInfo, error) {
+func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, feedEventID persist.DBID, before *string, after *string, first *int, last *int) ([]db.Comment, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"feedEventID": validate.WithTag(feedEventID, "required"),
@@ -405,6 +403,70 @@ func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, fee
 
 	countFunc := func() (int, error) {
 		total, err := api.loaders.CommentCountByFeedEventID.Load(feedEventID)
+		return total, err
+	}
+
+	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
+		if comment, ok := i.(db.Comment); ok {
+			return comment.CreatedAt, comment.ID, nil
+		}
+		return time.Time{}, "", fmt.Errorf("interface{} is not an comment")
+	}
+
+	paginator := timeIDPaginator{
+		QueryFunc:  queryFunc,
+		CursorFunc: cursorFunc,
+		CountFunc:  countFunc,
+	}
+
+	results, pageInfo, err := paginator.paginate(before, after, first, last)
+
+	comments := make([]db.Comment, len(results))
+	for i, result := range results {
+		comments[i] = result.(db.Comment)
+	}
+
+	return comments, pageInfo, err
+}
+
+func (api InteractionAPI) PaginateRepliesByCommentID(ctx context.Context, commentID persist.DBID, before *string, after *string, first *int, last *int) ([]db.Comment, PageInfo, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"commentID": validate.WithTag(commentID, "required"),
+	}); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
+
+		comments, err := api.loaders.RepliesByCommentID.Load(db.PaginateRepliesByCommentIDBatchParams{
+			CommentID:     commentID,
+			Limit:         params.Limit,
+			CurBeforeTime: params.CursorBeforeTime,
+			CurBeforeID:   params.CursorBeforeID,
+			CurAfterTime:  params.CursorAfterTime,
+			CurAfterID:    params.CursorAfterID,
+			PagingForward: params.PagingForward,
+		})
+
+		if err != nil {
+			return nil, err
+		}
+
+		results := make([]interface{}, len(comments))
+		for i, comment := range comments {
+			results[i] = comment
+		}
+
+		return results, nil
+	}
+
+	countFunc := func() (int, error) {
+		total, err := api.loaders.RepliesCountByCommentID.Load(commentID)
 		return total, err
 	}
 
@@ -495,8 +557,7 @@ func (api InteractionAPI) PaginateAdmiresByPostID(ctx context.Context, postID pe
 	return admires, pageInfo, err
 }
 
-func (api InteractionAPI) PaginateCommentsByPostID(ctx context.Context, postID persist.DBID, before *string, after *string,
-	first *int, last *int) ([]db.Comment, PageInfo, error) {
+func (api InteractionAPI) PaginateCommentsByPostID(ctx context.Context, postID persist.DBID, before *string, after *string, first *int, last *int) ([]db.Comment, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"feedEventID": validate.WithTag(postID, "required"),

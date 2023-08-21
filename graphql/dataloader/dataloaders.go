@@ -34,6 +34,7 @@
 //go:generate go run github.com/gallery-so/dataloaden FeedEventCommentsLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginateCommentsByFeedEventIDBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.Comment
 //go:generate go run github.com/gallery-so/dataloaden FeedEventAdmiresLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginateAdmiresByFeedEventIDBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.Admire
 //go:generate go run github.com/gallery-so/dataloaden PostCommentsLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginateCommentsByPostIDBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.Comment
+//go:generate go run github.com/gallery-so/dataloaden RepliesLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginateRepliesByCommentIDBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.Comment
 //go:generate go run github.com/gallery-so/dataloaden PostAdmiresLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginateAdmiresByPostIDBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.Admire
 //go:generate go run github.com/gallery-so/dataloaden FeedEventInteractionsLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginateInteractionsByFeedEventIDBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.PaginateInteractionsByFeedEventIDBatchRow
 //go:generate go run github.com/gallery-so/dataloaden FeedEventInteractionCountLoader github.com/mikeydub/go-gallery/db/gen/coredb.CountInteractionsByFeedEventIDBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.CountInteractionsByFeedEventIDBatchRow
@@ -123,6 +124,8 @@ type Loaders struct {
 	CommentsByFeedEventID                    *FeedEventCommentsLoader
 	CommentCountByPostID                     *IntLoaderByID
 	CommentsByPostID                         *PostCommentsLoader
+	RepliesByCommentID                       *RepliesLoader
+	RepliesCountByCommentID                  *IntLoaderByID
 	InteractionCountByFeedEventID            *FeedEventInteractionCountLoader
 	InteractionsByFeedEventID                *FeedEventInteractionsLoader
 	InteractionCountByPostID                 *PostInteractionCountLoader
@@ -306,6 +309,10 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 	loaders.CommentsByFeedEventID = NewFeedEventCommentsLoader(defaults, loadCommentsByFeedEventID(q))
 
 	loaders.CommentsByPostID = NewPostCommentsLoader(defaults, loadCommentsByPostID(q))
+
+	loaders.RepliesByCommentID = NewRepliesLoader(defaults, loadRepliesByCommentID(q))
+
+	loaders.RepliesCountByCommentID = NewIntLoaderByID(defaults, loadReplyCountByCommentID(q), IntLoaderByIDCacheSubscriptions{})
 
 	loaders.InteractionCountByFeedEventID = NewFeedEventInteractionCountLoader(defaults, loadInteractionCountByFeedEventID(q))
 
@@ -1221,6 +1228,39 @@ func loadCommentsByPostID(q *db.Queries) func(context.Context, []db.PaginateComm
 		})
 
 		return comments, errors
+	}
+}
+
+func loadRepliesByCommentID(q *db.Queries) func(context.Context, []db.PaginateRepliesByCommentIDBatchParams) ([][]db.Comment, []error) {
+	return func(ctx context.Context, params []db.PaginateRepliesByCommentIDBatchParams) ([][]db.Comment, []error) {
+		comments := make([][]db.Comment, len(params))
+		errors := make([]error, len(params))
+
+		b := q.PaginateRepliesByCommentIDBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, cmts []db.Comment, err error) {
+			comments[i] = cmts
+			errors[i] = err
+		})
+
+		return comments, errors
+	}
+}
+
+func loadReplyCountByCommentID(q *db.Queries) func(context.Context, []persist.DBID) ([]int, []error) {
+	return func(ctx context.Context, commentIDs []persist.DBID) ([]int, []error) {
+		counts := make([]int, len(commentIDs))
+		errors := make([]error, len(commentIDs))
+
+		b := q.CountRepliesByCommentIDBatch(ctx, commentIDs)
+		defer b.Close()
+
+		b.QueryRow(func(i int, count int64, err error) {
+			counts[i], errors[i] = int(count), err
+		})
+
+		return counts, errors
 	}
 }
 

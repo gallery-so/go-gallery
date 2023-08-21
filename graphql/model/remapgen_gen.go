@@ -28,6 +28,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"AdmireSource": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(AdmireSource)
+		return obj, ok
+	},
+
 	"AuthorizationError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(AuthorizationError)
 		return obj, ok
@@ -55,6 +60,16 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 
 	"CommentOnPostPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(CommentOnPostPayloadOrError)
+		return obj, ok
+	},
+
+	"CommentSource": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(CommentSource)
+		return obj, ok
+	},
+
+	"CommentsConnection": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(CommentsConnection)
 		return obj, ok
 	},
 

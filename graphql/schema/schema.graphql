@@ -792,16 +792,20 @@ union CollectionTokenByIdOrError = CollectionToken | ErrCollectionNotFound | Err
 
 union CommunityByAddressOrError = Community | ErrCommunityNotFound | ErrInvalidInput
 
-type Admire implements Node {
+union AdmireSource = Post | FeedEvent
+
+type Admire implements Node @goEmbedHelper {
   id: ID!
   dbid: DBID!
   creationTime: Time
   lastUpdated: Time
   admirer: GalleryUser @goField(forceResolver: true)
-  # should we include the feed event here?
+  source: AdmireSource @goField(forceResolver: true)
 }
 
-type Comment implements Node {
+union CommentSource = Post | FeedEvent
+
+type Comment implements Node @goEmbedHelper {
   id: ID!
   dbid: DBID!
   creationTime: Time
@@ -809,7 +813,12 @@ type Comment implements Node {
   replyTo: Comment @goField(forceResolver: true)
   commenter: GalleryUser @goField(forceResolver: true)
   comment: String
-  # should we include the feed event here?
+  replies(before: String, after: String, first: Int, last: Int): CommentsConnection
+    @goField(forceResolver: true)
+  source: CommentSource @goField(forceResolver: true)
+
+  # deleted is included because we want to still return deleted comments to show on the frontend but render them differently
+  deleted: Boolean
 }
 
 # Actions a user can take on a resource
@@ -837,6 +846,8 @@ type FeedEventAdmiresConnection {
   edges: [FeedEventAdmireEdge]
   pageInfo: PageInfo!
 }
+
+union CommentsConnection = FeedEventCommentsConnection | PostCommentsConnection
 
 type FeedEventCommentEdge {
   node: Comment
