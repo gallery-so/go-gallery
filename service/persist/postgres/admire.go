@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -21,7 +22,6 @@ func NewAdmireRepository(queries *db.Queries) *AdmireRepository {
 }
 
 func (a *AdmireRepository) CreateAdmire(ctx context.Context, feedEventID, postID, actorID persist.DBID) (persist.DBID, error) {
-
 	var feedEventString sql.NullString
 	if feedEventID != "" {
 		feedEventString = sql.NullString{
@@ -70,6 +70,7 @@ func (a *AdmireRepository) CreateTokenAdmire(ctx context.Context, tokenID, actor
 	if err != nil {
 		return "", err
 	}
+
 	return admireID, nil
 
 }

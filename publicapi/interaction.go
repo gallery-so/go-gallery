@@ -678,8 +678,7 @@ func (api InteractionAPI) AdmireToken(ctx context.Context, tokenID persist.DBID)
 	}
 
 	/*
-check later if admire already exists
-
+		check later if admire already exists
 	admire, err := api.GetAdmireByActorIDAndTokenID(ctx, userID, postID)
 	if err == nil {
 		return "", persist.ErrAdmireAlreadyExists{AdmireID: admire.ID, ActorID: userID, TokenID: tokenID}
@@ -688,8 +687,7 @@ check later if admire already exists
 	if !errors.As(err, &notFoundErr) {
 		return "", err
 	}
-	    **/
-
+	*/
 
 	admireID, err := api.repos.AdmireRepository.CreateTokenAdmire(ctx, tokenID, userID)
 	if err != nil {
@@ -708,8 +706,8 @@ check later if admire already exists
 	}, api.validator, nil)
 	if err != nil {
 		return "", err
-	}*/
-	fmt.Println("admire ID hereeeeeeeeee", admireID);
+	}
+	*/
 	return admireID, err
 }
 
