@@ -108,9 +108,9 @@ insert into contracts(id, deleted, version, created_at, address, symbol, name, o
     , unnest($10::bool[])
 )
 on conflict (chain, address) where parent_id is null
-do update set symbol = excluded.symbol
+do update set symbol = coalesce(nullif(excluded.symbol, ''), nullif(contracts.symbol, ''))
   , version = excluded.version
-  , name = excluded.name
+  , name = coalesce(nullif(excluded.name, ''), nullif(contracts.name, ''))
   , owner_address =
       case
           when nullif(contracts.owner_address, '') is null or ($11::bool and nullif (excluded.owner_address, '') is not null)
@@ -118,8 +118,8 @@ do update set symbol = excluded.symbol
           else
             contracts.owner_address
       end
-  , description = excluded.description
-  , profile_image_url = excluded.profile_image_url
+  , description = coalesce(nullif(excluded.description, ''), nullif(contracts.description, ''))
+  , profile_image_url = coalesce(nullif(excluded.profile_image_url, ''), nullif(contracts.profile_image_url, ''))
   , deleted = excluded.deleted
   , last_updated = now()
 returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id, override_creator_user_id

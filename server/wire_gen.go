@@ -93,7 +93,7 @@ var (
 
 // ethProvidersConfig is a wire injector that binds multichain interfaces to their concrete Ethereum implementations
 func ethProvidersConfig(indexerProvider *eth.Provider, openseaProvider *opensea.Provider, fallbackProvider multichain.SyncFailureFallbackProvider, alchemyProvider *alchemy.Provider) ethProviderList {
-	serverEthProviderList := ethRequirements(indexerProvider, indexerProvider, fallbackProvider, alchemyProvider, indexerProvider, indexerProvider, indexerProvider, indexerProvider, openseaProvider)
+	serverEthProviderList := ethRequirements(indexerProvider, indexerProvider, fallbackProvider, alchemyProvider, fallbackProvider, indexerProvider, indexerProvider, indexerProvider, indexerProvider, openseaProvider)
 	return serverEthProviderList
 }
 
@@ -176,7 +176,7 @@ func zoraProviderSet(serverEnvInit envInit, client *http.Client) zoraProviderLis
 
 // zoraProvidersConfig is a wire injector that binds multichain interfaces to their concrete zora implementations
 func zoraProvidersConfig(zoraProvider *zora.Provider) zoraProviderList {
-	serverZoraProviderList := zoraRequirements(zoraProvider, zoraProvider, zoraProvider, zoraProvider)
+	serverZoraProviderList := zoraRequirements(zoraProvider, zoraProvider, zoraProvider, zoraProvider, zoraProvider)
 	return serverZoraProviderList
 }
 
@@ -307,10 +307,11 @@ func ethRequirements(
 	cf multichain.ContractsFetcher,
 	cr multichain.ContractRefresher,
 	tmf multichain.TokenMetadataFetcher,
+	tcof multichain.ContractsOwnerFetcher,
 	tdf multichain.TokenDescriptorsFetcher,
 	osccf multichain.OpenSeaChildContractFetcher,
 ) ethProviderList {
-	return ethProviderList{nr, v, tof, toc, cf, cr, tmf, tdf, osccf}
+	return ethProviderList{nr, v, tof, toc, cf, cr, tmf, tcof, tdf, osccf}
 }
 
 // tezosRequirements is the set of provider interfaces required for Tezos
@@ -357,9 +358,10 @@ func zoraRequirements(
 	nr multichain.ContractsFetcher,
 	tof multichain.TokensOwnerFetcher,
 	toc multichain.TokensContractFetcher,
+	tcof multichain.ContractsOwnerFetcher,
 	tmf multichain.TokenMetadataFetcher,
 ) zoraProviderList {
-	return zoraProviderList{nr, tof, toc, tmf}
+	return zoraProviderList{nr, tof, toc, tcof, tmf}
 }
 
 // zoraRequirements is the set of provider interfaces required for zora
