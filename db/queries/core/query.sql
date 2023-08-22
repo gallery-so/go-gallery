@@ -727,7 +727,7 @@ SELECT * FROM admires WHERE actor_id = $1 AND feed_event_id = $2 AND deleted = f
 SELECT * FROM admires WHERE actor_id = $1 AND post_id = $2 AND deleted = false;
 
 -- name: InsertPost :one
-insert into posts(id, token_ids, contract_ids, actor_id, caption, created_at) values ($1, $2, $3, $4, $5, now()) returning id;
+insert into posts(id, token_ids, contract_ids, actor_id, caption, mentions, created_at) values ($1, $2, $3, $4, $5, $6, now()) returning id;
 
 -- name: DeletePostByID :exec
 update posts set deleted = true where id = $1;

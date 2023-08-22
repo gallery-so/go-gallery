@@ -175,47 +175,28 @@ func (r *commentResolver) Commenter(ctx context.Context, obj *model.Comment) (*m
 	return resolveGalleryUserByUserID(ctx, obj.Commenter.Dbid)
 }
 
+// Mentions is the resolver for the mentions field.
+func (r *commentResolver) Mentions(ctx context.Context, obj *model.Comment) ([]*model.Mention, error) {
+	return resolveMentionsByMentions(ctx, obj.HelperCommentData.Mentions)
+}
+
 // Replies is the resolver for the replies field.
-func (r *commentResolver) Replies(ctx context.Context, obj *model.Comment, before *string, after *string, first *int, last *int) (model.CommentsConnection, error) {
+func (r *commentResolver) Replies(ctx context.Context, obj *model.Comment, before *string, after *string, first *int, last *int) (*model.CommentsConnection, error) {
 	comments, pageInfo, err := publicapi.For(ctx).Interaction.PaginateRepliesByCommentID(ctx, obj.Dbid, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}
 
-	if obj.FeedEventID != nil {
-		var edges []*model.FeedEventCommentEdge
-		f, err := resolveFeedEventByEventID(ctx, *obj.FeedEventID)
-		if err != nil {
-			return nil, err
-		}
-		for _, comment := range comments {
-
-			edges = append(edges, &model.FeedEventCommentEdge{
-				Node:  commentToModel(ctx, comment),
-				Event: f,
-			})
-		}
-		return &model.FeedEventCommentsConnection{
-			Edges:    edges,
-			PageInfo: pageInfoToModel(ctx, pageInfo),
-		}, nil
-	} else if obj.PostID != nil {
-		var edges []*model.PostCommentEdge
-		post, err := resolvePostByPostID(ctx, *obj.PostID)
-		if err != nil {
-			return nil, err
-		}
-		for _, comment := range comments {
-			edges = append(edges, &model.PostCommentEdge{
-				Node: commentToModel(ctx, comment),
-				Post: post,
-			})
-		}
-		return &model.PostCommentsConnection{
-			Edges:    edges,
-			PageInfo: pageInfoToModel(ctx, pageInfo),
-		}, nil
+	var edges []*model.CommentEdge
+	for _, comment := range comments {
+		edges = append(edges, &model.CommentEdge{
+			Node: commentToModel(ctx, comment),
+		})
 	}
+	return &model.CommentsConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
 
 	return nil, fmt.Errorf("comment has no source")
 }
@@ -385,59 +366,55 @@ func (r *feedEventResolver) EventData(ctx context.Context, obj *model.FeedEvent)
 }
 
 // Admires is the resolver for the admires field.
-func (r *feedEventResolver) Admires(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.FeedEventAdmiresConnection, error) {
+func (r *feedEventResolver) Admires(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.AdmiresConnection, error) {
 	admires, pageInfo, err := publicapi.For(ctx).Interaction.PaginateAdmiresByFeedEventID(ctx, obj.Dbid, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}
 
-	var edges []*model.FeedEventAdmireEdge
+	var edges []*model.AdmireEdge
 	for _, admire := range admires {
-		edges = append(edges, &model.FeedEventAdmireEdge{
-			Node:  admireToModel(ctx, admire),
-			Event: obj,
+		edges = append(edges, &model.AdmireEdge{
+			Node: admireToModel(ctx, admire),
 		})
 	}
 
-	return &model.FeedEventAdmiresConnection{
+	return &model.AdmiresConnection{
 		Edges:    edges,
 		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}, nil
 }
 
 // Comments is the resolver for the comments field.
-func (r *feedEventResolver) Comments(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.FeedEventCommentsConnection, error) {
+func (r *feedEventResolver) Comments(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.CommentsConnection, error) {
 	comments, pageInfo, err := publicapi.For(ctx).Interaction.PaginateCommentsByFeedEventID(ctx, obj.Dbid, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}
 
-	var edges []*model.FeedEventCommentEdge
+	var edges []*model.CommentEdge
 	for _, comment := range comments {
-		edges = append(edges, &model.FeedEventCommentEdge{
-			Node:  commentToModel(ctx, comment),
-			Event: obj,
+		edges = append(edges, &model.CommentEdge{
+			Node: commentToModel(ctx, comment),
 		})
 	}
 
-	return &model.FeedEventCommentsConnection{
+	return &model.CommentsConnection{
 		Edges:    edges,
 		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}, nil
 }
 
 // Interactions is the resolver for the interactions field.
-func (r *feedEventResolver) Interactions(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.FeedEventInteractionsConnection, error) {
+func (r *feedEventResolver) Interactions(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.InteractionsConnection, error) {
 	interactions, pageInfo, err := publicapi.For(ctx).Interaction.PaginateInteractionsByFeedEventID(ctx, obj.Dbid, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}
 
-	var edges []*model.FeedEventInteractionsEdge
+	var edges []*model.InteractionsEdge
 	for _, interaction := range interactions {
-		edge := &model.FeedEventInteractionsEdge{
-			Event: obj,
-		}
+		edge := &model.InteractionsEdge{}
 		if admire, ok := interaction.(coredb.Admire); ok {
 			edge.Node = admireToModel(ctx, admire)
 		} else if comment, ok := interaction.(coredb.Comment); ok {
@@ -446,7 +423,7 @@ func (r *feedEventResolver) Interactions(ctx context.Context, obj *model.FeedEve
 		edges = append(edges, edge)
 	}
 
-	return &model.FeedEventInteractionsConnection{
+	return &model.InteractionsConnection{
 		Edges:    edges,
 		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}, nil
@@ -709,6 +686,22 @@ func (r *galleryUserResolver) CreatedCommunities(ctx context.Context, obj *model
 // IsMemberOfCommunity is the resolver for the isMemberOfCommunity field.
 func (r *galleryUserResolver) IsMemberOfCommunity(ctx context.Context, obj *model.GalleryUser, communityID persist.DBID) (bool, error) {
 	return publicapi.For(ctx).User.IsMemberOfCommunity(ctx, obj.Dbid, communityID)
+}
+
+// User is the resolver for the user field.
+func (r *mentionResolver) User(ctx context.Context, obj *model.Mention) (*model.GalleryUser, error) {
+	if obj.HelperMentionData.UserID == nil {
+		return nil, nil
+	}
+	return resolveGalleryUserByUserID(ctx, *obj.HelperMentionData.UserID)
+}
+
+// Community is the resolver for the community field.
+func (r *mentionResolver) Community(ctx context.Context, obj *model.Mention) (*model.Community, error) {
+	if obj.HelperMentionData.CommunityID == nil {
+		return nil, nil
+	}
+	return resolveCommunityByID(ctx, *obj.HelperMentionData.CommunityID)
 }
 
 // AddUserWallet is the resolver for the addUserWallet field.
@@ -1999,60 +1992,61 @@ func (r *postResolver) Tokens(ctx context.Context, obj *model.Post) ([]*model.To
 	return result, nil
 }
 
+// Mentions is the resolver for the mentions field.
+func (r *postResolver) Mentions(ctx context.Context, obj *model.Post) ([]*model.Mention, error) {
+	return resolveMentionsByMentions(ctx, obj.HelperPostData.Mentions)
+}
+
 // Admires is the resolver for the admires field.
-func (r *postResolver) Admires(ctx context.Context, obj *model.Post, before *string, after *string, first *int, last *int) (*model.PostAdmiresConnection, error) {
+func (r *postResolver) Admires(ctx context.Context, obj *model.Post, before *string, after *string, first *int, last *int) (*model.AdmiresConnection, error) {
 	admires, pageInfo, err := publicapi.For(ctx).Interaction.PaginateAdmiresByPostID(ctx, obj.Dbid, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}
 
-	var edges []*model.PostAdmireEdge
+	var edges []*model.AdmireEdge
 	for _, admire := range admires {
-		edges = append(edges, &model.PostAdmireEdge{
+		edges = append(edges, &model.AdmireEdge{
 			Node: admireToModel(ctx, admire),
-			Post: obj,
 		})
 	}
 
-	return &model.PostAdmiresConnection{
+	return &model.AdmiresConnection{
 		Edges:    edges,
 		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}, nil
 }
 
 // Comments is the resolver for the comments field.
-func (r *postResolver) Comments(ctx context.Context, obj *model.Post, before *string, after *string, first *int, last *int) (*model.PostCommentsConnection, error) {
+func (r *postResolver) Comments(ctx context.Context, obj *model.Post, before *string, after *string, first *int, last *int) (*model.CommentsConnection, error) {
 	comments, pageInfo, err := publicapi.For(ctx).Interaction.PaginateCommentsByPostID(ctx, obj.Dbid, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}
 
-	var edges []*model.PostCommentEdge
+	var edges []*model.CommentEdge
 	for _, comment := range comments {
-		edges = append(edges, &model.PostCommentEdge{
+		edges = append(edges, &model.CommentEdge{
 			Node: commentToModel(ctx, comment),
-			Post: obj,
 		})
 	}
 
-	return &model.PostCommentsConnection{
+	return &model.CommentsConnection{
 		Edges:    edges,
 		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}, nil
 }
 
 // Interactions is the resolver for the interactions field.
-func (r *postResolver) Interactions(ctx context.Context, obj *model.Post, before *string, after *string, first *int, last *int) (*model.PostInteractionsConnection, error) {
+func (r *postResolver) Interactions(ctx context.Context, obj *model.Post, before *string, after *string, first *int, last *int) (*model.InteractionsConnection, error) {
 	interactions, pageInfo, err := publicapi.For(ctx).Interaction.PaginateInteractionsByPostID(ctx, obj.Dbid, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}
 
-	var edges []*model.PostInteractionsEdge
+	var edges []*model.InteractionsEdge
 	for _, interaction := range interactions {
-		edge := &model.PostInteractionsEdge{
-			Post: obj,
-		}
+		edge := &model.InteractionsEdge{}
 		if admire, ok := interaction.(coredb.Admire); ok {
 			edge.Node = admireToModel(ctx, admire)
 		} else if comment, ok := interaction.(coredb.Comment); ok {
@@ -2061,7 +2055,7 @@ func (r *postResolver) Interactions(ctx context.Context, obj *model.Post, before
 		edges = append(edges, edge)
 	}
 
-	return &model.PostInteractionsConnection{
+	return &model.InteractionsConnection{
 		Edges:    edges,
 		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}, nil
@@ -2986,6 +2980,9 @@ func (r *Resolver) GalleryUpdatedFeedEventData() generated.GalleryUpdatedFeedEve
 // GalleryUser returns generated.GalleryUserResolver implementation.
 func (r *Resolver) GalleryUser() generated.GalleryUserResolver { return &galleryUserResolver{r} }
 
+// Mention returns generated.MentionResolver implementation.
+func (r *Resolver) Mention() generated.MentionResolver { return &mentionResolver{r} }
+
 // Mutation returns generated.MutationResolver implementation.
 func (r *Resolver) Mutation() generated.MutationResolver { return &mutationResolver{r} }
 
@@ -3151,6 +3148,7 @@ type galleryResolver struct{ *Resolver }
 type galleryInfoUpdatedFeedEventDataResolver struct{ *Resolver }
 type galleryUpdatedFeedEventDataResolver struct{ *Resolver }
 type galleryUserResolver struct{ *Resolver }
+type mentionResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type newTokensNotificationResolver struct{ *Resolver }
 type ownerAtBlockResolver struct{ *Resolver }

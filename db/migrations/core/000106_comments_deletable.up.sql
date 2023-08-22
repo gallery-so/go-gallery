@@ -5,4 +5,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS comments_created_at_id_post_id_idx ON comments
 
 alter table comments add column removed bool default false not null;
 
+alter table comments add column mentions jsonb default '{}'::jsonb not null;
+alter table posts add column mentions jsonb default '{}'::jsonb not null;
+
 

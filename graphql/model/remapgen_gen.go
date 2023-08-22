@@ -68,11 +68,6 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
-	"CommentsConnection": func(object interface{}) (interface{}, bool) {
-		obj, ok := object.(CommentsConnection)
-		return obj, ok
-	},
-
 	"CommunityByAddressOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(CommunityByAddressOrError)
 		return obj, ok

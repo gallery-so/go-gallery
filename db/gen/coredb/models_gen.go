@@ -48,17 +48,18 @@ type Collection struct {
 }
 
 type Comment struct {
-	ID          persist.DBID `json:"id"`
-	Version     int32        `json:"version"`
-	FeedEventID persist.DBID `json:"feed_event_id"`
-	ActorID     persist.DBID `json:"actor_id"`
-	ReplyTo     persist.DBID `json:"reply_to"`
-	Comment     string       `json:"comment"`
-	Deleted     bool         `json:"deleted"`
-	CreatedAt   time.Time    `json:"created_at"`
-	LastUpdated time.Time    `json:"last_updated"`
-	PostID      persist.DBID `json:"post_id"`
-	Removed     bool         `json:"removed"`
+	ID          persist.DBID     `json:"id"`
+	Version     int32            `json:"version"`
+	FeedEventID persist.DBID     `json:"feed_event_id"`
+	ActorID     persist.DBID     `json:"actor_id"`
+	ReplyTo     persist.DBID     `json:"reply_to"`
+	Comment     string           `json:"comment"`
+	Deleted     bool             `json:"deleted"`
+	CreatedAt   time.Time        `json:"created_at"`
+	LastUpdated time.Time        `json:"last_updated"`
+	PostID      persist.DBID     `json:"post_id"`
+	Removed     bool             `json:"removed"`
+	Mentions    persist.Mentions `json:"mentions"`
 }
 
 type Contract struct {
@@ -383,6 +384,7 @@ type Post struct {
 	CreatedAt   time.Time        `json:"created_at"`
 	LastUpdated time.Time        `json:"last_updated"`
 	Deleted     bool             `json:"deleted"`
+	Mentions    persist.Mentions `json:"mentions"`
 }
 
 type ProfileImage struct {

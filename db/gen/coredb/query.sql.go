@@ -1624,7 +1624,7 @@ func (q *Queries) GetCollectionsByGalleryId(ctx context.Context, id persist.DBID
 }
 
 const getCommentByCommentID = `-- name: GetCommentByCommentID :one
-SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id, removed FROM comments WHERE id = $1 and deleted = false
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id, removed, mentions FROM comments WHERE id = $1 and deleted = false
 `
 
 func (q *Queries) GetCommentByCommentID(ctx context.Context, id persist.DBID) (Comment, error) {
@@ -1642,12 +1642,13 @@ func (q *Queries) GetCommentByCommentID(ctx context.Context, id persist.DBID) (C
 		&i.LastUpdated,
 		&i.PostID,
 		&i.Removed,
+		&i.Mentions,
 	)
 	return i, err
 }
 
 const getCommentsByCommentIDs = `-- name: GetCommentsByCommentIDs :many
-SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id, removed from comments WHERE id = ANY($1) and deleted = false
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id, removed, mentions from comments WHERE id = ANY($1) and deleted = false
 `
 
 func (q *Queries) GetCommentsByCommentIDs(ctx context.Context, commentIds persist.DBIDList) ([]Comment, error) {
@@ -1671,6 +1672,7 @@ func (q *Queries) GetCommentsByCommentIDs(ctx context.Context, commentIds persis
 			&i.LastUpdated,
 			&i.PostID,
 			&i.Removed,
+			&i.Mentions,
 		); err != nil {
 			return nil, err
 		}
@@ -2980,7 +2982,7 @@ func (q *Queries) GetNotificationsByOwnerIDForActionAfter(ctx context.Context, a
 }
 
 const getPostsByIds = `-- name: GetPostsByIds :many
-SELECT id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted FROM posts WHERE id = ANY($1::varchar(255)[]) AND deleted = false
+SELECT id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted, mentions FROM posts WHERE id = ANY($1::varchar(255)[]) AND deleted = false
 `
 
 func (q *Queries) GetPostsByIds(ctx context.Context, ids []string) ([]Post, error) {
@@ -3002,6 +3004,7 @@ func (q *Queries) GetPostsByIds(ctx context.Context, ids []string) ([]Post, erro
 			&i.CreatedAt,
 			&i.LastUpdated,
 			&i.Deleted,
+			&i.Mentions,
 		); err != nil {
 			return nil, err
 		}
@@ -5072,7 +5075,7 @@ func (q *Queries) InsertExternalSocialConnectionsForUser(ctx context.Context, ar
 }
 
 const insertPost = `-- name: InsertPost :one
-insert into posts(id, token_ids, contract_ids, actor_id, caption, created_at) values ($1, $2, $3, $4, $5, now()) returning id
+insert into posts(id, token_ids, contract_ids, actor_id, caption, mentions, created_at) values ($1, $2, $3, $4, $5, $6, now()) returning id
 `
 
 type InsertPostParams struct {
@@ -5081,6 +5084,7 @@ type InsertPostParams struct {
 	ContractIds persist.DBIDList `json:"contract_ids"`
 	ActorID     persist.DBID     `json:"actor_id"`
 	Caption     sql.NullString   `json:"caption"`
+	Mentions    persist.Mentions `json:"mentions"`
 }
 
 func (q *Queries) InsertPost(ctx context.Context, arg InsertPostParams) (persist.DBID, error) {
@@ -5090,6 +5094,7 @@ func (q *Queries) InsertPost(ctx context.Context, arg InsertPostParams) (persist
 		arg.ContractIds,
 		arg.ActorID,
 		arg.Caption,
+		arg.Mentions,
 	)
 	var id persist.DBID
 	err := row.Scan(&id)

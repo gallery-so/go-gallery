@@ -62,6 +62,12 @@ type HelperCommentData struct {
 	PostID      *persist.DBID
 	FeedEventID *persist.DBID
 	ReplyToID   *persist.DBID
+	Mentions    persist.Mentions
+}
+
+type HelperMentionData struct {
+	UserID      *persist.DBID
+	CommunityID *persist.DBID
 }
 
 type HelperAdmireData struct {
@@ -178,6 +184,7 @@ type HelperEnsProfileImageData struct {
 type HelperPostData struct {
 	TokenIDs persist.DBIDList
 	AuthorID persist.DBID
+	Mentions persist.Mentions
 }
 
 type ErrInvalidIDFormat struct {

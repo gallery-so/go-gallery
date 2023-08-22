@@ -132,12 +132,18 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 		return c.ID, nil
 	})
 
+	dbMentions, err := mentionInputsToMentions(mentions)
+	if err != nil {
+		return "", err
+	}
+
 	id, err := api.queries.InsertPost(ctx, db.InsertPostParams{
 		ID:          persist.GenerateID(),
 		TokenIds:    tokenIDs,
 		ContractIds: contractIDs,
 		ActorID:     actorID,
 		Caption:     cap,
+		Mentions:    dbMentions,
 	})
 	if err != nil {
 		return "", err

@@ -868,7 +868,7 @@ func (b *GetCollectionsByGalleryIdBatchBatchResults) Close() error {
 }
 
 const getCommentByCommentIDBatch = `-- name: GetCommentByCommentIDBatch :batchone
-SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id, removed FROM comments WHERE id = $1 and deleted = false
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id, removed, mentions FROM comments WHERE id = $1 and deleted = false
 `
 
 type GetCommentByCommentIDBatchBatchResults struct {
@@ -912,6 +912,7 @@ func (b *GetCommentByCommentIDBatchBatchResults) QueryRow(f func(int, Comment, e
 			&i.LastUpdated,
 			&i.PostID,
 			&i.Removed,
+			&i.Mentions,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -2077,7 +2078,7 @@ func (b *GetOwnersByContractIdBatchPaginateBatchResults) Close() error {
 }
 
 const getPostByIdBatch = `-- name: GetPostByIdBatch :batchone
-SELECT id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted FROM posts WHERE id = $1 AND deleted = false
+SELECT id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted, mentions FROM posts WHERE id = $1 AND deleted = false
 `
 
 type GetPostByIdBatchBatchResults struct {
@@ -2119,6 +2120,7 @@ func (b *GetPostByIdBatchBatchResults) QueryRow(f func(int, Post, error)) {
 			&i.CreatedAt,
 			&i.LastUpdated,
 			&i.Deleted,
+			&i.Mentions,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -3844,7 +3846,7 @@ func (b *PaginateAdmiresByPostIDBatchBatchResults) Close() error {
 }
 
 const paginateCommentsByFeedEventIDBatch = `-- name: PaginateCommentsByFeedEventIDBatch :batchmany
-SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id, removed FROM comments WHERE feed_event_id = $1 AND reply_to is null AND deleted = false
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id, removed, mentions FROM comments WHERE feed_event_id = $1 AND reply_to is null AND deleted = false
     AND (created_at, id) < ($2, $3)
     AND (created_at, id) > ($4, $5)
     ORDER BY CASE WHEN $6::bool THEN (created_at, id) END ASC,
@@ -3916,6 +3918,7 @@ func (b *PaginateCommentsByFeedEventIDBatchBatchResults) Query(f func(int, []Com
 					&i.LastUpdated,
 					&i.PostID,
 					&i.Removed,
+					&i.Mentions,
 				); err != nil {
 					return err
 				}
@@ -3935,7 +3938,7 @@ func (b *PaginateCommentsByFeedEventIDBatchBatchResults) Close() error {
 }
 
 const paginateCommentsByPostIDBatch = `-- name: PaginateCommentsByPostIDBatch :batchmany
-SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id, removed FROM comments WHERE post_id = $1 AND reply_to is null AND deleted = false
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id, removed, mentions FROM comments WHERE post_id = $1 AND reply_to is null AND deleted = false
     AND (created_at, id) < ($2, $3)
     AND (created_at, id) > ($4, $5)
     ORDER BY CASE WHEN $6::bool THEN (created_at, id) END ASC,
@@ -4007,6 +4010,7 @@ func (b *PaginateCommentsByPostIDBatchBatchResults) Query(f func(int, []Comment,
 					&i.LastUpdated,
 					&i.PostID,
 					&i.Removed,
+					&i.Mentions,
 				); err != nil {
 					return err
 				}
@@ -4222,7 +4226,7 @@ func (b *PaginateInteractionsByPostIDBatchBatchResults) Close() error {
 }
 
 const paginatePostsByContractID = `-- name: PaginatePostsByContractID :batchmany
-SELECT posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted
+SELECT posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted, posts.mentions
 FROM posts
 WHERE $1 = ANY(posts.contract_ids)
 AND posts.deleted = false
@@ -4296,6 +4300,7 @@ func (b *PaginatePostsByContractIDBatchResults) Query(f func(int, []Post, error)
 					&i.CreatedAt,
 					&i.LastUpdated,
 					&i.Deleted,
+					&i.Mentions,
 				); err != nil {
 					return err
 				}
@@ -4315,7 +4320,7 @@ func (b *PaginatePostsByContractIDBatchResults) Close() error {
 }
 
 const paginateRepliesByCommentIDBatch = `-- name: PaginateRepliesByCommentIDBatch :batchmany
-SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id, removed FROM comments WHERE reply_to = $1 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id, removed, mentions FROM comments WHERE reply_to = $1 AND deleted = false
     AND (created_at, id) < ($2, $3)
     AND (created_at, id) > ($4, $5)
     ORDER BY CASE WHEN $6::bool THEN (created_at, id) END ASC,
@@ -4387,6 +4392,7 @@ func (b *PaginateRepliesByCommentIDBatchBatchResults) Query(f func(int, []Commen
 					&i.LastUpdated,
 					&i.PostID,
 					&i.Removed,
+					&i.Mentions,
 				); err != nil {
 					return err
 				}

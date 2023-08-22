@@ -668,6 +668,7 @@ func postsToConnection(ctx context.Context, posts []db.Post, contractID persist.
 				HelperPostData: model.HelperPostData{
 					TokenIDs: p.TokenIds,
 					AuthorID: p.ActorID,
+					Mentions: p.Mentions,
 				},
 				CreationTime: &p.CreatedAt,
 				Dbid:         p.ID,
@@ -752,6 +753,17 @@ func resolvePostByPostID(ctx context.Context, postID persist.DBID) (*model.Post,
 	}
 
 	return postToModel(post)
+}
+
+func resolveMentionsByMentions(ctx context.Context, mentions persist.Mentions) ([]*model.Mention, error) {
+	result := make([]*model.Mention, len(mentions))
+	i := 0
+	for dbid, mention := range mentions {
+		result[i] = mentionToModel(ctx, dbid, mention)
+		i++
+	}
+
+	return result, nil
 }
 
 func resolveViewerNotifications(ctx context.Context, before *string, after *string, first *int, last *int) (*model.NotificationsConnection, error) {
@@ -1314,6 +1326,7 @@ func feedEntityToModel(event any) (model.FeedEventOrError, error) {
 			HelperPostData: model.HelperPostData{
 				TokenIDs: event.TokenIds,
 				AuthorID: event.ActorID,
+				Mentions: event.Mentions,
 			},
 			CreationTime: &event.CreatedAt,
 			Dbid:         event.ID,
@@ -1626,6 +1639,7 @@ func postToModel(event *db.Post) (*model.Post, error) {
 		HelperPostData: model.HelperPostData{
 			TokenIDs: event.TokenIds,
 			AuthorID: event.ActorID,
+			Mentions: event.Mentions,
 		},
 		Dbid:         event.ID,
 		CreationTime: &event.CreatedAt,
@@ -1765,6 +1779,7 @@ func commentToModel(ctx context.Context, comment db.Comment) *model.Comment {
 			PostID:      postID,
 			FeedEventID: feedEventID,
 			ReplyToID:   replyToID,
+			Mentions:    comment.Mentions,
 		},
 		Dbid:         comment.ID,
 		CreationTime: &comment.CreatedAt,
@@ -2311,4 +2326,25 @@ func mediaToDimensions(dimensions persist.Dimensions) *model.MediaDimensions {
 		Width:       &dimensions.Width,
 		AspectRatio: &aspect,
 	}
+}
+
+func mentionToModel(ctx context.Context, id persist.DBID, mention persist.Mention) *model.Mention {
+	m := &model.Mention{}
+	if mention.Index != nil {
+		m.Index = &model.CompleteIndex{
+			Index:  mention.Index.Index,
+			Length: mention.Index.Length,
+		}
+	}
+
+	switch mention.MentionType {
+	case persist.MentionTypeUser:
+		m.HelperMentionData.UserID = &id
+	case persist.MentionTypeCommunity:
+		m.HelperMentionData.CommunityID = &id
+	default:
+		panic(fmt.Sprintf("unknown mention type: %s", mention.MentionType))
+	}
+
+	return m
 }

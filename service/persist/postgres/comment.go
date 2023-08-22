@@ -23,7 +23,7 @@ func NewCommentRepository(db *sql.DB, queries *db.Queries) *CommentRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
-	createStmt, err := db.PrepareContext(ctx, `INSERT INTO comments (ID, FEED_EVENT_ID, POST_ID, ACTOR_ID, REPLY_TO, COMMENT) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ID;`)
+	createStmt, err := db.PrepareContext(ctx, `INSERT INTO comments (ID, FEED_EVENT_ID, POST_ID, ACTOR_ID, REPLY_TO, COMMENT, MENTIONS) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING ID;`)
 	checkNoErr(err)
 
 	deleteStmt, err := db.PrepareContext(ctx, `UPDATE comments SET REMOVED = TRUE, COMMENT = 'comment removed' WHERE ID = $1;`)
@@ -37,7 +37,7 @@ func NewCommentRepository(db *sql.DB, queries *db.Queries) *CommentRepository {
 	}
 }
 
-func (a *CommentRepository) CreateComment(ctx context.Context, feedEventID, postID, actorID persist.DBID, replyToID *persist.DBID, comment string) (persist.DBID, error) {
+func (a *CommentRepository) CreateComment(ctx context.Context, feedEventID, postID, actorID persist.DBID, replyToID *persist.DBID, comment string, mentions map[persist.DBID]persist.Mention) (persist.DBID, error) {
 
 	var feedEventString sql.NullString
 	if feedEventID != "" {
@@ -56,7 +56,7 @@ func (a *CommentRepository) CreateComment(ctx context.Context, feedEventID, post
 	}
 
 	var resultID persist.DBID
-	err := a.createStmt.QueryRowContext(ctx, persist.GenerateID(), feedEventString, postString, actorID, replyToID, comment).Scan(&resultID)
+	err := a.createStmt.QueryRowContext(ctx, persist.GenerateID(), feedEventString, postString, actorID, replyToID, comment, mentions).Scan(&resultID)
 	if err != nil {
 		return "", err
 	}

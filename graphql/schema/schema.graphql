@@ -813,12 +813,24 @@ type Comment implements Node @goEmbedHelper {
   replyTo: Comment @goField(forceResolver: true)
   commenter: GalleryUser @goField(forceResolver: true)
   comment: String
+  mentions: [Mention] @goField(forceResolver: true)
   replies(before: String, after: String, first: Int, last: Int): CommentsConnection
     @goField(forceResolver: true)
   source: CommentSource @goField(forceResolver: true)
 
   # deleted is included because we want to still return deleted comments to show on the frontend but render them differently
   deleted: Boolean
+}
+
+type Mention @goEmbedHelper {
+  user: GalleryUser @goField(forceResolver: true)
+  community: Community @goField(forceResolver: true)
+  index: CompleteIndex
+}
+
+type CompleteIndex {
+  index: Int!
+  length: Int!
 }
 
 # Actions a user can take on a resource
@@ -836,73 +848,35 @@ type FollowInfo {
   followedBack: Boolean
 }
 
-type FeedEventAdmireEdge {
-  node: Admire
-  event: FeedEvent
-  cursor: String
-}
-
-type FeedEventAdmiresConnection {
-  edges: [FeedEventAdmireEdge]
-  pageInfo: PageInfo!
-}
-
-union CommentsConnection = FeedEventCommentsConnection | PostCommentsConnection
-
-type FeedEventCommentEdge {
-  node: Comment
-  event: FeedEvent
-  cursor: String
-}
-
-type FeedEventCommentsConnection {
-  edges: [FeedEventCommentEdge]
-  pageInfo: PageInfo!
-}
-
-type PostAdmireEdge {
+type AdmireEdge {
   node: Admire
   cursor: String
-  post: Post
 }
 
-type PostCommentEdge {
-  node: Comment
-  cursor: String
-  post: Post
-}
-
-type PostCommentsConnection {
-  edges: [PostCommentEdge]
+type AdmiresConnection {
+  edges: [AdmireEdge]
   pageInfo: PageInfo!
 }
 
-type PostAdmiresConnection {
-  edges: [PostAdmireEdge]
+type CommentEdge {
+  node: Comment
+  cursor: String
+}
+
+type CommentsConnection {
+  edges: [CommentEdge]
   pageInfo: PageInfo!
 }
 
 union Interaction = Admire | Comment
 
-type FeedEventInteractionsEdge {
-  node: Interaction
-  event: FeedEvent
-  cursor: String
-}
-
-type FeedEventInteractionsConnection {
-  edges: [FeedEventInteractionsEdge]
-  pageInfo: PageInfo!
-}
-
-type PostInteractionsEdge {
+type InteractionsEdge {
   node: Interaction
   cursor: String
-  post: Post
 }
 
-type PostInteractionsConnection {
-  edges: [PostInteractionsEdge]
+type InteractionsConnection {
+  edges: [InteractionsEdge]
   pageInfo: PageInfo!
 }
 
@@ -929,18 +903,14 @@ type FeedEvent implements Node @key(fields: "dbid") {
   dbid: DBID!
 
   eventData: FeedEventData @goField(forceResolver: true)
-  admires(before: String, after: String, first: Int, last: Int): FeedEventAdmiresConnection
+  admires(before: String, after: String, first: Int, last: Int): AdmiresConnection
     @goField(forceResolver: true)
-  comments(before: String, after: String, first: Int, last: Int): FeedEventCommentsConnection
+  comments(before: String, after: String, first: Int, last: Int): CommentsConnection
     @goField(forceResolver: true)
   caption: String
 
-  interactions(
-    before: String
-    after: String
-    first: Int
-    last: Int
-  ): FeedEventInteractionsConnection @goField(forceResolver: true)
+  interactions(before: String, after: String, first: Int, last: Int): InteractionsConnection
+    @goField(forceResolver: true)
 
   viewerAdmire: Admire @goField(forceResolver: true)
 
@@ -959,12 +929,14 @@ type Post implements Node @key(fields: "dbid") @goEmbedHelper {
   tokens: [Token] @goField(forceResolver: true)
 
   caption: String
-  admires(before: String, after: String, first: Int, last: Int): PostAdmiresConnection
+  mentions: [Mention] @goField(forceResolver: true)
+
+  admires(before: String, after: String, first: Int, last: Int): AdmiresConnection
     @goField(forceResolver: true)
-  comments(before: String, after: String, first: Int, last: Int): PostCommentsConnection
+  comments(before: String, after: String, first: Int, last: Int): CommentsConnection
     @goField(forceResolver: true)
 
-  interactions(before: String, after: String, first: Int, last: Int): PostInteractionsConnection
+  interactions(before: String, after: String, first: Int, last: Int): InteractionsConnection
     @goField(forceResolver: true)
 
   viewerAdmire: Admire @goField(forceResolver: true)
@@ -2482,8 +2454,14 @@ type DeletePostPayload {
 union DeletePostPayloadOrError = DeletePostPayload | ErrInvalidInput | ErrNotAuthorized
 
 input MentionInput {
+  index: CompleteIndexInput
   userId: DBID
   communityId: DBID
+}
+
+input CompleteIndexInput {
+  index: Int!
+  length: Int!
 }
 
 type Mutation {

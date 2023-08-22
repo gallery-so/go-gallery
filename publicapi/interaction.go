@@ -864,7 +864,9 @@ func (api InteractionAPI) comment(ctx context.Context, comment string, feedEvent
 
 	comment = validate.SanitizationPolicy.Sanitize(comment)
 
-	commentID, err := api.repos.CommentRepository.CreateComment(ctx, feedEventID, postID, actor, replyToID, comment)
+	dbMentions, err := mentionInputsToMentions(mentions)
+
+	commentID, err := api.repos.CommentRepository.CreateComment(ctx, feedEventID, postID, actor, replyToID, comment, dbMentions)
 	if err != nil {
 		return "", err
 	}
@@ -962,4 +964,31 @@ func (api InteractionAPI) RemoveComment(ctx context.Context, commentID persist.D
 	}
 
 	return comment.FeedEventID, comment.PostID, api.repos.CommentRepository.RemoveComment(ctx, commentID)
+}
+
+func mentionInputsToMentions(ms []*model.MentionInput) (map[persist.DBID]persist.Mention, error) {
+	res := make(map[persist.DBID]persist.Mention)
+
+	for _, m := range ms {
+		if m.CommunityID != nil && m.UserID != nil {
+			return nil, fmt.Errorf("mention input cannot have both communityID and userID set")
+		}
+		mention := persist.Mention{}
+		if m.Index != nil {
+			mention.Index = &persist.CompleteIndex{
+				Index:  m.Index.Start,
+				Length: m.Index.End,
+			}
+		}
+		if m.CommunityID != nil {
+			mention.MentionType = persist.MentionTypeCommunity
+			res[*m.CommunityID] = mention
+		}
+		if m.UserID != nil {
+			mention.MentionType = persist.MentionTypeUser
+			res[*m.UserID] = mention
+		}
+	}
+
+	return res, nil
 }
