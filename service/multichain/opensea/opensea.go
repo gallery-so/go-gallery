@@ -323,7 +323,6 @@ func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti mu
 
 // GetContractByAddress returns a contract for a contract address
 func (p *Provider) GetContractByAddress(ctx context.Context, contract persist.Address) (multichain.ChainAgnosticContract, error) {
-	logger.For(ctx).Warn("OPENSEA")
 	c, err := FetchContractByAddress(ctx, persist.EthereumAddress(contract))
 	if err != nil {
 		return multichain.ChainAgnosticContract{}, err
