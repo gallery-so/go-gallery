@@ -166,6 +166,10 @@ type MediaSubtype interface {
 	IsMediaSubtype()
 }
 
+type MentionEntity interface {
+	IsMentionEntity()
+}
+
 type MentionSource interface {
 	IsMentionSource()
 }
@@ -727,6 +731,7 @@ type Community struct {
 
 func (Community) IsNode()                      {}
 func (Community) IsCommunityByAddressOrError() {}
+func (Community) IsMentionEntity()             {}
 
 type CommunityEdge struct {
 	Node   *Community `json:"node"`
@@ -1384,6 +1389,7 @@ func (GalleryUser) IsGalleryUserOrAddress()              {}
 func (GalleryUser) IsUserByUsernameOrError()             {}
 func (GalleryUser) IsUserByIDOrError()                   {}
 func (GalleryUser) IsUserByAddressOrError()              {}
+func (GalleryUser) IsMentionEntity()                     {}
 func (GalleryUser) IsAddRolesToUserPayloadOrError()      {}
 func (GalleryUser) IsRevokeRolesFromUserPayloadOrError() {}
 
@@ -1527,9 +1533,8 @@ func (MembershipTier) IsNode() {}
 
 type Mention struct {
 	HelperMentionData
-	User      *GalleryUser   `json:"user"`
-	Community *Community     `json:"community"`
-	Index     *CompleteIndex `json:"index"`
+	Entity MentionEntity  `json:"entity"`
+	Index  *CompleteIndex `json:"index"`
 }
 
 type MentionInput struct {

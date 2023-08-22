@@ -752,9 +752,8 @@ type ComplexityRoot struct {
 	}
 
 	Mention struct {
-		Community func(childComplexity int) int
-		Index     func(childComplexity int) int
-		User      func(childComplexity int) int
+		Entity func(childComplexity int) int
+		Index  func(childComplexity int) int
 	}
 
 	MerchDiscountCode struct {
@@ -1654,8 +1653,7 @@ type GalleryUserResolver interface {
 	IsMemberOfCommunity(ctx context.Context, obj *model.GalleryUser, communityID persist.DBID) (bool, error)
 }
 type MentionResolver interface {
-	User(ctx context.Context, obj *model.Mention) (*model.GalleryUser, error)
-	Community(ctx context.Context, obj *model.Mention) (*model.Community, error)
+	Entity(ctx context.Context, obj *model.Mention) (model.MentionEntity, error)
 }
 type MutationResolver interface {
 	AddUserWallet(ctx context.Context, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) (model.AddUserWalletPayloadOrError, error)
@@ -4324,12 +4322,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.MembershipTier.TokenID(childComplexity), true
 
-	case "Mention.community":
-		if e.complexity.Mention.Community == nil {
+	case "Mention.entity":
+		if e.complexity.Mention.Entity == nil {
 			break
 		}
 
-		return e.complexity.Mention.Community(childComplexity), true
+		return e.complexity.Mention.Entity(childComplexity), true
 
 	case "Mention.index":
 		if e.complexity.Mention.Index == nil {
@@ -4337,13 +4335,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mention.Index(childComplexity), true
-
-	case "Mention.user":
-		if e.complexity.Mention.User == nil {
-			break
-		}
-
-		return e.complexity.Mention.User(childComplexity), true
 
 	case "MerchDiscountCode.code":
 		if e.complexity.MerchDiscountCode.Code == nil {
@@ -8880,9 +8871,10 @@ type Comment implements Node @goEmbedHelper {
   deleted: Boolean
 }
 
+union MentionEntity = GalleryUser | Community
+
 type Mention @goEmbedHelper {
-  user: GalleryUser @goField(forceResolver: true)
-  community: Community @goField(forceResolver: true)
+  entity: MentionEntity @goField(forceResolver: true)
   index: CompleteIndex
 }
 
@@ -18575,10 +18567,8 @@ func (ec *executionContext) fieldContext_Comment_mentions(ctx context.Context, f
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "user":
-				return ec.fieldContext_Mention_user(ctx, field)
-			case "community":
-				return ec.fieldContext_Mention_community(ctx, field)
+			case "entity":
+				return ec.fieldContext_Mention_entity(ctx, field)
 			case "index":
 				return ec.fieldContext_Mention_index(ctx, field)
 			}
@@ -30716,8 +30706,8 @@ func (ec *executionContext) fieldContext_MembershipTier_owners(ctx context.Conte
 	return fc, nil
 }
 
-func (ec *executionContext) _Mention_user(ctx context.Context, field graphql.CollectedField, obj *model.Mention) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Mention_user(ctx, field)
+func (ec *executionContext) _Mention_entity(ctx context.Context, field graphql.CollectedField, obj *model.Mention) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mention_entity(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -30730,7 +30720,7 @@ func (ec *executionContext) _Mention_user(ctx context.Context, field graphql.Col
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mention().User(rctx, obj)
+		return ec.resolvers.Mention().Entity(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -30739,152 +30729,19 @@ func (ec *executionContext) _Mention_user(ctx context.Context, field graphql.Col
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*model.GalleryUser)
+	res := resTmp.(model.MentionEntity)
 	fc.Result = res
-	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
+	return ec.marshalOMentionEntity2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMentionEntity(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Mention_user(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Mention_entity(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Mention",
 		Field:      field,
 		IsMethod:   true,
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_GalleryUser_id(ctx, field)
-			case "dbid":
-				return ec.fieldContext_GalleryUser_dbid(ctx, field)
-			case "username":
-				return ec.fieldContext_GalleryUser_username(ctx, field)
-			case "profileImage":
-				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
-			case "potentialEnsProfileImage":
-				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
-			case "bio":
-				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
-			case "universal":
-				return ec.fieldContext_GalleryUser_universal(ctx, field)
-			case "roles":
-				return ec.fieldContext_GalleryUser_roles(ctx, field)
-			case "socialAccounts":
-				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
-			case "tokens":
-				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
-			case "wallets":
-				return ec.fieldContext_GalleryUser_wallets(ctx, field)
-			case "primaryWallet":
-				return ec.fieldContext_GalleryUser_primaryWallet(ctx, field)
-			case "featuredGallery":
-				return ec.fieldContext_GalleryUser_featuredGallery(ctx, field)
-			case "galleries":
-				return ec.fieldContext_GalleryUser_galleries(ctx, field)
-			case "badges":
-				return ec.fieldContext_GalleryUser_badges(ctx, field)
-			case "isAuthenticatedUser":
-				return ec.fieldContext_GalleryUser_isAuthenticatedUser(ctx, field)
-			case "followers":
-				return ec.fieldContext_GalleryUser_followers(ctx, field)
-			case "following":
-				return ec.fieldContext_GalleryUser_following(ctx, field)
-			case "feed":
-				return ec.fieldContext_GalleryUser_feed(ctx, field)
-			case "sharedFollowers":
-				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
-			case "sharedCommunities":
-				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
-			case "createdCommunities":
-				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
-			case "isMemberOfCommunity":
-				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Mention_community(ctx context.Context, field graphql.CollectedField, obj *model.Mention) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Mention_community(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mention().Community(rctx, obj)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.Community)
-	fc.Result = res
-	return ec.marshalOCommunity2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunity(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Mention_community(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Mention",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "dbid":
-				return ec.fieldContext_Community_dbid(ctx, field)
-			case "id":
-				return ec.fieldContext_Community_id(ctx, field)
-			case "lastUpdated":
-				return ec.fieldContext_Community_lastUpdated(ctx, field)
-			case "contract":
-				return ec.fieldContext_Community_contract(ctx, field)
-			case "contractAddress":
-				return ec.fieldContext_Community_contractAddress(ctx, field)
-			case "creatorAddress":
-				return ec.fieldContext_Community_creatorAddress(ctx, field)
-			case "creator":
-				return ec.fieldContext_Community_creator(ctx, field)
-			case "chain":
-				return ec.fieldContext_Community_chain(ctx, field)
-			case "name":
-				return ec.fieldContext_Community_name(ctx, field)
-			case "description":
-				return ec.fieldContext_Community_description(ctx, field)
-			case "previewImage":
-				return ec.fieldContext_Community_previewImage(ctx, field)
-			case "profileImageURL":
-				return ec.fieldContext_Community_profileImageURL(ctx, field)
-			case "profileBannerURL":
-				return ec.fieldContext_Community_profileBannerURL(ctx, field)
-			case "badgeURL":
-				return ec.fieldContext_Community_badgeURL(ctx, field)
-			case "parentCommunity":
-				return ec.fieldContext_Community_parentCommunity(ctx, field)
-			case "subCommunities":
-				return ec.fieldContext_Community_subCommunities(ctx, field)
-			case "tokensInCommunity":
-				return ec.fieldContext_Community_tokensInCommunity(ctx, field)
-			case "owners":
-				return ec.fieldContext_Community_owners(ctx, field)
-			case "posts":
-				return ec.fieldContext_Community_posts(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
+			return nil, errors.New("field of type MentionEntity does not have child fields")
 		},
 	}
 	return fc, nil
@@ -38163,10 +38020,8 @@ func (ec *executionContext) fieldContext_Post_mentions(ctx context.Context, fiel
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "user":
-				return ec.fieldContext_Mention_user(ctx, field)
-			case "community":
-				return ec.fieldContext_Mention_community(ctx, field)
+			case "entity":
+				return ec.fieldContext_Mention_entity(ctx, field)
 			case "index":
 				return ec.fieldContext_Mention_index(ctx, field)
 			}
@@ -60663,6 +60518,29 @@ func (ec *executionContext) _MediaSubtype(ctx context.Context, sel ast.Selection
 	}
 }
 
+func (ec *executionContext) _MentionEntity(ctx context.Context, sel ast.SelectionSet, obj model.MentionEntity) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.GalleryUser:
+		return ec._GalleryUser(ctx, sel, &obj)
+	case *model.GalleryUser:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._GalleryUser(ctx, sel, obj)
+	case model.Community:
+		return ec._Community(ctx, sel, &obj)
+	case *model.Community:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._Community(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _MentionSource(ctx context.Context, sel ast.SelectionSet, obj model.MentionSource) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -64444,7 +64322,7 @@ func (ec *executionContext) _CommunitiesConnection(ctx context.Context, sel ast.
 	return out
 }
 
-var communityImplementors = []string{"Community", "Node", "CommunityByAddressOrError"}
+var communityImplementors = []string{"Community", "Node", "CommunityByAddressOrError", "MentionEntity"}
 
 func (ec *executionContext) _Community(ctx context.Context, sel ast.SelectionSet, obj *model.Community) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, communityImplementors)
@@ -66668,7 +66546,7 @@ func (ec *executionContext) _GalleryUpdatedFeedEventData(ctx context.Context, se
 	return out
 }
 
-var galleryUserImplementors = []string{"GalleryUser", "Node", "GalleryUserOrWallet", "GalleryUserOrAddress", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError"}
+var galleryUserImplementors = []string{"GalleryUser", "Node", "GalleryUserOrWallet", "GalleryUserOrAddress", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "MentionEntity", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError"}
 
 func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionSet, obj *model.GalleryUser) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, galleryUserImplementors)
@@ -67647,7 +67525,7 @@ func (ec *executionContext) _Mention(ctx context.Context, sel ast.SelectionSet, 
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Mention")
-		case "user":
+		case "entity":
 			field := field
 
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
@@ -67656,24 +67534,7 @@ func (ec *executionContext) _Mention(ctx context.Context, sel ast.SelectionSet, 
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._Mention_user(ctx, field, obj)
-				return res
-			}
-
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
-
-			})
-		case "community":
-			field := field
-
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Mention_community(ctx, field, obj)
+				res = ec._Mention_entity(ctx, field, obj)
 				return res
 			}
 
@@ -76784,6 +76645,13 @@ func (ec *executionContext) marshalOMention2ᚖgithubᚗcomᚋmikeydubᚋgoᚑga
 		return graphql.Null
 	}
 	return ec._Mention(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOMentionEntity2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMentionEntity(ctx context.Context, sel ast.SelectionSet, v model.MentionEntity) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._MentionEntity(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOMentionInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMentionInputᚄ(ctx context.Context, v interface{}) ([]*model.MentionInput, error) {

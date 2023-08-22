@@ -822,9 +822,10 @@ type Comment implements Node @goEmbedHelper {
   deleted: Boolean
 }
 
+union MentionEntity = GalleryUser | Community
+
 type Mention @goEmbedHelper {
-  user: GalleryUser @goField(forceResolver: true)
-  community: Community @goField(forceResolver: true)
+  entity: MentionEntity @goField(forceResolver: true)
   index: CompleteIndex
 }
 

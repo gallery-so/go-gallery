@@ -193,6 +193,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"MentionEntity": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(MentionEntity)
+		return obj, ok
+	},
+
 	"MentionSource": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(MentionSource)
 		return obj, ok

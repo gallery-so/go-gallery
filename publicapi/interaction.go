@@ -976,8 +976,8 @@ func mentionInputsToMentions(ms []*model.MentionInput) (map[persist.DBID]persist
 		mention := persist.Mention{}
 		if m.Index != nil {
 			mention.Index = &persist.CompleteIndex{
-				Index:  m.Index.Start,
-				Length: m.Index.End,
+				Index:  m.Index.Index,
+				Length: m.Index.Length,
 			}
 		}
 		if m.CommunityID != nil {

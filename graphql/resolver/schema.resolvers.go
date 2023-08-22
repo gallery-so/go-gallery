@@ -688,20 +688,15 @@ func (r *galleryUserResolver) IsMemberOfCommunity(ctx context.Context, obj *mode
 	return publicapi.For(ctx).User.IsMemberOfCommunity(ctx, obj.Dbid, communityID)
 }
 
-// User is the resolver for the user field.
-func (r *mentionResolver) User(ctx context.Context, obj *model.Mention) (*model.GalleryUser, error) {
-	if obj.HelperMentionData.UserID == nil {
-		return nil, nil
+// Entity is the resolver for the entity field.
+func (r *mentionResolver) Entity(ctx context.Context, obj *model.Mention) (model.MentionEntity, error) {
+	if obj.CommunityID != nil {
+		return resolveCommunityByID(ctx, *obj.CommunityID)
 	}
-	return resolveGalleryUserByUserID(ctx, *obj.HelperMentionData.UserID)
-}
-
-// Community is the resolver for the community field.
-func (r *mentionResolver) Community(ctx context.Context, obj *model.Mention) (*model.Community, error) {
-	if obj.HelperMentionData.CommunityID == nil {
-		return nil, nil
+	if obj.UserID != nil {
+		return resolveGalleryUserByUserID(ctx, *obj.UserID)
 	}
-	return resolveCommunityByID(ctx, *obj.HelperMentionData.CommunityID)
+	return nil, fmt.Errorf("mention has no entity")
 }
 
 // AddUserWallet is the resolver for the addUserWallet field.
