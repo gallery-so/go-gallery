@@ -41,11 +41,14 @@ func NewContractGalleryRepository(db *sql.DB, queries *db.Queries) *ContractGall
 	checkNoErr(err)
 
 	upsertByAddressStmt, err := db.PrepareContext(ctx, `
-		insert into contracts (id,version,address,symbol,name,owner_address,chain) values ($1,$2,$3,$4,$5,$6,$7)
+		insert into contracts (id,version,address,symbol,name,owner_address,chain,description,profile_image_url) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 			on conflict (address,chain) where parent_id is null do update set
 			version = $2,
 			address = $3,
-			symbol = $4,
+			symbol = coalesce(nullif(contracts.symbol, ''), nullif($4, '')),
+			name = coalesce(nullif(contracts.name, ''), nullif($5, '')),
+			description = coalesce(nullif(contracts.description, ''), nullif($8, '')),
+			profile_image_url = coalesce(nullif(contracts.profile_image_url, ''), nullif($9, '')),
 			owner_address = case when nullif(contracts.owner_address, '') is null then $6 else contracts.owner_address end,
 			chain = $7;
 	`)
@@ -120,7 +123,7 @@ func (c *ContractGalleryRepository) GetByAddresses(pCtx context.Context, pAddres
 
 // UpsertByAddress upserts the contract with the given address
 func (c *ContractGalleryRepository) UpsertByAddress(pCtx context.Context, pAddress persist.Address, pChain persist.Chain, pContract persist.ContractGallery) error {
-	_, err := c.upsertByAddressStmt.ExecContext(pCtx, persist.GenerateID(), pContract.Version, pContract.Address, pContract.Symbol, pContract.Name, pContract.OwnerAddress, pContract.Chain)
+	_, err := c.upsertByAddressStmt.ExecContext(pCtx, persist.GenerateID(), pContract.Version, pContract.Address, pContract.Symbol, pContract.Name, pContract.OwnerAddress, pContract.Chain, pContract.Description, pContract.ProfileImageURL)
 	if err != nil {
 		return err
 	}

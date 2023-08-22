@@ -1237,6 +1237,9 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 			if contract.CreatorAddress != "" && finalContractDescriptors.CreatorAddress == "" {
 				finalContractDescriptors.CreatorAddress = contract.CreatorAddress
 			}
+			if contract.ProfileImageURL != "" && finalContractDescriptors.ProfileImageURL == "" {
+				finalContractDescriptors.ProfileImageURL = contract.ProfileImageURL
+			}
 		} else {
 			logger.For(ctx).Infof("token %s-%s-%d not found for refresh (err: %s)", ti.TokenID, ti.ContractAddress, ti.Chain, err)
 		}
@@ -1253,11 +1256,13 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 	}
 
 	if err := p.Repos.ContractRepository.UpsertByAddress(ctx, ti.ContractAddress, ti.Chain, persist.ContractGallery{
-		Chain:        ti.Chain,
-		Address:      persist.Address(ti.Chain.NormalizeAddress(ti.ContractAddress)),
-		Symbol:       persist.NullString(finalContractDescriptors.Symbol),
-		Name:         persist.NullString(finalContractDescriptors.Name),
-		OwnerAddress: finalContractDescriptors.CreatorAddress,
+		Chain:           ti.Chain,
+		Address:         persist.Address(ti.Chain.NormalizeAddress(ti.ContractAddress)),
+		Symbol:          persist.NullString(finalContractDescriptors.Symbol),
+		Name:            persist.NullString(finalContractDescriptors.Name),
+		Description:     persist.NullString(finalContractDescriptors.Description),
+		ProfileImageURL: persist.NullString(finalContractDescriptors.ProfileImageURL),
+		OwnerAddress:    finalContractDescriptors.CreatorAddress,
 	}); err != nil {
 		return err
 	}
@@ -1267,12 +1272,15 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 // RefreshContract refreshes a contract on the given chain using the chain provider for that chain
 func (p *Provider) RefreshContract(ctx context.Context, ci persist.ContractIdentifiers) error {
 	contractRefreshers := matchingProvidersForChain[ContractRefresher](p.Chains, ci.Chain)
+	contractFetchers := matchingProvidersForChain[ContractsFetcher](p.Chains, ci.Chain)
 	var contracts []chainContracts
-	for i, refresher := range contractRefreshers {
+	for _, refresher := range contractRefreshers {
 		if err := refresher.RefreshContract(ctx, ci.ContractAddress); err != nil {
 			return err
 		}
-		c, err := refresher.GetContractByAddress(ctx, ci.ContractAddress)
+	}
+	for i, fetcher := range contractFetchers {
+		c, err := fetcher.GetContractByAddress(ctx, ci.ContractAddress)
 		if err != nil {
 			return err
 		}
