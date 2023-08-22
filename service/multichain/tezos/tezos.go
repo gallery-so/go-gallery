@@ -492,21 +492,6 @@ func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress
 	return tokens, contract, nil
 }
 
-func (d *Provider) GetCommunityOwners(ctx context.Context, contractAddress persist.Address, maxLimit, maxOffset int) ([]multichain.ChainAgnosticCommunityOwner, error) {
-	tokens, _, err := d.GetTokensByContractAddress(ctx, contractAddress, maxLimit, maxOffset)
-	if err != nil {
-		return nil, err
-	}
-	owners := make([]multichain.ChainAgnosticCommunityOwner, len(tokens))
-	for i, token := range tokens {
-		owners[i] = multichain.ChainAgnosticCommunityOwner{
-			Address: token.OwnerAddress,
-		}
-	}
-	return owners, nil
-
-}
-
 /*
 gql example
 {

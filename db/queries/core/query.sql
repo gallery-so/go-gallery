@@ -82,6 +82,9 @@ SELECT c.* FROM galleries g, unnest(g.collections)
 -- name: GetTokenById :one
 select * from tokens where id = $1 and displayable and deleted = false;
 
+-- name: GetTokenMediaByTokenId :one
+select tm.* from tokens join token_medias tm on tokens.token_media_id = tm.id where tokens.id = $1 and tokens.displayable and not tokens.deleted and not tm.deleted;
+
 -- name: GetTokenByIdBatch :batchone
 select * from tokens where id = $1 and displayable and deleted = false;
 
@@ -267,14 +270,14 @@ select u.* from tokens t
     where t.id = $1 and t.displayable and t.deleted = false and u.deleted = false;
 
 -- name: GetPreviewURLsByContractIdAndUserId :many
-select (tm.media->>'thumbnail_url')::varchar as thumbnail_url
+select coalesce(nullif(tm.media->>'thumbnail_url', ''), nullif(tm.media->>'media_url', ''))::varchar as thumbnail_url
     from tokens t
         inner join token_medias tm on t.token_media_id = tm.id
     where t.contract = $1
       and t.owner_user_id = $2
       and t.displayable
       and t.deleted = false
-      and tm.media ->> 'thumbnail_url' != ''
+      and (tm.media ->> 'thumbnail_url' != '' or tm.media->>'media_type' = 'image')
       and tm.deleted = false
     order by t.id limit 3;
 

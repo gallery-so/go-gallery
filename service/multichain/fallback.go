@@ -40,6 +40,7 @@ type SyncFailurePrimary interface {
 	TokensOwnerFetcher
 	TokenDescriptorsFetcher
 	TokensContractFetcher
+	ContractsFetcher
 }
 
 type SyncFailureSecondary interface {
@@ -161,6 +162,18 @@ func (f SyncFailureFallbackProvider) GetTokenDescriptorsByTokenIdentifiers(ctx c
 		return f.Fallback.GetTokenDescriptorsByTokenIdentifiers(ctx, id)
 	}
 	return token, contract, nil
+}
+
+func (f SyncFailureFallbackProvider) GetContractByAddress(ctx context.Context, addr persist.Address) (ChainAgnosticContract, error) {
+	contract, err := f.Primary.GetContractByAddress(ctx, addr)
+	if err != nil {
+		if tcf, ok := f.Fallback.(ContractsFetcher); ok {
+			logger.For(ctx).WithError(err).Warn("failed to get token by token identifiers and owner from primary in failure fallback")
+			return tcf.GetContractByAddress(ctx, addr)
+		}
+		return ChainAgnosticContract{}, err
+	}
+	return contract, nil
 }
 
 func (f SyncFailureFallbackProvider) GetTokensByContractAddress(ctx context.Context, contract persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error) {

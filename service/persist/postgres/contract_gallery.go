@@ -41,11 +41,14 @@ func NewContractGalleryRepository(db *sql.DB, queries *db.Queries) *ContractGall
 	checkNoErr(err)
 
 	upsertByAddressStmt, err := db.PrepareContext(ctx, `
-		insert into contracts (id,version,address,symbol,name,owner_address,chain) values ($1,$2,$3,$4,$5,$6,$7)
+		insert into contracts (id,version,address,symbol,name,owner_address,chain,description,profile_image_url) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 			on conflict (address,chain) where parent_id is null do update set
 			version = $2,
 			address = $3,
-			symbol = $4,
+			symbol = coalesce(nullif(contracts.symbol, ''), nullif($4, '')),
+			name = coalesce(nullif(contracts.name, ''), nullif($5, '')),
+			description = coalesce(nullif(contracts.description, ''), nullif($8, '')),
+			profile_image_url = coalesce(nullif(contracts.profile_image_url, ''), nullif($9, '')),
 			owner_address = case when nullif(contracts.owner_address, '') is null then $6 else contracts.owner_address end,
 			chain = $7;
 	`)
@@ -63,7 +66,7 @@ func NewContractGalleryRepository(db *sql.DB, queries *db.Queries) *ContractGall
 	getUserByWalletIDStmt, err := db.PrepareContext(ctx, `SELECT ID,USERNAME FROM users WHERE WALLETS @> ARRAY[$1]:: varchar[] AND DELETED = false`)
 	checkNoErr(err)
 
-	getPreviewNFTsStmt, err := db.PrepareContext(ctx, `SELECT token_medias.MEDIA->>'thumbnail_url' FROM tokens LEFT JOIN token_medias ON token_medias.ID = tokens.TOKEN_MEDIA_ID WHERE tokens.CONTRACT = $1 AND tokens.DISPLAYABLE AND tokens.DELETED = false AND tokens.OWNED_BY_WALLETS && $2 AND LENGTH(token_medias.MEDIA->>'thumbnail_url') > 0 ORDER BY tokens.ID LIMIT 3`)
+	getPreviewNFTsStmt, err := db.PrepareContext(ctx, `SELECT coalesce(nullif(token_medias.media->>'thumbnail_url', ''), nullif(token_medias.media->>'media_url', ''))::varchar FROM tokens LEFT JOIN token_medias ON token_medias.ID = tokens.TOKEN_MEDIA_ID WHERE tokens.CONTRACT = $1 AND tokens.DISPLAYABLE AND tokens.DELETED = false AND tokens.OWNED_BY_WALLETS && $2 AND (LENGTH(token_medias.MEDIA->>'thumbnail_url') > 0 or LENGTH(token_medias.MEDIA->>'media_url') > 0) ORDER BY tokens.ID LIMIT 3`)
 	checkNoErr(err)
 
 	return &ContractGalleryRepository{db: db, queries: queries, getByIDStmt: getByIDStmt, getByAddressStmt: getByAddressStmt, upsertByAddressStmt: upsertByAddressStmt, getByAddressesStmt: getByAddressesStmt, getOwnersStmt: getOwnersStmt, getUserByWalletIDStmt: getUserByWalletIDStmt, getPreviewNFTsStmt: getPreviewNFTsStmt}
@@ -120,7 +123,7 @@ func (c *ContractGalleryRepository) GetByAddresses(pCtx context.Context, pAddres
 
 // UpsertByAddress upserts the contract with the given address
 func (c *ContractGalleryRepository) UpsertByAddress(pCtx context.Context, pAddress persist.Address, pChain persist.Chain, pContract persist.ContractGallery) error {
-	_, err := c.upsertByAddressStmt.ExecContext(pCtx, persist.GenerateID(), pContract.Version, pContract.Address, pContract.Symbol, pContract.Name, pContract.OwnerAddress, pContract.Chain)
+	_, err := c.upsertByAddressStmt.ExecContext(pCtx, persist.GenerateID(), pContract.Version, pContract.Address, pContract.Symbol, pContract.Name, pContract.OwnerAddress, pContract.Chain, pContract.Description, pContract.ProfileImageURL)
 	if err != nil {
 		return err
 	}

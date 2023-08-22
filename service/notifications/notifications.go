@@ -48,6 +48,7 @@ type pushLimiter struct {
 	comments *limiters.KeyRateLimiter
 	admires  *limiters.KeyRateLimiter
 	follows  *limiters.KeyRateLimiter
+	tokens   *limiters.KeyRateLimiter
 }
 
 func newPushLimiter() *pushLimiter {
@@ -57,6 +58,7 @@ func newPushLimiter() *pushLimiter {
 		comments: limiters.NewKeyRateLimiter(ctx, cache, "comments", 5, time.Minute),
 		admires:  limiters.NewKeyRateLimiter(ctx, cache, "admires", 1, time.Minute*10),
 		follows:  limiters.NewKeyRateLimiter(ctx, cache, "follows", 1, time.Minute*10),
+		tokens:   limiters.NewKeyRateLimiter(ctx, cache, "tokens", 1, time.Minute*10),
 	}
 }
 
@@ -98,6 +100,18 @@ func (p *pushLimiter) tryFollow(ctx context.Context, sendingUserID persist.DBID,
 		limiterName: p.follows.Name(),
 		senderID:    sendingUserID,
 		receiverID:  receivingUserID,
+	}
+}
+
+func (p *pushLimiter) tryTokens(ctx context.Context, sendingUserID persist.DBID, tokenID persist.DBID) error {
+	key := fmt.Sprintf("%s:%s", sendingUserID, tokenID)
+	if p.isActionAllowed(ctx, p.tokens, key) {
+		return nil
+	}
+
+	return errRateLimited{
+		limiterName: p.follows.Name(),
+		senderID:    sendingUserID,
 	}
 }
 
@@ -496,7 +510,7 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 		},
 	}
 
-	if notif.Action == persist.ActionAdmiredFeedEvent {
+	if notif.Action == persist.ActionAdmiredFeedEvent || notif.Action == persist.ActionAdmiredPost {
 		admirer, err := queries.GetUserById(ctx, notif.Data.AdmirerIDs[0])
 		if err != nil {
 			return task.PushNotificationMessage{}, err
@@ -510,11 +524,16 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 			return task.PushNotificationMessage{}, fmt.Errorf("user with ID=%s has no username", admirer.ID)
 		}
 
-		message.Body = fmt.Sprintf("%s admired your activity", admirer.Username.String)
+		ac := "activity"
+		if notif.Action == persist.ActionAdmiredPost {
+			ac = "post"
+		}
+
+		message.Body = fmt.Sprintf("%s admired your %s", admirer.Username.String, ac)
 		return message, nil
 	}
 
-	if notif.Action == persist.ActionCommentedOnFeedEvent {
+	if notif.Action == persist.ActionCommentedOnFeedEvent || notif.Action == persist.ActionCommentedOnPost {
 		comment, err := queries.GetCommentByCommentID(ctx, notif.CommentID)
 		if err != nil {
 			return task.PushNotificationMessage{}, err
@@ -533,7 +552,12 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 			return task.PushNotificationMessage{}, fmt.Errorf("user with ID=%s has no username", commenter.ID)
 		}
 
-		message.Body = fmt.Sprintf("%s commented on your activity", commenter.Username.String)
+		ac := "activity"
+		if notif.Action == persist.ActionCommentedOnPost {
+			ac = "post"
+		}
+
+		message.Body = fmt.Sprintf("%s commented on your %s", commenter.Username.String, ac)
 		return message, nil
 	}
 
@@ -561,6 +585,34 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 		message.Body = body
 		return message, nil
 	}
+	if notif.Action == persist.ActionNewTokensReceived {
+
+		tm, err := queries.GetTokenMediaByTokenId(ctx, notif.Data.NewTokenID)
+		if err != nil {
+			return task.PushNotificationMessage{}, err
+		}
+		name := tm.Name
+		if name == "" {
+			to, err := queries.GetTokenById(ctx, notif.Data.NewTokenID)
+			if err != nil {
+				return task.PushNotificationMessage{}, err
+			}
+			name = to.Name.String
+		}
+
+		name = util.TruncateWithEllipsis(name, 20)
+
+		if err := limiter.tryTokens(ctx, notif.OwnerID, notif.Data.NewTokenID); err != nil {
+			return task.PushNotificationMessage{}, err
+		}
+		amount := notif.Data.NewTokenQuantity
+		i := amount.BigInt().Uint64()
+		if i > 1 {
+			message.Body = fmt.Sprintf("You received %d new %s tokens", i, name)
+		} else {
+			message.Body = fmt.Sprintf("You received a new %s token", name)
+		}
+	}
 
 	return task.PushNotificationMessage{}, fmt.Errorf("unsupported notification action: %s", notif.Action)
 }
@@ -572,6 +624,12 @@ func actionSupportsPushNotifications(action persist.Action) bool {
 	case persist.ActionCommentedOnFeedEvent:
 		return true
 	case persist.ActionUserFollowedUsers:
+		return true
+	case persist.ActionNewTokensReceived:
+		return true
+	case persist.ActionCommentedOnPost:
+		return true
+	case persist.ActionAdmiredPost:
 		return true
 	default:
 		return false

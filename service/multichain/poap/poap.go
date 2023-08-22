@@ -189,51 +189,6 @@ func (d *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, owner
 	return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("poap has no way to retrieve tokens by contract address")
 }
 
-func (d *Provider) GetCommunityOwners(ctx context.Context, contractAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticCommunityOwner, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/events/%s", d.apiURL, contractAddress), nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("X-API-KEY", d.apiKey)
-	resp, err := d.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, err
-	}
-	var event poapEvent
-	if err := json.NewDecoder(resp.Body).Decode(&event); err != nil {
-		return nil, err
-	}
-	nextReq, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/events/%d/poaps&limit=%d&offset=%d", d.apiURL, event.ID, limit, offset), nil)
-	if err != nil {
-		return nil, err
-	}
-	nextReq.Header.Set("X-API-KEY", d.apiKey)
-	nextReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", d.authToken))
-	nextResp, err := d.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer nextResp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, err
-	}
-	var eventPoaps eventPoaps
-	if err := json.NewDecoder(nextResp.Body).Decode(&eventPoaps); err != nil {
-		return nil, err
-	}
-	var owners []multichain.ChainAgnosticCommunityOwner
-	for _, token := range eventPoaps.Tokens {
-		owners = append(owners, multichain.ChainAgnosticCommunityOwner{
-			Address: persist.Address(token.Owner.ID), // TODO is this the address?
-		})
-	}
-	return owners, nil
-}
-
 // GetTokensByTokenIdentifiers retrieves tokens for a token identifiers on the Poap Blockchain
 func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	tid := tokenIdentifiers.TokenID

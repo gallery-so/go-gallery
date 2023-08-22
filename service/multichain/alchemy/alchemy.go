@@ -65,16 +65,26 @@ func (m *Metadata) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+type OpenseaCollection struct {
+	CollectionName string `json:"collectionName"`
+	Description    string `json:"description"`
+	ImageURL       string `json:"imageUrl"`
+}
+
 type ContractMetadata struct {
-	Name             string                  `json:"name"`
-	Symbol           string                  `json:"symbol"`
-	TotalSupply      string                  `json:"totalSupply"`
-	TokenType        string                  `json:"tokenType"`
-	ContractDeployer persist.EthereumAddress `json:"contractDeployer"`
+	Name              string                  `json:"name"`
+	Symbol            string                  `json:"symbol"`
+	TotalSupply       string                  `json:"totalSupply"`
+	TokenType         string                  `json:"tokenType"`
+	ContractDeployer  persist.EthereumAddress `json:"contractDeployer"`
+	OpenseaCollection OpenseaCollection       `json:"openSea"`
 }
 
 type Contract struct {
-	Address string `json:"address"`
+	Address          string                  `json:"address"`
+	Title            string                  `json:"title"`
+	ContractDeployer persist.EthereumAddress `json:"contractDeployer"`
+	Opensea          OpenseaCollection       `json:"openSea"`
 }
 
 type TokenID string
@@ -542,7 +552,7 @@ type GetContractMetadataResponse struct {
 
 // GetContractByAddress retrieves an ethereum contract by address
 func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Address) (multichain.ChainAgnosticContract, error) {
-	url := fmt.Sprintf("%s/getContractMetadata?contract=%s", d.alchemyAPIURL, addr)
+	url := fmt.Sprintf("%s/getContractMetadata?contractAddress=%s", d.alchemyAPIURL, addr)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return multichain.ChainAgnosticContract{}, err
@@ -567,93 +577,14 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 	return multichain.ChainAgnosticContract{
 		Address: persist.Address(contractMetadataResponse.Address),
 		Descriptors: multichain.ChainAgnosticContractDescriptors{
-			Symbol:         contractMetadataResponse.ContractMetadata.Symbol,
-			Name:           contractMetadataResponse.ContractMetadata.Name,
-			CreatorAddress: persist.Address(contractMetadataResponse.ContractMetadata.ContractDeployer),
+			Symbol:          contractMetadataResponse.ContractMetadata.Symbol,
+			Name:            contractMetadataResponse.ContractMetadata.Name,
+			CreatorAddress:  persist.Address(contractMetadataResponse.ContractMetadata.ContractDeployer),
+			Description:     contractMetadataResponse.ContractMetadata.OpenseaCollection.Description,
+			ProfileImageURL: contractMetadataResponse.ContractMetadata.OpenseaCollection.ImageURL,
 		},
 	}, nil
 
-}
-
-func (d *Provider) GetCommunityOwners(ctx context.Context, contractAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticCommunityOwner, error) {
-	owners, err := d.paginateCollectionOwners(ctx, contractAddress, limit, offset, "")
-	if err != nil {
-		return nil, err
-	}
-	result := make([]multichain.ChainAgnosticCommunityOwner, 0, limit)
-
-	for _, owner := range owners {
-		result = append(result, multichain.ChainAgnosticCommunityOwner{
-			Address: persist.Address(owner),
-		})
-	}
-
-	return result, nil
-}
-
-type collectionOwnersResponse struct {
-	Owners  []persist.EthereumAddress `json:"owners"`
-	PageKey string                    `json:"pageKey"`
-}
-
-func (d *Provider) paginateCollectionOwners(ctx context.Context, contractAddress persist.Address, limit, offset int, pagekey string) ([]persist.EthereumAddress, error) {
-	allOwners := make([]persist.EthereumAddress, 0, limit)
-	url := fmt.Sprintf("%s/getCollectionOwners?contractAddress=%s", d.alchemyAPIURL, contractAddress)
-	if pagekey != "" {
-		url = fmt.Sprintf("%s&pageKey=%s", url, pagekey)
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := d.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to get collection owners from alchemy api: %s", resp.Status)
-	}
-
-	var collectionOwnersResponse collectionOwnersResponse
-	if err := json.NewDecoder(resp.Body).Decode(&collectionOwnersResponse); err != nil {
-		return nil, err
-	}
-
-	if offset > 0 && offset < 50000 {
-		if len(collectionOwnersResponse.Owners) > offset {
-			collectionOwnersResponse.Owners = collectionOwnersResponse.Owners[offset:]
-		} else {
-			collectionOwnersResponse.Owners = nil
-		}
-	}
-
-	if limit > 0 && limit < 50000 {
-		if len(collectionOwnersResponse.Owners) > limit {
-			collectionOwnersResponse.Owners = collectionOwnersResponse.Owners[:limit]
-		}
-	}
-
-	allOwners = append(allOwners, collectionOwnersResponse.Owners...)
-
-	if collectionOwnersResponse.PageKey != "" {
-		if limit > 0 && limit > 50000 {
-			limit -= 50000
-		}
-		if offset > 0 && offset > 50000 {
-			offset -= 50000
-		}
-		owners, err := d.paginateCollectionOwners(ctx, contractAddress, limit, offset, collectionOwnersResponse.PageKey)
-		if err != nil {
-			return nil, err
-		}
-		allOwners = append(collectionOwnersResponse.Owners, owners...)
-	}
-
-	return allOwners, nil
 }
 
 func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress persist.Address, ownerAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {

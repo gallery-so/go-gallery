@@ -298,8 +298,8 @@ func (api ContractAPI) GetCommunityPostsByContractID(ctx context.Context, contra
 		}
 
 		results := make([]interface{}, len(posts))
-		for i, owner := range posts {
-			results[i] = owner
+		for i, post := range posts {
+			results[i] = post
 		}
 
 		return results, nil
@@ -314,7 +314,7 @@ func (api ContractAPI) GetCommunityPostsByContractID(ctx context.Context, contra
 		if user, ok := i.(db.Post); ok {
 			return user.CreatedAt, user.ID, nil
 		}
-		return time.Time{}, "", fmt.Errorf("interface{} is not a token")
+		return time.Time{}, "", fmt.Errorf("interface{} is not a post")
 	}
 
 	paginator := timeIDPaginator{

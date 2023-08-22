@@ -659,7 +659,7 @@ func postsToConnection(ctx context.Context, posts []db.Post, contractID persist.
 		cval, _ := p.Caption.Value()
 
 		var caption *string
-		if caption != nil {
+		if cval != nil {
 			caption = util.ToPointer(cval.(string))
 		}
 
