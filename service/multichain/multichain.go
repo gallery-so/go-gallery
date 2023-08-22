@@ -177,6 +177,9 @@ type TokensContractFetcher interface {
 
 type ContractsFetcher interface {
 	GetContractByAddress(ctx context.Context, contract persist.Address) (ChainAgnosticContract, error)
+}
+
+type ContractsOwnerFetcher interface {
 	GetContractsByOwnerAddress(ctx context.Context, owner persist.Address) ([]ChainAgnosticContract, error)
 }
 
@@ -1386,7 +1389,7 @@ func (p *Provider) SyncContractsOwnedByUser(ctx context.Context, userID persist.
 	}
 	contractsFromProviders := []chainContracts{}
 
-	contractFetchers := matchingProvidersByChains[ContractsFetcher](p.Chains, chains...)
+	contractFetchers := matchingProvidersByChains[ContractsOwnerFetcher](p.Chains, chains...)
 	searchAddresses := p.matchingWallets(user.Wallets, chains)
 	providerPool := pool.NewWithResults[ContractOwnerResult]().WithContext(ctx)
 

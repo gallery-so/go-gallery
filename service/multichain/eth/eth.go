@@ -103,6 +103,7 @@ func (d *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, ti
 
 // GetContractByAddress retrieves an ethereum contract by address
 func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Address) (multichain.ChainAgnosticContract, error) {
+	logger.For(ctx).Warn("ETH")
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/contracts/get?address=%s", d.indexerBaseURL, addr), nil)
 	if err != nil {
 		return multichain.ChainAgnosticContract{}, err
