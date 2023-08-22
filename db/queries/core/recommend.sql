@@ -88,4 +88,5 @@ from feed_entity_score_view f2
 where created_at > (select last_updated from refreshed limit 1)
   and (@include_viewer::bool or f2.actor_id != @viewer_id)
   and (@include_posts::bool or f2.feed_entity_type != @post_entity_type)
+  and (@include_events::bool or f2.feed_entity_type != @feed_entity_type)
   and not (f2.action = any(@excluded_feed_actions::varchar[]));
