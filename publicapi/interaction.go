@@ -444,7 +444,7 @@ func (api InteractionAPI) PaginateAdmiresByTokenID(ctx context.Context, tokenID 
 	}
 
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-		admires, err := api.loaders.AdmiresByPostID.Load(db.PaginateAdmiresByTokenIDBatchParams{
+		admires, err := api.loaders.AdmiresByTokenID.Load(db.PaginateAdmiresByTokenIDBatchParams{
 			TokenID:       tokenID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,

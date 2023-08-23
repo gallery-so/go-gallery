@@ -1376,12 +1376,12 @@ func loadAdmireByActorIDAndTokenID(q *db.Queries) func(context.Context, []db.Get
 		results := make([]db.Admire, len(params))
 		errors := make([]error, len(params))
 
-		b := q.GetAdmireByActorIDAndPostID(ctx, params)
+		b := q.GetAdmireByActorIDAndTokenID(ctx, params)
 		defer b.Close()
 
 		b.QueryRow(func(i int, admire db.Admire, err error) {
 			if err == pgx.ErrNoRows {
-				err = persist.ErrAdmireTokenNotFound{ActorID: params[i].ActorID, TokenID: params[i].TokenID}
+				err = persist.ErrAdmireNotFound{ActorID: params[i].ActorID, TokenID: params[i].TokenID}
 			}
 			results[i], errors[i] = admire, err
 		})
@@ -1389,7 +1389,6 @@ func loadAdmireByActorIDAndTokenID(q *db.Queries) func(context.Context, []db.Get
 		return results, errors
 	}
 }
-
 
 func loadMediaByTokenID(q *db.Queries) func(context.Context, []persist.DBID) ([]db.TokenMedia, []error) {
 	return func(ctx context.Context, tokenIDs []persist.DBID) ([]db.TokenMedia, []error) {
