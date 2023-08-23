@@ -10394,7 +10394,11 @@ type AdmireTokenPayload {
   admire: Admire @goField(forceResolver: true)
 }
 
-union AdmireTokenPayloadOrError = AdmireTokenPayload | ErrTokenNotFound | ErrInvalidInput | ErrNotAuthorized
+union AdmireTokenPayloadOrError =
+    AdmireTokenPayload
+  | ErrTokenNotFound
+  | ErrInvalidInput
+  | ErrNotAuthorized
 
 type CommentOnPostPayload {
   viewer: Viewer

@@ -581,7 +581,6 @@ mutation postTokens($input: PostTokensInput!) {
   }
 }
 
-
 mutation admireTokenMutation($tokenId: DBID!) {
   admireToken(tokenId: $tokenId) {
     ... on Error {
