@@ -26,10 +26,11 @@ type ErrAdmireNotFound struct {
 	ActorID     DBID
 	FeedEventID DBID
 	PostID      DBID
+	TokenID     DBID
 }
 
 func (e ErrAdmireNotFound) Error() string {
-	return fmt.Sprintf("admire not found | AdmireID: %s, ActorID: %s, FeedEventID: %s, PostID: %s", e.AdmireID, e.ActorID, e.FeedEventID, e.PostID)
+	return fmt.Sprintf("admire not found | AdmireID: %s, ActorID: %s, FeedEventID: %s, PostID: %s, TokenID: %s", e.AdmireID, e.ActorID, e.FeedEventID, e.PostID, e.TokenID)
 }
 
 type ErrAdmireAlreadyExists struct {
