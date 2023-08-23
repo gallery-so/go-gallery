@@ -8476,8 +8476,13 @@ type Token implements Node @goEmbedHelper {
   isSpamByProvider: Boolean @goField(forceResolver: true)
 
   # Returns an admires connection
-  admires(before: String, after: String, first: Int, last: Int, userID: DBID): TokenAdmiresConnection
-    @goField(forceResolver: true)
+  admires(
+    before: String
+    after: String
+    first: Int
+    last: Int
+    userID: DBID
+  ): TokenAdmiresConnection @goField(forceResolver: true)
   # These are subject to change; unlike the other fields, they aren't present on the current persist.Token
   # struct and may ultimately end up elsewhere
   creatorAddress: ChainAddress
