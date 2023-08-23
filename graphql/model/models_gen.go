@@ -2054,36 +2054,48 @@ func (TextMedia) IsMedia()        {}
 
 type Token struct {
 	HelperTokenData
-	Dbid                  persist.DBID          `json:"dbid"`
-	CreationTime          *time.Time            `json:"creationTime"`
-	LastUpdated           *time.Time            `json:"lastUpdated"`
-	CollectorsNote        *string               `json:"collectorsNote"`
-	Media                 MediaSubtype          `json:"media"`
-	TokenType             *TokenType            `json:"tokenType"`
-	Chain                 *persist.Chain        `json:"chain"`
-	Name                  *string               `json:"name"`
-	Description           *string               `json:"description"`
-	TokenID               *string               `json:"tokenId"`
-	Quantity              *string               `json:"quantity"`
-	Owner                 *GalleryUser          `json:"owner"`
-	OwnedByWallets        []*Wallet             `json:"ownedByWallets"`
-	OwnershipHistory      []*OwnerAtBlock       `json:"ownershipHistory"`
-	OwnerIsHolder         *bool                 `json:"ownerIsHolder"`
-	OwnerIsCreator        *bool                 `json:"ownerIsCreator"`
-	TokenMetadata         *string               `json:"tokenMetadata"`
-	Contract              *Contract             `json:"contract"`
-	Community             *Community            `json:"community"`
-	ExternalURL           *string               `json:"externalUrl"`
-	BlockNumber           *string               `json:"blockNumber"`
-	IsSpamByUser          *bool                 `json:"isSpamByUser"`
-	IsSpamByProvider      *bool                 `json:"isSpamByProvider"`
-	CreatorAddress        *persist.ChainAddress `json:"creatorAddress"`
-	OpenseaCollectionName *string               `json:"openseaCollectionName"`
-	OpenseaID             *int                  `json:"openseaId"`
+	Dbid                  persist.DBID            `json:"dbid"`
+	CreationTime          *time.Time              `json:"creationTime"`
+	LastUpdated           *time.Time              `json:"lastUpdated"`
+	CollectorsNote        *string                 `json:"collectorsNote"`
+	Media                 MediaSubtype            `json:"media"`
+	TokenType             *TokenType              `json:"tokenType"`
+	Chain                 *persist.Chain          `json:"chain"`
+	Name                  *string                 `json:"name"`
+	Description           *string                 `json:"description"`
+	TokenID               *string                 `json:"tokenId"`
+	Quantity              *string                 `json:"quantity"`
+	Owner                 *GalleryUser            `json:"owner"`
+	OwnedByWallets        []*Wallet               `json:"ownedByWallets"`
+	OwnershipHistory      []*OwnerAtBlock         `json:"ownershipHistory"`
+	OwnerIsHolder         *bool                   `json:"ownerIsHolder"`
+	OwnerIsCreator        *bool                   `json:"ownerIsCreator"`
+	TokenMetadata         *string                 `json:"tokenMetadata"`
+	Contract              *Contract               `json:"contract"`
+	Community             *Community              `json:"community"`
+	ExternalURL           *string                 `json:"externalUrl"`
+	BlockNumber           *string                 `json:"blockNumber"`
+	IsSpamByUser          *bool                   `json:"isSpamByUser"`
+	IsSpamByProvider      *bool                   `json:"isSpamByProvider"`
+	Admires               *TokenAdmiresConnection `json:"admires"`
+	CreatorAddress        *persist.ChainAddress   `json:"creatorAddress"`
+	OpenseaCollectionName *string                 `json:"openseaCollectionName"`
+	OpenseaID             *int                    `json:"openseaId"`
 }
 
 func (Token) IsNode()             {}
 func (Token) IsTokenByIDOrError() {}
+
+type TokenAdmireEdge struct {
+	Node   *Admire `json:"node"`
+	Cursor *string `json:"cursor"`
+	Token  *Token  `json:"token"`
+}
+
+type TokenAdmiresConnection struct {
+	Edges    []*TokenAdmireEdge `json:"edges"`
+	PageInfo *PageInfo          `json:"pageInfo"`
+}
 
 type TokenEdge struct {
 	Node   *Token  `json:"node"`
