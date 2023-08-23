@@ -677,37 +677,11 @@ func (api InteractionAPI) AdmireToken(ctx context.Context, tokenID persist.DBID)
 		return "", err
 	}
 
-	/*
-		check later if admire already exists
-	admire, err := api.GetAdmireByActorIDAndTokenID(ctx, userID, postID)
-	if err == nil {
-		return "", persist.ErrAdmireAlreadyExists{AdmireID: admire.ID, ActorID: userID, TokenID: tokenID}
-	}
-	notFoundErr := persist.ErrAdmireNotFound{}
-	if !errors.As(err, &notFoundErr) {
-		return "", err
-	}
-	*/
-
 	admireID, err := api.repos.AdmireRepository.CreateTokenAdmire(ctx, tokenID, userID)
 	if err != nil {
 		return "", err
 	}
 
-	/*
-	   skip dispatching this event for now
-	_, err = event.DispatchEvent(ctx, db.Event{
-		ActorID:        persist.DBIDToNullStr(userID),
-		ResourceTypeID: persist.ResourceTypeAdmire,
-		SubjectID:      tokenID,
-		TokenID:        tokenID,
-		AdmireID:       admireID,
-		Action:         persist.ActionAdmiredToken,
-	}, api.validator, nil)
-	if err != nil {
-		return "", err
-	}
-	*/
 	return admireID, err
 }
 
