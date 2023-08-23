@@ -2417,6 +2417,18 @@ type AdmirePostPayload {
 
 union AdmirePostPayloadOrError = AdmirePostPayload | ErrInvalidInput | ErrNotAuthorized
 
+type AdmireTokenPayload {
+  viewer: Viewer
+  token: Token @goField(forceResolver: true)
+  admire: Admire @goField(forceResolver: true)
+}
+
+union AdmireTokenPayloadOrError =
+    AdmireTokenPayload
+  | ErrTokenNotFound
+  | ErrInvalidInput
+  | ErrNotAuthorized
+
 type CommentOnPostPayload {
   viewer: Viewer
   post: Post @goField(forceResolver: true)
@@ -2508,6 +2520,7 @@ type Mutation {
 
   admireFeedEvent(feedEventId: DBID!): AdmireFeedEventPayloadOrError @authRequired
   admirePost(postId: DBID!): AdmirePostPayloadOrError @authRequired
+  admireToken(tokenId: DBID!): AdmireTokenPayloadOrError @authRequired
   removeAdmire(admireId: DBID!): RemoveAdmirePayloadOrError @authRequired
   commentOnFeedEvent(
     feedEventId: DBID!

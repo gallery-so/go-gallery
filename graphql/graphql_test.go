@@ -80,6 +80,7 @@ func testGraphQL(t *testing.T) {
 		{title: "should move collection to new gallery", run: testMoveCollection},
 		{title: "should connect social account", run: testConnectSocialAccount},
 		{title: "should view a token", run: testViewToken},
+		{title: "should admire a token", run: testAdmireToken},
 	}
 	for _, test := range tests {
 		t.Run(test.title, testWithFixtures(test.run, test.fixtures...))
@@ -784,6 +785,15 @@ func testGetCommunity(t *testing.T) {
 	})
 }
 
+func testAdmireToken(t *testing.T) {
+	ctx := context.Background()
+	userF := newUserFixture(t)
+	c := authedHandlerClient(t, userF.ID)
+	alice := newUserWithTokensFixture(t)
+	aliceTokenAdmireResp := admireToken(t, ctx, c, alice.TokenIDs[0])
+	assert.Equal(t, aliceTokenAdmireResp, alice.TokenIDs[0])
+}
+
 func testViewToken(t *testing.T) {
 	ctx := context.Background()
 	userF := newUserWithTokensFixture(t)
@@ -1453,6 +1463,15 @@ func admirePost(t *testing.T, ctx context.Context, c genql.Client, postID persis
 	require.NoError(t, err)
 
 	_ = (*resp.AdmirePost).(*admirePostMutationAdmirePostAdmirePostPayload)
+}
+
+// admireToken makes a GraphQL request to admire a token
+func admireToken(t *testing.T, ctx context.Context, c genql.Client, tokenID persist.DBID) persist.DBID {
+	t.Helper()
+	resp, err := admireTokenMutation(ctx, c, tokenID)
+	require.NoError(t, err)
+	payload := (*resp.AdmireToken).(*admireTokenMutationAdmireTokenAdmireTokenPayload)
+	return payload.Token.Dbid
 }
 
 // commentOnPost makes a GraphQL request to comment on a post
