@@ -654,9 +654,9 @@ func postsToConnection(ctx context.Context, posts []db.Post, contractID persist.
 	edges := make([]*model.PostEdge, len(posts))
 	for i, post := range posts {
 
-		p := post
+		po := post
 
-		cval, _ := p.Caption.Value()
+		cval, _ := po.Caption.Value()
 
 		var caption *string
 		if cval != nil {
@@ -666,12 +666,12 @@ func postsToConnection(ctx context.Context, posts []db.Post, contractID persist.
 		edges[i] = &model.PostEdge{
 			Node: &model.Post{
 				HelperPostData: model.HelperPostData{
-					TokenIDs: p.TokenIds,
-					AuthorID: p.ActorID,
-					Mentions: p.Mentions,
+					TokenIDs: po.TokenIds,
+					AuthorID: po.ActorID,
+					Mentions: po.Mentions,
 				},
-				CreationTime: &p.CreatedAt,
-				Dbid:         p.ID,
+				CreationTime: &po.CreatedAt,
+				Dbid:         po.ID,
 				Tokens:       nil, // handled by dedicated resolver
 				Caption:      caption,
 				Admires:      nil, // handled by dedicated resolver
