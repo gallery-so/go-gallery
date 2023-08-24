@@ -322,7 +322,7 @@ type BlockScoutTokenResponse struct {
 }
 
 func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
-	meta, err := d.fetchReservoirMetadata(ctx, ti)
+	meta, err := d.fetchReservoirMetadata(ctx, ti, true)
 	if err == nil {
 		return meta, nil
 	}
@@ -336,7 +336,31 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti mu
 	return meta, nil
 }
 
-func (d *Provider) fetchReservoirMetadata(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
+func (d *Provider) fetchReservoirMetadata(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, refresh bool) (persist.TokenMetadata, error) {
+	rtid := fmt.Sprintf("%s:%s", ti.ContractAddress, ti.TokenID.Base10String())
+	if refresh {
+		ru := fmt.Sprintf("%s/tokens/refresh/v1", d.apiURL)
+		body := map[string]interface{}{
+			"token": rtid,
+		}
+		b, err := json.Marshal(body)
+		if err != nil {
+			return nil, err
+		}
+
+		rreq, err := http.NewRequestWithContext(ctx, http.MethodPost, ru, strings.NewReader(string(b)))
+		if err != nil {
+			return nil, err
+		}
+
+		rreq.Header.Add("x-api-key", d.apiKey)
+
+		_, err = d.httpClient.Do(rreq)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	u := fmt.Sprintf("%s/tokens/v6", d.apiURL)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
@@ -345,7 +369,7 @@ func (d *Provider) fetchReservoirMetadata(ctx context.Context, ti multichain.Cha
 
 	req.Header.Add("x-api-key", d.apiKey)
 	q := req.URL.Query()
-	q.Add("tokens", fmt.Sprintf("%s:%s", ti.ContractAddress, ti.TokenID.Base10String()))
+	q.Add("tokens", rtid)
 
 	resp, err := d.httpClient.Do(req)
 	if err != nil {
