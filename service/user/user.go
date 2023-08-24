@@ -13,9 +13,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mikeydub/go-gallery/service/auth"
-	"github.com/mikeydub/go-gallery/service/emails"
 	"github.com/mikeydub/go-gallery/service/eth"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
@@ -84,73 +82,20 @@ type MergeUsersInput struct {
 }
 
 // CreateUser creates a new user
-func CreateUser(ctx context.Context, authenticator auth.Authenticator, username string, email *persist.Email, bio, galleryName, galleryDesc, galleryPos string, userRepo *postgres.UserRepository,
-	queries *coredb.Queries, mp *multichain.Provider) (userID persist.DBID, galleryID persist.DBID, err error) {
+func CreateUser(ctx context.Context, createUserParams persist.CreateUserInput, createGalleryParams coredb.GalleryRepoCreateParams, userRepo *postgres.UserRepository,
+	queries *coredb.Queries) (userID persist.DBID, galleryID persist.DBID, err error) {
 	gc := util.MustGetGinContext(ctx)
 
-	authResult, err := authenticator.Authenticate(ctx)
-	if err != nil {
-		return "", "", auth.ErrAuthenticationFailed{WrappedErr: err}
-	}
-
-	if authResult.User != nil && !authResult.User.Universal.Bool() {
-		return "", "", persist.ErrUserAlreadyExists{Authenticator: authenticator.GetDescription()}
-	}
-
-	var wallet auth.AuthenticatedAddress
-
-	if len(authResult.Addresses) > 0 {
-		// TODO: This currently takes the first authenticated address returned by the authenticator and creates
-		// the user's account based on that address. This works because the only auth mechanism we have is nonce-based
-		// auth and that supplies a single address. In the future, a user may authenticate in a way that makes
-		// multiple authenticated addresses available for initial user creation, and we may want to add all of
-		// those addresses to the user's account here.
-		wallet = authResult.Addresses[0]
-	}
-
-	user := persist.CreateUserInput{
-		Username:     username,
-		Bio:          bio,
-		Email:        email,
-		EmailStatus:  persist.EmailVerificationStatusUnverified,
-		ChainAddress: wallet.ChainAddress,
-		WalletType:   wallet.WalletType,
-	}
-
-	if authResult.Email != nil {
-		// N.B. Favor the verified email, even if it doesn't match the input email
-		user.Email = authResult.Email
-		user.EmailStatus = persist.EmailVerificationStatusVerified
-		user.EmailNotificationsSettings = persist.EmailUnsubscriptions{} // Sign them up for all emails
-	}
-
-	userID, err = userRepo.Create(ctx, user, queries)
+	userID, err = userRepo.Create(ctx, createUserParams, queries)
 	if err != nil {
 		return "", "", err
 	}
 
-	gallery, err := queries.GalleryRepoCreate(ctx, coredb.GalleryRepoCreateParams{
-		GalleryID:   persist.GenerateID(),
-		OwnerUserID: userID,
-		Name:        galleryName,
-		Description: galleryDesc,
-		Position:    galleryPos,
-	})
+	createGalleryParams.OwnerUserID = userID
+
+	gallery, err := queries.GalleryRepoCreate(ctx, createGalleryParams)
 	if err != nil {
 		return "", "", err
-	}
-
-	galleryID = gallery.ID
-
-	if user.EmailStatus == persist.EmailVerificationStatusUnverified && email != nil {
-		if err := emails.RequestVerificationEmail(ctx, userID); err != nil {
-			// Just the log the error since the user can verify their email later
-			logger.For(ctx).Warnf("failed to send verification email: %s", err)
-		}
-	}
-
-	if user.EmailStatus == persist.EmailVerificationStatusVerified {
-		// TODO: Create an endpoint to add to sendgrid
 	}
 
 	err = auth.StartSession(gc, queries, userID)
@@ -158,7 +103,7 @@ func CreateUser(ctx context.Context, authenticator auth.Authenticator, username 
 		return "", "", err
 	}
 
-	return userID, galleryID, nil
+	return userID, gallery.ID, nil
 }
 
 // RemoveWalletsFromUser removes wallets from a user in the DB, and returns the IDs of the wallets that were removed.

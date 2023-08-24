@@ -409,12 +409,14 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 		return "", "", err
 	}
 
-	if galleryPos == "" {
-		first, err := fracdex.KeyBetween("", "")
-		if err != nil {
-			return "", "", err
-		}
-		galleryPos = first
+	createUserParams, err := createAuthedNewUserParams(ctx, authenticator, username, bio, email)
+	if err != nil {
+		return "", "", err
+	}
+
+	createGalleryParams, err := createNewUserGalleryParams(galleryName, galleryDesc, galleryPos)
+	if err != nil {
+		return "", "", err
 	}
 
 	tx, err := api.repos.BeginTx(ctx)
@@ -424,7 +426,7 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 	queries := api.queries.WithTx(tx)
 	defer tx.Rollback(ctx)
 
-	userID, galleryID, err = user.CreateUser(ctx, authenticator, username, email, bio, galleryName, galleryDesc, galleryPos, api.repos.UserRepository, queries, api.multichainProvider)
+	userID, galleryID, err = user.CreateUser(ctx, createUserParams, createGalleryParams, api.repos.UserRepository, queries)
 	if err != nil {
 		return "", "", err
 	}
@@ -446,6 +448,21 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 	err = tx.Commit(ctx)
 	if err != nil {
 		return "", "", err
+	}
+
+	if createUserParams.EmailStatus == persist.EmailVerificationStatusUnverified && email != nil {
+		if err := emails.RequestVerificationEmail(ctx, userID); err != nil {
+			// Just the log the error since the user can verify their email later
+			logger.For(ctx).Warnf("failed to send verification email: %s", err)
+		}
+	}
+
+	if createUserParams.EmailStatus == persist.EmailVerificationStatusVerified {
+		if err := task.CreateTaskForAddingEmailToMailingList(ctx, task.AddEmailToMailingListMessage{UserID: userID}, api.taskClient); err != nil {
+			// Report an error to Sentry because there's currently no other way to subscribe a user to the mailing list
+			sentryutil.ReportError(ctx, err)
+			logger.For(ctx).Warnf("failed to send mailing list subscription task: %s", err)
+		}
 	}
 
 	// Send event
@@ -1646,4 +1663,53 @@ func standardizeURI(u string) string {
 		return ipfs.PathGatewayFrom(env.GetString("IPFS_URL"), u, true)
 	}
 	return u
+}
+
+func createAuthedNewUserParams(ctx context.Context, authenticator auth.Authenticator, username string, bio string, email *persist.Email) (persist.CreateUserInput, error) {
+	authResult, err := authenticator.Authenticate(ctx)
+	if err != nil {
+		return persist.CreateUserInput{}, auth.ErrAuthenticationFailed{WrappedErr: err}
+	}
+
+	if authResult.User != nil && !authResult.User.Universal.Bool() {
+		return persist.CreateUserInput{}, persist.ErrUserAlreadyExists{Authenticator: authenticator.GetDescription()}
+	}
+
+	var wallet auth.AuthenticatedAddress
+
+	if len(authResult.Addresses) > 0 {
+		// TODO: This currently takes the first authenticated address returned by the authenticator and creates
+		// the user's account based on that address. This works because the only auth mechanism we have is nonce-based
+		// auth and that supplies a single address. In the future, a user may authenticate in a way that makes
+		// multiple authenticated addresses available for initial user creation, and we may want to add all of
+		// those addresses to the user's account here.
+		wallet = authResult.Addresses[0]
+	}
+
+	return persist.CreateUserInput{
+		Username:     username,
+		Bio:          bio,
+		Email:        email,
+		EmailStatus:  persist.EmailVerificationStatusUnverified,
+		ChainAddress: wallet.ChainAddress,
+		WalletType:   wallet.WalletType,
+	}, nil
+}
+
+func createNewUserGalleryParams(galleryName, galleryDesc, galleryPos string) (params db.GalleryRepoCreateParams, err error) {
+	params = db.GalleryRepoCreateParams{
+		GalleryID:   persist.GenerateID(),
+		Name:        galleryName,
+		Description: galleryDesc,
+		Position:    galleryPos,
+	}
+
+	if params.Position == "" {
+		params.Position, err = fracdex.KeyBetween("", "")
+		if err != nil {
+			return db.GalleryRepoCreateParams{}, err
+		}
+	}
+
+	return params, nil
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sendgrid/sendgrid-go"
 )
@@ -133,6 +134,33 @@ func verifyEmail(queries *coredb.Queries) gin.HandlerFunc {
 			UserID: userWithPII.ID,
 			Email:  userWithPII.PiiEmailAddress,
 		})
+	}
+}
+
+func processAddToMailingList(queries *coredb.Queries) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var input task.AddEmailToMailingListMessage
+
+		if err := c.ShouldBindJSON(&input); err != nil {
+			util.ErrResponse(c, http.StatusBadRequest, err)
+			return
+		}
+
+		userWithPII, err := queries.GetUserWithPIIByID(c, input.UserID)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		if userWithPII.EmailVerified != persist.EmailVerificationStatusVerified {
+			util.ErrResponse(c, http.StatusBadRequest, fmt.Errorf("email not verified"))
+			return
+		}
+
+		if err := addEmailToSendgridList(c, userWithPII.PiiEmailAddress.String(), env.GetString("SENDGRID_DEFAULT_LIST_ID")); err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
 	}
 }
 
