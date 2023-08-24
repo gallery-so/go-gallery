@@ -31,13 +31,12 @@ type AdmirePostPayloadOrError interface {
 	IsAdmirePostPayloadOrError()
 }
 
-<<<<<<< HEAD
 type AdmireSource interface {
 	IsAdmireSource()
-=======
+}
+
 type AdmireTokenPayloadOrError interface {
 	IsAdmireTokenPayloadOrError()
->>>>>>> main
 }
 
 type AuthorizationError interface {

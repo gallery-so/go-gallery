@@ -15109,6 +15109,8 @@ func (ec *executionContext) fieldContext_AdmireTokenPayload_admire(ctx context.C
 				return ec.fieldContext_Admire_lastUpdated(ctx, field)
 			case "admirer":
 				return ec.fieldContext_Admire_admirer(ctx, field)
+			case "source":
+				return ec.fieldContext_Admire_source(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Admire", field.Name)
 		},
@@ -60299,7 +60301,6 @@ func (ec *executionContext) _AdmirePostPayloadOrError(ctx context.Context, sel a
 	}
 }
 
-<<<<<<< HEAD
 func (ec *executionContext) _AdmireSource(ctx context.Context, sel ast.SelectionSet, obj model.AdmireSource) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -60318,7 +60319,11 @@ func (ec *executionContext) _AdmireSource(ctx context.Context, sel ast.Selection
 			return graphql.Null
 		}
 		return ec._FeedEvent(ctx, sel, obj)
-=======
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _AdmireTokenPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.AdmireTokenPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -60351,7 +60356,6 @@ func (ec *executionContext) _AdmireTokenPayloadOrError(ctx context.Context, sel 
 			return graphql.Null
 		}
 		return ec._ErrNotAuthorized(ctx, sel, obj)
->>>>>>> main
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -76252,19 +76256,18 @@ func (ec *executionContext) marshalOAdmirePostPayloadOrError2githubᚗcomᚋmike
 	return ec._AdmirePostPayloadOrError(ctx, sel, v)
 }
 
-<<<<<<< HEAD
 func (ec *executionContext) marshalOAdmireSource2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdmireSource(ctx context.Context, sel ast.SelectionSet, v model.AdmireSource) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
 	return ec._AdmireSource(ctx, sel, v)
-=======
+}
+
 func (ec *executionContext) marshalOAdmireTokenPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdmireTokenPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.AdmireTokenPayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
 	return ec._AdmireTokenPayloadOrError(ctx, sel, v)
->>>>>>> main
 }
 
 func (ec *executionContext) marshalOBadge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐBadge(ctx context.Context, sel ast.SelectionSet, v []*model.Badge) graphql.Marshaler {
