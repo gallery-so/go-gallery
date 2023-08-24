@@ -772,7 +772,7 @@ upsert_metadata as (
         on conflict (user_id) do update set has_email_address = excluded.has_email_address
 )
 
-update users set email_verified = 0 where users.id = @user_id;
+update users set email_verified = @email_verification_status where users.id = @user_id;
 
 -- name: UpdateUserEmailUnsubscriptions :exec
 UPDATE users SET email_unsubscriptions = $2 WHERE id = $1;
@@ -1127,7 +1127,7 @@ insert into wallets (id, address, chain, wallet_type) values ($1, $2, $3, $4);
 update wallets set deleted = true, last_updated = now() where id = $1;
 
 -- name: InsertUser :exec
-insert into users (id, username, username_idempotent, bio, wallets, universal, email_unsubscriptions, primary_wallet_id) values ($1, $2, $3, $4, $5, $6, $7, $8) returning id;
+insert into users (id, username, username_idempotent, bio, wallets, universal, email_unsubscriptions, primary_wallet_id) values ($1, $2, $3, $4, $5, $6, $7, sqlc.narg('primary_wallet')) returning id;
 
 -- name: AddWalletToUserByID :exec
 update users set wallets = array_append(wallets, @wallet_id::varchar) where id = @user_id;

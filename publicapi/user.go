@@ -434,14 +434,6 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 		return "", "", err
 	}
 
-	if email != nil && *email != "" {
-		// TODO email validation ahead of time
-		err = emails.RequestVerificationEmail(ctx, userID)
-		if err != nil {
-			return "", "", err
-		}
-	}
-
 	gc := util.MustGetGinContext(ctx)
 	err = queries.AddPiiAccountCreationInfo(ctx, db.AddPiiAccountCreationInfoParams{
 		UserID:    userID,

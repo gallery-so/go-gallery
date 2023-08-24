@@ -5110,7 +5110,7 @@ type InsertUserParams struct {
 	Wallets              persist.WalletList           `json:"wallets"`
 	Universal            bool                         `json:"universal"`
 	EmailUnsubscriptions persist.EmailUnsubscriptions `json:"email_unsubscriptions"`
-	PrimaryWalletID      persist.DBID                 `json:"primary_wallet_id"`
+	PrimaryWallet        sql.NullString               `json:"primary_wallet"`
 }
 
 func (q *Queries) InsertUser(ctx context.Context, arg InsertUserParams) error {
@@ -5122,7 +5122,7 @@ func (q *Queries) InsertUser(ctx context.Context, arg InsertUserParams) error {
 		arg.Wallets,
 		arg.Universal,
 		arg.EmailUnsubscriptions,
-		arg.PrimaryWalletID,
+		arg.PrimaryWallet,
 	)
 	return err
 }
@@ -5992,25 +5992,26 @@ func (q *Queries) UpdateTokenMetadataFieldsByTokenIdentifiers(ctx context.Contex
 
 const updateUserEmail = `-- name: UpdateUserEmail :exec
 with upsert_pii as (
-    insert into pii.for_users (user_id, pii_email_address) values ($1, $2)
+    insert into pii.for_users (user_id, pii_email_address) values ($2, $3)
         on conflict (user_id) do update set pii_email_address = excluded.pii_email_address
 ),
 
 upsert_metadata as (
-    insert into dev_metadata_users (user_id, has_email_address) values ($1, ($2 is not null))
+    insert into dev_metadata_users (user_id, has_email_address) values ($2, ($3 is not null))
         on conflict (user_id) do update set has_email_address = excluded.has_email_address
 )
 
-update users set email_verified = 0 where users.id = $1
+update users set email_verified = $1 where users.id = $2
 `
 
 type UpdateUserEmailParams struct {
-	UserID       persist.DBID  `json:"user_id"`
-	EmailAddress persist.Email `json:"email_address"`
+	EmailVerificationStatus int32         `json:"email_verification_status"`
+	UserID                  persist.DBID  `json:"user_id"`
+	EmailAddress            persist.Email `json:"email_address"`
 }
 
 func (q *Queries) UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams) error {
-	_, err := q.db.Exec(ctx, updateUserEmail, arg.UserID, arg.EmailAddress)
+	_, err := q.db.Exec(ctx, updateUserEmail, arg.EmailVerificationStatus, arg.UserID, arg.EmailAddress)
 	return err
 }
 

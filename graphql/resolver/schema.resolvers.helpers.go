@@ -196,6 +196,8 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrInvalidInput{Message: message}
 	case publicapi.ErrProfileImageNotTokenOwner, publicapi.ErrProfileImageNotWalletOwner:
 		mappedErr = model.ErrNotAuthorized{Message: message}
+	case auth.ErrEmailUnverified:
+		mappedErr = model.ErrEmailUnverified{Message: message}
 	}
 
 	if mappedErr != nil {

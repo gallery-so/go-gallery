@@ -13,7 +13,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/emails"
 	"github.com/mikeydub/go-gallery/service/eth"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
@@ -95,19 +97,31 @@ func CreateUser(ctx context.Context, authenticator auth.Authenticator, username 
 		return "", "", persist.ErrUserAlreadyExists{Authenticator: authenticator.GetDescription()}
 	}
 
-	// TODO: This currently takes the first authenticated address returned by the authenticator and creates
-	// the user's account based on that address. This works because the only auth mechanism we have is nonce-based
-	// auth and that supplies a single address. In the future, a user may authenticate in a way that makes
-	// multiple authenticated addresses available for initial user creation, and we may want to add all of
-	// those addresses to the user's account here.
-	wallet := authResult.Addresses[0]
+	var wallet auth.AuthenticatedAddress
+
+	if len(authResult.Addresses) > 0 {
+		// TODO: This currently takes the first authenticated address returned by the authenticator and creates
+		// the user's account based on that address. This works because the only auth mechanism we have is nonce-based
+		// auth and that supplies a single address. In the future, a user may authenticate in a way that makes
+		// multiple authenticated addresses available for initial user creation, and we may want to add all of
+		// those addresses to the user's account here.
+		wallet = authResult.Addresses[0]
+	}
 
 	user := persist.CreateUserInput{
 		Username:     username,
 		Bio:          bio,
 		Email:        email,
+		EmailStatus:  persist.EmailVerificationStatusUnverified,
 		ChainAddress: wallet.ChainAddress,
 		WalletType:   wallet.WalletType,
+	}
+
+	if authResult.Email != nil {
+		// N.B. Favor the verified email, even if it doesn't match the input email
+		user.Email = authResult.Email
+		user.EmailStatus = persist.EmailVerificationStatusVerified
+		user.EmailNotificationsSettings = persist.EmailUnsubscriptions{} // Sign them up for all emails
 	}
 
 	userID, err = userRepo.Create(ctx, user, queries)
@@ -127,6 +141,17 @@ func CreateUser(ctx context.Context, authenticator auth.Authenticator, username 
 	}
 
 	galleryID = gallery.ID
+
+	if user.EmailStatus == persist.EmailVerificationStatusUnverified && email != nil {
+		if err := emails.RequestVerificationEmail(ctx, userID); err != nil {
+			// Just the log the error since the user can verify their email later
+			logger.For(ctx).Warnf("failed to send verification email: %s", err)
+		}
+	}
+
+	if user.EmailStatus == persist.EmailVerificationStatusVerified {
+		// TODO: Create an endpoint to add to sendgrid
+	}
 
 	err = auth.StartSession(gc, queries, userID)
 	if err != nil {
@@ -189,22 +214,6 @@ func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pChainAddress p
 
 	if err := userRepo.AddWallet(pCtx, pUserID, authenticatedAddress.ChainAddress, authenticatedAddress.WalletType, nil); err != nil {
 		return err
-	}
-
-	return nil
-}
-
-// RemoveAddressesFromUserToken removes any amount of addresses from a user in the DB
-func RemoveAddressesFromUserToken(pCtx context.Context, pUserID persist.DBID, pInput RemoveUserAddressesInput,
-	userRepo postgres.UserRepository) error {
-
-	user, err := userRepo.GetByID(pCtx, pUserID)
-	if err != nil {
-		return err
-	}
-
-	if len(user.Wallets) <= len(pInput.Addresses) {
-		return errUserCannotRemoveAllWallets
 	}
 
 	return nil
@@ -315,44 +324,6 @@ func UpdateUserInfo(pCtx context.Context, userID persist.DBID, username string, 
 // 	return userRepo.MergeUsers(pCtx, pUserID, pInput.SecondUserID)
 
 // }
-
-// DoesUserOwnWallets checks if a user owns any wallets
-func DoesUserOwnWallets(pCtx context.Context, userID persist.DBID, walletAddresses []persist.DBID, userRepo postgres.UserRepository) (bool, error) {
-	user, err := userRepo.GetByID(pCtx, userID)
-	if err != nil {
-		return false, err
-	}
-	walletIDs := make([]persist.DBID, len(user.Wallets))
-	for i, wallet := range user.Wallets {
-		walletIDs[i] = wallet.ID
-	}
-	for _, walletAddress := range walletAddresses {
-		if !persist.ContainsDBID(walletAddresses, walletAddress) {
-			return false, nil
-		}
-	}
-	return true, nil
-}
-
-// ContainsWallets checks if an array of wallets contains another wallet
-func ContainsWallets(a []persist.Wallet, b persist.Wallet) bool {
-	for _, v := range a {
-		if v.Address == b.Address {
-			return true
-		}
-	}
-
-	return false
-}
-
-type ErrDoesNotOwnWallets struct {
-	ID        persist.DBID
-	Addresses []persist.Wallet
-}
-
-func (e ErrDoesNotOwnWallets) Error() string {
-	return fmt.Sprintf("user with ID %s does not own all wallets: %+v", e.ID, e.Addresses)
-}
 
 type ErrUserAlreadyExists struct {
 	Address       persist.Address

@@ -1564,6 +1564,10 @@ type ErrAuthenticationFailed implements Error {
   message: String!
 }
 
+type ErrEmailUnverified implements Error {
+  message: String!
+}
+
 type ErrUserAlreadyExists implements Error {
   message: String!
 }
@@ -1713,6 +1717,7 @@ union LoginPayloadOrError =
     LoginPayload
   | ErrUserNotFound
   | ErrAuthenticationFailed
+  | ErrEmailUnverified
   | ErrDoesNotOwnRequiredToken
 
 type LoginPayload {

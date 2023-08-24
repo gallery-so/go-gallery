@@ -82,6 +82,9 @@ var ErrSignatureInvalid = errors.New("signature invalid")
 
 var ErrInvalidMagicLink = errors.New("invalid magic link")
 
+// TODO: Figure out a better scheme for handling user-facing errors
+var ErrEmailUnverified = errors.New("The email address you provided is unverified. Login with QR code instead, or verify your email at gallery.so/settings.")
+
 type Authenticator interface {
 	// GetDescription returns information about the authenticator for error and logging purposes.
 	// NOTE: GetDescription should NOT include any sensitive data (passwords, auth tokens, etc)
@@ -94,6 +97,7 @@ type Authenticator interface {
 type AuthResult struct {
 	User      *persist.User
 	Addresses []AuthenticatedAddress
+	Email     *persist.Email
 }
 
 func (a *AuthResult) GetAuthenticatedAddress(chainAddress persist.ChainAddress) (AuthenticatedAddress, bool) {
@@ -233,18 +237,20 @@ func (e MagicLinkAuthenticator) Authenticate(pCtx context.Context) (*AuthResult,
 		return nil, ErrInvalidMagicLink
 	}
 
-	user, err := e.UserRepo.GetByEmail(pCtx, persist.Email(info.Email))
+	authedEmail := persist.Email(info.Email)
+
+	user, err := e.UserRepo.GetByEmail(pCtx, authedEmail)
 	if err != nil {
 		if _, ok := err.(persist.ErrUserNotFound); !ok {
 			return nil, err
 		}
-		// TODO: Figure out a better scheme for handling user-facing errors
-		return nil, errors.New("The email address you provided is unverified. Login with QR code instead, or verify your email at gallery.so/settings.")
+		return nil, ErrEmailUnverified
 	}
 
 	return &AuthResult{
 		User:      &user,
 		Addresses: []AuthenticatedAddress{},
+		Email:     &authedEmail,
 	}, nil
 }
 

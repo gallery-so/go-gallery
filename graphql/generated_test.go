@@ -4776,6 +4776,18 @@ func (v *loginMutationLoginErrDoesNotOwnRequiredToken) GetTypename() *string { r
 // GetMessage returns loginMutationLoginErrDoesNotOwnRequiredToken.Message, and is useful for accessing the field via an interface.
 func (v *loginMutationLoginErrDoesNotOwnRequiredToken) GetMessage() string { return v.Message }
 
+// loginMutationLoginErrEmailUnverified includes the requested fields of the GraphQL type ErrEmailUnverified.
+type loginMutationLoginErrEmailUnverified struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns loginMutationLoginErrEmailUnverified.Typename, and is useful for accessing the field via an interface.
+func (v *loginMutationLoginErrEmailUnverified) GetTypename() *string { return v.Typename }
+
+// GetMessage returns loginMutationLoginErrEmailUnverified.Message, and is useful for accessing the field via an interface.
+func (v *loginMutationLoginErrEmailUnverified) GetMessage() string { return v.Message }
+
 // loginMutationLoginErrUserNotFound includes the requested fields of the GraphQL type ErrUserNotFound.
 type loginMutationLoginErrUserNotFound struct {
 	Typename *string `json:"__typename"`
@@ -4807,6 +4819,7 @@ func (v *loginMutationLoginLoginPayload) GetViewer() *loginMutationLoginLoginPay
 // loginMutationLoginLoginPayloadOrError is implemented by the following types:
 // loginMutationLoginErrAuthenticationFailed
 // loginMutationLoginErrDoesNotOwnRequiredToken
+// loginMutationLoginErrEmailUnverified
 // loginMutationLoginErrUserNotFound
 // loginMutationLoginLoginPayload
 type loginMutationLoginLoginPayloadOrError interface {
@@ -4818,6 +4831,8 @@ type loginMutationLoginLoginPayloadOrError interface {
 func (v *loginMutationLoginErrAuthenticationFailed) implementsGraphQLInterfaceloginMutationLoginLoginPayloadOrError() {
 }
 func (v *loginMutationLoginErrDoesNotOwnRequiredToken) implementsGraphQLInterfaceloginMutationLoginLoginPayloadOrError() {
+}
+func (v *loginMutationLoginErrEmailUnverified) implementsGraphQLInterfaceloginMutationLoginLoginPayloadOrError() {
 }
 func (v *loginMutationLoginErrUserNotFound) implementsGraphQLInterfaceloginMutationLoginLoginPayloadOrError() {
 }
@@ -4843,6 +4858,9 @@ func __unmarshalloginMutationLoginLoginPayloadOrError(b []byte, v *loginMutation
 		return json.Unmarshal(b, *v)
 	case "ErrDoesNotOwnRequiredToken":
 		*v = new(loginMutationLoginErrDoesNotOwnRequiredToken)
+		return json.Unmarshal(b, *v)
+	case "ErrEmailUnverified":
+		*v = new(loginMutationLoginErrEmailUnverified)
 		return json.Unmarshal(b, *v)
 	case "ErrUserNotFound":
 		*v = new(loginMutationLoginErrUserNotFound)
@@ -4877,6 +4895,14 @@ func __marshalloginMutationLoginLoginPayloadOrError(v *loginMutationLoginLoginPa
 		result := struct {
 			TypeName string `json:"__typename"`
 			*loginMutationLoginErrDoesNotOwnRequiredToken
+		}{typename, v}
+		return json.Marshal(result)
+	case *loginMutationLoginErrEmailUnverified:
+		typename = "ErrEmailUnverified"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*loginMutationLoginErrEmailUnverified
 		}{typename, v}
 		return json.Marshal(result)
 	case *loginMutationLoginErrUserNotFound:

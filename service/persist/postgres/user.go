@@ -254,9 +254,15 @@ func (u *UserRepository) Create(pCtx context.Context, pUser persist.CreateUserIn
 		return "", err
 	}
 
-	walletID, err := u.createWalletWithTx(pCtx, queries, pUser.ChainAddress, pUser.WalletType)
-	if err != nil {
-		return "", err
+	var primaryWalletID persist.DBID
+	var wallets persist.WalletList
+
+	if pUser.ChainAddress.Address() != "" {
+		walletID, err := u.createWalletWithTx(pCtx, queries, pUser.ChainAddress, pUser.WalletType)
+		if err != nil {
+			return "", err
+		}
+		wallets = persist.WalletList{persist.Wallet{ID: walletID}}
 	}
 
 	userID := persist.GenerateID()
@@ -265,10 +271,10 @@ func (u *UserRepository) Create(pCtx context.Context, pUser persist.CreateUserIn
 		Username:             util.ToNullString(pUser.Username, true),
 		UsernameIdempotent:   util.ToNullString(strings.ToLower(pUser.Username), true),
 		Bio:                  util.ToNullString(pUser.Bio, true),
-		Wallets:              persist.WalletList{persist.Wallet{ID: walletID}},
+		Wallets:              wallets,
 		Universal:            pUser.Universal,
 		EmailUnsubscriptions: pUser.EmailNotificationsSettings,
-		PrimaryWalletID:      walletID,
+		PrimaryWallet:        util.ToNullString(primaryWalletID.String(), true),
 	})
 	if err != nil {
 		return "", err
@@ -276,8 +282,9 @@ func (u *UserRepository) Create(pCtx context.Context, pUser persist.CreateUserIn
 
 	if pUser.Email != nil {
 		err := queries.UpdateUserEmail(pCtx, db.UpdateUserEmailParams{
-			UserID:       userID,
-			EmailAddress: *pUser.Email,
+			UserID:                  userID,
+			EmailAddress:            *pUser.Email,
+			EmailVerificationStatus: int32(pUser.EmailStatus),
 		})
 		if err != nil {
 			logger.For(pCtx).Errorf("failed to insert email address when creating new user with userID=%s\n", userID)
