@@ -125,11 +125,6 @@ type ComplexityRoot struct {
 		Source       func(childComplexity int) int
 	}
 
-	AdmireEdge struct {
-		Cursor func(childComplexity int) int
-		Node   func(childComplexity int) int
-	}
-
 	AdmireFeedEventPayload struct {
 		Admire    func(childComplexity int) int
 		FeedEvent func(childComplexity int) int
@@ -140,11 +135,6 @@ type ComplexityRoot struct {
 		Admire func(childComplexity int) int
 		Post   func(childComplexity int) int
 		Viewer func(childComplexity int) int
-	}
-
-	AdmiresConnection struct {
-		Edges    func(childComplexity int) int
-		PageInfo func(childComplexity int) int
 	}
 
 	AudioMedia struct {
@@ -344,11 +334,6 @@ type ComplexityRoot struct {
 
 	CommunitySearchResult struct {
 		Community func(childComplexity int) int
-	}
-
-	CompleteIndex struct {
-		Index  func(childComplexity int) int
-		Length func(childComplexity int) int
 	}
 
 	ConnectSocialAccountPayload struct {
@@ -558,6 +543,26 @@ type ComplexityRoot struct {
 		ViewerAdmire          func(childComplexity int) int
 	}
 
+	FeedEventAdmireEdge struct {
+		Cursor func(childComplexity int) int
+		Node   func(childComplexity int) int
+	}
+
+	FeedEventAdmiresConnection struct {
+		Edges    func(childComplexity int) int
+		PageInfo func(childComplexity int) int
+	}
+
+	FeedEventCommentEdge struct {
+		Cursor func(childComplexity int) int
+		Node   func(childComplexity int) int
+	}
+
+	FeedEventCommentsConnection struct {
+		Edges    func(childComplexity int) int
+		PageInfo func(childComplexity int) int
+	}
+
 	FollowAllSocialConnectionsPayload struct {
 		Viewer func(childComplexity int) int
 	}
@@ -697,6 +702,11 @@ type ComplexityRoot struct {
 	InteractionsEdge struct {
 		Cursor func(childComplexity int) int
 		Node   func(childComplexity int) int
+	}
+
+	Interval struct {
+		Length func(childComplexity int) int
+		Start  func(childComplexity int) int
 	}
 
 	InvalidMedia struct {
@@ -921,6 +931,26 @@ type ComplexityRoot struct {
 		Mentions     func(childComplexity int) int
 		Tokens       func(childComplexity int) int
 		ViewerAdmire func(childComplexity int) int
+	}
+
+	PostAdmireEdge struct {
+		Cursor func(childComplexity int) int
+		Node   func(childComplexity int) int
+	}
+
+	PostAdmiresConnection struct {
+		Edges    func(childComplexity int) int
+		PageInfo func(childComplexity int) int
+	}
+
+	PostCommentEdge struct {
+		Cursor func(childComplexity int) int
+		Node   func(childComplexity int) int
+	}
+
+	PostCommentsConnection struct {
+		Edges    func(childComplexity int) int
+		PageInfo func(childComplexity int) int
 	}
 
 	PostEdge struct {
@@ -1603,8 +1633,8 @@ type EntityResolver interface {
 }
 type FeedEventResolver interface {
 	EventData(ctx context.Context, obj *model.FeedEvent) (model.FeedEventData, error)
-	Admires(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.AdmiresConnection, error)
-	Comments(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.CommentsConnection, error)
+	Admires(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.FeedEventAdmiresConnection, error)
+	Comments(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.FeedEventCommentsConnection, error)
 
 	Interactions(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.InteractionsConnection, error)
 	ViewerAdmire(ctx context.Context, obj *model.FeedEvent) (*model.Admire, error)
@@ -1742,8 +1772,8 @@ type PostResolver interface {
 	Tokens(ctx context.Context, obj *model.Post) ([]*model.Token, error)
 
 	Mentions(ctx context.Context, obj *model.Post) ([]*model.Mention, error)
-	Admires(ctx context.Context, obj *model.Post, before *string, after *string, first *int, last *int) (*model.AdmiresConnection, error)
-	Comments(ctx context.Context, obj *model.Post, before *string, after *string, first *int, last *int) (*model.CommentsConnection, error)
+	Admires(ctx context.Context, obj *model.Post, before *string, after *string, first *int, last *int) (*model.PostAdmiresConnection, error)
+	Comments(ctx context.Context, obj *model.Post, before *string, after *string, first *int, last *int) (*model.PostCommentsConnection, error)
 	Interactions(ctx context.Context, obj *model.Post, before *string, after *string, first *int, last *int) (*model.InteractionsConnection, error)
 	ViewerAdmire(ctx context.Context, obj *model.Post) (*model.Admire, error)
 }
@@ -1971,20 +2001,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Admire.Source(childComplexity), true
 
-	case "AdmireEdge.cursor":
-		if e.complexity.AdmireEdge.Cursor == nil {
-			break
-		}
-
-		return e.complexity.AdmireEdge.Cursor(childComplexity), true
-
-	case "AdmireEdge.node":
-		if e.complexity.AdmireEdge.Node == nil {
-			break
-		}
-
-		return e.complexity.AdmireEdge.Node(childComplexity), true
-
 	case "AdmireFeedEventPayload.admire":
 		if e.complexity.AdmireFeedEventPayload.Admire == nil {
 			break
@@ -2026,20 +2042,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.AdmirePostPayload.Viewer(childComplexity), true
-
-	case "AdmiresConnection.edges":
-		if e.complexity.AdmiresConnection.Edges == nil {
-			break
-		}
-
-		return e.complexity.AdmiresConnection.Edges(childComplexity), true
-
-	case "AdmiresConnection.pageInfo":
-		if e.complexity.AdmiresConnection.PageInfo == nil {
-			break
-		}
-
-		return e.complexity.AdmiresConnection.PageInfo(childComplexity), true
 
 	case "AudioMedia.contentRenderURL":
 		if e.complexity.AudioMedia.ContentRenderURL == nil {
@@ -2855,20 +2857,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.CommunitySearchResult.Community(childComplexity), true
 
-	case "CompleteIndex.index":
-		if e.complexity.CompleteIndex.Index == nil {
-			break
-		}
-
-		return e.complexity.CompleteIndex.Index(childComplexity), true
-
-	case "CompleteIndex.length":
-		if e.complexity.CompleteIndex.Length == nil {
-			break
-		}
-
-		return e.complexity.CompleteIndex.Length(childComplexity), true
-
 	case "ConnectSocialAccountPayload.viewer":
 		if e.complexity.ConnectSocialAccountPayload.Viewer == nil {
 			break
@@ -3460,6 +3448,62 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.FeedEvent.ViewerAdmire(childComplexity), true
+
+	case "FeedEventAdmireEdge.cursor":
+		if e.complexity.FeedEventAdmireEdge.Cursor == nil {
+			break
+		}
+
+		return e.complexity.FeedEventAdmireEdge.Cursor(childComplexity), true
+
+	case "FeedEventAdmireEdge.node":
+		if e.complexity.FeedEventAdmireEdge.Node == nil {
+			break
+		}
+
+		return e.complexity.FeedEventAdmireEdge.Node(childComplexity), true
+
+	case "FeedEventAdmiresConnection.edges":
+		if e.complexity.FeedEventAdmiresConnection.Edges == nil {
+			break
+		}
+
+		return e.complexity.FeedEventAdmiresConnection.Edges(childComplexity), true
+
+	case "FeedEventAdmiresConnection.pageInfo":
+		if e.complexity.FeedEventAdmiresConnection.PageInfo == nil {
+			break
+		}
+
+		return e.complexity.FeedEventAdmiresConnection.PageInfo(childComplexity), true
+
+	case "FeedEventCommentEdge.cursor":
+		if e.complexity.FeedEventCommentEdge.Cursor == nil {
+			break
+		}
+
+		return e.complexity.FeedEventCommentEdge.Cursor(childComplexity), true
+
+	case "FeedEventCommentEdge.node":
+		if e.complexity.FeedEventCommentEdge.Node == nil {
+			break
+		}
+
+		return e.complexity.FeedEventCommentEdge.Node(childComplexity), true
+
+	case "FeedEventCommentsConnection.edges":
+		if e.complexity.FeedEventCommentsConnection.Edges == nil {
+			break
+		}
+
+		return e.complexity.FeedEventCommentsConnection.Edges(childComplexity), true
+
+	case "FeedEventCommentsConnection.pageInfo":
+		if e.complexity.FeedEventCommentsConnection.PageInfo == nil {
+			break
+		}
+
+		return e.complexity.FeedEventCommentsConnection.PageInfo(childComplexity), true
 
 	case "FollowAllSocialConnectionsPayload.viewer":
 		if e.complexity.FollowAllSocialConnectionsPayload.Viewer == nil {
@@ -4104,6 +4148,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.InteractionsEdge.Node(childComplexity), true
+
+	case "Interval.length":
+		if e.complexity.Interval.Length == nil {
+			break
+		}
+
+		return e.complexity.Interval.Length(childComplexity), true
+
+	case "Interval.start":
+		if e.complexity.Interval.Start == nil {
+			break
+		}
+
+		return e.complexity.Interval.Start(childComplexity), true
 
 	case "InvalidMedia.contentRenderURL":
 		if e.complexity.InvalidMedia.ContentRenderURL == nil {
@@ -5570,6 +5628,62 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Post.ViewerAdmire(childComplexity), true
+
+	case "PostAdmireEdge.cursor":
+		if e.complexity.PostAdmireEdge.Cursor == nil {
+			break
+		}
+
+		return e.complexity.PostAdmireEdge.Cursor(childComplexity), true
+
+	case "PostAdmireEdge.node":
+		if e.complexity.PostAdmireEdge.Node == nil {
+			break
+		}
+
+		return e.complexity.PostAdmireEdge.Node(childComplexity), true
+
+	case "PostAdmiresConnection.edges":
+		if e.complexity.PostAdmiresConnection.Edges == nil {
+			break
+		}
+
+		return e.complexity.PostAdmiresConnection.Edges(childComplexity), true
+
+	case "PostAdmiresConnection.pageInfo":
+		if e.complexity.PostAdmiresConnection.PageInfo == nil {
+			break
+		}
+
+		return e.complexity.PostAdmiresConnection.PageInfo(childComplexity), true
+
+	case "PostCommentEdge.cursor":
+		if e.complexity.PostCommentEdge.Cursor == nil {
+			break
+		}
+
+		return e.complexity.PostCommentEdge.Cursor(childComplexity), true
+
+	case "PostCommentEdge.node":
+		if e.complexity.PostCommentEdge.Node == nil {
+			break
+		}
+
+		return e.complexity.PostCommentEdge.Node(childComplexity), true
+
+	case "PostCommentsConnection.edges":
+		if e.complexity.PostCommentsConnection.Edges == nil {
+			break
+		}
+
+		return e.complexity.PostCommentsConnection.Edges(childComplexity), true
+
+	case "PostCommentsConnection.pageInfo":
+		if e.complexity.PostCommentsConnection.PageInfo == nil {
+			break
+		}
+
+		return e.complexity.PostCommentsConnection.PageInfo(childComplexity), true
 
 	case "PostEdge.cursor":
 		if e.complexity.PostEdge.Cursor == nil {
@@ -7922,7 +8036,6 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputCollectionLayoutInput,
 		ec.unmarshalInputCollectionSectionLayoutInput,
 		ec.unmarshalInputCollectionTokenSettingsInput,
-		ec.unmarshalInputCompleteIndexInput,
 		ec.unmarshalInputCreateCollectionInGalleryInput,
 		ec.unmarshalInputCreateCollectionInput,
 		ec.unmarshalInputCreateGalleryInput,
@@ -7933,6 +8046,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputEoaAuth,
 		ec.unmarshalInputGalleryPositionInput,
 		ec.unmarshalInputGnosisSafeAuth,
+		ec.unmarshalInputIntervalInput,
 		ec.unmarshalInputMagicLinkAuth,
 		ec.unmarshalInputMentionInput,
 		ec.unmarshalInputMintPremiumCardToWalletInput,
@@ -8875,11 +8989,11 @@ union MentionEntity = GalleryUser | Community
 
 type Mention @goEmbedHelper {
   entity: MentionEntity @goField(forceResolver: true)
-  index: CompleteIndex
+  index: Interval
 }
 
-type CompleteIndex {
-  index: Int!
+type Interval {
+  start: Int!
   length: Int!
 }
 
@@ -8898,14 +9012,29 @@ type FollowInfo {
   followedBack: Boolean
 }
 
-type AdmireEdge {
+type PostAdmireEdge {
   node: Admire
   cursor: String
 }
 
-type AdmiresConnection {
-  edges: [AdmireEdge]
+type FeedEventAdmireEdge {
+  node: Admire
+  cursor: String
+}
+
+type PostAdmiresConnection {
+  edges: [PostAdmireEdge] @deprecated(reason: "Use generic admires connection instead")
   pageInfo: PageInfo!
+}
+
+type FeedEventAdmiresConnection {
+  edges: [FeedEventAdmireEdge] @deprecated(reason: "Use generic admires connection instead")
+  pageInfo: PageInfo!
+}
+
+type PostCommentEdge {
+  node: Comment
+  cursor: String
 }
 
 type CommentEdge {
@@ -8915,6 +9044,21 @@ type CommentEdge {
 
 type CommentsConnection {
   edges: [CommentEdge]
+  pageInfo: PageInfo!
+}
+
+type PostCommentsConnection {
+  edges: [PostCommentEdge] @deprecated(reason: "Use generic comments connection instead")
+  pageInfo: PageInfo!
+}
+
+type FeedEventCommentEdge {
+  node: Comment
+  cursor: String
+}
+
+type FeedEventCommentsConnection {
+  edges: [FeedEventCommentEdge] @deprecated(reason: "Use generic comments connection instead")
   pageInfo: PageInfo!
 }
 
@@ -8953,9 +9097,9 @@ type FeedEvent implements Node @key(fields: "dbid") {
   dbid: DBID!
 
   eventData: FeedEventData @goField(forceResolver: true)
-  admires(before: String, after: String, first: Int, last: Int): AdmiresConnection
+  admires(before: String, after: String, first: Int, last: Int): FeedEventAdmiresConnection
     @goField(forceResolver: true)
-  comments(before: String, after: String, first: Int, last: Int): CommentsConnection
+  comments(before: String, after: String, first: Int, last: Int): FeedEventCommentsConnection
     @goField(forceResolver: true)
   caption: String
 
@@ -8981,9 +9125,9 @@ type Post implements Node @key(fields: "dbid") @goEmbedHelper {
   caption: String
   mentions: [Mention] @goField(forceResolver: true)
 
-  admires(before: String, after: String, first: Int, last: Int): AdmiresConnection
+  admires(before: String, after: String, first: Int, last: Int): PostAdmiresConnection
     @goField(forceResolver: true)
-  comments(before: String, after: String, first: Int, last: Int): CommentsConnection
+  comments(before: String, after: String, first: Int, last: Int): PostCommentsConnection
     @goField(forceResolver: true)
 
   interactions(before: String, after: String, first: Int, last: Int): InteractionsConnection
@@ -10504,13 +10648,13 @@ type DeletePostPayload {
 union DeletePostPayloadOrError = DeletePostPayload | ErrInvalidInput | ErrNotAuthorized
 
 input MentionInput {
-  index: CompleteIndexInput
+  index: IntervalInput
   userId: DBID
   communityId: DBID
 }
 
-input CompleteIndexInput {
-  index: Int!
+input IntervalInput {
+  start: Int!
   length: Int!
 }
 
@@ -14323,102 +14467,6 @@ func (ec *executionContext) fieldContext_Admire_source(ctx context.Context, fiel
 	return fc, nil
 }
 
-func (ec *executionContext) _AdmireEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.AdmireEdge) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_AdmireEdge_node(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Node, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.Admire)
-	fc.Result = res
-	return ec.marshalOAdmire2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdmire(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_AdmireEdge_node(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "AdmireEdge",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_Admire_id(ctx, field)
-			case "dbid":
-				return ec.fieldContext_Admire_dbid(ctx, field)
-			case "creationTime":
-				return ec.fieldContext_Admire_creationTime(ctx, field)
-			case "lastUpdated":
-				return ec.fieldContext_Admire_lastUpdated(ctx, field)
-			case "admirer":
-				return ec.fieldContext_Admire_admirer(ctx, field)
-			case "source":
-				return ec.fieldContext_Admire_source(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type Admire", field.Name)
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _AdmireEdge_cursor(ctx context.Context, field graphql.CollectedField, obj *model.AdmireEdge) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_AdmireEdge_cursor(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Cursor, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_AdmireEdge_cursor(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "AdmireEdge",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _AdmireFeedEventPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.AdmireFeedEventPayload) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_AdmireFeedEventPayload_viewer(ctx, field)
 	if err != nil {
@@ -14776,111 +14824,6 @@ func (ec *executionContext) fieldContext_AdmirePostPayload_admire(ctx context.Co
 				return ec.fieldContext_Admire_source(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Admire", field.Name)
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _AdmiresConnection_edges(ctx context.Context, field graphql.CollectedField, obj *model.AdmiresConnection) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_AdmiresConnection_edges(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Edges, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.([]*model.AdmireEdge)
-	fc.Result = res
-	return ec.marshalOAdmireEdge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdmireEdge(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_AdmiresConnection_edges(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "AdmiresConnection",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "node":
-				return ec.fieldContext_AdmireEdge_node(ctx, field)
-			case "cursor":
-				return ec.fieldContext_AdmireEdge_cursor(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type AdmireEdge", field.Name)
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _AdmiresConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *model.AdmiresConnection) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_AdmiresConnection_pageInfo(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.PageInfo, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(*model.PageInfo)
-	fc.Result = res
-	return ec.marshalNPageInfo2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPageInfo(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_AdmiresConnection_pageInfo(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "AdmiresConnection",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "total":
-				return ec.fieldContext_PageInfo_total(ctx, field)
-			case "size":
-				return ec.fieldContext_PageInfo_size(ctx, field)
-			case "hasPreviousPage":
-				return ec.fieldContext_PageInfo_hasPreviousPage(ctx, field)
-			case "hasNextPage":
-				return ec.fieldContext_PageInfo_hasNextPage(ctx, field)
-			case "startCursor":
-				return ec.fieldContext_PageInfo_startCursor(ctx, field)
-			case "endCursor":
-				return ec.fieldContext_PageInfo_endCursor(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type PageInfo", field.Name)
 		},
 	}
 	return fc, nil
@@ -20723,94 +20666,6 @@ func (ec *executionContext) fieldContext_CommunitySearchResult_community(ctx con
 	return fc, nil
 }
 
-func (ec *executionContext) _CompleteIndex_index(ctx context.Context, field graphql.CollectedField, obj *model.CompleteIndex) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_CompleteIndex_index(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Index, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(int)
-	fc.Result = res
-	return ec.marshalNInt2int(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_CompleteIndex_index(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "CompleteIndex",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Int does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _CompleteIndex_length(ctx context.Context, field graphql.CollectedField, obj *model.CompleteIndex) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_CompleteIndex_length(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Length, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(int)
-	fc.Result = res
-	return ec.marshalNInt2int(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_CompleteIndex_length(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "CompleteIndex",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Int does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _ConnectSocialAccountPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.ConnectSocialAccountPayload) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_ConnectSocialAccountPayload_viewer(ctx, field)
 	if err != nil {
@@ -24377,9 +24232,9 @@ func (ec *executionContext) _FeedEvent_admires(ctx context.Context, field graphq
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*model.AdmiresConnection)
+	res := resTmp.(*model.FeedEventAdmiresConnection)
 	fc.Result = res
-	return ec.marshalOAdmiresConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdmiresConnection(ctx, field.Selections, res)
+	return ec.marshalOFeedEventAdmiresConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventAdmiresConnection(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_FeedEvent_admires(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -24391,11 +24246,11 @@ func (ec *executionContext) fieldContext_FeedEvent_admires(ctx context.Context, 
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "edges":
-				return ec.fieldContext_AdmiresConnection_edges(ctx, field)
+				return ec.fieldContext_FeedEventAdmiresConnection_edges(ctx, field)
 			case "pageInfo":
-				return ec.fieldContext_AdmiresConnection_pageInfo(ctx, field)
+				return ec.fieldContext_FeedEventAdmiresConnection_pageInfo(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type AdmiresConnection", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type FeedEventAdmiresConnection", field.Name)
 		},
 	}
 	defer func() {
@@ -24435,9 +24290,9 @@ func (ec *executionContext) _FeedEvent_comments(ctx context.Context, field graph
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*model.CommentsConnection)
+	res := resTmp.(*model.FeedEventCommentsConnection)
 	fc.Result = res
-	return ec.marshalOCommentsConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommentsConnection(ctx, field.Selections, res)
+	return ec.marshalOFeedEventCommentsConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventCommentsConnection(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_FeedEvent_comments(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -24449,11 +24304,11 @@ func (ec *executionContext) fieldContext_FeedEvent_comments(ctx context.Context,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "edges":
-				return ec.fieldContext_CommentsConnection_edges(ctx, field)
+				return ec.fieldContext_FeedEventCommentsConnection_edges(ctx, field)
 			case "pageInfo":
-				return ec.fieldContext_CommentsConnection_pageInfo(ctx, field)
+				return ec.fieldContext_FeedEventCommentsConnection_pageInfo(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type CommentsConnection", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type FeedEventCommentsConnection", field.Name)
 		},
 	}
 	defer func() {
@@ -24660,6 +24515,418 @@ func (ec *executionContext) fieldContext_FeedEvent_hasViewerAdmiredEvent(ctx con
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FeedEventAdmireEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.FeedEventAdmireEdge) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FeedEventAdmireEdge_node(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Node, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Admire)
+	fc.Result = res
+	return ec.marshalOAdmire2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdmire(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FeedEventAdmireEdge_node(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FeedEventAdmireEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Admire_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Admire_dbid(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Admire_creationTime(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Admire_lastUpdated(ctx, field)
+			case "admirer":
+				return ec.fieldContext_Admire_admirer(ctx, field)
+			case "source":
+				return ec.fieldContext_Admire_source(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Admire", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FeedEventAdmireEdge_cursor(ctx context.Context, field graphql.CollectedField, obj *model.FeedEventAdmireEdge) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FeedEventAdmireEdge_cursor(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Cursor, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FeedEventAdmireEdge_cursor(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FeedEventAdmireEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FeedEventAdmiresConnection_edges(ctx context.Context, field graphql.CollectedField, obj *model.FeedEventAdmiresConnection) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FeedEventAdmiresConnection_edges(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Edges, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.FeedEventAdmireEdge)
+	fc.Result = res
+	return ec.marshalOFeedEventAdmireEdge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventAdmireEdge(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FeedEventAdmiresConnection_edges(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FeedEventAdmiresConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "node":
+				return ec.fieldContext_FeedEventAdmireEdge_node(ctx, field)
+			case "cursor":
+				return ec.fieldContext_FeedEventAdmireEdge_cursor(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type FeedEventAdmireEdge", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FeedEventAdmiresConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *model.FeedEventAdmiresConnection) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FeedEventAdmiresConnection_pageInfo(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PageInfo, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.PageInfo)
+	fc.Result = res
+	return ec.marshalNPageInfo2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPageInfo(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FeedEventAdmiresConnection_pageInfo(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FeedEventAdmiresConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "total":
+				return ec.fieldContext_PageInfo_total(ctx, field)
+			case "size":
+				return ec.fieldContext_PageInfo_size(ctx, field)
+			case "hasPreviousPage":
+				return ec.fieldContext_PageInfo_hasPreviousPage(ctx, field)
+			case "hasNextPage":
+				return ec.fieldContext_PageInfo_hasNextPage(ctx, field)
+			case "startCursor":
+				return ec.fieldContext_PageInfo_startCursor(ctx, field)
+			case "endCursor":
+				return ec.fieldContext_PageInfo_endCursor(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PageInfo", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FeedEventCommentEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.FeedEventCommentEdge) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FeedEventCommentEdge_node(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Node, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Comment)
+	fc.Result = res
+	return ec.marshalOComment2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐComment(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FeedEventCommentEdge_node(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FeedEventCommentEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Comment_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Comment_dbid(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Comment_creationTime(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Comment_lastUpdated(ctx, field)
+			case "replyTo":
+				return ec.fieldContext_Comment_replyTo(ctx, field)
+			case "commenter":
+				return ec.fieldContext_Comment_commenter(ctx, field)
+			case "comment":
+				return ec.fieldContext_Comment_comment(ctx, field)
+			case "mentions":
+				return ec.fieldContext_Comment_mentions(ctx, field)
+			case "replies":
+				return ec.fieldContext_Comment_replies(ctx, field)
+			case "source":
+				return ec.fieldContext_Comment_source(ctx, field)
+			case "deleted":
+				return ec.fieldContext_Comment_deleted(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Comment", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FeedEventCommentEdge_cursor(ctx context.Context, field graphql.CollectedField, obj *model.FeedEventCommentEdge) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FeedEventCommentEdge_cursor(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Cursor, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FeedEventCommentEdge_cursor(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FeedEventCommentEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FeedEventCommentsConnection_edges(ctx context.Context, field graphql.CollectedField, obj *model.FeedEventCommentsConnection) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FeedEventCommentsConnection_edges(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Edges, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.FeedEventCommentEdge)
+	fc.Result = res
+	return ec.marshalOFeedEventCommentEdge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventCommentEdge(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FeedEventCommentsConnection_edges(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FeedEventCommentsConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "node":
+				return ec.fieldContext_FeedEventCommentEdge_node(ctx, field)
+			case "cursor":
+				return ec.fieldContext_FeedEventCommentEdge_cursor(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type FeedEventCommentEdge", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FeedEventCommentsConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *model.FeedEventCommentsConnection) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FeedEventCommentsConnection_pageInfo(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PageInfo, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.PageInfo)
+	fc.Result = res
+	return ec.marshalNPageInfo2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPageInfo(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FeedEventCommentsConnection_pageInfo(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FeedEventCommentsConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "total":
+				return ec.fieldContext_PageInfo_total(ctx, field)
+			case "size":
+				return ec.fieldContext_PageInfo_size(ctx, field)
+			case "hasPreviousPage":
+				return ec.fieldContext_PageInfo_hasPreviousPage(ctx, field)
+			case "hasNextPage":
+				return ec.fieldContext_PageInfo_hasNextPage(ctx, field)
+			case "startCursor":
+				return ec.fieldContext_PageInfo_startCursor(ctx, field)
+			case "endCursor":
+				return ec.fieldContext_PageInfo_endCursor(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PageInfo", field.Name)
 		},
 	}
 	return fc, nil
@@ -29290,6 +29557,94 @@ func (ec *executionContext) fieldContext_InteractionsEdge_cursor(ctx context.Con
 	return fc, nil
 }
 
+func (ec *executionContext) _Interval_start(ctx context.Context, field graphql.CollectedField, obj *model.Interval) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Interval_start(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Start, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Interval_start(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Interval",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Interval_length(ctx context.Context, field graphql.CollectedField, obj *model.Interval) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Interval_length(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Length, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Interval_length(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Interval",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _InvalidMedia_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.InvalidMedia) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_InvalidMedia_previewURLs(ctx, field)
 	if err != nil {
@@ -30770,9 +31125,9 @@ func (ec *executionContext) _Mention_index(ctx context.Context, field graphql.Co
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*model.CompleteIndex)
+	res := resTmp.(*model.Interval)
 	fc.Result = res
-	return ec.marshalOCompleteIndex2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCompleteIndex(ctx, field.Selections, res)
+	return ec.marshalOInterval2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐInterval(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mention_index(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -30783,12 +31138,12 @@ func (ec *executionContext) fieldContext_Mention_index(ctx context.Context, fiel
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "index":
-				return ec.fieldContext_CompleteIndex_index(ctx, field)
+			case "start":
+				return ec.fieldContext_Interval_start(ctx, field)
 			case "length":
-				return ec.fieldContext_CompleteIndex_length(ctx, field)
+				return ec.fieldContext_Interval_length(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type CompleteIndex", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type Interval", field.Name)
 		},
 	}
 	return fc, nil
@@ -38054,9 +38409,9 @@ func (ec *executionContext) _Post_admires(ctx context.Context, field graphql.Col
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*model.AdmiresConnection)
+	res := resTmp.(*model.PostAdmiresConnection)
 	fc.Result = res
-	return ec.marshalOAdmiresConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdmiresConnection(ctx, field.Selections, res)
+	return ec.marshalOPostAdmiresConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostAdmiresConnection(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Post_admires(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -38068,11 +38423,11 @@ func (ec *executionContext) fieldContext_Post_admires(ctx context.Context, field
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "edges":
-				return ec.fieldContext_AdmiresConnection_edges(ctx, field)
+				return ec.fieldContext_PostAdmiresConnection_edges(ctx, field)
 			case "pageInfo":
-				return ec.fieldContext_AdmiresConnection_pageInfo(ctx, field)
+				return ec.fieldContext_PostAdmiresConnection_pageInfo(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type AdmiresConnection", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type PostAdmiresConnection", field.Name)
 		},
 	}
 	defer func() {
@@ -38112,9 +38467,9 @@ func (ec *executionContext) _Post_comments(ctx context.Context, field graphql.Co
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*model.CommentsConnection)
+	res := resTmp.(*model.PostCommentsConnection)
 	fc.Result = res
-	return ec.marshalOCommentsConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommentsConnection(ctx, field.Selections, res)
+	return ec.marshalOPostCommentsConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostCommentsConnection(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Post_comments(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -38126,11 +38481,11 @@ func (ec *executionContext) fieldContext_Post_comments(ctx context.Context, fiel
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "edges":
-				return ec.fieldContext_CommentsConnection_edges(ctx, field)
+				return ec.fieldContext_PostCommentsConnection_edges(ctx, field)
 			case "pageInfo":
-				return ec.fieldContext_CommentsConnection_pageInfo(ctx, field)
+				return ec.fieldContext_PostCommentsConnection_pageInfo(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type CommentsConnection", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type PostCommentsConnection", field.Name)
 		},
 	}
 	defer func() {
@@ -38255,6 +38610,418 @@ func (ec *executionContext) fieldContext_Post_viewerAdmire(ctx context.Context, 
 				return ec.fieldContext_Admire_source(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Admire", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PostAdmireEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.PostAdmireEdge) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PostAdmireEdge_node(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Node, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Admire)
+	fc.Result = res
+	return ec.marshalOAdmire2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdmire(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PostAdmireEdge_node(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PostAdmireEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Admire_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Admire_dbid(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Admire_creationTime(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Admire_lastUpdated(ctx, field)
+			case "admirer":
+				return ec.fieldContext_Admire_admirer(ctx, field)
+			case "source":
+				return ec.fieldContext_Admire_source(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Admire", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PostAdmireEdge_cursor(ctx context.Context, field graphql.CollectedField, obj *model.PostAdmireEdge) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PostAdmireEdge_cursor(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Cursor, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PostAdmireEdge_cursor(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PostAdmireEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PostAdmiresConnection_edges(ctx context.Context, field graphql.CollectedField, obj *model.PostAdmiresConnection) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PostAdmiresConnection_edges(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Edges, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.PostAdmireEdge)
+	fc.Result = res
+	return ec.marshalOPostAdmireEdge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostAdmireEdge(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PostAdmiresConnection_edges(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PostAdmiresConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "node":
+				return ec.fieldContext_PostAdmireEdge_node(ctx, field)
+			case "cursor":
+				return ec.fieldContext_PostAdmireEdge_cursor(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PostAdmireEdge", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PostAdmiresConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *model.PostAdmiresConnection) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PostAdmiresConnection_pageInfo(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PageInfo, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.PageInfo)
+	fc.Result = res
+	return ec.marshalNPageInfo2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPageInfo(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PostAdmiresConnection_pageInfo(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PostAdmiresConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "total":
+				return ec.fieldContext_PageInfo_total(ctx, field)
+			case "size":
+				return ec.fieldContext_PageInfo_size(ctx, field)
+			case "hasPreviousPage":
+				return ec.fieldContext_PageInfo_hasPreviousPage(ctx, field)
+			case "hasNextPage":
+				return ec.fieldContext_PageInfo_hasNextPage(ctx, field)
+			case "startCursor":
+				return ec.fieldContext_PageInfo_startCursor(ctx, field)
+			case "endCursor":
+				return ec.fieldContext_PageInfo_endCursor(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PageInfo", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PostCommentEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.PostCommentEdge) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PostCommentEdge_node(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Node, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Comment)
+	fc.Result = res
+	return ec.marshalOComment2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐComment(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PostCommentEdge_node(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PostCommentEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Comment_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Comment_dbid(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Comment_creationTime(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Comment_lastUpdated(ctx, field)
+			case "replyTo":
+				return ec.fieldContext_Comment_replyTo(ctx, field)
+			case "commenter":
+				return ec.fieldContext_Comment_commenter(ctx, field)
+			case "comment":
+				return ec.fieldContext_Comment_comment(ctx, field)
+			case "mentions":
+				return ec.fieldContext_Comment_mentions(ctx, field)
+			case "replies":
+				return ec.fieldContext_Comment_replies(ctx, field)
+			case "source":
+				return ec.fieldContext_Comment_source(ctx, field)
+			case "deleted":
+				return ec.fieldContext_Comment_deleted(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Comment", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PostCommentEdge_cursor(ctx context.Context, field graphql.CollectedField, obj *model.PostCommentEdge) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PostCommentEdge_cursor(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Cursor, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PostCommentEdge_cursor(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PostCommentEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PostCommentsConnection_edges(ctx context.Context, field graphql.CollectedField, obj *model.PostCommentsConnection) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PostCommentsConnection_edges(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Edges, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.PostCommentEdge)
+	fc.Result = res
+	return ec.marshalOPostCommentEdge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostCommentEdge(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PostCommentsConnection_edges(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PostCommentsConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "node":
+				return ec.fieldContext_PostCommentEdge_node(ctx, field)
+			case "cursor":
+				return ec.fieldContext_PostCommentEdge_cursor(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PostCommentEdge", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PostCommentsConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *model.PostCommentsConnection) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PostCommentsConnection_pageInfo(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PageInfo, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.PageInfo)
+	fc.Result = res
+	return ec.marshalNPageInfo2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPageInfo(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PostCommentsConnection_pageInfo(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PostCommentsConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "total":
+				return ec.fieldContext_PageInfo_total(ctx, field)
+			case "size":
+				return ec.fieldContext_PageInfo_size(ctx, field)
+			case "hasPreviousPage":
+				return ec.fieldContext_PageInfo_hasPreviousPage(ctx, field)
+			case "hasNextPage":
+				return ec.fieldContext_PageInfo_hasNextPage(ctx, field)
+			case "startCursor":
+				return ec.fieldContext_PageInfo_startCursor(ctx, field)
+			case "endCursor":
+				return ec.fieldContext_PageInfo_endCursor(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PageInfo", field.Name)
 		},
 	}
 	return fc, nil
@@ -56715,44 +57482,6 @@ func (ec *executionContext) unmarshalInputCollectionTokenSettingsInput(ctx conte
 	return it, nil
 }
 
-func (ec *executionContext) unmarshalInputCompleteIndexInput(ctx context.Context, obj interface{}) (model.CompleteIndexInput, error) {
-	var it model.CompleteIndexInput
-	asMap := map[string]interface{}{}
-	for k, v := range obj.(map[string]interface{}) {
-		asMap[k] = v
-	}
-
-	fieldsInOrder := [...]string{"index", "length"}
-	for _, k := range fieldsInOrder {
-		v, ok := asMap[k]
-		if !ok {
-			continue
-		}
-		switch k {
-		case "index":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("index"))
-			data, err := ec.unmarshalNInt2int(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.Index = data
-		case "length":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("length"))
-			data, err := ec.unmarshalNInt2int(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.Length = data
-		}
-	}
-
-	return it, nil
-}
-
 func (ec *executionContext) unmarshalInputCreateCollectionInGalleryInput(ctx context.Context, obj interface{}) (model.CreateCollectionInGalleryInput, error) {
 	var it model.CreateCollectionInGalleryInput
 	asMap := map[string]interface{}{}
@@ -57456,6 +58185,44 @@ func (ec *executionContext) unmarshalInputGnosisSafeAuth(ctx context.Context, ob
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputIntervalInput(ctx context.Context, obj interface{}) (model.IntervalInput, error) {
+	var it model.IntervalInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"start", "length"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "start":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("start"))
+			data, err := ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Start = data
+		case "length":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("length"))
+			data, err := ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Length = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputMagicLinkAuth(ctx context.Context, obj interface{}) (model.MagicLinkAuth, error) {
 	var it model.MagicLinkAuth
 	asMap := map[string]interface{}{}
@@ -57503,7 +58270,7 @@ func (ec *executionContext) unmarshalInputMentionInput(ctx context.Context, obj 
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("index"))
-			data, err := ec.unmarshalOCompleteIndexInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCompleteIndexInput(ctx, v)
+			data, err := ec.unmarshalOIntervalInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐIntervalInput(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -62897,35 +63664,6 @@ func (ec *executionContext) _Admire(ctx context.Context, sel ast.SelectionSet, o
 	return out
 }
 
-var admireEdgeImplementors = []string{"AdmireEdge"}
-
-func (ec *executionContext) _AdmireEdge(ctx context.Context, sel ast.SelectionSet, obj *model.AdmireEdge) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, admireEdgeImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("AdmireEdge")
-		case "node":
-
-			out.Values[i] = ec._AdmireEdge_node(ctx, field, obj)
-
-		case "cursor":
-
-			out.Values[i] = ec._AdmireEdge_cursor(ctx, field, obj)
-
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
 var admireFeedEventPayloadImplementors = []string{"AdmireFeedEventPayload", "AdmireFeedEventPayloadOrError"}
 
 func (ec *executionContext) _AdmireFeedEventPayload(ctx context.Context, sel ast.SelectionSet, obj *model.AdmireFeedEventPayload) graphql.Marshaler {
@@ -63033,38 +63771,6 @@ func (ec *executionContext) _AdmirePostPayload(ctx context.Context, sel ast.Sele
 				return innerFunc(ctx)
 
 			})
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
-var admiresConnectionImplementors = []string{"AdmiresConnection"}
-
-func (ec *executionContext) _AdmiresConnection(ctx context.Context, sel ast.SelectionSet, obj *model.AdmiresConnection) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, admiresConnectionImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("AdmiresConnection")
-		case "edges":
-
-			out.Values[i] = ec._AdmiresConnection_edges(ctx, field, obj)
-
-		case "pageInfo":
-
-			out.Values[i] = ec._AdmiresConnection_pageInfo(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -64582,41 +65288,6 @@ func (ec *executionContext) _CommunitySearchResult(ctx context.Context, sel ast.
 	return out
 }
 
-var completeIndexImplementors = []string{"CompleteIndex"}
-
-func (ec *executionContext) _CompleteIndex(ctx context.Context, sel ast.SelectionSet, obj *model.CompleteIndex) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, completeIndexImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("CompleteIndex")
-		case "index":
-
-			out.Values[i] = ec._CompleteIndex_index(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "length":
-
-			out.Values[i] = ec._CompleteIndex_length(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
 var connectSocialAccountPayloadImplementors = []string{"ConnectSocialAccountPayload", "ConnectSocialAccountPayloadOrError"}
 
 func (ec *executionContext) _ConnectSocialAccountPayload(ctx context.Context, sel ast.SelectionSet, obj *model.ConnectSocialAccountPayload) graphql.Marshaler {
@@ -66119,6 +66790,128 @@ func (ec *executionContext) _FeedEvent(ctx context.Context, sel ast.SelectionSet
 	return out
 }
 
+var feedEventAdmireEdgeImplementors = []string{"FeedEventAdmireEdge"}
+
+func (ec *executionContext) _FeedEventAdmireEdge(ctx context.Context, sel ast.SelectionSet, obj *model.FeedEventAdmireEdge) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, feedEventAdmireEdgeImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("FeedEventAdmireEdge")
+		case "node":
+
+			out.Values[i] = ec._FeedEventAdmireEdge_node(ctx, field, obj)
+
+		case "cursor":
+
+			out.Values[i] = ec._FeedEventAdmireEdge_cursor(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var feedEventAdmiresConnectionImplementors = []string{"FeedEventAdmiresConnection"}
+
+func (ec *executionContext) _FeedEventAdmiresConnection(ctx context.Context, sel ast.SelectionSet, obj *model.FeedEventAdmiresConnection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, feedEventAdmiresConnectionImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("FeedEventAdmiresConnection")
+		case "edges":
+
+			out.Values[i] = ec._FeedEventAdmiresConnection_edges(ctx, field, obj)
+
+		case "pageInfo":
+
+			out.Values[i] = ec._FeedEventAdmiresConnection_pageInfo(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var feedEventCommentEdgeImplementors = []string{"FeedEventCommentEdge"}
+
+func (ec *executionContext) _FeedEventCommentEdge(ctx context.Context, sel ast.SelectionSet, obj *model.FeedEventCommentEdge) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, feedEventCommentEdgeImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("FeedEventCommentEdge")
+		case "node":
+
+			out.Values[i] = ec._FeedEventCommentEdge_node(ctx, field, obj)
+
+		case "cursor":
+
+			out.Values[i] = ec._FeedEventCommentEdge_cursor(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var feedEventCommentsConnectionImplementors = []string{"FeedEventCommentsConnection"}
+
+func (ec *executionContext) _FeedEventCommentsConnection(ctx context.Context, sel ast.SelectionSet, obj *model.FeedEventCommentsConnection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, feedEventCommentsConnectionImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("FeedEventCommentsConnection")
+		case "edges":
+
+			out.Values[i] = ec._FeedEventCommentsConnection_edges(ctx, field, obj)
+
+		case "pageInfo":
+
+			out.Values[i] = ec._FeedEventCommentsConnection_pageInfo(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var followAllSocialConnectionsPayloadImplementors = []string{"FollowAllSocialConnectionsPayload", "FollowAllSocialConnectionsPayloadOrError"}
 
 func (ec *executionContext) _FollowAllSocialConnectionsPayload(ctx context.Context, sel ast.SelectionSet, obj *model.FollowAllSocialConnectionsPayload) graphql.Marshaler {
@@ -67206,6 +67999,41 @@ func (ec *executionContext) _InteractionsEdge(ctx context.Context, sel ast.Selec
 
 			out.Values[i] = ec._InteractionsEdge_cursor(ctx, field, obj)
 
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var intervalImplementors = []string{"Interval"}
+
+func (ec *executionContext) _Interval(ctx context.Context, sel ast.SelectionSet, obj *model.Interval) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, intervalImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Interval")
+		case "start":
+
+			out.Values[i] = ec._Interval_start(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "length":
+
+			out.Values[i] = ec._Interval_length(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -68657,6 +69485,128 @@ func (ec *executionContext) _Post(ctx context.Context, sel ast.SelectionSet, obj
 				return innerFunc(ctx)
 
 			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var postAdmireEdgeImplementors = []string{"PostAdmireEdge"}
+
+func (ec *executionContext) _PostAdmireEdge(ctx context.Context, sel ast.SelectionSet, obj *model.PostAdmireEdge) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, postAdmireEdgeImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PostAdmireEdge")
+		case "node":
+
+			out.Values[i] = ec._PostAdmireEdge_node(ctx, field, obj)
+
+		case "cursor":
+
+			out.Values[i] = ec._PostAdmireEdge_cursor(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var postAdmiresConnectionImplementors = []string{"PostAdmiresConnection"}
+
+func (ec *executionContext) _PostAdmiresConnection(ctx context.Context, sel ast.SelectionSet, obj *model.PostAdmiresConnection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, postAdmiresConnectionImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PostAdmiresConnection")
+		case "edges":
+
+			out.Values[i] = ec._PostAdmiresConnection_edges(ctx, field, obj)
+
+		case "pageInfo":
+
+			out.Values[i] = ec._PostAdmiresConnection_pageInfo(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var postCommentEdgeImplementors = []string{"PostCommentEdge"}
+
+func (ec *executionContext) _PostCommentEdge(ctx context.Context, sel ast.SelectionSet, obj *model.PostCommentEdge) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, postCommentEdgeImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PostCommentEdge")
+		case "node":
+
+			out.Values[i] = ec._PostCommentEdge_node(ctx, field, obj)
+
+		case "cursor":
+
+			out.Values[i] = ec._PostCommentEdge_cursor(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var postCommentsConnectionImplementors = []string{"PostCommentsConnection"}
+
+func (ec *executionContext) _PostCommentsConnection(ctx context.Context, sel ast.SelectionSet, obj *model.PostCommentsConnection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, postCommentsConnectionImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PostCommentsConnection")
+		case "edges":
+
+			out.Values[i] = ec._PostCommentsConnection_edges(ctx, field, obj)
+
+		case "pageInfo":
+
+			out.Values[i] = ec._PostCommentsConnection_pageInfo(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -74829,54 +75779,6 @@ func (ec *executionContext) marshalOAdmire2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgal
 	return ec._Admire(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalOAdmireEdge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdmireEdge(ctx context.Context, sel ast.SelectionSet, v []*model.AdmireEdge) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalOAdmireEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdmireEdge(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
-
-	return ret
-}
-
-func (ec *executionContext) marshalOAdmireEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdmireEdge(ctx context.Context, sel ast.SelectionSet, v *model.AdmireEdge) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._AdmireEdge(ctx, sel, v)
-}
-
 func (ec *executionContext) marshalOAdmireFeedEventPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdmireFeedEventPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.AdmireFeedEventPayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -74896,13 +75798,6 @@ func (ec *executionContext) marshalOAdmireSource2githubᚗcomᚋmikeydubᚋgoᚑ
 		return graphql.Null
 	}
 	return ec._AdmireSource(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalOAdmiresConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdmiresConnection(ctx context.Context, sel ast.SelectionSet, v *model.AdmiresConnection) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._AdmiresConnection(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOBadge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐBadge(ctx context.Context, sel ast.SelectionSet, v []*model.Badge) graphql.Marshaler {
@@ -75649,21 +76544,6 @@ func (ec *executionContext) marshalOCommunitySearchResult2ᚕᚖgithubᚗcomᚋm
 	return ret
 }
 
-func (ec *executionContext) marshalOCompleteIndex2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCompleteIndex(ctx context.Context, sel ast.SelectionSet, v *model.CompleteIndex) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._CompleteIndex(ctx, sel, v)
-}
-
-func (ec *executionContext) unmarshalOCompleteIndexInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCompleteIndexInput(ctx context.Context, v interface{}) (*model.CompleteIndexInput, error) {
-	if v == nil {
-		return nil, nil
-	}
-	res, err := ec.unmarshalInputCompleteIndexInput(ctx, v)
-	return &res, graphql.ErrorOnPath(ctx, err)
-}
-
 func (ec *executionContext) marshalOConnectSocialAccountPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐConnectSocialAccountPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.ConnectSocialAccountPayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -75964,11 +76844,121 @@ func (ec *executionContext) marshalOFeedEvent2ᚖgithubᚗcomᚋmikeydubᚋgoᚑ
 	return ec._FeedEvent(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalOFeedEventAdmireEdge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventAdmireEdge(ctx context.Context, sel ast.SelectionSet, v []*model.FeedEventAdmireEdge) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalOFeedEventAdmireEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventAdmireEdge(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	return ret
+}
+
+func (ec *executionContext) marshalOFeedEventAdmireEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventAdmireEdge(ctx context.Context, sel ast.SelectionSet, v *model.FeedEventAdmireEdge) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._FeedEventAdmireEdge(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOFeedEventAdmiresConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventAdmiresConnection(ctx context.Context, sel ast.SelectionSet, v *model.FeedEventAdmiresConnection) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._FeedEventAdmiresConnection(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOFeedEventByIdOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventByIDOrError(ctx context.Context, sel ast.SelectionSet, v model.FeedEventByIDOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
 	return ec._FeedEventByIdOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOFeedEventCommentEdge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventCommentEdge(ctx context.Context, sel ast.SelectionSet, v []*model.FeedEventCommentEdge) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalOFeedEventCommentEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventCommentEdge(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	return ret
+}
+
+func (ec *executionContext) marshalOFeedEventCommentEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventCommentEdge(ctx context.Context, sel ast.SelectionSet, v *model.FeedEventCommentEdge) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._FeedEventCommentEdge(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOFeedEventCommentsConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventCommentsConnection(ctx context.Context, sel ast.SelectionSet, v *model.FeedEventCommentsConnection) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._FeedEventCommentsConnection(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOFeedEventData2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventData(ctx context.Context, sel ast.SelectionSet, v model.FeedEventData) graphql.Marshaler {
@@ -76508,6 +77498,21 @@ func (ec *executionContext) marshalOInteractionsEdge2ᚖgithubᚗcomᚋmikeydub�
 	return ec._InteractionsEdge(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalOInterval2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐInterval(ctx context.Context, sel ast.SelectionSet, v *model.Interval) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._Interval(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOIntervalInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐIntervalInput(ctx context.Context, v interface{}) (*model.IntervalInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputIntervalInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) marshalOLensSocialAccount2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐLensSocialAccount(ctx context.Context, sel ast.SelectionSet, v *model.LensSocialAccount) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -76998,6 +78003,116 @@ func (ec *executionContext) marshalOPost2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalle
 		return graphql.Null
 	}
 	return ec._Post(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOPostAdmireEdge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostAdmireEdge(ctx context.Context, sel ast.SelectionSet, v []*model.PostAdmireEdge) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalOPostAdmireEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostAdmireEdge(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	return ret
+}
+
+func (ec *executionContext) marshalOPostAdmireEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostAdmireEdge(ctx context.Context, sel ast.SelectionSet, v *model.PostAdmireEdge) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._PostAdmireEdge(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOPostAdmiresConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostAdmiresConnection(ctx context.Context, sel ast.SelectionSet, v *model.PostAdmiresConnection) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._PostAdmiresConnection(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOPostCommentEdge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostCommentEdge(ctx context.Context, sel ast.SelectionSet, v []*model.PostCommentEdge) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalOPostCommentEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostCommentEdge(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	return ret
+}
+
+func (ec *executionContext) marshalOPostCommentEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostCommentEdge(ctx context.Context, sel ast.SelectionSet, v *model.PostCommentEdge) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._PostCommentEdge(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOPostCommentsConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostCommentsConnection(ctx context.Context, sel ast.SelectionSet, v *model.PostCommentsConnection) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._PostCommentsConnection(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOPostEdge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostEdge(ctx context.Context, sel ast.SelectionSet, v []*model.PostEdge) graphql.Marshaler {

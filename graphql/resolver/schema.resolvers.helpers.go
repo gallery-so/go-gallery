@@ -668,7 +668,6 @@ func postsToConnection(ctx context.Context, posts []db.Post, contractID persist.
 				HelperPostData: model.HelperPostData{
 					TokenIDs: po.TokenIds,
 					AuthorID: po.ActorID,
-					Mentions: po.Mentions,
 				},
 				CreationTime: &po.CreatedAt,
 				Dbid:         po.ID,
@@ -755,12 +754,29 @@ func resolvePostByPostID(ctx context.Context, postID persist.DBID) (*model.Post,
 	return postToModel(post)
 }
 
-func resolveMentionsByMentions(ctx context.Context, mentions persist.Mentions) ([]*model.Mention, error) {
+func resolveMentionsByCommentID(ctx context.Context, commentID persist.DBID) ([]*model.Mention, error) {
+	mentions, err := publicapi.For(ctx).Interaction.GetMentionsByCommentID(ctx, commentID)
+	if err != nil {
+		return nil, err
+	}
+
+	return mentionsToModel(ctx, mentions)
+}
+
+func resolveMentionsByPostID(ctx context.Context, postID persist.DBID) ([]*model.Mention, error) {
+	mentions, err := publicapi.For(ctx).Interaction.GetMentionsByPostID(ctx, postID)
+	if err != nil {
+		return nil, err
+	}
+
+	return mentionsToModel(ctx, mentions)
+}
+
+func mentionsToModel(ctx context.Context, mentions []db.Mention) ([]*model.Mention, error) {
 	result := make([]*model.Mention, len(mentions))
-	i := 0
-	for dbid, mention := range mentions {
-		result[i] = mentionToModel(ctx, dbid, mention)
-		i++
+
+	for i, mention := range mentions {
+		result[i] = mentionToModel(ctx, mention)
 	}
 
 	return result, nil
@@ -1326,7 +1342,6 @@ func feedEntityToModel(event any) (model.FeedEventOrError, error) {
 			HelperPostData: model.HelperPostData{
 				TokenIDs: event.TokenIds,
 				AuthorID: event.ActorID,
-				Mentions: event.Mentions,
 			},
 			CreationTime: &event.CreatedAt,
 			Dbid:         event.ID,
@@ -1639,7 +1654,6 @@ func postToModel(event *db.Post) (*model.Post, error) {
 		HelperPostData: model.HelperPostData{
 			TokenIDs: event.TokenIds,
 			AuthorID: event.ActorID,
-			Mentions: event.Mentions,
 		},
 		Dbid:         event.ID,
 		CreationTime: &event.CreatedAt,
@@ -1779,7 +1793,6 @@ func commentToModel(ctx context.Context, comment db.Comment) *model.Comment {
 			PostID:      postID,
 			FeedEventID: feedEventID,
 			ReplyToID:   replyToID,
-			Mentions:    comment.Mentions,
 		},
 		Dbid:         comment.ID,
 		CreationTime: &comment.CreatedAt,
@@ -2328,22 +2341,22 @@ func mediaToDimensions(dimensions persist.Dimensions) *model.MediaDimensions {
 	}
 }
 
-func mentionToModel(ctx context.Context, id persist.DBID, mention persist.Mention) *model.Mention {
+func mentionToModel(ctx context.Context, mention db.Mention) *model.Mention {
 	m := &model.Mention{}
-	if mention.Index != nil {
-		m.Index = &model.CompleteIndex{
-			Index:  mention.Index.Index,
-			Length: mention.Index.Length,
+	if mention.Start.Valid {
+		m.Index = &model.Interval{
+			Start:  int(mention.Start.Int32),
+			Length: int(mention.Length.Int32),
 		}
 	}
 
-	switch mention.MentionType {
-	case persist.MentionTypeUser:
-		m.HelperMentionData.UserID = &id
-	case persist.MentionTypeCommunity:
-		m.HelperMentionData.CommunityID = &id
+	switch {
+	case mention.UserID != "":
+		m.HelperMentionData.UserID = &mention.UserID
+	case mention.ContractID != "":
+		m.HelperMentionData.CommunityID = &mention.ContractID
 	default:
-		panic(fmt.Sprintf("unknown mention type: %s", mention.MentionType))
+		panic(fmt.Sprintf("unknown mention type: %+v", mention))
 	}
 
 	return m

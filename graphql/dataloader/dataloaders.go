@@ -29,6 +29,7 @@
 //go:generate go run github.com/gallery-so/dataloaden AdmiresLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Admire
 //go:generate go run github.com/gallery-so/dataloaden CommentLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Comment
 //go:generate go run github.com/gallery-so/dataloaden CommentsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Comment
+//go:generate go run github.com/gallery-so/dataloaden MentionsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Mention
 //go:generate go run github.com/gallery-so/dataloaden NotificationLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Notification
 //go:generate go run github.com/gallery-so/dataloaden NotificationsLoaderByUserID github.com/mikeydub/go-gallery/db/gen/coredb.GetUserNotificationsBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.Notification
 //go:generate go run github.com/gallery-so/dataloaden FeedEventCommentsLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginateCommentsByFeedEventIDBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.Comment
@@ -124,6 +125,8 @@ type Loaders struct {
 	CommentsByFeedEventID                    *FeedEventCommentsLoader
 	CommentCountByPostID                     *IntLoaderByID
 	CommentsByPostID                         *PostCommentsLoader
+	MentionsByCommentID                      *MentionsLoaderByID
+	MentionsByPostID                         *MentionsLoaderByID
 	RepliesByCommentID                       *RepliesLoader
 	RepliesCountByCommentID                  *IntLoaderByID
 	InteractionCountByFeedEventID            *FeedEventInteractionCountLoader
@@ -309,6 +312,10 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 	loaders.CommentsByFeedEventID = NewFeedEventCommentsLoader(defaults, loadCommentsByFeedEventID(q))
 
 	loaders.CommentsByPostID = NewPostCommentsLoader(defaults, loadCommentsByPostID(q))
+
+	loaders.MentionsByCommentID = NewMentionsLoaderByID(defaults, loadMentionsByCommentID(q))
+
+	loaders.MentionsByPostID = NewMentionsLoaderByID(defaults, loadMentionsByPostID(q))
 
 	loaders.RepliesByCommentID = NewRepliesLoader(defaults, loadRepliesByCommentID(q))
 
@@ -1228,6 +1235,40 @@ func loadCommentsByPostID(q *db.Queries) func(context.Context, []db.PaginateComm
 		})
 
 		return comments, errors
+	}
+}
+
+func loadMentionsByPostID(q *db.Queries) func(context.Context, []persist.DBID) ([][]db.Mention, []error) {
+	return func(ctx context.Context, ids []persist.DBID) ([][]db.Mention, []error) {
+		mentions := make([][]db.Mention, len(ids))
+		errors := make([]error, len(ids))
+
+		b := q.GetMentionsByPostID(ctx, ids)
+		defer b.Close()
+
+		b.Query(func(i int, mnts []db.Mention, err error) {
+			mentions[i] = mnts
+			errors[i] = err
+		})
+
+		return mentions, errors
+	}
+}
+
+func loadMentionsByCommentID(q *db.Queries) func(context.Context, []persist.DBID) ([][]db.Mention, []error) {
+	return func(ctx context.Context, ids []persist.DBID) ([][]db.Mention, []error) {
+		mentions := make([][]db.Mention, len(ids))
+		errors := make([]error, len(ids))
+
+		b := q.GetMentionsByCommentID(ctx, ids)
+		defer b.Close()
+
+		b.Query(func(i int, mnts []db.Mention, err error) {
+			mentions[i] = mnts
+			errors[i] = err
+		})
+
+		return mentions, errors
 	}
 }
 

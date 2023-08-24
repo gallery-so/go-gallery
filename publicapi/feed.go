@@ -132,49 +132,60 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 		return c.ID, nil
 	})
 
-	dbMentions, err := mentionInputsToMentions(mentions)
+	tx, err := api.repos.BeginTx(ctx)
 	if err != nil {
 		return "", err
 	}
+	defer tx.Rollback(ctx)
 
-	id, err := api.queries.InsertPost(ctx, db.InsertPostParams{
+	q := api.queries.WithTx(tx)
+
+	id, err := q.InsertPost(ctx, db.InsertPostParams{
 		ID:          persist.GenerateID(),
 		TokenIds:    tokenIDs,
 		ContractIds: contractIDs,
 		ActorID:     actorID,
 		Caption:     cap,
-		Mentions:    dbMentions,
 	})
 	if err != nil {
 		return "", err
 	}
 
-	if len(mentions) > 0 {
-		for _, mention := range mentions {
-			if mention == nil {
-				continue
-			}
+	dbMentions, err := insertMentionsForPost(ctx, mentions, id, q)
+	if err != nil {
+		return "", err
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	if len(dbMentions) > 0 {
+		for _, mention := range dbMentions {
 			switch {
-			case mention.UserID != nil:
+			case mention.UserID != "":
 				_, err = event.DispatchEvent(ctx, db.Event{
 					ActorID:        persist.DBIDToNullStr(actorID),
 					ResourceTypeID: persist.ResourceTypeUser,
-					SubjectID:      *mention.UserID,
+					SubjectID:      mention.UserID,
 					PostID:         id,
-					UserID:         *mention.UserID,
+					UserID:         mention.UserID,
 					Action:         persist.ActionMentionUser,
+					MentionID:      mention.ID,
 				}, api.validator, nil)
 				if err != nil {
 					return "", err
 				}
-			case mention.CommunityID != nil:
+			case mention.ContractID != "":
 				_, err = event.DispatchEvent(ctx, db.Event{
 					ActorID:        persist.DBIDToNullStr(actorID),
 					ResourceTypeID: persist.ResourceTypeContract,
-					SubjectID:      *mention.CommunityID,
+					SubjectID:      mention.ContractID,
 					PostID:         id,
-					ContractID:     *mention.CommunityID,
+					ContractID:     mention.ContractID,
 					Action:         persist.ActionMentionCommunity,
+					MentionID:      mention.ID,
 				}, api.validator, nil)
 
 			default:
@@ -184,6 +195,44 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 	}
 
 	return id, nil
+}
+
+func insertMentionsForPost(ctx context.Context, mentions []*model.MentionInput, postID persist.DBID, q *db.Queries) ([]db.Mention, error) {
+	dbMentions, err := mentionInputsToMentions(ctx, mentions, q)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]db.Mention, len(dbMentions))
+
+	for i, m := range dbMentions {
+		var user, contract sql.NullString
+		if m.UserID != "" {
+			user = sql.NullString{
+				String: m.UserID.String(),
+				Valid:  true,
+			}
+		} else if m.ContractID != "" {
+			contract = sql.NullString{
+				String: m.ContractID.String(),
+				Valid:  true,
+			}
+		}
+		mid, err := q.InsertPostMention(ctx, db.InsertPostMentionParams{
+			ID:       persist.GenerateID(),
+			User:     user,
+			Contract: contract,
+			PostID:   postID,
+			Start:    m.Start,
+			Length:   m.Length,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		result[i] = mid
+	}
+
+	return result, nil
 }
 
 func (api FeedAPI) DeletePostById(ctx context.Context, postID persist.DBID) error {

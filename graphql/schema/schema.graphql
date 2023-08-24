@@ -826,11 +826,11 @@ union MentionEntity = GalleryUser | Community
 
 type Mention @goEmbedHelper {
   entity: MentionEntity @goField(forceResolver: true)
-  index: CompleteIndex
+  index: Interval
 }
 
-type CompleteIndex {
-  index: Int!
+type Interval {
+  start: Int!
   length: Int!
 }
 
@@ -849,14 +849,29 @@ type FollowInfo {
   followedBack: Boolean
 }
 
-type AdmireEdge {
+type PostAdmireEdge {
   node: Admire
   cursor: String
 }
 
-type AdmiresConnection {
-  edges: [AdmireEdge]
+type FeedEventAdmireEdge {
+  node: Admire
+  cursor: String
+}
+
+type PostAdmiresConnection {
+  edges: [PostAdmireEdge] @deprecated(reason: "Use generic admires connection instead")
   pageInfo: PageInfo!
+}
+
+type FeedEventAdmiresConnection {
+  edges: [FeedEventAdmireEdge] @deprecated(reason: "Use generic admires connection instead")
+  pageInfo: PageInfo!
+}
+
+type PostCommentEdge {
+  node: Comment
+  cursor: String
 }
 
 type CommentEdge {
@@ -866,6 +881,21 @@ type CommentEdge {
 
 type CommentsConnection {
   edges: [CommentEdge]
+  pageInfo: PageInfo!
+}
+
+type PostCommentsConnection {
+  edges: [PostCommentEdge] @deprecated(reason: "Use generic comments connection instead")
+  pageInfo: PageInfo!
+}
+
+type FeedEventCommentEdge {
+  node: Comment
+  cursor: String
+}
+
+type FeedEventCommentsConnection {
+  edges: [FeedEventCommentEdge] @deprecated(reason: "Use generic comments connection instead")
   pageInfo: PageInfo!
 }
 
@@ -904,9 +934,9 @@ type FeedEvent implements Node @key(fields: "dbid") {
   dbid: DBID!
 
   eventData: FeedEventData @goField(forceResolver: true)
-  admires(before: String, after: String, first: Int, last: Int): AdmiresConnection
+  admires(before: String, after: String, first: Int, last: Int): FeedEventAdmiresConnection
     @goField(forceResolver: true)
-  comments(before: String, after: String, first: Int, last: Int): CommentsConnection
+  comments(before: String, after: String, first: Int, last: Int): FeedEventCommentsConnection
     @goField(forceResolver: true)
   caption: String
 
@@ -932,9 +962,9 @@ type Post implements Node @key(fields: "dbid") @goEmbedHelper {
   caption: String
   mentions: [Mention] @goField(forceResolver: true)
 
-  admires(before: String, after: String, first: Int, last: Int): AdmiresConnection
+  admires(before: String, after: String, first: Int, last: Int): PostAdmiresConnection
     @goField(forceResolver: true)
-  comments(before: String, after: String, first: Int, last: Int): CommentsConnection
+  comments(before: String, after: String, first: Int, last: Int): PostCommentsConnection
     @goField(forceResolver: true)
 
   interactions(before: String, after: String, first: Int, last: Int): InteractionsConnection
@@ -2455,13 +2485,13 @@ type DeletePostPayload {
 union DeletePostPayloadOrError = DeletePostPayload | ErrInvalidInput | ErrNotAuthorized
 
 input MentionInput {
-  index: CompleteIndexInput
+  index: IntervalInput
   userId: DBID
   communityId: DBID
 }
 
-input CompleteIndexInput {
-  index: Int!
+input IntervalInput {
+  start: Int!
   length: Int!
 }
 

@@ -119,17 +119,6 @@ func (v *CollectionTokenSettingsInput) GetRenderLive() bool { return v.RenderLiv
 // GetHighDefinition returns CollectionTokenSettingsInput.HighDefinition, and is useful for accessing the field via an interface.
 func (v *CollectionTokenSettingsInput) GetHighDefinition() bool { return v.HighDefinition }
 
-type CompleteIndexInput struct {
-	Index  int `json:"index"`
-	Length int `json:"length"`
-}
-
-// GetIndex returns CompleteIndexInput.Index, and is useful for accessing the field via an interface.
-func (v *CompleteIndexInput) GetIndex() int { return v.Index }
-
-// GetLength returns CompleteIndexInput.Length, and is useful for accessing the field via an interface.
-func (v *CompleteIndexInput) GetLength() int { return v.Length }
-
 type CreateCollectionInGalleryInput struct {
 	Name           string                         `json:"name"`
 	CollectorsNote string                         `json:"collectorsNote"`
@@ -302,6 +291,17 @@ func (v *GnosisSafeAuth) GetAddress() string { return v.Address }
 // GetNonce returns GnosisSafeAuth.Nonce, and is useful for accessing the field via an interface.
 func (v *GnosisSafeAuth) GetNonce() string { return v.Nonce }
 
+type IntervalInput struct {
+	Start  int `json:"start"`
+	Length int `json:"length"`
+}
+
+// GetStart returns IntervalInput.Start, and is useful for accessing the field via an interface.
+func (v *IntervalInput) GetStart() int { return v.Start }
+
+// GetLength returns IntervalInput.Length, and is useful for accessing the field via an interface.
+func (v *IntervalInput) GetLength() int { return v.Length }
+
 type MagicLinkAuth struct {
 	Token string `json:"token"`
 }
@@ -310,13 +310,13 @@ type MagicLinkAuth struct {
 func (v *MagicLinkAuth) GetToken() string { return v.Token }
 
 type MentionInput struct {
-	Index       *CompleteIndexInput `json:"index"`
-	UserId      *persist.DBID       `json:"userId"`
-	CommunityId *persist.DBID       `json:"communityId"`
+	Index       *IntervalInput `json:"index"`
+	UserId      *persist.DBID  `json:"userId"`
+	CommunityId *persist.DBID  `json:"communityId"`
 }
 
 // GetIndex returns MentionInput.Index, and is useful for accessing the field via an interface.
-func (v *MentionInput) GetIndex() *CompleteIndexInput { return v.Index }
+func (v *MentionInput) GetIndex() *IntervalInput { return v.Index }
 
 // GetUserId returns MentionInput.UserId, and is useful for accessing the field via an interface.
 func (v *MentionInput) GetUserId() *persist.DBID { return v.UserId }

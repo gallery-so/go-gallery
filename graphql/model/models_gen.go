@@ -473,11 +473,6 @@ type Admire struct {
 func (Admire) IsNode()        {}
 func (Admire) IsInteraction() {}
 
-type AdmireEdge struct {
-	Node   *Admire `json:"node"`
-	Cursor *string `json:"cursor"`
-}
-
 type AdmireFeedEventPayload struct {
 	Viewer    *Viewer    `json:"viewer"`
 	Admire    *Admire    `json:"admire"`
@@ -493,11 +488,6 @@ type AdmirePostPayload struct {
 }
 
 func (AdmirePostPayload) IsAdmirePostPayloadOrError() {}
-
-type AdmiresConnection struct {
-	Edges    []*AdmireEdge `json:"edges"`
-	PageInfo *PageInfo     `json:"pageInfo"`
-}
 
 type AudioMedia struct {
 	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`
@@ -744,16 +734,6 @@ type CommunityLink struct {
 
 type CommunitySearchResult struct {
 	Community *Community `json:"community"`
-}
-
-type CompleteIndex struct {
-	Index  int `json:"index"`
-	Length int `json:"length"`
-}
-
-type CompleteIndexInput struct {
-	Index  int `json:"index"`
-	Length int `json:"length"`
 }
 
 type ConnectSocialAccountPayload struct {
@@ -1261,14 +1241,14 @@ type FeedEdge struct {
 }
 
 type FeedEvent struct {
-	Dbid                  persist.DBID            `json:"dbid"`
-	EventData             FeedEventData           `json:"eventData"`
-	Admires               *AdmiresConnection      `json:"admires"`
-	Comments              *CommentsConnection     `json:"comments"`
-	Caption               *string                 `json:"caption"`
-	Interactions          *InteractionsConnection `json:"interactions"`
-	ViewerAdmire          *Admire                 `json:"viewerAdmire"`
-	HasViewerAdmiredEvent *bool                   `json:"hasViewerAdmiredEvent"`
+	Dbid                  persist.DBID                 `json:"dbid"`
+	EventData             FeedEventData                `json:"eventData"`
+	Admires               *FeedEventAdmiresConnection  `json:"admires"`
+	Comments              *FeedEventCommentsConnection `json:"comments"`
+	Caption               *string                      `json:"caption"`
+	Interactions          *InteractionsConnection      `json:"interactions"`
+	ViewerAdmire          *Admire                      `json:"viewerAdmire"`
+	HasViewerAdmiredEvent *bool                        `json:"hasViewerAdmiredEvent"`
 }
 
 func (FeedEvent) IsAdmireSource()         {}
@@ -1277,6 +1257,26 @@ func (FeedEvent) IsNode()                 {}
 func (FeedEvent) IsFeedEventOrError()     {}
 func (FeedEvent) IsFeedEventByIDOrError() {}
 func (FeedEvent) IsEntity()               {}
+
+type FeedEventAdmireEdge struct {
+	Node   *Admire `json:"node"`
+	Cursor *string `json:"cursor"`
+}
+
+type FeedEventAdmiresConnection struct {
+	Edges    []*FeedEventAdmireEdge `json:"edges"`
+	PageInfo *PageInfo              `json:"pageInfo"`
+}
+
+type FeedEventCommentEdge struct {
+	Node   *Comment `json:"node"`
+	Cursor *string  `json:"cursor"`
+}
+
+type FeedEventCommentsConnection struct {
+	Edges    []*FeedEventCommentEdge `json:"edges"`
+	PageInfo *PageInfo               `json:"pageInfo"`
+}
 
 type FollowAllSocialConnectionsPayload struct {
 	Viewer *Viewer `json:"viewer"`
@@ -1464,6 +1464,16 @@ type InteractionsEdge struct {
 	Cursor *string     `json:"cursor"`
 }
 
+type Interval struct {
+	Start  int `json:"start"`
+	Length int `json:"length"`
+}
+
+type IntervalInput struct {
+	Start  int `json:"start"`
+	Length int `json:"length"`
+}
+
 type InvalidMedia struct {
 	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`
 	MediaURL         *string          `json:"mediaURL"`
@@ -1533,14 +1543,14 @@ func (MembershipTier) IsNode() {}
 
 type Mention struct {
 	HelperMentionData
-	Entity MentionEntity  `json:"entity"`
-	Index  *CompleteIndex `json:"index"`
+	Entity MentionEntity `json:"entity"`
+	Index  *Interval     `json:"index"`
 }
 
 type MentionInput struct {
-	Index       *CompleteIndexInput `json:"index"`
-	UserID      *persist.DBID       `json:"userId"`
-	CommunityID *persist.DBID       `json:"communityId"`
+	Index       *IntervalInput `json:"index"`
+	UserID      *persist.DBID  `json:"userId"`
+	CommunityID *persist.DBID  `json:"communityId"`
 }
 
 type MerchDiscountCode struct {
@@ -1664,8 +1674,8 @@ type Post struct {
 	Tokens       []*Token                `json:"tokens"`
 	Caption      *string                 `json:"caption"`
 	Mentions     []*Mention              `json:"mentions"`
-	Admires      *AdmiresConnection      `json:"admires"`
-	Comments     *CommentsConnection     `json:"comments"`
+	Admires      *PostAdmiresConnection  `json:"admires"`
+	Comments     *PostCommentsConnection `json:"comments"`
 	Interactions *InteractionsConnection `json:"interactions"`
 	ViewerAdmire *Admire                 `json:"viewerAdmire"`
 }
@@ -1677,6 +1687,26 @@ func (Post) IsNode()             {}
 func (Post) IsFeedEventOrError() {}
 func (Post) IsMentionSource()    {}
 func (Post) IsEntity()           {}
+
+type PostAdmireEdge struct {
+	Node   *Admire `json:"node"`
+	Cursor *string `json:"cursor"`
+}
+
+type PostAdmiresConnection struct {
+	Edges    []*PostAdmireEdge `json:"edges"`
+	PageInfo *PageInfo         `json:"pageInfo"`
+}
+
+type PostCommentEdge struct {
+	Node   *Comment `json:"node"`
+	Cursor *string  `json:"cursor"`
+}
+
+type PostCommentsConnection struct {
+	Edges    []*PostCommentEdge `json:"edges"`
+	PageInfo *PageInfo          `json:"pageInfo"`
+}
 
 type PostEdge struct {
 	Node   PostOrError `json:"node"`
