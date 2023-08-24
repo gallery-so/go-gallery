@@ -52,6 +52,14 @@ func (e ErrTokenNotFoundByIdentifiers) Error() string {
 	return fmt.Sprintf("token not found for contract %s, tokenID %s, owner %s", e.ContractAddress, e.TokenID, e.OwnerAddress)
 }
 
+type ErrCollectionNotFoundByAddress struct {
+	Address persist.Address
+}
+
+func (e ErrCollectionNotFoundByAddress) Error() string {
+	return fmt.Sprintf("collection not found for address %s", e.Address)
+}
+
 /*
  {
       "token": {
@@ -117,6 +125,11 @@ type TokenWithOwnership struct {
 type TokensResponse struct {
 	Tokens       []TokenWithOwnership `json:"tokens"`
 	Continuation string               `json:"continuation"`
+}
+
+type CollectionsResponse struct {
+	Collections  []Collection `json:"collections"`
+	Continuation string       `json:"continuation"`
 }
 
 // Provider is an the struct for retrieving data from the Ethereum blockchain
@@ -186,7 +199,7 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 	if err != nil {
 		return nil, nil, err
 	}
-	t, c := tokensWithOwnershipToAgnosticTokens(tokens, addr)
+	t, c := d.tokensWithOwnershipToAgnosticTokens(ctx, tokens, addr)
 	return t, c, nil
 }
 
@@ -254,7 +267,7 @@ func (d *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, token
 		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, ErrTokenNotFoundByIdentifiers{ContractAddress: tokenIdentifiers.ContractAddress, TokenID: TokenID(tokenIdentifiers.TokenID.Base10String()), OwnerAddress: ownerAddress}
 	}
 
-	t, c := tokensWithOwnershipToAgnosticTokens(result.Tokens, ownerAddress)
+	t, c := d.tokensWithOwnershipToAgnosticTokens(ctx, result.Tokens, ownerAddress)
 	if len(t) == 0 || len(c) == 0 {
 		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, ErrTokenNotFoundByIdentifiers{ContractAddress: tokenIdentifiers.ContractAddress, TokenID: TokenID(tokenIdentifiers.TokenID.Base10String()), OwnerAddress: ownerAddress}
 	}
@@ -309,12 +322,12 @@ type BlockScoutTokenResponse struct {
 }
 
 func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
-	meta, err := d.reservoirMetadata(ctx, ti)
+	meta, err := d.fetchReservoirMetadata(ctx, ti)
 	if err == nil {
 		return meta, nil
 	}
 	logger.For(ctx).Infof("reservoir metadata error: %s", err)
-	meta, err = d.blockScoutMetadata(ctx, ti)
+	meta, err = d.fetchBlockScoutMetadata(ctx, ti)
 	if err != nil {
 		logger.For(ctx).Infof("blockscout metadata error: %s", err)
 		return nil, err
@@ -323,7 +336,7 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti mu
 	return meta, nil
 }
 
-func (d *Provider) reservoirMetadata(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
+func (d *Provider) fetchReservoirMetadata(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
 	u := fmt.Sprintf("%s/tokens/v6", d.apiURL)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
@@ -354,7 +367,58 @@ func (d *Provider) reservoirMetadata(ctx context.Context, ti multichain.ChainAgn
 	return meta, nil
 }
 
-func (d *Provider) blockScoutMetadata(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
+func (d *Provider) fetchCollection(ctx context.Context, address persist.Address, refresh bool) (Collection, error) {
+	if refresh {
+		ru := fmt.Sprintf("%s/collections/refresh/v2", d.apiURL)
+		body := map[string]interface{}{
+			"collection":    address,
+			"refreshTokens": true,
+		}
+		b, err := json.Marshal(body)
+		if err != nil {
+			return Collection{}, err
+		}
+		rreq, err := http.NewRequestWithContext(ctx, http.MethodPost, ru, strings.NewReader(string(b)))
+		if err != nil {
+			return Collection{}, err
+		}
+
+		rreq.Header.Add("x-api-key", d.apiKey)
+
+		_, err = d.httpClient.Do(rreq)
+		if err != nil {
+			return Collection{}, err
+		}
+	}
+
+	u := fmt.Sprintf("%s/collections/v6", d.apiURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return Collection{}, err
+	}
+
+	req.Header.Add("x-api-key", d.apiKey)
+	q := req.URL.Query()
+	q.Add("id", fmt.Sprintf("%s", address))
+	q.Add("limit", "1")
+
+	resp, err := d.httpClient.Do(req)
+	if err != nil {
+		return Collection{}, err
+	}
+
+	var res CollectionsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return Collection{}, err
+	}
+
+	if len(res.Collections) == 0 {
+		return Collection{}, ErrCollectionNotFoundByAddress{Address: address}
+	}
+	return res.Collections[0], nil
+}
+
+func (d *Provider) fetchBlockScoutMetadata(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
 	u := fmt.Sprintf("https://base.blockscout.com/api/v2/tokens/%s/instances/%s", ti.ContractAddress, ti.TokenID.Base10String())
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
@@ -386,7 +450,7 @@ func (d *Provider) blockScoutMetadata(ctx context.Context, ti multichain.ChainAg
 	return res.Metadata, nil
 }
 
-func tokensWithOwnershipToAgnosticTokens(tokens []TokenWithOwnership, ownerAddress persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract) {
+func (d *Provider) tokensWithOwnershipToAgnosticTokens(ctx context.Context, tokens []TokenWithOwnership, ownerAddress persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract) {
 	ts := []multichain.ChainAgnosticToken{}
 	cs := []multichain.ChainAgnosticContract{}
 	for _, t := range tokens {
@@ -427,6 +491,12 @@ func tokensWithOwnershipToAgnosticTokens(tokens []TokenWithOwnership, ownerAddre
 				ImageURL: persist.NullString(t.Token.Image),
 			},
 		})
+		if strings.EqualFold(t.Token.Collection.Name, t.Token.Contract.String()) || t.Token.Collection.Name == "" {
+			c, err := d.fetchCollection(ctx, t.Token.Contract, true)
+			if err == nil {
+				t.Token.Collection = c
+			}
+		}
 		cs = append(cs, multichain.ChainAgnosticContract{
 			Address: t.Token.Contract,
 			Descriptors: multichain.ChainAgnosticContractDescriptors{
