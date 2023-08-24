@@ -694,7 +694,7 @@ func (q *Queries) CreateContractEvent(ctx context.Context, arg CreateContractEve
 }
 
 const createContractNotification = `-- name: CreateContractNotification :one
-INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, comment_id, contract_id) VALUES ($1, $2, $3, $4, $5, $7, $8, $9, $6) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id
+INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, comment_id, contract_id, mention_id) VALUES ($1, $2, $3, $4, $5, $8, $9, $10, $6, $7) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id
 `
 
 type CreateContractNotificationParams struct {
@@ -704,6 +704,7 @@ type CreateContractNotificationParams struct {
 	Data       persist.NotificationData `json:"data"`
 	EventIds   persist.DBIDList         `json:"event_ids"`
 	ContractID persist.DBID             `json:"contract_id"`
+	MentionID  persist.DBID             `json:"mention_id"`
 	FeedEvent  sql.NullString           `json:"feed_event"`
 	Post       sql.NullString           `json:"post"`
 	Comment    sql.NullString           `json:"comment"`
@@ -717,6 +718,7 @@ func (q *Queries) CreateContractNotification(ctx context.Context, arg CreateCont
 		arg.Data,
 		arg.EventIds,
 		arg.ContractID,
+		arg.MentionID,
 		arg.FeedEvent,
 		arg.Post,
 		arg.Comment,

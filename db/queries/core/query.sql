@@ -661,7 +661,7 @@ INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id,
 INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, comment_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), $6) RETURNING *;
 
 -- name: CreateContractNotification :one
-INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, comment_id, contract_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), sqlc.narg('comment'), $6) RETURNING *;
+INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, comment_id, contract_id, mention_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), sqlc.narg('comment'), $6, $7) RETURNING *;
 
 -- name: CreateSimpleNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids) VALUES ($1, $2, $3, $4, $5) RETURNING *;
