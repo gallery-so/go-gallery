@@ -1211,7 +1211,7 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 
 	tokenFetchers := matchingProvidersForChain[TokenDescriptorsFetcher](p.Chains, ti.Chain)
 
-	if len(tokenFetchers) > 0 {
+	if len(tokenFetchers) == 0 {
 		return nil
 	}
 
