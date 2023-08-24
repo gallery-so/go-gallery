@@ -17,6 +17,7 @@ type Admire struct {
 
 type AdmireRepository interface {
 	CreateAdmire(ctx context.Context, feedEventID DBID, actorID DBID) (DBID, error)
+	CreateTokenAdmire(ctx context.Context, tokenID DBID) (DBID, error)
 	RemoveAdmire(ctx context.Context, admireID DBID) error
 }
 
@@ -38,6 +39,16 @@ type ErrAdmireAlreadyExists struct {
 	PostID      DBID
 }
 
+type ErrAdmireTokenAlreadyExists struct {
+	AdmireID    DBID
+	ActorID     DBID
+	TokenID 	DBID
+}
+
 func (e ErrAdmireAlreadyExists) Error() string {
 	return fmt.Sprintf("admire already exists | AdmireID: %s, ActorID: %s, FeedEventID: %s, PostID: %s", e.AdmireID, e.ActorID, e.FeedEventID, e.PostID)
+}
+
+func (e ErrAdmireTokenAlreadyExists) Error() string {
+	return fmt.Sprintf("admire token already exists | AdmireID: %s, ActorID: %s, TokenID: %s", e.AdmireID, e.ActorID, e.TokenID)
 }

@@ -557,6 +557,14 @@ type __admirePostMutationInput struct {
 // GetPostId returns __admirePostMutationInput.PostId, and is useful for accessing the field via an interface.
 func (v *__admirePostMutationInput) GetPostId() persist.DBID { return v.PostId }
 
+// __admireTokenMutationInput is used internally by genqlient
+type __admireTokenMutationInput struct {
+	TokenId persist.DBID `json:"tokenId"`
+}
+
+// GetTokenId returns __admireTokenMutationInput.TokenId, and is useful for accessing the field via an interface.
+func (v *__admireTokenMutationInput) GetTokenId() persist.DBID { return v.TokenId }
+
 // __commentOnFeedEventMutationInput is used internally by genqlient
 type __commentOnFeedEventMutationInput struct {
 	FeedEventId persist.DBID `json:"feedEventId"`
@@ -1608,6 +1616,241 @@ func (v *admirePostMutationResponse) __premarshalJSON() (*__premarshaladmirePost
 			if err != nil {
 				return nil, fmt.Errorf(
 					"unable to marshal admirePostMutationResponse.AdmirePost: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
+// admireTokenMutationAdmireTokenAdmireTokenPayload includes the requested fields of the GraphQL type AdmireTokenPayload.
+type admireTokenMutationAdmireTokenAdmireTokenPayload struct {
+	Typename *string                                                `json:"__typename"`
+	Token    *admireTokenMutationAdmireTokenAdmireTokenPayloadToken `json:"token"`
+}
+
+// GetTypename returns admireTokenMutationAdmireTokenAdmireTokenPayload.Typename, and is useful for accessing the field via an interface.
+func (v *admireTokenMutationAdmireTokenAdmireTokenPayload) GetTypename() *string { return v.Typename }
+
+// GetToken returns admireTokenMutationAdmireTokenAdmireTokenPayload.Token, and is useful for accessing the field via an interface.
+func (v *admireTokenMutationAdmireTokenAdmireTokenPayload) GetToken() *admireTokenMutationAdmireTokenAdmireTokenPayloadToken {
+	return v.Token
+}
+
+// admireTokenMutationAdmireTokenAdmireTokenPayloadOrError includes the requested fields of the GraphQL interface AdmireTokenPayloadOrError.
+//
+// admireTokenMutationAdmireTokenAdmireTokenPayloadOrError is implemented by the following types:
+// admireTokenMutationAdmireTokenAdmireTokenPayload
+// admireTokenMutationAdmireTokenErrInvalidInput
+// admireTokenMutationAdmireTokenErrNotAuthorized
+// admireTokenMutationAdmireTokenErrTokenNotFound
+type admireTokenMutationAdmireTokenAdmireTokenPayloadOrError interface {
+	implementsGraphQLInterfaceadmireTokenMutationAdmireTokenAdmireTokenPayloadOrError()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() *string
+}
+
+func (v *admireTokenMutationAdmireTokenAdmireTokenPayload) implementsGraphQLInterfaceadmireTokenMutationAdmireTokenAdmireTokenPayloadOrError() {
+}
+func (v *admireTokenMutationAdmireTokenErrInvalidInput) implementsGraphQLInterfaceadmireTokenMutationAdmireTokenAdmireTokenPayloadOrError() {
+}
+func (v *admireTokenMutationAdmireTokenErrNotAuthorized) implementsGraphQLInterfaceadmireTokenMutationAdmireTokenAdmireTokenPayloadOrError() {
+}
+func (v *admireTokenMutationAdmireTokenErrTokenNotFound) implementsGraphQLInterfaceadmireTokenMutationAdmireTokenAdmireTokenPayloadOrError() {
+}
+
+func __unmarshaladmireTokenMutationAdmireTokenAdmireTokenPayloadOrError(b []byte, v *admireTokenMutationAdmireTokenAdmireTokenPayloadOrError) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "AdmireTokenPayload":
+		*v = new(admireTokenMutationAdmireTokenAdmireTokenPayload)
+		return json.Unmarshal(b, *v)
+	case "ErrInvalidInput":
+		*v = new(admireTokenMutationAdmireTokenErrInvalidInput)
+		return json.Unmarshal(b, *v)
+	case "ErrNotAuthorized":
+		*v = new(admireTokenMutationAdmireTokenErrNotAuthorized)
+		return json.Unmarshal(b, *v)
+	case "ErrTokenNotFound":
+		*v = new(admireTokenMutationAdmireTokenErrTokenNotFound)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing AdmireTokenPayloadOrError.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for admireTokenMutationAdmireTokenAdmireTokenPayloadOrError: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshaladmireTokenMutationAdmireTokenAdmireTokenPayloadOrError(v *admireTokenMutationAdmireTokenAdmireTokenPayloadOrError) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *admireTokenMutationAdmireTokenAdmireTokenPayload:
+		typename = "AdmireTokenPayload"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*admireTokenMutationAdmireTokenAdmireTokenPayload
+		}{typename, v}
+		return json.Marshal(result)
+	case *admireTokenMutationAdmireTokenErrInvalidInput:
+		typename = "ErrInvalidInput"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*admireTokenMutationAdmireTokenErrInvalidInput
+		}{typename, v}
+		return json.Marshal(result)
+	case *admireTokenMutationAdmireTokenErrNotAuthorized:
+		typename = "ErrNotAuthorized"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*admireTokenMutationAdmireTokenErrNotAuthorized
+		}{typename, v}
+		return json.Marshal(result)
+	case *admireTokenMutationAdmireTokenErrTokenNotFound:
+		typename = "ErrTokenNotFound"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*admireTokenMutationAdmireTokenErrTokenNotFound
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for admireTokenMutationAdmireTokenAdmireTokenPayloadOrError: "%T"`, v)
+	}
+}
+
+// admireTokenMutationAdmireTokenAdmireTokenPayloadToken includes the requested fields of the GraphQL type Token.
+type admireTokenMutationAdmireTokenAdmireTokenPayloadToken struct {
+	Dbid persist.DBID `json:"dbid"`
+}
+
+// GetDbid returns admireTokenMutationAdmireTokenAdmireTokenPayloadToken.Dbid, and is useful for accessing the field via an interface.
+func (v *admireTokenMutationAdmireTokenAdmireTokenPayloadToken) GetDbid() persist.DBID { return v.Dbid }
+
+// admireTokenMutationAdmireTokenErrInvalidInput includes the requested fields of the GraphQL type ErrInvalidInput.
+type admireTokenMutationAdmireTokenErrInvalidInput struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns admireTokenMutationAdmireTokenErrInvalidInput.Typename, and is useful for accessing the field via an interface.
+func (v *admireTokenMutationAdmireTokenErrInvalidInput) GetTypename() *string { return v.Typename }
+
+// GetMessage returns admireTokenMutationAdmireTokenErrInvalidInput.Message, and is useful for accessing the field via an interface.
+func (v *admireTokenMutationAdmireTokenErrInvalidInput) GetMessage() string { return v.Message }
+
+// admireTokenMutationAdmireTokenErrNotAuthorized includes the requested fields of the GraphQL type ErrNotAuthorized.
+type admireTokenMutationAdmireTokenErrNotAuthorized struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns admireTokenMutationAdmireTokenErrNotAuthorized.Typename, and is useful for accessing the field via an interface.
+func (v *admireTokenMutationAdmireTokenErrNotAuthorized) GetTypename() *string { return v.Typename }
+
+// GetMessage returns admireTokenMutationAdmireTokenErrNotAuthorized.Message, and is useful for accessing the field via an interface.
+func (v *admireTokenMutationAdmireTokenErrNotAuthorized) GetMessage() string { return v.Message }
+
+// admireTokenMutationAdmireTokenErrTokenNotFound includes the requested fields of the GraphQL type ErrTokenNotFound.
+type admireTokenMutationAdmireTokenErrTokenNotFound struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns admireTokenMutationAdmireTokenErrTokenNotFound.Typename, and is useful for accessing the field via an interface.
+func (v *admireTokenMutationAdmireTokenErrTokenNotFound) GetTypename() *string { return v.Typename }
+
+// GetMessage returns admireTokenMutationAdmireTokenErrTokenNotFound.Message, and is useful for accessing the field via an interface.
+func (v *admireTokenMutationAdmireTokenErrTokenNotFound) GetMessage() string { return v.Message }
+
+// admireTokenMutationResponse is returned by admireTokenMutation on success.
+type admireTokenMutationResponse struct {
+	AdmireToken *admireTokenMutationAdmireTokenAdmireTokenPayloadOrError `json:"-"`
+}
+
+// GetAdmireToken returns admireTokenMutationResponse.AdmireToken, and is useful for accessing the field via an interface.
+func (v *admireTokenMutationResponse) GetAdmireToken() *admireTokenMutationAdmireTokenAdmireTokenPayloadOrError {
+	return v.AdmireToken
+}
+
+func (v *admireTokenMutationResponse) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*admireTokenMutationResponse
+		AdmireToken json.RawMessage `json:"admireToken"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.admireTokenMutationResponse = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.AdmireToken
+		src := firstPass.AdmireToken
+		if len(src) != 0 && string(src) != "null" {
+			*dst = new(admireTokenMutationAdmireTokenAdmireTokenPayloadOrError)
+			err = __unmarshaladmireTokenMutationAdmireTokenAdmireTokenPayloadOrError(
+				src, *dst)
+			if err != nil {
+				return fmt.Errorf(
+					"unable to unmarshal admireTokenMutationResponse.AdmireToken: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshaladmireTokenMutationResponse struct {
+	AdmireToken json.RawMessage `json:"admireToken"`
+}
+
+func (v *admireTokenMutationResponse) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *admireTokenMutationResponse) __premarshalJSON() (*__premarshaladmireTokenMutationResponse, error) {
+	var retval __premarshaladmireTokenMutationResponse
+
+	{
+
+		dst := &retval.AdmireToken
+		src := v.AdmireToken
+		if src != nil {
+			var err error
+			*dst, err = __marshaladmireTokenMutationAdmireTokenAdmireTokenPayloadOrError(
+				src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"unable to marshal admireTokenMutationResponse.AdmireToken: %w", err)
 			}
 		}
 	}
@@ -10686,6 +10929,50 @@ func admirePostMutation(
 	var err error
 
 	var data admirePostMutationResponse
+	resp := &graphql.Response{Data: &data}
+
+	err = client.MakeRequest(
+		ctx,
+		req,
+		resp,
+	)
+
+	return &data, err
+}
+
+// The query or mutation executed by admireTokenMutation.
+const admireTokenMutation_Operation = `
+mutation admireTokenMutation ($tokenId: DBID!) {
+	admireToken(tokenId: $tokenId) {
+		__typename
+		... on Error {
+			__typename
+			message
+		}
+		... on AdmireTokenPayload {
+			token {
+				dbid
+			}
+		}
+	}
+}
+`
+
+func admireTokenMutation(
+	ctx context.Context,
+	client graphql.Client,
+	tokenId persist.DBID,
+) (*admireTokenMutationResponse, error) {
+	req := &graphql.Request{
+		OpName: "admireTokenMutation",
+		Query:  admireTokenMutation_Operation,
+		Variables: &__admireTokenMutationInput{
+			TokenId: tokenId,
+		},
+	}
+	var err error
+
+	var data admireTokenMutationResponse
 	resp := &graphql.Response{Data: &data}
 
 	err = client.MakeRequest(

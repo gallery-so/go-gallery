@@ -392,7 +392,7 @@ func (b *CountRepliesByCommentIDBatchBatchResults) Close() error {
 }
 
 const getAdmireByActorIDAndFeedEventID = `-- name: GetAdmireByActorIDAndFeedEventID :batchone
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id FROM admires WHERE actor_id = $1 AND feed_event_id = $2 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id FROM admires WHERE actor_id = $1 AND feed_event_id = $2 AND deleted = false
 `
 
 type GetAdmireByActorIDAndFeedEventIDBatchResults struct {
@@ -439,6 +439,7 @@ func (b *GetAdmireByActorIDAndFeedEventIDBatchResults) QueryRow(f func(int, Admi
 			&i.CreatedAt,
 			&i.LastUpdated,
 			&i.PostID,
+			&i.TokenID,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -452,7 +453,7 @@ func (b *GetAdmireByActorIDAndFeedEventIDBatchResults) Close() error {
 }
 
 const getAdmireByActorIDAndPostID = `-- name: GetAdmireByActorIDAndPostID :batchone
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id FROM admires WHERE actor_id = $1 AND post_id = $2 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id FROM admires WHERE actor_id = $1 AND post_id = $2 AND deleted = false
 `
 
 type GetAdmireByActorIDAndPostIDBatchResults struct {
@@ -499,6 +500,7 @@ func (b *GetAdmireByActorIDAndPostIDBatchResults) QueryRow(f func(int, Admire, e
 			&i.CreatedAt,
 			&i.LastUpdated,
 			&i.PostID,
+			&i.TokenID,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -512,7 +514,7 @@ func (b *GetAdmireByActorIDAndPostIDBatchResults) Close() error {
 }
 
 const getAdmireByAdmireIDBatch = `-- name: GetAdmireByAdmireIDBatch :batchone
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id FROM admires WHERE id = $1 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id FROM admires WHERE id = $1 AND deleted = false
 `
 
 type GetAdmireByAdmireIDBatchBatchResults struct {
@@ -553,6 +555,7 @@ func (b *GetAdmireByAdmireIDBatchBatchResults) QueryRow(f func(int, Admire, erro
 			&i.CreatedAt,
 			&i.LastUpdated,
 			&i.PostID,
+			&i.TokenID,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -566,7 +569,7 @@ func (b *GetAdmireByAdmireIDBatchBatchResults) Close() error {
 }
 
 const getAdmiresByActorIDBatch = `-- name: GetAdmiresByActorIDBatch :batchmany
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id FROM admires WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id FROM admires WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC
 `
 
 type GetAdmiresByActorIDBatchBatchResults struct {
@@ -614,6 +617,7 @@ func (b *GetAdmiresByActorIDBatchBatchResults) Query(f func(int, []Admire, error
 					&i.CreatedAt,
 					&i.LastUpdated,
 					&i.PostID,
+					&i.TokenID,
 				); err != nil {
 					return err
 				}
@@ -3808,7 +3812,7 @@ func (b *GetWalletsByUserIDBatchBatchResults) Close() error {
 }
 
 const paginateAdmiresByFeedEventIDBatch = `-- name: PaginateAdmiresByFeedEventIDBatch :batchmany
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id FROM admires WHERE feed_event_id = $1 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id FROM admires WHERE feed_event_id = $1 AND deleted = false
     AND (created_at, id) < ($2, $3) AND (created_at, id) > ($4, $5)
     ORDER BY CASE WHEN $6::bool THEN (created_at, id) END ASC,
              CASE WHEN NOT $6::bool THEN (created_at, id) END DESC
@@ -3876,6 +3880,7 @@ func (b *PaginateAdmiresByFeedEventIDBatchBatchResults) Query(f func(int, []Admi
 					&i.CreatedAt,
 					&i.LastUpdated,
 					&i.PostID,
+					&i.TokenID,
 				); err != nil {
 					return err
 				}
@@ -3895,7 +3900,7 @@ func (b *PaginateAdmiresByFeedEventIDBatchBatchResults) Close() error {
 }
 
 const paginateAdmiresByPostIDBatch = `-- name: PaginateAdmiresByPostIDBatch :batchmany
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id FROM admires WHERE post_id = $1 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id FROM admires WHERE post_id = $1 AND deleted = false
     AND (created_at, id) < ($2, $3) AND (created_at, id) > ($4, $5)
     ORDER BY CASE WHEN $6::bool THEN (created_at, id) END ASC,
              CASE WHEN NOT $6::bool THEN (created_at, id) END DESC
@@ -3963,6 +3968,7 @@ func (b *PaginateAdmiresByPostIDBatchBatchResults) Query(f func(int, []Admire, e
 					&i.CreatedAt,
 					&i.LastUpdated,
 					&i.PostID,
+					&i.TokenID,
 				); err != nil {
 					return err
 				}

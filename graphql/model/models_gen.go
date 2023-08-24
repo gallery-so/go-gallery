@@ -31,8 +31,13 @@ type AdmirePostPayloadOrError interface {
 	IsAdmirePostPayloadOrError()
 }
 
+<<<<<<< HEAD
 type AdmireSource interface {
 	IsAdmireSource()
+=======
+type AdmireTokenPayloadOrError interface {
+	IsAdmireTokenPayloadOrError()
+>>>>>>> main
 }
 
 type AuthorizationError interface {
@@ -488,6 +493,14 @@ type AdmirePostPayload struct {
 }
 
 func (AdmirePostPayload) IsAdmirePostPayloadOrError() {}
+
+type AdmireTokenPayload struct {
+	Viewer *Viewer `json:"viewer"`
+	Token  *Token  `json:"token"`
+	Admire *Admire `json:"admire"`
+}
+
+func (AdmireTokenPayload) IsAdmireTokenPayloadOrError() {}
 
 type AudioMedia struct {
 	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`
@@ -1043,6 +1056,7 @@ func (ErrInvalidInput) IsFollowAllSocialConnectionsPayloadOrError()      {}
 func (ErrInvalidInput) IsSetProfileImagePayloadOrError()                 {}
 func (ErrInvalidInput) IsPostTokensPayloadOrError()                      {}
 func (ErrInvalidInput) IsAdmirePostPayloadOrError()                      {}
+func (ErrInvalidInput) IsAdmireTokenPayloadOrError()                     {}
 func (ErrInvalidInput) IsCommentOnPostPayloadOrError()                   {}
 func (ErrInvalidInput) IsDeletePostPayloadOrError()                      {}
 
@@ -1125,6 +1139,7 @@ func (ErrNotAuthorized) IsGenerateQRCodeLoginTokenPayloadOrError()             {
 func (ErrNotAuthorized) IsSetProfileImagePayloadOrError()                      {}
 func (ErrNotAuthorized) IsPostTokensPayloadOrError()                           {}
 func (ErrNotAuthorized) IsAdmirePostPayloadOrError()                           {}
+func (ErrNotAuthorized) IsAdmireTokenPayloadOrError()                          {}
 func (ErrNotAuthorized) IsCommentOnPostPayloadOrError()                        {}
 func (ErrNotAuthorized) IsDeletePostPayloadOrError()                           {}
 
@@ -1174,6 +1189,7 @@ func (ErrTokenNotFound) IsError()                         {}
 func (ErrTokenNotFound) IsCollectionTokenByIDOrError()    {}
 func (ErrTokenNotFound) IsViewTokenPayloadOrError()       {}
 func (ErrTokenNotFound) IsSetProfileImagePayloadOrError() {}
+func (ErrTokenNotFound) IsAdmireTokenPayloadOrError()     {}
 
 type ErrUnknownAction struct {
 	Message string `json:"message"`

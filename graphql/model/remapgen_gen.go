@@ -28,8 +28,13 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+<<<<<<< HEAD
 	"AdmireSource": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(AdmireSource)
+=======
+	"AdmireTokenPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(AdmireTokenPayloadOrError)
+>>>>>>> main
 		return obj, ok
 	},
 

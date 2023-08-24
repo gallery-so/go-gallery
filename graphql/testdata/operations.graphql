@@ -581,6 +581,20 @@ mutation postTokens($input: PostTokensInput!) {
   }
 }
 
+mutation admireTokenMutation($tokenId: DBID!) {
+  admireToken(tokenId: $tokenId) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on AdmireTokenPayload {
+      token {
+        dbid
+      }
+    }
+  }
+}
+
 mutation admirePostMutation($postId: DBID!) {
   admirePost(postId: $postId) {
     ... on Error {

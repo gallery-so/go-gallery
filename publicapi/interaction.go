@@ -722,6 +722,32 @@ func (api InteractionAPI) AdmireFeedEvent(ctx context.Context, feedEventID persi
 	return admireID, err
 }
 
+func (api InteractionAPI) AdmireToken(ctx context.Context, tokenID persist.DBID) (persist.DBID, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"tokenID": validate.WithTag(tokenID, "required"),
+	}); err != nil {
+		return "", err
+	}
+
+	_, err := api.loaders.TokenByTokenID.Load(tokenID)
+	if err != nil {
+		return "", err
+	}
+
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	admireID, err := api.repos.AdmireRepository.CreateTokenAdmire(ctx, tokenID, userID)
+	if err != nil {
+		return "", err
+	}
+
+	return admireID, err
+}
+
 func (api InteractionAPI) AdmirePost(ctx context.Context, postID persist.DBID) (persist.DBID, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
