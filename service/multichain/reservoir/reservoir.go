@@ -93,23 +93,26 @@ func (e ErrCollectionNotFoundByAddress) Error() string {
 */
 
 type Token struct {
-	Contract   persist.Address       `json:"contract"`
-	TokenID    TokenID               `json:"tokenId"`
-	Kind       string                `json:"kind"`
-	Name       string                `json:"name"`
-	Metadata   persist.TokenMetadata `json:"metadata"`
-	Media      string                `json:"media"`
-	Image      string                `json:"image"`
-	ImageSmall string                `json:"imageSmall"`
-	ImageLarge string                `json:"imageLarge"`
-	Collection Collection            `json:"collection"`
+	Contract    persist.Address       `json:"contract"`
+	TokenID     TokenID               `json:"tokenId"`
+	Kind        string                `json:"kind"`
+	Name        string                `json:"name"`
+	Description string                `json:"description"`
+	Metadata    persist.TokenMetadata `json:"metadata"`
+	Media       string                `json:"media"`
+	Image       string                `json:"image"`
+	ImageSmall  string                `json:"imageSmall"`
+	ImageLarge  string                `json:"imageLarge"`
+	Collection  Collection            `json:"collection"`
 }
 
 type Collection struct {
-	ID                        string `json:"id"`
-	Name                      string `json:"name"`
-	ImageURL                  string `json:"imageUrl"`
-	OpenseaVerificationStatus string `json:"openseaVerificationStatus"`
+	ID                        string          `json:"id"`
+	Name                      string          `json:"name"`
+	Description               string          `json:"description"`
+	ImageURL                  string          `json:"imageUrl"`
+	Creator                   persist.Address `json:"creator"`
+	OpenseaVerificationStatus string          `json:"openseaVerificationStatus"`
 }
 
 type Ownership struct {
@@ -336,6 +339,25 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti mu
 	return meta, nil
 }
 
+func (d *Provider) GetTokenDescriptorsByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (multichain.ChainAgnosticTokenDescriptors, multichain.ChainAgnosticContractDescriptors, error) {
+	token, err := d.fetchToken(ctx, ti)
+	if err != nil {
+		return multichain.ChainAgnosticTokenDescriptors{}, multichain.ChainAgnosticContractDescriptors{}, err
+	}
+	c, err := d.fetchCollection(ctx, token.Contract, true)
+
+	return multichain.ChainAgnosticTokenDescriptors{
+			Name:        token.Name,
+			Description: token.Description,
+		}, multichain.ChainAgnosticContractDescriptors{
+			Name:            c.Name,
+			ProfileImageURL: c.ImageURL,
+			Description:     c.Description,
+			CreatorAddress:  c.Creator,
+		}, nil
+
+}
+
 func (d *Provider) fetchReservoirMetadata(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, refresh bool) (persist.TokenMetadata, error) {
 	rtid := fmt.Sprintf("%s:%s", ti.ContractAddress, ti.TokenID.Base10String())
 	if refresh {
@@ -361,10 +383,23 @@ func (d *Provider) fetchReservoirMetadata(ctx context.Context, ti multichain.Cha
 		}
 	}
 
+	token, err := d.fetchToken(ctx, ti)
+	if err != nil {
+		return nil, err
+	}
+	meta := token.Metadata
+	if _, ok := util.FindFirstFieldFromMap(meta, "image", "image_url", "imageURL").(string); !ok {
+		meta["image_url"] = token.Image
+	}
+	return meta, nil
+}
+
+func (d *Provider) fetchToken(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (Token, error) {
+	rtid := fmt.Sprintf("%s:%s", ti.ContractAddress, ti.TokenID.Base10String())
 	u := fmt.Sprintf("%s/tokens/v6", d.apiURL)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
-		return nil, err
+		return Token{}, err
 	}
 
 	req.Header.Add("x-api-key", d.apiKey)
@@ -373,22 +408,18 @@ func (d *Provider) fetchReservoirMetadata(ctx context.Context, ti multichain.Cha
 
 	resp, err := d.httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return Token{}, err
 	}
 
 	var res TokensResponse
 	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
-		return nil, err
+		return Token{}, err
 	}
 
 	if len(res.Tokens) == 0 {
-		return nil, ErrTokenNotFoundByIdentifiers{ContractAddress: ti.ContractAddress, TokenID: TokenID(ti.TokenID.Base10String())}
+		return Token{}, ErrTokenNotFoundByIdentifiers{ContractAddress: ti.ContractAddress, TokenID: TokenID(ti.TokenID.Base10String())}
 	}
-	meta := res.Tokens[0].Token.Metadata
-	if _, ok := util.FindFirstFieldFromMap(meta, "image", "image_url", "imageURL").(string); !ok {
-		meta["image_url"] = res.Tokens[0].Token.Image
-	}
-	return meta, nil
+	return res.Tokens[0].Token, nil
 }
 
 func (d *Provider) fetchCollection(ctx context.Context, address persist.Address, refresh bool) (Collection, error) {
