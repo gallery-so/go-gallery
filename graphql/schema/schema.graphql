@@ -826,7 +826,7 @@ union MentionEntity = GalleryUser | Community
 
 type Mention @goEmbedHelper {
   entity: MentionEntity @goField(forceResolver: true)
-  index: Interval
+  interval: Interval
 }
 
 type Interval {
@@ -860,12 +860,12 @@ type FeedEventAdmireEdge {
 }
 
 type PostAdmiresConnection {
-  edges: [PostAdmireEdge] @deprecated(reason: "Use generic admires connection instead")
+  edges: [PostAdmireEdge]
   pageInfo: PageInfo!
 }
 
 type FeedEventAdmiresConnection {
-  edges: [FeedEventAdmireEdge] @deprecated(reason: "Use generic admires connection instead")
+  edges: [FeedEventAdmireEdge]
   pageInfo: PageInfo!
 }
 
@@ -885,7 +885,7 @@ type CommentsConnection {
 }
 
 type PostCommentsConnection {
-  edges: [PostCommentEdge] @deprecated(reason: "Use generic comments connection instead")
+  edges: [PostCommentEdge]
   pageInfo: PageInfo!
 }
 
@@ -895,7 +895,7 @@ type FeedEventCommentEdge {
 }
 
 type FeedEventCommentsConnection {
-  edges: [FeedEventCommentEdge] @deprecated(reason: "Use generic comments connection instead")
+  edges: [FeedEventCommentEdge]
   pageInfo: PageInfo!
 }
 
@@ -2485,7 +2485,7 @@ type DeletePostPayload {
 union DeletePostPayloadOrError = DeletePostPayload | ErrInvalidInput | ErrNotAuthorized
 
 input MentionInput {
-  index: IntervalInput
+  interval: IntervalInput
   userId: DBID
   communityId: DBID
 }

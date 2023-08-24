@@ -997,9 +997,9 @@ func mentionInputsToMentions(ctx context.Context, ms []*model.MentionInput, quer
 			return nil, fmt.Errorf("mention input cannot have both communityID and userID set")
 		}
 		mention := db.Mention{}
-		if m.Index != nil {
-			mention.Length = sql.NullInt32{Int32: int32(m.Index.Length), Valid: true}
-			mention.Start = sql.NullInt32{Int32: int32(m.Index.Start), Valid: true}
+		if m.Interval != nil {
+			mention.Length = sql.NullInt32{Int32: int32(m.Interval.Length), Valid: true}
+			mention.Start = sql.NullInt32{Int32: int32(m.Interval.Start), Valid: true}
 
 		}
 		if m.CommunityID != nil {

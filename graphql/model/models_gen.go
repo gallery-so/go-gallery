@@ -1543,12 +1543,12 @@ func (MembershipTier) IsNode() {}
 
 type Mention struct {
 	HelperMentionData
-	Entity MentionEntity `json:"entity"`
-	Index  *Interval     `json:"index"`
+	Entity   MentionEntity `json:"entity"`
+	Interval *Interval     `json:"interval"`
 }
 
 type MentionInput struct {
-	Index       *IntervalInput `json:"index"`
+	Interval    *IntervalInput `json:"interval"`
 	UserID      *persist.DBID  `json:"userId"`
 	CommunityID *persist.DBID  `json:"communityId"`
 }

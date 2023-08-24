@@ -762,8 +762,8 @@ type ComplexityRoot struct {
 	}
 
 	Mention struct {
-		Entity func(childComplexity int) int
-		Index  func(childComplexity int) int
+		Entity   func(childComplexity int) int
+		Interval func(childComplexity int) int
 	}
 
 	MerchDiscountCode struct {
@@ -4387,12 +4387,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mention.Entity(childComplexity), true
 
-	case "Mention.index":
-		if e.complexity.Mention.Index == nil {
+	case "Mention.interval":
+		if e.complexity.Mention.Interval == nil {
 			break
 		}
 
-		return e.complexity.Mention.Index(childComplexity), true
+		return e.complexity.Mention.Interval(childComplexity), true
 
 	case "MerchDiscountCode.code":
 		if e.complexity.MerchDiscountCode.Code == nil {
@@ -8989,7 +8989,7 @@ union MentionEntity = GalleryUser | Community
 
 type Mention @goEmbedHelper {
   entity: MentionEntity @goField(forceResolver: true)
-  index: Interval
+  interval: Interval
 }
 
 type Interval {
@@ -9023,12 +9023,12 @@ type FeedEventAdmireEdge {
 }
 
 type PostAdmiresConnection {
-  edges: [PostAdmireEdge] @deprecated(reason: "Use generic admires connection instead")
+  edges: [PostAdmireEdge]
   pageInfo: PageInfo!
 }
 
 type FeedEventAdmiresConnection {
-  edges: [FeedEventAdmireEdge] @deprecated(reason: "Use generic admires connection instead")
+  edges: [FeedEventAdmireEdge]
   pageInfo: PageInfo!
 }
 
@@ -9048,7 +9048,7 @@ type CommentsConnection {
 }
 
 type PostCommentsConnection {
-  edges: [PostCommentEdge] @deprecated(reason: "Use generic comments connection instead")
+  edges: [PostCommentEdge]
   pageInfo: PageInfo!
 }
 
@@ -9058,7 +9058,7 @@ type FeedEventCommentEdge {
 }
 
 type FeedEventCommentsConnection {
-  edges: [FeedEventCommentEdge] @deprecated(reason: "Use generic comments connection instead")
+  edges: [FeedEventCommentEdge]
   pageInfo: PageInfo!
 }
 
@@ -10648,7 +10648,7 @@ type DeletePostPayload {
 union DeletePostPayloadOrError = DeletePostPayload | ErrInvalidInput | ErrNotAuthorized
 
 input MentionInput {
-  index: IntervalInput
+  interval: IntervalInput
   userId: DBID
   communityId: DBID
 }
@@ -18512,8 +18512,8 @@ func (ec *executionContext) fieldContext_Comment_mentions(ctx context.Context, f
 			switch field.Name {
 			case "entity":
 				return ec.fieldContext_Mention_entity(ctx, field)
-			case "index":
-				return ec.fieldContext_Mention_index(ctx, field)
+			case "interval":
+				return ec.fieldContext_Mention_interval(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Mention", field.Name)
 		},
@@ -31102,8 +31102,8 @@ func (ec *executionContext) fieldContext_Mention_entity(ctx context.Context, fie
 	return fc, nil
 }
 
-func (ec *executionContext) _Mention_index(ctx context.Context, field graphql.CollectedField, obj *model.Mention) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Mention_index(ctx, field)
+func (ec *executionContext) _Mention_interval(ctx context.Context, field graphql.CollectedField, obj *model.Mention) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mention_interval(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -31116,7 +31116,7 @@ func (ec *executionContext) _Mention_index(ctx context.Context, field graphql.Co
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Index, nil
+		return obj.Interval, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -31130,7 +31130,7 @@ func (ec *executionContext) _Mention_index(ctx context.Context, field graphql.Co
 	return ec.marshalOInterval2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐInterval(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Mention_index(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Mention_interval(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Mention",
 		Field:      field,
@@ -38377,8 +38377,8 @@ func (ec *executionContext) fieldContext_Post_mentions(ctx context.Context, fiel
 			switch field.Name {
 			case "entity":
 				return ec.fieldContext_Mention_entity(ctx, field)
-			case "index":
-				return ec.fieldContext_Mention_index(ctx, field)
+			case "interval":
+				return ec.fieldContext_Mention_interval(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Mention", field.Name)
 		},
@@ -58259,22 +58259,22 @@ func (ec *executionContext) unmarshalInputMentionInput(ctx context.Context, obj 
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"index", "userId", "communityId"}
+	fieldsInOrder := [...]string{"interval", "userId", "communityId"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
 			continue
 		}
 		switch k {
-		case "index":
+		case "interval":
 			var err error
 
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("index"))
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("interval"))
 			data, err := ec.unmarshalOIntervalInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐIntervalInput(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.Index = data
+			it.Interval = data
 		case "userId":
 			var err error
 
@@ -68370,9 +68370,9 @@ func (ec *executionContext) _Mention(ctx context.Context, sel ast.SelectionSet, 
 				return innerFunc(ctx)
 
 			})
-		case "index":
+		case "interval":
 
-			out.Values[i] = ec._Mention_index(ctx, field, obj)
+			out.Values[i] = ec._Mention_interval(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))

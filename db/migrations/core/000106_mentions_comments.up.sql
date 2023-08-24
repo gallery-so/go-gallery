@@ -17,6 +17,12 @@ create table if not exists mentions (
   deleted bool default false not null
 );
 
+create index if not exists mentions_post_id_idx on mentions(post_id);
+create index if not exists mentions_comment_id_idx on mentions(comment_id);
+
+-- if start exists, then length must also exist
+alter table mentions add constraint mentions_start_length_check check ((start is null and length is null) or (start is not null and length is not null));
+
 alter table events add column mention_id varchar(255) references mentions(id);
 alter table notifications add column mention_id varchar(255) references mentions(id);
 

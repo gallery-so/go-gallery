@@ -2344,7 +2344,7 @@ func mediaToDimensions(dimensions persist.Dimensions) *model.MediaDimensions {
 func mentionToModel(ctx context.Context, mention db.Mention) *model.Mention {
 	m := &model.Mention{}
 	if mention.Start.Valid {
-		m.Index = &model.Interval{
+		m.Interval = &model.Interval{
 			Start:  int(mention.Start.Int32),
 			Length: int(mention.Length.Int32),
 		}

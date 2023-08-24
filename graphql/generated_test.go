@@ -310,13 +310,13 @@ type MagicLinkAuth struct {
 func (v *MagicLinkAuth) GetToken() string { return v.Token }
 
 type MentionInput struct {
-	Index       *IntervalInput `json:"index"`
+	Interval    *IntervalInput `json:"interval"`
 	UserId      *persist.DBID  `json:"userId"`
 	CommunityId *persist.DBID  `json:"communityId"`
 }
 
-// GetIndex returns MentionInput.Index, and is useful for accessing the field via an interface.
-func (v *MentionInput) GetIndex() *IntervalInput { return v.Index }
+// GetInterval returns MentionInput.Interval, and is useful for accessing the field via an interface.
+func (v *MentionInput) GetInterval() *IntervalInput { return v.Interval }
 
 // GetUserId returns MentionInput.UserId, and is useful for accessing the field via an interface.
 func (v *MentionInput) GetUserId() *persist.DBID { return v.UserId }
