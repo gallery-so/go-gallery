@@ -291,6 +291,17 @@ func (v *GnosisSafeAuth) GetAddress() string { return v.Address }
 // GetNonce returns GnosisSafeAuth.Nonce, and is useful for accessing the field via an interface.
 func (v *GnosisSafeAuth) GetNonce() string { return v.Nonce }
 
+type IntervalInput struct {
+	Start  int `json:"start"`
+	Length int `json:"length"`
+}
+
+// GetStart returns IntervalInput.Start, and is useful for accessing the field via an interface.
+func (v *IntervalInput) GetStart() int { return v.Start }
+
+// GetLength returns IntervalInput.Length, and is useful for accessing the field via an interface.
+func (v *IntervalInput) GetLength() int { return v.Length }
+
 type MagicLinkAuth struct {
 	Token string `json:"token"`
 }
@@ -299,9 +310,13 @@ type MagicLinkAuth struct {
 func (v *MagicLinkAuth) GetToken() string { return v.Token }
 
 type MentionInput struct {
-	UserId      *persist.DBID `json:"userId"`
-	CommunityId *persist.DBID `json:"communityId"`
+	Interval    *IntervalInput `json:"interval"`
+	UserId      *persist.DBID  `json:"userId"`
+	CommunityId *persist.DBID  `json:"communityId"`
 }
+
+// GetInterval returns MentionInput.Interval, and is useful for accessing the field via an interface.
+func (v *MentionInput) GetInterval() *IntervalInput { return v.Interval }
 
 // GetUserId returns MentionInput.UserId, and is useful for accessing the field via an interface.
 func (v *MentionInput) GetUserId() *persist.DBID { return v.UserId }

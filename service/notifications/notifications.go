@@ -848,6 +848,7 @@ func addNotification(ctx context.Context, notif db.Notification, queries *db.Que
 			FeedEvent: util.ToNullString(notif.FeedEventID.String(), true),
 			Post:      util.ToNullString(notif.PostID.String(), true),
 			Comment:   util.ToNullString(notif.CommentID.String(), true),
+			MentionID: notif.MentionID,
 		})
 	case persist.ActionMentionCommunity:
 		return queries.CreateContractNotification(ctx, db.CreateContractNotificationParams{
@@ -859,6 +860,7 @@ func addNotification(ctx context.Context, notif db.Notification, queries *db.Que
 			FeedEvent:  util.ToNullString(notif.FeedEventID.String(), true),
 			Post:       util.ToNullString(notif.PostID.String(), true),
 			Comment:    util.ToNullString(notif.CommentID.String(), true),
+			MentionID:  notif.MentionID,
 			ContractID: notif.ContractID,
 		})
 	default:

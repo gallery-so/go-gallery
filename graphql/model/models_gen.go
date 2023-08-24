@@ -63,10 +63,6 @@ type CommentSource interface {
 	IsCommentSource()
 }
 
-type CommentsConnection interface {
-	IsCommentsConnection()
-}
-
 type CommunityByAddressOrError interface {
 	IsCommunityByAddressOrError()
 }
@@ -168,6 +164,10 @@ type Media interface {
 
 type MediaSubtype interface {
 	IsMediaSubtype()
+}
+
+type MentionEntity interface {
+	IsMentionEntity()
 }
 
 type MentionSource interface {
@@ -648,20 +648,26 @@ func (CollectorsNoteAddedToTokenFeedEventData) IsFeedEventData() {}
 
 type Comment struct {
 	HelperCommentData
-	Dbid         persist.DBID       `json:"dbid"`
-	CreationTime *time.Time         `json:"creationTime"`
-	LastUpdated  *time.Time         `json:"lastUpdated"`
-	ReplyTo      *Comment           `json:"replyTo"`
-	Commenter    *GalleryUser       `json:"commenter"`
-	Comment      *string            `json:"comment"`
-	Replies      CommentsConnection `json:"replies"`
-	Source       CommentSource      `json:"source"`
-	Deleted      *bool              `json:"deleted"`
+	Dbid         persist.DBID        `json:"dbid"`
+	CreationTime *time.Time          `json:"creationTime"`
+	LastUpdated  *time.Time          `json:"lastUpdated"`
+	ReplyTo      *Comment            `json:"replyTo"`
+	Commenter    *GalleryUser        `json:"commenter"`
+	Comment      *string             `json:"comment"`
+	Mentions     []*Mention          `json:"mentions"`
+	Replies      *CommentsConnection `json:"replies"`
+	Source       CommentSource       `json:"source"`
+	Deleted      *bool               `json:"deleted"`
 }
 
 func (Comment) IsNode()          {}
 func (Comment) IsInteraction()   {}
 func (Comment) IsMentionSource() {}
+
+type CommentEdge struct {
+	Node   *Comment `json:"node"`
+	Cursor *string  `json:"cursor"`
+}
 
 type CommentOnFeedEventPayload struct {
 	Viewer         *Viewer    `json:"viewer"`
@@ -680,6 +686,11 @@ type CommentOnPostPayload struct {
 }
 
 func (CommentOnPostPayload) IsCommentOnPostPayloadOrError() {}
+
+type CommentsConnection struct {
+	Edges    []*CommentEdge `json:"edges"`
+	PageInfo *PageInfo      `json:"pageInfo"`
+}
 
 type CommunitiesConnection struct {
 	Edges    []*CommunityEdge `json:"edges"`
@@ -710,6 +721,7 @@ type Community struct {
 
 func (Community) IsNode()                      {}
 func (Community) IsCommunityByAddressOrError() {}
+func (Community) IsMentionEntity()             {}
 
 type CommunityEdge struct {
 	Node   *Community `json:"node"`
@@ -1229,14 +1241,14 @@ type FeedEdge struct {
 }
 
 type FeedEvent struct {
-	Dbid                  persist.DBID                     `json:"dbid"`
-	EventData             FeedEventData                    `json:"eventData"`
-	Admires               *FeedEventAdmiresConnection      `json:"admires"`
-	Comments              *FeedEventCommentsConnection     `json:"comments"`
-	Caption               *string                          `json:"caption"`
-	Interactions          *FeedEventInteractionsConnection `json:"interactions"`
-	ViewerAdmire          *Admire                          `json:"viewerAdmire"`
-	HasViewerAdmiredEvent *bool                            `json:"hasViewerAdmiredEvent"`
+	Dbid                  persist.DBID                 `json:"dbid"`
+	EventData             FeedEventData                `json:"eventData"`
+	Admires               *FeedEventAdmiresConnection  `json:"admires"`
+	Comments              *FeedEventCommentsConnection `json:"comments"`
+	Caption               *string                      `json:"caption"`
+	Interactions          *InteractionsConnection      `json:"interactions"`
+	ViewerAdmire          *Admire                      `json:"viewerAdmire"`
+	HasViewerAdmiredEvent *bool                        `json:"hasViewerAdmiredEvent"`
 }
 
 func (FeedEvent) IsAdmireSource()         {}
@@ -1247,9 +1259,8 @@ func (FeedEvent) IsFeedEventByIDOrError() {}
 func (FeedEvent) IsEntity()               {}
 
 type FeedEventAdmireEdge struct {
-	Node   *Admire    `json:"node"`
-	Event  *FeedEvent `json:"event"`
-	Cursor *string    `json:"cursor"`
+	Node   *Admire `json:"node"`
+	Cursor *string `json:"cursor"`
 }
 
 type FeedEventAdmiresConnection struct {
@@ -1258,27 +1269,13 @@ type FeedEventAdmiresConnection struct {
 }
 
 type FeedEventCommentEdge struct {
-	Node   *Comment   `json:"node"`
-	Event  *FeedEvent `json:"event"`
-	Cursor *string    `json:"cursor"`
+	Node   *Comment `json:"node"`
+	Cursor *string  `json:"cursor"`
 }
 
 type FeedEventCommentsConnection struct {
 	Edges    []*FeedEventCommentEdge `json:"edges"`
 	PageInfo *PageInfo               `json:"pageInfo"`
-}
-
-func (FeedEventCommentsConnection) IsCommentsConnection() {}
-
-type FeedEventInteractionsConnection struct {
-	Edges    []*FeedEventInteractionsEdge `json:"edges"`
-	PageInfo *PageInfo                    `json:"pageInfo"`
-}
-
-type FeedEventInteractionsEdge struct {
-	Node   Interaction `json:"node"`
-	Event  *FeedEvent  `json:"event"`
-	Cursor *string     `json:"cursor"`
 }
 
 type FollowAllSocialConnectionsPayload struct {
@@ -1392,6 +1389,7 @@ func (GalleryUser) IsGalleryUserOrAddress()              {}
 func (GalleryUser) IsUserByUsernameOrError()             {}
 func (GalleryUser) IsUserByIDOrError()                   {}
 func (GalleryUser) IsUserByAddressOrError()              {}
+func (GalleryUser) IsMentionEntity()                     {}
 func (GalleryUser) IsAddRolesToUserPayloadOrError()      {}
 func (GalleryUser) IsRevokeRolesFromUserPayloadOrError() {}
 
@@ -1455,6 +1453,26 @@ type ImageMedia struct {
 
 func (ImageMedia) IsMediaSubtype() {}
 func (ImageMedia) IsMedia()        {}
+
+type InteractionsConnection struct {
+	Edges    []*InteractionsEdge `json:"edges"`
+	PageInfo *PageInfo           `json:"pageInfo"`
+}
+
+type InteractionsEdge struct {
+	Node   Interaction `json:"node"`
+	Cursor *string     `json:"cursor"`
+}
+
+type Interval struct {
+	Start  int `json:"start"`
+	Length int `json:"length"`
+}
+
+type IntervalInput struct {
+	Start  int `json:"start"`
+	Length int `json:"length"`
+}
 
 type InvalidMedia struct {
 	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`
@@ -1523,9 +1541,16 @@ type MembershipTier struct {
 
 func (MembershipTier) IsNode() {}
 
+type Mention struct {
+	HelperMentionData
+	Entity   MentionEntity `json:"entity"`
+	Interval *Interval     `json:"interval"`
+}
+
 type MentionInput struct {
-	UserID      *persist.DBID `json:"userId"`
-	CommunityID *persist.DBID `json:"communityId"`
+	Interval    *IntervalInput `json:"interval"`
+	UserID      *persist.DBID  `json:"userId"`
+	CommunityID *persist.DBID  `json:"communityId"`
 }
 
 type MerchDiscountCode struct {
@@ -1643,15 +1668,16 @@ func (PDFMedia) IsMedia()        {}
 
 type Post struct {
 	HelperPostData
-	Dbid         persist.DBID                `json:"dbid"`
-	Author       *GalleryUser                `json:"author"`
-	CreationTime *time.Time                  `json:"creationTime"`
-	Tokens       []*Token                    `json:"tokens"`
-	Caption      *string                     `json:"caption"`
-	Admires      *PostAdmiresConnection      `json:"admires"`
-	Comments     *PostCommentsConnection     `json:"comments"`
-	Interactions *PostInteractionsConnection `json:"interactions"`
-	ViewerAdmire *Admire                     `json:"viewerAdmire"`
+	Dbid         persist.DBID            `json:"dbid"`
+	Author       *GalleryUser            `json:"author"`
+	CreationTime *time.Time              `json:"creationTime"`
+	Tokens       []*Token                `json:"tokens"`
+	Caption      *string                 `json:"caption"`
+	Mentions     []*Mention              `json:"mentions"`
+	Admires      *PostAdmiresConnection  `json:"admires"`
+	Comments     *PostCommentsConnection `json:"comments"`
+	Interactions *InteractionsConnection `json:"interactions"`
+	ViewerAdmire *Admire                 `json:"viewerAdmire"`
 }
 
 func (Post) IsAdmireSource()     {}
@@ -1665,7 +1691,6 @@ func (Post) IsEntity()           {}
 type PostAdmireEdge struct {
 	Node   *Admire `json:"node"`
 	Cursor *string `json:"cursor"`
-	Post   *Post   `json:"post"`
 }
 
 type PostAdmiresConnection struct {
@@ -1676,7 +1701,6 @@ type PostAdmiresConnection struct {
 type PostCommentEdge struct {
 	Node   *Comment `json:"node"`
 	Cursor *string  `json:"cursor"`
-	Post   *Post    `json:"post"`
 }
 
 type PostCommentsConnection struct {
@@ -1684,22 +1708,9 @@ type PostCommentsConnection struct {
 	PageInfo *PageInfo          `json:"pageInfo"`
 }
 
-func (PostCommentsConnection) IsCommentsConnection() {}
-
 type PostEdge struct {
 	Node   PostOrError `json:"node"`
 	Cursor *string     `json:"cursor"`
-}
-
-type PostInteractionsConnection struct {
-	Edges    []*PostInteractionsEdge `json:"edges"`
-	PageInfo *PageInfo               `json:"pageInfo"`
-}
-
-type PostInteractionsEdge struct {
-	Node   Interaction `json:"node"`
-	Cursor *string     `json:"cursor"`
-	Post   *Post       `json:"post"`
 }
 
 type PostTokensInput struct {

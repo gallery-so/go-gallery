@@ -12,10 +12,11 @@ import (
 
 // CommentRepository represents an comment repository in the postgres database
 type CommentRepository struct {
-	db         *sql.DB
-	queries    *db.Queries
-	createStmt *sql.Stmt
-	deleteStmt *sql.Stmt
+	db                *sql.DB
+	queries           *db.Queries
+	createStmt        *sql.Stmt
+	createMentionStmt *sql.Stmt
+	deleteStmt        *sql.Stmt
 }
 
 // NewCommentRepository creates a new postgres repository for interacting with comments
@@ -26,18 +27,22 @@ func NewCommentRepository(db *sql.DB, queries *db.Queries) *CommentRepository {
 	createStmt, err := db.PrepareContext(ctx, `INSERT INTO comments (ID, FEED_EVENT_ID, POST_ID, ACTOR_ID, REPLY_TO, COMMENT) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ID;`)
 	checkNoErr(err)
 
+	createMentionStmt, err := db.PrepareContext(ctx, `INSERT INTO mentions (ID, COMMENT_ID, USER_ID, CONTRACT_ID, START, LENGTH) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ID;`)
+	checkNoErr(err)
+
 	deleteStmt, err := db.PrepareContext(ctx, `UPDATE comments SET REMOVED = TRUE, COMMENT = 'comment removed' WHERE ID = $1;`)
 	checkNoErr(err)
 
 	return &CommentRepository{
-		db:         db,
-		queries:    queries,
-		createStmt: createStmt,
-		deleteStmt: deleteStmt,
+		db:                db,
+		queries:           queries,
+		createStmt:        createStmt,
+		createMentionStmt: createMentionStmt,
+		deleteStmt:        deleteStmt,
 	}
 }
 
-func (a *CommentRepository) CreateComment(ctx context.Context, feedEventID, postID, actorID persist.DBID, replyToID *persist.DBID, comment string) (persist.DBID, error) {
+func (a *CommentRepository) CreateComment(ctx context.Context, feedEventID, postID, actorID persist.DBID, replyToID *persist.DBID, comment string, mentions []db.Mention) (persist.DBID, []db.Mention, error) {
 
 	var feedEventString sql.NullString
 	if feedEventID != "" {
@@ -55,12 +60,48 @@ func (a *CommentRepository) CreateComment(ctx context.Context, feedEventID, post
 		}
 	}
 
-	var resultID persist.DBID
-	err := a.createStmt.QueryRowContext(ctx, persist.GenerateID(), feedEventString, postString, actorID, replyToID, comment).Scan(&resultID)
+	tx, err := a.db.BeginTx(ctx, nil)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
-	return resultID, nil
+	defer tx.Rollback()
+
+	var resultID persist.DBID
+	err = tx.StmtContext(ctx, a.createStmt).QueryRowContext(ctx, persist.GenerateID(), feedEventString, postString, actorID, replyToID, comment).Scan(&resultID)
+	if err != nil {
+		return "", nil, err
+	}
+
+	ms := make([]db.Mention, len(mentions))
+	cm := tx.StmtContext(ctx, a.createMentionStmt)
+	for i, m := range mentions {
+		var userID, contractID sql.NullString
+		if m.UserID != "" {
+			userID = sql.NullString{
+				String: m.UserID.String(),
+				Valid:  true,
+			}
+		} else if m.ContractID != "" {
+			contractID = sql.NullString{
+				String: m.ContractID.String(),
+				Valid:  true,
+			}
+		}
+		var mid persist.DBID
+		err = cm.QueryRowContext(ctx, persist.GenerateID(), resultID, userID, contractID, m.Start, m.Length).Scan(&mid)
+		if err != nil {
+			return "", nil, err
+		}
+		m.ID = mid
+		ms[i] = m
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return "", nil, err
+	}
+
+	return resultID, ms, nil
 }
 
 func (a *CommentRepository) RemoveComment(ctx context.Context, commentID persist.DBID) error {

@@ -49,6 +49,7 @@ func (r *EventRepository) AddUserEvent(ctx context.Context, event db.Event) (*db
 		Post:           util.ToNullString(event.PostID.String(), true),
 		Comment:        util.ToNullString(event.CommentID.String(), true),
 		FeedEvent:      util.ToNullString(event.FeedEventID.String(), true),
+		Mention:        util.ToNullString(event.MentionID.String(), true),
 		UserID:         event.SubjectID,
 		Data:           event.Data,
 		GroupID:        event.GroupID,
@@ -116,27 +117,20 @@ func (r *EventRepository) AddAdmireEvent(ctx context.Context, event db.Event) (*
 }
 
 func (r *EventRepository) AddCommentEvent(ctx context.Context, event db.Event) (*db.Event, error) {
-	var feedEventID sql.NullString
-	if event.FeedEventID != "" {
-		feedEventID = sql.NullString{String: string(event.FeedEventID), Valid: true}
-	}
 
-	var postID sql.NullString
-	if event.PostID != "" {
-		postID = sql.NullString{String: string(event.PostID), Valid: true}
-	}
 	event, err := r.Queries.CreateCommentEvent(ctx, db.CreateCommentEventParams{
 		ID:             persist.GenerateID(),
 		ActorID:        event.ActorID,
 		Action:         event.Action,
 		ResourceTypeID: event.ResourceTypeID,
 		CommentID:      event.CommentID,
-		FeedEvent:      feedEventID,
-		Post:           postID,
+		FeedEvent:      util.ToNullString(event.FeedEventID.String(), true),
+		Post:           util.ToNullString(event.PostID.String(), true),
 		Data:           event.Data,
 		GroupID:        event.GroupID,
 		Caption:        event.Caption,
 		SubjectID:      event.SubjectID,
+		Mention:        util.ToNullString(event.MentionID.String(), true),
 	})
 	return &event, err
 }
@@ -166,6 +160,7 @@ func (r *EventRepository) AddContractEvent(ctx context.Context, event db.Event) 
 		Post:           util.ToNullString(event.PostID.String(), true),
 		Comment:        util.ToNullString(event.CommentID.String(), true),
 		FeedEvent:      util.ToNullString(event.FeedEventID.String(), true),
+		Mention:        util.ToNullString(event.MentionID.String(), true),
 		ContractID:     event.ContractID,
 		Data:           event.Data,
 		GroupID:        event.GroupID,

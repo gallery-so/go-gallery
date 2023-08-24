@@ -654,9 +654,9 @@ func postsToConnection(ctx context.Context, posts []db.Post, contractID persist.
 	edges := make([]*model.PostEdge, len(posts))
 	for i, post := range posts {
 
-		p := post
+		po := post
 
-		cval, _ := p.Caption.Value()
+		cval, _ := po.Caption.Value()
 
 		var caption *string
 		if cval != nil {
@@ -666,11 +666,11 @@ func postsToConnection(ctx context.Context, posts []db.Post, contractID persist.
 		edges[i] = &model.PostEdge{
 			Node: &model.Post{
 				HelperPostData: model.HelperPostData{
-					TokenIDs: p.TokenIds,
-					AuthorID: p.ActorID,
+					TokenIDs: po.TokenIds,
+					AuthorID: po.ActorID,
 				},
-				CreationTime: &p.CreatedAt,
-				Dbid:         p.ID,
+				CreationTime: &po.CreatedAt,
+				Dbid:         po.ID,
 				Tokens:       nil, // handled by dedicated resolver
 				Caption:      caption,
 				Admires:      nil, // handled by dedicated resolver
@@ -752,6 +752,34 @@ func resolvePostByPostID(ctx context.Context, postID persist.DBID) (*model.Post,
 	}
 
 	return postToModel(post)
+}
+
+func resolveMentionsByCommentID(ctx context.Context, commentID persist.DBID) ([]*model.Mention, error) {
+	mentions, err := publicapi.For(ctx).Interaction.GetMentionsByCommentID(ctx, commentID)
+	if err != nil {
+		return nil, err
+	}
+
+	return mentionsToModel(ctx, mentions)
+}
+
+func resolveMentionsByPostID(ctx context.Context, postID persist.DBID) ([]*model.Mention, error) {
+	mentions, err := publicapi.For(ctx).Interaction.GetMentionsByPostID(ctx, postID)
+	if err != nil {
+		return nil, err
+	}
+
+	return mentionsToModel(ctx, mentions)
+}
+
+func mentionsToModel(ctx context.Context, mentions []db.Mention) ([]*model.Mention, error) {
+	result := make([]*model.Mention, len(mentions))
+
+	for i, mention := range mentions {
+		result[i] = mentionToModel(ctx, mention)
+	}
+
+	return result, nil
 }
 
 func resolveViewerNotifications(ctx context.Context, before *string, after *string, first *int, last *int) (*model.NotificationsConnection, error) {
@@ -2311,4 +2339,25 @@ func mediaToDimensions(dimensions persist.Dimensions) *model.MediaDimensions {
 		Width:       &dimensions.Width,
 		AspectRatio: &aspect,
 	}
+}
+
+func mentionToModel(ctx context.Context, mention db.Mention) *model.Mention {
+	m := &model.Mention{}
+	if mention.Start.Valid {
+		m.Interval = &model.Interval{
+			Start:  int(mention.Start.Int32),
+			Length: int(mention.Length.Int32),
+		}
+	}
+
+	switch {
+	case mention.UserID != "":
+		m.HelperMentionData.UserID = &mention.UserID
+	case mention.ContractID != "":
+		m.HelperMentionData.CommunityID = &mention.ContractID
+	default:
+		panic(fmt.Sprintf("unknown mention type: %+v", mention))
+	}
+
+	return m
 }

@@ -238,3 +238,5 @@ sql:
             go_type: 'github.com/mikeydub/go-gallery/service/persist.Socials'
           - column: '*.*.pii_socials'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.Socials'
+          - column: '*.*.mentions'
+            go_type: 'github.com/mikeydub/go-gallery/service/persist.Mentions'

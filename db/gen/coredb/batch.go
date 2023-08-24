@@ -1807,6 +1807,142 @@ func (b *GetMembershipByMembershipIdBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getMentionsByCommentID = `-- name: GetMentionsByCommentID :batchmany
+select id, post_id, comment_id, user_id, contract_id, start, length, created_at, deleted from mentions where comment_id = $1 and not deleted
+`
+
+type GetMentionsByCommentIDBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+func (q *Queries) GetMentionsByCommentID(ctx context.Context, commentID []persist.DBID) *GetMentionsByCommentIDBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range commentID {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(getMentionsByCommentID, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetMentionsByCommentIDBatchResults{br, len(commentID), false}
+}
+
+func (b *GetMentionsByCommentIDBatchResults) Query(f func(int, []Mention, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var items []Mention
+		if b.closed {
+			if f != nil {
+				f(t, items, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		err := func() error {
+			rows, err := b.br.Query()
+			defer rows.Close()
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var i Mention
+				if err := rows.Scan(
+					&i.ID,
+					&i.PostID,
+					&i.CommentID,
+					&i.UserID,
+					&i.ContractID,
+					&i.Start,
+					&i.Length,
+					&i.CreatedAt,
+					&i.Deleted,
+				); err != nil {
+					return err
+				}
+				items = append(items, i)
+			}
+			return rows.Err()
+		}()
+		if f != nil {
+			f(t, items, err)
+		}
+	}
+}
+
+func (b *GetMentionsByCommentIDBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
+const getMentionsByPostID = `-- name: GetMentionsByPostID :batchmany
+select id, post_id, comment_id, user_id, contract_id, start, length, created_at, deleted from mentions where post_id = $1 and not deleted
+`
+
+type GetMentionsByPostIDBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+func (q *Queries) GetMentionsByPostID(ctx context.Context, postID []persist.DBID) *GetMentionsByPostIDBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range postID {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(getMentionsByPostID, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetMentionsByPostIDBatchResults{br, len(postID), false}
+}
+
+func (b *GetMentionsByPostIDBatchResults) Query(f func(int, []Mention, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var items []Mention
+		if b.closed {
+			if f != nil {
+				f(t, items, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		err := func() error {
+			rows, err := b.br.Query()
+			defer rows.Close()
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var i Mention
+				if err := rows.Scan(
+					&i.ID,
+					&i.PostID,
+					&i.CommentID,
+					&i.UserID,
+					&i.ContractID,
+					&i.Start,
+					&i.Length,
+					&i.CreatedAt,
+					&i.Deleted,
+				); err != nil {
+					return err
+				}
+				items = append(items, i)
+			}
+			return rows.Err()
+		}()
+		if f != nil {
+			f(t, items, err)
+		}
+	}
+}
+
+func (b *GetMentionsByPostIDBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const getNewTokensByFeedEventIdBatch = `-- name: GetNewTokensByFeedEventIdBatch :batchmany
 with new_tokens as (
     select added.id, row_number() over () added_order
@@ -1898,7 +2034,7 @@ func (b *GetNewTokensByFeedEventIdBatchBatchResults) Close() error {
 }
 
 const getNotificationByIDBatch = `-- name: GetNotificationByIDBatch :batchone
-SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id FROM notifications WHERE id = $1 AND deleted = false
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id FROM notifications WHERE id = $1 AND deleted = false
 `
 
 type GetNotificationByIDBatchBatchResults struct {
@@ -1948,6 +2084,7 @@ func (b *GetNotificationByIDBatchBatchResults) QueryRow(f func(int, Notification
 			&i.PostID,
 			&i.TokenID,
 			&i.ContractID,
+			&i.MentionID,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -3315,7 +3452,7 @@ func (b *GetUserByUsernameBatchBatchResults) Close() error {
 }
 
 const getUserNotificationsBatch = `-- name: GetUserNotificationsBatch :batchmany
-SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id FROM notifications WHERE owner_id = $1 AND deleted = false
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id FROM notifications WHERE owner_id = $1 AND deleted = false
     AND (created_at, id) < ($2, $3)
     AND (created_at, id) > ($4, $5)
     ORDER BY CASE WHEN $6::bool THEN (created_at, id) END ASC,
@@ -3393,6 +3530,7 @@ func (b *GetUserNotificationsBatchBatchResults) Query(f func(int, []Notification
 					&i.PostID,
 					&i.TokenID,
 					&i.ContractID,
+					&i.MentionID,
 				); err != nil {
 					return err
 				}

@@ -813,12 +813,25 @@ type Comment implements Node @goEmbedHelper {
   replyTo: Comment @goField(forceResolver: true)
   commenter: GalleryUser @goField(forceResolver: true)
   comment: String
+  mentions: [Mention] @goField(forceResolver: true)
   replies(before: String, after: String, first: Int, last: Int): CommentsConnection
     @goField(forceResolver: true)
   source: CommentSource @goField(forceResolver: true)
 
   # deleted is included because we want to still return deleted comments to show on the frontend but render them differently
   deleted: Boolean
+}
+
+union MentionEntity = GalleryUser | Community
+
+type Mention @goEmbedHelper {
+  entity: MentionEntity @goField(forceResolver: true)
+  interval: Interval
+}
+
+type Interval {
+  start: Int!
+  length: Int!
 }
 
 # Actions a user can take on a resource
@@ -836,10 +849,19 @@ type FollowInfo {
   followedBack: Boolean
 }
 
+type PostAdmireEdge {
+  node: Admire
+  cursor: String
+}
+
 type FeedEventAdmireEdge {
   node: Admire
-  event: FeedEvent
   cursor: String
+}
+
+type PostAdmiresConnection {
+  edges: [PostAdmireEdge]
+  pageInfo: PageInfo!
 }
 
 type FeedEventAdmiresConnection {
@@ -847,11 +869,28 @@ type FeedEventAdmiresConnection {
   pageInfo: PageInfo!
 }
 
-union CommentsConnection = FeedEventCommentsConnection | PostCommentsConnection
+type PostCommentEdge {
+  node: Comment
+  cursor: String
+}
+
+type CommentEdge {
+  node: Comment
+  cursor: String
+}
+
+type CommentsConnection {
+  edges: [CommentEdge]
+  pageInfo: PageInfo!
+}
+
+type PostCommentsConnection {
+  edges: [PostCommentEdge]
+  pageInfo: PageInfo!
+}
 
 type FeedEventCommentEdge {
   node: Comment
-  event: FeedEvent
   cursor: String
 }
 
@@ -860,49 +899,15 @@ type FeedEventCommentsConnection {
   pageInfo: PageInfo!
 }
 
-type PostAdmireEdge {
-  node: Admire
-  cursor: String
-  post: Post
-}
-
-type PostCommentEdge {
-  node: Comment
-  cursor: String
-  post: Post
-}
-
-type PostCommentsConnection {
-  edges: [PostCommentEdge]
-  pageInfo: PageInfo!
-}
-
-type PostAdmiresConnection {
-  edges: [PostAdmireEdge]
-  pageInfo: PageInfo!
-}
-
 union Interaction = Admire | Comment
 
-type FeedEventInteractionsEdge {
-  node: Interaction
-  event: FeedEvent
-  cursor: String
-}
-
-type FeedEventInteractionsConnection {
-  edges: [FeedEventInteractionsEdge]
-  pageInfo: PageInfo!
-}
-
-type PostInteractionsEdge {
+type InteractionsEdge {
   node: Interaction
   cursor: String
-  post: Post
 }
 
-type PostInteractionsConnection {
-  edges: [PostInteractionsEdge]
+type InteractionsConnection {
+  edges: [InteractionsEdge]
   pageInfo: PageInfo!
 }
 
@@ -935,12 +940,8 @@ type FeedEvent implements Node @key(fields: "dbid") {
     @goField(forceResolver: true)
   caption: String
 
-  interactions(
-    before: String
-    after: String
-    first: Int
-    last: Int
-  ): FeedEventInteractionsConnection @goField(forceResolver: true)
+  interactions(before: String, after: String, first: Int, last: Int): InteractionsConnection
+    @goField(forceResolver: true)
 
   viewerAdmire: Admire @goField(forceResolver: true)
 
@@ -959,12 +960,14 @@ type Post implements Node @key(fields: "dbid") @goEmbedHelper {
   tokens: [Token] @goField(forceResolver: true)
 
   caption: String
+  mentions: [Mention] @goField(forceResolver: true)
+
   admires(before: String, after: String, first: Int, last: Int): PostAdmiresConnection
     @goField(forceResolver: true)
   comments(before: String, after: String, first: Int, last: Int): PostCommentsConnection
     @goField(forceResolver: true)
 
-  interactions(before: String, after: String, first: Int, last: Int): PostInteractionsConnection
+  interactions(before: String, after: String, first: Int, last: Int): InteractionsConnection
     @goField(forceResolver: true)
 
   viewerAdmire: Admire @goField(forceResolver: true)
@@ -2482,8 +2485,14 @@ type DeletePostPayload {
 union DeletePostPayloadOrError = DeletePostPayload | ErrInvalidInput | ErrNotAuthorized
 
 input MentionInput {
+  interval: IntervalInput
   userId: DBID
   communityId: DBID
+}
+
+input IntervalInput {
+  start: Int!
+  length: Int!
 }
 
 type Mutation {

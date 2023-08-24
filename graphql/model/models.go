@@ -64,6 +64,11 @@ type HelperCommentData struct {
 	ReplyToID   *persist.DBID
 }
 
+type HelperMentionData struct {
+	UserID      *persist.DBID
+	CommunityID *persist.DBID
+}
+
 type HelperAdmireData struct {
 	PostID      *persist.DBID
 	FeedEventID *persist.DBID

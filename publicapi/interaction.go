@@ -2,6 +2,7 @@ package publicapi
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -864,7 +865,9 @@ func (api InteractionAPI) comment(ctx context.Context, comment string, feedEvent
 
 	comment = validate.SanitizationPolicy.Sanitize(comment)
 
-	commentID, err := api.repos.CommentRepository.CreateComment(ctx, feedEventID, postID, actor, replyToID, comment)
+	dbMentions, err := mentionInputsToMentions(ctx, mentions, api.queries)
+
+	commentID, resultMentions, err := api.repos.CommentRepository.CreateComment(ctx, feedEventID, postID, actor, replyToID, comment, dbMentions)
 	if err != nil {
 		return "", err
 	}
@@ -891,34 +894,34 @@ func (api InteractionAPI) comment(ctx context.Context, comment string, feedEvent
 	}
 
 	if len(mentions) > 0 {
-		for _, mention := range mentions {
-			if mention == nil {
-				continue
-			}
+		for _, mention := range resultMentions {
+
 			switch {
-			case mention.UserID != nil:
+			case mention.UserID != "":
 				_, err = event.DispatchEvent(ctx, db.Event{
 					ActorID:        persist.DBIDToNullStr(actor),
 					ResourceTypeID: persist.ResourceTypeUser,
-					SubjectID:      *mention.UserID,
+					SubjectID:      mention.UserID,
 					PostID:         postID,
 					FeedEventID:    feedEventID,
-					UserID:         *mention.UserID,
+					UserID:         mention.UserID,
 					CommentID:      commentID,
+					MentionID:      mention.ID,
 					Action:         persist.ActionMentionUser,
 				}, api.validator, nil)
 				if err != nil {
 					return "", err
 				}
-			case mention.CommunityID != nil:
+			case mention.ContractID != "":
 				_, err = event.DispatchEvent(ctx, db.Event{
 					ActorID:        persist.DBIDToNullStr(actor),
 					ResourceTypeID: persist.ResourceTypeContract,
-					SubjectID:      *mention.CommunityID,
+					SubjectID:      mention.ContractID,
 					PostID:         postID,
 					FeedEventID:    feedEventID,
-					ContractID:     *mention.CommunityID,
+					ContractID:     mention.ContractID,
 					CommentID:      commentID,
+					MentionID:      mention.ID,
 					Action:         persist.ActionMentionCommunity,
 				}, api.validator, nil)
 
@@ -962,4 +965,58 @@ func (api InteractionAPI) RemoveComment(ctx context.Context, commentID persist.D
 	}
 
 	return comment.FeedEventID, comment.PostID, api.repos.CommentRepository.RemoveComment(ctx, commentID)
+}
+
+func (api InteractionAPI) GetMentionsByCommentID(ctx context.Context, commentID persist.DBID) ([]db.Mention, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"commentID": validate.WithTag(commentID, "required"),
+	}); err != nil {
+		return nil, err
+	}
+
+	return api.loaders.MentionsByCommentID.Load(commentID)
+}
+
+func (api InteractionAPI) GetMentionsByPostID(ctx context.Context, postID persist.DBID) ([]db.Mention, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"postID": validate.WithTag(postID, "required"),
+	}); err != nil {
+		return nil, err
+	}
+
+	return api.loaders.MentionsByPostID.Load(postID)
+}
+
+func mentionInputsToMentions(ctx context.Context, ms []*model.MentionInput, queries *db.Queries) ([]db.Mention, error) {
+	res := make([]db.Mention, len(ms))
+
+	for i, m := range ms {
+		if m.CommunityID != nil && m.UserID != nil {
+			return nil, fmt.Errorf("mention input cannot have both communityID and userID set")
+		}
+		mention := db.Mention{}
+		if m.Interval != nil {
+			mention.Length = sql.NullInt32{Int32: int32(m.Interval.Length), Valid: true}
+			mention.Start = sql.NullInt32{Int32: int32(m.Interval.Start), Valid: true}
+
+		}
+		if m.CommunityID != nil {
+			if c, err := queries.GetContractByID(ctx, *m.CommunityID); c.ID == "" || err != nil {
+				return nil, fmt.Errorf("could retrieve community: %s (%s)", *m.CommunityID, err)
+			}
+			mention.CommentID = *m.CommunityID
+		}
+		if m.UserID != nil {
+			if u, err := queries.GetUserById(ctx, *m.UserID); u.ID == "" || err != nil {
+				return nil, fmt.Errorf("could retrieve user: %s (%s)", *m.UserID, err)
+			}
+			mention.UserID = *m.UserID
+		}
+
+		res[i] = mention
+	}
+
+	return res, nil
 }

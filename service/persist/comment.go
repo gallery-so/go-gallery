@@ -17,6 +17,13 @@ type Comment struct {
 	Deleted     bool      `json:"deleted"`
 }
 
+type MentionType string
+
+const (
+	MentionTypeUser      MentionType = "user"
+	MentionTypeCommunity MentionType = "community"
+)
+
 type CommentRepository interface {
 	// replyToID is optional
 	CreateComment(ctx context.Context, feedEventID DBID, actorID DBID, replyToID *DBID, comment string) (DBID, error)
