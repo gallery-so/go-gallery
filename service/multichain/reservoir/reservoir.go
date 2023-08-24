@@ -491,7 +491,7 @@ func (d *Provider) tokensWithOwnershipToAgnosticTokens(ctx context.Context, toke
 				ImageURL: persist.NullString(t.Token.Image),
 			},
 		})
-		if strings.EqualFold(t.Token.Collection.Name, t.Token.Contract.String()) {
+		if strings.EqualFold(t.Token.Collection.Name, t.Token.Contract.String()) || t.Token.Collection.Name == "" {
 			c, err := d.fetchCollection(ctx, t.Token.Contract, true)
 			if err == nil {
 				t.Token.Collection = c
