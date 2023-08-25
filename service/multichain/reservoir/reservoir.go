@@ -406,6 +406,8 @@ func (d *Provider) fetchToken(ctx context.Context, ti multichain.ChainAgnosticId
 	q := req.URL.Query()
 	q.Add("tokens", rtid)
 
+	req.URL.RawQuery = q.Encode()
+
 	resp, err := d.httpClient.Do(req)
 	if err != nil {
 		return Token{}, err
@@ -417,6 +419,7 @@ func (d *Provider) fetchToken(ctx context.Context, ti multichain.ChainAgnosticId
 	}
 
 	if len(res.Tokens) == 0 {
+		logger.For(ctx).Infof("token not found for %s (%s)", rtid, req.URL.String())
 		return Token{}, ErrTokenNotFoundByIdentifiers{ContractAddress: ti.ContractAddress, TokenID: TokenID(ti.TokenID.Base10String())}
 	}
 	return res.Tokens[0].Token, nil
@@ -456,6 +459,8 @@ func (d *Provider) fetchCollection(ctx context.Context, address persist.Address,
 	q := req.URL.Query()
 	q.Add("id", fmt.Sprintf("%s", address))
 	q.Add("limit", "1")
+
+	req.URL.RawQuery = q.Encode()
 
 	resp, err := d.httpClient.Do(req)
 	if err != nil {
