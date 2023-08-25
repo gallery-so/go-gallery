@@ -85,6 +85,8 @@ var ErrInvalidMagicLink = errors.New("invalid magic link")
 // TODO: Figure out a better scheme for handling user-facing errors
 var ErrEmailUnverified = errors.New("The email address you provided is unverified. Login with QR code instead, or verify your email at gallery.so/settings.")
 
+var ErrEmailAlreadyUsed = errors.New("email already in use")
+
 type Authenticator interface {
 	// GetDescription returns information about the authenticator for error and logging purposes.
 	// NOTE: GetDescription should NOT include any sensitive data (passwords, auth tokens, etc)
@@ -226,7 +228,6 @@ func (e MagicLinkAuthenticator) GetDescription() string {
 }
 
 func (e MagicLinkAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, error) {
-
 	err := e.Token.Validate()
 	if err != nil {
 		return nil, ErrInvalidMagicLink
@@ -239,19 +240,23 @@ func (e MagicLinkAuthenticator) Authenticate(pCtx context.Context) (*AuthResult,
 
 	authedEmail := persist.Email(info.Email)
 
-	user, err := e.UserRepo.GetByEmail(pCtx, authedEmail)
-	if err != nil {
-		if _, ok := err.(persist.ErrUserNotFound); !ok {
-			return nil, err
-		}
-		return nil, ErrEmailUnverified
-	}
-
-	return &AuthResult{
-		User:      &user,
+	authResult := AuthResult{
 		Addresses: []AuthenticatedAddress{},
 		Email:     &authedEmail,
-	}, nil
+	}
+
+	user, err := e.UserRepo.GetByEmail(pCtx, authedEmail)
+	if err != nil {
+		return &authResult, err
+	}
+
+	if user.EmailVerified == 0 {
+		return &authResult, ErrEmailUnverified
+	}
+
+	authResult.User = &user
+
+	return &authResult, nil
 }
 
 func NewMagicLinkClient() *magicclient.API {

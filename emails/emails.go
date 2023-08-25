@@ -104,7 +104,7 @@ func setDefaults() {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
 	} else {
 		fi := "local"
-		if len(os.Args) > 0 {
+		if len(os.Args) > 1 {
 			fi = os.Args[1]
 		}
 		envFile := util.ResolveEnvFile("emails", fi)

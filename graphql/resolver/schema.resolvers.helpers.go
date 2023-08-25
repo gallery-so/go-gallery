@@ -198,6 +198,8 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrNotAuthorized{Message: message}
 	case auth.ErrEmailUnverified:
 		mappedErr = model.ErrEmailUnverified{Message: message}
+	case auth.ErrEmailAlreadyUsed:
+		mappedErr = model.ErrEmailAlreadyUsed{Message: message}
 	}
 
 	if mappedErr != nil {
@@ -781,10 +783,13 @@ func resolveWalletsByUserID(ctx context.Context, userID persist.DBID) ([]*model.
 }
 
 func resolvePrimaryWalletByUserID(ctx context.Context, userID persist.DBID) (*model.Wallet, error) {
-
 	user, err := publicapi.For(ctx).User.GetUserById(ctx, userID)
 	if err != nil {
 		return nil, err
+	}
+
+	if user.PrimaryWalletID == "" {
+		return nil, nil
 	}
 
 	wallet, err := publicapi.For(ctx).Wallet.GetWalletByID(ctx, user.PrimaryWalletID)

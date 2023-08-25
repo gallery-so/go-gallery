@@ -1667,11 +1667,14 @@ func standardizeURI(u string) string {
 
 func createAuthedNewUserParams(ctx context.Context, authenticator auth.Authenticator, username string, bio string, email *persist.Email) (persist.CreateUserInput, error) {
 	authResult, err := authenticator.Authenticate(ctx)
-	if err != nil {
+	if err != nil && !util.ErrorAs[persist.ErrUserNotFound](err) {
 		return persist.CreateUserInput{}, auth.ErrAuthenticationFailed{WrappedErr: err}
 	}
 
 	if authResult.User != nil && !authResult.User.Universal.Bool() {
+		if _, ok := authenticator.(auth.MagicLinkAuthenticator); ok {
+			return persist.CreateUserInput{}, auth.ErrEmailAlreadyUsed
+		}
 		return persist.CreateUserInput{}, persist.ErrUserAlreadyExists{Authenticator: authenticator.GetDescription()}
 	}
 
@@ -1686,14 +1689,22 @@ func createAuthedNewUserParams(ctx context.Context, authenticator auth.Authentic
 		wallet = authResult.Addresses[0]
 	}
 
-	return persist.CreateUserInput{
+	params := persist.CreateUserInput{
 		Username:     username,
 		Bio:          bio,
 		Email:        email,
 		EmailStatus:  persist.EmailVerificationStatusUnverified,
 		ChainAddress: wallet.ChainAddress,
 		WalletType:   wallet.WalletType,
-	}, nil
+	}
+
+	// Use verified email if available
+	if authResult.Email != nil {
+		params.Email = authResult.Email
+		params.EmailStatus = persist.EmailVerificationStatusVerified
+	}
+
+	return params, nil
 }
 
 func createNewUserGalleryParams(galleryName, galleryDesc, galleryPos string) (params db.GalleryRepoCreateParams, err error) {
@@ -1707,6 +1718,7 @@ func createNewUserGalleryParams(galleryName, galleryDesc, galleryPos string) (pa
 	if params.Position == "" {
 		params.Position, err = fracdex.KeyBetween("", "")
 		if err != nil {
+			panic(err)
 			return db.GalleryRepoCreateParams{}, err
 		}
 	}
