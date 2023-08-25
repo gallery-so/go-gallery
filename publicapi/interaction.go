@@ -430,8 +430,8 @@ func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, fee
 	return comments, pageInfo, err
 }
 
-func (api InteractionAPI) PaginateAdmiresByTokenID(ctx context.Context, tokenID persist.DBID, before *string, after *string, userID *persist.DBID
-	first *int, last *int) ([]db.Admire, PageInfo, error) {
+func (api InteractionAPI) PaginateAdmiresByTokenID(ctx context.Context, tokenID persist.DBID, before *string, after *string,
+	first *int, last *int, userID *persist.DBID) ([]db.Admire, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"tokenID": validate.WithTag(tokenID, "required"),
@@ -449,6 +449,7 @@ func (api InteractionAPI) PaginateAdmiresByTokenID(ctx context.Context, tokenID 
 			TokenID:       tokenID,
 			Limit:         params.Limit,
 			onlyForActor:  onlyForActor,
+			actorID: 	   *userID,
 			CurBeforeTime: params.CursorBeforeTime,
 			CurBeforeID:   params.CursorBeforeID,
 			CurAfterTime:  params.CursorAfterTime,
