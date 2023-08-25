@@ -1654,6 +1654,18 @@ type ErrAdmireAlreadyExists implements Error {
   message: String!
 }
 
+type ErrAdmireFeedEventNotFound implements Error {
+  message: String!
+}
+
+type ErrAdmirePostNotFound implements Error {
+  message: String!
+}
+
+type ErrAdmireTokenNotFound implements Error {
+  message: String!
+}
+
 type ErrCommentNotFound implements Error {
   message: String!
 }

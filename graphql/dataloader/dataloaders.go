@@ -43,7 +43,6 @@
 //go:generate go run github.com/gallery-so/dataloaden IntLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID int
 //go:generate go run github.com/gallery-so/dataloaden AdmireLoaderByActorAndFeedEvent github.com/mikeydub/go-gallery/db/gen/coredb.GetAdmireByActorIDAndFeedEventIDParams github.com/mikeydub/go-gallery/db/gen/coredb.Admire
 //go:generate go run github.com/gallery-so/dataloaden AdmireLoaderByActorAndPost github.com/mikeydub/go-gallery/db/gen/coredb.GetAdmireByActorIDAndPostIDParams github.com/mikeydub/go-gallery/db/gen/coredb.Admire
-//go:generate go run github.com/gallery-so/dataloaden AdmireLoaderByActorAndToken github.com/mikeydub/go-gallery/db/gen/coredb.GetAdmireByActorIDAndTokenIDParams github.com/mikeydub/go-gallery/db/gen/coredb.Admire
 //go:generate go run github.com/gallery-so/dataloaden SharedFollowersLoaderByIDs github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedFollowersBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedFollowersBatchPaginateRow
 //go:generate go run github.com/gallery-so/dataloaden SharedContractsLoaderByIDs github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedContractsBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedContractsBatchPaginateRow
 //go:generate go run github.com/gallery-so/dataloaden MediaLoaderByTokenID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.TokenMedia
@@ -137,7 +136,6 @@ type Loaders struct {
 	OwnersByContractID                       *UsersLoaderByContractID
 	AdmireByActorIDAndFeedEventID            *AdmireLoaderByActorAndFeedEvent
 	AdmireByActorIDAndPostID                 *AdmireLoaderByActorAndPost
-	AdmireByActorIDAndTokenID                *AdmireLoaderByActorAndToken
 	MediaByTokenID                           *MediaLoaderByTokenID
 	ContractCreatorByContractID              *ContractCreatorLoaderByID
 	ProfileImageByID                         *ProfileImageLoaderByID
@@ -327,8 +325,6 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 	loaders.AdmireByActorIDAndFeedEventID = NewAdmireLoaderByActorAndFeedEvent(defaults, loadAdmireByActorIDAndFeedEventID(q), AdmireLoaderByActorAndFeedEventCacheSubscriptions{})
 
 	loaders.AdmireByActorIDAndPostID = NewAdmireLoaderByActorAndPost(defaults, loadAdmireByActorIDAndPostID(q), AdmireLoaderByActorAndPostCacheSubscriptions{})
-
-	loaders.AdmireByActorIDAndTokenID = NewAdmireLoaderByActorAndToken(defaults, loadAdmireByActorIDAndTokenID(q), AdmireLoaderByActorAndTokenCacheSubscriptions{})
 
 	loaders.NotificationByID = NewNotificationLoaderByID(defaults, loadNotificationById(q), NotificationLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(notification db.Notification) persist.DBID { return notification.ID },
@@ -1343,7 +1339,7 @@ func loadAdmireByActorIDAndFeedEventID(q *db.Queries) func(context.Context, []db
 
 		b.QueryRow(func(i int, admire db.Admire, err error) {
 			if err == pgx.ErrNoRows {
-				err = persist.ErrAdmireNotFound{ActorID: params[i].ActorID, FeedEventID: params[i].FeedEventID}
+				err = persist.ErrAdmireFeedEventNotFound{ActorID: params[i].ActorID, FeedEventID: params[i].FeedEventID}
 			}
 			results[i], errors[i] = admire, err
 		})
@@ -1362,26 +1358,7 @@ func loadAdmireByActorIDAndPostID(q *db.Queries) func(context.Context, []db.GetA
 
 		b.QueryRow(func(i int, admire db.Admire, err error) {
 			if err == pgx.ErrNoRows {
-				err = persist.ErrAdmireNotFound{ActorID: params[i].ActorID, PostID: params[i].PostID}
-			}
-			results[i], errors[i] = admire, err
-		})
-
-		return results, errors
-	}
-}
-
-func loadAdmireByActorIDAndTokenID(q *db.Queries) func(context.Context, []db.GetAdmireByActorIDAndTokenIDParams) ([]db.Admire, []error) {
-	return func(ctx context.Context, params []db.GetAdmireByActorIDAndTokenIDParams) ([]db.Admire, []error) {
-		results := make([]db.Admire, len(params))
-		errors := make([]error, len(params))
-
-		b := q.GetAdmireByActorIDAndTokenID(ctx, params)
-		defer b.Close()
-
-		b.QueryRow(func(i int, admire db.Admire, err error) {
-			if err == pgx.ErrNoRows {
-				err = persist.ErrAdmireNotFound{ActorID: params[i].ActorID, TokenID: params[i].TokenID}
+				err = persist.ErrAdmirePostNotFound{ActorID: params[i].ActorID, PostID: params[i].PostID}
 			}
 			results[i], errors[i] = admire, err
 		})

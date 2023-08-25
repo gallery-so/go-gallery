@@ -2635,37 +2635,22 @@ func (r *tokenResolver) IsSpamByProvider(ctx context.Context, obj *model.Token) 
 // Admires is the resolver for the admires field.
 func (r *tokenResolver) Admires(ctx context.Context, obj *model.Token, before *string, after *string, first *int, last *int, userID *persist.DBID) (*model.TokenAdmiresConnection, error) {
 	var edges []*model.TokenAdmireEdge
-	if *userID == "" {
-		admires, pageInfo, err := publicapi.For(ctx).Interaction.PaginateAdmiresByTokenID(ctx, obj.Dbid, before, after, first, last)
-		if err != nil {
-			return nil, err
-		}
+	admires, pageInfo, err := publicapi.For(ctx).Interaction.PaginateAdmiresByTokenID(ctx, obj.Dbid, before, after, first, last, userID)
+	if err != nil {
+		return nil, err
+	}
 
-		for _, admire := range admires {
-			edges = append(edges, &model.TokenAdmireEdge{
-				Node:  admireToModel(ctx, admire),
-				Token: obj,
-			})
-		}
-
-		return &model.TokenAdmiresConnection{
-			Edges:    edges,
-			PageInfo: pageInfoToModel(ctx, pageInfo),
-		}, nil
-	} else {
-		admire, err := publicapi.For(ctx).Interaction.GetAdmireByActorIDAndTokenID(ctx, *userID, obj.Dbid)
-		if err != nil {
-			return nil, err
-		}
+	for _, admire := range admires {
 		edges = append(edges, &model.TokenAdmireEdge{
-			Node:  admireToModel(ctx, *admire),
+			Node:  admireToModel(ctx, admire),
 			Token: obj,
 		})
-
-		return &model.TokenAdmiresConnection{
-			Edges: edges,
-		}, nil
 	}
+
+	return &model.TokenAdmiresConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
 }
 
 // Wallets is the resolver for the wallets field.
