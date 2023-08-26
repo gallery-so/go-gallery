@@ -161,6 +161,8 @@ func processAddToMailingList(queries *coredb.Queries) gin.HandlerFunc {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
+
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
 
