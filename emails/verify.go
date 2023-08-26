@@ -157,7 +157,8 @@ func processAddToMailingList(queries *coredb.Queries) gin.HandlerFunc {
 			return
 		}
 
-		if err := addEmailToSendgridList(c, userWithPII.PiiEmailAddress.String(), env.GetString("SENDGRID_DEFAULT_LIST_ID")); err != nil {
+		err = addEmailToSendgridList(c, userWithPII.PiiEmailAddress.String(), env.GetString("SENDGRID_DEFAULT_LIST_ID"))
+		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
