@@ -13,7 +13,9 @@ import (
 )
 
 const createAdmire = `-- name: CreateAdmire :one
-insert into admires (id, feed_event_id, post_id, token_id, actor_id) values ($1, $3, $4, $5, $2) returning id
+insert into admires (id, feed_event_id, post_id, token_id, actor_id) values ($1, $3, $4, $5, $2)
+on conflict (token_id, actor_id) do nothing
+returning id
 `
 
 type CreateAdmireParams struct {
