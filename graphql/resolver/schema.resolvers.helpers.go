@@ -783,6 +783,7 @@ func resolveWalletsByUserID(ctx context.Context, userID persist.DBID) ([]*model.
 }
 
 func resolvePrimaryWalletByUserID(ctx context.Context, userID persist.DBID) (*model.Wallet, error) {
+
 	user, err := publicapi.For(ctx).User.GetUserById(ctx, userID)
 	if err != nil {
 		return nil, err

@@ -142,18 +142,19 @@ func processAddToMailingList(queries *coredb.Queries) gin.HandlerFunc {
 		var input task.AddEmailToMailingListMessage
 
 		if err := c.ShouldBindJSON(&input); err != nil {
-			util.ErrResponse(c, http.StatusBadRequest, err)
+			// Return OK to remove message from queue
+			util.ErrResponse(c, http.StatusOK, err)
 			return
 		}
 
 		userWithPII, err := queries.GetUserWithPIIByID(c, input.UserID)
 		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
+			util.ErrResponse(c, http.StatusNotFound, err)
 			return
 		}
 
 		if userWithPII.EmailVerified != persist.EmailVerificationStatusVerified {
-			util.ErrResponse(c, http.StatusBadRequest, fmt.Errorf("email not verified"))
+			util.ErrResponse(c, http.StatusOK, fmt.Errorf("email not verified"))
 			return
 		}
 

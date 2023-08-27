@@ -32,6 +32,5 @@ func handlersInitServer(router *gin.Engine, loaders *dataloader.Loaders, queries
 	router.POST("/verify", verifyEmail(queries))
 	preverifyLimiter := limiters.NewKeyRateLimiter(limiterCtx, limiterCache, "preverify", 1, time.Millisecond*500)
 	router.GET("/preverify", middleware.IPRateLimited(preverifyLimiter), preverifyEmail())
-
 	return router
 }

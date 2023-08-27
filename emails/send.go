@@ -49,8 +49,8 @@ type errEmailMismatch struct {
 	userID persist.DBID
 }
 
-// TODO: Eventually we want to replace this with Magiclink so that there's only a single way to verify an email
 func sendVerificationEmail(dataloaders *dataloader.Loaders, queries *coredb.Queries, s *sendgrid.Client) gin.HandlerFunc {
+
 	return func(c *gin.Context) {
 		var input VerificationEmailInput
 		err := c.ShouldBindJSON(&input)

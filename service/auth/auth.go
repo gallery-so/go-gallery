@@ -245,7 +245,7 @@ func (e MagicLinkAuthenticator) Authenticate(pCtx context.Context) (*AuthResult,
 		Email:     &authedEmail,
 	}
 
-	user, err := e.UserRepo.GetByEmail(pCtx, authedEmail)
+	user, err := e.UserRepo.GetByEmailIgnoringStatus(pCtx, authedEmail)
 	if err != nil {
 		return &authResult, err
 	}

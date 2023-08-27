@@ -459,7 +459,7 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 
 	if createUserParams.EmailStatus == persist.EmailVerificationStatusVerified {
 		if err := task.CreateTaskForAddingEmailToMailingList(ctx, task.AddEmailToMailingListMessage{UserID: userID}, api.taskClient); err != nil {
-			// Report an error to Sentry because there's currently no other way to subscribe a user to the mailing list
+			// Report error to Sentry since there's not another way to subscribe the user to the mailing list
 			sentryutil.ReportError(ctx, err)
 			logger.For(ctx).Warnf("failed to send mailing list subscription task: %s", err)
 		}
@@ -1698,7 +1698,7 @@ func createAuthedNewUserParams(ctx context.Context, authenticator auth.Authentic
 		WalletType:   wallet.WalletType,
 	}
 
-	// Use verified email if available
+	// Override input email with verified email if available
 	if authResult.Email != nil {
 		params.Email = authResult.Email
 		params.EmailStatus = persist.EmailVerificationStatusVerified
@@ -1718,7 +1718,6 @@ func createNewUserGalleryParams(galleryName, galleryDesc, galleryPos string) (pa
 	if params.Position == "" {
 		params.Position, err = fracdex.KeyBetween("", "")
 		if err != nil {
-			panic(err)
 			return db.GalleryRepoCreateParams{}, err
 		}
 	}

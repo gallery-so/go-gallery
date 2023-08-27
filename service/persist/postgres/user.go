@@ -410,7 +410,7 @@ func (u *UserRepository) GetByUsername(pCtx context.Context, pUsername string) (
 }
 
 // GetByEmail gets the user with the given email address
-func (u *UserRepository) GetByEmail(pCtx context.Context, pEmail persist.Email) (persist.User, error) {
+func (u *UserRepository) GetByEmailIgnoringStatus(pCtx context.Context, pEmail persist.Email) (persist.User, error) {
 
 	var user persist.User
 	err := u.getByEmailStmt.QueryRowContext(pCtx, pEmail.String()).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Wallets), &user.Bio, &user.Traits, &user.Universal, &user.PrimaryWalletID, &user.CreationTime, &user.LastUpdated, &user.EmailVerified)
