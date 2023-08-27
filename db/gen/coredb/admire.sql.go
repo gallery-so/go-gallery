@@ -13,9 +13,10 @@ import (
 )
 
 const createAdmire = `-- name: CreateAdmire :one
-insert into admires (id, feed_event_id, post_id, token_id, actor_id) values ($1, $3, $4, $5, $2)
-on conflict (token_id, actor_id) do nothing
-returning id
+INSERT INTO admires (id, feed_event_id, post_id, token_id, actor_id)
+VALUES ($1, $3, $4, $5, $2)
+ON CONFLICT (actor_id, token_id) WHERE deleted = false DO NOTHING
+RETURNING id
 `
 
 type CreateAdmireParams struct {
