@@ -358,13 +358,13 @@ type sharedContractsPaginator struct {
 
 func (p *sharedContractsPaginator) paginate(before *string, after *string, first *int, last *int) ([]interface{}, PageInfo, error) {
 	queryFunc := func(limit int32, pagingForward bool) ([]interface{}, error) {
-		beforeCur := boolBootIntIDCursor{
+		beforeCur := boolBoolIntIDCursorer{
 			Bool1: false,
 			Bool2: false,
 			Int:   -1,
 			ID:    defaultCursorBeforeID,
 		}
-		afterCur := boolBootIntIDCursor{
+		afterCur := boolBoolIntIDCursorer{
 			Bool1: true,
 			Bool2: true,
 			Int:   math.MaxInt32,
@@ -905,7 +905,7 @@ func (curs) NewTimeIDCursorer(f func(any) (time.Time, persist.DBID, error)) curs
 
 func (curs) NewBoolBoolIntIDCursorer(f func(any) (bool, bool, int64, persist.DBID, error)) cursorable {
 	return func(node any) (c cursorer, err error) {
-		var cur boolBootIntIDCursor
+		var cur boolBoolIntIDCursorer
 		cur.Bool1, cur.Bool2, cur.Int, cur.ID, err = f(node)
 		return &cur, err
 	}
@@ -974,15 +974,15 @@ func (c *timeIDCursor) Unpack(s string) error {
 
 //------------------------------------------------------------------------------
 
-type boolBootIntIDCursor struct {
+type boolBoolIntIDCursorer struct {
 	Bool1 bool
 	Bool2 bool
 	Int   int64
 	ID    persist.DBID
 }
 
-func (c boolBootIntIDCursor) Pack() (string, error) { return pack(c.Bool1, c.Bool2, c.Int, c.ID) }
-func (c *boolBootIntIDCursor) Unpack(s string) error {
+func (c boolBoolIntIDCursorer) Pack() (string, error) { return pack(c.Bool1, c.Bool2, c.Int, c.ID) }
+func (c *boolBoolIntIDCursorer) Unpack(s string) error {
 	d, err := newCursorDecoder(s)
 	if err != nil {
 		return err
