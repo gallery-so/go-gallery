@@ -166,7 +166,7 @@ func (u *UserRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUpd
 
 }
 
-func (u *UserRepository) createWalletWithTx(ctx context.Context, queries *db.Queries, chainAddress persist.ChainAddress, walletType persist.WalletType) (persist.DBID, error) {
+func (u *UserRepository) createWalletWithTx(ctx context.Context, queries *db.Queries, chainAddress persist.ChainAddress, walletType persist.WalletType, userID persist.DBID) (persist.DBID, error) {
 	if queries == nil {
 		queries = u.queries
 	}
@@ -216,6 +216,7 @@ func (u *UserRepository) createWalletWithTx(ctx context.Context, queries *db.Que
 		Address:    chainAddress.Address(),
 		Chain:      chainAddress.Chain(),
 		WalletType: walletType,
+		UserID:     userID,
 	})
 	if err != nil {
 		return "", persist.ErrWalletCreateFailed{
@@ -254,30 +255,23 @@ func (u *UserRepository) Create(pCtx context.Context, pUser persist.CreateUserIn
 		return "", err
 	}
 
-	var primaryWalletID persist.DBID
-	var wallets persist.WalletList
-
-	if pUser.ChainAddress.Address() != "" {
-		primaryWalletID, err = u.createWalletWithTx(pCtx, queries, pUser.ChainAddress, pUser.WalletType)
-		if err != nil {
-			return "", err
-		}
-		wallets = append(wallets, persist.Wallet{ID: primaryWalletID})
-	}
-
-	userID := persist.GenerateID()
-	err = queries.InsertUser(pCtx, db.InsertUserParams{
-		ID:                   userID,
+	userID, err := queries.InsertUser(pCtx, db.InsertUserParams{
+		ID:                   persist.GenerateID(),
 		Username:             util.ToNullString(pUser.Username, true),
 		UsernameIdempotent:   util.ToNullString(strings.ToLower(pUser.Username), true),
 		Bio:                  util.ToNullString(pUser.Bio, true),
-		Wallets:              wallets,
 		Universal:            pUser.Universal,
 		EmailUnsubscriptions: pUser.EmailNotificationsSettings,
-		PrimaryWallet:        util.ToNullString(primaryWalletID.String(), true),
 	})
 	if err != nil {
 		return "", err
+	}
+
+	if pUser.ChainAddress.Address() != "" {
+		_, err = u.createWalletWithTx(pCtx, queries, pUser.ChainAddress, pUser.WalletType, userID)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	if pUser.Email != nil {
@@ -426,33 +420,8 @@ func (u *UserRepository) GetByEmailIgnoringStatus(pCtx context.Context, pEmail p
 
 // AddWallet adds an address to user as well as ensures that the wallet and address exists
 func (u *UserRepository) AddWallet(pCtx context.Context, pUserID persist.DBID, pChainAddress persist.ChainAddress, pWalletType persist.WalletType, queries *db.Queries) error {
-
-	if queries == nil {
-		tx, err := u.pgx.BeginTx(pCtx, pgx.TxOptions{})
-		if err != nil {
-			return err
-		}
-		queries = u.queries.WithTx(tx)
-		defer tx.Rollback(pCtx)
-		defer func() {
-			err := tx.Commit(pCtx)
-			if err != nil {
-				logger.For(pCtx).Errorf("failed to commit transaction: %v", err)
-			}
-		}()
-	}
-
-	walletID, err := u.createWalletWithTx(pCtx, queries, pChainAddress, pWalletType)
-	if err != nil {
-		return err
-	}
-
-	queries.AddWalletToUserByID(pCtx, db.AddWalletToUserByIDParams{
-		WalletID: walletID.String(),
-		UserID:   pUserID,
-	})
-
-	return nil
+	_, err := u.createWalletWithTx(pCtx, queries, pChainAddress, pWalletType, pUserID)
+	return err
 }
 
 // RemoveWallet removes the specified wallet from a user. Returns true if the wallet exists and was successfully removed,
