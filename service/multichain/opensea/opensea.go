@@ -329,9 +329,6 @@ func (p *Provider) GetContractByAddress(ctx context.Context, contract persist.Ad
 	}
 	return contractToContract(ctx, c, p.ethClient)
 }
-func (d *Provider) GetCommunityOwners(ctx context.Context, communityID persist.Address, limit, offset int) ([]multichain.ChainAgnosticCommunityOwner, error) {
-	return []multichain.ChainAgnosticCommunityOwner{}, nil
-}
 
 func (d *Provider) GetOwnedTokensByContract(context.Context, persist.Address, persist.Address, int, int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	return []multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, nil

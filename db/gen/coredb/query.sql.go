@@ -1072,7 +1072,7 @@ func (q *Queries) GetActorForGroup(ctx context.Context, groupID sql.NullString) 
 }
 
 const getAdmireByAdmireID = `-- name: GetAdmireByAdmireID :one
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id FROM admires WHERE id = $1 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id FROM admires WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetAdmireByAdmireID(ctx context.Context, id persist.DBID) (Admire, error) {
@@ -1087,12 +1087,13 @@ func (q *Queries) GetAdmireByAdmireID(ctx context.Context, id persist.DBID) (Adm
 		&i.CreatedAt,
 		&i.LastUpdated,
 		&i.PostID,
+		&i.TokenID,
 	)
 	return i, err
 }
 
 const getAdmiresByActorID = `-- name: GetAdmiresByActorID :many
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id FROM admires WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id FROM admires WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC
 `
 
 func (q *Queries) GetAdmiresByActorID(ctx context.Context, actorID persist.DBID) ([]Admire, error) {
@@ -1113,6 +1114,7 @@ func (q *Queries) GetAdmiresByActorID(ctx context.Context, actorID persist.DBID)
 			&i.CreatedAt,
 			&i.LastUpdated,
 			&i.PostID,
+			&i.TokenID,
 		); err != nil {
 			return nil, err
 		}
@@ -1125,7 +1127,7 @@ func (q *Queries) GetAdmiresByActorID(ctx context.Context, actorID persist.DBID)
 }
 
 const getAdmiresByAdmireIDs = `-- name: GetAdmiresByAdmireIDs :many
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id from admires WHERE id = ANY($1) AND deleted = false
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id from admires WHERE id = ANY($1) AND deleted = false
 `
 
 func (q *Queries) GetAdmiresByAdmireIDs(ctx context.Context, admireIds persist.DBIDList) ([]Admire, error) {
@@ -1146,6 +1148,7 @@ func (q *Queries) GetAdmiresByAdmireIDs(ctx context.Context, admireIds persist.D
 			&i.CreatedAt,
 			&i.LastUpdated,
 			&i.PostID,
+			&i.TokenID,
 		); err != nil {
 			return nil, err
 		}
@@ -2857,14 +2860,14 @@ func (q *Queries) GetPostsByIds(ctx context.Context, ids []string) ([]Post, erro
 }
 
 const getPreviewURLsByContractIdAndUserId = `-- name: GetPreviewURLsByContractIdAndUserId :many
-select (tm.media->>'thumbnail_url')::varchar as thumbnail_url
+select coalesce(nullif(tm.media->>'thumbnail_url', ''), nullif(tm.media->>'media_url', ''))::varchar as thumbnail_url
     from tokens t
         inner join token_medias tm on t.token_media_id = tm.id
     where t.contract = $1
       and t.owner_user_id = $2
       and t.displayable
       and t.deleted = false
-      and tm.media ->> 'thumbnail_url' != ''
+      and (tm.media ->> 'thumbnail_url' != '' or tm.media->>'media_type' = 'image')
       and tm.deleted = false
     order by t.id limit 3
 `
@@ -3443,6 +3446,32 @@ func (q *Queries) GetTokenByTokenIdentifiers(ctx context.Context, arg GetTokenBy
 		&i.IsCreatorToken,
 		&i.IsHolderToken,
 		&i.Displayable,
+	)
+	return i, err
+}
+
+const getTokenMediaByTokenId = `-- name: GetTokenMediaByTokenId :one
+select tm.id, tm.created_at, tm.last_updated, tm.version, tm.contract_id, tm.token_id, tm.chain, tm.active, tm.metadata, tm.media, tm.name, tm.description, tm.processing_job_id, tm.deleted from tokens join token_medias tm on tokens.token_media_id = tm.id where tokens.id = $1 and tokens.displayable and not tokens.deleted and not tm.deleted
+`
+
+func (q *Queries) GetTokenMediaByTokenId(ctx context.Context, id persist.DBID) (TokenMedia, error) {
+	row := q.db.QueryRow(ctx, getTokenMediaByTokenId, id)
+	var i TokenMedia
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.LastUpdated,
+		&i.Version,
+		&i.ContractID,
+		&i.TokenID,
+		&i.Chain,
+		&i.Active,
+		&i.Metadata,
+		&i.Media,
+		&i.Name,
+		&i.Description,
+		&i.ProcessingJobID,
+		&i.Deleted,
 	)
 	return i, err
 }

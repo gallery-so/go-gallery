@@ -36,6 +36,12 @@ const staleCommunityTime = time.Minute * 30
 
 const maxCommunitySize = 10_000
 
+var contractNameBlacklist = map[string]bool{
+	"unidentified contract": true,
+	"unknown contract":      true,
+	"unknown":               true,
+}
+
 // SendTokens is called to process a user's batch of tokens
 type SendTokens func(context.Context, task.TokenProcessingUserMessage) error
 
@@ -171,6 +177,9 @@ type TokensContractFetcher interface {
 
 type ContractsFetcher interface {
 	GetContractByAddress(ctx context.Context, contract persist.Address) (ChainAgnosticContract, error)
+}
+
+type ContractsOwnerFetcher interface {
 	GetContractsByOwnerAddress(ctx context.Context, owner persist.Address) ([]ChainAgnosticContract, error)
 }
 
@@ -185,6 +194,7 @@ type OpenSeaChildContractFetcher interface {
 
 // ContractRefresher supports refreshes of a contract
 type ContractRefresher interface {
+	ContractsFetcher
 	RefreshContract(context.Context, persist.Address) error
 }
 
@@ -1201,6 +1211,10 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 
 	tokenFetchers := matchingProvidersForChain[TokenDescriptorsFetcher](p.Chains, ti.Chain)
 
+	if len(tokenFetchers) == 0 {
+		return nil
+	}
+
 	finalTokenDescriptors := ChainAgnosticTokenDescriptors{}
 	finalContractDescriptors := ChainAgnosticContractDescriptors{}
 	for _, tokenFetcher := range tokenFetchers {
@@ -1218,7 +1232,7 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 			}
 
 			// contract
-			if contract.Name != "" && finalContractDescriptors.Name == "" {
+			if (contract.Name != "" && !contractNameBlacklist[strings.ToLower(contract.Name)]) && finalContractDescriptors.Name == "" {
 				finalContractDescriptors.Name = contract.Name
 			}
 			if contract.Description != "" && finalContractDescriptors.Description == "" {
@@ -1229,6 +1243,9 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 			}
 			if contract.CreatorAddress != "" && finalContractDescriptors.CreatorAddress == "" {
 				finalContractDescriptors.CreatorAddress = contract.CreatorAddress
+			}
+			if contract.ProfileImageURL != "" && finalContractDescriptors.ProfileImageURL == "" {
+				finalContractDescriptors.ProfileImageURL = contract.ProfileImageURL
 			}
 		} else {
 			logger.For(ctx).Infof("token %s-%s-%d not found for refresh (err: %s)", ti.TokenID, ti.ContractAddress, ti.Chain, err)
@@ -1246,11 +1263,13 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 	}
 
 	if err := p.Repos.ContractRepository.UpsertByAddress(ctx, ti.ContractAddress, ti.Chain, persist.ContractGallery{
-		Chain:        ti.Chain,
-		Address:      persist.Address(ti.Chain.NormalizeAddress(ti.ContractAddress)),
-		Symbol:       persist.NullString(finalContractDescriptors.Symbol),
-		Name:         persist.NullString(finalContractDescriptors.Name),
-		OwnerAddress: finalContractDescriptors.CreatorAddress,
+		Chain:           ti.Chain,
+		Address:         persist.Address(ti.Chain.NormalizeAddress(ti.ContractAddress)),
+		Symbol:          persist.NullString(finalContractDescriptors.Symbol),
+		Name:            persist.NullString(finalContractDescriptors.Name),
+		Description:     persist.NullString(finalContractDescriptors.Description),
+		ProfileImageURL: persist.NullString(finalContractDescriptors.ProfileImageURL),
+		OwnerAddress:    finalContractDescriptors.CreatorAddress,
 	}); err != nil {
 		return err
 	}
@@ -1260,12 +1279,23 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 // RefreshContract refreshes a contract on the given chain using the chain provider for that chain
 func (p *Provider) RefreshContract(ctx context.Context, ci persist.ContractIdentifiers) error {
 	contractRefreshers := matchingProvidersForChain[ContractRefresher](p.Chains, ci.Chain)
+	contractFetchers := matchingProvidersForChain[ContractsFetcher](p.Chains, ci.Chain)
+	var contracts []chainContracts
 	for _, refresher := range contractRefreshers {
 		if err := refresher.RefreshContract(ctx, ci.ContractAddress); err != nil {
 			return err
 		}
 	}
-	return nil
+	for i, fetcher := range contractFetchers {
+		c, err := fetcher.GetContractByAddress(ctx, ci.ContractAddress)
+		if err != nil {
+			return err
+		}
+		contracts = append(contracts, chainContracts{priority: i, chain: ci.Chain, contracts: []ChainAgnosticContract{c}})
+	}
+
+	_, err := p.processContracts(ctx, contracts, false)
+	return err
 }
 
 // RefreshTokensForContract refreshes all tokens in a given contract
@@ -1363,7 +1393,7 @@ func (p *Provider) SyncContractsOwnedByUser(ctx context.Context, userID persist.
 	}
 	contractsFromProviders := []chainContracts{}
 
-	contractFetchers := matchingProvidersByChains[ContractsFetcher](p.Chains, chains...)
+	contractFetchers := matchingProvidersByChains[ContractsOwnerFetcher](p.Chains, chains...)
 	searchAddresses := p.matchingWallets(user.Wallets, chains)
 	providerPool := pool.NewWithResults[ContractOwnerResult]().WithContext(ctx)
 
@@ -1789,7 +1819,7 @@ func contractsToNewDedupedContracts(contracts []chainContracts) []persist.Contra
 			if contract.Descriptors.Symbol != "" {
 				meta.Symbol = contract.Descriptors.Symbol
 			}
-			if contract.Descriptors.Name != "" {
+			if contract.Descriptors.Name != "" && !contractNameBlacklist[strings.ToLower(contract.Descriptors.Name)] {
 				meta.Name = contract.Descriptors.Name
 			}
 			if contract.Descriptors.CreatorAddress != "" {

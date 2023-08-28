@@ -104,6 +104,7 @@ from feed_entity_score_view f2
 where created_at > (select last_updated from refreshed limit 1)
   and ($2::bool or f2.actor_id != $3)
   and ($4::bool or f2.feed_entity_type != $5)
+  and ($6::bool or f2.feed_entity_type != $7)
   and not (f2.action = any($8::varchar[]))
 `
 

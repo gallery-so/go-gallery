@@ -181,7 +181,7 @@ func (q *Queries) GalleryRepoGetGalleryCollections(ctx context.Context, id persi
 }
 
 const galleryRepoGetPreviewsForUserID = `-- name: GalleryRepoGetPreviewsForUserID :many
-select (tm.media ->> 'thumbnail_url')::text from galleries g,
+select coalesce(nullif(tm.media->>'thumbnail_url', ''), nullif(tm.media->>'media_url', ''))::varchar as thumbnail_url from galleries g,
     unnest(g.collections) with ordinality as collection_ids(id, ord) inner join collections c on c.id = collection_ids.id and c.deleted = false,
     unnest(c.nfts) with ordinality as token_ids(id, ord) inner join tokens t on t.id = token_ids.id and t.displayable and t.deleted = false
     inner join token_medias tm on t.token_media_id = tm.id and tm.media ->> 'thumbnail_url' != ''
@@ -202,11 +202,11 @@ func (q *Queries) GalleryRepoGetPreviewsForUserID(ctx context.Context, arg Galle
 	defer rows.Close()
 	var items []string
 	for rows.Next() {
-		var column_1 string
-		if err := rows.Scan(&column_1); err != nil {
+		var thumbnail_url string
+		if err := rows.Scan(&thumbnail_url); err != nil {
 			return nil, err
 		}
-		items = append(items, column_1)
+		items = append(items, thumbnail_url)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
