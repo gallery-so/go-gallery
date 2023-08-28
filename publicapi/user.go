@@ -409,7 +409,7 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 		return "", "", err
 	}
 
-	createUserParams, err := createAuthedNewUserParams(ctx, authenticator, username, bio, email)
+	createUserParams, err := createNewUserParamsWithAuth(ctx, authenticator, username, bio, email)
 	if err != nil {
 		return "", "", err
 	}
@@ -1665,7 +1665,7 @@ func standardizeURI(u string) string {
 	return u
 }
 
-func createAuthedNewUserParams(ctx context.Context, authenticator auth.Authenticator, username string, bio string, email *persist.Email) (persist.CreateUserInput, error) {
+func createNewUserParamsWithAuth(ctx context.Context, authenticator auth.Authenticator, username string, bio string, email *persist.Email) (persist.CreateUserInput, error) {
 	authResult, err := authenticator.Authenticate(ctx)
 	if err != nil && !util.ErrorAs[persist.ErrUserNotFound](err) {
 		return persist.CreateUserInput{}, auth.ErrAuthenticationFailed{WrappedErr: err}
@@ -1673,6 +1673,8 @@ func createAuthedNewUserParams(ctx context.Context, authenticator auth.Authentic
 
 	if authResult.User != nil && !authResult.User.Universal.Bool() {
 		if _, ok := authenticator.(auth.MagicLinkAuthenticator); ok {
+			// TODO: We currently only use MagicLink for email, but we may use it for other login methods like SMS later,
+			// so this error may not always be applicable in the future.
 			return persist.CreateUserInput{}, auth.ErrEmailAlreadyUsed
 		}
 		return persist.CreateUserInput{}, persist.ErrUserAlreadyExists{Authenticator: authenticator.GetDescription()}

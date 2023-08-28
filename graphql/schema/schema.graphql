@@ -1736,7 +1736,7 @@ type LogoutPayload {
 input CreateUserInput {
   username: String!
   bio: String
-  email: Email @srub
+  email: Email @scrub
   galleryName: String
   galleryDescription: String
   galleryPosition: String

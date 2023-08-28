@@ -258,11 +258,11 @@ func (u *UserRepository) Create(pCtx context.Context, pUser persist.CreateUserIn
 	var wallets persist.WalletList
 
 	if pUser.ChainAddress.Address() != "" {
-		walletID, err := u.createWalletWithTx(pCtx, queries, pUser.ChainAddress, pUser.WalletType)
+		primaryWalletID, err = u.createWalletWithTx(pCtx, queries, pUser.ChainAddress, pUser.WalletType)
 		if err != nil {
 			return "", err
 		}
-		wallets = persist.WalletList{persist.Wallet{ID: walletID}}
+		wallets = append(wallets, persist.Wallet{ID: primaryWalletID})
 	}
 
 	userID := persist.GenerateID()
