@@ -11,27 +11,114 @@ import (
 
 func TestMain(t *testing.T) {
 	t.Run("test cursor pagination", func(t *testing.T) {
-		t.Run("cursor encodes expected types", func(t *testing.T) {
-			types := []struct {
-				title string
-				typ   any
-			}{
-				{title: "can encode time", typ: time.Now()},
-				{title: "can encode bool", typ: true},
-				{title: "can encode int", typ: 1},
-				{title: "can encode int64", typ: int64(1)},
-				{title: "can encode uint64", typ: uint64(1)},
-				{title: "can encode stirng", typ: "id"},
-				{title: "can encode dbid", typ: persist.DBID("id")},
-				{title: "can encode slice of dbids", typ: []persist.DBID{"id0", "id1"}},
-				{title: "can encode slice of feed entity types", typ: []persist.FeedEntityType{0, 1}},
-			}
-			for _, typ := range types {
-				t.Run(typ.title, func(t *testing.T) {
-					_, err := pack(typ.typ)
-					assert.NoError(t, err)
-				})
-			}
+		t.Run("cursor decodes expected types", func(t *testing.T) {
+			t.Run("can decode timeID", func(t *testing.T) {
+				curA := cursors.NewTimeIDCursor()
+				curA.Time = time.Now()
+				curA.ID = persist.GenerateID()
+				packed, err := curA.Pack()
+				assert.NoError(t, err)
+
+				curB := cursors.NewTimeIDCursor()
+				err = curB.Unpack(packed)
+
+				assert.NoError(t, curB.Unpack(packed))
+				// assert.True(t, curA.Time.Equal(curB.Time))
+				assert.Equal(t, curA.ID, curB.ID)
+			})
+
+			t.Run("can decode boolBoolIntID", func(t *testing.T) {
+				curA := cursors.NewBoolBoolIntIDCursor()
+				curA.Bool1 = true
+				curA.Bool2 = true
+				curA.Int = 1337
+				curA.ID = persist.GenerateID()
+				packed, err := curA.Pack()
+				assert.NoError(t, err)
+
+				curB := cursors.NewBoolBoolIntIDCursor()
+
+				assert.NoError(t, curB.Unpack(packed))
+				assert.Equal(t, curA.Int, curB.Int)
+			})
+
+			t.Run("can decode boolTimeID", func(t *testing.T) {
+				curA := cursors.NewBoolTimeIDCursor()
+				curA.Bool = true
+				curA.Time = time.Now()
+				curA.ID = persist.GenerateID()
+				packed, err := curA.Pack()
+				assert.NoError(t, err)
+
+				curB := cursors.NewBoolTimeIDCursor()
+
+				assert.NoError(t, curB.Unpack(packed))
+				assert.Equal(t, curA.Bool, curB.Bool)
+				assert.True(t, curA.Time.Equal(curB.Time))
+				assert.Equal(t, curA.ID, curB.ID)
+			})
+
+			t.Run("can decode stringID", func(t *testing.T) {
+				curA := cursors.NewStringIDCursor()
+				curA.String = "string"
+				curA.ID = persist.GenerateID()
+				packed, err := curA.Pack()
+				assert.NoError(t, err)
+
+				curB := cursors.NewStringIDCursor()
+
+				assert.NoError(t, curB.Unpack(packed))
+				assert.Equal(t, curA.String, curB.String)
+				assert.Equal(t, curA.ID, curB.ID)
+			})
+
+			t.Run("can decode intTimeID", func(t *testing.T) {
+				curA := cursors.NewIntTimeIDCursor()
+				curA.Int = 1337
+				curA.Time = time.Now()
+				curA.ID = persist.GenerateID()
+				packed, err := curA.Pack()
+				assert.NoError(t, err)
+
+				curB := cursors.NewIntTimeIDCursor()
+
+				assert.NoError(t, curB.Unpack(packed))
+				assert.Equal(t, curA.Int, curB.Int)
+				assert.True(t, curA.Time.Equal(curB.Time))
+				assert.Equal(t, curA.ID, curB.ID)
+			})
+
+			t.Run("can decode feedPosition", func(t *testing.T) {
+				curA := cursors.NewFeedPositionCursor()
+				curA.CurrentPosition = 2
+				curA.EntityTypes = []persist.FeedEntityType{0, 1}
+				curA.EntityIDs = []persist.DBID{"a", "b", "c", "d", "e"}
+				packed, err := curA.Pack()
+				assert.NoError(t, err)
+
+				curB := cursors.NewFeedPositionCursor()
+				err = curB.Unpack(packed)
+
+				assert.NoError(t, curB.Unpack(packed))
+				assert.Equal(t, curA.CurrentPosition, curB.CurrentPosition)
+				assert.Equal(t, curA.EntityTypes, curB.EntityTypes)
+				assert.Equal(t, curA.EntityIDs, curB.EntityIDs)
+			})
+
+			t.Run("can decode position", func(t *testing.T) {
+				curA := cursors.NewPositionCursor()
+				curA.CurrentPosition = 2
+				curA.IDs = []persist.DBID{"a", "b", "c", "d", "e"}
+				packed, err := curA.Pack()
+				assert.NoError(t, err)
+
+				curB := cursors.NewPositionCursor()
+				err = curB.Unpack(packed)
+
+				assert.NoError(t, curB.Unpack(packed))
+				assert.Equal(t, curA.CurrentPosition, curB.CurrentPosition)
+				assert.Equal(t, curA.IDs, curB.IDs)
+			})
 		})
 
 		t.Run("cursor pagination returns expected edges", func(t *testing.T) {

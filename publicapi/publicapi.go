@@ -149,8 +149,9 @@ func newDBIDCache(cache *redis.Cache, key string, ttl time.Duration, f func(cont
 				if err != nil {
 					return nil, err
 				}
-
-				cur := positionCursor{CurrentPosition: 0, IDs: ids}
+				cur := cursors.NewPositionCursor()
+				cur.CurrentPosition = 0
+				cur.IDs = ids
 				b, err := cur.Pack()
 				return []byte(b), err
 			},
@@ -163,7 +164,7 @@ func (d dbidCache) Load(ctx context.Context) ([]persist.DBID, error) {
 	if err != nil {
 		return nil, err
 	}
-	var cur positionCursor
+	cur := cursors.NewPositionCursor()
 	err = cur.Unpack(string(b))
 	return cur.IDs, err
 }

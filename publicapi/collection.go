@@ -117,7 +117,7 @@ func (api CollectionAPI) GetTopCollectionsForCommunity(ctx context.Context, chai
 	}
 
 	var collectionIDs []persist.DBID
-	var cursor positionCursor
+	cursor := cursors.NewPositionCursor()
 	var paginator positionPaginator
 
 	// If a cursor is provided, we can skip querying the cache

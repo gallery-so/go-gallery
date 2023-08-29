@@ -1227,7 +1227,7 @@ func (api UserAPI) RecommendUsers(ctx context.Context, before, after *string, fi
 		return nil, PageInfo{}, err
 	}
 
-	var cursor positionCursor
+	cursor := cursors.NewPositionCursor()
 	var paginator positionPaginator
 
 	// If we have a cursor, we can page through the original set of recommended users

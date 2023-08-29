@@ -354,7 +354,7 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 
 	var (
 		err           error
-		cursor        feedPositionCursor
+		cursor        = cursors.NewFeedPositionCursor()
 		paginator     feedPaginator
 		entityIDToPos = make(map[persist.DBID]int)
 	)
@@ -460,7 +460,7 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 
 	var (
 		paginator     feedPaginator
-		cursor        feedPositionCursor
+		cursor        = cursors.NewFeedPositionCursor()
 		entityIDToPos = make(map[persist.DBID]int)
 	)
 
@@ -846,8 +846,8 @@ func (p *feedPaginator) paginate(before, after *string, first, last *int) ([]any
 		CurAfterPos:  defaultCursorAfterPosition,
 	}
 
-	var beforeCur feedPositionCursor
-	var afterCur feedPositionCursor
+	beforeCur := cursors.NewFeedPositionCursor()
+	afterCur := cursors.NewFeedPositionCursor()
 
 	if before != nil {
 		if err := beforeCur.Unpack(*before); err != nil {
@@ -872,7 +872,7 @@ func (p *feedPaginator) paginate(before, after *string, first, last *int) ([]any
 		return nil, PageInfo{}, err
 	}
 
-	return pageFrom(results, nil, cursors.NewFeedPositionCursorer(p.CursorFunc), before, after, first, last)
+	return pageFrom(results, nil, cursorables.NewFeedPositionCursorer(p.CursorFunc), before, after, first, last)
 }
 
 type feedCache struct {
@@ -895,11 +895,10 @@ func newFeedCache(cache *redis.Cache, includePosts bool, f func(context.Context)
 				if err != nil {
 					return nil, err
 				}
-				cur := feedPositionCursor{
-					CurrentPosition: 0,
-					EntityTypes:     types,
-					EntityIDs:       ids,
-				}
+				cur := cursors.NewFeedPositionCursor()
+				cur.CurrentPosition = 0
+				cur.EntityTypes = types
+				cur.EntityIDs = ids
 				b, err := cur.Pack()
 				return []byte(b), err
 			},
@@ -912,7 +911,7 @@ func (f feedCache) Load(ctx context.Context) ([]persist.FeedEntityType, []persis
 	if err != nil {
 		return nil, nil, err
 	}
-	var cur feedPositionCursor
+	cur := cursors.NewFeedPositionCursor()
 	err = cur.Unpack(string(b))
 	return cur.EntityTypes, cur.EntityIDs, err
 }
