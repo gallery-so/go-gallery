@@ -159,7 +159,7 @@ func SetDefaults() {
 	viper.SetDefault("ENV", "local")
 	viper.SetDefault("ALLOWED_ORIGINS", "http://localhost:3000")
 	viper.SetDefault("REFRESH_JWT_SECRET", "Refresh-Test-Secret")
-	viper.SetDefault("REFRESH_JWT_TTL", 60*60*24*7*4)
+	viper.SetDefault("REFRESH_JWT_TTL", 60*60*24*90)
 	viper.SetDefault("AUTH_JWT_SECRET", "Test-Secret")
 	viper.SetDefault("AUTH_JWT_TTL", 60*5)
 	viper.SetDefault("ONE_TIME_LOGIN_JWT_SECRET", "One-Time-Login-Test-Secret")
