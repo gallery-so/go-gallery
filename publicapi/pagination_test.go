@@ -23,7 +23,7 @@ func TestMain(t *testing.T) {
 				err = curB.Unpack(packed)
 
 				assert.NoError(t, curB.Unpack(packed))
-				// assert.True(t, curA.Time.Equal(curB.Time))
+				assert.True(t, curA.Time.Equal(curB.Time))
 				assert.Equal(t, curA.ID, curB.ID)
 			})
 
