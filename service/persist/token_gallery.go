@@ -51,6 +51,8 @@ type TokenGallery struct {
 	BlockNumber          BlockNumber `json:"block_number"`
 	IsUserMarkedSpam     *bool       `json:"is_user_marked_spam"`
 	IsProviderMarkedSpam *bool       `json:"is_provider_marked_spam"`
+
+	Priority *int `json:"-"`
 }
 
 func (l AddressAtBlockList) Value() (driver.Value, error) {

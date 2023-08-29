@@ -38,6 +38,7 @@ type SyncFailureFallbackProvider struct {
 type SyncFailurePrimary interface {
 	Configurer
 	TokensOwnerFetcher
+	TokensIncrementalOwnerFetcher
 	TokenDescriptorsFetcher
 	TokensContractFetcher
 	ContractsFetcher
@@ -144,6 +145,30 @@ func (f SyncFailureFallbackProvider) GetTokensByWalletAddress(ctx context.Contex
 	}
 
 	return tokens, contracts, nil
+}
+
+func (f SyncFailureFallbackProvider) GetTokensIncrementallyByWalletAddress(ctx context.Context, address persist.Address, rec chan<- ChainAgnosticTokensAndContracts, errChan chan<- error) {
+
+	if tiof, ok := f.Fallback.(TokensIncrementalOwnerFetcher); ok {
+		subErrChan := make(chan error)
+		subRec := make(chan ChainAgnosticTokensAndContracts)
+		f.Primary.GetTokensIncrementallyByWalletAddress(ctx, address, subRec, subErrChan)
+		for {
+			select {
+			case <-subErrChan:
+				tiof.GetTokensIncrementallyByWalletAddress(ctx, address, rec, errChan)
+				return
+			case tokens, ok := <-subRec:
+				if !ok {
+					close(rec)
+					return
+				}
+				rec <- tokens
+			}
+		}
+	} else {
+		f.Primary.GetTokensIncrementallyByWalletAddress(ctx, address, rec, errChan)
+	}
 }
 
 func (f SyncFailureFallbackProvider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, id ChainAgnosticIdentifiers, address persist.Address) (ChainAgnosticToken, ChainAgnosticContract, error) {

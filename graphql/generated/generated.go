@@ -820,7 +820,7 @@ type ComplexityRoot struct {
 		SyncCreatedTokensForExistingContract func(childComplexity int, input model.SyncCreatedTokensForExistingContractInput) int
 		SyncCreatedTokensForNewContracts     func(childComplexity int, input model.SyncCreatedTokensForNewContractsInput) int
 		SyncCreatedTokensForUsername         func(childComplexity int, username string, chains []persist.Chain) int
-		SyncTokens                           func(childComplexity int, chains []persist.Chain) int
+		SyncTokens                           func(childComplexity int, chains []persist.Chain, incrementally *bool) int
 		SyncTokensForUsername                func(childComplexity int, username string, chains []persist.Chain) int
 		UnbanUserFromFeed                    func(childComplexity int, username string) int
 		UnfollowUser                         func(childComplexity int, userID persist.DBID) int
@@ -1662,7 +1662,7 @@ type MutationResolver interface {
 	UpdateCollectionHidden(ctx context.Context, input model.UpdateCollectionHiddenInput) (model.UpdateCollectionHiddenPayloadOrError, error)
 	UpdateTokenInfo(ctx context.Context, input model.UpdateTokenInfoInput) (model.UpdateTokenInfoPayloadOrError, error)
 	SetSpamPreference(ctx context.Context, input model.SetSpamPreferenceInput) (model.SetSpamPreferencePayloadOrError, error)
-	SyncTokens(ctx context.Context, chains []persist.Chain) (model.SyncTokensPayloadOrError, error)
+	SyncTokens(ctx context.Context, chains []persist.Chain, incrementally *bool) (model.SyncTokensPayloadOrError, error)
 	SyncCreatedTokensForNewContracts(ctx context.Context, input model.SyncCreatedTokensForNewContractsInput) (model.SyncCreatedTokensForNewContractsPayloadOrError, error)
 	SyncCreatedTokensForExistingContract(ctx context.Context, input model.SyncCreatedTokensForExistingContractInput) (model.SyncCreatedTokensForExistingContractPayloadOrError, error)
 	RefreshToken(ctx context.Context, tokenID persist.DBID) (model.RefreshTokenPayloadOrError, error)
@@ -4909,7 +4909,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.SyncTokens(childComplexity, args["chains"].([]persist.Chain)), true
+		return e.complexity.Mutation.SyncTokens(childComplexity, args["chains"].([]persist.Chain), args["incrementally"].(*bool)), true
 
 	case "Mutation.syncTokensForUsername":
 		if e.complexity.Mutation.SyncTokensForUsername == nil {
@@ -10448,7 +10448,7 @@ type Mutation {
   updateTokenInfo(input: UpdateTokenInfoInput!): UpdateTokenInfoPayloadOrError @authRequired
   setSpamPreference(input: SetSpamPreferenceInput!): SetSpamPreferencePayloadOrError @authRequired
 
-  syncTokens(chains: [Chain!]): SyncTokensPayloadOrError @authRequired
+  syncTokens(chains: [Chain!], incrementally: Boolean): SyncTokensPayloadOrError @authRequired
   syncCreatedTokensForNewContracts(
     input: SyncCreatedTokensForNewContractsInput!
   ): SyncCreatedTokensForNewContractsPayloadOrError @authRequired
@@ -11991,6 +11991,15 @@ func (ec *executionContext) field_Mutation_syncTokens_args(ctx context.Context, 
 		}
 	}
 	args["chains"] = arg0
+	var arg1 *bool
+	if tmp, ok := rawArgs["incrementally"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("incrementally"))
+		arg1, err = ec.unmarshalOBoolean2ᚖbool(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["incrementally"] = arg1
 	return args, nil
 }
 
@@ -32187,7 +32196,7 @@ func (ec *executionContext) _Mutation_syncTokens(ctx context.Context, field grap
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().SyncTokens(rctx, fc.Args["chains"].([]persist.Chain))
+			return ec.resolvers.Mutation().SyncTokens(rctx, fc.Args["chains"].([]persist.Chain), fc.Args["incrementally"].(*bool))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.AuthRequired == nil {

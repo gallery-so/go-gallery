@@ -93,7 +93,7 @@ var (
 
 // ethProvidersConfig is a wire injector that binds multichain interfaces to their concrete Ethereum implementations
 func ethProvidersConfig(indexerProvider *eth.Provider, openseaProvider *opensea.Provider, fallbackProvider multichain.SyncFailureFallbackProvider, alchemyProvider *alchemy.Provider) ethProviderList {
-	serverEthProviderList := ethRequirements(indexerProvider, indexerProvider, fallbackProvider, alchemyProvider, fallbackProvider, indexerProvider, indexerProvider, indexerProvider, indexerProvider, openseaProvider)
+	serverEthProviderList := ethRequirements(indexerProvider, indexerProvider, fallbackProvider, alchemyProvider, alchemyProvider, fallbackProvider, indexerProvider, indexerProvider, indexerProvider, indexerProvider, openseaProvider)
 	return serverEthProviderList
 }
 
@@ -304,6 +304,7 @@ func ethRequirements(
 	v multichain.Verifier,
 	tof multichain.TokensOwnerFetcher,
 	toc multichain.TokensContractFetcher,
+	tiof multichain.TokensIncrementalOwnerFetcher,
 	cf multichain.ContractsFetcher,
 	cr multichain.ContractRefresher,
 	tmf multichain.TokenMetadataFetcher,
@@ -311,7 +312,7 @@ func ethRequirements(
 	tdf multichain.TokenDescriptorsFetcher,
 	osccf multichain.OpenSeaChildContractFetcher,
 ) ethProviderList {
-	return ethProviderList{nr, v, tof, toc, cf, cr, tmf, tcof, tdf, osccf}
+	return ethProviderList{nr, v, tof, toc, tiof, cf, cr, tmf, tcof, tdf, osccf}
 }
 
 // tezosRequirements is the set of provider interfaces required for Tezos

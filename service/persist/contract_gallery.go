@@ -27,6 +27,8 @@ type ContractGallery struct {
 	BadgeURL              NullString `json:"badge_url"`
 	IsProviderMarkedSpam  bool       `json:"is_provider_marked_spam"`
 	OverrideCreatorUserID DBID       `json:"override_creator_user_id"`
+
+	Priority *int `json:"-"`
 }
 
 // ErrContractNotFoundByAddress is an error type for when a contract is not found by address
@@ -39,6 +41,7 @@ type ErrGalleryContractNotFound struct {
 type ContractGalleryRepository interface {
 	GetByID(ctx context.Context, id DBID) (ContractGallery, error)
 	GetByAddress(context.Context, Address, Chain) (ContractGallery, error)
+	GetByTokenIDs(context.Context, DBIDList) ([]ContractGallery, error)
 	UpsertByAddress(context.Context, Address, Chain, ContractGallery) error
 	BulkUpsert(context.Context, []ContractGallery, bool) ([]ContractGallery, error)
 	GetOwnersByAddress(context.Context, Address, Chain, int, int) ([]TokenHolder, error)
