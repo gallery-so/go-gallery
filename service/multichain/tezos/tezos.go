@@ -140,16 +140,13 @@ func (d *Provider) GetBlockchainInfo() multichain.BlockchainInfo {
 }
 
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the Tezos Blockchain
-func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address, maxLimit, startingOffset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	tzAddr, err := toTzAddress(addr)
 	if err != nil {
 		return nil, nil, err
 	}
-	limit := int(math.Min(float64(maxLimit), float64(pageSize)))
-	if limit < 1 {
-		limit = pageSize
-	}
-	offset := startingOffset
+	limit := pageSize
+	offset := 0
 	resultTokens := []tzktBalanceToken{}
 	for {
 		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/tokens/balances?token.standard=fa2&account=%s&limit=%d&sort.asc=id&offset=%d", d.apiURL, tzAddr.String(), limit, offset), nil)
@@ -171,14 +168,10 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 
 		resultTokens = append(resultTokens, tzktBalances...)
 
-		if len(tzktBalances) < limit || (maxLimit > 0 && len(resultTokens) >= maxLimit) {
+		if len(tzktBalances) < limit {
 			break
 		}
 
-		if maxLimit > 0 && len(resultTokens)+limit >= maxLimit {
-			// this will ensure that we don't go over the max limit
-			limit = maxLimit - len(resultTokens)
-		}
 		offset += limit
 
 		logger.For(ctx).Debugf("retrieved %d tokens for address %s (limit %d offset %d)", len(resultTokens), tzAddr.String(), pageSize, offset)

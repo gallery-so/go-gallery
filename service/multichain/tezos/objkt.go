@@ -125,7 +125,7 @@ func (p *TezosObjktProvider) GetTokenMetadataByTokenIdentifiers(ctx context.Cont
 	return t[0].TokenMetadata, nil
 }
 
-func (p *TezosObjktProvider) GetTokensByWalletAddress(ctx context.Context, ownerAddress persist.Address, maxLimit int, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (p *TezosObjktProvider) GetTokensByWalletAddress(ctx context.Context, ownerAddress persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"ownerAddress": ownerAddress})
 	tzOwnerAddress, err := toTzAddress(ownerAddress)
 	if err != nil {
@@ -133,13 +133,11 @@ func (p *TezosObjktProvider) GetTokensByWalletAddress(ctx context.Context, owner
 	}
 
 	pageSize := maxPageSize
-	if maxLimit > 0 && maxLimit < maxPageSize {
-		pageSize = maxLimit
-	}
 
 	// Paginate results
 	var query tokensByWalletQuery
 	tokens := make([]tokenNode, 0)
+	offset := 0
 	for {
 		if err := retry.RetryQuery(ctx, p.gql, &query, inputArgs{
 			"ownerAddress": graphql.String(tzOwnerAddress),
@@ -156,16 +154,8 @@ func (p *TezosObjktProvider) GetTokensByWalletAddress(ctx context.Context, owner
 
 		// Exceeded fetch size
 		tokens = append(tokens, query.Holder[0].Held_Tokens...)
-		if maxLimit > 0 && len(tokens) >= maxLimit {
-			break
-		}
 
 		offset += len(query.Holder[0].Held_Tokens)
-	}
-
-	// Truncate tokens if there is a max limit
-	if maxLimit > 0 && len(tokens) > maxLimit {
-		tokens = tokens[:maxLimit]
 	}
 
 	returnTokens := make([]multichain.ChainAgnosticToken, 0, len(tokens))

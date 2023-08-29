@@ -53,8 +53,8 @@ func (f SyncWithContractEvalFallbackProvider) GetBlockchainInfo() BlockchainInfo
 	return f.Primary.GetBlockchainInfo()
 }
 
-func (f SyncWithContractEvalFallbackProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]ChainAgnosticToken, []ChainAgnosticContract, error) {
-	tokens, contracts, err := f.Primary.GetTokensByWalletAddress(ctx, address, limit, offset)
+func (f SyncWithContractEvalFallbackProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address) ([]ChainAgnosticToken, []ChainAgnosticContract, error) {
+	tokens, contracts, err := f.Primary.GetTokensByWalletAddress(ctx, address)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -137,11 +137,11 @@ func (f SyncFailureFallbackProvider) GetBlockchainInfo() BlockchainInfo {
 	return f.Primary.GetBlockchainInfo()
 }
 
-func (f SyncFailureFallbackProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]ChainAgnosticToken, []ChainAgnosticContract, error) {
-	tokens, contracts, err := f.Primary.GetTokensByWalletAddress(ctx, address, limit, offset)
+func (f SyncFailureFallbackProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address) ([]ChainAgnosticToken, []ChainAgnosticContract, error) {
+	tokens, contracts, err := f.Primary.GetTokensByWalletAddress(ctx, address)
 	if err != nil {
 		logger.For(ctx).WithError(err).Warn("failed to get tokens by wallet address from primary in failure fallback")
-		return f.Fallback.GetTokensByWalletAddress(ctx, address, limit, offset)
+		return f.Fallback.GetTokensByWalletAddress(ctx, address)
 	}
 
 	return tokens, contracts, nil

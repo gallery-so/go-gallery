@@ -197,7 +197,7 @@ func (d *Provider) GetBlockchainInfo() multichain.BlockchainInfo {
 	}
 }
 
-func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	tokens, err := d.getTokensByWalletAddressPaginate(ctx, addr, "")
 	if err != nil {
 		return nil, nil, err

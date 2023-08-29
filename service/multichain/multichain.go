@@ -172,7 +172,7 @@ type Verifier interface {
 
 // TokensOwnerFetcher supports fetching tokens for syncing
 type TokensOwnerFetcher interface {
-	GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
+	GetTokensByWalletAddress(ctx context.Context, address persist.Address) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
 	GetTokenByTokenIdentifiersAndOwner(context.Context, ChainAgnosticIdentifiers, persist.Address) (ChainAgnosticToken, ChainAgnosticContract, error)
 }
 
@@ -320,7 +320,7 @@ func (p *Provider) SyncTokensByUserID(ctx context.Context, userID persist.DBID, 
 					priority := i
 
 					subWg.Go(func() {
-						tokens, contracts, err := fetcher.GetTokensByWalletAddress(ctx, addr, 0, 0)
+						tokens, contracts, err := fetcher.GetTokensByWalletAddress(ctx, addr)
 						if err != nil {
 							errChan <- errWithPriority{err: err, priority: priority}
 							return
