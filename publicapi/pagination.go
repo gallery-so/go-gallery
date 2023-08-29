@@ -884,6 +884,12 @@ type cursorer interface {
 	Pack() (string, error)
 	Unpack(string) error
 }
+
+type baseCursor struct {
+	packable
+	unpackable
+}
+
 type cursorable func(any) (cursorer, error)
 
 type cursorN struct{}     // namespace for available cursors
@@ -951,121 +957,114 @@ func (cursorableN) NewFeedPositionCursorer(f func(any) (int64, []persist.FeedEnt
 //------------------------------------------------------------------------------
 
 type timeIDCursor struct {
+	*baseCursor
 	Time time.Time
 	ID   persist.DBID
-	unpackable
-	packable
 }
 
 func (cursorN) NewTimeIDCursor() *timeIDCursor {
-	c := timeIDCursor{unpackable: newUnpackable()}
-	c.unpackFs = []unpackF{unpackTo(&c.Time, c.d.readTime), unpackTo(&c.ID, c.d.readDBID)}
-	c.packVals = []any{&c.Time, &c.ID}
+	c := timeIDCursor{baseCursor: &baseCursor{}}
+	initCursor(c.baseCursor, &c.Time, &c.ID)
 	return &c
 }
 
 //------------------------------------------------------------------------------
 
 type boolBoolIntIDCursor struct {
+	*baseCursor
 	Bool1 bool
 	Bool2 bool
 	Int   int64
 	ID    persist.DBID
-	packable
-	unpackable
 }
 
 func (cursorN) NewBoolBoolIntIDCursor() *boolBoolIntIDCursor {
-	c := boolBoolIntIDCursor{unpackable: newUnpackable()}
-	c.unpackFs = []unpackF{unpackTo(&c.Bool1, c.d.readBool), unpackTo(&c.Bool2, c.d.readBool), unpackTo(&c.Int, c.d.readInt64), unpackTo(&c.ID, c.d.readDBID)}
-	c.packVals = []any{&c.Bool1, &c.Bool2, &c.Int, &c.ID}
+	c := boolBoolIntIDCursor{baseCursor: &baseCursor{}}
+	initCursor(c.baseCursor, &c.Bool1, &c.Bool2, &c.Int, &c.ID)
 	return &c
 }
 
 //------------------------------------------------------------------------------
 
 type boolTimeIDCursor struct {
+	*baseCursor
 	Bool bool
 	Time time.Time
 	ID   persist.DBID
-	packable
-	unpackable
 }
 
 func (cursorN) NewBoolTimeIDCursor() *boolTimeIDCursor {
-	c := boolTimeIDCursor{unpackable: newUnpackable()}
-	c.unpackFs = []unpackF{unpackTo(&c.Bool, c.d.readBool), unpackTo(&c.Time, c.d.readTime), unpackTo(&c.ID, c.d.readDBID)}
-	c.packVals = []any{&c.Bool, &c.Time, &c.ID}
+	c := boolTimeIDCursor{baseCursor: &baseCursor{}}
+	initCursor(c.baseCursor, &c.Bool, &c.Time, &c.ID)
 	return &c
 }
 
 //------------------------------------------------------------------------------
 
 type stringIDCursor struct {
+	*baseCursor
 	String string
 	ID     persist.DBID
-	packable
-	unpackable
 }
 
 func (cursorN) NewStringIDCursor() *stringIDCursor {
-	c := stringIDCursor{unpackable: newUnpackable()}
-	c.unpackFs = []unpackF{unpackTo(&c.String, c.d.readString), unpackTo(&c.ID, c.d.readDBID)}
-	c.packVals = []any{&c.String, &c.ID}
+	c := stringIDCursor{baseCursor: &baseCursor{}}
+	initCursor(c.baseCursor, &c.String, &c.ID)
 	return &c
 }
 
 //------------------------------------------------------------------------------
 
 type intTimeIDCursor struct {
+	*baseCursor
 	Int  int64
 	Time time.Time
 	ID   persist.DBID
-	packable
-	unpackable
 }
 
 func (cursorN) NewIntTimeIDCursor() *intTimeIDCursor {
-	c := intTimeIDCursor{unpackable: newUnpackable()}
-	c.unpackFs = []unpackF{unpackTo(&c.Int, c.d.readInt64), unpackTo(&c.Time, c.d.readTime), unpackTo(&c.ID, c.d.readDBID)}
-	c.packVals = []any{&c.Int, &c.Time, &c.ID}
+	c := intTimeIDCursor{baseCursor: &baseCursor{}}
+	initCursor(c.baseCursor, &c.Int, &c.Time, &c.ID)
 	return &c
 }
 
 //------------------------------------------------------------------------------
 
 type feedPositionCursor struct {
+	*baseCursor
 	CurrentPosition int64
 	EntityTypes     []persist.FeedEntityType
 	EntityIDs       []persist.DBID
-	packable
-	unpackable
 }
 
 func (cursorN) NewFeedPositionCursor() *feedPositionCursor {
-	c := feedPositionCursor{unpackable: newUnpackable()}
-	c.unpackFs = []unpackF{unpackTo(&c.CurrentPosition, c.d.readInt64), unpackSliceTo(&c.EntityTypes, &c.d, c.d.readFeedEntityType), unpackSliceTo(&c.EntityIDs, &c.d, c.d.readDBID)}
-	c.packVals = []any{&c.CurrentPosition, &c.EntityTypes, &c.EntityIDs}
+	c := feedPositionCursor{baseCursor: &baseCursor{}}
+	initCursor(c.baseCursor, &c.CurrentPosition, &c.EntityTypes, &c.EntityIDs)
 	return &c
 }
 
 //------------------------------------------------------------------------------
 
 type positionCursor struct {
+	*baseCursor
 	CurrentPosition int64
 	IDs             []persist.DBID
-	packable
-	unpackable
 }
 
 func (cursorN) NewPositionCursor() *positionCursor {
-	c := positionCursor{unpackable: newUnpackable()}
-	c.unpackFs = []unpackF{unpackTo(&c.CurrentPosition, c.d.readInt64), unpackSliceTo(&c.IDs, &c.d, c.d.readDBID)}
-	c.packVals = []any{&c.CurrentPosition, &c.IDs}
+	c := positionCursor{baseCursor: &baseCursor{}}
+	initCursor(c.baseCursor, &c.CurrentPosition, &c.IDs)
 	return &c
 }
 
 //------------------------------------------------------------------------------
+
+func initCursor(cur *baseCursor, vals ...any) {
+	cur.packVals = vals
+	d, _ := newCursorDecoder("")
+	cur.d = &d
+	cur.unpackFs = unpackVals(&d, vals...)
+}
 
 type packable struct {
 	packVals []any
@@ -1112,7 +1111,7 @@ func packVal(e *cursorEncoder, val any) error {
 			return err
 		}
 	default:
-		panic(fmt.Sprintf("unknown cursor type: %T", v))
+		panic(fmt.Sprintf("don't know how to encode type: %T", v))
 	}
 	return nil
 }
@@ -1135,7 +1134,7 @@ func packSlice[T any](e *cursorEncoder, s ...T) error {
 type unpackF func() error
 
 type unpackable struct {
-	d        cursorDecoder
+	d        *cursorDecoder
 	unpackFs []unpackF
 }
 
@@ -1151,9 +1150,33 @@ func (u *unpackable) Unpack(s string) (err error) {
 	return nil
 }
 
-func newUnpackable() unpackable {
-	d, _ := newCursorDecoder("")
-	return unpackable{d: d}
+func unpackVal(d *cursorDecoder, val any) unpackF {
+	switch v := val.(type) {
+	case *string:
+		return unpackTo(v, d.readString)
+	case *time.Time:
+		return unpackTo(v, d.readTime)
+	case *persist.DBID:
+		return unpackTo(v, d.readDBID)
+	case *bool:
+		return unpackTo(v, d.readBool)
+	case *int64:
+		return unpackTo(v, d.readInt64)
+	case *[]persist.FeedEntityType:
+		return unpackSliceTo(v, d, d.readFeedEntityType)
+	case *[]persist.DBID:
+		return unpackSliceTo(v, d, d.readDBID)
+	default:
+		panic(fmt.Sprintf("don't know how to unpack type: %T", v))
+	}
+}
+
+func unpackVals[T any](d *cursorDecoder, vals ...T) []unpackF {
+	unpackFs := make([]unpackF, len(vals))
+	for i, val := range vals {
+		unpackFs[i] = unpackVal(d, val)
+	}
+	return unpackFs
 }
 
 func unpackTo[T any](into *T, f func() (T, error)) unpackF {
