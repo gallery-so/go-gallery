@@ -1126,7 +1126,7 @@ update users set
     primary_wallet_id = coalesce(users.primary_wallet_id, new_wallet.id),
     wallets = array_append(users.wallets, new_wallet.id)
 from new_wallet
-where users.id = @user_id;
+where users.id = @user_id and not users.deleted;
 
 -- name: DeleteWalletByID :exec
 update wallets set deleted = true, last_updated = now() where id = $1;

@@ -5117,7 +5117,7 @@ update users set
     primary_wallet_id = coalesce(users.primary_wallet_id, new_wallet.id),
     wallets = array_append(users.wallets, new_wallet.id)
 from new_wallet
-where users.id = $5
+where users.id = $5 and not users.deleted
 `
 
 type InsertWalletParams struct {
