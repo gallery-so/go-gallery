@@ -331,7 +331,7 @@ func CreateTaskForAddingEmailToMailingList(ctx context.Context, message AddEmail
 
 	tracing.AddEventDataToSpan(span, map[string]interface{}{"User ID": message.UserID})
 
-	queue := env.GetString("EMAIL_QUEUE")
+	queue := env.GetString("EMAILS_QUEUE")
 
 	task := &taskspb.Task{
 		MessageType: &taskspb.Task_HttpRequest{

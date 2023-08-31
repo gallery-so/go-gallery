@@ -169,9 +169,9 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 		return total, err
 	}
 
-	cursorFunc := func(i interface{}) (int32, time.Time, persist.DBID, error) {
+	cursorFunc := func(i interface{}) (int64, time.Time, persist.DBID, error) {
 		if row, ok := i.(db.PaginateInteractionsByFeedEventIDBatchRow); ok {
-			return row.Tag, row.CreatedAt, row.ID, nil
+			return int64(row.Tag), row.CreatedAt, row.ID, nil
 		}
 		return 0, time.Time{}, "", fmt.Errorf("interface{} is not the correct type")
 	}
@@ -263,9 +263,9 @@ func (api InteractionAPI) PaginateInteractionsByPostID(ctx context.Context, post
 		return total, err
 	}
 
-	cursorFunc := func(i interface{}) (int32, time.Time, persist.DBID, error) {
+	cursorFunc := func(i interface{}) (int64, time.Time, persist.DBID, error) {
 		if row, ok := i.(db.PaginateInteractionsByPostIDBatchRow); ok {
-			return row.Tag, row.CreatedAt, row.ID, nil
+			return int64(row.Tag), row.CreatedAt, row.ID, nil
 		}
 		return 0, time.Time{}, "", fmt.Errorf("interface{} is not the correct type")
 	}

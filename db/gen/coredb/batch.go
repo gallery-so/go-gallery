@@ -1717,31 +1717,31 @@ func (b *GetGalleryTokenMediasByGalleryIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
-const getMediaByTokenID = `-- name: GetMediaByTokenID :batchone
+const getMediaByTokenIDIgnoringStatus = `-- name: GetMediaByTokenIDIgnoringStatus :batchone
 select m.id, m.created_at, m.last_updated, m.version, m.contract_id, m.token_id, m.chain, m.active, m.metadata, m.media, m.name, m.description, m.processing_job_id, m.deleted
 from token_medias m
-where m.id = (select token_media_id from tokens where tokens.id = $1) and m.active and not m.deleted
+where m.id = (select token_media_id from tokens where tokens.id = $1) and not m.deleted
 `
 
-type GetMediaByTokenIDBatchResults struct {
+type GetMediaByTokenIDIgnoringStatusBatchResults struct {
 	br     pgx.BatchResults
 	tot    int
 	closed bool
 }
 
-func (q *Queries) GetMediaByTokenID(ctx context.Context, id []persist.DBID) *GetMediaByTokenIDBatchResults {
+func (q *Queries) GetMediaByTokenIDIgnoringStatus(ctx context.Context, id []persist.DBID) *GetMediaByTokenIDIgnoringStatusBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range id {
 		vals := []interface{}{
 			a,
 		}
-		batch.Queue(getMediaByTokenID, vals...)
+		batch.Queue(getMediaByTokenIDIgnoringStatus, vals...)
 	}
 	br := q.db.SendBatch(ctx, batch)
-	return &GetMediaByTokenIDBatchResults{br, len(id), false}
+	return &GetMediaByTokenIDIgnoringStatusBatchResults{br, len(id), false}
 }
 
-func (b *GetMediaByTokenIDBatchResults) QueryRow(f func(int, TokenMedia, error)) {
+func (b *GetMediaByTokenIDIgnoringStatusBatchResults) QueryRow(f func(int, TokenMedia, error)) {
 	defer b.br.Close()
 	for t := 0; t < b.tot; t++ {
 		var i TokenMedia
@@ -1774,7 +1774,7 @@ func (b *GetMediaByTokenIDBatchResults) QueryRow(f func(int, TokenMedia, error))
 	}
 }
 
-func (b *GetMediaByTokenIDBatchResults) Close() error {
+func (b *GetMediaByTokenIDIgnoringStatusBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }

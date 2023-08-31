@@ -117,15 +117,16 @@ func (api CollectionAPI) GetTopCollectionsForCommunity(ctx context.Context, chai
 	}
 
 	var collectionIDs []persist.DBID
+	cursor := cursors.NewPositionCursor()
 	var paginator positionPaginator
 
 	// If a cursor is provided, we can skip querying the cache
 	if before != nil {
-		if _, collectionIDs, err = paginator.decodeCursor(*before); err != nil {
+		if err = cursor.Unpack(*before); err != nil {
 			return nil, pageInfo, err
 		}
 	} else if after != nil {
-		if _, collectionIDs, err = paginator.decodeCursor(*after); err != nil {
+		if err = cursor.Unpack(*after); err != nil {
 			return nil, pageInfo, err
 		}
 	} else {
@@ -143,9 +144,7 @@ func (api CollectionAPI) GetTopCollectionsForCommunity(ctx context.Context, chai
 	}
 
 	paginator.QueryFunc = func(params positionPagingParams) ([]any, error) {
-		cIDs, _ := util.Map(collectionIDs, func(id persist.DBID) (string, error) {
-			return id.String(), nil
-		})
+		cIDs := util.MapWithoutError(collectionIDs, func(id persist.DBID) string { return id.String() })
 		c, err := api.queries.GetVisibleCollectionsByIDsPaginate(ctx, db.GetVisibleCollectionsByIDsPaginateParams{
 			CollectionIds: cIDs,
 			CurBeforePos:  params.CursorBeforePos,
@@ -153,9 +152,7 @@ func (api CollectionAPI) GetTopCollectionsForCommunity(ctx context.Context, chai
 			PagingForward: params.PagingForward,
 			Limit:         params.Limit,
 		})
-		a, _ := util.Map(c, func(c db.Collection) (any, error) {
-			return c, nil
-		})
+		a := util.MapWithoutError(c, func(c db.Collection) any { return c })
 		return a, err
 	}
 
@@ -164,8 +161,8 @@ func (api CollectionAPI) GetTopCollectionsForCommunity(ctx context.Context, chai
 		posLookup[id] = i + 1 // Postgres uses 1-based indexing
 	}
 
-	paginator.CursorFunc = func(node any) (int, []persist.DBID, error) {
-		return posLookup[node.(db.Collection).ID], collectionIDs, nil
+	paginator.CursorFunc = func(node any) (int64, []persist.DBID, error) {
+		return int64(posLookup[node.(db.Collection).ID]), collectionIDs, nil
 	}
 
 	// The collections are sorted by ascending rank so we need to switch the cursor positions

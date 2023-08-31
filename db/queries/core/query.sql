@@ -1327,10 +1327,10 @@ ORDER BY tokens.id;
 -- name: GetReprocessJobRangeByID :one
 select * from reprocess_jobs where id = $1;
 
--- name: GetMediaByTokenID :batchone
+-- name: GetMediaByTokenIDIgnoringStatus :batchone
 select m.*
 from token_medias m
-where m.id = (select token_media_id from tokens where tokens.id = $1) and m.active and not m.deleted;
+where m.id = (select token_media_id from tokens where tokens.id = $1) and not m.deleted;
 
 -- name: UpsertSession :one
 insert into sessions (id, user_id,

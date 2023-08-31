@@ -22,7 +22,6 @@ import (
 	"roci.dev/fracdex"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
-	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
@@ -817,9 +816,9 @@ func (api UserAPI) SharedCommunities(ctx context.Context, userID persist.DBID, b
 		return int(total), err
 	}
 
-	cursorFunc := func(i any) (bool, bool, int, persist.DBID, error) {
+	cursorFunc := func(i any) (bool, bool, int64, persist.DBID, error) {
 		if row, ok := i.(db.GetSharedContractsBatchPaginateRow); ok {
-			return row.DisplayedByUserA, row.DisplayedByUserB, int(row.OwnedCount), row.ID, nil
+			return row.DisplayedByUserA, row.DisplayedByUserB, int64(row.OwnedCount), row.ID, nil
 		}
 		return false, false, 0, "", fmt.Errorf("node is not a db.GetSharedContractsBatchPaginateRow")
 	}
@@ -1236,16 +1235,16 @@ func (api UserAPI) RecommendUsers(ctx context.Context, before, after *string, fi
 		return nil, PageInfo{}, err
 	}
 
-	paginator := positionPaginator{}
-	var userIDs []persist.DBID
+	cursor := cursors.NewPositionCursor()
+	var paginator positionPaginator
 
 	// If we have a cursor, we can page through the original set of recommended users
 	if before != nil {
-		if _, userIDs, err = paginator.decodeCursor(*before); err != nil {
+		if err = cursor.Unpack(*before); err != nil {
 			return nil, PageInfo{}, err
 		}
 	} else if after != nil {
-		if _, userIDs, err = paginator.decodeCursor(*after); err != nil {
+		if err = cursor.Unpack(*after); err != nil {
 			return nil, PageInfo{}, err
 		}
 	} else {
@@ -1255,16 +1254,16 @@ func (api UserAPI) RecommendUsers(ctx context.Context, before, after *string, fi
 			return nil, PageInfo{}, err
 		}
 
-		userIDs, err = recommend.For(ctx).RecommendFromFollowingShuffled(ctx, curUserID, follows)
+		cursor.IDs, err = recommend.For(ctx).RecommendFromFollowingShuffled(ctx, curUserID, follows)
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
 	}
 
 	positionLookup := map[persist.DBID]int{}
-	idsAsString := make([]string, len(userIDs))
+	idsAsString := make([]string, len(cursor.IDs))
 
-	for i, id := range userIDs {
+	for i, id := range cursor.IDs {
 		// Postgres uses 1-based indexing
 		positionLookup[id] = i + 1
 		idsAsString[i] = id.String()
@@ -1290,9 +1289,9 @@ func (api UserAPI) RecommendUsers(ctx context.Context, before, after *string, fi
 		return results, nil
 	}
 
-	paginator.CursorFunc = func(node any) (int, []persist.DBID, error) {
+	paginator.CursorFunc = func(node any) (int64, []persist.DBID, error) {
 		if user, ok := node.(db.User); ok {
-			return positionLookup[user.ID], userIDs, nil
+			return int64(positionLookup[user.ID]), cursor.IDs, nil
 		}
 		return 0, nil, fmt.Errorf("node is not a db.User")
 	}
@@ -1660,7 +1659,7 @@ func imageMetadataRequest(chain persist.Chain) []multichain.FieldRequest[string]
 
 func standardizeURI(u string) string {
 	if strings.HasPrefix(u, "ipfs://") {
-		return ipfs.PathGatewayFrom(env.GetString("IPFS_URL"), u, true)
+		return ipfs.DefaultGatewayFrom(u)
 	}
 	return u
 }
