@@ -184,7 +184,7 @@ const galleryRepoGetPreviewsForUserID = `-- name: GalleryRepoGetPreviewsForUserI
 select coalesce(nullif(tm.media->>'thumbnail_url', ''), nullif(tm.media->>'media_url', ''))::varchar as thumbnail_url from galleries g,
     unnest(g.collections) with ordinality as collection_ids(id, ord) inner join collections c on c.id = collection_ids.id and c.deleted = false,
     unnest(c.nfts) with ordinality as token_ids(id, ord) inner join tokens t on t.id = token_ids.id and t.displayable and t.deleted = false
-    inner join token_medias tm on t.token_media_id = tm.id and tm.media ->> 'thumbnail_url' != ''
+    inner join token_medias tm on t.token_media_id = tm.id and (tm.media ->> 'thumbnail_url' != '' or tm.media ->> 'media_url' != '')
     where g.owner_user_id = $1 and g.deleted = false
     order by collection_ids.ord, token_ids.ord limit $2
 `

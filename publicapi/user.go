@@ -22,7 +22,6 @@ import (
 	"roci.dev/fracdex"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
-	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
@@ -1651,7 +1650,7 @@ func imageMetadataRequest(chain persist.Chain) []multichain.FieldRequest[string]
 
 func standardizeURI(u string) string {
 	if strings.HasPrefix(u, "ipfs://") {
-		return ipfs.PathGatewayFrom(env.GetString("IPFS_URL"), u, true)
+		return ipfs.DefaultGatewayFrom(u)
 	}
 	return u
 }

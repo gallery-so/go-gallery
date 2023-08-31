@@ -1331,7 +1331,7 @@ func loadMediaByTokenID(q *db.Queries) func(context.Context, []persist.DBID) ([]
 		results := make([]db.TokenMedia, len(tokenIDs))
 		errors := make([]error, len(tokenIDs))
 
-		b := q.GetMediaByTokenID(ctx, tokenIDs)
+		b := q.GetMediaByTokenIDIgnoringStatus(ctx, tokenIDs)
 		defer b.Close()
 
 		b.QueryRow(func(i int, media db.TokenMedia, err error) {
