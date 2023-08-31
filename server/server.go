@@ -229,6 +229,7 @@ func SetDefaults() {
 	viper.SetDefault("GOLDSKY_API_KEY", "")
 	viper.SetDefault("RESERVOIR_API_KEY", "")
 	viper.SetDefault("NEYNAR_API_KEY", "")
+	viper.SetDefault("EMAILS_TASK_SECRET", "emails-task-secret")
 
 	viper.AutomaticEnv()
 

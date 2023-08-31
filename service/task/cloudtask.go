@@ -340,7 +340,7 @@ func CreateTaskForAddingEmailToMailingList(ctx context.Context, message AddEmail
 				Url:        fmt.Sprintf("%s/send/process/add-to-mailing-list", env.GetString("EMAILS_HOST")),
 				Headers: map[string]string{
 					"Content-type":  "application/json",
-					"Authorization": basicauth.MakeHeader(nil, env.GetString("EMAIL_TASK_SECRET")),
+					"Authorization": basicauth.MakeHeader(nil, env.GetString("EMAILS_TASK_SECRET")),
 					"sentry-trace":  span.TraceID.String(),
 				},
 			},

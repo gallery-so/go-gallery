@@ -97,6 +97,7 @@ func setDefaults() {
 	viper.SetDefault("PUBSUB_NOTIFICATIONS_EMAILS_SUBSCRIPTION", "notifications-email-sub")
 	viper.SetDefault("GOOGLE_CLOUD_PROJECT", "")
 	viper.SetDefault("ADMIN_PASS", "admin")
+	viper.SetDefault("EMAILS_TASK_SECRET", "emails-task-secret")
 
 	viper.AutomaticEnv()
 
