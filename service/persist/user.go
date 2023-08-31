@@ -51,6 +51,7 @@ type User struct {
 	Traits             Traits     `json:"traits"`
 	Universal          NullBool   `json:"universal"`
 	PrimaryWalletID    NullString `json:"primary_wallet_id"`
+	EmailVerified      NullInt64  `json:"email_verified"`
 }
 
 // UserUpdateInfoInput represents the data to be updated when updating a user
@@ -84,6 +85,7 @@ type CreateUserInput struct {
 	Username                   string
 	Bio                        string
 	Email                      *Email
+	EmailStatus                EmailVerificationStatus
 	ChainAddress               ChainAddress
 	WalletType                 WalletType
 	Universal                  bool

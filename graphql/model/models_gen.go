@@ -933,6 +933,20 @@ func (ErrDoesNotOwnRequiredToken) IsError()                      {}
 func (ErrDoesNotOwnRequiredToken) IsLoginPayloadOrError()        {}
 func (ErrDoesNotOwnRequiredToken) IsCreateUserPayloadOrError()   {}
 
+type ErrEmailAlreadyUsed struct {
+	Message string `json:"message"`
+}
+
+func (ErrEmailAlreadyUsed) IsError()                    {}
+func (ErrEmailAlreadyUsed) IsCreateUserPayloadOrError() {}
+
+type ErrEmailUnverified struct {
+	Message string `json:"message"`
+}
+
+func (ErrEmailUnverified) IsError()               {}
+func (ErrEmailUnverified) IsLoginPayloadOrError() {}
+
 type ErrFeedEventNotFound struct {
 	Message string `json:"message"`
 }

@@ -44,6 +44,10 @@ type TokenProcessingContractTokensMessage struct {
 	ForceRefresh bool         `json:"force_refresh"`
 }
 
+type AddEmailToMailingListMessage struct {
+	UserID persist.DBID `json:"user_id" binding:"required"`
+}
+
 type TokenIdentifiersQuantities map[persist.TokenUniqueIdentifiers]persist.HexString
 
 func (t TokenIdentifiersQuantities) MarshalJSON() ([]byte, error) {
@@ -308,6 +312,36 @@ func CreateTaskForWalletRemoval(ctx context.Context, message TokenProcessingWall
 				Headers: map[string]string{
 					"Content-type": "application/json",
 					"sentry-trace": span.TraceID.String(),
+				},
+			},
+		},
+	}
+
+	body, err := json.Marshal(message)
+	if err != nil {
+		return err
+	}
+
+	return submitHttpTask(ctx, client, queue, task, body)
+}
+
+func CreateTaskForAddingEmailToMailingList(ctx context.Context, message AddEmailToMailingListMessage, client *gcptasks.Client) error {
+	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForAddingEmailToMailingList")
+	defer tracing.FinishSpan(span)
+
+	tracing.AddEventDataToSpan(span, map[string]interface{}{"User ID": message.UserID})
+
+	queue := env.GetString("EMAILS_QUEUE")
+
+	task := &taskspb.Task{
+		MessageType: &taskspb.Task_HttpRequest{
+			HttpRequest: &taskspb.HttpRequest{
+				HttpMethod: taskspb.HttpMethod_POST,
+				Url:        fmt.Sprintf("%s/send/process/add-to-mailing-list", env.GetString("EMAILS_HOST")),
+				Headers: map[string]string{
+					"Content-type":  "application/json",
+					"Authorization": basicauth.MakeHeader(nil, env.GetString("EMAILS_TASK_SECRET")),
+					"sentry-trace":  span.TraceID.String(),
 				},
 			},
 		},

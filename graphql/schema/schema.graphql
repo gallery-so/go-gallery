@@ -1564,6 +1564,14 @@ type ErrAuthenticationFailed implements Error {
   message: String!
 }
 
+type ErrEmailUnverified implements Error {
+  message: String!
+}
+
+type ErrEmailAlreadyUsed implements Error {
+  message: String!
+}
+
 type ErrUserAlreadyExists implements Error {
   message: String!
 }
@@ -1713,6 +1721,7 @@ union LoginPayloadOrError =
     LoginPayload
   | ErrUserNotFound
   | ErrAuthenticationFailed
+  | ErrEmailUnverified
   | ErrDoesNotOwnRequiredToken
 
 type LoginPayload {
@@ -1727,7 +1736,7 @@ type LogoutPayload {
 input CreateUserInput {
   username: String!
   bio: String
-  email: Email
+  email: Email @scrub
   galleryName: String
   galleryDescription: String
   galleryPosition: String
@@ -1740,6 +1749,7 @@ union CreateUserPayloadOrError =
   | ErrUserAlreadyExists
   | ErrUsernameNotAvailable
   | ErrInvalidInput
+  | ErrEmailAlreadyUsed
 
 type CreateUserPayload {
   userId: DBID
