@@ -3,6 +3,7 @@ package publicapi
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -568,4 +569,26 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collect
 		return *eventPtr, nil
 	}
 	return db.Event{}, nil
+}
+
+func (api TokenAPI) ConfirmToken(ctx context.Context, chainAddress *persist.ChainAddress, tokenID string) (bool, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"chainAddress": validate.WithTag(chainAddress, "required"),
+		"tokenID":      validate.WithTag(tokenID, "required"),
+	}); err != nil {
+		return false, err
+	}
+
+	cleansed := persist.TokenID(tokenID)
+
+	if strings.HasPrefix(tokenID, "0x") {
+		cleansed = persist.TokenID(cleansed.Base10String())
+	}
+
+	// Check providers and the db to see if the token exists
+
+	// Check if the token exists in the DB first?
+
+	return false, nil
 }

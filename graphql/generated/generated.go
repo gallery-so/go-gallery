@@ -324,6 +324,10 @@ type ComplexityRoot struct {
 		Community func(childComplexity int) int
 	}
 
+	ConfirmTokenPayload struct {
+		Confirmed func(childComplexity int) int
+	}
+
 	ConnectSocialAccountPayload struct {
 		Viewer func(childComplexity int) int
 	}
@@ -792,6 +796,7 @@ type ComplexityRoot struct {
 		ClearAllNotifications                func(childComplexity int) int
 		CommentOnFeedEvent                   func(childComplexity int, feedEventID persist.DBID, replyToID *persist.DBID, comment string) int
 		CommentOnPost                        func(childComplexity int, postID persist.DBID, replyToID *persist.DBID, comment string) int
+		ConfirmToken                         func(childComplexity int, input model.ConfirmTokenInput) int
 		ConnectSocialAccount                 func(childComplexity int, input model.SocialAuthMechanism, display bool) int
 		CreateCollection                     func(childComplexity int, input model.CreateCollectionInput) int
 		CreateGallery                        func(childComplexity int, input model.CreateGalleryInput) int
@@ -1676,6 +1681,7 @@ type MutationResolver interface {
 	RefreshToken(ctx context.Context, tokenID persist.DBID) (model.RefreshTokenPayloadOrError, error)
 	RefreshCollection(ctx context.Context, collectionID persist.DBID) (model.RefreshCollectionPayloadOrError, error)
 	RefreshContract(ctx context.Context, contractID persist.DBID) (model.RefreshContractPayloadOrError, error)
+	ConfirmToken(ctx context.Context, input model.ConfirmTokenInput) (model.ConfirmTokenPayloadOrError, error)
 	GetAuthNonce(ctx context.Context, chainAddress persist.ChainAddress) (model.GetAuthNoncePayloadOrError, error)
 	CreateUser(ctx context.Context, authMechanism model.AuthMechanism, input model.CreateUserInput) (model.CreateUserPayloadOrError, error)
 	UpdateEmail(ctx context.Context, input model.UpdateEmailInput) (model.UpdateEmailPayloadOrError, error)
@@ -2767,6 +2773,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.CommunitySearchResult.Community(childComplexity), true
+
+	case "ConfirmTokenPayload.confirmed":
+		if e.complexity.ConfirmTokenPayload.Confirmed == nil {
+			break
+		}
+
+		return e.complexity.ConfirmTokenPayload.Confirmed(childComplexity), true
 
 	case "ConnectSocialAccountPayload.viewer":
 		if e.complexity.ConnectSocialAccountPayload.Viewer == nil {
@@ -4503,6 +4516,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.CommentOnPost(childComplexity, args["postId"].(persist.DBID), args["replyToID"].(*persist.DBID), args["comment"].(string)), true
+
+	case "Mutation.confirmToken":
+		if e.complexity.Mutation.ConfirmToken == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_confirmToken_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.ConfirmToken(childComplexity, args["input"].(model.ConfirmTokenInput)), true
 
 	case "Mutation.connectSocialAccount":
 		if e.complexity.Mutation.ConnectSocialAccount == nil {
@@ -7868,6 +7893,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputCollectionLayoutInput,
 		ec.unmarshalInputCollectionSectionLayoutInput,
 		ec.unmarshalInputCollectionTokenSettingsInput,
+		ec.unmarshalInputConfirmTokenInput,
 		ec.unmarshalInputCreateCollectionInGalleryInput,
 		ec.unmarshalInputCreateCollectionInput,
 		ec.unmarshalInputCreateGalleryInput,
@@ -9729,7 +9755,7 @@ type LogoutPayload {
 input CreateUserInput {
   username: String!
   bio: String
-  email: Email
+  email: Email @scrub
   galleryName: String
   galleryDescription: String
   galleryPosition: String
@@ -10447,6 +10473,18 @@ type DeletePostPayload {
 
 union DeletePostPayloadOrError = DeletePostPayload | ErrInvalidInput | ErrNotAuthorized
 
+input ConfirmTokenInput {
+  chainAddress: ChainAddressInput!
+  # ID of the token in the contract represented in decimal, or interpreted as hexadecimal when prefixed with '0x'
+  tokenId: String!
+}
+
+type ConfirmTokenPayload {
+  confirmed: Boolean!
+}
+
+union ConfirmTokenPayloadOrError = ConfirmTokenPayload
+
 type Mutation {
   # User Mutations
   addUserWallet(
@@ -10490,6 +10528,8 @@ type Mutation {
   refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
   refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
   refreshContract(contractId: DBID!): RefreshContractPayloadOrError
+
+  confirmToken(input: ConfirmTokenInput!): ConfirmTokenPayloadOrError
 
   getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
 
@@ -11444,6 +11484,21 @@ func (ec *executionContext) field_Mutation_commentOnPost_args(ctx context.Contex
 		}
 	}
 	args["comment"] = arg2
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_confirmToken_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.ConfirmTokenInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNConfirmTokenInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐConfirmTokenInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -20127,6 +20182,50 @@ func (ec *executionContext) fieldContext_CommunitySearchResult_community(ctx con
 				return ec.fieldContext_Community_posts(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ConfirmTokenPayload_confirmed(ctx context.Context, field graphql.CollectedField, obj *model.ConfirmTokenPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ConfirmTokenPayload_confirmed(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Confirmed, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ConfirmTokenPayload_confirmed(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ConfirmTokenPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
 		},
 	}
 	return fc, nil
@@ -32658,6 +32757,58 @@ func (ec *executionContext) fieldContext_Mutation_refreshContract(ctx context.Co
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_refreshContract_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_confirmToken(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_confirmToken(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().ConfirmToken(rctx, fc.Args["input"].(model.ConfirmTokenInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.ConfirmTokenPayloadOrError)
+	fc.Result = res
+	return ec.marshalOConfirmTokenPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐConfirmTokenPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_confirmToken(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ConfirmTokenPayloadOrError does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_confirmToken_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return
 	}
@@ -56478,6 +56629,44 @@ func (ec *executionContext) unmarshalInputCollectionTokenSettingsInput(ctx conte
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputConfirmTokenInput(ctx context.Context, obj interface{}) (model.ConfirmTokenInput, error) {
+	var it model.ConfirmTokenInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"chainAddress", "tokenId"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "chainAddress":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chainAddress"))
+			data, err := ec.unmarshalNChainAddressInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ChainAddress = data
+		case "tokenId":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("tokenId"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.TokenID = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputCreateCollectionInGalleryInput(ctx context.Context, obj interface{}) (model.CreateCollectionInGalleryInput, error) {
 	var it model.CreateCollectionInGalleryInput
 	asMap := map[string]interface{}{}
@@ -59091,6 +59280,22 @@ func (ec *executionContext) _CommunityByAddressOrError(ctx context.Context, sel 
 			return graphql.Null
 		}
 		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _ConfirmTokenPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.ConfirmTokenPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.ConfirmTokenPayload:
+		return ec._ConfirmTokenPayload(ctx, sel, &obj)
+	case *model.ConfirmTokenPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ConfirmTokenPayload(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -64047,6 +64252,34 @@ func (ec *executionContext) _CommunitySearchResult(ctx context.Context, sel ast.
 	return out
 }
 
+var confirmTokenPayloadImplementors = []string{"ConfirmTokenPayload", "ConfirmTokenPayloadOrError"}
+
+func (ec *executionContext) _ConfirmTokenPayload(ctx context.Context, sel ast.SelectionSet, obj *model.ConfirmTokenPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, confirmTokenPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ConfirmTokenPayload")
+		case "confirmed":
+
+			out.Values[i] = ec._ConfirmTokenPayload_confirmed(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var connectSocialAccountPayloadImplementors = []string{"ConnectSocialAccountPayload", "ConnectSocialAccountPayloadOrError"}
 
 func (ec *executionContext) _ConnectSocialAccountPayload(ctx context.Context, sel ast.SelectionSet, obj *model.ConnectSocialAccountPayload) graphql.Marshaler {
@@ -67445,6 +67678,12 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_refreshContract(ctx, field)
+			})
+
+		case "confirmToken":
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_confirmToken(ctx, field)
 			})
 
 		case "getAuthNonce":
@@ -73322,6 +73561,11 @@ func (ec *executionContext) marshalNCommunitySearchResult2ᚖgithubᚗcomᚋmike
 	return ec._CommunitySearchResult(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalNConfirmTokenInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐConfirmTokenInput(ctx context.Context, v interface{}) (model.ConfirmTokenInput, error) {
+	res, err := ec.unmarshalInputConfirmTokenInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNCreateCollectionInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCreateCollectionInput(ctx context.Context, v interface{}) (model.CreateCollectionInput, error) {
 	res, err := ec.unmarshalInputCreateCollectionInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -75061,6 +75305,13 @@ func (ec *executionContext) marshalOCommunitySearchResult2ᚕᚖgithubᚗcomᚋm
 	}
 
 	return ret
+}
+
+func (ec *executionContext) marshalOConfirmTokenPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐConfirmTokenPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.ConfirmTokenPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._ConfirmTokenPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOConnectSocialAccountPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐConnectSocialAccountPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.ConnectSocialAccountPayloadOrError) graphql.Marshaler {

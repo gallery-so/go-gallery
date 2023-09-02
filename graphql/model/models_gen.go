@@ -63,6 +63,10 @@ type CommunityByAddressOrError interface {
 	IsCommunityByAddressOrError()
 }
 
+type ConfirmTokenPayloadOrError interface {
+	IsConfirmTokenPayloadOrError()
+}
+
 type ConnectSocialAccountPayloadOrError interface {
 	IsConnectSocialAccountPayloadOrError()
 }
@@ -712,6 +716,17 @@ type CommunityLink struct {
 type CommunitySearchResult struct {
 	Community *Community `json:"community"`
 }
+
+type ConfirmTokenInput struct {
+	ChainAddress *persist.ChainAddress `json:"chainAddress"`
+	TokenID      string                `json:"tokenId"`
+}
+
+type ConfirmTokenPayload struct {
+	Confirmed bool `json:"confirmed"`
+}
+
+func (ConfirmTokenPayload) IsConfirmTokenPayloadOrError() {}
 
 type ConnectSocialAccountPayload struct {
 	Viewer *Viewer `json:"viewer"`

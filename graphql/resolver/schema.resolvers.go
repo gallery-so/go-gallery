@@ -1078,6 +1078,12 @@ func (r *mutationResolver) RefreshContract(ctx context.Context, contractID persi
 	return output, nil
 }
 
+// ConfirmToken is the resolver for the confirmToken field.
+func (r *mutationResolver) ConfirmToken(ctx context.Context, input model.ConfirmTokenInput) (model.ConfirmTokenPayloadOrError, error) {
+	confirmed, err := publicapi.For(ctx).Token.ConfirmToken(ctx, input.ChainAddress, input.TokenID)
+	return &model.ConfirmTokenPayload{Confirmed: err != nil && confirmed}, err
+}
+
 // GetAuthNonce is the resolver for the getAuthNonce field.
 func (r *mutationResolver) GetAuthNonce(ctx context.Context, chainAddress persist.ChainAddress) (model.GetAuthNoncePayloadOrError, error) {
 	nonce, userExists, err := publicapi.For(ctx).Auth.GetAuthNonce(ctx, chainAddress)
@@ -2579,7 +2585,6 @@ func (r *tokenResolver) Media(ctx context.Context, obj *model.Token) (model.Medi
 		return mediaToModel(ctx, tokenMedia, fallbackMedia, highDef), err
 	}
 	return mediaToModel(ctx, tokenMedia, obj.HelperTokenData.Token.FallbackMedia, highDef), nil
-
 }
 
 // Owner is the resolver for the owner field.

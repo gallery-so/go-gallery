@@ -2454,6 +2454,18 @@ type DeletePostPayload {
 
 union DeletePostPayloadOrError = DeletePostPayload | ErrInvalidInput | ErrNotAuthorized
 
+input ConfirmTokenInput {
+  chainAddress: ChainAddressInput!
+  # ID of the token in the contract represented in decimal, or interpreted as hexadecimal when prefixed with '0x'
+  tokenId: String!
+}
+
+type ConfirmTokenPayload {
+  confirmed: Boolean!
+}
+
+union ConfirmTokenPayloadOrError = ConfirmTokenPayload
+
 type Mutation {
   # User Mutations
   addUserWallet(
@@ -2497,6 +2509,8 @@ type Mutation {
   refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
   refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
   refreshContract(contractId: DBID!): RefreshContractPayloadOrError
+
+  confirmToken(input: ConfirmTokenInput!): ConfirmTokenPayloadOrError
 
   getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
 
