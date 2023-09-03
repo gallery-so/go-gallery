@@ -402,19 +402,7 @@ type ComplexityRoot struct {
 		Message func(childComplexity int) int
 	}
 
-	ErrAdmireFeedEventNotFound struct {
-		Message func(childComplexity int) int
-	}
-
 	ErrAdmireNotFound struct {
-		Message func(childComplexity int) int
-	}
-
-	ErrAdmirePostNotFound struct {
-		Message func(childComplexity int) int
-	}
-
-	ErrAdmireTokenNotFound struct {
 		Message func(childComplexity int) int
 	}
 
@@ -3026,33 +3014,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ErrAdmireAlreadyExists.Message(childComplexity), true
 
-	case "ErrAdmireFeedEventNotFound.message":
-		if e.complexity.ErrAdmireFeedEventNotFound.Message == nil {
-			break
-		}
-
-		return e.complexity.ErrAdmireFeedEventNotFound.Message(childComplexity), true
-
 	case "ErrAdmireNotFound.message":
 		if e.complexity.ErrAdmireNotFound.Message == nil {
 			break
 		}
 
 		return e.complexity.ErrAdmireNotFound.Message(childComplexity), true
-
-	case "ErrAdmirePostNotFound.message":
-		if e.complexity.ErrAdmirePostNotFound.Message == nil {
-			break
-		}
-
-		return e.complexity.ErrAdmirePostNotFound.Message(childComplexity), true
-
-	case "ErrAdmireTokenNotFound.message":
-		if e.complexity.ErrAdmireTokenNotFound.Message == nil {
-			break
-		}
-
-		return e.complexity.ErrAdmireTokenNotFound.Message(childComplexity), true
 
 	case "ErrAuthenticationFailed.message":
 		if e.complexity.ErrAuthenticationFailed.Message == nil {
@@ -9715,18 +9682,6 @@ type ErrAdmireNotFound implements Error {
 }
 
 type ErrAdmireAlreadyExists implements Error {
-  message: String!
-}
-
-type ErrAdmireFeedEventNotFound implements Error {
-  message: String!
-}
-
-type ErrAdmirePostNotFound implements Error {
-  message: String!
-}
-
-type ErrAdmireTokenNotFound implements Error {
   message: String!
 }
 
@@ -21975,50 +21930,6 @@ func (ec *executionContext) fieldContext_ErrAdmireAlreadyExists_message(ctx cont
 	return fc, nil
 }
 
-func (ec *executionContext) _ErrAdmireFeedEventNotFound_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrAdmireFeedEventNotFound) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_ErrAdmireFeedEventNotFound_message(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Message, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_ErrAdmireFeedEventNotFound_message(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "ErrAdmireFeedEventNotFound",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _ErrAdmireNotFound_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrAdmireNotFound) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_ErrAdmireNotFound_message(ctx, field)
 	if err != nil {
@@ -22053,94 +21964,6 @@ func (ec *executionContext) _ErrAdmireNotFound_message(ctx context.Context, fiel
 func (ec *executionContext) fieldContext_ErrAdmireNotFound_message(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "ErrAdmireNotFound",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _ErrAdmirePostNotFound_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrAdmirePostNotFound) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_ErrAdmirePostNotFound_message(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Message, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_ErrAdmirePostNotFound_message(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "ErrAdmirePostNotFound",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _ErrAdmireTokenNotFound_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrAdmireTokenNotFound) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_ErrAdmireTokenNotFound_message(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Message, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_ErrAdmireTokenNotFound_message(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "ErrAdmireTokenNotFound",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -60100,27 +59923,6 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 			return graphql.Null
 		}
 		return ec._ErrAdmireAlreadyExists(ctx, sel, obj)
-	case model.ErrAdmireFeedEventNotFound:
-		return ec._ErrAdmireFeedEventNotFound(ctx, sel, &obj)
-	case *model.ErrAdmireFeedEventNotFound:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrAdmireFeedEventNotFound(ctx, sel, obj)
-	case model.ErrAdmirePostNotFound:
-		return ec._ErrAdmirePostNotFound(ctx, sel, &obj)
-	case *model.ErrAdmirePostNotFound:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrAdmirePostNotFound(ctx, sel, obj)
-	case model.ErrAdmireTokenNotFound:
-		return ec._ErrAdmireTokenNotFound(ctx, sel, &obj)
-	case *model.ErrAdmireTokenNotFound:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrAdmireTokenNotFound(ctx, sel, obj)
 	case model.ErrCommentNotFound:
 		return ec._ErrCommentNotFound(ctx, sel, &obj)
 	case *model.ErrCommentNotFound:
@@ -65168,34 +64970,6 @@ func (ec *executionContext) _ErrAdmireAlreadyExists(ctx context.Context, sel ast
 	return out
 }
 
-var errAdmireFeedEventNotFoundImplementors = []string{"ErrAdmireFeedEventNotFound", "Error"}
-
-func (ec *executionContext) _ErrAdmireFeedEventNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrAdmireFeedEventNotFound) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, errAdmireFeedEventNotFoundImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("ErrAdmireFeedEventNotFound")
-		case "message":
-
-			out.Values[i] = ec._ErrAdmireFeedEventNotFound_message(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
 var errAdmireNotFoundImplementors = []string{"ErrAdmireNotFound", "Error", "RemoveAdmirePayloadOrError"}
 
 func (ec *executionContext) _ErrAdmireNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrAdmireNotFound) graphql.Marshaler {
@@ -65209,62 +64983,6 @@ func (ec *executionContext) _ErrAdmireNotFound(ctx context.Context, sel ast.Sele
 		case "message":
 
 			out.Values[i] = ec._ErrAdmireNotFound_message(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
-var errAdmirePostNotFoundImplementors = []string{"ErrAdmirePostNotFound", "Error"}
-
-func (ec *executionContext) _ErrAdmirePostNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrAdmirePostNotFound) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, errAdmirePostNotFoundImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("ErrAdmirePostNotFound")
-		case "message":
-
-			out.Values[i] = ec._ErrAdmirePostNotFound_message(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
-var errAdmireTokenNotFoundImplementors = []string{"ErrAdmireTokenNotFound", "Error"}
-
-func (ec *executionContext) _ErrAdmireTokenNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrAdmireTokenNotFound) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, errAdmireTokenNotFoundImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("ErrAdmireTokenNotFound")
-		case "message":
-
-			out.Values[i] = ec._ErrAdmireTokenNotFound_message(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
 				invalids++

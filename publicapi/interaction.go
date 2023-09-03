@@ -445,7 +445,7 @@ func (api InteractionAPI) PaginateAdmiresByTokenID(ctx context.Context, tokenID 
 
 
 	var actorID persist.DBID
-	if userID != nil && *userID != "" {
+	if userID != nil {
     	actorID = *userID
 	} else {
     	actorID = ""

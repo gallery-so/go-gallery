@@ -873,30 +873,12 @@ type ErrAdmireAlreadyExists struct {
 func (ErrAdmireAlreadyExists) IsError()                         {}
 func (ErrAdmireAlreadyExists) IsAdmireFeedEventPayloadOrError() {}
 
-type ErrAdmireFeedEventNotFound struct {
-	Message string `json:"message"`
-}
-
-func (ErrAdmireFeedEventNotFound) IsError() {}
-
 type ErrAdmireNotFound struct {
 	Message string `json:"message"`
 }
 
 func (ErrAdmireNotFound) IsError()                      {}
 func (ErrAdmireNotFound) IsRemoveAdmirePayloadOrError() {}
-
-type ErrAdmirePostNotFound struct {
-	Message string `json:"message"`
-}
-
-func (ErrAdmirePostNotFound) IsError() {}
-
-type ErrAdmireTokenNotFound struct {
-	Message string `json:"message"`
-}
-
-func (ErrAdmireTokenNotFound) IsError() {}
 
 type ErrAuthenticationFailed struct {
 	Message string `json:"message"`
