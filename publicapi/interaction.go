@@ -443,13 +443,21 @@ func (api InteractionAPI) PaginateAdmiresByTokenID(ctx context.Context, tokenID 
 		return nil, PageInfo{}, err
 	}
 
-	onlyForActor := *userID != ""
+
+	var actorID persist.DBID
+	if userID != nil && *userID != "" {
+    	actorID = *userID
+	} else {
+    	actorID = ""
+	}
+	onlyForActor := actorID != ""
+
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
 		admires, err := api.loaders.AdmiresByTokenID.Load(db.PaginateAdmiresByTokenIDBatchParams{
 			TokenID:       tokenID,
 			Limit:         params.Limit,
 			OnlyForActor:  onlyForActor,
-			ActorID: 	   *userID,
+			ActorID: 	   actorID,
 			CurBeforeTime: params.CursorBeforeTime,
 			CurBeforeID:   params.CursorBeforeID,
 			CurAfterTime:  params.CursorAfterTime,
