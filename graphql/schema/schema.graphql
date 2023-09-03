@@ -443,6 +443,15 @@ type Token implements Node @goEmbedHelper {
   blockNumber: String # source is uint64
   isSpamByUser: Boolean
   isSpamByProvider: Boolean @goField(forceResolver: true)
+
+  # Returns an admires connection
+  admires(
+    before: String
+    after: String
+    first: Int
+    last: Int
+    userID: DBID
+  ): TokenAdmiresConnection @goField(forceResolver: true)
   # These are subject to change; unlike the other fields, they aren't present on the current persist.Token
   # struct and may ultimately end up elsewhere
   creatorAddress: ChainAddress
@@ -849,6 +858,12 @@ type FeedEventCommentsConnection {
   pageInfo: PageInfo!
 }
 
+type TokenAdmireEdge {
+  node: Admire
+  cursor: String
+  token: Token
+}
+
 type PostAdmireEdge {
   node: Admire
   cursor: String
@@ -869,6 +884,11 @@ type PostCommentsConnection {
 type PostAdmiresConnection {
   edges: [PostAdmireEdge]
   pageInfo: PageInfo!
+}
+
+type TokenAdmiresConnection {
+  edges: [TokenAdmireEdge]
+  pageInfo: PageInfo
 }
 
 union Interaction = Admire | Comment

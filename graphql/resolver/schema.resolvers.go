@@ -2648,6 +2648,27 @@ func (r *tokenResolver) IsSpamByProvider(ctx context.Context, obj *model.Token) 
 	return &isSpam, nil
 }
 
+// Admires is the resolver for the admires field.
+func (r *tokenResolver) Admires(ctx context.Context, obj *model.Token, before *string, after *string, first *int, last *int, userID *persist.DBID) (*model.TokenAdmiresConnection, error) {
+	var edges []*model.TokenAdmireEdge
+	admires, pageInfo, err := publicapi.For(ctx).Interaction.PaginateAdmiresByTokenID(ctx, obj.Dbid, before, after, first, last, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, admire := range admires {
+		edges = append(edges, &model.TokenAdmireEdge{
+			Node:  admireToModel(ctx, admire),
+			Token: obj,
+		})
+	}
+
+	return &model.TokenAdmiresConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
+}
+
 // Wallets is the resolver for the wallets field.
 func (r *tokenHolderResolver) Wallets(ctx context.Context, obj *model.TokenHolder) ([]*model.Wallet, error) {
 	wallets := make([]*model.Wallet, 0, len(obj.WalletIds))

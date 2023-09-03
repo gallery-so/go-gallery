@@ -169,7 +169,7 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrCommunityNotFound{Message: message}
 	case persist.ErrAddressOwnedByUser:
 		mappedErr = model.ErrAddressOwnedByUser{Message: message}
-	case persist.ErrAdmireNotFound:
+	case persist.ErrAdmireNotFound,persist.ErrAdmireFeedEventNotFound,persist.ErrAdmirePostNotFound,persist.ErrAdmireTokenNotFound:
 		mappedErr = model.ErrAdmireNotFound{Message: message}
 	case persist.ErrAdmireAlreadyExists:
 		mappedErr = model.ErrAdmireAlreadyExists{Message: message}

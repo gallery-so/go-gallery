@@ -544,6 +544,16 @@ SELECT * FROM admires WHERE post_id = sqlc.arg('post_id') AND deleted = false
 -- name: CountAdmiresByPostIDBatch :batchone
 SELECT count(*) FROM admires WHERE post_id = $1 AND deleted = false;
 
+-- name: PaginateAdmiresByTokenIDBatch :batchmany
+SELECT * FROM admires WHERE token_id = sqlc.arg('token_id') AND (not @only_for_actor::bool or actor_id = @actor_id) AND deleted = false
+    AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+    ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
+    LIMIT sqlc.arg('limit');
+
+-- name: CountAdmiresByTokenIDBatch :batchone
+SELECT count(*) FROM admires WHERE token_id = $1 AND deleted = false;
+
 -- name: GetCommentByCommentID :one
 SELECT * FROM comments WHERE id = $1 AND deleted = false;
 
