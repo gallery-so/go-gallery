@@ -1332,6 +1332,26 @@ select m.*
 from token_medias m
 where m.id = (select token_media_id from tokens where tokens.id = $1) and not m.deleted;
 
+-- name: GetMediaByTokenIdentifiers :one
+with contract as (
+	select id from contracts where contracts.chain = @chain and address = @address and not contracts.deleted
+),
+tokens as (
+	select tokens.*
+	from tokens, contract
+	where tokens.token_id = @token_id and tokens.contract = contract.id and tokens.chain = @chain and not tokens.deleted and fallback_media is not null
+	order by last_updated desc
+	limit 1
+),
+token_medias as (
+	select token_medias.*
+	from token_medias, contract
+	where token_medias.token_id = @token_id and token_medias.contract_id = contract.id and token_medias.chain = @chain and token_medias.active and not token_medias.deleted
+	order by last_updated desc
+	limit 1
+)
+select sqlc.embed(tokens), sqlc.embed(token_medias) from tokens, token_medias;
+
 -- name: UpsertSession :one
 insert into sessions (id, user_id,
                       created_at, created_with_user_agent, created_with_platform, created_with_os,

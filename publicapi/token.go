@@ -2,6 +2,7 @@ package publicapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -21,6 +22,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/util/retry"
 	"github.com/mikeydub/go-gallery/validate"
 )
 
@@ -525,6 +527,28 @@ func (api TokenAPI) MediaByTokenID(ctx context.Context, tokenID persist.DBID) (d
 	return api.loaders.MediaByTokenID.Load(tokenID)
 }
 
+// MediaByTokenIdentifiers returns media for a token and optionally returns a token instance with fallback media matching the identifiers if any exists.
+func (api TokenAPI) MediaByTokenIdentifiers(ctx context.Context, tokenIdentifiers persist.TokenIdentifiers) (db.TokenMedia, db.Token, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"address": validate.WithTag(tokenIdentifiers.ContractAddress, "required"),
+		"tokenID": validate.WithTag(tokenIdentifiers.TokenID, "required"),
+	}); err != nil {
+		return db.TokenMedia{}, db.Token{}, err
+	}
+	media, err := api.queries.GetMediaByTokenIdentifiers(ctx, db.GetMediaByTokenIdentifiersParams{
+		Chain:   tokenIdentifiers.Chain,
+		Address: tokenIdentifiers.ContractAddress,
+		TokenID: tokenIdentifiers.TokenID,
+	})
+	// TODO: Rewrite error to missing token
+	if err != nil {
+		return db.TokenMedia{}, db.Token{}, err
+	}
+
+	return media.TokenMedia, media.Token, nil
+}
+
 func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (db.Event, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
@@ -571,24 +595,50 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collect
 	return db.Event{}, nil
 }
 
-func (api TokenAPI) ConfirmToken(ctx context.Context, chainAddress *persist.ChainAddress, tokenID string) (bool, error) {
+func (api TokenAPI) ReferredPostPreflight(ctx context.Context, tokenIdentifiers *persist.TokenIdentifiers) (bool, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"chainAddress": validate.WithTag(chainAddress, "required"),
-		"tokenID":      validate.WithTag(tokenID, "required"),
+		"address": validate.WithTag(tokenIdentifiers.ContractAddress, "required"),
+		"tokenID": validate.WithTag(tokenIdentifiers.TokenID, "required"),
 	}); err != nil {
 		return false, err
 	}
 
-	cleansed := persist.TokenID(tokenID)
-
-	if strings.HasPrefix(tokenID, "0x") {
-		cleansed = persist.TokenID(cleansed.Base10String())
+	if strings.HasPrefix(tokenIdentifiers.TokenID.String(), "0x") {
+		tokenIdentifiers.TokenID = persist.TokenID(tokenIdentifiers.TokenID.Base10String())
 	}
 
-	// Check providers and the db to see if the token exists
+	r := retry.Retry{
+		Base:  1,
+		Cap:   4,
+		Tries: 12,
+	}
 
-	// Check if the token exists in the DB first?
+	var err error
+	var exists bool
 
-	return false, nil
+	for i := 0; i < r.Tries; i++ {
+		exists, err = api.multichainProvider.ConfirmTokenExists(ctx, persist.TokenIdentifiers{
+			TokenID:         tokenIdentifiers.TokenID,
+			Chain:           tokenIdentifiers.Chain,
+			ContractAddress: tokenIdentifiers.ContractAddress,
+		})
+		if exists {
+			break
+		}
+		if errors.Is(err, multichain.ErrNoMatchingProviders) {
+			return false, err
+		}
+		r.Sleep(i)
+	}
+
+	if !exists {
+		return false, err
+	}
+
+	// TODO: Should this create a token if it doesn't exist?
+	// Maybe when creating the post it creates the token.
+	// TODO: Actually submit the media to the tokenprocessing queue
+
+	return exists, err
 }

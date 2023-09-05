@@ -53,6 +53,7 @@ scalar Address
 scalar PubKey
 scalar DBID
 scalar Email
+scalar TokenId
 
 interface Node {
   id: ID!
@@ -1203,6 +1204,20 @@ union SearchCommunitiesPayloadOrError = SearchCommunitiesPayload | ErrInvalidInp
 
 union SocialQueriesOrError = SocialQueries | ErrNotAuthorized | ErrNeedsToReconnectSocial
 
+input ChainAddressTokenInput {
+  address: Address!
+  chain: Chain!
+  # Refers to the id of the token in the contract represented in decimal, or interpreted as hexadecimal when prefixed with '0x'
+  tokenId: TokenId!
+}
+
+# TODO: Figure out the other errors
+type TokenMediaByIdentifiers {
+  media: MediaSubtype @goField(forceResolver: true)
+}
+
+union TokenMediaByIdentifiersOrError = TokenMediaByIdentifiers | ErrInvalidInput
+
 type Query {
   node(id: ID!): Node
   viewer: ViewerOrError @authRequired
@@ -1214,6 +1229,7 @@ type Query {
   collectionById(id: DBID!): CollectionByIdOrError
   collectionsByIds(ids: [DBID!]!): [CollectionByIdOrError]
   tokenById(id: DBID!): TokenByIdOrError
+  tokenMediaByToken(token: ChainAddressTokenInput!): TokenMediaByIdentifiersOrError
   collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
   communityByAddress(
     communityAddress: ChainAddressInput!
@@ -2454,17 +2470,15 @@ type DeletePostPayload {
 
 union DeletePostPayloadOrError = DeletePostPayload | ErrInvalidInput | ErrNotAuthorized
 
-input ConfirmTokenInput {
-  chainAddress: ChainAddressInput!
-  # ID of the token in the contract represented in decimal, or interpreted as hexadecimal when prefixed with '0x'
-  tokenId: String!
+input ReferredPostPreflightInput {
+  token: ChainAddressTokenInput!
 }
 
-type ConfirmTokenPayload {
+type ReferredPostPreflightPayload {
   confirmed: Boolean!
 }
 
-union ConfirmTokenPayloadOrError = ConfirmTokenPayload
+union ReferredPostPreflightPayloadOrError = ReferredPostPreflightPayload
 
 type Mutation {
   # User Mutations
@@ -2510,7 +2524,7 @@ type Mutation {
   refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
   refreshContract(contractId: DBID!): RefreshContractPayloadOrError
 
-  confirmToken(input: ConfirmTokenInput!): ConfirmTokenPayloadOrError
+  referredPostPreflight(input: ReferredPostPreflightInput!): ReferredPostPreflightPayloadOrError
 
   getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
 

@@ -2459,6 +2459,87 @@ func (q *Queries) GetLastFeedEventForUser(ctx context.Context, arg GetLastFeedEv
 	return i, err
 }
 
+const getMediaByTokenIdentifiers = `-- name: GetMediaByTokenIdentifiers :one
+with contract as (
+	select id from contracts where contracts.chain = $1 and address = $2 and not contracts.deleted
+),
+tokens as (
+	select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id, tokens.is_creator_token, tokens.is_holder_token, tokens.displayable
+	from tokens, contract
+	where tokens.token_id = $3 and tokens.contract = contract.id and tokens.chain = $1 and not tokens.deleted and fallback_media is not null
+	order by last_updated desc
+	limit 1
+),
+token_medias as (
+	select token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.contract_id, token_medias.token_id, token_medias.chain, token_medias.active, token_medias.metadata, token_medias.media, token_medias.name, token_medias.description, token_medias.processing_job_id, token_medias.deleted
+	from token_medias, contract
+	where token_medias.token_id = $3 and token_medias.contract_id = contract.id and token_medias.chain = $1 and token_medias.active and not token_medias.deleted
+	order by last_updated desc
+	limit 1
+)
+select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id, tokens.is_creator_token, tokens.is_holder_token, tokens.displayable, token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.contract_id, token_medias.token_id, token_medias.chain, token_medias.active, token_medias.metadata, token_medias.media, token_medias.name, token_medias.description, token_medias.processing_job_id, token_medias.deleted from tokens, token_medias
+`
+
+type GetMediaByTokenIdentifiersParams struct {
+	Chain   persist.Chain   `json:"chain"`
+	Address persist.Address `json:"address"`
+	TokenID persist.TokenID `json:"token_id"`
+}
+
+type GetMediaByTokenIdentifiersRow struct {
+	Token      Token      `json:"token"`
+	TokenMedia TokenMedia `json:"tokenmedia"`
+}
+
+func (q *Queries) GetMediaByTokenIdentifiers(ctx context.Context, arg GetMediaByTokenIdentifiersParams) (GetMediaByTokenIdentifiersRow, error) {
+	row := q.db.QueryRow(ctx, getMediaByTokenIdentifiers, arg.Chain, arg.Address, arg.TokenID)
+	var i GetMediaByTokenIdentifiersRow
+	err := row.Scan(
+		&i.Token.ID,
+		&i.Token.Deleted,
+		&i.Token.Version,
+		&i.Token.CreatedAt,
+		&i.Token.LastUpdated,
+		&i.Token.Name,
+		&i.Token.Description,
+		&i.Token.CollectorsNote,
+		&i.Token.TokenUri,
+		&i.Token.TokenType,
+		&i.Token.TokenID,
+		&i.Token.Quantity,
+		&i.Token.OwnershipHistory,
+		&i.Token.ExternalUrl,
+		&i.Token.BlockNumber,
+		&i.Token.OwnerUserID,
+		&i.Token.OwnedByWallets,
+		&i.Token.Chain,
+		&i.Token.Contract,
+		&i.Token.IsUserMarkedSpam,
+		&i.Token.IsProviderMarkedSpam,
+		&i.Token.LastSynced,
+		&i.Token.FallbackMedia,
+		&i.Token.TokenMediaID,
+		&i.Token.IsCreatorToken,
+		&i.Token.IsHolderToken,
+		&i.Token.Displayable,
+		&i.TokenMedia.ID,
+		&i.TokenMedia.CreatedAt,
+		&i.TokenMedia.LastUpdated,
+		&i.TokenMedia.Version,
+		&i.TokenMedia.ContractID,
+		&i.TokenMedia.TokenID,
+		&i.TokenMedia.Chain,
+		&i.TokenMedia.Active,
+		&i.TokenMedia.Metadata,
+		&i.TokenMedia.Media,
+		&i.TokenMedia.Name,
+		&i.TokenMedia.Description,
+		&i.TokenMedia.ProcessingJobID,
+		&i.TokenMedia.Deleted,
+	)
+	return i, err
+}
+
 const getMembershipByMembershipId = `-- name: GetMembershipByMembershipId :one
 SELECT id, deleted, version, created_at, last_updated, token_id, name, asset_url, owners FROM membership WHERE id = $1 AND deleted = false
 `

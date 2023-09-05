@@ -63,10 +63,6 @@ type CommunityByAddressOrError interface {
 	IsCommunityByAddressOrError()
 }
 
-type ConfirmTokenPayloadOrError interface {
-	IsConfirmTokenPayloadOrError()
-}
-
 type ConnectSocialAccountPayloadOrError interface {
 	IsConnectSocialAccountPayloadOrError()
 }
@@ -211,6 +207,10 @@ type RedeemMerchPayloadOrError interface {
 	IsRedeemMerchPayloadOrError()
 }
 
+type ReferredPostPreflightPayloadOrError interface {
+	IsReferredPostPreflightPayloadOrError()
+}
+
 type RefreshCollectionPayloadOrError interface {
 	IsRefreshCollectionPayloadOrError()
 }
@@ -309,6 +309,10 @@ type SyncTokensPayloadOrError interface {
 
 type TokenByIDOrError interface {
 	IsTokenByIDOrError()
+}
+
+type TokenMediaByIdentifiersOrError interface {
+	IsTokenMediaByIdentifiersOrError()
 }
 
 type TrendingUsersPayloadOrError interface {
@@ -717,17 +721,6 @@ type CommunitySearchResult struct {
 	Community *Community `json:"community"`
 }
 
-type ConfirmTokenInput struct {
-	ChainAddress *persist.ChainAddress `json:"chainAddress"`
-	TokenID      string                `json:"tokenId"`
-}
-
-type ConfirmTokenPayload struct {
-	Confirmed bool `json:"confirmed"`
-}
-
-func (ConfirmTokenPayload) IsConfirmTokenPayloadOrError() {}
-
 type ConnectSocialAccountPayload struct {
 	Viewer *Viewer `json:"viewer"`
 }
@@ -999,6 +992,7 @@ func (ErrInvalidInput) IsMerchTokensPayloadOrError()                     {}
 func (ErrInvalidInput) IsSearchUsersPayloadOrError()                     {}
 func (ErrInvalidInput) IsSearchGalleriesPayloadOrError()                 {}
 func (ErrInvalidInput) IsSearchCommunitiesPayloadOrError()               {}
+func (ErrInvalidInput) IsTokenMediaByIdentifiersOrError()                {}
 func (ErrInvalidInput) IsCreateCollectionPayloadOrError()                {}
 func (ErrInvalidInput) IsDeleteCollectionPayloadOrError()                {}
 func (ErrInvalidInput) IsUpdateCollectionInfoPayloadOrError()            {}
@@ -1772,6 +1766,16 @@ type RedeemMerchPayload struct {
 
 func (RedeemMerchPayload) IsRedeemMerchPayloadOrError() {}
 
+type ReferredPostPreflightInput struct {
+	Token *persist.TokenIdentifiers `json:"token"`
+}
+
+type ReferredPostPreflightPayload struct {
+	Confirmed bool `json:"confirmed"`
+}
+
+func (ReferredPostPreflightPayload) IsReferredPostPreflightPayloadOrError() {}
+
 type RefreshCollectionPayload struct {
 	Collection *Collection `json:"collection"`
 }
@@ -2136,6 +2140,12 @@ type TokenHoldersConnection struct {
 	Edges    []*TokenHolderEdge `json:"edges"`
 	PageInfo *PageInfo          `json:"pageInfo"`
 }
+
+type TokenMediaByIdentifiers struct {
+	Media MediaSubtype `json:"media"`
+}
+
+func (TokenMediaByIdentifiers) IsTokenMediaByIdentifiersOrError() {}
 
 type TokenProfileImage struct {
 	Token *Token `json:"token"`

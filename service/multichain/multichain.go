@@ -42,6 +42,8 @@ var contractNameBlacklist = map[string]bool{
 	"unknown":               true,
 }
 
+var ErrNoMatchingProviders = errors.New("no matching providers")
+
 // SendTokens is called to process a user's batch of tokens
 type SendTokens func(context.Context, task.TokenProcessingUserMessage) error
 
@@ -1803,6 +1805,32 @@ type contractMetadata struct {
 	ProfileImageURL string
 	Description     string
 	IsSpam          bool
+}
+
+// ConfirmTokenExists verifies that the token exists according to a set of providers.
+// If the token exists in the database, the DBID of the token is included.
+func (p *Provider) ConfirmTokenExists(ctx context.Context, ti persist.TokenIdentifiers) (bool, error) {
+	// Using TokenDescriptorsFetcher to check if a token exists
+	tokenFetchers := matchingProvidersForChain[TokenDescriptorsFetcher](p.Chains, ti.Chain)
+
+	if len(tokenFetchers) == 0 {
+		return false, ErrNoMatchingProviders
+	}
+
+	// TODO: Should parallelize this
+	for _, fetcher := range tokenFetchers {
+		_, _, err := fetcher.GetTokenDescriptorsByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{
+			ContractAddress: ti.ContractAddress,
+			TokenID:         ti.TokenID,
+		})
+		if err == nil {
+			return true, nil
+		}
+		if err != nil {
+		}
+	}
+
+	return false, nil
 }
 
 func contractsToNewDedupedContracts(contracts []chainContracts) []persist.ContractGallery {

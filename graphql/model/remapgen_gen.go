@@ -68,11 +68,6 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
-	"ConfirmTokenPayloadOrError": func(object interface{}) (interface{}, bool) {
-		obj, ok := object.(ConfirmTokenPayloadOrError)
-		return obj, ok
-	},
-
 	"ConnectSocialAccountPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(ConnectSocialAccountPayloadOrError)
 		return obj, ok
@@ -248,6 +243,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"ReferredPostPreflightPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(ReferredPostPreflightPayloadOrError)
+		return obj, ok
+	},
+
 	"RefreshCollectionPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(RefreshCollectionPayloadOrError)
 		return obj, ok
@@ -370,6 +370,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 
 	"TokenByIdOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(TokenByIDOrError)
+		return obj, ok
+	},
+
+	"TokenMediaByIdentifiersOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(TokenMediaByIdentifiersOrError)
 		return obj, ok
 	},
 

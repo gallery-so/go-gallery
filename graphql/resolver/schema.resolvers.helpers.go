@@ -8,6 +8,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/gammazero/workerpool"
 	"github.com/magiclabs/magic-admin-go/token"
@@ -22,6 +24,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/notifications"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
 	"github.com/mikeydub/go-gallery/service/socialauth"
 	"github.com/mikeydub/go-gallery/service/twitter"
 	"github.com/mikeydub/go-gallery/util"
@@ -1974,6 +1977,34 @@ func pageInfoToModel(ctx context.Context, pageInfo publicapi.PageInfo) *model.Pa
 		StartCursor:     pageInfo.StartCursor,
 		EndCursor:       pageInfo.EndCursor,
 	}
+}
+
+func resolveTokenMedia(ctx context.Context, token db.Token, tokenMedia db.TokenMedia, highDef bool) model.MediaSubtype {
+	// Media is found and is active
+	if tokenMedia.ID != "" && tokenMedia.Active {
+		return mediaToModel(ctx, tokenMedia, token.FallbackMedia, highDef)
+	}
+
+	// If there is no media for a token (whether valid or not), assume that the token is still being synced.
+	tokenMedia.Media.MediaType = persist.MediaTypeSyncing
+
+	// In the worse case the processing message was dropped and the token never gets handled. To address that,
+	// we compare when the token was created to the current time. If it's longer than the grace period, we assume that the
+	// message was lost and set the media to invalid so it could be refreshed manually.
+	if time.Since(token.CreatedAt) > time.Duration(1*time.Hour) {
+		tokenMedia.Media.MediaType = persist.MediaTypeInvalid
+	}
+
+	fallbackMedia := token.FallbackMedia
+
+	// Rewrite IPFS and Arweave URLs to HTTP
+	if fallbackURL := strings.ToLower(fallbackMedia.ImageURL.String()); strings.HasPrefix(fallbackURL, "ipfs://") {
+		fallbackMedia.ImageURL = persist.NullString(ipfs.DefaultGatewayFrom(fallbackURL))
+	} else if strings.HasPrefix(fallbackURL, "ar://") {
+		fallbackMedia.ImageURL = persist.NullString(fmt.Sprintf("https://arweave.net/%s", util.GetURIPath(fallbackURL, false)))
+	}
+
+	return mediaToModel(ctx, tokenMedia, fallbackMedia, highDef)
 }
 
 func mediaToModel(ctx context.Context, tokenMedia db.TokenMedia, fallback persist.FallbackMedia, highDef bool) model.MediaSubtype {

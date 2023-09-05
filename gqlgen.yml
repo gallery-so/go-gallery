@@ -109,6 +109,12 @@ models:
   TokenOwnershipType:
     model:
       - github.com/mikeydub/go-gallery/service/persist.TokenOwnershipType
+  TokenId:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.TokenID
+  ChainAddressTokenInput:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.TokenIdentifiers
 directives:
   goGqlId:
     skip_runtime: true
