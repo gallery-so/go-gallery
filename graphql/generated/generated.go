@@ -814,7 +814,7 @@ type ComplexityRoot struct {
 		PreverifyEmail                       func(childComplexity int, input model.PreverifyEmailInput) int
 		PublishGallery                       func(childComplexity int, input model.PublishGalleryInput) int
 		RedeemMerch                          func(childComplexity int, input model.RedeemMerchInput) int
-		ReferredPostPreflight                func(childComplexity int, input model.ReferredPostPreflightInput) int
+		ReferralPostPreflight                func(childComplexity int, input model.ReferralPostPreflightInput) int
 		RefreshCollection                    func(childComplexity int, collectionID persist.DBID) int
 		RefreshContract                      func(childComplexity int, contractID persist.DBID) int
 		RefreshToken                         func(childComplexity int, tokenID persist.DBID) int
@@ -1032,8 +1032,8 @@ type ComplexityRoot struct {
 		Tokens func(childComplexity int) int
 	}
 
-	ReferredPostPreflightPayload struct {
-		Confirmed func(childComplexity int) int
+	ReferralPostPreflightPayload struct {
+		Accepted func(childComplexity int) int
 	}
 
 	RefreshCollectionPayload struct {
@@ -1688,7 +1688,7 @@ type MutationResolver interface {
 	RefreshToken(ctx context.Context, tokenID persist.DBID) (model.RefreshTokenPayloadOrError, error)
 	RefreshCollection(ctx context.Context, collectionID persist.DBID) (model.RefreshCollectionPayloadOrError, error)
 	RefreshContract(ctx context.Context, contractID persist.DBID) (model.RefreshContractPayloadOrError, error)
-	ReferredPostPreflight(ctx context.Context, input model.ReferredPostPreflightInput) (model.ReferredPostPreflightPayloadOrError, error)
+	ReferralPostPreflight(ctx context.Context, input model.ReferralPostPreflightInput) (model.ReferralPostPreflightPayloadOrError, error)
 	GetAuthNonce(ctx context.Context, chainAddress persist.ChainAddress) (model.GetAuthNoncePayloadOrError, error)
 	CreateUser(ctx context.Context, authMechanism model.AuthMechanism, input model.CreateUserInput) (model.CreateUserPayloadOrError, error)
 	UpdateEmail(ctx context.Context, input model.UpdateEmailInput) (model.UpdateEmailPayloadOrError, error)
@@ -4759,17 +4759,17 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.RedeemMerch(childComplexity, args["input"].(model.RedeemMerchInput)), true
 
-	case "Mutation.referredPostPreflight":
-		if e.complexity.Mutation.ReferredPostPreflight == nil {
+	case "Mutation.referralPostPreflight":
+		if e.complexity.Mutation.ReferralPostPreflight == nil {
 			break
 		}
 
-		args, err := ec.field_Mutation_referredPostPreflight_args(context.TODO(), rawArgs)
+		args, err := ec.field_Mutation_referralPostPreflight_args(context.TODO(), rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.Mutation.ReferredPostPreflight(childComplexity, args["input"].(model.ReferredPostPreflightInput)), true
+		return e.complexity.Mutation.ReferralPostPreflight(childComplexity, args["input"].(model.ReferralPostPreflightInput)), true
 
 	case "Mutation.refreshCollection":
 		if e.complexity.Mutation.RefreshCollection == nil {
@@ -6179,12 +6179,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RedeemMerchPayload.Tokens(childComplexity), true
 
-	case "ReferredPostPreflightPayload.confirmed":
-		if e.complexity.ReferredPostPreflightPayload.Confirmed == nil {
+	case "ReferralPostPreflightPayload.accepted":
+		if e.complexity.ReferralPostPreflightPayload.Accepted == nil {
 			break
 		}
 
-		return e.complexity.ReferredPostPreflightPayload.Confirmed(childComplexity), true
+		return e.complexity.ReferralPostPreflightPayload.Accepted(childComplexity), true
 
 	case "RefreshCollectionPayload.collection":
 		if e.complexity.RefreshCollectionPayload.Collection == nil {
@@ -7946,7 +7946,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputPreverifyEmailInput,
 		ec.unmarshalInputPublishGalleryInput,
 		ec.unmarshalInputRedeemMerchInput,
-		ec.unmarshalInputReferredPostPreflightInput,
+		ec.unmarshalInputReferralPostPreflightInput,
 		ec.unmarshalInputSetProfileImageInput,
 		ec.unmarshalInputSetSpamPreferenceInput,
 		ec.unmarshalInputSocialAuthMechanism,
@@ -10523,15 +10523,15 @@ type DeletePostPayload {
 
 union DeletePostPayloadOrError = DeletePostPayload | ErrInvalidInput | ErrNotAuthorized
 
-input ReferredPostPreflightInput {
+input ReferralPostPreflightInput {
   token: ChainAddressTokenInput!
 }
 
-type ReferredPostPreflightPayload {
-  confirmed: Boolean!
+type ReferralPostPreflightPayload {
+  accepted: Boolean!
 }
 
-union ReferredPostPreflightPayloadOrError = ReferredPostPreflightPayload
+union ReferralPostPreflightPayloadOrError = ReferralPostPreflightPayload
 
 type Mutation {
   # User Mutations
@@ -10577,7 +10577,7 @@ type Mutation {
   refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
   refreshContract(contractId: DBID!): RefreshContractPayloadOrError
 
-  referredPostPreflight(input: ReferredPostPreflightInput!): ReferredPostPreflightPayloadOrError
+  referralPostPreflight(input: ReferralPostPreflightInput!): ReferralPostPreflightPayloadOrError
 
   getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
 
@@ -11838,13 +11838,13 @@ func (ec *executionContext) field_Mutation_redeemMerch_args(ctx context.Context,
 	return args, nil
 }
 
-func (ec *executionContext) field_Mutation_referredPostPreflight_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+func (ec *executionContext) field_Mutation_referralPostPreflight_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 model.ReferredPostPreflightInput
+	var arg0 model.ReferralPostPreflightInput
 	if tmp, ok := rawArgs["input"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
-		arg0, err = ec.unmarshalNReferredPostPreflightInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐReferredPostPreflightInput(ctx, tmp)
+		arg0, err = ec.unmarshalNReferralPostPreflightInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐReferralPostPreflightInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -32782,8 +32782,8 @@ func (ec *executionContext) fieldContext_Mutation_refreshContract(ctx context.Co
 	return fc, nil
 }
 
-func (ec *executionContext) _Mutation_referredPostPreflight(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Mutation_referredPostPreflight(ctx, field)
+func (ec *executionContext) _Mutation_referralPostPreflight(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_referralPostPreflight(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -32796,7 +32796,7 @@ func (ec *executionContext) _Mutation_referredPostPreflight(ctx context.Context,
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().ReferredPostPreflight(rctx, fc.Args["input"].(model.ReferredPostPreflightInput))
+		return ec.resolvers.Mutation().ReferralPostPreflight(rctx, fc.Args["input"].(model.ReferralPostPreflightInput))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -32805,19 +32805,19 @@ func (ec *executionContext) _Mutation_referredPostPreflight(ctx context.Context,
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(model.ReferredPostPreflightPayloadOrError)
+	res := resTmp.(model.ReferralPostPreflightPayloadOrError)
 	fc.Result = res
-	return ec.marshalOReferredPostPreflightPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐReferredPostPreflightPayloadOrError(ctx, field.Selections, res)
+	return ec.marshalOReferralPostPreflightPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐReferralPostPreflightPayloadOrError(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Mutation_referredPostPreflight(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Mutation_referralPostPreflight(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Mutation",
 		Field:      field,
 		IsMethod:   true,
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type ReferredPostPreflightPayloadOrError does not have child fields")
+			return nil, errors.New("field of type ReferralPostPreflightPayloadOrError does not have child fields")
 		},
 	}
 	defer func() {
@@ -32827,7 +32827,7 @@ func (ec *executionContext) fieldContext_Mutation_referredPostPreflight(ctx cont
 		}
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_referredPostPreflight_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+	if fc.Args, err = ec.field_Mutation_referralPostPreflight_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return
 	}
@@ -41988,8 +41988,8 @@ func (ec *executionContext) fieldContext_RedeemMerchPayload_tokens(ctx context.C
 	return fc, nil
 }
 
-func (ec *executionContext) _ReferredPostPreflightPayload_confirmed(ctx context.Context, field graphql.CollectedField, obj *model.ReferredPostPreflightPayload) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_ReferredPostPreflightPayload_confirmed(ctx, field)
+func (ec *executionContext) _ReferralPostPreflightPayload_accepted(ctx context.Context, field graphql.CollectedField, obj *model.ReferralPostPreflightPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ReferralPostPreflightPayload_accepted(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -42002,7 +42002,7 @@ func (ec *executionContext) _ReferredPostPreflightPayload_confirmed(ctx context.
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Confirmed, nil
+		return obj.Accepted, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -42019,9 +42019,9 @@ func (ec *executionContext) _ReferredPostPreflightPayload_confirmed(ctx context.
 	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_ReferredPostPreflightPayload_confirmed(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_ReferralPostPreflightPayload_accepted(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "ReferredPostPreflightPayload",
+		Object:     "ReferralPostPreflightPayload",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -57897,8 +57897,8 @@ func (ec *executionContext) unmarshalInputRedeemMerchInput(ctx context.Context, 
 	return it, nil
 }
 
-func (ec *executionContext) unmarshalInputReferredPostPreflightInput(ctx context.Context, obj interface{}) (model.ReferredPostPreflightInput, error) {
-	var it model.ReferredPostPreflightInput
+func (ec *executionContext) unmarshalInputReferralPostPreflightInput(ctx context.Context, obj interface{}) (model.ReferralPostPreflightInput, error) {
+	var it model.ReferralPostPreflightInput
 	asMap := map[string]interface{}{}
 	for k, v := range obj.(map[string]interface{}) {
 		asMap[k] = v
@@ -61104,17 +61104,17 @@ func (ec *executionContext) _RedeemMerchPayloadOrError(ctx context.Context, sel 
 	}
 }
 
-func (ec *executionContext) _ReferredPostPreflightPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.ReferredPostPreflightPayloadOrError) graphql.Marshaler {
+func (ec *executionContext) _ReferralPostPreflightPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.ReferralPostPreflightPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
-	case model.ReferredPostPreflightPayload:
-		return ec._ReferredPostPreflightPayload(ctx, sel, &obj)
-	case *model.ReferredPostPreflightPayload:
+	case model.ReferralPostPreflightPayload:
+		return ec._ReferralPostPreflightPayload(ctx, sel, &obj)
+	case *model.ReferralPostPreflightPayload:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._ReferredPostPreflightPayload(ctx, sel, obj)
+		return ec._ReferralPostPreflightPayload(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -67871,10 +67871,10 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 				return ec._Mutation_refreshContract(ctx, field)
 			})
 
-		case "referredPostPreflight":
+		case "referralPostPreflight":
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_referredPostPreflight(ctx, field)
+				return ec._Mutation_referralPostPreflight(ctx, field)
 			})
 
 		case "getAuthNonce":
@@ -69808,19 +69808,19 @@ func (ec *executionContext) _RedeemMerchPayload(ctx context.Context, sel ast.Sel
 	return out
 }
 
-var referredPostPreflightPayloadImplementors = []string{"ReferredPostPreflightPayload", "ReferredPostPreflightPayloadOrError"}
+var referralPostPreflightPayloadImplementors = []string{"ReferralPostPreflightPayload", "ReferralPostPreflightPayloadOrError"}
 
-func (ec *executionContext) _ReferredPostPreflightPayload(ctx context.Context, sel ast.SelectionSet, obj *model.ReferredPostPreflightPayload) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, referredPostPreflightPayloadImplementors)
+func (ec *executionContext) _ReferralPostPreflightPayload(ctx context.Context, sel ast.SelectionSet, obj *model.ReferralPostPreflightPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, referralPostPreflightPayloadImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("ReferredPostPreflightPayload")
-		case "confirmed":
+			out.Values[i] = graphql.MarshalString("ReferralPostPreflightPayload")
+		case "accepted":
 
-			out.Values[i] = ec._ReferredPostPreflightPayload_confirmed(ctx, field, obj)
+			out.Values[i] = ec._ReferralPostPreflightPayload_accepted(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
 				invalids++
@@ -74166,8 +74166,8 @@ func (ec *executionContext) unmarshalNRedeemMerchInput2githubᚗcomᚋmikeydub�
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) unmarshalNReferredPostPreflightInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐReferredPostPreflightInput(ctx context.Context, v interface{}) (model.ReferredPostPreflightInput, error) {
-	res, err := ec.unmarshalInputReferredPostPreflightInput(ctx, v)
+func (ec *executionContext) unmarshalNReferralPostPreflightInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐReferralPostPreflightInput(ctx context.Context, v interface{}) (model.ReferralPostPreflightInput, error) {
+	res, err := ec.unmarshalInputReferralPostPreflightInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
@@ -77295,11 +77295,11 @@ func (ec *executionContext) marshalORedeemMerchPayloadOrError2githubᚗcomᚋmik
 	return ec._RedeemMerchPayloadOrError(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalOReferredPostPreflightPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐReferredPostPreflightPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.ReferredPostPreflightPayloadOrError) graphql.Marshaler {
+func (ec *executionContext) marshalOReferralPostPreflightPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐReferralPostPreflightPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.ReferralPostPreflightPayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	return ec._ReferredPostPreflightPayloadOrError(ctx, sel, v)
+	return ec._ReferralPostPreflightPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalORefreshCollectionPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRefreshCollectionPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.RefreshCollectionPayloadOrError) graphql.Marshaler {

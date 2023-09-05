@@ -595,13 +595,13 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collect
 	return db.Event{}, nil
 }
 
-func (api TokenAPI) ReferredPostPreflight(ctx context.Context, tokenIdentifiers *persist.TokenIdentifiers) (bool, error) {
+func (api TokenAPI) ReferralPostPreflight(ctx context.Context, tokenIdentifiers *persist.TokenIdentifiers) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"address": validate.WithTag(tokenIdentifiers.ContractAddress, "required"),
 		"tokenID": validate.WithTag(tokenIdentifiers.TokenID, "required"),
 	}); err != nil {
-		return false, err
+		return err
 	}
 
 	if strings.HasPrefix(tokenIdentifiers.TokenID.String(), "0x") {
@@ -627,18 +627,18 @@ func (api TokenAPI) ReferredPostPreflight(ctx context.Context, tokenIdentifiers 
 			break
 		}
 		if errors.Is(err, multichain.ErrNoMatchingProviders) {
-			return false, err
+			return err
 		}
 		r.Sleep(i)
 	}
 
 	if !exists {
-		return false, err
+		return err
 	}
 
 	// TODO: Should this create a token if it doesn't exist?
 	// Maybe when creating the post it creates the token.
 	// TODO: Actually submit the media to the tokenprocessing queue
 
-	return exists, err
+	return err
 }

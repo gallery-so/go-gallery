@@ -207,8 +207,8 @@ type RedeemMerchPayloadOrError interface {
 	IsRedeemMerchPayloadOrError()
 }
 
-type ReferredPostPreflightPayloadOrError interface {
-	IsReferredPostPreflightPayloadOrError()
+type ReferralPostPreflightPayloadOrError interface {
+	IsReferralPostPreflightPayloadOrError()
 }
 
 type RefreshCollectionPayloadOrError interface {
@@ -1766,15 +1766,15 @@ type RedeemMerchPayload struct {
 
 func (RedeemMerchPayload) IsRedeemMerchPayloadOrError() {}
 
-type ReferredPostPreflightInput struct {
+type ReferralPostPreflightInput struct {
 	Token *persist.TokenIdentifiers `json:"token"`
 }
 
-type ReferredPostPreflightPayload struct {
-	Confirmed bool `json:"confirmed"`
+type ReferralPostPreflightPayload struct {
+	Accepted bool `json:"accepted"`
 }
 
-func (ReferredPostPreflightPayload) IsReferredPostPreflightPayloadOrError() {}
+func (ReferralPostPreflightPayload) IsReferralPostPreflightPayloadOrError() {}
 
 type RefreshCollectionPayload struct {
 	Collection *Collection `json:"collection"`

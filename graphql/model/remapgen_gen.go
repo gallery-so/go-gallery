@@ -243,8 +243,8 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
-	"ReferredPostPreflightPayloadOrError": func(object interface{}) (interface{}, bool) {
-		obj, ok := object.(ReferredPostPreflightPayloadOrError)
+	"ReferralPostPreflightPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(ReferralPostPreflightPayloadOrError)
 		return obj, ok
 	},
 

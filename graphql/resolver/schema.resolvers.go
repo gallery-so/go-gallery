@@ -1075,13 +1075,13 @@ func (r *mutationResolver) RefreshContract(ctx context.Context, contractID persi
 	return output, nil
 }
 
-// ReferredPostPreflight is the resolver for the referredPostPreflight field.
-func (r *mutationResolver) ReferredPostPreflight(ctx context.Context, input model.ReferredPostPreflightInput) (model.ReferredPostPreflightPayloadOrError, error) {
+// ReferralPostPreflight is the resolver for the referralPostPreflight field.
+func (r *mutationResolver) ReferralPostPreflight(ctx context.Context, input model.ReferralPostPreflightInput) (model.ReferralPostPreflightPayloadOrError, error) {
 	fmt.Println("tokenID", input.Token.TokenID)
 	fmt.Println("chain", input.Token.Chain)
 	fmt.Println("contractAddress", input.Token.ContractAddress)
-	confirmed, err := publicapi.For(ctx).Token.ReferredPostPreflight(ctx, input.Token)
-	return &model.ReferredPostPreflightPayload{Confirmed: err != nil && confirmed}, err
+	err := publicapi.For(ctx).Token.ReferralPostPreflight(ctx, input.Token)
+	return &model.ReferralPostPreflightPayload{Accepted: err != nil}, err
 }
 
 // GetAuthNonce is the resolver for the getAuthNonce field.

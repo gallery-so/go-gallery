@@ -2470,15 +2470,15 @@ type DeletePostPayload {
 
 union DeletePostPayloadOrError = DeletePostPayload | ErrInvalidInput | ErrNotAuthorized
 
-input ReferredPostPreflightInput {
+input ReferralPostPreflightInput {
   token: ChainAddressTokenInput!
 }
 
-type ReferredPostPreflightPayload {
-  confirmed: Boolean!
+type ReferralPostPreflightPayload {
+  accepted: Boolean!
 }
 
-union ReferredPostPreflightPayloadOrError = ReferredPostPreflightPayload
+union ReferralPostPreflightPayloadOrError = ReferralPostPreflightPayload
 
 type Mutation {
   # User Mutations
@@ -2524,7 +2524,7 @@ type Mutation {
   refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
   refreshContract(contractId: DBID!): RefreshContractPayloadOrError
 
-  referredPostPreflight(input: ReferredPostPreflightInput!): ReferredPostPreflightPayloadOrError
+  referralPostPreflight(input: ReferralPostPreflightInput!): ReferralPostPreflightPayloadOrError
 
   getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
 
