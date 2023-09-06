@@ -134,7 +134,7 @@ func processMediaForToken(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRe
 			return
 		}
 
-		_, err = processToken(reqCtx, tp, token, contract, persist.ProcessingCauseRefresh)
+		_, err = processToken(reqCtx, tp, token, contract, persist.ProcessingCauseRefresh, PipelineOpts.WithForceFetchMetadata())
 		if err != nil {
 			if util.ErrorAs[ErrBadToken](err) {
 				util.ErrResponse(c, http.StatusUnprocessableEntity, err)
@@ -320,8 +320,10 @@ func detectSpamContracts(queries *coredb.Queries) gin.HandlerFunc {
 	}
 }
 
-func processToken(ctx context.Context, tp *tokenProcessor, t persist.TokenGallery, contract persist.ContractGallery, cause persist.ProcessingCause) (coredb.TokenMedia, error) {
-	opts := append([]PipelineOption{PipelineOpts.WithTokenInstance(&t)}, addContractSpecificOptions(contract)...)
+func processToken(ctx context.Context, tp *tokenProcessor, t persist.TokenGallery, contract persist.ContractGallery, cause persist.ProcessingCause, baseOpts ...PipelineOption) (coredb.TokenMedia, error) {
+	opts := append([]PipelineOption{}, baseOpts...)
+	opts = append(opts, PipelineOpts.WithTokenInstance(&t))
+	opts = append(opts, addContractSpecificOptions(contract)...)
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
 		"tokenDBID":       t.ID,
 		"tokenID":         t.TokenID,
@@ -406,7 +408,7 @@ func processPostPreflight(tp *tokenProcessor, mc *multichain.Provider) gin.Handl
 			return
 		}
 
-		_, err = tp.ProcessTokenPipeline(c, input.Token, persist.ContractGallery{}, "")
+		_, err = tp.ProcessTokenPipeline(c, input.Token, persist.ContractGallery{}, persist.ProcessingCausePostPreflight, PipelineOpts.WithForceFetchMetadata())
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return

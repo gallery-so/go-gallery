@@ -68,23 +68,31 @@ type tokenProcessingJob struct {
 	// If the job doesn't produce active media, only tokenInstance's media is updated. If there is active media from past jobs, tokenInstance's media
 	// will be updated to use that media instead.
 	tokenInstance *persist.TokenGallery
+	// forceFetchMetadata is a flag that always fetches metadata when enabled
+	forceFetchMetadata bool
 }
 
 type PipelineOption func(*tokenProcessingJob)
 
-type PipelineOptions struct{}
+type pipelineOptions struct{}
 
-var PipelineOpts PipelineOptions
+var PipelineOpts pipelineOptions
 
-func (PipelineOptions) WithProfileImageKey(key string) PipelineOption {
+func (pipelineOptions) WithProfileImageKey(key string) PipelineOption {
 	return func(j *tokenProcessingJob) {
 		j.profileImageKey = key
 	}
 }
 
-func (PipelineOptions) WithTokenInstance(t *persist.TokenGallery) PipelineOption {
+func (pipelineOptions) WithTokenInstance(t *persist.TokenGallery) PipelineOption {
 	return func(j *tokenProcessingJob) {
 		j.tokenInstance = t
+	}
+}
+
+func (pipelineOptions) WithForceFetchMetadata() PipelineOption {
+	return func(j *tokenProcessingJob) {
+		j.forceFetchMetadata = true
 	}
 }
 
@@ -209,7 +217,7 @@ func (tpj *tokenProcessingJob) retrieveMetadata(ctx context.Context) persist.Tok
 		metadata = tpj.tokenInstance.TokenMetadata
 	}
 
-	if len(metadata) == 0 || tpj.cause == persist.ProcessingCauseRefresh {
+	if len(metadata) == 0 || tpj.forceFetchMetadata {
 		i, a := tpj.contract.Chain.BaseKeywords()
 		fieldRequests := []multichain.FieldRequest[string]{
 			{
