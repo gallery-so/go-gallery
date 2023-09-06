@@ -183,6 +183,14 @@ type Notification interface {
 	IsNotification()
 }
 
+type OptInForRolesPayloadOrError interface {
+	IsOptInForRolesPayloadOrError()
+}
+
+type OptOutForRolesPayloadOrError interface {
+	IsOptOutForRolesPayloadOrError()
+}
+
 type PostOrError interface {
 	IsPostOrError()
 }
@@ -1014,6 +1022,8 @@ func (ErrInvalidInput) IsUpdateEmailPayloadOrError()                     {}
 func (ErrInvalidInput) IsResendVerificationEmailPayloadOrError()         {}
 func (ErrInvalidInput) IsUpdateEmailNotificationSettingsPayloadOrError() {}
 func (ErrInvalidInput) IsUnsubscribeFromEmailTypePayloadOrError()        {}
+func (ErrInvalidInput) IsOptInForRolesPayloadOrError()                   {}
+func (ErrInvalidInput) IsOptOutForRolesPayloadOrError()                  {}
 func (ErrInvalidInput) IsRedeemMerchPayloadOrError()                     {}
 func (ErrInvalidInput) IsCreateGalleryPayloadOrError()                   {}
 func (ErrInvalidInput) IsUpdateGalleryInfoPayloadOrError()               {}
@@ -1090,6 +1100,8 @@ func (ErrNotAuthorized) IsSyncCreatedTokensForExistingContractPayloadOrError() {
 func (ErrNotAuthorized) IsError()                                              {}
 func (ErrNotAuthorized) IsAddRolesToUserPayloadOrError()                       {}
 func (ErrNotAuthorized) IsRevokeRolesFromUserPayloadOrError()                  {}
+func (ErrNotAuthorized) IsOptInForRolesPayloadOrError()                        {}
+func (ErrNotAuthorized) IsOptOutForRolesPayloadOrError()                       {}
 func (ErrNotAuthorized) IsUploadPersistedQueriesPayloadOrError()               {}
 func (ErrNotAuthorized) IsSyncTokensForUsernamePayloadOrError()                {}
 func (ErrNotAuthorized) IsSyncCreatedTokensForUsernamePayloadOrError()         {}
@@ -1611,6 +1623,18 @@ type NotificationsConnection struct {
 type OneTimeLoginTokenAuth struct {
 	Token string `json:"token"`
 }
+
+type OptInForRolesPayload struct {
+	User *GalleryUser `json:"user"`
+}
+
+func (OptInForRolesPayload) IsOptInForRolesPayloadOrError() {}
+
+type OptOutForRolesPayload struct {
+	User *GalleryUser `json:"user"`
+}
+
+func (OptOutForRolesPayload) IsOptOutForRolesPayloadOrError() {}
 
 type OwnerAtBlock struct {
 	Owner       GalleryUserOrAddress `json:"owner"`

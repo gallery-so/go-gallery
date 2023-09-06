@@ -2083,6 +2083,17 @@ union UnsubscribeFromEmailTypePayloadOrError = UnsubscribeFromEmailTypePayload |
 union AddRolesToUserPayloadOrError = GalleryUser | ErrNotAuthorized
 union RevokeRolesFromUserPayloadOrError = GalleryUser | ErrNotAuthorized
 
+type OptInForRolesPayload {
+  user: GalleryUser
+}
+
+type OptOutForRolesPayload {
+  user: GalleryUser
+}
+
+union OptInForRolesPayloadOrError = OptInForRolesPayload | ErrNotAuthorized | ErrInvalidInput
+union OptOutForRolesPayloadOrError = OptOutForRolesPayload | ErrNotAuthorized | ErrInvalidInput
+
 input UploadPersistedQueriesInput {
   persistedQueries: String
 }
@@ -2588,6 +2599,9 @@ type Mutation {
   verifyEmailMagicLink(input: VerifyEmailMagicLinkInput!): VerifyEmailMagicLinkPayloadOrError
 
   redeemMerch(input: RedeemMerchInput!): RedeemMerchPayloadOrError @authRequired
+
+  optInForRoles(roles: [Role!]!): OptInForRolesPayloadOrError @authRequired
+  optOutForRoles(roles: [Role!]!): OptOutForRolesPayloadOrError @authRequired
 
   # Retool Specific Mutations
   addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth

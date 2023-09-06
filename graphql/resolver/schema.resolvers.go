@@ -1702,6 +1702,34 @@ func (r *mutationResolver) RedeemMerch(ctx context.Context, input model.RedeemMe
 	return output, nil
 }
 
+// OptInForRoles is the resolver for the optInForRoles field.
+func (r *mutationResolver) OptInForRoles(ctx context.Context, roles []persist.Role) (model.OptInForRolesPayloadOrError, error) {
+	user, err := publicapi.For(ctx).User.OptInForRoles(ctx, roles)
+	if err != nil {
+		return nil, err
+	}
+
+	payload := model.OptInForRolesPayload{
+		User: userToModel(ctx, *user),
+	}
+
+	return payload, nil
+}
+
+// OptOutForRoles is the resolver for the optOutForRoles field.
+func (r *mutationResolver) OptOutForRoles(ctx context.Context, roles []persist.Role) (model.OptOutForRolesPayloadOrError, error) {
+	user, err := publicapi.For(ctx).User.OptOutForRoles(ctx, roles)
+	if err != nil {
+		return nil, err
+	}
+
+	payload := model.OptOutForRolesPayload{
+		User: userToModel(ctx, *user),
+	}
+
+	return payload, nil
+}
+
 // AddRolesToUser is the resolver for the addRolesToUser field.
 func (r *mutationResolver) AddRolesToUser(ctx context.Context, username string, roles []*persist.Role) (model.AddRolesToUserPayloadOrError, error) {
 	user, err := publicapi.For(ctx).Admin.AddRolesToUser(ctx, username, roles)
@@ -2579,7 +2607,6 @@ func (r *tokenResolver) Media(ctx context.Context, obj *model.Token) (model.Medi
 		return mediaToModel(ctx, tokenMedia, fallbackMedia, highDef), err
 	}
 	return mediaToModel(ctx, tokenMedia, obj.HelperTokenData.Token.FallbackMedia, highDef), nil
-
 }
 
 // Owner is the resolver for the owner field.
