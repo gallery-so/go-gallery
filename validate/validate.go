@@ -141,6 +141,7 @@ func RegisterCustomValidators(v *validator.Validate) {
 	v.RegisterValidation("sorted_asc", SortedAscValidator)
 	v.RegisterValidation("chain", ChainValidator)
 	v.RegisterValidation("role", IsValidRole)
+	v.RegisterValidation("opt_in_role", IsOptInRole)
 	v.RegisterValidation("created_collections", CreatedCollectionsValidator)
 	v.RegisterValidation("http", HTTPValidator)
 	v.RegisterAlias("collection_name", "max=200")
@@ -158,6 +159,12 @@ func RegisterCustomValidators(v *validator.Validate) {
 var IsValidRole validator.Func = func(fl validator.FieldLevel) bool {
 	role := persist.Role(fl.Field().String())
 	return role == persist.RoleAdmin || role == persist.RoleBetaTester
+}
+
+// IsOptInRole designates roles that users can opt themselves into
+var IsOptInRole validator.Func = func(fl validator.FieldLevel) bool {
+	role := persist.Role(fl.Field().String())
+	return role == persist.RoleBetaTester
 }
 
 func ChainAddressValidator(sl validator.StructLevel) {

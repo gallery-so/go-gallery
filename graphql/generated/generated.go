@@ -808,6 +808,8 @@ type ComplexityRoot struct {
 		Logout                               func(childComplexity int, pushTokenToUnregister *string) int
 		MintPremiumCardToWallet              func(childComplexity int, input model.MintPremiumCardToWalletInput) int
 		MoveCollectionToGallery              func(childComplexity int, input *model.MoveCollectionToGalleryInput) int
+		OptInForRoles                        func(childComplexity int, roles []persist.Role) int
+		OptOutForRoles                       func(childComplexity int, roles []persist.Role) int
 		PostTokens                           func(childComplexity int, input model.PostTokensInput) int
 		PreverifyEmail                       func(childComplexity int, input model.PreverifyEmailInput) int
 		PublishGallery                       func(childComplexity int, input model.PublishGalleryInput) int
@@ -884,6 +886,14 @@ type ComplexityRoot struct {
 		Edges       func(childComplexity int) int
 		PageInfo    func(childComplexity int) int
 		UnseenCount func(childComplexity int) int
+	}
+
+	OptInForRolesPayload struct {
+		User func(childComplexity int) int
+	}
+
+	OptOutForRolesPayload struct {
+		User func(childComplexity int) int
 	}
 
 	OwnerAtBlock struct {
@@ -1727,6 +1737,8 @@ type MutationResolver interface {
 	VerifyEmail(ctx context.Context, input model.VerifyEmailInput) (model.VerifyEmailPayloadOrError, error)
 	VerifyEmailMagicLink(ctx context.Context, input model.VerifyEmailMagicLinkInput) (model.VerifyEmailMagicLinkPayloadOrError, error)
 	RedeemMerch(ctx context.Context, input model.RedeemMerchInput) (model.RedeemMerchPayloadOrError, error)
+	OptInForRoles(ctx context.Context, roles []persist.Role) (model.OptInForRolesPayloadOrError, error)
+	OptOutForRoles(ctx context.Context, roles []persist.Role) (model.OptOutForRolesPayloadOrError, error)
 	AddRolesToUser(ctx context.Context, username string, roles []*persist.Role) (model.AddRolesToUserPayloadOrError, error)
 	AddWalletToUserUnchecked(ctx context.Context, input model.AdminAddWalletInput) (model.AdminAddWalletPayloadOrError, error)
 	RevokeRolesFromUser(ctx context.Context, username string, roles []*persist.Role) (model.RevokeRolesFromUserPayloadOrError, error)
@@ -4704,6 +4716,30 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.MoveCollectionToGallery(childComplexity, args["input"].(*model.MoveCollectionToGalleryInput)), true
 
+	case "Mutation.optInForRoles":
+		if e.complexity.Mutation.OptInForRoles == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_optInForRoles_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.OptInForRoles(childComplexity, args["roles"].([]persist.Role)), true
+
+	case "Mutation.optOutForRoles":
+		if e.complexity.Mutation.OptOutForRoles == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_optOutForRoles_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.OptOutForRoles(childComplexity, args["roles"].([]persist.Role)), true
+
 	case "Mutation.postTokens":
 		if e.complexity.Mutation.PostTokens == nil {
 			break
@@ -5381,6 +5417,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.NotificationsConnection.UnseenCount(childComplexity), true
+
+	case "OptInForRolesPayload.user":
+		if e.complexity.OptInForRolesPayload.User == nil {
+			break
+		}
+
+		return e.complexity.OptInForRolesPayload.User(childComplexity), true
+
+	case "OptOutForRolesPayload.user":
+		if e.complexity.OptOutForRolesPayload.User == nil {
+			break
+		}
+
+		return e.complexity.OptOutForRolesPayload.User(childComplexity), true
 
 	case "OwnerAtBlock.blockNumber":
 		if e.complexity.OwnerAtBlock.BlockNumber == nil {
@@ -9809,7 +9859,7 @@ type LogoutPayload {
 input CreateUserInput {
   username: String!
   bio: String
-  email: Email
+  email: Email @scrub
   galleryName: String
   galleryDescription: String
   galleryPosition: String
@@ -10135,6 +10185,17 @@ union UnsubscribeFromEmailTypePayloadOrError = UnsubscribeFromEmailTypePayload |
 
 union AddRolesToUserPayloadOrError = GalleryUser | ErrNotAuthorized
 union RevokeRolesFromUserPayloadOrError = GalleryUser | ErrNotAuthorized
+
+type OptInForRolesPayload {
+  user: GalleryUser
+}
+
+type OptOutForRolesPayload {
+  user: GalleryUser
+}
+
+union OptInForRolesPayloadOrError = OptInForRolesPayload | ErrNotAuthorized | ErrInvalidInput
+union OptOutForRolesPayloadOrError = OptOutForRolesPayload | ErrNotAuthorized | ErrInvalidInput
 
 input UploadPersistedQueriesInput {
   persistedQueries: String
@@ -10641,6 +10702,9 @@ type Mutation {
   verifyEmailMagicLink(input: VerifyEmailMagicLinkInput!): VerifyEmailMagicLinkPayloadOrError
 
   redeemMerch(input: RedeemMerchInput!): RedeemMerchPayloadOrError @authRequired
+
+  optInForRoles(roles: [Role!]!): OptInForRolesPayloadOrError @authRequired
+  optOutForRoles(roles: [Role!]!): OptOutForRolesPayloadOrError @authRequired
 
   # Retool Specific Mutations
   addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth
@@ -11767,6 +11831,36 @@ func (ec *executionContext) field_Mutation_moveCollectionToGallery_args(ctx cont
 		}
 	}
 	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_optInForRoles_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 []persist.Role
+	if tmp, ok := rawArgs["roles"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("roles"))
+		arg0, err = ec.unmarshalNRole2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐRoleᚄ(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["roles"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_optOutForRoles_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 []persist.Role
+	if tmp, ok := rawArgs["roles"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("roles"))
+		arg0, err = ec.unmarshalNRole2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐRoleᚄ(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["roles"] = arg0
 	return args, nil
 }
 
@@ -35389,6 +35483,150 @@ func (ec *executionContext) fieldContext_Mutation_redeemMerch(ctx context.Contex
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_optInForRoles(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_optInForRoles(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().OptInForRoles(rctx, fc.Args["roles"].([]persist.Role))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.OptInForRolesPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.OptInForRolesPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.OptInForRolesPayloadOrError)
+	fc.Result = res
+	return ec.marshalOOptInForRolesPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐOptInForRolesPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_optInForRoles(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type OptInForRolesPayloadOrError does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_optInForRoles_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_optOutForRoles(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_optOutForRoles(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().OptOutForRoles(rctx, fc.Args["roles"].([]persist.Role))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.OptOutForRolesPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.OptOutForRolesPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.OptOutForRolesPayloadOrError)
+	fc.Result = res
+	return ec.marshalOOptOutForRolesPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐOptOutForRolesPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_optOutForRoles(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type OptOutForRolesPayloadOrError does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_optOutForRoles_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_addRolesToUser(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Mutation_addRolesToUser(ctx, field)
 	if err != nil {
@@ -37121,6 +37359,192 @@ func (ec *executionContext) fieldContext_NotificationsConnection_pageInfo(ctx co
 				return ec.fieldContext_PageInfo_endCursor(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PageInfo", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _OptInForRolesPayload_user(ctx context.Context, field graphql.CollectedField, obj *model.OptInForRolesPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_OptInForRolesPayload_user(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.User, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.GalleryUser)
+	fc.Result = res
+	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_OptInForRolesPayload_user(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "OptInForRolesPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_GalleryUser_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_GalleryUser_dbid(ctx, field)
+			case "username":
+				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
+			case "bio":
+				return ec.fieldContext_GalleryUser_bio(ctx, field)
+			case "traits":
+				return ec.fieldContext_GalleryUser_traits(ctx, field)
+			case "universal":
+				return ec.fieldContext_GalleryUser_universal(ctx, field)
+			case "roles":
+				return ec.fieldContext_GalleryUser_roles(ctx, field)
+			case "socialAccounts":
+				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
+			case "tokens":
+				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensByChain":
+				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
+			case "wallets":
+				return ec.fieldContext_GalleryUser_wallets(ctx, field)
+			case "primaryWallet":
+				return ec.fieldContext_GalleryUser_primaryWallet(ctx, field)
+			case "featuredGallery":
+				return ec.fieldContext_GalleryUser_featuredGallery(ctx, field)
+			case "galleries":
+				return ec.fieldContext_GalleryUser_galleries(ctx, field)
+			case "badges":
+				return ec.fieldContext_GalleryUser_badges(ctx, field)
+			case "isAuthenticatedUser":
+				return ec.fieldContext_GalleryUser_isAuthenticatedUser(ctx, field)
+			case "followers":
+				return ec.fieldContext_GalleryUser_followers(ctx, field)
+			case "following":
+				return ec.fieldContext_GalleryUser_following(ctx, field)
+			case "feed":
+				return ec.fieldContext_GalleryUser_feed(ctx, field)
+			case "sharedFollowers":
+				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
+			case "sharedCommunities":
+				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _OptOutForRolesPayload_user(ctx context.Context, field graphql.CollectedField, obj *model.OptOutForRolesPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_OptOutForRolesPayload_user(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.User, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.GalleryUser)
+	fc.Result = res
+	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_OptOutForRolesPayload_user(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "OptOutForRolesPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_GalleryUser_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_GalleryUser_dbid(ctx, field)
+			case "username":
+				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "profileImage":
+				return ec.fieldContext_GalleryUser_profileImage(ctx, field)
+			case "potentialEnsProfileImage":
+				return ec.fieldContext_GalleryUser_potentialEnsProfileImage(ctx, field)
+			case "bio":
+				return ec.fieldContext_GalleryUser_bio(ctx, field)
+			case "traits":
+				return ec.fieldContext_GalleryUser_traits(ctx, field)
+			case "universal":
+				return ec.fieldContext_GalleryUser_universal(ctx, field)
+			case "roles":
+				return ec.fieldContext_GalleryUser_roles(ctx, field)
+			case "socialAccounts":
+				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
+			case "tokens":
+				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensByChain":
+				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
+			case "wallets":
+				return ec.fieldContext_GalleryUser_wallets(ctx, field)
+			case "primaryWallet":
+				return ec.fieldContext_GalleryUser_primaryWallet(ctx, field)
+			case "featuredGallery":
+				return ec.fieldContext_GalleryUser_featuredGallery(ctx, field)
+			case "galleries":
+				return ec.fieldContext_GalleryUser_galleries(ctx, field)
+			case "badges":
+				return ec.fieldContext_GalleryUser_badges(ctx, field)
+			case "isAuthenticatedUser":
+				return ec.fieldContext_GalleryUser_isAuthenticatedUser(ctx, field)
+			case "followers":
+				return ec.fieldContext_GalleryUser_followers(ctx, field)
+			case "following":
+				return ec.fieldContext_GalleryUser_following(ctx, field)
+			case "feed":
+				return ec.fieldContext_GalleryUser_feed(ctx, field)
+			case "sharedFollowers":
+				return ec.fieldContext_GalleryUser_sharedFollowers(ctx, field)
+			case "sharedCommunities":
+				return ec.fieldContext_GalleryUser_sharedCommunities(ctx, field)
+			case "createdCommunities":
+				return ec.fieldContext_GalleryUser_createdCommunities(ctx, field)
+			case "isMemberOfCommunity":
+				return ec.fieldContext_GalleryUser_isMemberOfCommunity(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
 	}
 	return fc, nil
@@ -61074,6 +61498,66 @@ func (ec *executionContext) _Notification(ctx context.Context, sel ast.Selection
 	}
 }
 
+func (ec *executionContext) _OptInForRolesPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.OptInForRolesPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.OptInForRolesPayload:
+		return ec._OptInForRolesPayload(ctx, sel, &obj)
+	case *model.OptInForRolesPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._OptInForRolesPayload(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _OptOutForRolesPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.OptOutForRolesPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.OptOutForRolesPayload:
+		return ec._OptOutForRolesPayload(ctx, sel, &obj)
+	case *model.OptOutForRolesPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._OptOutForRolesPayload(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _PostOrError(ctx context.Context, sel ast.SelectionSet, obj model.PostOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -65398,7 +65882,7 @@ func (ec *executionContext) _ErrGalleryNotFound(ctx context.Context, sel ast.Sel
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "PostOrError", "SocialConnectionsOrError", "MerchTokensPayloadOrError", "SearchUsersPayloadOrError", "SearchGalleriesPayloadOrError", "SearchCommunitiesPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "VerifyEmailMagicLinkPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "RedeemMerchPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "AdmirePostPayloadOrError", "AdmireTokenPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "PostOrError", "SocialConnectionsOrError", "MerchTokensPayloadOrError", "SearchUsersPayloadOrError", "SearchGalleriesPayloadOrError", "SearchCommunitiesPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "VerifyEmailMagicLinkPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "OptInForRolesPayloadOrError", "OptOutForRolesPayloadOrError", "RedeemMerchPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "AdmirePostPayloadOrError", "AdmireTokenPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -65531,7 +66015,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "SocialQueriesOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "SyncTokensPayloadOrError", "SyncCreatedTokensForNewContractsPayloadOrError", "SyncCreatedTokensForExistingContractPayloadOrError", "Error", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "SyncCreatedTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "UnbanUserFromFeedPayloadOrError", "SetCommunityOverrideCreatorPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "GenerateQRCodeLoginTokenPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "AdmirePostPayloadOrError", "AdmireTokenPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "SocialQueriesOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "SyncTokensPayloadOrError", "SyncCreatedTokensForNewContractsPayloadOrError", "SyncCreatedTokensForExistingContractPayloadOrError", "Error", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "OptInForRolesPayloadOrError", "OptOutForRolesPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "SyncCreatedTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "UnbanUserFromFeedPayloadOrError", "SetCommunityOverrideCreatorPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "GenerateQRCodeLoginTokenPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "AdmirePostPayloadOrError", "AdmireTokenPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
@@ -68195,6 +68679,18 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 				return ec._Mutation_redeemMerch(ctx, field)
 			})
 
+		case "optInForRoles":
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_optInForRoles(ctx, field)
+			})
+
+		case "optOutForRoles":
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_optOutForRoles(ctx, field)
+			})
+
 		case "addRolesToUser":
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
@@ -68445,6 +68941,56 @@ func (ec *executionContext) _NotificationsConnection(ctx context.Context, sel as
 		case "pageInfo":
 
 			out.Values[i] = ec._NotificationsConnection_pageInfo(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var optInForRolesPayloadImplementors = []string{"OptInForRolesPayload", "OptInForRolesPayloadOrError"}
+
+func (ec *executionContext) _OptInForRolesPayload(ctx context.Context, sel ast.SelectionSet, obj *model.OptInForRolesPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, optInForRolesPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("OptInForRolesPayload")
+		case "user":
+
+			out.Values[i] = ec._OptInForRolesPayload_user(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var optOutForRolesPayloadImplementors = []string{"OptOutForRolesPayload", "OptOutForRolesPayloadOrError"}
+
+func (ec *executionContext) _OptOutForRolesPayload(ctx context.Context, sel ast.SelectionSet, obj *model.OptOutForRolesPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, optOutForRolesPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("OptOutForRolesPayload")
+		case "user":
+
+			out.Values[i] = ec._OptOutForRolesPayload_user(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -74253,6 +74799,67 @@ func (ec *executionContext) marshalNRole2githubᚗcomᚋmikeydubᚋgoᚑgallery�
 	return v
 }
 
+func (ec *executionContext) unmarshalNRole2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐRoleᚄ(ctx context.Context, v interface{}) ([]persist.Role, error) {
+	var vSlice []interface{}
+	if v != nil {
+		vSlice = graphql.CoerceList(v)
+	}
+	var err error
+	res := make([]persist.Role, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNRole2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐRole(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalNRole2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐRoleᚄ(ctx context.Context, sel ast.SelectionSet, v []persist.Role) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNRole2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐRole(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
 func (ec *executionContext) unmarshalNSetProfileImageInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSetProfileImageInput(ctx context.Context, v interface{}) (model.SetProfileImageInput, error) {
 	res, err := ec.unmarshalInputSetProfileImageInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -76956,6 +77563,20 @@ func (ec *executionContext) unmarshalOOneTimeLoginTokenAuth2ᚖgithubᚗcomᚋmi
 	}
 	res, err := ec.unmarshalInputOneTimeLoginTokenAuth(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOOptInForRolesPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐOptInForRolesPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.OptInForRolesPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._OptInForRolesPayloadOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOOptOutForRolesPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐOptOutForRolesPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.OptOutForRolesPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._OptOutForRolesPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOOwnerAtBlock2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐOwnerAtBlock(ctx context.Context, sel ast.SelectionSet, v []*model.OwnerAtBlock) graphql.Marshaler {
