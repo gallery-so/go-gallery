@@ -54,15 +54,20 @@ func NewTokenProcessor(queries *coredb.Queries, ethClient *ethclient.Client, htt
 type tokenProcessingJob struct {
 	tp               *tokenProcessor
 	id               persist.DBID
-	key              string
-	token            persist.TokenGallery
+	token            persist.TokenIdentifiers
 	contract         persist.ContractGallery
 	cause            persist.ProcessingCause
 	pipelineMetadata *persist.PipelineMetadata
+	// Pipeline runtime options
+	//
 	// profileImageKey is an optional key in the metadata that the pipeline should also process as a profile image
 	// The pipeline only looks at the root level of the metadata for the key and will also not fail
 	// if the key is missing or if processing media for the key fails
 	profileImageKey string
+	// tokenInstance is an already instanced token to derive data (such as the name, description, and metadata) from when fetching fails.
+	// If the job doesn't produce active media, only tokenInstance's media is updated. If there is active media from past jobs, tokenInstance's media
+	// will be updated to use that media instead.
+	tokenInstance *persist.TokenGallery
 }
 
 type PipelineOption func(*tokenProcessingJob)
@@ -77,14 +82,21 @@ func (PipelineOptions) WithProfileImageKey(key string) PipelineOption {
 	}
 }
 
-func (tp *tokenProcessor) ProcessTokenPipeline(c context.Context, t persist.TokenGallery, contract persist.ContractGallery, cause persist.ProcessingCause, opts ...PipelineOption) (coredb.TokenMedia, error) {
+func (PipelineOptions) WithTokenInstance(t *persist.TokenGallery) PipelineOption {
+	return func(j *tokenProcessingJob) {
+		j.tokenInstance = t
+	}
+}
+
+func (tp *tokenProcessor) ProcessTokenPipeline(ctx context.Context, token persist.TokenIdentifiers, contract persist.ContractGallery, cause persist.ProcessingCause, opts ...PipelineOption) (coredb.TokenMedia, error) {
 	runID := persist.GenerateID()
+
+	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"runID": runID})
 
 	job := &tokenProcessingJob{
 		id:               runID,
 		tp:               tp,
-		key:              persist.NewTokenIdentifiers(contract.Address, t.TokenID, t.Chain).String(),
-		token:            t,
+		token:            token,
 		contract:         contract,
 		cause:            cause,
 		pipelineMetadata: new(persist.PipelineMetadata),
@@ -94,23 +106,12 @@ func (tp *tokenProcessor) ProcessTokenPipeline(c context.Context, t persist.Toke
 		opt(job)
 	}
 
-	loggerCtx := logger.NewContextWithFields(c, logrus.Fields{
-		"tokenDBID":       t.ID,
-		"tokenID":         t.TokenID,
-		"tokenID_base10":  t.TokenID.Base10String(),
-		"contractDBID":    t.Contract,
-		"contractAddress": contract.Address,
-		"chain":           t.Chain,
-		"runID":           runID,
-	})
-
-	totalTime := time.Now()
-
-	media, err := job.run(loggerCtx)
-	recordPipelineEndState(loggerCtx, tp.mr, media, err, time.Since(totalTime), cause)
+	startTime := time.Now()
+	media, err := job.run(ctx)
+	recordPipelineEndState(ctx, tp.mr, media, err, time.Since(startTime), cause)
 
 	if err != nil {
-		reportJobError(c, err, *job)
+		reportJobError(ctx, err, *job)
 	}
 
 	return media, err
@@ -133,7 +134,7 @@ func (tpj *tokenProcessingJob) run(ctx context.Context) (coredb.TokenMedia, erro
 	span, ctx := tracing.StartSpan(ctx, "pipeline.run", fmt.Sprintf("run %s", tpj.id))
 	defer tracing.FinishSpan(span)
 
-	logger.For(ctx).Infof("starting token processing pipeline for token %s (tokenDBID: %s)", tpj.key, tpj.token.ID)
+	logger.For(ctx).Infof("starting token processing pipeline for token %s", tpj.token.String())
 
 	var media coredb.TokenMedia
 	var mediaErr error
@@ -172,7 +173,7 @@ func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) mediaRes
 
 	result := coredb.TokenMedia{
 		ID:              persist.GenerateID(),
-		ContractID:      tpj.token.Contract,
+		ContractID:      tpj.contract.ID,
 		TokenID:         tpj.token.TokenID,
 		Chain:           tpj.token.Chain,
 		Active:          true,
@@ -202,9 +203,13 @@ func (tpj *tokenProcessingJob) retrieveMetadata(ctx context.Context) persist.Tok
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 
-	newMetadata := tpj.token.TokenMetadata
+	var metadata persist.TokenMetadata
 
-	if len(newMetadata) == 0 || tpj.cause == persist.ProcessingCauseRefresh {
+	if tpj.tokenInstance != nil {
+		metadata = tpj.tokenInstance.TokenMetadata
+	}
+
+	if len(metadata) == 0 || tpj.cause == persist.ProcessingCauseRefresh {
 		i, a := tpj.contract.Chain.BaseKeywords()
 		fieldRequests := []multichain.FieldRequest[string]{
 			{
@@ -222,15 +227,15 @@ func (tpj *tokenProcessingJob) retrieveMetadata(ctx context.Context) persist.Tok
 			persist.FailStep(&tpj.pipelineMetadata.MetadataRetrieval)
 		} else if len(mcMetadata) > 0 {
 			logger.For(ctx).Infof("got metadata from chain: %v", mcMetadata)
-			newMetadata = mcMetadata
+			metadata = mcMetadata
 		}
 	}
 
-	if len(newMetadata) == 0 {
+	if len(metadata) == 0 {
 		persist.FailStep(&tpj.pipelineMetadata.MetadataRetrieval)
 	}
 
-	return newMetadata
+	return metadata
 }
 
 func (tpj *tokenProcessingJob) retrieveTokenInfo(ctx context.Context, metadata persist.TokenMetadata) (string, string) {
@@ -239,12 +244,12 @@ func (tpj *tokenProcessingJob) retrieveTokenInfo(ctx context.Context, metadata p
 
 	name, description := findNameAndDescription(ctx, metadata)
 
-	if name == "" {
-		name = tpj.token.Name.String()
+	if name == "" && tpj.tokenInstance != nil {
+		name = tpj.tokenInstance.Name.String()
 	}
 
 	if description == "" {
-		description = tpj.token.Description.String()
+		description = tpj.tokenInstance.Description.String()
 	}
 	return name, description
 }
@@ -385,11 +390,18 @@ func (tpj *tokenProcessingJob) upsertDB(ctx context.Context, tmetadata coredb.To
 		HasName:         tmetadata.Name != "",
 		HasDescription:  tmetadata.Description != "",
 	}
+
+	var tokenDBID persist.DBID
+
+	if tpj.tokenInstance != nil {
+		tokenDBID = tpj.tokenInstance.ID
+	}
+
 	return tpj.tp.queries.InsertTokenPipelineResults(ctx, coredb.InsertTokenPipelineResultsParams{
 		Chain:            tpj.token.Chain,
-		ContractID:       tpj.token.Contract,
+		ContractID:       tpj.contract.ID,
 		TokenID:          tpj.token.TokenID,
-		TokenDbid:        tpj.token.ID.String(),
+		TokenDbid:        tokenDBID.String(),
 		ProcessingJobID:  tpj.id,
 		TokenProperties:  p,
 		PipelineMetadata: *tpj.pipelineMetadata,
@@ -401,7 +413,7 @@ func (tpj *tokenProcessingJob) upsertDB(ctx context.Context, tmetadata coredb.To
 		Name:             tmetadata.Name,
 		Description:      tmetadata.Description,
 		Active:           tmetadata.Active,
-		CopyMediaID:      persist.GenerateID(),
+		RetiredMediaID:   persist.GenerateID(),
 	})
 }
 

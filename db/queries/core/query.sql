@@ -1147,7 +1147,7 @@ with insert_job(id) as (
 insert_media_move_active_record(last_updated) as (
     insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
     (
-        select @copy_media_id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, now()
+        select @retired_media_id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, now()
         from token_medias
         where contract_id = @contract_id
             and token_id = @token_id
@@ -1170,11 +1170,11 @@ insert_media_add_record(insert_id, active, is_new) as (
     on conflict (contract_id, token_id, chain) where active and not deleted do update
         set metadata = excluded.metadata,
             media = excluded.media,
-            name = excluded.name,
-            description = excluded.description,
+            name = coalesce(nullif(excluded.name, ''), name),
+            description = coalesce(nullif(excluded.description, ''), description),
             processing_job_id = excluded.processing_job_id,
             last_updated = now()
-    returning id as insert_id, active, id = @new_media_id is_new
+    returning id as insert_id, active, id = @new_media_id replaced_current
 ),
 -- This will return the existing active record if it exists. If the incoming record is active,
 -- this will still return the active record before the update, and not the new record.
@@ -1205,11 +1205,11 @@ where
         -- The case statement below handles which token instances get updated:
         case
             -- If the active media already existed, update tokens that have no media (new tokens that haven't been processed before) or tokens that don't use this media yet
-            when insert_medias.active and not insert_medias.is_new
+            when insert_medias.active and not insert_medias.replaced_current
             then (tokens.token_media_id is null or tokens.token_media_id != insert_medias.insert_id)
 
             -- Brand new active media, update all tokens in the filter to use this media
-            when insert_medias.active and insert_medias.is_new
+            when insert_medias.active and insert_medias.replaced_current
             then 1 = 1
 
             -- The pipeline run produced inactive media, only update the token instance (since it may have not been processed before)
@@ -1346,7 +1346,7 @@ tokens as (
 token_medias as (
 	select token_medias.*
 	from token_medias, contract
-	where token_medias.token_id = @token_id and token_medias.contract_id = contract.id and token_medias.chain = @chain and token_medias.active and not token_medias.deleted
+	where token_medias.token_id = @token_id and token_medias.contract_id = contract.id and token_medias.chain = @chain and not token_medias.deleted
 	order by last_updated desc
 	limit 1
 )

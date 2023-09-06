@@ -2473,7 +2473,7 @@ tokens as (
 token_medias as (
 	select token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.contract_id, token_medias.token_id, token_medias.chain, token_medias.active, token_medias.metadata, token_medias.media, token_medias.name, token_medias.description, token_medias.processing_job_id, token_medias.deleted
 	from token_medias, contract
-	where token_medias.token_id = $3 and token_medias.contract_id = contract.id and token_medias.chain = $1 and token_medias.active and not token_medias.deleted
+	where token_medias.token_id = $3 and token_medias.contract_id = contract.id and token_medias.chain = $1 and not token_medias.deleted
 	order by last_updated desc
 	limit 1
 )
@@ -5070,11 +5070,11 @@ insert_media_add_record(insert_id, active, is_new) as (
     on conflict (contract_id, token_id, chain) where active and not deleted do update
         set metadata = excluded.metadata,
             media = excluded.media,
-            name = excluded.name,
-            description = excluded.description,
+            name = coalesce(nullif(excluded.name, ''), name),
+            description = coalesce(nullif(excluded.description, ''), description),
             processing_job_id = excluded.processing_job_id,
             last_updated = now()
-    returning id as insert_id, active, id = $12 is_new
+    returning id as insert_id, active, id = $12 replaced_current
 ),
 existing_active(id) as (
     select id
@@ -5103,11 +5103,11 @@ where
         -- The case statement below handles which token instances get updated:
         case
             -- If the active media already existed, update tokens that have no media (new tokens that haven't been processed before) or tokens that don't use this media yet
-            when insert_medias.active and not insert_medias.is_new
+            when insert_medias.active and not insert_medias.replaced_current
             then (tokens.token_media_id is null or tokens.token_media_id != insert_medias.insert_id)
 
             -- Brand new active media, update all tokens in the filter to use this media
-            when insert_medias.active and insert_medias.is_new
+            when insert_medias.active and insert_medias.replaced_current
             then 1 = 1
 
             -- The pipeline run produced inactive media, only update the token instance (since it may have not been processed before)
@@ -5130,7 +5130,7 @@ type InsertTokenPipelineResultsParams struct {
 	PipelineMetadata persist.PipelineMetadata `json:"pipeline_metadata"`
 	ProcessingCause  persist.ProcessingCause  `json:"processing_cause"`
 	ProcessorVersion string                   `json:"processor_version"`
-	CopyMediaID      persist.DBID             `json:"copy_media_id"`
+	RetiredMediaID   persist.DBID             `json:"retired_media_id"`
 	Active           interface{}              `json:"active"`
 	NewMediaID       persist.DBID             `json:"new_media_id"`
 	Metadata         persist.TokenMetadata    `json:"metadata"`
@@ -5154,7 +5154,7 @@ func (q *Queries) InsertTokenPipelineResults(ctx context.Context, arg InsertToke
 		arg.PipelineMetadata,
 		arg.ProcessingCause,
 		arg.ProcessorVersion,
-		arg.CopyMediaID,
+		arg.RetiredMediaID,
 		arg.Active,
 		arg.NewMediaID,
 		arg.Metadata,

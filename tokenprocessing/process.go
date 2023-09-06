@@ -3,19 +3,22 @@ package tokenprocessing
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/sirupsen/logrus"
 	"github.com/sourcegraph/conc/pool"
 
-	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
@@ -25,7 +28,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
-	"github.com/sirupsen/logrus"
 )
 
 type ProcessMediaForTokenInput struct {
@@ -318,8 +320,18 @@ func detectSpamContracts(queries *coredb.Queries) gin.HandlerFunc {
 	}
 }
 
-func processToken(ctx context.Context, tp *tokenProcessor, token persist.TokenGallery, contract persist.ContractGallery, cause persist.ProcessingCause) (coredb.TokenMedia, error) {
-	return tp.ProcessTokenPipeline(ctx, token, contract, cause, addPipelineRunOptions(contract)...)
+func processToken(ctx context.Context, tp *tokenProcessor, t persist.TokenGallery, contract persist.ContractGallery, cause persist.ProcessingCause) (coredb.TokenMedia, error) {
+	opts := append([]PipelineOption{PipelineOpts.WithTokenInstance(&t)}, addContractSpecificOptions(contract)...)
+	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
+		"tokenDBID":       t.ID,
+		"tokenID":         t.TokenID,
+		"tokenID_base10":  t.TokenID.Base10String(),
+		"contractDBID":    t.Contract,
+		"contractAddress": contract.Address,
+		"chain":           t.Chain,
+	})
+	token := persist.NewTokenIdentifiers(contract.Address, t.TokenID, t.Chain)
+	return tp.ProcessTokenPipeline(ctx, token, contract, cause, opts...)
 }
 
 func processWalletRemoval(queries *coredb.Queries) gin.HandlerFunc {
@@ -356,8 +368,59 @@ func processWalletRemoval(queries *coredb.Queries) gin.HandlerFunc {
 	}
 }
 
-// addPipelineRunOptions adds pipeline options for specific contracts
-func addPipelineRunOptions(contract persist.ContractGallery) (opts []PipelineOption) {
+func processPostPreflight(tp *tokenProcessor, mc *multichain.Provider) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var input task.PostPreflightMessage
+
+		if err := c.ShouldBindJSON(&input); err != nil {
+			util.ErrResponse(c, http.StatusOK, err)
+			return
+		}
+
+		if strings.HasPrefix(input.Token.TokenID.String(), "0x") {
+			input.Token.TokenID = persist.TokenID(input.Token.TokenID.Base10String())
+		}
+
+		var r retry.Retry = retry.Retry{Base: 1, Cap: 4, Tries: 12}
+		var err error
+		var exists bool
+
+		for i := 0; i < r.Tries; i++ {
+			exists, err = mc.ConfirmTokenExists(c, persist.TokenIdentifiers{
+				TokenID:         input.Token.TokenID,
+				Chain:           input.Token.Chain,
+				ContractAddress: input.Token.ContractAddress,
+			})
+			if exists {
+				break
+			}
+			if errors.Is(err, multichain.ErrNoMatchingProviders) {
+				util.ErrResponse(c, http.StatusOK, err)
+				return
+			}
+			r.Sleep(i)
+		}
+
+		if !exists {
+			util.ErrResponse(c, http.StatusNotFound, err)
+			return
+		}
+
+		_, err = tp.ProcessTokenPipeline(c, input.Token, persist.ContractGallery{}, "")
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		// // TODO: Should this create a token if it doesn't exist?
+		// // Maybe when creating the post it creates the token.
+
+		// return err
+	}
+}
+
+// addContractSpecificOptions adds pipeline options for specific contracts
+func addContractSpecificOptions(contract persist.ContractGallery) (opts []PipelineOption) {
 	if contract.Address == eth.EnsAddress {
 		opts = append(opts, PipelineOpts.WithProfileImageKey("profile_image"))
 	}

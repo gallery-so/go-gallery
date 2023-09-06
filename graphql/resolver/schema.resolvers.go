@@ -1077,9 +1077,6 @@ func (r *mutationResolver) RefreshContract(ctx context.Context, contractID persi
 
 // ReferralPostPreflight is the resolver for the referralPostPreflight field.
 func (r *mutationResolver) ReferralPostPreflight(ctx context.Context, input model.ReferralPostPreflightInput) (model.ReferralPostPreflightPayloadOrError, error) {
-	fmt.Println("tokenID", input.Token.TokenID)
-	fmt.Println("chain", input.Token.Chain)
-	fmt.Println("contractAddress", input.Token.ContractAddress)
 	err := publicapi.For(ctx).Token.ReferralPostPreflight(ctx, input.Token)
 	return &model.ReferralPostPreflightPayload{Accepted: err != nil}, err
 }
@@ -1425,7 +1422,8 @@ func (r *mutationResolver) CommentOnPost(ctx context.Context, postID persist.DBI
 
 // PostTokens is the resolver for the postTokens field.
 func (r *mutationResolver) PostTokens(ctx context.Context, input model.PostTokensInput) (model.PostTokensPayloadOrError, error) {
-	id, err := publicapi.For(ctx).Feed.PostTokens(ctx, input.TokenIds, input.Tokens, input.Caption)
+	tokens := util.MapWithoutError(input.Tokens, func(t *persist.TokenIdentifiers) persist.TokenIdentifiers { return *t })
+	id, err := publicapi.For(ctx).Feed.PostTokens(ctx, input.TokenIds, tokens, input.Caption)
 	if err != nil {
 		return nil, err
 	}

@@ -6,20 +6,21 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/mikeydub/go-gallery/service/auth/basicauth"
-
 	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
 	taskspb "cloud.google.com/go/cloudtasks/apiv2/cloudtaskspb"
-	"github.com/mikeydub/go-gallery/env"
-	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/tracing"
-	"github.com/mikeydub/go-gallery/util"
+	"github.com/getsentry/sentry-go"
+	"github.com/mikeydub/go-gallery/service/auth/basicauth"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/tracing"
+	"github.com/mikeydub/go-gallery/util"
 )
 
 // FeedMessage is the input message to the feed service
@@ -46,6 +47,10 @@ type TokenProcessingContractTokensMessage struct {
 
 type AddEmailToMailingListMessage struct {
 	UserID persist.DBID `json:"user_id" binding:"required"`
+}
+
+type PostPreflightMessage struct {
+	Token persist.TokenIdentifiers `json:"token" binding:"required"`
 }
 
 type TokenIdentifiersQuantities map[persist.TokenUniqueIdentifiers]persist.HexString
@@ -102,257 +107,85 @@ type PushNotificationMessage struct {
 func CreateTaskForPushNotification(ctx context.Context, message PushNotificationMessage, client *gcptasks.Client) error {
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForPushNotification")
 	defer tracing.FinishSpan(span)
-
-	tracing.AddEventDataToSpan(span, map[string]interface{}{
-		"PushTokenID": message.PushTokenID,
-	})
-
-	url := fmt.Sprintf("%s/tasks/send-push-notification", env.GetString("PUSH_NOTIFICATIONS_URL"))
-	logger.For(ctx).Infof("creating task for push notification, sending to %s", url)
-
+	tracing.AddEventDataToSpan(span, map[string]any{"PushTokenID": message.PushTokenID})
 	queue := env.GetString("GCLOUD_PUSH_NOTIFICATIONS_QUEUE")
-	task := &taskspb.Task{
-		MessageType: &taskspb.Task_HttpRequest{
-			HttpRequest: &taskspb.HttpRequest{
-				HttpMethod: taskspb.HttpMethod_POST,
-				Url:        url,
-				Headers: map[string]string{
-					"Content-type":  "application/json",
-					"Authorization": basicauth.MakeHeader(nil, env.GetString("PUSH_NOTIFICATIONS_SECRET")),
-					"sentry-trace":  span.TraceID.String(),
-				},
-			},
-		},
-	}
-
-	body, err := json.Marshal(message)
-	if err != nil {
-		return err
-	}
-
-	return submitHttpTask(ctx, client, queue, task, body)
+	url := fmt.Sprintf("%s/tasks/send-push-notification", env.GetString("PUSH_NOTIFICATIONS_URL"))
+	secret := env.GetString("PUSH_NOTIFICATIONS_SECRET")
+	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span), withBasicAuth(secret))
 }
 
 func CreateTaskForFeed(ctx context.Context, scheduleOn time.Time, message FeedMessage, client *gcptasks.Client) error {
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForFeed")
 	defer tracing.FinishSpan(span)
-
-	tracing.AddEventDataToSpan(span, map[string]interface{}{
-		"Event ID": message.ID,
-	})
-
-	url := fmt.Sprintf("%s/tasks/feed-event", env.GetString("FEED_URL"))
-	logger.For(ctx).Infof("creating task for feed event %s, scheduling on %s, sending to %s", message.ID, scheduleOn, url)
-
+	tracing.AddEventDataToSpan(span, map[string]any{"Event ID": message.ID})
 	queue := env.GetString("GCLOUD_FEED_QUEUE")
-	task := &taskspb.Task{
-		ScheduleTime: timestamppb.New(scheduleOn),
-		MessageType: &taskspb.Task_HttpRequest{
-			HttpRequest: &taskspb.HttpRequest{
-				HttpMethod: taskspb.HttpMethod_POST,
-				Url:        url,
-				Headers: map[string]string{
-					"Content-type":  "application/json",
-					"sentry-trace":  span.TraceID.String(),
-					"Authorization": "Basic " + env.GetString("FEED_SECRET"),
-				},
-			},
-		},
-	}
-
-	body, err := json.Marshal(message)
-	if err != nil {
-		return err
-	}
-
-	return submitHttpTask(ctx, client, queue, task, body)
+	url := fmt.Sprintf("%s/tasks/feed-event", env.GetString("FEED_URL"))
+	secret := env.GetString("FEED_SECRET")
+	return submitTask(ctx, client, queue, url, withScheduleOn(scheduleOn), withJSON(message), withTrace(span), withBasicAuth(secret))
 }
 
 func CreateTaskForFeedbot(ctx context.Context, scheduleOn time.Time, message FeedbotMessage, client *gcptasks.Client) error {
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForFeedbot")
 	defer tracing.FinishSpan(span)
-
-	tracing.AddEventDataToSpan(span, map[string]interface{}{
-		"Event ID": message.FeedEventID,
-	})
-
+	tracing.AddEventDataToSpan(span, map[string]any{"Event ID": message.FeedEventID})
 	queue := env.GetString("GCLOUD_FEEDBOT_TASK_QUEUE")
-	task := &taskspb.Task{
-		Name:         fmt.Sprintf("%s/tasks/%s", queue, message.FeedEventID.String()),
-		ScheduleTime: timestamppb.New(scheduleOn),
-		MessageType: &taskspb.Task_HttpRequest{
-			HttpRequest: &taskspb.HttpRequest{
-				HttpMethod: taskspb.HttpMethod_POST,
-				Url:        fmt.Sprintf("%s/tasks/feed-event", env.GetString("FEEDBOT_URL")),
-				Headers: map[string]string{
-					"Content-type":  "application/json",
-					"Authorization": "Basic " + env.GetString("FEEDBOT_SECRET"),
-					"sentry-trace":  span.TraceID.String(),
-				},
-			},
-		},
-	}
-
-	body, err := json.Marshal(message)
-	if err != nil {
-		return err
-	}
-
-	return submitHttpTask(ctx, client, queue, task, body)
+	url := fmt.Sprintf("%s/tasks/feed-event", env.GetString("FEEDBOT_URL"))
+	secret := env.GetString("FEEDBOT_SECRET")
+	return submitTask(ctx, client, queue, url, withScheduleOn(scheduleOn), withJSON(message), withTrace(span), withBasicAuth(secret))
 }
 
 func CreateTaskForTokenProcessing(ctx context.Context, client *gcptasks.Client, message TokenProcessingUserMessage) error {
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForTokenProcessing")
 	defer tracing.FinishSpan(span)
-
-	tracing.AddEventDataToSpan(span, map[string]interface{}{"User ID": message.UserID})
-
+	tracing.AddEventDataToSpan(span, map[string]any{"User ID": message.UserID})
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
-
-	task := &taskspb.Task{
-		DispatchDeadline: durationpb.New(time.Minute * 30),
-		MessageType: &taskspb.Task_HttpRequest{
-			HttpRequest: &taskspb.HttpRequest{
-				HttpMethod: taskspb.HttpMethod_POST,
-				Url:        fmt.Sprintf("%s/media/process", env.GetString("TOKEN_PROCESSING_URL")),
-				Headers: map[string]string{
-					"Content-type": "application/json",
-					"sentry-trace": span.TraceID.String(),
-				},
-			},
-		},
-	}
-
-	body, err := json.Marshal(message)
-	if err != nil {
-		return err
-	}
-
-	return submitHttpTask(ctx, client, queue, task, body)
+	url := fmt.Sprintf("%s/media/process", env.GetString("TOKEN_PROCESSING_URL"))
+	return submitTask(ctx, client, queue, url, withDeadline(time.Minute*30), withJSON(message), withTrace(span))
 }
 
 func CreateTaskForContractOwnerProcessing(ctx context.Context, message TokenProcessingContractTokensMessage, client *gcptasks.Client) error {
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForContractOwnerProcessing")
 	defer tracing.FinishSpan(span)
-
-	tracing.AddEventDataToSpan(span, map[string]interface{}{
-		"Contract ID": message.ContractID,
-	})
-
+	tracing.AddEventDataToSpan(span, map[string]any{"Contract ID": message.ContractID})
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
-
-	task := &taskspb.Task{
-		MessageType: &taskspb.Task_HttpRequest{
-			HttpRequest: &taskspb.HttpRequest{
-				HttpMethod: taskspb.HttpMethod_POST,
-				Url:        fmt.Sprintf("%s/owners/process/contract", env.GetString("TOKEN_PROCESSING_URL")),
-				Headers: map[string]string{
-					"Content-type": "application/json",
-					"sentry-trace": span.TraceID.String(),
-				},
-			},
-		},
-	}
-
-	body, err := json.Marshal(message)
-	if err != nil {
-		return err
-	}
-
-	return submitHttpTask(ctx, client, queue, task, body)
+	url := fmt.Sprintf("%s/owners/process/contract", env.GetString("TOKEN_PROCESSING_URL"))
+	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span))
 }
 
 func CreateTaskForUserTokenProcessing(ctx context.Context, message TokenProcessingUserTokensMessage, client *gcptasks.Client) error {
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForUserTokenProcessing")
 	defer tracing.FinishSpan(span)
-
-	tracing.AddEventDataToSpan(span, map[string]interface{}{
-		"User ID": message.UserID,
-	})
-
+	tracing.AddEventDataToSpan(span, map[string]any{"User ID": message.UserID})
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
-
-	task := &taskspb.Task{
-		MessageType: &taskspb.Task_HttpRequest{
-			HttpRequest: &taskspb.HttpRequest{
-				HttpMethod: taskspb.HttpMethod_POST,
-				Url:        fmt.Sprintf("%s/owners/process/user", env.GetString("TOKEN_PROCESSING_URL")),
-				Headers: map[string]string{
-					"Content-type": "application/json",
-					"sentry-trace": span.TraceID.String(),
-				},
-			},
-		},
-	}
-
-	body, err := json.Marshal(message)
-	if err != nil {
-		return err
-	}
-
-	return submitHttpTask(ctx, client, queue, task, body)
+	url := fmt.Sprintf("%s/owners/process/user", env.GetString("TOKEN_PROCESSING_URL"))
+	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span))
 }
 
 func CreateTaskForWalletRemoval(ctx context.Context, message TokenProcessingWalletRemovalMessage, client *gcptasks.Client) error {
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForWalletRemoval")
 	defer tracing.FinishSpan(span)
-
-	tracing.AddEventDataToSpan(span, map[string]interface{}{
-		"User ID":    message.UserID,
-		"Wallet IDs": message.WalletIDs,
-	})
-
+	tracing.AddEventDataToSpan(span, map[string]any{"User ID": message.UserID, "Wallet IDs": message.WalletIDs})
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
-
-	task := &taskspb.Task{
-		MessageType: &taskspb.Task_HttpRequest{
-			HttpRequest: &taskspb.HttpRequest{
-				HttpMethod: taskspb.HttpMethod_POST,
-				Url:        fmt.Sprintf("%s/owners/process/wallet-removal", env.GetString("TOKEN_PROCESSING_URL")),
-				Headers: map[string]string{
-					"Content-type": "application/json",
-					"sentry-trace": span.TraceID.String(),
-				},
-			},
-		},
-	}
-
-	body, err := json.Marshal(message)
-	if err != nil {
-		return err
-	}
-
-	return submitHttpTask(ctx, client, queue, task, body)
+	url := fmt.Sprintf("%s/owners/process/wallet-removal", env.GetString("TOKEN_PROCESSING_URL"))
+	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span))
 }
 
 func CreateTaskForAddingEmailToMailingList(ctx context.Context, message AddEmailToMailingListMessage, client *gcptasks.Client) error {
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForAddingEmailToMailingList")
 	defer tracing.FinishSpan(span)
-
-	tracing.AddEventDataToSpan(span, map[string]interface{}{"User ID": message.UserID})
-
+	tracing.AddEventDataToSpan(span, map[string]any{"User ID": message.UserID})
 	queue := env.GetString("EMAILS_QUEUE")
+	url := fmt.Sprintf("%s/send/process/add-to-mailing-list", env.GetString("EMAILS_HOST"))
+	secret := env.GetString("EMAILS_TASK_SECRET")
+	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span), withBasicAuth(secret))
+}
 
-	task := &taskspb.Task{
-		MessageType: &taskspb.Task_HttpRequest{
-			HttpRequest: &taskspb.HttpRequest{
-				HttpMethod: taskspb.HttpMethod_POST,
-				Url:        fmt.Sprintf("%s/send/process/add-to-mailing-list", env.GetString("EMAILS_HOST")),
-				Headers: map[string]string{
-					"Content-type":  "application/json",
-					"Authorization": basicauth.MakeHeader(nil, env.GetString("EMAILS_TASK_SECRET")),
-					"sentry-trace":  span.TraceID.String(),
-				},
-			},
-		},
-	}
-
-	body, err := json.Marshal(message)
-	if err != nil {
-		return err
-	}
-
-	return submitHttpTask(ctx, client, queue, task, body)
+func CreateTaskForPostPreflight(ctx context.Context, message PostPreflightMessage, client *gcptasks.Client) error {
+	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForPostPreflight")
+	defer tracing.FinishSpan(span)
+	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
+	url := fmt.Sprintf("%s/media/process/post-preflight", env.GetString("TOKEN_PROCESSING_URL"))
+	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span))
 }
 
 // NewClient returns a new task client with tracing enabled.
@@ -395,9 +228,60 @@ func NewClient(ctx context.Context) *gcptasks.Client {
 	return client
 }
 
-func submitHttpTask(ctx context.Context, client *gcptasks.Client, queue string, task *taskspb.Task, messageBody []byte) error {
-	req := &taskspb.CreateTaskRequest{Parent: queue, Task: task}
-	req.Task.GetHttpRequest().Body = messageBody
-	_, err := client.CreateTask(ctx, req)
+func withScheduleOn(scheduleOn time.Time) func(*taskspb.Task) error {
+	return func(t *taskspb.Task) error {
+		t.ScheduleTime = timestamppb.New(scheduleOn)
+		return nil
+	}
+}
+
+func withDeadline(d time.Duration) func(*taskspb.Task) error {
+	return func(t *taskspb.Task) error {
+		t.DispatchDeadline = durationpb.New(d)
+		return nil
+	}
+}
+
+func withBasicAuth(secret string) func(*taskspb.Task) error {
+	return func(t *taskspb.Task) error {
+		t.GetHttpRequest().Headers["Authorization"] = basicauth.MakeHeader(nil, env.GetString("PUSH_NOTIFICATIONS_SECRET"))
+		return nil
+	}
+}
+
+func withJSON(data any) func(*taskspb.Task) error {
+	return func(t *taskspb.Task) error {
+		body, err := json.Marshal(data)
+		if err != nil {
+			return err
+		}
+		t.GetHttpRequest().Body = body
+		t.GetHttpRequest().Headers["Content-type"] = "application/json"
+		return nil
+	}
+}
+
+func withTrace(span *sentry.Span) func(*taskspb.Task) error {
+	return func(t *taskspb.Task) error {
+		t.GetHttpRequest().Headers["sentry-trace"] = span.TraceID.String()
+		return nil
+	}
+}
+
+func submitTask(ctx context.Context, c *gcptasks.Client, queue, url string, opts ...func(*taskspb.Task) error) error {
+	task := &taskspb.Task{
+		MessageType: &taskspb.Task_HttpRequest{
+			HttpRequest: &taskspb.HttpRequest{
+				HttpMethod: taskspb.HttpMethod_POST,
+				Url:        url,
+			},
+		},
+	}
+	for _, opt := range opts {
+		if err := opt(task); err != nil {
+			return err
+		}
+	}
+	_, err := c.CreateTask(ctx, &taskspb.CreateTaskRequest{Parent: queue, Task: task})
 	return err
 }

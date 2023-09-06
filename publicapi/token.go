@@ -2,11 +2,10 @@ package publicapi
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"strings"
 	"time"
 
+	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gammazero/workerpool"
 	"github.com/go-playground/validator/v10"
@@ -20,9 +19,9 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/mikeydub/go-gallery/util/retry"
 	"github.com/mikeydub/go-gallery/validate"
 )
 
@@ -34,6 +33,7 @@ type TokenAPI struct {
 	ethClient          *ethclient.Client
 	multichainProvider *multichain.Provider
 	throttler          *throttle.Locker
+	taskClient         *gcptasks.Client
 }
 
 // ErrTokenRefreshFailed is a generic error that wraps all other OpenSea sync failures.
@@ -595,50 +595,13 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collect
 	return db.Event{}, nil
 }
 
-func (api TokenAPI) ReferralPostPreflight(ctx context.Context, tokenIdentifiers *persist.TokenIdentifiers) error {
+func (api TokenAPI) ReferralPostPreflight(ctx context.Context, t *persist.TokenIdentifiers) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"address": validate.WithTag(tokenIdentifiers.ContractAddress, "required"),
-		"tokenID": validate.WithTag(tokenIdentifiers.TokenID, "required"),
+		"address": validate.WithTag(t.ContractAddress, "required"),
+		"tokenID": validate.WithTag(t.TokenID, "required"),
 	}); err != nil {
 		return err
 	}
-
-	if strings.HasPrefix(tokenIdentifiers.TokenID.String(), "0x") {
-		tokenIdentifiers.TokenID = persist.TokenID(tokenIdentifiers.TokenID.Base10String())
-	}
-
-	r := retry.Retry{
-		Base:  1,
-		Cap:   4,
-		Tries: 12,
-	}
-
-	var err error
-	var exists bool
-
-	for i := 0; i < r.Tries; i++ {
-		exists, err = api.multichainProvider.ConfirmTokenExists(ctx, persist.TokenIdentifiers{
-			TokenID:         tokenIdentifiers.TokenID,
-			Chain:           tokenIdentifiers.Chain,
-			ContractAddress: tokenIdentifiers.ContractAddress,
-		})
-		if exists {
-			break
-		}
-		if errors.Is(err, multichain.ErrNoMatchingProviders) {
-			return err
-		}
-		r.Sleep(i)
-	}
-
-	if !exists {
-		return err
-	}
-
-	// TODO: Should this create a token if it doesn't exist?
-	// Maybe when creating the post it creates the token.
-	// TODO: Actually submit the media to the tokenprocessing queue
-
-	return err
+	return task.CreateTaskForPostPreflight(ctx, task.PostPreflightMessage{Token: *t}, api.taskClient)
 }

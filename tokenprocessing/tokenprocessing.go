@@ -164,21 +164,27 @@ func InitSentry() {
 func reportJobError(ctx context.Context, err error, job tokenProcessingJob) {
 	sentryutil.ReportError(ctx, err, func(scope *sentry.Scope) {
 		setRunTags(scope, job.id)
-		setTokenTags(scope, job.token.Chain, job.contract.Address, job.token.TokenID, job.token.ID)
+		setTokenTags(scope, job.token.Chain, job.contract.Address, job.token.TokenID)
 		setTokenContext(scope, job.token.Chain, job.contract.Address, job.token.TokenID, isSpamToken(job))
+		if job.tokenInstance != nil {
+			setDBIDTag(scope, job.tokenInstance.ID)
+		}
 	})
 }
 
-func setTokenTags(scope *sentry.Scope, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID, id persist.DBID) {
+func setTokenTags(scope *sentry.Scope, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) {
 	scope.SetTag("chain", fmt.Sprintf("%d", chain))
 	scope.SetTag("contractAddress", contractAddress.String())
 	scope.SetTag("nftID", string(tokenID))
-	scope.SetTag("tokenDBID", string(id))
 	assetPage := assetURL(chain, contractAddress, tokenID)
 	if len(assetPage) > 200 {
 		assetPage = "assetURL too long, see token context"
 	}
 	scope.SetTag("assetURL", assetPage)
+}
+
+func setDBIDTag(scope *sentry.Scope, id persist.DBID) {
+	scope.SetTag("tokenDBID", string(id))
 }
 
 func assetURL(chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) string {
@@ -212,8 +218,10 @@ func setRunTags(scope *sentry.Scope, runID persist.DBID) {
 // isSpamToken returns true if the token is marked as spam.
 func isSpamToken(job tokenProcessingJob) bool {
 	isSpam := job.contract.IsProviderMarkedSpam
-	isSpam = isSpam || util.GetOptionalValue(job.token.IsProviderMarkedSpam, false)
-	isSpam = isSpam || util.GetOptionalValue(job.token.IsUserMarkedSpam, false)
+	if job.tokenInstance != nil {
+		isSpam = isSpam || util.GetOptionalValue(job.tokenInstance.IsProviderMarkedSpam, false)
+		isSpam = isSpam || util.GetOptionalValue(job.tokenInstance.IsUserMarkedSpam, false)
+	}
 	return isSpam
 }
 
