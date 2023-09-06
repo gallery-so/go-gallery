@@ -1704,8 +1704,9 @@ type PostInteractionsEdge struct {
 }
 
 type PostTokensInput struct {
-	TokenIds []persist.DBID `json:"tokenIds"`
-	Caption  *string        `json:"caption"`
+	TokenIds []persist.DBID              `json:"tokenIds"`
+	Tokens   []*persist.TokenIdentifiers `json:"tokens"`
+	Caption  *string                     `json:"caption"`
 }
 
 type PostTokensPayload struct {

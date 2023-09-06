@@ -85,7 +85,6 @@ type ResolverRoot interface {
 	Subscription() SubscriptionResolver
 	Token() TokenResolver
 	TokenHolder() TokenHolderResolver
-	TokenMediaByIdentifiers() TokenMediaByIdentifiersResolver
 	TokensAddedToCollectionFeedEventData() TokensAddedToCollectionFeedEventDataResolver
 	UnfollowUserPayload() UnfollowUserPayloadResolver
 	UpdateCollectionTokensPayload() UpdateCollectionTokensPayloadResolver
@@ -1859,9 +1858,6 @@ type TokenHolderResolver interface {
 	Wallets(ctx context.Context, obj *model.TokenHolder) ([]*model.Wallet, error)
 	User(ctx context.Context, obj *model.TokenHolder) (*model.GalleryUser, error)
 	PreviewTokens(ctx context.Context, obj *model.TokenHolder) ([]*string, error)
-}
-type TokenMediaByIdentifiersResolver interface {
-	Media(ctx context.Context, obj *model.TokenMediaByIdentifiers) (model.MediaSubtype, error)
 }
 type TokensAddedToCollectionFeedEventDataResolver interface {
 	Owner(ctx context.Context, obj *model.TokensAddedToCollectionFeedEventData) (*model.GalleryUser, error)
@@ -9266,7 +9262,7 @@ input ChainAddressTokenInput {
 
 # TODO: Figure out the other errors
 type TokenMediaByIdentifiers {
-  media: MediaSubtype @goField(forceResolver: true)
+  media: MediaSubtype
 }
 
 union TokenMediaByIdentifiersOrError = TokenMediaByIdentifiers | ErrInvalidInput
@@ -10478,7 +10474,9 @@ union RemoveProfileImagePayloadOrError =
   | ErrUserNotFound
 
 input PostTokensInput {
+  # Either tokenIds or tokens should be provided, but not both
   tokenIds: [DBID!]
+  tokens: [ChainAddressTokenInput!]
   caption: String
 }
 
@@ -49358,7 +49356,7 @@ func (ec *executionContext) _TokenMediaByIdentifiers_media(ctx context.Context, 
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.TokenMediaByIdentifiers().Media(rctx, obj)
+		return obj.Media, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -49376,8 +49374,8 @@ func (ec *executionContext) fieldContext_TokenMediaByIdentifiers_media(ctx conte
 	fc = &graphql.FieldContext{
 		Object:     "TokenMediaByIdentifiers",
 		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
+		IsMethod:   false,
+		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type MediaSubtype does not have child fields")
 		},
@@ -57734,7 +57732,7 @@ func (ec *executionContext) unmarshalInputPostTokensInput(ctx context.Context, o
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"tokenIds", "caption"}
+	fieldsInOrder := [...]string{"tokenIds", "tokens", "caption"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -57750,6 +57748,15 @@ func (ec *executionContext) unmarshalInputPostTokensInput(ctx context.Context, o
 				return it, err
 			}
 			it.TokenIds = data
+		case "tokens":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("tokens"))
+			data, err := ec.unmarshalOChainAddressTokenInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenIdentifiersᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Tokens = data
 		case "caption":
 			var err error
 
@@ -71718,22 +71725,9 @@ func (ec *executionContext) _TokenMediaByIdentifiers(ctx context.Context, sel as
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("TokenMediaByIdentifiers")
 		case "media":
-			field := field
 
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._TokenMediaByIdentifiers_media(ctx, field, obj)
-				return res
-			}
+			out.Values[i] = ec._TokenMediaByIdentifiers_media(ctx, field, obj)
 
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
-
-			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -75182,6 +75176,26 @@ func (ec *executionContext) unmarshalOChainAddressInput2ᚖgithubᚗcomᚋmikeyd
 	}
 	res, err := ec.unmarshalInputChainAddressInput(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalOChainAddressTokenInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenIdentifiersᚄ(ctx context.Context, v interface{}) ([]*persist.TokenIdentifiers, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var vSlice []interface{}
+	if v != nil {
+		vSlice = graphql.CoerceList(v)
+	}
+	var err error
+	res := make([]*persist.TokenIdentifiers, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNChainAddressTokenInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenIdentifiers(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
 }
 
 func (ec *executionContext) marshalOChainTokens2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐChainTokens(ctx context.Context, sel ast.SelectionSet, v *model.ChainTokens) graphql.Marshaler {

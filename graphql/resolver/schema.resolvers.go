@@ -1425,7 +1425,7 @@ func (r *mutationResolver) CommentOnPost(ctx context.Context, postID persist.DBI
 
 // PostTokens is the resolver for the postTokens field.
 func (r *mutationResolver) PostTokens(ctx context.Context, input model.PostTokensInput) (model.PostTokensPayloadOrError, error) {
-	id, err := publicapi.For(ctx).Feed.PostTokens(ctx, input.TokenIds, input.Caption)
+	id, err := publicapi.For(ctx).Feed.PostTokens(ctx, input.TokenIds, input.Tokens, input.Caption)
 	if err != nil {
 		return nil, err
 	}
@@ -2672,11 +2672,6 @@ func (r *tokenHolderResolver) PreviewTokens(ctx context.Context, obj *model.Toke
 	return previewURLs, nil
 }
 
-// Media is the resolver for the media field.
-func (r *tokenMediaByIdentifiersResolver) Media(ctx context.Context, obj *model.TokenMediaByIdentifiers) (model.MediaSubtype, error) {
-	panic(fmt.Errorf("not implemented: Media - media"))
-}
-
 // Owner is the resolver for the owner field.
 func (r *tokensAddedToCollectionFeedEventDataResolver) Owner(ctx context.Context, obj *model.TokensAddedToCollectionFeedEventData) (*model.GalleryUser, error) {
 	return resolveGalleryUserByUserID(ctx, obj.Owner.Dbid)
@@ -3014,11 +3009,6 @@ func (r *Resolver) Token() generated.TokenResolver { return &tokenResolver{r} }
 // TokenHolder returns generated.TokenHolderResolver implementation.
 func (r *Resolver) TokenHolder() generated.TokenHolderResolver { return &tokenHolderResolver{r} }
 
-// TokenMediaByIdentifiers returns generated.TokenMediaByIdentifiersResolver implementation.
-func (r *Resolver) TokenMediaByIdentifiers() generated.TokenMediaByIdentifiersResolver {
-	return &tokenMediaByIdentifiersResolver{r}
-}
-
 // TokensAddedToCollectionFeedEventData returns generated.TokensAddedToCollectionFeedEventDataResolver implementation.
 func (r *Resolver) TokensAddedToCollectionFeedEventData() generated.TokensAddedToCollectionFeedEventDataResolver {
 	return &tokensAddedToCollectionFeedEventDataResolver{r}
@@ -3109,7 +3099,6 @@ type someoneViewedYourGalleryNotificationResolver struct{ *Resolver }
 type subscriptionResolver struct{ *Resolver }
 type tokenResolver struct{ *Resolver }
 type tokenHolderResolver struct{ *Resolver }
-type tokenMediaByIdentifiersResolver struct{ *Resolver }
 type tokensAddedToCollectionFeedEventDataResolver struct{ *Resolver }
 type unfollowUserPayloadResolver struct{ *Resolver }
 type updateCollectionTokensPayloadResolver struct{ *Resolver }

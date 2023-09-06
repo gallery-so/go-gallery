@@ -1213,7 +1213,7 @@ input ChainAddressTokenInput {
 
 # TODO: Figure out the other errors
 type TokenMediaByIdentifiers {
-  media: MediaSubtype @goField(forceResolver: true)
+  media: MediaSubtype
 }
 
 union TokenMediaByIdentifiersOrError = TokenMediaByIdentifiers | ErrInvalidInput
@@ -2425,7 +2425,9 @@ union RemoveProfileImagePayloadOrError =
   | ErrUserNotFound
 
 input PostTokensInput {
+  # Either tokenIds or tokens should be provided, but not both
   tokenIds: [DBID!]
+  tokens: [ChainAddressTokenInput!]
   caption: String
 }
 

@@ -102,48 +102,52 @@ func (api FeedAPI) GetPostById(ctx context.Context, postID persist.DBID) (*db.Po
 	return &post, nil
 }
 
-func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, caption *string) (persist.DBID, error) {
+func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, tokens []persist.TokenIdentifiers, caption *string) (persist.DBID, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"tokenIDs": validate.WithTag(tokenIDs, "required"),
+		// tokenIDs and tokens are mutually exclusive
+		"postToken": validate.WithTag(validate.PostTokensParams{TokenIDs: tokenIDs, Tokens: tokens}, "required,post_token"),
 		// caption can be null but less than 600 chars
 		"caption": validate.WithTag(caption, "max=600"),
 	}); err != nil {
 		return "", err
 	}
+
 	actorID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return "", err
 	}
 
-	var cap sql.NullString
+	var c sql.NullString
+
 	if caption != nil {
-		cap = sql.NullString{
+		c = sql.NullString{
 			String: *caption,
 			Valid:  true,
 		}
 	}
 
-	contracts, err := api.queries.GetContractsByTokenIDs(ctx, tokenIDs)
-	if err != nil {
-		return "", err
+	if len(tokenIDs) > 0 {
+		contracts, err := api.queries.GetContractsByTokenIDs(ctx, tokenIDs)
+		if err != nil {
+			return "", err
+		}
+
+		contractIDs := util.MapWithoutError(contracts, func(c db.Contract) persist.DBID { return c.ID })
+
+		return api.queries.InsertPost(ctx, db.InsertPostParams{
+			ID:          persist.GenerateID(),
+			TokenIds:    tokenIDs,
+			ContractIds: contractIDs,
+			ActorID:     actorID,
+			Caption:     c,
+		})
 	}
 
-	contractIDs, _ := util.Map(contracts, func(c db.Contract) (persist.DBID, error) {
-		return c.ID, nil
-	})
-
-	id, err := api.queries.InsertPost(ctx, db.InsertPostParams{
-		ID:          persist.GenerateID(),
-		TokenIds:    tokenIDs,
-		ContractIds: contractIDs,
-		ActorID:     actorID,
-		Caption:     cap,
-	})
-	if err != nil {
-		return "", err
+	if len(tokens) > 0 {
 	}
-	return id, nil
+
+	return "", nil
 }
 
 func (api FeedAPI) DeletePostById(ctx context.Context, postID persist.DBID) error {
