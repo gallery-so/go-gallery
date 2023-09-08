@@ -1218,7 +1218,9 @@ func (p *Provider) VerifySignature(ctx context.Context, pSig string, pNonce stri
 	return true, nil
 }
 
-func (p *Provider) RefreshTokenDescriptorsByTokenIdentifiers(ctx context.Context, ti persist.TokenIdentifiers) error {
+// RefreshTokenDescriptorsByTokenIdentifiers will refresh the token descriptors for a token by its identifiers.
+// It returns a slice of updated token DBIDs if any, and the DBID of the updated contract.
+func (p *Provider) RefreshTokenDescriptorsByTokenIdentifiers(ctx context.Context, ti persist.TokenIdentifiers) (tokenIDs []persist.DBID, contractID persist.DBID, err error) {
 	finalTokenDescriptors := ChainAgnosticTokenDescriptors{}
 	finalContractDescriptors := ChainAgnosticContractDescriptors{}
 	tokenFetchers := matchingProvidersForChain[TokenDescriptorsFetcher](p.Chains, ti.Chain)
@@ -1258,19 +1260,10 @@ func (p *Provider) RefreshTokenDescriptorsByTokenIdentifiers(ctx context.Context
 	}
 
 	if !found {
-		return ErrTokenNotFoundByIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID}
+		return tokenIDs, contractID, ErrTokenNotFoundByIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID}
 	}
 
-	if err := p.Queries.UpdateTokenMetadataFieldsByTokenIdentifiers(ctx, db.UpdateTokenMetadataFieldsByTokenIdentifiersParams{
-		Name:            util.ToNullString(finalTokenDescriptors.Name, true),
-		Description:     util.ToNullString(finalTokenDescriptors.Description, true),
-		TokenID:         ti.TokenID,
-		ContractAddress: ti.ContractAddress,
-	}); err != nil {
-		return err
-	}
-
-	return p.Repos.ContractRepository.UpsertByAddress(ctx, ti.ContractAddress, ti.Chain, persist.ContractGallery{
+	contractID, err = p.Repos.ContractRepository.UpsertByAddress(ctx, ti.ContractAddress, ti.Chain, persist.ContractGallery{
 		Chain:           ti.Chain,
 		Address:         persist.Address(ti.Chain.NormalizeAddress(ti.ContractAddress)),
 		Symbol:          persist.NullString(finalContractDescriptors.Symbol),
@@ -1279,11 +1272,24 @@ func (p *Provider) RefreshTokenDescriptorsByTokenIdentifiers(ctx context.Context
 		ProfileImageURL: persist.NullString(finalContractDescriptors.ProfileImageURL),
 		OwnerAddress:    finalContractDescriptors.CreatorAddress,
 	})
+
+	tokenIDs, err = p.Queries.UpdateTokenMetadataFieldsByTokenIdentifiers(ctx, db.UpdateTokenMetadataFieldsByTokenIdentifiersParams{
+		Name:        util.ToNullString(finalTokenDescriptors.Name, true),
+		Description: util.ToNullString(finalTokenDescriptors.Description, true),
+		TokenID:     ti.TokenID,
+		ContractID:  contractID,
+		Chain:       ti.Chain,
+	})
+	if err != nil {
+		return tokenIDs, contractID, err
+	}
+
+	return tokenIDs, contractID, err
 }
 
 // RefreshToken refreshes a token on the given chain using the chain provider for that chain
 func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers) error {
-	err := p.RefreshTokenDescriptorsByTokenIdentifiers(ctx, ti)
+	_, _, err := p.RefreshTokenDescriptorsByTokenIdentifiers(ctx, ti)
 	if err != nil {
 		return err
 	}

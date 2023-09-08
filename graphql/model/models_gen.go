@@ -1664,7 +1664,6 @@ type Post struct {
 	Comments     *PostCommentsConnection     `json:"comments"`
 	Interactions *PostInteractionsConnection `json:"interactions"`
 	ViewerAdmire *Admire                     `json:"viewerAdmire"`
-	Status       *PostStatus                 `json:"status"`
 }
 
 func (Post) IsPostOrError()      {}
@@ -1708,10 +1707,6 @@ type PostInteractionsEdge struct {
 	Node   Interaction `json:"node"`
 	Cursor *string     `json:"cursor"`
 	Post   *Post       `json:"post"`
-}
-
-type PostStatus struct {
-	IsVerified bool `json:"isVerified"`
 }
 
 type PostTokensInput struct {

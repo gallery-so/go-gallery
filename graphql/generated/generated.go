@@ -920,7 +920,6 @@ type ComplexityRoot struct {
 		Dbid         func(childComplexity int) int
 		ID           func(childComplexity int) int
 		Interactions func(childComplexity int, before *string, after *string, first *int, last *int) int
-		Status       func(childComplexity int) int
 		Tokens       func(childComplexity int) int
 		ViewerAdmire func(childComplexity int) int
 	}
@@ -961,10 +960,6 @@ type ComplexityRoot struct {
 		Cursor func(childComplexity int) int
 		Node   func(childComplexity int) int
 		Post   func(childComplexity int) int
-	}
-
-	PostStatus struct {
-		IsVerified func(childComplexity int) int
 	}
 
 	PostTokensPayload struct {
@@ -1765,7 +1760,6 @@ type PostResolver interface {
 	Comments(ctx context.Context, obj *model.Post, before *string, after *string, first *int, last *int) (*model.PostCommentsConnection, error)
 	Interactions(ctx context.Context, obj *model.Post, before *string, after *string, first *int, last *int) (*model.PostInteractionsConnection, error)
 	ViewerAdmire(ctx context.Context, obj *model.Post) (*model.Admire, error)
-	Status(ctx context.Context, obj *model.Post) (*model.PostStatus, error)
 }
 type PreviewURLSetResolver interface {
 	Blurhash(ctx context.Context, obj *model.PreviewURLSet) (*string, error)
@@ -5575,13 +5569,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Post.Interactions(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
-	case "Post.status":
-		if e.complexity.Post.Status == nil {
-			break
-		}
-
-		return e.complexity.Post.Status(childComplexity), true
-
 	case "Post.tokens":
 		if e.complexity.Post.Tokens == nil {
 			break
@@ -5714,13 +5701,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.PostInteractionsEdge.Post(childComplexity), true
-
-	case "PostStatus.isVerified":
-		if e.complexity.PostStatus.IsVerified == nil {
-			break
-		}
-
-		return e.complexity.PostStatus.IsVerified(childComplexity), true
 
 	case "PostTokensPayload.post":
 		if e.complexity.PostTokensPayload.Post == nil {
@@ -9052,11 +9032,6 @@ type Post implements Node @key(fields: "dbid") @goEmbedHelper {
     @goField(forceResolver: true)
 
   viewerAdmire: Admire @goField(forceResolver: true)
-  status: PostStatus! @goField(forceResolver: true)
-}
-
-type PostStatus {
-  isVerified: Boolean!
 }
 
 type UserCreatedFeedEventData implements FeedEventData {
@@ -14637,8 +14612,6 @@ func (ec *executionContext) fieldContext_AdmirePostPayload_post(ctx context.Cont
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
-			case "status":
-				return ec.fieldContext_Post_status(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -18906,8 +18879,6 @@ func (ec *executionContext) fieldContext_CommentOnPostPayload_post(ctx context.C
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
-			case "status":
-				return ec.fieldContext_Post_status(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -21896,8 +21867,6 @@ func (ec *executionContext) fieldContext_Entity_findPostByDbid(ctx context.Conte
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
-			case "status":
-				return ec.fieldContext_Post_status(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -38424,54 +38393,6 @@ func (ec *executionContext) fieldContext_Post_viewerAdmire(ctx context.Context, 
 	return fc, nil
 }
 
-func (ec *executionContext) _Post_status(ctx context.Context, field graphql.CollectedField, obj *model.Post) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Post_status(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Post().Status(rctx, obj)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(*model.PostStatus)
-	fc.Result = res
-	return ec.marshalNPostStatus2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostStatus(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Post_status(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Post",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "isVerified":
-				return ec.fieldContext_PostStatus_isVerified(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type PostStatus", field.Name)
-		},
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _PostAdmireEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.PostAdmireEdge) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_PostAdmireEdge_node(ctx, field)
 	if err != nil {
@@ -38622,8 +38543,6 @@ func (ec *executionContext) fieldContext_PostAdmireEdge_post(ctx context.Context
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
-			case "status":
-				return ec.fieldContext_Post_status(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -38892,8 +38811,6 @@ func (ec *executionContext) fieldContext_PostCommentEdge_post(ctx context.Contex
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
-			case "status":
-				return ec.fieldContext_Post_status(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -39335,54 +39252,8 @@ func (ec *executionContext) fieldContext_PostInteractionsEdge_post(ctx context.C
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
-			case "status":
-				return ec.fieldContext_Post_status(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _PostStatus_isVerified(ctx context.Context, field graphql.CollectedField, obj *model.PostStatus) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_PostStatus_isVerified(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.IsVerified, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(bool)
-	fc.Result = res
-	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_PostStatus_isVerified(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "PostStatus",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Boolean does not have child fields")
 		},
 	}
 	return fc, nil
@@ -39447,8 +39318,6 @@ func (ec *executionContext) fieldContext_PostTokensPayload_post(ctx context.Cont
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
-			case "status":
-				return ec.fieldContext_Post_status(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -42702,8 +42571,6 @@ func (ec *executionContext) fieldContext_RemoveAdmirePayload_post(ctx context.Co
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
-			case "status":
-				return ec.fieldContext_Post_status(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -42891,8 +42758,6 @@ func (ec *executionContext) fieldContext_RemoveCommentPayload_post(ctx context.C
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
-			case "status":
-				return ec.fieldContext_Post_status(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -44991,8 +44856,6 @@ func (ec *executionContext) fieldContext_SomeoneAdmiredYourPostNotification_post
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
-			case "status":
-				return ec.fieldContext_Post_status(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -45711,8 +45574,6 @@ func (ec *executionContext) fieldContext_SomeoneCommentedOnYourPostNotification_
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
-			case "status":
-				return ec.fieldContext_Post_status(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -69024,26 +68885,6 @@ func (ec *executionContext) _Post(ctx context.Context, sel ast.SelectionSet, obj
 				return innerFunc(ctx)
 
 			})
-		case "status":
-			field := field
-
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Post_status(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
-				}
-				return res
-			}
-
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
-
-			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -69268,34 +69109,6 @@ func (ec *executionContext) _PostInteractionsEdge(ctx context.Context, sel ast.S
 
 			out.Values[i] = ec._PostInteractionsEdge_post(ctx, field, obj)
 
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
-var postStatusImplementors = []string{"PostStatus"}
-
-func (ec *executionContext) _PostStatus(ctx context.Context, sel ast.SelectionSet, obj *model.PostStatus) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, postStatusImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("PostStatus")
-		case "isVerified":
-
-			out.Values[i] = ec._PostStatus_isVerified(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -74543,20 +74356,6 @@ func (ec *executionContext) marshalNPost2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalle
 		return graphql.Null
 	}
 	return ec._Post(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalNPostStatus2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostStatus(ctx context.Context, sel ast.SelectionSet, v model.PostStatus) graphql.Marshaler {
-	return ec._PostStatus(ctx, sel, &v)
-}
-
-func (ec *executionContext) marshalNPostStatus2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostStatus(ctx context.Context, sel ast.SelectionSet, v *model.PostStatus) graphql.Marshaler {
-	if v == nil {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
-		}
-		return graphql.Null
-	}
-	return ec._PostStatus(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNPostTokensInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostTokensInput(ctx context.Context, v interface{}) (model.PostTokensInput, error) {

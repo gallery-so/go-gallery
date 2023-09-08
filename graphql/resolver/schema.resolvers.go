@@ -2056,21 +2056,6 @@ func (r *postResolver) ViewerAdmire(ctx context.Context, obj *model.Post) (*mode
 	return admireToModel(ctx, *admire), nil
 }
 
-// Status is the resolver for the status field.
-func (r *postResolver) Status(ctx context.Context, obj *model.Post) (*model.PostStatus, error) {
-	// Nothing to verify
-	if len(obj.HelperPostData.TokenIDs) == 0 {
-		return &model.PostStatus{IsVerified: false}, nil
-	}
-	// N.B. Only check the first token
-	token, err := publicapi.For(ctx).Token.GetTokenById(ctx, obj.HelperPostData.TokenIDs[0])
-	if err != nil {
-		return &model.PostStatus{IsVerified: false}, nil
-	}
-	isVerified := obj.HelperPostData.AuthorID == token.OwnerUserID && (token.IsCreatorToken || token.IsHolderToken)
-	return &model.PostStatus{IsVerified: isVerified}, nil
-}
-
 // Blurhash is the resolver for the blurhash field.
 func (r *previewURLSetResolver) Blurhash(ctx context.Context, obj *model.PreviewURLSet) (*string, error) {
 	mm := mediamapper.For(ctx)

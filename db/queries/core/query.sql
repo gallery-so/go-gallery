@@ -1370,14 +1370,13 @@ insert into sessions (id, user_id,
 -- name: InvalidateSession :exec
 update sessions set invalidated = true, active_until = least(active_until, now()), last_updated = now() where id = @id and deleted = false and invalidated = false;
 
--- name: UpdateTokenMetadataFieldsByTokenIdentifiers :exec
-update tokens
-    set name = @name,
-        description = @description,
-        last_updated = now()
-    where token_id = @token_id
-      and contract = (select id from contracts where address = @contract_address)
-      and deleted = false;
+-- name: UpdateTokenMetadataFieldsByTokenIdentifiers :many
+update tokens set name = @name, description = @description, last_updated = now()
+where token_id = @token_id
+    and tokens.contract = @contract_id
+    and tokens.chain = @chain
+    and tokens.deleted = false
+returning tokens.id;
 
 -- name: GetTopCollectionsForCommunity :many
 with contract_tokens as (

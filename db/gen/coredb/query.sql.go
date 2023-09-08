@@ -6035,31 +6035,47 @@ func (q *Queries) UpdatePushTickets(ctx context.Context, arg UpdatePushTicketsPa
 	return err
 }
 
-const updateTokenMetadataFieldsByTokenIdentifiers = `-- name: UpdateTokenMetadataFieldsByTokenIdentifiers :exec
-update tokens
-    set name = $1,
-        description = $2,
-        last_updated = now()
-    where token_id = $3
-      and contract = (select id from contracts where address = $4)
-      and deleted = false
+const updateTokenMetadataFieldsByTokenIdentifiers = `-- name: UpdateTokenMetadataFieldsByTokenIdentifiers :many
+update tokens set name = $1, description = $2, last_updated = now()
+where token_id = $3
+    and tokens.contract = $4
+    and tokens.chain = $5
+    and tokens.deleted = false
+returning tokens.id
 `
 
 type UpdateTokenMetadataFieldsByTokenIdentifiersParams struct {
-	Name            sql.NullString  `json:"name"`
-	Description     sql.NullString  `json:"description"`
-	TokenID         persist.TokenID `json:"token_id"`
-	ContractAddress persist.Address `json:"contract_address"`
+	Name        sql.NullString  `json:"name"`
+	Description sql.NullString  `json:"description"`
+	TokenID     persist.TokenID `json:"token_id"`
+	ContractID  persist.DBID    `json:"contract_id"`
+	Chain       persist.Chain   `json:"chain"`
 }
 
-func (q *Queries) UpdateTokenMetadataFieldsByTokenIdentifiers(ctx context.Context, arg UpdateTokenMetadataFieldsByTokenIdentifiersParams) error {
-	_, err := q.db.Exec(ctx, updateTokenMetadataFieldsByTokenIdentifiers,
+func (q *Queries) UpdateTokenMetadataFieldsByTokenIdentifiers(ctx context.Context, arg UpdateTokenMetadataFieldsByTokenIdentifiersParams) ([]persist.DBID, error) {
+	rows, err := q.db.Query(ctx, updateTokenMetadataFieldsByTokenIdentifiers,
 		arg.Name,
 		arg.Description,
 		arg.TokenID,
-		arg.ContractAddress,
+		arg.ContractID,
+		arg.Chain,
 	)
-	return err
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []persist.DBID
+	for rows.Next() {
+		var id persist.DBID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const updateUserEmail = `-- name: UpdateUserEmail :exec

@@ -1986,14 +1986,15 @@ func resolveTokenMedia(ctx context.Context, token db.Token, tokenMedia db.TokenM
 		return mediaToModel(ctx, tokenMedia, token.FallbackMedia, highDef)
 	}
 
-	// If there is no media for a token (whether valid or not), assume that the token is still being synced.
-	tokenMedia.Media.MediaType = persist.MediaTypeSyncing
-
-	// In the worse case the processing message was dropped and the token never gets handled. To address that,
-	// we compare when the token was created to the current time. If it's longer than the grace period, we assume that the
-	// message was lost and set the media to invalid so it could be refreshed manually.
-	if time.Since(token.CreatedAt) > time.Duration(1*time.Hour) {
-		tokenMedia.Media.MediaType = persist.MediaTypeInvalid
+	// If there is no media for a token, assume that the token is still being synced.
+	if tokenMedia.ID == "" {
+		tokenMedia.Media.MediaType = persist.MediaTypeSyncing
+		// In the worse case the processing message was dropped and the token never gets handled. To address that,
+		// we compare when the token was created to the current time. If it's longer than the grace period, we assume that the
+		// message was lost and set the media to invalid so it could be refreshed manually.
+		if time.Since(token.CreatedAt) > time.Duration(1*time.Hour) {
+			tokenMedia.Media.MediaType = persist.MediaTypeInvalid
+		}
 	}
 
 	fallbackMedia := token.FallbackMedia

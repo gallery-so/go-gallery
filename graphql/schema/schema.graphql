@@ -958,11 +958,6 @@ type Post implements Node @key(fields: "dbid") @goEmbedHelper {
     @goField(forceResolver: true)
 
   viewerAdmire: Admire @goField(forceResolver: true)
-  status: PostStatus! @goField(forceResolver: true)
-}
-
-type PostStatus {
-  isVerified: Boolean!
 }
 
 type UserCreatedFeedEventData implements FeedEventData {

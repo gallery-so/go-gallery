@@ -50,7 +50,8 @@ func NewContractGalleryRepository(db *sql.DB, queries *db.Queries) *ContractGall
 			description = coalesce(nullif(contracts.description, ''), nullif($8, '')),
 			profile_image_url = coalesce(nullif(contracts.profile_image_url, ''), nullif($9, '')),
 			owner_address = case when nullif(contracts.owner_address, '') is null then $6 else contracts.owner_address end,
-			chain = $7;
+			chain = $7
+		returning id;
 	`)
 	checkNoErr(err)
 
@@ -122,13 +123,9 @@ func (c *ContractGalleryRepository) GetByAddresses(pCtx context.Context, pAddres
 }
 
 // UpsertByAddress upserts the contract with the given address
-func (c *ContractGalleryRepository) UpsertByAddress(pCtx context.Context, pAddress persist.Address, pChain persist.Chain, pContract persist.ContractGallery) error {
-	_, err := c.upsertByAddressStmt.ExecContext(pCtx, persist.GenerateID(), pContract.Version, pContract.Address, pContract.Symbol, pContract.Name, pContract.OwnerAddress, pContract.Chain, pContract.Description, pContract.ProfileImageURL)
-	if err != nil {
-		return err
-	}
-
-	return nil
+func (c *ContractGalleryRepository) UpsertByAddress(pCtx context.Context, pAddress persist.Address, pChain persist.Chain, pContract persist.ContractGallery) (contractID persist.DBID, err error) {
+	err = c.upsertByAddressStmt.QueryRowContext(pCtx, persist.GenerateID(), pContract.Version, pContract.Address, pContract.Symbol, pContract.Name, pContract.OwnerAddress, pContract.Chain, pContract.Description, pContract.ProfileImageURL).Scan(&contractID)
+	return contractID, nil
 }
 
 // BulkUpsert bulk upserts the contracts by address

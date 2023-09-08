@@ -10,21 +10,23 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
-	"github.com/mikeydub/go-gallery/service/redis"
-	"github.com/mikeydub/go-gallery/validate"
-
+	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
+
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/recommend"
 	"github.com/mikeydub/go-gallery/service/recommend/userpref"
+	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/validate"
 )
 
 const tHalf = math.Ln2 / 0.002 // half-life of approx 6 hours
@@ -33,12 +35,14 @@ var ErrNoTokensToPost = fmt.Errorf("no tokens to post")
 var ErrTooManyTokenSources = fmt.Errorf("too many token sources")
 
 type FeedAPI struct {
-	repos     *postgres.Repositories
-	queries   *db.Queries
-	loaders   *dataloader.Loaders
-	validator *validator.Validate
-	ethClient *ethclient.Client
-	cache     *redis.Cache
+	repos              *postgres.Repositories
+	queries            *db.Queries
+	loaders            *dataloader.Loaders
+	validator          *validator.Validate
+	ethClient          *ethclient.Client
+	cache              *redis.Cache
+	taskClient         *gcptasks.Client
+	multichainProvider *multichain.Provider
 }
 
 func (api FeedAPI) BlockUser(ctx context.Context, userId persist.DBID, action persist.Action) error {
@@ -135,30 +139,61 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, toke
 		}
 	}
 
+	var contractIDs []persist.DBID
+	var tokensToPost []persist.DBID
+
 	if len(tokenIDs) > 0 {
+		tokensToPost = tokenIDs
 		contracts, err := api.queries.GetContractsByTokenIDs(ctx, tokenIDs)
 		if err != nil {
 			return "", err
 		}
-
-		contractIDs := util.MapWithoutError(contracts, func(c db.Contract) persist.DBID { return c.ID })
-
-		return api.queries.InsertPost(ctx, db.InsertPostParams{
-			ID:          persist.GenerateID(),
-			TokenIds:    tokenIDs,
-			ContractIds: contractIDs,
-			ActorID:     actorID,
-			Caption:     c,
-		})
+		contractIDs = util.MapWithoutError(contracts, func(c db.Contract) persist.DBID { return c.ID })
+		// return api.queries.InsertPost(ctx, db.InsertPostParams{
+		// 	ID:          persist.GenerateID(),
+		// 	TokenIds:    tokenIDs,
+		// 	ContractIds: contractIDs,
+		// 	ActorID:     actorID,
+		// 	Caption:     c,
+		// })
 	}
 
-	if len(tokens) > 0 {
+	confirmedTokens := make([]persist.DBID, 0, len(tokens))
+	pendingTokens := make([]persist.TokenIdentifiers, 0, len(tokens))
+
+	for i, t := range tokens {
+		token, err := For(ctx).Token.GetTokensByIdentifiersOwner(ctx, t, actorID)
+		if err == nil {
+			confirmedTokens[i] = token.ID
+		}
+		// TODO: Catch for token missing error
+		pendingTokens[i] = t
 	}
 
-	return "", nil
+	for i, t := range pendingTokens {
+		synced, err := api.multichainProvider.SyncTokensByUserIDAndTokenIdentifiers(ctx, actorID, t)
+		if err != nil {
+			return "", err
+		}
+		confirmedTokens[i] = synced[0].ID
+	}
+
+	contracts, err := api.queries.GetContractsByTokenIDs(ctx, tokenIDs)
+	if err != nil {
+		return "", err
+	}
+	contractIDs := util.MapWithoutError(contracts, func(c db.Contract) persist.DBID { return c.ID })
+
+	return api.queries.InsertPost(ctx, db.InsertPostParams{
+		ID:          persist.GenerateID(),
+		TokenIds:    tokenIDs,
+		ContractIds: contractIDs,
+		ActorID:     actorID,
+		Caption:     c,
+	})
 }
 
-func (api TokenAPI) ReferralPostPreflight(ctx context.Context, t persist.TokenIdentifiers) error {
+func (api FeedAPI) ReferralPostPreflight(ctx context.Context, t persist.TokenIdentifiers) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"address": validate.WithTag(t.ContractAddress, "required"),
