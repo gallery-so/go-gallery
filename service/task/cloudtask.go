@@ -245,7 +245,7 @@ func withDeadline(d time.Duration) func(*taskspb.Task) error {
 
 func withBasicAuth(secret string) func(*taskspb.Task) error {
 	return func(t *taskspb.Task) error {
-		t.GetHttpRequest().Headers["Authorization"] = basicauth.MakeHeader(nil, env.GetString("PUSH_NOTIFICATIONS_SECRET"))
+		addHeader(t.GetHttpRequest(), "Authorization", basicauth.MakeHeader(nil, env.GetString("PUSH_NOTIFICATIONS_SECRET")))
 		return nil
 	}
 }
@@ -257,16 +257,23 @@ func withJSON(data any) func(*taskspb.Task) error {
 			return err
 		}
 		t.GetHttpRequest().Body = body
-		t.GetHttpRequest().Headers["Content-type"] = "application/json"
+		addHeader(t.GetHttpRequest(), "Content-type", "application/json")
 		return nil
 	}
 }
 
 func withTrace(span *sentry.Span) func(*taskspb.Task) error {
 	return func(t *taskspb.Task) error {
-		t.GetHttpRequest().Headers["sentry-trace"] = span.TraceID.String()
+		addHeader(t.GetHttpRequest(), "sentry-trace", span.TraceID.String())
 		return nil
 	}
+}
+
+func addHeader(r *taskspb.HttpRequest, key, value string) {
+	if r.Headers == nil {
+		r.Headers = map[string]string{}
+	}
+	r.Headers[key] = value
 }
 
 func submitTask(ctx context.Context, c *gcptasks.Client, queue, url string, opts ...func(*taskspb.Task) error) error {

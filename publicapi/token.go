@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gammazero/workerpool"
 	"github.com/go-playground/validator/v10"
@@ -19,7 +18,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
-	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
@@ -33,7 +31,6 @@ type TokenAPI struct {
 	ethClient          *ethclient.Client
 	multichainProvider *multichain.Provider
 	throttler          *throttle.Locker
-	taskClient         *gcptasks.Client
 }
 
 // ErrTokenRefreshFailed is a generic error that wraps all other OpenSea sync failures.
@@ -593,16 +590,4 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collect
 		return *eventPtr, nil
 	}
 	return db.Event{}, nil
-}
-
-func (api TokenAPI) ReferralPostPreflight(ctx context.Context, t persist.TokenIdentifiers) error {
-	// Validate
-	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"address": validate.WithTag(t.ContractAddress, "required"),
-		"tokenID": validate.WithTag(t.TokenID, "required"),
-	}); err != nil {
-		return err
-	}
-	userID, _ := getAuthenticatedUserID(ctx)
-	return task.CreateTaskForPostPreflight(ctx, task.PostPreflightMessage{Token: t, UserID: userID}, api.taskClient)
 }

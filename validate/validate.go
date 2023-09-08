@@ -134,11 +134,6 @@ func (e ErrInvalidInput) Error() string {
 }
 
 func RegisterCustomValidators(v *validator.Validate) {
-	v.RegisterStructValidation(ChainAddressValidator, persist.ChainAddress{})
-	v.RegisterStructValidation(ConnectionPaginationParamsValidator, ConnectionPaginationParams{})
-	v.RegisterStructValidation(CollectionTokenSettingsParamsValidator, CollectionTokenSettingsParams{})
-	v.RegisterStructValidation(EventValidator, coredb.Event{})
-	v.RegisterStructValidation(postTokensValidator, PostTokensParams{})
 	v.RegisterValidation("eth_addr", EthValidator)
 	v.RegisterValidation("nonce", NonceValidator)
 	v.RegisterValidation("signature", SignatureValidator)
@@ -153,7 +148,10 @@ func RegisterCustomValidators(v *validator.Validate) {
 	v.RegisterAlias("token_note", "max=1200")
 	v.RegisterAlias("bio", "max=1200")
 	v.RegisterAlias("caption", "max=1200")
-	v.RegisterValidation("post_token", postTokenValidatorFunc(v))
+	v.RegisterStructValidation(ChainAddressValidator, persist.ChainAddress{})
+	v.RegisterStructValidation(ConnectionPaginationParamsValidator, ConnectionPaginationParams{})
+	v.RegisterStructValidation(CollectionTokenSettingsParamsValidator, CollectionTokenSettingsParams{})
+	v.RegisterStructValidation(EventValidator, coredb.Event{})
 }
 
 var IsValidRole validator.Func = func(fl validator.FieldLevel) bool {
@@ -331,22 +329,4 @@ func consecutivePeriodsOrUnderscores(s string) bool {
 		}
 	}
 	return false
-}
-
-type PostTokensParams struct {
-	TokenIDs []persist.DBID             `validate:"required_without=Tokens,excluded_with=Tokens"`
-	Tokens   []persist.TokenIdentifiers `validate:"required_without=TokenIDs,excluded_with=TokenIDs"`
-}
-
-func postTokensValidator(fl validator.StructLevel) {
-	if err := fl.Validator().Struct(fl.Current()); err != nil {
-		fl.ReportValidationErrors("", "", err.(validator.ValidationErrors))
-	}
-}
-
-func postTokenValidatorFunc(v *validator.Validate) validator.Func {
-	return func(fl validator.FieldLevel) bool {
-		err := v.Struct(fl.Field())
-		return err == nil
-	}
 }

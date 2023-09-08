@@ -195,7 +195,7 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 	}
 
 	switch err {
-	case publicapi.ErrProfileImageTooManySources, publicapi.ErrProfileImageUnknownSource:
+	case publicapi.ErrProfileImageTooManySources, publicapi.ErrProfileImageUnknownSource, publicapi.ErrNoTokensToPost, publicapi.ErrTooManyTokenSources:
 		mappedErr = model.ErrInvalidInput{Message: message}
 	case publicapi.ErrProfileImageNotTokenOwner, publicapi.ErrProfileImageNotWalletOwner:
 		mappedErr = model.ErrNotAuthorized{Message: message}

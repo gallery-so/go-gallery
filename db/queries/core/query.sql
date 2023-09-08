@@ -1160,7 +1160,7 @@ insert_media_move_active_record(last_updated) as (
     returning last_updated
 ),
 -- Update the existing active record with the new media data
-insert_media_add_record(insert_id, active, is_new) as (
+insert_media_add_record(insert_id, active, replaced_current) as (
     insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
     values (@new_media_id, @contract_id, @token_id, @chain, @metadata, @media, @name, @description, (select id from insert_job), @active,
         -- Using timestamps generated from insert_media_move_active_record ensures that the new record is only inserted after the current media is moved
@@ -1170,8 +1170,8 @@ insert_media_add_record(insert_id, active, is_new) as (
     on conflict (contract_id, token_id, chain) where active and not deleted do update
         set metadata = excluded.metadata,
             media = excluded.media,
-            name = coalesce(nullif(excluded.name, ''), name),
-            description = coalesce(nullif(excluded.description, ''), description),
+            name = coalesce(nullif(excluded.name, ''), token_medias.name),
+            description = coalesce(nullif(excluded.description, ''), token_medias.description),
             processing_job_id = excluded.processing_job_id,
             last_updated = now()
     returning id as insert_id, active, id = @new_media_id replaced_current

@@ -23,10 +23,14 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/recommend"
 	"github.com/mikeydub/go-gallery/service/recommend/userpref"
+	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
 )
 
 const tHalf = math.Ln2 / 0.002 // half-life of approx 6 hours
+
+var ErrNoTokensToPost = fmt.Errorf("no tokens to post")
+var ErrTooManyTokenSources = fmt.Errorf("too many token sources")
 
 type FeedAPI struct {
 	repos     *postgres.Repositories
@@ -105,12 +109,16 @@ func (api FeedAPI) GetPostById(ctx context.Context, postID persist.DBID) (*db.Po
 func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, tokens []persist.TokenIdentifiers, caption *string) (persist.DBID, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		// tokenIDs and tokens are mutually exclusive
-		"postToken": validate.WithTag(validate.PostTokensParams{TokenIDs: tokenIDs, Tokens: tokens}, "required,post_token"),
 		// caption can be null but less than 600 chars
 		"caption": validate.WithTag(caption, "max=600"),
 	}); err != nil {
 		return "", err
+	}
+	if len(tokenIDs) == 0 && len(tokens) == 0 {
+		return "", ErrNoTokensToPost
+	}
+	if len(tokenIDs) > 0 && len(tokens) > 0 {
+		return "", ErrTooManyTokenSources
 	}
 
 	actorID, err := getAuthenticatedUserID(ctx)
@@ -148,6 +156,18 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, toke
 	}
 
 	return "", nil
+}
+
+func (api TokenAPI) ReferralPostPreflight(ctx context.Context, t persist.TokenIdentifiers) error {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"address": validate.WithTag(t.ContractAddress, "required"),
+		"tokenID": validate.WithTag(t.TokenID, "required"),
+	}); err != nil {
+		return err
+	}
+	userID, _ := getAuthenticatedUserID(ctx)
+	return task.CreateTaskForPostPreflight(ctx, task.PostPreflightMessage{Token: t, UserID: userID}, api.taskClient)
 }
 
 func (api FeedAPI) DeletePostById(ctx context.Context, postID persist.DBID) error {
