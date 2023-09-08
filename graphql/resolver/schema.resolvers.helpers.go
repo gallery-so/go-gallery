@@ -1636,6 +1636,7 @@ func postToModel(event *db.Post) (*model.Post, error) {
 		Dbid:         event.ID,
 		CreationTime: &event.CreatedAt,
 		Caption:      captionVal,
+		Status:       nil, // handled by dedicated resolver
 	}, nil
 
 }

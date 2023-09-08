@@ -42,16 +42,6 @@ func (t TokenID) ToTokenID() persist.TokenID {
 
 }
 
-type ErrTokenNotFoundByIdentifiers struct {
-	ContractAddress persist.Address
-	TokenID         TokenID
-	OwnerAddress    persist.Address
-}
-
-func (e ErrTokenNotFoundByIdentifiers) Error() string {
-	return fmt.Sprintf("token not found for contract %s, tokenID %s, owner %s", e.ContractAddress, e.TokenID, e.OwnerAddress)
-}
-
 type ErrCollectionNotFoundByAddress struct {
 	Address persist.Address
 }
@@ -267,12 +257,12 @@ func (d *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, token
 	}
 
 	if len(result.Tokens) == 0 {
-		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, ErrTokenNotFoundByIdentifiers{ContractAddress: tokenIdentifiers.ContractAddress, TokenID: TokenID(tokenIdentifiers.TokenID.Base10String()), OwnerAddress: ownerAddress}
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, multichain.ErrTokenNotFoundByIdentifiers{ContractAddress: tokenIdentifiers.ContractAddress, TokenID: tokenIdentifiers.TokenID, OwnerAddress: ownerAddress}
 	}
 
 	t, c := d.tokensWithOwnershipToAgnosticTokens(ctx, result.Tokens, ownerAddress)
 	if len(t) == 0 || len(c) == 0 {
-		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, ErrTokenNotFoundByIdentifiers{ContractAddress: tokenIdentifiers.ContractAddress, TokenID: TokenID(tokenIdentifiers.TokenID.Base10String()), OwnerAddress: ownerAddress}
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, multichain.ErrTokenNotFoundByIdentifiers{ContractAddress: tokenIdentifiers.ContractAddress, TokenID: tokenIdentifiers.TokenID, OwnerAddress: ownerAddress}
 	}
 	return t[0], c[0], nil
 }
@@ -425,7 +415,7 @@ func (d *Provider) fetchToken(ctx context.Context, ti multichain.ChainAgnosticId
 
 	if len(res.Tokens) == 0 {
 		logger.For(ctx).Infof("token not found for %s (%s)", rtid, req.URL.String())
-		return Token{}, ErrTokenNotFoundByIdentifiers{ContractAddress: ti.ContractAddress, TokenID: TokenID(ti.TokenID.Base10String())}
+		return Token{}, multichain.ErrTokenNotFoundByIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID}
 	}
 	return res.Tokens[0].Token, nil
 }
@@ -501,7 +491,7 @@ func (d *Provider) fetchBlockScoutMetadata(ctx context.Context, ti multichain.Ch
 	}
 
 	if len(res.Metadata) == 0 {
-		return nil, ErrTokenNotFoundByIdentifiers{ContractAddress: ti.ContractAddress, TokenID: TokenID(ti.TokenID.Base10String())}
+		return nil, multichain.ErrTokenNotFoundByIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID}
 	}
 
 	if _, ok := util.FindFirstFieldFromMap(res.Metadata, "image", "image_url", "imageURL").(string); !ok {

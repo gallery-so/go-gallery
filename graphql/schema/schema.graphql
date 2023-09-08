@@ -958,6 +958,11 @@ type Post implements Node @key(fields: "dbid") @goEmbedHelper {
     @goField(forceResolver: true)
 
   viewerAdmire: Admire @goField(forceResolver: true)
+  status: PostStatus! @goField(forceResolver: true)
+}
+
+type PostStatus {
+  isVerified: Boolean!
 }
 
 type UserCreatedFeedEventData implements FeedEventData {
@@ -1205,18 +1210,27 @@ union SearchCommunitiesPayloadOrError = SearchCommunitiesPayload | ErrInvalidInp
 union SocialQueriesOrError = SocialQueries | ErrNotAuthorized | ErrNeedsToReconnectSocial
 
 input ChainAddressTokenInput {
-  address: Address!
-  chain: Chain!
-  # Refers to the id of the token in the contract represented in decimal, or interpreted as hexadecimal when prefixed with '0x'
+  chainAddress: ChainAddressInput!
+  """
+  Refers to the id of the token in the contract either in decimal, or interpreted as hexadecimal when prefixed with '0x'
+  """
   tokenId: TokenId!
 }
 
-# TODO: Figure out the other errors
-type TokenMediaByIdentifiers {
-  media: MediaSubtype
+input TokenDraftDetailsInput {
+  token: ChainAddressTokenInput!
+  highDefinition: Boolean!
 }
 
-union TokenMediaByIdentifiersOrError = TokenMediaByIdentifiers | ErrInvalidInput
+type TokenDraftDetails @goEmbedHelper {
+  media: MediaSubtype
+  community: Community @goField(forceResolver: true)
+  tokenName: String
+  tokenDescription: String
+}
+
+# TODO: Figure out the other errors
+union TokenDraftDetailsOrError = TokenDraftDetails | ErrInvalidInput
 
 type Query {
   node(id: ID!): Node
@@ -1229,7 +1243,7 @@ type Query {
   collectionById(id: DBID!): CollectionByIdOrError
   collectionsByIds(ids: [DBID!]!): [CollectionByIdOrError]
   tokenById(id: DBID!): TokenByIdOrError
-  tokenMediaByToken(token: ChainAddressTokenInput!): TokenMediaByIdentifiersOrError
+  tokenDraftDetails(input: TokenDraftDetailsInput!): TokenDraftDetailsOrError
   collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
   communityByAddress(
     communityAddress: ChainAddressInput!

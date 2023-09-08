@@ -373,8 +373,8 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
-	"TokenMediaByIdentifiersOrError": func(object interface{}) (interface{}, bool) {
-		obj, ok := object.(TokenMediaByIdentifiersOrError)
+	"TokenDraftDetailsOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(TokenDraftDetailsOrError)
 		return obj, ok
 	},
 

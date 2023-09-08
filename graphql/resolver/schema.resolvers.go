@@ -1077,7 +1077,11 @@ func (r *mutationResolver) RefreshContract(ctx context.Context, contractID persi
 
 // ReferralPostPreflight is the resolver for the referralPostPreflight field.
 func (r *mutationResolver) ReferralPostPreflight(ctx context.Context, input model.ReferralPostPreflightInput) (model.ReferralPostPreflightPayloadOrError, error) {
-	err := publicapi.For(ctx).Token.ReferralPostPreflight(ctx, input.Token)
+	err := publicapi.For(ctx).Token.ReferralPostPreflight(ctx, persist.TokenIdentifiers{
+		Chain:           input.Token.ChainAddress.Chain(),
+		ContractAddress: input.Token.ChainAddress.Address(),
+		TokenID:         input.Token.TokenID,
+	})
 	return &model.ReferralPostPreflightPayload{Accepted: err != nil}, err
 }
 
@@ -1422,7 +1426,13 @@ func (r *mutationResolver) CommentOnPost(ctx context.Context, postID persist.DBI
 
 // PostTokens is the resolver for the postTokens field.
 func (r *mutationResolver) PostTokens(ctx context.Context, input model.PostTokensInput) (model.PostTokensPayloadOrError, error) {
-	tokens := util.MapWithoutError(input.Tokens, func(t *persist.TokenIdentifiers) persist.TokenIdentifiers { return *t })
+	tokens := util.MapWithoutError(input.Tokens, func(t *model.ChainAddressTokenInput) persist.TokenIdentifiers {
+		return persist.TokenIdentifiers{
+			TokenID:         t.TokenID,
+			ContractAddress: t.ChainAddress.Address(),
+			Chain:           t.ChainAddress.Chain(),
+		}
+	})
 	id, err := publicapi.For(ctx).Feed.PostTokens(ctx, input.TokenIds, tokens, input.Caption)
 	if err != nil {
 		return nil, err
@@ -2046,6 +2056,21 @@ func (r *postResolver) ViewerAdmire(ctx context.Context, obj *model.Post) (*mode
 	return admireToModel(ctx, *admire), nil
 }
 
+// Status is the resolver for the status field.
+func (r *postResolver) Status(ctx context.Context, obj *model.Post) (*model.PostStatus, error) {
+	// Nothing to verify
+	if len(obj.HelperPostData.TokenIDs) == 0 {
+		return &model.PostStatus{IsVerified: false}, nil
+	}
+	// N.B. Only check the first token
+	token, err := publicapi.For(ctx).Token.GetTokenById(ctx, obj.HelperPostData.TokenIDs[0])
+	if err != nil {
+		return &model.PostStatus{IsVerified: false}, nil
+	}
+	isVerified := obj.HelperPostData.AuthorID == token.OwnerUserID && (token.IsCreatorToken || token.IsHolderToken)
+	return &model.PostStatus{IsVerified: isVerified}, nil
+}
+
 // Blurhash is the resolver for the blurhash field.
 func (r *previewURLSetResolver) Blurhash(ctx context.Context, obj *model.PreviewURLSet) (*string, error) {
 	mm := mediamapper.For(ctx)
@@ -2141,14 +2166,36 @@ func (r *queryResolver) TokenByID(ctx context.Context, id persist.DBID) (model.T
 	return resolveTokenByTokenID(ctx, id)
 }
 
-// TokenMediaByToken is the resolver for the tokenMediaByToken field.
-func (r *queryResolver) TokenMediaByToken(ctx context.Context, token persist.TokenIdentifiers) (model.TokenMediaByIdentifiersOrError, error) {
+// TokenDraftDetails is the resolver for the tokenDraftDetails field.
+func (r *queryResolver) TokenDraftDetails(ctx context.Context, input model.TokenDraftDetailsInput) (model.TokenDraftDetailsOrError, error) {
+	token := persist.TokenIdentifiers{
+		Chain:           input.Token.ChainAddress.Chain(),
+		ContractAddress: input.Token.ChainAddress.Address(),
+		TokenID:         input.Token.TokenID,
+	}
 	media, t, err := publicapi.For(ctx).Token.MediaByTokenIdentifiers(ctx, token)
 	if util.ErrorAs[persist.ErrMediaNotFound](err) {
 		err = nil
 	}
-	highDef := false
-	return model.TokenMediaByIdentifiers{Media: resolveTokenMedia(ctx, t, media, highDef)}, err
+	tokenName := t.Name.String
+	if media.ID != "" && media.Name != "" {
+		tokenName = media.Name
+	}
+	tokenDescription := t.Description.String
+	if media.ID != "" && media.Description != "" {
+		tokenDescription = media.Description
+	}
+	contractID := t.Contract
+	if media.ID != "" && media.ContractID != "" {
+		contractID = media.ContractID
+	}
+	return model.TokenDraftDetails{
+		Media:                       resolveTokenMedia(ctx, t, media, input.HighDefinition),
+		TokenName:                   util.ToPointer(tokenName),
+		TokenDescription:            util.ToPointer(tokenDescription),
+		Community:                   nil, // handled by dedicated resolver
+		HelperTokenDraftDetailsData: model.HelperTokenDraftDetailsData{ContractID: contractID},
+	}, err
 }
 
 // CollectionTokenByID is the resolver for the collectionTokenById field.
@@ -2639,6 +2686,14 @@ func (r *tokenResolver) IsSpamByProvider(ctx context.Context, obj *model.Token) 
 	return &isSpam, nil
 }
 
+// Community is the resolver for the community field.
+func (r *tokenDraftDetailsResolver) Community(ctx context.Context, obj *model.TokenDraftDetails) (*model.Community, error) {
+	if obj.HelperTokenDraftDetailsData.ContractID != "" {
+		return resolveCommunityByID(ctx, obj.HelperTokenDraftDetailsData.ContractID)
+	}
+	return nil, nil
+}
+
 // Wallets is the resolver for the wallets field.
 func (r *tokenHolderResolver) Wallets(ctx context.Context, obj *model.TokenHolder) ([]*model.Wallet, error) {
 	wallets := make([]*model.Wallet, 0, len(obj.WalletIds))
@@ -2802,13 +2857,6 @@ func (r *chainAddressInputResolver) Address(ctx context.Context, obj *persist.Ch
 // Chain is the resolver for the chain field.
 func (r *chainAddressInputResolver) Chain(ctx context.Context, obj *persist.ChainAddress, data persist.Chain) error {
 	return obj.GQLSetChainFromResolver(data)
-}
-
-// Address is the resolver for the address field.
-func (r *chainAddressTokenInputResolver) Address(ctx context.Context, obj *persist.TokenIdentifiers, data persist.Address) error {
-	// TODO: I'm not really sure why this resolver is generated...
-	obj.ContractAddress = data
-	return nil
 }
 
 // PubKey is the resolver for the pubKey field.
@@ -3004,6 +3052,11 @@ func (r *Resolver) Subscription() generated.SubscriptionResolver { return &subsc
 // Token returns generated.TokenResolver implementation.
 func (r *Resolver) Token() generated.TokenResolver { return &tokenResolver{r} }
 
+// TokenDraftDetails returns generated.TokenDraftDetailsResolver implementation.
+func (r *Resolver) TokenDraftDetails() generated.TokenDraftDetailsResolver {
+	return &tokenDraftDetailsResolver{r}
+}
+
 // TokenHolder returns generated.TokenHolderResolver implementation.
 func (r *Resolver) TokenHolder() generated.TokenHolderResolver { return &tokenHolderResolver{r} }
 
@@ -3041,11 +3094,6 @@ func (r *Resolver) Wallet() generated.WalletResolver { return &walletResolver{r}
 // ChainAddressInput returns generated.ChainAddressInputResolver implementation.
 func (r *Resolver) ChainAddressInput() generated.ChainAddressInputResolver {
 	return &chainAddressInputResolver{r}
-}
-
-// ChainAddressTokenInput returns generated.ChainAddressTokenInputResolver implementation.
-func (r *Resolver) ChainAddressTokenInput() generated.ChainAddressTokenInputResolver {
-	return &chainAddressTokenInputResolver{r}
 }
 
 // ChainPubKeyInput returns generated.ChainPubKeyInputResolver implementation.
@@ -3096,6 +3144,7 @@ type someoneFollowedYouNotificationResolver struct{ *Resolver }
 type someoneViewedYourGalleryNotificationResolver struct{ *Resolver }
 type subscriptionResolver struct{ *Resolver }
 type tokenResolver struct{ *Resolver }
+type tokenDraftDetailsResolver struct{ *Resolver }
 type tokenHolderResolver struct{ *Resolver }
 type tokensAddedToCollectionFeedEventDataResolver struct{ *Resolver }
 type unfollowUserPayloadResolver struct{ *Resolver }
@@ -3105,5 +3154,4 @@ type userFollowedUsersFeedEventDataResolver struct{ *Resolver }
 type viewerResolver struct{ *Resolver }
 type walletResolver struct{ *Resolver }
 type chainAddressInputResolver struct{ *Resolver }
-type chainAddressTokenInputResolver struct{ *Resolver }
 type chainPubKeyInputResolver struct{ *Resolver }

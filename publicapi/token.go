@@ -595,7 +595,7 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collect
 	return db.Event{}, nil
 }
 
-func (api TokenAPI) ReferralPostPreflight(ctx context.Context, t *persist.TokenIdentifiers) error {
+func (api TokenAPI) ReferralPostPreflight(ctx context.Context, t persist.TokenIdentifiers) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"address": validate.WithTag(t.ContractAddress, "required"),
@@ -603,5 +603,6 @@ func (api TokenAPI) ReferralPostPreflight(ctx context.Context, t *persist.TokenI
 	}); err != nil {
 		return err
 	}
-	return task.CreateTaskForPostPreflight(ctx, task.PostPreflightMessage{Token: *t}, api.taskClient)
+	userID, _ := getAuthenticatedUserID(ctx)
+	return task.CreateTaskForPostPreflight(ctx, task.PostPreflightMessage{Token: t, UserID: userID}, api.taskClient)
 }

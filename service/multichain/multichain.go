@@ -42,8 +42,6 @@ var contractNameBlacklist = map[string]bool{
 	"unknown":               true,
 }
 
-var ErrNoMatchingProviders = errors.New("no matching providers")
-
 // SendTokens is called to process a user's batch of tokens
 type SendTokens func(context.Context, task.TokenProcessingUserMessage) error
 
@@ -124,6 +122,18 @@ type ChainAgnosticIdentifiers struct {
 
 type ChainAgnosticCommunityOwner struct {
 	Address persist.Address `json:"address"`
+}
+
+var ErrNoMatchingProviders = errors.New("no matching providers")
+
+type ErrTokenNotFoundByIdentifiers struct {
+	ContractAddress persist.Address
+	TokenID         persist.TokenID
+	OwnerAddress    persist.Address
+}
+
+func (e ErrTokenNotFoundByIdentifiers) Error() string {
+	return fmt.Sprintf("token not found for contract %s, tokenID %s, owner %s", e.ContractAddress, e.TokenID, e.OwnerAddress)
 }
 
 type TokenHolder struct {
@@ -261,14 +271,14 @@ func matchingProvidersForChain[T any](availableProviders map[persist.Chain][]any
 	return matchingProvidersByChains[T](availableProviders, chain)[chain]
 }
 
-// matchingWallets returns wallet addresses that belong to any of the passed chains
-func (p *Provider) matchingWallets(wallets []persist.Wallet, chains []persist.Chain) map[persist.Chain][]persist.Address {
+// MatchingWallets returns wallet addresses that belong to any of the passed chains
+func MatchingWallets(wallets []persist.Wallet, chains []persist.Chain, walletOverrides WalletOverrideMap) map[persist.Chain][]persist.Address {
 	matches := make(map[persist.Chain][]persist.Address)
 	for _, chain := range chains {
 		for _, wallet := range wallets {
 			if wallet.Chain == chain {
 				matches[chain] = append(matches[chain], wallet.Address)
-			} else if overrides, ok := p.WalletOverrides[chain]; ok && util.Contains(overrides, wallet.Chain) {
+			} else if overrides, ok := walletOverrides[chain]; ok && util.Contains(overrides, wallet.Chain) {
 				matches[chain] = append(matches[chain], wallet.Address)
 			}
 		}
@@ -277,6 +287,11 @@ func (p *Provider) matchingWallets(wallets []persist.Wallet, chains []persist.Ch
 		matches[chain] = util.Dedupe(addresses, true)
 	}
 	return matches
+}
+
+// MatchingWalletsForChain returns wallet addresses that belong to chain
+func MatchingWalletsForChain(wallets []persist.Wallet, chain persist.Chain, walletOverrides WalletOverrideMap) []persist.Address {
+	return MatchingWallets(wallets, []persist.Chain{chain}, walletOverrides)[chain]
 }
 
 // SyncTokensByUserID updates the media for all tokens for a user
@@ -292,7 +307,7 @@ func (p *Provider) SyncTokensByUserID(ctx context.Context, userID persist.DBID, 
 	errChan := make(chan error)
 	incomingTokens := make(chan chainTokens)
 	incomingContracts := make(chan chainContracts)
-	chainsToAddresses := p.matchingWallets(user.Wallets, chains)
+	chainsToAddresses := MatchingWallets(user.Wallets, chains, p.WalletOverrides)
 
 	wg := &conc.WaitGroup{}
 	for c, a := range chainsToAddresses {
@@ -351,8 +366,7 @@ func (p *Provider) SyncTokensByUserIDAndTokenIdentifiers(ctx context.Context, us
 	})
 
 	chains = util.Dedupe(chains, false)
-
-	matchingWallets := p.matchingWallets(user.Wallets, chains)
+	matchingWallets := MatchingWallets(user.Wallets, chains, p.WalletOverrides)
 
 	chainAddresses := map[persist.ChainAddress]bool{}
 	for chain, addresses := range matchingWallets {
@@ -680,7 +694,7 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 	}
 
 	fetchers := matchingProvidersByChains[ChildContractFetcher](p.Chains, chains...)
-	searchAddresses := p.matchingWallets(user.Wallets, chains)
+	searchAddresses := MatchingWallets(user.Wallets, chains, p.WalletOverrides)
 	providerPool := pool.NewWithResults[ProviderChildContractResult]().WithContext(ctx)
 
 	// Fetch all tokens created by the user
@@ -1204,27 +1218,18 @@ func (p *Provider) VerifySignature(ctx context.Context, pSig string, pNonce stri
 	return true, nil
 }
 
-// RefreshToken refreshes a token on the given chain using the chain provider for that chain
-func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers) error {
-	err := p.processTokenMedia(ctx, ti.TokenID, ti.ContractAddress, ti.Chain)
-	if err != nil {
-		return err
-	}
-
-	tokenFetchers := matchingProvidersForChain[TokenDescriptorsFetcher](p.Chains, ti.Chain)
-
-	if len(tokenFetchers) == 0 {
-		return nil
-	}
-
+func (p *Provider) RefreshTokenDescriptorsByTokenIdentifiers(ctx context.Context, ti persist.TokenIdentifiers) error {
 	finalTokenDescriptors := ChainAgnosticTokenDescriptors{}
 	finalContractDescriptors := ChainAgnosticContractDescriptors{}
+	tokenFetchers := matchingProvidersForChain[TokenDescriptorsFetcher](p.Chains, ti.Chain)
+	found := false
+
 	for _, tokenFetcher := range tokenFetchers {
-
 		id := ChainAgnosticIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID}
-
 		token, contract, err := tokenFetcher.GetTokenDescriptorsByTokenIdentifiers(ctx, id)
 		if err == nil {
+			found = true
+
 			// token
 			if token.Name != "" && finalContractDescriptors.Name == "" {
 				finalTokenDescriptors.Name = token.Name
@@ -1249,10 +1254,11 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 			if contract.ProfileImageURL != "" && finalContractDescriptors.ProfileImageURL == "" {
 				finalContractDescriptors.ProfileImageURL = contract.ProfileImageURL
 			}
-		} else {
-			logger.For(ctx).Infof("token %s-%s-%d not found for refresh (err: %s)", ti.TokenID, ti.ContractAddress, ti.Chain, err)
 		}
+	}
 
+	if !found {
+		return ErrTokenNotFoundByIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID}
 	}
 
 	if err := p.Queries.UpdateTokenMetadataFieldsByTokenIdentifiers(ctx, db.UpdateTokenMetadataFieldsByTokenIdentifiersParams{
@@ -1264,7 +1270,7 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 		return err
 	}
 
-	if err := p.Repos.ContractRepository.UpsertByAddress(ctx, ti.ContractAddress, ti.Chain, persist.ContractGallery{
+	return p.Repos.ContractRepository.UpsertByAddress(ctx, ti.ContractAddress, ti.Chain, persist.ContractGallery{
 		Chain:           ti.Chain,
 		Address:         persist.Address(ti.Chain.NormalizeAddress(ti.ContractAddress)),
 		Symbol:          persist.NullString(finalContractDescriptors.Symbol),
@@ -1272,10 +1278,16 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 		Description:     persist.NullString(finalContractDescriptors.Description),
 		ProfileImageURL: persist.NullString(finalContractDescriptors.ProfileImageURL),
 		OwnerAddress:    finalContractDescriptors.CreatorAddress,
-	}); err != nil {
+	})
+}
+
+// RefreshToken refreshes a token on the given chain using the chain provider for that chain
+func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers) error {
+	err := p.RefreshTokenDescriptorsByTokenIdentifiers(ctx, ti)
+	if err != nil {
 		return err
 	}
-	return nil
+	return p.processTokenMedia(ctx, ti.TokenID, ti.ContractAddress, ti.Chain)
 }
 
 // RefreshContract refreshes a contract on the given chain using the chain provider for that chain
@@ -1396,7 +1408,7 @@ func (p *Provider) SyncContractsOwnedByUser(ctx context.Context, userID persist.
 	contractsFromProviders := []chainContracts{}
 
 	contractFetchers := matchingProvidersByChains[ContractsOwnerFetcher](p.Chains, chains...)
-	searchAddresses := p.matchingWallets(user.Wallets, chains)
+	searchAddresses := MatchingWallets(user.Wallets, chains, p.WalletOverrides)
 	providerPool := pool.NewWithResults[ContractOwnerResult]().WithContext(ctx)
 
 	for chain, addresses := range searchAddresses {
@@ -1805,32 +1817,6 @@ type contractMetadata struct {
 	ProfileImageURL string
 	Description     string
 	IsSpam          bool
-}
-
-// ConfirmTokenExists verifies that the token exists according to a set of providers.
-// If the token exists in the database, the DBID of the token is included.
-func (p *Provider) ConfirmTokenExists(ctx context.Context, ti persist.TokenIdentifiers) (bool, error) {
-	// Using TokenDescriptorsFetcher to check if a token exists
-	tokenFetchers := matchingProvidersForChain[TokenDescriptorsFetcher](p.Chains, ti.Chain)
-
-	if len(tokenFetchers) == 0 {
-		return false, ErrNoMatchingProviders
-	}
-
-	// TODO: Should parallelize this
-	for _, fetcher := range tokenFetchers {
-		_, _, err := fetcher.GetTokenDescriptorsByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{
-			ContractAddress: ti.ContractAddress,
-			TokenID:         ti.TokenID,
-		})
-		if err == nil {
-			return true, nil
-		}
-		if err != nil {
-		}
-	}
-
-	return false, nil
 }
 
 func contractsToNewDedupedContracts(contracts []chainContracts) []persist.ContractGallery {

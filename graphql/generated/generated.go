@@ -84,6 +84,7 @@ type ResolverRoot interface {
 	SomeoneViewedYourGalleryNotification() SomeoneViewedYourGalleryNotificationResolver
 	Subscription() SubscriptionResolver
 	Token() TokenResolver
+	TokenDraftDetails() TokenDraftDetailsResolver
 	TokenHolder() TokenHolderResolver
 	TokensAddedToCollectionFeedEventData() TokensAddedToCollectionFeedEventDataResolver
 	UnfollowUserPayload() UnfollowUserPayloadResolver
@@ -93,7 +94,6 @@ type ResolverRoot interface {
 	Viewer() ViewerResolver
 	Wallet() WalletResolver
 	ChainAddressInput() ChainAddressInputResolver
-	ChainAddressTokenInput() ChainAddressTokenInputResolver
 	ChainPubKeyInput() ChainPubKeyInputResolver
 }
 
@@ -920,6 +920,7 @@ type ComplexityRoot struct {
 		Dbid         func(childComplexity int) int
 		ID           func(childComplexity int) int
 		Interactions func(childComplexity int, before *string, after *string, first *int, last *int) int
+		Status       func(childComplexity int) int
 		Tokens       func(childComplexity int) int
 		ViewerAdmire func(childComplexity int) int
 	}
@@ -960,6 +961,10 @@ type ComplexityRoot struct {
 		Cursor func(childComplexity int) int
 		Node   func(childComplexity int) int
 		Post   func(childComplexity int) int
+	}
+
+	PostStatus struct {
+		IsVerified func(childComplexity int) int
 	}
 
 	PostTokensPayload struct {
@@ -1012,7 +1017,7 @@ type ComplexityRoot struct {
 		SocialConnections          func(childComplexity int, socialAccountType persist.SocialProvider, excludeAlreadyFollowing *bool, before *string, after *string, first *int, last *int) int
 		SocialQueries              func(childComplexity int) int
 		TokenByID                  func(childComplexity int, id persist.DBID) int
-		TokenMediaByToken          func(childComplexity int, token persist.TokenIdentifiers) int
+		TokenDraftDetails          func(childComplexity int, input model.TokenDraftDetailsInput) int
 		TopCollectionsForCommunity func(childComplexity int, input model.TopCollectionsForCommunityInput, before *string, after *string, first *int, last *int) int
 		TrendingFeed               func(childComplexity int, before *string, after *string, first *int, last *int, includePosts bool) int
 		TrendingUsers              func(childComplexity int, input model.TrendingUsersInput) int
@@ -1278,6 +1283,13 @@ type ComplexityRoot struct {
 		TokenType             func(childComplexity int) int
 	}
 
+	TokenDraftDetails struct {
+		Community        func(childComplexity int) int
+		Media            func(childComplexity int) int
+		TokenDescription func(childComplexity int) int
+		TokenName        func(childComplexity int) int
+	}
+
 	TokenEdge struct {
 		Cursor func(childComplexity int) int
 		Node   func(childComplexity int) int
@@ -1298,10 +1310,6 @@ type ComplexityRoot struct {
 	TokenHoldersConnection struct {
 		Edges    func(childComplexity int) int
 		PageInfo func(childComplexity int) int
-	}
-
-	TokenMediaByIdentifiers struct {
-		Media func(childComplexity int) int
 	}
 
 	TokenProfileImage struct {
@@ -1757,6 +1765,7 @@ type PostResolver interface {
 	Comments(ctx context.Context, obj *model.Post, before *string, after *string, first *int, last *int) (*model.PostCommentsConnection, error)
 	Interactions(ctx context.Context, obj *model.Post, before *string, after *string, first *int, last *int) (*model.PostInteractionsConnection, error)
 	ViewerAdmire(ctx context.Context, obj *model.Post) (*model.Admire, error)
+	Status(ctx context.Context, obj *model.Post) (*model.PostStatus, error)
 }
 type PreviewURLSetResolver interface {
 	Blurhash(ctx context.Context, obj *model.PreviewURLSet) (*string, error)
@@ -1772,7 +1781,7 @@ type QueryResolver interface {
 	CollectionByID(ctx context.Context, id persist.DBID) (model.CollectionByIDOrError, error)
 	CollectionsByIds(ctx context.Context, ids []persist.DBID) ([]model.CollectionByIDOrError, error)
 	TokenByID(ctx context.Context, id persist.DBID) (model.TokenByIDOrError, error)
-	TokenMediaByToken(ctx context.Context, token persist.TokenIdentifiers) (model.TokenMediaByIdentifiersOrError, error)
+	TokenDraftDetails(ctx context.Context, input model.TokenDraftDetailsInput) (model.TokenDraftDetailsOrError, error)
 	CollectionTokenByID(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (model.CollectionTokenByIDOrError, error)
 	CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool) (model.CommunityByAddressOrError, error)
 	GeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error)
@@ -1854,6 +1863,9 @@ type TokenResolver interface {
 
 	IsSpamByProvider(ctx context.Context, obj *model.Token) (*bool, error)
 }
+type TokenDraftDetailsResolver interface {
+	Community(ctx context.Context, obj *model.TokenDraftDetails) (*model.Community, error)
+}
 type TokenHolderResolver interface {
 	Wallets(ctx context.Context, obj *model.TokenHolder) ([]*model.Wallet, error)
 	User(ctx context.Context, obj *model.TokenHolder) (*model.GalleryUser, error)
@@ -1895,9 +1907,6 @@ type WalletResolver interface {
 type ChainAddressInputResolver interface {
 	Address(ctx context.Context, obj *persist.ChainAddress, data persist.Address) error
 	Chain(ctx context.Context, obj *persist.ChainAddress, data persist.Chain) error
-}
-type ChainAddressTokenInputResolver interface {
-	Address(ctx context.Context, obj *persist.TokenIdentifiers, data persist.Address) error
 }
 type ChainPubKeyInputResolver interface {
 	PubKey(ctx context.Context, obj *persist.ChainPubKey, data persist.PubKey) error
@@ -5566,6 +5575,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Post.Interactions(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
+	case "Post.status":
+		if e.complexity.Post.Status == nil {
+			break
+		}
+
+		return e.complexity.Post.Status(childComplexity), true
+
 	case "Post.tokens":
 		if e.complexity.Post.Tokens == nil {
 			break
@@ -5698,6 +5714,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.PostInteractionsEdge.Post(childComplexity), true
+
+	case "PostStatus.isVerified":
+		if e.complexity.PostStatus.IsVerified == nil {
+			break
+		}
+
+		return e.complexity.PostStatus.IsVerified(childComplexity), true
 
 	case "PostTokensPayload.post":
 		if e.complexity.PostTokensPayload.Post == nil {
@@ -6022,17 +6045,17 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.TokenByID(childComplexity, args["id"].(persist.DBID)), true
 
-	case "Query.tokenMediaByToken":
-		if e.complexity.Query.TokenMediaByToken == nil {
+	case "Query.tokenDraftDetails":
+		if e.complexity.Query.TokenDraftDetails == nil {
 			break
 		}
 
-		args, err := ec.field_Query_tokenMediaByToken_args(context.TODO(), rawArgs)
+		args, err := ec.field_Query_tokenDraftDetails_args(context.TODO(), rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.Query.TokenMediaByToken(childComplexity, args["token"].(persist.TokenIdentifiers)), true
+		return e.complexity.Query.TokenDraftDetails(childComplexity, args["input"].(model.TokenDraftDetailsInput)), true
 
 	case "Query.topCollectionsForCommunity":
 		if e.complexity.Query.TopCollectionsForCommunity == nil {
@@ -7157,6 +7180,34 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Token.TokenType(childComplexity), true
 
+	case "TokenDraftDetails.community":
+		if e.complexity.TokenDraftDetails.Community == nil {
+			break
+		}
+
+		return e.complexity.TokenDraftDetails.Community(childComplexity), true
+
+	case "TokenDraftDetails.media":
+		if e.complexity.TokenDraftDetails.Media == nil {
+			break
+		}
+
+		return e.complexity.TokenDraftDetails.Media(childComplexity), true
+
+	case "TokenDraftDetails.tokenDescription":
+		if e.complexity.TokenDraftDetails.TokenDescription == nil {
+			break
+		}
+
+		return e.complexity.TokenDraftDetails.TokenDescription(childComplexity), true
+
+	case "TokenDraftDetails.tokenName":
+		if e.complexity.TokenDraftDetails.TokenName == nil {
+			break
+		}
+
+		return e.complexity.TokenDraftDetails.TokenName(childComplexity), true
+
 	case "TokenEdge.cursor":
 		if e.complexity.TokenEdge.Cursor == nil {
 			break
@@ -7226,13 +7277,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.TokenHoldersConnection.PageInfo(childComplexity), true
-
-	case "TokenMediaByIdentifiers.media":
-		if e.complexity.TokenMediaByIdentifiers.Media == nil {
-			break
-		}
-
-		return e.complexity.TokenMediaByIdentifiers.Media(childComplexity), true
 
 	case "TokenProfileImage.token":
 		if e.complexity.TokenProfileImage.Token == nil {
@@ -7948,6 +7992,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputSocialAuthMechanism,
 		ec.unmarshalInputSyncCreatedTokensForExistingContractInput,
 		ec.unmarshalInputSyncCreatedTokensForNewContractsInput,
+		ec.unmarshalInputTokenDraftDetailsInput,
 		ec.unmarshalInputTrendingUsersInput,
 		ec.unmarshalInputTwitterAuth,
 		ec.unmarshalInputUnsubscribeFromEmailTypeInput,
@@ -9007,6 +9052,11 @@ type Post implements Node @key(fields: "dbid") @goEmbedHelper {
     @goField(forceResolver: true)
 
   viewerAdmire: Admire @goField(forceResolver: true)
+  status: PostStatus! @goField(forceResolver: true)
+}
+
+type PostStatus {
+  isVerified: Boolean!
 }
 
 type UserCreatedFeedEventData implements FeedEventData {
@@ -9254,18 +9304,27 @@ union SearchCommunitiesPayloadOrError = SearchCommunitiesPayload | ErrInvalidInp
 union SocialQueriesOrError = SocialQueries | ErrNotAuthorized | ErrNeedsToReconnectSocial
 
 input ChainAddressTokenInput {
-  address: Address!
-  chain: Chain!
-  # Refers to the id of the token in the contract represented in decimal, or interpreted as hexadecimal when prefixed with '0x'
+  chainAddress: ChainAddressInput!
+  """
+  Refers to the id of the token in the contract either in decimal, or interpreted as hexadecimal when prefixed with '0x'
+  """
   tokenId: TokenId!
 }
 
-# TODO: Figure out the other errors
-type TokenMediaByIdentifiers {
-  media: MediaSubtype
+input TokenDraftDetailsInput {
+  token: ChainAddressTokenInput!
+  highDefinition: Boolean!
 }
 
-union TokenMediaByIdentifiersOrError = TokenMediaByIdentifiers | ErrInvalidInput
+type TokenDraftDetails @goEmbedHelper {
+  media: MediaSubtype
+  community: Community @goField(forceResolver: true)
+  tokenName: String
+  tokenDescription: String
+}
+
+# TODO: Figure out the other errors
+union TokenDraftDetailsOrError = TokenDraftDetails | ErrInvalidInput
 
 type Query {
   node(id: ID!): Node
@@ -9278,7 +9337,7 @@ type Query {
   collectionById(id: DBID!): CollectionByIdOrError
   collectionsByIds(ids: [DBID!]!): [CollectionByIdOrError]
   tokenById(id: DBID!): TokenByIdOrError
-  tokenMediaByToken(token: ChainAddressTokenInput!): TokenMediaByIdentifiersOrError
+  tokenDraftDetails(input: TokenDraftDetailsInput!): TokenDraftDetailsOrError
   collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
   communityByAddress(
     communityAddress: ChainAddressInput!
@@ -13162,18 +13221,18 @@ func (ec *executionContext) field_Query_tokenById_args(ctx context.Context, rawA
 	return args, nil
 }
 
-func (ec *executionContext) field_Query_tokenMediaByToken_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+func (ec *executionContext) field_Query_tokenDraftDetails_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 persist.TokenIdentifiers
-	if tmp, ok := rawArgs["token"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("token"))
-		arg0, err = ec.unmarshalNChainAddressTokenInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenIdentifiers(ctx, tmp)
+	var arg0 model.TokenDraftDetailsInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNTokenDraftDetailsInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenDraftDetailsInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["token"] = arg0
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -14578,6 +14637,8 @@ func (ec *executionContext) fieldContext_AdmirePostPayload_post(ctx context.Cont
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
+			case "status":
+				return ec.fieldContext_Post_status(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -18845,6 +18906,8 @@ func (ec *executionContext) fieldContext_CommentOnPostPayload_post(ctx context.C
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
+			case "status":
+				return ec.fieldContext_Post_status(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -21833,6 +21896,8 @@ func (ec *executionContext) fieldContext_Entity_findPostByDbid(ctx context.Conte
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
+			case "status":
+				return ec.fieldContext_Post_status(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -38359,6 +38424,54 @@ func (ec *executionContext) fieldContext_Post_viewerAdmire(ctx context.Context, 
 	return fc, nil
 }
 
+func (ec *executionContext) _Post_status(ctx context.Context, field graphql.CollectedField, obj *model.Post) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Post_status(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Post().Status(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.PostStatus)
+	fc.Result = res
+	return ec.marshalNPostStatus2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostStatus(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Post_status(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Post",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "isVerified":
+				return ec.fieldContext_PostStatus_isVerified(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PostStatus", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _PostAdmireEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.PostAdmireEdge) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_PostAdmireEdge_node(ctx, field)
 	if err != nil {
@@ -38509,6 +38622,8 @@ func (ec *executionContext) fieldContext_PostAdmireEdge_post(ctx context.Context
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
+			case "status":
+				return ec.fieldContext_Post_status(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -38777,6 +38892,8 @@ func (ec *executionContext) fieldContext_PostCommentEdge_post(ctx context.Contex
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
+			case "status":
+				return ec.fieldContext_Post_status(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -39218,8 +39335,54 @@ func (ec *executionContext) fieldContext_PostInteractionsEdge_post(ctx context.C
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
+			case "status":
+				return ec.fieldContext_Post_status(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PostStatus_isVerified(ctx context.Context, field graphql.CollectedField, obj *model.PostStatus) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PostStatus_isVerified(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.IsVerified, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PostStatus_isVerified(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PostStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
 		},
 	}
 	return fc, nil
@@ -39284,6 +39447,8 @@ func (ec *executionContext) fieldContext_PostTokensPayload_post(ctx context.Cont
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
+			case "status":
+				return ec.fieldContext_Post_status(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -40488,8 +40653,8 @@ func (ec *executionContext) fieldContext_Query_tokenById(ctx context.Context, fi
 	return fc, nil
 }
 
-func (ec *executionContext) _Query_tokenMediaByToken(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Query_tokenMediaByToken(ctx, field)
+func (ec *executionContext) _Query_tokenDraftDetails(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_tokenDraftDetails(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -40502,7 +40667,7 @@ func (ec *executionContext) _Query_tokenMediaByToken(ctx context.Context, field 
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().TokenMediaByToken(rctx, fc.Args["token"].(persist.TokenIdentifiers))
+		return ec.resolvers.Query().TokenDraftDetails(rctx, fc.Args["input"].(model.TokenDraftDetailsInput))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -40511,19 +40676,19 @@ func (ec *executionContext) _Query_tokenMediaByToken(ctx context.Context, field 
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(model.TokenMediaByIdentifiersOrError)
+	res := resTmp.(model.TokenDraftDetailsOrError)
 	fc.Result = res
-	return ec.marshalOTokenMediaByIdentifiersOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenMediaByIdentifiersOrError(ctx, field.Selections, res)
+	return ec.marshalOTokenDraftDetailsOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenDraftDetailsOrError(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Query_tokenMediaByToken(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Query_tokenDraftDetails(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Query",
 		Field:      field,
 		IsMethod:   true,
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type TokenMediaByIdentifiersOrError does not have child fields")
+			return nil, errors.New("field of type TokenDraftDetailsOrError does not have child fields")
 		},
 	}
 	defer func() {
@@ -40533,7 +40698,7 @@ func (ec *executionContext) fieldContext_Query_tokenMediaByToken(ctx context.Con
 		}
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_tokenMediaByToken_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+	if fc.Args, err = ec.field_Query_tokenDraftDetails_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return
 	}
@@ -42537,6 +42702,8 @@ func (ec *executionContext) fieldContext_RemoveAdmirePayload_post(ctx context.Co
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
+			case "status":
+				return ec.fieldContext_Post_status(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -42724,6 +42891,8 @@ func (ec *executionContext) fieldContext_RemoveCommentPayload_post(ctx context.C
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
+			case "status":
+				return ec.fieldContext_Post_status(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -44822,6 +44991,8 @@ func (ec *executionContext) fieldContext_SomeoneAdmiredYourPostNotification_post
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
+			case "status":
+				return ec.fieldContext_Post_status(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -45540,6 +45711,8 @@ func (ec *executionContext) fieldContext_SomeoneCommentedOnYourPostNotification_
 				return ec.fieldContext_Post_interactions(ctx, field)
 			case "viewerAdmire":
 				return ec.fieldContext_Post_viewerAdmire(ctx, field)
+			case "status":
+				return ec.fieldContext_Post_status(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Post", field.Name)
 		},
@@ -48777,6 +48950,210 @@ func (ec *executionContext) fieldContext_Token_openseaId(ctx context.Context, fi
 	return fc, nil
 }
 
+func (ec *executionContext) _TokenDraftDetails_media(ctx context.Context, field graphql.CollectedField, obj *model.TokenDraftDetails) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TokenDraftDetails_media(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Media, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.MediaSubtype)
+	fc.Result = res
+	return ec.marshalOMediaSubtype2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMediaSubtype(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TokenDraftDetails_media(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TokenDraftDetails",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type MediaSubtype does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TokenDraftDetails_community(ctx context.Context, field graphql.CollectedField, obj *model.TokenDraftDetails) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TokenDraftDetails_community(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.TokenDraftDetails().Community(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Community)
+	fc.Result = res
+	return ec.marshalOCommunity2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunity(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TokenDraftDetails_community(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TokenDraftDetails",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "dbid":
+				return ec.fieldContext_Community_dbid(ctx, field)
+			case "id":
+				return ec.fieldContext_Community_id(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Community_lastUpdated(ctx, field)
+			case "contract":
+				return ec.fieldContext_Community_contract(ctx, field)
+			case "contractAddress":
+				return ec.fieldContext_Community_contractAddress(ctx, field)
+			case "creatorAddress":
+				return ec.fieldContext_Community_creatorAddress(ctx, field)
+			case "creator":
+				return ec.fieldContext_Community_creator(ctx, field)
+			case "chain":
+				return ec.fieldContext_Community_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Community_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Community_description(ctx, field)
+			case "previewImage":
+				return ec.fieldContext_Community_previewImage(ctx, field)
+			case "profileImageURL":
+				return ec.fieldContext_Community_profileImageURL(ctx, field)
+			case "profileBannerURL":
+				return ec.fieldContext_Community_profileBannerURL(ctx, field)
+			case "badgeURL":
+				return ec.fieldContext_Community_badgeURL(ctx, field)
+			case "parentCommunity":
+				return ec.fieldContext_Community_parentCommunity(ctx, field)
+			case "subCommunities":
+				return ec.fieldContext_Community_subCommunities(ctx, field)
+			case "tokensInCommunity":
+				return ec.fieldContext_Community_tokensInCommunity(ctx, field)
+			case "owners":
+				return ec.fieldContext_Community_owners(ctx, field)
+			case "posts":
+				return ec.fieldContext_Community_posts(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TokenDraftDetails_tokenName(ctx context.Context, field graphql.CollectedField, obj *model.TokenDraftDetails) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TokenDraftDetails_tokenName(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TokenName, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TokenDraftDetails_tokenName(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TokenDraftDetails",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TokenDraftDetails_tokenDescription(ctx context.Context, field graphql.CollectedField, obj *model.TokenDraftDetails) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TokenDraftDetails_tokenDescription(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TokenDescription, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TokenDraftDetails_tokenDescription(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TokenDraftDetails",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _TokenEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.TokenEdge) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_TokenEdge_node(ctx, field)
 	if err != nil {
@@ -49337,47 +49714,6 @@ func (ec *executionContext) fieldContext_TokenHoldersConnection_pageInfo(ctx con
 				return ec.fieldContext_PageInfo_endCursor(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PageInfo", field.Name)
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _TokenMediaByIdentifiers_media(ctx context.Context, field graphql.CollectedField, obj *model.TokenMediaByIdentifiers) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_TokenMediaByIdentifiers_media(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Media, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(model.MediaSubtype)
-	fc.Result = res
-	return ec.marshalOMediaSubtype2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMediaSubtype(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_TokenMediaByIdentifiers_media(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "TokenMediaByIdentifiers",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type MediaSubtype does not have child fields")
 		},
 	}
 	return fc, nil
@@ -56618,40 +56954,29 @@ func (ec *executionContext) unmarshalInputChainAddressInput(ctx context.Context,
 	return it, nil
 }
 
-func (ec *executionContext) unmarshalInputChainAddressTokenInput(ctx context.Context, obj interface{}) (persist.TokenIdentifiers, error) {
-	var it persist.TokenIdentifiers
+func (ec *executionContext) unmarshalInputChainAddressTokenInput(ctx context.Context, obj interface{}) (model.ChainAddressTokenInput, error) {
+	var it model.ChainAddressTokenInput
 	asMap := map[string]interface{}{}
 	for k, v := range obj.(map[string]interface{}) {
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"address", "chain", "tokenId"}
+	fieldsInOrder := [...]string{"chainAddress", "tokenId"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
 			continue
 		}
 		switch k {
-		case "address":
+		case "chainAddress":
 			var err error
 
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("address"))
-			data, err := ec.unmarshalNAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, v)
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chainAddress"))
+			data, err := ec.unmarshalNChainAddressInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			if err = ec.resolvers.ChainAddressTokenInput().Address(ctx, &it, data); err != nil {
-				return it, err
-			}
-		case "chain":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chain"))
-			data, err := ec.unmarshalNChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.Chain = data
+			it.ChainAddress = data
 		case "tokenId":
 			var err error
 
@@ -57752,7 +58077,7 @@ func (ec *executionContext) unmarshalInputPostTokensInput(ctx context.Context, o
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("tokens"))
-			data, err := ec.unmarshalOChainAddressTokenInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenIdentifiersᚄ(ctx, v)
+			data, err := ec.unmarshalOChainAddressTokenInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐChainAddressTokenInputᚄ(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -57922,7 +58247,7 @@ func (ec *executionContext) unmarshalInputReferralPostPreflightInput(ctx context
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("token"))
-			data, err := ec.unmarshalNChainAddressTokenInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenIdentifiers(ctx, v)
+			data, err := ec.unmarshalNChainAddressTokenInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐChainAddressTokenInput(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -58120,6 +58445,44 @@ func (ec *executionContext) unmarshalInputSyncCreatedTokensForNewContractsInput(
 				return it, err
 			}
 			it.IncludeChains = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputTokenDraftDetailsInput(ctx context.Context, obj interface{}) (model.TokenDraftDetailsInput, error) {
+	var it model.TokenDraftDetailsInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"token", "highDefinition"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "token":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("token"))
+			data, err := ec.unmarshalNChainAddressTokenInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐChainAddressTokenInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Token = data
+		case "highDefinition":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("highDefinition"))
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.HighDefinition = data
 		}
 	}
 
@@ -61870,17 +62233,17 @@ func (ec *executionContext) _TokenByIdOrError(ctx context.Context, sel ast.Selec
 	}
 }
 
-func (ec *executionContext) _TokenMediaByIdentifiersOrError(ctx context.Context, sel ast.SelectionSet, obj model.TokenMediaByIdentifiersOrError) graphql.Marshaler {
+func (ec *executionContext) _TokenDraftDetailsOrError(ctx context.Context, sel ast.SelectionSet, obj model.TokenDraftDetailsOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
-	case model.TokenMediaByIdentifiers:
-		return ec._TokenMediaByIdentifiers(ctx, sel, &obj)
-	case *model.TokenMediaByIdentifiers:
+	case model.TokenDraftDetails:
+		return ec._TokenDraftDetails(ctx, sel, &obj)
+	case *model.TokenDraftDetails:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._TokenMediaByIdentifiers(ctx, sel, obj)
+		return ec._TokenDraftDetails(ctx, sel, obj)
 	case model.ErrInvalidInput:
 		return ec._ErrInvalidInput(ctx, sel, &obj)
 	case *model.ErrInvalidInput:
@@ -65315,7 +65678,7 @@ func (ec *executionContext) _ErrGalleryNotFound(ctx context.Context, sel ast.Sel
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "PostOrError", "SocialConnectionsOrError", "MerchTokensPayloadOrError", "SearchUsersPayloadOrError", "SearchGalleriesPayloadOrError", "SearchCommunitiesPayloadOrError", "TokenMediaByIdentifiersOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "VerifyEmailMagicLinkPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "RedeemMerchPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "AdmirePostPayloadOrError", "AdmireTokenPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "PostOrError", "SocialConnectionsOrError", "MerchTokensPayloadOrError", "SearchUsersPayloadOrError", "SearchGalleriesPayloadOrError", "SearchCommunitiesPayloadOrError", "TokenDraftDetailsOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "VerifyEmailMagicLinkPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "RedeemMerchPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "AdmirePostPayloadOrError", "AdmireTokenPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -68661,6 +69024,26 @@ func (ec *executionContext) _Post(ctx context.Context, sel ast.SelectionSet, obj
 				return innerFunc(ctx)
 
 			})
+		case "status":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Post_status(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -68885,6 +69268,34 @@ func (ec *executionContext) _PostInteractionsEdge(ctx context.Context, sel ast.S
 
 			out.Values[i] = ec._PostInteractionsEdge_post(ctx, field, obj)
 
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var postStatusImplementors = []string{"PostStatus"}
+
+func (ec *executionContext) _PostStatus(ctx context.Context, sel ast.SelectionSet, obj *model.PostStatus) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, postStatusImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PostStatus")
+		case "isVerified":
+
+			out.Values[i] = ec._PostStatus_isVerified(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -69301,7 +69712,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			out.Concurrently(i, func() graphql.Marshaler {
 				return rrm(innerCtx)
 			})
-		case "tokenMediaByToken":
+		case "tokenDraftDetails":
 			field := field
 
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
@@ -69310,7 +69721,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._Query_tokenMediaByToken(ctx, field)
+				res = ec._Query_tokenDraftDetails(ctx, field)
 				return res
 			}
 
@@ -71548,6 +71959,56 @@ func (ec *executionContext) _Token(ctx context.Context, sel ast.SelectionSet, ob
 	return out
 }
 
+var tokenDraftDetailsImplementors = []string{"TokenDraftDetails", "TokenDraftDetailsOrError"}
+
+func (ec *executionContext) _TokenDraftDetails(ctx context.Context, sel ast.SelectionSet, obj *model.TokenDraftDetails) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, tokenDraftDetailsImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TokenDraftDetails")
+		case "media":
+
+			out.Values[i] = ec._TokenDraftDetails_media(ctx, field, obj)
+
+		case "community":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._TokenDraftDetails_community(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "tokenName":
+
+			out.Values[i] = ec._TokenDraftDetails_tokenName(ctx, field, obj)
+
+		case "tokenDescription":
+
+			out.Values[i] = ec._TokenDraftDetails_tokenDescription(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var tokenEdgeImplementors = []string{"TokenEdge"}
 
 func (ec *executionContext) _TokenEdge(ctx context.Context, sel ast.SelectionSet, obj *model.TokenEdge) graphql.Marshaler {
@@ -71703,31 +72164,6 @@ func (ec *executionContext) _TokenHoldersConnection(ctx context.Context, sel ast
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
-var tokenMediaByIdentifiersImplementors = []string{"TokenMediaByIdentifiers", "TokenMediaByIdentifiersOrError"}
-
-func (ec *executionContext) _TokenMediaByIdentifiers(ctx context.Context, sel ast.SelectionSet, obj *model.TokenMediaByIdentifiers) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, tokenMediaByIdentifiersImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("TokenMediaByIdentifiers")
-		case "media":
-
-			out.Values[i] = ec._TokenMediaByIdentifiers_media(ctx, field, obj)
-
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -73768,12 +74204,7 @@ func (ec *executionContext) unmarshalNChainAddressInput2ᚖgithubᚗcomᚋmikeyd
 	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) unmarshalNChainAddressTokenInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenIdentifiers(ctx context.Context, v interface{}) (persist.TokenIdentifiers, error) {
-	res, err := ec.unmarshalInputChainAddressTokenInput(ctx, v)
-	return res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) unmarshalNChainAddressTokenInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenIdentifiers(ctx context.Context, v interface{}) (*persist.TokenIdentifiers, error) {
+func (ec *executionContext) unmarshalNChainAddressTokenInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐChainAddressTokenInput(ctx context.Context, v interface{}) (*model.ChainAddressTokenInput, error) {
 	res, err := ec.unmarshalInputChainAddressTokenInput(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
 }
@@ -74114,6 +74545,20 @@ func (ec *executionContext) marshalNPost2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalle
 	return ec._Post(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNPostStatus2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostStatus(ctx context.Context, sel ast.SelectionSet, v model.PostStatus) graphql.Marshaler {
+	return ec._PostStatus(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNPostStatus2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostStatus(ctx context.Context, sel ast.SelectionSet, v *model.PostStatus) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._PostStatus(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNPostTokensInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostTokensInput(ctx context.Context, v interface{}) (model.PostTokensInput, error) {
 	res, err := ec.unmarshalInputPostTokensInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -74283,20 +74728,19 @@ func (ec *executionContext) marshalNToken2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgall
 	return ec._Token(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalNTokenDraftDetailsInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenDraftDetailsInput(ctx context.Context, v interface{}) (model.TokenDraftDetailsInput, error) {
+	res, err := ec.unmarshalInputTokenDraftDetailsInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNTokenId2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenID(ctx context.Context, v interface{}) (persist.TokenID, error) {
-	tmp, err := graphql.UnmarshalString(v)
-	res := persist.TokenID(tmp)
+	var res persist.TokenID
+	err := res.UnmarshalGQL(v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalNTokenId2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenID(ctx context.Context, sel ast.SelectionSet, v persist.TokenID) graphql.Marshaler {
-	res := graphql.MarshalString(string(v))
-	if res == graphql.Null {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
-		}
-	}
-	return res
+	return v
 }
 
 func (ec *executionContext) unmarshalNTokenOwnershipType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenOwnershipType(ctx context.Context, v interface{}) (persist.TokenOwnershipType, error) {
@@ -75178,7 +75622,7 @@ func (ec *executionContext) unmarshalOChainAddressInput2ᚖgithubᚗcomᚋmikeyd
 	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) unmarshalOChainAddressTokenInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenIdentifiersᚄ(ctx context.Context, v interface{}) ([]*persist.TokenIdentifiers, error) {
+func (ec *executionContext) unmarshalOChainAddressTokenInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐChainAddressTokenInputᚄ(ctx context.Context, v interface{}) ([]*model.ChainAddressTokenInput, error) {
 	if v == nil {
 		return nil, nil
 	}
@@ -75187,10 +75631,10 @@ func (ec *executionContext) unmarshalOChainAddressTokenInput2ᚕᚖgithubᚗcom�
 		vSlice = graphql.CoerceList(v)
 	}
 	var err error
-	res := make([]*persist.TokenIdentifiers, len(vSlice))
+	res := make([]*model.ChainAddressTokenInput, len(vSlice))
 	for i := range vSlice {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
-		res[i], err = ec.unmarshalNChainAddressTokenInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenIdentifiers(ctx, vSlice[i])
+		res[i], err = ec.unmarshalNChainAddressTokenInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐChainAddressTokenInput(ctx, vSlice[i])
 		if err != nil {
 			return nil, err
 		}
@@ -77783,6 +78227,13 @@ func (ec *executionContext) marshalOTokenByIdOrError2githubᚗcomᚋmikeydubᚋg
 	return ec._TokenByIdOrError(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalOTokenDraftDetailsOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenDraftDetailsOrError(ctx context.Context, sel ast.SelectionSet, v model.TokenDraftDetailsOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._TokenDraftDetailsOrError(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOTokenEdge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenEdge(ctx context.Context, sel ast.SelectionSet, v []*model.TokenEdge) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -77932,13 +78383,6 @@ func (ec *executionContext) marshalOTokenHoldersConnection2ᚖgithubᚗcomᚋmik
 		return graphql.Null
 	}
 	return ec._TokenHoldersConnection(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalOTokenMediaByIdentifiersOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenMediaByIdentifiersOrError(ctx context.Context, sel ast.SelectionSet, v model.TokenMediaByIdentifiersOrError) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._TokenMediaByIdentifiersOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOTokenOwnershipType2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenOwnershipTypeᚄ(ctx context.Context, v interface{}) ([]persist.TokenOwnershipType, error) {

@@ -70,16 +70,13 @@ func (v *ChainAddressInput) GetAddress() string { return v.Address }
 func (v *ChainAddressInput) GetChain() Chain { return v.Chain }
 
 type ChainAddressTokenInput struct {
-	Address string          `json:"address"`
-	Chain   Chain           `json:"chain"`
+	ChainAddress ChainAddressInput `json:"chainAddress"`
+	// Refers to the id of the token in the contract either in decimal, or interpreted as hexadecimal when prefixed with '0x'
 	TokenId persist.TokenID `json:"tokenId"`
 }
 
-// GetAddress returns ChainAddressTokenInput.Address, and is useful for accessing the field via an interface.
-func (v *ChainAddressTokenInput) GetAddress() string { return v.Address }
-
-// GetChain returns ChainAddressTokenInput.Chain, and is useful for accessing the field via an interface.
-func (v *ChainAddressTokenInput) GetChain() Chain { return v.Chain }
+// GetChainAddress returns ChainAddressTokenInput.ChainAddress, and is useful for accessing the field via an interface.
+func (v *ChainAddressTokenInput) GetChainAddress() ChainAddressInput { return v.ChainAddress }
 
 // GetTokenId returns ChainAddressTokenInput.TokenId, and is useful for accessing the field via an interface.
 func (v *ChainAddressTokenInput) GetTokenId() persist.TokenID { return v.TokenId }

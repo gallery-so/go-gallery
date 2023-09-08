@@ -58,17 +58,15 @@ type tokenProcessingJob struct {
 	contract         persist.ContractGallery
 	cause            persist.ProcessingCause
 	pipelineMetadata *persist.PipelineMetadata
-	// Pipeline runtime options
-	//
-	// profileImageKey is an optional key in the metadata that the pipeline should also process as a profile image
-	// The pipeline only looks at the root level of the metadata for the key and will also not fail
-	// if the key is missing or if processing media for the key fails
+	// profileImageKey is an optional key in the metadata that the pipeline should also process as a profile image.
+	// The pipeline only looks at the root level of the metadata for the key and will also not fail if the key is missing
+	// or if processing media for the key fails.
 	profileImageKey string
-	// tokenInstance is an already instanced token to derive data (such as the name, description, and metadata) from when fetching fails.
-	// If the job doesn't produce active media, only tokenInstance's media is updated. If there is active media from past jobs, tokenInstance's media
-	// will be updated to use that media instead.
+	// tokenInstance is an already instanced token to derive data (name, description, and metadata) from when fetching fails.
+	// If the job doesn't produce active media, only tokenInstance's media is updated (in contrast to all instances of a token).
+	// If there is active media from past jobs, tokenInstance's media will reference that media instead.
 	tokenInstance *persist.TokenGallery
-	// forceFetchMetadata is a flag that always fetches metadata when enabled
+	// forceFetchMetadata always fetches new metadata when enabled. It's useful when the metadata is expected to change such as for refreshes.
 	forceFetchMetadata bool
 }
 

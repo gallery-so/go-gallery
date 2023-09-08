@@ -311,8 +311,8 @@ type TokenByIDOrError interface {
 	IsTokenByIDOrError()
 }
 
-type TokenMediaByIdentifiersOrError interface {
-	IsTokenMediaByIdentifiersOrError()
+type TokenDraftDetailsOrError interface {
+	IsTokenDraftDetailsOrError()
 }
 
 type TrendingUsersPayloadOrError interface {
@@ -529,6 +529,12 @@ type BanUserFromFeedPayload struct {
 }
 
 func (BanUserFromFeedPayload) IsBanUserFromFeedPayloadOrError() {}
+
+type ChainAddressTokenInput struct {
+	ChainAddress *persist.ChainAddress `json:"chainAddress"`
+	// Refers to the id of the token in the contract either in decimal, or interpreted as hexadecimal when prefixed with '0x'
+	TokenID persist.TokenID `json:"tokenId"`
+}
 
 type ChainTokens struct {
 	Chain  *persist.Chain `json:"chain"`
@@ -992,7 +998,7 @@ func (ErrInvalidInput) IsMerchTokensPayloadOrError()                     {}
 func (ErrInvalidInput) IsSearchUsersPayloadOrError()                     {}
 func (ErrInvalidInput) IsSearchGalleriesPayloadOrError()                 {}
 func (ErrInvalidInput) IsSearchCommunitiesPayloadOrError()               {}
-func (ErrInvalidInput) IsTokenMediaByIdentifiersOrError()                {}
+func (ErrInvalidInput) IsTokenDraftDetailsOrError()                      {}
 func (ErrInvalidInput) IsCreateCollectionPayloadOrError()                {}
 func (ErrInvalidInput) IsDeleteCollectionPayloadOrError()                {}
 func (ErrInvalidInput) IsUpdateCollectionInfoPayloadOrError()            {}
@@ -1658,6 +1664,7 @@ type Post struct {
 	Comments     *PostCommentsConnection     `json:"comments"`
 	Interactions *PostInteractionsConnection `json:"interactions"`
 	ViewerAdmire *Admire                     `json:"viewerAdmire"`
+	Status       *PostStatus                 `json:"status"`
 }
 
 func (Post) IsPostOrError()      {}
@@ -1703,10 +1710,14 @@ type PostInteractionsEdge struct {
 	Post   *Post       `json:"post"`
 }
 
+type PostStatus struct {
+	IsVerified bool `json:"isVerified"`
+}
+
 type PostTokensInput struct {
-	TokenIds []persist.DBID              `json:"tokenIds"`
-	Tokens   []*persist.TokenIdentifiers `json:"tokens"`
-	Caption  *string                     `json:"caption"`
+	TokenIds []persist.DBID            `json:"tokenIds"`
+	Tokens   []*ChainAddressTokenInput `json:"tokens"`
+	Caption  *string                   `json:"caption"`
 }
 
 type PostTokensPayload struct {
@@ -1768,7 +1779,7 @@ type RedeemMerchPayload struct {
 func (RedeemMerchPayload) IsRedeemMerchPayloadOrError() {}
 
 type ReferralPostPreflightInput struct {
-	Token *persist.TokenIdentifiers `json:"token"`
+	Token *ChainAddressTokenInput `json:"token"`
 }
 
 type ReferralPostPreflightPayload struct {
@@ -2119,6 +2130,21 @@ type Token struct {
 func (Token) IsNode()             {}
 func (Token) IsTokenByIDOrError() {}
 
+type TokenDraftDetails struct {
+	HelperTokenDraftDetailsData
+	Media            MediaSubtype `json:"media"`
+	Community        *Community   `json:"community"`
+	TokenName        *string      `json:"tokenName"`
+	TokenDescription *string      `json:"tokenDescription"`
+}
+
+func (TokenDraftDetails) IsTokenDraftDetailsOrError() {}
+
+type TokenDraftDetailsInput struct {
+	Token          *ChainAddressTokenInput `json:"token"`
+	HighDefinition bool                    `json:"highDefinition"`
+}
+
 type TokenEdge struct {
 	Node   *Token  `json:"node"`
 	Cursor *string `json:"cursor"`
@@ -2141,12 +2167,6 @@ type TokenHoldersConnection struct {
 	Edges    []*TokenHolderEdge `json:"edges"`
 	PageInfo *PageInfo          `json:"pageInfo"`
 }
-
-type TokenMediaByIdentifiers struct {
-	Media MediaSubtype `json:"media"`
-}
-
-func (TokenMediaByIdentifiers) IsTokenMediaByIdentifiersOrError() {}
 
 type TokenProfileImage struct {
 	Token *Token `json:"token"`

@@ -3,11 +3,9 @@ package tokenprocessing
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -72,7 +70,7 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 				}
 				defer throttler.Unlock(reqCtx, lockID)
 				ctx := sentryutil.NewSentryHubContext(reqCtx)
-				_, err := processToken(ctx, tp, t, contract, persist.ProcessingCauseSync)
+				_, err := runPipelineForToken(ctx, tp, t, contract, persist.ProcessingCauseSync)
 				return err
 			})
 		}
@@ -134,7 +132,7 @@ func processMediaForToken(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRe
 			return
 		}
 
-		_, err = processToken(reqCtx, tp, token, contract, persist.ProcessingCauseRefresh, PipelineOpts.WithForceFetchMetadata())
+		_, err = runPipelineForToken(reqCtx, tp, token, contract, persist.ProcessingCauseRefresh, PipelineOpts.WithForceFetchMetadata())
 		if err != nil {
 			if util.ErrorAs[ErrBadToken](err) {
 				util.ErrResponse(c, http.StatusUnprocessableEntity, err)
@@ -320,7 +318,7 @@ func detectSpamContracts(queries *coredb.Queries) gin.HandlerFunc {
 	}
 }
 
-func processToken(ctx context.Context, tp *tokenProcessor, t persist.TokenGallery, contract persist.ContractGallery, cause persist.ProcessingCause, baseOpts ...PipelineOption) (coredb.TokenMedia, error) {
+func runPipelineForToken(ctx context.Context, tp *tokenProcessor, t persist.TokenGallery, contract persist.ContractGallery, cause persist.ProcessingCause, baseOpts ...PipelineOption) (coredb.TokenMedia, error) {
 	opts := append([]PipelineOption{}, baseOpts...)
 	opts = append(opts, PipelineOpts.WithTokenInstance(&t))
 	opts = append(opts, addContractSpecificOptions(contract)...)
@@ -370,7 +368,7 @@ func processWalletRemoval(queries *coredb.Queries) gin.HandlerFunc {
 	}
 }
 
-func processPostPreflight(tp *tokenProcessor, mc *multichain.Provider) gin.HandlerFunc {
+func processPostPreflight(tp *tokenProcessor, q *coredb.Queries, mc *multichain.Provider, contractRepo *postgres.ContractGalleryRepository, userRepo *postgres.UserRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input task.PostPreflightMessage
 
@@ -379,45 +377,54 @@ func processPostPreflight(tp *tokenProcessor, mc *multichain.Provider) gin.Handl
 			return
 		}
 
-		if strings.HasPrefix(input.Token.TokenID.String(), "0x") {
-			input.Token.TokenID = persist.TokenID(input.Token.TokenID.Base10String())
-		}
+		media, err := q.GetMediaByTokenIdentifiers(c, coredb.GetMediaByTokenIdentifiersParams{
+			Chain:   input.Token.Chain,
+			TokenID: input.Token.TokenID,
+			Address: input.Token.ContractAddress,
+		})
 
-		var r retry.Retry = retry.Retry{Base: 1, Cap: 4, Tries: 12}
-		var err error
-		var exists bool
-
-		for i := 0; i < r.Tries; i++ {
-			exists, err = mc.ConfirmTokenExists(c, persist.TokenIdentifiers{
-				TokenID:         input.Token.TokenID,
-				Chain:           input.Token.Chain,
-				ContractAddress: input.Token.ContractAddress,
-			})
-			if exists {
-				break
+		// Run the unauthed preflight first so that we can show media if the token exists
+		// If we don't have the media or media is not active, run the preflight
+		if err != nil || !media.TokenMedia.Active {
+			f := func(ctx context.Context) error {
+				return runPostPreflightUnauthed(ctx, tp, input.Token, mc, contractRepo)
 			}
-			if errors.Is(err, multichain.ErrNoMatchingProviders) {
-				util.ErrResponse(c, http.StatusOK, err)
+			shouldRetry := func(err error) bool {
+				logger.For(c).Errorf("error occurred running unauthed preflight, retrying on error: %s", err.Error())
+				return true
+			}
+			if err := retry.RetryFunc(c, f, shouldRetry, retry.DefaultRetry); err != nil {
+				util.ErrResponse(c, http.StatusInternalServerError, err)
 				return
 			}
-			r.Sleep(i)
 		}
 
-		if !exists {
-			util.ErrResponse(c, http.StatusNotFound, err)
+		if input.UserID == "" {
+			c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 			return
 		}
 
-		_, err = tp.ProcessTokenPipeline(c, input.Token, persist.ContractGallery{}, persist.ProcessingCausePostPreflight, PipelineOpts.WithForceFetchMetadata())
+		// Confirmed that the token exists at this point, now check if the user has it
+
+		user, err := userRepo.GetByID(c, input.UserID)
 		if err != nil {
+			util.ErrResponse(c, http.StatusOK, err)
+			return
+		}
+
+		f := func(ctx context.Context) error {
+			return runPostPreflightAuthed(c, tp, user, input.Token, mc, contractRepo)
+		}
+		shouldRetry := func(err error) bool {
+			logger.For(c).Errorf("error occurred running authed preflight, retrying on error: %s", err.Error())
+			return true
+		}
+		if err := retry.RetryFunc(c, f, shouldRetry, retry.DefaultRetry); err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
-		// // TODO: Should this create a token if it doesn't exist?
-		// // Maybe when creating the post it creates the token.
-
-		// return err
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
 
@@ -427,4 +434,56 @@ func addContractSpecificOptions(contract persist.ContractGallery) (opts []Pipeli
 		opts = append(opts, PipelineOpts.WithProfileImageKey("profile_image"))
 	}
 	return opts
+}
+
+func runPostPreflightUnauthed(ctx context.Context, tp *tokenProcessor, token persist.TokenIdentifiers, mc *multichain.Provider, contractRepo *postgres.ContractGalleryRepository) error {
+	err := mc.RefreshTokenDescriptorsByTokenIdentifiers(ctx, persist.TokenIdentifiers{
+		TokenID:         token.TokenID,
+		Chain:           token.Chain,
+		ContractAddress: token.ContractAddress,
+	})
+	if err != nil {
+		return err
+	}
+	// Contract exists and is persisted in the db at this point. The token is also confirmed to exist, but it might not be
+	// persisted in the db because RefreshTokenDescriptorsByTokenIdentifiers only updates existing token
+	contract, err := contractRepo.GetByAddress(ctx, token.ContractAddress, token.Chain)
+	if err != nil {
+		return err
+	}
+	_, err = tp.ProcessTokenPipeline(ctx, token, contract, persist.ProcessingCausePostPreflight, PipelineOpts.WithForceFetchMetadata())
+	return err
+}
+
+func runPostPreflightAuthed(ctx context.Context, tp *tokenProcessor, user persist.User, token persist.TokenIdentifiers, mc *multichain.Provider, contractRepo *postgres.ContractGalleryRepository) error {
+	wallets := multichain.MatchingWalletsForChain(user.Wallets, token.Chain, mc.WalletOverrides)
+
+	// Don't know which wallet it's in, so try all of them
+	tokens := util.MapWithoutError(wallets, func(w persist.Address) persist.TokenUniqueIdentifiers {
+		return persist.TokenUniqueIdentifiers{
+			Chain:           token.Chain,
+			ContractAddress: token.ContractAddress,
+			TokenID:         token.TokenID,
+		}
+	})
+
+	// SyncTokensByUserIDAndTokenIdentifiers doesn't return an error if at least one token is synced
+	// meaning that the user has the token
+	syncedTokens, err := mc.SyncTokensByUserIDAndTokenIdentifiers(ctx, user.ID, tokens)
+	if err != nil {
+		return err
+	}
+
+	// Should always be length of 1
+	if len(syncedTokens) != 1 {
+		panic(fmt.Sprintf("expected length of synced tokens to be 1, got %d, tokens: %v", len(syncedTokens), syncedTokens))
+	}
+
+	contract, err := contractRepo.GetByID(ctx, syncedTokens[0].Contract)
+	if err != nil {
+		return err
+	}
+
+	_, err = runPipelineForToken(ctx, tp, syncedTokens[0], contract, persist.ProcessingCausePostPreflight)
+	return err
 }

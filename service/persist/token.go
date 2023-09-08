@@ -8,6 +8,7 @@ import (
 	"io"
 	"math/big"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -698,6 +699,30 @@ func (id TokenID) Base10String() string {
 // ToInt returns the token ID as a base 10 integer
 func (id TokenID) ToInt() int64 {
 	return id.BigInt().Int64()
+}
+
+// UnmarshalGQL implements the graphql.Unmarshaler interface
+func (id *TokenID) UnmarshalGQL(v any) error {
+	if val, ok := v.(string); ok {
+		// Assume its in hexadecimal
+		if strings.HasPrefix(val, "0x") {
+			*id = TokenID(TokenID(val).String())
+			return nil
+		}
+		// Assume its in decimal
+		asInt, err := strconv.Atoi(val)
+		if err != nil {
+			return fmt.Errorf("failed to convert %s; prepend with '0x' if val is in hex", val)
+		}
+		*id = TokenID(fmt.Sprintf("%x", asInt))
+	}
+	return nil
+}
+
+// MarshalGQL implements the graphql.Marshaler interface
+func (id TokenID) MarshalGQL(w io.Writer) {
+	p := "0x" + id.String()
+	w.Write([]byte(fmt.Sprintf(`"%s"`, p)))
 }
 
 func (hex HexString) String() string {

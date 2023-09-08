@@ -50,7 +50,8 @@ type AddEmailToMailingListMessage struct {
 }
 
 type PostPreflightMessage struct {
-	Token persist.TokenIdentifiers `json:"token" binding:"required"`
+	Token  persist.TokenIdentifiers `json:"token" binding:"required"`
+	UserID persist.DBID             `json:"user_id"`
 }
 
 type TokenIdentifiersQuantities map[persist.TokenUniqueIdentifiers]persist.HexString
