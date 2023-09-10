@@ -129,6 +129,11 @@ func (c *Cache) SetNX(pCtx context.Context, key string, value []byte, expiration
 	return cmd.Val(), nil
 }
 
+// MSet sets multiple keys in the redis cache
+func (c *Cache) MSet(pCtx context.Context, keyValues map[string]any) error {
+	return c.client.MSet(pCtx, keyValues).Err()
+}
+
 // SetTime sets a time in the redis cache. If onlyIfLater is true, the value will only be set if the
 // key doesn't exist, or if the existing key's value is an earlier time than the one being set.
 func (c *Cache) SetTime(ctx context.Context, key string, value time.Time, expiration time.Duration, onlyIfLater bool) error {

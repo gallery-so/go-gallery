@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"time"
 
-	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"github.com/sirupsen/logrus"
@@ -18,26 +17,19 @@ import (
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/service/eth"
-	"github.com/mikeydub/go-gallery/service/limiters"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
-	"github.com/mikeydub/go-gallery/service/redis"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/throttle"
+	"github.com/mikeydub/go-gallery/service/tokenmanage"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
 )
 
-type ProcessMediaForTokenInput struct {
-	TokenID         persist.TokenID `json:"token_id" binding:"required"`
-	ContractAddress persist.Address `json:"contract_address" binding:"required"`
-	Chain           persist.Chain   `json:"chain"`
-}
-
-func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRepository, contractRepo *postgres.ContractGalleryRepository, tm *tokenManage) gin.HandlerFunc {
+func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRepository, contractRepo *postgres.ContractGalleryRepository, tm *tokenmanage.Manager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input task.TokenProcessingUserMessage
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -52,6 +44,7 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 		logger.For(reqCtx).Infof("Processing Media: %s - Started (%d tokens)", input.UserID, len(input.TokenIDs))
 
 		for _, tokenID := range input.TokenIDs {
+			tokenID := tokenID
 
 			t, err := tokenRepo.GetByID(reqCtx, tokenID)
 			if err != nil {
@@ -65,15 +58,15 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 			}
 
 			wp.Go(func() error {
-				tids := persist.TokenIdentifiers{
+				tid := persist.TokenIdentifiers{
 					TokenID:         t.TokenID,
 					ContractAddress: contract.Address,
 					Chain:           contract.Chain,
 				}
 
-				err, closing := tm.Start(reqCtx, tids)
+				err, closing := tm.StartProcessing(reqCtx, tokenID, tid)
 				if err != nil {
-					logger.For(reqCtx).Warnf("failed to start token=%s: %s", tids, err)
+					logger.For(reqCtx).Warnf("failed to start tokenID=%s: %s", tokenID, err)
 					return err
 				}
 
@@ -94,9 +87,9 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 	}
 }
 
-func processMediaForToken(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRepository, contractRepo persist.ContractGalleryRepository, userRepo *postgres.UserRepository, walletRepo *postgres.WalletRepository, tm *tokenManage) gin.HandlerFunc {
+func processMediaForToken(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRepository, contractRepo persist.ContractGalleryRepository, userRepo *postgres.UserRepository, walletRepo *postgres.WalletRepository, tm *tokenmanage.Manager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var input ProcessMediaForTokenInput
+		var input task.TokenProcessingTokenMessage
 		if err := c.ShouldBindJSON(&input); err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
@@ -136,13 +129,13 @@ func processMediaForToken(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRe
 			return
 		}
 
-		tids := persist.TokenIdentifiers{
+		tid := persist.TokenIdentifiers{
 			TokenID:         token.TokenID,
 			ContractAddress: contract.Address,
 			Chain:           contract.Chain,
 		}
 
-		err, closing := tm.Start(reqCtx, tids)
+		err, closing := tm.StartProcessing(reqCtx, token.ID, tid)
 		if err != nil {
 			util.ErrResponse(c, http.StatusTooManyRequests, err)
 			return
@@ -381,91 +374,4 @@ func addPipelineRunOptions(contract persist.ContractGallery) (opts []PipelineOpt
 		opts = append(opts, PipelineOpts.WithProfileImageKey("profile_image"))
 	}
 	return opts
-}
-
-type registry struct{ c *redis.Cache }
-
-func (r registry) Finish(ctx context.Context, token persist.TokenIdentifiers) error {
-	return r.c.Delete(ctx, "inflight:"+token.String())
-}
-
-func (r registry) Start(ctx context.Context, token persist.TokenIdentifiers) error {
-	_, err := r.c.SetNX(ctx, "inflight:"+token.String(), []byte("enqueued"), 10*time.Minute)
-	return err
-}
-
-func (r registry) Keep(ctx context.Context, token persist.TokenIdentifiers) error {
-	return r.c.Set(ctx, "inflight:"+token.String(), []byte("processing"), time.Minute)
-}
-
-type enqueue struct {
-	taskClient *cloudtasks.Client
-}
-
-func (e enqueue) Enqueue(ctx context.Context, token persist.TokenIdentifiers) error {
-	panic("implement me")
-}
-
-type tokenManage struct {
-	retryLimiter    *limiters.KeyRateLimiter
-	processRegistry *registry
-	enqueue         *enqueue
-	throttler       *throttle.Locker
-}
-
-func (t tokenManage) Start(ctx context.Context, token persist.TokenIdentifiers) (error, func(err error) error) {
-	err := t.throttler.Lock(ctx, token.String())
-	if err != nil {
-		return err, nil
-	}
-
-	stop := make(chan bool)
-	done := make(chan bool)
-	tick := time.NewTicker(10 * time.Second)
-
-	go func() {
-		for {
-			select {
-			case <-tick.C:
-				t.processRegistry.Keep(ctx, token)
-			case <-stop:
-				done <- true
-				return
-			}
-		}
-	}()
-
-	callback := func(err error) error {
-		stop <- true
-		done <- true
-		t.Continue(ctx, token, err)
-		t.throttler.Unlock(ctx, token.String())
-		return nil
-	}
-
-	return nil, callback
-}
-
-func (t tokenManage) Continue(ctx context.Context, token persist.TokenIdentifiers, err error) error {
-	if err == nil {
-		t.processRegistry.Finish(ctx, token)
-		return nil
-	}
-
-	canRetry, _, err := t.retryLimiter.ForKey(ctx, token.String())
-	if err != nil {
-		return err
-	}
-
-	if !canRetry {
-		t.processRegistry.Finish(ctx, token)
-		return nil
-	}
-
-	err = t.processRegistry.Start(ctx, token)
-	if err != nil {
-		return err
-	}
-
-	return t.enqueue.Enqueue(ctx, token)
 }

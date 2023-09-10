@@ -9,6 +9,9 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
+
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/middleware"
@@ -22,11 +25,10 @@ import (
 	"github.com/mikeydub/go-gallery/service/redis"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/throttle"
+	"github.com/mikeydub/go-gallery/service/tokenmanage"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 )
 
 const sentryTokenContextName = "NFT context" // Sentry excludes contexts that contain "token" so we use "NFT" instead
@@ -36,13 +38,14 @@ func InitServer() {
 	setDefaults()
 	ctx := context.Background()
 	c := server.ClientInit(ctx)
-	provider, _ := server.NewMultichainProvider(ctx, setDefaults)
-	router := CoreInitServer(c, provider)
+	tm := tokenmanage.New()
+	mc, _ := server.NewMultichainProvider(ctx, setDefaults)
+	router := CoreInitServer(c, mc, tm)
 	logger.For(nil).Info("Starting tokenprocessing server...")
 	http.Handle("/", router)
 }
 
-func CoreInitServer(clients *server.Clients, mc *multichain.Provider) *gin.Engine {
+func CoreInitServer(clients *server.Clients, mc *multichain.Provider, tm *tokenmanage.Manager) *gin.Engine {
 	InitSentry()
 	logger.InitWithGCPDefaults()
 
@@ -69,7 +72,7 @@ func CoreInitServer(clients *server.Clients, mc *multichain.Provider) *gin.Engin
 
 	tp := NewTokenProcessor(clients.Queries, clients.EthClient, clients.HTTPClient, mc, clients.IPFSClient, clients.ArweaveClient, clients.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), clients.Repos.TokenRepository, metric.NewLogMetricReporter())
 
-	return handlersInitServer(router, tp, mc, clients.Repos, t, validate.WithCustomValidators())
+	return handlersInitServer(router, tp, mc, clients.Repos, t, validate.WithCustomValidators(), tm)
 }
 
 func setDefaults() {

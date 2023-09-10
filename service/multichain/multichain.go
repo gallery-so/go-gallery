@@ -16,7 +16,6 @@ import (
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/redis"
-	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/sirupsen/logrus"
 	"github.com/sourcegraph/conc"
 	"github.com/sourcegraph/conc/pool"
@@ -43,7 +42,7 @@ var contractNameBlacklist = map[string]bool{
 }
 
 // SendTokens is called to process a user's batch of tokens
-type SendTokens func(context.Context, task.TokenProcessingUserMessage) error
+type SendTokens func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, chains []persist.Chain) error
 
 type Provider struct {
 	Repos   *postgres.Repositories
@@ -807,7 +806,7 @@ func (p *Provider) processTokensForUsers(ctx context.Context, users map[persist.
 	newUserTokens := make(map[persist.DBID][]persist.TokenGallery)
 
 	errors := make([]error, 0)
-	for userID, _ := range users {
+	for userID := range users {
 		newTokensForUser := tokenIsNewForUser[userID]
 		persistedTokensForUser := persistedUserTokens[userID]
 
@@ -818,7 +817,7 @@ func (p *Provider) processTokensForUsers(ctx context.Context, users map[persist.
 		newUserTokens[userID] = newPersistedTokens
 		newPersistedTokenIDs := util.MapWithoutError(newPersistedTokens, func(t persist.TokenGallery) persist.DBID { return t.ID })
 
-		err = p.sendTokensToTokenProcessing(ctx, userID, newPersistedTokenIDs, chains)
+		err = p.SendTokens(ctx, userID, newPersistedTokenIDs, chains)
 		if err != nil {
 			errors = append(errors, err)
 		}
@@ -922,13 +921,6 @@ func (p *Provider) processTokensForOwnersOfContract(ctx context.Context, contrac
 	}
 
 	return p.processTokensForUsers(ctx, users, chainTokensForUsers, existingTokensForUsers, contracts, chains, upsertParams)
-}
-
-func (p *Provider) sendTokensToTokenProcessing(ctx context.Context, userID persist.DBID, tokens []persist.DBID, chains []persist.Chain) error {
-	if len(tokens) == 0 {
-		return nil
-	}
-	return p.SendTokens(ctx, task.TokenProcessingUserMessage{UserID: userID, TokenIDs: tokens, Chains: chains})
 }
 
 func (p *Provider) processTokenMedia(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain) error {

@@ -30,6 +30,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/service/task"
+	"github.com/mikeydub/go-gallery/service/tokenmanage"
 	"net/http"
 )
 
@@ -55,7 +56,8 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 	serverArbitrumProviderList := arbitrumProviderSet(httpClient)
 	v := newMultichainSet(serverEthProviderList, serverOptimismProviderList, serverTezosProviderList, serverPoapProviderList, serverZoraProviderList, serverBaseProviderList, serverPolygonProviderList, serverArbitrumProviderList)
 	v2 := defaultWalletOverrides()
-	sendTokens := newSendTokensFunc(ctx, client)
+	manager := tokenmanage.New()
+	sendTokens := newManagedTokens(ctx, manager)
 	provider := &multichain.Provider{
 		Repos:           repositories,
 		Queries:         queries,
@@ -468,8 +470,8 @@ func newTokenProcessingCache() *redis.Cache {
 	return redis.NewCache(redis.TokenProcessingMetadataCache)
 }
 
-func newSendTokensFunc(ctx context.Context, taskClient *cloudtasks.Client) multichain.SendTokens {
-	return func(ctx context.Context, t task.TokenProcessingUserMessage) error {
-		return task.CreateTaskForTokenProcessing(ctx, taskClient, t)
+func newManagedTokens(ctx context.Context, tm *tokenmanage.Manager) multichain.SendTokens {
+	return func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, chains []persist.Chain) error {
+		return tm.SubmitUser(ctx, userID, tokenIDs, chains)
 	}
 }
