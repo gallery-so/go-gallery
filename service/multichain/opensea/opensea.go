@@ -814,7 +814,6 @@ func streamAssetsToTokens(ctx context.Context, ownerAddress persist.Address, ass
 	seenContracts := &sync.Map{}
 
 	for a := range assetsChan {
-		logger.For(ctx).Infof("received %d assets from opensea", len(a.assets))
 		assetsReceived := a
 		if assetsReceived.err != nil {
 			errChan <- assetsReceived.err
@@ -836,7 +835,6 @@ func streamAssetsToTokens(ctx context.Context, ownerAddress persist.Address, ass
 					continue
 				}
 				wp.Go(func(ctx context.Context) error {
-					logger.For(ctx).Infof("streaming token opensea %s", nft.Name)
 					return streamTokenAndContract(ctx, ownerAddress, nft, persist.BlockNumber(block), innerTokenReceived, innerContractReceived, seenContracts)
 				})
 			}
@@ -844,7 +842,7 @@ func streamAssetsToTokens(ctx context.Context, ownerAddress persist.Address, ass
 			if err != nil {
 				innerErrChan <- err
 			}
-			logger.For(ctx).Infof("finished steaming tokens opensea")
+
 		}()
 	outer:
 		for {
@@ -854,7 +852,6 @@ func streamAssetsToTokens(ctx context.Context, ownerAddress persist.Address, ass
 					break outer
 				}
 				innerTokens = append(innerTokens, token)
-				logger.For(ctx).Infof("streamed token opensea")
 			case contract, ok := <-innerContractReceived:
 				if !ok {
 					break outer
@@ -872,7 +869,7 @@ func streamAssetsToTokens(ctx context.Context, ownerAddress persist.Address, ass
 			}
 		}
 
-		logger.For(ctx).Infof("received %d tokens from opensea, sending to receiver", len(innerTokenReceived))
+		logger.For(ctx).Infof("incrementally received %d tokens from opensea, sending to receiver", len(innerTokenReceived))
 		rec <- multichain.ChainAgnosticTokensAndContracts{
 			Tokens:    innerTokens,
 			Contracts: innerContracts,
