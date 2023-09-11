@@ -1957,6 +1957,21 @@ func (SomeoneAdmiredYourPostNotification) IsNotification()        {}
 func (SomeoneAdmiredYourPostNotification) IsNode()                {}
 func (SomeoneAdmiredYourPostNotification) IsGroupedNotification() {}
 
+type SomeoneAdmiredYourTokenNotification struct {
+	HelperSomeoneAdmiredYourTokenNotificationData
+	Dbid         persist.DBID                      `json:"dbid"`
+	Seen         *bool                             `json:"seen"`
+	CreationTime *time.Time                        `json:"creationTime"`
+	UpdatedTime  *time.Time                        `json:"updatedTime"`
+	Count        *int                              `json:"count"`
+	Token        *Token                            `json:"token"`
+	Admirers     *GroupNotificationUsersConnection `json:"admirers"`
+}
+
+func (SomeoneAdmiredYourTokenNotification) IsNotification()        {}
+func (SomeoneAdmiredYourTokenNotification) IsNode()                {}
+func (SomeoneAdmiredYourTokenNotification) IsGroupedNotification() {}
+
 type SomeoneCommentedOnYourFeedEventNotification struct {
 	HelperSomeoneCommentedOnYourFeedEventNotificationData
 	Dbid         persist.DBID `json:"dbid"`

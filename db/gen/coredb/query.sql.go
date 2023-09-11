@@ -360,7 +360,7 @@ func (q *Queries) CreateAdmireEvent(ctx context.Context, arg CreateAdmireEventPa
 }
 
 const createAdmireNotification = `-- name: CreateAdmireNotification :one
-INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id
+INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, token_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id
 `
 
 type CreateAdmireNotificationParams struct {
@@ -371,6 +371,7 @@ type CreateAdmireNotificationParams struct {
 	EventIds  persist.DBIDList         `json:"event_ids"`
 	FeedEvent sql.NullString           `json:"feed_event"`
 	Post      sql.NullString           `json:"post"`
+	Token     sql.NullString           `json:"token"`
 }
 
 func (q *Queries) CreateAdmireNotification(ctx context.Context, arg CreateAdmireNotificationParams) (Notification, error) {
@@ -382,6 +383,7 @@ func (q *Queries) CreateAdmireNotification(ctx context.Context, arg CreateAdmire
 		arg.EventIds,
 		arg.FeedEvent,
 		arg.Post,
+		arg.Token,
 	)
 	var i Notification
 	err := row.Scan(
