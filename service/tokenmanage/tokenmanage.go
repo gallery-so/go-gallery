@@ -15,23 +15,31 @@ import (
 )
 
 type Manager struct {
-	retryLimiter    *limiters.KeyRateLimiter
 	processRegistry *registry
 	queue           *enqueue
 	throttle        *throttle.Locker
+	retryLimiter    *limiters.KeyRateLimiter
 }
 
 func New(ctx context.Context, taskClient *cloudtasks.Client) *Manager {
 	cache := redis.NewCache(redis.TokenManageCache)
 	m := &Manager{
-		retryLimiter:    limiters.NewKeyRateLimiter(ctx, cache, "tokenmanage:retry", 10, 15*time.Minute),
 		processRegistry: &registry{cache},
 		queue:           &enqueue{taskClient},
 		throttle:        throttle.NewThrottleLocker(cache, 30*time.Minute),
+		retryLimiter:    limiters.NewKeyRateLimiter(ctx, cache, "tokenmanage:retry", 10, 15*time.Minute),
 	}
 	return m
 }
 
+// Processing returns true if the token is currently being processed.
+func (m Manager) Processing(ctx context.Context, tokenID persist.DBID) bool {
+	p, _ := m.processRegistry.processing(ctx, tokenID)
+	return p
+}
+
+// StartProcessing marks a token as processing. It returns a callback function that should be called when work on the token is done to mark
+// it as finished, release the lock and close the keepalive routine.
 func (m Manager) StartProcessing(ctx context.Context, tokenID persist.DBID, token persist.TokenIdentifiers) (error, func(err error) error) {
 	err := m.throttle.Lock(ctx, tokenID.String())
 	if err != nil {
@@ -65,6 +73,7 @@ func (m Manager) StartProcessing(ctx context.Context, tokenID persist.DBID, toke
 	return nil, callback
 }
 
+// SubmitUser enqueues a user's tokens for processing.
 func (m Manager) SubmitUser(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, chains []persist.Chain) error {
 	err := m.processRegistry.setEnqueuedM(ctx, tokenIDs)
 	if err != nil {
@@ -101,41 +110,42 @@ func (m Manager) tryRetry(ctx context.Context, tokenID persist.DBID, token persi
 
 type registry struct{ c *redis.Cache }
 
+func key(tokenID persist.DBID) string { return "inflight:" + tokenID.String() }
+
+func (r registry) processing(ctx context.Context, tokenID persist.DBID) (bool, error) {
+	_, err := r.c.Get(ctx, key(tokenID))
+	return err == nil, err
+}
+
 func (r registry) finish(ctx context.Context, tokenID persist.DBID) error {
-	return r.c.Delete(ctx, "inflight:"+tokenID.String())
+	return r.c.Delete(ctx, key(tokenID))
 }
 
 func (r registry) setEnqueue(ctx context.Context, tokenID persist.DBID) error {
-	_, err := r.c.SetNX(ctx, "inflight:"+tokenID.String(), []byte("enqueued"), 0)
+	_, err := r.c.SetNX(ctx, key(tokenID), []byte("enqueued"), 0)
 	return err
 }
 
 func (r registry) setEnqueuedM(ctx context.Context, tokenIDs []persist.DBID) error {
 	keyValues := make(map[string]any, len(tokenIDs))
 	for _, tokenID := range tokenIDs {
-		keyValues["inflight:"+tokenID.String()] = []byte("enqueued")
+		keyValues[key(tokenID)] = []byte("enqueued")
 	}
 	return r.c.MSet(ctx, keyValues)
 }
 
 func (r registry) keepAlive(ctx context.Context, tokenID persist.DBID) error {
-	return r.c.Set(ctx, "inflight:"+tokenID.String(), []byte("processing"), time.Minute)
+	return r.c.Set(ctx, key(tokenID), []byte("processing"), time.Minute)
 }
 
 type enqueue struct{ taskClient *cloudtasks.Client }
 
 func (e enqueue) submitUser(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, chains []persist.Chain) error {
-	return task.CreateTaskForTokenProcessing(ctx, task.TokenProcessingUserMessage{
-		UserID:   userID,
-		TokenIDs: tokenIDs,
-		Chains:   chains,
-	}, e.taskClient)
+	message := task.TokenProcessingUserMessage{UserID: userID, TokenIDs: tokenIDs, Chains: chains}
+	return task.CreateTaskForTokenProcessing(ctx, message, e.taskClient)
 }
 
 func (e enqueue) submitToken(ctx context.Context, token persist.TokenIdentifiers) error {
-	return task.CreateTaskForTokenTokenProcessing(ctx, task.TokenProcessingTokenMessage{
-		TokenID:         token.TokenID,
-		ContractAddress: token.ContractAddress,
-		Chain:           token.Chain,
-	}, e.taskClient)
+	message := task.TokenProcessingTokenMessage{TokenID: token.TokenID, ContractAddress: token.ContractAddress, Chain: token.Chain}
+	return task.CreateTaskForTokenTokenProcessing(ctx, message, e.taskClient)
 }

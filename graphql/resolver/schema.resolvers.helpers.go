@@ -8,6 +8,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/gammazero/workerpool"
 	"github.com/magiclabs/magic-admin-go/token"
@@ -22,6 +24,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/notifications"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
 	"github.com/mikeydub/go-gallery/service/socialauth"
 	"github.com/mikeydub/go-gallery/service/twitter"
 	"github.com/mikeydub/go-gallery/util"
@@ -169,7 +172,7 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrCommunityNotFound{Message: message}
 	case persist.ErrAddressOwnedByUser:
 		mappedErr = model.ErrAddressOwnedByUser{Message: message}
-	case persist.ErrAdmireNotFound,persist.ErrAdmireFeedEventNotFound,persist.ErrAdmirePostNotFound,persist.ErrAdmireTokenNotFound:
+	case persist.ErrAdmireNotFound, persist.ErrAdmireFeedEventNotFound, persist.ErrAdmirePostNotFound, persist.ErrAdmireTokenNotFound:
 		mappedErr = model.ErrAdmireNotFound{Message: message}
 	case persist.ErrAdmireAlreadyExists:
 		mappedErr = model.ErrAdmireAlreadyExists{Message: message}
@@ -1974,6 +1977,42 @@ func pageInfoToModel(ctx context.Context, pageInfo publicapi.PageInfo) *model.Pa
 		StartCursor:     pageInfo.StartCursor,
 		EndCursor:       pageInfo.EndCursor,
 	}
+}
+
+func resolveTokenMedia(ctx context.Context, token db.Token, tokenMedia db.TokenMedia, highDef bool) model.MediaSubtype {
+	// Rewrite fallback IPFS and Arweave URLs to HTTP
+	if fallback := strings.ToLower(token.FallbackMedia.ImageURL.String()); strings.HasPrefix(fallback, "ipfs://") {
+		token.FallbackMedia.ImageURL = persist.NullString(ipfs.DefaultGatewayFrom(fallback))
+	} else if strings.HasPrefix(fallback, "ar://") {
+		token.FallbackMedia.ImageURL = persist.NullString(fmt.Sprintf("https://arweave.net/%s", util.GetURIPath(fallback, false)))
+	}
+
+	// Media is found and is active. While it's possible for the token to also be processing, if we have media for it we'll use it.
+	if tokenMedia.ID != "" && tokenMedia.Active {
+		return mediaToModel(ctx, tokenMedia, token.FallbackMedia, highDef)
+	}
+
+	// If there is no media for a token, assume that the token is still being synced.
+	if tokenMedia.ID == "" {
+		tokenMedia.Media.MediaType = persist.MediaTypeSyncing
+		// In the worse case the processing message was dropped and the token never gets handled. To address that,
+		// we compare when the token was created to the current time. If it's longer than the grace period, we assume that the
+		// message was lost and set the media to invalid so it could be refreshed manually.
+		if inFlight := publicapi.For(ctx).Token.GetProcessingStateByID(ctx, token.ID); !inFlight {
+			if time.Since(token.CreatedAt) > time.Duration(1*time.Hour) {
+				tokenMedia.Media.MediaType = persist.MediaTypeInvalid
+			}
+		}
+	}
+
+	// If the media isn't valid, check if its still up for processing from a retry. If so, set the media as syncing.
+	if tokenMedia.Media.MediaType != persist.MediaTypeSyncing && !tokenMedia.Media.MediaType.IsValid() {
+		if inFlight := publicapi.For(ctx).Token.GetProcessingStateByID(ctx, token.ID); inFlight {
+			tokenMedia.Media.MediaType = persist.MediaTypeSyncing
+		}
+	}
+
+	return mediaToModel(ctx, tokenMedia, token.FallbackMedia, highDef)
 }
 
 func mediaToModel(ctx context.Context, tokenMedia db.TokenMedia, fallback persist.FallbackMedia, highDef bool) model.MediaSubtype {
