@@ -46,31 +46,26 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 		for _, tokenID := range input.TokenIDs {
 			tokenID := tokenID
 
-			t, err := tokenRepo.GetByID(reqCtx, tokenID)
-			if err != nil {
-				logger.For(reqCtx).Errorf("failed to fetch tokenID=%s: %s", tokenID, err)
-				continue
-			}
-
-			contract, err := contractRepo.GetByID(reqCtx, t.Contract)
-			if err != nil {
-				logger.For(reqCtx).Errorf("error getting contract: %s", err)
-			}
-
 			wp.Go(func() error {
-				tid := persist.TokenIdentifiers{
-					TokenID:         t.TokenID,
-					ContractAddress: contract.Address,
-					Chain:           contract.Chain,
+				t, err := tokenRepo.GetByID(reqCtx, tokenID)
+				if err != nil {
+					return err
 				}
 
-				err, closing := tm.StartProcessing(reqCtx, tokenID, tid)
+				contract, err := contractRepo.GetByID(reqCtx, t.Contract)
+				if err != nil {
+					logger.For(reqCtx).Errorf("error getting contract: %s", err)
+				}
+
+				err, closing := tm.StartProcessingRetry(reqCtx, tokenID)
 				if err != nil {
 					logger.For(reqCtx).Warnf("failed to start tokenID=%s: %s", tokenID, err)
 					return err
 				}
 
 				ctx := sentryutil.NewSentryHubContext(reqCtx)
+				// XXX Add delay to watch things happen
+				time.Sleep(10 * time.Second)
 				_, err = processToken(ctx, tp, t, contract, persist.ProcessingCauseSync)
 
 				defer closing(err)
@@ -86,9 +81,46 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 	}
 }
 
-func processMediaForToken(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRepository, contractRepo persist.ContractGalleryRepository, userRepo *postgres.UserRepository, walletRepo *postgres.WalletRepository, tm *tokenmanage.Manager) gin.HandlerFunc {
+// processMediaForTokenInstance processes a single token instance. It's only called for individual tokens that failed during a sync.
+func processMediaForTokenInstance(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRepository, contractRepo *postgres.ContractGalleryRepository, tm *tokenmanage.Manager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var input task.TokenProcessingTokenMessage
+		var input task.TokenProcessingTokenInstanceMessage
+		if err := c.ShouldBindJSON(&input); err != nil {
+			util.ErrResponse(c, http.StatusBadRequest, err)
+			return
+		}
+
+		t, err := tokenRepo.GetByID(c, input.TokenDBID)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		contract, err := contractRepo.GetByID(c, t.Contract)
+		if err != nil {
+			logger.For(c).Errorf("error getting contract: %s", err)
+		}
+
+		err, closing := tm.StartProcessingRetry(c, input.TokenDBID)
+		if err != nil {
+			logger.For(c).Warnf("failed to start tokenID=%s: %s", input.TokenDBID, err)
+			c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+			return
+		}
+
+		// XXX Add delay to watch things happen
+		time.Sleep(10 * time.Second)
+		_, err = processToken(c, tp, t, contract, persist.ProcessingCauseSync)
+
+		defer closing(err)
+
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+	}
+}
+
+func processMediaForTokenIdentifiers(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRepository, contractRepo *postgres.ContractGalleryRepository, userRepo *postgres.UserRepository, walletRepo *postgres.WalletRepository, tm *tokenmanage.Manager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var input task.TokenProcessingTokenIdentifiersMessage
 		if err := c.ShouldBindJSON(&input); err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
@@ -128,13 +160,7 @@ func processMediaForToken(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRe
 			return
 		}
 
-		tid := persist.TokenIdentifiers{
-			TokenID:         token.TokenID,
-			ContractAddress: contract.Address,
-			Chain:           contract.Chain,
-		}
-
-		err, closing := tm.StartProcessing(reqCtx, token.ID, tid)
+		err, closing := tm.StartProcessingNoRetry(reqCtx, token.ID)
 		if err != nil {
 			util.ErrResponse(c, http.StatusTooManyRequests, err)
 			return

@@ -2,6 +2,7 @@ package tokenmanage
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
@@ -27,7 +28,8 @@ func New(ctx context.Context, taskClient *cloudtasks.Client) *Manager {
 		processRegistry: &registry{cache},
 		queue:           &enqueue{taskClient},
 		throttle:        throttle.NewThrottleLocker(cache, 30*time.Minute),
-		retryLimiter:    limiters.NewKeyRateLimiter(ctx, cache, "tokenmanage:retry", 10, 15*time.Minute),
+		// XXX retryLimiter:    limiters.NewKeyRateLimiter(ctx, cache, "retry", 10, 15*time.Minute),
+		retryLimiter: limiters.NewKeyRateLimiter(ctx, cache, "retry", 3, 15*time.Minute),
 	}
 	return m
 }
@@ -38,35 +40,59 @@ func (m Manager) Processing(ctx context.Context, tokenID persist.DBID) bool {
 	return p
 }
 
-// StartProcessing marks a token as processing. It returns a callback function that should be called when work on the token is done to mark
-// it as finished, release the lock and close the keepalive routine.
-func (m Manager) StartProcessing(ctx context.Context, tokenID persist.DBID, token persist.TokenIdentifiers) (error, func(err error) error) {
-	err := m.throttle.Lock(ctx, tokenID.String())
+func (m Manager) StartProcessingRetry(ctx context.Context, tokenID persist.DBID) (error, func(err error) error) {
+	return m.startProcessing(ctx, tokenID, true)
+}
+
+func (m Manager) StartProcessingNoRetry(ctx context.Context, tokenID persist.DBID) (error, func(err error) error) {
+	return m.startProcessing(ctx, tokenID, false)
+}
+
+// startProcessing marks a token as processing. It returns a callback function that should be called when work on the token is done to mark
+// it as finished, release the lock and close the keepalive routine. If withRetry is true, the callback will attempt to retry the token
+// by re-enqueuing it if an error is passed to it.
+func (m Manager) startProcessing(ctx context.Context, tokenID persist.DBID, withRetry bool) (error, func(err error) error) {
+	err := m.throttle.Lock(ctx, lockKey(tokenID))
 	if err != nil {
 		return err, nil
 	}
 
 	stop := make(chan bool)
 	done := make(chan bool)
-	tick := time.NewTicker(10 * time.Second)
+	// XXX tick := time.NewTicker(10 * time.Second)
+	tick := time.NewTicker(4 * time.Second)
 
 	go func() {
+		defer tick.Stop()
 		for {
 			select {
 			case <-tick.C:
+				fmt.Println("keeping alive", tokenID)
 				m.processRegistry.keepAlive(ctx, tokenID)
 			case <-stop:
-				done <- true
+				fmt.Println("finished", tokenID)
+				close(done)
 				return
 			}
 		}
 	}()
 
 	callback := func(err error) error {
-		stop <- true
-		done <- true
-		m.tryRetry(ctx, tokenID, token, err)
-		m.throttle.Unlock(ctx, tokenID.String())
+		fmt.Println("in callback", tokenID)
+		close(stop)
+		<-done
+		if withRetry {
+			err = m.tryRetry(ctx, tokenID, err)
+			if err != nil {
+				panic(err)
+			}
+		}
+		fmt.Println("unlocking", tokenID)
+		err = m.throttle.Unlock(ctx, lockKey(tokenID))
+		fmt.Println("done unlocking", tokenID)
+		if err != nil {
+			panic(err)
+		}
 		return nil
 	}
 
@@ -75,67 +101,86 @@ func (m Manager) StartProcessing(ctx context.Context, tokenID persist.DBID, toke
 
 // SubmitUser enqueues a user's tokens for processing.
 func (m Manager) SubmitUser(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, chains []persist.Chain) error {
-	err := m.processRegistry.setEnqueuedM(ctx, tokenIDs)
+	err := m.processRegistry.setEnqueuedMany(ctx, tokenIDs)
 	if err != nil {
+		panic(err)
 		// Only log the error so the task is still enqueued
 		logger.For(ctx).Errorf("failed to set enqueued tokens for user %s: %s", userID, err)
 	}
 	return m.queue.submitUser(ctx, userID, tokenIDs, chains)
 }
 
-func (m Manager) tryRetry(ctx context.Context, tokenID persist.DBID, token persist.TokenIdentifiers, err error) error {
+func (m Manager) tryRetry(ctx context.Context, tokenID persist.DBID, err error) error {
 	if err == nil {
-		m.processRegistry.finish(ctx, tokenID)
+		err := m.processRegistry.finish(ctx, tokenID)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("DONE WITH TOKEN", tokenID)
 		return nil
 	}
 
 	canRetry, _, err := m.retryLimiter.ForKey(ctx, tokenID.String())
 	if err != nil {
+		panic(err)
 		return err
 	}
 
 	if !canRetry {
-		m.processRegistry.finish(ctx, tokenID)
+		fmt.Println("CAN'T RETRY", tokenID)
+		err := m.processRegistry.finish(ctx, tokenID)
+		if err != nil {
+			panic(err)
+		}
 		return nil
 	}
 
 	err = m.processRegistry.setEnqueue(ctx, tokenID)
 	if err != nil {
+		panic(err)
 		// Only log the error so the task can still be retried
 		logger.For(ctx).Errorf("failed to set enqueued for token %s: %s", tokenID, err)
 	}
 
-	return m.queue.submitToken(ctx, token)
+	fmt.Println("putting back in queue", tokenID, "...")
+	err = m.queue.submitTokenForRetry(ctx, tokenID)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("REQUEUED", tokenID)
+	return err
 }
 
 type registry struct{ c *redis.Cache }
 
-func key(tokenID persist.DBID) string { return "inflight:" + tokenID.String() }
+func inflightKey(tokenID persist.DBID) string { return "inflight:" + tokenID.String() }
+func lockKey(tokenID persist.DBID) string     { return "lock:" + tokenID.String() }
 
 func (r registry) processing(ctx context.Context, tokenID persist.DBID) (bool, error) {
-	_, err := r.c.Get(ctx, key(tokenID))
+	_, err := r.c.Get(ctx, inflightKey(tokenID))
 	return err == nil, err
 }
 
 func (r registry) finish(ctx context.Context, tokenID persist.DBID) error {
-	return r.c.Delete(ctx, key(tokenID))
+	fmt.Println("deleting", tokenID, inflightKey(tokenID))
+	return r.c.Delete(ctx, inflightKey(tokenID))
 }
 
 func (r registry) setEnqueue(ctx context.Context, tokenID persist.DBID) error {
-	_, err := r.c.SetNX(ctx, key(tokenID), []byte("enqueued"), 0)
+	err := r.c.Set(ctx, inflightKey(tokenID), []byte("enqueued"), 0)
 	return err
 }
 
-func (r registry) setEnqueuedM(ctx context.Context, tokenIDs []persist.DBID) error {
+func (r registry) setEnqueuedMany(ctx context.Context, tokenIDs []persist.DBID) error {
 	keyValues := make(map[string]any, len(tokenIDs))
 	for _, tokenID := range tokenIDs {
-		keyValues[key(tokenID)] = []byte("enqueued")
+		keyValues[inflightKey(tokenID)] = []byte("enqueued")
 	}
 	return r.c.MSet(ctx, keyValues)
 }
 
 func (r registry) keepAlive(ctx context.Context, tokenID persist.DBID) error {
-	return r.c.Set(ctx, key(tokenID), []byte("processing"), time.Minute)
+	return r.c.Set(ctx, inflightKey(tokenID), []byte("processing"), time.Minute)
 }
 
 type enqueue struct{ taskClient *cloudtasks.Client }
@@ -145,7 +190,7 @@ func (e enqueue) submitUser(ctx context.Context, userID persist.DBID, tokenIDs [
 	return task.CreateTaskForTokenProcessing(ctx, message, e.taskClient)
 }
 
-func (e enqueue) submitToken(ctx context.Context, token persist.TokenIdentifiers) error {
-	message := task.TokenProcessingTokenMessage{TokenID: token.TokenID, ContractAddress: token.ContractAddress, Chain: token.Chain}
-	return task.CreateTaskForTokenTokenProcessing(ctx, message, e.taskClient)
+func (e enqueue) submitTokenForRetry(ctx context.Context, tokenID persist.DBID) error {
+	message := task.TokenProcessingTokenInstanceMessage{TokenDBID: tokenID}
+	return task.CreateTaskForTokenInstanceTokenProcessing(ctx, message, e.taskClient)
 }

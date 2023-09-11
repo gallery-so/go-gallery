@@ -5960,15 +5960,17 @@ update tokens
         description = $2,
         last_updated = now()
     where token_id = $3
-      and contract = (select id from contracts where address = $4)
+      and contract = $4
+      and chain = $5
       and deleted = false
 `
 
 type UpdateTokenMetadataFieldsByTokenIdentifiersParams struct {
-	Name            sql.NullString  `json:"name"`
-	Description     sql.NullString  `json:"description"`
-	TokenID         persist.TokenID `json:"token_id"`
-	ContractAddress persist.Address `json:"contract_address"`
+	Name        sql.NullString  `json:"name"`
+	Description sql.NullString  `json:"description"`
+	TokenID     persist.TokenID `json:"token_id"`
+	ContractID  persist.DBID    `json:"contract_id"`
+	Chain       persist.Chain   `json:"chain"`
 }
 
 func (q *Queries) UpdateTokenMetadataFieldsByTokenIdentifiers(ctx context.Context, arg UpdateTokenMetadataFieldsByTokenIdentifiersParams) error {
@@ -5976,7 +5978,8 @@ func (q *Queries) UpdateTokenMetadataFieldsByTokenIdentifiers(ctx context.Contex
 		arg.Name,
 		arg.Description,
 		arg.TokenID,
-		arg.ContractAddress,
+		arg.ContractID,
+		arg.Chain,
 	)
 	return err
 }

@@ -1366,7 +1366,8 @@ update tokens
         description = @description,
         last_updated = now()
     where token_id = @token_id
-      and contract = (select id from contracts where address = @contract_address)
+      and contract = @contract_id
+      and chain = @chain
       and deleted = false;
 
 -- name: GetTopCollectionsForCommunity :many

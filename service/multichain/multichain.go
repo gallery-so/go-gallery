@@ -820,6 +820,7 @@ func (p *Provider) processTokensForUsers(ctx context.Context, users map[persist.
 
 		err = p.SubmitUserTokens(ctx, userID, newPersistedTokenIDs, chains)
 		if err != nil {
+			panic(err)
 			errors = append(errors, err)
 		}
 	}
@@ -935,7 +936,8 @@ func (p *Provider) processTokenMedia(ctx context.Context, tokenID persist.TokenI
 		return err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/media/process/token", env.GetString("TOKEN_PROCESSING_URL")), bytes.NewBuffer(asJSON))
+	// XXX: req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/media/process/token", env.GetString("TOKEN_PROCESSING_URL")), bytes.NewBuffer(asJSON))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/media/process/token", "http://localhost:6500"), bytes.NewBuffer(asJSON))
 	if err != nil {
 		return err
 	}
@@ -1199,6 +1201,7 @@ func (p *Provider) VerifySignature(ctx context.Context, pSig string, pNonce stri
 func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers) error {
 	err := p.processTokenMedia(ctx, ti.TokenID, ti.ContractAddress, ti.Chain)
 	if err != nil {
+		panic(err)
 		return err
 	}
 
@@ -1246,16 +1249,7 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 
 	}
 
-	if err := p.Queries.UpdateTokenMetadataFieldsByTokenIdentifiers(ctx, db.UpdateTokenMetadataFieldsByTokenIdentifiersParams{
-		Name:            util.ToNullString(finalTokenDescriptors.Name, true),
-		Description:     util.ToNullString(finalTokenDescriptors.Description, true),
-		TokenID:         ti.TokenID,
-		ContractAddress: ti.ContractAddress,
-	}); err != nil {
-		return err
-	}
-
-	if err := p.Repos.ContractRepository.UpsertByAddress(ctx, ti.ContractAddress, ti.Chain, persist.ContractGallery{
+	contractID, err := p.Repos.ContractRepository.UpsertByAddress(ctx, ti.ContractAddress, ti.Chain, persist.ContractGallery{
 		Chain:           ti.Chain,
 		Address:         persist.Address(ti.Chain.NormalizeAddress(ti.ContractAddress)),
 		Symbol:          persist.NullString(finalContractDescriptors.Symbol),
@@ -1263,9 +1257,21 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 		Description:     persist.NullString(finalContractDescriptors.Description),
 		ProfileImageURL: persist.NullString(finalContractDescriptors.ProfileImageURL),
 		OwnerAddress:    finalContractDescriptors.CreatorAddress,
+	})
+	if err != nil {
+		return err
+	}
+
+	if err := p.Queries.UpdateTokenMetadataFieldsByTokenIdentifiers(ctx, db.UpdateTokenMetadataFieldsByTokenIdentifiersParams{
+		Name:        util.ToNullString(finalTokenDescriptors.Name, true),
+		Description: util.ToNullString(finalTokenDescriptors.Description, true),
+		TokenID:     ti.TokenID,
+		ContractID:  contractID,
+		Chain:       ti.Chain,
 	}); err != nil {
 		return err
 	}
+
 	return nil
 }
 

@@ -17,10 +17,10 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/mikeydub/go-gallery/env"
-	"github.com/mikeydub/go-gallery/service/logger"
+	// XXX "github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/tracing"
-	"github.com/mikeydub/go-gallery/util"
+	// XXX "github.com/mikeydub/go-gallery/util"
 )
 
 // FeedMessage is the input message to the feed service
@@ -41,10 +41,14 @@ type TokenProcessingUserMessage struct {
 	Chains []persist.Chain `json:"chains" binding:"-"`
 }
 
-type TokenProcessingTokenMessage struct {
+type TokenProcessingTokenIdentifiersMessage struct {
 	TokenID         persist.TokenID `json:"token_id" binding:"required"`
 	ContractAddress persist.Address `json:"contract_address" binding:"required"`
 	Chain           persist.Chain   `json:"chain"`
+}
+
+type TokenProcessingTokenInstanceMessage struct {
+	TokenDBID persist.DBID `json:"token_dbid" binding:"required"`
 }
 
 type TokenProcessingContractTokensMessage struct {
@@ -164,11 +168,19 @@ func CreateTaskForUserTokenProcessing(ctx context.Context, message TokenProcessi
 	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span))
 }
 
-func CreateTaskForTokenTokenProcessing(ctx context.Context, message TokenProcessingTokenMessage, client *gcptasks.Client) error {
-	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForAddingEmailToMailingList")
+func CreateTaskForTokenIdentifiersTokenProcessing(ctx context.Context, message TokenProcessingTokenIdentifiersMessage, client *gcptasks.Client) error {
+	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForTokenIdentifiersTokenProcessing")
 	defer tracing.FinishSpan(span)
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
-	url := fmt.Sprintf("%s/process/token", env.GetString("TOKEN_PROCESSING_URL"))
+	url := fmt.Sprintf("%s/media/process/token", env.GetString("TOKEN_PROCESSING_URL"))
+	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span))
+}
+
+func CreateTaskForTokenInstanceTokenProcessing(ctx context.Context, message TokenProcessingTokenInstanceMessage, client *gcptasks.Client) error {
+	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForTokenInstanceTokenProcessing")
+	defer tracing.FinishSpan(span)
+	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
+	url := fmt.Sprintf("%s/media/process/token-id", env.GetString("TOKEN_PROCESSING_URL"))
 	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span))
 }
 
@@ -200,28 +212,37 @@ func NewClient(ctx context.Context) *gcptasks.Client {
 		option.WithGRPCDialOption(grpc.WithTimeout(time.Duration(2) * time.Second)),
 	}
 
+	if host := env.GetString("TASK_QUEUE_HOST"); host != "" {
+		copts = append(
+			copts,
+			option.WithEndpoint(host),
+			option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
+			option.WithoutAuthentication(),
+		)
+	}
+
 	// Configure the client depending on whether or not
 	// the cloud task emulator is used.
-	if env.GetString("ENV") == "local" {
-		if host := env.GetString("TASK_QUEUE_HOST"); host != "" {
-			copts = append(
-				copts,
-				option.WithEndpoint(host),
-				option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
-				option.WithoutAuthentication(),
-			)
-		} else {
-			fi, err := util.LoadEncryptedServiceKeyOrError("./secrets/dev/service-key-dev.json")
-			if err != nil {
-				logger.For(ctx).WithError(err).Error("failed to find service key, running without task client")
-				return nil
-			}
-			copts = append(
-				copts,
-				option.WithCredentialsJSON(fi),
-			)
-		}
-	}
+	// XXX if env.GetString("ENV") == "local" {
+	// XXX 	if host := env.GetString("TASK_QUEUE_HOST"); host != "" {
+	// XXX 		copts = append(
+	// XXX 			copts,
+	// XXX 			option.WithEndpoint(host),
+	// XXX 			option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
+	// XXX 			option.WithoutAuthentication(),
+	// XXX 		)
+	// XXX 	} else {
+	// XXX 		fi, err := util.LoadEncryptedServiceKeyOrError("./secrets/dev/service-key-dev.json")
+	// XXX 		if err != nil {
+	// XXX 			logger.For(ctx).WithError(err).Error("failed to find service key, running without task client")
+	// XXX 			return nil
+	// XXX 		}
+	// XXX 		copts = append(
+	// XXX 			copts,
+	// XXX 			option.WithCredentialsJSON(fi),
+	// XXX 		)
+	// XXX 	}
+	// XXX }
 
 	client, err := gcptasks.NewClient(ctx, copts...)
 	if err != nil {
