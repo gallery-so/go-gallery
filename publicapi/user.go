@@ -22,7 +22,6 @@ import (
 	"roci.dev/fracdex"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
-	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
@@ -244,6 +243,104 @@ func (api UserAPI) GetUsersWithTrait(ctx context.Context, trait string) ([]db.Us
 	return users, nil
 }
 
+func (api *UserAPI) OptInForRoles(ctx context.Context, roles []persist.Role) (*db.User, error) {
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"roles": validate.WithTag(roles, "required,min=1,unique,dive,role,opt_in_role"),
+	}); err != nil {
+		return nil, err
+	}
+
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// The opt_in_role validator already checks this, but let's be explicit about not letting
+	// users opt in for the admin role.
+	for _, role := range roles {
+		if role == persist.RoleAdmin {
+			err = errors.New("cannot opt in for admin role")
+			sentryutil.ReportError(ctx, err)
+			return nil, err
+		}
+	}
+
+	newRoles := util.MapWithoutError(roles, func(role persist.Role) string { return string(role) })
+	ids := util.MapWithoutError(roles, func(role persist.Role) string { return persist.GenerateID().String() })
+
+	err = api.queries.AddUserRoles(ctx, db.AddUserRolesParams{
+		UserID: userID,
+		Ids:    ids,
+		Roles:  newRoles,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Even though the user's roles have changed in the database, it could take a while before
+	// the new roles are reflected in their auth token. Forcing an auth token refresh will
+	// make the roles appear immediately.
+	err = For(ctx).Auth.ForceAuthTokenRefresh(ctx, userID)
+	if err != nil {
+		logger.For(ctx).Errorf("error forcing auth token refresh for user %s: %s", userID, err)
+	}
+
+	user, err := api.queries.GetUserById(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, err
+}
+
+func (api *UserAPI) OptOutForRoles(ctx context.Context, roles []persist.Role) (*db.User, error) {
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"roles": validate.WithTag(roles, "required,min=1,unique,dive,role,opt_in_role"),
+	}); err != nil {
+		return nil, err
+	}
+
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// The opt_in_role validator already checks this, but let's be explicit about not letting
+	// users opt out of the admin role.
+	for _, role := range roles {
+		if role == persist.RoleAdmin {
+			err := errors.New("cannot opt out of admin role")
+			sentryutil.ReportError(ctx, err)
+			return nil, err
+		}
+	}
+
+	err = api.queries.DeleteUserRoles(ctx, db.DeleteUserRolesParams{
+		Roles:  roles,
+		UserID: userID,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Even though the user's roles have changed in the database, it could take a while before
+	// the new roles are reflected in their auth token. Forcing an auth token refresh will
+	// make the roles appear immediately.
+	err = For(ctx).Auth.ForceAuthTokenRefresh(ctx, userID)
+	if err != nil {
+		logger.For(ctx).Errorf("error forcing auth token refresh for user %s: %s", userID, err)
+	}
+
+	user, err := api.queries.GetUserById(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, err
+}
+
 func (api *UserAPI) GetUserRolesByUserID(ctx context.Context, userID persist.DBID) ([]persist.Role, error) {
 	return auth.RolesByUserID(ctx, api.queries, userID)
 }
@@ -409,12 +506,14 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 		return "", "", err
 	}
 
-	if galleryPos == "" {
-		first, err := fracdex.KeyBetween("", "")
-		if err != nil {
-			return "", "", err
-		}
-		galleryPos = first
+	createUserParams, err := createNewUserParamsWithAuth(ctx, authenticator, username, bio, email)
+	if err != nil {
+		return "", "", err
+	}
+
+	createGalleryParams, err := createNewUserGalleryParams(galleryName, galleryDesc, galleryPos)
+	if err != nil {
+		return "", "", err
 	}
 
 	tx, err := api.repos.BeginTx(ctx)
@@ -424,7 +523,7 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 	queries := api.queries.WithTx(tx)
 	defer tx.Rollback(ctx)
 
-	userID, galleryID, err = user.CreateUser(ctx, authenticator, username, email, bio, galleryName, galleryDesc, galleryPos, api.repos.UserRepository, queries, api.multichainProvider)
+	userID, galleryID, err = user.CreateUser(ctx, createUserParams, createGalleryParams, api.repos.UserRepository, queries)
 	if err != nil {
 		return "", "", err
 	}
@@ -432,14 +531,6 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 	err = queries.UpdateUserFeaturedGallery(ctx, db.UpdateUserFeaturedGalleryParams{GalleryID: galleryID, UserID: userID})
 	if err != nil {
 		return "", "", err
-	}
-
-	if email != nil && *email != "" {
-		// TODO email validation ahead of time
-		err = emails.RequestVerificationEmail(ctx, userID)
-		if err != nil {
-			return "", "", err
-		}
 	}
 
 	gc := util.MustGetGinContext(ctx)
@@ -454,6 +545,21 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 	err = tx.Commit(ctx)
 	if err != nil {
 		return "", "", err
+	}
+
+	if createUserParams.EmailStatus == persist.EmailVerificationStatusUnverified && email != nil {
+		if err := emails.RequestVerificationEmail(ctx, userID); err != nil {
+			// Just the log the error since the user can verify their email later
+			logger.For(ctx).Warnf("failed to send verification email: %s", err)
+		}
+	}
+
+	if createUserParams.EmailStatus == persist.EmailVerificationStatusVerified {
+		if err := task.CreateTaskForAddingEmailToMailingList(ctx, task.AddEmailToMailingListMessage{UserID: userID}, api.taskClient); err != nil {
+			// Report error to Sentry since there's not another way to subscribe the user to the mailing list
+			sentryutil.ReportError(ctx, err)
+			logger.For(ctx).Warnf("failed to send mailing list subscription task: %s", err)
+		}
 	}
 
 	// Send event
@@ -808,9 +914,9 @@ func (api UserAPI) SharedCommunities(ctx context.Context, userID persist.DBID, b
 		return int(total), err
 	}
 
-	cursorFunc := func(i any) (bool, bool, int, persist.DBID, error) {
+	cursorFunc := func(i any) (bool, bool, int64, persist.DBID, error) {
 		if row, ok := i.(db.GetSharedContractsBatchPaginateRow); ok {
-			return row.DisplayedByUserA, row.DisplayedByUserB, int(row.OwnedCount), row.ID, nil
+			return row.DisplayedByUserA, row.DisplayedByUserB, int64(row.OwnedCount), row.ID, nil
 		}
 		return false, false, 0, "", fmt.Errorf("node is not a db.GetSharedContractsBatchPaginateRow")
 	}
@@ -1227,16 +1333,16 @@ func (api UserAPI) RecommendUsers(ctx context.Context, before, after *string, fi
 		return nil, PageInfo{}, err
 	}
 
-	paginator := positionPaginator{}
-	var userIDs []persist.DBID
+	cursor := cursors.NewPositionCursor()
+	var paginator positionPaginator
 
 	// If we have a cursor, we can page through the original set of recommended users
 	if before != nil {
-		if _, userIDs, err = paginator.decodeCursor(*before); err != nil {
+		if err = cursor.Unpack(*before); err != nil {
 			return nil, PageInfo{}, err
 		}
 	} else if after != nil {
-		if _, userIDs, err = paginator.decodeCursor(*after); err != nil {
+		if err = cursor.Unpack(*after); err != nil {
 			return nil, PageInfo{}, err
 		}
 	} else {
@@ -1246,16 +1352,16 @@ func (api UserAPI) RecommendUsers(ctx context.Context, before, after *string, fi
 			return nil, PageInfo{}, err
 		}
 
-		userIDs, err = recommend.For(ctx).RecommendFromFollowingShuffled(ctx, curUserID, follows)
+		cursor.IDs, err = recommend.For(ctx).RecommendFromFollowingShuffled(ctx, curUserID, follows)
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
 	}
 
 	positionLookup := map[persist.DBID]int{}
-	idsAsString := make([]string, len(userIDs))
+	idsAsString := make([]string, len(cursor.IDs))
 
-	for i, id := range userIDs {
+	for i, id := range cursor.IDs {
 		// Postgres uses 1-based indexing
 		positionLookup[id] = i + 1
 		idsAsString[i] = id.String()
@@ -1281,9 +1387,9 @@ func (api UserAPI) RecommendUsers(ctx context.Context, before, after *string, fi
 		return results, nil
 	}
 
-	paginator.CursorFunc = func(node any) (int, []persist.DBID, error) {
+	paginator.CursorFunc = func(node any) (int64, []persist.DBID, error) {
 		if user, ok := node.(db.User); ok {
-			return positionLookup[user.ID], userIDs, nil
+			return int64(positionLookup[user.ID]), cursor.IDs, nil
 		}
 		return 0, nil, fmt.Errorf("node is not a db.User")
 	}
@@ -1651,7 +1757,69 @@ func imageMetadataRequest(chain persist.Chain) []multichain.FieldRequest[string]
 
 func standardizeURI(u string) string {
 	if strings.HasPrefix(u, "ipfs://") {
-		return ipfs.PathGatewayFrom(env.GetString("IPFS_URL"), u, true)
+		return ipfs.DefaultGatewayFrom(u)
 	}
 	return u
+}
+
+func createNewUserParamsWithAuth(ctx context.Context, authenticator auth.Authenticator, username string, bio string, email *persist.Email) (persist.CreateUserInput, error) {
+	authResult, err := authenticator.Authenticate(ctx)
+	if err != nil && !util.ErrorAs[persist.ErrUserNotFound](err) {
+		return persist.CreateUserInput{}, auth.ErrAuthenticationFailed{WrappedErr: err}
+	}
+
+	if authResult.User != nil && !authResult.User.Universal.Bool() {
+		if _, ok := authenticator.(auth.MagicLinkAuthenticator); ok {
+			// TODO: We currently only use MagicLink for email, but we may use it for other login methods like SMS later,
+			// so this error may not always be applicable in the future.
+			return persist.CreateUserInput{}, auth.ErrEmailAlreadyUsed
+		}
+		return persist.CreateUserInput{}, persist.ErrUserAlreadyExists{Authenticator: authenticator.GetDescription()}
+	}
+
+	var wallet auth.AuthenticatedAddress
+
+	if len(authResult.Addresses) > 0 {
+		// TODO: This currently takes the first authenticated address returned by the authenticator and creates
+		// the user's account based on that address. This works because the only auth mechanism we have is nonce-based
+		// auth and that supplies a single address. In the future, a user may authenticate in a way that makes
+		// multiple authenticated addresses available for initial user creation, and we may want to add all of
+		// those addresses to the user's account here.
+		wallet = authResult.Addresses[0]
+	}
+
+	params := persist.CreateUserInput{
+		Username:     username,
+		Bio:          bio,
+		Email:        email,
+		EmailStatus:  persist.EmailVerificationStatusUnverified,
+		ChainAddress: wallet.ChainAddress,
+		WalletType:   wallet.WalletType,
+	}
+
+	// Override input email with verified email if available
+	if authResult.Email != nil {
+		params.Email = authResult.Email
+		params.EmailStatus = persist.EmailVerificationStatusVerified
+	}
+
+	return params, nil
+}
+
+func createNewUserGalleryParams(galleryName, galleryDesc, galleryPos string) (params db.GalleryRepoCreateParams, err error) {
+	params = db.GalleryRepoCreateParams{
+		GalleryID:   persist.GenerateID(),
+		Name:        galleryName,
+		Description: galleryDesc,
+		Position:    galleryPos,
+	}
+
+	if params.Position == "" {
+		params.Position, err = fracdex.KeyBetween("", "")
+		if err != nil {
+			return db.GalleryRepoCreateParams{}, err
+		}
+	}
+
+	return params, nil
 }

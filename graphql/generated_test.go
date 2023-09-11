@@ -3480,6 +3480,7 @@ func (v *createUserMutationCreateUserCreateUserPayload) GetViewer() *createUserM
 // createUserMutationCreateUserCreateUserPayload
 // createUserMutationCreateUserErrAuthenticationFailed
 // createUserMutationCreateUserErrDoesNotOwnRequiredToken
+// createUserMutationCreateUserErrEmailAlreadyUsed
 // createUserMutationCreateUserErrInvalidInput
 // createUserMutationCreateUserErrUserAlreadyExists
 // createUserMutationCreateUserErrUsernameNotAvailable
@@ -3494,6 +3495,8 @@ func (v *createUserMutationCreateUserCreateUserPayload) implementsGraphQLInterfa
 func (v *createUserMutationCreateUserErrAuthenticationFailed) implementsGraphQLInterfacecreateUserMutationCreateUserCreateUserPayloadOrError() {
 }
 func (v *createUserMutationCreateUserErrDoesNotOwnRequiredToken) implementsGraphQLInterfacecreateUserMutationCreateUserCreateUserPayloadOrError() {
+}
+func (v *createUserMutationCreateUserErrEmailAlreadyUsed) implementsGraphQLInterfacecreateUserMutationCreateUserCreateUserPayloadOrError() {
 }
 func (v *createUserMutationCreateUserErrInvalidInput) implementsGraphQLInterfacecreateUserMutationCreateUserCreateUserPayloadOrError() {
 }
@@ -3524,6 +3527,9 @@ func __unmarshalcreateUserMutationCreateUserCreateUserPayloadOrError(b []byte, v
 		return json.Unmarshal(b, *v)
 	case "ErrDoesNotOwnRequiredToken":
 		*v = new(createUserMutationCreateUserErrDoesNotOwnRequiredToken)
+		return json.Unmarshal(b, *v)
+	case "ErrEmailAlreadyUsed":
+		*v = new(createUserMutationCreateUserErrEmailAlreadyUsed)
 		return json.Unmarshal(b, *v)
 	case "ErrInvalidInput":
 		*v = new(createUserMutationCreateUserErrInvalidInput)
@@ -3569,6 +3575,14 @@ func __marshalcreateUserMutationCreateUserCreateUserPayloadOrError(v *createUser
 		result := struct {
 			TypeName string `json:"__typename"`
 			*createUserMutationCreateUserErrDoesNotOwnRequiredToken
+		}{typename, v}
+		return json.Marshal(result)
+	case *createUserMutationCreateUserErrEmailAlreadyUsed:
+		typename = "ErrEmailAlreadyUsed"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*createUserMutationCreateUserErrEmailAlreadyUsed
 		}{typename, v}
 		return json.Marshal(result)
 	case *createUserMutationCreateUserErrInvalidInput:
@@ -3680,6 +3694,18 @@ func (v *createUserMutationCreateUserErrDoesNotOwnRequiredToken) GetTypename() *
 func (v *createUserMutationCreateUserErrDoesNotOwnRequiredToken) GetMessage() string {
 	return v.Message
 }
+
+// createUserMutationCreateUserErrEmailAlreadyUsed includes the requested fields of the GraphQL type ErrEmailAlreadyUsed.
+type createUserMutationCreateUserErrEmailAlreadyUsed struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns createUserMutationCreateUserErrEmailAlreadyUsed.Typename, and is useful for accessing the field via an interface.
+func (v *createUserMutationCreateUserErrEmailAlreadyUsed) GetTypename() *string { return v.Typename }
+
+// GetMessage returns createUserMutationCreateUserErrEmailAlreadyUsed.Message, and is useful for accessing the field via an interface.
+func (v *createUserMutationCreateUserErrEmailAlreadyUsed) GetMessage() string { return v.Message }
 
 // createUserMutationCreateUserErrInvalidInput includes the requested fields of the GraphQL type ErrInvalidInput.
 type createUserMutationCreateUserErrInvalidInput struct {
@@ -4776,6 +4802,18 @@ func (v *loginMutationLoginErrDoesNotOwnRequiredToken) GetTypename() *string { r
 // GetMessage returns loginMutationLoginErrDoesNotOwnRequiredToken.Message, and is useful for accessing the field via an interface.
 func (v *loginMutationLoginErrDoesNotOwnRequiredToken) GetMessage() string { return v.Message }
 
+// loginMutationLoginErrEmailUnverified includes the requested fields of the GraphQL type ErrEmailUnverified.
+type loginMutationLoginErrEmailUnverified struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns loginMutationLoginErrEmailUnverified.Typename, and is useful for accessing the field via an interface.
+func (v *loginMutationLoginErrEmailUnverified) GetTypename() *string { return v.Typename }
+
+// GetMessage returns loginMutationLoginErrEmailUnverified.Message, and is useful for accessing the field via an interface.
+func (v *loginMutationLoginErrEmailUnverified) GetMessage() string { return v.Message }
+
 // loginMutationLoginErrUserNotFound includes the requested fields of the GraphQL type ErrUserNotFound.
 type loginMutationLoginErrUserNotFound struct {
 	Typename *string `json:"__typename"`
@@ -4807,6 +4845,7 @@ func (v *loginMutationLoginLoginPayload) GetViewer() *loginMutationLoginLoginPay
 // loginMutationLoginLoginPayloadOrError is implemented by the following types:
 // loginMutationLoginErrAuthenticationFailed
 // loginMutationLoginErrDoesNotOwnRequiredToken
+// loginMutationLoginErrEmailUnverified
 // loginMutationLoginErrUserNotFound
 // loginMutationLoginLoginPayload
 type loginMutationLoginLoginPayloadOrError interface {
@@ -4818,6 +4857,8 @@ type loginMutationLoginLoginPayloadOrError interface {
 func (v *loginMutationLoginErrAuthenticationFailed) implementsGraphQLInterfaceloginMutationLoginLoginPayloadOrError() {
 }
 func (v *loginMutationLoginErrDoesNotOwnRequiredToken) implementsGraphQLInterfaceloginMutationLoginLoginPayloadOrError() {
+}
+func (v *loginMutationLoginErrEmailUnverified) implementsGraphQLInterfaceloginMutationLoginLoginPayloadOrError() {
 }
 func (v *loginMutationLoginErrUserNotFound) implementsGraphQLInterfaceloginMutationLoginLoginPayloadOrError() {
 }
@@ -4843,6 +4884,9 @@ func __unmarshalloginMutationLoginLoginPayloadOrError(b []byte, v *loginMutation
 		return json.Unmarshal(b, *v)
 	case "ErrDoesNotOwnRequiredToken":
 		*v = new(loginMutationLoginErrDoesNotOwnRequiredToken)
+		return json.Unmarshal(b, *v)
+	case "ErrEmailUnverified":
+		*v = new(loginMutationLoginErrEmailUnverified)
 		return json.Unmarshal(b, *v)
 	case "ErrUserNotFound":
 		*v = new(loginMutationLoginErrUserNotFound)
@@ -4877,6 +4921,14 @@ func __marshalloginMutationLoginLoginPayloadOrError(v *loginMutationLoginLoginPa
 		result := struct {
 			TypeName string `json:"__typename"`
 			*loginMutationLoginErrDoesNotOwnRequiredToken
+		}{typename, v}
+		return json.Marshal(result)
+	case *loginMutationLoginErrEmailUnverified:
+		typename = "ErrEmailUnverified"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*loginMutationLoginErrEmailUnverified
 		}{typename, v}
 		return json.Marshal(result)
 	case *loginMutationLoginErrUserNotFound:

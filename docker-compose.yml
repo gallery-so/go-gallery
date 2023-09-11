@@ -56,6 +56,7 @@ services:
       "-queue", "projects/gallery-local/locations/here/queues/indexer-refreshes",
       "-queue", "projects/gallery-local/locations/here/queues/wallet-validate",
       "-queue", "projects/gallery-local/locations/here/queues/push-notifications",
+      "-queue", "projects/gallery-local/locations/here/queues/email",
     ]
   pubsub-emulator:
     image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators

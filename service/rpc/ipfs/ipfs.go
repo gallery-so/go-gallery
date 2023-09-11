@@ -153,6 +153,11 @@ func defaultHTTPClient() *http.Client {
 	}
 }
 
+// DefaultGatewayFrom rewrites an IPFS URL to a gateway URL using the default gateway
+func DefaultGatewayFrom(ipfsURL string) string {
+	return PathGatewayFrom(env.GetString("IPFS_URL"), ipfsURL, true)
+}
+
 // PathGatewayFrom is a helper function that rewrites an IPFS URI to an IPFS gateway URL
 // If includeQueryParams is true, the query parameters will be included in the gateway URL
 func PathGatewayFrom(gatewayHost, ipfsURL string, includeQueryParams bool) string {

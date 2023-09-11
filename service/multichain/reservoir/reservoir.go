@@ -387,7 +387,12 @@ func (d *Provider) fetchReservoirMetadata(ctx context.Context, ti multichain.Cha
 	if err != nil {
 		return nil, err
 	}
-	meta := token.Metadata
+
+	meta := make(persist.TokenMetadata, len(token.Metadata))
+	for k, v := range token.Metadata {
+		meta[k] = v
+	}
+
 	if _, ok := util.FindFirstFieldFromMap(meta, "image", "image_url", "imageURL").(string); !ok {
 		meta["image_url"] = token.Image
 	}

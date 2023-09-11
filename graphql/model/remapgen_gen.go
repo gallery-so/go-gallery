@@ -213,6 +213,16 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"OptInForRolesPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(OptInForRolesPayloadOrError)
+		return obj, ok
+	},
+
+	"OptOutForRolesPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(OptOutForRolesPayloadOrError)
+		return obj, ok
+	},
+
 	"PostOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(PostOrError)
 		return obj, ok

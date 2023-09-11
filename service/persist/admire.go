@@ -24,12 +24,41 @@ type AdmireRepository interface {
 type ErrAdmireNotFound struct {
 	AdmireID    DBID
 	ActorID     DBID
+}
+
+type ErrAdmireFeedEventNotFound struct {
+	AdmireID    DBID
+	ActorID     DBID
 	FeedEventID DBID
-	PostID      DBID
+}
+
+type ErrAdmirePostNotFound struct {
+	AdmireID    DBID
+	ActorID     DBID
+	PostID		DBID
+}
+
+
+type ErrAdmireTokenNotFound struct {
+	AdmireID    DBID
+	ActorID     DBID
+	TokenID		DBID
 }
 
 func (e ErrAdmireNotFound) Error() string {
-	return fmt.Sprintf("admire not found | AdmireID: %s, ActorID: %s, FeedEventID: %s, PostID: %s", e.AdmireID, e.ActorID, e.FeedEventID, e.PostID)
+	return fmt.Sprintf("admire not found | AdmireID: %s, ActorID: %s", e.AdmireID, e.ActorID)
+}
+
+func (e ErrAdmireFeedEventNotFound) Error() string {
+	return fmt.Sprintf("admire feed event not found | AdmireID: %s, ActorID: %s, FeedEventID: %s", e.AdmireID, e.ActorID, e.FeedEventID)
+}
+
+func (e ErrAdmirePostNotFound) Error() string {
+	return fmt.Sprintf("admire post not found | AdmireID: %s, ActorID: %s, PostID: %s", e.AdmireID, e.ActorID, e.PostID)
+}
+
+func (e ErrAdmireTokenNotFound) Error() string {
+	return fmt.Sprintf("admire token not found | AdmireID: %s, ActorID: %s, TokenID: %s", e.AdmireID, e.ActorID, e.TokenID)
 }
 
 type ErrAdmireAlreadyExists struct {
@@ -39,16 +68,6 @@ type ErrAdmireAlreadyExists struct {
 	PostID      DBID
 }
 
-type ErrAdmireTokenAlreadyExists struct {
-	AdmireID    DBID
-	ActorID     DBID
-	TokenID 	DBID
-}
-
 func (e ErrAdmireAlreadyExists) Error() string {
 	return fmt.Sprintf("admire already exists | AdmireID: %s, ActorID: %s, FeedEventID: %s, PostID: %s", e.AdmireID, e.ActorID, e.FeedEventID, e.PostID)
-}
-
-func (e ErrAdmireTokenAlreadyExists) Error() string {
-	return fmt.Sprintf("admire token already exists | AdmireID: %s, ActorID: %s, TokenID: %s", e.AdmireID, e.ActorID, e.TokenID)
 }

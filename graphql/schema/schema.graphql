@@ -443,6 +443,15 @@ type Token implements Node @goEmbedHelper {
   blockNumber: String # source is uint64
   isSpamByUser: Boolean
   isSpamByProvider: Boolean @goField(forceResolver: true)
+
+  # Returns an admires connection
+  admires(
+    before: String
+    after: String
+    first: Int
+    last: Int
+    userID: DBID
+  ): TokenAdmiresConnection @goField(forceResolver: true)
   # These are subject to change; unlike the other fields, they aren't present on the current persist.Token
   # struct and may ultimately end up elsewhere
   creatorAddress: ChainAddress
@@ -849,6 +858,12 @@ type FeedEventCommentsConnection {
   pageInfo: PageInfo!
 }
 
+type TokenAdmireEdge {
+  node: Admire
+  cursor: String
+  token: Token
+}
+
 type PostAdmireEdge {
   node: Admire
   cursor: String
@@ -869,6 +884,11 @@ type PostCommentsConnection {
 type PostAdmiresConnection {
   edges: [PostAdmireEdge]
   pageInfo: PageInfo!
+}
+
+type TokenAdmiresConnection {
+  edges: [TokenAdmireEdge]
+  pageInfo: PageInfo
 }
 
 union Interaction = Admire | Comment
@@ -1564,6 +1584,14 @@ type ErrAuthenticationFailed implements Error {
   message: String!
 }
 
+type ErrEmailUnverified implements Error {
+  message: String!
+}
+
+type ErrEmailAlreadyUsed implements Error {
+  message: String!
+}
+
 type ErrUserAlreadyExists implements Error {
   message: String!
 }
@@ -1713,6 +1741,7 @@ union LoginPayloadOrError =
     LoginPayload
   | ErrUserNotFound
   | ErrAuthenticationFailed
+  | ErrEmailUnverified
   | ErrDoesNotOwnRequiredToken
 
 type LoginPayload {
@@ -1727,7 +1756,7 @@ type LogoutPayload {
 input CreateUserInput {
   username: String!
   bio: String
-  email: Email
+  email: Email @scrub
   galleryName: String
   galleryDescription: String
   galleryPosition: String
@@ -1740,6 +1769,7 @@ union CreateUserPayloadOrError =
   | ErrUserAlreadyExists
   | ErrUsernameNotAvailable
   | ErrInvalidInput
+  | ErrEmailAlreadyUsed
 
 type CreateUserPayload {
   userId: DBID
@@ -2052,6 +2082,17 @@ union UnsubscribeFromEmailTypePayloadOrError = UnsubscribeFromEmailTypePayload |
 
 union AddRolesToUserPayloadOrError = GalleryUser | ErrNotAuthorized
 union RevokeRolesFromUserPayloadOrError = GalleryUser | ErrNotAuthorized
+
+type OptInForRolesPayload {
+  user: GalleryUser
+}
+
+type OptOutForRolesPayload {
+  user: GalleryUser
+}
+
+union OptInForRolesPayloadOrError = OptInForRolesPayload | ErrNotAuthorized | ErrInvalidInput
+union OptOutForRolesPayloadOrError = OptOutForRolesPayload | ErrNotAuthorized | ErrInvalidInput
 
 input UploadPersistedQueriesInput {
   persistedQueries: String
@@ -2558,6 +2599,9 @@ type Mutation {
   verifyEmailMagicLink(input: VerifyEmailMagicLinkInput!): VerifyEmailMagicLinkPayloadOrError
 
   redeemMerch(input: RedeemMerchInput!): RedeemMerchPayloadOrError @authRequired
+
+  optInForRoles(roles: [Role!]!): OptInForRolesPayloadOrError @authRequired
+  optOutForRoles(roles: [Role!]!): OptOutForRolesPayloadOrError @authRequired
 
   # Retool Specific Mutations
   addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth

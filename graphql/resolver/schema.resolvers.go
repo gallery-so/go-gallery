@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -20,6 +21,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
@@ -1700,6 +1702,34 @@ func (r *mutationResolver) RedeemMerch(ctx context.Context, input model.RedeemMe
 	return output, nil
 }
 
+// OptInForRoles is the resolver for the optInForRoles field.
+func (r *mutationResolver) OptInForRoles(ctx context.Context, roles []persist.Role) (model.OptInForRolesPayloadOrError, error) {
+	user, err := publicapi.For(ctx).User.OptInForRoles(ctx, roles)
+	if err != nil {
+		return nil, err
+	}
+
+	payload := model.OptInForRolesPayload{
+		User: userToModel(ctx, *user),
+	}
+
+	return payload, nil
+}
+
+// OptOutForRoles is the resolver for the optOutForRoles field.
+func (r *mutationResolver) OptOutForRoles(ctx context.Context, roles []persist.Role) (model.OptOutForRolesPayloadOrError, error) {
+	user, err := publicapi.For(ctx).User.OptOutForRoles(ctx, roles)
+	if err != nil {
+		return nil, err
+	}
+
+	payload := model.OptOutForRolesPayload{
+		User: userToModel(ctx, *user),
+	}
+
+	return payload, nil
+}
+
 // AddRolesToUser is the resolver for the addRolesToUser field.
 func (r *mutationResolver) AddRolesToUser(ctx context.Context, username string, roles []*persist.Role) (model.AddRolesToUserPayloadOrError, error) {
 	user, err := publicapi.For(ctx).Admin.AddRolesToUser(ctx, username, roles)
@@ -2548,20 +2578,33 @@ func (r *tokenResolver) Media(ctx context.Context, obj *model.Token) (model.Medi
 		}
 		highDef = *settings.HighDefinition
 	}
+
 	tokenMedia, err := publicapi.For(ctx).Token.MediaByTokenID(ctx, obj.Dbid)
-	if err != nil {
-		// If we have no media, just return the fallback media
+	if err != nil || !tokenMedia.Active {
 		if util.ErrorAs[persist.ErrMediaNotFound](err) {
-			// TODO this is hacky, replace this logic later
-			fallbackURL := strings.ToLower(obj.Token.FallbackMedia.ImageURL.String())
-			if fallbackURL == "" || strings.HasPrefix(fallbackURL, "ar://") || strings.HasPrefix(fallbackURL, "ipfs://") {
-				tokenMedia = coredb.TokenMedia{Media: persist.Media{MediaType: persist.MediaTypeSyncing}}
-			} else {
-				tokenMedia = coredb.TokenMedia{Media: persist.Media{MediaType: persist.MediaTypeInvalid}}
-			}
-			return mediaToModel(ctx, tokenMedia, obj.HelperTokenData.Token.FallbackMedia, highDef), nil
+			err = nil
 		}
-		return nil, err
+
+		// If there is no media for a token (whether valid or not), assume that the token is still being synced.
+		tokenMedia.Media.MediaType = persist.MediaTypeSyncing
+
+		// In the worse case the processing message was dropped and the token never gets handled. To address that,
+		// we compare when the token was created to the current time. If it's longer than the grace period, we assume that the
+		// message was lost and set the media to invalid so it could be refreshed manually.
+		if time.Since(obj.Token.CreatedAt) > time.Duration(1*time.Hour) {
+			tokenMedia.Media.MediaType = persist.MediaTypeInvalid
+		}
+
+		fallbackMedia := obj.HelperTokenData.Token.FallbackMedia
+
+		// Rewrite IPFS and Arweave URLs to HTTP
+		if fallbackURL := strings.ToLower(fallbackMedia.ImageURL.String()); strings.HasPrefix(fallbackURL, "ipfs://") {
+			fallbackMedia.ImageURL = persist.NullString(ipfs.DefaultGatewayFrom(fallbackURL))
+		} else if strings.HasPrefix(fallbackURL, "ar://") {
+			fallbackMedia.ImageURL = persist.NullString(fmt.Sprintf("https://arweave.net/%s", util.GetURIPath(fallbackURL, false)))
+		}
+
+		return mediaToModel(ctx, tokenMedia, fallbackMedia, highDef), err
 	}
 	return mediaToModel(ctx, tokenMedia, obj.HelperTokenData.Token.FallbackMedia, highDef), nil
 }
@@ -2630,6 +2673,27 @@ func (r *tokenResolver) IsSpamByProvider(ctx context.Context, obj *model.Token) 
 	}
 	isSpam := (c.IsSpam != nil && *c.IsSpam) || (obj.IsSpamByProvider != nil && *obj.IsSpamByProvider)
 	return &isSpam, nil
+}
+
+// Admires is the resolver for the admires field.
+func (r *tokenResolver) Admires(ctx context.Context, obj *model.Token, before *string, after *string, first *int, last *int, userID *persist.DBID) (*model.TokenAdmiresConnection, error) {
+	var edges []*model.TokenAdmireEdge
+	admires, pageInfo, err := publicapi.For(ctx).Interaction.PaginateAdmiresByTokenID(ctx, obj.Dbid, before, after, first, last, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, admire := range admires {
+		edges = append(edges, &model.TokenAdmireEdge{
+			Node:  admireToModel(ctx, admire),
+			Token: obj,
+		})
+	}
+
+	return &model.TokenAdmiresConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
 }
 
 // Wallets is the resolver for the wallets field.
