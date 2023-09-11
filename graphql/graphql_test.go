@@ -892,7 +892,7 @@ func testSyncOnlySubmitsNewTokens(t *testing.T) {
 	tokenRecorder := sendTokensRecorder{}
 	h := handlerWithProviders(t, tokenRecorder.Send, provider)
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
-	tokenRecorder.On("Send", mock.Anything, mock.Anything).Times(1).Return(nil)
+	tokenRecorder.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Times(1).Return(nil)
 
 	_, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum})
 
