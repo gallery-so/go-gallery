@@ -869,7 +869,7 @@ func streamAssetsToTokens(ctx context.Context, ownerAddress persist.Address, ass
 			}
 		}
 
-		logger.For(ctx).Infof("incrementally received %d tokens from opensea, sending to receiver", len(innerTokenReceived))
+		logger.For(ctx).Infof("incrementally received %d tokens from opensea, sending to receiver", len(innerTokens))
 		rec <- multichain.ChainAgnosticTokensAndContracts{
 			Tokens:    innerTokens,
 			Contracts: innerContracts,

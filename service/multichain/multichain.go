@@ -346,6 +346,11 @@ func (p *Provider) SyncTokensByUserID(ctx context.Context, userID persist.DBID, 
 	return err
 }
 
+type chainTokensAndContracts struct {
+	tokens    chainTokens
+	contracts chainContracts
+}
+
 // SyncTokensIncrementallyByUserID processes a user's tokens incrementally
 func (p *Provider) SyncTokensIncrementallyByUserID(ctx context.Context, userID persist.DBID, chains []persist.Chain) error {
 
@@ -357,8 +362,7 @@ func (p *Provider) SyncTokensIncrementallyByUserID(ctx context.Context, userID p
 	}
 
 	errChan := make(chan error)
-	incomingTokens := make(chan chainTokens)
-	incomingContracts := make(chan chainContracts)
+	result := make(chan chainTokensAndContracts)
 	chainsToAddresses := p.matchingWallets(user.Wallets, chains)
 
 	walletWg := &conc.WaitGroup{}
@@ -391,8 +395,11 @@ func (p *Provider) SyncTokensIncrementallyByUserID(ctx context.Context, userID p
 									break outer
 								}
 								// contracts must be sent first because tokens need contract DBIDs to be inserted properly, so the contracts must have already been processed
-								incomingContracts <- chainContracts{chain: chain, contracts: ts.Contracts, priority: priority}
-								incomingTokens <- chainTokens{chain: chain, tokens: ts.Tokens, priority: priority}
+								result <- chainTokensAndContracts{
+									tokens:    chainTokens{chain: chain, tokens: ts.Tokens, priority: priority},
+									contracts: chainContracts{chain: chain, contracts: ts.Contracts, priority: priority},
+								}
+
 							case err := <-errs:
 								logger.For(ctx).Errorf("error while syncing tokens for user %s: %s (provider: %d (%T))", user.Username, err, priority, fetcher)
 								errChan <- err
@@ -407,12 +414,11 @@ func (p *Provider) SyncTokensIncrementallyByUserID(ctx context.Context, userID p
 	}
 
 	go func() {
-		defer close(incomingTokens)
-		defer close(incomingContracts)
+		defer close(result)
 		walletWg.Wait()
 	}()
 
-	return p.receiveSyncedTokensIncrementallyForUser(ctx, user, chains, incomingTokens, incomingContracts, errChan)
+	return p.receiveSyncedTokensIncrementallyForUser(ctx, user, chains, result, errChan)
 }
 
 // SyncTokensByUserIDAndTokenIdentifiers updates the media for specific tokens for a user
@@ -570,7 +576,7 @@ outer:
 	return newTokens, nil
 }
 
-func (p *Provider) receiveSyncedTokensIncrementallyForUser(ctx context.Context, user persist.User, chains []persist.Chain, incomingTokens chan chainTokens, incomingContracts chan chainContracts, errChan chan error) error {
+func (p *Provider) receiveSyncedTokensIncrementallyForUser(ctx context.Context, user persist.User, chains []persist.Chain, result <-chan chainTokensAndContracts, errChan chan error) error {
 
 	beginTime := time.Now()
 	errs := []error{}
@@ -587,24 +593,24 @@ func (p *Provider) receiveSyncedTokensIncrementallyForUser(ctx context.Context, 
 outer:
 	for {
 		select {
-		case incomingTokens, ok := <-incomingTokens:
+		case inc, ok := <-result:
 			if !ok {
 				break outer
 			}
-			totalTokensReceived += len(incomingTokens.tokens)
-			currentTokens, _, err = p.AddHolderTokensToUser(ctx, user, []chainTokens{incomingTokens}, currentContracts, chains, currentTokens)
+			newContracts, err := p.processContracts(ctx, []chainContracts{inc.contracts}, currentContracts, false)
+			if err != nil {
+				return err
+			}
+			currentContracts = append(currentContracts, newContracts...)
+
+			totalTokensReceived += len(inc.tokens.tokens)
+
+			tokens, _, err := p.AddHolderTokensToUser(ctx, user, []chainTokens{inc.tokens}, currentContracts, chains, currentTokens)
 			if err != nil {
 				return err
 			}
 
-		case incomingContracts, ok := <-incomingContracts:
-			if !ok {
-				break outer
-			}
-			currentContracts, err = p.processContracts(ctx, []chainContracts{incomingContracts}, currentContracts, false)
-			if err != nil {
-				return err
-			}
+			currentTokens = append(currentTokens, tokens...)
 		case <-ctx.Done():
 			return ctx.Err()
 		case err := <-errChan:
@@ -1881,6 +1887,8 @@ func tokensToNewDedupedTokens(tokens []chainTokens, existingTokens []persist.Tok
 			initialSeenToken, seen := seenTokens[ti]
 
 			contractAddress := chainToken.chain.NormalizeAddress(token.ContractAddress)
+			contract := addressToDBID[contractAddress]
+
 			candidateToken := persist.TokenGallery{
 				TokenType:            token.TokenType,
 				Chain:                chainToken.chain,
@@ -1891,7 +1899,7 @@ func tokensToNewDedupedTokens(tokens []chainTokens, existingTokens []persist.Tok
 				OwnerUserID:          ownerUser.ID,
 				FallbackMedia:        token.FallbackMedia,
 				TokenMetadata:        token.TokenMetadata,
-				Contract:             addressToDBID[contractAddress],
+				Contract:             contract,
 				ExternalURL:          persist.NullString(token.ExternalURL),
 				BlockNumber:          token.BlockNumber,
 				IsProviderMarkedSpam: token.IsSpam,
