@@ -1,8 +1,8 @@
 name: deployer
 on:
   push:
-    branches:
-      - main
+    # XXX   branches:
+    # XXX     - main
 env:
   CLOUDSDK_CORE_DISABLE_PROMPTS: 1
 jobs:
@@ -17,17 +17,17 @@ jobs:
           gcp-credentials-json: ${{ secrets.GCP_DEV_CREDENTIALS }}
       - name: "Deploy"
         run: make deploy-dev-backend
-  deploy-prod-backend:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: "Install build deps"
-        uses: ./.github/actions/build-deps
-        with:
-          sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          gcp-credentials-json: ${{ secrets.GCP_PROD_CREDENTIALS }}
-      - name: "Deploy"
-        run: make deploy-prod-backend
+          # XXX deploy-prod-backend:
+          # XXX   runs-on: ubuntu-latest
+          # XXX   steps:
+          # XXX     - uses: actions/checkout@v2
+          # XXX     - name: "Install build deps"
+          # XXX       uses: ./.github/actions/build-deps
+          # XXX       with:
+          # XXX         sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          # XXX         gcp-credentials-json: ${{ secrets.GCP_PROD_CREDENTIALS }}
+          # XXX     - name: "Deploy"
+          # XXX       run: make deploy-prod-backend
   deploy-dev-tokenprocessing:
     runs-on: ubuntu-latest
     steps:
@@ -39,133 +39,133 @@ jobs:
           gcp-credentials-json: ${{ secrets.GCP_DEV_CREDENTIALS }}
       - name: "Deploy"
         run: make deploy-dev-tokenprocessing
-  deploy-prod-tokenprocessing:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: "Install build deps"
-        uses: ./.github/actions/build-deps
-        with:
-          sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          gcp-credentials-json: ${{ secrets.GCP_PROD_CREDENTIALS }}
-      - name: "Deploy"
-        run: make deploy-prod-tokenprocessing
-  deploy-prod-indexer-api:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: "Install build deps"
-        uses: ./.github/actions/build-deps
-        with:
-          sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          gcp-credentials-json: ${{ secrets.GCP_PROD_CREDENTIALS }}
-      - name: "Deploy"
-        run: make deploy-prod-indexer-server
-  deploy-dev-emails:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: "Install build deps"
-        uses: ./.github/actions/build-deps
-        with:
-          sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          gcp-credentials-json: ${{ secrets.GCP_DEV_CREDENTIALS }}
-      - name: "Deploy"
-        run: make deploy-dev-emails
-  deploy-prod-emails:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: "Install build deps"
-        uses: ./.github/actions/build-deps
-        with:
-          sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          gcp-credentials-json: ${{ secrets.GCP_PROD_CREDENTIALS }}
-      - name: "Deploy"
-        run: make deploy-prod-emails
-  deploy-dev-feed:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: "Install build deps"
-        uses: ./.github/actions/build-deps
-        with:
-          sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          gcp-credentials-json: ${{ secrets.GCP_DEV_CREDENTIALS }}
-      - name: "Deploy"
-        run: make deploy-dev-feed
-  deploy-prod-feed:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: "Install build deps"
-        uses: ./.github/actions/build-deps
-        with:
-          sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          gcp-credentials-json: ${{ secrets.GCP_PROD_CREDENTIALS }}
-      - name: "Deploy"
-        run: make deploy-prod-feed
-  deploy-dev-feedbot:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: "Install build deps"
-        uses: ./.github/actions/build-deps
-        with:
-          sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          gcp-credentials-json: ${{ secrets.GCP_DEV_CREDENTIALS }}
-      - name: "Deploy"
-        run: make deploy-dev-feedbot
-  deploy-prod-feedbot:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: "Install build deps"
-        uses: ./.github/actions/build-deps
-        with:
-          sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          gcp-credentials-json: ${{ secrets.GCP_PROD_CREDENTIALS }}
-      - name: "Deploy"
-        run: make deploy-prod-feedbot
-  deploy-dev-graphql-gateway:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: "Install build deps"
-        uses: ./.github/actions/build-deps
-        with:
-          gcp-credentials-json: ${{ secrets.GCP_DEV_CREDENTIALS }}
-      - name: "Deploy"
-        run: make deploy-dev-graphql-gateway
-  deploy-prod-graphql-gateway:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: "Install build deps"
-        uses: ./.github/actions/build-deps
-        with:
-          gcp-credentials-json: ${{ secrets.GCP_PROD_CREDENTIALS }}
-      - name: "Deploy"
-        run: make deploy-prod-graphql-gateway
-  deploy-dev-pushnotifications:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: "Install build deps"
-        uses: ./.github/actions/build-deps
-        with:
-          sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          gcp-credentials-json: ${{ secrets.GCP_DEV_CREDENTIALS }}
-      - name: "Deploy"
-        run: make deploy-dev-pushnotifications
-  deploy-prod-pushnotifications:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: "Install build deps"
-        uses: ./.github/actions/build-deps
-        with:
-          sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          gcp-credentials-json: ${{ secrets.GCP_PROD_CREDENTIALS }}
-      - name: "Deploy"
-        run: make deploy-prod-pushnotifications
+          # XXX deploy-prod-tokenprocessing:
+          # XXX   runs-on: ubuntu-latest
+          # XXX   steps:
+          # XXX     - uses: actions/checkout@v2
+          # XXX     - name: "Install build deps"
+          # XXX       uses: ./.github/actions/build-deps
+          # XXX       with:
+          # XXX         sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          # XXX         gcp-credentials-json: ${{ secrets.GCP_PROD_CREDENTIALS }}
+          # XXX     - name: "Deploy"
+          # XXX       run: make deploy-prod-tokenprocessing
+          # XXX deploy-prod-indexer-api:
+          # XXX   runs-on: ubuntu-latest
+          # XXX   steps:
+          # XXX     - uses: actions/checkout@v2
+          # XXX     - name: "Install build deps"
+          # XXX       uses: ./.github/actions/build-deps
+          # XXX       with:
+          # XXX         sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          # XXX         gcp-credentials-json: ${{ secrets.GCP_PROD_CREDENTIALS }}
+          # XXX     - name: "Deploy"
+          # XXX       run: make deploy-prod-indexer-server
+          # XXX deploy-dev-emails:
+          # XXX   runs-on: ubuntu-latest
+          # XXX   steps:
+          # XXX     - uses: actions/checkout@v2
+          # XXX     - name: "Install build deps"
+          # XXX       uses: ./.github/actions/build-deps
+          # XXX       with:
+          # XXX         sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          # XXX         gcp-credentials-json: ${{ secrets.GCP_DEV_CREDENTIALS }}
+          # XXX     - name: "Deploy"
+          # XXX       run: make deploy-dev-emails
+          # XXX deploy-prod-emails:
+          # XXX   runs-on: ubuntu-latest
+          # XXX   steps:
+          # XXX     - uses: actions/checkout@v2
+          # XXX     - name: "Install build deps"
+          # XXX       uses: ./.github/actions/build-deps
+          # XXX       with:
+          # XXX         sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          # XXX         gcp-credentials-json: ${{ secrets.GCP_PROD_CREDENTIALS }}
+          # XXX     - name: "Deploy"
+          # XXX       run: make deploy-prod-emails
+          # XXX deploy-dev-feed:
+          # XXX   runs-on: ubuntu-latest
+          # XXX   steps:
+          # XXX     - uses: actions/checkout@v2
+          # XXX     - name: "Install build deps"
+          # XXX       uses: ./.github/actions/build-deps
+          # XXX       with:
+          # XXX         sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          # XXX         gcp-credentials-json: ${{ secrets.GCP_DEV_CREDENTIALS }}
+          # XXX     - name: "Deploy"
+          # XXX       run: make deploy-dev-feed
+          # XXX deploy-prod-feed:
+          # XXX   runs-on: ubuntu-latest
+          # XXX   steps:
+          # XXX     - uses: actions/checkout@v2
+          # XXX     - name: "Install build deps"
+          # XXX       uses: ./.github/actions/build-deps
+          # XXX       with:
+          # XXX         sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          # XXX         gcp-credentials-json: ${{ secrets.GCP_PROD_CREDENTIALS }}
+          # XXX     - name: "Deploy"
+          # XXX       run: make deploy-prod-feed
+          # XXX deploy-dev-feedbot:
+          # XXX   runs-on: ubuntu-latest
+          # XXX   steps:
+          # XXX     - uses: actions/checkout@v2
+          # XXX     - name: "Install build deps"
+          # XXX       uses: ./.github/actions/build-deps
+          # XXX       with:
+          # XXX         sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          # XXX         gcp-credentials-json: ${{ secrets.GCP_DEV_CREDENTIALS }}
+          # XXX     - name: "Deploy"
+          # XXX       run: make deploy-dev-feedbot
+          # XXX deploy-prod-feedbot:
+          # XXX   runs-on: ubuntu-latest
+          # XXX   steps:
+          # XXX     - uses: actions/checkout@v2
+          # XXX     - name: "Install build deps"
+          # XXX       uses: ./.github/actions/build-deps
+          # XXX       with:
+          # XXX         sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          # XXX         gcp-credentials-json: ${{ secrets.GCP_PROD_CREDENTIALS }}
+          # XXX     - name: "Deploy"
+          # XXX       run: make deploy-prod-feedbot
+          # XXX deploy-dev-graphql-gateway:
+          # XXX   runs-on: ubuntu-latest
+          # XXX   steps:
+          # XXX     - uses: actions/checkout@v2
+          # XXX     - name: "Install build deps"
+          # XXX       uses: ./.github/actions/build-deps
+          # XXX       with:
+          # XXX         gcp-credentials-json: ${{ secrets.GCP_DEV_CREDENTIALS }}
+          # XXX     - name: "Deploy"
+          # XXX       run: make deploy-dev-graphql-gateway
+          # XXX deploy-prod-graphql-gateway:
+          # XXX   runs-on: ubuntu-latest
+          # XXX   steps:
+          # XXX     - uses: actions/checkout@v2
+          # XXX     - name: "Install build deps"
+          # XXX       uses: ./.github/actions/build-deps
+          # XXX       with:
+          # XXX         gcp-credentials-json: ${{ secrets.GCP_PROD_CREDENTIALS }}
+          # XXX     - name: "Deploy"
+          # XXX       run: make deploy-prod-graphql-gateway
+          # XXX deploy-dev-pushnotifications:
+          # XXX   runs-on: ubuntu-latest
+          # XXX   steps:
+          # XXX     - uses: actions/checkout@v2
+          # XXX     - name: "Install build deps"
+          # XXX       uses: ./.github/actions/build-deps
+          # XXX       with:
+          # XXX         sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          # XXX         gcp-credentials-json: ${{ secrets.GCP_DEV_CREDENTIALS }}
+          # XXX     - name: "Deploy"
+          # XXX       run: make deploy-dev-pushnotifications
+          # XXX deploy-prod-pushnotifications:
+          # XXX   runs-on: ubuntu-latest
+          # XXX   steps:
+          # XXX     - uses: actions/checkout@v2
+          # XXX     - name: "Install build deps"
+          # XXX       uses: ./.github/actions/build-deps
+          # XXX       with:
+          # XXX         sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          # XXX         gcp-credentials-json: ${{ secrets.GCP_PROD_CREDENTIALS }}
+          # XXX     - name: "Deploy"
+          # XXX       run: make deploy-prod-pushnotifications
