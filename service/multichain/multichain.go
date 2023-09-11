@@ -41,8 +41,9 @@ var contractNameBlacklist = map[string]bool{
 	"unknown":               true,
 }
 
-// SendTokens is called to process a user's batch of tokens
-type SendTokens func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, chains []persist.Chain) error
+// SubmitUserTokensF is called to process a user's batch of tokens
+// TODO: Remove chains when made optional on tokenprocessing
+type SubmitUserTokensF func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, chains []persist.Chain) error
 
 type Provider struct {
 	Repos   *postgres.Repositories
@@ -51,8 +52,8 @@ type Provider struct {
 	Chains  map[persist.Chain][]any
 
 	// some chains use the addresses of other chains, this will map of chain we want tokens from => chain that's address will be used for lookup
-	WalletOverrides WalletOverrideMap
-	SendTokens      SendTokens
+	WalletOverrides  WalletOverrideMap
+	SubmitUserTokens SubmitUserTokensF
 }
 
 // BlockchainInfo retrieves blockchain info from all chains
@@ -817,7 +818,7 @@ func (p *Provider) processTokensForUsers(ctx context.Context, users map[persist.
 		newUserTokens[userID] = newPersistedTokens
 		newPersistedTokenIDs := util.MapWithoutError(newPersistedTokens, func(t persist.TokenGallery) persist.DBID { return t.ID })
 
-		err = p.SendTokens(ctx, userID, newPersistedTokenIDs, chains)
+		err = p.SubmitUserTokens(ctx, userID, newPersistedTokenIDs, chains)
 		if err != nil {
 			errors = append(errors, err)
 		}

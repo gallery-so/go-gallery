@@ -38,14 +38,13 @@ func InitServer() {
 	setDefaults()
 	ctx := context.Background()
 	c := server.ClientInit(ctx)
-	tm := tokenmanage.New()
 	mc, _ := server.NewMultichainProvider(ctx, setDefaults)
-	router := CoreInitServer(c, mc, tm)
+	router := CoreInitServer(ctx, c, mc)
 	logger.For(nil).Info("Starting tokenprocessing server...")
 	http.Handle("/", router)
 }
 
-func CoreInitServer(clients *server.Clients, mc *multichain.Provider, tm *tokenmanage.Manager) *gin.Engine {
+func CoreInitServer(ctx context.Context, clients *server.Clients, mc *multichain.Provider) *gin.Engine {
 	InitSentry()
 	logger.InitWithGCPDefaults()
 
@@ -69,8 +68,8 @@ func CoreInitServer(clients *server.Clients, mc *multichain.Provider, tm *tokenm
 	logger.For(nil).Info("Registering handlers...")
 
 	t := newThrottler()
-
 	tp := NewTokenProcessor(clients.Queries, clients.EthClient, clients.HTTPClient, mc, clients.IPFSClient, clients.ArweaveClient, clients.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), clients.Repos.TokenRepository, metric.NewLogMetricReporter())
+	tm := tokenmanage.New(ctx, clients.TaskClient)
 
 	return handlersInitServer(router, tp, mc, clients.Repos, t, validate.WithCustomValidators(), tm)
 }

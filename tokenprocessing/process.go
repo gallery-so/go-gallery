@@ -80,7 +80,6 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 		}
 
 		wp.Wait()
-
 		logger.For(reqCtx).Infof("Processing Media: %s - Finished", input.UserID)
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})

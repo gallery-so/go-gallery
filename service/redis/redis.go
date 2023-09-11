@@ -59,6 +59,7 @@ var (
 	SocialCache                       = CacheConfig{database: social, keyPrefix: "", displayName: "social"}
 	SearchCache                       = CacheConfig{keyPrefix: "search", displayName: "search"}
 	UserPrefCache                     = CacheConfig{keyPrefix: "userpref", displayName: "userPref"}
+	TokenManageCache                  = CacheConfig{keyPrefix: "tokenmanage", displayName: "tokenManage"}
 )
 
 func newClient(db redisDB, traceName string) *redis.Client {

@@ -504,8 +504,11 @@ func newTokenProcessingCache() *redis.Cache {
 	return redis.NewCache(redis.TokenProcessingMetadataCache)
 }
 
-func newManagedTokens(ctx context.Context, tm *tokenmanage.Manager) multichain.SendTokens {
+func newManagedTokens(ctx context.Context, tm *tokenmanage.Manager) multichain.SubmitUserTokensF {
 	return func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, chains []persist.Chain) error {
+		if len(tokenIDs) == 0 {
+			return nil
+		}
 		return tm.SubmitUser(ctx, userID, tokenIDs, chains)
 	}
 }
