@@ -94,6 +94,16 @@ var nodeFetcher = model.NodeFetcher{
 
 		return &notifConverted, nil
 	},
+	OnSomeoneAdmiredYourTokenNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneAdmiredYourTokenNotification, error) {
+		notif, err := resolveNotificationByID(ctx, dbid)
+		if err != nil {
+			return nil, err
+		}
+
+		notifConverted := notif.(model.SomeoneAdmiredYourTokenNotification)
+
+		return &notifConverted, nil
+	},
 	OnSomeoneFollowedYouBackNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneFollowedYouBackNotification, error) {
 		notif, err := resolveNotificationByID(ctx, dbid)
 		if err != nil {

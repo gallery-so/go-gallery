@@ -2518,7 +2518,7 @@ func (r *someoneAdmiredYourPostNotificationResolver) Admirers(ctx context.Contex
 	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.NotificationData.AdmirerIDs, before, after, first, last)
 }
 
-// Token is the resolver for the post field.
+// Token is the resolver for the token field.
 func (r *someoneAdmiredYourTokenNotificationResolver) Token(ctx context.Context, obj *model.SomeoneAdmiredYourTokenNotification) (*model.Token, error) {
 	return resolveTokenByTokenID(ctx, obj.TokenID)
 }
