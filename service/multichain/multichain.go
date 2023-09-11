@@ -178,6 +178,7 @@ type TokensOwnerFetcher interface {
 
 // TokensIncrementalOwnerFetcher supports fetching tokens for syncing incrementally
 type TokensIncrementalOwnerFetcher interface {
+	// NOTE: implementation MUST close the rec channel
 	GetTokensIncrementallyByWalletAddress(ctx context.Context, address persist.Address, rec chan<- ChainAgnosticTokensAndContracts, errChain chan<- error)
 }
 
@@ -360,7 +361,7 @@ func (p *Provider) SyncTokensIncrementallyByUserID(ctx context.Context, userID p
 	incomingContracts := make(chan chainContracts)
 	chainsToAddresses := p.matchingWallets(user.Wallets, chains)
 
-	wg := &conc.WaitGroup{}
+	walletWg := &conc.WaitGroup{}
 	for c, a := range chainsToAddresses {
 		logger.For(ctx).Infof("syncing chain %d tokens for user %s wallets %s", c, user.Username, a)
 		chain := c
@@ -369,24 +370,37 @@ func (p *Provider) SyncTokensIncrementallyByUserID(ctx context.Context, userID p
 		for _, addr := range addresses {
 			addr := addr
 			chain := chain
-			wg.Go(func() {
-				subWg := &conc.WaitGroup{}
+			walletWg.Go(func() {
+				providerWg := &conc.WaitGroup{}
 				tokenFetchers := matchingProvidersForChain[TokensIncrementalOwnerFetcher](p.Chains, chain)
 				for i, p := range tokenFetchers {
 					fetcher := p
 					priority := i
 
-					subWg.Go(func() {
+					providerWg.Go(func() {
+						testDone := make(chan struct{})
 						inc := make(chan ChainAgnosticTokensAndContracts)
-						fetcher.GetTokensIncrementallyByWalletAddress(ctx, addr, inc, errChan)
+						go fetcher.GetTokensIncrementallyByWalletAddress(ctx, addr, inc, errChan)
+						go func() {
+							for {
+								select {
+								case <-testDone:
+									logger.For(ctx).Infof("done incrementally fetching from provider %d (%T)", i, p)
+								default:
+									logger.For(ctx).Infof("still fetching from provider %d (%T)", i, p)
+									<-time.After(time.Second * 10)
+								}
+							}
+						}()
 						for ts := range inc {
 							// contracts must be sent first because tokens need contract DBIDs to be inserted properly, so the contracts must have already been processed
 							incomingContracts <- chainContracts{chain: chain, contracts: ts.Contracts, priority: priority}
 							incomingTokens <- chainTokens{chain: chain, tokens: ts.Tokens, priority: priority}
 						}
+						testDone <- struct{}{}
 					})
 				}
-				subWg.Wait()
+				providerWg.Wait()
 			})
 		}
 	}
@@ -394,7 +408,7 @@ func (p *Provider) SyncTokensIncrementallyByUserID(ctx context.Context, userID p
 	go func() {
 		defer close(incomingTokens)
 		defer close(incomingContracts)
-		wg.Wait()
+		walletWg.Wait()
 	}()
 
 	return p.receiveSyncedTokensIncrementallyForUser(ctx, user, chains, incomingTokens, incomingContracts, errChan)
@@ -572,7 +586,10 @@ func (p *Provider) receiveSyncedTokensIncrementallyForUser(ctx context.Context, 
 outer:
 	for {
 		select {
-		case incomingTokens := <-incomingTokens:
+		case incomingTokens, ok := <-incomingTokens:
+			if !ok {
+				break outer
+			}
 			totalTokensReceived += len(incomingTokens.tokens)
 			currentTokens, _, err = p.AddHolderTokensToUser(ctx, user, []chainTokens{incomingTokens}, currentContracts, chains, currentTokens)
 			if err != nil {

@@ -179,6 +179,19 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 	return resultTokens, resultContracts, nil
 }
 
+func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, addr persist.Address, rec chan<- multichain.ChainAgnosticTokensAndContracts, errChan chan<- error) {
+	defer close(rec)
+	tokens, contracts, err := d.GetTokensByWalletAddress(ctx, addr)
+	if err != nil {
+		errChan <- err
+		return
+	}
+	rec <- multichain.ChainAgnosticTokensAndContracts{
+		Tokens:    tokens,
+		Contracts: contracts,
+	}
+}
+
 // GetTokensByContractAddress retrieves tokens for a contract address on the Poap Blockchain
 func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("poap has no way to retrieve tokens by contract address")

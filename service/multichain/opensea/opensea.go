@@ -804,6 +804,7 @@ func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsCha
 }
 
 func streamAssetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsChan <-chan assetsReceieved, ethClient *ethclient.Client, chain persist.Chain, rec chan<- multichain.ChainAgnosticTokensAndContracts, errChan chan<- error) {
+	defer close(rec)
 	block, err := ethClient.BlockNumber(ctx)
 	if err != nil {
 		errChan <- err
@@ -814,7 +815,6 @@ func streamAssetsToTokens(ctx context.Context, ownerAddress persist.Address, ass
 
 	wp := pool.New().WithMaxGoroutines(10).WithContext(ctx)
 
-	defer close(rec)
 	for a := range assetsChan {
 		assetsReceived := a
 		if assetsReceived.err != nil {

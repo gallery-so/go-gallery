@@ -258,7 +258,7 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 	return cTokens, cContracts, d.cacheMetadatasForTokens(ctx, cTokens...)
 }
 
-// GetTokensByWalletAddress retrieves tokens for a wallet address on the Ethereum Blockchain
+// GetTokensIncrementallyByWalletAddress retrieves tokens for a wallet address on the Ethereum Blockchain
 func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, addr persist.Address, rec chan<- multichain.ChainAgnosticTokensAndContracts, errChan chan<- error) {
 	url := fmt.Sprintf("%s/getNFTs?owner=%s&withMetadata=true", d.alchemyAPIURL, addr)
 	if d.chain == persist.ChainPolygon {
@@ -275,25 +275,23 @@ func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 		}
 	}()
 
-	go func() {
-		defer close(rec)
-	outer:
-		for {
-			select {
-			case <-ctx.Done():
-				errChan <- ctx.Err()
-			case tokens, ok := <-aRec:
-				if !ok {
-					break outer
-				}
-				cTokens, cContracts := alchemyTokensToChainAgnosticTokensForOwner(persist.EthereumAddress(addr), tokens)
-				rec <- multichain.ChainAgnosticTokensAndContracts{
-					Tokens:    cTokens,
-					Contracts: cContracts,
-				}
+	defer close(rec)
+outer:
+	for {
+		select {
+		case <-ctx.Done():
+			errChan <- ctx.Err()
+		case tokens, ok := <-aRec:
+			if !ok {
+				break outer
+			}
+			cTokens, cContracts := alchemyTokensToChainAgnosticTokensForOwner(persist.EthereumAddress(addr), tokens)
+			rec <- multichain.ChainAgnosticTokensAndContracts{
+				Tokens:    cTokens,
+				Contracts: cContracts,
 			}
 		}
-	}()
+	}
 
 }
 

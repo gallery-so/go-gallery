@@ -149,10 +149,18 @@ func (d *Provider) GetBlockchainInfo() multichain.BlockchainInfo {
 
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the zora Blockchain
 func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
-	return d.getTokensByWalletAddressPaginate(ctx, addr, "")
+	return d.getTokensByWalletAddressPaginate(ctx, addr, "", nil)
 }
 
-func (d *Provider) getTokensWithRequest(ctx context.Context, req string, owner, collection persist.Address, endCursor string) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, addr persist.Address, rec chan<- multichain.ChainAgnosticTokensAndContracts, errChan chan<- error) {
+	_, _, err := d.getTokensByWalletAddressPaginate(ctx, addr, "", rec)
+	if err != nil {
+		errChan <- err
+		return
+	}
+}
+
+func (d *Provider) getTokensWithRequest(ctx context.Context, req string, owner, collection persist.Address, endCursor string, rec chan<- multichain.ChainAgnosticTokensAndContracts) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 
 	greq := graphql.NewRequest(req)
 	greq.Var("address", owner)
@@ -175,9 +183,15 @@ func (d *Provider) getTokensWithRequest(ctx context.Context, req string, owner, 
 	}
 
 	if resp.Tokens.PageInfo.hasNextPage {
-		nextTokens, nextContracts, err := d.getTokensWithRequest(ctx, req, owner, collection, resp.Tokens.PageInfo.endCursor)
+		nextTokens, nextContracts, err := d.getTokensWithRequest(ctx, req, owner, collection, resp.Tokens.PageInfo.endCursor, rec)
 		if err != nil {
 			return nil, nil, err
+		}
+		if rec != nil {
+			rec <- multichain.ChainAgnosticTokensAndContracts{
+				Tokens:    nextTokens,
+				Contracts: nextContracts,
+			}
 		}
 		tokens = append(tokens, nextTokens...)
 		contracts = append(contracts, nextContracts...)
@@ -212,7 +226,7 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti mu
 	return resp.Token.Token.Metadata, nil
 }
 
-func (d *Provider) getTokensByWalletAddressPaginate(ctx context.Context, addr persist.Address, endCursor string) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (d *Provider) getTokensByWalletAddressPaginate(ctx context.Context, addr persist.Address, endCursor string, rec chan<- multichain.ChainAgnosticTokensAndContracts) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	req := fmt.Sprintf(`query tokensByWalletAddress($address: String!, $after:String!, $limit:Int!) {
   tokens(where:{ownerAddresses:[$address]}, networks:{network:ZORA, chain: ZORA_MAINNET}, pagination: {limit: $limit, after:$after}, sort:{sortKey: TRANSFERRED, sortDirection: ASC}) {
     nodes {
@@ -244,7 +258,7 @@ func (d *Provider) getTokensByWalletAddressPaginate(ctx context.Context, addr pe
   }
 }`)
 
-	return d.getTokensWithRequest(ctx, req, addr, "", endCursor)
+	return d.getTokensWithRequest(ctx, req, addr, "", endCursor, rec)
 }
 
 func (d *Provider) getTokensByContractAddressPaginate(ctx context.Context, addr persist.Address, endCursor string) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
@@ -279,7 +293,7 @@ func (d *Provider) getTokensByContractAddressPaginate(ctx context.Context, addr 
   }
 }`)
 
-	tokens, contracts, err := d.getTokensWithRequest(ctx, req, addr, "", endCursor)
+	tokens, contracts, err := d.getTokensWithRequest(ctx, req, addr, "", endCursor, nil)
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
@@ -321,7 +335,7 @@ func (d *Provider) getTokensByWalletAddressAndContractPaginate(ctx context.Conte
   }
 }`)
 
-	tokens, contracts, err := d.getTokensWithRequest(ctx, req, addr, contractAddress, endCursor)
+	tokens, contracts, err := d.getTokensWithRequest(ctx, req, addr, contractAddress, endCursor, nil)
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
