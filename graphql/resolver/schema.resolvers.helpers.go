@@ -906,6 +906,21 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 			Post:         nil, // handled by dedicated resolver
 			Admirers:     nil, // handled by dedicated resolver
 		}, nil
+	case persist.ActionAdmiredToken:
+		return model.SomeoneAdmiredYourTokenNotification{
+			HelperSomeoneAdmiredYourTokenNotificationData: model.HelperSomeoneAdmiredYourTokenNotificationData{
+				OwnerID:          notif.OwnerID,
+				TokenID:          notif.TokenID,
+				NotificationData: notif.Data,
+			},
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
+			Count:        &amount,
+			Token:         nil, // handled by dedicated resolver
+			Admirers:     nil, // handled by dedicated resolver
+		}, nil
 	case persist.ActionCommentedOnPost:
 		return model.SomeoneCommentedOnYourPostNotification{
 			HelperSomeoneCommentedOnYourPostNotificationData: model.HelperSomeoneCommentedOnYourPostNotificationData{

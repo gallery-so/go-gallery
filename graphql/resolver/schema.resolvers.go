@@ -3151,3 +3151,21 @@ type viewerResolver struct{ *Resolver }
 type walletResolver struct{ *Resolver }
 type chainAddressInputResolver struct{ *Resolver }
 type chainPubKeyInputResolver struct{ *Resolver }
+
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//   - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//     it when you're done.
+//   - You have helper methods in this file. Move them out to keep these resolver files clean.
+func (r *someoneAdmiredYourTokenNotificationResolver) Token(ctx context.Context, obj *model.SomeoneAdmiredYourTokenNotification) (*model.Token, error) {
+	return resolveTokenByTokenID(ctx, obj.TokenID)
+}
+func (r *someoneAdmiredYourTokenNotificationResolver) Admirers(ctx context.Context, obj *model.SomeoneAdmiredYourTokenNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error) {
+	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.NotificationData.AdmirerIDs, before, after, first, last)
+}
+func (r *Resolver) SomeoneAdmiredYourTokenNotification() generated.SomeoneAdmiredYourTokenNotificationResolver {
+	return &someoneAdmiredYourTokenNotificationResolver{r}
+}
+
+type someoneAdmiredYourTokenNotificationResolver struct{ *Resolver }

@@ -657,7 +657,7 @@ SELECT * FROM notifications
     ORDER BY created_at DESC;
 
 -- name: CreateAdmireNotification :one
-INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post')) RETURNING *;
+INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, token_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), sqlc.narg('token')) RETURNING *;
 
 -- name: CreateCommentNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, comment_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), $6) RETURNING *;
