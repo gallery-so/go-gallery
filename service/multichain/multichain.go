@@ -380,25 +380,9 @@ func (p *Provider) SyncTokensIncrementallyByUserID(ctx context.Context, userID p
 					logger.For(ctx).Infof("incrementally fetching from provider %d (%T)", priority, fetcher)
 
 					providerWg.Go(func() {
-						testDone := make(chan struct{})
-						defer func() {
-							testDone <- struct{}{}
-						}()
 						inc := make(chan ChainAgnosticTokensAndContracts)
 						errs := make(chan error)
 						go fetcher.GetTokensIncrementallyByWalletAddress(ctx, addr, inc, errs)
-						go func() {
-							for {
-								select {
-								case <-testDone:
-									logger.For(ctx).Infof("done incrementally fetching from provider %d (%T)", priority, fetcher)
-									return
-								default:
-									<-time.After(time.Second * 15)
-									logger.For(ctx).Infof("still fetching from provider %d (%T)", priority, fetcher)
-								}
-							}
-						}()
 					outer:
 						for {
 							select {
