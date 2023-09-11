@@ -363,7 +363,7 @@ func (p *Provider) SyncTokensIncrementallyByUserID(ctx context.Context, userID p
 
 	walletWg := &conc.WaitGroup{}
 	for c, a := range chainsToAddresses {
-		logger.For(ctx).Infof("syncing chain %d tokens for user %s wallets %s", c, user.Username, a)
+		logger.For(ctx).Infof("incrementally syncing chain %d tokens for user %s wallets %s", c, user.Username, a)
 		chain := c
 		addresses := a
 
@@ -377,27 +377,44 @@ func (p *Provider) SyncTokensIncrementallyByUserID(ctx context.Context, userID p
 					fetcher := p
 					priority := i
 
+					logger.For(ctx).Infof("incrementally fetching from provider %d (%T)", priority, fetcher)
+
 					providerWg.Go(func() {
 						testDone := make(chan struct{})
+						defer func() {
+							testDone <- struct{}{}
+						}()
 						inc := make(chan ChainAgnosticTokensAndContracts)
-						go fetcher.GetTokensIncrementallyByWalletAddress(ctx, addr, inc, errChan)
+						errs := make(chan error)
+						go fetcher.GetTokensIncrementallyByWalletAddress(ctx, addr, inc, errs)
 						go func() {
 							for {
 								select {
 								case <-testDone:
-									logger.For(ctx).Infof("done incrementally fetching from provider %d (%T)", i, p)
+									logger.For(ctx).Infof("done incrementally fetching from provider %d (%T)", priority, fetcher)
+									return
 								default:
-									logger.For(ctx).Infof("still fetching from provider %d (%T)", i, p)
-									<-time.After(time.Second * 10)
+									<-time.After(time.Second * 15)
+									logger.For(ctx).Infof("still fetching from provider %d (%T)", priority, fetcher)
 								}
 							}
 						}()
-						for ts := range inc {
-							// contracts must be sent first because tokens need contract DBIDs to be inserted properly, so the contracts must have already been processed
-							incomingContracts <- chainContracts{chain: chain, contracts: ts.Contracts, priority: priority}
-							incomingTokens <- chainTokens{chain: chain, tokens: ts.Tokens, priority: priority}
+					outer:
+						for {
+							select {
+							case ts, ok := <-inc:
+								if !ok {
+									break outer
+								}
+								// contracts must be sent first because tokens need contract DBIDs to be inserted properly, so the contracts must have already been processed
+								incomingContracts <- chainContracts{chain: chain, contracts: ts.Contracts, priority: priority}
+								incomingTokens <- chainTokens{chain: chain, tokens: ts.Tokens, priority: priority}
+							case err := <-errs:
+								logger.For(ctx).Errorf("error while syncing tokens for user %s: %s (provider: %d (%T))", user.Username, err, priority, fetcher)
+								errChan <- err
+								return
+							}
 						}
-						testDone <- struct{}{}
 					})
 				}
 				providerWg.Wait()

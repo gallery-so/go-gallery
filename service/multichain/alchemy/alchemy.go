@@ -260,28 +260,34 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 
 // GetTokensIncrementallyByWalletAddress retrieves tokens for a wallet address on the Ethereum Blockchain
 func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, addr persist.Address, rec chan<- multichain.ChainAgnosticTokensAndContracts, errChan chan<- error) {
+	defer close(rec)
+
 	url := fmt.Sprintf("%s/getNFTs?owner=%s&withMetadata=true", d.alchemyAPIURL, addr)
 	if d.chain == persist.ChainPolygon {
 		url += "&excludeFilters[]=SPAM"
 	}
-	aRec := make(chan []Token)
+	alchemyRec := make(chan []Token)
+	subErrChan := make(chan error)
 
 	go func() {
-		defer close(aRec)
-		_, err := getNFTsPaginate(ctx, url, 100, "pageKey", 0, 0, "", d.httpClient, aRec, &getNFTsResponse{})
+		defer close(alchemyRec)
+		_, err := getNFTsPaginate(ctx, url, 100, "pageKey", 0, 0, "", d.httpClient, alchemyRec, &getNFTsResponse{})
 		if err != nil {
-			errChan <- err
+			subErrChan <- err
 			return
 		}
 	}()
 
-	defer close(rec)
 outer:
 	for {
 		select {
+		case err := <-subErrChan:
+			errChan <- err
+			return
 		case <-ctx.Done():
 			errChan <- ctx.Err()
-		case tokens, ok := <-aRec:
+			return
+		case tokens, ok := <-alchemyRec:
 			if !ok {
 				break outer
 			}

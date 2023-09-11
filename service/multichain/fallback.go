@@ -150,23 +150,25 @@ func (f SyncFailureFallbackProvider) GetTokensByWalletAddress(ctx context.Contex
 func (f SyncFailureFallbackProvider) GetTokensIncrementallyByWalletAddress(ctx context.Context, address persist.Address, rec chan<- ChainAgnosticTokensAndContracts, errChan chan<- error) {
 
 	if tiof, ok := f.Fallback.(TokensIncrementalOwnerFetcher); ok {
+		logger.For(ctx).Warn("using fallback for incremental fetching if primary fails")
 		subErrChan := make(chan error)
 		subRec := make(chan ChainAgnosticTokensAndContracts)
 		f.Primary.GetTokensIncrementallyByWalletAddress(ctx, address, subRec, subErrChan)
 		for {
 			select {
-			case <-subErrChan:
+			case err := <-subErrChan:
+				logger.For(ctx).Warnf("failed to get tokens incrementally by wallet address from primary in failure fallback: %s", err)
 				tiof.GetTokensIncrementallyByWalletAddress(ctx, address, rec, errChan)
 				return
 			case tokens, ok := <-subRec:
 				if !ok {
-					close(rec)
 					return
 				}
 				rec <- tokens
 			}
 		}
 	} else {
+		logger.For(ctx).Warn("fallback does not support incremental fetching, only using primary provider")
 		f.Primary.GetTokensIncrementallyByWalletAddress(ctx, address, rec, errChan)
 	}
 }
