@@ -37,7 +37,7 @@ func (p stubProvider) GetBlockchainInfo() multichain.BlockchainInfo {
 	return p.Info
 }
 
-func (p stubProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (p stubProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	return p.Tokens, p.Contracts, nil
 }
 
