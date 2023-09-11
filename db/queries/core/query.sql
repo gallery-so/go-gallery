@@ -547,6 +547,16 @@ SELECT * FROM admires WHERE post_id = sqlc.arg('post_id') AND deleted = false
 -- name: CountAdmiresByPostIDBatch :batchone
 SELECT count(*) FROM admires WHERE post_id = $1 AND deleted = false;
 
+-- name: PaginateAdmiresByTokenIDBatch :batchmany
+SELECT * FROM admires WHERE token_id = sqlc.arg('token_id') AND (not @only_for_actor::bool or actor_id = @actor_id) AND deleted = false
+    AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+    ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
+    LIMIT sqlc.arg('limit');
+
+-- name: CountAdmiresByTokenIDBatch :batchone
+SELECT count(*) FROM admires WHERE token_id = $1 AND deleted = false;
+
 -- name: GetCommentByCommentID :one
 SELECT * FROM comments WHERE id = $1 and deleted = false;
 
@@ -786,7 +796,7 @@ upsert_metadata as (
         on conflict (user_id) do update set has_email_address = excluded.has_email_address
 )
 
-update users set email_verified = 0 where users.id = @user_id;
+update users set email_verified = @email_verification_status where users.id = @user_id;
 
 -- name: UpdateUserEmailUnsubscriptions :exec
 UPDATE users SET email_unsubscriptions = $2 WHERE id = $1;
@@ -1135,16 +1145,18 @@ select * from users where array[@wallet::varchar]::varchar[] <@ wallets and dele
 update users set deleted = true where id = $1;
 
 -- name: InsertWallet :exec
-insert into wallets (id, address, chain, wallet_type) values ($1, $2, $3, $4);
+with new_wallet as (insert into wallets(id, address, chain, wallet_type) values ($1, $2, $3, $4) returning id)
+update users set
+    primary_wallet_id = coalesce(users.primary_wallet_id, new_wallet.id),
+    wallets = array_append(users.wallets, new_wallet.id)
+from new_wallet
+where users.id = @user_id and not users.deleted;
 
 -- name: DeleteWalletByID :exec
 update wallets set deleted = true, last_updated = now() where id = $1;
 
--- name: InsertUser :exec
-insert into users (id, username, username_idempotent, bio, wallets, universal, email_unsubscriptions, primary_wallet_id) values ($1, $2, $3, $4, $5, $6, $7, $8) returning id;
-
--- name: AddWalletToUserByID :exec
-update users set wallets = array_append(wallets, @wallet_id::varchar) where id = @user_id;
+-- name: InsertUser :one
+insert into users (id, username, username_idempotent, bio, universal, email_unsubscriptions) values ($1, $2, $3, $4, $5, $6) returning id;
 
 -- name: IsExistsActiveTokenMediaByTokenIdentifers :one
 select exists(select 1 from token_medias where token_medias.contract_id = $1 and token_medias.token_id = $2 and token_medias.chain = $3 and active = true and deleted = false);
@@ -1339,10 +1351,10 @@ ORDER BY tokens.id;
 -- name: GetReprocessJobRangeByID :one
 select * from reprocess_jobs where id = $1;
 
--- name: GetMediaByTokenID :batchone
+-- name: GetMediaByTokenIDIgnoringStatus :batchone
 select m.*
 from token_medias m
-where m.id = (select token_media_id from tokens where tokens.id = $1) and m.active and not m.deleted;
+where m.id = (select token_media_id from tokens where tokens.id = $1) and not m.deleted;
 
 -- name: UpsertSession :one
 insert into sessions (id, user_id,

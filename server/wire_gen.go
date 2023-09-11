@@ -193,7 +193,7 @@ var (
 
 // baseProvidersConfig is a wire injector that binds multichain interfaces to their concrete base implementations
 func baseProvidersConfig(baseProvider *reservoir.Provider) baseProviderList {
-	serverBaseProviderList := baseRequirements(baseProvider)
+	serverBaseProviderList := baseRequirements(baseProvider, baseProvider)
 	return serverBaseProviderList
 }
 
@@ -367,8 +367,9 @@ func zoraRequirements(
 // zoraRequirements is the set of provider interfaces required for zora
 func baseRequirements(
 	tof multichain.TokensOwnerFetcher,
+	tdf multichain.TokenDescriptorsFetcher,
 ) baseProviderList {
-	return baseProviderList{tof}
+	return baseProviderList{tof, tdf}
 }
 
 // polygonRequirements is the set of provider interfaces required for Polygon

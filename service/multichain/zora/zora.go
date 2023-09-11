@@ -201,7 +201,7 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti mu
 
 	greq := graphql.NewRequest(treq)
 	greq.Var("address", ti.ContractAddress)
-	greq.Var("tokenId", ti.TokenID)
+	greq.Var("tokenId", ti.TokenID.Base10String())
 
 	resp := getTokenResponse{}
 	err := d.zgql.Run(ctx, greq, &resp)

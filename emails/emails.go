@@ -97,6 +97,7 @@ func setDefaults() {
 	viper.SetDefault("PUBSUB_NOTIFICATIONS_EMAILS_SUBSCRIPTION", "notifications-email-sub")
 	viper.SetDefault("GOOGLE_CLOUD_PROJECT", "")
 	viper.SetDefault("ADMIN_PASS", "admin")
+	viper.SetDefault("EMAILS_TASK_SECRET", "emails-task-secret")
 
 	viper.AutomaticEnv()
 
@@ -104,7 +105,7 @@ func setDefaults() {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
 	} else {
 		fi := "local"
-		if len(os.Args) > 0 {
+		if len(os.Args) > 1 {
 			fi = os.Args[1]
 		}
 		envFile := util.ResolveEnvFile("emails", fi)

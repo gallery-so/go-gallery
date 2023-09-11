@@ -82,58 +82,28 @@ type MergeUsersInput struct {
 }
 
 // CreateUser creates a new user
-func CreateUser(ctx context.Context, authenticator auth.Authenticator, username string, email *persist.Email, bio, galleryName, galleryDesc, galleryPos string, userRepo *postgres.UserRepository,
-	queries *coredb.Queries, mp *multichain.Provider) (userID persist.DBID, galleryID persist.DBID, err error) {
+func CreateUser(ctx context.Context, createUserParams persist.CreateUserInput, createGalleryParams coredb.GalleryRepoCreateParams, userRepo *postgres.UserRepository,
+	queries *coredb.Queries) (userID persist.DBID, galleryID persist.DBID, err error) {
 	gc := util.MustGetGinContext(ctx)
 
-	authResult, err := authenticator.Authenticate(ctx)
-	if err != nil {
-		return "", "", auth.ErrAuthenticationFailed{WrappedErr: err}
-	}
-
-	if authResult.User != nil && !authResult.User.Universal.Bool() {
-		return "", "", persist.ErrUserAlreadyExists{Authenticator: authenticator.GetDescription()}
-	}
-
-	// TODO: This currently takes the first authenticated address returned by the authenticator and creates
-	// the user's account based on that address. This works because the only auth mechanism we have is nonce-based
-	// auth and that supplies a single address. In the future, a user may authenticate in a way that makes
-	// multiple authenticated addresses available for initial user creation, and we may want to add all of
-	// those addresses to the user's account here.
-	wallet := authResult.Addresses[0]
-
-	user := persist.CreateUserInput{
-		Username:     username,
-		Bio:          bio,
-		Email:        email,
-		ChainAddress: wallet.ChainAddress,
-		WalletType:   wallet.WalletType,
-	}
-
-	userID, err = userRepo.Create(ctx, user, queries)
+	userID, err = userRepo.Create(ctx, createUserParams, queries)
 	if err != nil {
 		return "", "", err
 	}
 
-	gallery, err := queries.GalleryRepoCreate(ctx, coredb.GalleryRepoCreateParams{
-		GalleryID:   persist.GenerateID(),
-		OwnerUserID: userID,
-		Name:        galleryName,
-		Description: galleryDesc,
-		Position:    galleryPos,
-	})
+	createGalleryParams.OwnerUserID = userID
+
+	gallery, err := queries.GalleryRepoCreate(ctx, createGalleryParams)
 	if err != nil {
 		return "", "", err
 	}
-
-	galleryID = gallery.ID
 
 	err = auth.StartSession(gc, queries, userID)
 	if err != nil {
 		return "", "", err
 	}
 
-	return userID, galleryID, nil
+	return userID, gallery.ID, nil
 }
 
 // RemoveWalletsFromUser removes wallets from a user in the DB, and returns the IDs of the wallets that were removed.
@@ -189,22 +159,6 @@ func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pChainAddress p
 
 	if err := userRepo.AddWallet(pCtx, pUserID, authenticatedAddress.ChainAddress, authenticatedAddress.WalletType, nil); err != nil {
 		return err
-	}
-
-	return nil
-}
-
-// RemoveAddressesFromUserToken removes any amount of addresses from a user in the DB
-func RemoveAddressesFromUserToken(pCtx context.Context, pUserID persist.DBID, pInput RemoveUserAddressesInput,
-	userRepo postgres.UserRepository) error {
-
-	user, err := userRepo.GetByID(pCtx, pUserID)
-	if err != nil {
-		return err
-	}
-
-	if len(user.Wallets) <= len(pInput.Addresses) {
-		return errUserCannotRemoveAllWallets
 	}
 
 	return nil
@@ -315,44 +269,6 @@ func UpdateUserInfo(pCtx context.Context, userID persist.DBID, username string, 
 // 	return userRepo.MergeUsers(pCtx, pUserID, pInput.SecondUserID)
 
 // }
-
-// DoesUserOwnWallets checks if a user owns any wallets
-func DoesUserOwnWallets(pCtx context.Context, userID persist.DBID, walletAddresses []persist.DBID, userRepo postgres.UserRepository) (bool, error) {
-	user, err := userRepo.GetByID(pCtx, userID)
-	if err != nil {
-		return false, err
-	}
-	walletIDs := make([]persist.DBID, len(user.Wallets))
-	for i, wallet := range user.Wallets {
-		walletIDs[i] = wallet.ID
-	}
-	for _, walletAddress := range walletAddresses {
-		if !persist.ContainsDBID(walletAddresses, walletAddress) {
-			return false, nil
-		}
-	}
-	return true, nil
-}
-
-// ContainsWallets checks if an array of wallets contains another wallet
-func ContainsWallets(a []persist.Wallet, b persist.Wallet) bool {
-	for _, v := range a {
-		if v.Address == b.Address {
-			return true
-		}
-	}
-
-	return false
-}
-
-type ErrDoesNotOwnWallets struct {
-	ID        persist.DBID
-	Addresses []persist.Wallet
-}
-
-func (e ErrDoesNotOwnWallets) Error() string {
-	return fmt.Sprintf("user with ID %s does not own all wallets: %+v", e.ID, e.Addresses)
-}
 
 type ErrUserAlreadyExists struct {
 	Address       persist.Address

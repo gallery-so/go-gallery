@@ -336,6 +336,7 @@ func baseProviderSet(*http.Client) baseProviderList {
 func baseProvidersConfig(baseProvider *reservoir.Provider) baseProviderList {
 	wire.Build(
 		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(baseProvider)),
+		wire.Bind(new(multichain.TokenDescriptorsFetcher), util.ToPointer(baseProvider)),
 		baseRequirements,
 	)
 	return nil
@@ -344,8 +345,9 @@ func baseProvidersConfig(baseProvider *reservoir.Provider) baseProviderList {
 // zoraRequirements is the set of provider interfaces required for zora
 func baseRequirements(
 	tof multichain.TokensOwnerFetcher,
+	tdf multichain.TokenDescriptorsFetcher,
 ) baseProviderList {
-	return baseProviderList{tof}
+	return baseProviderList{tof, tdf}
 }
 
 // polygonProviderSet is a wire injector that creates the set of polygon providers

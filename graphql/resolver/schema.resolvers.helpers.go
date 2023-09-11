@@ -112,7 +112,7 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrCommunityNotFound{Message: message}
 	case persist.ErrAddressOwnedByUser:
 		mappedErr = model.ErrAddressOwnedByUser{Message: message}
-	case persist.ErrAdmireNotFound:
+	case persist.ErrAdmireNotFound,persist.ErrAdmireFeedEventNotFound,persist.ErrAdmirePostNotFound,persist.ErrAdmireTokenNotFound:
 		mappedErr = model.ErrAdmireNotFound{Message: message}
 	case persist.ErrAdmireAlreadyExists:
 		mappedErr = model.ErrAdmireAlreadyExists{Message: message}
@@ -139,6 +139,10 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrInvalidInput{Message: message}
 	case publicapi.ErrProfileImageNotTokenOwner, publicapi.ErrProfileImageNotWalletOwner:
 		mappedErr = model.ErrNotAuthorized{Message: message}
+	case auth.ErrEmailUnverified:
+		mappedErr = model.ErrEmailUnverified{Message: message}
+	case auth.ErrEmailAlreadyUsed:
+		mappedErr = model.ErrEmailAlreadyUsed{Message: message}
 	}
 
 	if mappedErr != nil {
@@ -726,6 +730,10 @@ func resolvePrimaryWalletByUserID(ctx context.Context, userID persist.DBID) (*mo
 	user, err := publicapi.For(ctx).User.GetUserById(ctx, userID)
 	if err != nil {
 		return nil, err
+	}
+
+	if user.PrimaryWalletID == "" {
+		return nil, nil
 	}
 
 	wallet, err := publicapi.For(ctx).Wallet.GetWalletByID(ctx, user.PrimaryWalletID)

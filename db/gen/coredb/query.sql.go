@@ -89,20 +89,6 @@ func (q *Queries) AddUserRoles(ctx context.Context, arg AddUserRolesParams) erro
 	return err
 }
 
-const addWalletToUserByID = `-- name: AddWalletToUserByID :exec
-update users set wallets = array_append(wallets, $1::varchar) where id = $2
-`
-
-type AddWalletToUserByIDParams struct {
-	WalletID string       `json:"wallet_id"`
-	UserID   persist.DBID `json:"user_id"`
-}
-
-func (q *Queries) AddWalletToUserByID(ctx context.Context, arg AddWalletToUserByIDParams) error {
-	_, err := q.db.Exec(ctx, addWalletToUserByID, arg.WalletID, arg.UserID)
-	return err
-}
-
 const blockUserFromFeed = `-- name: BlockUserFromFeed :exec
 INSERT INTO feed_blocklist (id, user_id, action) VALUES ($1, $2, $3)
 `
@@ -5368,8 +5354,8 @@ func (q *Queries) InsertTokenPipelineResults(ctx context.Context, arg InsertToke
 	return err
 }
 
-const insertUser = `-- name: InsertUser :exec
-insert into users (id, username, username_idempotent, bio, wallets, universal, email_unsubscriptions, primary_wallet_id) values ($1, $2, $3, $4, $5, $6, $7, $8) returning id
+const insertUser = `-- name: InsertUser :one
+insert into users (id, username, username_idempotent, bio, universal, email_unsubscriptions) values ($1, $2, $3, $4, $5, $6) returning id
 `
 
 type InsertUserParams struct {
@@ -5377,28 +5363,31 @@ type InsertUserParams struct {
 	Username             sql.NullString               `json:"username"`
 	UsernameIdempotent   sql.NullString               `json:"username_idempotent"`
 	Bio                  sql.NullString               `json:"bio"`
-	Wallets              persist.WalletList           `json:"wallets"`
 	Universal            bool                         `json:"universal"`
 	EmailUnsubscriptions persist.EmailUnsubscriptions `json:"email_unsubscriptions"`
-	PrimaryWalletID      persist.DBID                 `json:"primary_wallet_id"`
 }
 
-func (q *Queries) InsertUser(ctx context.Context, arg InsertUserParams) error {
-	_, err := q.db.Exec(ctx, insertUser,
+func (q *Queries) InsertUser(ctx context.Context, arg InsertUserParams) (persist.DBID, error) {
+	row := q.db.QueryRow(ctx, insertUser,
 		arg.ID,
 		arg.Username,
 		arg.UsernameIdempotent,
 		arg.Bio,
-		arg.Wallets,
 		arg.Universal,
 		arg.EmailUnsubscriptions,
-		arg.PrimaryWalletID,
 	)
-	return err
+	var id persist.DBID
+	err := row.Scan(&id)
+	return id, err
 }
 
 const insertWallet = `-- name: InsertWallet :exec
-insert into wallets (id, address, chain, wallet_type) values ($1, $2, $3, $4)
+with new_wallet as (insert into wallets(id, address, chain, wallet_type) values ($1, $2, $3, $4) returning id)
+update users set
+    primary_wallet_id = coalesce(users.primary_wallet_id, new_wallet.id),
+    wallets = array_append(users.wallets, new_wallet.id)
+from new_wallet
+where users.id = $5 and not users.deleted
 `
 
 type InsertWalletParams struct {
@@ -5406,6 +5395,7 @@ type InsertWalletParams struct {
 	Address    persist.Address    `json:"address"`
 	Chain      persist.Chain      `json:"chain"`
 	WalletType persist.WalletType `json:"wallet_type"`
+	UserID     persist.DBID       `json:"user_id"`
 }
 
 func (q *Queries) InsertWallet(ctx context.Context, arg InsertWalletParams) error {
@@ -5414,6 +5404,7 @@ func (q *Queries) InsertWallet(ctx context.Context, arg InsertWalletParams) erro
 		arg.Address,
 		arg.Chain,
 		arg.WalletType,
+		arg.UserID,
 	)
 	return err
 }
@@ -6262,25 +6253,26 @@ func (q *Queries) UpdateTokenMetadataFieldsByTokenIdentifiers(ctx context.Contex
 
 const updateUserEmail = `-- name: UpdateUserEmail :exec
 with upsert_pii as (
-    insert into pii.for_users (user_id, pii_email_address) values ($1, $2)
+    insert into pii.for_users (user_id, pii_email_address) values ($2, $3)
         on conflict (user_id) do update set pii_email_address = excluded.pii_email_address
 ),
 
 upsert_metadata as (
-    insert into dev_metadata_users (user_id, has_email_address) values ($1, ($2 is not null))
+    insert into dev_metadata_users (user_id, has_email_address) values ($2, ($3 is not null))
         on conflict (user_id) do update set has_email_address = excluded.has_email_address
 )
 
-update users set email_verified = 0 where users.id = $1
+update users set email_verified = $1 where users.id = $2
 `
 
 type UpdateUserEmailParams struct {
-	UserID       persist.DBID  `json:"user_id"`
-	EmailAddress persist.Email `json:"email_address"`
+	EmailVerificationStatus int32         `json:"email_verification_status"`
+	UserID                  persist.DBID  `json:"user_id"`
+	EmailAddress            persist.Email `json:"email_address"`
 }
 
 func (q *Queries) UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams) error {
-	_, err := q.db.Exec(ctx, updateUserEmail, arg.UserID, arg.EmailAddress)
+	_, err := q.db.Exec(ctx, updateUserEmail, arg.EmailVerificationStatus, arg.UserID, arg.EmailAddress)
 	return err
 }
 

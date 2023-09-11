@@ -156,3 +156,7 @@ func (api AuthAPI) GenerateQRCodeLoginToken(ctx context.Context) (string, error)
 
 	return auth.GenerateOneTimeLoginToken(ctx, userID, "qr_code", 5*time.Minute)
 }
+
+func (api AuthAPI) ForceAuthTokenRefresh(ctx context.Context, userID persist.DBID) error {
+	return auth.ForceAuthTokenRefresh(ctx, api.authRefreshCache, userID)
+}

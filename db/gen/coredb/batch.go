@@ -110,6 +110,51 @@ func (b *CountAdmiresByPostIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const countAdmiresByTokenIDBatch = `-- name: CountAdmiresByTokenIDBatch :batchone
+SELECT count(*) FROM admires WHERE token_id = $1 AND deleted = false
+`
+
+type CountAdmiresByTokenIDBatchBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+func (q *Queries) CountAdmiresByTokenIDBatch(ctx context.Context, tokenID []persist.DBID) *CountAdmiresByTokenIDBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range tokenID {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(countAdmiresByTokenIDBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &CountAdmiresByTokenIDBatchBatchResults{br, len(tokenID), false}
+}
+
+func (b *CountAdmiresByTokenIDBatchBatchResults) QueryRow(f func(int, int64, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var count int64
+		if b.closed {
+			if f != nil {
+				f(t, count, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		row := b.br.QueryRow()
+		err := row.Scan(&count)
+		if f != nil {
+			f(t, count, err)
+		}
+	}
+}
+
+func (b *CountAdmiresByTokenIDBatchBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const countCommentsByFeedEventIDBatch = `-- name: CountCommentsByFeedEventIDBatch :batchone
 SELECT count(*) FROM comments WHERE feed_event_id = $1 AND reply_to is null AND deleted = false
 `
@@ -1694,31 +1739,31 @@ func (b *GetGalleryTokenMediasByGalleryIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
-const getMediaByTokenID = `-- name: GetMediaByTokenID :batchone
+const getMediaByTokenIDIgnoringStatus = `-- name: GetMediaByTokenIDIgnoringStatus :batchone
 select m.id, m.created_at, m.last_updated, m.version, m.contract_id, m.token_id, m.chain, m.active, m.metadata, m.media, m.name, m.description, m.processing_job_id, m.deleted
 from token_medias m
-where m.id = (select token_media_id from tokens where tokens.id = $1) and m.active and not m.deleted
+where m.id = (select token_media_id from tokens where tokens.id = $1) and not m.deleted
 `
 
-type GetMediaByTokenIDBatchResults struct {
+type GetMediaByTokenIDIgnoringStatusBatchResults struct {
 	br     pgx.BatchResults
 	tot    int
 	closed bool
 }
 
-func (q *Queries) GetMediaByTokenID(ctx context.Context, id []persist.DBID) *GetMediaByTokenIDBatchResults {
+func (q *Queries) GetMediaByTokenIDIgnoringStatus(ctx context.Context, id []persist.DBID) *GetMediaByTokenIDIgnoringStatusBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range id {
 		vals := []interface{}{
 			a,
 		}
-		batch.Queue(getMediaByTokenID, vals...)
+		batch.Queue(getMediaByTokenIDIgnoringStatus, vals...)
 	}
 	br := q.db.SendBatch(ctx, batch)
-	return &GetMediaByTokenIDBatchResults{br, len(id), false}
+	return &GetMediaByTokenIDIgnoringStatusBatchResults{br, len(id), false}
 }
 
-func (b *GetMediaByTokenIDBatchResults) QueryRow(f func(int, TokenMedia, error)) {
+func (b *GetMediaByTokenIDIgnoringStatusBatchResults) QueryRow(f func(int, TokenMedia, error)) {
 	defer b.br.Close()
 	for t := 0; t < b.tot; t++ {
 		var i TokenMedia
@@ -1751,7 +1796,7 @@ func (b *GetMediaByTokenIDBatchResults) QueryRow(f func(int, TokenMedia, error))
 	}
 }
 
-func (b *GetMediaByTokenIDBatchResults) Close() error {
+func (b *GetMediaByTokenIDIgnoringStatusBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }
@@ -3983,6 +4028,98 @@ func (b *PaginateAdmiresByPostIDBatchBatchResults) Query(f func(int, []Admire, e
 }
 
 func (b *PaginateAdmiresByPostIDBatchBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
+const paginateAdmiresByTokenIDBatch = `-- name: PaginateAdmiresByTokenIDBatch :batchmany
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id FROM admires WHERE token_id = $1 AND (not $2::bool or actor_id = $3) AND deleted = false
+    AND (created_at, id) < ($4, $5) AND (created_at, id) > ($6, $7)
+    ORDER BY CASE WHEN $8::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT $8::bool THEN (created_at, id) END DESC
+    LIMIT $9
+`
+
+type PaginateAdmiresByTokenIDBatchBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type PaginateAdmiresByTokenIDBatchParams struct {
+	TokenID       persist.DBID `json:"token_id"`
+	OnlyForActor  bool         `json:"only_for_actor"`
+	ActorID       persist.DBID `json:"actor_id"`
+	CurBeforeTime time.Time    `json:"cur_before_time"`
+	CurBeforeID   persist.DBID `json:"cur_before_id"`
+	CurAfterTime  time.Time    `json:"cur_after_time"`
+	CurAfterID    persist.DBID `json:"cur_after_id"`
+	PagingForward bool         `json:"paging_forward"`
+	Limit         int32        `json:"limit"`
+}
+
+func (q *Queries) PaginateAdmiresByTokenIDBatch(ctx context.Context, arg []PaginateAdmiresByTokenIDBatchParams) *PaginateAdmiresByTokenIDBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.TokenID,
+			a.OnlyForActor,
+			a.ActorID,
+			a.CurBeforeTime,
+			a.CurBeforeID,
+			a.CurAfterTime,
+			a.CurAfterID,
+			a.PagingForward,
+			a.Limit,
+		}
+		batch.Queue(paginateAdmiresByTokenIDBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &PaginateAdmiresByTokenIDBatchBatchResults{br, len(arg), false}
+}
+
+func (b *PaginateAdmiresByTokenIDBatchBatchResults) Query(f func(int, []Admire, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var items []Admire
+		if b.closed {
+			if f != nil {
+				f(t, items, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		err := func() error {
+			rows, err := b.br.Query()
+			defer rows.Close()
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var i Admire
+				if err := rows.Scan(
+					&i.ID,
+					&i.Version,
+					&i.FeedEventID,
+					&i.ActorID,
+					&i.Deleted,
+					&i.CreatedAt,
+					&i.LastUpdated,
+					&i.PostID,
+					&i.TokenID,
+				); err != nil {
+					return err
+				}
+				items = append(items, i)
+			}
+			return rows.Err()
+		}()
+		if f != nil {
+			f(t, items, err)
+		}
+	}
+}
+
+func (b *PaginateAdmiresByTokenIDBatchBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }
