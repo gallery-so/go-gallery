@@ -2150,7 +2150,17 @@ type Token struct {
 func (Token) IsNode()             {}
 func (Token) IsTokenByIDOrError() {}
 
-<<<<<<< HEAD
+type TokenAdmireEdge struct {
+	Node   *Admire `json:"node"`
+	Cursor *string `json:"cursor"`
+	Token  *Token  `json:"token"`
+}
+
+type TokenAdmiresConnection struct {
+	Edges    []*TokenAdmireEdge `json:"edges"`
+	PageInfo *PageInfo          `json:"pageInfo"`
+}
+
 type TokenDraftDetails struct {
 	HelperTokenDraftDetailsData
 	Media            MediaSubtype `json:"media"`
@@ -2164,17 +2174,6 @@ func (TokenDraftDetails) IsTokenDraftDetailsOrError() {}
 type TokenDraftDetailsInput struct {
 	Token          *ChainAddressTokenInput `json:"token"`
 	HighDefinition bool                    `json:"highDefinition"`
-=======
-type TokenAdmireEdge struct {
-	Node   *Admire `json:"node"`
-	Cursor *string `json:"cursor"`
-	Token  *Token  `json:"token"`
-}
-
-type TokenAdmiresConnection struct {
-	Edges    []*TokenAdmireEdge `json:"edges"`
-	PageInfo *PageInfo          `json:"pageInfo"`
->>>>>>> jarrel/add-sync-retries
 }
 
 type TokenEdge struct {

@@ -372,7 +372,7 @@ func processWalletRemoval(queries *coredb.Queries) gin.HandlerFunc {
 	}
 }
 
-func processPostPreflight(tp *tokenProcessor, q *coredb.Queries, mc *multichain.Provider, contractRepo *postgres.ContractGalleryRepository, userRepo *postgres.UserRepository, tokenRepo *postgres.TokenGalleryRepository) gin.HandlerFunc {
+func processPostPreflight(tp *tokenProcessor, tm *tokenmanage.Manager, q *coredb.Queries, mc *multichain.Provider, contractRepo *postgres.ContractGalleryRepository, userRepo *postgres.UserRepository, tokenRepo *postgres.TokenGalleryRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input task.PostPreflightMessage
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -400,7 +400,7 @@ func processPostPreflight(tp *tokenProcessor, q *coredb.Queries, mc *multichain.
 				util.ErrResponse(c, http.StatusOK, err)
 				return
 			}
-			err = runPostPreflightAuthed(c, tp, user, input.Token, mc, contractRepo)
+			err = runPostPreflightAuthed(c, tp, tm, user, input.Token, mc, contractRepo)
 			if err != nil {
 				util.ErrResponse(c, http.StatusInternalServerError, err)
 				return
@@ -412,36 +412,33 @@ func processPostPreflight(tp *tokenProcessor, q *coredb.Queries, mc *multichain.
 }
 
 func processFromInstance(ctx context.Context, tp *tokenProcessor, tm *tokenmanage.Manager, token persist.TokenGallery, contract persist.ContractGallery, cause persist.ProcessingCause) (coredb.TokenMedia, error) {
-	opts := append(addContractRunOptions(contract), addContextRunOptions(cause)...)
-	opts = append(opts, PipelineOpts.WithTokenInstance(&token))
-	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
-		"tokenDBID":       token.ID,
-		"tokenID":         token.TokenID,
-		"tokenID_base10":  token.TokenID.Base10String(),
-		"contractDBID":    token.Contract,
-		"contractAddress": contract.Address,
-		"chain":           token.Chain,
-	})
-
+	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"tokenDBID": token.ID})
+	t := persist.NewTokenIdentifiers(contract.Address, token.TokenID, token.Chain)
 	err, closing := tm.StartProcessing(ctx, token.ID, 0)
 	if err != nil {
-		logger.For(ctx).Warnf("failed to start tokenID=%s: %s", token.ID, err)
 		return coredb.TokenMedia{}, err
 	}
-
-	t := persist.NewTokenIdentifiers(contract.Address, token.TokenID, token.Chain)
-	media, err := tp.ProcessTokenPipeline(ctx, t, contract, cause, opts...)
+	media, err := processFromIdentifiers(ctx, tp, t, contract, cause, PipelineOpts.WithTokenInstance(&token))
 	defer closing(err)
-
 	return media, err
 }
 
-func processFromIdentifiers(ctx context.Context, tp *tokenProcessor, token persist.TokenIdentifiers, contract persist.ContractGallery, cause persist.ProcessingCause) (coredb.TokenMedia, error) {
+func processFromIdentifiers(ctx context.Context, tp *tokenProcessor, token persist.TokenIdentifiers, contract persist.ContractGallery, cause persist.ProcessingCause, opts ...PipelineOption) (coredb.TokenMedia, error) {
+	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
+		"tokenID":         token.TokenID,
+		"tokenID_base10":  token.TokenID.Base10String(),
+		"contractDBID":    contract.ID,
+		"contractAddress": contract.Address,
+		"chain":           token.Chain,
+	})
+	baseOpts := append(addContractRunOptions(contract), addContextRunOptions(cause)...)
+	opts = append(baseOpts, opts...)
+	return tp.ProcessTokenPipeline(ctx, token, contract, cause, opts...)
 }
 
 // addContextRunOptions adds pipeline options for specific types of runs
 func addContextRunOptions(cause persist.ProcessingCause) (opts []PipelineOption) {
-	if cause == persist.ProcessingCauseRefresh || cause == persist.ProcessingCauseSyncRetry {
+	if cause == persist.ProcessingCauseRefresh || cause == persist.ProcessingCauseSyncRetry || cause == persist.ProcessingCausePostPreflight {
 		opts = append(opts, PipelineOpts.WithRefreshMetadata())
 	}
 	return opts
@@ -469,7 +466,7 @@ func runPostPreflightUnauthed(ctx context.Context, tp *tokenProcessor, token per
 		if err != nil {
 			return err
 		}
-		_, err = tp.ProcessTokenPipeline(ctx, token, contract, persist.ProcessingCausePostPreflight, PipelineOpts.WithForceFetchMetadata())
+		_, err = processFromIdentifiers(ctx, tp, token, contract, persist.ProcessingCausePostPreflight)
 		return err
 	}
 
@@ -481,7 +478,7 @@ func runPostPreflightUnauthed(ctx context.Context, tp *tokenProcessor, token per
 	return retry.RetryFunc(ctx, prelightF, shouldRetry, retry.DefaultRetry)
 }
 
-func runPostPreflightAuthed(ctx context.Context, tp *tokenProcessor, user persist.User, token persist.TokenIdentifiers, mc *multichain.Provider, contractRepo *postgres.ContractGalleryRepository) error {
+func runPostPreflightAuthed(ctx context.Context, tp *tokenProcessor, tm *tokenmanage.Manager, user persist.User, token persist.TokenIdentifiers, mc *multichain.Provider, contractRepo *postgres.ContractGalleryRepository) error {
 	preflightF := func(ctx context.Context) error {
 		wallets := multichain.MatchingWalletsForChain(user.Wallets, token.Chain, mc.WalletOverrides)
 		tokens := util.MapWithoutError(wallets, func(w persist.Address) persist.TokenUniqueIdentifiers {
@@ -499,7 +496,7 @@ func runPostPreflightAuthed(ctx context.Context, tp *tokenProcessor, user persis
 		if err != nil {
 			return err
 		}
-		_, err = runPipelineForToken(ctx, tp, syncedTokens[0], contract, persist.ProcessingCausePostPreflight)
+		_, err = processFromInstance(ctx, tp, nil, syncedTokens[0], contract, persist.ProcessingCausePostPreflight)
 		return err
 	}
 

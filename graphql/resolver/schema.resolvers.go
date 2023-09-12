@@ -1077,7 +1077,7 @@ func (r *mutationResolver) RefreshContract(ctx context.Context, contractID persi
 
 // ReferralPostPreflight is the resolver for the referralPostPreflight field.
 func (r *mutationResolver) ReferralPostPreflight(ctx context.Context, input model.ReferralPostPreflightInput) (model.ReferralPostPreflightPayloadOrError, error) {
-	err := publicapi.For(ctx).Token.ReferralPostPreflight(ctx, persist.TokenIdentifiers{
+	err := publicapi.For(ctx).Feed.ReferralPostPreflight(ctx, persist.TokenIdentifiers{
 		Chain:           input.Token.ChainAddress.Chain(),
 		ContractAddress: input.Token.ChainAddress.Address(),
 		TokenID:         input.Token.TokenID,
@@ -2699,14 +2699,6 @@ func (r *tokenResolver) IsSpamByProvider(ctx context.Context, obj *model.Token) 
 	return &isSpam, nil
 }
 
-// Community is the resolver for the community field.
-func (r *tokenDraftDetailsResolver) Community(ctx context.Context, obj *model.TokenDraftDetails) (*model.Community, error) {
-	if obj.HelperTokenDraftDetailsData.ContractID == "" {
-		return nil, nil
-	}
-	return resolveCommunityByID(ctx, obj.HelperTokenDraftDetailsData.ContractID)
-}
-
 // Admires is the resolver for the admires field.
 func (r *tokenResolver) Admires(ctx context.Context, obj *model.Token, before *string, after *string, first *int, last *int, userID *persist.DBID) (*model.TokenAdmiresConnection, error) {
 	var edges []*model.TokenAdmireEdge
@@ -2726,6 +2718,14 @@ func (r *tokenResolver) Admires(ctx context.Context, obj *model.Token, before *s
 		Edges:    edges,
 		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}, nil
+}
+
+// Community is the resolver for the community field.
+func (r *tokenDraftDetailsResolver) Community(ctx context.Context, obj *model.TokenDraftDetails) (*model.Community, error) {
+	if obj.HelperTokenDraftDetailsData.ContractID == "" {
+		return nil, nil
+	}
+	return resolveCommunityByID(ctx, obj.HelperTokenDraftDetailsData.ContractID)
 }
 
 // Wallets is the resolver for the wallets field.
