@@ -37,7 +37,7 @@ func New(ctx context.Context, taskClient *cloudtasks.Client) *Manager {
 func NewWithRetries(ctx context.Context, taskClient *cloudtasks.Client, maxRetries int) *Manager {
 	m := New(ctx, taskClient)
 	m.maxRetries = maxRetries
-	m.delayer = limiters.NewKeyRateLimiter(ctx, m.cache, "retry", 2, 1*time.Minute)
+	m.delayer = limiters.NewKeyRateLimiter(ctx, m.cache, "retry", 1, 2*time.Minute)
 	return m
 }
 
@@ -51,7 +51,7 @@ func (m Manager) Processing(ctx context.Context, tokenID persist.DBID) bool {
 // it as finished. If withRetry is true, the callback will attempt to reenqueue the token if an error is passed. attemps is ignored when MaxRetries
 // is set to the default value of 0.
 func (m Manager) StartProcessing(ctx context.Context, tokenID persist.DBID, attempts int) (error, func(err error) error) {
-	err := m.throttle.Lock(ctx, lockKey(tokenID))
+	err := m.throttle.Lock(ctx, "lock:"+tokenID.String())
 	if err != nil {
 		return err, nil
 	}
@@ -77,7 +77,7 @@ func (m Manager) StartProcessing(ctx context.Context, tokenID persist.DBID, atte
 		close(stop)
 		<-done
 		m.tryRetry(ctx, tokenID, err, attempts)
-		m.throttle.Unlock(ctx, lockKey(tokenID))
+		m.throttle.Unlock(ctx, "lock:"+tokenID.String())
 		return nil
 	}
 
@@ -110,31 +110,29 @@ func (m Manager) tryRetry(ctx context.Context, tokenID persist.DBID, err error, 
 
 type registry struct{ c *redis.Cache }
 
-func inflightKey(t persist.DBID) string { return "inflight:" + t.String() }
-func lockKey(t persist.DBID) string     { return "lock:" + t.String() }
-
 func (r registry) processing(ctx context.Context, tokenID persist.DBID) (bool, error) {
-	_, err := r.c.Get(ctx, inflightKey(tokenID))
+	_, err := r.c.Get(ctx, prefixKey(tokenID))
 	return err == nil, err
 }
 
 func (r registry) finish(ctx context.Context, tokenID persist.DBID) error {
-	return r.c.Delete(ctx, inflightKey(tokenID))
+	return r.c.Delete(ctx, prefixKey(tokenID))
 }
 
 func (r registry) setEnqueue(ctx context.Context, tokenID persist.DBID) error {
-	err := r.c.Set(ctx, inflightKey(tokenID), []byte("enqueued"), 0)
-	return err
+	return r.setManyEnqueue(ctx, []persist.DBID{tokenID})
 }
 
 func (r registry) setManyEnqueue(ctx context.Context, tokenIDs []persist.DBID) error {
 	keyValues := make(map[string]any, len(tokenIDs))
-	for _, tokenID := range tokenIDs {
-		keyValues[inflightKey(tokenID)] = []byte("enqueued")
+	for _, t := range tokenIDs {
+		keyValues[prefixKey(t)] = []byte("enqueued")
 	}
-	return r.c.MSet(ctx, keyValues)
+	return r.c.MSetWithTTL(ctx, keyValues, time.Hour)
 }
 
 func (r registry) keepAlive(ctx context.Context, tokenID persist.DBID) error {
-	return r.c.Set(ctx, inflightKey(tokenID), []byte("processing"), time.Minute)
+	return r.c.Set(ctx, prefixKey(tokenID), []byte("processing"), time.Minute)
 }
+
+func prefixKey(t persist.DBID) string { return "inflight:" + t.String() }

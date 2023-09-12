@@ -130,13 +130,15 @@ func (c *Cache) SetNX(pCtx context.Context, key string, value []byte, expiration
 	return cmd.Val(), nil
 }
 
-// MSet sets multiple keys in the redis cache atomically.
-func (c *Cache) MSet(pCtx context.Context, keyValues map[string]any) error {
-	keyValuesPrefixed := make(map[string]any, len(keyValues))
-	for key, value := range keyValues {
-		keyValuesPrefixed[c.getPrefixedKey(key)] = value
+// MSetWithTTL sets multiple keys in the redis cache via pipelining.
+func (c *Cache) MSetWithTTL(ctx context.Context, keyValues map[string]any, expiration time.Duration) error {
+	p := c.client.Pipeline()
+	defer p.Close()
+	for k, v := range keyValues {
+		p.Set(ctx, c.getPrefixedKey(k), v, expiration)
 	}
-	return c.client.MSet(pCtx, keyValuesPrefixed).Err()
+	_, err := p.Exec(ctx)
+	return err
 }
 
 // SetTime sets a time in the redis cache. If onlyIfLater is true, the value will only be set if the
