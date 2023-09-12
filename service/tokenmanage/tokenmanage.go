@@ -86,7 +86,7 @@ func (m Manager) StartProcessing(ctx context.Context, tokenID persist.DBID, atte
 
 // SubmitUser enqueues a user's tokens for processing.
 func (m Manager) SubmitUser(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, chains []persist.Chain) error {
-	m.processRegistry.setEnqueuedMany(ctx, tokenIDs)
+	m.processRegistry.setManyEnqueue(ctx, tokenIDs)
 	message := task.TokenProcessingUserMessage{UserID: userID, TokenIDs: tokenIDs, Chains: chains}
 	return task.CreateTaskForTokenProcessing(ctx, message, m.taskClient)
 }
@@ -110,8 +110,8 @@ func (m Manager) tryRetry(ctx context.Context, tokenID persist.DBID, err error, 
 
 type registry struct{ c *redis.Cache }
 
-func inflightKey(tokenID persist.DBID) string { return "inflight:" + tokenID.String() }
-func lockKey(tokenID persist.DBID) string     { return "lock:" + tokenID.String() }
+func inflightKey(t persist.DBID) string { return "inflight:" + t.String() }
+func lockKey(t persist.DBID) string     { return "lock:" + t.String() }
 
 func (r registry) processing(ctx context.Context, tokenID persist.DBID) (bool, error) {
 	_, err := r.c.Get(ctx, inflightKey(tokenID))
@@ -123,12 +123,11 @@ func (r registry) finish(ctx context.Context, tokenID persist.DBID) error {
 }
 
 func (r registry) setEnqueue(ctx context.Context, tokenID persist.DBID) error {
-	// Set a TTL while enqueued on the off-chance that if the task is never picked up it can still be refreshed manually
-	err := r.c.Set(ctx, inflightKey(tokenID), []byte("enqueued"), time.Hour*3)
+	err := r.c.Set(ctx, inflightKey(tokenID), []byte("enqueued"), 0)
 	return err
 }
 
-func (r registry) setEnqueuedMany(ctx context.Context, tokenIDs []persist.DBID) error {
+func (r registry) setManyEnqueue(ctx context.Context, tokenIDs []persist.DBID) error {
 	keyValues := make(map[string]any, len(tokenIDs))
 	for _, tokenID := range tokenIDs {
 		keyValues[inflightKey(tokenID)] = []byte("enqueued")

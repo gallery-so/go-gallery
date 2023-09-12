@@ -1987,7 +1987,7 @@ func resolveTokenMedia(ctx context.Context, token db.Token, tokenMedia db.TokenM
 		token.FallbackMedia.ImageURL = persist.NullString(fmt.Sprintf("https://arweave.net/%s", util.GetURIPath(fallback, false)))
 	}
 
-	// Media is found and is active. While it's possible for the token to also be processing, if we have media for it we'll use it.
+	// Media is found and is active.
 	if tokenMedia.ID != "" && tokenMedia.Active {
 		return mediaToModel(ctx, tokenMedia, token.FallbackMedia, highDef)
 	}
@@ -2005,7 +2005,7 @@ func resolveTokenMedia(ctx context.Context, token db.Token, tokenMedia db.TokenM
 		}
 	}
 
-	// If the media isn't valid, check if its still up for processing from a retry. If so, set the media as syncing.
+	// If the media isn't valid, check if its still up for processing. If so, set the media as syncing.
 	if tokenMedia.Media.MediaType != persist.MediaTypeSyncing && !tokenMedia.Media.MediaType.IsValid() {
 		if inFlight := publicapi.For(ctx).Token.GetProcessingStateByID(ctx, token.ID); inFlight {
 			tokenMedia.Media.MediaType = persist.MediaTypeSyncing
