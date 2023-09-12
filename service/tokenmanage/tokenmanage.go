@@ -8,7 +8,6 @@ import (
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 
 	"github.com/mikeydub/go-gallery/service/limiters"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/task"
@@ -16,21 +15,30 @@ import (
 )
 
 type Manager struct {
+	cache           *redis.Cache
 	processRegistry *registry
-	queue           *enqueue
+	taskClient      *cloudtasks.Client
 	throttle        *throttle.Locker
-	retryLimiter    *limiters.KeyRateLimiter
+	// delayer sets the linear delay for retrying tokens up to MaxRetries
+	delayer *limiters.KeyRateLimiter
+	// MaxRetries is the maximum number of times a token can be reenqueued before it is not retried again
+	MaxRetries int
 }
 
 func New(ctx context.Context, taskClient *cloudtasks.Client) *Manager {
 	cache := redis.NewCache(redis.TokenManageCache)
-	m := &Manager{
+	return &Manager{
+		cache:           cache,
 		processRegistry: &registry{cache},
-		queue:           &enqueue{taskClient},
+		taskClient:      taskClient,
 		throttle:        throttle.NewThrottleLocker(cache, 30*time.Minute),
-		// XXX retryLimiter:    limiters.NewKeyRateLimiter(ctx, cache, "retry", 10, 15*time.Minute),
-		retryLimiter: limiters.NewKeyRateLimiter(ctx, cache, "retry", 3, 15*time.Minute),
 	}
+}
+
+func NewWithRetries(ctx context.Context, taskClient *cloudtasks.Client, maxRetries int) *Manager {
+	m := New(ctx, taskClient)
+	m.MaxRetries = maxRetries
+	m.delayer = limiters.NewKeyRateLimiter(ctx, m.cache, "retry", 2, 1*time.Minute)
 	return m
 }
 
@@ -40,18 +48,10 @@ func (m Manager) Processing(ctx context.Context, tokenID persist.DBID) bool {
 	return p
 }
 
-func (m Manager) StartProcessingRetry(ctx context.Context, tokenID persist.DBID) (error, func(err error) error) {
-	return m.startProcessing(ctx, tokenID, true)
-}
-
-func (m Manager) StartProcessingNoRetry(ctx context.Context, tokenID persist.DBID) (error, func(err error) error) {
-	return m.startProcessing(ctx, tokenID, false)
-}
-
-// startProcessing marks a token as processing. It returns a callback function that should be called when work on the token is done to mark
-// it as finished, release the lock and close the keepalive routine. If withRetry is true, the callback will attempt to retry the token
-// by re-enqueuing it if an error is passed to it.
-func (m Manager) startProcessing(ctx context.Context, tokenID persist.DBID, withRetry bool) (error, func(err error) error) {
+// StartProcessing marks a token as processing. It returns a callback that should be called when work on the token is done to mark
+// it as finished. If withRetry is true, the callback will attempt to reenqueue the token if an error is passed. The tries arg is ignored
+// when MaxRetries is set to the default value of 0.
+func (m Manager) StartProcessing(ctx context.Context, tokenID persist.DBID, tries int) (error, func(err error) error) {
 	err := m.throttle.Lock(ctx, lockKey(tokenID))
 	if err != nil {
 		return err, nil
@@ -59,18 +59,15 @@ func (m Manager) startProcessing(ctx context.Context, tokenID persist.DBID, with
 
 	stop := make(chan bool)
 	done := make(chan bool)
-	// XXX tick := time.NewTicker(10 * time.Second)
-	tick := time.NewTicker(4 * time.Second)
+	tick := time.NewTicker(10 * time.Second)
 
 	go func() {
 		defer tick.Stop()
 		for {
 			select {
 			case <-tick.C:
-				fmt.Println("keeping alive", tokenID)
 				m.processRegistry.keepAlive(ctx, tokenID)
 			case <-stop:
-				fmt.Println("finished", tokenID)
 				close(done)
 				return
 			}
@@ -78,21 +75,10 @@ func (m Manager) startProcessing(ctx context.Context, tokenID persist.DBID, with
 	}()
 
 	callback := func(err error) error {
-		fmt.Println("in callback", tokenID)
 		close(stop)
 		<-done
-		if withRetry {
-			err = m.tryRetry(ctx, tokenID, err)
-			if err != nil {
-				panic(err)
-			}
-		}
-		fmt.Println("unlocking", tokenID)
-		err = m.throttle.Unlock(ctx, lockKey(tokenID))
-		fmt.Println("done unlocking", tokenID)
-		if err != nil {
-			panic(err)
-		}
+		m.tryRetry(ctx, tokenID, err, tries)
+		m.throttle.Unlock(ctx, lockKey(tokenID))
 		return nil
 	}
 
@@ -101,54 +87,28 @@ func (m Manager) startProcessing(ctx context.Context, tokenID persist.DBID, with
 
 // SubmitUser enqueues a user's tokens for processing.
 func (m Manager) SubmitUser(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, chains []persist.Chain) error {
-	err := m.processRegistry.setEnqueuedMany(ctx, tokenIDs)
-	if err != nil {
-		panic(err)
-		// Only log the error so the task is still enqueued
-		logger.For(ctx).Errorf("failed to set enqueued tokens for user %s: %s", userID, err)
-	}
-	return m.queue.submitUser(ctx, userID, tokenIDs, chains)
+	m.processRegistry.setEnqueuedMany(ctx, tokenIDs)
+	message := task.TokenProcessingUserMessage{UserID: userID, TokenIDs: tokenIDs, Chains: chains}
+	return task.CreateTaskForTokenProcessing(ctx, message, m.taskClient)
 }
 
-func (m Manager) tryRetry(ctx context.Context, tokenID persist.DBID, err error) error {
-	if err == nil {
-		err := m.processRegistry.finish(ctx, tokenID)
-		if err != nil {
-			panic(err)
-		}
-		fmt.Println("DONE WITH TOKEN", tokenID)
+func (m Manager) tryRetry(ctx context.Context, tokenID persist.DBID, err error, tries int) error {
+	if err == nil || m.MaxRetries <= 0 || tries >= m.MaxRetries {
+		m.processRegistry.finish(ctx, tokenID)
+		fmt.Println("DONE WITH TOKEN", tokenID, "err", err, "tries", tries, "max", m.MaxRetries)
 		return nil
 	}
 
-	canRetry, _, err := m.retryLimiter.ForKey(ctx, tokenID.String())
+	_, delay, err := m.delayer.ForKey(ctx, tokenID.String())
 	if err != nil {
-		panic(err)
+		m.processRegistry.finish(ctx, tokenID)
 		return err
 	}
 
-	if !canRetry {
-		fmt.Println("CAN'T RETRY", tokenID)
-		err := m.processRegistry.finish(ctx, tokenID)
-		if err != nil {
-			panic(err)
-		}
-		return nil
-	}
-
-	err = m.processRegistry.setEnqueue(ctx, tokenID)
-	if err != nil {
-		panic(err)
-		// Only log the error so the task can still be retried
-		logger.For(ctx).Errorf("failed to set enqueued for token %s: %s", tokenID, err)
-	}
-
-	fmt.Println("putting back in queue", tokenID, "...")
-	err = m.queue.submitTokenForRetry(ctx, tokenID)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println("REQUEUED", tokenID)
-	return err
+	m.processRegistry.setEnqueue(ctx, tokenID)
+	message := task.TokenProcessingTokenInstanceMessage{TokenDBID: tokenID, Attempts: tries + 1}
+	fmt.Println("reenqueued", tokenID, "atttempt", message.Attempts, "delayed for", delay)
+	return task.CreateTaskForTokenInstanceTokenProcessing(ctx, message, m.taskClient, delay)
 }
 
 type registry struct{ c *redis.Cache }
@@ -162,12 +122,12 @@ func (r registry) processing(ctx context.Context, tokenID persist.DBID) (bool, e
 }
 
 func (r registry) finish(ctx context.Context, tokenID persist.DBID) error {
-	fmt.Println("deleting", tokenID, inflightKey(tokenID))
 	return r.c.Delete(ctx, inflightKey(tokenID))
 }
 
 func (r registry) setEnqueue(ctx context.Context, tokenID persist.DBID) error {
-	err := r.c.Set(ctx, inflightKey(tokenID), []byte("enqueued"), 0)
+	// Set a long TTL on the off-chance that a worker never picks up the message
+	err := r.c.Set(ctx, inflightKey(tokenID), []byte("enqueued"), time.Hour*3)
 	return err
 }
 
@@ -181,16 +141,4 @@ func (r registry) setEnqueuedMany(ctx context.Context, tokenIDs []persist.DBID) 
 
 func (r registry) keepAlive(ctx context.Context, tokenID persist.DBID) error {
 	return r.c.Set(ctx, inflightKey(tokenID), []byte("processing"), time.Minute)
-}
-
-type enqueue struct{ taskClient *cloudtasks.Client }
-
-func (e enqueue) submitUser(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, chains []persist.Chain) error {
-	message := task.TokenProcessingUserMessage{UserID: userID, TokenIDs: tokenIDs, Chains: chains}
-	return task.CreateTaskForTokenProcessing(ctx, message, e.taskClient)
-}
-
-func (e enqueue) submitTokenForRetry(ctx context.Context, tokenID persist.DBID) error {
-	message := task.TokenProcessingTokenInstanceMessage{TokenDBID: tokenID}
-	return task.CreateTaskForTokenInstanceTokenProcessing(ctx, message, e.taskClient)
 }

@@ -1989,17 +1989,26 @@ func resolveTokenMedia(ctx context.Context, token db.Token, tokenMedia db.TokenM
 
 	// Media is found and is active. While it's possible for the token to also be processing, if we have media for it we'll use it.
 	if tokenMedia.ID != "" && tokenMedia.Active {
-		return mediaToModel(ctx, tokenMedia, token.FallbackMedia, highDef)
+		m := mediaToModel(ctx, tokenMedia, token.FallbackMedia, highDef)
+		fmt.Println("returning active media", "name", tokenMedia.Name, "type", tokenMedia.Media.MediaType, "id", token.ID)
+		im, ok := m.(model.ImageMedia)
+		if ok {
+			fmt.Println("previewURL", "small", *im.PreviewURLs.Small, "medium", *im.PreviewURLs.Medium, "large", *im.PreviewURLs.Large)
+		}
+		return m
 	}
 
 	// If there is no media for a token, assume that the token is still being synced.
 	if tokenMedia.ID == "" {
+		fmt.Println("assuming token is syncing")
 		tokenMedia.Media.MediaType = persist.MediaTypeSyncing
 		// In the worse case the processing message was dropped and the token never gets handled. To address that,
 		// we compare when the token was created to the current time. If it's longer than the grace period, we assume that the
 		// message was lost and set the media to invalid so it could be refreshed manually.
 		if inFlight := publicapi.For(ctx).Token.GetProcessingStateByID(ctx, token.ID); !inFlight {
+			fmt.Println("setting as invalid for some reason")
 			if time.Since(token.CreatedAt) > time.Duration(1*time.Hour) {
+				fmt.Println("setting as invalid for some reason")
 				tokenMedia.Media.MediaType = persist.MediaTypeInvalid
 			}
 		}
@@ -2008,11 +2017,18 @@ func resolveTokenMedia(ctx context.Context, token db.Token, tokenMedia db.TokenM
 	// If the media isn't valid, check if its still up for processing from a retry. If so, set the media as syncing.
 	if tokenMedia.Media.MediaType != persist.MediaTypeSyncing && !tokenMedia.Media.MediaType.IsValid() {
 		if inFlight := publicapi.For(ctx).Token.GetProcessingStateByID(ctx, token.ID); inFlight {
+			fmt.Println("token is invalid, but is still being processed")
 			tokenMedia.Media.MediaType = persist.MediaTypeSyncing
 		}
 	}
 
-	return mediaToModel(ctx, tokenMedia, token.FallbackMedia, highDef)
+	m := mediaToModel(ctx, tokenMedia, token.FallbackMedia, highDef)
+	fmt.Println("returning inactive media", "name", tokenMedia.Name, "type", tokenMedia.Media.MediaType, "id", token.ID)
+	im, ok := m.(model.ImageMedia)
+	if ok {
+		fmt.Println("previewURL", "small", *im.PreviewURLs.Small, "medium", *im.PreviewURLs.Medium, "large", *im.PreviewURLs.Large)
+	}
+	return m
 }
 
 func mediaToModel(ctx context.Context, tokenMedia db.TokenMedia, fallback persist.FallbackMedia, highDef bool) model.MediaSubtype {

@@ -49,6 +49,7 @@ type TokenProcessingTokenIdentifiersMessage struct {
 
 type TokenProcessingTokenInstanceMessage struct {
 	TokenDBID persist.DBID `json:"token_dbid" binding:"required"`
+	Attempts  int          `json:"attempts" binding:"required"`
 }
 
 type TokenProcessingContractTokensMessage struct {
@@ -176,12 +177,12 @@ func CreateTaskForTokenIdentifiersTokenProcessing(ctx context.Context, message T
 	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span))
 }
 
-func CreateTaskForTokenInstanceTokenProcessing(ctx context.Context, message TokenProcessingTokenInstanceMessage, client *gcptasks.Client) error {
+func CreateTaskForTokenInstanceTokenProcessing(ctx context.Context, message TokenProcessingTokenInstanceMessage, client *gcptasks.Client, delay time.Duration) error {
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForTokenInstanceTokenProcessing")
 	defer tracing.FinishSpan(span)
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
 	url := fmt.Sprintf("%s/media/process/token-id", env.GetString("TOKEN_PROCESSING_URL"))
-	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span))
+	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span), withScheduleOn(time.Now().Add(delay)))
 }
 
 func CreateTaskForWalletRemoval(ctx context.Context, message TokenProcessingWalletRemovalMessage, client *gcptasks.Client) error {

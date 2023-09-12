@@ -1201,7 +1201,6 @@ func (p *Provider) VerifySignature(ctx context.Context, pSig string, pNonce stri
 func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers) error {
 	err := p.processTokenMedia(ctx, ti.TokenID, ti.ContractAddress, ti.Chain)
 	if err != nil {
-		panic(err)
 		return err
 	}
 
