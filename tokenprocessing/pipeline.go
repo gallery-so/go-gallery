@@ -62,35 +62,35 @@ type tokenProcessingJob struct {
 	// The pipeline only looks at the root level of the metadata for the key and will also not fail if the key is missing
 	// or if processing media for the key fails.
 	profileImageKey string
+	// refreshMetadata is an optional flag that indicates that the pipeline should check for new metadata when enabled
+	refreshMetadata bool
 	// tokenInstance is an already instanced token to derive data (name, description, and metadata) from when fetching fails.
-	// If the job doesn't produce active media, only tokenInstance's media is updated (in contrast to all instances of a token).
+	// If the job doesn't produce active media, only tokenInstance's media is updated (as opposed to all instances of a token).
 	// If there is active media from past jobs, tokenInstance's media will reference that media instead.
 	tokenInstance *persist.TokenGallery
-	// forceFetchMetadata always fetches new metadata when enabled. It's useful when the metadata is expected to change such as for refreshes.
-	forceFetchMetadata bool
 }
 
 type PipelineOption func(*tokenProcessingJob)
 
-type pipelineOptions struct{}
+type pOpts struct{}
 
-var PipelineOpts pipelineOptions
+var PipelineOpts pOpts
 
-func (pipelineOptions) WithProfileImageKey(key string) PipelineOption {
+func (pOpts) WithProfileImageKey(key string) PipelineOption {
 	return func(j *tokenProcessingJob) {
 		j.profileImageKey = key
 	}
 }
 
-func (pipelineOptions) WithTokenInstance(t *persist.TokenGallery) PipelineOption {
+func (pOpts) WithRefreshMetadata() PipelineOption {
 	return func(j *tokenProcessingJob) {
-		j.tokenInstance = t
+		j.refreshMetadata = true
 	}
 }
 
-func (pipelineOptions) WithForceFetchMetadata() PipelineOption {
+func (pOpts) WithTokenInstance(t *persist.TokenGallery) PipelineOption {
 	return func(j *tokenProcessingJob) {
-		j.forceFetchMetadata = true
+		j.tokenInstance = t
 	}
 }
 
@@ -215,7 +215,7 @@ func (tpj *tokenProcessingJob) retrieveMetadata(ctx context.Context) persist.Tok
 		metadata = tpj.tokenInstance.TokenMetadata
 	}
 
-	if len(metadata) == 0 || tpj.forceFetchMetadata {
+	if len(metadata) == 0 || tpj.refreshMetadata {
 		i, a := tpj.contract.Chain.BaseKeywords()
 		fieldRequests := []multichain.FieldRequest[string]{
 			{

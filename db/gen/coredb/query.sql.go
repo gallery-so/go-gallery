@@ -6036,11 +6036,14 @@ func (q *Queries) UpdatePushTickets(ctx context.Context, arg UpdatePushTicketsPa
 }
 
 const updateTokenMetadataFieldsByTokenIdentifiers = `-- name: UpdateTokenMetadataFieldsByTokenIdentifiers :many
-update tokens set name = $1, description = $2, last_updated = now()
+update tokens
+set name = $1,
+    description = $2,
+    last_updated = now()
 where token_id = $3
-    and tokens.contract = $4
-    and tokens.chain = $5
-    and tokens.deleted = false
+    and contract = $4
+    and chain = $5
+    and deleted = false
 returning tokens.id
 `
 

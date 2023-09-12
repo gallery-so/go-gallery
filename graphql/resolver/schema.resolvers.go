@@ -1716,6 +1716,34 @@ func (r *mutationResolver) RedeemMerch(ctx context.Context, input model.RedeemMe
 	return output, nil
 }
 
+// OptInForRoles is the resolver for the optInForRoles field.
+func (r *mutationResolver) OptInForRoles(ctx context.Context, roles []persist.Role) (model.OptInForRolesPayloadOrError, error) {
+	user, err := publicapi.For(ctx).User.OptInForRoles(ctx, roles)
+	if err != nil {
+		return nil, err
+	}
+
+	payload := model.OptInForRolesPayload{
+		User: userToModel(ctx, *user),
+	}
+
+	return payload, nil
+}
+
+// OptOutForRoles is the resolver for the optOutForRoles field.
+func (r *mutationResolver) OptOutForRoles(ctx context.Context, roles []persist.Role) (model.OptOutForRolesPayloadOrError, error) {
+	user, err := publicapi.For(ctx).User.OptOutForRoles(ctx, roles)
+	if err != nil {
+		return nil, err
+	}
+
+	payload := model.OptOutForRolesPayload{
+		User: userToModel(ctx, *user),
+	}
+
+	return payload, nil
+}
+
 // AddRolesToUser is the resolver for the addRolesToUser field.
 func (r *mutationResolver) AddRolesToUser(ctx context.Context, username string, roles []*persist.Role) (model.AddRolesToUserPayloadOrError, error) {
 	user, err := publicapi.For(ctx).Admin.AddRolesToUser(ctx, username, roles)
@@ -2602,7 +2630,7 @@ func (r *tokenResolver) Media(ctx context.Context, obj *model.Token) (model.Medi
 		err = nil
 	}
 
-	return resolveTokenMedia(ctx, obj.HelperTokenData.Token, tokenMedia, highDef), nil
+	return resolveTokenMedia(ctx, obj.HelperTokenData.Token, tokenMedia, highDef), err
 }
 
 // Owner is the resolver for the owner field.
@@ -2673,10 +2701,31 @@ func (r *tokenResolver) IsSpamByProvider(ctx context.Context, obj *model.Token) 
 
 // Community is the resolver for the community field.
 func (r *tokenDraftDetailsResolver) Community(ctx context.Context, obj *model.TokenDraftDetails) (*model.Community, error) {
-	if obj.HelperTokenDraftDetailsData.ContractID != "" {
-		return resolveCommunityByID(ctx, obj.HelperTokenDraftDetailsData.ContractID)
+	if obj.HelperTokenDraftDetailsData.ContractID == "" {
+		return nil, nil
 	}
-	return nil, nil
+	return resolveCommunityByID(ctx, obj.HelperTokenDraftDetailsData.ContractID)
+}
+
+// Admires is the resolver for the admires field.
+func (r *tokenResolver) Admires(ctx context.Context, obj *model.Token, before *string, after *string, first *int, last *int, userID *persist.DBID) (*model.TokenAdmiresConnection, error) {
+	var edges []*model.TokenAdmireEdge
+	admires, pageInfo, err := publicapi.For(ctx).Interaction.PaginateAdmiresByTokenID(ctx, obj.Dbid, before, after, first, last, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, admire := range admires {
+		edges = append(edges, &model.TokenAdmireEdge{
+			Node:  admireToModel(ctx, admire),
+			Token: obj,
+		})
+	}
+
+	return &model.TokenAdmiresConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
 }
 
 // Wallets is the resolver for the wallets field.

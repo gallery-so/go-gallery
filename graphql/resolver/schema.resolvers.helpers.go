@@ -172,7 +172,7 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrCommunityNotFound{Message: message}
 	case persist.ErrAddressOwnedByUser:
 		mappedErr = model.ErrAddressOwnedByUser{Message: message}
-	case persist.ErrAdmireNotFound:
+	case persist.ErrAdmireNotFound, persist.ErrAdmireFeedEventNotFound, persist.ErrAdmirePostNotFound, persist.ErrAdmireTokenNotFound:
 		mappedErr = model.ErrAdmireNotFound{Message: message}
 	case persist.ErrAdmireAlreadyExists:
 		mappedErr = model.ErrAdmireAlreadyExists{Message: message}
@@ -1636,7 +1636,6 @@ func postToModel(event *db.Post) (*model.Post, error) {
 		Dbid:         event.ID,
 		CreationTime: &event.CreatedAt,
 		Caption:      captionVal,
-		Status:       nil, // handled by dedicated resolver
 	}, nil
 
 }
@@ -1981,7 +1980,14 @@ func pageInfoToModel(ctx context.Context, pageInfo publicapi.PageInfo) *model.Pa
 }
 
 func resolveTokenMedia(ctx context.Context, token db.Token, tokenMedia db.TokenMedia, highDef bool) model.MediaSubtype {
-	// Media is found and is active
+	// Rewrite fallback IPFS and Arweave URLs to HTTP
+	if fallback := strings.ToLower(token.FallbackMedia.ImageURL.String()); strings.HasPrefix(fallback, "ipfs://") {
+		token.FallbackMedia.ImageURL = persist.NullString(ipfs.DefaultGatewayFrom(fallback))
+	} else if strings.HasPrefix(fallback, "ar://") {
+		token.FallbackMedia.ImageURL = persist.NullString(fmt.Sprintf("https://arweave.net/%s", util.GetURIPath(fallback, false)))
+	}
+
+	// Media is found and is active.
 	if tokenMedia.ID != "" && tokenMedia.Active {
 		return mediaToModel(ctx, tokenMedia, token.FallbackMedia, highDef)
 	}
@@ -1992,21 +1998,22 @@ func resolveTokenMedia(ctx context.Context, token db.Token, tokenMedia db.TokenM
 		// In the worse case the processing message was dropped and the token never gets handled. To address that,
 		// we compare when the token was created to the current time. If it's longer than the grace period, we assume that the
 		// message was lost and set the media to invalid so it could be refreshed manually.
-		if time.Since(token.CreatedAt) > time.Duration(1*time.Hour) {
-			tokenMedia.Media.MediaType = persist.MediaTypeInvalid
+		if inFlight := publicapi.For(ctx).Token.GetProcessingStateByID(ctx, token.ID); !inFlight {
+			if time.Since(token.CreatedAt) > time.Duration(1*time.Hour) {
+				tokenMedia.Media.MediaType = persist.MediaTypeInvalid
+			}
+		}
+		return mediaToModel(ctx, tokenMedia, token.FallbackMedia, highDef)
+	}
+
+	// If the media isn't valid, check if its still up for processing. If so, set the media as syncing.
+	if tokenMedia.Media.MediaType != persist.MediaTypeSyncing && !tokenMedia.Media.MediaType.IsValid() {
+		if inFlight := publicapi.For(ctx).Token.GetProcessingStateByID(ctx, token.ID); inFlight {
+			tokenMedia.Media.MediaType = persist.MediaTypeSyncing
 		}
 	}
 
-	fallbackMedia := token.FallbackMedia
-
-	// Rewrite IPFS and Arweave URLs to HTTP
-	if fallbackURL := strings.ToLower(fallbackMedia.ImageURL.String()); strings.HasPrefix(fallbackURL, "ipfs://") {
-		fallbackMedia.ImageURL = persist.NullString(ipfs.DefaultGatewayFrom(fallbackURL))
-	} else if strings.HasPrefix(fallbackURL, "ar://") {
-		fallbackMedia.ImageURL = persist.NullString(fmt.Sprintf("https://arweave.net/%s", util.GetURIPath(fallbackURL, false)))
-	}
-
-	return mediaToModel(ctx, tokenMedia, fallbackMedia, highDef)
+	return mediaToModel(ctx, tokenMedia, token.FallbackMedia, highDef)
 }
 
 func mediaToModel(ctx context.Context, tokenMedia db.TokenMedia, fallback persist.FallbackMedia, highDef bool) model.MediaSubtype {

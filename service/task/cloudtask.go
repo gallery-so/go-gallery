@@ -35,9 +35,15 @@ type FeedbotMessage struct {
 }
 
 type TokenProcessingUserMessage struct {
-	UserID   persist.DBID    `json:"user_id" binding:"required"`
-	TokenIDs []persist.DBID  `json:"token_ids" binding:"required"`
-	Chains   []persist.Chain `json:"chains" binding:"required"`
+	UserID   persist.DBID   `json:"user_id" binding:"required"`
+	TokenIDs []persist.DBID `json:"token_ids" binding:"required"`
+	// TODO: chains isn't used anymore, remove once the backend is updated to stop sending it
+	Chains []persist.Chain `json:"chains" binding:"-"`
+}
+
+type TokenProcessingTokenInstanceMessage struct {
+	TokenDBID persist.DBID `json:"token_dbid" binding:"required"`
+	Attempts  int          `json:"attempts" binding:"required"`
 }
 
 type TokenProcessingContractTokensMessage struct {
@@ -135,7 +141,7 @@ func CreateTaskForFeedbot(ctx context.Context, scheduleOn time.Time, message Fee
 	return submitTask(ctx, client, queue, url, withScheduleOn(scheduleOn), withJSON(message), withTrace(span), withBasicAuth(secret))
 }
 
-func CreateTaskForTokenProcessing(ctx context.Context, client *gcptasks.Client, message TokenProcessingUserMessage) error {
+func CreateTaskForTokenProcessing(ctx context.Context, message TokenProcessingUserMessage, client *gcptasks.Client) error {
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForTokenProcessing")
 	defer tracing.FinishSpan(span)
 	tracing.AddEventDataToSpan(span, map[string]any{"User ID": message.UserID})
@@ -160,6 +166,14 @@ func CreateTaskForUserTokenProcessing(ctx context.Context, message TokenProcessi
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
 	url := fmt.Sprintf("%s/owners/process/user", env.GetString("TOKEN_PROCESSING_URL"))
 	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span))
+}
+
+func CreateTaskForTokenInstanceTokenProcessing(ctx context.Context, message TokenProcessingTokenInstanceMessage, client *gcptasks.Client, delay time.Duration) error {
+	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForTokenInstanceTokenProcessing")
+	defer tracing.FinishSpan(span)
+	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
+	url := fmt.Sprintf("%s/media/process/token-id", env.GetString("TOKEN_PROCESSING_URL"))
+	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span), withScheduleOn(time.Now().Add(delay)))
 }
 
 func CreateTaskForWalletRemoval(ctx context.Context, message TokenProcessingWalletRemovalMessage, client *gcptasks.Client) error {
@@ -198,8 +212,7 @@ func NewClient(ctx context.Context) *gcptasks.Client {
 		option.WithGRPCDialOption(grpc.WithTimeout(time.Duration(2) * time.Second)),
 	}
 
-	// Configure the client depending on whether or not
-	// the cloud task emulator is used.
+	// Configure the client depending on whether or not the cloud task emulator is used.
 	if env.GetString("ENV") == "local" {
 		if host := env.GetString("TASK_QUEUE_HOST"); host != "" {
 			copts = append(

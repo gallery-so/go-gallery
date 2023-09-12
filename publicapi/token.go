@@ -19,6 +19,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/throttle"
+	"github.com/mikeydub/go-gallery/service/tokenmanage"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 )
@@ -31,6 +32,7 @@ type TokenAPI struct {
 	ethClient          *ethclient.Client
 	multichainProvider *multichain.Provider
 	throttler          *throttle.Locker
+	manager            *tokenmanage.Manager
 }
 
 // ErrTokenRefreshFailed is a generic error that wraps all other OpenSea sync failures.
@@ -590,4 +592,9 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collect
 		return *eventPtr, nil
 	}
 	return db.Event{}, nil
+}
+
+// GetProcessingStateByID returns true if a token is queued for processing, or is currently being processed.
+func (api TokenAPI) GetProcessingStateByID(ctx context.Context, tokenID persist.DBID) bool {
+	return api.manager.Processing(ctx, tokenID)
 }

@@ -430,6 +430,81 @@ func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, fee
 	return comments, pageInfo, err
 }
 
+func (api InteractionAPI) PaginateAdmiresByTokenID(ctx context.Context, tokenID persist.DBID, before *string, after *string,
+	first *int, last *int, userID *persist.DBID) ([]db.Admire, PageInfo, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"tokenID": validate.WithTag(tokenID, "required"),
+	}); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+
+	var actorID persist.DBID
+	if userID != nil {
+    	actorID = *userID
+	} else {
+    	actorID = ""
+	}
+	onlyForActor := actorID != ""
+
+	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
+		admires, err := api.loaders.AdmiresByTokenID.Load(db.PaginateAdmiresByTokenIDBatchParams{
+			TokenID:       tokenID,
+			Limit:         params.Limit,
+			OnlyForActor:  onlyForActor,
+			ActorID: 	   actorID,
+			CurBeforeTime: params.CursorBeforeTime,
+			CurBeforeID:   params.CursorBeforeID,
+			CurAfterTime:  params.CursorAfterTime,
+			CurAfterID:    params.CursorAfterID,
+			PagingForward: params.PagingForward,
+		})
+
+		if err != nil {
+			return nil, err
+		}
+
+		results := make([]interface{}, len(admires))
+		for i, admire := range admires {
+			results[i] = admire
+		}
+
+		return results, nil
+	}
+
+	countFunc := func() (int, error) {
+		total, err := api.loaders.AdmireCountByTokenID.Load(tokenID)
+		return total, err
+	}
+
+	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
+		if admire, ok := i.(db.Admire); ok {
+			return admire.CreatedAt, admire.ID, nil
+		}
+		return time.Time{}, "", fmt.Errorf("interface{} is not an admire")
+	}
+
+	paginator := timeIDPaginator{
+		QueryFunc:  queryFunc,
+		CursorFunc: cursorFunc,
+		CountFunc:  countFunc,
+	}
+
+	results, pageInfo, err := paginator.paginate(before, after, first, last)
+
+	admires := make([]db.Admire, len(results))
+	for i, result := range results {
+		admires[i] = result.(db.Admire)
+	}
+
+	return admires, pageInfo, err
+}
+
 func (api InteractionAPI) PaginateAdmiresByPostID(ctx context.Context, postID persist.DBID, before *string, after *string,
 	first *int, last *int) ([]db.Admire, PageInfo, error) {
 	// Validate
@@ -634,7 +709,7 @@ func (api InteractionAPI) AdmireFeedEvent(ctx context.Context, feedEventID persi
 		return "", persist.ErrAdmireAlreadyExists{AdmireID: admire.ID, ActorID: userID, FeedEventID: feedEventID}
 	}
 
-	notFoundErr := persist.ErrAdmireNotFound{}
+	notFoundErr := persist.ErrAdmireFeedEventNotFound{}
 	if !errors.As(err, &notFoundErr) {
 		return "", err
 	}
@@ -677,6 +752,7 @@ func (api InteractionAPI) AdmireToken(ctx context.Context, tokenID persist.DBID)
 		return "", err
 	}
 
+	// if admire already exists, the existing admireID is returned
 	admireID, err := api.repos.AdmireRepository.CreateTokenAdmire(ctx, tokenID, userID)
 	if err != nil {
 		return "", err
@@ -703,7 +779,7 @@ func (api InteractionAPI) AdmirePost(ctx context.Context, postID persist.DBID) (
 		return "", persist.ErrAdmireAlreadyExists{AdmireID: admire.ID, ActorID: userID, PostID: postID}
 	}
 
-	notFoundErr := persist.ErrAdmireNotFound{}
+	notFoundErr := persist.ErrAdmirePostNotFound{}
 	if !errors.As(err, &notFoundErr) {
 		return "", err
 	}
@@ -763,7 +839,7 @@ func (api InteractionAPI) HasUserAdmiredFeedEvent(ctx context.Context, userID pe
 		return &hasAdmired, nil
 	}
 
-	notFoundErr := persist.ErrAdmireNotFound{}
+	notFoundErr := persist.ErrAdmireFeedEventNotFound{}
 	if errors.As(err, &notFoundErr) {
 		hasAdmired := false
 		return &hasAdmired, nil

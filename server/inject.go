@@ -30,6 +30,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/service/task"
+	"github.com/mikeydub/go-gallery/service/tokenmanage"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -60,7 +61,8 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 		newCommunitiesCache,
 		postgres.NewRepositories,
 		dbConnSet,
-		newSendTokensFunc,
+		tokenmanage.New,
+		newManagedTokens,
 		wire.Struct(new(multichain.Provider), "*"),
 		// Add additional chains here
 		newMultichainSet,
@@ -502,8 +504,11 @@ func newTokenProcessingCache() *redis.Cache {
 	return redis.NewCache(redis.TokenProcessingMetadataCache)
 }
 
-func newSendTokensFunc(ctx context.Context, taskClient *cloudtasks.Client) multichain.SendTokens {
-	return func(ctx context.Context, t task.TokenProcessingUserMessage) error {
-		return task.CreateTaskForTokenProcessing(ctx, taskClient, t)
+func newManagedTokens(ctx context.Context, tm *tokenmanage.Manager) multichain.SubmitUserTokensF {
+	return func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, chains []persist.Chain) error {
+		if len(tokenIDs) == 0 {
+			return nil
+		}
+		return tm.SubmitUser(ctx, userID, tokenIDs, chains)
 	}
 }

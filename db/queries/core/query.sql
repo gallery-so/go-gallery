@@ -544,6 +544,16 @@ SELECT * FROM admires WHERE post_id = sqlc.arg('post_id') AND deleted = false
 -- name: CountAdmiresByPostIDBatch :batchone
 SELECT count(*) FROM admires WHERE post_id = $1 AND deleted = false;
 
+-- name: PaginateAdmiresByTokenIDBatch :batchmany
+SELECT * FROM admires WHERE token_id = sqlc.arg('token_id') AND (not @only_for_actor::bool or actor_id = @actor_id) AND deleted = false
+    AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+    ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
+    LIMIT sqlc.arg('limit');
+
+-- name: CountAdmiresByTokenIDBatch :batchone
+SELECT count(*) FROM admires WHERE token_id = $1 AND deleted = false;
+
 -- name: GetCommentByCommentID :one
 SELECT * FROM comments WHERE id = $1 AND deleted = false;
 
@@ -1371,11 +1381,14 @@ insert into sessions (id, user_id,
 update sessions set invalidated = true, active_until = least(active_until, now()), last_updated = now() where id = @id and deleted = false and invalidated = false;
 
 -- name: UpdateTokenMetadataFieldsByTokenIdentifiers :many
-update tokens set name = @name, description = @description, last_updated = now()
+update tokens
+set name = @name,
+    description = @description,
+    last_updated = now()
 where token_id = @token_id
-    and tokens.contract = @contract_id
-    and tokens.chain = @chain
-    and tokens.deleted = false
+    and contract = @contract_id
+    and chain = @chain
+    and deleted = false
 returning tokens.id;
 
 -- name: GetTopCollectionsForCommunity :many

@@ -183,6 +183,14 @@ type Notification interface {
 	IsNotification()
 }
 
+type OptInForRolesPayloadOrError interface {
+	IsOptInForRolesPayloadOrError()
+}
+
+type OptOutForRolesPayloadOrError interface {
+	IsOptOutForRolesPayloadOrError()
+}
+
 type PostOrError interface {
 	IsPostOrError()
 }
@@ -1029,6 +1037,8 @@ func (ErrInvalidInput) IsUpdateEmailPayloadOrError()                     {}
 func (ErrInvalidInput) IsResendVerificationEmailPayloadOrError()         {}
 func (ErrInvalidInput) IsUpdateEmailNotificationSettingsPayloadOrError() {}
 func (ErrInvalidInput) IsUnsubscribeFromEmailTypePayloadOrError()        {}
+func (ErrInvalidInput) IsOptInForRolesPayloadOrError()                   {}
+func (ErrInvalidInput) IsOptOutForRolesPayloadOrError()                  {}
 func (ErrInvalidInput) IsRedeemMerchPayloadOrError()                     {}
 func (ErrInvalidInput) IsCreateGalleryPayloadOrError()                   {}
 func (ErrInvalidInput) IsUpdateGalleryInfoPayloadOrError()               {}
@@ -1105,6 +1115,8 @@ func (ErrNotAuthorized) IsSyncCreatedTokensForExistingContractPayloadOrError() {
 func (ErrNotAuthorized) IsError()                                              {}
 func (ErrNotAuthorized) IsAddRolesToUserPayloadOrError()                       {}
 func (ErrNotAuthorized) IsRevokeRolesFromUserPayloadOrError()                  {}
+func (ErrNotAuthorized) IsOptInForRolesPayloadOrError()                        {}
+func (ErrNotAuthorized) IsOptOutForRolesPayloadOrError()                       {}
 func (ErrNotAuthorized) IsUploadPersistedQueriesPayloadOrError()               {}
 func (ErrNotAuthorized) IsSyncTokensForUsernamePayloadOrError()                {}
 func (ErrNotAuthorized) IsSyncCreatedTokensForUsernamePayloadOrError()         {}
@@ -1627,6 +1639,18 @@ type OneTimeLoginTokenAuth struct {
 	Token string `json:"token"`
 }
 
+type OptInForRolesPayload struct {
+	User *GalleryUser `json:"user"`
+}
+
+func (OptInForRolesPayload) IsOptInForRolesPayloadOrError() {}
+
+type OptOutForRolesPayload struct {
+	User *GalleryUser `json:"user"`
+}
+
+func (OptOutForRolesPayload) IsOptOutForRolesPayloadOrError() {}
+
 type OwnerAtBlock struct {
 	Owner       GalleryUserOrAddress `json:"owner"`
 	BlockNumber *string              `json:"blockNumber"`
@@ -2094,37 +2118,39 @@ func (TextMedia) IsMedia()        {}
 
 type Token struct {
 	HelperTokenData
-	Dbid                  persist.DBID          `json:"dbid"`
-	CreationTime          *time.Time            `json:"creationTime"`
-	LastUpdated           *time.Time            `json:"lastUpdated"`
-	CollectorsNote        *string               `json:"collectorsNote"`
-	Media                 MediaSubtype          `json:"media"`
-	TokenType             *TokenType            `json:"tokenType"`
-	Chain                 *persist.Chain        `json:"chain"`
-	Name                  *string               `json:"name"`
-	Description           *string               `json:"description"`
-	TokenID               *string               `json:"tokenId"`
-	Quantity              *string               `json:"quantity"`
-	Owner                 *GalleryUser          `json:"owner"`
-	OwnedByWallets        []*Wallet             `json:"ownedByWallets"`
-	OwnershipHistory      []*OwnerAtBlock       `json:"ownershipHistory"`
-	OwnerIsHolder         *bool                 `json:"ownerIsHolder"`
-	OwnerIsCreator        *bool                 `json:"ownerIsCreator"`
-	TokenMetadata         *string               `json:"tokenMetadata"`
-	Contract              *Contract             `json:"contract"`
-	Community             *Community            `json:"community"`
-	ExternalURL           *string               `json:"externalUrl"`
-	BlockNumber           *string               `json:"blockNumber"`
-	IsSpamByUser          *bool                 `json:"isSpamByUser"`
-	IsSpamByProvider      *bool                 `json:"isSpamByProvider"`
-	CreatorAddress        *persist.ChainAddress `json:"creatorAddress"`
-	OpenseaCollectionName *string               `json:"openseaCollectionName"`
-	OpenseaID             *int                  `json:"openseaId"`
+	Dbid                  persist.DBID            `json:"dbid"`
+	CreationTime          *time.Time              `json:"creationTime"`
+	LastUpdated           *time.Time              `json:"lastUpdated"`
+	CollectorsNote        *string                 `json:"collectorsNote"`
+	Media                 MediaSubtype            `json:"media"`
+	TokenType             *TokenType              `json:"tokenType"`
+	Chain                 *persist.Chain          `json:"chain"`
+	Name                  *string                 `json:"name"`
+	Description           *string                 `json:"description"`
+	TokenID               *string                 `json:"tokenId"`
+	Quantity              *string                 `json:"quantity"`
+	Owner                 *GalleryUser            `json:"owner"`
+	OwnedByWallets        []*Wallet               `json:"ownedByWallets"`
+	OwnershipHistory      []*OwnerAtBlock         `json:"ownershipHistory"`
+	OwnerIsHolder         *bool                   `json:"ownerIsHolder"`
+	OwnerIsCreator        *bool                   `json:"ownerIsCreator"`
+	TokenMetadata         *string                 `json:"tokenMetadata"`
+	Contract              *Contract               `json:"contract"`
+	Community             *Community              `json:"community"`
+	ExternalURL           *string                 `json:"externalUrl"`
+	BlockNumber           *string                 `json:"blockNumber"`
+	IsSpamByUser          *bool                   `json:"isSpamByUser"`
+	IsSpamByProvider      *bool                   `json:"isSpamByProvider"`
+	Admires               *TokenAdmiresConnection `json:"admires"`
+	CreatorAddress        *persist.ChainAddress   `json:"creatorAddress"`
+	OpenseaCollectionName *string                 `json:"openseaCollectionName"`
+	OpenseaID             *int                    `json:"openseaId"`
 }
 
 func (Token) IsNode()             {}
 func (Token) IsTokenByIDOrError() {}
 
+<<<<<<< HEAD
 type TokenDraftDetails struct {
 	HelperTokenDraftDetailsData
 	Media            MediaSubtype `json:"media"`
@@ -2138,6 +2164,17 @@ func (TokenDraftDetails) IsTokenDraftDetailsOrError() {}
 type TokenDraftDetailsInput struct {
 	Token          *ChainAddressTokenInput `json:"token"`
 	HighDefinition bool                    `json:"highDefinition"`
+=======
+type TokenAdmireEdge struct {
+	Node   *Admire `json:"node"`
+	Cursor *string `json:"cursor"`
+	Token  *Token  `json:"token"`
+}
+
+type TokenAdmiresConnection struct {
+	Edges    []*TokenAdmireEdge `json:"edges"`
+	PageInfo *PageInfo          `json:"pageInfo"`
+>>>>>>> jarrel/add-sync-retries
 }
 
 type TokenEdge struct {

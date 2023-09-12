@@ -125,7 +125,7 @@ func (c *ContractGalleryRepository) GetByAddresses(pCtx context.Context, pAddres
 // UpsertByAddress upserts the contract with the given address
 func (c *ContractGalleryRepository) UpsertByAddress(pCtx context.Context, pAddress persist.Address, pChain persist.Chain, pContract persist.ContractGallery) (contractID persist.DBID, err error) {
 	err = c.upsertByAddressStmt.QueryRowContext(pCtx, persist.GenerateID(), pContract.Version, pContract.Address, pContract.Symbol, pContract.Name, pContract.OwnerAddress, pContract.Chain, pContract.Description, pContract.ProfileImageURL).Scan(&contractID)
-	return contractID, nil
+	return contractID, err
 }
 
 // BulkUpsert bulk upserts the contracts by address
