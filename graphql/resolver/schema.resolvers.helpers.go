@@ -2003,6 +2003,7 @@ func resolveTokenMedia(ctx context.Context, token db.Token, tokenMedia db.TokenM
 				tokenMedia.Media.MediaType = persist.MediaTypeInvalid
 			}
 		}
+		return mediaToModel(ctx, tokenMedia, token.FallbackMedia, highDef)
 	}
 
 	// If the media isn't valid, check if its still up for processing. If so, set the media as syncing.

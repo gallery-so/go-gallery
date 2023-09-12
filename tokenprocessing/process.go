@@ -173,9 +173,13 @@ func processMediaForTokenInstance(tp *tokenProcessor, tokenRepo *postgres.TokenG
 		}
 
 		err, closing := tm.StartProcessing(c, input.TokenDBID, input.Attempts)
+		if err != nil && util.ErrorAs[throttle.ErrThrottleLocked](err) {
+			c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+			return
+		}
 		if err != nil {
 			logger.For(c).Warnf("failed to start tokenID=%s: %s", input.TokenDBID, err)
-			c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
