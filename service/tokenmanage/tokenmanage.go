@@ -2,7 +2,6 @@ package tokenmanage
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
@@ -21,8 +20,8 @@ type Manager struct {
 	throttle        *throttle.Locker
 	// delayer sets the linear delay for retrying tokens up to MaxRetries
 	delayer *limiters.KeyRateLimiter
-	// MaxRetries is the maximum number of times a token can be reenqueued before it is not retried again
-	MaxRetries int
+	// maxRetries is the maximum number of times a token can be reenqueued before it is not retried again
+	maxRetries int
 }
 
 func New(ctx context.Context, taskClient *cloudtasks.Client) *Manager {
@@ -37,21 +36,21 @@ func New(ctx context.Context, taskClient *cloudtasks.Client) *Manager {
 
 func NewWithRetries(ctx context.Context, taskClient *cloudtasks.Client, maxRetries int) *Manager {
 	m := New(ctx, taskClient)
-	m.MaxRetries = maxRetries
+	m.maxRetries = maxRetries
 	m.delayer = limiters.NewKeyRateLimiter(ctx, m.cache, "retry", 2, 1*time.Minute)
 	return m
 }
 
-// Processing returns true if the token is currently being processed.
+// Processing returns true if the token is processing or enqueued.
 func (m Manager) Processing(ctx context.Context, tokenID persist.DBID) bool {
 	p, _ := m.processRegistry.processing(ctx, tokenID)
 	return p
 }
 
-// StartProcessing marks a token as processing. It returns a callback that should be called when work on the token is done to mark
-// it as finished. If withRetry is true, the callback will attempt to reenqueue the token if an error is passed. The tries arg is ignored
-// when MaxRetries is set to the default value of 0.
-func (m Manager) StartProcessing(ctx context.Context, tokenID persist.DBID, tries int) (error, func(err error) error) {
+// StartProcessing marks a token as processing. It returns a callback that must be called when work on the token is finished in order to mark
+// it as finished. If withRetry is true, the callback will attempt to reenqueue the token if an error is passed. attemps is ignored when MaxRetries
+// is set to the default value of 0.
+func (m Manager) StartProcessing(ctx context.Context, tokenID persist.DBID, attempts int) (error, func(err error) error) {
 	err := m.throttle.Lock(ctx, lockKey(tokenID))
 	if err != nil {
 		return err, nil
@@ -77,7 +76,7 @@ func (m Manager) StartProcessing(ctx context.Context, tokenID persist.DBID, trie
 	callback := func(err error) error {
 		close(stop)
 		<-done
-		m.tryRetry(ctx, tokenID, err, tries)
+		m.tryRetry(ctx, tokenID, err, attempts)
 		m.throttle.Unlock(ctx, lockKey(tokenID))
 		return nil
 	}
@@ -92,10 +91,9 @@ func (m Manager) SubmitUser(ctx context.Context, userID persist.DBID, tokenIDs [
 	return task.CreateTaskForTokenProcessing(ctx, message, m.taskClient)
 }
 
-func (m Manager) tryRetry(ctx context.Context, tokenID persist.DBID, err error, tries int) error {
-	if err == nil || m.MaxRetries <= 0 || tries >= m.MaxRetries {
+func (m Manager) tryRetry(ctx context.Context, tokenID persist.DBID, err error, attempts int) error {
+	if err == nil || m.maxRetries <= 0 || attempts >= m.maxRetries {
 		m.processRegistry.finish(ctx, tokenID)
-		fmt.Println("DONE WITH TOKEN", tokenID, "err", err, "tries", tries, "max", m.MaxRetries)
 		return nil
 	}
 
@@ -106,8 +104,7 @@ func (m Manager) tryRetry(ctx context.Context, tokenID persist.DBID, err error, 
 	}
 
 	m.processRegistry.setEnqueue(ctx, tokenID)
-	message := task.TokenProcessingTokenInstanceMessage{TokenDBID: tokenID, Attempts: tries + 1}
-	fmt.Println("reenqueued", tokenID, "atttempt", message.Attempts, "delayed for", delay)
+	message := task.TokenProcessingTokenInstanceMessage{TokenDBID: tokenID, Attempts: attempts + 1}
 	return task.CreateTaskForTokenInstanceTokenProcessing(ctx, message, m.taskClient, delay)
 }
 
@@ -126,7 +123,7 @@ func (r registry) finish(ctx context.Context, tokenID persist.DBID) error {
 }
 
 func (r registry) setEnqueue(ctx context.Context, tokenID persist.DBID) error {
-	// Set a long TTL on the off-chance that a worker never picks up the message
+	// Set a TTL while enqueued on the off-chance that if the task is never picked up it can still be refreshed manually
 	err := r.c.Set(ctx, inflightKey(tokenID), []byte("enqueued"), time.Hour*3)
 	return err
 }

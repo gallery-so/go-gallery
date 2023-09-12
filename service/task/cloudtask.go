@@ -41,12 +41,6 @@ type TokenProcessingUserMessage struct {
 	Chains []persist.Chain `json:"chains" binding:"-"`
 }
 
-type TokenProcessingTokenIdentifiersMessage struct {
-	TokenID         persist.TokenID `json:"token_id" binding:"required"`
-	ContractAddress persist.Address `json:"contract_address" binding:"required"`
-	Chain           persist.Chain   `json:"chain"`
-}
-
 type TokenProcessingTokenInstanceMessage struct {
 	TokenDBID persist.DBID `json:"token_dbid" binding:"required"`
 	Attempts  int          `json:"attempts" binding:"required"`
@@ -166,14 +160,6 @@ func CreateTaskForUserTokenProcessing(ctx context.Context, message TokenProcessi
 	tracing.AddEventDataToSpan(span, map[string]any{"User ID": message.UserID})
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
 	url := fmt.Sprintf("%s/owners/process/user", env.GetString("TOKEN_PROCESSING_URL"))
-	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span))
-}
-
-func CreateTaskForTokenIdentifiersTokenProcessing(ctx context.Context, message TokenProcessingTokenIdentifiersMessage, client *gcptasks.Client) error {
-	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForTokenIdentifiersTokenProcessing")
-	defer tracing.FinishSpan(span)
-	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
-	url := fmt.Sprintf("%s/media/process/token", env.GetString("TOKEN_PROCESSING_URL"))
 	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span))
 }
 

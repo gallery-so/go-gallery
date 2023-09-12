@@ -936,8 +936,7 @@ func (p *Provider) processTokenMedia(ctx context.Context, tokenID persist.TokenI
 		return err
 	}
 
-	// XXX: req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/media/process/token", env.GetString("TOKEN_PROCESSING_URL")), bytes.NewBuffer(asJSON))
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/media/process/token", "http://localhost:6500"), bytes.NewBuffer(asJSON))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/media/process/token", env.GetString("TOKEN_PROCESSING_URL")), bytes.NewBuffer(asJSON))
 	if err != nil {
 		return err
 	}
@@ -1261,17 +1260,13 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 		return err
 	}
 
-	if err := p.Queries.UpdateTokenMetadataFieldsByTokenIdentifiers(ctx, db.UpdateTokenMetadataFieldsByTokenIdentifiersParams{
+	return p.Queries.UpdateTokenMetadataFieldsByTokenIdentifiers(ctx, db.UpdateTokenMetadataFieldsByTokenIdentifiersParams{
 		Name:        util.ToNullString(finalTokenDescriptors.Name, true),
 		Description: util.ToNullString(finalTokenDescriptors.Description, true),
 		TokenID:     ti.TokenID,
 		ContractID:  contractID,
 		Chain:       ti.Chain,
-	}); err != nil {
-		return err
-	}
-
-	return nil
+	})
 }
 
 // RefreshContract refreshes a contract on the given chain using the chain provider for that chain

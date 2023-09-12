@@ -63,7 +63,7 @@ type tokenProcessingJob struct {
 	// The pipeline only looks at the root level of the metadata for the key and will also not fail
 	// if the key is missing or if processing media for the key fails
 	profileImageKey string
-	// refreshMetadata is an optional flag that indicates that the pipeline should always fetch new metadata
+	// refreshMetadata is an optional flag that indicates that the pipeline should check for new metadata when enabled
 	refreshMetadata bool
 }
 
@@ -166,7 +166,6 @@ func (tpj *tokenProcessingJob) run(ctx context.Context) (coredb.TokenMedia, erro
 		return media, err
 	}
 
-	fmt.Println("final media", media, "err", mediaErr)
 	return media, mediaErr
 }
 

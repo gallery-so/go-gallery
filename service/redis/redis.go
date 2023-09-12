@@ -130,7 +130,7 @@ func (c *Cache) SetNX(pCtx context.Context, key string, value []byte, expiration
 	return cmd.Val(), nil
 }
 
-// MSet sets multiple keys in the redis cache
+// MSet sets multiple keys in the redis cache atomically.
 func (c *Cache) MSet(pCtx context.Context, keyValues map[string]any) error {
 	keyValuesPrefixed := make(map[string]any, len(keyValues))
 	for key, value := range keyValues {

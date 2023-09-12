@@ -1,9 +1,5 @@
 name: ci
-  # XXX on: [push]
-on:
-  push:
-    branches:
-    - main
+on: [push]
 jobs:
   core-tests:
     runs-on: ubuntu-latest
