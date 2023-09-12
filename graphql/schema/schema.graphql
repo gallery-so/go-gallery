@@ -2465,8 +2465,6 @@ union RemoveProfileImagePayloadOrError =
   | ErrUserNotFound
 
 input PostTokensInput {
-  # Either tokenIds or tokens should be provided, but not both
-  tokenIds: [DBID!]
   tokens: [ChainAddressTokenInput!]
   caption: String
 }
@@ -2476,6 +2474,20 @@ type PostTokensPayload {
 }
 
 union PostTokensPayloadOrError = PostTokensPayload | ErrInvalidInput | ErrNotAuthorized
+
+input PostTokensReferralInput {
+  token: ChainAddressTokenInput!
+  caption: String
+}
+
+type PostTokensReferralPayload {
+  post: Post!
+}
+
+union PostTokensReferralPayloadOrError =
+    PostTokensReferralPayload
+  | ErrInvalidInput
+  | ErrNotAuthorized
 
 type AdmirePostPayload {
   viewer: Viewer
@@ -2612,6 +2624,7 @@ type Mutation {
     @authRequired
 
   postTokens(input: PostTokensInput!): PostTokensPayloadOrError @authRequired
+  postTokensReferral(input: PostTokensReferralInput!): PostTokensReferralPayloadOrError @authRequired
   deletePost(postId: DBID!): DeletePostPayloadOrError @authRequired
 
   viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError

@@ -31,9 +31,6 @@ import (
 
 const tHalf = math.Ln2 / 0.002 // half-life of approx 6 hours
 
-var ErrNoTokensToPost = fmt.Errorf("no tokens to post")
-var ErrTooManyTokenSources = fmt.Errorf("too many token sources")
-
 type FeedAPI struct {
 	repos              *postgres.Repositories
 	queries            *db.Queries
@@ -110,19 +107,58 @@ func (api FeedAPI) GetPostById(ctx context.Context, postID persist.DBID) (*db.Po
 	return &post, nil
 }
 
-func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, tokens []persist.TokenIdentifiers, caption *string) (persist.DBID, error) {
+func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, caption *string) (persist.DBID, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"tokenIDs": validate.WithTag(tokenIDs, "required"),
 		// caption can be null but less than 600 chars
 		"caption": validate.WithTag(caption, "max=600"),
 	}); err != nil {
 		return "", err
 	}
-	if len(tokenIDs) == 0 && len(tokens) == 0 {
-		return "", ErrNoTokensToPost
+	actorID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return "", err
 	}
-	if len(tokenIDs) > 0 && len(tokens) > 0 {
-		return "", ErrTooManyTokenSources
+
+	var cap sql.NullString
+	if caption != nil {
+		cap = sql.NullString{
+			String: *caption,
+			Valid:  true,
+		}
+	}
+
+	contracts, err := api.queries.GetContractsByTokenIDs(ctx, tokenIDs)
+	if err != nil {
+		return "", err
+	}
+
+	contractIDs, _ := util.Map(contracts, func(c db.Contract) (persist.DBID, error) {
+		return c.ID, nil
+	})
+
+	id, err := api.queries.InsertPost(ctx, db.InsertPostParams{
+		ID:          persist.GenerateID(),
+		TokenIds:    tokenIDs,
+		ContractIds: contractIDs,
+		ActorID:     actorID,
+		Caption:     cap,
+	})
+	if err != nil {
+		return "", err
+	}
+	return id, nil
+}
+
+func (api FeedAPI) PostTokenReferral(ctx context.Context, t persist.TokenIdentifiers, caption *string) (persist.DBID, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"token": validate.WithTag(t, "required"),
+		// caption can be null but less than 600 chars
+		"caption": validate.WithTag(caption, "max=600"),
+	}); err != nil {
+		return "", err
 	}
 
 	actorID, err := getAuthenticatedUserID(ctx)
@@ -139,55 +175,25 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, toke
 		}
 	}
 
-	var contractIDs []persist.DBID
-	var tokensToPost []persist.DBID
-
-	if len(tokenIDs) > 0 {
-		tokensToPost = tokenIDs
-		contracts, err := api.queries.GetContractsByTokenIDs(ctx, tokenIDs)
-		if err != nil {
-			return "", err
-		}
-		contractIDs = util.MapWithoutError(contracts, func(c db.Contract) persist.DBID { return c.ID })
-		// return api.queries.InsertPost(ctx, db.InsertPostParams{
-		// 	ID:          persist.GenerateID(),
-		// 	TokenIds:    tokenIDs,
-		// 	ContractIds: contractIDs,
-		// 	ActorID:     actorID,
-		// 	Caption:     c,
-		// })
+	token, err := For(ctx).Token.GetTokenByIdentifiersOwner(ctx, t, actorID)
+	if err != nil {
+		// find the token
+		// synced, err := api.multichainProvider.SyncTokensByUserIDAndTokenIdentifiers(ctx, actorID, t)
+		// if err != nil {
+		// 	return "", err
+		// }
+		// confirmedTokens[i] = synced[0].ID
 	}
 
-	confirmedTokens := make([]persist.DBID, 0, len(tokens))
-	pendingTokens := make([]persist.TokenIdentifiers, 0, len(tokens))
-
-	for i, t := range tokens {
-		token, err := For(ctx).Token.GetTokensByIdentifiersOwner(ctx, t, actorID)
-		if err == nil {
-			confirmedTokens[i] = token.ID
-		}
-		// TODO: Catch for token missing error
-		pendingTokens[i] = t
-	}
-
-	for i, t := range pendingTokens {
-		synced, err := api.multichainProvider.SyncTokensByUserIDAndTokenIdentifiers(ctx, actorID, t)
-		if err != nil {
-			return "", err
-		}
-		confirmedTokens[i] = synced[0].ID
-	}
-
-	contracts, err := api.queries.GetContractsByTokenIDs(ctx, tokenIDs)
+	contract, err := api.queries.GetContractByID(ctx, token.Contract)
 	if err != nil {
 		return "", err
 	}
-	contractIDs := util.MapWithoutError(contracts, func(c db.Contract) persist.DBID { return c.ID })
 
 	return api.queries.InsertPost(ctx, db.InsertPostParams{
 		ID:          persist.GenerateID(),
-		TokenIds:    tokenIDs,
-		ContractIds: contractIDs,
+		TokenIds:    []persist.DBID{token.ID},
+		ContractIds: []persist.DBID{contract.ID},
 		ActorID:     actorID,
 		Caption:     c,
 	})

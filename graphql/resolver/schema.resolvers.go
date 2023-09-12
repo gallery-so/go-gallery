@@ -1426,14 +1426,7 @@ func (r *mutationResolver) CommentOnPost(ctx context.Context, postID persist.DBI
 
 // PostTokens is the resolver for the postTokens field.
 func (r *mutationResolver) PostTokens(ctx context.Context, input model.PostTokensInput) (model.PostTokensPayloadOrError, error) {
-	tokens := util.MapWithoutError(input.Tokens, func(t *model.ChainAddressTokenInput) persist.TokenIdentifiers {
-		return persist.TokenIdentifiers{
-			TokenID:         t.TokenID,
-			ContractAddress: t.ChainAddress.Address(),
-			Chain:           t.ChainAddress.Chain(),
-		}
-	})
-	id, err := publicapi.For(ctx).Feed.PostTokens(ctx, input.TokenIds, tokens, input.Caption)
+	id, err := publicapi.For(ctx).Feed.PostTokens(ctx, input.TokenIds, input.Caption)
 	if err != nil {
 		return nil, err
 	}
@@ -1448,6 +1441,24 @@ func (r *mutationResolver) PostTokens(ctx context.Context, input model.PostToken
 	}
 
 	return output, nil
+}
+
+// PostTokensReferral is the resolver for the postTokensReferral field.
+func (r *mutationResolver) PostTokensReferral(ctx context.Context, input model.PostTokensReferralInput) (model.PostTokensReferralPayloadOrError, error) {
+	token := persist.TokenIdentifiers{
+		Chain:           input.Token.ChainAddress.Chain(),
+		ContractAddress: input.Token.ChainAddress.Address(),
+		TokenID:         input.Token.TokenID,
+	}
+	id, err := publicapi.For(ctx).Feed.PostTokenReferral(ctx, token, input.Caption)
+	if err != nil {
+		return nil, err
+	}
+	post, err := resolvePostByPostID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return &model.PostTokensReferralPayload{Post: post}, nil
 }
 
 // DeletePost is the resolver for the deletePost field.

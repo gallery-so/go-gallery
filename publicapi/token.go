@@ -82,6 +82,10 @@ func (api TokenAPI) GetTokenByEnsDomain(ctx context.Context, userID persist.DBID
 	})
 }
 
+func (api TokenAPI) GetTokenByIdentifiersOwner(ctx context.Context, token persist.TokenIdentifiers, ownerID persist.DBID) (db.Token, error) {
+	panic("implement me")
+}
+
 func (api TokenAPI) GetTokensByCollectionId(ctx context.Context, collectionID persist.DBID, limit *int) ([]db.Token, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{

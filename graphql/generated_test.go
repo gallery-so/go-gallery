@@ -331,13 +331,9 @@ type OneTimeLoginTokenAuth struct {
 func (v *OneTimeLoginTokenAuth) GetToken() string { return v.Token }
 
 type PostTokensInput struct {
-	TokenIds []persist.DBID           `json:"tokenIds"`
-	Tokens   []ChainAddressTokenInput `json:"tokens"`
-	Caption  *string                  `json:"caption"`
+	Tokens  []ChainAddressTokenInput `json:"tokens"`
+	Caption *string                  `json:"caption"`
 }
-
-// GetTokenIds returns PostTokensInput.TokenIds, and is useful for accessing the field via an interface.
-func (v *PostTokensInput) GetTokenIds() []persist.DBID { return v.TokenIds }
 
 // GetTokens returns PostTokensInput.Tokens, and is useful for accessing the field via an interface.
 func (v *PostTokensInput) GetTokens() []ChainAddressTokenInput { return v.Tokens }

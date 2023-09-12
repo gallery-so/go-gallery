@@ -199,6 +199,10 @@ type PostTokensPayloadOrError interface {
 	IsPostTokensPayloadOrError()
 }
 
+type PostTokensReferralPayloadOrError interface {
+	IsPostTokensReferralPayloadOrError()
+}
+
 type PreverifyEmailPayloadOrError interface {
 	IsPreverifyEmailPayloadOrError()
 }
@@ -1058,6 +1062,7 @@ func (ErrInvalidInput) IsDisconnectSocialAccountPayloadOrError()         {}
 func (ErrInvalidInput) IsFollowAllSocialConnectionsPayloadOrError()      {}
 func (ErrInvalidInput) IsSetProfileImagePayloadOrError()                 {}
 func (ErrInvalidInput) IsPostTokensPayloadOrError()                      {}
+func (ErrInvalidInput) IsPostTokensReferralPayloadOrError()              {}
 func (ErrInvalidInput) IsAdmirePostPayloadOrError()                      {}
 func (ErrInvalidInput) IsAdmireTokenPayloadOrError()                     {}
 func (ErrInvalidInput) IsCommentOnPostPayloadOrError()                   {}
@@ -1143,6 +1148,7 @@ func (ErrNotAuthorized) IsFollowAllSocialConnectionsPayloadOrError()           {
 func (ErrNotAuthorized) IsGenerateQRCodeLoginTokenPayloadOrError()             {}
 func (ErrNotAuthorized) IsSetProfileImagePayloadOrError()                      {}
 func (ErrNotAuthorized) IsPostTokensPayloadOrError()                           {}
+func (ErrNotAuthorized) IsPostTokensReferralPayloadOrError()                   {}
 func (ErrNotAuthorized) IsAdmirePostPayloadOrError()                           {}
 func (ErrNotAuthorized) IsAdmireTokenPayloadOrError()                          {}
 func (ErrNotAuthorized) IsCommentOnPostPayloadOrError()                        {}
@@ -1734,9 +1740,8 @@ type PostInteractionsEdge struct {
 }
 
 type PostTokensInput struct {
-	TokenIds []persist.DBID            `json:"tokenIds"`
-	Tokens   []*ChainAddressTokenInput `json:"tokens"`
-	Caption  *string                   `json:"caption"`
+	Tokens  []*ChainAddressTokenInput `json:"tokens"`
+	Caption *string                   `json:"caption"`
 }
 
 type PostTokensPayload struct {
@@ -1744,6 +1749,17 @@ type PostTokensPayload struct {
 }
 
 func (PostTokensPayload) IsPostTokensPayloadOrError() {}
+
+type PostTokensReferralInput struct {
+	Token   *ChainAddressTokenInput `json:"token"`
+	Caption *string                 `json:"caption"`
+}
+
+type PostTokensReferralPayload struct {
+	Post *Post `json:"post"`
+}
+
+func (PostTokensReferralPayload) IsPostTokensReferralPayloadOrError() {}
 
 type PostsConnection struct {
 	Edges    []*PostEdge `json:"edges"`
