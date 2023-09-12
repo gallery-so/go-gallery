@@ -820,7 +820,6 @@ func (p *Provider) processTokensForUsers(ctx context.Context, users map[persist.
 
 		err = p.SubmitUserTokens(ctx, userID, newPersistedTokenIDs, chains)
 		if err != nil {
-			panic(err)
 			errors = append(errors, err)
 		}
 	}
