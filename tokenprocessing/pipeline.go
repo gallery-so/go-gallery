@@ -63,17 +63,25 @@ type tokenProcessingJob struct {
 	// The pipeline only looks at the root level of the metadata for the key and will also not fail
 	// if the key is missing or if processing media for the key fails
 	profileImageKey string
+	// refreshMetadata is an optional flag that indicates that the pipeline should check for new metadata when enabled
+	refreshMetadata bool
 }
 
 type PipelineOption func(*tokenProcessingJob)
 
-type PipelineOptions struct{}
+type pOpts struct{}
 
-var PipelineOpts PipelineOptions
+var PipelineOpts pOpts
 
-func (PipelineOptions) WithProfileImageKey(key string) PipelineOption {
+func (pOpts) WithProfileImageKey(key string) PipelineOption {
 	return func(j *tokenProcessingJob) {
 		j.profileImageKey = key
+	}
+}
+
+func (pOpts) WithRefreshMetadata() PipelineOption {
+	return func(j *tokenProcessingJob) {
+		j.refreshMetadata = true
 	}
 }
 
@@ -204,7 +212,7 @@ func (tpj *tokenProcessingJob) retrieveMetadata(ctx context.Context) persist.Tok
 
 	newMetadata := tpj.token.TokenMetadata
 
-	if len(newMetadata) == 0 || tpj.cause == persist.ProcessingCauseRefresh {
+	if len(newMetadata) == 0 || tpj.refreshMetadata {
 		i, a := tpj.contract.Chain.BaseKeywords()
 		fieldRequests := []multichain.FieldRequest[string]{
 			{

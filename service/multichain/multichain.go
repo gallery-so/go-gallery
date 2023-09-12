@@ -16,7 +16,6 @@ import (
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/redis"
-	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/sirupsen/logrus"
 	"github.com/sourcegraph/conc"
 	"github.com/sourcegraph/conc/pool"
@@ -42,8 +41,9 @@ var contractNameBlacklist = map[string]bool{
 	"unknown":               true,
 }
 
-// SendTokens is called to process a user's batch of tokens
-type SendTokens func(context.Context, task.TokenProcessingUserMessage) error
+// SubmitUserTokensF is called to process a user's batch of tokens
+// TODO: Remove chains when made optional on tokenprocessing
+type SubmitUserTokensF func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, chains []persist.Chain) error
 
 type Provider struct {
 	Repos   *postgres.Repositories
@@ -52,8 +52,8 @@ type Provider struct {
 	Chains  map[persist.Chain][]any
 
 	// some chains use the addresses of other chains, this will map of chain we want tokens from => chain that's address will be used for lookup
-	WalletOverrides WalletOverrideMap
-	SendTokens      SendTokens
+	WalletOverrides  WalletOverrideMap
+	SubmitUserTokens SubmitUserTokensF
 }
 
 // BlockchainInfo retrieves blockchain info from all chains
@@ -807,7 +807,7 @@ func (p *Provider) processTokensForUsers(ctx context.Context, users map[persist.
 	newUserTokens := make(map[persist.DBID][]persist.TokenGallery)
 
 	errors := make([]error, 0)
-	for userID, _ := range users {
+	for userID := range users {
 		newTokensForUser := tokenIsNewForUser[userID]
 		persistedTokensForUser := persistedUserTokens[userID]
 
@@ -818,7 +818,7 @@ func (p *Provider) processTokensForUsers(ctx context.Context, users map[persist.
 		newUserTokens[userID] = newPersistedTokens
 		newPersistedTokenIDs := util.MapWithoutError(newPersistedTokens, func(t persist.TokenGallery) persist.DBID { return t.ID })
 
-		err = p.sendTokensToTokenProcessing(ctx, userID, newPersistedTokenIDs, chains)
+		err = p.SubmitUserTokens(ctx, userID, newPersistedTokenIDs, chains)
 		if err != nil {
 			errors = append(errors, err)
 		}
@@ -922,13 +922,6 @@ func (p *Provider) processTokensForOwnersOfContract(ctx context.Context, contrac
 	}
 
 	return p.processTokensForUsers(ctx, users, chainTokensForUsers, existingTokensForUsers, contracts, chains, upsertParams)
-}
-
-func (p *Provider) sendTokensToTokenProcessing(ctx context.Context, userID persist.DBID, tokens []persist.DBID, chains []persist.Chain) error {
-	if len(tokens) == 0 {
-		return nil
-	}
-	return p.SendTokens(ctx, task.TokenProcessingUserMessage{UserID: userID, TokenIDs: tokens, Chains: chains})
 }
 
 func (p *Provider) processTokenMedia(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain) error {
@@ -1253,16 +1246,7 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 
 	}
 
-	if err := p.Queries.UpdateTokenMetadataFieldsByTokenIdentifiers(ctx, db.UpdateTokenMetadataFieldsByTokenIdentifiersParams{
-		Name:            util.ToNullString(finalTokenDescriptors.Name, true),
-		Description:     util.ToNullString(finalTokenDescriptors.Description, true),
-		TokenID:         ti.TokenID,
-		ContractAddress: ti.ContractAddress,
-	}); err != nil {
-		return err
-	}
-
-	if err := p.Repos.ContractRepository.UpsertByAddress(ctx, ti.ContractAddress, ti.Chain, persist.ContractGallery{
+	contractID, err := p.Repos.ContractRepository.UpsertByAddress(ctx, ti.ContractAddress, ti.Chain, persist.ContractGallery{
 		Chain:           ti.Chain,
 		Address:         persist.Address(ti.Chain.NormalizeAddress(ti.ContractAddress)),
 		Symbol:          persist.NullString(finalContractDescriptors.Symbol),
@@ -1270,10 +1254,18 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 		Description:     persist.NullString(finalContractDescriptors.Description),
 		ProfileImageURL: persist.NullString(finalContractDescriptors.ProfileImageURL),
 		OwnerAddress:    finalContractDescriptors.CreatorAddress,
-	}); err != nil {
+	})
+	if err != nil {
 		return err
 	}
-	return nil
+
+	return p.Queries.UpdateTokenMetadataFieldsByTokenIdentifiers(ctx, db.UpdateTokenMetadataFieldsByTokenIdentifiersParams{
+		Name:        util.ToNullString(finalTokenDescriptors.Name, true),
+		Description: util.ToNullString(finalTokenDescriptors.Description, true),
+		TokenID:     ti.TokenID,
+		ContractID:  contractID,
+		Chain:       ti.Chain,
+	})
 }
 
 // RefreshContract refreshes a contract on the given chain using the chain provider for that chain

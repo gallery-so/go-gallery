@@ -9,6 +9,9 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
+
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/middleware"
@@ -25,8 +28,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 )
 
 const sentryTokenContextName = "NFT context" // Sentry excludes contexts that contain "token" so we use "NFT" instead
@@ -36,13 +37,13 @@ func InitServer() {
 	setDefaults()
 	ctx := context.Background()
 	c := server.ClientInit(ctx)
-	provider, _ := server.NewMultichainProvider(ctx, setDefaults)
-	router := CoreInitServer(c, provider)
+	mc, _ := server.NewMultichainProvider(ctx, setDefaults)
+	router := CoreInitServer(ctx, c, mc)
 	logger.For(nil).Info("Starting tokenprocessing server...")
 	http.Handle("/", router)
 }
 
-func CoreInitServer(clients *server.Clients, mc *multichain.Provider) *gin.Engine {
+func CoreInitServer(ctx context.Context, clients *server.Clients, mc *multichain.Provider) *gin.Engine {
 	InitSentry()
 	logger.InitWithGCPDefaults()
 
@@ -66,10 +67,9 @@ func CoreInitServer(clients *server.Clients, mc *multichain.Provider) *gin.Engin
 	logger.For(nil).Info("Registering handlers...")
 
 	t := newThrottler()
-
 	tp := NewTokenProcessor(clients.Queries, clients.EthClient, clients.HTTPClient, mc, clients.IPFSClient, clients.ArweaveClient, clients.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), clients.Repos.TokenRepository, metric.NewLogMetricReporter())
 
-	return handlersInitServer(router, tp, mc, clients.Repos, t, validate.WithCustomValidators())
+	return handlersInitServer(ctx, router, tp, mc, clients.Repos, t, validate.WithCustomValidators(), clients.TaskClient)
 }
 
 func setDefaults() {

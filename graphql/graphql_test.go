@@ -843,7 +843,7 @@ func testSyncNewTokens(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("should sync new tokens", func(t *testing.T) {
-		h := handlerWithProviders(t, sendTokensNOOP, provider)
+		h := handlerWithProviders(t, submitUserTokensNoop, provider)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
@@ -854,7 +854,7 @@ func testSyncNewTokens(t *testing.T) {
 	})
 
 	t.Run("should not duplicate tokens from repeat syncs", func(t *testing.T) {
-		h := handlerWithProviders(t, sendTokensNOOP, provider)
+		h := handlerWithProviders(t, submitUserTokensNoop, provider)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
@@ -874,7 +874,7 @@ func testSyncNewTokensMultichain(t *testing.T) {
 		withContractTokens(contract, userF.Wallet.Address, 10),
 		withBlockchainInfo(multichain.BlockchainInfo{ProviderID: persist.GenerateID().String()}),
 	)
-	h := handlerWithProviders(t, sendTokensNOOP, provider, secondProvider)
+	h := handlerWithProviders(t, submitUserTokensNoop, provider, secondProvider)
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 	ctx := context.Background()
 
@@ -892,7 +892,8 @@ func testSyncOnlySubmitsNewTokens(t *testing.T) {
 	tokenRecorder := sendTokensRecorder{}
 	h := handlerWithProviders(t, tokenRecorder.Send, provider)
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
-	tokenRecorder.On("Send", mock.Anything, mock.Anything).Times(1).Return(nil)
+	// Ideally this compares against expected values, but mocks seems to behave weirdly with slices
+	tokenRecorder.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Times(1).Return(nil)
 
 	_, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum})
 
@@ -921,7 +922,7 @@ func testSyncDeletesOldTokens(t *testing.T) {
 			Name: "someContract",
 		},
 	}, userF.Wallet.Address, 4))
-	h := handlerWithProviders(t, sendTokensNOOP, provider)
+	h := handlerWithProviders(t, submitUserTokensNoop, provider)
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum})
@@ -943,7 +944,7 @@ func testSyncShouldCombineProviders(t *testing.T) {
 			Name: "anotherContract",
 		},
 	}, userF.Wallet.Address, 2))
-	h := handlerWithProviders(t, sendTokensNOOP, providerA, providerB)
+	h := handlerWithProviders(t, submitUserTokensNoop, providerA, providerB)
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum})
@@ -961,7 +962,7 @@ func testSyncShouldMergeDuplicatesInProvider(t *testing.T) {
 		withContracts([]multichain.ChainAgnosticContract{contract}),
 		withTokens([]multichain.ChainAgnosticToken{token, token}),
 	)
-	h := handlerWithProviders(t, sendTokensNOOP, provider)
+	h := handlerWithProviders(t, submitUserTokensNoop, provider)
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum})
@@ -977,7 +978,7 @@ func testSyncShouldMergeDuplicatesAcrossProviders(t *testing.T) {
 	}}
 	providerA := newStubProvider(withContracts([]multichain.ChainAgnosticContract{contract}), withTokens([]multichain.ChainAgnosticToken{token}))
 	providerB := newStubProvider(withContracts([]multichain.ChainAgnosticContract{contract}), withTokens([]multichain.ChainAgnosticToken{token}))
-	h := handlerWithProviders(t, sendTokensNOOP, providerA, providerB)
+	h := handlerWithProviders(t, submitUserTokensNoop, providerA, providerB)
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum})
@@ -999,13 +1000,13 @@ func testSyncShouldProcessMedia(t *testing.T) {
 			withContractToken(contract, address, startTokenID),
 			withFetchMetadata(fetchFromDummyEndpoint(metadataServer.URL, endpoint, clients.IPFSClient, clients.ArweaveClient)),
 		)
-		mc := newMultichainProvider(clients, sendTokensNOOP, []any{provider})
+		mc := newMultichainProvider(clients, submitUserTokensNoop, []any{provider})
 		t.Cleanup(func() {
 			clients.Close()
 			// Change the token ID so that the next test doesn't conflict with the token generated from the previous test
 			startTokenID++
 		})
-		return handlerWithProviders(t, sendTokensToTokenProcessing(clients, &mc), provider)
+		return handlerWithProviders(t, sendTokensToTokenProcessing(ctx, clients, &mc), provider)
 	}
 
 	t.Run("should process image", func(t *testing.T) {
@@ -1561,10 +1562,10 @@ func defaultHandler(t *testing.T) http.Handler {
 }
 
 // handlerWithProviders returns a GraphQL http.Handler
-func handlerWithProviders(t *testing.T, sendTokens multichain.SendTokens, providers ...any) http.Handler {
+func handlerWithProviders(t *testing.T, submitF multichain.SubmitUserTokensF, providers ...any) http.Handler {
 	ctx := context.Background()
 	c := server.ClientInit(context.Background())
-	provider := newMultichainProvider(c, sendTokens, providers)
+	provider := newMultichainProvider(c, submitF, providers)
 	recommender := newStubRecommender(t, []persist.DBID{})
 	p := newStubPersonaliztion(t)
 	t.Cleanup(c.Close)
@@ -1572,7 +1573,7 @@ func handlerWithProviders(t *testing.T, sendTokens multichain.SendTokens, provid
 }
 
 // newMultichainProvider a new multichain provider configured with the given providers
-func newMultichainProvider(c *server.Clients, sendToken multichain.SendTokens, providers []any) multichain.Provider {
+func newMultichainProvider(c *server.Clients, submitF multichain.SubmitUserTokensF, providers []any) multichain.Provider {
 	chains := map[persist.Chain][]any{}
 	if len(providers) > 1 {
 		chains[persist.ChainETH] = providers[:1]
@@ -1581,10 +1582,10 @@ func newMultichainProvider(c *server.Clients, sendToken multichain.SendTokens, p
 		chains[persist.ChainETH] = providers
 	}
 	return multichain.Provider{
-		Repos:      c.Repos,
-		Queries:    c.Queries,
-		Chains:     map[persist.Chain][]any{persist.ChainETH: providers, persist.ChainOptimism: providers},
-		SendTokens: sendToken,
+		Repos:            c.Repos,
+		Queries:          c.Queries,
+		Chains:           map[persist.Chain][]any{persist.ChainETH: providers, persist.ChainOptimism: providers},
+		SubmitUserTokens: submitF,
 	}
 }
 

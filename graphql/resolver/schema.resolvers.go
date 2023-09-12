@@ -8,8 +8,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
-	"time"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -21,7 +19,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
@@ -2580,33 +2577,12 @@ func (r *tokenResolver) Media(ctx context.Context, obj *model.Token) (model.Medi
 	}
 
 	tokenMedia, err := publicapi.For(ctx).Token.MediaByTokenID(ctx, obj.Dbid)
-	if err != nil || !tokenMedia.Active {
-		if util.ErrorAs[persist.ErrMediaNotFound](err) {
-			err = nil
-		}
 
-		// If there is no media for a token (whether valid or not), assume that the token is still being synced.
-		tokenMedia.Media.MediaType = persist.MediaTypeSyncing
-
-		// In the worse case the processing message was dropped and the token never gets handled. To address that,
-		// we compare when the token was created to the current time. If it's longer than the grace period, we assume that the
-		// message was lost and set the media to invalid so it could be refreshed manually.
-		if time.Since(obj.Token.CreatedAt) > time.Duration(1*time.Hour) {
-			tokenMedia.Media.MediaType = persist.MediaTypeInvalid
-		}
-
-		fallbackMedia := obj.HelperTokenData.Token.FallbackMedia
-
-		// Rewrite IPFS and Arweave URLs to HTTP
-		if fallbackURL := strings.ToLower(fallbackMedia.ImageURL.String()); strings.HasPrefix(fallbackURL, "ipfs://") {
-			fallbackMedia.ImageURL = persist.NullString(ipfs.DefaultGatewayFrom(fallbackURL))
-		} else if strings.HasPrefix(fallbackURL, "ar://") {
-			fallbackMedia.ImageURL = persist.NullString(fmt.Sprintf("https://arweave.net/%s", util.GetURIPath(fallbackURL, false)))
-		}
-
-		return mediaToModel(ctx, tokenMedia, fallbackMedia, highDef), err
+	if util.ErrorAs[persist.ErrMediaNotFound](err) {
+		err = nil
 	}
-	return mediaToModel(ctx, tokenMedia, obj.HelperTokenData.Token.FallbackMedia, highDef), nil
+
+	return resolveTokenMedia(ctx, obj.HelperTokenData.Token, tokenMedia, highDef), err
 }
 
 // Owner is the resolver for the owner field.
