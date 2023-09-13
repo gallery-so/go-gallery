@@ -209,13 +209,13 @@ func (tpj *tokenProcessingJob) retrieveMetadata(ctx context.Context) persist.Tok
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 
-	var metadata persist.TokenMetadata
+	var newMetadata persist.TokenMetadata
 
 	if tpj.tokenInstance != nil {
 		metadata = tpj.tokenInstance.TokenMetadata
 	}
 
-	if len(metadata) == 0 || tpj.refreshMetadata {
+	if len(newMetadata) == 0 || tpj.refreshMetadata {
 		i, a := tpj.contract.Chain.BaseKeywords()
 		fieldRequests := []multichain.FieldRequest[string]{
 			{
@@ -233,15 +233,15 @@ func (tpj *tokenProcessingJob) retrieveMetadata(ctx context.Context) persist.Tok
 			persist.FailStep(&tpj.pipelineMetadata.MetadataRetrieval)
 		} else if len(mcMetadata) > 0 {
 			logger.For(ctx).Infof("got metadata from chain: %v", mcMetadata)
-			metadata = mcMetadata
+			newMetadata = mcMetadata
 		}
 	}
 
-	if len(metadata) == 0 {
+	if len(newMetadata) == 0 {
 		persist.FailStep(&tpj.pipelineMetadata.MetadataRetrieval)
 	}
 
-	return metadata
+	return newMetadata
 }
 
 func (tpj *tokenProcessingJob) retrieveTokenInfo(ctx context.Context, metadata persist.TokenMetadata) (string, string) {
