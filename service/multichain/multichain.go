@@ -285,7 +285,7 @@ func (p *Provider) SyncTokensByUserID(ctx context.Context, userID persist.DBID, 
 	errChan := make(chan error)
 	incomingTokens := make(chan chainTokens)
 	incomingContracts := make(chan chainContracts)
-	chainsToAddresses := p.MatchingWallets(user.Wallets, chains)
+	chainsToAddresses := p.matchingWallets(user.Wallets, chains)
 
 	wg := &conc.WaitGroup{}
 	for c, a := range chainsToAddresses {
@@ -344,7 +344,7 @@ func (p *Provider) SyncTokensByUserIDAndTokenIdentifiers(ctx context.Context, us
 	})
 
 	chains = util.Dedupe(chains, false)
-	matchingWallets := p.MatchingWallets(user.Wallets, chains)
+	matchingWallets := p.matchingWallets(user.Wallets, chains)
 
 	chainAddresses := map[persist.ChainAddress]bool{}
 	for chain, addresses := range matchingWallets {
@@ -429,7 +429,7 @@ func (p *Provider) SyncTokensByUserIDAndTokenIdentifiers(ctx context.Context, us
 }
 
 func (p *Provider) SearchForTokenInUserWalletsRetry(ctx context.Context, userID persist.DBID, w []persist.Wallet, t persist.TokenIdentifiers, r retry.Retry) (token persist.TokenGallery, err error) {
-	wallets := p.MatchingWalletsForChain(w, token.Chain)
+	wallets := p.matchingWalletsChain(w, token.Chain)
 
 	if len(wallets) == 0 {
 		return token, persist.ErrTokenNotFoundByUserTokenIdentifers{
@@ -719,7 +719,7 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 	}
 
 	fetchers := matchingProvidersByChains[ChildContractFetcher](p.Chains, chains...)
-	searchAddresses := p.MatchingWallets(user.Wallets, chains)
+	searchAddresses := p.matchingWallets(user.Wallets, chains)
 	providerPool := pool.NewWithResults[ProviderChildContractResult]().WithContext(ctx)
 
 	// Fetch all tokens created by the user
@@ -1236,6 +1236,16 @@ func (p *Provider) VerifySignature(ctx context.Context, pSig string, pNonce stri
 	return true, nil
 }
 
+// RefreshToken refreshes a token on the given chain using the chain provider for that chain
+func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers) error {
+	err := p.processTokenMedia(ctx, ti.TokenID, ti.ContractAddress, ti.Chain)
+	if err != nil {
+		return err
+	}
+	_, _, err = p.RefreshTokenDescriptorsByTokenIdentifiers(ctx, ti)
+	return err
+}
+
 // RefreshTokenDescriptorsByTokenIdentifiers will refresh the token descriptors for a token by its identifiers.
 // It returns a slice of updated token DBIDs if any, and the DBID of the updated contract.
 func (p *Provider) RefreshTokenDescriptorsByTokenIdentifiers(ctx context.Context, ti persist.TokenIdentifiers) (tokenIDs []persist.DBID, contractID persist.DBID, err error) {
@@ -1299,16 +1309,6 @@ func (p *Provider) RefreshTokenDescriptorsByTokenIdentifiers(ctx context.Context
 	})
 
 	return tokenIDs, contractID, err
-}
-
-// RefreshToken refreshes a token on the given chain using the chain provider for that chain
-func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers) error {
-	err := p.processTokenMedia(ctx, ti.TokenID, ti.ContractAddress, ti.Chain)
-	if err != nil {
-		return err
-	}
-	_, _, err = p.RefreshTokenDescriptorsByTokenIdentifiers(ctx, ti)
-	return err
 }
 
 // RefreshContract refreshes a contract on the given chain using the chain provider for that chain
@@ -1429,7 +1429,7 @@ func (p *Provider) SyncContractsOwnedByUser(ctx context.Context, userID persist.
 	contractsFromProviders := []chainContracts{}
 
 	contractFetchers := matchingProvidersByChains[ContractsOwnerFetcher](p.Chains, chains...)
-	searchAddresses := p.MatchingWallets(user.Wallets, chains)
+	searchAddresses := p.matchingWallets(user.Wallets, chains)
 	providerPool := pool.NewWithResults[ContractOwnerResult]().WithContext(ctx)
 
 	for chain, addresses := range searchAddresses {
@@ -1685,8 +1685,8 @@ func (p *Provider) processContracts(ctx context.Context, contractsFromProviders 
 	return p.Repos.ContractRepository.BulkUpsert(ctx, newContracts, canOverwriteOwnerAddress)
 }
 
-// MatchingWallets returns wallet addresses that belong to any of the passed chains
-func (p *Provider) MatchingWallets(wallets []persist.Wallet, chains []persist.Chain) map[persist.Chain][]persist.Address {
+// matchingWallets returns wallet addresses that belong to any of the passed chains
+func (p *Provider) matchingWallets(wallets []persist.Wallet, chains []persist.Chain) map[persist.Chain][]persist.Address {
 	matches := make(map[persist.Chain][]persist.Address)
 	for _, chain := range chains {
 		for _, wallet := range wallets {
@@ -1703,9 +1703,9 @@ func (p *Provider) MatchingWallets(wallets []persist.Wallet, chains []persist.Ch
 	return matches
 }
 
-// MatchingWalletsForChain returns a list of wallets that match the given chain
-func (p *Provider) MatchingWalletsForChain(wallets []persist.Wallet, chain persist.Chain) []persist.Address {
-	return p.MatchingWallets(wallets, []persist.Chain{chain})[chain]
+// matchingWalletsChain returns a list of wallets that match the given chain
+func (p *Provider) matchingWalletsChain(wallets []persist.Wallet, chain persist.Chain) []persist.Address {
+	return p.matchingWallets(wallets, []persist.Chain{chain})[chain]
 }
 
 func tokensToNewDedupedTokens(tokens []chainTokens, contracts []persist.ContractGallery, ownerUser persist.User) ([]persist.TokenGallery, map[persist.DBID]persist.Address) {
