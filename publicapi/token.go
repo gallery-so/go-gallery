@@ -535,17 +535,15 @@ func (api TokenAPI) MediaByTokenIdentifiers(ctx context.Context, tokenIdentifier
 	}); err != nil {
 		return db.TokenMedia{}, db.Token{}, err
 	}
+	// Check if the user is logged in, and if so prioritize fetching media specific to their token
+	userID, _ := getAuthenticatedUserID(ctx)
 	media, err := api.queries.GetMediaByTokenIdentifiers(ctx, db.GetMediaByTokenIdentifiersParams{
+		UserID:  userID,
 		Chain:   tokenIdentifiers.Chain,
 		Address: tokenIdentifiers.ContractAddress,
 		TokenID: tokenIdentifiers.TokenID,
 	})
-	// TODO: Rewrite error to missing token
-	if err != nil {
-		return db.TokenMedia{}, db.Token{}, err
-	}
-
-	return media.TokenMedia, media.Token, nil
+	return media.TokenMedia, media.Token, err
 }
 
 func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (db.Event, error) {

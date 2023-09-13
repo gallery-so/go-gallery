@@ -204,15 +204,15 @@ func (api FeedAPI) PostTokenReferral(ctx context.Context, t persist.TokenIdentif
 		})
 	}
 
-	// Got an unexpected error
 	if err != nil && !util.ErrorAs[persist.ErrTokenNotFoundByUserTokenIdentifers](err) {
+		fmt.Println("error in sync", err)
 		return "", err
 	}
 
 	// The token is not synced, so we need to find it
-	// TODO: Add error message to schema
-	// TODO: Configure different retry
-	synced, err := api.multichainProvider.SearchForTokenInUserWalletsRetry(ctx, user.ID, user.Wallets, t, retry.DefaultRetry)
+
+	r := retry.Retry{Base: 2, Cap: 10, Tries: 7}
+	synced, err := api.multichainProvider.SearchForTokenInUserWalletsRetry(ctx, user.ID, user.Wallets, t, r)
 	if err != nil {
 		return "", err
 	}

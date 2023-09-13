@@ -2461,26 +2461,24 @@ func (q *Queries) GetLastFeedEventForUser(ctx context.Context, arg GetLastFeedEv
 
 const getMediaByTokenIdentifiers = `-- name: GetMediaByTokenIdentifiers :one
 with contract as (
-	select id from contracts where contracts.chain = $1 and address = $2 and not contracts.deleted
-),
-tokens as (
-	select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id, tokens.is_creator_token, tokens.is_holder_token, tokens.displayable
-	from tokens, contract
-	where tokens.token_id = $3 and tokens.contract = contract.id and tokens.chain = $1 and not tokens.deleted and fallback_media is not null
-	order by last_updated desc
-	limit 1
+	select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id, override_creator_user_id from contracts where contracts.chain = $2 and contracts.address = $3 and not contracts.deleted
 ),
 token_medias as (
 	select token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.contract_id, token_medias.token_id, token_medias.chain, token_medias.active, token_medias.metadata, token_medias.media, token_medias.name, token_medias.description, token_medias.processing_job_id, token_medias.deleted
 	from token_medias, contract
-	where token_medias.token_id = $3 and token_medias.contract_id = contract.id and token_medias.chain = $1 and not token_medias.deleted
-	order by last_updated desc
+	where token_medias.contract_id = contract.id and token_medias.chain = $2 and token_medias.token_id = $4 and not token_medias.deleted
+	order by token_medias.active desc, token_medias.last_updated desc
 	limit 1
 )
-select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id, tokens.is_creator_token, tokens.is_holder_token, tokens.displayable, token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.contract_id, token_medias.token_id, token_medias.chain, token_medias.active, token_medias.metadata, token_medias.media, token_medias.name, token_medias.description, token_medias.processing_job_id, token_medias.deleted from tokens, token_medias
+select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id, tokens.is_creator_token, tokens.is_holder_token, tokens.displayable, token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.contract_id, token_medias.token_id, token_medias.chain, token_medias.active, token_medias.metadata, token_medias.media, token_medias.name, token_medias.description, token_medias.processing_job_id, token_medias.deleted
+from token_medias
+left join tokens on token_medias.id = tokens.token_media_id and not tokens.deleted
+order by tokens.owner_user_id = $1 desc, token_medias.active desc, token_medias.last_updated desc
+limit 1
 `
 
 type GetMediaByTokenIdentifiersParams struct {
+	UserID  persist.DBID    `json:"user_id"`
 	Chain   persist.Chain   `json:"chain"`
 	Address persist.Address `json:"address"`
 	TokenID persist.TokenID `json:"token_id"`
@@ -2492,7 +2490,12 @@ type GetMediaByTokenIdentifiersRow struct {
 }
 
 func (q *Queries) GetMediaByTokenIdentifiers(ctx context.Context, arg GetMediaByTokenIdentifiersParams) (GetMediaByTokenIdentifiersRow, error) {
-	row := q.db.QueryRow(ctx, getMediaByTokenIdentifiers, arg.Chain, arg.Address, arg.TokenID)
+	row := q.db.QueryRow(ctx, getMediaByTokenIdentifiers,
+		arg.UserID,
+		arg.Chain,
+		arg.Address,
+		arg.TokenID,
+	)
 	var i GetMediaByTokenIdentifiersRow
 	err := row.Scan(
 		&i.Token.ID,
