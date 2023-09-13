@@ -26,6 +26,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/util/retry"
 	"github.com/mikeydub/go-gallery/validate"
 )
 
@@ -161,7 +162,12 @@ func (api FeedAPI) PostTokenReferral(ctx context.Context, t persist.TokenIdentif
 		return "", err
 	}
 
-	actorID, err := getAuthenticatedUserID(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	user, err := For(ctx).User.GetUserById(ctx, userID)
 	if err != nil {
 		return "", err
 	}
@@ -175,26 +181,47 @@ func (api FeedAPI) PostTokenReferral(ctx context.Context, t persist.TokenIdentif
 		}
 	}
 
-	token, err := For(ctx).Token.GetTokenByIdentifiersOwner(ctx, t, actorID)
-	if err != nil {
-		// find the token
-		// synced, err := api.multichainProvider.SyncTokensByUserIDAndTokenIdentifiers(ctx, actorID, t)
-		// if err != nil {
-		// 	return "", err
-		// }
-		// confirmedTokens[i] = synced[0].ID
+	token, err := api.loaders.TokenByUserTokenIdentifiers.Load(db.GetTokenByUserTokenIdentifiersBatchParams{
+		OwnerID:         user.ID,
+		TokenID:         t.TokenID,
+		ContractAddress: t.ContractAddress,
+		Chain:           t.Chain,
+	})
+
+	// The token is already synced
+	if err == nil {
+		contract, err := api.queries.GetContractByID(ctx, token.Contract)
+		if err != nil {
+			return "", err
+		}
+
+		return api.queries.InsertPost(ctx, db.InsertPostParams{
+			ID:          persist.GenerateID(),
+			TokenIds:    []persist.DBID{token.ID},
+			ContractIds: []persist.DBID{contract.ID},
+			ActorID:     user.ID,
+			Caption:     c,
+		})
 	}
 
-	contract, err := api.queries.GetContractByID(ctx, token.Contract)
+	// Got an unexpected error
+	if err != nil && !util.ErrorAs[persist.ErrTokenNotFoundByUserTokenIdentifers](err) {
+		return "", err
+	}
+
+	// The token is not synced, so we need to find it
+	// TODO: Add error message to schema
+	// TODO: Configure different retry
+	synced, err := api.multichainProvider.SearchForTokenInUserWalletsRetry(ctx, user.ID, user.Wallets, t, retry.DefaultRetry)
 	if err != nil {
 		return "", err
 	}
 
 	return api.queries.InsertPost(ctx, db.InsertPostParams{
 		ID:          persist.GenerateID(),
-		TokenIds:    []persist.DBID{token.ID},
-		ContractIds: []persist.DBID{contract.ID},
-		ActorID:     actorID,
+		TokenIds:    []persist.DBID{synced.ID},
+		ContractIds: []persist.DBID{synced.Contract},
+		ActorID:     user.ID,
 		Caption:     c,
 	})
 }

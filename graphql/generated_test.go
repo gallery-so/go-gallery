@@ -69,18 +69,6 @@ func (v *ChainAddressInput) GetAddress() string { return v.Address }
 // GetChain returns ChainAddressInput.Chain, and is useful for accessing the field via an interface.
 func (v *ChainAddressInput) GetChain() Chain { return v.Chain }
 
-type ChainAddressTokenInput struct {
-	ChainAddress ChainAddressInput `json:"chainAddress"`
-	// Refers to the id of the token in the contract either in decimal, or interpreted as hexadecimal when prefixed with '0x'
-	TokenId persist.TokenID `json:"tokenId"`
-}
-
-// GetChainAddress returns ChainAddressTokenInput.ChainAddress, and is useful for accessing the field via an interface.
-func (v *ChainAddressTokenInput) GetChainAddress() ChainAddressInput { return v.ChainAddress }
-
-// GetTokenId returns ChainAddressTokenInput.TokenId, and is useful for accessing the field via an interface.
-func (v *ChainAddressTokenInput) GetTokenId() persist.TokenID { return v.TokenId }
-
 type ChainPubKeyInput struct {
 	PubKey string `json:"pubKey"`
 	Chain  Chain  `json:"chain"`
@@ -331,12 +319,12 @@ type OneTimeLoginTokenAuth struct {
 func (v *OneTimeLoginTokenAuth) GetToken() string { return v.Token }
 
 type PostTokensInput struct {
-	Tokens  []ChainAddressTokenInput `json:"tokens"`
-	Caption *string                  `json:"caption"`
+	TokenIds []persist.DBID `json:"tokenIds"`
+	Caption  *string        `json:"caption"`
 }
 
-// GetTokens returns PostTokensInput.Tokens, and is useful for accessing the field via an interface.
-func (v *PostTokensInput) GetTokens() []ChainAddressTokenInput { return v.Tokens }
+// GetTokenIds returns PostTokensInput.TokenIds, and is useful for accessing the field via an interface.
+func (v *PostTokensInput) GetTokenIds() []persist.DBID { return v.TokenIds }
 
 // GetCaption returns PostTokensInput.Caption, and is useful for accessing the field via an interface.
 func (v *PostTokensInput) GetCaption() *string { return v.Caption }

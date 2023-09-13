@@ -88,11 +88,11 @@ select tm.* from tokens join token_medias tm on tokens.token_media_id = tm.id wh
 -- name: GetTokenByIdBatch :batchone
 select * from tokens where id = $1 and displayable and deleted = false;
 
--- name: GetTokenByHolderIdContractAddressAndTokenIdBatch :batchone
+-- name: GetTokenByUserTokenIdentifiersBatch :batchone
 select t.*
 from tokens t
 join contracts c on t.contract = c.id
-where t.owner_user_id = @holder_id and t.token_id = @token_id and c.address = @contract_address and c.chain = @chain and t.displayable and not t.deleted and not c.deleted;
+where t.owner_user_id = @owner_id and t.token_id = @token_id and c.address = @contract_address and c.chain = @chain and t.displayable and not t.deleted and not c.deleted;
 
 -- name: GetTokensByCollectionIdBatch :batchmany
 select t.* from collections c,

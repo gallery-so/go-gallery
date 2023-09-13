@@ -10675,7 +10675,7 @@ union RemoveProfileImagePayloadOrError =
   | ErrUserNotFound
 
 input PostTokensInput {
-  tokens: [ChainAddressTokenInput!]
+  tokenIds: [DBID!]
   caption: String
 }
 
@@ -59048,22 +59048,22 @@ func (ec *executionContext) unmarshalInputPostTokensInput(ctx context.Context, o
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"tokens", "caption"}
+	fieldsInOrder := [...]string{"tokenIds", "caption"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
 			continue
 		}
 		switch k {
-		case "tokens":
+		case "tokenIds":
 			var err error
 
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("tokens"))
-			data, err := ec.unmarshalOChainAddressTokenInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐChainAddressTokenInputᚄ(ctx, v)
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("tokenIds"))
+			data, err := ec.unmarshalODBID2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBIDᚄ(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.Tokens = data
+			it.TokenIds = data
 		case "caption":
 			var err error
 
@@ -76909,26 +76909,6 @@ func (ec *executionContext) unmarshalOChainAddressInput2ᚖgithubᚗcomᚋmikeyd
 	}
 	res, err := ec.unmarshalInputChainAddressInput(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) unmarshalOChainAddressTokenInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐChainAddressTokenInputᚄ(ctx context.Context, v interface{}) ([]*model.ChainAddressTokenInput, error) {
-	if v == nil {
-		return nil, nil
-	}
-	var vSlice []interface{}
-	if v != nil {
-		vSlice = graphql.CoerceList(v)
-	}
-	var err error
-	res := make([]*model.ChainAddressTokenInput, len(vSlice))
-	for i := range vSlice {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
-		res[i], err = ec.unmarshalNChainAddressTokenInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐChainAddressTokenInput(ctx, vSlice[i])
-		if err != nil {
-			return nil, err
-		}
-	}
-	return res, nil
 }
 
 func (ec *executionContext) marshalOChainTokens2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐChainTokens(ctx context.Context, sel ast.SelectionSet, v *model.ChainTokens) graphql.Marshaler {

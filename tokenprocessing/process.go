@@ -400,7 +400,7 @@ func processPostPreflight(tp *tokenProcessor, tm *tokenmanage.Manager, q *coredb
 				util.ErrResponse(c, http.StatusOK, err)
 				return
 			}
-			err = runPostPreflightAuthed(c, tp, tm, user, input.Token, mc, contractRepo)
+			err = runPostPreflightAuthed(c, user, input.Token, mc)
 			if err != nil {
 				util.ErrResponse(c, http.StatusInternalServerError, err)
 				return
@@ -453,7 +453,7 @@ func addContractRunOptions(contract persist.ContractGallery) (opts []PipelineOpt
 }
 
 func runPostPreflightUnauthed(ctx context.Context, tp *tokenProcessor, token persist.TokenIdentifiers, mc *multichain.Provider, contractRepo *postgres.ContractGalleryRepository, tokenRepo *postgres.TokenGalleryRepository) error {
-	prelightF := func(ctx context.Context) error {
+	searchF := func(ctx context.Context) error {
 		_, contractID, err := mc.RefreshTokenDescriptorsByTokenIdentifiers(ctx, persist.TokenIdentifiers{
 			TokenID:         token.TokenID,
 			Chain:           token.Chain,
@@ -470,40 +470,15 @@ func runPostPreflightUnauthed(ctx context.Context, tp *tokenProcessor, token per
 		return err
 	}
 
-	shouldRetry := func(err error) bool {
-		logger.For(ctx).Errorf("error occurred running unauthed preflight, retrying on error: %s", err.Error())
+	retryCondition := func(err error) bool {
+		logger.For(ctx).Errorf("unauthed preflight: retrying on error: %s", err.Error())
 		return true
 	}
 
-	return retry.RetryFunc(ctx, prelightF, shouldRetry, retry.DefaultRetry)
+	return retry.RetryFunc(ctx, searchF, retryCondition, retry.DefaultRetry)
 }
 
-func runPostPreflightAuthed(ctx context.Context, tp *tokenProcessor, tm *tokenmanage.Manager, user persist.User, token persist.TokenIdentifiers, mc *multichain.Provider, contractRepo *postgres.ContractGalleryRepository) error {
-	preflightF := func(ctx context.Context) error {
-		wallets := multichain.MatchingWalletsForChain(user.Wallets, token.Chain, mc.WalletOverrides)
-		tokens := util.MapWithoutError(wallets, func(w persist.Address) persist.TokenUniqueIdentifiers {
-			return persist.TokenUniqueIdentifiers{
-				Chain:           token.Chain,
-				ContractAddress: token.ContractAddress,
-				TokenID:         token.TokenID,
-			}
-		})
-		syncedTokens, err := mc.SyncTokensByUserIDAndTokenIdentifiers(ctx, user.ID, tokens)
-		if err != nil {
-			return err
-		}
-		contract, err := contractRepo.GetByID(ctx, syncedTokens[0].Contract)
-		if err != nil {
-			return err
-		}
-		_, err = processFromInstance(ctx, tp, nil, syncedTokens[0], contract, persist.ProcessingCausePostPreflight)
-		return err
-	}
-
-	shouldRetry := func(err error) bool {
-		logger.For(ctx).Errorf("error occurred running authed preflight, retrying on error: %s", err.Error())
-		return true
-	}
-
-	return retry.RetryFunc(ctx, preflightF, shouldRetry, retry.DefaultRetry)
+func runPostPreflightAuthed(ctx context.Context, user persist.User, token persist.TokenIdentifiers, mc *multichain.Provider) error {
+	_, err := mc.SearchForTokenInUserWalletsRetry(ctx, user.ID, user.Wallets, token, retry.DefaultRetry)
+	return err
 }

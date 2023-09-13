@@ -25,6 +25,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/util/retry"
 )
 
 func init() {
@@ -271,29 +272,6 @@ func matchingProvidersForChain[T any](availableProviders map[persist.Chain][]any
 	return matchingProvidersByChains[T](availableProviders, chain)[chain]
 }
 
-// MatchingWallets returns wallet addresses that belong to any of the passed chains
-func MatchingWallets(wallets []persist.Wallet, chains []persist.Chain, walletOverrides WalletOverrideMap) map[persist.Chain][]persist.Address {
-	matches := make(map[persist.Chain][]persist.Address)
-	for _, chain := range chains {
-		for _, wallet := range wallets {
-			if wallet.Chain == chain {
-				matches[chain] = append(matches[chain], wallet.Address)
-			} else if overrides, ok := walletOverrides[chain]; ok && util.Contains(overrides, wallet.Chain) {
-				matches[chain] = append(matches[chain], wallet.Address)
-			}
-		}
-	}
-	for chain, addresses := range matches {
-		matches[chain] = util.Dedupe(addresses, true)
-	}
-	return matches
-}
-
-// MatchingWalletsForChain returns wallet addresses that belong to chain
-func MatchingWalletsForChain(wallets []persist.Wallet, chain persist.Chain, walletOverrides WalletOverrideMap) []persist.Address {
-	return MatchingWallets(wallets, []persist.Chain{chain}, walletOverrides)[chain]
-}
-
 // SyncTokensByUserID updates the media for all tokens for a user
 func (p *Provider) SyncTokensByUserID(ctx context.Context, userID persist.DBID, chains []persist.Chain) error {
 
@@ -307,7 +285,7 @@ func (p *Provider) SyncTokensByUserID(ctx context.Context, userID persist.DBID, 
 	errChan := make(chan error)
 	incomingTokens := make(chan chainTokens)
 	incomingContracts := make(chan chainContracts)
-	chainsToAddresses := MatchingWallets(user.Wallets, chains, p.WalletOverrides)
+	chainsToAddresses := p.MatchingWallets(user.Wallets, chains)
 
 	wg := &conc.WaitGroup{}
 	for c, a := range chainsToAddresses {
@@ -366,7 +344,7 @@ func (p *Provider) SyncTokensByUserIDAndTokenIdentifiers(ctx context.Context, us
 	})
 
 	chains = util.Dedupe(chains, false)
-	matchingWallets := MatchingWallets(user.Wallets, chains, p.WalletOverrides)
+	matchingWallets := p.MatchingWallets(user.Wallets, chains)
 
 	chainAddresses := map[persist.ChainAddress]bool{}
 	for chain, addresses := range matchingWallets {
@@ -448,6 +426,53 @@ func (p *Provider) SyncTokensByUserIDAndTokenIdentifiers(ctx context.Context, us
 	}()
 
 	return p.receiveSyncedTokensForUser(ctx, user, chains, incomingTokens, incomingContracts, errChan, false)
+}
+
+func (p *Provider) SearchForTokenInUserWalletsRetry(ctx context.Context, userID persist.DBID, w []persist.Wallet, t persist.TokenIdentifiers, r retry.Retry) (token persist.TokenGallery, err error) {
+	wallets := p.MatchingWalletsForChain(w, token.Chain)
+
+	if len(wallets) == 0 {
+		return token, persist.ErrTokenNotFoundByUserTokenIdentifers{
+			OwnerID:         userID,
+			TokenID:         t.TokenID,
+			Chain:           t.Chain,
+			ContractAddress: t.ContractAddress,
+		}
+	}
+
+	searchF := func(ctx context.Context) error {
+		searchInWallets := util.MapWithoutError(wallets, func(w persist.Address) persist.TokenUniqueIdentifiers {
+			return persist.TokenUniqueIdentifiers{
+				Chain:           t.Chain,
+				ContractAddress: t.ContractAddress,
+				TokenID:         t.TokenID,
+				OwnerAddress:    w,
+			}
+		})
+		synced, err := p.SyncTokensByUserIDAndTokenIdentifiers(ctx, userID, searchInWallets)
+		if err != nil {
+			return err
+		}
+		if len(synced) == 0 {
+			return persist.ErrTokenNotFoundByUserTokenIdentifers{
+				OwnerID:         userID,
+				TokenID:         t.TokenID,
+				Chain:           t.Chain,
+				ContractAddress: t.ContractAddress,
+			}
+		}
+		token = synced[0]
+		return nil
+	}
+
+	retryCondition := func(err error) bool {
+		logger.For(ctx).Errorf("searching for token: retrying on error: %s", err.Error())
+		return true
+	}
+
+	err = retry.RetryFunc(ctx, searchF, retryCondition, r)
+
+	return token, err
 }
 
 func (p *Provider) receiveSyncedTokensForUser(ctx context.Context, user persist.User, chains []persist.Chain, incomingTokens chan chainTokens, incomingContracts chan chainContracts, errChan chan error, replace bool) ([]persist.TokenGallery, error) {
@@ -694,7 +719,7 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 	}
 
 	fetchers := matchingProvidersByChains[ChildContractFetcher](p.Chains, chains...)
-	searchAddresses := MatchingWallets(user.Wallets, chains, p.WalletOverrides)
+	searchAddresses := p.MatchingWallets(user.Wallets, chains)
 	providerPool := pool.NewWithResults[ProviderChildContractResult]().WithContext(ctx)
 
 	// Fetch all tokens created by the user
@@ -1404,7 +1429,7 @@ func (p *Provider) SyncContractsOwnedByUser(ctx context.Context, userID persist.
 	contractsFromProviders := []chainContracts{}
 
 	contractFetchers := matchingProvidersByChains[ContractsOwnerFetcher](p.Chains, chains...)
-	searchAddresses := MatchingWallets(user.Wallets, chains, p.WalletOverrides)
+	searchAddresses := p.MatchingWallets(user.Wallets, chains)
 	providerPool := pool.NewWithResults[ContractOwnerResult]().WithContext(ctx)
 
 	for chain, addresses := range searchAddresses {
@@ -1655,9 +1680,32 @@ outer:
 // processContracts deduplicates contracts and upserts them into the database. If canOverwriteOwnerAddress is true, then
 // the owner address of an existing contract will be overwritten if the new contract provides a non-empty owner address.
 // An empty owner address will never overwrite an existing address, even if canOverwriteOwnerAddress is true.
-func (d *Provider) processContracts(ctx context.Context, contractsFromProviders []chainContracts, canOverwriteOwnerAddress bool) ([]persist.ContractGallery, error) {
+func (p *Provider) processContracts(ctx context.Context, contractsFromProviders []chainContracts, canOverwriteOwnerAddress bool) ([]persist.ContractGallery, error) {
 	newContracts := contractsToNewDedupedContracts(contractsFromProviders)
-	return d.Repos.ContractRepository.BulkUpsert(ctx, newContracts, canOverwriteOwnerAddress)
+	return p.Repos.ContractRepository.BulkUpsert(ctx, newContracts, canOverwriteOwnerAddress)
+}
+
+// MatchingWallets returns wallet addresses that belong to any of the passed chains
+func (p *Provider) MatchingWallets(wallets []persist.Wallet, chains []persist.Chain) map[persist.Chain][]persist.Address {
+	matches := make(map[persist.Chain][]persist.Address)
+	for _, chain := range chains {
+		for _, wallet := range wallets {
+			if wallet.Chain == chain {
+				matches[chain] = append(matches[chain], wallet.Address)
+			} else if overrides, ok := p.WalletOverrides[chain]; ok && util.Contains(overrides, wallet.Chain) {
+				matches[chain] = append(matches[chain], wallet.Address)
+			}
+		}
+	}
+	for chain, addresses := range matches {
+		matches[chain] = util.Dedupe(addresses, true)
+	}
+	return matches
+}
+
+// MatchingWalletsForChain returns a list of wallets that match the given chain
+func (p *Provider) MatchingWalletsForChain(wallets []persist.Wallet, chain persist.Chain) []persist.Address {
+	return p.MatchingWallets(wallets, []persist.Chain{chain})[chain]
 }
 
 func tokensToNewDedupedTokens(tokens []chainTokens, contracts []persist.ContractGallery, ownerUser persist.User) ([]persist.TokenGallery, map[persist.DBID]persist.Address) {

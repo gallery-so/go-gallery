@@ -13,7 +13,7 @@
 //go:generate go run github.com/gallery-so/dataloaden WalletLoaderByChainAddress github.com/mikeydub/go-gallery/service/persist.ChainAddress github.com/mikeydub/go-gallery/db/gen/coredb.Wallet
 //go:generate go run github.com/gallery-so/dataloaden WalletsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Wallet
 //go:generate go run github.com/gallery-so/dataloaden TokenLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Token
-//go:generate go run github.com/gallery-so/dataloaden TokenLoaderByHolderIDContractAddressAndTokenID github.com/mikeydub/go-gallery/db/gen/coredb.GetTokenByHolderIdContractAddressAndTokenIdBatchParams github.com/mikeydub/go-gallery/db/gen/coredb.Token
+//go:generate go run github.com/gallery-so/dataloaden TokenLoaderByUserTokenIdentifiers github.com/mikeydub/go-gallery/db/gen/coredb.GetTokenByUserTokenIdentifiersBatchParams github.com/mikeydub/go-gallery/db/gen/coredb.Token
 //go:generate go run github.com/gallery-so/dataloaden TokensLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Token
 //go:generate go run github.com/gallery-so/dataloaden TokensLoaderByIDAndLimit github.com/mikeydub/go-gallery/graphql/dataloader.IDAndLimit []github.com/mikeydub/go-gallery/db/gen/coredb.Token
 //go:generate go run github.com/gallery-so/dataloaden TokensLoaderByIDAndChain github.com/mikeydub/go-gallery/graphql/dataloader.IDAndChain []github.com/mikeydub/go-gallery/db/gen/coredb.Token
@@ -80,66 +80,66 @@ type IDAndLimit struct {
 // a single request, nor should they be shared between requests (since the data returned is
 // relative to the current request context, including the user and their auth status).
 type Loaders struct {
-	UserByUserID                             *UserLoaderByID
-	UserByUsername                           *UserLoaderByString
-	UserByAddress                            *UserLoaderByAddress
-	UsersWithTrait                           *UsersLoaderByString
-	GalleryByGalleryID                       *GalleryLoaderByID
-	GalleryByCollectionID                    *GalleryLoaderByID
-	GalleriesByUserID                        *GalleriesLoaderByID
-	CollectionByCollectionID                 *CollectionLoaderByID
-	CollectionsByGalleryID                   *CollectionsLoaderByID
-	MembershipByMembershipID                 *MembershipLoaderById
-	WalletByWalletID                         *WalletLoaderById
-	WalletsByUserID                          *WalletsLoaderByID
-	WalletByChainAddress                     *WalletLoaderByChainAddress
-	TokenByTokenID                           *TokenLoaderByID
-	TokenByHolderIDContractAddressAndTokenID *TokenLoaderByHolderIDContractAddressAndTokenID
-	TokensByContractID                       *TokensLoaderByID
-	TokensByCollectionID                     *TokensLoaderByIDAndLimit
-	TokensByWalletID                         *TokensLoaderByID
-	TokensByUserID                           *TokensLoaderByUserIDAndFilters
-	TokensByUserIDAndChain                   *TokensLoaderByIDAndChain
-	NewTokensByFeedEventID                   *TokensLoaderByID
-	OwnerByTokenID                           *UserLoaderByID
-	ContractByContractID                     *ContractLoaderByID
-	ContractsLoaderByCreatorID               *ContractsLoaderByCreatorID
-	ContractsLoaderByParentID                *ContractsLoaderByParentID
-	ContractsByUserID                        *ContractsLoaderByID
-	ContractByChainAddress                   *ContractLoaderByChainAddress
-	FollowersByUserID                        *UsersLoaderByID
-	FollowingByUserID                        *UsersLoaderByID
-	SharedFollowersByUserIDs                 *SharedFollowersLoaderByIDs
-	SharedContractsByUserIDs                 *SharedContractsLoaderByIDs
-	FeedEventByFeedEventID                   *EventLoaderByID
-	PostByPostID                             *PostLoaderByID
-	PostsPaginatedByContractID               *PostsPaginatedLoaderByContractID
-	AdmireByAdmireID                         *AdmireLoaderByID
-	AdmireCountByFeedEventID                 *IntLoaderByID
-	AdmiresByFeedEventID                     *FeedEventAdmiresLoader
-	AdmireCountByPostID                      *IntLoaderByID
-	AdmiresByPostID                          *PostAdmiresLoader
-	AdmireCountByTokenID                     *IntLoaderByID
-	AdmiresByTokenID                     	 *TokenAdmiresLoader
-	CommentByCommentID                       *CommentLoaderByID
-	CommentCountByFeedEventID                *IntLoaderByID
-	CommentsByFeedEventID                    *FeedEventCommentsLoader
-	CommentCountByPostID                     *IntLoaderByID
-	CommentsByPostID                         *PostCommentsLoader
-	InteractionCountByFeedEventID            *FeedEventInteractionCountLoader
-	InteractionsByFeedEventID                *FeedEventInteractionsLoader
-	InteractionCountByPostID                 *PostInteractionCountLoader
-	InteractionsByPostID                     *PostInteractionsLoader
-	NotificationByID                         *NotificationLoaderByID
-	NotificationsByUserID                    *NotificationsLoaderByUserID
-	ContractsDisplayedByUserID               *ContractsLoaderByID
-	OwnersByContractID                       *UsersLoaderByContractID
-	AdmireByActorIDAndFeedEventID            *AdmireLoaderByActorAndFeedEvent
-	AdmireByActorIDAndPostID                 *AdmireLoaderByActorAndPost
-	MediaByTokenID                           *MediaLoaderByTokenID
-	ContractCreatorByContractID              *ContractCreatorLoaderByID
-	ProfileImageByID                         *ProfileImageLoaderByID
-	GalleryTokenPreviewsByID                 *GalleryTokenPreviewsByID
+	UserByUserID                  *UserLoaderByID
+	UserByUsername                *UserLoaderByString
+	UserByAddress                 *UserLoaderByAddress
+	UsersWithTrait                *UsersLoaderByString
+	GalleryByGalleryID            *GalleryLoaderByID
+	GalleryByCollectionID         *GalleryLoaderByID
+	GalleriesByUserID             *GalleriesLoaderByID
+	CollectionByCollectionID      *CollectionLoaderByID
+	CollectionsByGalleryID        *CollectionsLoaderByID
+	MembershipByMembershipID      *MembershipLoaderById
+	WalletByWalletID              *WalletLoaderById
+	WalletsByUserID               *WalletsLoaderByID
+	WalletByChainAddress          *WalletLoaderByChainAddress
+	TokenByTokenID                *TokenLoaderByID
+	TokenByUserTokenIdentifiers   *TokenLoaderByUserTokenIdentifiers
+	TokensByContractID            *TokensLoaderByID
+	TokensByCollectionID          *TokensLoaderByIDAndLimit
+	TokensByWalletID              *TokensLoaderByID
+	TokensByUserID                *TokensLoaderByUserIDAndFilters
+	TokensByUserIDAndChain        *TokensLoaderByIDAndChain
+	NewTokensByFeedEventID        *TokensLoaderByID
+	OwnerByTokenID                *UserLoaderByID
+	ContractByContractID          *ContractLoaderByID
+	ContractsLoaderByCreatorID    *ContractsLoaderByCreatorID
+	ContractsLoaderByParentID     *ContractsLoaderByParentID
+	ContractsByUserID             *ContractsLoaderByID
+	ContractByChainAddress        *ContractLoaderByChainAddress
+	FollowersByUserID             *UsersLoaderByID
+	FollowingByUserID             *UsersLoaderByID
+	SharedFollowersByUserIDs      *SharedFollowersLoaderByIDs
+	SharedContractsByUserIDs      *SharedContractsLoaderByIDs
+	FeedEventByFeedEventID        *EventLoaderByID
+	PostByPostID                  *PostLoaderByID
+	PostsPaginatedByContractID    *PostsPaginatedLoaderByContractID
+	AdmireByAdmireID              *AdmireLoaderByID
+	AdmireCountByFeedEventID      *IntLoaderByID
+	AdmiresByFeedEventID          *FeedEventAdmiresLoader
+	AdmireCountByPostID           *IntLoaderByID
+	AdmiresByPostID               *PostAdmiresLoader
+	AdmireCountByTokenID          *IntLoaderByID
+	AdmiresByTokenID              *TokenAdmiresLoader
+	CommentByCommentID            *CommentLoaderByID
+	CommentCountByFeedEventID     *IntLoaderByID
+	CommentsByFeedEventID         *FeedEventCommentsLoader
+	CommentCountByPostID          *IntLoaderByID
+	CommentsByPostID              *PostCommentsLoader
+	InteractionCountByFeedEventID *FeedEventInteractionCountLoader
+	InteractionsByFeedEventID     *FeedEventInteractionsLoader
+	InteractionCountByPostID      *PostInteractionCountLoader
+	InteractionsByPostID          *PostInteractionsLoader
+	NotificationByID              *NotificationLoaderByID
+	NotificationsByUserID         *NotificationsLoaderByUserID
+	ContractsDisplayedByUserID    *ContractsLoaderByID
+	OwnersByContractID            *UsersLoaderByContractID
+	AdmireByActorIDAndFeedEventID *AdmireLoaderByActorAndFeedEvent
+	AdmireByActorIDAndPostID      *AdmireLoaderByActorAndPost
+	MediaByTokenID                *MediaLoaderByTokenID
+	ContractCreatorByContractID   *ContractCreatorLoaderByID
+	ProfileImageByID              *ProfileImageLoaderByID
+	GalleryTokenPreviewsByID      *GalleryTokenPreviewsByID
 }
 
 func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loaders {
@@ -238,7 +238,7 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 		AutoCacheWithKey: func(token db.Token) persist.DBID { return token.ID },
 	})
 
-	loaders.TokenByHolderIDContractAddressAndTokenID = NewTokenLoaderByHolderIDContractAddressAndTokenID(defaults, loadTokenByHolderIDContractAddressAndTokenID(q), TokenLoaderByHolderIDContractAddressAndTokenIDCacheSubscriptions{})
+	loaders.TokenByUserTokenIdentifiers = NewTokenLoaderByUserTokenIdentifiers(defaults, loadTokenByUserTokenIdentifers(q), TokenLoaderByUserTokenIdentifiersCacheSubscriptions{})
 
 	loaders.TokensByCollectionID = NewTokensLoaderByIDAndLimit(defaults, loadTokensByCollectionID(q))
 
@@ -720,20 +720,20 @@ func loadTokenByTokenID(q *db.Queries) func(context.Context, []persist.DBID) ([]
 	}
 }
 
-func loadTokenByHolderIDContractAddressAndTokenID(q *db.Queries) func(context.Context, []db.GetTokenByHolderIdContractAddressAndTokenIdBatchParams) ([]db.Token, []error) {
-	return func(ctx context.Context, params []db.GetTokenByHolderIdContractAddressAndTokenIdBatchParams) ([]db.Token, []error) {
+func loadTokenByUserTokenIdentifers(q *db.Queries) func(context.Context, []db.GetTokenByUserTokenIdentifiersBatchParams) ([]db.Token, []error) {
+	return func(ctx context.Context, params []db.GetTokenByUserTokenIdentifiersBatchParams) ([]db.Token, []error) {
 		tokens := make([]db.Token, len(params))
 		errors := make([]error, len(params))
 
-		b := q.GetTokenByHolderIdContractAddressAndTokenIdBatch(ctx, params)
+		b := q.GetTokenByUserTokenIdentifiersBatch(ctx, params)
 		defer b.Close()
 
 		b.QueryRow(func(i int, t db.Token, err error) {
 			tokens[i], errors[i] = t, err
 
 			if errors[i] == pgx.ErrNoRows {
-				errors[i] = persist.ErrTokenNotFoundByHolderIdentifiers{
-					HolderID:        params[i].HolderID,
+				errors[i] = persist.ErrTokenNotFoundByUserTokenIdentifers{
+					OwnerID:         params[i].OwnerID,
 					TokenID:         params[i].TokenID,
 					ContractAddress: params[i].ContractAddress,
 					Chain:           params[i].Chain,
@@ -1169,7 +1169,6 @@ func loadAdmiresByTokenID(q *db.Queries) func(context.Context, []db.PaginateAdmi
 		return admires, errors
 	}
 }
-
 
 func loadCommentById(q *db.Queries) func(context.Context, []persist.DBID) ([]db.Comment, []error) {
 	return func(ctx context.Context, commentIDs []persist.DBID) ([]db.Comment, []error) {

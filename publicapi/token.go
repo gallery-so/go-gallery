@@ -74,16 +74,12 @@ func (api TokenAPI) GetTokenByEnsDomain(ctx context.Context, userID persist.DBID
 		return db.Token{}, err
 	}
 
-	return api.loaders.TokenByHolderIDContractAddressAndTokenID.Load(db.GetTokenByHolderIdContractAddressAndTokenIdBatchParams{
-		HolderID:        userID,
+	return api.loaders.TokenByUserTokenIdentifiers.Load(db.GetTokenByUserTokenIdentifiersBatchParams{
+		OwnerID:         userID,
 		TokenID:         persist.TokenID(tokenID),
 		ContractAddress: eth.EnsAddress,
 		Chain:           persist.ChainETH,
 	})
-}
-
-func (api TokenAPI) GetTokenByIdentifiersOwner(ctx context.Context, token persist.TokenIdentifiers, ownerID persist.DBID) (db.Token, error) {
-	panic("implement me")
 }
 
 func (api TokenAPI) GetTokensByCollectionId(ctx context.Context, collectionID persist.DBID, limit *int) ([]db.Token, error) {
