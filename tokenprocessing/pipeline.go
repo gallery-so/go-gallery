@@ -254,7 +254,7 @@ func (tpj *tokenProcessingJob) retrieveTokenInfo(ctx context.Context, metadata p
 		name = tpj.tokenInstance.Name.String()
 	}
 
-	if description == "" {
+	if description == "" && tpj.tokenInstance != nil {
 		description = tpj.tokenInstance.Description.String()
 	}
 	return name, description
