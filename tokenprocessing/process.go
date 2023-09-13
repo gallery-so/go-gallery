@@ -162,7 +162,7 @@ func processMediaForTokenInstance(tp *tokenProcessor, tokenRepo *postgres.TokenG
 		if err != nil {
 			logger.For(c).Warnf("failed to start tokenID=%s: %s", input.TokenDBID, err)
 		}
-	
+
 		// We always return a 200 because retries are managed by the token manager and we don't
 		// want the queue retrying the current message.
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
@@ -375,7 +375,6 @@ func processWalletRemoval(queries *coredb.Queries) gin.HandlerFunc {
 	}
 }
 
-<<<<<<< HEAD
 func processPostPreflight(tp *tokenProcessor, tm *tokenmanage.Manager, q *coredb.Queries, mc *multichain.Provider, contractRepo *postgres.ContractGalleryRepository, userRepo *postgres.UserRepository, tokenRepo *postgres.TokenGalleryRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input task.PostPreflightMessage
@@ -442,7 +441,7 @@ func processFromIdentifiers(ctx context.Context, tp *tokenProcessor, token persi
 
 // addContextRunOptions adds pipeline options for specific types of runs
 func addContextRunOptions(cause persist.ProcessingCause) (opts []PipelineOption) {
-	if cause == persist.ProcessingCauseRefresh || cause == persist.ProcessingCauseSyncRetry {
+	if cause == persist.ProcessingCauseRefresh || cause == persist.ProcessingCauseSyncRetry || cause == persist.ProcessingCausePostPreflight {
 		opts = append(opts, PipelineOpts.WithRefreshMetadata())
 	}
 	return opts

@@ -212,7 +212,7 @@ func (tpj *tokenProcessingJob) retrieveMetadata(ctx context.Context) persist.Tok
 	var newMetadata persist.TokenMetadata
 
 	if tpj.tokenInstance != nil {
-		metadata = tpj.tokenInstance.TokenMetadata
+		newMetadata = tpj.tokenInstance.TokenMetadata
 	}
 
 	if len(newMetadata) == 0 || tpj.refreshMetadata {
