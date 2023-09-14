@@ -394,7 +394,6 @@ func (p *Provider) SyncTokensIncrementallyByUserID(ctx context.Context, userID p
 								if !ok {
 									break outer
 								}
-								// contracts must be sent first because tokens need contract DBIDs to be inserted properly, so the contracts must have already been processed
 								result <- chainTokensAndContracts{
 									tokens:    chainTokens{chain: chain, tokens: ts.Tokens, priority: priority},
 									contracts: chainContracts{chain: chain, contracts: ts.Contracts, priority: priority},
