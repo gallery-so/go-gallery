@@ -2473,17 +2473,17 @@ type PostTokensPayload {
 
 union PostTokensPayloadOrError = PostTokensPayload | ErrInvalidInput | ErrNotAuthorized
 
-input ReferralPostTokensInput {
+input ReferralPostTokenInput {
   token: ChainAddressTokenInput!
   caption: String
 }
 
-type ReferralPostTokensPayload {
+type ReferralPostTokenPayload {
   post: Post!
 }
 
-union ReferralPostTokensPayloadOrError =
-    ReferralPostTokensPayload
+union ReferralPostTokenPayloadOrError =
+    ReferralPostTokenPayload
   | ErrInvalidInput
   | ErrNotAuthorized
   | ErrTokenNotFound
@@ -2621,7 +2621,7 @@ type Mutation {
     @authRequired
 
   postTokens(input: PostTokensInput!): PostTokensPayloadOrError @authRequired
-  referralPostTokens(input: ReferralPostTokensInput!): ReferralPostTokensPayloadOrError @authRequired
+  referralPostToken(input: ReferralPostTokenInput!): ReferralPostTokenPayloadOrError @authRequired
   referralPostPreflight(input: ReferralPostPreflightInput!): ReferralPostPreflightPayloadOrError
   deletePost(postId: DBID!): DeletePostPayloadOrError @authRequired
 

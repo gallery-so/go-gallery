@@ -167,7 +167,7 @@ func (api FeedAPI) PostTokenReferral(ctx context.Context, t persist.TokenIdentif
 		return "", err
 	}
 
-	user, err := For(ctx).User.GetUserById(ctx, userID)
+	user, err := api.repos.UserRepository.GetByID(ctx, userID)
 	if err != nil {
 		return "", err
 	}
@@ -211,8 +211,8 @@ func (api FeedAPI) PostTokenReferral(ctx context.Context, t persist.TokenIdentif
 	// The token is not synced, so we need to find it
 	synced, err := api.multichainProvider.SearchForTokenInUserWalletsRetry(ctx, user.ID, user.Wallets, t, retry.Retry{
 		Base:  2,
-		Cap:   10,
-		Tries: 8,
+		Cap:   8,
+		Tries: 4,
 	})
 	if err != nil {
 		return "", err

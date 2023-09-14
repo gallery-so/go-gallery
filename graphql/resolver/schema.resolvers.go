@@ -1433,8 +1433,8 @@ func (r *mutationResolver) PostTokens(ctx context.Context, input model.PostToken
 	return output, nil
 }
 
-// ReferralPostTokens is the resolver for the referralPostTokens field.
-func (r *mutationResolver) ReferralPostTokens(ctx context.Context, input model.ReferralPostTokensInput) (model.ReferralPostTokensPayloadOrError, error) {
+// ReferralPostToken is the resolver for the referralPostToken field.
+func (r *mutationResolver) ReferralPostToken(ctx context.Context, input model.ReferralPostTokenInput) (model.ReferralPostTokenPayloadOrError, error) {
 	token := persist.TokenIdentifiers{
 		Chain:           input.Token.ChainAddress.Chain(),
 		ContractAddress: input.Token.ChainAddress.Address(),
@@ -1448,7 +1448,7 @@ func (r *mutationResolver) ReferralPostTokens(ctx context.Context, input model.R
 	if err != nil {
 		return nil, err
 	}
-	return &model.ReferralPostTokensPayload{Post: post}, nil
+	return &model.ReferralPostTokenPayload{Post: post}, nil
 }
 
 // ReferralPostPreflight is the resolver for the referralPostPreflight field.

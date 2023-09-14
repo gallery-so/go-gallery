@@ -103,7 +103,7 @@ func RetryFunc(ctx context.Context, f func(ctx context.Context) error, shouldRet
 
 		r.Sleep(i)
 	}
-	return ErrOutOfRetries{err, r}
+	return ErrOutOfRetries{Err: err, Retry: r}
 }
 
 func HTTPErrNotFound(err error) bool {

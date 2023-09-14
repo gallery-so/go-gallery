@@ -816,7 +816,7 @@ type ComplexityRoot struct {
 		PublishGallery                       func(childComplexity int, input model.PublishGalleryInput) int
 		RedeemMerch                          func(childComplexity int, input model.RedeemMerchInput) int
 		ReferralPostPreflight                func(childComplexity int, input model.ReferralPostPreflightInput) int
-		ReferralPostTokens                   func(childComplexity int, input model.ReferralPostTokensInput) int
+		ReferralPostToken                    func(childComplexity int, input model.ReferralPostTokenInput) int
 		RefreshCollection                    func(childComplexity int, collectionID persist.DBID) int
 		RefreshContract                      func(childComplexity int, contractID persist.DBID) int
 		RefreshToken                         func(childComplexity int, tokenID persist.DBID) int
@@ -1053,7 +1053,7 @@ type ComplexityRoot struct {
 		Accepted func(childComplexity int) int
 	}
 
-	ReferralPostTokensPayload struct {
+	ReferralPostTokenPayload struct {
 		Post func(childComplexity int) int
 	}
 
@@ -1739,7 +1739,7 @@ type MutationResolver interface {
 	RemoveComment(ctx context.Context, commentID persist.DBID) (model.RemoveCommentPayloadOrError, error)
 	CommentOnPost(ctx context.Context, postID persist.DBID, replyToID *persist.DBID, comment string) (model.CommentOnPostPayloadOrError, error)
 	PostTokens(ctx context.Context, input model.PostTokensInput) (model.PostTokensPayloadOrError, error)
-	ReferralPostTokens(ctx context.Context, input model.ReferralPostTokensInput) (model.ReferralPostTokensPayloadOrError, error)
+	ReferralPostToken(ctx context.Context, input model.ReferralPostTokenInput) (model.ReferralPostTokenPayloadOrError, error)
 	ReferralPostPreflight(ctx context.Context, input model.ReferralPostPreflightInput) (model.ReferralPostPreflightPayloadOrError, error)
 	DeletePost(ctx context.Context, postID persist.DBID) (model.DeletePostPayloadOrError, error)
 	ViewGallery(ctx context.Context, galleryID persist.DBID) (model.ViewGalleryPayloadOrError, error)
@@ -4825,17 +4825,17 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.ReferralPostPreflight(childComplexity, args["input"].(model.ReferralPostPreflightInput)), true
 
-	case "Mutation.referralPostTokens":
-		if e.complexity.Mutation.ReferralPostTokens == nil {
+	case "Mutation.referralPostToken":
+		if e.complexity.Mutation.ReferralPostToken == nil {
 			break
 		}
 
-		args, err := ec.field_Mutation_referralPostTokens_args(context.TODO(), rawArgs)
+		args, err := ec.field_Mutation_referralPostToken_args(context.TODO(), rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.Mutation.ReferralPostTokens(childComplexity, args["input"].(model.ReferralPostTokensInput)), true
+		return e.complexity.Mutation.ReferralPostToken(childComplexity, args["input"].(model.ReferralPostTokenInput)), true
 
 	case "Mutation.refreshCollection":
 		if e.complexity.Mutation.RefreshCollection == nil {
@@ -6294,12 +6294,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ReferralPostPreflightPayload.Accepted(childComplexity), true
 
-	case "ReferralPostTokensPayload.post":
-		if e.complexity.ReferralPostTokensPayload.Post == nil {
+	case "ReferralPostTokenPayload.post":
+		if e.complexity.ReferralPostTokenPayload.Post == nil {
 			break
 		}
 
-		return e.complexity.ReferralPostTokensPayload.Post(childComplexity), true
+		return e.complexity.ReferralPostTokenPayload.Post(childComplexity), true
 
 	case "RefreshCollectionPayload.collection":
 		if e.complexity.RefreshCollectionPayload.Collection == nil {
@@ -8103,7 +8103,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputPublishGalleryInput,
 		ec.unmarshalInputRedeemMerchInput,
 		ec.unmarshalInputReferralPostPreflightInput,
-		ec.unmarshalInputReferralPostTokensInput,
+		ec.unmarshalInputReferralPostTokenInput,
 		ec.unmarshalInputSetProfileImageInput,
 		ec.unmarshalInputSetSpamPreferenceInput,
 		ec.unmarshalInputSocialAuthMechanism,
@@ -10683,17 +10683,17 @@ type PostTokensPayload {
 
 union PostTokensPayloadOrError = PostTokensPayload | ErrInvalidInput | ErrNotAuthorized
 
-input ReferralPostTokensInput {
+input ReferralPostTokenInput {
   token: ChainAddressTokenInput!
   caption: String
 }
 
-type ReferralPostTokensPayload {
+type ReferralPostTokenPayload {
   post: Post!
 }
 
-union ReferralPostTokensPayloadOrError =
-    ReferralPostTokensPayload
+union ReferralPostTokenPayloadOrError =
+    ReferralPostTokenPayload
   | ErrInvalidInput
   | ErrNotAuthorized
   | ErrTokenNotFound
@@ -10831,7 +10831,7 @@ type Mutation {
     @authRequired
 
   postTokens(input: PostTokensInput!): PostTokensPayloadOrError @authRequired
-  referralPostTokens(input: ReferralPostTokensInput!): ReferralPostTokensPayloadOrError @authRequired
+  referralPostToken(input: ReferralPostTokenInput!): ReferralPostTokenPayloadOrError @authRequired
   referralPostPreflight(input: ReferralPostPreflightInput!): ReferralPostPreflightPayloadOrError
   deletePost(postId: DBID!): DeletePostPayloadOrError @authRequired
 
@@ -12096,13 +12096,13 @@ func (ec *executionContext) field_Mutation_referralPostPreflight_args(ctx contex
 	return args, nil
 }
 
-func (ec *executionContext) field_Mutation_referralPostTokens_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+func (ec *executionContext) field_Mutation_referralPostToken_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 model.ReferralPostTokensInput
+	var arg0 model.ReferralPostTokenInput
 	if tmp, ok := rawArgs["input"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
-		arg0, err = ec.unmarshalNReferralPostTokensInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐReferralPostTokensInput(ctx, tmp)
+		arg0, err = ec.unmarshalNReferralPostTokenInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐReferralPostTokenInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -34578,8 +34578,8 @@ func (ec *executionContext) fieldContext_Mutation_postTokens(ctx context.Context
 	return fc, nil
 }
 
-func (ec *executionContext) _Mutation_referralPostTokens(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Mutation_referralPostTokens(ctx, field)
+func (ec *executionContext) _Mutation_referralPostToken(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_referralPostToken(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -34593,7 +34593,7 @@ func (ec *executionContext) _Mutation_referralPostTokens(ctx context.Context, fi
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().ReferralPostTokens(rctx, fc.Args["input"].(model.ReferralPostTokensInput))
+			return ec.resolvers.Mutation().ReferralPostToken(rctx, fc.Args["input"].(model.ReferralPostTokenInput))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.AuthRequired == nil {
@@ -34609,10 +34609,10 @@ func (ec *executionContext) _Mutation_referralPostTokens(ctx context.Context, fi
 		if tmp == nil {
 			return nil, nil
 		}
-		if data, ok := tmp.(model.ReferralPostTokensPayloadOrError); ok {
+		if data, ok := tmp.(model.ReferralPostTokenPayloadOrError); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.ReferralPostTokensPayloadOrError`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.ReferralPostTokenPayloadOrError`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -34621,19 +34621,19 @@ func (ec *executionContext) _Mutation_referralPostTokens(ctx context.Context, fi
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(model.ReferralPostTokensPayloadOrError)
+	res := resTmp.(model.ReferralPostTokenPayloadOrError)
 	fc.Result = res
-	return ec.marshalOReferralPostTokensPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐReferralPostTokensPayloadOrError(ctx, field.Selections, res)
+	return ec.marshalOReferralPostTokenPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐReferralPostTokenPayloadOrError(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Mutation_referralPostTokens(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Mutation_referralPostToken(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Mutation",
 		Field:      field,
 		IsMethod:   true,
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type ReferralPostTokensPayloadOrError does not have child fields")
+			return nil, errors.New("field of type ReferralPostTokenPayloadOrError does not have child fields")
 		},
 	}
 	defer func() {
@@ -34643,7 +34643,7 @@ func (ec *executionContext) fieldContext_Mutation_referralPostTokens(ctx context
 		}
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_referralPostTokens_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+	if fc.Args, err = ec.field_Mutation_referralPostToken_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return
 	}
@@ -42961,8 +42961,8 @@ func (ec *executionContext) fieldContext_ReferralPostPreflightPayload_accepted(c
 	return fc, nil
 }
 
-func (ec *executionContext) _ReferralPostTokensPayload_post(ctx context.Context, field graphql.CollectedField, obj *model.ReferralPostTokensPayload) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_ReferralPostTokensPayload_post(ctx, field)
+func (ec *executionContext) _ReferralPostTokenPayload_post(ctx context.Context, field graphql.CollectedField, obj *model.ReferralPostTokenPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ReferralPostTokenPayload_post(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -42992,9 +42992,9 @@ func (ec *executionContext) _ReferralPostTokensPayload_post(ctx context.Context,
 	return ec.marshalNPost2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPost(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_ReferralPostTokensPayload_post(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_ReferralPostTokenPayload_post(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "ReferralPostTokensPayload",
+		Object:     "ReferralPostTokenPayload",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -59267,8 +59267,8 @@ func (ec *executionContext) unmarshalInputReferralPostPreflightInput(ctx context
 	return it, nil
 }
 
-func (ec *executionContext) unmarshalInputReferralPostTokensInput(ctx context.Context, obj interface{}) (model.ReferralPostTokensInput, error) {
-	var it model.ReferralPostTokensInput
+func (ec *executionContext) unmarshalInputReferralPostTokenInput(ctx context.Context, obj interface{}) (model.ReferralPostTokenInput, error) {
+	var it model.ReferralPostTokenInput
 	asMap := map[string]interface{}{}
 	for k, v := range obj.(map[string]interface{}) {
 		asMap[k] = v
@@ -62589,17 +62589,17 @@ func (ec *executionContext) _ReferralPostPreflightPayloadOrError(ctx context.Con
 	}
 }
 
-func (ec *executionContext) _ReferralPostTokensPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.ReferralPostTokensPayloadOrError) graphql.Marshaler {
+func (ec *executionContext) _ReferralPostTokenPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.ReferralPostTokenPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
-	case model.ReferralPostTokensPayload:
-		return ec._ReferralPostTokensPayload(ctx, sel, &obj)
-	case *model.ReferralPostTokensPayload:
+	case model.ReferralPostTokenPayload:
+		return ec._ReferralPostTokenPayload(ctx, sel, &obj)
+	case *model.ReferralPostTokenPayload:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._ReferralPostTokensPayload(ctx, sel, obj)
+		return ec._ReferralPostTokenPayload(ctx, sel, obj)
 	case model.ErrInvalidInput:
 		return ec._ErrInvalidInput(ctx, sel, &obj)
 	case *model.ErrInvalidInput:
@@ -66791,7 +66791,7 @@ func (ec *executionContext) _ErrGalleryNotFound(ctx context.Context, sel ast.Sel
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "PostOrError", "SocialConnectionsOrError", "MerchTokensPayloadOrError", "SearchUsersPayloadOrError", "SearchGalleriesPayloadOrError", "SearchCommunitiesPayloadOrError", "PostComposerDraftDetailsPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "VerifyEmailMagicLinkPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "OptInForRolesPayloadOrError", "OptOutForRolesPayloadOrError", "RedeemMerchPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "ReferralPostTokensPayloadOrError", "AdmirePostPayloadOrError", "AdmireTokenPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError", "ReferralPostPreflightPayloadOrError"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "PostOrError", "SocialConnectionsOrError", "MerchTokensPayloadOrError", "SearchUsersPayloadOrError", "SearchGalleriesPayloadOrError", "SearchCommunitiesPayloadOrError", "PostComposerDraftDetailsPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "VerifyEmailMagicLinkPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "OptInForRolesPayloadOrError", "OptOutForRolesPayloadOrError", "RedeemMerchPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "ReferralPostTokenPayloadOrError", "AdmirePostPayloadOrError", "AdmireTokenPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError", "ReferralPostPreflightPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -66924,7 +66924,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "SocialQueriesOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "SyncTokensPayloadOrError", "SyncCreatedTokensForNewContractsPayloadOrError", "SyncCreatedTokensForExistingContractPayloadOrError", "Error", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "OptInForRolesPayloadOrError", "OptOutForRolesPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "SyncCreatedTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "UnbanUserFromFeedPayloadOrError", "SetCommunityOverrideCreatorPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "GenerateQRCodeLoginTokenPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "ReferralPostTokensPayloadOrError", "AdmirePostPayloadOrError", "AdmireTokenPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "SocialQueriesOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "SyncTokensPayloadOrError", "SyncCreatedTokensForNewContractsPayloadOrError", "SyncCreatedTokensForExistingContractPayloadOrError", "Error", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "OptInForRolesPayloadOrError", "OptOutForRolesPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "SyncCreatedTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "UnbanUserFromFeedPayloadOrError", "SetCommunityOverrideCreatorPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "GenerateQRCodeLoginTokenPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "ReferralPostTokenPayloadOrError", "AdmirePostPayloadOrError", "AdmireTokenPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
@@ -67071,7 +67071,7 @@ func (ec *executionContext) _ErrSyncFailed(ctx context.Context, sel ast.Selectio
 	return out
 }
 
-var errTokenNotFoundImplementors = []string{"ErrTokenNotFound", "TokenByIdOrError", "Error", "CollectionTokenByIdOrError", "ViewTokenPayloadOrError", "SetProfileImagePayloadOrError", "ReferralPostTokensPayloadOrError", "AdmireTokenPayloadOrError"}
+var errTokenNotFoundImplementors = []string{"ErrTokenNotFound", "TokenByIdOrError", "Error", "CollectionTokenByIdOrError", "ViewTokenPayloadOrError", "SetProfileImagePayloadOrError", "ReferralPostTokenPayloadOrError", "AdmireTokenPayloadOrError"}
 
 func (ec *executionContext) _ErrTokenNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrTokenNotFound) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errTokenNotFoundImplementors)
@@ -69486,10 +69486,10 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 				return ec._Mutation_postTokens(ctx, field)
 			})
 
-		case "referralPostTokens":
+		case "referralPostToken":
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_referralPostTokens(ctx, field)
+				return ec._Mutation_referralPostToken(ctx, field)
 			})
 
 		case "referralPostPreflight":
@@ -71437,19 +71437,19 @@ func (ec *executionContext) _ReferralPostPreflightPayload(ctx context.Context, s
 	return out
 }
 
-var referralPostTokensPayloadImplementors = []string{"ReferralPostTokensPayload", "ReferralPostTokensPayloadOrError"}
+var referralPostTokenPayloadImplementors = []string{"ReferralPostTokenPayload", "ReferralPostTokenPayloadOrError"}
 
-func (ec *executionContext) _ReferralPostTokensPayload(ctx context.Context, sel ast.SelectionSet, obj *model.ReferralPostTokensPayload) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, referralPostTokensPayloadImplementors)
+func (ec *executionContext) _ReferralPostTokenPayload(ctx context.Context, sel ast.SelectionSet, obj *model.ReferralPostTokenPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, referralPostTokenPayloadImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("ReferralPostTokensPayload")
+			out.Values[i] = graphql.MarshalString("ReferralPostTokenPayload")
 		case "post":
 
-			out.Values[i] = ec._ReferralPostTokensPayload_post(ctx, field, obj)
+			out.Values[i] = ec._ReferralPostTokenPayload_post(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
 				invalids++
@@ -75841,8 +75841,8 @@ func (ec *executionContext) unmarshalNReferralPostPreflightInput2githubᚗcomᚋ
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) unmarshalNReferralPostTokensInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐReferralPostTokensInput(ctx context.Context, v interface{}) (model.ReferralPostTokensInput, error) {
-	res, err := ec.unmarshalInputReferralPostTokensInput(ctx, v)
+func (ec *executionContext) unmarshalNReferralPostTokenInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐReferralPostTokenInput(ctx context.Context, v interface{}) (model.ReferralPostTokenInput, error) {
+	res, err := ec.unmarshalInputReferralPostTokenInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
@@ -79053,11 +79053,11 @@ func (ec *executionContext) marshalOReferralPostPreflightPayloadOrError2github�
 	return ec._ReferralPostPreflightPayloadOrError(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalOReferralPostTokensPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐReferralPostTokensPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.ReferralPostTokensPayloadOrError) graphql.Marshaler {
+func (ec *executionContext) marshalOReferralPostTokenPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐReferralPostTokenPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.ReferralPostTokenPayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	return ec._ReferralPostTokensPayloadOrError(ctx, sel, v)
+	return ec._ReferralPostTokenPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalORefreshCollectionPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRefreshCollectionPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.RefreshCollectionPayloadOrError) graphql.Marshaler {

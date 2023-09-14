@@ -263,8 +263,8 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
-	"ReferralPostTokensPayloadOrError": func(object interface{}) (interface{}, bool) {
-		obj, ok := object.(ReferralPostTokensPayloadOrError)
+	"ReferralPostTokenPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(ReferralPostTokenPayloadOrError)
 		return obj, ok
 	},
 
