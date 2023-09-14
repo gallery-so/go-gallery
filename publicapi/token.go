@@ -305,9 +305,9 @@ func (api TokenAPI) SyncTokens(ctx context.Context, chains []persist.Chain, incr
 
 	key := fmt.Sprintf("sync:owned:%s", userID.String())
 
-	// if err := api.throttler.Lock(ctx, key); err != nil {
-	// 	return ErrTokenRefreshFailed{Message: err.Error()}
-	// }
+	if err := api.throttler.Lock(ctx, key); err != nil {
+		return ErrTokenRefreshFailed{Message: err.Error()}
+	}
 	defer api.throttler.Unlock(ctx, key)
 
 	if incrementally {

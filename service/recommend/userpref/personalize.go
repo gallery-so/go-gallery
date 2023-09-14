@@ -261,7 +261,7 @@ func (p *Personalization) update(ctx context.Context) {
 
 	if p.pM == nil {
 		logger.For(ctx).Infof("no data loaded, reading from cache")
-		// p.readCache(ctx)
+		p.readCache(ctx)
 		return
 	}
 
