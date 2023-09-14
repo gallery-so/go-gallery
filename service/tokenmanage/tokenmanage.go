@@ -37,7 +37,7 @@ func New(ctx context.Context, taskClient *cloudtasks.Client) *Manager {
 func NewWithRetries(ctx context.Context, taskClient *cloudtasks.Client, maxRetries int) *Manager {
 	m := New(ctx, taskClient)
 	m.maxRetries = maxRetries
-	m.delayer = limiters.NewKeyRateLimiter(ctx, m.cache, "retry", 1, 2*time.Minute)
+	m.delayer = limiters.NewKeyRateLimiter(ctx, m.cache, "retry", 2, 1*time.Minute)
 	return m
 }
 
