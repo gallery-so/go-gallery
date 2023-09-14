@@ -1252,6 +1252,7 @@ func (p *Provider) RefreshTokenDescriptorsByTokenIdentifiers(ctx context.Context
 
 	for _, tokenFetcher := range tokenFetchers {
 		id := ChainAgnosticIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID}
+
 		token, contract, err := tokenFetcher.GetTokenDescriptorsByTokenIdentifiers(ctx, id)
 		if err == nil {
 			tokenExists = true
