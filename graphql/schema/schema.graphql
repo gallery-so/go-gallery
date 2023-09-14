@@ -1244,7 +1244,6 @@ type TokenDraftDetails @goEmbedHelper {
   tokenDescription: String
 }
 
-# TODO: Figure out the other errors
 union TokenDraftDetailsOrError = TokenDraftDetails | ErrInvalidInput
 
 type Query {
@@ -2475,19 +2474,20 @@ type PostTokensPayload {
 
 union PostTokensPayloadOrError = PostTokensPayload | ErrInvalidInput | ErrNotAuthorized
 
-input PostTokensReferralInput {
+input ReferralPostTokensInput {
   token: ChainAddressTokenInput!
   caption: String
 }
 
-type PostTokensReferralPayload {
+type ReferralPostTokensPayload {
   post: Post!
 }
 
-union PostTokensReferralPayloadOrError =
-    PostTokensReferralPayload
+union ReferralPostTokensPayloadOrError =
+    ReferralPostTokensPayload
   | ErrInvalidInput
   | ErrNotAuthorized
+  | ErrTokenNotFound
 
 type AdmirePostPayload {
   viewer: Viewer
@@ -2532,7 +2532,7 @@ type ReferralPostPreflightPayload {
   accepted: Boolean!
 }
 
-union ReferralPostPreflightPayloadOrError = ReferralPostPreflightPayload
+union ReferralPostPreflightPayloadOrError = ReferralPostPreflightPayload | ErrInvalidInput
 
 type Mutation {
   # User Mutations
@@ -2624,7 +2624,7 @@ type Mutation {
     @authRequired
 
   postTokens(input: PostTokensInput!): PostTokensPayloadOrError @authRequired
-  postTokensReferral(input: PostTokensReferralInput!): PostTokensReferralPayloadOrError @authRequired
+  referralPostTokens(input: ReferralPostTokensInput!): ReferralPostTokensPayloadOrError @authRequired
   deletePost(postId: DBID!): DeletePostPayloadOrError @authRequired
 
   viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError

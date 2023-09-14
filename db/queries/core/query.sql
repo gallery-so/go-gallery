@@ -94,6 +94,12 @@ from tokens t
 join contracts c on t.contract = c.id
 where t.owner_user_id = @owner_id and t.token_id = @token_id and c.address = @contract_address and c.chain = @chain and t.displayable and not t.deleted and not c.deleted;
 
+-- name: GetTokenByUserTokenIdentifiers :one
+select t.*
+from tokens t
+join contracts c on t.contract = c.id
+where t.owner_user_id = @owner_id and t.token_id = @token_id and c.address = @contract_address and c.chain = @chain and t.displayable and not t.deleted and not c.deleted;
+
 -- name: GetTokensByCollectionIdBatch :batchmany
 select t.* from collections c,
     unnest(c.nfts) with ordinality as u(nft_id, nft_ord)
@@ -1342,21 +1348,34 @@ select m.*
 from token_medias m
 where m.id = (select token_media_id from tokens where tokens.id = $1) and not m.deleted;
 
--- name: GetMediaByTokenIdentifiers :one
+-- name: GetMediaByUserTokenIdentifiers :one
 with contract as (
 	select * from contracts where contracts.chain = @chain and contracts.address = @address and not contracts.deleted
 ),
-token_medias as (
+matching_medias as (
 	select token_medias.*
 	from token_medias, contract
 	where token_medias.contract_id = contract.id and token_medias.chain = @chain and token_medias.token_id = @token_id and not token_medias.deleted
 	order by token_medias.active desc, token_medias.last_updated desc
 	limit 1
+),
+matched_token(id) as (
+    select tokens.id
+    from tokens, contract, token_medias
+    where tokens.contract = contract.id and tokens.chain = @chain and tokens.token_id = @token_id and not tokens.deleted
+    order by tokens.owner_user_id = @user_id desc, tokens.token_media_id = token_medias.id desc, tokens.last_updated desc
+    limit 1
 )
-select sqlc.embed(tokens), sqlc.embed(token_medias)
-from token_medias
-left join tokens on token_medias.id = tokens.token_media_id and not tokens.deleted
-order by tokens.owner_user_id = @user_id desc, token_medias.active desc, token_medias.last_updated desc
+select sqlc.embed(token_medias), (select id from matched_token) token_instance_id from matching_medias token_medias;
+
+-- name: GetFallbackTokenByUserTokenIdentifiers :one
+with contract as (
+	select * from contracts where contracts.chain = @chain and contracts.address = @address and not contracts.deleted
+)
+select tokens.*
+from tokens, contract
+where tokens.contract = contract.id and tokens.chain = contract.chain and tokens.token_id = @token_id and not tokens.deleted
+order by tokens.owner_user_id = @user_id desc, tokens.last_updated desc
 limit 1;
 
 -- name: UpsertSession :one

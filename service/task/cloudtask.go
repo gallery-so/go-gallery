@@ -17,10 +17,10 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/mikeydub/go-gallery/env"
-	"github.com/mikeydub/go-gallery/service/logger"
+	// XXX "github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/tracing"
-	"github.com/mikeydub/go-gallery/util"
+	// XXX "github.com/mikeydub/go-gallery/util"
 )
 
 // FeedMessage is the input message to the feed service
@@ -212,27 +212,36 @@ func NewClient(ctx context.Context) *gcptasks.Client {
 		option.WithGRPCDialOption(grpc.WithTimeout(time.Duration(2) * time.Second)),
 	}
 
-	// Configure the client depending on whether or not the cloud task emulator is used.
-	if env.GetString("ENV") == "local" {
-		if host := env.GetString("TASK_QUEUE_HOST"); host != "" {
-			copts = append(
-				copts,
-				option.WithEndpoint(host),
-				option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
-				option.WithoutAuthentication(),
-			)
-		} else {
-			fi, err := util.LoadEncryptedServiceKeyOrError("./secrets/dev/service-key-dev.json")
-			if err != nil {
-				logger.For(ctx).WithError(err).Error("failed to find service key, running without task client")
-				return nil
-			}
-			copts = append(
-				copts,
-				option.WithCredentialsJSON(fi),
-			)
-		}
+	if host := env.GetString("TASK_QUEUE_HOST"); host != "" {
+		copts = append(
+			copts,
+			option.WithEndpoint(host),
+			option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
+			option.WithoutAuthentication(),
+		)
 	}
+
+	// Configure the client depending on whether or not the cloud task emulator is used.
+	// XXX if env.GetString("ENV") == "local" {
+	// XXX 	if host := env.GetString("TASK_QUEUE_HOST"); host != "" {
+	// XXX 		copts = append(
+	// XXX 			copts,
+	// XXX 			option.WithEndpoint(host),
+	// XXX 			option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
+	// XXX 			option.WithoutAuthentication(),
+	// XXX 		)
+	// XXX 	} else {
+	// XXX 		fi, err := util.LoadEncryptedServiceKeyOrError("./secrets/dev/service-key-dev.json")
+	// XXX 		if err != nil {
+	// XXX 			logger.For(ctx).WithError(err).Error("failed to find service key, running without task client")
+	// XXX 			return nil
+	// XXX 		}
+	// XXX 		copts = append(
+	// XXX 			copts,
+	// XXX 			option.WithCredentialsJSON(fi),
+	// XXX 		)
+	// XXX 	}
+	// XXX }
 
 	client, err := gcptasks.NewClient(ctx, copts...)
 	if err != nil {

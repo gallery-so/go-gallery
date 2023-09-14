@@ -13,17 +13,18 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mikeydub/go-gallery/env"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
-	"github.com/mikeydub/go-gallery/service/redis"
+	"github.com/gammazero/workerpool"
+	"github.com/jackc/pgx/v4"
 	"github.com/sirupsen/logrus"
 	"github.com/sourcegraph/conc"
 	"github.com/sourcegraph/conc/pool"
 
-	"github.com/gammazero/workerpool"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
 )
@@ -126,16 +127,6 @@ type ChainAgnosticCommunityOwner struct {
 }
 
 var ErrNoMatchingProviders = errors.New("no matching providers")
-
-type ErrTokenNotFoundByIdentifiers struct {
-	ContractAddress persist.Address
-	TokenID         persist.TokenID
-	OwnerAddress    persist.Address
-}
-
-func (e ErrTokenNotFoundByIdentifiers) Error() string {
-	return fmt.Sprintf("token not found for contract %s, tokenID %s, owner %s", e.ContractAddress, e.TokenID, e.OwnerAddress)
-}
 
 type TokenHolder struct {
 	UserID        persist.DBID    `json:"user_id"`
@@ -371,7 +362,7 @@ func (p *Provider) SyncTokensByUserIDAndTokenIdentifiers(ctx context.Context, us
 
 	wg := &conc.WaitGroup{}
 	for c, t := range chainsToTokenIdentifiers {
-		logger.For(ctx).Infof("syncing %d chain %d tokens for user %s", len(t), c, user.Username)
+		logger.For(ctx).Infof("attempting to sync %d token(s) on chain=%d for user %s", len(t), c, user.Username)
 		chain := c
 		tids := t
 		tokenFetchers := matchingProvidersForChain[TokensOwnerFetcher](p.Chains, chain)
@@ -428,41 +419,48 @@ func (p *Provider) SyncTokensByUserIDAndTokenIdentifiers(ctx context.Context, us
 	return p.receiveSyncedTokensForUser(ctx, user, chains, incomingTokens, incomingContracts, errChan, false)
 }
 
-func (p *Provider) SearchForTokenInUserWalletsRetry(ctx context.Context, userID persist.DBID, w []persist.Wallet, t persist.TokenIdentifiers, r retry.Retry) (token persist.TokenGallery, err error) {
-	wallets := p.matchingWalletsChain(w, token.Chain)
-
-	if len(wallets) == 0 {
-		return token, persist.ErrTokenNotFoundByUserTokenIdentifers{
+func (p *Provider) SearchForTokenInUserWalletsRetry(ctx context.Context, userID persist.DBID, w []persist.Wallet, t persist.TokenIdentifiers, r retry.Retry) (token db.Token, err error) {
+	searchF := func(ctx context.Context) error {
+		_, err := p.Queries.GetTokenByUserTokenIdentifiers(ctx, db.GetTokenByUserTokenIdentifiersParams{
 			OwnerID:         userID,
 			TokenID:         t.TokenID,
-			Chain:           t.Chain,
 			ContractAddress: t.ContractAddress,
+			Chain:           t.Chain,
+		})
+		// Token alrady exists, do nothing
+		if err == nil {
+			return nil
 		}
-	}
-
-	searchF := func(ctx context.Context) error {
-		searchInWallets := util.MapWithoutError(wallets, func(w persist.Address) persist.TokenUniqueIdentifiers {
-			return persist.TokenUniqueIdentifiers{
+		// Unexpected error
+		if err != nil && err != pgx.ErrNoRows {
+			return err
+		}
+		// Try to sync the token from each wallet
+		for _, w := range p.matchingWalletsChain(w, token.Chain) {
+			w := w
+			searchWallet := persist.TokenUniqueIdentifiers{
 				Chain:           t.Chain,
 				ContractAddress: t.ContractAddress,
 				TokenID:         t.TokenID,
 				OwnerAddress:    w,
 			}
-		})
-		synced, err := p.SyncTokensByUserIDAndTokenIdentifiers(ctx, userID, searchInWallets)
-		if err != nil {
-			return err
-		}
-		if len(synced) == 0 {
-			return persist.ErrTokenNotFoundByUserTokenIdentifers{
-				OwnerID:         userID,
-				TokenID:         t.TokenID,
-				Chain:           t.Chain,
-				ContractAddress: t.ContractAddress,
+			synced, _ := p.SyncTokensByUserIDAndTokenIdentifiers(ctx, userID, []persist.TokenUniqueIdentifiers{searchWallet})
+			// Able to sync a new token
+			if len(synced) > 0 {
+				break
 			}
 		}
-		token = synced[0]
-		return nil
+		// Now check if we got a token at the end of it
+		token, err = p.Queries.GetTokenByUserTokenIdentifiers(ctx, db.GetTokenByUserTokenIdentifiersParams{
+			OwnerID:         userID,
+			TokenID:         t.TokenID,
+			ContractAddress: t.ContractAddress,
+			Chain:           t.Chain,
+		})
+		if err == pgx.ErrNoRows {
+			return persist.ErrTokenNotFoundByUserTokenIdentifers{UserID: userID, Token: t}
+		}
+		return err
 	}
 
 	retryCondition := func(err error) bool {
@@ -1287,7 +1285,7 @@ func (p *Provider) RefreshTokenDescriptorsByTokenIdentifiers(ctx context.Context
 	}
 
 	if !tokenExists {
-		return tokenIDs, contractID, ErrTokenNotFoundByIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID}
+		return tokenIDs, contractID, persist.ErrTokenNotFoundByTokenIdentifiers{Token: ti}
 	}
 
 	contractID, err = p.Repos.ContractRepository.UpsertByAddress(ctx, ti.ContractAddress, ti.Chain, persist.ContractGallery{

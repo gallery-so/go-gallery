@@ -152,6 +152,7 @@ type HelperPostData struct {
 }
 
 type HelperTokenDraftDetailsData struct {
+	Token      persist.TokenIdentifiers
 	ContractID persist.DBID
 }
 

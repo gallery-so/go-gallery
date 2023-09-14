@@ -733,10 +733,12 @@ func loadTokenByUserTokenIdentifers(q *db.Queries) func(context.Context, []db.Ge
 
 			if errors[i] == pgx.ErrNoRows {
 				errors[i] = persist.ErrTokenNotFoundByUserTokenIdentifers{
-					OwnerID:         params[i].OwnerID,
-					TokenID:         params[i].TokenID,
-					ContractAddress: params[i].ContractAddress,
-					Chain:           params[i].Chain,
+					UserID: params[i].OwnerID,
+					Token: persist.TokenIdentifiers{
+						TokenID:         params[i].TokenID,
+						ContractAddress: params[i].ContractAddress,
+						Chain:           params[i].Chain,
+					},
 				}
 			}
 		})

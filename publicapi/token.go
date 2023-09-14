@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gammazero/workerpool"
 	"github.com/go-playground/validator/v10"
+	"github.com/jackc/pgx/v4"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/event"
@@ -535,15 +536,46 @@ func (api TokenAPI) MediaByTokenIdentifiers(ctx context.Context, tokenIdentifier
 	}); err != nil {
 		return db.TokenMedia{}, db.Token{}, err
 	}
+
 	// Check if the user is logged in, and if so prioritize fetching media specific to their token
 	userID, _ := getAuthenticatedUserID(ctx)
-	media, err := api.queries.GetMediaByTokenIdentifiers(ctx, db.GetMediaByTokenIdentifiersParams{
+
+	// This query only returns a row if there is matching media, but it may not have a corresponding token instance
+	media, err := api.queries.GetMediaByUserTokenIdentifiers(ctx, db.GetMediaByUserTokenIdentifiersParams{
 		UserID:  userID,
 		Chain:   tokenIdentifiers.Chain,
 		Address: tokenIdentifiers.ContractAddress,
 		TokenID: tokenIdentifiers.TokenID,
 	})
-	return media.TokenMedia, media.Token, err
+
+	// Got media and a token instance
+	if err == nil && media.TokenInstanceID != "" {
+		token, err := api.GetTokenById(ctx, media.TokenInstanceID)
+		if err != nil || token == nil {
+			return media.TokenMedia, db.Token{}, err
+		}
+		return media.TokenMedia, *token, err
+	}
+
+	// Unexpected error
+	if err != nil && err != pgx.ErrNoRows {
+		return db.TokenMedia{}, db.Token{}, err
+	}
+
+	// Try to find a token instance with fallback media
+	token, err := api.queries.GetFallbackTokenByUserTokenIdentifiers(ctx, db.GetFallbackTokenByUserTokenIdentifiersParams{
+		UserID:  userID,
+		Chain:   tokenIdentifiers.Chain,
+		Address: tokenIdentifiers.ContractAddress,
+		TokenID: tokenIdentifiers.TokenID,
+	})
+
+	// Unexpected error
+	if err != nil && err != pgx.ErrNoRows {
+		return media.TokenMedia, db.Token{}, err
+	}
+
+	return media.TokenMedia, token, nil
 }
 
 func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (db.Event, error) {

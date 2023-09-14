@@ -1082,7 +1082,7 @@ func (r *mutationResolver) ReferralPostPreflight(ctx context.Context, input mode
 		ContractAddress: input.Token.ChainAddress.Address(),
 		TokenID:         input.Token.TokenID,
 	})
-	return &model.ReferralPostPreflightPayload{Accepted: err != nil}, err
+	return &model.ReferralPostPreflightPayload{Accepted: err == nil}, err
 }
 
 // GetAuthNonce is the resolver for the getAuthNonce field.
@@ -1443,8 +1443,8 @@ func (r *mutationResolver) PostTokens(ctx context.Context, input model.PostToken
 	return output, nil
 }
 
-// PostTokensReferral is the resolver for the postTokensReferral field.
-func (r *mutationResolver) PostTokensReferral(ctx context.Context, input model.PostTokensReferralInput) (model.PostTokensReferralPayloadOrError, error) {
+// ReferralPostTokens is the resolver for the referralPostTokens field.
+func (r *mutationResolver) ReferralPostTokens(ctx context.Context, input model.ReferralPostTokensInput) (model.ReferralPostTokensPayloadOrError, error) {
 	token := persist.TokenIdentifiers{
 		Chain:           input.Token.ChainAddress.Chain(),
 		ContractAddress: input.Token.ChainAddress.Address(),
@@ -1458,7 +1458,7 @@ func (r *mutationResolver) PostTokensReferral(ctx context.Context, input model.P
 	if err != nil {
 		return nil, err
 	}
-	return &model.PostTokensReferralPayload{Post: post}, nil
+	return &model.ReferralPostTokensPayload{Post: post}, nil
 }
 
 // DeletePost is the resolver for the deletePost field.
@@ -2197,28 +2197,36 @@ func (r *queryResolver) TokenDraftDetails(ctx context.Context, input model.Token
 		ContractAddress: input.Token.ChainAddress.Address(),
 		TokenID:         input.Token.TokenID,
 	}
+
 	media, t, err := publicapi.For(ctx).Token.MediaByTokenIdentifiers(ctx, token)
-	if util.ErrorAs[persist.ErrMediaNotFound](err) {
-		err = nil
+	if err != nil {
+		return nil, err
 	}
+
 	tokenName := t.Name.String
 	if media.ID != "" && media.Name != "" {
 		tokenName = media.Name
 	}
+
 	tokenDescription := t.Description.String
 	if media.ID != "" && media.Description != "" {
 		tokenDescription = media.Description
 	}
+
 	contractID := t.Contract
 	if media.ID != "" && media.ContractID != "" {
 		contractID = media.ContractID
 	}
+
 	return model.TokenDraftDetails{
-		Media:                       resolveTokenMedia(ctx, t, media, input.HighDefinition),
-		TokenName:                   util.ToPointer(tokenName),
-		TokenDescription:            util.ToPointer(tokenDescription),
-		Community:                   nil, // handled by dedicated resolver
-		HelperTokenDraftDetailsData: model.HelperTokenDraftDetailsData{ContractID: contractID},
+		Media:            resolveTokenMedia(ctx, t, media, input.HighDefinition),
+		TokenName:        util.ToPointer(tokenName),
+		TokenDescription: util.ToPointer(tokenDescription),
+		Community:        nil, // handled by dedicated resolver
+		HelperTokenDraftDetailsData: model.HelperTokenDraftDetailsData{
+			Token:      token,
+			ContractID: contractID,
+		},
 	}, err
 }
 
@@ -2733,10 +2741,16 @@ func (r *tokenResolver) Admires(ctx context.Context, obj *model.Token, before *s
 
 // Community is the resolver for the community field.
 func (r *tokenDraftDetailsResolver) Community(ctx context.Context, obj *model.TokenDraftDetails) (*model.Community, error) {
-	if obj.HelperTokenDraftDetailsData.ContractID == "" {
-		return nil, nil
+	if obj.HelperTokenDraftDetailsData.ContractID != "" {
+		return resolveCommunityByID(ctx, obj.HelperTokenDraftDetailsData.ContractID)
 	}
-	return resolveCommunityByID(ctx, obj.HelperTokenDraftDetailsData.ContractID)
+
+	if obj.HelperTokenDraftDetailsData.Token.ContractAddress != "" {
+		chainAddress := persist.NewChainAddress(obj.HelperTokenDraftDetailsData.Token.ContractAddress, persist.ChainETH)
+		return resolveCommunityByContractAddress(ctx, chainAddress, util.ToPointer(false))
+	}
+
+	return nil, nil
 }
 
 // Wallets is the resolver for the wallets field.

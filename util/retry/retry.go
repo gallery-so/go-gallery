@@ -25,6 +25,10 @@ func (e ErrOutOfRetries) Error() string {
 	return fmt.Sprintf("retried %d times: last error: %s", e.Retry.Tries, e.Err.Error())
 }
 
+func (e ErrOutOfRetries) Unwrap() error {
+	return e.Err
+}
+
 type Retry struct {
 	Base  int // Min amount of time to sleep per iteration
 	Cap   int // Max amount of time to sleep per iteration

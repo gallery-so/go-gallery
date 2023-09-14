@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
+	"github.com/jackc/pgx/v4"
 	"github.com/sirupsen/logrus"
 	"github.com/sourcegraph/conc/pool"
 
@@ -383,15 +384,20 @@ func processPostPreflight(tp *tokenProcessor, tm *tokenmanage.Manager, q *coredb
 			return
 		}
 
-		existingMedia, err := q.GetMediaByTokenIdentifiers(c, coredb.GetMediaByTokenIdentifiersParams{
+		existingMedia, err := q.GetMediaByUserTokenIdentifiers(c, coredb.GetMediaByUserTokenIdentifiersParams{
+			UserID:  input.UserID,
 			Chain:   input.Token.Chain,
-			TokenID: input.Token.TokenID,
 			Address: input.Token.ContractAddress,
+			TokenID: input.Token.TokenID,
 		})
 
-		if err != nil || !existingMedia.TokenMedia.Active {
-			err := runPostPreflightUnauthed(c, tp, input.Token, mc, contractRepo, tokenRepo)
-			if err != nil {
+		if err != nil && err != pgx.ErrNoRows {
+			util.ErrResponse(c, http.StatusOK, err)
+			return
+		}
+
+		if !existingMedia.TokenMedia.Active {
+			if err := runPostPreflightUnauthed(c, tp, input.Token, mc, contractRepo, tokenRepo); err != nil {
 				util.ErrResponse(c, http.StatusInternalServerError, err)
 				return
 			}
@@ -403,8 +409,7 @@ func processPostPreflight(tp *tokenProcessor, tm *tokenmanage.Manager, q *coredb
 				util.ErrResponse(c, http.StatusOK, err)
 				return
 			}
-			err = runPostPreflightAuthed(c, user, input.Token, mc)
-			if err != nil {
+			if err := runPostPreflightAuthed(c, user, input.Token, mc); err != nil {
 				util.ErrResponse(c, http.StatusInternalServerError, err)
 				return
 			}

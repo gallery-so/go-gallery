@@ -75,9 +75,9 @@ type AddressAtBlock struct {
 
 // TokenIdentifiers represents a unique identifier for a token
 type TokenIdentifiers struct {
-	TokenID         TokenID `json:"token_id" binding:"required"`
-	ContractAddress Address `json:"contract_address" binding:"required"`
-	Chain           Chain   `json:"chain" binding:"required"`
+	TokenID         TokenID `json:"token_id"`
+	ContractAddress Address `json:"contract_address"`
+	Chain           Chain   `json:"chain"`
 }
 
 type TokenUniqueIdentifiers struct {
