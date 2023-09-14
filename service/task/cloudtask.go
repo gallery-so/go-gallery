@@ -210,15 +210,6 @@ func NewClient(ctx context.Context) *gcptasks.Client {
 		option.WithGRPCDialOption(grpc.WithTimeout(time.Duration(2) * time.Second)),
 	}
 
-	if host := env.GetString("TASK_QUEUE_HOST"); host != "" {
-		copts = append(
-			copts,
-			option.WithEndpoint(host),
-			option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
-			option.WithoutAuthentication(),
-		)
-	}
-
 	// Configure the client depending on whether or not the cloud task emulator is used.
 	if env.GetString("ENV") == "local" {
 		if host := env.GetString("TASK_QUEUE_HOST"); host != "" {
