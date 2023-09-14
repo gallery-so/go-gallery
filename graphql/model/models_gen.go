@@ -191,6 +191,10 @@ type OptOutForRolesPayloadOrError interface {
 	IsOptOutForRolesPayloadOrError()
 }
 
+type PostComposerDraftDetailsPayloadOrError interface {
+	IsPostComposerDraftDetailsPayloadOrError()
+}
+
 type PostOrError interface {
 	IsPostOrError()
 }
@@ -321,10 +325,6 @@ type SyncTokensPayloadOrError interface {
 
 type TokenByIDOrError interface {
 	IsTokenByIDOrError()
-}
-
-type TokenDraftDetailsOrError interface {
-	IsTokenDraftDetailsOrError()
 }
 
 type TrendingUsersPayloadOrError interface {
@@ -1010,7 +1010,7 @@ func (ErrInvalidInput) IsMerchTokensPayloadOrError()                     {}
 func (ErrInvalidInput) IsSearchUsersPayloadOrError()                     {}
 func (ErrInvalidInput) IsSearchGalleriesPayloadOrError()                 {}
 func (ErrInvalidInput) IsSearchCommunitiesPayloadOrError()               {}
-func (ErrInvalidInput) IsTokenDraftDetailsOrError()                      {}
+func (ErrInvalidInput) IsPostComposerDraftDetailsPayloadOrError()        {}
 func (ErrInvalidInput) IsCreateCollectionPayloadOrError()                {}
 func (ErrInvalidInput) IsDeleteCollectionPayloadOrError()                {}
 func (ErrInvalidInput) IsUpdateCollectionInfoPayloadOrError()            {}
@@ -1725,6 +1725,20 @@ type PostCommentsConnection struct {
 	PageInfo *PageInfo          `json:"pageInfo"`
 }
 
+type PostComposerDraftDetailsInput struct {
+	Token *ChainAddressTokenInput `json:"token"`
+}
+
+type PostComposerDraftDetailsPayload struct {
+	HelperPostComposerDraftDetailsPayloadData
+	Media            MediaSubtype `json:"media"`
+	Community        *Community   `json:"community"`
+	TokenName        *string      `json:"tokenName"`
+	TokenDescription *string      `json:"tokenDescription"`
+}
+
+func (PostComposerDraftDetailsPayload) IsPostComposerDraftDetailsPayloadOrError() {}
+
 type PostEdge struct {
 	Node   PostOrError `json:"node"`
 	Cursor *string     `json:"cursor"`
@@ -2177,21 +2191,6 @@ type TokenAdmireEdge struct {
 type TokenAdmiresConnection struct {
 	Edges    []*TokenAdmireEdge `json:"edges"`
 	PageInfo *PageInfo          `json:"pageInfo"`
-}
-
-type TokenDraftDetails struct {
-	HelperTokenDraftDetailsData
-	Media            MediaSubtype `json:"media"`
-	Community        *Community   `json:"community"`
-	TokenName        *string      `json:"tokenName"`
-	TokenDescription *string      `json:"tokenDescription"`
-}
-
-func (TokenDraftDetails) IsTokenDraftDetailsOrError() {}
-
-type TokenDraftDetailsInput struct {
-	Token          *ChainAddressTokenInput `json:"token"`
-	HighDefinition bool                    `json:"highDefinition"`
 }
 
 type TokenEdge struct {

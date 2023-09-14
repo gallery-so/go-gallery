@@ -1232,19 +1232,18 @@ input ChainAddressTokenInput {
   tokenId: TokenId!
 }
 
-input TokenDraftDetailsInput {
+input PostComposerDraftDetailsInput {
   token: ChainAddressTokenInput!
-  highDefinition: Boolean!
 }
 
-type TokenDraftDetails @goEmbedHelper {
+type PostComposerDraftDetailsPayload @goEmbedHelper {
   media: MediaSubtype
   community: Community @goField(forceResolver: true)
   tokenName: String
   tokenDescription: String
 }
 
-union TokenDraftDetailsOrError = TokenDraftDetails | ErrInvalidInput
+union PostComposerDraftDetailsPayloadOrError = PostComposerDraftDetailsPayload | ErrInvalidInput
 
 type Query {
   node(id: ID!): Node
@@ -1257,7 +1256,6 @@ type Query {
   collectionById(id: DBID!): CollectionByIdOrError
   collectionsByIds(ids: [DBID!]!): [CollectionByIdOrError]
   tokenById(id: DBID!): TokenByIdOrError
-  tokenDraftDetails(input: TokenDraftDetailsInput!): TokenDraftDetailsOrError
   collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
   communityByAddress(
     communityAddress: ChainAddressInput!
@@ -1353,6 +1351,7 @@ type Query {
     first: Int
     last: Int
   ): CollectionsConnection
+  postComposerDraftDetails(input: PostComposerDraftDetailsInput!): PostComposerDraftDetailsPayloadOrError
 }
 
 type SocialQueries {
@@ -2578,8 +2577,6 @@ type Mutation {
   refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
   refreshContract(contractId: DBID!): RefreshContractPayloadOrError
 
-  referralPostPreflight(input: ReferralPostPreflightInput!): ReferralPostPreflightPayloadOrError
-
   getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
 
   createUser(authMechanism: AuthMechanism!, input: CreateUserInput!): CreateUserPayloadOrError
@@ -2625,6 +2622,7 @@ type Mutation {
 
   postTokens(input: PostTokensInput!): PostTokensPayloadOrError @authRequired
   referralPostTokens(input: ReferralPostTokensInput!): ReferralPostTokensPayloadOrError @authRequired
+  referralPostPreflight(input: ReferralPostPreflightInput!): ReferralPostPreflightPayloadOrError
   deletePost(postId: DBID!): DeletePostPayloadOrError @authRequired
 
   viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError

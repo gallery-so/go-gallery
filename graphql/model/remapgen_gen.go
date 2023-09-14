@@ -223,6 +223,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"PostComposerDraftDetailsPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(PostComposerDraftDetailsPayloadOrError)
+		return obj, ok
+	},
+
 	"PostOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(PostOrError)
 		return obj, ok
@@ -385,11 +390,6 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 
 	"TokenByIdOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(TokenByIDOrError)
-		return obj, ok
-	},
-
-	"TokenDraftDetailsOrError": func(object interface{}) (interface{}, bool) {
-		obj, ok := object.(TokenDraftDetailsOrError)
 		return obj, ok
 	},
 

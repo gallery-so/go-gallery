@@ -126,8 +126,6 @@ type ChainAgnosticCommunityOwner struct {
 	Address persist.Address `json:"address"`
 }
 
-var ErrNoMatchingProviders = errors.New("no matching providers")
-
 type TokenHolder struct {
 	UserID        persist.DBID    `json:"user_id"`
 	DisplayName   string          `json:"display_name"`
@@ -335,6 +333,7 @@ func (p *Provider) SyncTokensByUserIDAndTokenIdentifiers(ctx context.Context, us
 	})
 
 	chains = util.Dedupe(chains, false)
+
 	matchingWallets := p.matchingWallets(user.Wallets, chains)
 
 	chainAddresses := map[persist.ChainAddress]bool{}
