@@ -167,6 +167,7 @@ func (r *sendTokensRecorder) Send(ctx context.Context, userID persist.DBID, toke
 
 // submitUserTokensNoop is useful when the code under test doesn't require tokenprocessing
 func submitUserTokensNoop(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID) error {
+	return nil
 }
 
 // sendTokensToHTTPHandler makes an HTTP request to the passed handler
