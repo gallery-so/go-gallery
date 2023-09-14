@@ -685,11 +685,15 @@ func (v *__removeUserWalletsMutationInput) GetWalletIds() []persist.DBID { retur
 
 // __syncTokensMutationInput is used internally by genqlient
 type __syncTokensMutationInput struct {
-	Chains []Chain `json:"chains"`
+	Chains        []Chain `json:"chains"`
+	Incrementally *bool   `json:"incrementally"`
 }
 
 // GetChains returns __syncTokensMutationInput.Chains, and is useful for accessing the field via an interface.
 func (v *__syncTokensMutationInput) GetChains() []Chain { return v.Chains }
+
+// GetIncrementally returns __syncTokensMutationInput.Incrementally, and is useful for accessing the field via an interface.
+func (v *__syncTokensMutationInput) GetIncrementally() *bool { return v.Incrementally }
 
 // __tokenByIdQueryInput is used internally by genqlient
 type __tokenByIdQueryInput struct {
@@ -11820,8 +11824,8 @@ func removeUserWalletsMutation(
 
 // The query or mutation executed by syncTokensMutation.
 const syncTokensMutation_Operation = `
-mutation syncTokensMutation ($chains: [Chain!]) {
-	syncTokens(chains: $chains) {
+mutation syncTokensMutation ($chains: [Chain!], $incrementally: Boolean) {
+	syncTokens(chains: $chains, incrementally: $incrementally) {
 		__typename
 		... on Error {
 			__typename
@@ -11897,12 +11901,14 @@ func syncTokensMutation(
 	ctx context.Context,
 	client graphql.Client,
 	chains []Chain,
+	incrementally *bool,
 ) (*syncTokensMutationResponse, error) {
 	req := &graphql.Request{
 		OpName: "syncTokensMutation",
 		Query:  syncTokensMutation_Operation,
 		Variables: &__syncTokensMutationInput{
-			Chains: chains,
+			Chains:        chains,
+			Incrementally: incrementally,
 		},
 	}
 	var err error
