@@ -1279,6 +1279,8 @@ func (p *Provider) RefreshTokenDescriptorsByTokenIdentifiers(ctx context.Context
 			if contract.ProfileImageURL != "" && finalContractDescriptors.ProfileImageURL == "" {
 				finalContractDescriptors.ProfileImageURL = contract.ProfileImageURL
 			}
+		} else {
+			logger.For(ctx).Infof("token %s-%s-%d not found for refresh (err: %s)", ti.TokenID, ti.ContractAddress, ti.Chain, err)
 		}
 	}
 

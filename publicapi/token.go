@@ -540,8 +540,7 @@ func (api TokenAPI) MediaByTokenIdentifiers(ctx context.Context, tokenIdentifier
 	// Check if the user is logged in, and if so prioritize fetching media specific to their token
 	userID, _ := getAuthenticatedUserID(ctx)
 
-	// This query only returns a row if there is matching media, and it may not have a corresponding
-	// token instance if it did return a row
+	// This query only returns a row if there is matching media, and it may not have a token instance even if it did return a row
 	media, err := api.queries.GetMediaByUserTokenIdentifiers(ctx, db.GetMediaByUserTokenIdentifiersParams{
 		UserID:  userID,
 		Chain:   tokenIdentifiers.Chain,

@@ -1351,7 +1351,9 @@ type Query {
     first: Int
     last: Int
   ): CollectionsConnection
-  postComposerDraftDetails(input: PostComposerDraftDetailsInput!): PostComposerDraftDetailsPayloadOrError
+  postComposerDraftDetails(
+    input: PostComposerDraftDetailsInput!
+  ): PostComposerDraftDetailsPayloadOrError
 }
 
 type SocialQueries {

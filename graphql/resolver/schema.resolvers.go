@@ -2102,7 +2102,7 @@ func (r *postComposerDraftDetailsPayloadResolver) Community(ctx context.Context,
 	}
 
 	if obj.HelperPostComposerDraftDetailsPayloadData.Token.ContractAddress != "" {
-		chainAddress := persist.NewChainAddress(obj.HelperPostComposerDraftDetailsPayloadData.Token.ContractAddress, persist.ChainETH)
+		chainAddress := persist.NewChainAddress(obj.HelperPostComposerDraftDetailsPayloadData.Token.ContractAddress, obj.HelperPostComposerDraftDetailsPayloadData.Token.Chain)
 		return resolveCommunityByContractAddress(ctx, chainAddress, util.ToPointer(false))
 	}
 
@@ -2661,6 +2661,7 @@ func (r *tokenResolver) Media(ctx context.Context, obj *model.Token) (model.Medi
 	}
 
 	tokenMedia, err := publicapi.For(ctx).Token.MediaByTokenID(ctx, obj.Dbid)
+
 	if util.ErrorAs[persist.ErrMediaNotFound](err) {
 		err = nil
 	}
