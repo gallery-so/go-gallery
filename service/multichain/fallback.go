@@ -19,6 +19,7 @@ type SyncWithContractEvalFallbackProvider struct {
 type SyncWithContractEvalPrimary interface {
 	Configurer
 	TokensOwnerFetcher
+	TokensIncrementalOwnerFetcher
 	TokensContractFetcher
 	TokenDescriptorsFetcher
 	TokenMetadataFetcher
@@ -26,6 +27,7 @@ type SyncWithContractEvalPrimary interface {
 
 type SyncWithContractEvalSecondary interface {
 	TokensOwnerFetcher
+	TokensIncrementalOwnerFetcher
 }
 
 // SyncFailureFallbackProvider will call its fallback if the primary Provider's token
@@ -60,6 +62,10 @@ func (f SyncWithContractEvalFallbackProvider) GetTokensByWalletAddress(ctx conte
 	}
 	tokens = f.resolveTokens(ctx, tokens)
 	return tokens, contracts, nil
+}
+
+func (f SyncWithContractEvalFallbackProvider) GetTokensIncrementallyByWalletAddress(ctx context.Context, address persist.Address, rec chan<- ChainAgnosticTokensAndContracts, errChan chan<- error) {
+	getTokensIncrementallyByWalletAddressWithFallback(ctx, address, f.Primary, f.Fallback, rec, errChan, f.resolveTokens, nil)
 }
 
 func (f SyncWithContractEvalFallbackProvider) GetTokensByContractAddress(ctx context.Context, contract persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error) {
@@ -148,28 +154,56 @@ func (f SyncFailureFallbackProvider) GetTokensByWalletAddress(ctx context.Contex
 }
 
 func (f SyncFailureFallbackProvider) GetTokensIncrementallyByWalletAddress(ctx context.Context, address persist.Address, rec chan<- ChainAgnosticTokensAndContracts, errChan chan<- error) {
+	getTokensIncrementallyByWalletAddressWithFallback(ctx, address, f.Primary, f.Fallback, rec, errChan, nil, nil)
+}
 
-	if tiof, ok := f.Fallback.(TokensIncrementalOwnerFetcher); ok {
-		logger.For(ctx).Warn("using fallback for incremental fetching if primary fails")
-		subErrChan := make(chan error)
-		subRec := make(chan ChainAgnosticTokensAndContracts)
-		f.Primary.GetTokensIncrementallyByWalletAddress(ctx, address, subRec, subErrChan)
-		for {
-			select {
-			case err := <-subErrChan:
+func getTokensIncrementallyByWalletAddressWithFallback(ctx context.Context, address persist.Address, primary TokensIncrementalOwnerFetcher, fallback any, rec chan<- ChainAgnosticTokensAndContracts, errChan chan<- error, processTokens func(context.Context, []ChainAgnosticToken) []ChainAgnosticToken, processContracts func(context.Context, []ChainAgnosticContract) []ChainAgnosticContract) {
+	defer close(rec)
+	// create sub channels so that we can separately keep track of the results and errors and handle them here as opposed to the original receiving channels
+	subErrChan := make(chan error)
+	subRec := make(chan ChainAgnosticTokensAndContracts)
+	go primary.GetTokensIncrementallyByWalletAddress(ctx, address, subRec, subErrChan)
+	for {
+		select {
+		case err := <-subErrChan:
+			if tiof, ok := fallback.(TokensIncrementalOwnerFetcher); ok {
 				logger.For(ctx).Warnf("failed to get tokens incrementally by wallet address from primary in failure fallback: %s", err)
-				tiof.GetTokensIncrementallyByWalletAddress(ctx, address, rec, errChan)
-				return
-			case tokens, ok := <-subRec:
-				if !ok {
-					return
+				fallbackRec := make(chan ChainAgnosticTokensAndContracts)
+				go tiof.GetTokensIncrementallyByWalletAddress(ctx, address, fallbackRec, subErrChan)
+				for {
+					select {
+					case err := <-subErrChan:
+						logger.For(ctx).Warnf("failed to get tokens incrementally by wallet address from fallback in failure fallback: %s", err)
+						errChan <- err
+						return
+					case tokens, ok := <-fallbackRec:
+						if !ok {
+							return
+						}
+						if processTokens != nil {
+							tokens.Tokens = processTokens(ctx, tokens.Tokens)
+						}
+						if processContracts != nil {
+							tokens.Contracts = processContracts(ctx, tokens.Contracts)
+						}
+						rec <- tokens
+					}
 				}
-				rec <- tokens
 			}
+			errChan <- err
+			return
+		case tokens, ok := <-subRec:
+			if !ok {
+				return
+			}
+			if processTokens != nil {
+				tokens.Tokens = processTokens(ctx, tokens.Tokens)
+			}
+			if processContracts != nil {
+				tokens.Contracts = processContracts(ctx, tokens.Contracts)
+			}
+			rec <- tokens
 		}
-	} else {
-		logger.For(ctx).Warn("fallback does not support incremental fetching, only using primary provider")
-		f.Primary.GetTokensIncrementallyByWalletAddress(ctx, address, rec, errChan)
 	}
 }
 
