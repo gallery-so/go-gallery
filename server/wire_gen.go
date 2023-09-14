@@ -471,10 +471,10 @@ func newTokenProcessingCache() *redis.Cache {
 }
 
 func newManagedTokens(ctx context.Context, tm *tokenmanage.Manager) multichain.SubmitUserTokensF {
-	return func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, chains []persist.Chain) error {
+	return func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID) error {
 		if len(tokenIDs) == 0 {
 			return nil
 		}
-		return tm.SubmitUser(ctx, userID, tokenIDs, chains)
+		return tm.SubmitUser(ctx, userID, tokenIDs)
 	}
 }
