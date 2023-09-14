@@ -37,8 +37,6 @@ type FeedbotMessage struct {
 type TokenProcessingUserMessage struct {
 	UserID   persist.DBID   `json:"user_id" binding:"required"`
 	TokenIDs []persist.DBID `json:"token_ids" binding:"required"`
-	// TODO: chains isn't used anymore, remove once the backend is updated to stop sending it
-	Chains []persist.Chain `json:"chains" binding:"-"`
 }
 
 type TokenProcessingTokenInstanceMessage struct {

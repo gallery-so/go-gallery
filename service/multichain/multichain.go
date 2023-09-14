@@ -44,8 +44,7 @@ var contractNameBlacklist = map[string]bool{
 }
 
 // SubmitUserTokensF is called to process a user's batch of tokens
-// TODO: Remove chains when made optional on tokenprocessing
-type SubmitUserTokensF func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, chains []persist.Chain) error
+type SubmitUserTokensF func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID) error
 
 type Provider struct {
 	Repos   *postgres.Repositories
@@ -856,7 +855,7 @@ func (p *Provider) processTokensForUsers(ctx context.Context, users map[persist.
 		newUserTokens[userID] = newPersistedTokens
 		newPersistedTokenIDs := util.MapWithoutError(newPersistedTokens, func(t persist.TokenGallery) persist.DBID { return t.ID })
 
-		err = p.SubmitUserTokens(ctx, userID, newPersistedTokenIDs, chains)
+		err = p.SubmitUserTokens(ctx, userID, newPersistedTokenIDs)
 		if err != nil {
 			errors = append(errors, err)
 		}
