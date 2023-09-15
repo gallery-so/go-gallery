@@ -50,6 +50,7 @@
 //go:generate go run github.com/gallery-so/dataloaden TokensLoaderByUserIDAndFilters github.com/mikeydub/go-gallery/db/gen/coredb.GetTokensByUserIdBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.Token
 //go:generate go run github.com/gallery-so/dataloaden ProfileImageLoaderByID github.com/mikeydub/go-gallery/db/gen/coredb.GetProfileImageByIDParams github.com/mikeydub/go-gallery/db/gen/coredb.ProfileImage
 //go:generate go run github.com/gallery-so/dataloaden GalleryTokenPreviewsByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.TokenMedia
+//go:generate go run github.com/gallery-so/dataloaden CommunityLoaderByKey github.com/mikeydub/go-gallery/service/persist.CommunityKey github.com/mikeydub/go-gallery/db/gen/coredb.Community
 
 package dataloader
 
@@ -120,7 +121,7 @@ type Loaders struct {
 	AdmireCountByPostID                      *IntLoaderByID
 	AdmiresByPostID                          *PostAdmiresLoader
 	AdmireCountByTokenID                     *IntLoaderByID
-	AdmiresByTokenID                     	 *TokenAdmiresLoader
+	AdmiresByTokenID                         *TokenAdmiresLoader
 	CommentByCommentID                       *CommentLoaderByID
 	CommentCountByFeedEventID                *IntLoaderByID
 	CommentsByFeedEventID                    *FeedEventCommentsLoader
@@ -140,6 +141,7 @@ type Loaders struct {
 	ContractCreatorByContractID              *ContractCreatorLoaderByID
 	ProfileImageByID                         *ProfileImageLoaderByID
 	GalleryTokenPreviewsByID                 *GalleryTokenPreviewsByID
+	CommunityByKey                           *CommunityLoaderByKey
 }
 
 func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loaders {
@@ -340,6 +342,16 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 	loaders.ProfileImageByID = NewProfileImageLoaderByID(defaults, loadProfileImageByID(q), ProfileImageLoaderByIDCacheSubscriptions{})
 
 	loaders.GalleryTokenPreviewsByID = NewGalleryTokenPreviewsByID(defaults, loadGalleryTokenPreviewsByID(q))
+
+	loaders.CommunityByKey = NewCommunityLoaderByKey(defaults, loadCommunityByKey(q), CommunityLoaderByKeyCacheSubscriptions{
+		AutoCacheWithKey: func(community db.Community) persist.CommunityKey {
+			return persist.CommunityKey{
+				Type:    community.CommunityType,
+				Subtype: community.CommunitySubtype,
+				Key:     community.CommunityKey,
+			}
+		},
+	})
 
 	return loaders
 }
@@ -1170,7 +1182,6 @@ func loadAdmiresByTokenID(q *db.Queries) func(context.Context, []db.PaginateAdmi
 	}
 }
 
-
 func loadCommentById(q *db.Queries) func(context.Context, []persist.DBID) ([]db.Comment, []error) {
 	return func(ctx context.Context, commentIDs []persist.DBID) ([]db.Comment, []error) {
 		comments := make([]db.Comment, len(commentIDs))
@@ -1437,5 +1448,34 @@ func loadGalleryTokenPreviewsByID(q *db.Queries) func(context.Context, []persist
 		})
 
 		return results, errors
+	}
+}
+
+func loadCommunityByKey(q *db.Queries) func(ctx context.Context, keys []persist.CommunityKey) ([]db.Community, []error) {
+	return func(ctx context.Context, communityKeys []persist.CommunityKey) ([]db.Community, []error) {
+		params := db.GetCommunitiesByKeysWithPreservedOrderParams{}
+		for _, key := range communityKeys {
+			params.Types = append(params.Types, int32(key.Type))
+			params.Subtypes = append(params.Subtypes, key.Subtype)
+			params.Keys = append(params.Keys, key.Key)
+		}
+		rows, err := q.GetCommunitiesByKeysWithPreservedOrder(ctx, params)
+		if err != nil {
+			return emptyResultsWithError[db.Community](len(communityKeys), err)
+		}
+
+		keyFunc := func(row db.Community) persist.CommunityKey {
+			return persist.CommunityKey{
+				Type:    row.CommunityType,
+				Subtype: row.CommunitySubtype,
+				Key:     row.CommunityKey,
+			}
+		}
+
+		onNotFound := func(key persist.CommunityKey) (db.Community, error) {
+			return db.Community{}, persist.ErrCommunityNotFound{Key: key}
+		}
+
+		return fillUnnestedJoinResults(communityKeys, rows, keyFunc, onNotFound)
 	}
 }

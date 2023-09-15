@@ -9,11 +9,12 @@ import (
 	"context"
 )
 
-const getCommunitiesByKeys = `-- name: GetCommunitiesByKeys :many
+const getCommunitiesByKeysWithPreservedOrder = `-- name: GetCommunitiesByKeysWithPreservedOrder :many
 with keys as (
     select unnest ($1::int[]) as type
          , unnest ($2::varchar[]) as subtype
          , unnest ($3::varchar[]) as key
+         , generate_subscripts($1::varchar[], 1) as idx
 )
 select c.id, c.version, c.name, c.description, c.community_type, c.community_subtype, c.community_key, c.created_at, c.last_updated, c.deleted from keys k
     join communities c on
@@ -21,16 +22,18 @@ select c.id, c.version, c.name, c.description, c.community_type, c.community_sub
         and k.subtype = c.community_subtype
         and k.key = c.community_key
     where not c.deleted
+    order by k.idx
 `
 
-type GetCommunitiesByKeysParams struct {
+type GetCommunitiesByKeysWithPreservedOrderParams struct {
 	Types    []int32  `json:"types"`
 	Subtypes []string `json:"subtypes"`
 	Keys     []string `json:"keys"`
 }
 
-func (q *Queries) GetCommunitiesByKeys(ctx context.Context, arg GetCommunitiesByKeysParams) ([]Community, error) {
-	rows, err := q.db.Query(ctx, getCommunitiesByKeys, arg.Types, arg.Subtypes, arg.Keys)
+// Get communities by keys, and preserve the ordering of the results
+func (q *Queries) GetCommunitiesByKeysWithPreservedOrder(ctx context.Context, arg GetCommunitiesByKeysWithPreservedOrderParams) ([]Community, error) {
+	rows, err := q.db.Query(ctx, getCommunitiesByKeysWithPreservedOrder, arg.Types, arg.Subtypes, arg.Keys)
 	if err != nil {
 		return nil, err
 	}

@@ -553,8 +553,8 @@ func resolveCommunityByTokenID(ctx context.Context, tokenID persist.DBID) (*mode
 	}
 
 	// TODO: It's probably worth revisiting "forceRefresh" to see if it still makes sense as a
-	// parameter for every call to communityToModel.
-	return communityToModel(ctx, *contract, util.ToPointer(false)), nil
+	// parameter for every call to contractToCommunityModel.
+	return contractToCommunityModel(ctx, *contract, util.ToPointer(false)), nil
 }
 
 func resolveContractByTokenID(ctx context.Context, tokenID persist.DBID) (*model.Contract, error) {
@@ -651,7 +651,7 @@ func resolveCommunityByID(ctx context.Context, id persist.DBID) (*model.Communit
 	if err != nil {
 		return nil, err
 	}
-	return communityToModel(ctx, *community, nil), nil
+	return contractToCommunityModel(ctx, *community, nil), nil
 }
 
 func resolveCommunityByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, forceRefresh *bool) (*model.Community, error) {
@@ -661,7 +661,17 @@ func resolveCommunityByContractAddress(ctx context.Context, contractAddress pers
 		return nil, err
 	}
 
-	return communityToModel(ctx, *community, forceRefresh), nil
+	return contractToCommunityModel(ctx, *community, forceRefresh), nil
+}
+
+func resolveCommunityByKey(ctx context.Context, communityKey persist.CommunityKey) (*model.Community, error) {
+	community, err := publicapi.For(ctx).Community.GetCommunityByKey(ctx, communityKey)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return communityToModel(ctx, *community), nil
 }
 
 func resolveCommunityOwnersByContractID(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int, onlyGalleryUsers bool) (*model.TokenHoldersConnection, error) {
@@ -1932,15 +1942,38 @@ func collectionTokenToModel(ctx context.Context, token *model.Token, collectionI
 	}
 }
 
-func communityToModel(ctx context.Context, community db.Contract, forceRefresh *bool) *model.Community {
+func communityToModel(ctx context.Context, community db.Community) *model.Community {
 	lastUpdated := community.LastUpdated
-	contractAddress := persist.NewChainAddress(community.Address, community.Chain)
-	chain := community.Chain
+
+	return &model.Community{
+		Dbid:        community.ID,
+		LastUpdated: &lastUpdated,
+		//Contract:        contractToModel(ctx, community),
+		//ContractAddress: &contractAddress,
+		//CreatorAddress:  creatorAddress,
+		Name:        util.ToPointer(community.Name),
+		Description: util.ToPointer(community.Description),
+		//Chain:             &chain,
+		//ProfileImageURL:   util.ToPointer(community.ProfileImageUrl.String),
+		//ProfileBannerURL:  util.ToPointer(community.ProfileBannerUrl.String),
+		//BadgeURL:          util.ToPointer(community.BadgeUrl.String),
+		Owners:            nil, // handled by dedicated resolver
+		Creator:           nil, // handled by dedicated resolver
+		ParentCommunity:   nil, // handled by dedicated resolver
+		SubCommunities:    nil, // handled by dedicated resolver
+		TokensInCommunity: nil, // handled by dedicated resolver
+	}
+}
+
+func contractToCommunityModel(ctx context.Context, contract db.Contract, forceRefresh *bool) *model.Community {
+	lastUpdated := contract.LastUpdated
+	contractAddress := persist.NewChainAddress(contract.Address, contract.Chain)
+	chain := contract.Chain
 
 	// TODO: Should this use CreatorAddress or OwnerAddress?
 	var creatorAddress *persist.ChainAddress
-	if community.CreatorAddress != "" {
-		chainAddress := persist.NewChainAddress(community.CreatorAddress, chain)
+	if contract.CreatorAddress != "" {
+		chainAddress := persist.NewChainAddress(contract.CreatorAddress, chain)
 		creatorAddress = &chainAddress
 	}
 
@@ -1948,18 +1981,18 @@ func communityToModel(ctx context.Context, community db.Contract, forceRefresh *
 		HelperCommunityData: model.HelperCommunityData{
 			ForceRefresh: forceRefresh,
 		},
-		Dbid:            community.ID,
+		Dbid:            contract.ID,
 		LastUpdated:     &lastUpdated,
-		Contract:        contractToModel(ctx, community),
+		Contract:        contractToModel(ctx, contract),
 		ContractAddress: &contractAddress,
 		CreatorAddress:  creatorAddress,
-		Name:            util.ToPointer(community.Name.String),
-		Description:     util.ToPointer(community.Description.String),
-		// PreviewImage:     util.ToPointer(community.Pr.String()), // TODO do we still need this with the new image fields?
+		Name:            util.ToPointer(contract.Name.String),
+		Description:     util.ToPointer(contract.Description.String),
+		// PreviewImage:     util.ToPointer(contract.Pr.String()), // TODO do we still need this with the new image fields?
 		Chain:             &chain,
-		ProfileImageURL:   util.ToPointer(community.ProfileImageUrl.String),
-		ProfileBannerURL:  util.ToPointer(community.ProfileBannerUrl.String),
-		BadgeURL:          util.ToPointer(community.BadgeUrl.String),
+		ProfileImageURL:   util.ToPointer(contract.ProfileImageUrl.String),
+		ProfileBannerURL:  util.ToPointer(contract.ProfileBannerUrl.String),
+		BadgeURL:          util.ToPointer(contract.BadgeUrl.String),
 		Owners:            nil, // handled by dedicated resolver
 		Creator:           nil, // handled by dedicated resolver
 		ParentCommunity:   nil, // handled by dedicated resolver

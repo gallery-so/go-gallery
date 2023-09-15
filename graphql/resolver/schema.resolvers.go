@@ -232,7 +232,7 @@ func (r *communityResolver) ParentCommunity(ctx context.Context, obj *model.Comm
 		return nil, err
 	}
 
-	obj.ParentCommunity.Node = communityToModel(ctx, *contract, obj.ParentCommunity.Node.ForceRefresh)
+	obj.ParentCommunity.Node = contractToCommunityModel(ctx, *contract, obj.ParentCommunity.Node.ForceRefresh)
 	return obj.ParentCommunity, nil
 }
 
@@ -246,7 +246,7 @@ func (r *communityResolver) SubCommunities(ctx context.Context, obj *model.Commu
 	edges := make([]*model.CommunityEdge, len(communities))
 	for i, community := range communities {
 		edges[i] = &model.CommunityEdge{
-			Node:   communityToModel(ctx, community, util.ToPointer(false)),
+			Node:   contractToCommunityModel(ctx, community, util.ToPointer(false)),
 			Cursor: nil, // not used by relay, but relay will complain without this field existing
 		}
 	}
@@ -611,7 +611,7 @@ func (r *galleryUserResolver) SharedCommunities(ctx context.Context, obj *model.
 	edges := make([]*model.CommunityEdge, len(communities))
 	for i, community := range communities {
 		edges[i] = &model.CommunityEdge{
-			Node:   communityToModel(ctx, community, util.ToPointer(false)),
+			Node:   contractToCommunityModel(ctx, community, util.ToPointer(false)),
 			Cursor: nil, // not used by relay, but relay will complain without this field existing
 		}
 	}
@@ -632,7 +632,7 @@ func (r *galleryUserResolver) CreatedCommunities(ctx context.Context, obj *model
 	edges := make([]*model.CommunityEdge, len(communities))
 	for i, community := range communities {
 		edges[i] = &model.CommunityEdge{
-			Node:   communityToModel(ctx, community, util.ToPointer(false)),
+			Node:   contractToCommunityModel(ctx, community, util.ToPointer(false)),
 			Cursor: nil, // not used by relay, but relay will complain without this field existing
 		}
 	}
@@ -2172,6 +2172,16 @@ func (r *queryResolver) CommunityByAddress(ctx context.Context, communityAddress
 	return resolveCommunityByContractAddress(ctx, communityAddress, forceRefresh)
 }
 
+// CommunityByKey is the resolver for the communityByKey field.
+func (r *queryResolver) CommunityByKey(ctx context.Context, communityKey model.CommunityKeyInput) (model.CommunityByKeyOrError, error) {
+	key := persist.CommunityKey{
+		Type:    communityKey.Type,
+		Subtype: util.GetOptionalValue(communityKey.Subtype, ""),
+		Key:     communityKey.Key,
+	}
+	return resolveCommunityByKey(ctx, key)
+}
+
 // GeneralAllowlist is the resolver for the generalAllowlist field.
 func (r *queryResolver) GeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error) {
 	return resolveGeneralAllowlist(ctx)
@@ -2362,7 +2372,7 @@ func (r *queryResolver) SearchCommunities(ctx context.Context, query string, lim
 	results := make([]*model.CommunitySearchResult, len(contracts))
 	for i, contract := range contracts {
 		results[i] = &model.CommunitySearchResult{
-			Community: communityToModel(ctx, contract, &forceRefresh),
+			Community: contractToCommunityModel(ctx, contract, &forceRefresh),
 		}
 	}
 

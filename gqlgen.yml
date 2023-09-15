@@ -109,6 +109,9 @@ models:
   TokenOwnershipType:
     model:
       - github.com/mikeydub/go-gallery/service/persist.TokenOwnershipType
+  CommunityType:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.CommunityType
 directives:
   goGqlId:
     skip_runtime: true

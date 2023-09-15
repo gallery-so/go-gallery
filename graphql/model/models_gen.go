@@ -63,6 +63,10 @@ type CommunityByAddressOrError interface {
 	IsCommunityByAddressOrError()
 }
 
+type CommunityByKeyOrError interface {
+	IsCommunityByKeyOrError()
+}
+
 type ConnectSocialAccountPayloadOrError interface {
 	IsConnectSocialAccountPayloadOrError()
 }
@@ -707,10 +711,17 @@ type Community struct {
 
 func (Community) IsNode()                      {}
 func (Community) IsCommunityByAddressOrError() {}
+func (Community) IsCommunityByKeyOrError()     {}
 
 type CommunityEdge struct {
 	Node   *Community `json:"node"`
 	Cursor *string    `json:"cursor"`
+}
+
+type CommunityKeyInput struct {
+	Type    persist.CommunityType `json:"type"`
+	Subtype *string               `json:"subtype"`
+	Key     string                `json:"key"`
 }
 
 type CommunityLink struct {
@@ -929,6 +940,7 @@ type ErrCommunityNotFound struct {
 }
 
 func (ErrCommunityNotFound) IsCommunityByAddressOrError() {}
+func (ErrCommunityNotFound) IsCommunityByKeyOrError()     {}
 func (ErrCommunityNotFound) IsError()                     {}
 
 type ErrDoesNotOwnRequiredToken struct {
@@ -986,6 +998,7 @@ func (ErrInvalidInput) IsUserByIDOrError()                               {}
 func (ErrInvalidInput) IsUserByAddressOrError()                          {}
 func (ErrInvalidInput) IsCollectionByIDOrError()                         {}
 func (ErrInvalidInput) IsCommunityByAddressOrError()                     {}
+func (ErrInvalidInput) IsCommunityByKeyOrError()                         {}
 func (ErrInvalidInput) IsPostOrError()                                   {}
 func (ErrInvalidInput) IsSocialConnectionsOrError()                      {}
 func (ErrInvalidInput) IsMerchTokensPayloadOrError()                     {}

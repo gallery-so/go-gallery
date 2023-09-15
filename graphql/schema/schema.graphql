@@ -166,6 +166,12 @@ input ChainPubKeyInput {
   chain: Chain! @goField(forceResolver: true)
 }
 
+input CommunityKeyInput {
+  type: CommunityType!
+  subtype: String
+  key: String!
+}
+
 input CreatedCommunitiesInput {
   # When includeChains is empty, returns all communities from all chains.
   includeChains: [Chain!]
@@ -401,6 +407,11 @@ enum Chain {
   POAP
   Zora
   Base
+}
+
+enum CommunityType {
+  Contract
+  Prohibition
 }
 
 enum TokenOwnershipType {
@@ -800,6 +811,8 @@ union CollectionByIdOrError = Collection | ErrCollectionNotFound | ErrInvalidInp
 union CollectionTokenByIdOrError = CollectionToken | ErrCollectionNotFound | ErrTokenNotFound
 
 union CommunityByAddressOrError = Community | ErrCommunityNotFound | ErrInvalidInput
+
+union CommunityByKeyOrError = Community | ErrCommunityNotFound | ErrInvalidInput
 
 type Admire implements Node {
   id: ID!
@@ -1239,6 +1252,7 @@ type Query {
     communityAddress: ChainAddressInput!
     forceRefresh: Boolean
   ): CommunityByAddressOrError
+  communityByKey(communityKey: CommunityKeyInput!): CommunityByKeyOrError
   generalAllowlist: [ChainAddress!]
   galleryOfTheWeekWinners: [GalleryUser!]
   globalFeed(

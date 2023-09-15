@@ -1674,15 +1674,9 @@ func (d *Provider) processContractCommunities(ctx context.Context, contracts []p
 		return nil, err
 	}
 
-	type communityKey struct {
-		Type    persist.CommunityType
-		Subtype string
-		Key     string
-	}
-
-	communityByKey := make(map[communityKey]db.Community)
+	communityByKey := make(map[persist.CommunityKey]db.Community)
 	for _, community := range communities {
-		communityByKey[communityKey{
+		communityByKey[persist.CommunityKey{
 			Type:    community.CommunityType,
 			Subtype: community.CommunitySubtype,
 			Key:     community.CommunityKey,
@@ -1692,7 +1686,7 @@ func (d *Provider) processContractCommunities(ctx context.Context, contracts []p
 	params := db.UpsertContractCommunityMembershipsParams{}
 
 	for _, contract := range contracts {
-		key := communityKey{
+		key := persist.CommunityKey{
 			Type:    persist.CommunityTypeContract,
 			Subtype: fmt.Sprintf("%d", contract.Chain),
 			Key:     contract.Address.String(),
