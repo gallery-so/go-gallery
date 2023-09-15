@@ -65,7 +65,7 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 				}
 
 				ctx := sentryutil.NewSentryHubContext(reqCtx)
-				_, err = processFromInstance(ctx, tp, tm, token, contract, persist.ProcessingCauseSync, 0)
+				_, err = processFromInstanceManaged(ctx, tp, tm, token, contract, persist.ProcessingCauseSync, 0)
 				return err
 			})
 		}
@@ -119,7 +119,7 @@ func processMediaForTokenIdentifiers(tp *tokenProcessor, tokenRepo *postgres.Tok
 			return
 		}
 
-		_, err = processFromInstance(reqCtx, tp, tm, token, contract, persist.ProcessingCauseRefresh, 0)
+		_, err = processFromInstanceManaged(reqCtx, tp, tm, token, contract, persist.ProcessingCauseRefresh, 0)
 
 		if err != nil {
 			if util.ErrorAs[ErrBadToken](err) {
@@ -151,7 +151,7 @@ func processMediaForTokenManaged(tp *tokenProcessor, tokenRepo *postgres.TokenGa
 			return
 		}
 
-		if _, err = processFromIdentifiers(c, tp, tm, input.Token, contract, persist.ProcessingCauseSyncRetry, input.Attempts); err != nil {
+		if _, err = processFromIdentifiersManaged(c, tp, tm, input.Token, contract, persist.ProcessingCauseSyncRetry, input.Attempts); err != nil {
 			// Only log the error, because tokenmanage will handle reprocessing
 			logger.For(c).Errorf("error processing token: %s", err)
 		}
@@ -397,7 +397,7 @@ func processPostPreflight(tp *tokenProcessor, tm *tokenmanage.Manager, q *coredb
 				util.ErrResponse(c, http.StatusInternalServerError, err)
 				return
 			}
-			if _, err = processFromIdentifiers(c, tp, tm, input.Token, contract, persist.ProcessingCausePostPreflight, 0); err != nil {
+			if _, err = processFromIdentifiersManaged(c, tp, tm, input.Token, contract, persist.ProcessingCausePostPreflight, 0); err != nil {
 				// Only log the error, because tokenmanage will handle reprocessing
 				logger.For(c).Errorf("error in preflight: error processing token: %s", err)
 			}
@@ -423,14 +423,14 @@ func processPostPreflight(tp *tokenProcessor, tm *tokenmanage.Manager, q *coredb
 	}
 }
 
-func processFromInstance(ctx context.Context, tp *tokenProcessor, tm *tokenmanage.Manager, token persist.TokenGallery, contract persist.ContractGallery, cause persist.ProcessingCause, attempts int) (coredb.TokenMedia, error) {
+func processFromInstanceManaged(ctx context.Context, tp *tokenProcessor, tm *tokenmanage.Manager, token persist.TokenGallery, contract persist.ContractGallery, cause persist.ProcessingCause, attempts int) (coredb.TokenMedia, error) {
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"tokenDBID": token.ID})
 	t := persist.NewTokenIdentifiers(contract.Address, token.TokenID, token.Chain)
-	media, err := processFromIdentifiers(ctx, tp, tm, t, contract, cause, attempts, PipelineOpts.WithTokenInstance(&token))
+	media, err := processFromIdentifiersManaged(ctx, tp, tm, t, contract, cause, attempts, PipelineOpts.WithTokenInstance(&token))
 	return media, err
 }
 
-func processFromIdentifiers(ctx context.Context, tp *tokenProcessor, tm *tokenmanage.Manager, token persist.TokenIdentifiers, contract persist.ContractGallery, cause persist.ProcessingCause, attempts int, opts ...PipelineOption) (coredb.TokenMedia, error) {
+func processFromIdentifiersManaged(ctx context.Context, tp *tokenProcessor, tm *tokenmanage.Manager, token persist.TokenIdentifiers, contract persist.ContractGallery, cause persist.ProcessingCause, attempts int, opts ...PipelineOption) (coredb.TokenMedia, error) {
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
 		"tokenID":         token.TokenID,
 		"tokenID_base10":  token.TokenID.Base10String(),
