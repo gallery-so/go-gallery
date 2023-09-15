@@ -238,6 +238,25 @@ func Dedupe[T comparable](src []T, filterInPlace bool) []T {
 	return result
 }
 
+// DedupeByKey removes duplicate elements from a slice, preserving the order of the remaining elements.
+func DedupeByKey[T any, K comparable](src []T, filterInPlace bool, keyFunc func(T) K) []T {
+	var result []T
+	if filterInPlace {
+		result = src[:0]
+	} else {
+		result = make([]T, 0, len(src))
+	}
+	seen := make(map[K]bool)
+	for _, x := range src {
+		key := keyFunc(x)
+		if !seen[key] {
+			result = append(result, x)
+			seen[key] = true
+		}
+	}
+	return result
+}
+
 func Contains[T comparable](s []T, str T) bool {
 	for _, v := range s {
 		if v == str {
@@ -246,6 +265,14 @@ func Contains[T comparable](s []T, str T) bool {
 	}
 
 	return false
+}
+
+func FillSliceWithValue[T any](s []T, fillWith T) []T {
+	for i, l := 0, len(s); i < l; i++ {
+		s[i] = fillWith
+	}
+
+	return s
 }
 
 // Difference will take in 2 arrays and return the elements that exist in the second array but are not in the first

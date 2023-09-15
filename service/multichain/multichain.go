@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"math/big"
 	"net/http"
 	"sort"
@@ -147,6 +148,14 @@ type chainContracts struct {
 type errWithPriority struct {
 	err      error
 	priority int
+}
+
+type communityInfo struct {
+	Name        string
+	Description string
+	Type        persist.CommunityType
+	Subtype     string
+	Key         string
 }
 
 // Configurer maintains provider settings
@@ -742,6 +751,11 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 	return err
 }
 
+func (p *Provider) processTokenCommunities(ctx context.Context, contracts []persist.ContractGallery, tokens []persist.TokenGallery) error {
+	// TODO: Configure actual providers by chain via wire
+	return p.processProhibitionTokenCommunities(ctx, contracts, tokens)
+}
+
 func (p *Provider) prepTokensForTokenProcessing(ctx context.Context, tokensFromProviders []chainTokens, existingTokens []persist.TokenGallery, contracts []persist.ContractGallery, user persist.User) ([]persist.TokenGallery, map[persist.TokenIdentifiers]bool, error) {
 	providerTokens, _ := tokensToNewDedupedTokens(tokensFromProviders, contracts, user)
 
@@ -793,6 +807,12 @@ func (p *Provider) processTokensForUsers(ctx context.Context, users map[persist.
 	for _, token := range persistedTokens {
 		persistedUserTokens[token.OwnerUserID] = append(persistedUserTokens[token.OwnerUserID], token)
 	}
+
+	// TODO: Currently checking all tokens since finding Prohibition tokens is fast and doesn't add much
+	// overhead, but we actually want to track token status in a table so we only have to look up tokens
+	// that haven't been assigned to the appropriate communities yet.
+	communityTokens := persistedTokens
+	err = p.processTokenCommunities(ctx, contracts, communityTokens)
 
 	if upsertParams.OptionalDelete != nil {
 		numAffectedRows, err := p.Queries.DeleteTokensBeforeTimestamp(ctx, upsertParams.OptionalDelete.ToParams(upsertTime))
@@ -1634,12 +1654,89 @@ outer:
 	return chainTokensForUser, users, nil
 }
 
+func (d *Provider) processContractCommunities(ctx context.Context, contracts []persist.ContractGallery) ([]db.Community, error) {
+	communities := make([]db.Community, 0, len(contracts))
+	for _, contract := range contracts {
+		// No need to fill in createdAt, lastUpdated, or deleted. They'll be handled by the upsert.
+		communities = append(communities, db.Community{
+			ID:               persist.GenerateID(),
+			Version:          0,
+			Name:             contract.Name.String(),
+			Description:      contract.Description.String(),
+			CommunityType:    persist.CommunityTypeContract,
+			CommunitySubtype: fmt.Sprintf("%d", contract.Chain),
+			CommunityKey:     contract.Address.String(),
+		})
+	}
+
+	communities, err := d.Repos.CommunityRepository.UpsertCommunities(ctx, communities)
+	if err != nil {
+		return nil, err
+	}
+
+	type communityKey struct {
+		Type    persist.CommunityType
+		Subtype string
+		Key     string
+	}
+
+	communityByKey := make(map[communityKey]db.Community)
+	for _, community := range communities {
+		communityByKey[communityKey{
+			Type:    community.CommunityType,
+			Subtype: community.CommunitySubtype,
+			Key:     community.CommunityKey,
+		}] = community
+	}
+
+	params := db.UpsertContractCommunityMembershipsParams{}
+
+	for _, contract := range contracts {
+		key := communityKey{
+			Type:    persist.CommunityTypeContract,
+			Subtype: fmt.Sprintf("%d", contract.Chain),
+			Key:     contract.Address.String(),
+		}
+
+		community, ok := communityByKey[key]
+		if !ok {
+			// This shouldn't happen. By this point, we've successfully upserted communities,
+			// so we should be able to find one matching every contract we have.
+			err = fmt.Errorf("couldn't find community with type: %d, subtype: %s, key: %s for contract ID: %s", key.Type, key.Subtype, key.Key, contract.ID)
+			sentryutil.ReportError(ctx, err)
+			return nil, err
+		}
+
+		params.Ids = append(params.Ids, persist.GenerateID().String())
+		params.ContractID = append(params.ContractID, contract.ID.String())
+		params.CommunityID = append(params.CommunityID, community.ID.String())
+	}
+
+	_, err = d.Queries.UpsertContractCommunityMemberships(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+
+	return communities, nil
+}
+
 // processContracts deduplicates contracts and upserts them into the database. If canOverwriteOwnerAddress is true, then
 // the owner address of an existing contract will be overwritten if the new contract provides a non-empty owner address.
 // An empty owner address will never overwrite an existing address, even if canOverwriteOwnerAddress is true.
 func (d *Provider) processContracts(ctx context.Context, contractsFromProviders []chainContracts, canOverwriteOwnerAddress bool) ([]persist.ContractGallery, error) {
 	newContracts := contractsToNewDedupedContracts(contractsFromProviders)
-	return d.Repos.ContractRepository.BulkUpsert(ctx, newContracts, canOverwriteOwnerAddress)
+
+	contracts, err := d.Repos.ContractRepository.BulkUpsert(ctx, newContracts, canOverwriteOwnerAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = d.processContractCommunities(ctx, contracts)
+	if err != nil {
+		return nil, err
+	}
+
+	return contracts, nil
 }
 
 func tokensToNewDedupedTokens(tokens []chainTokens, contracts []persist.ContractGallery, ownerUser persist.User) ([]persist.TokenGallery, map[persist.DBID]persist.Address) {

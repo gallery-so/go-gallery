@@ -61,6 +61,19 @@ type Comment struct {
 	PostID      persist.DBID `json:"post_id"`
 }
 
+type Community struct {
+	ID               persist.DBID          `json:"id"`
+	Version          int32                 `json:"version"`
+	Name             string                `json:"name"`
+	Description      string                `json:"description"`
+	CommunityType    persist.CommunityType `json:"community_type"`
+	CommunitySubtype string                `json:"community_subtype"`
+	CommunityKey     string                `json:"community_key"`
+	CreatedAt        time.Time             `json:"created_at"`
+	LastUpdated      time.Time             `json:"last_updated"`
+	Deleted          bool                  `json:"deleted"`
+}
+
 type Contract struct {
 	ID                    persist.DBID    `json:"id"`
 	Deleted               bool            `json:"deleted"`
@@ -80,6 +93,16 @@ type Contract struct {
 	IsProviderMarkedSpam  bool            `json:"is_provider_marked_spam"`
 	ParentID              persist.DBID    `json:"parent_id"`
 	OverrideCreatorUserID persist.DBID    `json:"override_creator_user_id"`
+}
+
+type ContractCommunityMembership struct {
+	ID          persist.DBID `json:"id"`
+	Version     int32        `json:"version"`
+	ContractID  persist.DBID `json:"contract_id"`
+	CommunityID persist.DBID `json:"community_id"`
+	CreatedAt   time.Time    `json:"created_at"`
+	LastUpdated time.Time    `json:"last_updated"`
+	Deleted     bool         `json:"deleted"`
 }
 
 type ContractCreator struct {
@@ -500,6 +523,16 @@ type Token struct {
 	IsCreatorToken       bool                       `json:"is_creator_token"`
 	IsHolderToken        bool                       `json:"is_holder_token"`
 	Displayable          bool                       `json:"displayable"`
+}
+
+type TokenCommunityMembership struct {
+	ID          persist.DBID `json:"id"`
+	Version     int32        `json:"version"`
+	TokenID     persist.DBID `json:"token_id"`
+	CommunityID persist.DBID `json:"community_id"`
+	CreatedAt   time.Time    `json:"created_at"`
+	LastUpdated time.Time    `json:"last_updated"`
+	Deleted     bool         `json:"deleted"`
 }
 
 type TokenMedia struct {

@@ -315,6 +315,7 @@ type Repositories struct {
 	AdmireRepository      *AdmireRepository
 	CommentRepository     *CommentRepository
 	EventRepository       *EventRepository
+	CommunityRepository   *CommunityRepository
 }
 
 func NewRepositories(pq *sql.DB, pgx *pgxpool.Pool) *Repositories {
@@ -335,6 +336,7 @@ func NewRepositories(pq *sql.DB, pgx *pgxpool.Pool) *Repositories {
 		AdmireRepository:      NewAdmireRepository(queries),
 		CommentRepository:     NewCommentRepository(pq, queries),
 		EventRepository:       &EventRepository{queries},
+		CommunityRepository:   NewCommunityRepository(queries),
 	}
 }
 
