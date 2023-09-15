@@ -1997,7 +1997,7 @@ func resolveTokenMedia(ctx context.Context, token db.Token, tokenMedia db.TokenM
 		// In the worse case the processing message was dropped and the token never gets handled. To address that,
 		// we compare when the token was created to the current time. If it's longer than the grace period, we assume that the
 		// message was lost and set the media to invalid so it could be refreshed manually.
-		if inFlight := publicapi.For(ctx).Token.GetProcessingStateByID(ctx, token.ID); !inFlight {
+		if inFlight, err := publicapi.For(ctx).Token.GetProcessingStateByID(ctx, token.ID); !inFlight || err != nil {
 			if time.Since(token.CreatedAt) > time.Duration(1*time.Hour) {
 				tokenMedia.Media.MediaType = persist.MediaTypeInvalid
 			}
@@ -2007,7 +2007,7 @@ func resolveTokenMedia(ctx context.Context, token db.Token, tokenMedia db.TokenM
 
 	// If the media isn't valid, check if its still up for processing. If so, set the media as syncing.
 	if tokenMedia.Media.MediaType != persist.MediaTypeSyncing && !tokenMedia.Media.MediaType.IsValid() {
-		if inFlight := publicapi.For(ctx).Token.GetProcessingStateByID(ctx, token.ID); inFlight {
+		if inFlight, _ := publicapi.For(ctx).Token.GetProcessingStateByID(ctx, token.ID); inFlight {
 			tokenMedia.Media.MediaType = persist.MediaTypeSyncing
 		}
 	}

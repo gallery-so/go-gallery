@@ -893,7 +893,7 @@ func testSyncOnlySubmitsNewTokens(t *testing.T) {
 	h := handlerWithProviders(t, tokenRecorder.Send, provider)
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 	// Ideally this compares against expected values, but mocks seems to behave weirdly with slices
-	tokenRecorder.On("Send", mock.Anything, mock.Anything, mock.Anything).Times(1).Return(nil)
+	tokenRecorder.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Times(1).Return(nil)
 
 	_, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum})
 

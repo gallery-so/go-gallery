@@ -159,20 +159,20 @@ type sendTokensRecorder struct {
 	Tasks            []task.TokenProcessingUserMessage
 }
 
-func (r *sendTokensRecorder) Send(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID) error {
-	r.Called(ctx, userID, tokenIDs)
+func (r *sendTokensRecorder) Send(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, tokens []persist.TokenIdentifiers) error {
+	r.Called(ctx, userID, tokenIDs, tokens)
 	r.Tasks = append(r.Tasks, task.TokenProcessingUserMessage{UserID: userID, TokenIDs: tokenIDs})
 	return nil
 }
 
 // submitUserTokensNoop is useful when the code under test doesn't require tokenprocessing
-func submitUserTokensNoop(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID) error {
+func submitUserTokensNoop(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, tokens []persist.TokenIdentifiers) error {
 	return nil
 }
 
 // sendTokensToHTTPHandler makes an HTTP request to the passed handler
 func sendTokensToHTTPHandler(handler http.Handler, method, endpoint string) multichain.SubmitUserTokensF {
-	return func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID) error {
+	return func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, _ []persist.TokenIdentifiers) error {
 		m := task.TokenProcessingUserMessage{UserID: userID, TokenIDs: tokenIDs}
 		byt, _ := json.Marshal(m)
 		r := bytes.NewReader(byt)
@@ -189,9 +189,9 @@ func sendTokensToHTTPHandler(handler http.Handler, method, endpoint string) mult
 
 // sendTokensToTokenProcessing processes a batch of tokens synchronously through tokenprocessing
 func sendTokensToTokenProcessing(ctx context.Context, c *server.Clients, provider *multichain.Provider) multichain.SubmitUserTokensF {
-	return func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID) error {
+	return func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, tokens []persist.TokenIdentifiers) error {
 		h := tokenprocessing.CoreInitServer(ctx, c, provider)
-		return sendTokensToHTTPHandler(h, http.MethodPost, "/media/process")(ctx, userID, tokenIDs)
+		return sendTokensToHTTPHandler(h, http.MethodPost, "/media/process")(ctx, userID, tokenIDs, tokens)
 	}
 }
 

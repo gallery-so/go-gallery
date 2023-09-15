@@ -28,7 +28,7 @@ func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProces
 		processMediaForUsersTokens(tp, repos.TokenRepository, repos.ContractRepository, syncManager)(c)
 	})
 	mediaGroup.POST("/process/token", processMediaForTokenIdentifiers(tp, repos.TokenRepository, repos.ContractRepository, repos.UserRepository, repos.WalletRepository, refreshManager))
-	mediaGroup.POST("/process/token-id", processMediaForTokenInstance(tp, repos.TokenRepository, repos.ContractRepository, syncManager))
+	mediaGroup.POST("/tokenmanage/process/token", processMediaForTokenManaged(tp, repos.TokenRepository, repos.ContractRepository, syncManager))
 	mediaGroup.POST("/process/post-preflight", processPostPreflight(tp, syncManager, mc.Queries, mc, repos.ContractRepository, repos.UserRepository, repos.TokenRepository))
 	ownersGroup := router.Group("/owners")
 	ownersGroup.POST("/process/contract", processOwnersForContractTokens(mc, repos.ContractRepository, throttler))

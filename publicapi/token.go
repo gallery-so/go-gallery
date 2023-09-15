@@ -625,6 +625,17 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collect
 }
 
 // GetProcessingStateByID returns true if a token is queued for processing, or is currently being processed.
-func (api TokenAPI) GetProcessingStateByID(ctx context.Context, tokenID persist.DBID) bool {
-	return api.manager.Processing(ctx, tokenID)
+func (api TokenAPI) GetProcessingStateByID(ctx context.Context, tokenID persist.DBID) (bool, error) {
+	token, err := api.loaders.TokenByTokenID.Load(tokenID)
+	if err != nil {
+		return false, err
+	}
+
+	contract, err := api.loaders.ContractByContractID.Load(token.Contract)
+	if err != nil {
+		return false, err
+	}
+
+	t := persist.NewTokenIdentifiers(contract.Address, token.TokenID, contract.Chain)
+	return api.manager.Processing(ctx, t), nil
 }

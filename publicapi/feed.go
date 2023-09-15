@@ -209,7 +209,7 @@ func (api FeedAPI) PostTokenReferral(ctx context.Context, t persist.TokenIdentif
 	}
 
 	// The token is not synced, so we need to find it
-	synced, err := api.multichainProvider.SearchForTokenInUserWalletsRetry(ctx, user.ID, user.Wallets, t, retry.Retry{
+	synced, err := api.multichainProvider.PollForTokenByUserTokenIdentifiers(ctx, user.ID, user.Wallets, t, retry.Retry{
 		Base:  2,
 		Cap:   8,
 		Tries: 4,

@@ -44,7 +44,7 @@ var contractNameBlacklist = map[string]bool{
 }
 
 // SubmitUserTokensF is called to process a user's batch of tokens
-type SubmitUserTokensF func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID) error
+type SubmitUserTokensF func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, tokens []persist.TokenIdentifiers) error
 
 type Provider struct {
 	Repos   *postgres.Repositories
@@ -417,7 +417,29 @@ func (p *Provider) SyncTokensByUserIDAndTokenIdentifiers(ctx context.Context, us
 	return p.receiveSyncedTokensForUser(ctx, user, chains, incomingTokens, incomingContracts, errChan, false)
 }
 
-func (p *Provider) SearchForTokenInUserWalletsRetry(ctx context.Context, userID persist.DBID, w []persist.Wallet, t persist.TokenIdentifiers, r retry.Retry) (token db.Token, err error) {
+func (p *Provider) PollForTokenByTokenIdentifiers(ctx context.Context, token persist.TokenIdentifiers, r retry.Retry) (contract persist.ContractGallery, err error) {
+	searchF := func(ctx context.Context) error {
+		contractID, err := p.RefreshTokenDescriptorsByTokenIdentifiers(ctx, persist.TokenIdentifiers{
+			TokenID:         token.TokenID,
+			Chain:           token.Chain,
+			ContractAddress: token.ContractAddress,
+		})
+		if err != nil {
+			return err
+		}
+		contract, err = p.Repos.ContractRepository.GetByID(ctx, contractID)
+		return err
+	}
+
+	retryCondition := func(err error) bool {
+		logger.For(ctx).Errorf("polling for token: %s: retrying on error: %s", token.String(), err.Error())
+		return true
+	}
+
+	return contract, retry.RetryFunc(ctx, searchF, retryCondition, r)
+}
+
+func (p *Provider) PollForTokenByUserTokenIdentifiers(ctx context.Context, userID persist.DBID, w []persist.Wallet, t persist.TokenIdentifiers, r retry.Retry) (token db.Token, err error) {
 	searchF := func(ctx context.Context) error {
 		_, err := p.Queries.GetTokenByUserTokenIdentifiers(ctx, db.GetTokenByUserTokenIdentifiersParams{
 			OwnerID:         userID,
@@ -462,7 +484,7 @@ func (p *Provider) SearchForTokenInUserWalletsRetry(ctx context.Context, userID 
 	}
 
 	retryCondition := func(err error) bool {
-		logger.For(ctx).Errorf("searching for token: retrying on error: %s", err.Error())
+		logger.For(ctx).Errorf("polling for token for user=%s: polling for token=%s: retrying on error: %s", userID, t.String(), err.Error())
 		return true
 	}
 
@@ -848,14 +870,21 @@ func (p *Provider) processTokensForUsers(ctx context.Context, users map[persist.
 		newTokensForUser := tokenIsNewForUser[userID]
 		persistedTokensForUser := persistedUserTokens[userID]
 
-		newPersistedTokens := util.Filter(persistedTokensForUser, func(t persist.TokenGallery) bool {
-			return newTokensForUser[t.TokenIdentifiers()]
-		}, false)
+		newPersistedTokens := make([]persist.TokenGallery, 0, len(persistedTokensForUser))
+		newPersistedTokenIDs := make([]persist.DBID, 0, len(persistedTokensForUser))
+		newPersistedTokenIdentifiers := make([]persist.TokenIdentifiers, 0, len(persistedTokensForUser))
+
+		for _, token := range persistedTokensForUser {
+			if newTokensForUser[token.TokenIdentifiers()] {
+				newPersistedTokens = append(newPersistedTokens, token)
+				newPersistedTokenIDs = append(newPersistedTokenIDs, token.ID)
+				newPersistedTokenIdentifiers = append(newPersistedTokenIdentifiers, token.TokenIdentifiers())
+			}
+		}
 
 		newUserTokens[userID] = newPersistedTokens
-		newPersistedTokenIDs := util.MapWithoutError(newPersistedTokens, func(t persist.TokenGallery) persist.DBID { return t.ID })
 
-		err = p.SubmitUserTokens(ctx, userID, newPersistedTokenIDs)
+		err = p.SubmitUserTokens(ctx, userID, newPersistedTokenIDs, newPersistedTokenIdentifiers)
 		if err != nil {
 			errors = append(errors, err)
 		}
@@ -1238,13 +1267,13 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 	if err != nil {
 		return err
 	}
-	_, _, err = p.RefreshTokenDescriptorsByTokenIdentifiers(ctx, ti)
+	_, err = p.RefreshTokenDescriptorsByTokenIdentifiers(ctx, ti)
 	return err
 }
 
 // RefreshTokenDescriptorsByTokenIdentifiers will refresh the token descriptors for a token by its identifiers.
 // It returns a slice of updated token DBIDs if any, and the DBID of the updated contract.
-func (p *Provider) RefreshTokenDescriptorsByTokenIdentifiers(ctx context.Context, ti persist.TokenIdentifiers) (tokenIDs []persist.DBID, contractID persist.DBID, err error) {
+func (p *Provider) RefreshTokenDescriptorsByTokenIdentifiers(ctx context.Context, ti persist.TokenIdentifiers) (contractID persist.DBID, err error) {
 	finalTokenDescriptors := ChainAgnosticTokenDescriptors{}
 	finalContractDescriptors := ChainAgnosticContractDescriptors{}
 	tokenFetchers := matchingProvidersForChain[TokenDescriptorsFetcher](p.Chains, ti.Chain)
@@ -1286,7 +1315,7 @@ func (p *Provider) RefreshTokenDescriptorsByTokenIdentifiers(ctx context.Context
 	}
 
 	if !tokenExists {
-		return tokenIDs, contractID, persist.ErrTokenNotFoundByTokenIdentifiers{Token: ti}
+		return contractID, persist.ErrTokenNotFoundByTokenIdentifiers{Token: ti}
 	}
 
 	contractID, err = p.Repos.ContractRepository.UpsertByAddress(ctx, ti.ContractAddress, ti.Chain, persist.ContractGallery{
@@ -1299,7 +1328,7 @@ func (p *Provider) RefreshTokenDescriptorsByTokenIdentifiers(ctx context.Context
 		OwnerAddress:    finalContractDescriptors.CreatorAddress,
 	})
 
-	tokenIDs, err = p.Queries.UpdateTokenMetadataFieldsByTokenIdentifiers(ctx, db.UpdateTokenMetadataFieldsByTokenIdentifiersParams{
+	_, err = p.Queries.UpdateTokenMetadataFieldsByTokenIdentifiers(ctx, db.UpdateTokenMetadataFieldsByTokenIdentifiersParams{
 		Name:        util.ToNullString(finalTokenDescriptors.Name, true),
 		Description: util.ToNullString(finalTokenDescriptors.Description, true),
 		TokenID:     ti.TokenID,
@@ -1307,7 +1336,7 @@ func (p *Provider) RefreshTokenDescriptorsByTokenIdentifiers(ctx context.Context
 		Chain:       ti.Chain,
 	})
 
-	return tokenIDs, contractID, err
+	return contractID, err
 }
 
 // RefreshContract refreshes a contract on the given chain using the chain provider for that chain
