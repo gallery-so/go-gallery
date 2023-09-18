@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
+	"github.com/jackc/pgx/v4"
 	"github.com/sirupsen/logrus"
 	"github.com/sourcegraph/conc/pool"
 
@@ -58,23 +59,13 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 					return err
 				}
 
-				contract, err := contractRepo.GetByID(reqCtx, token.Contract)
+				contract, err := contractRepo.GetByID(reqCtx, token.Contract.ID)
 				if err != nil {
 					logger.For(reqCtx).Errorf("error getting contract: %s", err)
 				}
 
-				err, closing := tm.StartProcessing(reqCtx, tokenID, 0)
-				if err != nil {
-					logger.For(reqCtx).Warnf("failed to start tokenID=%s: %s", tokenID, err)
-					return err
-				}
-
 				ctx := sentryutil.NewSentryHubContext(reqCtx)
-
-				_, err = processToken(ctx, tp, token, contract, persist.ProcessingCauseSync)
-
-				defer closing(err)
-
+				_, err = processFromInstanceManaged(ctx, tp, tm, token, contract, persist.ProcessingCauseSync, 0)
 				return err
 			})
 		}
@@ -118,7 +109,7 @@ func processMediaForTokenIdentifiers(tp *tokenProcessor, tokenRepo *postgres.Tok
 
 		token = tokens[0]
 
-		contract, err := contractRepo.GetByID(reqCtx, token.Contract)
+		contract, err := contractRepo.GetByID(reqCtx, token.Contract.ID)
 		if err != nil {
 			if util.ErrorAs[persist.ErrContractNotFoundByID](err) {
 				util.ErrResponse(c, http.StatusNotFound, err)
@@ -128,15 +119,7 @@ func processMediaForTokenIdentifiers(tp *tokenProcessor, tokenRepo *postgres.Tok
 			return
 		}
 
-		err, closing := tm.StartProcessing(reqCtx, token.ID, 0)
-		if err != nil {
-			util.ErrResponse(c, http.StatusTooManyRequests, err)
-			return
-		}
-
-		_, err = processToken(reqCtx, tp, token, contract, persist.ProcessingCauseRefresh)
-
-		defer closing(err)
+		_, err = processFromInstanceManaged(reqCtx, tp, tm, token, contract, persist.ProcessingCauseRefresh, 0)
 
 		if err != nil {
 			if util.ErrorAs[ErrBadToken](err) {
@@ -151,44 +134,29 @@ func processMediaForTokenIdentifiers(tp *tokenProcessor, tokenRepo *postgres.Tok
 	}
 }
 
-// processMediaForTokenInstance processes a single token instance. It's only called for tokens that failed during a sync.
-func processMediaForTokenInstance(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRepository, contractRepo *postgres.ContractGalleryRepository, tm *tokenmanage.Manager) gin.HandlerFunc {
+// processMediaForTokenManaged processes a single token instance. It's only called for tokens that failed during a sync.
+func processMediaForTokenManaged(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRepository, contractRepo *postgres.ContractGalleryRepository, tm *tokenmanage.Manager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var input task.TokenProcessingTokenInstanceMessage
+		var input task.TokenProcessingTokenMessage
+
+		// Remove from queue if bad message
 		if err := c.ShouldBindJSON(&input); err != nil {
-			util.ErrResponse(c, http.StatusBadRequest, err)
+			util.ErrResponse(c, http.StatusOK, err)
 			return
 		}
 
-		token, err := tokenRepo.GetByID(c, input.TokenDBID)
+		contract, err := contractRepo.GetByAddress(c, input.Token.ContractAddress, input.Token.Chain)
 		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
+			util.ErrResponse(c, http.StatusNotFound, err)
 			return
 		}
 
-		contract, err := contractRepo.GetByID(c, token.Contract)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
+		if _, err = processFromIdentifiersManaged(c, tp, tm, input.Token, contract, persist.ProcessingCauseSyncRetry, input.Attempts); err != nil {
+			// Only log the error, because tokenmanage will handle reprocessing
+			logger.For(c).Errorf("error processing token: %s", err)
 		}
 
-		err, closing := tm.StartProcessing(c, input.TokenDBID, input.Attempts)
-		if err != nil && util.ErrorAs[throttle.ErrThrottleLocked](err) {
-			c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
-			return
-		}
-		if err != nil {
-			logger.For(c).Warnf("failed to start tokenID=%s: %s", input.TokenDBID, err)
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-
-		_, err = processToken(c, tp, token, contract, persist.ProcessingCauseSyncRetry)
-
-		defer closing(err)
-
-		// We always return a 200 because retries are managed by the token manager and we don't
-		// want the queue retrying the current message.
+		// We always return a 200 because retries are managed by the token manager and we don't want the queue retrying the current message.
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
@@ -365,11 +333,6 @@ func detectSpamContracts(queries *coredb.Queries) gin.HandlerFunc {
 	}
 }
 
-func processToken(ctx context.Context, tp *tokenProcessor, token persist.TokenGallery, contract persist.ContractGallery, cause persist.ProcessingCause) (coredb.TokenMedia, error) {
-	opts := append(addContractRunOptions(contract), addContextRunOptions(cause)...)
-	return tp.ProcessTokenPipeline(ctx, token, contract, cause, opts...)
-}
-
 func processWalletRemoval(queries *coredb.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input task.TokenProcessingWalletRemovalMessage
@@ -404,9 +367,105 @@ func processWalletRemoval(queries *coredb.Queries) gin.HandlerFunc {
 	}
 }
 
+func processPostPreflight(tp *tokenProcessor, tm *tokenmanage.Manager, q *coredb.Queries, mc *multichain.Provider, contractRepo *postgres.ContractGalleryRepository, userRepo *postgres.UserRepository, tokenRepo *postgres.TokenGalleryRepository) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var input task.PostPreflightMessage
+
+		if err := c.ShouldBindJSON(&input); err != nil {
+			// Remove from queue if bad message
+			util.ErrResponse(c, http.StatusOK, err)
+			return
+		}
+
+		existingMedia, err := q.GetMediaByUserTokenIdentifiers(c, coredb.GetMediaByUserTokenIdentifiersParams{
+			UserID:  input.UserID,
+			Chain:   input.Token.Chain,
+			Address: input.Token.ContractAddress,
+			TokenID: input.Token.TokenID,
+		})
+
+		if err != nil && err != pgx.ErrNoRows {
+			util.ErrResponse(c, http.StatusOK, err)
+			return
+		}
+
+		// Process media for the token
+		if !existingMedia.TokenMedia.Active {
+			if err := mc.TokenExists(c, input.Token, retry.DefaultRetry); err != nil {
+				// Keep retrying until we get the token or reach max retries
+				util.ErrResponse(c, http.StatusInternalServerError, err)
+				return
+			}
+			// If the token exists, the contract also exists
+			contract, err := contractRepo.GetByAddress(c, input.Token.ContractAddress, input.Token.Chain)
+			if err != nil && util.ErrorAs[persist.ErrContractNotFoundByAddress](err) {
+				util.ErrResponse(c, http.StatusNotFound, err)
+				return
+			}
+			if err != nil {
+				util.ErrResponse(c, http.StatusInternalServerError, err)
+				return
+			}
+			_, err = processFromIdentifiersManaged(c, tp, tm, input.Token, contract, persist.ProcessingCausePostPreflight, 0)
+			if err != nil {
+				// Only log the error, because tokenmanage will handle reprocessing
+				logger.For(c).Errorf("error in preflight: error processing token: %s", err)
+			}
+		}
+
+		// Try to sync the user's token if a user is provided
+		if input.UserID != "" {
+			user, err := userRepo.GetByID(c, input.UserID)
+			if err != nil {
+				// If the user doesn't exist, remove the message from the queue
+				util.ErrResponse(c, http.StatusOK, err)
+				return
+			}
+			// Try to sync the user's tokens by searching for the token in each of the user's wallets
+			// SyncTokenByUserWalletsAndTokenIdentifiersRetry processes media for the token if it is found
+			// so we don't need to run the pipeline again here
+			_, err = mc.SyncTokenByUserWalletsAndTokenIdentifiersRetry(c, user, input.Token, retry.DefaultRetry)
+			if err != nil {
+				// Keep retrying until we get the token or reach max retries
+				util.ErrResponse(c, http.StatusInternalServerError, err)
+				return
+			}
+		}
+
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+	}
+}
+
+func processFromInstanceManaged(ctx context.Context, tp *tokenProcessor, tm *tokenmanage.Manager, token persist.TokenGallery, contract persist.ContractGallery, cause persist.ProcessingCause, attempts int) (coredb.TokenMedia, error) {
+	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"tokenDBID": token.ID})
+	t := persist.NewTokenIdentifiers(contract.Address, token.TokenID, token.Chain)
+	media, err := processFromIdentifiersManaged(ctx, tp, tm, t, contract, cause, attempts, PipelineOpts.WithTokenInstance(&token))
+	return media, err
+}
+
+func processFromIdentifiersManaged(ctx context.Context, tp *tokenProcessor, tm *tokenmanage.Manager, token persist.TokenIdentifiers, contract persist.ContractGallery, cause persist.ProcessingCause, attempts int, opts ...PipelineOption) (coredb.TokenMedia, error) {
+	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
+		"tokenID":         token.TokenID,
+		"tokenID_base10":  token.TokenID.Base10String(),
+		"contractDBID":    contract.ID,
+		"contractAddress": contract.Address,
+		"chain":           token.Chain,
+	})
+	err, closing := tm.StartProcessing(ctx, token, attempts)
+	if err != nil {
+		return coredb.TokenMedia{}, err
+	}
+	runOpts := append([]PipelineOption{}, addContractRunOptions(contract)...)
+	runOpts = append(runOpts, addContextRunOptions(cause)...)
+	runOpts = append(runOpts, opts...)
+	media, err := tp.ProcessTokenPipeline(ctx, token, contract, cause, runOpts...)
+	defer closing(err)
+	return media, err
+}
+
 // addContextRunOptions adds pipeline options for specific types of runs
 func addContextRunOptions(cause persist.ProcessingCause) (opts []PipelineOption) {
-	if cause == persist.ProcessingCauseRefresh || cause == persist.ProcessingCauseSyncRetry {
+	if cause == persist.ProcessingCauseRefresh || cause == persist.ProcessingCauseSyncRetry || cause == persist.ProcessingCausePostPreflight {
 		opts = append(opts, PipelineOpts.WithRefreshMetadata())
 	}
 	return opts

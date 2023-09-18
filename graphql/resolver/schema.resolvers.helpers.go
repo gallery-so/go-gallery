@@ -7,6 +7,7 @@ package graphql
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -153,55 +154,53 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 
 	// TODO: Add model.ErrNotAuthorized mapping once auth handling is moved to the publicapi layer
 
-	switch errTyp := err.(type) {
-	case auth.ErrAuthenticationFailed:
+	switch {
+	case util.ErrorAs[auth.ErrAuthenticationFailed](err):
 		mappedErr = model.ErrAuthenticationFailed{Message: message}
-	case auth.ErrDoesNotOwnRequiredNFT:
+	case util.ErrorAs[auth.ErrDoesNotOwnRequiredNFT](err):
 		mappedErr = model.ErrDoesNotOwnRequiredToken{Message: message}
-	case persist.ErrUserNotFound:
+	case util.ErrorAs[persist.ErrUserNotFound](err):
 		mappedErr = model.ErrUserNotFound{Message: message}
-	case persist.ErrUserAlreadyExists:
+	case util.ErrorAs[persist.ErrUserAlreadyExists](err):
 		mappedErr = model.ErrUserAlreadyExists{Message: message}
-	case persist.ErrUsernameNotAvailable:
+	case util.ErrorAs[persist.ErrUsernameNotAvailable](err):
 		mappedErr = model.ErrUsernameNotAvailable{Message: message}
-	case persist.ErrCollectionNotFoundByID:
+	case util.ErrorAs[persist.ErrCollectionNotFoundByID](err):
 		mappedErr = model.ErrCollectionNotFound{Message: message}
-	case persist.ErrTokenNotFoundByID:
+	case util.ErrorAs[persist.ErrTokenNotFoundByID](err) || util.ErrorAs[persist.ErrTokenNotFoundByUserTokenIdentifers](err):
 		mappedErr = model.ErrTokenNotFound{Message: message}
-	case persist.ErrContractNotFoundByAddress:
+	case util.ErrorAs[persist.ErrContractNotFoundByAddress](err):
 		mappedErr = model.ErrCommunityNotFound{Message: message}
-	case persist.ErrAddressOwnedByUser:
+	case util.ErrorAs[persist.ErrAddressOwnedByUser](err):
 		mappedErr = model.ErrAddressOwnedByUser{Message: message}
-	case persist.ErrAdmireNotFound, persist.ErrAdmireFeedEventNotFound, persist.ErrAdmirePostNotFound, persist.ErrAdmireTokenNotFound:
+	case util.ErrorAs[persist.ErrAdmireNotFound](err) || util.ErrorAs[persist.ErrAdmireFeedEventNotFound](err) || util.ErrorAs[persist.ErrAdmirePostNotFound](err) || util.ErrorAs[persist.ErrAdmireTokenNotFound](err):
 		mappedErr = model.ErrAdmireNotFound{Message: message}
-	case persist.ErrAdmireAlreadyExists:
+	case util.ErrorAs[persist.ErrAdmireAlreadyExists](err):
 		mappedErr = model.ErrAdmireAlreadyExists{Message: message}
-	case persist.ErrCommentNotFound:
+	case util.ErrorAs[persist.ErrCommentNotFound](err):
 		mappedErr = model.ErrCommentNotFound{Message: message}
-	case publicapi.ErrTokenRefreshFailed:
+	case util.ErrorAs[publicapi.ErrTokenRefreshFailed](err):
 		mappedErr = model.ErrSyncFailed{Message: message}
-	case validate.ErrInvalidInput:
+	case util.ErrorAs[validate.ErrInvalidInput](err):
+		errTyp := err.(validate.ErrInvalidInput)
 		mappedErr = model.ErrInvalidInput{Message: message, Parameters: errTyp.Parameters, Reasons: errTyp.Reasons}
-	case persist.ErrFeedEventNotFoundByID:
+	case util.ErrorAs[persist.ErrFeedEventNotFoundByID](err):
 		mappedErr = model.ErrFeedEventNotFound{Message: message}
-	case persist.ErrUnknownAction:
+	case util.ErrorAs[persist.ErrUnknownAction](err):
 		mappedErr = model.ErrUnknownAction{Message: message}
-	case persist.ErrGalleryNotFound:
+	case util.ErrorAs[persist.ErrGalleryNotFound](err):
 		mappedErr = model.ErrGalleryNotFound{Message: message}
-	case twitter.ErrInvalidRefreshToken:
+	case util.ErrorAs[twitter.ErrInvalidRefreshToken](err):
 		mappedErr = model.ErrNeedsToReconnectSocial{SocialAccountType: persist.SocialProviderTwitter, Message: message}
-	case persist.ErrPushTokenBelongsToAnotherUser:
+	case util.ErrorAs[persist.ErrPushTokenBelongsToAnotherUser](err):
 		mappedErr = model.ErrPushTokenBelongsToAnotherUser{Message: message}
-	}
-
-	switch err {
-	case publicapi.ErrProfileImageTooManySources, publicapi.ErrProfileImageUnknownSource:
+	case errors.Is(err, publicapi.ErrProfileImageTooManySources) || errors.Is(err, publicapi.ErrProfileImageUnknownSource):
 		mappedErr = model.ErrInvalidInput{Message: message}
-	case publicapi.ErrProfileImageNotTokenOwner, publicapi.ErrProfileImageNotWalletOwner:
+	case errors.Is(err, publicapi.ErrProfileImageNotTokenOwner) || errors.Is(err, publicapi.ErrProfileImageNotWalletOwner):
 		mappedErr = model.ErrNotAuthorized{Message: message}
-	case auth.ErrEmailUnverified:
+	case errors.Is(err, auth.ErrEmailUnverified):
 		mappedErr = model.ErrEmailUnverified{Message: message}
-	case auth.ErrEmailAlreadyUsed:
+	case errors.Is(err, auth.ErrEmailAlreadyUsed):
 		mappedErr = model.ErrEmailAlreadyUsed{Message: message}
 	}
 
@@ -1998,7 +1997,7 @@ func resolveTokenMedia(ctx context.Context, token db.Token, tokenMedia db.TokenM
 		// In the worse case the processing message was dropped and the token never gets handled. To address that,
 		// we compare when the token was created to the current time. If it's longer than the grace period, we assume that the
 		// message was lost and set the media to invalid so it could be refreshed manually.
-		if inFlight := publicapi.For(ctx).Token.GetProcessingStateByID(ctx, token.ID); !inFlight {
+		if inFlight, err := publicapi.For(ctx).Token.GetProcessingState(ctx, token.ID); !inFlight || err != nil {
 			if time.Since(token.CreatedAt) > time.Duration(1*time.Hour) {
 				tokenMedia.Media.MediaType = persist.MediaTypeInvalid
 			}
@@ -2008,7 +2007,7 @@ func resolveTokenMedia(ctx context.Context, token db.Token, tokenMedia db.TokenM
 
 	// If the media isn't valid, check if its still up for processing. If so, set the media as syncing.
 	if tokenMedia.Media.MediaType != persist.MediaTypeSyncing && !tokenMedia.Media.MediaType.IsValid() {
-		if inFlight := publicapi.For(ctx).Token.GetProcessingStateByID(ctx, token.ID); inFlight {
+		if inFlight, _ := publicapi.For(ctx).Token.GetProcessingState(ctx, token.ID); inFlight {
 			tokenMedia.Media.MediaType = persist.MediaTypeSyncing
 		}
 	}

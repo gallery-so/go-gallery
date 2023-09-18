@@ -151,6 +151,11 @@ type HelperPostData struct {
 	AuthorID persist.DBID
 }
 
+type HelperPostComposerDraftDetailsPayloadData struct {
+	Token      persist.TokenIdentifiers
+	ContractID persist.DBID
+}
+
 type ErrInvalidIDFormat struct {
 	message string
 }

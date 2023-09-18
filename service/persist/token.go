@@ -8,6 +8,7 @@ import (
 	"io"
 	"math/big"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -359,9 +360,7 @@ type TokenRepository interface {
 	GetByWallet(context.Context, EthereumAddress, int64, int64) ([]Token, []Contract, error)
 	GetByContract(context.Context, EthereumAddress, int64, int64) ([]Token, error)
 	GetOwnedByContract(context.Context, EthereumAddress, EthereumAddress, int64, int64) ([]Token, Contract, error)
-	GetByTokenIdentifiers(context.Context, TokenID, EthereumAddress, int64, int64) ([]Token, error)
 	GetURIByTokenIdentifiers(context.Context, TokenID, EthereumAddress) (TokenURI, error)
-	GetByIdentifiers(context.Context, TokenID, EthereumAddress, EthereumAddress) (Token, error)
 	DeleteByID(context.Context, DBID) error
 	BulkUpsert(context.Context, []Token) error
 	Upsert(context.Context, Token) error
@@ -372,15 +371,7 @@ type TokenRepository interface {
 
 // ErrTokenNotFoundByTokenIdentifiers is an error that is returned when a token is not found by its identifiers (token ID and contract address)
 type ErrTokenNotFoundByTokenIdentifiers struct {
-	TokenID         TokenID
-	ContractAddress EthereumAddress
-}
-
-// ErrTokenNotFoundByIdentifiers is an error that is returned when a token is not found by its identifiers (token ID and contract address and owner address)
-type ErrTokenNotFoundByIdentifiers struct {
-	TokenID         TokenID
-	ContractAddress EthereumAddress
-	OwnerAddress    EthereumAddress
+	Token TokenIdentifiers
 }
 
 // ErrTokenNotFoundByID is an error that is returned when a token is not found by its ID
@@ -388,11 +379,9 @@ type ErrTokenNotFoundByID struct {
 	ID DBID
 }
 
-type ErrTokenNotFoundByHolderIdentifiers struct {
-	HolderID        DBID
-	TokenID         TokenID
-	ContractAddress Address
-	Chain           Chain
+type ErrTokenNotFoundByUserTokenIdentifers struct {
+	UserID DBID
+	Token  TokenIdentifiers
 }
 
 type ErrTokensNotFoundByTokenID struct {
@@ -407,8 +396,8 @@ func (e ErrTokenNotFoundByID) Error() string {
 	return fmt.Sprintf("token not found by ID: %s", e.ID)
 }
 
-func (e ErrTokenNotFoundByHolderIdentifiers) Error() string {
-	return fmt.Sprintf("token not found by holder ID: %s, chain: %d, contract address: %s, and token ID: %s", e.HolderID, e.Chain, e.ContractAddress, e.TokenID)
+func (e ErrTokenNotFoundByUserTokenIdentifers) Error() string {
+	return fmt.Sprintf("token not found by user ID: %s and identifiers: %s", e.UserID, e.Token.String())
 }
 
 func (e ErrTokensNotFoundByTokenID) Error() string {
@@ -420,11 +409,7 @@ func (e ErrTokensNotFoundByContract) Error() string {
 }
 
 func (e ErrTokenNotFoundByTokenIdentifiers) Error() string {
-	return fmt.Sprintf("token not found with contract address %s and token ID %s", e.ContractAddress, e.TokenID)
-}
-
-func (e ErrTokenNotFoundByIdentifiers) Error() string {
-	return fmt.Sprintf("token not found with contract address %s and token ID %s and owner address %s", e.ContractAddress, e.TokenID, e.OwnerAddress)
+	return fmt.Sprintf("token not found by identifiers: %s", e.Token.String())
 }
 
 // NormalizeAddress normalizes an address for the given chain
@@ -698,6 +683,30 @@ func (id TokenID) Base10String() string {
 // ToInt returns the token ID as a base 10 integer
 func (id TokenID) ToInt() int64 {
 	return id.BigInt().Int64()
+}
+
+// UnmarshalGQL implements the graphql.Unmarshaler interface
+func (id *TokenID) UnmarshalGQL(v any) error {
+	if val, ok := v.(string); ok {
+		// Assume its in hexadecimal
+		if strings.HasPrefix(val, "0x") {
+			*id = TokenID(TokenID(val).String())
+			return nil
+		}
+		// Assume its in decimal
+		asInt, err := strconv.Atoi(val)
+		if err != nil {
+			return fmt.Errorf("failed to convert %s; prepend with '0x' if val is in hex", val)
+		}
+		*id = TokenID(fmt.Sprintf("%x", asInt))
+	}
+	return nil
+}
+
+// MarshalGQL implements the graphql.Marshaler interface
+func (id TokenID) MarshalGQL(w io.Writer) {
+	p := "0x" + id.String()
+	w.Write([]byte(fmt.Sprintf(`"%s"`, p)))
 }
 
 func (hex HexString) String() string {

@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gammazero/workerpool"
 	"github.com/go-playground/validator/v10"
+	"github.com/jackc/pgx/v4"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/event"
@@ -74,8 +75,8 @@ func (api TokenAPI) GetTokenByEnsDomain(ctx context.Context, userID persist.DBID
 		return db.Token{}, err
 	}
 
-	return api.loaders.TokenByHolderIDContractAddressAndTokenID.Load(db.GetTokenByHolderIdContractAddressAndTokenIdBatchParams{
-		HolderID:        userID,
+	return api.loaders.TokenByUserTokenIdentifiers.Load(db.GetTokenByUserTokenIdentifiersBatchParams{
+		OwnerID:         userID,
 		TokenID:         persist.TokenID(tokenID),
 		ContractAddress: eth.EnsAddress,
 		Chain:           persist.ChainETH,
@@ -526,6 +527,57 @@ func (api TokenAPI) MediaByTokenID(ctx context.Context, tokenID persist.DBID) (d
 	return api.loaders.MediaByTokenID.Load(tokenID)
 }
 
+// MediaByTokenIdentifiers returns media for a token and optionally returns a token instance with fallback media matching the identifiers if any exists.
+func (api TokenAPI) MediaByTokenIdentifiers(ctx context.Context, tokenIdentifiers persist.TokenIdentifiers) (db.TokenMedia, db.Token, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"address": validate.WithTag(tokenIdentifiers.ContractAddress, "required"),
+		"tokenID": validate.WithTag(tokenIdentifiers.TokenID, "required"),
+	}); err != nil {
+		return db.TokenMedia{}, db.Token{}, err
+	}
+
+	// Check if the user is logged in, and if so sort results by prioritizing results specific to the user first
+	userID, _ := getAuthenticatedUserID(ctx)
+
+	// This query only returns a row if there is matching media, and it may not have a token instance even if it did return a row
+	media, err := api.queries.GetMediaByUserTokenIdentifiers(ctx, db.GetMediaByUserTokenIdentifiersParams{
+		UserID:  userID,
+		Chain:   tokenIdentifiers.Chain,
+		Address: tokenIdentifiers.ContractAddress,
+		TokenID: tokenIdentifiers.TokenID,
+	})
+
+	// Got media and a token instance
+	if err == nil && media.TokenInstanceID != "" {
+		token, err := api.GetTokenById(ctx, media.TokenInstanceID)
+		if err != nil || token == nil {
+			return media.TokenMedia, db.Token{}, err
+		}
+		return media.TokenMedia, *token, err
+	}
+
+	// Unexpected error
+	if err != nil && err != pgx.ErrNoRows {
+		return db.TokenMedia{}, db.Token{}, err
+	}
+
+	// Try to find a suitable instance with fallback media
+	token, err := api.queries.GetFallbackTokenByUserTokenIdentifiers(ctx, db.GetFallbackTokenByUserTokenIdentifiersParams{
+		UserID:  userID,
+		Chain:   tokenIdentifiers.Chain,
+		Address: tokenIdentifiers.ContractAddress,
+		TokenID: tokenIdentifiers.TokenID,
+	})
+
+	// Unexpected error
+	if err != nil && err != pgx.ErrNoRows {
+		return media.TokenMedia, db.Token{}, err
+	}
+
+	return media.TokenMedia, token, nil
+}
+
 func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (db.Event, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
@@ -572,7 +624,16 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collect
 	return db.Event{}, nil
 }
 
-// GetProcessingStateByID returns true if a token is queued for processing, or is currently being processed.
-func (api TokenAPI) GetProcessingStateByID(ctx context.Context, tokenID persist.DBID) bool {
-	return api.manager.Processing(ctx, tokenID)
+// GetProcessingState returns true if a token is queued for processing, or is currently being processed.
+func (api TokenAPI) GetProcessingState(ctx context.Context, tokenID persist.DBID) (bool, error) {
+	token, err := api.loaders.TokenByTokenID.Load(tokenID)
+	if err != nil {
+		return false, err
+	}
+	contract, err := api.loaders.ContractByContractID.Load(token.Contract)
+	if err != nil {
+		return false, err
+	}
+	t := persist.NewTokenIdentifiers(contract.Address, token.TokenID, contract.Chain)
+	return api.manager.Processing(ctx, t), nil
 }

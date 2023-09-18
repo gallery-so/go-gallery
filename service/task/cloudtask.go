@@ -39,18 +39,23 @@ type TokenProcessingUserMessage struct {
 	TokenIDs []persist.DBID `json:"token_ids" binding:"required"`
 }
 
-type TokenProcessingTokenInstanceMessage struct {
-	TokenDBID persist.DBID `json:"token_dbid" binding:"required"`
-	Attempts  int          `json:"attempts" binding:"required"`
-}
-
 type TokenProcessingContractTokensMessage struct {
 	ContractID   persist.DBID `json:"contract_id" binding:"required"`
 	ForceRefresh bool         `json:"force_refresh"`
 }
 
+type TokenProcessingTokenMessage struct {
+	Token    persist.TokenIdentifiers `json:"token" binding:"required"`
+	Attempts int                      `json:"attempts" binding:"required"`
+}
+
 type AddEmailToMailingListMessage struct {
 	UserID persist.DBID `json:"user_id" binding:"required"`
+}
+
+type PostPreflightMessage struct {
+	Token  persist.TokenIdentifiers `json:"token" binding:"required"`
+	UserID persist.DBID             `json:"user_id"`
 }
 
 type TokenIdentifiersQuantities map[persist.TokenUniqueIdentifiers]persist.HexString
@@ -161,11 +166,11 @@ func CreateTaskForUserTokenProcessing(ctx context.Context, message TokenProcessi
 	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span))
 }
 
-func CreateTaskForTokenInstanceTokenProcessing(ctx context.Context, message TokenProcessingTokenInstanceMessage, client *gcptasks.Client, delay time.Duration) error {
-	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForTokenInstanceTokenProcessing")
+func CreateTaskForTokenTokenProcessing(ctx context.Context, message TokenProcessingTokenMessage, client *gcptasks.Client, delay time.Duration) error {
+	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForTokenTokenProcessing")
 	defer tracing.FinishSpan(span)
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
-	url := fmt.Sprintf("%s/media/process/token-id", env.GetString("TOKEN_PROCESSING_URL"))
+	url := fmt.Sprintf("%s/media/tokenmanage/process/token", env.GetString("TOKEN_PROCESSING_URL"))
 	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span), withScheduleOn(time.Now().Add(delay)))
 }
 
@@ -186,6 +191,14 @@ func CreateTaskForAddingEmailToMailingList(ctx context.Context, message AddEmail
 	url := fmt.Sprintf("%s/send/process/add-to-mailing-list", env.GetString("EMAILS_HOST"))
 	secret := env.GetString("EMAILS_TASK_SECRET")
 	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span), withBasicAuth(secret))
+}
+
+func CreateTaskForPostPreflight(ctx context.Context, message PostPreflightMessage, client *gcptasks.Client) error {
+	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForPostPreflight")
+	defer tracing.FinishSpan(span)
+	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
+	url := fmt.Sprintf("%s/media/process/post-preflight", env.GetString("TOKEN_PROCESSING_URL"))
+	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span))
 }
 
 // NewClient returns a new task client with tracing enabled.

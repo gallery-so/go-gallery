@@ -191,6 +191,10 @@ type OptOutForRolesPayloadOrError interface {
 	IsOptOutForRolesPayloadOrError()
 }
 
+type PostComposerDraftDetailsPayloadOrError interface {
+	IsPostComposerDraftDetailsPayloadOrError()
+}
+
 type PostOrError interface {
 	IsPostOrError()
 }
@@ -213,6 +217,14 @@ type PublishGalleryPayloadOrError interface {
 
 type RedeemMerchPayloadOrError interface {
 	IsRedeemMerchPayloadOrError()
+}
+
+type ReferralPostPreflightPayloadOrError interface {
+	IsReferralPostPreflightPayloadOrError()
+}
+
+type ReferralPostTokenPayloadOrError interface {
+	IsReferralPostTokenPayloadOrError()
 }
 
 type RefreshCollectionPayloadOrError interface {
@@ -529,6 +541,12 @@ type BanUserFromFeedPayload struct {
 }
 
 func (BanUserFromFeedPayload) IsBanUserFromFeedPayloadOrError() {}
+
+type ChainAddressTokenInput struct {
+	ChainAddress *persist.ChainAddress `json:"chainAddress"`
+	// Refers to the id of the token in the contract either in decimal, or interpreted as hexadecimal when prefixed with '0x'
+	TokenID persist.TokenID `json:"tokenId"`
+}
 
 type ChainTokens struct {
 	Chain  *persist.Chain `json:"chain"`
@@ -992,6 +1010,7 @@ func (ErrInvalidInput) IsMerchTokensPayloadOrError()                     {}
 func (ErrInvalidInput) IsSearchUsersPayloadOrError()                     {}
 func (ErrInvalidInput) IsSearchGalleriesPayloadOrError()                 {}
 func (ErrInvalidInput) IsSearchCommunitiesPayloadOrError()               {}
+func (ErrInvalidInput) IsPostComposerDraftDetailsPayloadOrError()        {}
 func (ErrInvalidInput) IsCreateCollectionPayloadOrError()                {}
 func (ErrInvalidInput) IsDeleteCollectionPayloadOrError()                {}
 func (ErrInvalidInput) IsUpdateCollectionInfoPayloadOrError()            {}
@@ -1043,10 +1062,12 @@ func (ErrInvalidInput) IsDisconnectSocialAccountPayloadOrError()         {}
 func (ErrInvalidInput) IsFollowAllSocialConnectionsPayloadOrError()      {}
 func (ErrInvalidInput) IsSetProfileImagePayloadOrError()                 {}
 func (ErrInvalidInput) IsPostTokensPayloadOrError()                      {}
+func (ErrInvalidInput) IsReferralPostTokenPayloadOrError()               {}
 func (ErrInvalidInput) IsAdmirePostPayloadOrError()                      {}
 func (ErrInvalidInput) IsAdmireTokenPayloadOrError()                     {}
 func (ErrInvalidInput) IsCommentOnPostPayloadOrError()                   {}
 func (ErrInvalidInput) IsDeletePostPayloadOrError()                      {}
+func (ErrInvalidInput) IsReferralPostPreflightPayloadOrError()           {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -1128,6 +1149,7 @@ func (ErrNotAuthorized) IsFollowAllSocialConnectionsPayloadOrError()           {
 func (ErrNotAuthorized) IsGenerateQRCodeLoginTokenPayloadOrError()             {}
 func (ErrNotAuthorized) IsSetProfileImagePayloadOrError()                      {}
 func (ErrNotAuthorized) IsPostTokensPayloadOrError()                           {}
+func (ErrNotAuthorized) IsReferralPostTokenPayloadOrError()                    {}
 func (ErrNotAuthorized) IsAdmirePostPayloadOrError()                           {}
 func (ErrNotAuthorized) IsAdmireTokenPayloadOrError()                          {}
 func (ErrNotAuthorized) IsCommentOnPostPayloadOrError()                        {}
@@ -1174,12 +1196,13 @@ type ErrTokenNotFound struct {
 	Message string `json:"message"`
 }
 
-func (ErrTokenNotFound) IsTokenByIDOrError()              {}
-func (ErrTokenNotFound) IsError()                         {}
-func (ErrTokenNotFound) IsCollectionTokenByIDOrError()    {}
-func (ErrTokenNotFound) IsViewTokenPayloadOrError()       {}
-func (ErrTokenNotFound) IsSetProfileImagePayloadOrError() {}
-func (ErrTokenNotFound) IsAdmireTokenPayloadOrError()     {}
+func (ErrTokenNotFound) IsTokenByIDOrError()                {}
+func (ErrTokenNotFound) IsError()                           {}
+func (ErrTokenNotFound) IsCollectionTokenByIDOrError()      {}
+func (ErrTokenNotFound) IsViewTokenPayloadOrError()         {}
+func (ErrTokenNotFound) IsSetProfileImagePayloadOrError()   {}
+func (ErrTokenNotFound) IsReferralPostTokenPayloadOrError() {}
+func (ErrTokenNotFound) IsAdmireTokenPayloadOrError()       {}
 
 type ErrUnknownAction struct {
 	Message string `json:"message"`
@@ -1702,6 +1725,20 @@ type PostCommentsConnection struct {
 	PageInfo *PageInfo          `json:"pageInfo"`
 }
 
+type PostComposerDraftDetailsInput struct {
+	Token *ChainAddressTokenInput `json:"token"`
+}
+
+type PostComposerDraftDetailsPayload struct {
+	HelperPostComposerDraftDetailsPayloadData
+	Media            MediaSubtype `json:"media"`
+	Community        *Community   `json:"community"`
+	TokenName        *string      `json:"tokenName"`
+	TokenDescription *string      `json:"tokenDescription"`
+}
+
+func (PostComposerDraftDetailsPayload) IsPostComposerDraftDetailsPayloadOrError() {}
+
 type PostEdge struct {
 	Node   PostOrError `json:"node"`
 	Cursor *string     `json:"cursor"`
@@ -1780,6 +1817,27 @@ type RedeemMerchPayload struct {
 }
 
 func (RedeemMerchPayload) IsRedeemMerchPayloadOrError() {}
+
+type ReferralPostPreflightInput struct {
+	Token *ChainAddressTokenInput `json:"token"`
+}
+
+type ReferralPostPreflightPayload struct {
+	Accepted bool `json:"accepted"`
+}
+
+func (ReferralPostPreflightPayload) IsReferralPostPreflightPayloadOrError() {}
+
+type ReferralPostTokenInput struct {
+	Token   *ChainAddressTokenInput `json:"token"`
+	Caption *string                 `json:"caption"`
+}
+
+type ReferralPostTokenPayload struct {
+	Post *Post `json:"post"`
+}
+
+func (ReferralPostTokenPayload) IsReferralPostTokenPayloadOrError() {}
 
 type RefreshCollectionPayload struct {
 	Collection *Collection `json:"collection"`

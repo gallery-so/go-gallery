@@ -1433,6 +1433,34 @@ func (r *mutationResolver) PostTokens(ctx context.Context, input model.PostToken
 	return output, nil
 }
 
+// ReferralPostToken is the resolver for the referralPostToken field.
+func (r *mutationResolver) ReferralPostToken(ctx context.Context, input model.ReferralPostTokenInput) (model.ReferralPostTokenPayloadOrError, error) {
+	token := persist.TokenIdentifiers{
+		Chain:           input.Token.ChainAddress.Chain(),
+		ContractAddress: input.Token.ChainAddress.Address(),
+		TokenID:         input.Token.TokenID,
+	}
+	id, err := publicapi.For(ctx).Feed.ReferralPostToken(ctx, token, input.Caption)
+	if err != nil {
+		return nil, err
+	}
+	post, err := resolvePostByPostID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return &model.ReferralPostTokenPayload{Post: post}, nil
+}
+
+// ReferralPostPreflight is the resolver for the referralPostPreflight field.
+func (r *mutationResolver) ReferralPostPreflight(ctx context.Context, input model.ReferralPostPreflightInput) (model.ReferralPostPreflightPayloadOrError, error) {
+	err := publicapi.For(ctx).Feed.ReferralPostPreflight(ctx, persist.TokenIdentifiers{
+		Chain:           input.Token.ChainAddress.Chain(),
+		ContractAddress: input.Token.ChainAddress.Address(),
+		TokenID:         input.Token.TokenID,
+	})
+	return &model.ReferralPostPreflightPayload{Accepted: err == nil}, err
+}
+
 // DeletePost is the resolver for the deletePost field.
 func (r *mutationResolver) DeletePost(ctx context.Context, postID persist.DBID) (model.DeletePostPayloadOrError, error) {
 	err := publicapi.For(ctx).Feed.DeletePostById(ctx, postID)
@@ -2067,6 +2095,20 @@ func (r *postResolver) ViewerAdmire(ctx context.Context, obj *model.Post) (*mode
 	return admireToModel(ctx, *admire), nil
 }
 
+// Community is the resolver for the community field.
+func (r *postComposerDraftDetailsPayloadResolver) Community(ctx context.Context, obj *model.PostComposerDraftDetailsPayload) (*model.Community, error) {
+	if obj.HelperPostComposerDraftDetailsPayloadData.ContractID != "" {
+		return resolveCommunityByID(ctx, obj.HelperPostComposerDraftDetailsPayloadData.ContractID)
+	}
+
+	if obj.HelperPostComposerDraftDetailsPayloadData.Token.ContractAddress != "" {
+		chainAddress := persist.NewChainAddress(obj.HelperPostComposerDraftDetailsPayloadData.Token.ContractAddress, obj.HelperPostComposerDraftDetailsPayloadData.Token.Chain)
+		return resolveCommunityByContractAddress(ctx, chainAddress, util.ToPointer(false))
+	}
+
+	return nil, nil
+}
+
 // Blurhash is the resolver for the blurhash field.
 func (r *previewURLSetResolver) Blurhash(ctx context.Context, obj *model.PreviewURLSet) (*string, error) {
 	mm := mediamapper.For(ctx)
@@ -2423,6 +2465,48 @@ func (r *queryResolver) TopCollectionsForCommunity(ctx context.Context, input mo
 		Edges:    edges,
 		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}, nil
+}
+
+// PostComposerDraftDetails is the resolver for the postComposerDraftDetails field.
+func (r *queryResolver) PostComposerDraftDetails(ctx context.Context, input model.PostComposerDraftDetailsInput) (model.PostComposerDraftDetailsPayloadOrError, error) {
+	token := persist.TokenIdentifiers{
+		Chain:           input.Token.ChainAddress.Chain(),
+		ContractAddress: input.Token.ChainAddress.Address(),
+		TokenID:         input.Token.TokenID,
+	}
+
+	media, t, err := publicapi.For(ctx).Token.MediaByTokenIdentifiers(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	tokenName := t.Name.String
+	if media.ID != "" && media.Name != "" {
+		tokenName = media.Name
+	}
+
+	tokenDescription := t.Description.String
+	if media.ID != "" && media.Description != "" {
+		tokenDescription = media.Description
+	}
+
+	contractID := t.Contract
+	if media.ID != "" && media.ContractID != "" {
+		contractID = media.ContractID
+	}
+
+	highDef := false
+
+	return model.PostComposerDraftDetailsPayload{
+		Media:            resolveTokenMedia(ctx, t, media, highDef),
+		TokenName:        util.ToPointer(tokenName),
+		TokenDescription: util.ToPointer(tokenDescription),
+		Community:        nil, // handled by dedicated resolver
+		HelperPostComposerDraftDetailsPayloadData: model.HelperPostComposerDraftDetailsPayloadData{
+			Token:      token,
+			ContractID: contractID,
+		},
+	}, err
 }
 
 // FeedEvent is the resolver for the feedEvent field.
@@ -2960,6 +3044,11 @@ func (r *Resolver) OwnerAtBlock() generated.OwnerAtBlockResolver { return &owner
 // Post returns generated.PostResolver implementation.
 func (r *Resolver) Post() generated.PostResolver { return &postResolver{r} }
 
+// PostComposerDraftDetailsPayload returns generated.PostComposerDraftDetailsPayloadResolver implementation.
+func (r *Resolver) PostComposerDraftDetailsPayload() generated.PostComposerDraftDetailsPayloadResolver {
+	return &postComposerDraftDetailsPayloadResolver{r}
+}
+
 // PreviewURLSet returns generated.PreviewURLSetResolver implementation.
 func (r *Resolver) PreviewURLSet() generated.PreviewURLSetResolver { return &previewURLSetResolver{r} }
 
@@ -3101,6 +3190,7 @@ type mutationResolver struct{ *Resolver }
 type newTokensNotificationResolver struct{ *Resolver }
 type ownerAtBlockResolver struct{ *Resolver }
 type postResolver struct{ *Resolver }
+type postComposerDraftDetailsPayloadResolver struct{ *Resolver }
 type previewURLSetResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type removeAdmirePayloadResolver struct{ *Resolver }

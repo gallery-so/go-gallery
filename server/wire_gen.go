@@ -152,7 +152,7 @@ var (
 
 // arbitrumProvidersConfig is a wire injector that binds multichain interfaces to their concrete Arbitrum implementations
 func arbitrumProvidersConfig(arbitrumProvider2 *arbitrumProvider, openseaProvider *opensea.Provider) arbitrumProviderList {
-	serverArbitrumProviderList := arbitrumRequirements(arbitrumProvider2, arbitrumProvider2, arbitrumProvider2, openseaProvider)
+	serverArbitrumProviderList := arbitrumRequirements(arbitrumProvider2, arbitrumProvider2, arbitrumProvider2, openseaProvider, arbitrumProvider2)
 	return serverArbitrumProviderList
 }
 
@@ -341,8 +341,9 @@ func arbitrumRequirements(
 	toc multichain.TokensContractFetcher,
 	tmf multichain.TokenMetadataFetcher, opensea2 multichain.OpenSeaChildContractFetcher,
 
+	tdf multichain.TokenDescriptorsFetcher,
 ) arbitrumProviderList {
-	return arbitrumProviderList{tof, toc, tmf, opensea2}
+	return arbitrumProviderList{tof, toc, tmf, opensea2, tdf}
 }
 
 // poapRequirements is the set of provider interfaces required for POAP
@@ -471,10 +472,10 @@ func newTokenProcessingCache() *redis.Cache {
 }
 
 func newManagedTokens(ctx context.Context, tm *tokenmanage.Manager) multichain.SubmitUserTokensF {
-	return func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID) error {
+	return func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, tokens []persist.TokenIdentifiers) error {
 		if len(tokenIDs) == 0 {
 			return nil
 		}
-		return tm.SubmitUser(ctx, userID, tokenIDs)
+		return tm.SubmitUser(ctx, userID, tokenIDs, tokens)
 	}
 }

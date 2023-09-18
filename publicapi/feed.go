@@ -10,31 +10,37 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
-	"github.com/mikeydub/go-gallery/service/redis"
-	"github.com/mikeydub/go-gallery/validate"
-
+	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
+
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/recommend"
 	"github.com/mikeydub/go-gallery/service/recommend/userpref"
+	"github.com/mikeydub/go-gallery/service/redis"
+	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/util/retry"
+	"github.com/mikeydub/go-gallery/validate"
 )
 
 const tHalf = math.Ln2 / 0.002 // half-life of approx 6 hours
 
 type FeedAPI struct {
-	repos     *postgres.Repositories
-	queries   *db.Queries
-	loaders   *dataloader.Loaders
-	validator *validator.Validate
-	ethClient *ethclient.Client
-	cache     *redis.Cache
+	repos              *postgres.Repositories
+	queries            *db.Queries
+	loaders            *dataloader.Loaders
+	validator          *validator.Validate
+	ethClient          *ethclient.Client
+	cache              *redis.Cache
+	taskClient         *gcptasks.Client
+	multichainProvider *multichain.Provider
 }
 
 func (api FeedAPI) BlockUser(ctx context.Context, userId persist.DBID, action persist.Action) error {
@@ -144,6 +150,92 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, capt
 		return "", err
 	}
 	return id, nil
+}
+
+func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentifiers, caption *string) (persist.DBID, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"token": validate.WithTag(t, "required"),
+		// caption can be null but less than 600 chars
+		"caption": validate.WithTag(caption, "max=600"),
+	}); err != nil {
+		return "", err
+	}
+
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	user, err := api.repos.UserRepository.GetByID(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+
+	var c sql.NullString
+
+	if caption != nil {
+		c = sql.NullString{
+			String: *caption,
+			Valid:  true,
+		}
+	}
+
+	token, err := api.loaders.TokenByUserTokenIdentifiers.Load(db.GetTokenByUserTokenIdentifiersBatchParams{
+		OwnerID:         user.ID,
+		TokenID:         t.TokenID,
+		ContractAddress: t.ContractAddress,
+		Chain:           t.Chain,
+	})
+
+	// The token is already synced
+	if err == nil {
+		contract, err := api.queries.GetContractByID(ctx, token.Contract)
+		if err != nil {
+			return "", err
+		}
+		return api.queries.InsertPost(ctx, db.InsertPostParams{
+			ID:          persist.GenerateID(),
+			TokenIds:    []persist.DBID{token.ID},
+			ContractIds: []persist.DBID{contract.ID},
+			ActorID:     user.ID,
+			Caption:     c,
+		})
+	}
+
+	// Unexpected error
+	if err != nil && !util.ErrorAs[persist.ErrTokenNotFoundByUserTokenIdentifers](err) {
+		return "", err
+	}
+
+	// The token is not synced, so we need to find it
+	synced, err := api.multichainProvider.SyncTokenByUserWalletsAndTokenIdentifiersRetry(ctx, user, t, retry.Retry{
+		Base:  2,
+		Cap:   8,
+		Tries: 4,
+	})
+	if err != nil {
+		return "", err
+	}
+	return api.queries.InsertPost(ctx, db.InsertPostParams{
+		ID:          persist.GenerateID(),
+		TokenIds:    []persist.DBID{synced.ID},
+		ContractIds: []persist.DBID{synced.Contract},
+		ActorID:     user.ID,
+		Caption:     c,
+	})
+}
+
+func (api FeedAPI) ReferralPostPreflight(ctx context.Context, t persist.TokenIdentifiers) error {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"address": validate.WithTag(t.ContractAddress, "required"),
+		"tokenID": validate.WithTag(t.TokenID, "required"),
+	}); err != nil {
+		return err
+	}
+	userID, _ := getAuthenticatedUserID(ctx)
+	return task.CreateTaskForPostPreflight(ctx, task.PostPreflightMessage{Token: t, UserID: userID}, api.taskClient)
 }
 
 func (api FeedAPI) DeletePostById(ctx context.Context, postID persist.DBID) error {

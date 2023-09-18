@@ -88,11 +88,17 @@ select tm.* from tokens join token_medias tm on tokens.token_media_id = tm.id wh
 -- name: GetTokenByIdBatch :batchone
 select * from tokens where id = $1 and displayable and deleted = false;
 
--- name: GetTokenByHolderIdContractAddressAndTokenIdBatch :batchone
+-- name: GetTokenByUserTokenIdentifiersBatch :batchone
 select t.*
 from tokens t
 join contracts c on t.contract = c.id
-where t.owner_user_id = @holder_id and t.token_id = @token_id and c.address = @contract_address and c.chain = @chain and t.displayable and not t.deleted and not c.deleted;
+where t.owner_user_id = @owner_id and t.token_id = @token_id and c.address = @contract_address and c.chain = @chain and t.displayable and not t.deleted and not c.deleted;
+
+-- name: GetTokenByUserTokenIdentifiers :one
+select t.*
+from tokens t
+join contracts c on t.contract = c.id
+where t.owner_user_id = @owner_id and t.token_id = @token_id and c.address = @contract_address and c.chain = @chain and t.displayable and not t.deleted and not c.deleted;
 
 -- name: GetTokensByCollectionIdBatch :batchmany
 select t.* from collections c,
@@ -1157,7 +1163,7 @@ with insert_job(id) as (
 insert_media_move_active_record(last_updated) as (
     insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
     (
-        select @copy_media_id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, now()
+        select @retired_media_id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, now()
         from token_medias
         where contract_id = @contract_id
             and token_id = @token_id
@@ -1170,7 +1176,7 @@ insert_media_move_active_record(last_updated) as (
     returning last_updated
 ),
 -- Update the existing active record with the new media data
-insert_media_add_record(insert_id, active, is_new) as (
+insert_media_add_record(insert_id, active, replaced_current) as (
     insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
     values (@new_media_id, @contract_id, @token_id, @chain, @metadata, @media, @name, @description, (select id from insert_job), @active,
         -- Using timestamps generated from insert_media_move_active_record ensures that the new record is only inserted after the current media is moved
@@ -1180,11 +1186,11 @@ insert_media_add_record(insert_id, active, is_new) as (
     on conflict (contract_id, token_id, chain) where active and not deleted do update
         set metadata = excluded.metadata,
             media = excluded.media,
-            name = excluded.name,
-            description = excluded.description,
+            name = coalesce(nullif(excluded.name, ''), token_medias.name),
+            description = coalesce(nullif(excluded.description, ''), token_medias.description),
             processing_job_id = excluded.processing_job_id,
             last_updated = now()
-    returning id as insert_id, active, id = @new_media_id is_new
+    returning id as insert_id, active, id = @new_media_id replaced_current
 ),
 -- This will return the existing active record if it exists. If the incoming record is active,
 -- this will still return the active record before the update, and not the new record.
@@ -1215,11 +1221,11 @@ where
         -- The case statement below handles which token instances get updated:
         case
             -- If the active media already existed, update tokens that have no media (new tokens that haven't been processed before) or tokens that don't use this media yet
-            when insert_medias.active and not insert_medias.is_new
+            when insert_medias.active and not insert_medias.replaced_current
             then (tokens.token_media_id is null or tokens.token_media_id != insert_medias.insert_id)
 
             -- Brand new active media, update all tokens in the filter to use this media
-            when insert_medias.active and insert_medias.is_new
+            when insert_medias.active and insert_medias.replaced_current
             then 1 = 1
 
             -- The pipeline run produced inactive media, only update the token instance (since it may have not been processed before)
@@ -1342,6 +1348,36 @@ select m.*
 from token_medias m
 where m.id = (select token_media_id from tokens where tokens.id = $1) and not m.deleted;
 
+-- name: GetMediaByUserTokenIdentifiers :one
+with contract as (
+	select * from contracts where contracts.chain = @chain and contracts.address = @address and not contracts.deleted
+),
+matching_media as (
+	select token_medias.*
+	from token_medias, contract
+	where token_medias.contract_id = contract.id and token_medias.chain = @chain and token_medias.token_id = @token_id and not token_medias.deleted
+	order by token_medias.active desc, token_medias.last_updated desc
+	limit 1
+),
+matched_token(id) as (
+    select tokens.id
+    from tokens, contract, matching_media
+    where tokens.contract = contract.id and tokens.chain = @chain and tokens.token_id = @token_id and not tokens.deleted
+    order by tokens.owner_user_id = @user_id desc, tokens.token_media_id = matching_media.id desc, tokens.last_updated desc
+    limit 1
+)
+select sqlc.embed(token_medias), (select id from matched_token) token_instance_id from matching_media token_medias;
+
+-- name: GetFallbackTokenByUserTokenIdentifiers :one
+with contract as (
+	select * from contracts where contracts.chain = @chain and contracts.address = @address and not contracts.deleted
+)
+select tokens.*
+from tokens, contract
+where tokens.contract = contract.id and tokens.chain = contract.chain and tokens.token_id = @token_id and not tokens.deleted
+order by tokens.owner_user_id = @user_id desc, nullif(tokens.fallback_media->>'image_url', '') asc, tokens.last_updated desc
+limit 1;
+
 -- name: UpsertSession :one
 insert into sessions (id, user_id,
                       created_at, created_with_user_agent, created_with_platform, created_with_os,
@@ -1362,13 +1398,13 @@ update sessions set invalidated = true, active_until = least(active_until, now()
 
 -- name: UpdateTokenMetadataFieldsByTokenIdentifiers :exec
 update tokens
-    set name = @name,
-        description = @description,
-        last_updated = now()
-    where token_id = @token_id
-      and contract = @contract_id
-      and chain = @chain
-      and deleted = false;
+set name = @name,
+    description = @description,
+    last_updated = now()
+where token_id = @token_id
+    and contract = @contract_id
+    and chain = @chain
+    and deleted = false;
 
 -- name: GetTopCollectionsForCommunity :many
 with contract_tokens as (
