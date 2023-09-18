@@ -1274,7 +1274,6 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 }
 
 // RefreshTokenDescriptorsByTokenIdentifiers will refresh the token descriptors for a token by its identifiers.
-// It returns a slice of updated token DBIDs if any, and the DBID of the updated contract.
 func (p *Provider) RefreshTokenDescriptorsByTokenIdentifiers(ctx context.Context, ti persist.TokenIdentifiers) error {
 	finalTokenDescriptors := ChainAgnosticTokenDescriptors{}
 	finalContractDescriptors := ChainAgnosticContractDescriptors{}

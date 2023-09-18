@@ -1440,7 +1440,7 @@ func (r *mutationResolver) ReferralPostToken(ctx context.Context, input model.Re
 		ContractAddress: input.Token.ChainAddress.Address(),
 		TokenID:         input.Token.TokenID,
 	}
-	id, err := publicapi.For(ctx).Feed.PostTokenReferral(ctx, token, input.Caption)
+	id, err := publicapi.For(ctx).Feed.ReferralPostToken(ctx, token, input.Caption)
 	if err != nil {
 		return nil, err
 	}

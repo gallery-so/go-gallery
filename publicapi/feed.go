@@ -152,7 +152,7 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, capt
 	return id, nil
 }
 
-func (api FeedAPI) PostTokenReferral(ctx context.Context, t persist.TokenIdentifiers, caption *string) (persist.DBID, error) {
+func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentifiers, caption *string) (persist.DBID, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"token": validate.WithTag(t, "required"),
