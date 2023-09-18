@@ -2120,7 +2120,7 @@ with contract as (
 select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id, tokens.is_creator_token, tokens.is_holder_token, tokens.displayable
 from tokens, contract
 where tokens.contract = contract.id and tokens.chain = contract.chain and tokens.token_id = $1 and not tokens.deleted
-order by tokens.owner_user_id = $2 desc, tokens.last_updated desc
+order by tokens.owner_user_id = $2 desc, nullif(tokens.fallback_media->>'image_url', '') asc, tokens.last_updated desc
 limit 1
 `
 
@@ -2521,7 +2521,7 @@ const getMediaByUserTokenIdentifiers = `-- name: GetMediaByUserTokenIdentifiers 
 with contract as (
 	select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id, override_creator_user_id from contracts where contracts.chain = $1 and contracts.address = $2 and not contracts.deleted
 ),
-matching_medias as (
+matching_media as (
 	select token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.contract_id, token_medias.token_id, token_medias.chain, token_medias.active, token_medias.metadata, token_medias.media, token_medias.name, token_medias.description, token_medias.processing_job_id, token_medias.deleted
 	from token_medias, contract
 	where token_medias.contract_id = contract.id and token_medias.chain = $1 and token_medias.token_id = $3 and not token_medias.deleted
@@ -2530,12 +2530,12 @@ matching_medias as (
 ),
 matched_token(id) as (
     select tokens.id
-    from tokens, contract, token_medias
+    from tokens, contract, matching_media
     where tokens.contract = contract.id and tokens.chain = $1 and tokens.token_id = $3 and not tokens.deleted
-    order by tokens.owner_user_id = $4 desc, tokens.token_media_id = token_medias.id desc, tokens.last_updated desc
+    order by tokens.owner_user_id = $4 desc, tokens.token_media_id = matching_media.id desc, tokens.last_updated desc
     limit 1
 )
-select token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.contract_id, token_medias.token_id, token_medias.chain, token_medias.active, token_medias.metadata, token_medias.media, token_medias.name, token_medias.description, token_medias.processing_job_id, token_medias.deleted, (select id from matched_token) token_instance_id from matching_medias token_medias
+select token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.contract_id, token_medias.token_id, token_medias.chain, token_medias.active, token_medias.metadata, token_medias.media, token_medias.name, token_medias.description, token_medias.processing_job_id, token_medias.deleted, (select id from matched_token) token_instance_id from matching_media token_medias
 `
 
 type GetMediaByUserTokenIdentifiersParams struct {
@@ -6127,7 +6127,7 @@ func (q *Queries) UpdatePushTickets(ctx context.Context, arg UpdatePushTicketsPa
 	return err
 }
 
-const updateTokenMetadataFieldsByTokenIdentifiers = `-- name: UpdateTokenMetadataFieldsByTokenIdentifiers :many
+const updateTokenMetadataFieldsByTokenIdentifiers = `-- name: UpdateTokenMetadataFieldsByTokenIdentifiers :exec
 update tokens
 set name = $1,
     description = $2,
@@ -6136,7 +6136,6 @@ where token_id = $3
     and contract = $4
     and chain = $5
     and deleted = false
-returning tokens.id
 `
 
 type UpdateTokenMetadataFieldsByTokenIdentifiersParams struct {
@@ -6147,30 +6146,15 @@ type UpdateTokenMetadataFieldsByTokenIdentifiersParams struct {
 	Chain       persist.Chain   `json:"chain"`
 }
 
-func (q *Queries) UpdateTokenMetadataFieldsByTokenIdentifiers(ctx context.Context, arg UpdateTokenMetadataFieldsByTokenIdentifiersParams) ([]persist.DBID, error) {
-	rows, err := q.db.Query(ctx, updateTokenMetadataFieldsByTokenIdentifiers,
+func (q *Queries) UpdateTokenMetadataFieldsByTokenIdentifiers(ctx context.Context, arg UpdateTokenMetadataFieldsByTokenIdentifiersParams) error {
+	_, err := q.db.Exec(ctx, updateTokenMetadataFieldsByTokenIdentifiers,
 		arg.Name,
 		arg.Description,
 		arg.TokenID,
 		arg.ContractID,
 		arg.Chain,
 	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []persist.DBID
-	for rows.Next() {
-		var id persist.DBID
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		items = append(items, id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+	return err
 }
 
 const updateUserEmail = `-- name: UpdateUserEmail :exec

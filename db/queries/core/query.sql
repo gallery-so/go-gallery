@@ -1352,7 +1352,7 @@ where m.id = (select token_media_id from tokens where tokens.id = $1) and not m.
 with contract as (
 	select * from contracts where contracts.chain = @chain and contracts.address = @address and not contracts.deleted
 ),
-matching_medias as (
+matching_media as (
 	select token_medias.*
 	from token_medias, contract
 	where token_medias.contract_id = contract.id and token_medias.chain = @chain and token_medias.token_id = @token_id and not token_medias.deleted
@@ -1361,12 +1361,12 @@ matching_medias as (
 ),
 matched_token(id) as (
     select tokens.id
-    from tokens, contract, token_medias
+    from tokens, contract, matching_media
     where tokens.contract = contract.id and tokens.chain = @chain and tokens.token_id = @token_id and not tokens.deleted
-    order by tokens.owner_user_id = @user_id desc, tokens.token_media_id = token_medias.id desc, tokens.last_updated desc
+    order by tokens.owner_user_id = @user_id desc, tokens.token_media_id = matching_media.id desc, tokens.last_updated desc
     limit 1
 )
-select sqlc.embed(token_medias), (select id from matched_token) token_instance_id from matching_medias token_medias;
+select sqlc.embed(token_medias), (select id from matched_token) token_instance_id from matching_media token_medias;
 
 -- name: GetFallbackTokenByUserTokenIdentifiers :one
 with contract as (
@@ -1375,7 +1375,7 @@ with contract as (
 select tokens.*
 from tokens, contract
 where tokens.contract = contract.id and tokens.chain = contract.chain and tokens.token_id = @token_id and not tokens.deleted
-order by tokens.owner_user_id = @user_id desc, tokens.last_updated desc
+order by tokens.owner_user_id = @user_id desc, nullif(tokens.fallback_media->>'image_url', '') asc, tokens.last_updated desc
 limit 1;
 
 -- name: UpsertSession :one
@@ -1396,7 +1396,7 @@ insert into sessions (id, user_id,
 -- name: InvalidateSession :exec
 update sessions set invalidated = true, active_until = least(active_until, now()), last_updated = now() where id = @id and deleted = false and invalidated = false;
 
--- name: UpdateTokenMetadataFieldsByTokenIdentifiers :many
+-- name: UpdateTokenMetadataFieldsByTokenIdentifiers :exec
 update tokens
 set name = @name,
     description = @description,
@@ -1404,8 +1404,7 @@ set name = @name,
 where token_id = @token_id
     and contract = @contract_id
     and chain = @chain
-    and deleted = false
-returning tokens.id;
+    and deleted = false;
 
 -- name: GetTopCollectionsForCommunity :many
 with contract_tokens as (

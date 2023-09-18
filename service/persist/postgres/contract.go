@@ -45,7 +45,8 @@ func (c *ContractRepository) GetByAddress(pCtx context.Context, pAddress persist
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return persist.Contract{}, persist.ErrContractNotFoundByAddress{
-				Address: pAddress,
+				Address: persist.Address(pAddress),
+				Chain:   persist.ChainETH,
 			}
 		}
 		return persist.Contract{}, err

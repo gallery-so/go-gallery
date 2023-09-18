@@ -59,7 +59,7 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 					return err
 				}
 
-				contract, err := contractRepo.GetByID(reqCtx, token.Contract)
+				contract, err := contractRepo.GetByID(reqCtx, token.Contract.ID)
 				if err != nil {
 					logger.For(reqCtx).Errorf("error getting contract: %s", err)
 				}
@@ -109,7 +109,7 @@ func processMediaForTokenIdentifiers(tp *tokenProcessor, tokenRepo *postgres.Tok
 
 		token = tokens[0]
 
-		contract, err := contractRepo.GetByID(reqCtx, token.Contract)
+		contract, err := contractRepo.GetByID(reqCtx, token.Contract.ID)
 		if err != nil {
 			if util.ErrorAs[persist.ErrContractNotFoundByID](err) {
 				util.ErrResponse(c, http.StatusNotFound, err)
@@ -391,19 +391,29 @@ func processPostPreflight(tp *tokenProcessor, tm *tokenmanage.Manager, q *coredb
 
 		// Process media for the token
 		if !existingMedia.TokenMedia.Active {
-			contract, err := mc.PollForTokenByTokenIdentifiers(c, input.Token, retry.DefaultRetry)
-			if err != nil {
+			if err := mc.TokenExists(c, input.Token, retry.DefaultRetry); err != nil {
 				// Keep retrying until we get the token or reach max retries
 				util.ErrResponse(c, http.StatusInternalServerError, err)
 				return
 			}
-			if _, err = processFromIdentifiersManaged(c, tp, tm, input.Token, contract, persist.ProcessingCausePostPreflight, 0); err != nil {
+			// If the token exists, the contract also exists
+			contract, err := contractRepo.GetByAddress(c, input.Token.ContractAddress, input.Token.Chain)
+			if err != nil && util.ErrorAs[persist.ErrContractNotFoundByAddress](err) {
+				util.ErrResponse(c, http.StatusNotFound, err)
+				return
+			}
+			if err != nil {
+				util.ErrResponse(c, http.StatusInternalServerError, err)
+				return
+			}
+			_, err = processFromIdentifiersManaged(c, tp, tm, input.Token, contract, persist.ProcessingCausePostPreflight, 0)
+			if err != nil {
 				// Only log the error, because tokenmanage will handle reprocessing
 				logger.For(c).Errorf("error in preflight: error processing token: %s", err)
 			}
 		}
 
-		// Try to sync the user's token
+		// Try to sync the user's token if a user is provided
 		if input.UserID != "" {
 			user, err := userRepo.GetByID(c, input.UserID)
 			if err != nil {
@@ -411,7 +421,10 @@ func processPostPreflight(tp *tokenProcessor, tm *tokenmanage.Manager, q *coredb
 				util.ErrResponse(c, http.StatusOK, err)
 				return
 			}
-			_, err = mc.PollForTokenByUserTokenIdentifiers(c, user.ID, user.Wallets, input.Token, retry.DefaultRetry)
+			// Try to sync the user's tokens by searching for the token in each of the user's wallets
+			// SyncTokenByUserWalletsAndTokenIdentifiersRetry processes media for the token if it is found
+			// so we don't need to run the pipeline again here
+			_, err = mc.SyncTokenByUserWalletsAndTokenIdentifiersRetry(c, user, input.Token, retry.DefaultRetry)
 			if err != nil {
 				// Keep retrying until we get the token or reach max retries
 				util.ErrResponse(c, http.StatusInternalServerError, err)

@@ -91,6 +91,9 @@ func (c *ContractGalleryRepository) GetByAddress(pCtx context.Context, pAddress 
 	contract := persist.ContractGallery{}
 	err := c.getByAddressStmt.QueryRowContext(pCtx, pAddress, pChain).Scan(&contract.ID, &contract.Version, &contract.CreationTime, &contract.LastUpdated, &contract.Address, &contract.Symbol, &contract.Name, &contract.OwnerAddress, &contract.Chain, &contract.IsProviderMarkedSpam)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return persist.ContractGallery{}, persist.ErrContractNotFoundByAddress{Address: pAddress, Chain: pChain}
+		}
 		return persist.ContractGallery{}, err
 	}
 
