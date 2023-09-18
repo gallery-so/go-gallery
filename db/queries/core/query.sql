@@ -28,6 +28,15 @@ where p.pii_email_address = lower($1)
   and p.deleted = false
   and u.deleted = false;
 
+-- name: GetUserByAddress :one
+select users.*
+from users, wallets
+where wallets.address = sqlc.arg('address')
+	and wallets.chain = sqlc.arg('chain')::int
+	and array[wallets.id] <@ users.wallets
+	and wallets.deleted = false
+	and users.deleted = false;
+
 -- name: GetUserByAddressBatch :batchone
 select users.*
 from users, wallets
