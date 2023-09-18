@@ -290,25 +290,26 @@ type ComplexityRoot struct {
 	}
 
 	Community struct {
-		BadgeURL          func(childComplexity int) int
-		Chain             func(childComplexity int) int
-		Contract          func(childComplexity int) int
-		ContractAddress   func(childComplexity int) int
-		Creator           func(childComplexity int) int
-		CreatorAddress    func(childComplexity int) int
-		Dbid              func(childComplexity int) int
-		Description       func(childComplexity int) int
-		ID                func(childComplexity int) int
-		LastUpdated       func(childComplexity int) int
-		Name              func(childComplexity int) int
-		Owners            func(childComplexity int, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) int
-		ParentCommunity   func(childComplexity int) int
-		Posts             func(childComplexity int, before *string, after *string, first *int, last *int) int
-		PreviewImage      func(childComplexity int) int
-		ProfileBannerURL  func(childComplexity int) int
-		ProfileImageURL   func(childComplexity int) int
-		SubCommunities    func(childComplexity int, before *string, after *string, first *int, last *int) int
-		TokensInCommunity func(childComplexity int, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) int
+		BadgeURL              func(childComplexity int) int
+		Chain                 func(childComplexity int) int
+		Contract              func(childComplexity int) int
+		ContractAddress       func(childComplexity int) int
+		Creator               func(childComplexity int) int
+		CreatorAddress        func(childComplexity int) int
+		Dbid                  func(childComplexity int) int
+		Description           func(childComplexity int) int
+		ID                    func(childComplexity int) int
+		LastUpdated           func(childComplexity int) int
+		Name                  func(childComplexity int) int
+		Owners                func(childComplexity int, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) int
+		ParentCommunity       func(childComplexity int) int
+		Posts                 func(childComplexity int, before *string, after *string, first *int, last *int) int
+		PreviewImage          func(childComplexity int) int
+		ProfileBannerURL      func(childComplexity int) int
+		ProfileImageURL       func(childComplexity int) int
+		SubCommunities        func(childComplexity int, before *string, after *string, first *int, last *int) int
+		TmpPostsWithProjectID func(childComplexity int, projectID int, before *string, after *string, first *int, last *int) int
+		TokensInCommunity     func(childComplexity int, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) int
 	}
 
 	CommunityEdge struct {
@@ -1612,6 +1613,7 @@ type CommunityResolver interface {
 	TokensInCommunity(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokensConnection, error)
 	Owners(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokenHoldersConnection, error)
 	Posts(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.PostsConnection, error)
+	TmpPostsWithProjectID(ctx context.Context, obj *model.Community, projectID int, before *string, after *string, first *int, last *int) (*model.PostsConnection, error)
 }
 type CreateCollectionPayloadResolver interface {
 	FeedEvent(ctx context.Context, obj *model.CreateCollectionPayload) (*model.FeedEvent, error)
@@ -2752,6 +2754,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Community.SubCommunities(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
+
+	case "Community.tmpPostsWithProjectID":
+		if e.complexity.Community.TmpPostsWithProjectID == nil {
+			break
+		}
+
+		args, err := ec.field_Community_tmpPostsWithProjectID_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Community.TmpPostsWithProjectID(childComplexity, args["projectID"].(int), args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
 	case "Community.tokensInCommunity":
 		if e.complexity.Community.TokensInCommunity == nil {
@@ -8705,6 +8719,9 @@ type Community implements Node @goEmbedHelper {
 
   posts(before: String, after: String, first: Int, last: Int): PostsConnection
     @goField(forceResolver: true)
+
+  tmpPostsWithProjectID(projectID: Int!, before: String, after: String, first: Int, last: Int): PostsConnection
+  @goField(forceResolver: true)
 }
 
 type Contract implements Node {
@@ -10952,6 +10969,57 @@ func (ec *executionContext) field_Community_subCommunities_args(ctx context.Cont
 		}
 	}
 	args["last"] = arg3
+	return args, nil
+}
+
+func (ec *executionContext) field_Community_tmpPostsWithProjectID_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 int
+	if tmp, ok := rawArgs["projectID"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("projectID"))
+		arg0, err = ec.unmarshalNInt2int(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["projectID"] = arg0
+	var arg1 *string
+	if tmp, ok := rawArgs["before"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
+		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["before"] = arg1
+	var arg2 *string
+	if tmp, ok := rawArgs["after"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
+		arg2, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["after"] = arg2
+	var arg3 *int
+	if tmp, ok := rawArgs["first"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
+		arg3, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["first"] = arg3
+	var arg4 *int
+	if tmp, ok := rawArgs["last"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("last"))
+		arg4, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["last"] = arg4
 	return args, nil
 }
 
@@ -20079,6 +20147,64 @@ func (ec *executionContext) fieldContext_Community_posts(ctx context.Context, fi
 	return fc, nil
 }
 
+func (ec *executionContext) _Community_tmpPostsWithProjectID(ctx context.Context, field graphql.CollectedField, obj *model.Community) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Community_tmpPostsWithProjectID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Community().TmpPostsWithProjectID(rctx, obj, fc.Args["projectID"].(int), fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.PostsConnection)
+	fc.Result = res
+	return ec.marshalOPostsConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPostsConnection(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Community_tmpPostsWithProjectID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Community",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "edges":
+				return ec.fieldContext_PostsConnection_edges(ctx, field)
+			case "pageInfo":
+				return ec.fieldContext_PostsConnection_pageInfo(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PostsConnection", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Community_tmpPostsWithProjectID_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _CommunityEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.CommunityEdge) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_CommunityEdge_node(ctx, field)
 	if err != nil {
@@ -20153,6 +20279,8 @@ func (ec *executionContext) fieldContext_CommunityEdge_node(ctx context.Context,
 				return ec.fieldContext_Community_owners(ctx, field)
 			case "posts":
 				return ec.fieldContext_Community_posts(ctx, field)
+			case "tmpPostsWithProjectID":
+				return ec.fieldContext_Community_tmpPostsWithProjectID(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
 		},
@@ -20275,6 +20403,8 @@ func (ec *executionContext) fieldContext_CommunityLink_node(ctx context.Context,
 				return ec.fieldContext_Community_owners(ctx, field)
 			case "posts":
 				return ec.fieldContext_Community_posts(ctx, field)
+			case "tmpPostsWithProjectID":
+				return ec.fieldContext_Community_tmpPostsWithProjectID(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
 		},
@@ -20356,6 +20486,8 @@ func (ec *executionContext) fieldContext_CommunitySearchResult_community(ctx con
 				return ec.fieldContext_Community_owners(ctx, field)
 			case "posts":
 				return ec.fieldContext_Community_posts(ctx, field)
+			case "tmpPostsWithProjectID":
+				return ec.fieldContext_Community_tmpPostsWithProjectID(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
 		},
@@ -48786,6 +48918,8 @@ func (ec *executionContext) fieldContext_Token_community(ctx context.Context, fi
 				return ec.fieldContext_Community_owners(ctx, field)
 			case "posts":
 				return ec.fieldContext_Community_posts(ctx, field)
+			case "tmpPostsWithProjectID":
+				return ec.fieldContext_Community_tmpPostsWithProjectID(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
 		},
@@ -64948,6 +65082,23 @@ func (ec *executionContext) _Community(ctx context.Context, sel ast.SelectionSet
 					}
 				}()
 				res = ec._Community_posts(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "tmpPostsWithProjectID":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Community_tmpPostsWithProjectID(ctx, field, obj)
 				return res
 			}
 

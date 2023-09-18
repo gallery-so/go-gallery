@@ -685,24 +685,25 @@ type CommunitiesConnection struct {
 
 type Community struct {
 	HelperCommunityData
-	Dbid              persist.DBID            `json:"dbid"`
-	LastUpdated       *time.Time              `json:"lastUpdated"`
-	Contract          *Contract               `json:"contract"`
-	ContractAddress   *persist.ChainAddress   `json:"contractAddress"`
-	CreatorAddress    *persist.ChainAddress   `json:"creatorAddress"`
-	Creator           GalleryUserOrAddress    `json:"creator"`
-	Chain             *persist.Chain          `json:"chain"`
-	Name              *string                 `json:"name"`
-	Description       *string                 `json:"description"`
-	PreviewImage      *string                 `json:"previewImage"`
-	ProfileImageURL   *string                 `json:"profileImageURL"`
-	ProfileBannerURL  *string                 `json:"profileBannerURL"`
-	BadgeURL          *string                 `json:"badgeURL"`
-	ParentCommunity   *CommunityLink          `json:"parentCommunity"`
-	SubCommunities    *CommunitiesConnection  `json:"subCommunities"`
-	TokensInCommunity *TokensConnection       `json:"tokensInCommunity"`
-	Owners            *TokenHoldersConnection `json:"owners"`
-	Posts             *PostsConnection        `json:"posts"`
+	Dbid                  persist.DBID            `json:"dbid"`
+	LastUpdated           *time.Time              `json:"lastUpdated"`
+	Contract              *Contract               `json:"contract"`
+	ContractAddress       *persist.ChainAddress   `json:"contractAddress"`
+	CreatorAddress        *persist.ChainAddress   `json:"creatorAddress"`
+	Creator               GalleryUserOrAddress    `json:"creator"`
+	Chain                 *persist.Chain          `json:"chain"`
+	Name                  *string                 `json:"name"`
+	Description           *string                 `json:"description"`
+	PreviewImage          *string                 `json:"previewImage"`
+	ProfileImageURL       *string                 `json:"profileImageURL"`
+	ProfileBannerURL      *string                 `json:"profileBannerURL"`
+	BadgeURL              *string                 `json:"badgeURL"`
+	ParentCommunity       *CommunityLink          `json:"parentCommunity"`
+	SubCommunities        *CommunitiesConnection  `json:"subCommunities"`
+	TokensInCommunity     *TokensConnection       `json:"tokensInCommunity"`
+	Owners                *TokenHoldersConnection `json:"owners"`
+	Posts                 *PostsConnection        `json:"posts"`
+	TmpPostsWithProjectID *PostsConnection        `json:"tmpPostsWithProjectID"`
 }
 
 func (Community) IsNode()                      {}

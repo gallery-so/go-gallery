@@ -292,6 +292,16 @@ func (r *communityResolver) Posts(ctx context.Context, obj *model.Community, bef
 	return resolveCommunityPostsByContractID(ctx, obj.Dbid, before, after, first, last)
 }
 
+// TmpPostsWithProjectID is the resolver for the tmpPostsWithProjectID field.
+func (r *communityResolver) TmpPostsWithProjectID(ctx context.Context, obj *model.Community, projectID int, before *string, after *string, first *int, last *int) (*model.PostsConnection, error) {
+	posts, pageInfo, err := publicapi.For(ctx).Contract.GetCommunityPostsByContractIDAndProjectID(ctx, obj.Dbid, projectID, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+	connection := postsToConnection(ctx, posts, obj.Dbid, pageInfo)
+	return &connection, nil
+}
+
 // FeedEvent is the resolver for the feedEvent field.
 func (r *createCollectionPayloadResolver) FeedEvent(ctx context.Context, obj *model.CreateCollectionPayload) (*model.FeedEvent, error) {
 	if obj.FeedEvent.Dbid == "" {

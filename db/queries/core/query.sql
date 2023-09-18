@@ -444,6 +444,27 @@ ORDER BY
     CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (posts.created_at, posts.id) END DESC
 LIMIT sqlc.arg('limit');
 
+-- name: PaginatePostsByContractIDAndProjectID :many
+with valid_post_ids as (
+    SELECT distinct on (posts.id) posts.id
+    FROM posts
+        JOIN tokens on tokens.id = ANY(posts.token_ids)
+            and tokens.displayable
+            and tokens.deleted = false
+            and tokens.contract = sqlc.arg('contract_id')
+            and ('x' || lpad(substring(tokens.token_id, 1, 16), 16, '0'))::bit(64)::bigint / 1000000 = sqlc.arg('project_id_int')::int
+    WHERE sqlc.arg('contract_id') = ANY(posts.contract_ids)
+      AND posts.deleted = false
+)
+SELECT posts.* from posts
+    join valid_post_ids on posts.id = valid_post_ids.id
+WHERE (posts.created_at, posts.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+  AND (posts.created_at, posts.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+ORDER BY
+    CASE WHEN sqlc.arg('paging_forward')::bool THEN (posts.created_at, posts.id) END ASC,
+    CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (posts.created_at, posts.id) END DESC
+LIMIT sqlc.arg('limit');
+
 -- name: CountPostsByContractID :one
 select count(*)
 from posts
