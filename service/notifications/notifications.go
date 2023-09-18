@@ -609,6 +609,7 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 		} else {
 			message.Body = fmt.Sprintf("You received a new %s token", name)
 		}
+		return message, nil
 	}
 
 	return task.PushNotificationMessage{}, fmt.Errorf("unsupported notification action: %s", notif.Action)

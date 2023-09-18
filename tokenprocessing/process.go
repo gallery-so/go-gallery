@@ -377,7 +377,6 @@ func processOwnersForAlchemyTokens(mc *multichain.Provider, queries *coredb.Quer
 
 			userID, ok := addressToUsers[persist.NewChainAddress(activity.ToAddress, chain)]
 			if !ok {
-
 				user, err := queries.GetUserByAddress(c, coredb.GetUserByAddressParams{
 					Address: activity.ToAddress,
 					Chain:   int32(chain),
