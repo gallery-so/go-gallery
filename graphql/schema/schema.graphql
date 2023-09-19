@@ -1251,7 +1251,10 @@ type PostComposerDraftDetailsPayload @goEmbedHelper {
   tokenDescription: String
 }
 
-union PostComposerDraftDetailsPayloadOrError = PostComposerDraftDetailsPayload | ErrInvalidInput
+union PostComposerDraftDetailsPayloadOrError =
+    PostComposerDraftDetailsPayload
+  | ErrInvalidInput
+  | ErrCommunityNotFound
 
 type Query {
   node(id: ID!): Node
