@@ -952,6 +952,7 @@ type ErrCommunityNotFound struct {
 }
 
 func (ErrCommunityNotFound) IsCommunityByAddressOrError()                                     {}
+func (ErrCommunityNotFound) IsPostComposerDraftDetailsPayloadOrError()                        {}
 func (ErrCommunityNotFound) IsError()                                                         {}
 func (ErrCommunityNotFound) IsSyncCreatedTokensForUsernameAndExistingContractPayloadOrError() {}
 

@@ -9500,7 +9500,7 @@ type PostComposerDraftDetailsPayload @goEmbedHelper {
   tokenDescription: String
 }
 
-union PostComposerDraftDetailsPayloadOrError = PostComposerDraftDetailsPayload | ErrInvalidInput
+union PostComposerDraftDetailsPayloadOrError = PostComposerDraftDetailsPayload | ErrInvalidInput | ErrCommunityNotFound
 
 type Query {
   node(id: ID!): Node
@@ -62725,6 +62725,13 @@ func (ec *executionContext) _PostComposerDraftDetailsPayloadOrError(ctx context.
 			return graphql.Null
 		}
 		return ec._ErrInvalidInput(ctx, sel, obj)
+	case model.ErrCommunityNotFound:
+		return ec._ErrCommunityNotFound(ctx, sel, &obj)
+	case *model.ErrCommunityNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrCommunityNotFound(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -67007,7 +67014,7 @@ func (ec *executionContext) _ErrCommentNotFound(ctx context.Context, sel ast.Sel
 	return out
 }
 
-var errCommunityNotFoundImplementors = []string{"ErrCommunityNotFound", "CommunityByAddressOrError", "Error", "SyncCreatedTokensForUsernameAndExistingContractPayloadOrError"}
+var errCommunityNotFoundImplementors = []string{"ErrCommunityNotFound", "CommunityByAddressOrError", "PostComposerDraftDetailsPayloadOrError", "Error", "SyncCreatedTokensForUsernameAndExistingContractPayloadOrError"}
 
 func (ec *executionContext) _ErrCommunityNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrCommunityNotFound) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errCommunityNotFoundImplementors)
