@@ -603,6 +603,14 @@ type Community implements Node @goEmbedHelper {
 
   posts(before: String, after: String, first: Int, last: Int): PostsConnection
     @goField(forceResolver: true)
+
+  tmpPostsWithProjectID(
+    projectID: Int!
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): PostsConnection @goField(forceResolver: true)
 }
 
 type Contract implements Node {

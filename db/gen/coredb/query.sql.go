@@ -5617,6 +5617,78 @@ func (q *Queries) PaginatePersonalFeedByUserID(ctx context.Context, arg Paginate
 	return items, nil
 }
 
+const paginatePostsByContractIDAndProjectID = `-- name: PaginatePostsByContractIDAndProjectID :many
+with valid_post_ids as (
+    SELECT distinct on (posts.id) posts.id
+    FROM posts
+        JOIN tokens on tokens.id = ANY(posts.token_ids)
+            and tokens.displayable
+            and tokens.deleted = false
+            and tokens.contract = $7
+            and ('x' || lpad(substring(tokens.token_id, 1, 16), 16, '0'))::bit(64)::bigint / 1000000 = $8::int
+    WHERE $7 = ANY(posts.contract_ids)
+      AND posts.deleted = false
+)
+SELECT posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted from posts
+    join valid_post_ids on posts.id = valid_post_ids.id
+WHERE (posts.created_at, posts.id) < ($1, $2)
+  AND (posts.created_at, posts.id) > ($3, $4)
+ORDER BY
+    CASE WHEN $5::bool THEN (posts.created_at, posts.id) END ASC,
+    CASE WHEN NOT $5::bool THEN (posts.created_at, posts.id) END DESC
+LIMIT $6
+`
+
+type PaginatePostsByContractIDAndProjectIDParams struct {
+	CurBeforeTime time.Time    `json:"cur_before_time"`
+	CurBeforeID   persist.DBID `json:"cur_before_id"`
+	CurAfterTime  time.Time    `json:"cur_after_time"`
+	CurAfterID    persist.DBID `json:"cur_after_id"`
+	PagingForward bool         `json:"paging_forward"`
+	Limit         int32        `json:"limit"`
+	ContractID    persist.DBID `json:"contract_id"`
+	ProjectIDInt  int32        `json:"project_id_int"`
+}
+
+func (q *Queries) PaginatePostsByContractIDAndProjectID(ctx context.Context, arg PaginatePostsByContractIDAndProjectIDParams) ([]Post, error) {
+	rows, err := q.db.Query(ctx, paginatePostsByContractIDAndProjectID,
+		arg.CurBeforeTime,
+		arg.CurBeforeID,
+		arg.CurAfterTime,
+		arg.CurAfterID,
+		arg.PagingForward,
+		arg.Limit,
+		arg.ContractID,
+		arg.ProjectIDInt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Post
+	for rows.Next() {
+		var i Post
+		if err := rows.Scan(
+			&i.ID,
+			&i.Version,
+			&i.TokenIds,
+			&i.ContractIds,
+			&i.ActorID,
+			&i.Caption,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Deleted,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const paginateUserFeedByUserID = `-- name: PaginateUserFeedByUserID :many
 SELECT id, feed_entity_type, created_at, actor_id
 FROM feed_entities
