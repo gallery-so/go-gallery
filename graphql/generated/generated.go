@@ -834,7 +834,7 @@ type ComplexityRoot struct {
 		SyncCreatedTokensForExistingContract            func(childComplexity int, input model.SyncCreatedTokensForExistingContractInput) int
 		SyncCreatedTokensForNewContracts                func(childComplexity int, input model.SyncCreatedTokensForNewContractsInput) int
 		SyncCreatedTokensForUsername                    func(childComplexity int, username string, chains []persist.Chain) int
-		SyncCreatedTokensForUsernameAndExistingContract func(childComplexity int, username string, contractID persist.DBID) int
+		SyncCreatedTokensForUsernameAndExistingContract func(childComplexity int, username string, chainAddress persist.ChainAddress) int
 		SyncTokens                                      func(childComplexity int, chains []persist.Chain) int
 		SyncTokensForUsername                           func(childComplexity int, username string, chains []persist.Chain) int
 		UnbanUserFromFeed                               func(childComplexity int, username string) int
@@ -1772,7 +1772,7 @@ type MutationResolver interface {
 	RevokeRolesFromUser(ctx context.Context, username string, roles []*persist.Role) (model.RevokeRolesFromUserPayloadOrError, error)
 	SyncTokensForUsername(ctx context.Context, username string, chains []persist.Chain) (model.SyncTokensForUsernamePayloadOrError, error)
 	SyncCreatedTokensForUsername(ctx context.Context, username string, chains []persist.Chain) (model.SyncCreatedTokensForUsernamePayloadOrError, error)
-	SyncCreatedTokensForUsernameAndExistingContract(ctx context.Context, username string, contractID persist.DBID) (model.SyncCreatedTokensForUsernameAndExistingContractPayloadOrError, error)
+	SyncCreatedTokensForUsernameAndExistingContract(ctx context.Context, username string, chainAddress persist.ChainAddress) (model.SyncCreatedTokensForUsernameAndExistingContractPayloadOrError, error)
 	BanUserFromFeed(ctx context.Context, username string, action string) (model.BanUserFromFeedPayloadOrError, error)
 	UnbanUserFromFeed(ctx context.Context, username string) (model.UnbanUserFromFeedPayloadOrError, error)
 	MintPremiumCardToWallet(ctx context.Context, input model.MintPremiumCardToWalletInput) (model.MintPremiumCardToWalletPayloadOrError, error)
@@ -5049,7 +5049,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.SyncCreatedTokensForUsernameAndExistingContract(childComplexity, args["username"].(string), args["contractId"].(persist.DBID)), true
+		return e.complexity.Mutation.SyncCreatedTokensForUsernameAndExistingContract(childComplexity, args["username"].(string), args["chainAddress"].(persist.ChainAddress)), true
 
 	case "Mutation.syncTokens":
 		if e.complexity.Mutation.SyncTokens == nil {
@@ -10422,15 +10422,16 @@ union SyncCreatedTokensForUsernamePayloadOrError =
   | ErrNotAuthorized
   | ErrSyncFailed
 
-
 type SyncCreatedTokensForUsernameAndExistingContractPayload {
   message: String!
 }
 
 union SyncCreatedTokensForUsernameAndExistingContractPayloadOrError =
     SyncCreatedTokensForUsernameAndExistingContractPayload
+  | ErrInvalidInput
   | ErrNotAuthorized
   | ErrSyncFailed
+  | ErrCommunityNotFound
 
 type BanUserFromFeedPayload {
   user: GalleryUser
@@ -10935,7 +10936,7 @@ type Mutation {
   ): SyncCreatedTokensForUsernamePayloadOrError @retoolAuth
   syncCreatedTokensForUsernameAndExistingContract(
     username: String!
-    contractId: DBID!
+    chainAddress: ChainAddressInput!
   ): SyncCreatedTokensForUsernameAndExistingContractPayloadOrError @retoolAuth
   banUserFromFeed(username: String!, action: String!): BanUserFromFeedPayloadOrError @retoolAuth
   unbanUserFromFeed(username: String!): UnbanUserFromFeedPayloadOrError @retoolAuth
@@ -12450,15 +12451,15 @@ func (ec *executionContext) field_Mutation_syncCreatedTokensForUsernameAndExisti
 		}
 	}
 	args["username"] = arg0
-	var arg1 persist.DBID
-	if tmp, ok := rawArgs["contractId"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("contractId"))
-		arg1, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+	var arg1 persist.ChainAddress
+	if tmp, ok := rawArgs["chainAddress"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chainAddress"))
+		arg1, err = ec.unmarshalNChainAddressInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["contractId"] = arg1
+	args["chainAddress"] = arg1
 	return args, nil
 }
 
@@ -36530,7 +36531,7 @@ func (ec *executionContext) _Mutation_syncCreatedTokensForUsernameAndExistingCon
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().SyncCreatedTokensForUsernameAndExistingContract(rctx, fc.Args["username"].(string), fc.Args["contractId"].(persist.DBID))
+			return ec.resolvers.Mutation().SyncCreatedTokensForUsernameAndExistingContract(rctx, fc.Args["username"].(string), fc.Args["chainAddress"].(persist.ChainAddress))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.RetoolAuth == nil {
@@ -63589,6 +63590,13 @@ func (ec *executionContext) _SyncCreatedTokensForUsernameAndExistingContractPayl
 			return graphql.Null
 		}
 		return ec._SyncCreatedTokensForUsernameAndExistingContractPayload(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
 	case model.ErrNotAuthorized:
 		return ec._ErrNotAuthorized(ctx, sel, &obj)
 	case *model.ErrNotAuthorized:
@@ -63603,6 +63611,13 @@ func (ec *executionContext) _SyncCreatedTokensForUsernameAndExistingContractPayl
 			return graphql.Null
 		}
 		return ec._ErrSyncFailed(ctx, sel, obj)
+	case model.ErrCommunityNotFound:
+		return ec._ErrCommunityNotFound(ctx, sel, &obj)
+	case *model.ErrCommunityNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrCommunityNotFound(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -66992,7 +67007,7 @@ func (ec *executionContext) _ErrCommentNotFound(ctx context.Context, sel ast.Sel
 	return out
 }
 
-var errCommunityNotFoundImplementors = []string{"ErrCommunityNotFound", "CommunityByAddressOrError", "Error"}
+var errCommunityNotFoundImplementors = []string{"ErrCommunityNotFound", "CommunityByAddressOrError", "Error", "SyncCreatedTokensForUsernameAndExistingContractPayloadOrError"}
 
 func (ec *executionContext) _ErrCommunityNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrCommunityNotFound) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errCommunityNotFoundImplementors)
@@ -67160,7 +67175,7 @@ func (ec *executionContext) _ErrGalleryNotFound(ctx context.Context, sel ast.Sel
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "PostOrError", "SocialConnectionsOrError", "MerchTokensPayloadOrError", "SearchUsersPayloadOrError", "SearchGalleriesPayloadOrError", "SearchCommunitiesPayloadOrError", "PostComposerDraftDetailsPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "VerifyEmailMagicLinkPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "OptInForRolesPayloadOrError", "OptOutForRolesPayloadOrError", "RedeemMerchPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "ReferralPostTokenPayloadOrError", "AdmirePostPayloadOrError", "AdmireTokenPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError", "ReferralPostPreflightPayloadOrError"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "PostOrError", "SocialConnectionsOrError", "MerchTokensPayloadOrError", "SearchUsersPayloadOrError", "SearchGalleriesPayloadOrError", "SearchCommunitiesPayloadOrError", "PostComposerDraftDetailsPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RegisterUserPushTokenPayloadOrError", "UnregisterUserPushTokenPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "VerifyEmailMagicLinkPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "OptInForRolesPayloadOrError", "OptOutForRolesPayloadOrError", "RedeemMerchPayloadOrError", "SyncCreatedTokensForUsernameAndExistingContractPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError", "SetProfileImagePayloadOrError", "PostTokensPayloadOrError", "ReferralPostTokenPayloadOrError", "AdmirePostPayloadOrError", "AdmireTokenPayloadOrError", "CommentOnPostPayloadOrError", "DeletePostPayloadOrError", "ReferralPostPreflightPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)

@@ -1855,7 +1855,7 @@ func (r *mutationResolver) SyncCreatedTokensForUsername(ctx context.Context, use
 }
 
 // SyncCreatedTokensForUsernameAndExistingContract is the resolver for the syncCreatedTokensForUsernameAndExistingContract field.
-func (r *mutationResolver) SyncCreatedTokensForUsernameAndExistingContract(ctx context.Context, username string, contractID persist.DBID) (model.SyncCreatedTokensForUsernameAndExistingContractPayloadOrError, error) {
+func (r *mutationResolver) SyncCreatedTokensForUsernameAndExistingContract(ctx context.Context, username string, chainAddress persist.ChainAddress) (model.SyncCreatedTokensForUsernameAndExistingContractPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
 	user, err := api.User.GetUserByUsername(ctx, username)
@@ -1864,7 +1864,7 @@ func (r *mutationResolver) SyncCreatedTokensForUsernameAndExistingContract(ctx c
 		return nil, err
 	}
 
-	err = api.Token.SyncCreatedTokensForExistingContractAdmin(ctx, user.ID, contractID)
+	err = api.Token.SyncCreatedTokensForExistingContractAdmin(ctx, user.ID, chainAddress)
 	if err != nil {
 		return nil, err
 	}
