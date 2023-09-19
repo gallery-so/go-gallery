@@ -2173,6 +2173,16 @@ union SyncCreatedTokensForUsernamePayloadOrError =
   | ErrNotAuthorized
   | ErrSyncFailed
 
+
+type SyncCreatedTokensForUsernameAndExistingContractPayload {
+  message: String!
+}
+
+union SyncCreatedTokensForUsernameAndExistingContractPayloadOrError =
+    SyncCreatedTokensForUsernameAndExistingContractPayload
+  | ErrNotAuthorized
+  | ErrSyncFailed
+
 type BanUserFromFeedPayload {
   user: GalleryUser
 }
@@ -2674,6 +2684,10 @@ type Mutation {
     username: String!
     chains: [Chain!]!
   ): SyncCreatedTokensForUsernamePayloadOrError @retoolAuth
+  syncCreatedTokensForUsernameAndExistingContract(
+    username: String!
+    contractId: DBID!
+  ): SyncCreatedTokensForUsernameAndExistingContractPayloadOrError @retoolAuth
   banUserFromFeed(username: String!, action: String!): BanUserFromFeedPayloadOrError @retoolAuth
   unbanUserFromFeed(username: String!): UnbanUserFromFeedPayloadOrError @retoolAuth
   mintPremiumCardToWallet(

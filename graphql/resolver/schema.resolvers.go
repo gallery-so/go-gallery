@@ -1854,6 +1854,28 @@ func (r *mutationResolver) SyncCreatedTokensForUsername(ctx context.Context, use
 	return output, nil
 }
 
+// SyncCreatedTokensForUsernameAndExistingContract is the resolver for the syncCreatedTokensForUsernameAndExistingContract field.
+func (r *mutationResolver) SyncCreatedTokensForUsernameAndExistingContract(ctx context.Context, username string, contractID persist.DBID) (model.SyncCreatedTokensForUsernameAndExistingContractPayloadOrError, error) {
+	api := publicapi.For(ctx)
+
+	user, err := api.User.GetUserByUsername(ctx, username)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = api.Token.SyncCreatedTokensForExistingContractAdmin(ctx, user.ID, contractID)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.SyncCreatedTokensForUsernameAndExistingContractPayload{
+		Message: "Successfully synced tokens",
+	}
+
+	return output, nil
+}
+
 // BanUserFromFeed is the resolver for the banUserFromFeed field.
 func (r *mutationResolver) BanUserFromFeed(ctx context.Context, username string, action string) (model.BanUserFromFeedPayloadOrError, error) {
 	user, err := publicapi.For(ctx).User.GetUserByUsername(ctx, username)
