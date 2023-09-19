@@ -2173,7 +2173,6 @@ union SyncCreatedTokensForUsernamePayloadOrError =
   | ErrNotAuthorized
   | ErrSyncFailed
 
-
 type SyncCreatedTokensForUsernameAndExistingContractPayload {
   message: String!
 }
