@@ -311,6 +311,10 @@ type SyncCreatedTokensForNewContractsPayloadOrError interface {
 	IsSyncCreatedTokensForNewContractsPayloadOrError()
 }
 
+type SyncCreatedTokensForUsernameAndExistingContractPayloadOrError interface {
+	IsSyncCreatedTokensForUsernameAndExistingContractPayloadOrError()
+}
+
 type SyncCreatedTokensForUsernamePayloadOrError interface {
 	IsSyncCreatedTokensForUsernamePayloadOrError()
 }
@@ -947,8 +951,9 @@ type ErrCommunityNotFound struct {
 	Message string `json:"message"`
 }
 
-func (ErrCommunityNotFound) IsCommunityByAddressOrError() {}
-func (ErrCommunityNotFound) IsError()                     {}
+func (ErrCommunityNotFound) IsCommunityByAddressOrError()                                     {}
+func (ErrCommunityNotFound) IsError()                                                         {}
+func (ErrCommunityNotFound) IsSyncCreatedTokensForUsernameAndExistingContractPayloadOrError() {}
 
 type ErrDoesNotOwnRequiredToken struct {
 	Message string `json:"message"`
@@ -1000,75 +1005,76 @@ type ErrInvalidInput struct {
 	Reasons    []string `json:"reasons"`
 }
 
-func (ErrInvalidInput) IsUserByUsernameOrError()                         {}
-func (ErrInvalidInput) IsUserByIDOrError()                               {}
-func (ErrInvalidInput) IsUserByAddressOrError()                          {}
-func (ErrInvalidInput) IsCollectionByIDOrError()                         {}
-func (ErrInvalidInput) IsCommunityByAddressOrError()                     {}
-func (ErrInvalidInput) IsPostOrError()                                   {}
-func (ErrInvalidInput) IsSocialConnectionsOrError()                      {}
-func (ErrInvalidInput) IsMerchTokensPayloadOrError()                     {}
-func (ErrInvalidInput) IsSearchUsersPayloadOrError()                     {}
-func (ErrInvalidInput) IsSearchGalleriesPayloadOrError()                 {}
-func (ErrInvalidInput) IsSearchCommunitiesPayloadOrError()               {}
-func (ErrInvalidInput) IsPostComposerDraftDetailsPayloadOrError()        {}
-func (ErrInvalidInput) IsCreateCollectionPayloadOrError()                {}
-func (ErrInvalidInput) IsDeleteCollectionPayloadOrError()                {}
-func (ErrInvalidInput) IsUpdateCollectionInfoPayloadOrError()            {}
-func (ErrInvalidInput) IsUpdateCollectionTokensPayloadOrError()          {}
-func (ErrInvalidInput) IsUpdateCollectionHiddenPayloadOrError()          {}
-func (ErrInvalidInput) IsUpdateGalleryCollectionsPayloadOrError()        {}
-func (ErrInvalidInput) IsUpdateTokenInfoPayloadOrError()                 {}
-func (ErrInvalidInput) IsAddUserWalletPayloadOrError()                   {}
-func (ErrInvalidInput) IsRemoveUserWalletsPayloadOrError()               {}
-func (ErrInvalidInput) IsUpdateUserInfoPayloadOrError()                  {}
-func (ErrInvalidInput) IsRegisterUserPushTokenPayloadOrError()           {}
-func (ErrInvalidInput) IsUnregisterUserPushTokenPayloadOrError()         {}
-func (ErrInvalidInput) IsRefreshTokenPayloadOrError()                    {}
-func (ErrInvalidInput) IsRefreshCollectionPayloadOrError()               {}
-func (ErrInvalidInput) IsRefreshContractPayloadOrError()                 {}
-func (ErrInvalidInput) IsError()                                         {}
-func (ErrInvalidInput) IsCreateUserPayloadOrError()                      {}
-func (ErrInvalidInput) IsFollowUserPayloadOrError()                      {}
-func (ErrInvalidInput) IsUnfollowUserPayloadOrError()                    {}
-func (ErrInvalidInput) IsAdmireFeedEventPayloadOrError()                 {}
-func (ErrInvalidInput) IsRemoveAdmirePayloadOrError()                    {}
-func (ErrInvalidInput) IsCommentOnFeedEventPayloadOrError()              {}
-func (ErrInvalidInput) IsRemoveCommentPayloadOrError()                   {}
-func (ErrInvalidInput) IsVerifyEmailPayloadOrError()                     {}
-func (ErrInvalidInput) IsPreverifyEmailPayloadOrError()                  {}
-func (ErrInvalidInput) IsVerifyEmailMagicLinkPayloadOrError()            {}
-func (ErrInvalidInput) IsUpdateEmailPayloadOrError()                     {}
-func (ErrInvalidInput) IsResendVerificationEmailPayloadOrError()         {}
-func (ErrInvalidInput) IsUpdateEmailNotificationSettingsPayloadOrError() {}
-func (ErrInvalidInput) IsUnsubscribeFromEmailTypePayloadOrError()        {}
-func (ErrInvalidInput) IsOptInForRolesPayloadOrError()                   {}
-func (ErrInvalidInput) IsOptOutForRolesPayloadOrError()                  {}
-func (ErrInvalidInput) IsRedeemMerchPayloadOrError()                     {}
-func (ErrInvalidInput) IsCreateGalleryPayloadOrError()                   {}
-func (ErrInvalidInput) IsUpdateGalleryInfoPayloadOrError()               {}
-func (ErrInvalidInput) IsUpdateGalleryHiddenPayloadOrError()             {}
-func (ErrInvalidInput) IsDeleteGalleryPayloadOrError()                   {}
-func (ErrInvalidInput) IsUpdateGalleryOrderPayloadOrError()              {}
-func (ErrInvalidInput) IsUpdateFeaturedGalleryPayloadOrError()           {}
-func (ErrInvalidInput) IsUpdateGalleryPayloadOrError()                   {}
-func (ErrInvalidInput) IsPublishGalleryPayloadOrError()                  {}
-func (ErrInvalidInput) IsUpdatePrimaryWalletPayloadOrError()             {}
-func (ErrInvalidInput) IsUpdateUserExperiencePayloadOrError()            {}
-func (ErrInvalidInput) IsMoveCollectionToGalleryPayloadOrError()         {}
-func (ErrInvalidInput) IsConnectSocialAccountPayloadOrError()            {}
-func (ErrInvalidInput) IsUpdateSocialAccountDisplayedPayloadOrError()    {}
-func (ErrInvalidInput) IsMintPremiumCardToWalletPayloadOrError()         {}
-func (ErrInvalidInput) IsDisconnectSocialAccountPayloadOrError()         {}
-func (ErrInvalidInput) IsFollowAllSocialConnectionsPayloadOrError()      {}
-func (ErrInvalidInput) IsSetProfileImagePayloadOrError()                 {}
-func (ErrInvalidInput) IsPostTokensPayloadOrError()                      {}
-func (ErrInvalidInput) IsReferralPostTokenPayloadOrError()               {}
-func (ErrInvalidInput) IsAdmirePostPayloadOrError()                      {}
-func (ErrInvalidInput) IsAdmireTokenPayloadOrError()                     {}
-func (ErrInvalidInput) IsCommentOnPostPayloadOrError()                   {}
-func (ErrInvalidInput) IsDeletePostPayloadOrError()                      {}
-func (ErrInvalidInput) IsReferralPostPreflightPayloadOrError()           {}
+func (ErrInvalidInput) IsUserByUsernameOrError()                                         {}
+func (ErrInvalidInput) IsUserByIDOrError()                                               {}
+func (ErrInvalidInput) IsUserByAddressOrError()                                          {}
+func (ErrInvalidInput) IsCollectionByIDOrError()                                         {}
+func (ErrInvalidInput) IsCommunityByAddressOrError()                                     {}
+func (ErrInvalidInput) IsPostOrError()                                                   {}
+func (ErrInvalidInput) IsSocialConnectionsOrError()                                      {}
+func (ErrInvalidInput) IsMerchTokensPayloadOrError()                                     {}
+func (ErrInvalidInput) IsSearchUsersPayloadOrError()                                     {}
+func (ErrInvalidInput) IsSearchGalleriesPayloadOrError()                                 {}
+func (ErrInvalidInput) IsSearchCommunitiesPayloadOrError()                               {}
+func (ErrInvalidInput) IsPostComposerDraftDetailsPayloadOrError()                        {}
+func (ErrInvalidInput) IsCreateCollectionPayloadOrError()                                {}
+func (ErrInvalidInput) IsDeleteCollectionPayloadOrError()                                {}
+func (ErrInvalidInput) IsUpdateCollectionInfoPayloadOrError()                            {}
+func (ErrInvalidInput) IsUpdateCollectionTokensPayloadOrError()                          {}
+func (ErrInvalidInput) IsUpdateCollectionHiddenPayloadOrError()                          {}
+func (ErrInvalidInput) IsUpdateGalleryCollectionsPayloadOrError()                        {}
+func (ErrInvalidInput) IsUpdateTokenInfoPayloadOrError()                                 {}
+func (ErrInvalidInput) IsAddUserWalletPayloadOrError()                                   {}
+func (ErrInvalidInput) IsRemoveUserWalletsPayloadOrError()                               {}
+func (ErrInvalidInput) IsUpdateUserInfoPayloadOrError()                                  {}
+func (ErrInvalidInput) IsRegisterUserPushTokenPayloadOrError()                           {}
+func (ErrInvalidInput) IsUnregisterUserPushTokenPayloadOrError()                         {}
+func (ErrInvalidInput) IsRefreshTokenPayloadOrError()                                    {}
+func (ErrInvalidInput) IsRefreshCollectionPayloadOrError()                               {}
+func (ErrInvalidInput) IsRefreshContractPayloadOrError()                                 {}
+func (ErrInvalidInput) IsError()                                                         {}
+func (ErrInvalidInput) IsCreateUserPayloadOrError()                                      {}
+func (ErrInvalidInput) IsFollowUserPayloadOrError()                                      {}
+func (ErrInvalidInput) IsUnfollowUserPayloadOrError()                                    {}
+func (ErrInvalidInput) IsAdmireFeedEventPayloadOrError()                                 {}
+func (ErrInvalidInput) IsRemoveAdmirePayloadOrError()                                    {}
+func (ErrInvalidInput) IsCommentOnFeedEventPayloadOrError()                              {}
+func (ErrInvalidInput) IsRemoveCommentPayloadOrError()                                   {}
+func (ErrInvalidInput) IsVerifyEmailPayloadOrError()                                     {}
+func (ErrInvalidInput) IsPreverifyEmailPayloadOrError()                                  {}
+func (ErrInvalidInput) IsVerifyEmailMagicLinkPayloadOrError()                            {}
+func (ErrInvalidInput) IsUpdateEmailPayloadOrError()                                     {}
+func (ErrInvalidInput) IsResendVerificationEmailPayloadOrError()                         {}
+func (ErrInvalidInput) IsUpdateEmailNotificationSettingsPayloadOrError()                 {}
+func (ErrInvalidInput) IsUnsubscribeFromEmailTypePayloadOrError()                        {}
+func (ErrInvalidInput) IsOptInForRolesPayloadOrError()                                   {}
+func (ErrInvalidInput) IsOptOutForRolesPayloadOrError()                                  {}
+func (ErrInvalidInput) IsRedeemMerchPayloadOrError()                                     {}
+func (ErrInvalidInput) IsSyncCreatedTokensForUsernameAndExistingContractPayloadOrError() {}
+func (ErrInvalidInput) IsCreateGalleryPayloadOrError()                                   {}
+func (ErrInvalidInput) IsUpdateGalleryInfoPayloadOrError()                               {}
+func (ErrInvalidInput) IsUpdateGalleryHiddenPayloadOrError()                             {}
+func (ErrInvalidInput) IsDeleteGalleryPayloadOrError()                                   {}
+func (ErrInvalidInput) IsUpdateGalleryOrderPayloadOrError()                              {}
+func (ErrInvalidInput) IsUpdateFeaturedGalleryPayloadOrError()                           {}
+func (ErrInvalidInput) IsUpdateGalleryPayloadOrError()                                   {}
+func (ErrInvalidInput) IsPublishGalleryPayloadOrError()                                  {}
+func (ErrInvalidInput) IsUpdatePrimaryWalletPayloadOrError()                             {}
+func (ErrInvalidInput) IsUpdateUserExperiencePayloadOrError()                            {}
+func (ErrInvalidInput) IsMoveCollectionToGalleryPayloadOrError()                         {}
+func (ErrInvalidInput) IsConnectSocialAccountPayloadOrError()                            {}
+func (ErrInvalidInput) IsUpdateSocialAccountDisplayedPayloadOrError()                    {}
+func (ErrInvalidInput) IsMintPremiumCardToWalletPayloadOrError()                         {}
+func (ErrInvalidInput) IsDisconnectSocialAccountPayloadOrError()                         {}
+func (ErrInvalidInput) IsFollowAllSocialConnectionsPayloadOrError()                      {}
+func (ErrInvalidInput) IsSetProfileImagePayloadOrError()                                 {}
+func (ErrInvalidInput) IsPostTokensPayloadOrError()                                      {}
+func (ErrInvalidInput) IsReferralPostTokenPayloadOrError()                               {}
+func (ErrInvalidInput) IsAdmirePostPayloadOrError()                                      {}
+func (ErrInvalidInput) IsAdmireTokenPayloadOrError()                                     {}
+func (ErrInvalidInput) IsCommentOnPostPayloadOrError()                                   {}
+func (ErrInvalidInput) IsDeletePostPayloadOrError()                                      {}
+func (ErrInvalidInput) IsReferralPostPreflightPayloadOrError()                           {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -1101,60 +1107,61 @@ type ErrNotAuthorized struct {
 	Cause   AuthorizationError `json:"cause"`
 }
 
-func (ErrNotAuthorized) IsViewerOrError()                                      {}
-func (ErrNotAuthorized) IsSocialQueriesOrError()                               {}
-func (ErrNotAuthorized) IsCreateCollectionPayloadOrError()                     {}
-func (ErrNotAuthorized) IsDeleteCollectionPayloadOrError()                     {}
-func (ErrNotAuthorized) IsUpdateCollectionInfoPayloadOrError()                 {}
-func (ErrNotAuthorized) IsUpdateCollectionTokensPayloadOrError()               {}
-func (ErrNotAuthorized) IsUpdateCollectionHiddenPayloadOrError()               {}
-func (ErrNotAuthorized) IsUpdateGalleryCollectionsPayloadOrError()             {}
-func (ErrNotAuthorized) IsUpdateTokenInfoPayloadOrError()                      {}
-func (ErrNotAuthorized) IsSetSpamPreferencePayloadOrError()                    {}
-func (ErrNotAuthorized) IsAddUserWalletPayloadOrError()                        {}
-func (ErrNotAuthorized) IsRemoveUserWalletsPayloadOrError()                    {}
-func (ErrNotAuthorized) IsUpdateUserInfoPayloadOrError()                       {}
-func (ErrNotAuthorized) IsRegisterUserPushTokenPayloadOrError()                {}
-func (ErrNotAuthorized) IsUnregisterUserPushTokenPayloadOrError()              {}
-func (ErrNotAuthorized) IsSyncTokensPayloadOrError()                           {}
-func (ErrNotAuthorized) IsSyncCreatedTokensForNewContractsPayloadOrError()     {}
-func (ErrNotAuthorized) IsSyncCreatedTokensForExistingContractPayloadOrError() {}
-func (ErrNotAuthorized) IsError()                                              {}
-func (ErrNotAuthorized) IsAddRolesToUserPayloadOrError()                       {}
-func (ErrNotAuthorized) IsRevokeRolesFromUserPayloadOrError()                  {}
-func (ErrNotAuthorized) IsOptInForRolesPayloadOrError()                        {}
-func (ErrNotAuthorized) IsOptOutForRolesPayloadOrError()                       {}
-func (ErrNotAuthorized) IsUploadPersistedQueriesPayloadOrError()               {}
-func (ErrNotAuthorized) IsSyncTokensForUsernamePayloadOrError()                {}
-func (ErrNotAuthorized) IsSyncCreatedTokensForUsernamePayloadOrError()         {}
-func (ErrNotAuthorized) IsBanUserFromFeedPayloadOrError()                      {}
-func (ErrNotAuthorized) IsUnbanUserFromFeedPayloadOrError()                    {}
-func (ErrNotAuthorized) IsSetCommunityOverrideCreatorPayloadOrError()          {}
-func (ErrNotAuthorized) IsCreateGalleryPayloadOrError()                        {}
-func (ErrNotAuthorized) IsUpdateGalleryInfoPayloadOrError()                    {}
-func (ErrNotAuthorized) IsUpdateGalleryHiddenPayloadOrError()                  {}
-func (ErrNotAuthorized) IsDeleteGalleryPayloadOrError()                        {}
-func (ErrNotAuthorized) IsUpdateGalleryOrderPayloadOrError()                   {}
-func (ErrNotAuthorized) IsUpdateFeaturedGalleryPayloadOrError()                {}
-func (ErrNotAuthorized) IsUpdateGalleryPayloadOrError()                        {}
-func (ErrNotAuthorized) IsPublishGalleryPayloadOrError()                       {}
-func (ErrNotAuthorized) IsUpdatePrimaryWalletPayloadOrError()                  {}
-func (ErrNotAuthorized) IsAdminAddWalletPayloadOrError()                       {}
-func (ErrNotAuthorized) IsUpdateUserExperiencePayloadOrError()                 {}
-func (ErrNotAuthorized) IsMoveCollectionToGalleryPayloadOrError()              {}
-func (ErrNotAuthorized) IsConnectSocialAccountPayloadOrError()                 {}
-func (ErrNotAuthorized) IsUpdateSocialAccountDisplayedPayloadOrError()         {}
-func (ErrNotAuthorized) IsMintPremiumCardToWalletPayloadOrError()              {}
-func (ErrNotAuthorized) IsDisconnectSocialAccountPayloadOrError()              {}
-func (ErrNotAuthorized) IsFollowAllSocialConnectionsPayloadOrError()           {}
-func (ErrNotAuthorized) IsGenerateQRCodeLoginTokenPayloadOrError()             {}
-func (ErrNotAuthorized) IsSetProfileImagePayloadOrError()                      {}
-func (ErrNotAuthorized) IsPostTokensPayloadOrError()                           {}
-func (ErrNotAuthorized) IsReferralPostTokenPayloadOrError()                    {}
-func (ErrNotAuthorized) IsAdmirePostPayloadOrError()                           {}
-func (ErrNotAuthorized) IsAdmireTokenPayloadOrError()                          {}
-func (ErrNotAuthorized) IsCommentOnPostPayloadOrError()                        {}
-func (ErrNotAuthorized) IsDeletePostPayloadOrError()                           {}
+func (ErrNotAuthorized) IsViewerOrError()                                                 {}
+func (ErrNotAuthorized) IsSocialQueriesOrError()                                          {}
+func (ErrNotAuthorized) IsCreateCollectionPayloadOrError()                                {}
+func (ErrNotAuthorized) IsDeleteCollectionPayloadOrError()                                {}
+func (ErrNotAuthorized) IsUpdateCollectionInfoPayloadOrError()                            {}
+func (ErrNotAuthorized) IsUpdateCollectionTokensPayloadOrError()                          {}
+func (ErrNotAuthorized) IsUpdateCollectionHiddenPayloadOrError()                          {}
+func (ErrNotAuthorized) IsUpdateGalleryCollectionsPayloadOrError()                        {}
+func (ErrNotAuthorized) IsUpdateTokenInfoPayloadOrError()                                 {}
+func (ErrNotAuthorized) IsSetSpamPreferencePayloadOrError()                               {}
+func (ErrNotAuthorized) IsAddUserWalletPayloadOrError()                                   {}
+func (ErrNotAuthorized) IsRemoveUserWalletsPayloadOrError()                               {}
+func (ErrNotAuthorized) IsUpdateUserInfoPayloadOrError()                                  {}
+func (ErrNotAuthorized) IsRegisterUserPushTokenPayloadOrError()                           {}
+func (ErrNotAuthorized) IsUnregisterUserPushTokenPayloadOrError()                         {}
+func (ErrNotAuthorized) IsSyncTokensPayloadOrError()                                      {}
+func (ErrNotAuthorized) IsSyncCreatedTokensForNewContractsPayloadOrError()                {}
+func (ErrNotAuthorized) IsSyncCreatedTokensForExistingContractPayloadOrError()            {}
+func (ErrNotAuthorized) IsError()                                                         {}
+func (ErrNotAuthorized) IsAddRolesToUserPayloadOrError()                                  {}
+func (ErrNotAuthorized) IsRevokeRolesFromUserPayloadOrError()                             {}
+func (ErrNotAuthorized) IsOptInForRolesPayloadOrError()                                   {}
+func (ErrNotAuthorized) IsOptOutForRolesPayloadOrError()                                  {}
+func (ErrNotAuthorized) IsUploadPersistedQueriesPayloadOrError()                          {}
+func (ErrNotAuthorized) IsSyncTokensForUsernamePayloadOrError()                           {}
+func (ErrNotAuthorized) IsSyncCreatedTokensForUsernamePayloadOrError()                    {}
+func (ErrNotAuthorized) IsSyncCreatedTokensForUsernameAndExistingContractPayloadOrError() {}
+func (ErrNotAuthorized) IsBanUserFromFeedPayloadOrError()                                 {}
+func (ErrNotAuthorized) IsUnbanUserFromFeedPayloadOrError()                               {}
+func (ErrNotAuthorized) IsSetCommunityOverrideCreatorPayloadOrError()                     {}
+func (ErrNotAuthorized) IsCreateGalleryPayloadOrError()                                   {}
+func (ErrNotAuthorized) IsUpdateGalleryInfoPayloadOrError()                               {}
+func (ErrNotAuthorized) IsUpdateGalleryHiddenPayloadOrError()                             {}
+func (ErrNotAuthorized) IsDeleteGalleryPayloadOrError()                                   {}
+func (ErrNotAuthorized) IsUpdateGalleryOrderPayloadOrError()                              {}
+func (ErrNotAuthorized) IsUpdateFeaturedGalleryPayloadOrError()                           {}
+func (ErrNotAuthorized) IsUpdateGalleryPayloadOrError()                                   {}
+func (ErrNotAuthorized) IsPublishGalleryPayloadOrError()                                  {}
+func (ErrNotAuthorized) IsUpdatePrimaryWalletPayloadOrError()                             {}
+func (ErrNotAuthorized) IsAdminAddWalletPayloadOrError()                                  {}
+func (ErrNotAuthorized) IsUpdateUserExperiencePayloadOrError()                            {}
+func (ErrNotAuthorized) IsMoveCollectionToGalleryPayloadOrError()                         {}
+func (ErrNotAuthorized) IsConnectSocialAccountPayloadOrError()                            {}
+func (ErrNotAuthorized) IsUpdateSocialAccountDisplayedPayloadOrError()                    {}
+func (ErrNotAuthorized) IsMintPremiumCardToWalletPayloadOrError()                         {}
+func (ErrNotAuthorized) IsDisconnectSocialAccountPayloadOrError()                         {}
+func (ErrNotAuthorized) IsFollowAllSocialConnectionsPayloadOrError()                      {}
+func (ErrNotAuthorized) IsGenerateQRCodeLoginTokenPayloadOrError()                        {}
+func (ErrNotAuthorized) IsSetProfileImagePayloadOrError()                                 {}
+func (ErrNotAuthorized) IsPostTokensPayloadOrError()                                      {}
+func (ErrNotAuthorized) IsReferralPostTokenPayloadOrError()                               {}
+func (ErrNotAuthorized) IsAdmirePostPayloadOrError()                                      {}
+func (ErrNotAuthorized) IsAdmireTokenPayloadOrError()                                     {}
+func (ErrNotAuthorized) IsCommentOnPostPayloadOrError()                                   {}
+func (ErrNotAuthorized) IsDeletePostPayloadOrError()                                      {}
 
 type ErrPostNotFound struct {
 	Message string `json:"message"`
@@ -1183,15 +1190,16 @@ type ErrSyncFailed struct {
 	Message string `json:"message"`
 }
 
-func (ErrSyncFailed) IsSyncTokensPayloadOrError()                           {}
-func (ErrSyncFailed) IsSyncCreatedTokensForNewContractsPayloadOrError()     {}
-func (ErrSyncFailed) IsSyncCreatedTokensForExistingContractPayloadOrError() {}
-func (ErrSyncFailed) IsRefreshTokenPayloadOrError()                         {}
-func (ErrSyncFailed) IsRefreshCollectionPayloadOrError()                    {}
-func (ErrSyncFailed) IsRefreshContractPayloadOrError()                      {}
-func (ErrSyncFailed) IsError()                                              {}
-func (ErrSyncFailed) IsSyncTokensForUsernamePayloadOrError()                {}
-func (ErrSyncFailed) IsSyncCreatedTokensForUsernamePayloadOrError()         {}
+func (ErrSyncFailed) IsSyncTokensPayloadOrError()                                      {}
+func (ErrSyncFailed) IsSyncCreatedTokensForNewContractsPayloadOrError()                {}
+func (ErrSyncFailed) IsSyncCreatedTokensForExistingContractPayloadOrError()            {}
+func (ErrSyncFailed) IsRefreshTokenPayloadOrError()                                    {}
+func (ErrSyncFailed) IsRefreshCollectionPayloadOrError()                               {}
+func (ErrSyncFailed) IsRefreshContractPayloadOrError()                                 {}
+func (ErrSyncFailed) IsError()                                                         {}
+func (ErrSyncFailed) IsSyncTokensForUsernamePayloadOrError()                           {}
+func (ErrSyncFailed) IsSyncCreatedTokensForUsernamePayloadOrError()                    {}
+func (ErrSyncFailed) IsSyncCreatedTokensForUsernameAndExistingContractPayloadOrError() {}
 
 type ErrTokenNotFound struct {
 	Message string `json:"message"`
@@ -2106,6 +2114,13 @@ type SyncCreatedTokensForNewContractsPayload struct {
 }
 
 func (SyncCreatedTokensForNewContractsPayload) IsSyncCreatedTokensForNewContractsPayloadOrError() {}
+
+type SyncCreatedTokensForUsernameAndExistingContractPayload struct {
+	Message string `json:"message"`
+}
+
+func (SyncCreatedTokensForUsernameAndExistingContractPayload) IsSyncCreatedTokensForUsernameAndExistingContractPayloadOrError() {
+}
 
 type SyncCreatedTokensForUsernamePayload struct {
 	Message string `json:"message"`

@@ -365,6 +365,31 @@ func (api TokenAPI) SyncCreatedTokensForExistingContract(ctx context.Context, co
 	return api.multichainProvider.SyncCreatedTokensForExistingContract(ctx, userID, contractID)
 }
 
+func (api TokenAPI) SyncCreatedTokensForExistingContractAdmin(ctx context.Context, userID persist.DBID, chainAddress persist.ChainAddress) error {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"userID":  validate.WithTag(userID, "required"),
+		"chain":   validate.WithTag(chainAddress.Chain(), "chain"),
+		"address": validate.WithTag(chainAddress.Address(), "required"),
+	}); err != nil {
+		return err
+	}
+
+	contract, err := api.repos.ContractRepository.GetByAddress(ctx, chainAddress.Address(), chainAddress.Chain())
+	if err != nil {
+		return err
+	}
+
+	key := fmt.Sprintf("sync:created:contract:%s:%s", userID.String(), contract.ID)
+
+	if err := api.throttler.Lock(ctx, key); err != nil {
+		return ErrTokenRefreshFailed{Message: err.Error()}
+	}
+	defer api.throttler.Unlock(ctx, key)
+
+	return api.multichainProvider.SyncCreatedTokensForExistingContract(ctx, userID, contract.ID)
+}
+
 func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) error {
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"tokenID": validate.WithTag(tokenDBID, "required"),
