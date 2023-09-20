@@ -681,7 +681,10 @@ func (d *Provider) getOwnersForToken(ctx context.Context, token Token) ([]persis
 
 func (d *Provider) cacheMetadatasForTokens(ctx context.Context, tokens ...multichain.ChainAgnosticToken) error {
 	for _, token := range tokens {
-		if token.TokenMetadata != nil {
+		if token.TokenMetadata != nil && len(token.TokenMetadata) > 0 {
+			if token.TokenMetadata["name"] == "" && token.TokenMetadata["description"] == "" && token.TokenMetadata["external_url"] == "" && token.TokenMetadata["image_url"] == "" && token.TokenMetadata["animation_url"] == "" {
+				continue
+			}
 			mar, err := json.Marshal(token.TokenMetadata)
 			if err != nil {
 				return err
