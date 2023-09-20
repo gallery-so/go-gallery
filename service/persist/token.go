@@ -641,7 +641,7 @@ func (uri TokenURI) IsHTTP() bool {
 }
 
 func (id TokenID) String() string {
-	return strings.ToLower(strings.TrimPrefix(util.RemoveLeftPaddedZeros(string(id)), "0x"))
+	return strings.ToLower(util.RemoveLeftPaddedZeros(string(id)))
 }
 
 // Value implements the driver.Valuer interface for token IDs
