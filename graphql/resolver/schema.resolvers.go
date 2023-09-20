@@ -2028,11 +2028,11 @@ func (r *postResolver) Author(ctx context.Context, obj *model.Post) (*model.Gall
 func (r *postResolver) Tokens(ctx context.Context, obj *model.Post) ([]*model.Token, error) {
 	result := make([]*model.Token, len(obj.TokenIDs))
 	for i, token := range obj.TokenIDs {
-		t, err := resolveTokenByTokenID(ctx, token)
+		t, err := publicapi.For(ctx).Token.GetTokenByIdIgnoreDisplayable(ctx, token)
 		if err != nil {
 			return nil, err
 		}
-		result[i] = t
+		result[i] = tokenToModel(ctx, *t, nil)
 	}
 
 	return result, nil

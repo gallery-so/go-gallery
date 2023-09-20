@@ -80,66 +80,67 @@ type IDAndLimit struct {
 // a single request, nor should they be shared between requests (since the data returned is
 // relative to the current request context, including the user and their auth status).
 type Loaders struct {
-	UserByUserID                  *UserLoaderByID
-	UserByUsername                *UserLoaderByString
-	UserByAddress                 *UserLoaderByAddress
-	UsersWithTrait                *UsersLoaderByString
-	GalleryByGalleryID            *GalleryLoaderByID
-	GalleryByCollectionID         *GalleryLoaderByID
-	GalleriesByUserID             *GalleriesLoaderByID
-	CollectionByCollectionID      *CollectionLoaderByID
-	CollectionsByGalleryID        *CollectionsLoaderByID
-	MembershipByMembershipID      *MembershipLoaderById
-	WalletByWalletID              *WalletLoaderById
-	WalletsByUserID               *WalletsLoaderByID
-	WalletByChainAddress          *WalletLoaderByChainAddress
-	TokenByTokenID                *TokenLoaderByID
-	TokenByUserTokenIdentifiers   *TokenLoaderByUserTokenIdentifiers
-	TokensByContractID            *TokensLoaderByID
-	TokensByCollectionID          *TokensLoaderByIDAndLimit
-	TokensByWalletID              *TokensLoaderByID
-	TokensByUserID                *TokensLoaderByUserIDAndFilters
-	TokensByUserIDAndChain        *TokensLoaderByIDAndChain
-	NewTokensByFeedEventID        *TokensLoaderByID
-	OwnerByTokenID                *UserLoaderByID
-	ContractByContractID          *ContractLoaderByID
-	ContractsLoaderByCreatorID    *ContractsLoaderByCreatorID
-	ContractsLoaderByParentID     *ContractsLoaderByParentID
-	ContractsByUserID             *ContractsLoaderByID
-	ContractByChainAddress        *ContractLoaderByChainAddress
-	FollowersByUserID             *UsersLoaderByID
-	FollowingByUserID             *UsersLoaderByID
-	SharedFollowersByUserIDs      *SharedFollowersLoaderByIDs
-	SharedContractsByUserIDs      *SharedContractsLoaderByIDs
-	FeedEventByFeedEventID        *EventLoaderByID
-	PostByPostID                  *PostLoaderByID
-	PostsPaginatedByContractID    *PostsPaginatedLoaderByContractID
-	AdmireByAdmireID              *AdmireLoaderByID
-	AdmireCountByFeedEventID      *IntLoaderByID
-	AdmiresByFeedEventID          *FeedEventAdmiresLoader
-	AdmireCountByPostID           *IntLoaderByID
-	AdmiresByPostID               *PostAdmiresLoader
-	AdmireCountByTokenID          *IntLoaderByID
-	AdmiresByTokenID              *TokenAdmiresLoader
-	CommentByCommentID            *CommentLoaderByID
-	CommentCountByFeedEventID     *IntLoaderByID
-	CommentsByFeedEventID         *FeedEventCommentsLoader
-	CommentCountByPostID          *IntLoaderByID
-	CommentsByPostID              *PostCommentsLoader
-	InteractionCountByFeedEventID *FeedEventInteractionCountLoader
-	InteractionsByFeedEventID     *FeedEventInteractionsLoader
-	InteractionCountByPostID      *PostInteractionCountLoader
-	InteractionsByPostID          *PostInteractionsLoader
-	NotificationByID              *NotificationLoaderByID
-	NotificationsByUserID         *NotificationsLoaderByUserID
-	ContractsDisplayedByUserID    *ContractsLoaderByID
-	OwnersByContractID            *UsersLoaderByContractID
-	AdmireByActorIDAndFeedEventID *AdmireLoaderByActorAndFeedEvent
-	AdmireByActorIDAndPostID      *AdmireLoaderByActorAndPost
-	MediaByTokenID                *MediaLoaderByTokenID
-	ContractCreatorByContractID   *ContractCreatorLoaderByID
-	ProfileImageByID              *ProfileImageLoaderByID
-	GalleryTokenPreviewsByID      *GalleryTokenPreviewsByID
+	UserByUserID                    *UserLoaderByID
+	UserByUsername                  *UserLoaderByString
+	UserByAddress                   *UserLoaderByAddress
+	UsersWithTrait                  *UsersLoaderByString
+	GalleryByGalleryID              *GalleryLoaderByID
+	GalleryByCollectionID           *GalleryLoaderByID
+	GalleriesByUserID               *GalleriesLoaderByID
+	CollectionByCollectionID        *CollectionLoaderByID
+	CollectionsByGalleryID          *CollectionsLoaderByID
+	MembershipByMembershipID        *MembershipLoaderById
+	WalletByWalletID                *WalletLoaderById
+	WalletsByUserID                 *WalletsLoaderByID
+	WalletByChainAddress            *WalletLoaderByChainAddress
+	TokenByTokenID                  *TokenLoaderByID
+	TokenByTokenIDIgnoreDisplayable *TokenLoaderByID
+	TokenByUserTokenIdentifiers     *TokenLoaderByUserTokenIdentifiers
+	TokensByContractID              *TokensLoaderByID
+	TokensByCollectionID            *TokensLoaderByIDAndLimit
+	TokensByWalletID                *TokensLoaderByID
+	TokensByUserID                  *TokensLoaderByUserIDAndFilters
+	TokensByUserIDAndChain          *TokensLoaderByIDAndChain
+	NewTokensByFeedEventID          *TokensLoaderByID
+	OwnerByTokenID                  *UserLoaderByID
+	ContractByContractID            *ContractLoaderByID
+	ContractsLoaderByCreatorID      *ContractsLoaderByCreatorID
+	ContractsLoaderByParentID       *ContractsLoaderByParentID
+	ContractsByUserID               *ContractsLoaderByID
+	ContractByChainAddress          *ContractLoaderByChainAddress
+	FollowersByUserID               *UsersLoaderByID
+	FollowingByUserID               *UsersLoaderByID
+	SharedFollowersByUserIDs        *SharedFollowersLoaderByIDs
+	SharedContractsByUserIDs        *SharedContractsLoaderByIDs
+	FeedEventByFeedEventID          *EventLoaderByID
+	PostByPostID                    *PostLoaderByID
+	PostsPaginatedByContractID      *PostsPaginatedLoaderByContractID
+	AdmireByAdmireID                *AdmireLoaderByID
+	AdmireCountByFeedEventID        *IntLoaderByID
+	AdmiresByFeedEventID            *FeedEventAdmiresLoader
+	AdmireCountByPostID             *IntLoaderByID
+	AdmiresByPostID                 *PostAdmiresLoader
+	AdmireCountByTokenID            *IntLoaderByID
+	AdmiresByTokenID                *TokenAdmiresLoader
+	CommentByCommentID              *CommentLoaderByID
+	CommentCountByFeedEventID       *IntLoaderByID
+	CommentsByFeedEventID           *FeedEventCommentsLoader
+	CommentCountByPostID            *IntLoaderByID
+	CommentsByPostID                *PostCommentsLoader
+	InteractionCountByFeedEventID   *FeedEventInteractionCountLoader
+	InteractionsByFeedEventID       *FeedEventInteractionsLoader
+	InteractionCountByPostID        *PostInteractionCountLoader
+	InteractionsByPostID            *PostInteractionsLoader
+	NotificationByID                *NotificationLoaderByID
+	NotificationsByUserID           *NotificationsLoaderByUserID
+	ContractsDisplayedByUserID      *ContractsLoaderByID
+	OwnersByContractID              *UsersLoaderByContractID
+	AdmireByActorIDAndFeedEventID   *AdmireLoaderByActorAndFeedEvent
+	AdmireByActorIDAndPostID        *AdmireLoaderByActorAndPost
+	MediaByTokenID                  *MediaLoaderByTokenID
+	ContractCreatorByContractID     *ContractCreatorLoaderByID
+	ProfileImageByID                *ProfileImageLoaderByID
+	GalleryTokenPreviewsByID        *GalleryTokenPreviewsByID
 }
 
 func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loaders {
@@ -238,6 +239,12 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 		AutoCacheWithKey: func(token db.Token) persist.DBID { return token.ID },
 	})
 
+	loaders.TokenByTokenIDIgnoreDisplayable = NewTokenLoaderByID(
+		defaultSettingsPlusOpts(ctx, disableCaching, &subscriptionRegistry, &mutexRegistry, withPublishResults(false)),
+		loadTokenByTokenIDIgnoreDisplayable(q),
+		TokenLoaderByIDCacheSubscriptions{AutoCacheWithKey: func(token db.Token) persist.DBID { return token.ID }},
+	)
+
 	loaders.TokenByUserTokenIdentifiers = NewTokenLoaderByUserTokenIdentifiers(defaults, loadTokenByUserTokenIdentifers(q), TokenLoaderByUserTokenIdentifiersCacheSubscriptions{})
 
 	loaders.TokensByCollectionID = NewTokensLoaderByIDAndLimit(defaults, loadTokensByCollectionID(q))
@@ -257,7 +264,7 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 	loaders.NewTokensByFeedEventID = NewTokensLoaderByID(defaults, loadNewTokensByFeedEventID(q))
 
 	loaders.ContractByContractID = NewContractLoaderByID(
-		settingsWithOptions(ctx, disableCaching, &subscriptionRegistry, &mutexRegistry, withMaxBatchOne(500), withWaitTime(5*time.Millisecond)),
+		defaultSettingsPlusOpts(ctx, disableCaching, &subscriptionRegistry, &mutexRegistry, withMaxBatchOne(500), withMaxWait(5*time.Millisecond)),
 		loadContractByContractID(q),
 		ContractLoaderByIDCacheSubscriptions{AutoCacheWithKey: func(contract db.Contract) persist.DBID { return contract.ID }},
 	)
@@ -331,7 +338,7 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 	})
 
 	loaders.MediaByTokenID = NewMediaLoaderByTokenID(
-		settingsWithOptions(ctx, disableCaching, &subscriptionRegistry, &mutexRegistry, withMaxBatchOne(500), withWaitTime(5*time.Millisecond)),
+		defaultSettingsPlusOpts(ctx, disableCaching, &subscriptionRegistry, &mutexRegistry, withMaxBatchOne(500), withMaxWait(5*time.Millisecond)),
 		loadMediaByTokenID(q),
 		MediaLoaderByTokenIDCacheSubscriptions{AutoCacheWithKey: func(media db.TokenMedia) persist.DBID { return media.ID }})
 
@@ -706,6 +713,26 @@ func loadTokenByTokenID(q *db.Queries) func(context.Context, []persist.DBID) ([]
 		errors := make([]error, len(tokenIDs))
 
 		b := q.GetTokenByIdBatch(ctx, tokenIDs)
+		defer b.Close()
+
+		b.QueryRow(func(i int, t db.Token, err error) {
+			tokens[i], errors[i] = t, err
+
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = persist.ErrTokenNotFoundByID{ID: tokenIDs[i]}
+			}
+		})
+
+		return tokens, errors
+	}
+}
+
+func loadTokenByTokenIDIgnoreDisplayable(q *db.Queries) func(context.Context, []persist.DBID) ([]db.Token, []error) {
+	return func(ctx context.Context, tokenIDs []persist.DBID) ([]db.Token, []error) {
+		tokens := make([]db.Token, len(tokenIDs))
+		errors := make([]error, len(tokenIDs))
+
+		b := q.GetTokenByIdIgnoreDisplayableBatch(ctx, tokenIDs)
 		defer b.Close()
 
 		b.QueryRow(func(i int, t db.Token, err error) {
