@@ -76,7 +76,7 @@ func defaultSettings(ctx context.Context, disableCaching bool, subscriptionRegis
 	}
 }
 
-func settingsWithOptions(ctx context.Context, disableCaching bool, subscriptionRegistry *[]any, mutexRegistry *[]*sync.Mutex, opts ...func(*settings)) settings {
+func defaultSettingsPlusOpts(ctx context.Context, disableCaching bool, subscriptionRegistry *[]any, mutexRegistry *[]*sync.Mutex, opts ...func(*settings)) settings {
 	s := defaultSettings(ctx, disableCaching, subscriptionRegistry, mutexRegistry)
 	for _, opt := range opts {
 		opt(&s)
@@ -90,99 +90,33 @@ func withMaxBatchOne(batchSize int) func(*settings) {
 	}
 }
 
-func withWaitTime(t time.Duration) func(*settings) {
+func withMaxWait(t time.Duration) func(*settings) {
 	return func(s *settings) {
 		s.waitTime = t
 	}
 }
 
-func withContext(ctx context.Context) func(interface {
-	setContext(ctx context.Context)
-	setWait(time.Duration)
-	setMaxBatch(int)
-	setDisableCaching(bool)
-	setPublishResults(bool)
-}) {
-	return func(s interface {
-		setContext(ctx context.Context)
-		setWait(time.Duration)
-		setMaxBatch(int)
-		setDisableCaching(bool)
-		setPublishResults(bool)
-	}) {
-		s.setContext(ctx)
+func withContext(ctx context.Context) func(*settings) {
+	return func(s *settings) {
+		s.ctx = ctx
 	}
 }
 
-func withMaxWait(wait time.Duration) func(interface {
-	setContext(ctx context.Context)
-	setWait(time.Duration)
-	setMaxBatch(int)
-	setDisableCaching(bool)
-	setPublishResults(bool)
-}) {
-	return func(s interface {
-		setContext(ctx context.Context)
-		setWait(time.Duration)
-		setMaxBatch(int)
-		setDisableCaching(bool)
-		setPublishResults(bool)
-	}) {
-		s.setWait(wait)
+func withMaxBatchMany(batchSize int) func(*settings) {
+	return func(s *settings) {
+		s.maxBatchMany = batchSize
 	}
 }
 
-func withMaxBatch(batchSize int) func(interface {
-	setContext(ctx context.Context)
-	setWait(time.Duration)
-	setMaxBatch(int)
-	setDisableCaching(bool)
-	setPublishResults(bool)
-}) {
-	return func(s interface {
-		setContext(ctx context.Context)
-		setWait(time.Duration)
-		setMaxBatch(int)
-		setDisableCaching(bool)
-		setPublishResults(bool)
-	}) {
-		s.setMaxBatch(batchSize)
+func withDisableCaching(disable bool) func(*settings) {
+	return func(s *settings) {
+		s.disableCaching = disable
 	}
 }
 
-func withDisableCaching(disable bool) func(interface {
-	setContext(ctx context.Context)
-	setWait(time.Duration)
-	setMaxBatch(int)
-	setDisableCaching(bool)
-	setPublishResults(bool)
-}) {
-	return func(s interface {
-		setContext(ctx context.Context)
-		setWait(time.Duration)
-		setMaxBatch(int)
-		setDisableCaching(bool)
-		setPublishResults(bool)
-	}) {
-		s.setDisableCaching(disable)
-	}
-}
-
-func withPublishResults(publish bool) func(interface {
-	setContext(ctx context.Context)
-	setWait(time.Duration)
-	setMaxBatch(int)
-	setDisableCaching(bool)
-	setPublishResults(bool)
-}) {
-	return func(s interface {
-		setContext(ctx context.Context)
-		setWait(time.Duration)
-		setMaxBatch(int)
-		setDisableCaching(bool)
-		setPublishResults(bool)
-	}) {
-		s.setPublishResults(publish)
+func withPublishResults(publish bool) func(*settings) {
+	return func(s *settings) {
+		s.publishResults = publish
 	}
 }
 

@@ -62,6 +62,23 @@ func (api TokenAPI) GetTokenById(ctx context.Context, tokenID persist.DBID) (*db
 	return &token, nil
 }
 
+// GetTokenByIdIgnoreDisplayable returns a token by ID, ignoring the displayable flag.
+func (api TokenAPI) GetTokenByIdIgnoreDisplayable(ctx context.Context, tokenID persist.DBID) (*db.Token, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"tokenID": validate.WithTag(tokenID, "required"),
+	}); err != nil {
+		return nil, err
+	}
+
+	token, err := api.loaders.TokenByTokenIDIgnoreDisplayable.Load(tokenID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &token, nil
+}
+
 func (api TokenAPI) GetTokenByEnsDomain(ctx context.Context, userID persist.DBID, domain string) (db.Token, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{

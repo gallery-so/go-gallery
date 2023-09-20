@@ -2645,6 +2645,79 @@ func (b *GetTokenByIdBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getTokenByIdIgnoreDisplayableBatch = `-- name: GetTokenByIdIgnoreDisplayableBatch :batchone
+select id, deleted, version, created_at, last_updated, name, description, collectors_note, token_uri, token_type, token_id, quantity, ownership_history, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id, is_creator_token, is_holder_token, displayable from tokens where id = $1 and deleted = false
+`
+
+type GetTokenByIdIgnoreDisplayableBatchBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+func (q *Queries) GetTokenByIdIgnoreDisplayableBatch(ctx context.Context, id []persist.DBID) *GetTokenByIdIgnoreDisplayableBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range id {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(getTokenByIdIgnoreDisplayableBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetTokenByIdIgnoreDisplayableBatchBatchResults{br, len(id), false}
+}
+
+func (b *GetTokenByIdIgnoreDisplayableBatchBatchResults) QueryRow(f func(int, Token, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var i Token
+		if b.closed {
+			if f != nil {
+				f(t, i, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		row := b.br.QueryRow()
+		err := row.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Name,
+			&i.Description,
+			&i.CollectorsNote,
+			&i.TokenUri,
+			&i.TokenType,
+			&i.TokenID,
+			&i.Quantity,
+			&i.OwnershipHistory,
+			&i.ExternalUrl,
+			&i.BlockNumber,
+			&i.OwnerUserID,
+			&i.OwnedByWallets,
+			&i.Chain,
+			&i.Contract,
+			&i.IsUserMarkedSpam,
+			&i.IsProviderMarkedSpam,
+			&i.LastSynced,
+			&i.FallbackMedia,
+			&i.TokenMediaID,
+			&i.IsCreatorToken,
+			&i.IsHolderToken,
+			&i.Displayable,
+		)
+		if f != nil {
+			f(t, i, err)
+		}
+	}
+}
+
+func (b *GetTokenByIdIgnoreDisplayableBatchBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const getTokenByUserTokenIdentifiersBatch = `-- name: GetTokenByUserTokenIdentifiersBatch :batchone
 select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id, t.is_creator_token, t.is_holder_token, t.displayable
 from tokens t
