@@ -9028,6 +9028,7 @@ enum UserExperienceType {
   MobileUpsell1
   MobileBetaUpsell
   UpsellMintMemento5
+  UpsellBanner
 }
 
 type UserExperience {
