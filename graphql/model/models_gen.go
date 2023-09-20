@@ -2820,6 +2820,7 @@ const (
 	UserExperienceTypeMobileUpsell1                     UserExperienceType = "MobileUpsell1"
 	UserExperienceTypeMobileBetaUpsell                  UserExperienceType = "MobileBetaUpsell"
 	UserExperienceTypeUpsellMintMemento5                UserExperienceType = "UpsellMintMemento5"
+	UserExperienceTypeUpsellBanner                      UserExperienceType = "UpsellBanner"
 )
 
 var AllUserExperienceType = []UserExperienceType{
@@ -2834,11 +2835,12 @@ var AllUserExperienceType = []UserExperienceType{
 	UserExperienceTypeMobileUpsell1,
 	UserExperienceTypeMobileBetaUpsell,
 	UserExperienceTypeUpsellMintMemento5,
+	UserExperienceTypeUpsellBanner,
 }
 
 func (e UserExperienceType) IsValid() bool {
 	switch e {
-	case UserExperienceTypeMultiGalleryAnnouncement, UserExperienceTypeEmailUpsell, UserExperienceTypeMerchStoreUpsell, UserExperienceTypeMaintenanceFeb2023, UserExperienceTypeMaintenanceAug2023, UserExperienceTypeTwitterConnectionOnboardingUpsell, UserExperienceTypeUpsellMintMemento4, UserExperienceTypeUpsellGallerySelects1, UserExperienceTypeMobileUpsell1, UserExperienceTypeMobileBetaUpsell, UserExperienceTypeUpsellMintMemento5:
+	case UserExperienceTypeMultiGalleryAnnouncement, UserExperienceTypeEmailUpsell, UserExperienceTypeMerchStoreUpsell, UserExperienceTypeMaintenanceFeb2023, UserExperienceTypeMaintenanceAug2023, UserExperienceTypeTwitterConnectionOnboardingUpsell, UserExperienceTypeUpsellMintMemento4, UserExperienceTypeUpsellGallerySelects1, UserExperienceTypeMobileUpsell1, UserExperienceTypeMobileBetaUpsell, UserExperienceTypeUpsellMintMemento5, UserExperienceTypeUpsellBanner:
 		return true
 	}
 	return false

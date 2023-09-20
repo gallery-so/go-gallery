@@ -8981,6 +8981,7 @@ enum UserExperienceType {
   MobileUpsell1
   MobileBetaUpsell
   UpsellMintMemento5
+  UpsellBanner
 }
 
 type UserExperience {
@@ -9561,7 +9562,9 @@ type Query {
     first: Int
     last: Int
   ): CollectionsConnection
-  postComposerDraftDetails(input: PostComposerDraftDetailsInput!): PostComposerDraftDetailsPayloadOrError
+  postComposerDraftDetails(
+    input: PostComposerDraftDetailsInput!
+  ): PostComposerDraftDetailsPayloadOrError
 }
 
 type SocialQueries {
