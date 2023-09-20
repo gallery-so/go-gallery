@@ -3703,23 +3703,23 @@ func (q *Queries) GetUniqueTokenIdentifiersByTokenID(ctx context.Context, id per
 	return i, err
 }
 
-const getUserByAddress = `-- name: GetUserByAddress :one
+const getUserByAddressAndChains = `-- name: GetUserByAddressAndChains :one
 select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id
 from users, wallets
 where wallets.address = $1
-	and wallets.chain = $2::int
+	and wallets.chain = any($2::int[])
 	and array[wallets.id] <@ users.wallets
 	and wallets.deleted = false
 	and users.deleted = false
 `
 
-type GetUserByAddressParams struct {
+type GetUserByAddressAndChainsParams struct {
 	Address persist.Address `json:"address"`
-	Chain   int32           `json:"chain"`
+	Chains  []int32         `json:"chains"`
 }
 
-func (q *Queries) GetUserByAddress(ctx context.Context, arg GetUserByAddressParams) (User, error) {
-	row := q.db.QueryRow(ctx, getUserByAddress, arg.Address, arg.Chain)
+func (q *Queries) GetUserByAddressAndChains(ctx context.Context, arg GetUserByAddressAndChainsParams) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByAddressAndChains, arg.Address, arg.Chains)
 	var i User
 	err := row.Scan(
 		&i.ID,

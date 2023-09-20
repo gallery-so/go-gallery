@@ -377,9 +377,9 @@ func processOwnersForAlchemyTokens(mc *multichain.Provider, queries *coredb.Quer
 
 			userID, ok := addressToUsers[persist.NewChainAddress(activity.ToAddress, chain)]
 			if !ok {
-				user, err := queries.GetUserByAddress(c, coredb.GetUserByAddressParams{
+				user, err := queries.GetUserByAddressAndChains(c, coredb.GetUserByAddressAndChainsParams{
 					Address: persist.Address(chain.NormalizeAddress(activity.ToAddress)),
-					Chain:   int32(chain),
+					Chains:  util.MapWithoutError(persist.EvmChains, func(c persist.Chain) int32 { return int32(c) }),
 				})
 				if err != nil {
 					logger.For(c).Warnf("error getting user by address: %s", err)
@@ -439,7 +439,8 @@ func processOwnersForAlchemyTokens(mc *multichain.Provider, queries *coredb.Quer
 		}
 
 		for userID, tokens := range usersToTokens {
-			logger.For(c).WithFields(logrus.Fields{"user_id": userID, "total_tokens": len(tokens), "token_ids": tokens}).Infof("Processing: %s - Processing Alchemy User Tokens Refresh (total: %d)", userID, len(tokens))
+			l := logger.For(c).WithFields(logrus.Fields{"user_id": userID, "total_tokens": len(tokens), "token_ids": tokens})
+			l.Infof("Processing: %s - Processing Alchemy User Tokens Refresh (total: %d)", userID, len(tokens))
 			newTokens, err := mc.SyncTokensByUserIDAndTokenIdentifiers(c, userID, util.MapWithoutError(tokens, func(t alchemyTokenIdentifiers) persist.TokenUniqueIdentifiers {
 				return persist.TokenUniqueIdentifiers{
 					Chain:           t.Chain,
@@ -449,8 +450,8 @@ func processOwnersForAlchemyTokens(mc *multichain.Provider, queries *coredb.Quer
 				}
 			}))
 			if err != nil {
-				util.ErrResponse(c, http.StatusInternalServerError, err)
-				return
+				logger.For(c).Errorf("error syncing tokens: %s", err)
+				continue
 			}
 
 			if len(newTokens) > 0 {
@@ -473,7 +474,7 @@ func processOwnersForAlchemyTokens(mc *multichain.Provider, queries *coredb.Quer
 
 					// verify the total is less than or equal to the total in the db
 					if curTotal.BigInt().Cmp(token.Quantity.BigInt()) > 0 {
-						logger.For(c).Errorf("error: total quantity of tokens in db is greater than total quantity of tokens on chain")
+						l.Errorf("error: total quantity of tokens in db is greater than total quantity of tokens on chain")
 						continue
 					}
 
