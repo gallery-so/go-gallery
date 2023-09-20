@@ -641,7 +641,7 @@ func (uri TokenURI) IsHTTP() bool {
 }
 
 func (id TokenID) String() string {
-	return strings.ToLower(util.RemoveLeftPaddedZeros(string(id)))
+	return strings.ToLower(strings.TrimPrefix(util.RemoveLeftPaddedZeros(string(id)), "0x"))
 }
 
 // Value implements the driver.Valuer interface for token IDs
@@ -661,7 +661,7 @@ func (id *TokenID) Scan(src interface{}) error {
 
 // BigInt returns the token ID as a big.Int
 func (id TokenID) BigInt() *big.Int {
-	normalized := util.RemoveLeftPaddedZeros(string(id))
+	normalized := id.String()
 	if normalized == "" {
 		return big.NewInt(0)
 	}

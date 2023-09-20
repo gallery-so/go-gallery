@@ -323,6 +323,7 @@ type AlchemyNFTActivity struct {
 	ERC721TokenID   persist.TokenID `json:"erc721TokenId"`
 	TokenID         persist.TokenID `json:"tokenId"`
 	ContractAddress persist.Address `json:"contractAddress"`
+	Address         persist.Address `json:"address"` // also the contract address supposedly
 	ERC1155Metadata []struct {
 		TokenID persist.TokenID   `json:"tokenId"`
 		Value   persist.HexString `json:"value"`
@@ -411,26 +412,28 @@ func processOwnersForAlchemyTokens(mc *multichain.Provider, queries *coredb.Quer
 
 			addressToUsers[persist.NewChainAddress(activity.ToAddress, chain)] = userID
 
+			ca := persist.Address(util.FirstNonEmptyString(activity.ContractAddress.String(), activity.Address.String()))
+
 			if activity.Category == "erc721" {
 				usersToTokens[userID] = append(usersToTokens[userID], alchemyTokenIdentifiers{
 					Chain:           chain,
-					ContractAddress: activity.ContractAddress,
-					TokenID:         activity.TokenID,
+					ContractAddress: ca,
+					TokenID:         activity.ERC721TokenID,
 					OwnerAddress:    activity.ToAddress,
 					Quantity:        "1",
 				})
 
 				tokenQuantities[persist.TokenUniqueIdentifiers{
 					Chain:           chain,
-					ContractAddress: activity.ContractAddress,
-					TokenID:         activity.TokenID,
+					ContractAddress: ca,
+					TokenID:         activity.ERC721TokenID,
 					OwnerAddress:    activity.ToAddress,
 				}] = "1"
 			} else {
 				for _, m := range activity.ERC1155Metadata {
 					usersToTokens[userID] = append(usersToTokens[userID], alchemyTokenIdentifiers{
 						Chain:           chain,
-						ContractAddress: activity.ContractAddress,
+						ContractAddress: ca,
 						TokenID:         m.TokenID,
 						OwnerAddress:    activity.ToAddress,
 						Quantity:        m.Value,
@@ -438,7 +441,7 @@ func processOwnersForAlchemyTokens(mc *multichain.Provider, queries *coredb.Quer
 
 					tids := persist.TokenUniqueIdentifiers{
 						Chain:           chain,
-						ContractAddress: activity.ContractAddress,
+						ContractAddress: ca,
 						TokenID:         m.TokenID,
 						OwnerAddress:    activity.ToAddress,
 					}
@@ -454,7 +457,7 @@ func processOwnersForAlchemyTokens(mc *multichain.Provider, queries *coredb.Quer
 		}
 
 		for userID, tokens := range usersToTokens {
-			l := logger.For(c).WithFields(logrus.Fields{"user_id": userID, "total_tokens": len(tokens), "token_ids": tokens})
+			l := logger.For(c).WithFields(logrus.Fields{"user_id": userID, "total_tokens": len(tokens), "token_ids": tokens, "raw_body": string(bodyBytes)})
 			l.Infof("Processing: %s - Processing Alchemy User Tokens Refresh (total: %d)", userID, len(tokens))
 			newTokens, err := mc.SyncTokensByUserIDAndTokenIdentifiers(c, userID, util.MapWithoutError(tokens, func(t alchemyTokenIdentifiers) persist.TokenUniqueIdentifiers {
 				return persist.TokenUniqueIdentifiers{

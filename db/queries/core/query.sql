@@ -1240,7 +1240,7 @@ set token_media_id = (
         -- The pipeline produced active media, or didn't produce active media but no active media existed before
         else insert_medias.insert_id
     end
-)
+), name = coalesce(nullif(@name, ''), tokens.name), description = coalesce(nullif(@description, ''), tokens.description), last_updated = now() -- update the duplicate fields on the token in the meantime before we get rid of these fields
 from insert_media_add_record insert_medias
 where
     tokens.chain = @chain
