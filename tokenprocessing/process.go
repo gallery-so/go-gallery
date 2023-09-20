@@ -366,7 +366,7 @@ func processOwnersForAlchemyTokens(mc *multichain.Provider, queries *coredb.Quer
 				chain = persist.ChainETH
 			case "POLYGON_MAINNET":
 				chain = persist.ChainPolygon
-			case "ARBITRUM_MAINNET":
+			case "ARB_MAINNET":
 				chain = persist.ChainArbitrum
 			case "OPTIMISM_MAINNET":
 				chain = persist.ChainOptimism
