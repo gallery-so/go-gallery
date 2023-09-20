@@ -97,6 +97,9 @@ select tm.* from tokens join token_medias tm on tokens.token_media_id = tm.id wh
 -- name: GetTokenByIdBatch :batchone
 select * from tokens where id = $1 and displayable and deleted = false;
 
+-- name: GetTokenByIdIgnoreDisplayableBatch :batchone
+select * from tokens where id = $1 and deleted = false;
+
 -- name: GetTokenByUserTokenIdentifiersBatch :batchone
 select t.*
 from tokens t
