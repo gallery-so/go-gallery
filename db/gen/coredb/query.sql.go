@@ -5175,27 +5175,27 @@ func (q *Queries) InsertSpamContracts(ctx context.Context, arg InsertSpamContrac
 const insertTokenPipelineResults = `-- name: InsertTokenPipelineResults :exec
 with insert_job(id) as (
     insert into token_processing_jobs (id, token_properties, pipeline_metadata, processing_cause, processor_version)
-    values ($5, $6, $7, $8, $9)
+    values ($7, $8, $9, $10, $11)
     returning id
 ),
 insert_media_move_active_record(last_updated) as (
     insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
     (
-        select $10, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, now()
+        select $12, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, now()
         from token_medias
-        where contract_id = $2
-            and token_id = $3
-            and chain = $1
+        where contract_id = $4
+            and token_id = $5
+            and chain = $3
             and active
             and not deleted
-            and $11 = true
+            and $13 = true
         limit 1
     )
     returning last_updated
 ),
 insert_media_add_record(insert_id, active, replaced_current) as (
     insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
-    values ($12, $2, $3, $1, $13, $14, $15, $16, (select id from insert_job), $11,
+    values ($14, $4, $5, $3, $15, $16, $1, $2, (select id from insert_job), $13,
         -- Using timestamps generated from insert_media_move_active_record ensures that the new record is only inserted after the current media is moved
         (select coalesce((select last_updated from insert_media_move_active_record), now())),
         (select coalesce((select last_updated from insert_media_move_active_record), now()))
@@ -5207,12 +5207,12 @@ insert_media_add_record(insert_id, active, replaced_current) as (
             description = coalesce(nullif(excluded.description, ''), token_medias.description),
             processing_job_id = excluded.processing_job_id,
             last_updated = now()
-    returning id as insert_id, active, id = $12 replaced_current
+    returning id as insert_id, active, id = $14 replaced_current
 ),
 existing_active(id) as (
     select id
     from token_medias
-    where chain = $1 and contract_id = $2 and token_id = $3 and active and not deleted
+    where chain = $3 and contract_id = $4 and token_id = $5 and active and not deleted
     limit 1
 )
 update tokens
@@ -5225,12 +5225,12 @@ set token_media_id = (
         -- The pipeline produced active media, or didn't produce active media but no active media existed before
         else insert_medias.insert_id
     end
-)
+), name = coalesce(nullif($1, ''), tokens.name), description = coalesce(nullif($2, ''), tokens.description), last_updated = now() -- update the duplicate fields on the token in the meantime before we get rid of these fields
 from insert_media_add_record insert_medias
 where
-    tokens.chain = $1
-    and tokens.contract = $2
-    and tokens.token_id = $3
+    tokens.chain = $3
+    and tokens.contract = $4
+    and tokens.token_id = $5
     and not tokens.deleted
     and (
         -- The case statement below handles which token instances get updated:
@@ -5246,7 +5246,7 @@ where
             -- The pipeline run produced inactive media, only update the token instance (since it may have not been processed before)
             -- Since there is no db constraint on inactive media, all inactive media is new
             when not insert_medias.active
-            then tokens.id = $4
+            then tokens.id = $6
 
             else 1 = 1
         end
@@ -5254,6 +5254,8 @@ where
 `
 
 type InsertTokenPipelineResultsParams struct {
+	Name             interface{}              `json:"name"`
+	Description      interface{}              `json:"description"`
 	Chain            persist.Chain            `json:"chain"`
 	ContractID       persist.DBID             `json:"contract_id"`
 	TokenID          persist.TokenID          `json:"token_id"`
@@ -5268,8 +5270,6 @@ type InsertTokenPipelineResultsParams struct {
 	NewMediaID       persist.DBID             `json:"new_media_id"`
 	Metadata         persist.TokenMetadata    `json:"metadata"`
 	Media            persist.Media            `json:"media"`
-	Name             string                   `json:"name"`
-	Description      string                   `json:"description"`
 }
 
 // Optionally create an inactive record of the existing active record if the new media is also active
@@ -5278,6 +5278,8 @@ type InsertTokenPipelineResultsParams struct {
 // this will still return the active record before the update, and not the new record.
 func (q *Queries) InsertTokenPipelineResults(ctx context.Context, arg InsertTokenPipelineResultsParams) error {
 	_, err := q.db.Exec(ctx, insertTokenPipelineResults,
+		arg.Name,
+		arg.Description,
 		arg.Chain,
 		arg.ContractID,
 		arg.TokenID,
@@ -5292,8 +5294,6 @@ func (q *Queries) InsertTokenPipelineResults(ctx context.Context, arg InsertToke
 		arg.NewMediaID,
 		arg.Metadata,
 		arg.Media,
-		arg.Name,
-		arg.Description,
 	)
 	return err
 }
