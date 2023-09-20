@@ -62,6 +62,7 @@ func (m Manager) StartProcessing(ctx context.Context, token persist.TokenIdentif
 
 	go func() {
 		defer tick.Stop()
+		m.processRegistry.keepAlive(ctx, token)
 		for {
 			select {
 			case <-tick.C:
