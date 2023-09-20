@@ -33,6 +33,7 @@ func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProces
 	ownersGroup := router.Group("/owners")
 	ownersGroup.POST("/process/contract", processOwnersForContractTokens(mc, repos.ContractRepository, throttler))
 	ownersGroup.POST("/process/user", processOwnersForUserTokens(mc, mc.Queries, validator))
+	ownersGroup.POST("/process/alchemy", processOwnersForAlchemyTokens(mc, mc.Queries, validator))
 	ownersGroup.POST("/process/wallet-removal", processWalletRemoval(mc.Queries))
 	contractsGroup := router.Group("/contracts")
 	contractsGroup.POST("/detect-spam", detectSpamContracts(mc.Queries))
