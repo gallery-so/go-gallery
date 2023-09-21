@@ -874,7 +874,7 @@ func testSyncNewTokensIncrementally(t *testing.T) {
 
 	tr := util.ToPointer(true)
 	t.Run("should sync new tokens incrementally", func(t *testing.T) {
-		h := handlerWithProviders(t, sendTokensNOOP, provider)
+		h := handlerWithProviders(t, submitUserTokensNoop, provider)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, tr)
@@ -885,7 +885,7 @@ func testSyncNewTokensIncrementally(t *testing.T) {
 	})
 
 	t.Run("should not duplicate tokens from repeat incremental syncs", func(t *testing.T) {
-		h := handlerWithProviders(t, sendTokensNOOP, provider)
+		h := handlerWithProviders(t, submitUserTokensNoop, provider)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
 		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, tr)

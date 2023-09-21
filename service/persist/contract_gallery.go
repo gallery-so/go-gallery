@@ -27,6 +27,7 @@ type ContractGallery struct {
 	IsProviderMarkedSpam  bool       `json:"is_provider_marked_spam"`
 	OverrideCreatorUserID DBID       `json:"override_creator_user_id"`
 
+	// this will not be persisted, only used in memory for contract comparison
 	Priority *int `json:"-"`
 }
 
