@@ -93,7 +93,7 @@ func (a FarcasterAuthenticator) Authenticate(ctx context.Context) (*SocialAuthRe
 
 	return &SocialAuthResult{
 		Provider: persist.SocialProviderFarcaster,
-		ID:       fu.Fid,
+		ID:       fu.Fid.String(),
 		Metadata: map[string]interface{}{
 			"username":          fu.Username,
 			"name":              fu.DisplayName,

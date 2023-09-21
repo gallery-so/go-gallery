@@ -60,7 +60,7 @@ func main() {
 				Socials: persist.Socials{
 					persist.SocialProviderFarcaster: persist.SocialUserIdentifiers{
 						Provider: persist.SocialProviderFarcaster,
-						ID:       u.Fid,
+						ID:       u.Fid.String(),
 						Display:  true,
 						Metadata: map[string]interface{}{
 							"username":          u.Username,
