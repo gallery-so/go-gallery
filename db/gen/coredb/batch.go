@@ -2572,92 +2572,6 @@ func (b *GetSharedFollowersBatchPaginateBatchResults) Close() error {
 	return b.br.Close()
 }
 
-const getTokenByHolderIdContractAddressAndTokenIdBatch = `-- name: GetTokenByHolderIdContractAddressAndTokenIdBatch :batchone
-select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id, t.is_creator_token, t.is_holder_token, t.displayable
-from tokens t
-join contracts c on t.contract = c.id
-where t.owner_user_id = $1 and t.token_id = $2 and c.address = $3 and c.chain = $4 and t.displayable and not t.deleted and not c.deleted
-`
-
-type GetTokenByHolderIdContractAddressAndTokenIdBatchBatchResults struct {
-	br     pgx.BatchResults
-	tot    int
-	closed bool
-}
-
-type GetTokenByHolderIdContractAddressAndTokenIdBatchParams struct {
-	HolderID        persist.DBID    `json:"holder_id"`
-	TokenID         persist.TokenID `json:"token_id"`
-	ContractAddress persist.Address `json:"contract_address"`
-	Chain           persist.Chain   `json:"chain"`
-}
-
-func (q *Queries) GetTokenByHolderIdContractAddressAndTokenIdBatch(ctx context.Context, arg []GetTokenByHolderIdContractAddressAndTokenIdBatchParams) *GetTokenByHolderIdContractAddressAndTokenIdBatchBatchResults {
-	batch := &pgx.Batch{}
-	for _, a := range arg {
-		vals := []interface{}{
-			a.HolderID,
-			a.TokenID,
-			a.ContractAddress,
-			a.Chain,
-		}
-		batch.Queue(getTokenByHolderIdContractAddressAndTokenIdBatch, vals...)
-	}
-	br := q.db.SendBatch(ctx, batch)
-	return &GetTokenByHolderIdContractAddressAndTokenIdBatchBatchResults{br, len(arg), false}
-}
-
-func (b *GetTokenByHolderIdContractAddressAndTokenIdBatchBatchResults) QueryRow(f func(int, Token, error)) {
-	defer b.br.Close()
-	for t := 0; t < b.tot; t++ {
-		var i Token
-		if b.closed {
-			if f != nil {
-				f(t, i, ErrBatchAlreadyClosed)
-			}
-			continue
-		}
-		row := b.br.QueryRow()
-		err := row.Scan(
-			&i.ID,
-			&i.Deleted,
-			&i.Version,
-			&i.CreatedAt,
-			&i.LastUpdated,
-			&i.Name,
-			&i.Description,
-			&i.CollectorsNote,
-			&i.TokenUri,
-			&i.TokenType,
-			&i.TokenID,
-			&i.Quantity,
-			&i.OwnershipHistory,
-			&i.ExternalUrl,
-			&i.BlockNumber,
-			&i.OwnerUserID,
-			&i.OwnedByWallets,
-			&i.Chain,
-			&i.Contract,
-			&i.IsUserMarkedSpam,
-			&i.IsProviderMarkedSpam,
-			&i.LastSynced,
-			&i.FallbackMedia,
-			&i.TokenMediaID,
-			&i.IsCreatorToken,
-			&i.IsHolderToken,
-			&i.Displayable,
-		)
-		if f != nil {
-			f(t, i, err)
-		}
-	}
-}
-
-func (b *GetTokenByHolderIdContractAddressAndTokenIdBatchBatchResults) Close() error {
-	b.closed = true
-	return b.br.Close()
-}
-
 const getTokenByIdBatch = `-- name: GetTokenByIdBatch :batchone
 select id, deleted, version, created_at, last_updated, name, description, collectors_note, token_uri, token_type, token_id, quantity, ownership_history, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id, is_creator_token, is_holder_token, displayable from tokens where id = $1 and displayable and deleted = false
 `
@@ -2727,6 +2641,165 @@ func (b *GetTokenByIdBatchBatchResults) QueryRow(f func(int, Token, error)) {
 }
 
 func (b *GetTokenByIdBatchBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
+const getTokenByIdIgnoreDisplayableBatch = `-- name: GetTokenByIdIgnoreDisplayableBatch :batchone
+select id, deleted, version, created_at, last_updated, name, description, collectors_note, token_uri, token_type, token_id, quantity, ownership_history, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id, is_creator_token, is_holder_token, displayable from tokens where id = $1 and deleted = false
+`
+
+type GetTokenByIdIgnoreDisplayableBatchBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+func (q *Queries) GetTokenByIdIgnoreDisplayableBatch(ctx context.Context, id []persist.DBID) *GetTokenByIdIgnoreDisplayableBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range id {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(getTokenByIdIgnoreDisplayableBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetTokenByIdIgnoreDisplayableBatchBatchResults{br, len(id), false}
+}
+
+func (b *GetTokenByIdIgnoreDisplayableBatchBatchResults) QueryRow(f func(int, Token, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var i Token
+		if b.closed {
+			if f != nil {
+				f(t, i, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		row := b.br.QueryRow()
+		err := row.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Name,
+			&i.Description,
+			&i.CollectorsNote,
+			&i.TokenUri,
+			&i.TokenType,
+			&i.TokenID,
+			&i.Quantity,
+			&i.OwnershipHistory,
+			&i.ExternalUrl,
+			&i.BlockNumber,
+			&i.OwnerUserID,
+			&i.OwnedByWallets,
+			&i.Chain,
+			&i.Contract,
+			&i.IsUserMarkedSpam,
+			&i.IsProviderMarkedSpam,
+			&i.LastSynced,
+			&i.FallbackMedia,
+			&i.TokenMediaID,
+			&i.IsCreatorToken,
+			&i.IsHolderToken,
+			&i.Displayable,
+		)
+		if f != nil {
+			f(t, i, err)
+		}
+	}
+}
+
+func (b *GetTokenByIdIgnoreDisplayableBatchBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
+const getTokenByUserTokenIdentifiersBatch = `-- name: GetTokenByUserTokenIdentifiersBatch :batchone
+select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id, t.is_creator_token, t.is_holder_token, t.displayable
+from tokens t
+join contracts c on t.contract = c.id
+where t.owner_user_id = $1 and t.token_id = $2 and c.address = $3 and c.chain = $4 and t.displayable and not t.deleted and not c.deleted
+`
+
+type GetTokenByUserTokenIdentifiersBatchBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type GetTokenByUserTokenIdentifiersBatchParams struct {
+	OwnerID         persist.DBID    `json:"owner_id"`
+	TokenID         persist.TokenID `json:"token_id"`
+	ContractAddress persist.Address `json:"contract_address"`
+	Chain           persist.Chain   `json:"chain"`
+}
+
+func (q *Queries) GetTokenByUserTokenIdentifiersBatch(ctx context.Context, arg []GetTokenByUserTokenIdentifiersBatchParams) *GetTokenByUserTokenIdentifiersBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.OwnerID,
+			a.TokenID,
+			a.ContractAddress,
+			a.Chain,
+		}
+		batch.Queue(getTokenByUserTokenIdentifiersBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetTokenByUserTokenIdentifiersBatchBatchResults{br, len(arg), false}
+}
+
+func (b *GetTokenByUserTokenIdentifiersBatchBatchResults) QueryRow(f func(int, Token, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var i Token
+		if b.closed {
+			if f != nil {
+				f(t, i, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		row := b.br.QueryRow()
+		err := row.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Name,
+			&i.Description,
+			&i.CollectorsNote,
+			&i.TokenUri,
+			&i.TokenType,
+			&i.TokenID,
+			&i.Quantity,
+			&i.OwnershipHistory,
+			&i.ExternalUrl,
+			&i.BlockNumber,
+			&i.OwnerUserID,
+			&i.OwnedByWallets,
+			&i.Chain,
+			&i.Contract,
+			&i.IsUserMarkedSpam,
+			&i.IsProviderMarkedSpam,
+			&i.LastSynced,
+			&i.FallbackMedia,
+			&i.TokenMediaID,
+			&i.IsCreatorToken,
+			&i.IsHolderToken,
+			&i.Displayable,
+		)
+		if f != nil {
+			f(t, i, err)
+		}
+	}
+}
+
+func (b *GetTokenByUserTokenIdentifiersBatchBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }

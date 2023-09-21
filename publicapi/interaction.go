@@ -758,6 +758,18 @@ func (api InteractionAPI) AdmireToken(ctx context.Context, tokenID persist.DBID)
 		return "", err
 	}
 
+_, err = event.DispatchEvent(ctx, db.Event{
+		ActorID:        persist.DBIDToNullStr(userID),
+		ResourceTypeID: persist.ResourceTypeAdmire,
+		SubjectID:      tokenID,
+		TokenID:        tokenID,
+		AdmireID:       admireID,
+		Action:         persist.ActionAdmiredToken,
+	}, api.validator, nil)
+	if err != nil {
+		return "", err
+	}
+
 	return admireID, err
 }
 

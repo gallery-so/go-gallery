@@ -10,7 +10,7 @@ import (
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 )
 
-type TokenLoaderByHolderIDContractAddressAndTokenIDSettings interface {
+type TokenLoaderByUserTokenIdentifiersSettings interface {
 	getContext() context.Context
 	getWait() time.Duration
 	getMaxBatchOne() int
@@ -23,20 +23,20 @@ type TokenLoaderByHolderIDContractAddressAndTokenIDSettings interface {
 	getMutexRegistry() *[]*sync.Mutex
 }
 
-// TokenLoaderByHolderIDContractAddressAndTokenIDCacheSubscriptions
-type TokenLoaderByHolderIDContractAddressAndTokenIDCacheSubscriptions struct {
-	// AutoCacheWithKey is a function that returns the coredb.GetTokenByHolderIdContractAddressAndTokenIdBatchParams cache key for a coredb.Token.
+// TokenLoaderByUserTokenIdentifiersCacheSubscriptions
+type TokenLoaderByUserTokenIdentifiersCacheSubscriptions struct {
+	// AutoCacheWithKey is a function that returns the coredb.GetTokenByUserTokenIdentifiersBatchParams cache key for a coredb.Token.
 	// If AutoCacheWithKey is not nil, this loader will automatically cache published results from other loaders
 	// that return a coredb.Token. Loaders that return pointers or slices of coredb.Token
 	// will be dereferenced/iterated automatically, invoking this function with the base coredb.Token type.
-	AutoCacheWithKey func(coredb.Token) coredb.GetTokenByHolderIdContractAddressAndTokenIdBatchParams
+	AutoCacheWithKey func(coredb.Token) coredb.GetTokenByUserTokenIdentifiersBatchParams
 
-	// AutoCacheWithKeys is a function that returns the []coredb.GetTokenByHolderIdContractAddressAndTokenIdBatchParams cache keys for a coredb.Token.
+	// AutoCacheWithKeys is a function that returns the []coredb.GetTokenByUserTokenIdentifiersBatchParams cache keys for a coredb.Token.
 	// Similar to AutoCacheWithKey, but for cases where a single value gets cached by many keys.
 	// If AutoCacheWithKeys is not nil, this loader will automatically cache published results from other loaders
 	// that return a coredb.Token. Loaders that return pointers or slices of coredb.Token
 	// will be dereferenced/iterated automatically, invoking this function with the base coredb.Token type.
-	AutoCacheWithKeys func(coredb.Token) []coredb.GetTokenByHolderIdContractAddressAndTokenIdBatchParams
+	AutoCacheWithKeys func(coredb.Token) []coredb.GetTokenByUserTokenIdentifiersBatchParams
 
 	// TODO: Allow custom cache functions once we're able to use generics. It could be done without generics, but
 	// would be messy and error-prone. A non-generic implementation might look something like:
@@ -48,38 +48,38 @@ type TokenLoaderByHolderIDContractAddressAndTokenIDCacheSubscriptions struct {
 	// to prime the cache.
 }
 
-func (l *TokenLoaderByHolderIDContractAddressAndTokenID) setContext(ctx context.Context) {
+func (l *TokenLoaderByUserTokenIdentifiers) setContext(ctx context.Context) {
 	l.ctx = ctx
 }
 
-func (l *TokenLoaderByHolderIDContractAddressAndTokenID) setWait(wait time.Duration) {
+func (l *TokenLoaderByUserTokenIdentifiers) setWait(wait time.Duration) {
 	l.wait = wait
 }
 
-func (l *TokenLoaderByHolderIDContractAddressAndTokenID) setMaxBatch(maxBatch int) {
+func (l *TokenLoaderByUserTokenIdentifiers) setMaxBatch(maxBatch int) {
 	l.maxBatch = maxBatch
 }
 
-func (l *TokenLoaderByHolderIDContractAddressAndTokenID) setDisableCaching(disableCaching bool) {
+func (l *TokenLoaderByUserTokenIdentifiers) setDisableCaching(disableCaching bool) {
 	l.disableCaching = disableCaching
 }
 
-func (l *TokenLoaderByHolderIDContractAddressAndTokenID) setPublishResults(publishResults bool) {
+func (l *TokenLoaderByUserTokenIdentifiers) setPublishResults(publishResults bool) {
 	l.publishResults = publishResults
 }
 
-func (l *TokenLoaderByHolderIDContractAddressAndTokenID) setPreFetchHook(preFetchHook func(context.Context, string) context.Context) {
+func (l *TokenLoaderByUserTokenIdentifiers) setPreFetchHook(preFetchHook func(context.Context, string) context.Context) {
 	l.preFetchHook = preFetchHook
 }
 
-func (l *TokenLoaderByHolderIDContractAddressAndTokenID) setPostFetchHook(postFetchHook func(context.Context, string)) {
+func (l *TokenLoaderByUserTokenIdentifiers) setPostFetchHook(postFetchHook func(context.Context, string)) {
 	l.postFetchHook = postFetchHook
 }
 
-// NewTokenLoaderByHolderIDContractAddressAndTokenID creates a new TokenLoaderByHolderIDContractAddressAndTokenID with the given settings, functions, and options
-func NewTokenLoaderByHolderIDContractAddressAndTokenID(
-	settings TokenLoaderByHolderIDContractAddressAndTokenIDSettings, fetch func(ctx context.Context, keys []coredb.GetTokenByHolderIdContractAddressAndTokenIdBatchParams) ([]coredb.Token, []error),
-	funcs TokenLoaderByHolderIDContractAddressAndTokenIDCacheSubscriptions,
+// NewTokenLoaderByUserTokenIdentifiers creates a new TokenLoaderByUserTokenIdentifiers with the given settings, functions, and options
+func NewTokenLoaderByUserTokenIdentifiers(
+	settings TokenLoaderByUserTokenIdentifiersSettings, fetch func(ctx context.Context, keys []coredb.GetTokenByUserTokenIdentifiersBatchParams) ([]coredb.Token, []error),
+	funcs TokenLoaderByUserTokenIdentifiersCacheSubscriptions,
 	opts ...func(interface {
 		setContext(context.Context)
 		setWait(time.Duration)
@@ -89,8 +89,8 @@ func NewTokenLoaderByHolderIDContractAddressAndTokenID(
 		setPreFetchHook(func(context.Context, string) context.Context)
 		setPostFetchHook(func(context.Context, string))
 	}),
-) *TokenLoaderByHolderIDContractAddressAndTokenID {
-	loader := &TokenLoaderByHolderIDContractAddressAndTokenID{
+) *TokenLoaderByUserTokenIdentifiers {
+	loader := &TokenLoaderByUserTokenIdentifiers{
 		ctx:                  settings.getContext(),
 		wait:                 settings.getWait(),
 		disableCaching:       settings.getDisableCaching(),
@@ -107,18 +107,18 @@ func NewTokenLoaderByHolderIDContractAddressAndTokenID(
 	}
 
 	// Set this after applying options, in case a different context was set via options
-	loader.fetch = func(keys []coredb.GetTokenByHolderIdContractAddressAndTokenIdBatchParams) ([]coredb.Token, []error) {
+	loader.fetch = func(keys []coredb.GetTokenByUserTokenIdentifiersBatchParams) ([]coredb.Token, []error) {
 		ctx := loader.ctx
 
 		// Allow the preFetchHook to modify and return a new context
 		if loader.preFetchHook != nil {
-			ctx = loader.preFetchHook(ctx, "TokenLoaderByHolderIDContractAddressAndTokenID")
+			ctx = loader.preFetchHook(ctx, "TokenLoaderByUserTokenIdentifiers")
 		}
 
 		results, errors := fetch(ctx, keys)
 
 		if loader.postFetchHook != nil {
-			loader.postFetchHook(ctx, "TokenLoaderByHolderIDContractAddressAndTokenID")
+			loader.postFetchHook(ctx, "TokenLoaderByUserTokenIdentifiers")
 		}
 
 		return results, errors
@@ -156,13 +156,13 @@ func NewTokenLoaderByHolderIDContractAddressAndTokenID(
 	return loader
 }
 
-// TokenLoaderByHolderIDContractAddressAndTokenID batches and caches requests
-type TokenLoaderByHolderIDContractAddressAndTokenID struct {
+// TokenLoaderByUserTokenIdentifiers batches and caches requests
+type TokenLoaderByUserTokenIdentifiers struct {
 	// context passed to fetch functions
 	ctx context.Context
 
 	// this method provides the data for the loader
-	fetch func(keys []coredb.GetTokenByHolderIdContractAddressAndTokenIdBatchParams) ([]coredb.Token, []error)
+	fetch func(keys []coredb.GetTokenByUserTokenIdentifiersBatchParams) ([]coredb.Token, []error)
 
 	// how long to wait before sending a batch
 	wait time.Duration
@@ -194,18 +194,18 @@ type TokenLoaderByHolderIDContractAddressAndTokenID struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[coredb.GetTokenByHolderIdContractAddressAndTokenIdBatchParams]coredb.Token
+	cache map[coredb.GetTokenByUserTokenIdentifiersBatchParams]coredb.Token
 
 	// typed cache functions
 	//subscribers []func(coredb.Token)
-	subscribers []tokenLoaderByHolderIDContractAddressAndTokenIDSubscriber
+	subscribers []tokenLoaderByUserTokenIdentifiersSubscriber
 
 	// functions used to cache published results from other dataloaders
 	cacheFuncs []interface{}
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
-	batch *tokenLoaderByHolderIDContractAddressAndTokenIDBatch
+	batch *tokenLoaderByUserTokenIdentifiersBatch
 
 	// mutex to prevent races
 	mu sync.Mutex
@@ -214,8 +214,8 @@ type TokenLoaderByHolderIDContractAddressAndTokenID struct {
 	once sync.Once
 }
 
-type tokenLoaderByHolderIDContractAddressAndTokenIDBatch struct {
-	keys    []coredb.GetTokenByHolderIdContractAddressAndTokenIdBatchParams
+type tokenLoaderByUserTokenIdentifiersBatch struct {
+	keys    []coredb.GetTokenByUserTokenIdentifiersBatchParams
 	data    []coredb.Token
 	error   []error
 	closing bool
@@ -223,14 +223,14 @@ type tokenLoaderByHolderIDContractAddressAndTokenIDBatch struct {
 }
 
 // Load a Token by key, batching and caching will be applied automatically
-func (l *TokenLoaderByHolderIDContractAddressAndTokenID) Load(key coredb.GetTokenByHolderIdContractAddressAndTokenIdBatchParams) (coredb.Token, error) {
+func (l *TokenLoaderByUserTokenIdentifiers) Load(key coredb.GetTokenByUserTokenIdentifiersBatchParams) (coredb.Token, error) {
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a Token.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *TokenLoaderByHolderIDContractAddressAndTokenID) LoadThunk(key coredb.GetTokenByHolderIdContractAddressAndTokenIdBatchParams) func() (coredb.Token, error) {
+func (l *TokenLoaderByUserTokenIdentifiers) LoadThunk(key coredb.GetTokenByUserTokenIdentifiersBatchParams) func() (coredb.Token, error) {
 	l.mu.Lock()
 	if !l.disableCaching {
 		if it, ok := l.cache[key]; ok {
@@ -241,7 +241,7 @@ func (l *TokenLoaderByHolderIDContractAddressAndTokenID) LoadThunk(key coredb.Ge
 		}
 	}
 	if l.batch == nil {
-		l.batch = &tokenLoaderByHolderIDContractAddressAndTokenIDBatch{done: make(chan struct{})}
+		l.batch = &tokenLoaderByUserTokenIdentifiersBatch{done: make(chan struct{})}
 	}
 	batch := l.batch
 	pos := batch.keyIndex(l, key)
@@ -281,7 +281,7 @@ func (l *TokenLoaderByHolderIDContractAddressAndTokenID) LoadThunk(key coredb.Ge
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *TokenLoaderByHolderIDContractAddressAndTokenID) LoadAll(keys []coredb.GetTokenByHolderIdContractAddressAndTokenIdBatchParams) ([]coredb.Token, []error) {
+func (l *TokenLoaderByUserTokenIdentifiers) LoadAll(keys []coredb.GetTokenByUserTokenIdentifiersBatchParams) ([]coredb.Token, []error) {
 	results := make([]func() (coredb.Token, error), len(keys))
 
 	for i, key := range keys {
@@ -299,7 +299,7 @@ func (l *TokenLoaderByHolderIDContractAddressAndTokenID) LoadAll(keys []coredb.G
 // LoadAllThunk returns a function that when called will block waiting for a Tokens.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *TokenLoaderByHolderIDContractAddressAndTokenID) LoadAllThunk(keys []coredb.GetTokenByHolderIdContractAddressAndTokenIdBatchParams) func() ([]coredb.Token, []error) {
+func (l *TokenLoaderByUserTokenIdentifiers) LoadAllThunk(keys []coredb.GetTokenByUserTokenIdentifiersBatchParams) func() ([]coredb.Token, []error) {
 	results := make([]func() (coredb.Token, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
@@ -317,7 +317,7 @@ func (l *TokenLoaderByHolderIDContractAddressAndTokenID) LoadAllThunk(keys []cor
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *TokenLoaderByHolderIDContractAddressAndTokenID) Prime(key coredb.GetTokenByHolderIdContractAddressAndTokenIdBatchParams, value coredb.Token) bool {
+func (l *TokenLoaderByUserTokenIdentifiers) Prime(key coredb.GetTokenByUserTokenIdentifiersBatchParams, value coredb.Token) bool {
 	if l.disableCaching {
 		return false
 	}
@@ -331,7 +331,7 @@ func (l *TokenLoaderByHolderIDContractAddressAndTokenID) Prime(key coredb.GetTok
 }
 
 // Prime the cache without acquiring locks. Should only be used when the lock is already held.
-func (l *TokenLoaderByHolderIDContractAddressAndTokenID) unsafePrime(key coredb.GetTokenByHolderIdContractAddressAndTokenIdBatchParams, value coredb.Token) bool {
+func (l *TokenLoaderByUserTokenIdentifiers) unsafePrime(key coredb.GetTokenByUserTokenIdentifiersBatchParams, value coredb.Token) bool {
 	if l.disableCaching {
 		return false
 	}
@@ -343,7 +343,7 @@ func (l *TokenLoaderByHolderIDContractAddressAndTokenID) unsafePrime(key coredb.
 }
 
 // Clear the value at key from the cache, if it exists
-func (l *TokenLoaderByHolderIDContractAddressAndTokenID) Clear(key coredb.GetTokenByHolderIdContractAddressAndTokenIdBatchParams) {
+func (l *TokenLoaderByUserTokenIdentifiers) Clear(key coredb.GetTokenByUserTokenIdentifiersBatchParams) {
 	if l.disableCaching {
 		return
 	}
@@ -352,16 +352,16 @@ func (l *TokenLoaderByHolderIDContractAddressAndTokenID) Clear(key coredb.GetTok
 	l.mu.Unlock()
 }
 
-func (l *TokenLoaderByHolderIDContractAddressAndTokenID) unsafeSet(key coredb.GetTokenByHolderIdContractAddressAndTokenIdBatchParams, value coredb.Token) {
+func (l *TokenLoaderByUserTokenIdentifiers) unsafeSet(key coredb.GetTokenByUserTokenIdentifiersBatchParams, value coredb.Token) {
 	if l.cache == nil {
-		l.cache = map[coredb.GetTokenByHolderIdContractAddressAndTokenIdBatchParams]coredb.Token{}
+		l.cache = map[coredb.GetTokenByUserTokenIdentifiersBatchParams]coredb.Token{}
 	}
 	l.cache[key] = value
 }
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
-func (b *tokenLoaderByHolderIDContractAddressAndTokenIDBatch) keyIndex(l *TokenLoaderByHolderIDContractAddressAndTokenID, key coredb.GetTokenByHolderIdContractAddressAndTokenIdBatchParams) int {
+func (b *tokenLoaderByUserTokenIdentifiersBatch) keyIndex(l *TokenLoaderByUserTokenIdentifiers, key coredb.GetTokenByUserTokenIdentifiersBatchParams) int {
 	for i, existingKey := range b.keys {
 		if key == existingKey {
 			return i
@@ -385,7 +385,7 @@ func (b *tokenLoaderByHolderIDContractAddressAndTokenIDBatch) keyIndex(l *TokenL
 	return pos
 }
 
-func (b *tokenLoaderByHolderIDContractAddressAndTokenIDBatch) startTimer(l *TokenLoaderByHolderIDContractAddressAndTokenID) {
+func (b *tokenLoaderByUserTokenIdentifiersBatch) startTimer(l *TokenLoaderByUserTokenIdentifiers) {
 	time.Sleep(l.wait)
 	l.mu.Lock()
 
@@ -401,24 +401,24 @@ func (b *tokenLoaderByHolderIDContractAddressAndTokenIDBatch) startTimer(l *Toke
 	b.end(l)
 }
 
-func (b *tokenLoaderByHolderIDContractAddressAndTokenIDBatch) end(l *TokenLoaderByHolderIDContractAddressAndTokenID) {
+func (b *tokenLoaderByUserTokenIdentifiersBatch) end(l *TokenLoaderByUserTokenIdentifiers) {
 	b.data, b.error = l.fetch(b.keys)
 	close(b.done)
 }
 
-type tokenLoaderByHolderIDContractAddressAndTokenIDSubscriber struct {
+type tokenLoaderByUserTokenIdentifiersSubscriber struct {
 	cacheFunc func(coredb.Token)
 	mutex     *sync.Mutex
 }
 
-func (l *TokenLoaderByHolderIDContractAddressAndTokenID) publishToSubscribers(value coredb.Token) {
+func (l *TokenLoaderByUserTokenIdentifiers) publishToSubscribers(value coredb.Token) {
 	// Lazy build our list of typed cache functions once
 	l.once.Do(func() {
 		for i, subscription := range *l.subscriptionRegistry {
 			if typedFunc, ok := subscription.(*func(coredb.Token)); ok {
 				// Don't invoke our own cache function
 				if !l.ownsCacheFunc(typedFunc) {
-					l.subscribers = append(l.subscribers, tokenLoaderByHolderIDContractAddressAndTokenIDSubscriber{cacheFunc: *typedFunc, mutex: (*l.mutexRegistry)[i]})
+					l.subscribers = append(l.subscribers, tokenLoaderByUserTokenIdentifiersSubscriber{cacheFunc: *typedFunc, mutex: (*l.mutexRegistry)[i]})
 				}
 			}
 		}
@@ -434,13 +434,13 @@ func (l *TokenLoaderByHolderIDContractAddressAndTokenID) publishToSubscribers(va
 	}
 }
 
-func (l *TokenLoaderByHolderIDContractAddressAndTokenID) registerCacheFunc(cacheFunc interface{}, mutex *sync.Mutex) {
+func (l *TokenLoaderByUserTokenIdentifiers) registerCacheFunc(cacheFunc interface{}, mutex *sync.Mutex) {
 	l.cacheFuncs = append(l.cacheFuncs, cacheFunc)
 	*l.subscriptionRegistry = append(*l.subscriptionRegistry, cacheFunc)
 	*l.mutexRegistry = append(*l.mutexRegistry, mutex)
 }
 
-func (l *TokenLoaderByHolderIDContractAddressAndTokenID) ownsCacheFunc(f *func(coredb.Token)) bool {
+func (l *TokenLoaderByUserTokenIdentifiers) ownsCacheFunc(f *func(coredb.Token)) bool {
 	for _, cacheFunc := range l.cacheFuncs {
 		if cacheFunc == f {
 			return true

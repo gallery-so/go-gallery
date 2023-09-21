@@ -44,7 +44,7 @@ type TokenGallery struct {
 	OwnershipHistory []AddressAtBlock `json:"previous_owners"`
 	IsCreatorToken   bool             `json:"is_creator_token"`
 	TokenMetadata    TokenMetadata    `json:"metadata"`
-	Contract         DBID             `json:"contract"`
+	Contract         ContractGallery  `json:"contract"`
 
 	ExternalURL NullString `json:"external_url"`
 
@@ -66,7 +66,7 @@ func (l *AddressAtBlockList) Scan(value interface{}) error {
 
 // TokenIdentifiers returns the identifiers for a token
 func (t TokenGallery) TokenIdentifiers() TokenIdentifiers {
-	return NewTokenIdentifiers(Address(t.Contract), t.TokenID, t.Chain)
+	return NewTokenIdentifiers(t.Contract.Address, t.TokenID, t.Chain)
 }
 
 // AddressAtBlock represents an address at a specific block

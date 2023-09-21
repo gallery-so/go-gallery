@@ -57,6 +57,7 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 	notificationHandler := newNotificationHandler(notif, disableDataloaderCaching, queries)
 	sender.addDelayedHandler(notifications, persist.ActionUserFollowedUsers, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionAdmiredFeedEvent, notificationHandler)
+	sender.addDelayedHandler(notifications, persist.ActionAdmiredToken, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionAdmiredPost, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionViewedGallery, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionCommentedOnFeedEvent, notificationHandler)
@@ -469,7 +470,7 @@ func (h notificationHandler) createNotificationDataForEvent(event db.Event) (dat
 		if event.ExternalID.String != "" {
 			data.UnauthedViewerIDs = []string{persist.NullStrToStr(event.ExternalID)}
 		}
-	case persist.ActionAdmiredFeedEvent, persist.ActionAdmiredPost:
+	case persist.ActionAdmiredFeedEvent, persist.ActionAdmiredPost, persist.ActionAdmiredToken:
 		if event.ActorID.String != "" {
 			data.AdmirerIDs = []persist.DBID{persist.NullStrToDBID(event.ActorID)}
 		}

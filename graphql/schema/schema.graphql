@@ -53,6 +53,7 @@ scalar Address
 scalar PubKey
 scalar DBID
 scalar Email
+scalar TokenId
 
 interface Node {
   id: ID!
@@ -602,6 +603,14 @@ type Community implements Node @goEmbedHelper {
 
   posts(before: String, after: String, first: Int, last: Int): PostsConnection
     @goField(forceResolver: true)
+
+  tmpPostsWithProjectID(
+    projectID: Int!
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): PostsConnection @goField(forceResolver: true)
 }
 
 type Contract implements Node {
@@ -770,6 +779,7 @@ enum UserExperienceType {
   MobileUpsell1
   MobileBetaUpsell
   UpsellMintMemento5
+  UpsellBanner
 }
 
 type UserExperience {
@@ -1223,6 +1233,30 @@ union SearchCommunitiesPayloadOrError = SearchCommunitiesPayload | ErrInvalidInp
 
 union SocialQueriesOrError = SocialQueries | ErrNotAuthorized | ErrNeedsToReconnectSocial
 
+input ChainAddressTokenInput {
+  chainAddress: ChainAddressInput!
+  """
+  Refers to the id of the token in the contract either in decimal, or interpreted as hexadecimal when prefixed with '0x'
+  """
+  tokenId: TokenId!
+}
+
+input PostComposerDraftDetailsInput {
+  token: ChainAddressTokenInput!
+}
+
+type PostComposerDraftDetailsPayload @goEmbedHelper {
+  media: MediaSubtype
+  community: Community @goField(forceResolver: true)
+  tokenName: String
+  tokenDescription: String
+}
+
+union PostComposerDraftDetailsPayloadOrError =
+    PostComposerDraftDetailsPayload
+  | ErrInvalidInput
+  | ErrCommunityNotFound
+
 type Query {
   node(id: ID!): Node
   viewer: ViewerOrError @authRequired
@@ -1329,6 +1363,9 @@ type Query {
     first: Int
     last: Int
   ): CollectionsConnection
+  postComposerDraftDetails(
+    input: PostComposerDraftDetailsInput!
+  ): PostComposerDraftDetailsPayloadOrError
 }
 
 type SocialQueries {
@@ -1946,6 +1983,20 @@ type SomeoneAdmiredYourPostNotification implements Notification & Node & Grouped
     @goField(forceResolver: true)
 }
 
+type SomeoneAdmiredYourTokenNotification implements Notification & Node & GroupedNotification
+  @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+  count: Int
+
+  token: Token @goField(forceResolver: true)
+  admirers(before: String, after: String, first: Int, last: Int): GroupNotificationUsersConnection
+    @goField(forceResolver: true)
+}
+
 type SomeoneCommentedOnYourPostNotification implements Notification & Node @goEmbedHelper {
   id: ID!
   dbid: DBID!
@@ -2139,6 +2190,17 @@ union SyncCreatedTokensForUsernamePayloadOrError =
     SyncCreatedTokensForUsernamePayload
   | ErrNotAuthorized
   | ErrSyncFailed
+
+type SyncCreatedTokensForUsernameAndExistingContractPayload {
+  message: String!
+}
+
+union SyncCreatedTokensForUsernameAndExistingContractPayloadOrError =
+    SyncCreatedTokensForUsernameAndExistingContractPayload
+  | ErrInvalidInput
+  | ErrNotAuthorized
+  | ErrSyncFailed
+  | ErrCommunityNotFound
 
 type BanUserFromFeedPayload {
   user: GalleryUser
@@ -2450,6 +2512,21 @@ type PostTokensPayload {
 
 union PostTokensPayloadOrError = PostTokensPayload | ErrInvalidInput | ErrNotAuthorized
 
+input ReferralPostTokenInput {
+  token: ChainAddressTokenInput!
+  caption: String
+}
+
+type ReferralPostTokenPayload {
+  post: Post!
+}
+
+union ReferralPostTokenPayloadOrError =
+    ReferralPostTokenPayload
+  | ErrInvalidInput
+  | ErrNotAuthorized
+  | ErrTokenNotFound
+
 type AdmirePostPayload {
   viewer: Viewer
   post: Post @goField(forceResolver: true)
@@ -2484,6 +2561,16 @@ type DeletePostPayload {
 }
 
 union DeletePostPayloadOrError = DeletePostPayload | ErrInvalidInput | ErrNotAuthorized
+
+input ReferralPostPreflightInput {
+  token: ChainAddressTokenInput!
+}
+
+type ReferralPostPreflightPayload {
+  accepted: Boolean!
+}
+
+union ReferralPostPreflightPayloadOrError = ReferralPostPreflightPayload | ErrInvalidInput
 
 type Mutation {
   # User Mutations
@@ -2573,6 +2660,8 @@ type Mutation {
     @authRequired
 
   postTokens(input: PostTokensInput!): PostTokensPayloadOrError @authRequired
+  referralPostToken(input: ReferralPostTokenInput!): ReferralPostTokenPayloadOrError @authRequired
+  referralPostPreflight(input: ReferralPostPreflightInput!): ReferralPostPreflightPayloadOrError
   deletePost(postId: DBID!): DeletePostPayloadOrError @authRequired
 
   viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
@@ -2614,6 +2703,10 @@ type Mutation {
     username: String!
     chains: [Chain!]!
   ): SyncCreatedTokensForUsernamePayloadOrError @retoolAuth
+  syncCreatedTokensForUsernameAndExistingContract(
+    username: String!
+    chainAddress: ChainAddressInput!
+  ): SyncCreatedTokensForUsernameAndExistingContractPayloadOrError @retoolAuth
   banUserFromFeed(username: String!, action: String!): BanUserFromFeedPayloadOrError @retoolAuth
   unbanUserFromFeed(username: String!): UnbanUserFromFeedPayloadOrError @retoolAuth
   mintPremiumCardToWallet(

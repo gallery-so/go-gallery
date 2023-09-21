@@ -8,8 +8,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
-	"time"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -21,7 +19,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/rpc/ipfs"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
@@ -293,6 +290,16 @@ func (r *communityResolver) Owners(ctx context.Context, obj *model.Community, be
 // Posts is the resolver for the posts field.
 func (r *communityResolver) Posts(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.PostsConnection, error) {
 	return resolveCommunityPostsByContractID(ctx, obj.Dbid, before, after, first, last)
+}
+
+// TmpPostsWithProjectID is the resolver for the tmpPostsWithProjectID field.
+func (r *communityResolver) TmpPostsWithProjectID(ctx context.Context, obj *model.Community, projectID int, before *string, after *string, first *int, last *int) (*model.PostsConnection, error) {
+	posts, pageInfo, err := publicapi.For(ctx).Contract.GetCommunityPostsByContractIDAndProjectID(ctx, obj.Dbid, projectID, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+	connection := postsToConnection(ctx, posts, obj.Dbid, pageInfo)
+	return &connection, nil
 }
 
 // FeedEvent is the resolver for the feedEvent field.
@@ -1436,6 +1443,34 @@ func (r *mutationResolver) PostTokens(ctx context.Context, input model.PostToken
 	return output, nil
 }
 
+// ReferralPostToken is the resolver for the referralPostToken field.
+func (r *mutationResolver) ReferralPostToken(ctx context.Context, input model.ReferralPostTokenInput) (model.ReferralPostTokenPayloadOrError, error) {
+	token := persist.TokenIdentifiers{
+		Chain:           input.Token.ChainAddress.Chain(),
+		ContractAddress: input.Token.ChainAddress.Address(),
+		TokenID:         input.Token.TokenID,
+	}
+	id, err := publicapi.For(ctx).Feed.ReferralPostToken(ctx, token, input.Caption)
+	if err != nil {
+		return nil, err
+	}
+	post, err := resolvePostByPostID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return &model.ReferralPostTokenPayload{Post: post}, nil
+}
+
+// ReferralPostPreflight is the resolver for the referralPostPreflight field.
+func (r *mutationResolver) ReferralPostPreflight(ctx context.Context, input model.ReferralPostPreflightInput) (model.ReferralPostPreflightPayloadOrError, error) {
+	err := publicapi.For(ctx).Feed.ReferralPostPreflight(ctx, persist.TokenIdentifiers{
+		Chain:           input.Token.ChainAddress.Chain(),
+		ContractAddress: input.Token.ChainAddress.Address(),
+		TokenID:         input.Token.TokenID,
+	})
+	return &model.ReferralPostPreflightPayload{Accepted: err == nil}, err
+}
+
 // DeletePost is the resolver for the deletePost field.
 func (r *mutationResolver) DeletePost(ctx context.Context, postID persist.DBID) (model.DeletePostPayloadOrError, error) {
 	err := publicapi.For(ctx).Feed.DeletePostById(ctx, postID)
@@ -1819,6 +1854,28 @@ func (r *mutationResolver) SyncCreatedTokensForUsername(ctx context.Context, use
 	return output, nil
 }
 
+// SyncCreatedTokensForUsernameAndExistingContract is the resolver for the syncCreatedTokensForUsernameAndExistingContract field.
+func (r *mutationResolver) SyncCreatedTokensForUsernameAndExistingContract(ctx context.Context, username string, chainAddress persist.ChainAddress) (model.SyncCreatedTokensForUsernameAndExistingContractPayloadOrError, error) {
+	api := publicapi.For(ctx)
+
+	user, err := api.User.GetUserByUsername(ctx, username)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = api.Token.SyncCreatedTokensForExistingContractAdmin(ctx, user.ID, chainAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.SyncCreatedTokensForUsernameAndExistingContractPayload{
+		Message: "Successfully synced tokens",
+	}
+
+	return output, nil
+}
+
 // BanUserFromFeed is the resolver for the banUserFromFeed field.
 func (r *mutationResolver) BanUserFromFeed(ctx context.Context, username string, action string) (model.BanUserFromFeedPayloadOrError, error) {
 	user, err := publicapi.For(ctx).User.GetUserByUsername(ctx, username)
@@ -1971,11 +2028,11 @@ func (r *postResolver) Author(ctx context.Context, obj *model.Post) (*model.Gall
 func (r *postResolver) Tokens(ctx context.Context, obj *model.Post) ([]*model.Token, error) {
 	result := make([]*model.Token, len(obj.TokenIDs))
 	for i, token := range obj.TokenIDs {
-		t, err := resolveTokenByTokenID(ctx, token)
+		t, err := publicapi.For(ctx).Token.GetTokenByIdIgnoreDisplayable(ctx, token)
 		if err != nil {
 			return nil, err
 		}
-		result[i] = t
+		result[i] = tokenToModel(ctx, *t, nil)
 	}
 
 	return result, nil
@@ -2068,6 +2125,20 @@ func (r *postResolver) ViewerAdmire(ctx context.Context, obj *model.Post) (*mode
 	}
 
 	return admireToModel(ctx, *admire), nil
+}
+
+// Community is the resolver for the community field.
+func (r *postComposerDraftDetailsPayloadResolver) Community(ctx context.Context, obj *model.PostComposerDraftDetailsPayload) (*model.Community, error) {
+	if obj.HelperPostComposerDraftDetailsPayloadData.ContractID != "" {
+		return resolveCommunityByID(ctx, obj.HelperPostComposerDraftDetailsPayloadData.ContractID)
+	}
+
+	if obj.HelperPostComposerDraftDetailsPayloadData.Token.ContractAddress != "" {
+		chainAddress := persist.NewChainAddress(obj.HelperPostComposerDraftDetailsPayloadData.Token.ContractAddress, obj.HelperPostComposerDraftDetailsPayloadData.Token.Chain)
+		return resolveCommunityByContractAddress(ctx, chainAddress, util.ToPointer(false))
+	}
+
+	return nil, nil
 }
 
 // Blurhash is the resolver for the blurhash field.
@@ -2428,6 +2499,48 @@ func (r *queryResolver) TopCollectionsForCommunity(ctx context.Context, input mo
 	}, nil
 }
 
+// PostComposerDraftDetails is the resolver for the postComposerDraftDetails field.
+func (r *queryResolver) PostComposerDraftDetails(ctx context.Context, input model.PostComposerDraftDetailsInput) (model.PostComposerDraftDetailsPayloadOrError, error) {
+	token := persist.TokenIdentifiers{
+		Chain:           input.Token.ChainAddress.Chain(),
+		ContractAddress: input.Token.ChainAddress.Address(),
+		TokenID:         input.Token.TokenID,
+	}
+
+	media, t, err := publicapi.For(ctx).Token.MediaByTokenIdentifiers(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	tokenName := t.Name.String
+	if media.ID != "" && media.Name != "" {
+		tokenName = media.Name
+	}
+
+	tokenDescription := t.Description.String
+	if media.ID != "" && media.Description != "" {
+		tokenDescription = media.Description
+	}
+
+	contractID := t.Contract
+	if media.ID != "" && media.ContractID != "" {
+		contractID = media.ContractID
+	}
+
+	highDef := false
+
+	return model.PostComposerDraftDetailsPayload{
+		Media:            resolveTokenMedia(ctx, t, media, highDef),
+		TokenName:        util.ToPointer(tokenName),
+		TokenDescription: util.ToPointer(tokenDescription),
+		Community:        nil, // handled by dedicated resolver
+		HelperPostComposerDraftDetailsPayloadData: model.HelperPostComposerDraftDetailsPayloadData{
+			Token:      token,
+			ContractID: contractID,
+		},
+	}, err
+}
+
 // FeedEvent is the resolver for the feedEvent field.
 func (r *removeAdmirePayloadResolver) FeedEvent(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.FeedEvent, error) {
 	if obj.FeedEvent == nil || obj.FeedEvent.Dbid == "" {
@@ -2518,6 +2631,16 @@ func (r *someoneAdmiredYourPostNotificationResolver) Admirers(ctx context.Contex
 	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.NotificationData.AdmirerIDs, before, after, first, last)
 }
 
+// Token is the resolver for the token field.
+func (r *someoneAdmiredYourTokenNotificationResolver) Token(ctx context.Context, obj *model.SomeoneAdmiredYourTokenNotification) (*model.Token, error) {
+	return resolveTokenByTokenID(ctx, obj.TokenID)
+}
+
+// Admirers is the resolver for the admirers field.
+func (r *someoneAdmiredYourTokenNotificationResolver) Admirers(ctx context.Context, obj *model.SomeoneAdmiredYourTokenNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error) {
+	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.NotificationData.AdmirerIDs, before, after, first, last)
+}
+
 // Comment is the resolver for the comment field.
 func (r *someoneCommentedOnYourFeedEventNotificationResolver) Comment(ctx context.Context, obj *model.SomeoneCommentedOnYourFeedEventNotification) (*model.Comment, error) {
 	return resolveCommentByCommentID(ctx, obj.CommentID)
@@ -2580,33 +2703,12 @@ func (r *tokenResolver) Media(ctx context.Context, obj *model.Token) (model.Medi
 	}
 
 	tokenMedia, err := publicapi.For(ctx).Token.MediaByTokenID(ctx, obj.Dbid)
-	if err != nil || !tokenMedia.Active {
-		if util.ErrorAs[persist.ErrMediaNotFound](err) {
-			err = nil
-		}
 
-		// If there is no media for a token (whether valid or not), assume that the token is still being synced.
-		tokenMedia.Media.MediaType = persist.MediaTypeSyncing
-
-		// In the worse case the processing message was dropped and the token never gets handled. To address that,
-		// we compare when the token was created to the current time. If it's longer than the grace period, we assume that the
-		// message was lost and set the media to invalid so it could be refreshed manually.
-		if time.Since(obj.Token.CreatedAt) > time.Duration(1*time.Hour) {
-			tokenMedia.Media.MediaType = persist.MediaTypeInvalid
-		}
-
-		fallbackMedia := obj.HelperTokenData.Token.FallbackMedia
-
-		// Rewrite IPFS and Arweave URLs to HTTP
-		if fallbackURL := strings.ToLower(fallbackMedia.ImageURL.String()); strings.HasPrefix(fallbackURL, "ipfs://") {
-			fallbackMedia.ImageURL = persist.NullString(ipfs.DefaultGatewayFrom(fallbackURL))
-		} else if strings.HasPrefix(fallbackURL, "ar://") {
-			fallbackMedia.ImageURL = persist.NullString(fmt.Sprintf("https://arweave.net/%s", util.GetURIPath(fallbackURL, false)))
-		}
-
-		return mediaToModel(ctx, tokenMedia, fallbackMedia, highDef), err
+	if util.ErrorAs[persist.ErrMediaNotFound](err) {
+		err = nil
 	}
-	return mediaToModel(ctx, tokenMedia, obj.HelperTokenData.Token.FallbackMedia, highDef), nil
+
+	return resolveTokenMedia(ctx, obj.HelperTokenData.Token, tokenMedia, highDef), err
 }
 
 // Owner is the resolver for the owner field.
@@ -2984,6 +3086,11 @@ func (r *Resolver) OwnerAtBlock() generated.OwnerAtBlockResolver { return &owner
 // Post returns generated.PostResolver implementation.
 func (r *Resolver) Post() generated.PostResolver { return &postResolver{r} }
 
+// PostComposerDraftDetailsPayload returns generated.PostComposerDraftDetailsPayloadResolver implementation.
+func (r *Resolver) PostComposerDraftDetailsPayload() generated.PostComposerDraftDetailsPayloadResolver {
+	return &postComposerDraftDetailsPayloadResolver{r}
+}
+
 // PreviewURLSet returns generated.PreviewURLSetResolver implementation.
 func (r *Resolver) PreviewURLSet() generated.PreviewURLSetResolver { return &previewURLSetResolver{r} }
 
@@ -3021,6 +3128,11 @@ func (r *Resolver) SomeoneAdmiredYourFeedEventNotification() generated.SomeoneAd
 // SomeoneAdmiredYourPostNotification returns generated.SomeoneAdmiredYourPostNotificationResolver implementation.
 func (r *Resolver) SomeoneAdmiredYourPostNotification() generated.SomeoneAdmiredYourPostNotificationResolver {
 	return &someoneAdmiredYourPostNotificationResolver{r}
+}
+
+// SomeoneAdmiredYourTokenNotification returns generated.SomeoneAdmiredYourTokenNotificationResolver implementation.
+func (r *Resolver) SomeoneAdmiredYourTokenNotification() generated.SomeoneAdmiredYourTokenNotificationResolver {
+	return &someoneAdmiredYourTokenNotificationResolver{r}
 }
 
 // SomeoneCommentedOnYourFeedEventNotification returns generated.SomeoneCommentedOnYourFeedEventNotificationResolver implementation.
@@ -3125,6 +3237,7 @@ type mutationResolver struct{ *Resolver }
 type newTokensNotificationResolver struct{ *Resolver }
 type ownerAtBlockResolver struct{ *Resolver }
 type postResolver struct{ *Resolver }
+type postComposerDraftDetailsPayloadResolver struct{ *Resolver }
 type previewURLSetResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type removeAdmirePayloadResolver struct{ *Resolver }
@@ -3134,6 +3247,7 @@ type socialConnectionResolver struct{ *Resolver }
 type socialQueriesResolver struct{ *Resolver }
 type someoneAdmiredYourFeedEventNotificationResolver struct{ *Resolver }
 type someoneAdmiredYourPostNotificationResolver struct{ *Resolver }
+type someoneAdmiredYourTokenNotificationResolver struct{ *Resolver }
 type someoneCommentedOnYourFeedEventNotificationResolver struct{ *Resolver }
 type someoneCommentedOnYourPostNotificationResolver struct{ *Resolver }
 type someoneFollowedYouBackNotificationResolver struct{ *Resolver }
