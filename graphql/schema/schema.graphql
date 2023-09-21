@@ -1759,10 +1759,22 @@ input OneTimeLoginTokenAuth {
 input SocialAuthMechanism {
   twitter: TwitterAuth
   debug: DebugSocialAuth
+  farcaster: FarcasterAuth
+  lens: LensAuth
 }
 
 input TwitterAuth {
   code: String!
+}
+
+input FarcasterAuth {
+  address: Address!
+  # farcaster only supports ETH addresses currently so no need to specify a chain
+}
+
+input LensAuth {
+  address: Address!
+  # lens only supports ETH addresses currently so no need to specify a chain
 }
 
 input DebugSocialAuth @restrictEnvironment(allowed: ["local", "development", "sandbox"]) {
