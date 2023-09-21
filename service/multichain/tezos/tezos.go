@@ -169,50 +169,53 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 	return d.tzBalanceTokensToTokens(ctx, resultTokens, addr.String())
 }
 
-func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, addr persist.Address, rec chan<- multichain.ChainAgnosticTokensAndContracts, errChan chan<- error) {
+func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, addr persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+	rec := make(chan multichain.ChainAgnosticTokensAndContracts)
+	errChan := make(chan error)
+	go func() {
+		defer close(rec)
 
-	defer close(rec)
-
-	tzAddr, err := toTzAddress(addr)
-	if err != nil {
-		errChan <- err
-		return
-	}
-	limit := 100
-	offset := 0
-	for {
-		tzktBalances, err := d.fetchBalancesByAddress(tzAddr, limit, offset)
+		tzAddr, err := toTzAddress(addr)
 		if err != nil {
 			errChan <- err
 			return
 		}
-
-		logger.For(ctx).Debugf("retrieved %d tokens for address %s (limit %d offset %d)", len(tzktBalances), tzAddr.String(), limit, offset)
-
-		resultTokens, resultContracts, err := d.tzBalanceTokensToTokens(ctx, tzktBalances, addr.String())
-		if err != nil {
-			errChan <- err
-			return
-		}
-
-		logger.For(ctx).Debugf("converted %d tokens for address %s (limit %d offset %d)", len(resultTokens), tzAddr.String(), limit, offset)
-
-		if len(resultTokens) > 0 || len(resultContracts) > 0 {
-			rec <- multichain.ChainAgnosticTokensAndContracts{
-				Tokens:    resultTokens,
-				Contracts: resultContracts,
+		limit := 100
+		offset := 0
+		for {
+			tzktBalances, err := d.fetchBalancesByAddress(tzAddr, limit, offset)
+			if err != nil {
+				errChan <- err
+				return
 			}
+
+			logger.For(ctx).Debugf("retrieved %d tokens for address %s (limit %d offset %d)", len(tzktBalances), tzAddr.String(), limit, offset)
+
+			resultTokens, resultContracts, err := d.tzBalanceTokensToTokens(ctx, tzktBalances, addr.String())
+			if err != nil {
+				errChan <- err
+				return
+			}
+
+			logger.For(ctx).Debugf("converted %d tokens for address %s (limit %d offset %d)", len(resultTokens), tzAddr.String(), limit, offset)
+
+			if len(resultTokens) > 0 || len(resultContracts) > 0 {
+				rec <- multichain.ChainAgnosticTokensAndContracts{
+					Tokens:    resultTokens,
+					Contracts: resultContracts,
+				}
+			}
+
+			if len(tzktBalances) < limit {
+				break
+			}
+
+			offset += limit
+
+			logger.For(ctx).Debugf("retrieved %d tokens for address %s (limit %d offset %d)", len(resultTokens), tzAddr.String(), limit, offset)
 		}
-
-		if len(tzktBalances) < limit {
-			break
-		}
-
-		offset += limit
-
-		logger.For(ctx).Debugf("retrieved %d tokens for address %s (limit %d offset %d)", len(resultTokens), tzAddr.String(), limit, offset)
-	}
-
+	}()
+	return rec, errChan
 }
 
 func (d *Provider) fetchBalancesByAddress(tzAddr persist.Address, limit, offset int) ([]tzktBalanceToken, error) {

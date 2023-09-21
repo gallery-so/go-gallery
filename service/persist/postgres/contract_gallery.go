@@ -41,7 +41,7 @@ func NewContractGalleryRepository(db *sql.DB, queries *db.Queries) *ContractGall
 	getByAddressesStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,SYMBOL,NAME,OWNER_ADDRESS,CHAIN,IS_PROVIDER_MARKED_SPAM FROM contracts WHERE ADDRESS = ANY($1) AND CHAIN = $2 AND DELETED = false;`)
 	checkNoErr(err)
 
-	getByTokenIDsStmt, err := db.PrepareContext(ctx, `select contracts.ID,contracts.VERSION,contracts.CREATED_AT,contracts.LAST_UPDATED,contracts.ADDRESS,contracts.SYMBOL,contracts.NAME,contracts.OWNER_ADDRESS,contracts.CHAIN,contracts.IS_PROVIDER_MARKED_SPAM from contracts join tokens on contracts.id = tokens.contract where tokens.id = any($1) and contracts.deleted = false;`)
+	getByTokenIDsStmt, err := db.PrepareContext(ctx, `select distinct on (contracts.ID) contracts.ID,contracts.VERSION,contracts.CREATED_AT,contracts.LAST_UPDATED,contracts.ADDRESS,contracts.SYMBOL,contracts.NAME,contracts.OWNER_ADDRESS,contracts.CHAIN,contracts.IS_PROVIDER_MARKED_SPAM from contracts join tokens on contracts.id = tokens.contract where tokens.id = any($1) and contracts.deleted = false ORDER BY contracts.ID;`)
 	checkNoErr(err)
 
 	upsertByAddressStmt, err := db.PrepareContext(ctx, `

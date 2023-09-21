@@ -41,12 +41,17 @@ func (p stubProvider) GetTokensByWalletAddress(ctx context.Context, address pers
 	return p.Tokens, p.Contracts, nil
 }
 
-func (p stubProvider) GetTokensIncrementallyByWalletAddress(ctx context.Context, address persist.Address, rec chan<- multichain.ChainAgnosticTokensAndContracts, errChan chan<- error) {
-	defer close(rec)
-	rec <- multichain.ChainAgnosticTokensAndContracts{
-		Tokens:    p.Tokens,
-		Contracts: p.Contracts,
-	}
+func (p stubProvider) GetTokensIncrementallyByWalletAddress(ctx context.Context, address persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+	rec := make(chan multichain.ChainAgnosticTokensAndContracts)
+	errChan := make(chan error)
+	go func() {
+		defer close(rec)
+		rec <- multichain.ChainAgnosticTokensAndContracts{
+			Tokens:    p.Tokens,
+			Contracts: p.Contracts,
+		}
+	}()
+	return rec, errChan
 }
 
 func (p stubProvider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {

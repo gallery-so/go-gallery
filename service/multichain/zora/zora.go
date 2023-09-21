@@ -152,12 +152,17 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 	return d.getTokensByWalletAddressPaginate(ctx, addr, "", nil)
 }
 
-func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, addr persist.Address, rec chan<- multichain.ChainAgnosticTokensAndContracts, errChan chan<- error) {
-	_, _, err := d.getTokensByWalletAddressPaginate(ctx, addr, "", rec)
-	if err != nil {
-		errChan <- err
-		return
-	}
+func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, addr persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+	rec := make(chan multichain.ChainAgnosticTokensAndContracts)
+	errChan := make(chan error)
+	go func() {
+		_, _, err := d.getTokensByWalletAddressPaginate(ctx, addr, "", rec)
+		if err != nil {
+			errChan <- err
+			return
+		}
+	}()
+	return rec, errChan
 }
 
 func (d *Provider) getTokensWithRequest(ctx context.Context, req string, owner, collection persist.Address, endCursor string, rec chan<- multichain.ChainAgnosticTokensAndContracts) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {

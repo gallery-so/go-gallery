@@ -259,8 +259,9 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 }
 
 // GetTokensIncrementallyByWalletAddress retrieves tokens for a wallet address on the Ethereum Blockchain
-func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, addr persist.Address, rec chan<- multichain.ChainAgnosticTokensAndContracts, errChan chan<- error) {
-	defer close(rec)
+func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, addr persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+	rec := make(chan multichain.ChainAgnosticTokensAndContracts)
+	errChan := make(chan error)
 
 	url := fmt.Sprintf("%s/getNFTs?owner=%s&withMetadata=true", d.alchemyAPIURL, addr)
 	if d.chain == persist.ChainPolygon {
@@ -278,27 +279,31 @@ func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 		}
 	}()
 
-outer:
-	for {
-		select {
-		case err := <-subErrChan:
-			errChan <- err
-			return
-		case <-ctx.Done():
-			errChan <- ctx.Err()
-			return
-		case tokens, ok := <-alchemyRec:
-			if !ok {
-				break outer
-			}
-			cTokens, cContracts := alchemyTokensToChainAgnosticTokensForOwner(persist.EthereumAddress(addr), tokens)
-			rec <- multichain.ChainAgnosticTokensAndContracts{
-				Tokens:    cTokens,
-				Contracts: cContracts,
+	go func() {
+		defer close(rec)
+	outer:
+		for {
+			select {
+			case err := <-subErrChan:
+				errChan <- err
+				return
+			case <-ctx.Done():
+				errChan <- ctx.Err()
+				return
+			case tokens, ok := <-alchemyRec:
+				if !ok {
+					break outer
+				}
+				cTokens, cContracts := alchemyTokensToChainAgnosticTokensForOwner(persist.EthereumAddress(addr), tokens)
+				rec <- multichain.ChainAgnosticTokensAndContracts{
+					Tokens:    cTokens,
+					Contracts: cContracts,
+				}
 			}
 		}
-	}
+	}()
 
+	return rec, errChan
 }
 
 func getNFTsPaginate[T tokensPaginated](ctx context.Context, baseURL string, defaultLimit int, pageKeyName string, limit, offset int, pageKey string, httpClient *http.Client, rec chan<- []Token, result T) ([]Token, error) {
