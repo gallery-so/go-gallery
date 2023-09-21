@@ -2631,6 +2631,16 @@ func (r *someoneAdmiredYourPostNotificationResolver) Admirers(ctx context.Contex
 	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.NotificationData.AdmirerIDs, before, after, first, last)
 }
 
+// Token is the resolver for the token field.
+func (r *someoneAdmiredYourTokenNotificationResolver) Token(ctx context.Context, obj *model.SomeoneAdmiredYourTokenNotification) (*model.Token, error) {
+	return resolveTokenByTokenID(ctx, obj.TokenID)
+}
+
+// Admirers is the resolver for the admirers field.
+func (r *someoneAdmiredYourTokenNotificationResolver) Admirers(ctx context.Context, obj *model.SomeoneAdmiredYourTokenNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error) {
+	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.NotificationData.AdmirerIDs, before, after, first, last)
+}
+
 // Comment is the resolver for the comment field.
 func (r *someoneCommentedOnYourFeedEventNotificationResolver) Comment(ctx context.Context, obj *model.SomeoneCommentedOnYourFeedEventNotification) (*model.Comment, error) {
 	return resolveCommentByCommentID(ctx, obj.CommentID)
@@ -3120,6 +3130,11 @@ func (r *Resolver) SomeoneAdmiredYourPostNotification() generated.SomeoneAdmired
 	return &someoneAdmiredYourPostNotificationResolver{r}
 }
 
+// SomeoneAdmiredYourTokenNotification returns generated.SomeoneAdmiredYourTokenNotificationResolver implementation.
+func (r *Resolver) SomeoneAdmiredYourTokenNotification() generated.SomeoneAdmiredYourTokenNotificationResolver {
+	return &someoneAdmiredYourTokenNotificationResolver{r}
+}
+
 // SomeoneCommentedOnYourFeedEventNotification returns generated.SomeoneCommentedOnYourFeedEventNotificationResolver implementation.
 func (r *Resolver) SomeoneCommentedOnYourFeedEventNotification() generated.SomeoneCommentedOnYourFeedEventNotificationResolver {
 	return &someoneCommentedOnYourFeedEventNotificationResolver{r}
@@ -3232,6 +3247,7 @@ type socialConnectionResolver struct{ *Resolver }
 type socialQueriesResolver struct{ *Resolver }
 type someoneAdmiredYourFeedEventNotificationResolver struct{ *Resolver }
 type someoneAdmiredYourPostNotificationResolver struct{ *Resolver }
+type someoneAdmiredYourTokenNotificationResolver struct{ *Resolver }
 type someoneCommentedOnYourFeedEventNotificationResolver struct{ *Resolver }
 type someoneCommentedOnYourPostNotificationResolver struct{ *Resolver }
 type someoneFollowedYouBackNotificationResolver struct{ *Resolver }

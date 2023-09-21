@@ -98,6 +98,16 @@ var nodeFetcher = model.NodeFetcher{
 
 		return &notifConverted, nil
 	},
+	OnSomeoneAdmiredYourTokenNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneAdmiredYourTokenNotification, error) {
+		notif, err := resolveNotificationByID(ctx, dbid)
+		if err != nil {
+			return nil, err
+		}
+
+		notifConverted := notif.(model.SomeoneAdmiredYourTokenNotification)
+
+		return &notifConverted, nil
+	},
 	OnSomeoneFollowedYouBackNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneFollowedYouBackNotification, error) {
 		notif, err := resolveNotificationByID(ctx, dbid)
 		if err != nil {
@@ -906,6 +916,21 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 			UpdatedTime:  &notif.LastUpdated,
 			Count:        &amount,
 			Post:         nil, // handled by dedicated resolver
+			Admirers:     nil, // handled by dedicated resolver
+		}, nil
+	case persist.ActionAdmiredToken:
+		return model.SomeoneAdmiredYourTokenNotification{
+			HelperSomeoneAdmiredYourTokenNotificationData: model.HelperSomeoneAdmiredYourTokenNotificationData{
+				OwnerID:          notif.OwnerID,
+				TokenID:          notif.TokenID,
+				NotificationData: notif.Data,
+			},
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
+			Count:        &amount,
+			Token:         nil, // handled by dedicated resolver
 			Admirers:     nil, // handled by dedicated resolver
 		}, nil
 	case persist.ActionCommentedOnPost:

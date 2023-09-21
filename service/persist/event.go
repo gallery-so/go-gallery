@@ -24,6 +24,7 @@ const (
 	ActionTokensAddedToCollection         Action = "TokensAddedToCollection"
 	ActionAdmiredFeedEvent                Action = "AdmiredFeedEvent"
 	ActionAdmiredPost                     Action = "AdmiredPost"
+	ActionAdmiredToken                    Action = "AdmiredToken"
 	ActionCommentedOnFeedEvent            Action = "CommentedOnFeedEvent"
 	ActionCommentedOnPost                 Action = "CommentedOnPost"
 	ActionViewedGallery                   Action = "ViewedGallery"
