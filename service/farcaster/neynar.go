@@ -51,10 +51,35 @@ UserByVerification
 }
 */
 
+type NeynarID string
+
+func (n NeynarID) String() string {
+	return string(n)
+}
+
+// could be a string or a number
+func (n *NeynarID) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		var i int
+		if err := json.Unmarshal(b, &i); err != nil {
+			return err
+		}
+		*n = NeynarID(fmt.Sprintf("%d", i))
+	} else {
+		*n = NeynarID(s)
+	}
+	return nil
+}
+
+func (n NeynarID) MarshalJSON() ([]byte, error) {
+	return json.Marshal(n.String())
+}
+
 type NeynarUser struct {
-	Fid         string `json:"fid"`
-	Username    string `json:"username"`
-	DisplayName string `json:"displayName"`
+	Fid         NeynarID `json:"fid"`
+	Username    string   `json:"username"`
+	DisplayName string   `json:"displayName"`
 	Pfp         struct {
 		URL string `json:"url"`
 	} `json:"pfp"`
