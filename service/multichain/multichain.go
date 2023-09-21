@@ -1962,10 +1962,17 @@ func tokensToNewDedupedTokens(tokens []chainTokens, existingTokens []persist.Tok
 			}
 
 			ti := persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID, chainToken.chain)
+
 			existingToken, existsAlready := existingTokenLookup[ti]
+
+			// we add a higher priority token to the seen tokens as a sort of pre-seed when there isn't currently a higher priority token in the map
+			// and the existing token from the DB is higher priority than the current token we are about to process
 			if existsAlready && existingToken.Priority != nil && chainToken.priority >= *existingToken.Priority {
-				seenTokens[ti] = existingToken
+				if startingSeenToken, startingExists := seenTokens[ti]; !startingExists || startingSeenToken.Priority == nil || *startingSeenToken.Priority < *existingToken.Priority {
+					seenTokens[ti] = existingToken
+				}
 			}
+			// if there was in fact a higher priority DB token than the current token or any token in the map, than this DB token will be the baseline for comparing against the current token
 			initialSeenToken, seen := seenTokens[ti]
 
 			contractAddress := chainToken.chain.NormalizeAddress(token.ContractAddress)
@@ -1996,6 +2003,10 @@ func tokensToNewDedupedTokens(tokens []chainTokens, existingTokens []persist.Tok
 				seenTokens[ti] = mergeToken(initialSeenToken, candidateToken)
 			}
 
+			// if the token exists already in the DB, then we need to merge the token with the existing token
+			// in the case that it washigher priority above, the "curSeenToken" will be the existing token so it will be merging against itself, essentially a no-op.
+			// if the token was not a higher priority token, then we will still use it to merge to ensure that even lower priority tokens have their fields considered
+			// when a higher priority token may have bad or empty data
 			if existsAlready {
 				curSeenToken := seenTokens[ti]
 				seenTokens[ti] = mergeToken(curSeenToken, existingToken)
@@ -2098,16 +2109,25 @@ func contractsToNewDedupedContracts(contracts []chainContracts, existingContract
 	for _, chainContract := range contracts {
 		for _, contract := range chainContract.contracts {
 
+			// we start by checking if there is a DB contract that is higher priority than whatever is currently in the map or whatever we are about to process
+			// if it is higher priority, then we will use that as the starting point for the contract we are about to process
 			existingMetadata, existsAlready := existingMetadatas[persist.NewChainAddress(contract.Address, chainContract.chain)]
 			if existsAlready && existingMetadata.priority != nil && chainContract.priority >= *existingMetadata.priority {
-				// if we already have a contract and its priority is greater than the current one, use its metadata as a basepoint
-				contractMetadatas[persist.NewChainAddress(contract.Address, chainContract.chain)] = existingMetadata
+				if startingMetadata, startingExists := contractMetadatas[persist.NewChainAddress(contract.Address, chainContract.chain)]; !startingExists || startingMetadata.priority == nil || *startingMetadata.priority < *existingMetadata.priority {
+					contractMetadatas[persist.NewChainAddress(contract.Address, chainContract.chain)] = existingMetadata
+				}
 			}
 
+			// this is the contract we will use to merge with the existing contract, at this point it could be the higher priority DB contract that we start with,
+			// another contract that we have already processed in this scope, or empty if we have not processed a contract for this address yet and no higher priority DB contract existed
 			meta := contractMetadatas[persist.NewChainAddress(contract.Address, chainContract.chain)]
 			contractAsMetadata := contractToMetadata(contract)
+			// merge the lower priority new contract into the higher priority "meta" contract. Given that "meta" is in fact empty, it will still have it's empty fields overwritten by the lower priority contract
 			meta = mergeContractMetadata(contractAsMetadata, meta)
 			if existsAlready {
+				// this could be a no-op given that existingMetadata could have been the higher priority DB contract that we started with.
+				// in the case that a contract existed in the DB and was not higher priority than what we were processing, we still want to consider it just in case it
+				// can address any currently empty fields that this lower priority contract has set
 				meta = mergeContractMetadata(existingMetadata, meta)
 			}
 
