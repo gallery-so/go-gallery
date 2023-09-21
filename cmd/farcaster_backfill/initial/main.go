@@ -30,7 +30,7 @@ func main() {
 	ctx := context.Background()
 
 	// get every wallet with their owner user ID
-	rows, err := pg.Query(ctx, `select u.id, w.address from users u join wallets w on w.id = any(u.wallets) where u.deleted = false and w.chain = 0 and w.deleted = false and u.universal = false order by u.created_at desc;`)
+	rows, err := pg.Query(ctx, `select u.id, w.address from pii.user_view u join wallets w on w.id = any(u.wallets) where u.deleted = false and w.chain = 0 and w.deleted = false and u.universal = false and u.pii_socials->>'Farcaster' is null order by u.created_at desc;`)
 	if err != nil {
 		panic(err)
 	}
