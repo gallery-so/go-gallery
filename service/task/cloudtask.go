@@ -256,7 +256,7 @@ func withDeadline(d time.Duration) func(*taskspb.Task) error {
 
 func withBasicAuth(secret string) func(*taskspb.Task) error {
 	return func(t *taskspb.Task) error {
-		addHeader(t.GetHttpRequest(), "Authorization", basicauth.MakeHeader(nil, env.GetString("PUSH_NOTIFICATIONS_SECRET")))
+		addHeader(t.GetHttpRequest(), "Authorization", basicauth.MakeHeader(nil, secret))
 		return nil
 	}
 }

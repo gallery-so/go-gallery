@@ -740,24 +740,23 @@ func testTrendingFeedEvents(t *testing.T) {
 	userF := newUserWithFeedEntitiesFixture(t)
 	c := authedHandlerClient(t, userF.ID)
 	// four total interactions
-	admireFeedEvent(t, ctx, c, userF.FeedEventIDs[1])
-	commentOnFeedEvent(t, ctx, c, userF.FeedEventIDs[1], "a")
-	commentOnFeedEvent(t, ctx, c, userF.FeedEventIDs[1], "b")
-	commentOnFeedEvent(t, ctx, c, userF.FeedEventIDs[1], "c")
-	// three total interactions
-	admireFeedEvent(t, ctx, c, userF.FeedEventIDs[0])
-	commentOnFeedEvent(t, ctx, c, userF.FeedEventIDs[0], "a")
-	commentOnFeedEvent(t, ctx, c, userF.FeedEventIDs[0], "b")
-	// two total interactions
 	admirePost(t, ctx, c, userF.PostIDs[0])
 	commentOnPost(t, ctx, c, userF.PostIDs[0], "a")
+	commentOnPost(t, ctx, c, userF.PostIDs[0], "b")
+	commentOnPost(t, ctx, c, userF.PostIDs[0], "c")
+	// three total interactions
+	admirePost(t, ctx, c, userF.PostIDs[1])
+	commentOnPost(t, ctx, c, userF.PostIDs[1], "a")
+	commentOnPost(t, ctx, c, userF.PostIDs[1], "b")
+	// one total interactions
+	admirePost(t, ctx, c, userF.PostIDs[2])
+
 	// one total interactions
 	admireFeedEvent(t, ctx, c, userF.FeedEventIDs[2])
 	expected := []persist.DBID{
-		userF.FeedEventIDs[2],
+		userF.PostIDs[2],
+		userF.PostIDs[1],
 		userF.PostIDs[0],
-		userF.FeedEventIDs[0],
-		userF.FeedEventIDs[1],
 	}
 
 	actual := trendingFeedEvents(t, ctx, c, 4, true)
