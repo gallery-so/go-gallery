@@ -257,11 +257,19 @@ func newUserWithFeedEntitiesFixture(t *testing.T) userWithFeedEntititesFixture {
 		TokenSettings: defaultTokenSettings(user.TokenIDs),
 		Caption:       util.ToPointer("this is a caption"),
 	})
-	postID := createPost(t, ctx, c, PostTokensInput{
+	postOne := createPost(t, ctx, c, PostTokensInput{
 		TokenIds: user.TokenIDs,
-		Caption:  util.ToPointer("this is a post caption"),
+		Caption:  util.ToPointer("postOne"),
+	})
+	postTwo := createPost(t, ctx, c, PostTokensInput{
+		TokenIds: user.TokenIDs,
+		Caption:  util.ToPointer("postTwo"),
+	})
+	postThree := createPost(t, ctx, c, PostTokensInput{
+		TokenIds: user.TokenIDs,
+		Caption:  util.ToPointer("postThree"),
 	})
 	feedEvents := globalFeedEvents(t, ctx, c, 4, true)
 	require.Len(t, feedEvents, 4)
-	return userWithFeedEntititesFixture{user, feedEvents, []persist.DBID{postID}}
+	return userWithFeedEntititesFixture{user, feedEvents, []persist.DBID{postOne, postTwo, postThree}}
 }
