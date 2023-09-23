@@ -36,7 +36,6 @@ func postToDiscord(gql *graphql.Client) gin.HandlerFunc {
 
 func postToSlack(gql *graphql.Client) gin.HandlerFunc {
 	webhookURL := env.GetString("SLACK_WEBHOOK_URL")
-	webhookURL = "https://hooks.slack.com/services/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"
 
 	if webhookURL == "" {
 		return func(c *gin.Context) {
