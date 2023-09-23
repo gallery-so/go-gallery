@@ -699,6 +699,57 @@ func (q *Queries) CreateGalleryEvent(ctx context.Context, arg CreateGalleryEvent
 	return i, err
 }
 
+const createPostEvent = `-- name: CreatePostEvent :one
+INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, post_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id
+`
+
+type CreatePostEventParams struct {
+	ID             persist.DBID         `json:"id"`
+	ActorID        sql.NullString       `json:"actor_id"`
+	Action         persist.Action       `json:"action"`
+	ResourceTypeID persist.ResourceType `json:"resource_type_id"`
+	UserID         persist.DBID         `json:"user_id"`
+	SubjectID      persist.DBID         `json:"subject_id"`
+	PostID         persist.DBID         `json:"post_id"`
+}
+
+func (q *Queries) CreatePostEvent(ctx context.Context, arg CreatePostEventParams) (Event, error) {
+	row := q.db.QueryRow(ctx, createPostEvent,
+		arg.ID,
+		arg.ActorID,
+		arg.Action,
+		arg.ResourceTypeID,
+		arg.UserID,
+		arg.SubjectID,
+		arg.PostID,
+	)
+	var i Event
+	err := row.Scan(
+		&i.ID,
+		&i.Version,
+		&i.ActorID,
+		&i.ResourceTypeID,
+		&i.SubjectID,
+		&i.UserID,
+		&i.TokenID,
+		&i.CollectionID,
+		&i.Action,
+		&i.Data,
+		&i.Deleted,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.GalleryID,
+		&i.CommentID,
+		&i.AdmireID,
+		&i.FeedEventID,
+		&i.ExternalID,
+		&i.Caption,
+		&i.GroupID,
+		&i.PostID,
+	)
+	return i, err
+}
+
 const createPushTickets = `-- name: CreatePushTickets :exec
 insert into push_notification_tickets (id, push_token_id, ticket_id, created_at, check_after, num_check_attempts, status, deleted) values
   (

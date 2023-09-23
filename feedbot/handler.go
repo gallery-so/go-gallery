@@ -1,31 +1,23 @@
 package feedbot
 
 import (
-	"errors"
-	"github.com/mikeydub/go-gallery/middleware"
-	"github.com/mikeydub/go-gallery/util"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/env"
 	"github.com/shurcooL/graphql"
+
+	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/middleware"
+	"github.com/mikeydub/go-gallery/util"
 )
 
-// TODO: Use middleware.BasicHeaderAuthRequired. Requires reworking the sender to use
-// the appropriate header/encoding.
-func authRequired() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		creds := c.Request.Header.Get("Authorization")
-		if creds != "Basic "+env.GetString("FEEDBOT_SECRET") {
-			// Return 200 on auth failures to prevent task retries
-			c.AbortWithError(http.StatusOK, errors.New("unauthorized request"))
-			return
-		}
-	}
-}
-
 func handlersInit(router *gin.Engine, gql *graphql.Client) *gin.Engine {
+	authOpts := middleware.BasicAuthOptionBuilder{}
+	fmt.Println("plain secret", env.GetString("FEEDBOT_SECRET"))
+	basicAuthHandler := middleware.BasicHeaderAuthRequired(env.GetString("FEEDBOT_SECRET"), authOpts.WithFailureStatus(http.StatusOK))
 	router.GET("/ping", util.HealthCheckHandler())
-	router.POST("/tasks/feed-event", middleware.TaskRequired(), authRequired(), handleMessage(gql))
+	router.POST("/tasks/feed-event", middleware.TaskRequired(), basicAuthHandler, postToDiscord(gql))
+	router.POST("/tasks/slack-post", middleware.TaskRequired(), basicAuthHandler, postToSlack(gql))
 	return router
 }

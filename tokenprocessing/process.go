@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/go-playground/validator/v10"
 	"github.com/jackc/pgx/v4"
 	"github.com/sirupsen/logrus"
 	"github.com/sourcegraph/conc/pool"
@@ -198,7 +197,7 @@ func processOwnersForContractTokens(mc *multichain.Provider, contractRepo *postg
 	}
 }
 
-func processOwnersForUserTokens(mc *multichain.Provider, queries *coredb.Queries, validator *validator.Validate) gin.HandlerFunc {
+func processOwnersForUserTokens(mc *multichain.Provider, queries *coredb.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input task.TokenProcessingUserTokensMessage
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -238,7 +237,7 @@ func processOwnersForUserTokens(mc *multichain.Provider, queries *coredb.Queries
 				}
 
 				// one event per token identifier (grouping ERC-1155s)
-				_, err = event.DispatchEvent(c, coredb.Event{
+				err = event.Dispatch(c, coredb.Event{
 					ID:             persist.GenerateID(),
 					ActorID:        persist.DBIDToNullStr(input.UserID),
 					ResourceTypeID: persist.ResourceTypeToken,
@@ -250,7 +249,7 @@ func processOwnersForUserTokens(mc *multichain.Provider, queries *coredb.Queries
 						NewTokenID:       token.ID,
 						NewTokenQuantity: curTotal,
 					},
-				}, validator, nil)
+				})
 				if err != nil {
 					logger.For(c).Errorf("error dispatching event: %s", err)
 				}
@@ -342,7 +341,7 @@ var alchemyIPs = []string{
 	"34.237.24.169",
 }
 
-func processOwnersForAlchemyTokens(mc *multichain.Provider, queries *coredb.Queries, validator *validator.Validate) gin.HandlerFunc {
+func processOwnersForAlchemyTokens(mc *multichain.Provider, queries *coredb.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		bodyBytes, err := c.GetRawData()
@@ -494,7 +493,7 @@ func processOwnersForAlchemyTokens(mc *multichain.Provider, queries *coredb.Quer
 					}
 
 					// one event per token identifier (grouping ERC-1155s)
-					_, err = event.DispatchEvent(c, coredb.Event{
+					err = event.Dispatch(c, coredb.Event{
 						ID:             persist.GenerateID(),
 						ActorID:        persist.DBIDToNullStr(userID),
 						ResourceTypeID: persist.ResourceTypeToken,
@@ -506,7 +505,7 @@ func processOwnersForAlchemyTokens(mc *multichain.Provider, queries *coredb.Quer
 							NewTokenID:       token.ID,
 							NewTokenQuantity: curTotal,
 						},
-					}, validator, nil)
+					})
 					if err != nil {
 						l.Errorf("error dispatching event: %s", err)
 					}

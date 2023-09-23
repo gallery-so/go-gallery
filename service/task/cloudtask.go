@@ -34,6 +34,10 @@ type FeedbotMessage struct {
 	Action      persist.Action `json:"action" binding:"required"`
 }
 
+type FeedbotSlackPostMessage struct {
+	PostID persist.DBID `json:"post_id" binding:"required"`
+}
+
 type TokenProcessingUserMessage struct {
 	UserID   persist.DBID   `json:"user_id" binding:"required"`
 	TokenIDs []persist.DBID `json:"token_ids" binding:"required"`
@@ -201,6 +205,15 @@ func CreateTaskForPostPreflight(ctx context.Context, message PostPreflightMessag
 	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span))
 }
 
+func CreateTaskForSlackPostFeedBot(ctx context.Context, message FeedbotSlackPostMessage, client *gcptasks.Client) error {
+	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForSlackPostFeedBot")
+	defer tracing.FinishSpan(span)
+	queue := env.GetString("GCLOUD_FEEDBOT_TASK_QUEUE")
+	url := fmt.Sprintf("%s/tasks/slack-post", env.GetString("FEEDBOT_URL"))
+	secret := env.GetString("FEEDBOT_SECRET")
+	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span), withBasicAuth(secret))
+}
+
 // NewClient returns a new task client with tracing enabled.
 func NewClient(ctx context.Context) *gcptasks.Client {
 	trace := tracing.NewTracingInterceptor(true)
@@ -229,6 +242,7 @@ func NewClient(ctx context.Context) *gcptasks.Client {
 				copts,
 				option.WithCredentialsJSON(fi),
 			)
+
 		}
 	}
 
@@ -256,7 +270,7 @@ func withDeadline(d time.Duration) func(*taskspb.Task) error {
 
 func withBasicAuth(secret string) func(*taskspb.Task) error {
 	return func(t *taskspb.Task) error {
-		addHeader(t.GetHttpRequest(), "Authorization", basicauth.MakeHeader(nil, env.GetString("PUSH_NOTIFICATIONS_SECRET")))
+		addHeader(t.GetHttpRequest(), "Authorization", basicauth.MakeHeader(nil, secret))
 		return nil
 	}
 }
