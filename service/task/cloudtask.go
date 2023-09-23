@@ -242,7 +242,6 @@ func NewClient(ctx context.Context) *gcptasks.Client {
 				copts,
 				option.WithCredentialsJSON(fi),
 			)
-
 		}
 	}
 

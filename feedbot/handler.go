@@ -1,7 +1,6 @@
 package feedbot
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -14,7 +13,6 @@ import (
 
 func handlersInit(router *gin.Engine, gql *graphql.Client) *gin.Engine {
 	authOpts := middleware.BasicAuthOptionBuilder{}
-	fmt.Println("plain secret", env.GetString("FEEDBOT_SECRET"))
 	basicAuthHandler := middleware.BasicHeaderAuthRequired(env.GetString("FEEDBOT_SECRET"), authOpts.WithFailureStatus(http.StatusOK))
 	router.GET("/ping", util.HealthCheckHandler())
 	router.POST("/tasks/feed-event", middleware.TaskRequired(), basicAuthHandler, postToDiscord(gql))
