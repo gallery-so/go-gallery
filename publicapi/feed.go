@@ -438,7 +438,7 @@ func fetchFeedEntityScores(ctx context.Context, queries *db.Queries, p feedParam
 	return queries.GetFeedEntityScores(ctx, q)
 }
 
-func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *string, first *int, last *int, includePosts bool) ([]any, PageInfo, error) {
+func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *string, first *int, last *int) ([]any, PageInfo, error) {
 	// Validate
 	if err := validatePaginationParams(api.validator, first, last); err != nil {
 		return nil, PageInfo{}, err
@@ -453,11 +453,6 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 
 	now := time.Now()
 
-	// Include posts for admins always during the soft launch
-	if !includePosts {
-		includePosts = shouldShowPosts(ctx)
-	}
-
 	if before != nil {
 		if err = cursor.Unpack(*before); err != nil {
 			return nil, PageInfo{}, err
@@ -469,8 +464,8 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 	} else {
 		calcFunc := func(ctx context.Context) ([]persist.FeedEntityType, []persist.DBID, error) {
 			trendData, err := fetchFeedEntityScores(ctx, api.queries, feedParams{
-				IncludePosts:   includePosts,
-				IncludeEvents:  true,
+				IncludePosts:   true,
+				IncludeEvents:  false,
 				ExcludeActions: []persist.Action{persist.ActionUserCreated, persist.ActionUserFollowedUsers},
 				FetchFrom:      time.Duration(3 * 24 * time.Hour),
 			})
@@ -493,7 +488,7 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 			return entityTypes, entityIDs, nil
 		}
 
-		l := newFeedCache(api.cache, includePosts, calcFunc)
+		l := newFeedCache(api.cache, calcFunc)
 
 		cursor.EntityTypes, cursor.EntityIDs, err = l.Load(ctx)
 		if err != nil {
@@ -505,21 +500,6 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 		for i, id := range cursor.EntityIDs {
 			entityIDToPos[id] = i
 		}
-
-		// Filter slices in place
-		if !includePosts {
-			idx := 0
-			for i := range cursor.EntityTypes {
-				if cursor.EntityTypes[i] != persist.PostTypeTag {
-					cursor.EntityTypes[idx] = cursor.EntityTypes[i]
-					cursor.EntityIDs[idx] = cursor.EntityIDs[i]
-					idx++
-				}
-			}
-			cursor.EntityTypes = cursor.EntityTypes[:idx]
-			cursor.EntityIDs = cursor.EntityIDs[:idx]
-		}
-
 		return loadFeedEntities(ctx, api.loaders, cursor.EntityTypes, cursor.EntityIDs)
 	}
 
@@ -537,13 +517,13 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 	return paginator.paginate(before, after, first, last)
 }
 
-func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first, last *int, includePosts bool) ([]any, PageInfo, error) {
+func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first, last *int) ([]any, PageInfo, error) {
 	// Validate
 	userID, _ := getAuthenticatedUserID(ctx)
 
 	// Fallback to trending if no user
 	if userID == "" {
-		return api.TrendingFeed(ctx, before, after, first, last, includePosts)
+		return api.TrendingFeed(ctx, before, after, first, last)
 	}
 
 	if err := validatePaginationParams(api.validator, first, last); err != nil {
@@ -558,11 +538,6 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 
 	now := time.Now()
 
-	// Include posts for admins always during the soft launch
-	if !includePosts {
-		includePosts = shouldShowPosts(ctx)
-	}
-
 	if before != nil {
 		if err := cursor.Unpack(*before); err != nil {
 			return nil, PageInfo{}, err
@@ -573,8 +548,8 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 		}
 	} else {
 		trendData, err := fetchFeedEntityScores(ctx, api.queries, feedParams{
-			IncludePosts:   includePosts,
-			IncludeEvents:  !includePosts,
+			IncludePosts:   true,
+			IncludeEvents:  false,
 			ExcludeUserID:  userID,
 			ExcludeActions: []persist.Action{persist.ActionUserCreated, persist.ActionUserFollowedUsers},
 			FetchFrom:      time.Duration(7 * 24 * time.Hour),
@@ -652,21 +627,6 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 		for i, id := range cursor.EntityIDs {
 			entityIDToPos[id] = i
 		}
-
-		// Filter slices in place
-		if !includePosts {
-			idx := 0
-			for i := range cursor.EntityTypes {
-				if cursor.EntityTypes[i] != persist.PostTypeTag {
-					cursor.EntityTypes[idx] = cursor.EntityTypes[i]
-					cursor.EntityIDs[idx] = cursor.EntityIDs[i]
-					idx++
-				}
-			}
-			cursor.EntityTypes = cursor.EntityTypes[:idx]
-			cursor.EntityIDs = cursor.EntityIDs[:idx]
-		}
-
 		return loadFeedEntities(ctx, api.loaders, cursor.EntityTypes, cursor.EntityIDs)
 	}
 
@@ -972,11 +932,8 @@ type feedCache struct {
 	CalcFunc func(context.Context) ([]persist.FeedEntityType, []persist.DBID, error)
 }
 
-func newFeedCache(cache *redis.Cache, includePosts bool, f func(context.Context) ([]persist.FeedEntityType, []persist.DBID, error)) *feedCache {
+func newFeedCache(cache *redis.Cache, f func(context.Context) ([]persist.FeedEntityType, []persist.DBID, error)) *feedCache {
 	key := "trending:feedEvents:all"
-	if !includePosts {
-		key = "trending:feedEvents:noPosts"
-	}
 	return &feedCache{
 		LazyCache: &redis.LazyCache{
 			Cache: cache,
