@@ -17,7 +17,7 @@ import (
 func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProcessor, mc *multichain.Provider, repos *postgres.Repositories, throttler *throttle.Locker, taskClient *cloudtasks.Client) *gin.Engine {
 	// Retry tokens that failed during syncs, but don't retry tokens that failed during manual refreshes
 	refreshManager := tokenmanage.New(ctx, taskClient)
-	syncManager := tokenmanage.NewWithRetries(ctx, taskClient, 12)
+	syncManager := tokenmanage.NewWithRetries(ctx, taskClient, 40)
 
 	mediaGroup := router.Group("/media")
 	mediaGroup.POST("/process", func(c *gin.Context) {
