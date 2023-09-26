@@ -9,7 +9,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/sourcegraph/conc/pool"
 )
 
 type idAddressTuple struct {
@@ -70,8 +69,6 @@ func processAllUsers(pg *pgxpool.Pool, ctc *cloudtasks.Client) gin.HandlerFunc {
 			}
 		}()
 
-		activeRequests := pool.New().WithMaxGoroutines(100).WithErrors().WithContext(c)
-
 		var allErrs []error
 		send := make(map[persist.DBID]map[persist.SocialProvider]persist.ChainAddress)
 		for {
@@ -107,11 +104,6 @@ func processAllUsers(pg *pgxpool.Pool, ctc *cloudtasks.Client) gin.HandlerFunc {
 							allErrs = append(allErrs, err)
 						}
 
-					}
-
-					finalErr := activeRequests.Wait()
-					if finalErr != nil {
-						allErrs = append(allErrs, finalErr)
 					}
 
 					if len(allErrs) > 0 {
