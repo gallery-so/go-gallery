@@ -13,6 +13,6 @@ RUN go build -o ./bin/autosocial-orchestrator ./cmd/autosocial/orchestrator/main
 
 ENV GAE_VERSION=$VERSION
 
-EXPOSE 4000
+EXPOSE 6800
 USER nobody
 ENTRYPOINT ["./bin/autosocial-orchestrator"]

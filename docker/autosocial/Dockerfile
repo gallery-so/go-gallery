@@ -13,6 +13,6 @@ RUN go build -o ./bin/autosocial ./cmd/autosocial/main.go
 
 ENV GAE_VERSION=$VERSION
 
-EXPOSE 4000
+EXPOSE 6700
 USER nobody
 ENTRYPOINT ["./bin/autosocial"]
