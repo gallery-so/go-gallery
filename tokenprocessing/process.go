@@ -369,6 +369,7 @@ func processOwnersForAlchemyTokens(mc *multichain.Provider, queries *coredb.Quer
 		case "ARB_MAINNET":
 			chain = persist.ChainArbitrum
 		default:
+			logger.For(c).Errorf("invalid alchemy network: %s", input.Event.Network)
 			util.ErrResponse(c, http.StatusInternalServerError, fmt.Errorf("invalid alchemy network: %s", input.Event.Network))
 			return
 		}
