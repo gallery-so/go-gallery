@@ -344,27 +344,39 @@ var alchemyIPs = []string{
 func processOwnersForAlchemyTokens(mc *multichain.Provider, queries *coredb.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
+		if !util.Contains(alchemyIPs, c.ClientIP()) {
+			util.ErrResponse(c, http.StatusUnauthorized, fmt.Errorf("invalid alchemy ip"))
+			return
+		}
+
 		bodyBytes, err := c.GetRawData()
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
-		signature := c.GetHeader("X-Alchemy-Signature")
-
-		if !isValidAlchemySignatureForStringBody(bodyBytes, signature) {
-			util.ErrResponse(c, http.StatusUnauthorized, fmt.Errorf("invalid alchemy signature"))
-			return
-		}
-
-		if !util.Contains(alchemyIPs, c.ClientIP()) {
-			util.ErrResponse(c, http.StatusUnauthorized, fmt.Errorf("invalid alchemy ip"))
-			return
-		}
-
 		var input AlchemyNFTActivityWebhookResponse
 		if err := json.Unmarshal(bodyBytes, &input); err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		var chain persist.Chain
+		switch input.Event.Network {
+		case "ETH_MAINNET", "ETH_GOERLI":
+			chain = persist.ChainETH
+		case "ARB_MAINNET":
+			chain = persist.ChainArbitrum
+		default:
+			logger.For(c).Errorf("invalid alchemy network: %s", input.Event.Network)
+			util.ErrResponse(c, http.StatusInternalServerError, fmt.Errorf("invalid alchemy network: %s", input.Event.Network))
+			return
+		}
+
+		signature := c.GetHeader("X-Alchemy-Signature")
+
+		if !isValidAlchemySignatureForStringBody(bodyBytes, signature, chain) {
+			util.ErrResponse(c, http.StatusUnauthorized, fmt.Errorf("invalid alchemy signature"))
 			return
 		}
 
@@ -520,8 +532,20 @@ func processOwnersForAlchemyTokens(mc *multichain.Provider, queries *coredb.Quer
 func isValidAlchemySignatureForStringBody(
 	body []byte, // must be raw string body, not json transformed version of the body
 	signature string, // your "X-Alchemy-Signature" from header
+	chain persist.Chain,
 ) bool {
-	h := hmac.New(sha256.New, []byte(env.GetString("ALCHEMY_WEBHOOK_SECRET")))
+	var secret string
+	switch chain {
+	case persist.ChainETH:
+		secret = env.GetString("ALCHEMY_WEBHOOK_SECRET_ETH")
+	case persist.ChainArbitrum:
+		secret = env.GetString("ALCHEMY_WEBHOOK_SECRET_ARBITRUM")
+	default:
+		logger.For(nil).Errorf("invalid chain for alchemy webhook signature: %s", chain)
+		return false
+	}
+
+	h := hmac.New(sha256.New, []byte(secret))
 	h.Write([]byte(body))
 	digest := hex.EncodeToString(h.Sum(nil))
 	return digest == signature
