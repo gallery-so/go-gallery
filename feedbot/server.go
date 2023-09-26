@@ -72,7 +72,7 @@ func postToSlack(gql *graphql.Client) gin.HandlerFunc {
 		var postURL string
 
 		switch e := env.GetString("ENV"); e {
-		case "prod":
+		case "production":
 			postURL = "https://gallery.so/posts"
 		default:
 			postURL = "https://gallery-dev.vercel.app"
