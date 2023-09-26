@@ -35,10 +35,8 @@ func processUsers(q *coredb.Queries, n *farcaster.NeynarAPI, l *lens.LensAPI) gi
 			if address, ok := socials[persist.SocialProviderLens]; ok {
 
 				lp.Go(func(ctx context.Context) error {
-					logrus.Infof("getting user %s (%s)", userID, address)
 					u, err := l.DefaultProfileByAddress(ctx, address.Address())
 					if err != nil {
-						logrus.Error(err)
 						if strings.Contains(err.Error(), "too many requests") {
 							time.Sleep(4 * time.Minute)
 							u, err = l.DefaultProfileByAddress(ctx, address.Address())
@@ -50,7 +48,7 @@ func processUsers(q *coredb.Queries, n *farcaster.NeynarAPI, l *lens.LensAPI) gi
 							return nil
 						}
 					}
-					logrus.Infof("got user %s %s %s %s", u.Name, u.Handle, u.Picture.Optimized.URL, u.Bio)
+					logrus.Infof("got lens user %s %s %s %s", u.Name, u.Handle, u.Picture.Optimized.URL, u.Bio)
 					return q.AddSocialToUser(ctx, coredb.AddSocialToUserParams{
 						UserID: userID,
 						Socials: persist.Socials{
@@ -73,13 +71,11 @@ func processUsers(q *coredb.Queries, n *farcaster.NeynarAPI, l *lens.LensAPI) gi
 
 			if address, ok := socials[persist.SocialProviderFarcaster]; ok {
 				fp.Go(func(ctx context.Context) error {
-					logrus.Infof("getting user %s (%s)", userID, address.Address())
 					u, err := n.UserByAddress(ctx, address.Address())
 					if err != nil {
-						logrus.Error(err)
 						return nil
 					}
-					logrus.Infof("got user %s %s %s %s", u.Username, u.DisplayName, u.Pfp.URL, u.Profile.Bio.Text)
+					logrus.Infof("got farcaster user %s %s %s %s", u.Username, u.DisplayName, u.Pfp.URL, u.Profile.Bio.Text)
 
 					return q.AddSocialToUser(ctx, coredb.AddSocialToUserParams{
 						UserID: userID,
