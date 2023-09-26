@@ -9,13 +9,14 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
 
+	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/middleware"
-	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/farcaster"
 	"github.com/mikeydub/go-gallery/service/lens"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
 )
@@ -24,28 +25,28 @@ import (
 func InitServer() {
 	setDefaults()
 	ctx := context.Background()
-	c := server.ClientInit(ctx)
+	router := CoreInitServer(ctx)
 
-	router := CoreInitServer(ctx, c)
 	logger.For(nil).Info("Starting autosocial server...")
 	http.Handle("/", router)
 }
 
-func CoreInitServer(ctx context.Context, clients *server.Clients) *gin.Engine {
+func CoreInitServer(ctx context.Context) *gin.Engine {
 	InitSentry()
 	logger.InitWithGCPDefaults()
 
 	http.DefaultClient = &http.Client{Transport: tracing.NewTracingTransport(http.DefaultTransport, false)}
 
 	router := gin.Default()
+	pgx := postgres.NewPgxClient()
+	queries := coredb.New(pgx)
 
 	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger())
-	router.POST("/process/users", processUsers(clients.Queries, farcaster.NewNeynarAPI(http.DefaultClient), lens.NewAPI(http.DefaultClient)))
+	router.POST("/process/users", processUsers(queries, farcaster.NewNeynarAPI(http.DefaultClient), lens.NewAPI(http.DefaultClient)))
 	return router
 }
 
 func setDefaults() {
-	viper.SetDefault("CHAIN", 0)
 	viper.SetDefault("ENV", "local")
 	viper.SetDefault("POSTGRES_HOST", "0.0.0.0")
 	viper.SetDefault("POSTGRES_PORT", 5432)
@@ -54,7 +55,7 @@ func setDefaults() {
 	viper.SetDefault("POSTGRES_DB", "postgres")
 	viper.SetDefault("ALLOWED_ORIGINS", "http://localhost:3000")
 	viper.SetDefault("SENTRY_DSN", "")
-	viper.SetDefault("VERSION", "")
+	viper.SetDefault("GAE_VERSION", "")
 	viper.SetDefault("GOOGLE_CLOUD_PROJECT", "gallery-dev-322005")
 	viper.SetDefault("NEYNAR_API_KEY", "")
 
@@ -73,7 +74,6 @@ func setDefaults() {
 
 	if env.GetString("ENV") != "local" {
 		util.VarNotSetTo("SENTRY_DSN", "")
-		util.VarNotSetTo("VERSION", "")
 	}
 }
 
@@ -89,7 +89,7 @@ func InitSentry() {
 		Dsn:              env.GetString("SENTRY_DSN"),
 		Environment:      env.GetString("ENV"),
 		TracesSampleRate: env.GetFloat64("SENTRY_TRACES_SAMPLE_RATE"),
-		Release:          env.GetString("VERSION"),
+		Release:          env.GetString("GAE_VERSION"),
 		AttachStacktrace: true,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			event = auth.ScrubEventCookies(event, hint)

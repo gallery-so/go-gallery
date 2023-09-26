@@ -46,7 +46,6 @@ func CoreInitServer(ctx context.Context) *gin.Engine {
 }
 
 func setDefaults() {
-	viper.SetDefault("CHAIN", 0)
 	viper.SetDefault("ENV", "local")
 	viper.SetDefault("POSTGRES_HOST", "0.0.0.0")
 	viper.SetDefault("POSTGRES_PORT", 5432)
@@ -55,7 +54,7 @@ func setDefaults() {
 	viper.SetDefault("POSTGRES_DB", "postgres")
 	viper.SetDefault("ALLOWED_ORIGINS", "http://localhost:3000")
 	viper.SetDefault("SENTRY_DSN", "")
-	viper.SetDefault("VERSION", "")
+	viper.SetDefault("GAE_VERSION", "")
 	viper.SetDefault("GOOGLE_CLOUD_PROJECT", "gallery-dev-322005")
 	viper.SetDefault("AUTOSOCIAL_URL", "")
 	viper.SetDefault("AUTOSOCIAL_QUEUE", "")
@@ -76,7 +75,6 @@ func setDefaults() {
 
 	if env.GetString("ENV") != "local" {
 		util.VarNotSetTo("SENTRY_DSN", "")
-		util.VarNotSetTo("VERSION", "")
 	}
 }
 
@@ -92,7 +90,7 @@ func InitSentry() {
 		Dsn:              env.GetString("SENTRY_DSN"),
 		Environment:      env.GetString("ENV"),
 		TracesSampleRate: env.GetFloat64("SENTRY_TRACES_SAMPLE_RATE"),
-		Release:          env.GetString("VERSION"),
+		Release:          env.GetString("GAE_VERSION"),
 		AttachStacktrace: true,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			event = auth.ScrubEventCookies(event, hint)
