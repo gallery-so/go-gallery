@@ -1139,6 +1139,9 @@ type unpackable struct {
 }
 
 func (u *unpackable) Unpack(s string) (err error) {
+	if s == "" {
+		return nil
+	}
 	if err = u.d.setReader(s); err != nil {
 		return err
 	}
