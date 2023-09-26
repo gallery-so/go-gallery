@@ -58,6 +58,10 @@ func processAllUsers(pg *pgxpool.Pool, ctc *cloudtasks.Client) gin.HandlerFunc {
 					tuples = nil
 				}
 			}
+
+			if len(tuples) > 0 {
+				rec <- tuples
+			}
 		}()
 
 		activeRequests := pool.New().WithMaxGoroutines(100).WithErrors().WithContext(c)
