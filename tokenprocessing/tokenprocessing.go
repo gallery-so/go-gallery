@@ -109,7 +109,8 @@ func setDefaults() {
 	viper.SetDefault("PUBSUB_SUB_UPDATED_NOTIFICATIONS", "dev-updated-notifications-sub")
 	viper.SetDefault("RASTERIZER_URL", "http://localhost:3000")
 	viper.SetDefault("TEZOS_API_URL", "https://api.tzkt.io")
-	viper.SetDefault("ALCHEMY_WEBHOOK_SECRET", "")
+	viper.SetDefault("ALCHEMY_WEBHOOK_SECRET_ARBITRUM", "")
+	viper.SetDefault("ALCHEMY_WEBHOOK_SECRET_ETH", "")
 
 	viper.AutomaticEnv()
 
