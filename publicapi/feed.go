@@ -15,6 +15,7 @@ import (
 	"github.com/go-playground/validator/v10"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -122,9 +123,9 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, capt
 		return "", err
 	}
 
-	var cap sql.NullString
+	var c sql.NullString
 	if caption != nil {
-		cap = sql.NullString{
+		c = sql.NullString{
 			String: *caption,
 			Valid:  true,
 		}
@@ -139,17 +140,27 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, capt
 		return c.ID, nil
 	})
 
-	id, err := api.queries.InsertPost(ctx, db.InsertPostParams{
+	postID, err := api.queries.InsertPost(ctx, db.InsertPostParams{
 		ID:          persist.GenerateID(),
 		TokenIds:    tokenIDs,
 		ContractIds: contractIDs,
 		ActorID:     actorID,
-		Caption:     cap,
+		Caption:     c,
 	})
 	if err != nil {
 		return "", err
 	}
-	return id, nil
+
+	err = event.Dispatch(ctx, db.Event{
+		ActorID:        persist.DBIDToNullStr(actorID),
+		Action:         persist.ActionUserPosted,
+		ResourceTypeID: persist.ResourceTypePost,
+		UserID:         actorID,
+		SubjectID:      postID,
+		PostID:         postID,
+	})
+
+	return postID, err
 }
 
 func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentifiers, caption *string) (persist.DBID, error) {
@@ -194,13 +205,28 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 		if err != nil {
 			return "", err
 		}
-		return api.queries.InsertPost(ctx, db.InsertPostParams{
+
+		postID, err := api.queries.InsertPost(ctx, db.InsertPostParams{
 			ID:          persist.GenerateID(),
 			TokenIds:    []persist.DBID{token.ID},
 			ContractIds: []persist.DBID{contract.ID},
 			ActorID:     user.ID,
 			Caption:     c,
 		})
+		if err != nil {
+			return postID, err
+		}
+
+		err = event.Dispatch(ctx, db.Event{
+			ActorID:        persist.DBIDToNullStr(user.ID),
+			Action:         persist.ActionUserPosted,
+			ResourceTypeID: persist.ResourceTypePost,
+			UserID:         user.ID,
+			SubjectID:      postID,
+			PostID:         postID,
+		})
+
+		return postID, err
 	}
 
 	// Unexpected error
@@ -217,13 +243,28 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 	if err != nil {
 		return "", err
 	}
-	return api.queries.InsertPost(ctx, db.InsertPostParams{
+
+	postID, err := api.queries.InsertPost(ctx, db.InsertPostParams{
 		ID:          persist.GenerateID(),
 		TokenIds:    []persist.DBID{synced.ID},
 		ContractIds: []persist.DBID{synced.Contract},
 		ActorID:     user.ID,
 		Caption:     c,
 	})
+	if err != nil {
+		return postID, err
+	}
+
+	err = event.Dispatch(ctx, db.Event{
+		ActorID:        persist.DBIDToNullStr(user.ID),
+		Action:         persist.ActionUserPosted,
+		ResourceTypeID: persist.ResourceTypePost,
+		UserID:         user.ID,
+		SubjectID:      postID,
+		PostID:         postID,
+	})
+
+	return postID, err
 }
 
 func (api FeedAPI) ReferralPostPreflight(ctx context.Context, t persist.TokenIdentifiers) error {

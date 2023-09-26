@@ -5,22 +5,23 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-playground/validator/v10"
-	"github.com/mikeydub/go-gallery/env"
-	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
-	"github.com/mikeydub/go-gallery/service/task"
-
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
+	"golang.org/x/sync/errgroup"
+
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/feed"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/notifications"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
-	"golang.org/x/sync/errgroup"
+	"github.com/mikeydub/go-gallery/validate"
 )
 
 type sendType int
@@ -46,6 +47,7 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 	sender.addDelayedHandler(feed, persist.ActionTokensAddedToCollection, feedHandler)
 	sender.addDelayedHandler(feed, persist.ActionGalleryUpdated, feedHandler)
 	sender.addDelayedHandler(feed, persist.ActionGalleryInfoUpdated, feedHandler)
+	sender.addDelayedHandler(feed, persist.ActionUserPosted, slackHandler{taskClient})
 	sender.addImmediateHandler(feed, persist.ActionCollectionCreated, feedHandler)
 	sender.addImmediateHandler(feed, persist.ActionTokensAddedToCollection, feedHandler)
 	sender.addImmediateHandler(feed, persist.ActionCollectorsNoteAddedToCollection, feedHandler)
@@ -69,64 +71,62 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 	ctx.Set(eventSenderContextKey, &sender)
 }
 
-func DispatchEvent(ctx context.Context, evt db.Event, v *validator.Validate, caption *string) (*db.FeedEvent, error) {
+func Dispatch(ctx context.Context, evt db.Event) error {
 	ctx = sentryutil.NewSentryHubGinContext(ctx)
-	if err := v.Struct(evt); err != nil {
-		return nil, err
-	}
+	go PushEvent(ctx, evt)
+	return nil
+}
+
+func DispatchCaptioned(ctx context.Context, evt db.Event, caption *string) (*db.FeedEvent, error) {
+	ctx = sentryutil.NewSentryHubGinContext(ctx)
 
 	if caption != nil {
 		evt.Caption = persist.StrPtrToNullStr(caption)
-		return DispatchImmediate(ctx, []db.Event{evt})
+		return dispatchImmediate(ctx, []db.Event{evt})
 	}
 
 	go PushEvent(ctx, evt)
 	return nil, nil
 }
 
-func DispatchEvents(ctx context.Context, evts []db.Event, v *validator.Validate, editID *string, caption *string) (*db.FeedEvent, error) {
-
+func DispatchMany(ctx context.Context, evts []db.Event, editID *string) error {
 	if len(evts) == 0 {
-		return nil, nil
+		return nil
+	}
+
+	for i := range evts {
+		evts[i].GroupID = persist.StrPtrToNullStr(editID)
 	}
 
 	ctx = sentryutil.NewSentryHubGinContext(ctx)
-	for i, evt := range evts {
-		evt.GroupID = persist.StrPtrToNullStr(editID)
-		if err := v.Struct(evt); err != nil {
-			return nil, err
-		}
-		evts[i] = evt
-	}
-
-	if caption != nil {
-		for i, evt := range evts {
-			evt.Caption = persist.StrPtrToNullStr(caption)
-			evts[i] = evt
-		}
-		return DispatchImmediate(ctx, evts)
-	}
 
 	for _, evt := range evts {
 		go PushEvent(ctx, evt)
 	}
-	return nil, nil
+
+	return nil
 }
 
 func PushEvent(ctx context.Context, evt db.Event) {
 	if hub := sentryutil.SentryHubFromContext(ctx); hub != nil {
 		sentryutil.SetEventContext(hub.Scope(), persist.NullStrToDBID(evt.ActorID), evt.SubjectID, evt.Action)
 	}
-	if err := DispatchDelayed(ctx, evt); err != nil {
+	if err := dispatchDelayed(ctx, evt); err != nil {
 		logger.For(ctx).Error(err)
 		sentryutil.ReportError(ctx, err)
 	}
 }
 
-// DispatchDelayed sends the event to all of its registered handlers.
-func DispatchDelayed(ctx context.Context, event db.Event) error {
+// dispatchDelayed sends the event to all of its registered handlers.
+func dispatchDelayed(ctx context.Context, event db.Event) error {
 	gc := util.MustGetGinContext(ctx)
 	sender := For(gc)
+
+	// Vaidate event
+	err := sender.validate.Struct(event)
+	if err != nil {
+		return err
+	}
 
 	if _, handable := sender.registry[delayedKey][event.Action]; !handable {
 		logger.For(ctx).WithField("action", event.Action).Warn("no delayed handler configured for action")
@@ -144,12 +144,16 @@ func DispatchDelayed(ctx context.Context, event db.Event) error {
 	return eg.Wait()
 }
 
-// DispatchImmediate flushes the event immediately to its registered handlers.
-func DispatchImmediate(ctx context.Context, events []db.Event) (*db.FeedEvent, error) {
+// dispatchImmediate flushes the event immediately to its registered handlers.
+func dispatchImmediate(ctx context.Context, events []db.Event) (*db.FeedEvent, error) {
 	gc := util.MustGetGinContext(ctx)
 	sender := For(gc)
 
 	for _, e := range events {
+		// Vaidate event
+		if err := sender.validate.Struct(e); err != nil {
+			return nil, err
+		}
 		if _, handable := sender.registry[immediateKey][e.Action]; !handable {
 			logger.For(ctx).WithField("action", e.Action).Warn("no immediate handler configured for action")
 			return nil, nil
@@ -235,17 +239,17 @@ type eventSender struct {
 	registry      map[sendType]registedActions
 	queries       *db.Queries
 	eventRepo     postgres.EventRepository
+	validate      *validator.Validate
 }
 
 func newEventSender(queries *db.Queries) eventSender {
+	v := validator.New()
+	v.RegisterStructValidation(validate.EventValidator, db.Event{})
 	return eventSender{
-		registry: map[sendType]registedActions{
-			delayedKey:   {},
-			immediateKey: {},
-			groupKey:     {},
-		},
+		registry:  map[sendType]registedActions{delayedKey: {}, immediateKey: {}, groupKey: {}},
 		queries:   queries,
 		eventRepo: postgres.EventRepository{Queries: queries},
+		validate:  v,
 	}
 }
 
@@ -533,4 +537,11 @@ func (h notificationHandler) findOwnerForNotificationFromEvent(event db.Event) (
 	}
 
 	return "", fmt.Errorf("no owner found for event: %s", event.Action)
+}
+
+// slackHandler posts events to Slack
+type slackHandler struct{ tc *cloudtasks.Client }
+
+func (s slackHandler) handleDelayed(ctx context.Context, event db.Event) error {
+	return task.CreateTaskForSlackPostFeedBot(ctx, task.FeedbotSlackPostMessage{PostID: event.PostID}, s.tc)
 }

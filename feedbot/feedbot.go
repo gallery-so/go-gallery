@@ -47,13 +47,14 @@ func setDefaults() {
 	viper.SetDefault("BOT_TOKEN", "")
 	viper.SetDefault("GALLERY_HOST", "http://localhost:3000")
 	viper.SetDefault("GALLERY_API", "http://localhost:4000/glry/graphql/query")
-	viper.SetDefault("FEEDBOT_SECRET", "feed-bot-secret")
+	viper.SetDefault("FEEDBOT_SECRET", "")
 	viper.SetDefault("SENTRY_DSN", "")
+	viper.SetDefault("SLACK_WEBHOOK_URL", "")
 
 	viper.AutomaticEnv()
 
-	util.VarNotSetTo("BOT_TOKEN", "")
 	if env.GetString("ENV") != "local" {
+		util.VarNotSetTo("BOT_TOKEN", "")
 		util.VarNotSetTo("SENTRY_DSN", "")
 	}
 }

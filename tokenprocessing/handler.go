@@ -6,7 +6,6 @@ import (
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/gin-gonic/gin"
-	"github.com/go-playground/validator/v10"
 
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -15,7 +14,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/tokenmanage"
 )
 
-func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProcessor, mc *multichain.Provider, repos *postgres.Repositories, throttler *throttle.Locker, validator *validator.Validate, taskClient *cloudtasks.Client) *gin.Engine {
+func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProcessor, mc *multichain.Provider, repos *postgres.Repositories, throttler *throttle.Locker, taskClient *cloudtasks.Client) *gin.Engine {
 	// Retry tokens that failed during syncs, but don't retry tokens that failed during manual refreshes
 	refreshManager := tokenmanage.New(ctx, taskClient)
 	syncManager := tokenmanage.NewWithRetries(ctx, taskClient, 40)
@@ -32,8 +31,8 @@ func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProces
 	mediaGroup.POST("/process/post-preflight", processPostPreflight(tp, syncManager, mc.Queries, mc, repos.ContractRepository, repos.UserRepository, repos.TokenRepository))
 	ownersGroup := router.Group("/owners")
 	ownersGroup.POST("/process/contract", processOwnersForContractTokens(mc, repos.ContractRepository, throttler))
-	ownersGroup.POST("/process/user", processOwnersForUserTokens(mc, mc.Queries, validator))
-	ownersGroup.POST("/process/alchemy", processOwnersForAlchemyTokens(mc, mc.Queries, validator))
+	ownersGroup.POST("/process/user", processOwnersForUserTokens(mc, mc.Queries))
+	ownersGroup.POST("/process/alchemy", processOwnersForAlchemyTokens(mc, mc.Queries))
 	ownersGroup.POST("/process/wallet-removal", processWalletRemoval(mc.Queries))
 	contractsGroup := router.Group("/contracts")
 	contractsGroup.POST("/detect-spam", detectSpamContracts(mc.Queries))
