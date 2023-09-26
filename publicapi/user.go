@@ -1,15 +1,16 @@
 package publicapi
 
 import (
-	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/task"
 	"strconv"
 	"strings"
 	"time"
+
+	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
+	"github.com/mikeydub/go-gallery/service/task"
 
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -430,7 +431,14 @@ func (api UserAPI) AddWalletToUser(ctx context.Context, chainAddress persist.Cha
 		return err
 	}
 
-	return nil
+	return task.CreateTaskForAutosocialProcessUsers(ctx, task.AutosocialProcessUsersMessage{
+		Users: map[persist.DBID]map[persist.SocialProvider]persist.ChainAddress{
+			userID: {
+				persist.SocialProviderFarcaster: chainAddress,
+				persist.SocialProviderLens:      chainAddress,
+			},
+		},
+	}, api.taskClient)
 }
 
 func (api UserAPI) RemoveWalletsFromUser(ctx context.Context, walletIDs []persist.DBID) error {
@@ -571,8 +579,25 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 		SubjectID:      userID,
 		Data:           persist.EventData{UserBio: bio},
 	})
+	if err != nil {
+		logger.For(ctx).Errorf("failed to dispatch event: %s", err)
+		return userID, galleryID, err
+	}
 
-	return userID, galleryID, err
+	err = task.CreateTaskForAutosocialProcessUsers(ctx, task.AutosocialProcessUsersMessage{
+		Users: map[persist.DBID]map[persist.SocialProvider]persist.ChainAddress{
+			userID: {
+				persist.SocialProviderFarcaster: createUserParams.ChainAddress,
+				persist.SocialProviderLens:      createUserParams.ChainAddress,
+			},
+		},
+	}, api.taskClient)
+	if err != nil {
+		logger.For(ctx).Errorf("failed to create task for autosocial process users: %s", err)
+		return userID, galleryID, err
+	}
+
+	return userID, galleryID, nil
 }
 
 func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio string) error {

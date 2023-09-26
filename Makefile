@@ -75,6 +75,8 @@ $(DEPLOY)-$(DEV)-indexer-server     : SERVICE_FILE := indexer-server-env.yaml
 $(DEPLOY)-$(DEV)-admin              : SERVICE_FILE := app-dev-admin.yaml
 $(DEPLOY)-$(DEV)-feed               : SERVICE_FILE := feed-env.yaml
 $(DEPLOY)-$(DEV)-tokenprocessing    : SERVICE_FILE := tokenprocessing-env.yaml
+$(DEPLOY)-$(DEV)-autosocial         : SERVICE_FILE := autosocial-env.yaml
+$(DEPLOY)-$(DEV)-autosocial-orch    : SERVICE_FILE := autosocial-orchestrator.yaml
 $(DEPLOY)-$(DEV)-pushnotifications  : SERVICE_FILE := pushnotifications-env.yaml
 $(DEPLOY)-$(DEV)-emails             : SERVICE_FILE := emails-server-env.yaml
 $(DEPLOY)-$(DEV)-feedbot            : SERVICE_FILE := feedbot-env.yaml
@@ -86,6 +88,8 @@ $(DEPLOY)-$(PROD)-indexer-server    : SERVICE_FILE := indexer-server-env.yaml
 $(DEPLOY)-$(PROD)-admin             : SERVICE_FILE := app-prod-admin.yaml
 $(DEPLOY)-$(PROD)-feed              : SERVICE_FILE := feed-env.yaml
 $(DEPLOY)-$(PROD)-feedbot           : SERVICE_FILE := feedbot-env.yaml
+$(DEPLOY)-$(PROD)-autosocial        : SERVICE_FILE := autosocial-env.yaml
+$(DEPLOY)-$(PROD)-autosocial-orch   : SERVICE_FILE := autosocial-orchestrator.yaml
 $(DEPLOY)-$(PROD)-tokenprocessing   : SERVICE_FILE := tokenprocessing-env.yaml
 $(DEPLOY)-$(PROD)-pushnotifications : SERVICE_FILE := pushnotifications-env.yaml
 $(DEPLOY)-$(PROD)-dummymetadata     : SERVICE_FILE := dummymetadata-env.yaml
@@ -107,6 +111,8 @@ $(DEPLOY)-%-feed                  : SENTRY_PROJECT := feed
 $(DEPLOY)-%-feedbot               : SENTRY_PROJECT := feedbot
 $(DEPLOY)-%-emails                : SENTRY_PROJECT := emails
 $(DEPLOY)-%-userpref-upload       : SENTRY_PROJECT := userpref
+$(DEPLOY)-%-autosocial            : SENTRY_PROJECT := autosocial
+$(DEPLOY)-%-autosocial-orch       : SENTRY_PROJECT := autosocial
 
 # Docker builds
 $(DEPLOY)-%-tokenprocessing            : REPO           := tokenprocessing-v3
@@ -118,6 +124,25 @@ $(DEPLOY)-%-tokenprocessing            : MEMORY         := $(TOKENPROCESSING_MEM
 $(DEPLOY)-%-tokenprocessing            : CONCURRENCY    := $(TOKENPROCESSING_CONCURRENCY)
 $(DEPLOY)-$(DEV)-tokenprocessing       : SERVICE        := tokenprocessing-v3
 $(DEPLOY)-$(PROD)-tokenprocessing      : SERVICE        := tokenprocessing-v3
+$(DEPLOY)-%-autosocial            	   : REPO           := autosocial
+$(DEPLOY)-%-autosocial            	   : DOCKER_FILE    := $(DOCKER_DIR)/autosocial/Dockerfile
+$(DEPLOY)-%-autosocial            	   : PORT           := 6700
+$(DEPLOY)-%-autosocial            	   : TIMEOUT        := $(AUTOSOCIAL_TIMEOUT)
+$(DEPLOY)-%-autosocial            	   : CPU            := $(AUTOSOCIAL_CPU)
+$(DEPLOY)-%-autosocial            	   : MEMORY         := $(AUTOSOCIAL_MEMORY)
+$(DEPLOY)-%-autosocial            	   : CONCURRENCY    := $(AUTOSOCIAL_CONCURRENCY)
+$(DEPLOY)-$(DEV)-autosocial      	   : SERVICE        := autosocial
+$(DEPLOY)-$(PROD)-autosocial      	   : SERVICE        := autosocial
+$(DEPLOY)-%-autosocial-orch            : REPO           := autosocial-orchestrator
+$(DEPLOY)-%-autosocial-orch            : DOCKER_FILE    := $(DOCKER_DIR)/autosocial/orchestrator/Dockerfile
+$(DEPLOY)-%-autosocial-orch            : PORT           := 6800
+$(DEPLOY)-%-autosocial-orch            : TIMEOUT        := $(AUTOSOCIAL_ORCH_TIMEOUT)
+$(DEPLOY)-%-autosocial-orch            : CPU            := $(AUTOSOCIAL_ORCH_CPU)
+$(DEPLOY)-%-autosocial-orch            : MEMORY         := $(AUTOSOCIAL_ORCH_MEMORY)
+$(DEPLOY)-%-autosocial-orch            : CONCURRENCY    := $(AUTOSOCIAL_ORCH_CONCURRENCY)
+$(DEPLOY)-$(DEV)-autosocial      	   : SERVICE        := autosocial-orchestrator
+$(DEPLOY)-$(PROD)-autosocial      	   : SERVICE        := autosocial-orchestrator
+$(DEPLOY)-%-pushnotifications          : REPO           := pushnotifications
 $(DEPLOY)-%-pushnotifications          : REPO           := pushnotifications
 $(DEPLOY)-%-pushnotifications          : DOCKER_FILE    := $(DOCKER_DIR)/pushnotifications/Dockerfile
 $(DEPLOY)-%-pushnotifications          : PORT           := 6600
@@ -219,6 +244,13 @@ $(DEPLOY)-%-check-push-tickets         : CRON_METHOD    := POST
 $(DEPLOY)-%-check-push-tickets         : CRON_FLAGS     = --headers='Authorization=Basic $(shell printf ":$(PUSH_NOTIFICATIONS_SECRET)" | base64)' --attempt-deadline=10m
 $(DEPLOY)-$(DEV)-check-push-tickets    : URI_NAME       := pushnotifications-dev
 $(DEPLOY)-$(PROD)-check-push-tickets   : URI_NAME       := pushnotifications
+$(DEPLOY)-%-autosocial-process-users         : CRON_PREFIX    := autosocial-process-users
+$(DEPLOY)-%-autosocial-process-users         : CRON_LOCATION  := $(DEPLOY_REGION)
+$(DEPLOY)-%-autosocial-process-users         : CRON_SCHEDULE  := '0 0 * * *'
+$(DEPLOY)-%-autosocial-process-users         : CRON_URI       = $(shell gcloud run services describe $(URI_NAME) --region $(DEPLOY_REGION) --format 'value(status.url)')/process/users
+$(DEPLOY)-%-autosocial-process-users         : CRON_METHOD    := POST
+$(DEPLOY)-$(DEV)-autosocial-process-users    : URI_NAME       := autosocial-orchestrator
+$(DEPLOY)-$(PROD)-autosocial-process-users   : URI_NAME       := autosocial-orchestrator
 
 # Cloud Jobs
 $(DEPLOY)-%-userpref-upload            : JOB_NAME       := userpref-upload
@@ -242,6 +274,8 @@ $(PROMOTE)-%-indexer-server            : SERVICE := indexer-api
 $(PROMOTE)-%-emails                    : SERVICE := emails
 $(PROMOTE)-%-tokenprocessing           : SERVICE := tokenprocessing
 $(PROMOTE)-%-tokenprocessing           : SERVICE := tokenprocessing-v3
+$(PROMOTE)-%-autosocial                : SERVICE := autosocial
+$(PROMOTE)-%-autosocial-orch           : SERVICE := autosocial-orchestrator
 $(PROMOTE)-%-pushnotifications         : SERVICE := pushnotifications
 $(PROMOTE)-%-dummymetadata             : SERVICE := dummymetadata
 $(PROMOTE)-%-feed                      : SERVICE := feed
@@ -367,6 +401,8 @@ _$(RELEASE)-%:
 $(DEPLOY)-$(DEV)-backend            : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend
 $(DEPLOY)-$(DEV)-indexer-server     : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer-server _$(RELEASE)-indexer-server
 $(DEPLOY)-$(DEV)-tokenprocessing    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-tokenprocessing _$(RELEASE)-tokenprocessing
+$(DEPLOY)-$(DEV)-autosocial         : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-autosocial _$(RELEASE)-autosocial
+$(DEPLOY)-$(DEV)-autosocial-orch    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-autosocial-orch _$(RELEASE)-autosocial-orch
 $(DEPLOY)-$(DEV)-pushnotifications  : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-pushnotifications _$(RELEASE)-pushnotifications
 $(DEPLOY)-$(DEV)-emails             : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-emails _$(RELEASE)-emails
 $(DEPLOY)-$(DEV)-admin              : _set-project-$(ENV) _$(DEPLOY)-admin
@@ -377,6 +413,7 @@ $(DEPLOY)-$(DEV)-graphql-gateway    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-g
 $(DEPLOY)-$(DEV)-alchemy-spam       : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-alchemy-spam _$(CRON)-$(PAUSE)-alchemy-spam
 $(DEPLOY)-$(DEV)-check-push-tickets : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-check-push-tickets _$(CRON)-$(PAUSE)-check-push-tickets
 $(DEPLOY)-$(DEV)-userpref-upload    : _set-project-$(ENV) _$(JOB)-$(DEPLOY)-userpref-upload _$(CRON)-$(DEPLOY)-userpref-upload _$(CRON)-$(PAUSE)-userpref-upload
+$(DEPLOY)-$(DEV)-autosocial-process-users : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-autosocial-process-users _$(CRON)-$(PAUSE)-autosocial-process-users
 
 # SANDBOX deployments
 $(DEPLOY)-$(SANDBOX)-backend      : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend # go server that uses dev upstream services
@@ -386,6 +423,8 @@ $(DEPLOY)-$(PROD)-backend            : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-
 $(DEPLOY)-$(PROD)-indexer            : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer _$(RELEASE)-indexer
 $(DEPLOY)-$(PROD)-indexer-server     : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer-server _$(RELEASE)-indexer-server
 $(DEPLOY)-$(PROD)-tokenprocessing    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-tokenprocessing _$(RELEASE)-tokenprocessing
+$(DEPLOY)-$(PROD)-autosocial         : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-autosocial _$(RELEASE)-autosocial
+$(DEPLOY)-$(PROD)-autosocial-orch    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-autosocial-orch _$(RELEASE)-autosocial-orch
 $(DEPLOY)-$(PROD)-pushnotifications  : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-pushnotifications _$(RELEASE)-pushnotifications
 $(DEPLOY)-$(PROD)-dummymetadata      : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-dummymetadata _$(RELEASE)-dummymetadata
 $(DEPLOY)-$(PROD)-emails             : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-emails _$(RELEASE)-emails
@@ -397,6 +436,7 @@ $(DEPLOY)-$(PROD)-graphql-gateway    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-
 $(DEPLOY)-$(PROD)-alchemy-spam       : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-alchemy-spam _$(CRON)-$(PAUSE)-alchemy-spam
 $(DEPLOY)-$(PROD)-check-push-tickets : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-check-push-tickets _$(CRON)-$(PAUSE)-check-push-tickets
 $(DEPLOY)-$(PROD)-userpref-upload    : _set-project-$(ENV) _$(JOB)-$(DEPLOY)-userpref-upload _$(CRON)-$(DEPLOY)-userpref-upload _$(CRON)-$(PAUSE)-userpref-upload
+$(DEPLOY)-$(PROD)-autosocial-process-users : _set-project-$(ENV) _$(CRON)-$(DEPLOY)-autosocial-process-users _$(CRON)-$(PAUSE)-autosocial-process-users
 
 # PROD promotions. Running these targets will migrate traffic to the specified version.
 # Example usage:
@@ -407,6 +447,8 @@ $(PROMOTE)-$(PROD)-backend            : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE
 $(PROMOTE)-$(PROD)-indexer            : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-indexer
 $(PROMOTE)-$(PROD)-indexer-server     : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-indexer-server
 $(PROMOTE)-$(PROD)-tokenprocessing    : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-tokenprocessing
+$(PROMOTE)-$(PROD)-autosocial         : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-autosocial
+$(PROMOTE)-$(PROD)-autosocial-orch    : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-autosocial-orch
 $(PROMOTE)-$(PROD)-pushnotifications  : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-pushnotifications
 $(PROMOTE)-$(PROD)-dummymetadata      : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-dummymetadata
 $(PROMOTE)-$(PROD)-emails             : _set-project-$(ENV) _$(DOCKER)-$(PROMOTE)-emails
