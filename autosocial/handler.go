@@ -11,18 +11,15 @@ import (
 	"github.com/mikeydub/go-gallery/service/farcaster"
 	"github.com/mikeydub/go-gallery/service/lens"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 	"github.com/sourcegraph/conc/pool"
 )
 
-type ProcessUsersInput struct {
-	Users map[persist.DBID]map[persist.SocialProvider]persist.ChainAddress `json:"users" binding:"required"`
-}
-
 func processUsers(q *coredb.Queries, n *farcaster.NeynarAPI, l *lens.LensAPI) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var in ProcessUsersInput
+		var in task.AutosocialProcessUsersMessage
 		if err := c.ShouldBindJSON(&in); err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
