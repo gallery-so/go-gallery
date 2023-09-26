@@ -72,7 +72,7 @@ func postToSlack(gql *graphql.Client) gin.HandlerFunc {
 		var postURL string
 
 		switch e := env.GetString("ENV"); e {
-		case "prod":
+		case "production":
 			postURL = "https://gallery.so/posts"
 		default:
 			postURL = "https://gallery-dev.vercel.app"
@@ -83,32 +83,57 @@ func postToSlack(gql *graphql.Client) gin.HandlerFunc {
 		contextBlock["elements"] = make([]any, 0)
 		contextBlock["elements"] = append(contextBlock["elements"].([]any), textObject(fmt.Sprintf("New Post - *%s*", template.PostOrError.Post.Tokens[0].Community.Name)))
 
-		if pfp := template.PostOrError.Post.Author.ProfileImage.TokenProfileImage.Token.Media.Media.PreviewURLs.Thumbnail; pfp != "" {
-			contextBlock["elements"] = append(contextBlock["elements"].([]any), imageObject(pfp, fmt.Sprintf("pfp of %s", template.PostOrError.Post.Author.Username)))
-		} else if pfp := template.PostOrError.Post.Author.ProfileImage.EnsProfileImage.ProfileImage.PreviewURLs.Thumbnail; pfp != "" {
-			contextBlock["elements"] = append(contextBlock["elements"].([]any), imageObject(pfp, fmt.Sprintf("pfp of %s", template.PostOrError.Post.Author.Username)))
+		tokenPFP := template.PostOrError.Post.Author.ProfileImage.TokenProfileImage.Token.Media.Media.PreviewURLs.Thumbnail
+		fallbackPFP := template.PostOrError.Post.Author.ProfileImage.TokenProfileImage.Token.Media.Media.FallbackMedia.MediaURL
+		ensPFP := template.PostOrError.Post.Author.ProfileImage.EnsProfileImage.ProfileImage.PreviewURLs.Thumbnail
+		pfpText := fmt.Sprintf("pfp of %s", template.PostOrError.Post.Author.Username)
+
+		if tokenPFP != "" {
+			contextBlock["elements"] = append(contextBlock["elements"].([]any), imageObject(tokenPFP, pfpText))
+		} else if fallbackPFP != "" {
+			contextBlock["elements"] = append(contextBlock["elements"].([]any), imageObject(fallbackPFP, pfpText))
+		} else if ensPFP != "" {
+			contextBlock["elements"] = append(contextBlock["elements"].([]any), imageObject(ensPFP, pfpText))
 		}
 
 		contextBlock["elements"] = append(contextBlock["elements"].([]any), textObject(fmt.Sprintf("posted by *%s*", template.PostOrError.Post.Author.Username)))
 
 		div := dividerObject()
 
-		body := make(map[string]any)
-		body["blocks"] = []any{
+		imagePreview := template.PostOrError.Post.Tokens[0].Media.Media.PreviewURLs.Thumbnail
+		fallbackPreview := template.PostOrError.Post.Tokens[0].Media.Media.FallbackMedia.MediaURL
+		imageText := template.PostOrError.Post.Tokens[0].Name
+
+		body := map[string]any{"blocks": []any{
 			contextBlock,
 			div,
-			map[string]any{
-				"type":      "section",
-				"text":      textObject(template.PostOrError.Post.Caption),
-				"accessory": imageObject(template.PostOrError.Post.Tokens[0].Media.Media.PreviewURLs.Small, template.PostOrError.Post.Tokens[0].Name),
-			},
-			map[string]any{
-				"type":      "section",
-				"text":      textObject(" "),
-				"accessory": linkButtonObject("View Post", fmt.Sprintf("%s/post/%s", postURL, message.PostID)),
-			},
-			div,
+		}}
+
+		if imagePreview != "" {
+			body["blocks"] = append(body["blocks"].([]any),
+				map[string]any{
+					"type":      "section",
+					"text":      textObject(template.PostOrError.Post.Caption),
+					"accessory": imageObject(imagePreview, imageText),
+				},
+			)
+		} else if fallbackPreview != "" {
+			body["blocks"] = append(body["blocks"].([]any),
+				map[string]any{
+					"type":      "section",
+					"text":      textObject(template.PostOrError.Post.Caption),
+					"accessory": imageObject(fallbackPreview, imageText),
+				},
+			)
 		}
+
+		body["blocks"] = append(body["blocks"].([]any), map[string]any{
+			"type":      "section",
+			"text":      textObject(" "),
+			"accessory": linkButtonObject("View Post", fmt.Sprintf("%s/post/%s", postURL, message.PostID)),
+		})
+
+		body["blocks"] = append(body["blocks"].([]any), div)
 
 		r, err := json.Marshal(body)
 		if err != nil {
@@ -133,6 +158,16 @@ func postToSlack(gql *graphql.Client) gin.HandlerFunc {
 	return nil
 }
 
+type mediaFragment struct {
+	PreviewURLs struct {
+		Thumbnail string
+		Small     string
+	} `graphql:"previewURLs"`
+	FallbackMedia struct {
+		MediaURL string `graphql:"mediaURL"`
+	} `graphql:"fallbackMedia`
+}
+
 type slackTemplateInfo struct {
 	PostOrError struct {
 		Post struct {
@@ -143,12 +178,7 @@ type slackTemplateInfo struct {
 						Token struct {
 							Name  string
 							Media struct {
-								Media struct {
-									PreviewURLs struct {
-										Thumbnail string
-										Small     string
-									} `graphql:"previewURLs"`
-								} `graphql:"...on Media"`
+								Media mediaFragment `graphql:"...on Media"`
 							}
 						}
 					} `graphql:"...on TokenProfileImage"`
@@ -166,12 +196,7 @@ type slackTemplateInfo struct {
 			Tokens  []struct {
 				Name  string
 				Media struct {
-					Media struct {
-						PreviewURLs struct {
-							Thumbnail string
-							Small     string
-						} `graphql:"previewURLs"`
-					} `graphql:"...on Media"`
+					Media mediaFragment `graphql:"...on Media"`
 				}
 				Community struct {
 					Name string
