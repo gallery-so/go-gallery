@@ -494,7 +494,8 @@ and posts.deleted = false;
 SELECT * FROM feed_events WHERE id = ANY(@ids::varchar(255)[]) AND deleted = false;
 
 -- name: GetPostsByIds :many
-SELECT * FROM posts WHERE id = ANY(@ids::varchar(255)[]) AND deleted = false;
+-- TODO: Add order by clause
+SELECT * FROM posts WHERE id = ANY(@post_ids::varchar(255)[]) AND deleted = false;
 
 -- name: GetEventByIdBatch :batchone
 SELECT * FROM feed_events WHERE id = $1 AND deleted = false;

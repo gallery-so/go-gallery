@@ -869,15 +869,6 @@ func (d *cursorDecoder) readInt64() (int64, error) {
 	return binary.ReadVarint(d.reader)
 }
 
-// readFeedEntityType reads FeedEntityType from the underlying reader and advances the stream
-func (d *cursorDecoder) readFeedEntityType() (persist.FeedEntityType, error) {
-	i, err := binary.ReadVarint(d.reader)
-	if err != nil {
-		return 0, err
-	}
-	return persist.FeedEntityType(i), nil
-}
-
 //------------------------------------------------------------------------------
 
 type cursorer interface {
@@ -946,10 +937,10 @@ func (cursorableN) NewPositionCursorer(f func(any) (int64, []persist.DBID, error
 	}
 }
 
-func (cursorableN) NewFeedPositionCursorer(f func(any) (int64, []persist.FeedEntityType, []persist.DBID, error)) cursorable {
+func (cursorableN) NewFeedPositionCursorer(f func(any) (int64, []persist.DBID, error)) cursorable {
 	return func(node any) (c cursorer, err error) {
 		cur := cursors.NewFeedPositionCursor()
-		cur.CurrentPosition, cur.EntityTypes, cur.EntityIDs, err = f(node)
+		cur.CurrentPosition, cur.EntityIDs, err = f(node)
 		return cur, err
 	}
 }
@@ -1033,13 +1024,24 @@ func (cursorN) NewIntTimeIDCursor() *intTimeIDCursor {
 type feedPositionCursor struct {
 	*baseCursor
 	CurrentPosition int64
-	EntityTypes     []persist.FeedEntityType
 	EntityIDs       []persist.DBID
+	PositionLookup  map[persist.DBID]int64
+}
+
+func (f *feedPositionCursor) Unpack(s string) error {
+	err := f.baseCursor.Unpack(s)
+	if err != nil {
+		return err
+	}
+	for i, id := range f.EntityIDs {
+		f.PositionLookup[id] = int64(i)
+	}
+	return nil
 }
 
 func (cursorN) NewFeedPositionCursor() *feedPositionCursor {
-	c := feedPositionCursor{baseCursor: &baseCursor{}}
-	initCursor(c.baseCursor, &c.CurrentPosition, &c.EntityTypes, &c.EntityIDs)
+	c := feedPositionCursor{baseCursor: &baseCursor{}, PositionLookup: make(map[persist.DBID]int64)}
+	initCursor(c.baseCursor, &c.CurrentPosition, &c.EntityIDs)
 	return &c
 }
 
@@ -1165,8 +1167,6 @@ func unpackVal(d *cursorDecoder, val any) unpackF {
 		return unpackTo(v, d.readBool)
 	case *int64:
 		return unpackTo(v, d.readInt64)
-	case *[]persist.FeedEntityType:
-		return unpackSliceTo(v, d, d.readFeedEntityType)
 	case *[]persist.DBID:
 		return unpackSliceTo(v, d, d.readDBID)
 	default:

@@ -2987,8 +2987,9 @@ const getPostsByIds = `-- name: GetPostsByIds :many
 SELECT id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted FROM posts WHERE id = ANY($1::varchar(255)[]) AND deleted = false
 `
 
-func (q *Queries) GetPostsByIds(ctx context.Context, ids []string) ([]Post, error) {
-	rows, err := q.db.Query(ctx, getPostsByIds, ids)
+// TODO: Add order by clause
+func (q *Queries) GetPostsByIds(ctx context.Context, postIds []string) ([]Post, error) {
+	rows, err := q.db.Query(ctx, getPostsByIds, postIds)
 	if err != nil {
 		return nil, err
 	}

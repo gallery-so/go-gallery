@@ -75,18 +75,17 @@ where contract_id not in (
 with refreshed as (
   select greatest((select last_updated from feed_entity_scores limit 1), @window_end::timestamptz) last_updated
 )
-select *
-from feed_entity_scores f1
-where f1.created_at > @window_end::timestamptz
-  and (@include_viewer::bool or f1.actor_id != @viewer_id)
-  and (@include_posts::bool or f1.feed_entity_type != @post_entity_type)
-  and (@include_events::bool or f1.feed_entity_type != @feed_entity_type)
-  and not (f1.action = any(@excluded_feed_actions::varchar[]))
+select sqlc.embed(feed_entity_scores), sqlc.embed(posts)
+from feed_entity_scores
+join posts on feed_entity_scores.id = posts.id
+where feed_entity_scores.created_at > @window_end::timestamptz
+  and (@include_viewer::bool or feed_entity_scores.actor_id != @viewer_id)
+  and feed_entity_scores.feed_entity_type == @post_entity_type
+  and not posts.deleted
 union
-select *
-from feed_entity_score_view f2
+select sqlc.embed(feed_entity_scores), sqlc.embed(posts)
+from feed_entity_score_view feed_entity_scores
+join posts on feed_entity_score_view.id = posts.id
 where created_at > (select last_updated from refreshed limit 1)
-  and (@include_viewer::bool or f2.actor_id != @viewer_id)
-  and (@include_posts::bool or f2.feed_entity_type != @post_entity_type)
-  and (@include_events::bool or f2.feed_entity_type != @feed_entity_type)
-  and not (f2.action = any(@excluded_feed_actions::varchar[]));
+and (@include_viewer::bool or feed_entity_score_view.actor_id != @viewer_id)
+and feed_entity_score_view.feed_entity_type == @post_entity_type;
