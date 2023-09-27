@@ -115,7 +115,7 @@ type GalleryUser implements Node @goEmbedHelper {
     after: String
     first: Int
     last: Int
-    includePosts: Boolean! = false
+    includePosts: Boolean! = false @deprecated(reason: "Posts are always included now.")
   ): FeedConnection @goField(forceResolver: true)
   sharedFollowers(before: String, after: String, first: Int, last: Int): UsersConnection
     @authRequired
@@ -702,7 +702,7 @@ type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
     after: String
     first: Int
     last: Int
-    includePosts: Boolean! = false
+    includePosts: Boolean! = false @deprecated(reason: "Posts are always included now.")
   ): FeedConnection @goField(forceResolver: true)
 
   email: UserEmail @goField(forceResolver: true)
@@ -1280,7 +1280,7 @@ type Query {
     after: String
     first: Int
     last: Int
-    includePosts: Boolean! = false
+    includePosts: Boolean! = false @deprecated(reason: "Posts are always included now.")
   ): FeedConnection
   # Paging forward i.e. providing the `first` argument will return events in order of descending popularity.
   trendingFeed(
@@ -1288,14 +1288,14 @@ type Query {
     after: String
     first: Int
     last: Int
-    includePosts: Boolean! = false
+    includePosts: Boolean! = false @deprecated(reason: "Posts are always included now.")
   ): FeedConnection
   curatedFeed(
     before: String
     after: String
     first: Int
     last: Int
-    includePosts: Boolean! = false
+    includePosts: Boolean! = false @deprecated(reason: "Posts are always included now.")
   ): FeedConnection
   feedEventById(id: DBID!): FeedEventByIdOrError
   postById(id: DBID!): PostOrError

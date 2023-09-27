@@ -5598,11 +5598,11 @@ SELECT id, feed_entity_type, created_at, actor_id
 FROM feed_entities
 WHERE (created_at, id) < ($1, $2)
         AND (created_at, id) > ($3, $4)
-        AND ($5::bool OR feed_entity_type != $6)
+        AND (feed_entity_type != $5) -- Always exclude feed events
 ORDER BY 
-    CASE WHEN $7::bool THEN (created_at, id) END ASC,
-    CASE WHEN NOT $7::bool THEN (created_at, id) END DESC
-LIMIT $8
+    CASE WHEN $6::bool THEN (created_at, id) END ASC,
+    CASE WHEN NOT $6::bool THEN (created_at, id) END DESC
+LIMIT $7
 `
 
 type PaginateGlobalFeedParams struct {
@@ -5610,8 +5610,7 @@ type PaginateGlobalFeedParams struct {
 	CurBeforeID    persist.DBID `json:"cur_before_id"`
 	CurAfterTime   time.Time    `json:"cur_after_time"`
 	CurAfterID     persist.DBID `json:"cur_after_id"`
-	IncludePosts   bool         `json:"include_posts"`
-	PostEntityType int32        `json:"post_entity_type"`
+	FeedEntityType int32        `json:"feed_entity_type"`
 	PagingForward  bool         `json:"paging_forward"`
 	Limit          int32        `json:"limit"`
 }
@@ -5622,8 +5621,7 @@ func (q *Queries) PaginateGlobalFeed(ctx context.Context, arg PaginateGlobalFeed
 		arg.CurBeforeID,
 		arg.CurAfterTime,
 		arg.CurAfterID,
-		arg.IncludePosts,
-		arg.PostEntityType,
+		arg.FeedEntityType,
 		arg.PagingForward,
 		arg.Limit,
 	)
@@ -5657,23 +5655,20 @@ select fe.id, fe.feed_entity_type, fe.created_at, fe.actor_id from feed_entities
       and fl.follower = $1
       and (fe.created_at, fe.id) < ($2, $3)
       and (fe.created_at, fe.id) > ($4, $5)
-      and ($6::bool or feed_entity_type != $7)
 order by
-    case when $8::bool then (fe.created_at, fe.id) end asc,
-    case when not $8::bool then (fe.created_at, fe.id) end desc
-limit $9
+    case when $6::bool then (fe.created_at, fe.id) end asc,
+    case when not $6::bool then (fe.created_at, fe.id) end desc
+limit $7
 `
 
 type PaginatePersonalFeedByUserIDParams struct {
-	Follower       persist.DBID `json:"follower"`
-	CurBeforeTime  time.Time    `json:"cur_before_time"`
-	CurBeforeID    persist.DBID `json:"cur_before_id"`
-	CurAfterTime   time.Time    `json:"cur_after_time"`
-	CurAfterID     persist.DBID `json:"cur_after_id"`
-	IncludePosts   bool         `json:"include_posts"`
-	PostEntityType int32        `json:"post_entity_type"`
-	PagingForward  bool         `json:"paging_forward"`
-	Limit          int32        `json:"limit"`
+	Follower      persist.DBID `json:"follower"`
+	CurBeforeTime time.Time    `json:"cur_before_time"`
+	CurBeforeID   persist.DBID `json:"cur_before_id"`
+	CurAfterTime  time.Time    `json:"cur_after_time"`
+	CurAfterID    persist.DBID `json:"cur_after_id"`
+	PagingForward bool         `json:"paging_forward"`
+	Limit         int32        `json:"limit"`
 }
 
 func (q *Queries) PaginatePersonalFeedByUserID(ctx context.Context, arg PaginatePersonalFeedByUserIDParams) ([]FeedEntity, error) {
@@ -5683,8 +5678,6 @@ func (q *Queries) PaginatePersonalFeedByUserID(ctx context.Context, arg Paginate
 		arg.CurBeforeID,
 		arg.CurAfterTime,
 		arg.CurAfterID,
-		arg.IncludePosts,
-		arg.PostEntityType,
 		arg.PagingForward,
 		arg.Limit,
 	)
@@ -5789,11 +5782,11 @@ FROM feed_entities
 WHERE actor_id = $1
         AND (created_at, id) < ($2, $3)
         AND (created_at, id) > ($4, $5)
-        AND ($6::bool OR feed_entity_type != $7)
+        AND (feed_entity_type != $6) -- Always exclude feed events
 ORDER BY 
-    CASE WHEN $8::bool THEN (created_at, id) END ASC,
-    CASE WHEN NOT $8::bool THEN (created_at, id) END DESC
-LIMIT $9
+    CASE WHEN $7::bool THEN (created_at, id) END ASC,
+    CASE WHEN NOT $7::bool THEN (created_at, id) END DESC
+LIMIT $8
 `
 
 type PaginateUserFeedByUserIDParams struct {
@@ -5802,8 +5795,7 @@ type PaginateUserFeedByUserIDParams struct {
 	CurBeforeID    persist.DBID `json:"cur_before_id"`
 	CurAfterTime   time.Time    `json:"cur_after_time"`
 	CurAfterID     persist.DBID `json:"cur_after_id"`
-	IncludePosts   bool         `json:"include_posts"`
-	PostEntityType int32        `json:"post_entity_type"`
+	FeedEntityType int32        `json:"feed_entity_type"`
 	PagingForward  bool         `json:"paging_forward"`
 	Limit          int32        `json:"limit"`
 }
@@ -5815,8 +5807,7 @@ func (q *Queries) PaginateUserFeedByUserID(ctx context.Context, arg PaginateUser
 		arg.CurBeforeID,
 		arg.CurAfterTime,
 		arg.CurAfterID,
-		arg.IncludePosts,
-		arg.PostEntityType,
+		arg.FeedEntityType,
 		arg.PagingForward,
 		arg.Limit,
 	)

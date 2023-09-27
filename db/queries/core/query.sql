@@ -422,7 +422,7 @@ SELECT *
 FROM feed_entities
 WHERE (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
         AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
-        AND (@include_posts::bool OR feed_entity_type != @post_entity_type)
+        AND (feed_entity_type != @feed_entity_type) -- Always exclude feed events
 ORDER BY 
     CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
     CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
@@ -435,7 +435,6 @@ select fe.* from feed_entities fe, follows fl
       and fl.follower = sqlc.arg('follower')
       and (fe.created_at, fe.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
       and (fe.created_at, fe.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
-      and (@include_posts::bool or feed_entity_type != @post_entity_type)
 order by
     case when sqlc.arg('paging_forward')::bool then (fe.created_at, fe.id) end asc,
     case when not sqlc.arg('paging_forward')::bool then (fe.created_at, fe.id) end desc
@@ -447,7 +446,7 @@ FROM feed_entities
 WHERE actor_id = sqlc.arg('owner_id')
         AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
         AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
-        AND (@include_posts::bool OR feed_entity_type != @post_entity_type)
+        AND (feed_entity_type != @feed_entity_type) -- Always exclude feed events
 ORDER BY 
     CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
     CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
