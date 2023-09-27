@@ -17,14 +17,17 @@ const (
 	ResourceTypeAdmire
 	ResourceTypeComment
 	ResourceTypeContract
+	ResourceTypePost
 	ActionUserCreated                     Action = "UserCreated"
 	ActionUserFollowedUsers               Action = "UserFollowedUsers"
+	ActionUserPosted                      Action = "UserPosted"
 	ActionCollectorsNoteAddedToToken      Action = "CollectorsNoteAddedToToken"
 	ActionCollectionCreated               Action = "CollectionCreated"
 	ActionCollectorsNoteAddedToCollection Action = "CollectorsNoteAddedToCollection"
 	ActionTokensAddedToCollection         Action = "TokensAddedToCollection"
 	ActionAdmiredFeedEvent                Action = "AdmiredFeedEvent"
 	ActionAdmiredPost                     Action = "AdmiredPost"
+	ActionAdmiredToken                    Action = "AdmiredToken"
 	ActionCommentedOnFeedEvent            Action = "CommentedOnFeedEvent"
 	ActionCommentedOnPost                 Action = "CommentedOnPost"
 	ActionReplyToComment                  Action = "RepliedToComment"

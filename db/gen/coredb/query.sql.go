@@ -366,7 +366,7 @@ func (q *Queries) CreateAdmireEvent(ctx context.Context, arg CreateAdmireEventPa
 }
 
 const createAdmireNotification = `-- name: CreateAdmireNotification :one
-INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id
+INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, token_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id
 `
 
 type CreateAdmireNotificationParams struct {
@@ -377,6 +377,7 @@ type CreateAdmireNotificationParams struct {
 	EventIds  persist.DBIDList         `json:"event_ids"`
 	FeedEvent sql.NullString           `json:"feed_event"`
 	Post      sql.NullString           `json:"post"`
+	Token     sql.NullString           `json:"token"`
 }
 
 func (q *Queries) CreateAdmireNotification(ctx context.Context, arg CreateAdmireNotificationParams) (Notification, error) {
@@ -388,6 +389,7 @@ func (q *Queries) CreateAdmireNotification(ctx context.Context, arg CreateAdmire
 		arg.EventIds,
 		arg.FeedEvent,
 		arg.Post,
+		arg.Token,
 	)
 	var i Notification
 	err := row.Scan(
@@ -880,6 +882,59 @@ func (q *Queries) CreateMentionUserNotification(ctx context.Context, arg CreateM
 		&i.Amount,
 		&i.PostID,
 		&i.TokenID,
+		&i.ContractID,
+		&i.MentionID,
+	)
+	return i, err
+}
+
+const createPostEvent = `-- name: CreatePostEvent :one
+INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, post_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id, contract_id, mention_id
+`
+
+type CreatePostEventParams struct {
+	ID             persist.DBID         `json:"id"`
+	ActorID        sql.NullString       `json:"actor_id"`
+	Action         persist.Action       `json:"action"`
+	ResourceTypeID persist.ResourceType `json:"resource_type_id"`
+	UserID         persist.DBID         `json:"user_id"`
+	SubjectID      persist.DBID         `json:"subject_id"`
+	PostID         persist.DBID         `json:"post_id"`
+}
+
+func (q *Queries) CreatePostEvent(ctx context.Context, arg CreatePostEventParams) (Event, error) {
+	row := q.db.QueryRow(ctx, createPostEvent,
+		arg.ID,
+		arg.ActorID,
+		arg.Action,
+		arg.ResourceTypeID,
+		arg.UserID,
+		arg.SubjectID,
+		arg.PostID,
+	)
+	var i Event
+	err := row.Scan(
+		&i.ID,
+		&i.Version,
+		&i.ActorID,
+		&i.ResourceTypeID,
+		&i.SubjectID,
+		&i.UserID,
+		&i.TokenID,
+		&i.CollectionID,
+		&i.Action,
+		&i.Data,
+		&i.Deleted,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.GalleryID,
+		&i.CommentID,
+		&i.AdmireID,
+		&i.FeedEventID,
+		&i.ExternalID,
+		&i.Caption,
+		&i.GroupID,
+		&i.PostID,
 		&i.ContractID,
 		&i.MentionID,
 	)
@@ -2293,6 +2348,64 @@ func (q *Queries) GetEventsInWindow(ctx context.Context, arg GetEventsInWindowPa
 	return items, nil
 }
 
+const getFallbackTokenByUserTokenIdentifiers = `-- name: GetFallbackTokenByUserTokenIdentifiers :one
+with contract as (
+	select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id, override_creator_user_id from contracts where contracts.chain = $3 and contracts.address = $4 and not contracts.deleted
+)
+select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id, tokens.is_creator_token, tokens.is_holder_token, tokens.displayable
+from tokens, contract
+where tokens.contract = contract.id and tokens.chain = contract.chain and tokens.token_id = $1 and not tokens.deleted
+order by tokens.owner_user_id = $2 desc, nullif(tokens.fallback_media->>'image_url', '') asc, tokens.last_updated desc
+limit 1
+`
+
+type GetFallbackTokenByUserTokenIdentifiersParams struct {
+	TokenID persist.TokenID `json:"token_id"`
+	UserID  persist.DBID    `json:"user_id"`
+	Chain   persist.Chain   `json:"chain"`
+	Address persist.Address `json:"address"`
+}
+
+func (q *Queries) GetFallbackTokenByUserTokenIdentifiers(ctx context.Context, arg GetFallbackTokenByUserTokenIdentifiersParams) (Token, error) {
+	row := q.db.QueryRow(ctx, getFallbackTokenByUserTokenIdentifiers,
+		arg.TokenID,
+		arg.UserID,
+		arg.Chain,
+		arg.Address,
+	)
+	var i Token
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.Version,
+		&i.CreatedAt,
+		&i.LastUpdated,
+		&i.Name,
+		&i.Description,
+		&i.CollectorsNote,
+		&i.TokenUri,
+		&i.TokenType,
+		&i.TokenID,
+		&i.Quantity,
+		&i.OwnershipHistory,
+		&i.ExternalUrl,
+		&i.BlockNumber,
+		&i.OwnerUserID,
+		&i.OwnedByWallets,
+		&i.Chain,
+		&i.Contract,
+		&i.IsUserMarkedSpam,
+		&i.IsProviderMarkedSpam,
+		&i.LastSynced,
+		&i.FallbackMedia,
+		&i.TokenMediaID,
+		&i.IsCreatorToken,
+		&i.IsHolderToken,
+		&i.Displayable,
+	)
+	return i, err
+}
+
 const getFeedEventByID = `-- name: GetFeedEventByID :one
 SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption, group_id FROM feed_events WHERE id = $1 AND deleted = false
 `
@@ -2637,6 +2750,67 @@ func (q *Queries) GetLastFeedEventForUser(ctx context.Context, arg GetLastFeedEv
 		&i.CreatedAt,
 		&i.Caption,
 		&i.GroupID,
+	)
+	return i, err
+}
+
+const getMediaByUserTokenIdentifiers = `-- name: GetMediaByUserTokenIdentifiers :one
+with contract as (
+	select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id, override_creator_user_id from contracts where contracts.chain = $1 and contracts.address = $2 and not contracts.deleted
+),
+matching_media as (
+	select token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.contract_id, token_medias.token_id, token_medias.chain, token_medias.active, token_medias.metadata, token_medias.media, token_medias.name, token_medias.description, token_medias.processing_job_id, token_medias.deleted
+	from token_medias, contract
+	where token_medias.contract_id = contract.id and token_medias.chain = $1 and token_medias.token_id = $3 and not token_medias.deleted
+	order by token_medias.active desc, token_medias.last_updated desc
+	limit 1
+),
+matched_token(id) as (
+    select tokens.id
+    from tokens, contract, matching_media
+    where tokens.contract = contract.id and tokens.chain = $1 and tokens.token_id = $3 and not tokens.deleted
+    order by tokens.owner_user_id = $4 desc, tokens.token_media_id = matching_media.id desc, tokens.last_updated desc
+    limit 1
+)
+select token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.contract_id, token_medias.token_id, token_medias.chain, token_medias.active, token_medias.metadata, token_medias.media, token_medias.name, token_medias.description, token_medias.processing_job_id, token_medias.deleted, (select id from matched_token) token_instance_id from matching_media token_medias
+`
+
+type GetMediaByUserTokenIdentifiersParams struct {
+	Chain   persist.Chain   `json:"chain"`
+	Address persist.Address `json:"address"`
+	TokenID persist.TokenID `json:"token_id"`
+	UserID  persist.DBID    `json:"user_id"`
+}
+
+type GetMediaByUserTokenIdentifiersRow struct {
+	TokenMedia      TokenMedia   `json:"tokenmedia"`
+	TokenInstanceID persist.DBID `json:"token_instance_id"`
+}
+
+func (q *Queries) GetMediaByUserTokenIdentifiers(ctx context.Context, arg GetMediaByUserTokenIdentifiersParams) (GetMediaByUserTokenIdentifiersRow, error) {
+	row := q.db.QueryRow(ctx, getMediaByUserTokenIdentifiers,
+		arg.Chain,
+		arg.Address,
+		arg.TokenID,
+		arg.UserID,
+	)
+	var i GetMediaByUserTokenIdentifiersRow
+	err := row.Scan(
+		&i.TokenMedia.ID,
+		&i.TokenMedia.CreatedAt,
+		&i.TokenMedia.LastUpdated,
+		&i.TokenMedia.Version,
+		&i.TokenMedia.ContractID,
+		&i.TokenMedia.TokenID,
+		&i.TokenMedia.Chain,
+		&i.TokenMedia.Active,
+		&i.TokenMedia.Metadata,
+		&i.TokenMedia.Media,
+		&i.TokenMedia.Name,
+		&i.TokenMedia.Description,
+		&i.TokenMedia.ProcessingJobID,
+		&i.TokenMedia.Deleted,
+		&i.TokenInstanceID,
 	)
 	return i, err
 }
@@ -3628,6 +3802,60 @@ func (q *Queries) GetTokenByTokenIdentifiers(ctx context.Context, arg GetTokenBy
 	return i, err
 }
 
+const getTokenByUserTokenIdentifiers = `-- name: GetTokenByUserTokenIdentifiers :one
+select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id, t.is_creator_token, t.is_holder_token, t.displayable
+from tokens t
+join contracts c on t.contract = c.id
+where t.owner_user_id = $1 and t.token_id = $2 and c.address = $3 and c.chain = $4 and t.displayable and not t.deleted and not c.deleted
+`
+
+type GetTokenByUserTokenIdentifiersParams struct {
+	OwnerID         persist.DBID    `json:"owner_id"`
+	TokenID         persist.TokenID `json:"token_id"`
+	ContractAddress persist.Address `json:"contract_address"`
+	Chain           persist.Chain   `json:"chain"`
+}
+
+func (q *Queries) GetTokenByUserTokenIdentifiers(ctx context.Context, arg GetTokenByUserTokenIdentifiersParams) (Token, error) {
+	row := q.db.QueryRow(ctx, getTokenByUserTokenIdentifiers,
+		arg.OwnerID,
+		arg.TokenID,
+		arg.ContractAddress,
+		arg.Chain,
+	)
+	var i Token
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.Version,
+		&i.CreatedAt,
+		&i.LastUpdated,
+		&i.Name,
+		&i.Description,
+		&i.CollectorsNote,
+		&i.TokenUri,
+		&i.TokenType,
+		&i.TokenID,
+		&i.Quantity,
+		&i.OwnershipHistory,
+		&i.ExternalUrl,
+		&i.BlockNumber,
+		&i.OwnerUserID,
+		&i.OwnedByWallets,
+		&i.Chain,
+		&i.Contract,
+		&i.IsUserMarkedSpam,
+		&i.IsProviderMarkedSpam,
+		&i.LastSynced,
+		&i.FallbackMedia,
+		&i.TokenMediaID,
+		&i.IsCreatorToken,
+		&i.IsHolderToken,
+		&i.Displayable,
+	)
+	return i, err
+}
+
 const getTokenMediaByTokenId = `-- name: GetTokenMediaByTokenId :one
 select tm.id, tm.created_at, tm.last_updated, tm.version, tm.contract_id, tm.token_id, tm.chain, tm.active, tm.metadata, tm.media, tm.name, tm.description, tm.processing_job_id, tm.deleted from tokens join token_medias tm on tokens.token_media_id = tm.id where tokens.id = $1 and tokens.displayable and not tokens.deleted and not tm.deleted
 `
@@ -3891,6 +4119,47 @@ func (q *Queries) GetUniqueTokenIdentifiersByTokenID(ctx context.Context, id per
 		&i.Chain,
 		&i.Quantity,
 		&i.OwnerAddresses,
+	)
+	return i, err
+}
+
+const getUserByAddressAndChains = `-- name: GetUserByAddressAndChains :one
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id
+from users, wallets
+where wallets.address = $1
+	and wallets.chain = any($2::int[])
+	and array[wallets.id] <@ users.wallets
+	and wallets.deleted = false
+	and users.deleted = false
+`
+
+type GetUserByAddressAndChainsParams struct {
+	Address persist.Address `json:"address"`
+	Chains  []int32         `json:"chains"`
+}
+
+func (q *Queries) GetUserByAddressAndChains(ctx context.Context, arg GetUserByAddressAndChainsParams) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByAddressAndChains, arg.Address, arg.Chains)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.Version,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.Username,
+		&i.UsernameIdempotent,
+		&i.Wallets,
+		&i.Bio,
+		&i.Traits,
+		&i.Universal,
+		&i.NotificationSettings,
+		&i.EmailVerified,
+		&i.EmailUnsubscriptions,
+		&i.FeaturedGallery,
+		&i.PrimaryWalletID,
+		&i.UserExperiences,
+		&i.ProfileImageID,
 	)
 	return i, err
 }
@@ -5231,27 +5500,27 @@ func (q *Queries) InsertSpamContracts(ctx context.Context, arg InsertSpamContrac
 const insertTokenPipelineResults = `-- name: InsertTokenPipelineResults :exec
 with insert_job(id) as (
     insert into token_processing_jobs (id, token_properties, pipeline_metadata, processing_cause, processor_version)
-    values ($5, $6, $7, $8, $9)
+    values ($7, $8, $9, $10, $11)
     returning id
 ),
 insert_media_move_active_record(last_updated) as (
     insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
     (
-        select $10, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, now()
+        select $12, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, now()
         from token_medias
-        where contract_id = $2
-            and token_id = $3
-            and chain = $1
+        where contract_id = $4
+            and token_id = $5
+            and chain = $3
             and active
             and not deleted
-            and $11 = true
+            and $13 = true
         limit 1
     )
     returning last_updated
 ),
-insert_media_add_record(insert_id, active, is_new) as (
+insert_media_add_record(insert_id, active, replaced_current) as (
     insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
-    values ($12, $2, $3, $1, $13, $14, $15, $16, (select id from insert_job), $11,
+    values ($14, $4, $5, $3, $15, $16, $1, $2, (select id from insert_job), $13,
         -- Using timestamps generated from insert_media_move_active_record ensures that the new record is only inserted after the current media is moved
         (select coalesce((select last_updated from insert_media_move_active_record), now())),
         (select coalesce((select last_updated from insert_media_move_active_record), now()))
@@ -5259,16 +5528,16 @@ insert_media_add_record(insert_id, active, is_new) as (
     on conflict (contract_id, token_id, chain) where active and not deleted do update
         set metadata = excluded.metadata,
             media = excluded.media,
-            name = excluded.name,
-            description = excluded.description,
+            name = coalesce(nullif(excluded.name, ''), token_medias.name),
+            description = coalesce(nullif(excluded.description, ''), token_medias.description),
             processing_job_id = excluded.processing_job_id,
             last_updated = now()
-    returning id as insert_id, active, id = $12 is_new
+    returning id as insert_id, active, id = $14 replaced_current
 ),
 existing_active(id) as (
     select id
     from token_medias
-    where chain = $1 and contract_id = $2 and token_id = $3 and active and not deleted
+    where chain = $3 and contract_id = $4 and token_id = $5 and active and not deleted
     limit 1
 )
 update tokens
@@ -5281,28 +5550,28 @@ set token_media_id = (
         -- The pipeline produced active media, or didn't produce active media but no active media existed before
         else insert_medias.insert_id
     end
-)
+), name = coalesce(nullif($1, ''), tokens.name), description = coalesce(nullif($2, ''), tokens.description), last_updated = now() -- update the duplicate fields on the token in the meantime before we get rid of these fields
 from insert_media_add_record insert_medias
 where
-    tokens.chain = $1
-    and tokens.contract = $2
-    and tokens.token_id = $3
+    tokens.chain = $3
+    and tokens.contract = $4
+    and tokens.token_id = $5
     and not tokens.deleted
     and (
         -- The case statement below handles which token instances get updated:
         case
             -- If the active media already existed, update tokens that have no media (new tokens that haven't been processed before) or tokens that don't use this media yet
-            when insert_medias.active and not insert_medias.is_new
+            when insert_medias.active and not insert_medias.replaced_current
             then (tokens.token_media_id is null or tokens.token_media_id != insert_medias.insert_id)
 
             -- Brand new active media, update all tokens in the filter to use this media
-            when insert_medias.active and insert_medias.is_new
+            when insert_medias.active and insert_medias.replaced_current
             then 1 = 1
 
             -- The pipeline run produced inactive media, only update the token instance (since it may have not been processed before)
             -- Since there is no db constraint on inactive media, all inactive media is new
             when not insert_medias.active
-            then tokens.id = $4
+            then tokens.id = $6
 
             else 1 = 1
         end
@@ -5310,6 +5579,8 @@ where
 `
 
 type InsertTokenPipelineResultsParams struct {
+	Name             interface{}              `json:"name"`
+	Description      interface{}              `json:"description"`
 	Chain            persist.Chain            `json:"chain"`
 	ContractID       persist.DBID             `json:"contract_id"`
 	TokenID          persist.TokenID          `json:"token_id"`
@@ -5319,13 +5590,11 @@ type InsertTokenPipelineResultsParams struct {
 	PipelineMetadata persist.PipelineMetadata `json:"pipeline_metadata"`
 	ProcessingCause  persist.ProcessingCause  `json:"processing_cause"`
 	ProcessorVersion string                   `json:"processor_version"`
-	CopyMediaID      persist.DBID             `json:"copy_media_id"`
+	RetiredMediaID   persist.DBID             `json:"retired_media_id"`
 	Active           interface{}              `json:"active"`
 	NewMediaID       persist.DBID             `json:"new_media_id"`
 	Metadata         persist.TokenMetadata    `json:"metadata"`
 	Media            persist.Media            `json:"media"`
-	Name             string                   `json:"name"`
-	Description      string                   `json:"description"`
 }
 
 // Optionally create an inactive record of the existing active record if the new media is also active
@@ -5334,6 +5603,8 @@ type InsertTokenPipelineResultsParams struct {
 // this will still return the active record before the update, and not the new record.
 func (q *Queries) InsertTokenPipelineResults(ctx context.Context, arg InsertTokenPipelineResultsParams) error {
 	_, err := q.db.Exec(ctx, insertTokenPipelineResults,
+		arg.Name,
+		arg.Description,
 		arg.Chain,
 		arg.ContractID,
 		arg.TokenID,
@@ -5343,13 +5614,11 @@ func (q *Queries) InsertTokenPipelineResults(ctx context.Context, arg InsertToke
 		arg.PipelineMetadata,
 		arg.ProcessingCause,
 		arg.ProcessorVersion,
-		arg.CopyMediaID,
+		arg.RetiredMediaID,
 		arg.Active,
 		arg.NewMediaID,
 		arg.Metadata,
 		arg.Media,
-		arg.Name,
-		arg.Description,
 	)
 	return err
 }
@@ -5703,6 +5972,78 @@ func (q *Queries) PaginatePersonalFeedByUserID(ctx context.Context, arg Paginate
 			&i.FeedEntityType,
 			&i.CreatedAt,
 			&i.ActorID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const paginatePostsByContractIDAndProjectID = `-- name: PaginatePostsByContractIDAndProjectID :many
+with valid_post_ids as (
+    SELECT distinct on (posts.id) posts.id
+    FROM posts
+        JOIN tokens on tokens.id = ANY(posts.token_ids)
+            and tokens.displayable
+            and tokens.deleted = false
+            and tokens.contract = $7
+            and ('x' || lpad(substring(tokens.token_id, 1, 16), 16, '0'))::bit(64)::bigint / 1000000 = $8::int
+    WHERE $7 = ANY(posts.contract_ids)
+      AND posts.deleted = false
+)
+SELECT posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted from posts
+    join valid_post_ids on posts.id = valid_post_ids.id
+WHERE (posts.created_at, posts.id) < ($1, $2)
+  AND (posts.created_at, posts.id) > ($3, $4)
+ORDER BY
+    CASE WHEN $5::bool THEN (posts.created_at, posts.id) END ASC,
+    CASE WHEN NOT $5::bool THEN (posts.created_at, posts.id) END DESC
+LIMIT $6
+`
+
+type PaginatePostsByContractIDAndProjectIDParams struct {
+	CurBeforeTime time.Time    `json:"cur_before_time"`
+	CurBeforeID   persist.DBID `json:"cur_before_id"`
+	CurAfterTime  time.Time    `json:"cur_after_time"`
+	CurAfterID    persist.DBID `json:"cur_after_id"`
+	PagingForward bool         `json:"paging_forward"`
+	Limit         int32        `json:"limit"`
+	ContractID    persist.DBID `json:"contract_id"`
+	ProjectIDInt  int32        `json:"project_id_int"`
+}
+
+func (q *Queries) PaginatePostsByContractIDAndProjectID(ctx context.Context, arg PaginatePostsByContractIDAndProjectIDParams) ([]Post, error) {
+	rows, err := q.db.Query(ctx, paginatePostsByContractIDAndProjectID,
+		arg.CurBeforeTime,
+		arg.CurBeforeID,
+		arg.CurAfterTime,
+		arg.CurAfterID,
+		arg.PagingForward,
+		arg.Limit,
+		arg.ContractID,
+		arg.ProjectIDInt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Post
+	for rows.Next() {
+		var i Post
+		if err := rows.Scan(
+			&i.ID,
+			&i.Version,
+			&i.TokenIds,
+			&i.ContractIds,
+			&i.ActorID,
+			&i.Caption,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Deleted,
 		); err != nil {
 			return nil, err
 		}
@@ -6226,19 +6567,21 @@ func (q *Queries) UpdatePushTickets(ctx context.Context, arg UpdatePushTicketsPa
 
 const updateTokenMetadataFieldsByTokenIdentifiers = `-- name: UpdateTokenMetadataFieldsByTokenIdentifiers :exec
 update tokens
-    set name = $1,
-        description = $2,
-        last_updated = now()
-    where token_id = $3
-      and contract = (select id from contracts where address = $4)
-      and deleted = false
+set name = $1,
+    description = $2,
+    last_updated = now()
+where token_id = $3
+    and contract = $4
+    and chain = $5
+    and deleted = false
 `
 
 type UpdateTokenMetadataFieldsByTokenIdentifiersParams struct {
-	Name            sql.NullString  `json:"name"`
-	Description     sql.NullString  `json:"description"`
-	TokenID         persist.TokenID `json:"token_id"`
-	ContractAddress persist.Address `json:"contract_address"`
+	Name        sql.NullString  `json:"name"`
+	Description sql.NullString  `json:"description"`
+	TokenID     persist.TokenID `json:"token_id"`
+	ContractID  persist.DBID    `json:"contract_id"`
+	Chain       persist.Chain   `json:"chain"`
 }
 
 func (q *Queries) UpdateTokenMetadataFieldsByTokenIdentifiers(ctx context.Context, arg UpdateTokenMetadataFieldsByTokenIdentifiersParams) error {
@@ -6246,7 +6589,8 @@ func (q *Queries) UpdateTokenMetadataFieldsByTokenIdentifiers(ctx context.Contex
 		arg.Name,
 		arg.Description,
 		arg.TokenID,
-		arg.ContractAddress,
+		arg.ContractID,
+		arg.Chain,
 	)
 	return err
 }

@@ -15,27 +15,37 @@ import (
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/validate"
 
+	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
+
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
+
 	"github.com/mikeydub/go-gallery/service/recommend"
 	"github.com/mikeydub/go-gallery/service/recommend/userpref"
+
+	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/util/retry"
 )
 
 const tHalf = math.Ln2 / 0.002 // half-life of approx 6 hours
 
 type FeedAPI struct {
-	repos     *postgres.Repositories
-	queries   *db.Queries
-	loaders   *dataloader.Loaders
-	validator *validator.Validate
-	ethClient *ethclient.Client
-	cache     *redis.Cache
+	repos              *postgres.Repositories
+	queries            *db.Queries
+	loaders            *dataloader.Loaders
+	validator          *validator.Validate
+	ethClient          *ethclient.Client
+	cache              *redis.Cache
+	taskClient         *gcptasks.Client
+	multichainProvider *multichain.Provider
 }
 
 func (api FeedAPI) BlockUser(ctx context.Context, userId persist.DBID, action persist.Action) error {
@@ -117,9 +127,9 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 		return "", err
 	}
 
-	var cap sql.NullString
+	var c sql.NullString
 	if caption != nil {
-		cap = sql.NullString{
+		c = sql.NullString{
 			String: *caption,
 			Valid:  true,
 		}
@@ -142,53 +152,44 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 
 	q := api.queries.WithTx(tx)
 
-	id, err := q.InsertPost(ctx, db.InsertPostParams{
+	postID, err := q.InsertPost(ctx, db.InsertPostParams{
 		ID:          persist.GenerateID(),
 		TokenIds:    tokenIDs,
 		ContractIds: contractIDs,
 		ActorID:     actorID,
-		Caption:     cap,
+		Caption:     c,
 	})
 	if err != nil {
 		return "", err
 	}
 
-	dbMentions, err := insertMentionsForPost(ctx, mentions, id, q)
-	if err != nil {
-		return "", err
-	}
-
-	err = tx.Commit(ctx)
-	if err != nil {
-		return "", err
-	}
-
+	dbMentions, err := insertMentionsForPost(ctx, mentions, postID, q)
 	if len(dbMentions) > 0 {
 		for _, mention := range dbMentions {
 			switch {
 			case mention.UserID != "":
-				_, err = event.DispatchEvent(ctx, db.Event{
+				err = event.Dispatch(ctx, db.Event{
 					ActorID:        persist.DBIDToNullStr(actorID),
 					ResourceTypeID: persist.ResourceTypeUser,
 					SubjectID:      mention.UserID,
-					PostID:         id,
+					PostID:         postID,
 					UserID:         mention.UserID,
 					Action:         persist.ActionMentionUser,
 					MentionID:      mention.ID,
-				}, api.validator, nil)
+				})
 				if err != nil {
 					return "", err
 				}
 			case mention.ContractID != "":
-				_, err = event.DispatchEvent(ctx, db.Event{
+				err = event.Dispatch(ctx, db.Event{
 					ActorID:        persist.DBIDToNullStr(actorID),
 					ResourceTypeID: persist.ResourceTypeContract,
 					SubjectID:      mention.ContractID,
-					PostID:         id,
+					PostID:         postID,
 					ContractID:     mention.ContractID,
 					Action:         persist.ActionMentionCommunity,
 					MentionID:      mention.ID,
-				}, api.validator, nil)
+				})
 
 			default:
 				return "", fmt.Errorf("invalid mention type: %+v", mention)
@@ -196,7 +197,137 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 		}
 	}
 
-	return id, nil
+	err = tx.Commit(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	err = event.Dispatch(ctx, db.Event{
+		ActorID:        persist.DBIDToNullStr(actorID),
+		Action:         persist.ActionUserPosted,
+		ResourceTypeID: persist.ResourceTypePost,
+		UserID:         actorID,
+		SubjectID:      postID,
+		PostID:         postID,
+	})
+
+	return postID, err
+}
+
+func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentifiers, caption *string) (persist.DBID, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"token": validate.WithTag(t, "required"),
+		// caption can be null but less than 600 chars
+		"caption": validate.WithTag(caption, "max=600"),
+	}); err != nil {
+		return "", err
+	}
+
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	user, err := api.repos.UserRepository.GetByID(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+
+	var c sql.NullString
+
+	if caption != nil {
+		c = sql.NullString{
+			String: *caption,
+			Valid:  true,
+		}
+	}
+
+	token, err := api.loaders.TokenByUserTokenIdentifiers.Load(db.GetTokenByUserTokenIdentifiersBatchParams{
+		OwnerID:         user.ID,
+		TokenID:         t.TokenID,
+		ContractAddress: t.ContractAddress,
+		Chain:           t.Chain,
+	})
+
+	// The token is already synced
+	if err == nil {
+		contract, err := api.queries.GetContractByID(ctx, token.Contract)
+		if err != nil {
+			return "", err
+		}
+
+		postID, err := api.queries.InsertPost(ctx, db.InsertPostParams{
+			ID:          persist.GenerateID(),
+			TokenIds:    []persist.DBID{token.ID},
+			ContractIds: []persist.DBID{contract.ID},
+			ActorID:     user.ID,
+			Caption:     c,
+		})
+		if err != nil {
+			return postID, err
+		}
+
+		err = event.Dispatch(ctx, db.Event{
+			ActorID:        persist.DBIDToNullStr(user.ID),
+			Action:         persist.ActionUserPosted,
+			ResourceTypeID: persist.ResourceTypePost,
+			UserID:         user.ID,
+			SubjectID:      postID,
+			PostID:         postID,
+		})
+
+		return postID, err
+	}
+
+	// Unexpected error
+	if err != nil && !util.ErrorAs[persist.ErrTokenNotFoundByUserTokenIdentifers](err) {
+		return "", err
+	}
+
+	// The token is not synced, so we need to find it
+	synced, err := api.multichainProvider.SyncTokenByUserWalletsAndTokenIdentifiersRetry(ctx, user, t, retry.Retry{
+		Base:  2,
+		Cap:   4,
+		Tries: 4,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	postID, err := api.queries.InsertPost(ctx, db.InsertPostParams{
+		ID:          persist.GenerateID(),
+		TokenIds:    []persist.DBID{synced.ID},
+		ContractIds: []persist.DBID{synced.Contract},
+		ActorID:     user.ID,
+		Caption:     c,
+	})
+	if err != nil {
+		return postID, err
+	}
+
+	err = event.Dispatch(ctx, db.Event{
+		ActorID:        persist.DBIDToNullStr(user.ID),
+		Action:         persist.ActionUserPosted,
+		ResourceTypeID: persist.ResourceTypePost,
+		UserID:         user.ID,
+		SubjectID:      postID,
+		PostID:         postID,
+	})
+
+	return postID, err
+}
+
+func (api FeedAPI) ReferralPostPreflight(ctx context.Context, t persist.TokenIdentifiers) error {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"address": validate.WithTag(t.ContractAddress, "required"),
+		"tokenID": validate.WithTag(t.TokenID, "required"),
+	}); err != nil {
+		return err
+	}
+	userID, _ := getAuthenticatedUserID(ctx)
+	return task.CreateTaskForPostPreflight(ctx, task.PostPreflightMessage{Token: t, UserID: userID}, api.taskClient)
 }
 
 func insertMentionsForPost(ctx context.Context, mentions []*model.MentionInput, postID persist.DBID, q *db.Queries) ([]db.Mention, error) {
@@ -437,7 +568,7 @@ func fetchFeedEntityScores(ctx context.Context, queries *db.Queries, p feedParam
 	return queries.GetFeedEntityScores(ctx, q)
 }
 
-func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *string, first *int, last *int, includePosts bool) ([]any, PageInfo, error) {
+func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *string, first *int, last *int) ([]any, PageInfo, error) {
 	// Validate
 	if err := validatePaginationParams(api.validator, first, last); err != nil {
 		return nil, PageInfo{}, err
@@ -452,11 +583,6 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 
 	now := time.Now()
 
-	// Include posts for admins always during the soft launch
-	if !includePosts {
-		includePosts = shouldShowPosts(ctx)
-	}
-
 	if before != nil {
 		if err = cursor.Unpack(*before); err != nil {
 			return nil, PageInfo{}, err
@@ -468,8 +594,8 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 	} else {
 		calcFunc := func(ctx context.Context) ([]persist.FeedEntityType, []persist.DBID, error) {
 			trendData, err := fetchFeedEntityScores(ctx, api.queries, feedParams{
-				IncludePosts:   includePosts,
-				IncludeEvents:  true,
+				IncludePosts:   true,
+				IncludeEvents:  false,
 				ExcludeActions: []persist.Action{persist.ActionUserCreated, persist.ActionUserFollowedUsers},
 				FetchFrom:      time.Duration(3 * 24 * time.Hour),
 			})
@@ -492,7 +618,7 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 			return entityTypes, entityIDs, nil
 		}
 
-		l := newFeedCache(api.cache, includePosts, calcFunc)
+		l := newFeedCache(api.cache, calcFunc)
 
 		cursor.EntityTypes, cursor.EntityIDs, err = l.Load(ctx)
 		if err != nil {
@@ -504,21 +630,6 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 		for i, id := range cursor.EntityIDs {
 			entityIDToPos[id] = i
 		}
-
-		// Filter slices in place
-		if !includePosts {
-			idx := 0
-			for i := range cursor.EntityTypes {
-				if cursor.EntityTypes[i] != persist.PostTypeTag {
-					cursor.EntityTypes[idx] = cursor.EntityTypes[i]
-					cursor.EntityIDs[idx] = cursor.EntityIDs[i]
-					idx++
-				}
-			}
-			cursor.EntityTypes = cursor.EntityTypes[:idx]
-			cursor.EntityIDs = cursor.EntityIDs[:idx]
-		}
-
 		return loadFeedEntities(ctx, api.loaders, cursor.EntityTypes, cursor.EntityIDs)
 	}
 
@@ -536,13 +647,13 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 	return paginator.paginate(before, after, first, last)
 }
 
-func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first, last *int, includePosts bool) ([]any, PageInfo, error) {
+func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first, last *int) ([]any, PageInfo, error) {
 	// Validate
 	userID, _ := getAuthenticatedUserID(ctx)
 
 	// Fallback to trending if no user
 	if userID == "" {
-		return api.TrendingFeed(ctx, before, after, first, last, includePosts)
+		return api.TrendingFeed(ctx, before, after, first, last)
 	}
 
 	if err := validatePaginationParams(api.validator, first, last); err != nil {
@@ -557,11 +668,6 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 
 	now := time.Now()
 
-	// Include posts for admins always during the soft launch
-	if !includePosts {
-		includePosts = shouldShowPosts(ctx)
-	}
-
 	if before != nil {
 		if err := cursor.Unpack(*before); err != nil {
 			return nil, PageInfo{}, err
@@ -572,8 +678,8 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 		}
 	} else {
 		trendData, err := fetchFeedEntityScores(ctx, api.queries, feedParams{
-			IncludePosts:   includePosts,
-			IncludeEvents:  !includePosts,
+			IncludePosts:   true,
+			IncludeEvents:  false,
 			ExcludeUserID:  userID,
 			ExcludeActions: []persist.Action{persist.ActionUserCreated, persist.ActionUserFollowedUsers},
 			FetchFrom:      time.Duration(7 * 24 * time.Hour),
@@ -651,21 +757,6 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 		for i, id := range cursor.EntityIDs {
 			entityIDToPos[id] = i
 		}
-
-		// Filter slices in place
-		if !includePosts {
-			idx := 0
-			for i := range cursor.EntityTypes {
-				if cursor.EntityTypes[i] != persist.PostTypeTag {
-					cursor.EntityTypes[idx] = cursor.EntityTypes[i]
-					cursor.EntityIDs[idx] = cursor.EntityIDs[i]
-					idx++
-				}
-			}
-			cursor.EntityTypes = cursor.EntityTypes[:idx]
-			cursor.EntityIDs = cursor.EntityIDs[:idx]
-		}
-
 		return loadFeedEntities(ctx, api.loaders, cursor.EntityTypes, cursor.EntityIDs)
 	}
 
@@ -971,11 +1062,8 @@ type feedCache struct {
 	CalcFunc func(context.Context) ([]persist.FeedEntityType, []persist.DBID, error)
 }
 
-func newFeedCache(cache *redis.Cache, includePosts bool, f func(context.Context) ([]persist.FeedEntityType, []persist.DBID, error)) *feedCache {
+func newFeedCache(cache *redis.Cache, f func(context.Context) ([]persist.FeedEntityType, []persist.DBID, error)) *feedCache {
 	key := "trending:feedEvents:all"
-	if !includePosts {
-		key = "trending:feedEvents:noPosts"
-	}
 	return &feedCache{
 		LazyCache: &redis.LazyCache{
 			Cache: cache,

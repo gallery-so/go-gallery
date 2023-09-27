@@ -563,17 +563,14 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 	}
 
 	// Send event
-	_, err = event.DispatchEvent(ctx, db.Event{
+	err = event.Dispatch(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		Action:         persist.ActionUserCreated,
 		ResourceTypeID: persist.ResourceTypeUser,
 		UserID:         userID,
 		SubjectID:      userID,
 		Data:           persist.EventData{UserBio: bio},
-	}, api.validator, nil)
-	if err != nil {
-		return "", "", err
-	}
+	})
 
 	return userID, galleryID, err
 }

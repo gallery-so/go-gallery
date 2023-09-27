@@ -30,6 +30,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/service/task"
+	"github.com/mikeydub/go-gallery/service/tokenmanage"
 	"net/http"
 )
 
@@ -55,14 +56,15 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 	serverArbitrumProviderList := arbitrumProviderSet(httpClient)
 	v := newMultichainSet(serverEthProviderList, serverOptimismProviderList, serverTezosProviderList, serverPoapProviderList, serverZoraProviderList, serverBaseProviderList, serverPolygonProviderList, serverArbitrumProviderList)
 	v2 := defaultWalletOverrides()
-	sendTokens := newSendTokensFunc(ctx, client)
+	manager := tokenmanage.New(ctx, client)
+	submitUserTokensF := newManagedTokens(ctx, manager)
 	provider := &multichain.Provider{
-		Repos:           repositories,
-		Queries:         queries,
-		Cache:           cache,
-		Chains:          v,
-		WalletOverrides: v2,
-		SendTokens:      sendTokens,
+		Repos:            repositories,
+		Queries:          queries,
+		Cache:            cache,
+		Chains:           v,
+		WalletOverrides:  v2,
+		SubmitUserTokens: submitUserTokensF,
 	}
 	return provider, func() {
 		cleanup2()
@@ -150,7 +152,7 @@ var (
 
 // arbitrumProvidersConfig is a wire injector that binds multichain interfaces to their concrete Arbitrum implementations
 func arbitrumProvidersConfig(arbitrumProvider2 *arbitrumProvider, openseaProvider *opensea.Provider) arbitrumProviderList {
-	serverArbitrumProviderList := arbitrumRequirements(arbitrumProvider2, arbitrumProvider2, arbitrumProvider2, openseaProvider)
+	serverArbitrumProviderList := arbitrumRequirements(arbitrumProvider2, arbitrumProvider2, arbitrumProvider2, openseaProvider, arbitrumProvider2)
 	return serverArbitrumProviderList
 }
 
@@ -339,8 +341,9 @@ func arbitrumRequirements(
 	toc multichain.TokensContractFetcher,
 	tmf multichain.TokenMetadataFetcher, opensea2 multichain.OpenSeaChildContractFetcher,
 
+	tdf multichain.TokenDescriptorsFetcher,
 ) arbitrumProviderList {
-	return arbitrumProviderList{tof, toc, tmf, opensea2}
+	return arbitrumProviderList{tof, toc, tmf, opensea2, tdf}
 }
 
 // poapRequirements is the set of provider interfaces required for POAP
@@ -468,8 +471,11 @@ func newTokenProcessingCache() *redis.Cache {
 	return redis.NewCache(redis.TokenProcessingMetadataCache)
 }
 
-func newSendTokensFunc(ctx context.Context, taskClient *cloudtasks.Client) multichain.SendTokens {
-	return func(ctx context.Context, t task.TokenProcessingUserMessage) error {
-		return task.CreateTaskForTokenProcessing(ctx, taskClient, t)
+func newManagedTokens(ctx context.Context, tm *tokenmanage.Manager) multichain.SubmitUserTokensF {
+	return func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, tokens []persist.TokenIdentifiers) error {
+		if len(tokenIDs) == 0 {
+			return nil
+		}
+		return tm.SubmitUser(ctx, userID, tokenIDs, tokens)
 	}
 }

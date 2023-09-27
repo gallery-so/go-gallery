@@ -2,7 +2,6 @@ package persist
 
 import (
 	"context"
-	"fmt"
 	"time"
 )
 
@@ -29,12 +28,6 @@ type ContractGallery struct {
 	OverrideCreatorUserID DBID       `json:"override_creator_user_id"`
 }
 
-// ErrContractNotFoundByAddress is an error type for when a contract is not found by address
-type ErrGalleryContractNotFound struct {
-	Address Address
-	Chain   Chain
-}
-
 // ContractGalleryRepository represents a repository for interacting with persisted contracts
 type ContractGalleryRepository interface {
 	GetByID(ctx context.Context, id DBID) (ContractGallery, error)
@@ -46,8 +39,4 @@ type ContractGalleryRepository interface {
 
 func (c ContractGallery) ContractIdentifiers() ContractIdentifiers {
 	return NewContractIdentifiers(c.Address, c.Chain)
-}
-
-func (e ErrGalleryContractNotFound) Error() string {
-	return fmt.Sprintf("contract not found by address: %s-%d", e.Address, e.Chain)
 }

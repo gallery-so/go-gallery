@@ -781,17 +781,14 @@ func (api InteractionAPI) AdmireFeedEvent(ctx context.Context, feedEventID persi
 		return "", err
 	}
 
-	_, err = event.DispatchEvent(ctx, db.Event{
+	err = event.Dispatch(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		ResourceTypeID: persist.ResourceTypeAdmire,
 		SubjectID:      feedEventID,
 		FeedEventID:    feedEventID,
 		AdmireID:       admireID,
 		Action:         persist.ActionAdmiredFeedEvent,
-	}, api.validator, nil)
-	if err != nil {
-		return "", err
-	}
+	})
 
 	return admireID, err
 }
@@ -819,6 +816,15 @@ func (api InteractionAPI) AdmireToken(ctx context.Context, tokenID persist.DBID)
 	if err != nil {
 		return "", err
 	}
+
+	err = event.Dispatch(ctx, db.Event{
+		ActorID:        persist.DBIDToNullStr(userID),
+		ResourceTypeID: persist.ResourceTypeAdmire,
+		SubjectID:      tokenID,
+		TokenID:        tokenID,
+		AdmireID:       admireID,
+		Action:         persist.ActionAdmiredToken,
+	})
 
 	return admireID, err
 }
@@ -851,17 +857,14 @@ func (api InteractionAPI) AdmirePost(ctx context.Context, postID persist.DBID) (
 		return "", err
 	}
 
-	_, err = event.DispatchEvent(ctx, db.Event{
+	err = event.Dispatch(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		ResourceTypeID: persist.ResourceTypeAdmire,
 		SubjectID:      postID,
 		PostID:         postID,
 		AdmireID:       admireID,
 		Action:         persist.ActionAdmiredPost,
-	}, api.validator, nil)
-	if err != nil {
-		return "", err
-	}
+	})
 
 	return admireID, err
 }
@@ -981,7 +984,7 @@ func (api InteractionAPI) comment(ctx context.Context, comment string, feedEvent
 		panic("commenting on neither feed event nor post")
 	}
 
-	_, err = event.DispatchEvent(ctx, db.Event{
+	err = event.Dispatch(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(actor),
 		ResourceTypeID: persist.ResourceTypeComment,
 		SubjectID:      persist.DBID(util.FirstNonEmptyString(postID.String(), feedEventID.String())),
@@ -989,7 +992,7 @@ func (api InteractionAPI) comment(ctx context.Context, comment string, feedEvent
 		FeedEventID:    feedEventID,
 		CommentID:      commentID,
 		Action:         action,
-	}, api.validator, nil)
+	})
 	if err != nil {
 		return "", err
 	}
@@ -999,7 +1002,7 @@ func (api InteractionAPI) comment(ctx context.Context, comment string, feedEvent
 
 			switch {
 			case mention.UserID != "":
-				_, err = event.DispatchEvent(ctx, db.Event{
+				err = event.Dispatch(ctx, db.Event{
 					ActorID:        persist.DBIDToNullStr(actor),
 					ResourceTypeID: persist.ResourceTypeUser,
 					SubjectID:      mention.UserID,
@@ -1009,12 +1012,12 @@ func (api InteractionAPI) comment(ctx context.Context, comment string, feedEvent
 					CommentID:      commentID,
 					MentionID:      mention.ID,
 					Action:         persist.ActionMentionUser,
-				}, api.validator, nil)
+				})
 				if err != nil {
 					return "", err
 				}
 			case mention.ContractID != "":
-				_, err = event.DispatchEvent(ctx, db.Event{
+				err = event.Dispatch(ctx, db.Event{
 					ActorID:        persist.DBIDToNullStr(actor),
 					ResourceTypeID: persist.ResourceTypeContract,
 					SubjectID:      mention.ContractID,
@@ -1024,7 +1027,7 @@ func (api InteractionAPI) comment(ctx context.Context, comment string, feedEvent
 					CommentID:      commentID,
 					MentionID:      mention.ID,
 					Action:         persist.ActionMentionCommunity,
-				}, api.validator, nil)
+				})
 
 			default:
 				return "", fmt.Errorf("invalid mention type: %+v", mention)
@@ -1033,7 +1036,7 @@ func (api InteractionAPI) comment(ctx context.Context, comment string, feedEvent
 	}
 
 	if replyToID != nil {
-		_, err = event.DispatchEvent(ctx, db.Event{
+		err = event.Dispatch(ctx, db.Event{
 			ActorID:        persist.DBIDToNullStr(actor),
 			ResourceTypeID: persist.ResourceTypeComment,
 			SubjectID:      *replyToID,
@@ -1041,7 +1044,7 @@ func (api InteractionAPI) comment(ctx context.Context, comment string, feedEvent
 			FeedEventID:    feedEventID,
 			CommentID:      commentID,
 			Action:         persist.ActionReplyToComment,
-		}, api.validator, nil)
+		})
 		if err != nil {
 			return "", err
 		}

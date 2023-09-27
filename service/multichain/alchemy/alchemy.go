@@ -284,7 +284,7 @@ func getNFTsPaginate[T tokensPaginated](ctx context.Context, baseURL string, def
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get tokens from alchemy api: %w (url: %s)", err, u)
 	}
 
 	defer resp.Body.Close()
@@ -392,7 +392,7 @@ func (d *Provider) getTokenWithMetadata(ctx context.Context, ti multichain.Chain
 
 	resp, err := d.httpClient.Do(req)
 	if err != nil {
-		return nil, multichain.ChainAgnosticContract{}, err
+		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("failed to get token metadata from alchemy api: %w (url: %s)", err, url)
 	}
 
 	defer resp.Body.Close()
@@ -405,7 +405,7 @@ func (d *Provider) getTokenWithMetadata(ctx context.Context, ti multichain.Chain
 	// will have most of the fields empty
 	var token Token
 	if err := json.NewDecoder(resp.Body).Decode(&token); err != nil {
-		return nil, multichain.ChainAgnosticContract{}, err
+		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("failed to decode token metadata response: %w (url: %s)", err, url)
 	}
 
 	if token.Metadata.Image == "" && !forceRefresh {
@@ -414,7 +414,7 @@ func (d *Provider) getTokenWithMetadata(ctx context.Context, ti multichain.Chain
 
 	tokens, contracts, err := d.alchemyTokensToChainAgnosticTokens(ctx, []Token{token})
 	if err != nil {
-		return nil, multichain.ChainAgnosticContract{}, err
+		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("failed to convert token to chain agnostic token: %w (url: %s)", err, url)
 	}
 
 	if len(contracts) == 0 {
@@ -430,11 +430,11 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti mu
 		return nil, fmt.Errorf("not implemented")
 	}
 
-	cached, err := d.fetchMetadataFromCache(ctx, ti)
-	if cached != nil && err == nil {
-		logger.For(ctx).Infof("got cached metadata for %s", ti)
-		return cached, nil
-	}
+	// cached, err := d.fetchMetadataFromCache(ctx, ti)
+	// if cached != nil && err == nil {
+	// 	logger.For(ctx).Infof("got cached metadata for %s", ti)
+	// 	return cached, nil
+	// }
 
 	logger.For(ctx).Infof("no cached metadata for %s", ti)
 
@@ -447,7 +447,8 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti mu
 		return nil, nil
 	}
 
-	return tokens[0].TokenMetadata, d.cacheMetadatasForTokens(ctx, tokens...)
+	// return tokens[0].TokenMetadata, d.cacheMetadatasForTokens(ctx, tokens...)
+	return tokens[0].TokenMetadata, nil
 }
 
 // GetTokensByContractAddress retrieves tokens for a contract address on the Ethereum Blockchain
@@ -681,7 +682,10 @@ func (d *Provider) getOwnersForToken(ctx context.Context, token Token) ([]persis
 
 func (d *Provider) cacheMetadatasForTokens(ctx context.Context, tokens ...multichain.ChainAgnosticToken) error {
 	for _, token := range tokens {
-		if token.TokenMetadata != nil {
+		if token.TokenMetadata != nil && len(token.TokenMetadata) > 0 {
+			if token.TokenMetadata["name"] == "" && token.TokenMetadata["description"] == "" && token.TokenMetadata["external_url"] == "" && token.TokenMetadata["image_url"] == "" && token.TokenMetadata["animation_url"] == "" {
+				continue
+			}
 			mar, err := json.Marshal(token.TokenMetadata)
 			if err != nil {
 				return err

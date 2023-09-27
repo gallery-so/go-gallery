@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gammazero/workerpool"
 	"github.com/go-playground/validator/v10"
+	"github.com/jackc/pgx/v4"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/event"
@@ -19,6 +20,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/throttle"
+	"github.com/mikeydub/go-gallery/service/tokenmanage"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 )
@@ -31,6 +33,7 @@ type TokenAPI struct {
 	ethClient          *ethclient.Client
 	multichainProvider *multichain.Provider
 	throttler          *throttle.Locker
+	manager            *tokenmanage.Manager
 }
 
 // ErrTokenRefreshFailed is a generic error that wraps all other OpenSea sync failures.
@@ -59,6 +62,23 @@ func (api TokenAPI) GetTokenById(ctx context.Context, tokenID persist.DBID) (*db
 	return &token, nil
 }
 
+// GetTokenByIdIgnoreDisplayable returns a token by ID, ignoring the displayable flag.
+func (api TokenAPI) GetTokenByIdIgnoreDisplayable(ctx context.Context, tokenID persist.DBID) (*db.Token, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"tokenID": validate.WithTag(tokenID, "required"),
+	}); err != nil {
+		return nil, err
+	}
+
+	token, err := api.loaders.TokenByTokenIDIgnoreDisplayable.Load(tokenID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &token, nil
+}
+
 func (api TokenAPI) GetTokenByEnsDomain(ctx context.Context, userID persist.DBID, domain string) (db.Token, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
@@ -72,8 +92,8 @@ func (api TokenAPI) GetTokenByEnsDomain(ctx context.Context, userID persist.DBID
 		return db.Token{}, err
 	}
 
-	return api.loaders.TokenByHolderIDContractAddressAndTokenID.Load(db.GetTokenByHolderIdContractAddressAndTokenIdBatchParams{
-		HolderID:        userID,
+	return api.loaders.TokenByUserTokenIdentifiers.Load(db.GetTokenByUserTokenIdentifiersBatchParams{
+		OwnerID:         userID,
 		TokenID:         persist.TokenID(tokenID),
 		ContractAddress: eth.EnsAddress,
 		Chain:           persist.ChainETH,
@@ -362,6 +382,31 @@ func (api TokenAPI) SyncCreatedTokensForExistingContract(ctx context.Context, co
 	return api.multichainProvider.SyncCreatedTokensForExistingContract(ctx, userID, contractID)
 }
 
+func (api TokenAPI) SyncCreatedTokensForExistingContractAdmin(ctx context.Context, userID persist.DBID, chainAddress persist.ChainAddress) error {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"userID":  validate.WithTag(userID, "required"),
+		"chain":   validate.WithTag(chainAddress.Chain(), "chain"),
+		"address": validate.WithTag(chainAddress.Address(), "required"),
+	}); err != nil {
+		return err
+	}
+
+	contract, err := api.repos.ContractRepository.GetByAddress(ctx, chainAddress.Address(), chainAddress.Chain())
+	if err != nil {
+		return err
+	}
+
+	key := fmt.Sprintf("sync:created:contract:%s:%s", userID.String(), contract.ID)
+
+	if err := api.throttler.Lock(ctx, key); err != nil {
+		return ErrTokenRefreshFailed{Message: err.Error()}
+	}
+	defer api.throttler.Unlock(ctx, key)
+
+	return api.multichainProvider.SyncCreatedTokensForExistingContract(ctx, userID, contract.ID)
+}
+
 func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) error {
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"tokenID": validate.WithTag(tokenDBID, "required"),
@@ -475,7 +520,7 @@ func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, c
 	}
 
 	// Send event
-	_, err = event.DispatchEvent(ctx, db.Event{
+	return event.Dispatch(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		Action:         persist.ActionCollectorsNoteAddedToToken,
 		ResourceTypeID: persist.ResourceTypeToken,
@@ -487,9 +532,7 @@ func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, c
 			TokenCollectionID:   collectionID,
 			TokenCollectorsNote: collectorsNote,
 		},
-	}, api.validator, nil)
-
-	return err
+	})
 }
 
 func (api TokenAPI) SetSpamPreference(ctx context.Context, tokens []persist.DBID, isSpam bool) error {
@@ -522,6 +565,57 @@ func (api TokenAPI) MediaByTokenID(ctx context.Context, tokenID persist.DBID) (d
 	}
 
 	return api.loaders.MediaByTokenID.Load(tokenID)
+}
+
+// MediaByTokenIdentifiers returns media for a token and optionally returns a token instance with fallback media matching the identifiers if any exists.
+func (api TokenAPI) MediaByTokenIdentifiers(ctx context.Context, tokenIdentifiers persist.TokenIdentifiers) (db.TokenMedia, db.Token, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"address": validate.WithTag(tokenIdentifiers.ContractAddress, "required"),
+		"tokenID": validate.WithTag(tokenIdentifiers.TokenID, "required"),
+	}); err != nil {
+		return db.TokenMedia{}, db.Token{}, err
+	}
+
+	// Check if the user is logged in, and if so sort results by prioritizing results specific to the user first
+	userID, _ := getAuthenticatedUserID(ctx)
+
+	// This query only returns a row if there is matching media, and it may not have a token instance even if it did return a row
+	media, err := api.queries.GetMediaByUserTokenIdentifiers(ctx, db.GetMediaByUserTokenIdentifiersParams{
+		UserID:  userID,
+		Chain:   tokenIdentifiers.Chain,
+		Address: tokenIdentifiers.ContractAddress,
+		TokenID: tokenIdentifiers.TokenID,
+	})
+
+	// Got media and a token instance
+	if err == nil && media.TokenInstanceID != "" {
+		token, err := api.GetTokenById(ctx, media.TokenInstanceID)
+		if err != nil || token == nil {
+			return media.TokenMedia, db.Token{}, err
+		}
+		return media.TokenMedia, *token, err
+	}
+
+	// Unexpected error
+	if err != nil && err != pgx.ErrNoRows {
+		return db.TokenMedia{}, db.Token{}, err
+	}
+
+	// Try to find a suitable instance with fallback media
+	token, err := api.queries.GetFallbackTokenByUserTokenIdentifiers(ctx, db.GetFallbackTokenByUserTokenIdentifiersParams{
+		UserID:  userID,
+		Chain:   tokenIdentifiers.Chain,
+		Address: tokenIdentifiers.ContractAddress,
+		TokenID: tokenIdentifiers.TokenID,
+	})
+
+	// Unexpected error
+	if err != nil && err != pgx.ErrNoRows {
+		return media.TokenMedia, db.Token{}, err
+	}
+
+	return media.TokenMedia, token, nil
 }
 
 func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (db.Event, error) {
@@ -568,4 +662,18 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collect
 		return *eventPtr, nil
 	}
 	return db.Event{}, nil
+}
+
+// GetProcessingState returns true if a token is queued for processing, or is currently being processed.
+func (api TokenAPI) GetProcessingState(ctx context.Context, tokenID persist.DBID) (bool, error) {
+	token, err := api.loaders.TokenByTokenID.Load(tokenID)
+	if err != nil {
+		return false, err
+	}
+	contract, err := api.loaders.ContractByContractID.Load(token.Contract)
+	if err != nil {
+		return false, err
+	}
+	t := persist.NewTokenIdentifiers(contract.Address, token.TokenID, contract.Chain)
+	return api.manager.Processing(ctx, t), nil
 }

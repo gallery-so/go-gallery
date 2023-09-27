@@ -117,6 +117,12 @@ type HelperSomeoneAdmiredYourPostNotificationData struct {
 	NotificationData persist.NotificationData
 }
 
+type HelperSomeoneAdmiredYourTokenNotificationData struct {
+	OwnerID          persist.DBID
+	TokenID          persist.DBID
+	NotificationData persist.NotificationData
+}
+
 type HelperNewTokensNotificationData struct {
 	OwnerID          persist.DBID
 	NotificationData persist.NotificationData
@@ -183,6 +189,11 @@ type HelperEnsProfileImageData struct {
 type HelperPostData struct {
 	TokenIDs persist.DBIDList
 	AuthorID persist.DBID
+}
+
+type HelperPostComposerDraftDetailsPayloadData struct {
+	Token      persist.TokenIdentifiers
+	ContractID persist.DBID
 }
 
 type ErrInvalidIDFormat struct {

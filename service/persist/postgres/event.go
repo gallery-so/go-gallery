@@ -34,6 +34,8 @@ func (r *EventRepository) Add(ctx context.Context, event db.Event) (*db.Event, e
 		return r.AddGalleryEvent(ctx, event)
 	case persist.ResourceTypeContract:
 		return r.AddContractEvent(ctx, event)
+	case persist.ResourceTypePost:
+		return r.AddPostEvent(ctx, event)
 	default:
 		return nil, persist.ErrUnknownResourceType{ResourceType: event.ResourceTypeID}
 	}
@@ -151,20 +153,28 @@ func (r *EventRepository) AddGalleryEvent(ctx context.Context, event db.Event) (
 }
 
 func (r *EventRepository) AddContractEvent(ctx context.Context, event db.Event) (*db.Event, error) {
-
 	event, err := r.Queries.CreateContractEvent(ctx, db.CreateContractEventParams{
+		Post:       util.ToNullString(event.PostID.String(), true),
+		Comment:    util.ToNullString(event.CommentID.String(), true),
+		FeedEvent:  util.ToNullString(event.FeedEventID.String(), true),
+		Mention:    util.ToNullString(event.MentionID.String(), true),
+		ContractID: event.ContractID,
+		Data:       event.Data,
+		GroupID:    event.GroupID,
+		Caption:    event.Caption,
+	})
+	return &event, err
+}
+
+func (r *EventRepository) AddPostEvent(ctx context.Context, event db.Event) (*db.Event, error) {
+	event, err := r.Queries.CreatePostEvent(ctx, db.CreatePostEventParams{
 		ID:             persist.GenerateID(),
 		ActorID:        event.ActorID,
 		Action:         event.Action,
 		ResourceTypeID: event.ResourceTypeID,
-		Post:           util.ToNullString(event.PostID.String(), true),
-		Comment:        util.ToNullString(event.CommentID.String(), true),
-		FeedEvent:      util.ToNullString(event.FeedEventID.String(), true),
-		Mention:        util.ToNullString(event.MentionID.String(), true),
-		ContractID:     event.ContractID,
-		Data:           event.Data,
-		GroupID:        event.GroupID,
-		Caption:        event.Caption,
+		UserID:         event.UserID,
+		SubjectID:      event.SubjectID,
+		PostID:         event.PostID,
 	})
 	return &event, err
 }

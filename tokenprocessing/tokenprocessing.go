@@ -9,6 +9,9 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
+
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/middleware"
@@ -24,9 +27,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/mikeydub/go-gallery/validate"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 )
 
 const sentryTokenContextName = "NFT context" // Sentry excludes contexts that contain "token" so we use "NFT" instead
@@ -36,13 +36,13 @@ func InitServer() {
 	setDefaults()
 	ctx := context.Background()
 	c := server.ClientInit(ctx)
-	provider, _ := server.NewMultichainProvider(ctx, setDefaults)
-	router := CoreInitServer(c, provider)
+	mc, _ := server.NewMultichainProvider(ctx, setDefaults)
+	router := CoreInitServer(ctx, c, mc)
 	logger.For(nil).Info("Starting tokenprocessing server...")
 	http.Handle("/", router)
 }
 
-func CoreInitServer(clients *server.Clients, mc *multichain.Provider) *gin.Engine {
+func CoreInitServer(ctx context.Context, clients *server.Clients, mc *multichain.Provider) *gin.Engine {
 	InitSentry()
 	logger.InitWithGCPDefaults()
 
@@ -66,10 +66,9 @@ func CoreInitServer(clients *server.Clients, mc *multichain.Provider) *gin.Engin
 	logger.For(nil).Info("Registering handlers...")
 
 	t := newThrottler()
-
 	tp := NewTokenProcessor(clients.Queries, clients.EthClient, clients.HTTPClient, mc, clients.IPFSClient, clients.ArweaveClient, clients.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), clients.Repos.TokenRepository, metric.NewLogMetricReporter())
 
-	return handlersInitServer(router, tp, mc, clients.Repos, t, validate.WithCustomValidators())
+	return handlersInitServer(ctx, router, tp, mc, clients.Repos, t, clients.TaskClient)
 }
 
 func setDefaults() {
@@ -109,6 +108,8 @@ func setDefaults() {
 	viper.SetDefault("PUBSUB_SUB_UPDATED_NOTIFICATIONS", "dev-updated-notifications-sub")
 	viper.SetDefault("RASTERIZER_URL", "http://localhost:3000")
 	viper.SetDefault("TEZOS_API_URL", "https://api.tzkt.io")
+	viper.SetDefault("ALCHEMY_WEBHOOK_SECRET_ARBITRUM", "")
+	viper.SetDefault("ALCHEMY_WEBHOOK_SECRET_ETH", "")
 
 	viper.AutomaticEnv()
 
@@ -164,21 +165,27 @@ func InitSentry() {
 func reportJobError(ctx context.Context, err error, job tokenProcessingJob) {
 	sentryutil.ReportError(ctx, err, func(scope *sentry.Scope) {
 		setRunTags(scope, job.id)
-		setTokenTags(scope, job.token.Chain, job.contract.Address, job.token.TokenID, job.token.ID)
+		setTokenTags(scope, job.token.Chain, job.contract.Address, job.token.TokenID)
 		setTokenContext(scope, job.token.Chain, job.contract.Address, job.token.TokenID, isSpamToken(job))
+		if job.tokenInstance != nil {
+			setDBIDTag(scope, job.tokenInstance.ID)
+		}
 	})
 }
 
-func setTokenTags(scope *sentry.Scope, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID, id persist.DBID) {
+func setTokenTags(scope *sentry.Scope, chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) {
 	scope.SetTag("chain", fmt.Sprintf("%d", chain))
 	scope.SetTag("contractAddress", contractAddress.String())
 	scope.SetTag("nftID", string(tokenID))
-	scope.SetTag("tokenDBID", string(id))
 	assetPage := assetURL(chain, contractAddress, tokenID)
 	if len(assetPage) > 200 {
 		assetPage = "assetURL too long, see token context"
 	}
 	scope.SetTag("assetURL", assetPage)
+}
+
+func setDBIDTag(scope *sentry.Scope, id persist.DBID) {
+	scope.SetTag("tokenDBID", string(id))
 }
 
 func assetURL(chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) string {
@@ -212,8 +219,10 @@ func setRunTags(scope *sentry.Scope, runID persist.DBID) {
 // isSpamToken returns true if the token is marked as spam.
 func isSpamToken(job tokenProcessingJob) bool {
 	isSpam := job.contract.IsProviderMarkedSpam
-	isSpam = isSpam || util.GetOptionalValue(job.token.IsProviderMarkedSpam, false)
-	isSpam = isSpam || util.GetOptionalValue(job.token.IsUserMarkedSpam, false)
+	if job.tokenInstance != nil {
+		isSpam = isSpam || util.GetOptionalValue(job.tokenInstance.IsProviderMarkedSpam, false)
+		isSpam = isSpam || util.GetOptionalValue(job.tokenInstance.IsUserMarkedSpam, false)
+	}
 	return isSpam
 }
 

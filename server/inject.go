@@ -30,6 +30,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/service/task"
+	"github.com/mikeydub/go-gallery/service/tokenmanage"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -60,7 +61,8 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 		newCommunitiesCache,
 		postgres.NewRepositories,
 		dbConnSet,
-		newSendTokensFunc,
+		tokenmanage.New,
+		newManagedTokens,
 		wire.Struct(new(multichain.Provider), "*"),
 		// Add additional chains here
 		newMultichainSet,
@@ -241,6 +243,7 @@ func arbitrumProvidersConfig(arbitrumProvider *arbitrumProvider, openseaProvider
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(arbitrumProvider)),
 		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(arbitrumProvider)),
 		wire.Bind(new(multichain.OpenSeaChildContractFetcher), util.ToPointer(openseaProvider)),
+		wire.Bind(new(multichain.TokenDescriptorsFetcher), util.ToPointer(arbitrumProvider)),
 		arbitrumRequirements,
 	)
 	return nil
@@ -252,8 +255,9 @@ func arbitrumRequirements(
 	toc multichain.TokensContractFetcher,
 	tmf multichain.TokenMetadataFetcher,
 	opensea multichain.OpenSeaChildContractFetcher,
+	tdf multichain.TokenDescriptorsFetcher,
 ) arbitrumProviderList {
-	return arbitrumProviderList{tof, toc, tmf, opensea}
+	return arbitrumProviderList{tof, toc, tmf, opensea, tdf}
 }
 
 // poapProviderSet is a wire injector that creates the set of POAP providers
@@ -502,8 +506,11 @@ func newTokenProcessingCache() *redis.Cache {
 	return redis.NewCache(redis.TokenProcessingMetadataCache)
 }
 
-func newSendTokensFunc(ctx context.Context, taskClient *cloudtasks.Client) multichain.SendTokens {
-	return func(ctx context.Context, t task.TokenProcessingUserMessage) error {
-		return task.CreateTaskForTokenProcessing(ctx, taskClient, t)
+func newManagedTokens(ctx context.Context, tm *tokenmanage.Manager) multichain.SubmitUserTokensF {
+	return func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, tokens []persist.TokenIdentifiers) error {
+		if len(tokenIDs) == 0 {
+			return nil
+		}
+		return tm.SubmitUser(ctx, userID, tokenIDs, tokens)
 	}
 }
