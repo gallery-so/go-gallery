@@ -5598,21 +5598,19 @@ SELECT id, feed_entity_type, created_at, actor_id
 FROM feed_entities
 WHERE (created_at, id) < ($1, $2)
         AND (created_at, id) > ($3, $4)
-        AND (feed_entity_type != $5) -- Always exclude feed events
 ORDER BY 
-    CASE WHEN $6::bool THEN (created_at, id) END ASC,
-    CASE WHEN NOT $6::bool THEN (created_at, id) END DESC
-LIMIT $7
+    CASE WHEN $5::bool THEN (created_at, id) END ASC,
+    CASE WHEN NOT $5::bool THEN (created_at, id) END DESC
+LIMIT $6
 `
 
 type PaginateGlobalFeedParams struct {
-	CurBeforeTime  time.Time    `json:"cur_before_time"`
-	CurBeforeID    persist.DBID `json:"cur_before_id"`
-	CurAfterTime   time.Time    `json:"cur_after_time"`
-	CurAfterID     persist.DBID `json:"cur_after_id"`
-	FeedEntityType int32        `json:"feed_entity_type"`
-	PagingForward  bool         `json:"paging_forward"`
-	Limit          int32        `json:"limit"`
+	CurBeforeTime time.Time    `json:"cur_before_time"`
+	CurBeforeID   persist.DBID `json:"cur_before_id"`
+	CurAfterTime  time.Time    `json:"cur_after_time"`
+	CurAfterID    persist.DBID `json:"cur_after_id"`
+	PagingForward bool         `json:"paging_forward"`
+	Limit         int32        `json:"limit"`
 }
 
 func (q *Queries) PaginateGlobalFeed(ctx context.Context, arg PaginateGlobalFeedParams) ([]FeedEntity, error) {
@@ -5621,7 +5619,6 @@ func (q *Queries) PaginateGlobalFeed(ctx context.Context, arg PaginateGlobalFeed
 		arg.CurBeforeID,
 		arg.CurAfterTime,
 		arg.CurAfterID,
-		arg.FeedEntityType,
 		arg.PagingForward,
 		arg.Limit,
 	)

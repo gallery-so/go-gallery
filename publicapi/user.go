@@ -783,10 +783,11 @@ func (api UserAPI) GetFollowingByUserId(ctx context.Context, userID persist.DBID
 }
 
 func (api UserAPI) SharedFollowers(ctx context.Context, userID persist.DBID, before, after *string, first, last *int) ([]db.User, PageInfo, error) {
-	// Validate
-	curUserID, err := getAuthenticatedUserID(ctx)
-	if err != nil {
-		return nil, PageInfo{}, err
+	curUserID, _ := getAuthenticatedUserID(ctx)
+
+	// If the user is not logged in, return an empty list of users
+	if curUserID == "" {
+		return []db.User{}, PageInfo{}, nil
 	}
 
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
@@ -861,9 +862,11 @@ func (api UserAPI) SharedFollowers(ctx context.Context, userID persist.DBID, bef
 
 func (api UserAPI) SharedCommunities(ctx context.Context, userID persist.DBID, before, after *string, first, last *int) ([]db.Contract, PageInfo, error) {
 	// Validate
-	curUserID, err := getAuthenticatedUserID(ctx)
-	if err != nil {
-		return nil, PageInfo{}, err
+	curUserID, _ := getAuthenticatedUserID(ctx)
+
+	// If the user is not logged in, return an empty list of users
+	if curUserID == "" {
+		return []db.Contract{}, PageInfo{}, nil
 	}
 
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{

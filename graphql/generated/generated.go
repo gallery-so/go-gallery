@@ -8441,13 +8441,11 @@ type GalleryUser implements Node @goEmbedHelper {
     after: String
     first: Int
     last: Int
-    includePosts: Boolean! = false
+    includePosts: Boolean! = false @deprecated(reason: "Posts are always included now.")
   ): FeedConnection @goField(forceResolver: true)
   sharedFollowers(before: String, after: String, first: Int, last: Int): UsersConnection
-    @authRequired
     @goField(forceResolver: true)
   sharedCommunities(before: String, after: String, first: Int, last: Int): CommunitiesConnection
-    @authRequired
     @goField(forceResolver: true)
   createdCommunities(
     input: CreatedCommunitiesInput!
@@ -9028,7 +9026,7 @@ type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
     after: String
     first: Int
     last: Int
-    includePosts: Boolean! = false
+    includePosts: Boolean! = false @deprecated(reason: "Posts are always included now.")
   ): FeedConnection @goField(forceResolver: true)
 
   email: UserEmail @goField(forceResolver: true)
@@ -9578,7 +9576,10 @@ type PostComposerDraftDetailsPayload @goEmbedHelper {
   tokenDescription: String
 }
 
-union PostComposerDraftDetailsPayloadOrError = PostComposerDraftDetailsPayload | ErrInvalidInput | ErrCommunityNotFound
+union PostComposerDraftDetailsPayloadOrError =
+    PostComposerDraftDetailsPayload
+  | ErrInvalidInput
+  | ErrCommunityNotFound
 
 type Query {
   node(id: ID!): Node
@@ -9603,7 +9604,7 @@ type Query {
     after: String
     first: Int
     last: Int
-    includePosts: Boolean! = false
+    includePosts: Boolean! = false @deprecated(reason: "Posts are always included now.")
   ): FeedConnection
   # Paging forward i.e. providing the ` + "`" + `first` + "`" + ` argument will return events in order of descending popularity.
   trendingFeed(
@@ -9611,14 +9612,14 @@ type Query {
     after: String
     first: Int
     last: Int
-    includePosts: Boolean! = false
+    includePosts: Boolean! = false @deprecated(reason: "Posts are always included now.")
   ): FeedConnection
   curatedFeed(
     before: String
     after: String
     first: Int
     last: Int
-    includePosts: Boolean! = false
+    includePosts: Boolean! = false @deprecated(reason: "Posts are always included now.")
   ): FeedConnection
   feedEventById(id: DBID!): FeedEventByIdOrError
   postById(id: DBID!): PostOrError
@@ -28631,28 +28632,8 @@ func (ec *executionContext) _GalleryUser_sharedFollowers(ctx context.Context, fi
 		}
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		directive0 := func(rctx context.Context) (interface{}, error) {
-			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.GalleryUser().SharedFollowers(rctx, obj, fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
-		}
-		directive1 := func(ctx context.Context) (interface{}, error) {
-			if ec.directives.AuthRequired == nil {
-				return nil, errors.New("directive authRequired is not implemented")
-			}
-			return ec.directives.AuthRequired(ctx, obj, directive0)
-		}
-
-		tmp, err := directive1(rctx)
-		if err != nil {
-			return nil, graphql.ErrorOnPath(ctx, err)
-		}
-		if tmp == nil {
-			return nil, nil
-		}
-		if data, ok := tmp.(*model.UsersConnection); ok {
-			return data, nil
-		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/mikeydub/go-gallery/graphql/model.UsersConnection`, tmp)
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.GalleryUser().SharedFollowers(rctx, obj, fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -28709,28 +28690,8 @@ func (ec *executionContext) _GalleryUser_sharedCommunities(ctx context.Context, 
 		}
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		directive0 := func(rctx context.Context) (interface{}, error) {
-			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.GalleryUser().SharedCommunities(rctx, obj, fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
-		}
-		directive1 := func(ctx context.Context) (interface{}, error) {
-			if ec.directives.AuthRequired == nil {
-				return nil, errors.New("directive authRequired is not implemented")
-			}
-			return ec.directives.AuthRequired(ctx, obj, directive0)
-		}
-
-		tmp, err := directive1(rctx)
-		if err != nil {
-			return nil, graphql.ErrorOnPath(ctx, err)
-		}
-		if tmp == nil {
-			return nil, nil
-		}
-		if data, ok := tmp.(*model.CommunitiesConnection); ok {
-			return data, nil
-		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/mikeydub/go-gallery/graphql/model.CommunitiesConnection`, tmp)
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.GalleryUser().SharedCommunities(rctx, obj, fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
 	})
 	if err != nil {
 		ec.Error(ctx, err)

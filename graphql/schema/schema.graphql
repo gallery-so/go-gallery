@@ -118,10 +118,8 @@ type GalleryUser implements Node @goEmbedHelper {
     includePosts: Boolean! = false @deprecated(reason: "Posts are always included now.")
   ): FeedConnection @goField(forceResolver: true)
   sharedFollowers(before: String, after: String, first: Int, last: Int): UsersConnection
-    @authRequired
     @goField(forceResolver: true)
   sharedCommunities(before: String, after: String, first: Int, last: Int): CommunitiesConnection
-    @authRequired
     @goField(forceResolver: true)
   createdCommunities(
     input: CreatedCommunitiesInput!

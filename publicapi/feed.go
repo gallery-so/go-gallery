@@ -401,13 +401,12 @@ func (api FeedAPI) GlobalFeed(ctx context.Context, before *string, after *string
 
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
 		keys, err := api.queries.PaginateGlobalFeed(ctx, db.PaginateGlobalFeedParams{
-			Limit:          params.Limit,
-			CurBeforeTime:  params.CursorBeforeTime,
-			CurBeforeID:    params.CursorBeforeID,
-			CurAfterTime:   params.CursorAfterTime,
-			CurAfterID:     params.CursorAfterID,
-			PagingForward:  params.PagingForward,
-			FeedEntityType: int32(persist.FeedEventTypeTag),
+			Limit:         params.Limit,
+			CurBeforeTime: params.CursorBeforeTime,
+			CurBeforeID:   params.CursorBeforeID,
+			CurAfterTime:  params.CursorAfterTime,
+			CurAfterID:    params.CursorAfterID,
+			PagingForward: params.PagingForward,
 		})
 
 		if err != nil {
