@@ -21,6 +21,7 @@ import (
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/emails"
+	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/notifications"
@@ -212,6 +213,8 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrEmailUnverified{Message: message}
 	case errors.Is(err, auth.ErrEmailAlreadyUsed):
 		mappedErr = model.ErrEmailAlreadyUsed{Message: message}
+	case errors.Is(err, eth.ErrNoAvatarRecord) || errors.Is(err, eth.ErrNoResolution):
+		mappedErr = model.ErrNoAvatarRecordSet{Message: message}
 	}
 
 	if mappedErr != nil {
@@ -930,7 +933,7 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 			CreationTime: &notif.CreatedAt,
 			UpdatedTime:  &notif.LastUpdated,
 			Count:        &amount,
-			Token:         nil, // handled by dedicated resolver
+			Token:        nil, // handled by dedicated resolver
 			Admirers:     nil, // handled by dedicated resolver
 		}, nil
 	case persist.ActionCommentedOnPost:

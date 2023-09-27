@@ -460,6 +460,10 @@ type ComplexityRoot struct {
 		SocialAccountType func(childComplexity int) int
 	}
 
+	ErrNoAvatarRecordSet struct {
+		Message func(childComplexity int) int
+	}
+
 	ErrNoCookie struct {
 		Message func(childComplexity int) int
 	}
@@ -3206,6 +3210,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ErrNeedsToReconnectSocial.SocialAccountType(childComplexity), true
+
+	case "ErrNoAvatarRecordSet.message":
+		if e.complexity.ErrNoAvatarRecordSet.Message == nil {
+			break
+		}
+
+		return e.complexity.ErrNoAvatarRecordSet.Message(childComplexity), true
 
 	case "ErrNoCookie.message":
 		if e.complexity.ErrNoCookie.Message == nil {
@@ -10812,6 +10823,10 @@ type RemoveProfileImagePayload {
   viewer: Viewer
 }
 
+type ErrNoAvatarRecordSet implements Error {
+  message: String!
+}
+
 union SetProfileImagePayloadOrError =
     SetProfileImagePayload
   | ErrAuthenticationFailed
@@ -10819,6 +10834,7 @@ union SetProfileImagePayloadOrError =
   | ErrInvalidInput
   | ErrTokenNotFound
   | ErrNotAuthorized
+  | ErrNoAvatarRecordSet
 
 union RemoveProfileImagePayloadOrError =
     RemoveProfileImagePayload
@@ -23290,6 +23306,50 @@ func (ec *executionContext) _ErrNeedsToReconnectSocial_message(ctx context.Conte
 func (ec *executionContext) fieldContext_ErrNeedsToReconnectSocial_message(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "ErrNeedsToReconnectSocial",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ErrNoAvatarRecordSet_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrNoAvatarRecordSet) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ErrNoAvatarRecordSet_message(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ErrNoAvatarRecordSet_message(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ErrNoAvatarRecordSet",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -62155,6 +62215,13 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 			return graphql.Null
 		}
 		return ec._ErrPushTokenBelongsToAnotherUser(ctx, sel, obj)
+	case model.ErrNoAvatarRecordSet:
+		return ec._ErrNoAvatarRecordSet(ctx, sel, &obj)
+	case *model.ErrNoAvatarRecordSet:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNoAvatarRecordSet(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -63940,6 +64007,13 @@ func (ec *executionContext) _SetProfileImagePayloadOrError(ctx context.Context, 
 			return graphql.Null
 		}
 		return ec._ErrNotAuthorized(ctx, sel, obj)
+	case model.ErrNoAvatarRecordSet:
+		return ec._ErrNoAvatarRecordSet(ctx, sel, &obj)
+	case *model.ErrNoAvatarRecordSet:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNoAvatarRecordSet(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -67797,6 +67871,34 @@ func (ec *executionContext) _ErrNeedsToReconnectSocial(ctx context.Context, sel 
 		case "message":
 
 			out.Values[i] = ec._ErrNeedsToReconnectSocial_message(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var errNoAvatarRecordSetImplementors = []string{"ErrNoAvatarRecordSet", "Error", "SetProfileImagePayloadOrError"}
+
+func (ec *executionContext) _ErrNoAvatarRecordSet(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNoAvatarRecordSet) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, errNoAvatarRecordSetImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ErrNoAvatarRecordSet")
+		case "message":
+
+			out.Values[i] = ec._ErrNoAvatarRecordSet_message(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
 				invalids++

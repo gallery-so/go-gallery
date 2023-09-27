@@ -2486,6 +2486,10 @@ type RemoveProfileImagePayload {
   viewer: Viewer
 }
 
+type ErrNoAvatarRecordSet implements Error {
+  message: String!
+}
+
 union SetProfileImagePayloadOrError =
     SetProfileImagePayload
   | ErrAuthenticationFailed
@@ -2493,6 +2497,7 @@ union SetProfileImagePayloadOrError =
   | ErrInvalidInput
   | ErrTokenNotFound
   | ErrNotAuthorized
+  | ErrNoAvatarRecordSet
 
 union RemoveProfileImagePayloadOrError =
     RemoveProfileImagePayload
