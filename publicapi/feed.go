@@ -376,7 +376,7 @@ func (api FeedAPI) UserFeed(ctx context.Context, userID persist.DBID, before *st
 			CurAfterTime:   params.CursorAfterTime,
 			CurAfterID:     params.CursorAfterID,
 			PagingForward:  params.PagingForward,
-			FeedEntityType: int32(persist.FeedEventTypeTag),
+			PostEntityType: int32(persist.PostTypeTag),
 		})
 		if err != nil {
 			return nil, err
