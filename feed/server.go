@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"time"
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/gin-gonic/gin"
@@ -46,9 +45,7 @@ func handleEvent(queries *db.Queries, taskClient *cloudtasks.Client) gin.Handler
 		}
 
 		// Send event to feedbot
-		err = task.CreateTaskForFeedbot(c.Request.Context(),
-			time.Now(), task.FeedbotMessage{FeedEventID: event.ID, Action: event.Action}, taskClient,
-		)
+		err = task.CreateTaskForFeedbot(c.Request.Context(), task.FeedbotMessage{FeedEventID: event.ID, Action: event.Action}, taskClient)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return

@@ -582,7 +582,7 @@ func (r *galleryUserResolver) Following(ctx context.Context, obj *model.GalleryU
 
 // Feed is the resolver for the feed field.
 func (r *galleryUserResolver) Feed(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int, includePosts bool) (*model.FeedConnection, error) {
-	events, pageInfo, err := publicapi.For(ctx).Feed.UserFeed(ctx, obj.Dbid, before, after, first, last, includePosts)
+	events, pageInfo, err := publicapi.For(ctx).Feed.UserFeed(ctx, obj.Dbid, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}
@@ -2265,7 +2265,7 @@ func (r *queryResolver) GalleryOfTheWeekWinners(ctx context.Context) ([]*model.G
 
 // GlobalFeed is the resolver for the globalFeed field.
 func (r *queryResolver) GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int, includePosts bool) (*model.FeedConnection, error) {
-	events, pageInfo, err := publicapi.For(ctx).Feed.GlobalFeed(ctx, before, after, first, last, includePosts)
+	events, pageInfo, err := publicapi.For(ctx).Feed.GlobalFeed(ctx, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}
@@ -2899,7 +2899,7 @@ func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer)
 
 // Feed is the resolver for the feed field.
 func (r *viewerResolver) Feed(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int, includePosts bool) (*model.FeedConnection, error) {
-	events, pageInfo, err := publicapi.For(ctx).Feed.PersonalFeed(ctx, before, after, first, last, includePosts)
+	events, pageInfo, err := publicapi.For(ctx).Feed.PersonalFeed(ctx, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}
