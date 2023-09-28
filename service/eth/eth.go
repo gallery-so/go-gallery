@@ -19,7 +19,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/rpc"
 )
 
-var ErrNoResolution = errors.New("unable to resolve ENS doman from address")
+var ErrNoResolution = errors.New("unable to resolve ENS domain from address")
 var ErrUnknownEnsAvatarURI = errors.New("unknown ENS avatar uri")
 var ErrChainNotSupported = errors.New("chain not supported")
 var ErrUnknownTokenType = errors.New("unknown token type")
