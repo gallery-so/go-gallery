@@ -558,6 +558,8 @@ func detectSpamContracts(queries *coredb.Queries) gin.HandlerFunc {
 
 		now := time.Now()
 
+		seen := make(map[persist.ContractIdentifiers]bool)
+
 		for _, source := range []struct {
 			Chain    persist.Chain
 			Endpoint string
@@ -604,6 +606,11 @@ func detectSpamContracts(queries *coredb.Queries) gin.HandlerFunc {
 			}
 
 			for _, contract := range body.Contracts {
+				id := persist.NewContractIdentifiers(contract, source.Chain)
+				if seen[id] {
+					continue
+				}
+				seen[id] = true
 				params.ID = append(params.ID, persist.GenerateID().String())
 				params.Chain = append(params.Chain, int32(source.Chain))
 				params.Address = append(params.Address, source.Chain.NormalizeAddress(contract))
