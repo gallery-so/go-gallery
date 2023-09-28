@@ -164,7 +164,7 @@ type mediaFragment struct {
 	} `graphql:"previewURLs"`
 	FallbackMedia struct {
 		MediaURL string `graphql:"mediaURL"`
-	} `graphql:"fallbackMedia`
+	} `graphql:"fallbackMedia"`
 }
 
 type slackTemplateInfo struct {
