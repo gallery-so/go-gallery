@@ -7,6 +7,7 @@ package graphql
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/99designs/gqlgen/graphql"
@@ -16,6 +17,7 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/emails"
+	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -490,6 +492,9 @@ func (r *galleryUserResolver) ProfileImage(ctx context.Context, obj *model.Galle
 // PotentialEnsProfileImage is the resolver for the potentialEnsProfileImage field.
 func (r *galleryUserResolver) PotentialEnsProfileImage(ctx context.Context, obj *model.GalleryUser) (*model.EnsProfileImage, error) {
 	a, err := publicapi.For(ctx).User.GetEnsProfileImageByUserID(ctx, obj.Dbid)
+	if err != nil && (errors.Is(err, eth.ErrNoResolution) || errors.Is(err, eth.ErrNoAvatarRecord)) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}
