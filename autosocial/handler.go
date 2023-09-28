@@ -98,19 +98,22 @@ func processUsers(q *coredb.Queries, n *farcaster.NeynarAPI, l *lens.LensAPI) gi
 			}
 		}
 
+		errs := make([]error, 0, 2)
 		err := fp.Wait()
 		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
+			errs = append(errs, err)
 		}
 
 		err = lp.Wait()
 		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
+			errs = append(errs, err)
+		}
+
+		if len(errs) > 0 {
+			util.ErrResponse(c, http.StatusInternalServerError, util.MultiErr(errs))
 			return
 		}
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
-
 	}
 }
