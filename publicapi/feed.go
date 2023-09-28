@@ -807,11 +807,6 @@ func loadFeedEntities(ctx context.Context, d *dataloader.Loaders, typs []persist
 	return entities, nil
 }
 
-type scoredEntity struct {
-	e db.FeedEntityScore
-	s float64
-}
-
 func (api FeedAPI) scoreFeedEntities(ctx context.Context, n int, trendData []db.FeedEntityScore, scoreF func(db.FeedEntityScore) float64) []db.FeedEntityScore {
 	h := &heap{}
 

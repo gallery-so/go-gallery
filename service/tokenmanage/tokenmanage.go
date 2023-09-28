@@ -20,8 +20,8 @@ type Manager struct {
 	throttle        *throttle.Locker
 	// delayer sets the linear delay for retrying tokens up to MaxRetries
 	delayer *limiters.KeyRateLimiter
-	// maxRetries is the maximum number of times a token can be reenqueued before it is not retried again
-	maxRetries int
+	// maxRetryF is a function that defines the maximum number of times a token can be reenqueued before it is not retried again
+	maxRetryF func(t persist.TokenIdentifiers) int
 }
 
 func New(ctx context.Context, taskClient *cloudtasks.Client) *Manager {
@@ -34,9 +34,9 @@ func New(ctx context.Context, taskClient *cloudtasks.Client) *Manager {
 	}
 }
 
-func NewWithRetries(ctx context.Context, taskClient *cloudtasks.Client, maxRetries int) *Manager {
+func NewWithRetries(ctx context.Context, taskClient *cloudtasks.Client, maxRetryF func(persist.TokenIdentifiers) int) *Manager {
 	m := New(ctx, taskClient)
-	m.maxRetries = maxRetries
+	m.maxRetryF = maxRetryF
 	m.delayer = limiters.NewKeyRateLimiter(ctx, m.cache, "retry", 2, 1*time.Minute)
 	return m
 }
@@ -50,10 +50,10 @@ func (m Manager) Processing(ctx context.Context, token persist.TokenIdentifiers)
 // StartProcessing marks a token as processing. It returns a callback that must be called when work on the token is finished in order to mark
 // it as finished. If withRetry is true, the callback will attempt to reenqueue the token if an error is passed. attemps is ignored when MaxRetries
 // is set to the default value of 0.
-func (m Manager) StartProcessing(ctx context.Context, token persist.TokenIdentifiers, attempts int) (error, func(err error) error) {
+func (m Manager) StartProcessing(ctx context.Context, token persist.TokenIdentifiers, attempts int) (func(err error) error, error) {
 	err := m.throttle.Lock(ctx, "lock:"+token.String())
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 
 	stop := make(chan bool)
@@ -82,7 +82,7 @@ func (m Manager) StartProcessing(ctx context.Context, token persist.TokenIdentif
 		return nil
 	}
 
-	return nil, callback
+	return callback, err
 }
 
 // SubmitUser enqueues a user's tokens for processing.
@@ -93,7 +93,7 @@ func (m Manager) SubmitUser(ctx context.Context, userID persist.DBID, tokenIDs [
 }
 
 func (m Manager) tryRetry(ctx context.Context, token persist.TokenIdentifiers, err error, attempts int) error {
-	if err == nil || m.maxRetries <= 0 || attempts >= m.maxRetries {
+	if err == nil || m.maxRetryF == nil || attempts >= m.maxRetryF(token) {
 		m.processRegistry.finish(ctx, token)
 		return nil
 	}

@@ -96,24 +96,6 @@ func withMaxWait(t time.Duration) func(*settings) {
 	}
 }
 
-func withContext(ctx context.Context) func(*settings) {
-	return func(s *settings) {
-		s.ctx = ctx
-	}
-}
-
-func withMaxBatchMany(batchSize int) func(*settings) {
-	return func(s *settings) {
-		s.maxBatchMany = batchSize
-	}
-}
-
-func withDisableCaching(disable bool) func(*settings) {
-	return func(s *settings) {
-		s.disableCaching = disable
-	}
-}
-
 func withPublishResults(publish bool) func(*settings) {
 	return func(s *settings) {
 		s.publishResults = publish
