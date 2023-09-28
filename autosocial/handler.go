@@ -32,7 +32,7 @@ func processUsers(q *coredb.Queries, n *farcaster.NeynarAPI, l *lens.LensAPI) gi
 			userID := u
 			socials := s
 
-			if address, ok := socials[persist.SocialProviderLens]; ok {
+			if address, ok := socials[persist.SocialProviderLens]; ok && address.Address() != "" {
 
 				lp.Go(func(ctx context.Context) error {
 					u, err := l.DefaultProfileByAddress(ctx, address.Address())
@@ -69,7 +69,7 @@ func processUsers(q *coredb.Queries, n *farcaster.NeynarAPI, l *lens.LensAPI) gi
 				})
 			}
 
-			if address, ok := socials[persist.SocialProviderFarcaster]; ok {
+			if address, ok := socials[persist.SocialProviderFarcaster]; ok && address.Address() != "" {
 				fp.Go(func(ctx context.Context) error {
 					u, err := n.UserByAddress(ctx, address.Address())
 					if err != nil {

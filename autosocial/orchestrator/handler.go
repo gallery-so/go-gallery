@@ -44,6 +44,10 @@ func processAllUsers(pg *pgxpool.Pool, ctc *cloudtasks.Client) gin.HandlerFunc {
 					return
 				}
 
+				if walletAddress == "" {
+					continue
+				}
+
 				if noLens {
 					tuples = append(tuples, idAddressTuple{ID: userID, Address: persist.NewChainAddress(walletAddress, persist.ChainETH), Social: persist.SocialProviderLens})
 				}
