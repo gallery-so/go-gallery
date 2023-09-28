@@ -76,7 +76,7 @@ func RetryRequestWithRetry(c *http.Client, req *http.Request, r Retry) (*http.Re
 
 		r.Sleep(i)
 	}
-	return nil, ErrOutOfRetries{err, r}
+	return nil, ErrOutOfRetries{Err: err, Retry: r}
 }
 
 func RetryQuery(ctx context.Context, c *graphql.Client, query any, vars map[string]any) error {

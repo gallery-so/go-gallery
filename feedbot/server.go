@@ -155,7 +155,6 @@ func postToSlack(gql *graphql.Client) gin.HandlerFunc {
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
-	return nil
 }
 
 type mediaFragment struct {
@@ -210,6 +209,10 @@ type slackTemplateInfo struct {
 }
 
 func textObject(s string) map[string]any {
+	// Slack doesn't like empty strings
+	if s == "" {
+		s = " "
+	}
 	return map[string]any{"type": "mrkdwn", "text": s}
 }
 
