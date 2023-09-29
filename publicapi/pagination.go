@@ -1035,10 +1035,22 @@ type feedPositionCursor struct {
 	CurrentPosition int64
 	EntityTypes     []persist.FeedEntityType
 	EntityIDs       []persist.DBID
+	PositionLookup  map[persist.DBID]int64
+}
+
+func (f *feedPositionCursor) Unpack(s string) error {
+	err := f.baseCursor.Unpack(s)
+	if err != nil {
+		return err
+	}
+	for i, id := range f.EntityIDs {
+		f.PositionLookup[id] = int64(i)
+	}
+	return nil
 }
 
 func (cursorN) NewFeedPositionCursor() *feedPositionCursor {
-	c := feedPositionCursor{baseCursor: &baseCursor{}}
+	c := feedPositionCursor{baseCursor: &baseCursor{}, PositionLookup: make(map[persist.DBID]int64)}
 	initCursor(c.baseCursor, &c.CurrentPosition, &c.EntityTypes, &c.EntityIDs)
 	return &c
 }

@@ -2984,11 +2984,15 @@ func (q *Queries) GetNotificationsByOwnerIDForActionAfter(ctx context.Context, a
 }
 
 const getPostsByIds = `-- name: GetPostsByIds :many
-SELECT id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted FROM posts WHERE id = ANY($1::varchar(255)[]) AND deleted = false
+select posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted
+from posts
+join unnest($1::varchar(255)[]) with ordinality t(id, pos) using(id)
+where not posts.deleted
+order by pos asc
 `
 
-func (q *Queries) GetPostsByIds(ctx context.Context, ids []string) ([]Post, error) {
-	rows, err := q.db.Query(ctx, getPostsByIds, ids)
+func (q *Queries) GetPostsByIds(ctx context.Context, postIds []string) ([]Post, error) {
+	rows, err := q.db.Query(ctx, getPostsByIds, postIds)
 	if err != nil {
 		return nil, err
 	}

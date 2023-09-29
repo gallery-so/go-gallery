@@ -494,7 +494,11 @@ and posts.deleted = false;
 SELECT * FROM feed_events WHERE id = ANY(@ids::varchar(255)[]) AND deleted = false;
 
 -- name: GetPostsByIds :many
-SELECT * FROM posts WHERE id = ANY(@ids::varchar(255)[]) AND deleted = false;
+select posts.*
+from posts
+join unnest(@post_ids::varchar(255)[]) with ordinality t(id, pos) using(id)
+where not posts.deleted
+order by pos asc;
 
 -- name: GetEventByIdBatch :batchone
 SELECT * FROM feed_events WHERE id = $1 AND deleted = false;

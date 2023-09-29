@@ -33,6 +33,8 @@ import (
 
 const tHalf = math.Ln2 / 0.002 // half-life of approx 6 hours
 
+var feedLookback = time.Duration(7 * 24 * time.Hour)
+
 type FeedAPI struct {
 	repos              *postgres.Repositories
 	queries            *db.Queries
@@ -424,39 +426,60 @@ func (api FeedAPI) GlobalFeed(ctx context.Context, before *string, after *string
 	return paginator.paginate(before, after, first, last)
 }
 
-type feedParams struct {
-	ExcludeUserID  persist.DBID
-	IncludePosts   bool
-	IncludeEvents  bool
-	ExcludeActions []persist.Action
-	FetchFrom      time.Duration
+func fetchFeedEntityScores(ctx context.Context, queries *db.Queries, excludeUserID persist.DBID) (map[persist.DBID]db.GetFeedEntityScoresRow, error) {
+	params := db.GetFeedEntityScoresParams{
+		IncludeViewer: true,
+		WindowEnd:     time.Now().Add(-feedLookback),
+	}
+	if excludeUserID != "" {
+		params.IncludeViewer = false
+		params.ViewerID = excludeUserID
+	}
+	scores, err := queries.GetFeedEntityScores(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+	scoreMap := make(map[persist.DBID]db.GetFeedEntityScoresRow)
+	for _, s := range scores {
+		scoreMap[s.Post.ID] = s
+	}
+	return scoreMap, nil
 }
 
-func fetchFeedEntityScores(ctx context.Context, queries *db.Queries, p feedParams) ([]db.FeedEntityScore, error) {
-	var q db.GetFeedEntityScoresParams
+func newPaginatorFromCursor(ctx context.Context, cur string, q *db.Queries) (paginator feedPaginator, err error) {
+	queryF := func(postIDs []persist.DBID) ([]db.Post, error) {
+		ids := util.MapWithoutError(postIDs, func(id persist.DBID) string { return id.String() })
+		return q.GetPostsByIds(ctx, ids)
+	}
+	return newPaginatorFromCursorWithF(cur, queryF)
+}
 
-	q.IncludeViewer = true
-	q.IncludePosts = true
-	q.IncludeEvents = true
-	q.WindowEnd = time.Now().Add(-p.FetchFrom)
-	q.ExcludedFeedActions = util.MapWithoutError(p.ExcludeActions, func(a persist.Action) string { return string(a) })
+func newPaginatorFromCursorWithF(cur string, queryF func([]persist.DBID) ([]db.Post, error)) (paginator feedPaginator, err error) {
+	cursor := cursors.NewFeedPositionCursor()
 
-	if !p.IncludePosts {
-		q.IncludePosts = false
-		q.PostEntityType = int32(persist.PostTypeTag)
+	if err := cursor.Unpack(cur); err != nil {
+		return paginator, err
 	}
 
-	if !p.IncludeEvents {
-		q.IncludeEvents = false
-		q.FeedEntityType = int32(persist.FeedEventTypeTag)
+	paginator.QueryFunc = func(params feedPagingParams) ([]any, error) {
+		posts, err := queryF(cursor.EntityIDs)
+		postEdges := util.MapWithoutError(posts, func(p db.Post) any { return p })
+		return postEdges, err
 	}
 
-	if p.ExcludeUserID != "" {
-		q.IncludeViewer = false
-		q.ViewerID = p.ExcludeUserID
+	paginator.CursorFunc = func(node any) (int64, []persist.FeedEntityType, []persist.DBID, error) {
+		_, id, err := feedCursor(node)
+		if err != nil {
+			return 0, cursor.EntityTypes, cursor.EntityIDs, err
+		}
+		pos, ok := cursor.PositionLookup[id]
+		if !ok {
+			panic(fmt.Sprintf("could not find position for id=%s", id))
+		}
+		return pos, cursor.EntityTypes, cursor.EntityIDs, err
 	}
 
-	return queries.GetFeedEntityScores(ctx, q)
+	return paginator, nil
 }
 
 func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *string, first *int, last *int) ([]any, PageInfo, error) {
@@ -465,76 +488,79 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 		return nil, PageInfo{}, err
 	}
 
-	var (
-		err           error
-		cursor        = cursors.NewFeedPositionCursor()
-		paginator     feedPaginator
-		entityIDToPos = make(map[persist.DBID]int)
-	)
-
-	now := time.Now()
+	var paginator feedPaginator
+	var err error
 
 	if before != nil {
-		if err = cursor.Unpack(*before); err != nil {
+		paginator, err = newPaginatorFromCursor(ctx, *before, api.queries)
+		if err != nil {
 			return nil, PageInfo{}, err
 		}
 	} else if after != nil {
-		if err = cursor.Unpack(*after); err != nil {
+		paginator, err = newPaginatorFromCursor(ctx, *after, api.queries)
+		if err != nil {
 			return nil, PageInfo{}, err
 		}
 	} else {
-		calcFunc := func(ctx context.Context) ([]persist.FeedEntityType, []persist.DBID, error) {
-			trendData, err := fetchFeedEntityScores(ctx, api.queries, feedParams{
-				IncludePosts:   true,
-				IncludeEvents:  false,
-				ExcludeActions: []persist.Action{persist.ActionUserCreated, persist.ActionUserFollowedUsers},
-				FetchFrom:      time.Duration(3 * 24 * time.Hour),
-			})
+		var posts []db.Post
+
+		cacheCalcFunc := func(ctx context.Context) ([]persist.FeedEntityType, []persist.DBID, error) {
+			postScores, err := fetchFeedEntityScores(ctx, api.queries, "")
 			if err != nil {
 				return nil, nil, err
 			}
-			scored := api.scoreFeedEntities(ctx, 128, trendData, func(e db.FeedEntityScore) float64 {
-				return timeFactor(e.CreatedAt, now) * engagementFactor(int(e.Interactions))
+
+			scores := util.MapWithoutError(util.MapValues(postScores), func(s db.GetFeedEntityScoresRow) db.FeedEntityScore { return s.FeedEntityScore })
+			scored := api.scoreFeedEntities(ctx, 128, scores, func(e db.FeedEntityScore) float64 {
+				return timeFactor(e.CreatedAt, time.Now()) * engagementFactor(int(e.Interactions))
 			})
 
-			entityTypes := make([]persist.FeedEntityType, len(scored))
-			entityIDs := make([]persist.DBID, len(scored))
+			postIDs := make([]persist.DBID, len(scored))
+			posts = make([]db.Post, len(scored))
+			postTypes := make([]persist.FeedEntityType, len(scored))
 
-			for i, e := range scored {
+			for i, post := range scored {
 				idx := len(scored) - i - 1
-				entityTypes[idx] = persist.FeedEntityType(e.FeedEntityType)
-				entityIDs[idx] = e.ID
+				postIDs[idx] = post.ID
+				posts[idx] = postScores[post.ID].Post
+				postTypes[idx] = persist.FeedEntityType(post.FeedEntityType)
 			}
 
-			return entityTypes, entityIDs, nil
+			return postTypes, postIDs, nil
 		}
 
-		l := newFeedCache(api.cache, calcFunc)
+		// Prime the cache
+		cache := newFeedCache(api.cache, cacheCalcFunc)
+		postTypes, postIDs, err := cache.Load(ctx)
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
 
-		cursor.EntityTypes, cursor.EntityIDs, err = l.Load(ctx)
+		cursorable := cursorables.NewFeedPositionCursorer(func(node any) (int64, []persist.FeedEntityType, []persist.DBID, error) {
+			return 0, postTypes, postIDs, nil
+		})
+
+		cursor, err := cursorable(nil)
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+
+		curString, err := cursor.Pack()
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+
+		if len(posts) == 0 {
+			paginator, err = newPaginatorFromCursor(ctx, curString, api.queries)
+		} else {
+			paginator, err = newPaginatorFromCursorWithF(curString, func(postIDs []persist.DBID) ([]db.Post, error) { return posts, nil })
+		}
+
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
 	}
 
-	queryFunc := func(params feedPagingParams) ([]any, error) {
-		for i, id := range cursor.EntityIDs {
-			entityIDToPos[id] = i
-		}
-		return loadFeedEntities(ctx, api.loaders, cursor.EntityTypes, cursor.EntityIDs)
-	}
-
-	cursorFunc := func(node any) (int64, []persist.FeedEntityType, []persist.DBID, error) {
-		_, id, err := feedCursor(node)
-		pos, ok := entityIDToPos[id]
-		if !ok {
-			panic(fmt.Sprintf("could not find position for id=%s", id))
-		}
-		return int64(pos), cursor.EntityTypes, cursor.EntityIDs, err
-	}
-
-	paginator.QueryFunc = queryFunc
-	paginator.CursorFunc = cursorFunc
 	return paginator.paginate(before, after, first, last)
 }
 
@@ -551,58 +577,46 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 		return nil, PageInfo{}, err
 	}
 
-	var (
-		paginator     feedPaginator
-		cursor        = cursors.NewFeedPositionCursor()
-		entityIDToPos = make(map[persist.DBID]int)
-	)
-
-	now := time.Now()
+	var err error
+	var paginator feedPaginator
 
 	if before != nil {
-		if err := cursor.Unpack(*before); err != nil {
+		paginator, err = newPaginatorFromCursor(ctx, *before, api.queries)
+		if err != nil {
 			return nil, PageInfo{}, err
 		}
 	} else if after != nil {
-		if err := cursor.Unpack(*after); err != nil {
+		paginator, err = newPaginatorFromCursor(ctx, *after, api.queries)
+		if err != nil {
 			return nil, PageInfo{}, err
 		}
 	} else {
-		trendData, err := fetchFeedEntityScores(ctx, api.queries, feedParams{
-			IncludePosts:   true,
-			IncludeEvents:  false,
-			ExcludeUserID:  userID,
-			ExcludeActions: []persist.Action{persist.ActionUserCreated, persist.ActionUserFollowedUsers},
-			FetchFrom:      time.Duration(7 * 24 * time.Hour),
-		})
+		postScores, err := fetchFeedEntityScores(ctx, api.queries, userID)
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
 
-		idToEntity := make(map[persist.DBID]db.FeedEntityScore)
-		for _, e := range trendData {
-			idToEntity[e.ID] = e
-		}
-
+		now := time.Now()
+		scores := util.MapWithoutError(util.MapValues(postScores), func(s db.GetFeedEntityScoresRow) db.FeedEntityScore { return s.FeedEntityScore })
 		engagementScores := make(map[persist.DBID]float64)
 		personalizationScores := make(map[persist.DBID]float64)
 
-		for _, e := range trendData {
+		for _, e := range postScores {
 			// Boost new events
 			boost := 1.0
-			if now.Sub(e.CreatedAt) < 6*time.Hour {
+			if now.Sub(e.Post.CreatedAt) < 6*time.Hour {
 				boost *= 2.0
 			}
-			timeF := timeFactor(e.CreatedAt, now)
-			engagementScores[e.ID] = boost * timeF * (1 + engagementFactor(int(e.Interactions)))
-			personalizationScores[e.ID] = boost * timeF * userpref.For(ctx).RelevanceTo(userID, e)
+			timeF := timeFactor(e.Post.CreatedAt, now)
+			engagementScores[e.Post.ID] = boost * timeF * (1 + engagementFactor(int(e.FeedEntityScore.Interactions)))
+			personalizationScores[e.Post.ID] = boost * timeF * userpref.For(ctx).RelevanceTo(userID, e.FeedEntityScore)
 		}
 
 		// Rank by engagement first, then by personalization
-		topNByEngagement := api.scoreFeedEntities(ctx, 128, trendData, func(e db.FeedEntityScore) float64 { return engagementScores[e.ID] })
+		topNByEngagement := api.scoreFeedEntities(ctx, 128, scores, func(e db.FeedEntityScore) float64 { return engagementScores[e.ID] })
 		topNByEngagement = api.scoreFeedEntities(ctx, 128, topNByEngagement, func(e db.FeedEntityScore) float64 { return personalizationScores[e.ID] })
 		// Rank by personalization, then by engagement
-		topNByPersonalization := api.scoreFeedEntities(ctx, 128, trendData, func(e db.FeedEntityScore) float64 { return personalizationScores[e.ID] })
+		topNByPersonalization := api.scoreFeedEntities(ctx, 128, scores, func(e db.FeedEntityScore) float64 { return personalizationScores[e.ID] })
 		topNByPersonalization = api.scoreFeedEntities(ctx, 128, topNByPersonalization, func(e db.FeedEntityScore) float64 { return engagementScores[e.ID] })
 
 		// Get ranking of both
@@ -634,34 +648,37 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 
 		recommend.Shuffle(interleaved, 8)
 
-		cursor.EntityTypes = make([]persist.FeedEntityType, len(interleaved))
-		cursor.EntityIDs = make([]persist.DBID, len(interleaved))
+		posts := make([]db.Post, len(interleaved))
+		postIDs := make([]persist.DBID, len(interleaved))
+		postTypes := make([]persist.FeedEntityType, len(interleaved))
 
 		for i, e := range interleaved {
 			idx := len(interleaved) - i - 1
-			cursor.EntityTypes[idx] = persist.FeedEntityType(e.FeedEntityType)
-			cursor.EntityIDs[idx] = e.ID
+			postIDs[idx] = e.ID
+			posts[idx] = postScores[e.ID].Post
+			postTypes[idx] = persist.FeedEntityType(e.FeedEntityType)
+		}
+
+		cursorable := cursorables.NewFeedPositionCursorer(func(node any) (int64, []persist.FeedEntityType, []persist.DBID, error) {
+			return 0, postTypes, postIDs, nil
+		})
+
+		cursor, err := cursorable(nil)
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+
+		curString, err := cursor.Pack()
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+
+		paginator, err = newPaginatorFromCursorWithF(curString, func(postIDs []persist.DBID) ([]db.Post, error) { return posts, nil })
+		if err != nil {
+			return nil, PageInfo{}, err
 		}
 	}
 
-	queryFunc := func(params feedPagingParams) ([]any, error) {
-		for i, id := range cursor.EntityIDs {
-			entityIDToPos[id] = i
-		}
-		return loadFeedEntities(ctx, api.loaders, cursor.EntityTypes, cursor.EntityIDs)
-	}
-
-	cursorFunc := func(node any) (int64, []persist.FeedEntityType, []persist.DBID, error) {
-		_, id, err := feedCursor(node)
-		pos, ok := entityIDToPos[id]
-		if !ok {
-			panic(fmt.Sprintf("could not find position for id=%s", id))
-		}
-		return int64(pos), cursor.EntityTypes, cursor.EntityIDs, err
-	}
-
-	paginator.QueryFunc = queryFunc
-	paginator.CursorFunc = cursorFunc
 	return paginator.paginate(before, after, first, last)
 }
 
@@ -899,7 +916,6 @@ func (h *heap) Pop() any {
 type feedPagingParams struct {
 	CurBeforePos int
 	CurAfterPos  int
-	EntityTypes  []persist.FeedEntityType
 	EntityIDs    []persist.DBID
 }
 
@@ -922,7 +938,6 @@ func (p *feedPaginator) paginate(before, after *string, first, last *int) ([]any
 			return nil, PageInfo{}, err
 		}
 		args.CurBeforePos = int(beforeCur.CurrentPosition)
-		args.EntityTypes = beforeCur.EntityTypes
 		args.EntityIDs = beforeCur.EntityIDs
 	}
 
@@ -931,7 +946,6 @@ func (p *feedPaginator) paginate(before, after *string, first, last *int) ([]any
 			return nil, PageInfo{}, err
 		}
 		args.CurAfterPos = int(afterCur.CurrentPosition)
-		args.EntityTypes = afterCur.EntityTypes
 		args.EntityIDs = afterCur.EntityIDs
 	}
 
@@ -961,7 +975,6 @@ func newFeedCache(cache *redis.Cache, f func(context.Context) ([]persist.FeedEnt
 					return nil, err
 				}
 				cur := cursors.NewFeedPositionCursor()
-				cur.CurrentPosition = 0
 				cur.EntityTypes = types
 				cur.EntityIDs = ids
 				b, err := cur.Pack()
