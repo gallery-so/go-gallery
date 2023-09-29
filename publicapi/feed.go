@@ -457,16 +457,16 @@ func paginatorFromCursor(cur string, queryF func([]persist.DBID) ([]db.Post, err
 		return nodes, err
 	}
 
-	paginator.CursorFunc = func(node any) (int64, []persist.DBID, error) {
+	paginator.CursorFunc = func(node any) (int64, []persist.FeedEntityType, []persist.DBID, error) {
 		_, id, err := feedCursor(node)
 		if err != nil {
-			return 0, cursor.EntityIDs, err
+			return 0, cursor.EntityTypes, cursor.EntityIDs, err
 		}
 		pos, ok := cursor.PositionLookup[id]
 		if !ok {
 			panic(fmt.Sprintf("could not find position for id=%s", id))
 		}
-		return pos, cursor.EntityIDs, err
+		return pos, cursor.EntityTypes, cursor.EntityIDs, err
 	}
 
 	return paginator, nil
@@ -510,22 +510,26 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 
 		postIDs := make([]persist.DBID, len(scored))
 		posts := make([]db.Post, len(scored))
+		postTypes := make([]persist.FeedEntityType, len(scored))
 
 		for i, post := range scored {
 			idx := len(scored) - i - 1
 			postIDs[idx] = post.ID
 			posts[idx] = postScores[post.ID].Post
+			postTypes[idx] = persist.FeedEntityType(post.FeedEntityType)
 		}
 
 		// Prime the cache
-		cache := newFeedCache(api.cache, func(ctx context.Context) ([]persist.DBID, error) { return postIDs, nil })
-		_, err = cache.Load(ctx)
+		cache := newFeedCache(api.cache, func(ctx context.Context) ([]persist.FeedEntityType, []persist.DBID, error) {
+			return postTypes, postIDs, nil
+		})
+		_, _, err = cache.Load(ctx)
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
 
-		cursorable := cursorables.NewFeedPositionCursorer(func(node any) (int64, []persist.DBID, error) {
-			return 0, postIDs, nil
+		cursorable := cursorables.NewFeedPositionCursorer(func(node any) (int64, []persist.FeedEntityType, []persist.DBID, error) {
+			return 0, postTypes, postIDs, nil
 		})
 
 		cursor, err := cursorable(nil)
@@ -639,15 +643,17 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 
 		posts := make([]db.Post, len(interleaved))
 		postIDs := make([]persist.DBID, len(interleaved))
+		postTypes := make([]persist.FeedEntityType, len(interleaved))
 
 		for i, e := range interleaved {
 			idx := len(interleaved) - i - 1
 			postIDs[idx] = e.ID
 			posts[idx] = postScores[e.ID].Post
+			postTypes[idx] = persist.FeedEntityType(e.FeedEntityType)
 		}
 
-		cursorable := cursorables.NewFeedPositionCursorer(func(node any) (int64, []persist.DBID, error) {
-			return 0, postIDs, nil
+		cursorable := cursorables.NewFeedPositionCursorer(func(node any) (int64, []persist.FeedEntityType, []persist.DBID, error) {
+			return 0, postTypes, postIDs, nil
 		})
 
 		cursor, err := cursorable(nil)
@@ -908,7 +914,7 @@ type feedPagingParams struct {
 
 type feedPaginator struct {
 	QueryFunc  func(params feedPagingParams) ([]any, error)
-	CursorFunc func(node any) (pos int64, ids []persist.DBID, err error)
+	CursorFunc func(node any) (pos int64, feedEntityType []persist.FeedEntityType, ids []persist.DBID, err error)
 }
 
 func (p *feedPaginator) paginate(before, after *string, first, last *int) ([]any, PageInfo, error) {
@@ -949,7 +955,7 @@ type feedCache struct {
 	CalcFunc func(context.Context) ([]persist.FeedEntityType, []persist.DBID, error)
 }
 
-func newFeedCache(cache *redis.Cache, f func(context.Context) ([]persist.DBID, error)) *feedCache {
+func newFeedCache(cache *redis.Cache, f func(context.Context) ([]persist.FeedEntityType, []persist.DBID, error)) *feedCache {
 	key := "trending:feedEvents:all"
 	return &feedCache{
 		LazyCache: &redis.LazyCache{
@@ -957,12 +963,13 @@ func newFeedCache(cache *redis.Cache, f func(context.Context) ([]persist.DBID, e
 			Key:   key,
 			TTL:   time.Minute * 10,
 			CalcFunc: func(ctx context.Context) ([]byte, error) {
-				ids, err := f(ctx)
+				types, ids, err := f(ctx)
 				if err != nil {
 					return nil, err
 				}
 				cur := cursors.NewFeedPositionCursor()
 				cur.CurrentPosition = 0
+				cur.EntityTypes = types
 				cur.EntityIDs = ids
 				b, err := cur.Pack()
 				return []byte(b), err
@@ -971,12 +978,12 @@ func newFeedCache(cache *redis.Cache, f func(context.Context) ([]persist.DBID, e
 	}
 }
 
-func (f feedCache) Load(ctx context.Context) ([]persist.DBID, error) {
+func (f feedCache) Load(ctx context.Context) ([]persist.FeedEntityType, []persist.DBID, error) {
 	b, err := f.LazyCache.Load(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	cur := cursors.NewFeedPositionCursor()
 	err = cur.Unpack(string(b))
-	return cur.EntityIDs, err
+	return cur.EntityTypes, cur.EntityIDs, err
 }
