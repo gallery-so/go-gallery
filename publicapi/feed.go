@@ -426,9 +426,8 @@ func (api FeedAPI) GlobalFeed(ctx context.Context, before *string, after *string
 
 func fetchFeedEntityScores(ctx context.Context, queries *db.Queries, excludeUserID persist.DBID, lookback time.Duration) (map[persist.DBID]db.GetFeedEntityScoresRow, error) {
 	q := db.GetFeedEntityScoresParams{
-		IncludeViewer:  true,
-		WindowEnd:      time.Now().Add(-lookback),
-		PostEntityType: int32(persist.PostTypeTag),
+		IncludeViewer: true,
+		WindowEnd:     time.Now().Add(-lookback),
 	}
 	if excludeUserID != "" {
 		q.IncludeViewer = false
@@ -448,8 +447,7 @@ func fetchFeedEntityScores(ctx context.Context, queries *db.Queries, excludeUser
 func paginatorFromCursor(cur string, queryF func([]persist.DBID) ([]db.Post, error)) (paginator feedPaginator, err error) {
 	cursor := cursors.NewFeedPositionCursor()
 
-	err = cursor.Unpack(cur)
-	if err != nil {
+	if err := cursor.Unpack(cur); err != nil {
 		return paginator, err
 	}
 
@@ -458,6 +456,7 @@ func paginatorFromCursor(cur string, queryF func([]persist.DBID) ([]db.Post, err
 		nodes := util.MapWithoutError(posts, func(p db.Post) any { return p })
 		return nodes, err
 	}
+
 	paginator.CursorFunc = func(node any) (int64, []persist.DBID, error) {
 		_, id, err := feedCursor(node)
 		if err != nil {
@@ -499,33 +498,28 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 			return nil, PageInfo{}, err
 		}
 	} else {
-		var posts []db.Post
-		var postScores map[persist.DBID]db.GetFeedEntityScoresRow
-
-		calcFunc := func(ctx context.Context) ([]persist.DBID, error) {
-			postScores, err = fetchFeedEntityScores(ctx, api.queries, "", time.Duration(3*24*time.Hour))
-			if err != nil {
-				return nil, err
-			}
-
-			scores := util.MapWithoutError(util.MapValues(postScores), func(s db.GetFeedEntityScoresRow) db.FeedEntityScore { return s.FeedEntityScore })
-
-			scored := api.scoreFeedEntities(ctx, 128, scores, func(e db.FeedEntityScore) float64 {
-				return timeFactor(e.CreatedAt, time.Now()) * engagementFactor(int(e.Interactions))
-			})
-
-			postIDs := make([]persist.DBID, len(scored))
-
-			for i, post := range scored {
-				idx := len(scored) - i - 1
-				postIDs[idx] = post.ID
-				posts[idx] = postScores[post.ID].Post
-			}
-
-			return postIDs, nil
+		postScores, err := fetchFeedEntityScores(ctx, api.queries, "", time.Duration(3*24*time.Hour))
+		if err != nil {
+			return nil, PageInfo{}, err
 		}
 
-		postIDs, err := newFeedCache(api.cache, calcFunc).Load(ctx)
+		scores := util.MapWithoutError(util.MapValues(postScores), func(s db.GetFeedEntityScoresRow) db.FeedEntityScore { return s.FeedEntityScore })
+		scored := api.scoreFeedEntities(ctx, 128, scores, func(e db.FeedEntityScore) float64 {
+			return timeFactor(e.CreatedAt, time.Now()) * engagementFactor(int(e.Interactions))
+		})
+
+		postIDs := make([]persist.DBID, len(scored))
+		posts := make([]db.Post, len(scored))
+
+		for i, post := range scored {
+			idx := len(scored) - i - 1
+			postIDs[idx] = post.ID
+			posts[idx] = postScores[post.ID].Post
+		}
+
+		// Prime the cache
+		cache := newFeedCache(api.cache, func(ctx context.Context) ([]persist.DBID, error) { return postIDs, nil })
+		_, err = cache.Load(ctx)
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
@@ -815,11 +809,6 @@ func loadFeedEntities(ctx context.Context, d *dataloader.Loaders, typs []persist
 	}
 
 	return entities, nil
-}
-
-type scoredEntity struct {
-	e db.FeedEntityScore
-	s float64
 }
 
 func (api FeedAPI) scoreFeedEntities(ctx context.Context, n int, trendData []db.FeedEntityScore, scoreF func(db.FeedEntityScore) float64) []db.FeedEntityScore {

@@ -80,12 +80,11 @@ from feed_entity_scores
 join posts on feed_entity_scores.id = posts.id
 where feed_entity_scores.created_at > @window_end::timestamptz
   and (@include_viewer::bool or feed_entity_scores.actor_id != @viewer_id)
-  and feed_entity_scores.feed_entity_type == @post_entity_type
   and not posts.deleted
 union
 select sqlc.embed(feed_entity_scores), sqlc.embed(posts)
 from feed_entity_score_view feed_entity_scores
-join posts on feed_entity_score_view.id = posts.id
-where created_at > (select last_updated from refreshed limit 1)
-and (@include_viewer::bool or feed_entity_score_view.actor_id != @viewer_id)
-and feed_entity_score_view.feed_entity_type == @post_entity_type;
+join posts on feed_entity_scores.id = posts.id
+where feed_entity_scores.created_at > (select last_updated from refreshed limit 1)
+  and (@include_viewer::bool or feed_entity_scores.actor_id != @viewer_id)
+  and not posts.deleted;
