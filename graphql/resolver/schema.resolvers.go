@@ -2306,7 +2306,7 @@ func (r *queryResolver) TrendingFeed(ctx context.Context, before *string, after 
 
 // CuratedFeed is the resolver for the curatedFeed field.
 func (r *queryResolver) CuratedFeed(ctx context.Context, before *string, after *string, first *int, last *int, includePosts bool) (*model.FeedConnection, error) {
-	events, pageInfo, err := publicapi.For(ctx).Feed.CuratedFeed(ctx, before, after, first, last)
+	events, pageInfo, err := publicapi.For(ctx).Feed.ForYouFeed(ctx, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}

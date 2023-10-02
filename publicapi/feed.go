@@ -427,16 +427,8 @@ func (api FeedAPI) GlobalFeed(ctx context.Context, before *string, after *string
 	return paginator.paginate(before, after, first, last)
 }
 
-func fetchFeedEntityScores(ctx context.Context, queries *db.Queries, excludeUserID persist.DBID) (map[persist.DBID]db.GetFeedEntityScoresRow, error) {
-	params := db.GetFeedEntityScoresParams{
-		IncludeViewer: true,
-		WindowEnd:     time.Now().Add(-feedLookback),
-	}
-	if excludeUserID != "" {
-		params.IncludeViewer = false
-		params.ViewerID = excludeUserID
-	}
-	scores, err := queries.GetFeedEntityScores(ctx, params)
+func fetchFeedEntityScores(ctx context.Context, queries *db.Queries) (map[persist.DBID]db.GetFeedEntityScoresRow, error) {
+	scores, err := queries.GetFeedEntityScores(ctx, time.Now().Add(-feedLookback))
 	if err != nil {
 		return nil, err
 	}
@@ -506,7 +498,7 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 		var posts []db.Post
 
 		cacheCalcFunc := func(ctx context.Context) ([]persist.FeedEntityType, []persist.DBID, error) {
-			postScores, err := fetchFeedEntityScores(ctx, api.queries, "")
+			postScores, err := fetchFeedEntityScores(ctx, api.queries)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -565,7 +557,7 @@ func (api FeedAPI) TrendingFeed(ctx context.Context, before *string, after *stri
 	return paginator.paginate(before, after, first, last)
 }
 
-func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first, last *int) ([]any, PageInfo, error) {
+func (api FeedAPI) ForYouFeed(ctx context.Context, before, after *string, first, last *int) ([]any, PageInfo, error) {
 	// Validate
 	userID, _ := getAuthenticatedUserID(ctx)
 
@@ -592,7 +584,7 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 			return nil, PageInfo{}, err
 		}
 	} else {
-		postScores, err := fetchFeedEntityScores(ctx, api.queries, userID)
+		postScores, err := fetchFeedEntityScores(ctx, api.queries)
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
@@ -603,22 +595,19 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 		personalizationScores := make(map[persist.DBID]float64)
 
 		for _, e := range postScores {
-			// Boost new events
-			boost := 1.0
-			if now.Sub(e.Post.CreatedAt) < 6*time.Hour {
-				boost *= 2.0
-			}
+			boost := newPostFactor(e.Post.CreatedAt, now)
 			timeF := timeFactor(e.Post.CreatedAt, now)
 			engagementScores[e.Post.ID] = boost * timeF * (1 + engagementFactor(int(e.FeedEntityScore.Interactions)))
 			personalizationScores[e.Post.ID] = boost * timeF * userpref.For(ctx).RelevanceTo(userID, e.FeedEntityScore)
 		}
 
 		// Rank by engagement first, then by personalization
-		topNByEngagement := api.scoreFeedEntities(ctx, 128, scores, func(e db.FeedEntityScore) float64 { return engagementScores[e.ID] })
-		topNByEngagement = api.scoreFeedEntities(ctx, 128, topNByEngagement, func(e db.FeedEntityScore) float64 { return personalizationScores[e.ID] })
+		topNByPersonalization := api.scoreFeedEntities(ctx, 128, scores, func(e db.FeedEntityScore) float64 { return engagementScores[e.ID] })
+		topNByPersonalization = api.scoreFeedEntities(ctx, 128, topNByPersonalization, func(e db.FeedEntityScore) float64 { return personalizationScores[e.ID] })
+
 		// Rank by personalization, then by engagement
-		topNByPersonalization := api.scoreFeedEntities(ctx, 128, scores, func(e db.FeedEntityScore) float64 { return personalizationScores[e.ID] })
-		topNByPersonalization = api.scoreFeedEntities(ctx, 128, topNByPersonalization, func(e db.FeedEntityScore) float64 { return engagementScores[e.ID] })
+		topNByEngagement := api.scoreFeedEntities(ctx, 128, scores, func(e db.FeedEntityScore) float64 { return personalizationScores[e.ID] })
+		topNByEngagement = api.scoreFeedEntities(ctx, 128, topNByEngagement, func(e db.FeedEntityScore) float64 { return engagementScores[e.ID] })
 
 		// Get ranking of both
 		seen := make(map[persist.DBID]bool)
@@ -644,10 +633,13 @@ func (api FeedAPI) CuratedFeed(ctx context.Context, before, after *string, first
 
 		// Score based on the average of the two rankings
 		interleaved := api.scoreFeedEntities(ctx, 128, combined, func(e db.FeedEntityScore) float64 {
+			if e.ActorID == userID {
+				return float64(engagementRank[e.ID])
+			}
 			return float64(engagementRank[e.ID]+personalizationRank[e.ID]) / 2.0
 		})
 
-		recommend.Shuffle(interleaved, 8)
+		recommend.Shuffle(interleaved, 4)
 
 		posts := make([]db.Post, len(interleaved))
 		postIDs := make([]persist.DBID, len(interleaved))
@@ -876,6 +868,14 @@ func (api FeedAPI) scoreFeedEntities(ctx context.Context, n int, trendData []db.
 func timeFactor(t0, t1 time.Time) float64 {
 	age := t1.Sub(t0).Minutes()
 	return math.Pow(2, -(age / tHalf))
+}
+
+// newPostFactor returns a scaling factor for a post based on how recently it was made.
+func newPostFactor(t1, t2 time.Time) float64 {
+	if t2.Sub(t1) < 6*time.Hour {
+		return 2.0
+	}
+	return 1.0
 }
 
 func engagementFactor(interactions int) float64 {
