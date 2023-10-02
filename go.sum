@@ -621,6 +621,8 @@ github.com/gabriel-vasile/mimetype v1.3.1/go.mod h1:fA8fi6KUiG7MgQQ+mEWotXoEOvmx
 github.com/gabriel-vasile/mimetype v1.4.0/go.mod h1:fA8fi6KUiG7MgQQ+mEWotXoEOvmxRtOJlERCzSmRvr8=
 github.com/gallery-so/dataloaden v0.0.0-20221214221404-9d30d4c39aa7 h1:TWEXFA3RvDyMCj8+jlBEsoGi6OosY+vJPMKhWExXDxY=
 github.com/gallery-so/dataloaden v0.0.0-20221214221404-9d30d4c39aa7/go.mod h1:WvVHZ6EqIU+sixliZvmgqe6l+3cmTU8iuMpV96/Vd2U=
+github.com/gallery-so/fracdex v0.0.0-20231002204609-f530b8914277 h1:uOY50C2TQ60zGQZI1HgA2+5U+iNxj+mwYGPOxFQM5Ic=
+github.com/gallery-so/fracdex v0.0.0-20231002204609-f530b8914277/go.mod h1:R6ZDP82WFgGxCfmDi3VaJylp6eEcKoLawQSTpMUH+1k=
 github.com/gammazero/deque v0.1.0/go.mod h1:KQw7vFau1hHuM8xmI9RbgKFbAsQFWmBpqQ2KenFLk6M=
 github.com/gammazero/deque v0.1.1 h1:xRVkDuSvDmFuMGf3IquHuRc2jlL0+v/WpFCWaauzwbE=
 github.com/gammazero/deque v0.1.1/go.mod h1:KQw7vFau1hHuM8xmI9RbgKFbAsQFWmBpqQ2KenFLk6M=
