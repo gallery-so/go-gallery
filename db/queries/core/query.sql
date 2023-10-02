@@ -439,17 +439,20 @@ order by
     case when not sqlc.arg('paging_forward')::bool then (fe.created_at, fe.id) end desc
 limit sqlc.arg('limit');
 
--- name: PaginateUserFeedByUserID :many
-SELECT *
-FROM feed_entities
-WHERE actor_id = sqlc.arg('owner_id')
-        AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-        AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
-        AND (feed_entity_type = @post_entity_type)
-ORDER BY 
-    CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
-    CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
-LIMIT sqlc.arg('limit');
+-- name: PaginatePostsByUserID :many
+select *
+from posts
+where actor_id = sqlc.arg('user_id')
+        and (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+        and (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+        and not posts.deleted
+order by
+    case when sqlc.arg('paging_forward')::bool then (created_at, id) end asc,
+    case when not sqlc.arg('paging_forward')::bool then (created_at, id) end desc
+limit sqlc.arg('limit');
+
+-- name: CountPostsByUserID :one
+select count(*) from posts where actor_id = $1 and not posts.deleted;
 
 -- name: PaginatePostsByContractID :batchmany
 SELECT posts.*

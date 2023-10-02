@@ -369,27 +369,28 @@ func (api FeedAPI) UserFeed(ctx context.Context, userID persist.DBID, before *st
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-		keys, err := api.queries.PaginateUserFeedByUserID(ctx, db.PaginateUserFeedByUserIDParams{
-			OwnerID:        userID,
-			Limit:          params.Limit,
-			CurBeforeTime:  params.CursorBeforeTime,
-			CurBeforeID:    params.CursorBeforeID,
-			CurAfterTime:   params.CursorAfterTime,
-			CurAfterID:     params.CursorAfterID,
-			PagingForward:  params.PagingForward,
-			PostEntityType: int32(persist.PostTypeTag),
+	queryFunc := func(params timeIDPagingParams) ([]any, error) {
+		posts, err := api.queries.PaginatePostsByUserID(ctx, db.PaginatePostsByUserIDParams{
+			UserID:        userID,
+			Limit:         params.Limit,
+			CurBeforeTime: params.CursorBeforeTime,
+			CurBeforeID:   params.CursorBeforeID,
+			CurAfterTime:  params.CursorAfterTime,
+			CurAfterID:    params.CursorAfterID,
+			PagingForward: params.PagingForward,
 		})
-		if err != nil {
-			return nil, err
-		}
+		return util.MapWithoutError(posts, func(p db.Post) any { return p }), err
+	}
 
-		return feedEntityToTypedType(ctx, api.loaders, keys)
+	countFunc := func() (int, error) {
+		c, err := api.queries.CountPostsByUserID(ctx, userID)
+		return int(c), err
 	}
 
 	paginator := timeIDPaginator{
 		QueryFunc:  queryFunc,
 		CursorFunc: feedCursor,
+		CountFunc:  countFunc,
 	}
 
 	return paginator.paginate(before, after, first, last)
