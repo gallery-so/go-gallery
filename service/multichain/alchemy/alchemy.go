@@ -482,11 +482,11 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti mu
 		return nil, fmt.Errorf("not implemented")
 	}
 
-	cached, err := d.fetchMetadataFromCache(ctx, ti)
-	if cached != nil && err == nil {
-		logger.For(ctx).Infof("got cached metadata for %s", ti)
-		return cached, nil
-	}
+	// cached, err := d.fetchMetadataFromCache(ctx, ti)
+	// if cached != nil && err == nil {
+	// 	logger.For(ctx).Infof("got cached metadata for %s", ti)
+	// 	return cached, nil
+	// }
 
 	logger.For(ctx).Infof("no cached metadata for %s", ti)
 
@@ -499,7 +499,8 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti mu
 		return nil, nil
 	}
 
-	return tokens[0].TokenMetadata, d.cacheMetadatasForTokens(ctx, tokens...)
+	// return tokens[0].TokenMetadata, d.cacheMetadatasForTokens(ctx, tokens...)
+	return tokens[0].TokenMetadata, nil
 }
 
 // GetTokensByContractAddress retrieves tokens for a contract address on the Ethereum Blockchain

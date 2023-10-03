@@ -27,7 +27,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/mikeydub/go-gallery/validate"
 )
 
 const sentryTokenContextName = "NFT context" // Sentry excludes contexts that contain "token" so we use "NFT" instead
@@ -69,7 +68,7 @@ func CoreInitServer(ctx context.Context, clients *server.Clients, mc *multichain
 	t := newThrottler()
 	tp := NewTokenProcessor(clients.Queries, clients.EthClient, clients.HTTPClient, mc, clients.IPFSClient, clients.ArweaveClient, clients.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), clients.Repos.TokenRepository, metric.NewLogMetricReporter())
 
-	return handlersInitServer(ctx, router, tp, mc, clients.Repos, t, validate.WithCustomValidators(), clients.TaskClient)
+	return handlersInitServer(ctx, router, tp, mc, clients.Repos, t, clients.TaskClient)
 }
 
 func setDefaults() {
@@ -109,7 +108,8 @@ func setDefaults() {
 	viper.SetDefault("PUBSUB_SUB_UPDATED_NOTIFICATIONS", "dev-updated-notifications-sub")
 	viper.SetDefault("RASTERIZER_URL", "http://localhost:3000")
 	viper.SetDefault("TEZOS_API_URL", "https://api.tzkt.io")
-	viper.SetDefault("ALCHEMY_WEBHOOK_SECRET", "")
+	viper.SetDefault("ALCHEMY_WEBHOOK_SECRET_ARBITRUM", "")
+	viper.SetDefault("ALCHEMY_WEBHOOK_SECRET_ETH", "")
 
 	viper.AutomaticEnv()
 

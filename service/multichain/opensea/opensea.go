@@ -168,21 +168,6 @@ func (c ChainIdentifier) Chain() persist.Chain {
 	}
 }
 
-func chainIdentifierFromChain(c persist.Chain) ChainIdentifier {
-	switch c {
-	case persist.ChainETH:
-		return ChainIdentifierEthereum
-	case persist.ChainPolygon:
-		return ChainIdentifierPolygon
-	case persist.ChainOptimism:
-		return ChainIdentifierOptimism
-	case persist.ChainArbitrum:
-		return ChainIdentifierArbitrum
-	default:
-		panic(fmt.Sprintf("unknown chain: %d", c))
-	}
-}
-
 // Contract represents an NFT contract from Opensea
 type Contract struct {
 	Collection      Collection              `json:"collection"`

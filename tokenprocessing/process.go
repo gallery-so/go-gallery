@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/go-playground/validator/v10"
 	"github.com/jackc/pgx/v4"
 	"github.com/sirupsen/logrus"
 	"github.com/sourcegraph/conc/pool"
@@ -198,7 +197,7 @@ func processOwnersForContractTokens(mc *multichain.Provider, contractRepo *postg
 	}
 }
 
-func processOwnersForUserTokens(mc *multichain.Provider, queries *coredb.Queries, validator *validator.Validate) gin.HandlerFunc {
+func processOwnersForUserTokens(mc *multichain.Provider, queries *coredb.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input task.TokenProcessingUserTokensMessage
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -238,7 +237,7 @@ func processOwnersForUserTokens(mc *multichain.Provider, queries *coredb.Queries
 				}
 
 				// one event per token identifier (grouping ERC-1155s)
-				_, err = event.DispatchEvent(c, coredb.Event{
+				err = event.Dispatch(c, coredb.Event{
 					ID:             persist.GenerateID(),
 					ActorID:        persist.DBIDToNullStr(input.UserID),
 					ResourceTypeID: persist.ResourceTypeToken,
@@ -250,7 +249,7 @@ func processOwnersForUserTokens(mc *multichain.Provider, queries *coredb.Queries
 						NewTokenID:       token.ID,
 						NewTokenQuantity: curTotal,
 					},
-				}, validator, nil)
+				})
 				if err != nil {
 					logger.For(c).Errorf("error dispatching event: %s", err)
 				}
@@ -342,8 +341,13 @@ var alchemyIPs = []string{
 	"34.237.24.169",
 }
 
-func processOwnersForAlchemyTokens(mc *multichain.Provider, queries *coredb.Queries, validator *validator.Validate) gin.HandlerFunc {
+func processOwnersForAlchemyTokens(mc *multichain.Provider, queries *coredb.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
+
+		if !util.Contains(alchemyIPs, c.ClientIP()) {
+			util.ErrResponse(c, http.StatusUnauthorized, fmt.Errorf("invalid alchemy ip"))
+			return
+		}
 
 		bodyBytes, err := c.GetRawData()
 		if err != nil {
@@ -351,21 +355,28 @@ func processOwnersForAlchemyTokens(mc *multichain.Provider, queries *coredb.Quer
 			return
 		}
 
-		signature := c.GetHeader("X-Alchemy-Signature")
-
-		if !isValidAlchemySignatureForStringBody(bodyBytes, signature) {
-			util.ErrResponse(c, http.StatusUnauthorized, fmt.Errorf("invalid alchemy signature"))
-			return
-		}
-
-		if !util.Contains(alchemyIPs, c.ClientIP()) {
-			util.ErrResponse(c, http.StatusUnauthorized, fmt.Errorf("invalid alchemy ip"))
-			return
-		}
-
 		var input AlchemyNFTActivityWebhookResponse
 		if err := json.Unmarshal(bodyBytes, &input); err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		var chain persist.Chain
+		switch input.Event.Network {
+		case "ETH_MAINNET", "ETH_GOERLI":
+			chain = persist.ChainETH
+		case "ARB_MAINNET":
+			chain = persist.ChainArbitrum
+		default:
+			logger.For(c).Errorf("invalid alchemy network: %s", input.Event.Network)
+			util.ErrResponse(c, http.StatusInternalServerError, fmt.Errorf("invalid alchemy network: %s", input.Event.Network))
+			return
+		}
+
+		signature := c.GetHeader("X-Alchemy-Signature")
+
+		if !isValidAlchemySignatureForStringBody(bodyBytes, signature, chain) {
+			util.ErrResponse(c, http.StatusUnauthorized, fmt.Errorf("invalid alchemy signature"))
 			return
 		}
 
@@ -494,7 +505,7 @@ func processOwnersForAlchemyTokens(mc *multichain.Provider, queries *coredb.Quer
 					}
 
 					// one event per token identifier (grouping ERC-1155s)
-					_, err = event.DispatchEvent(c, coredb.Event{
+					err = event.Dispatch(c, coredb.Event{
 						ID:             persist.GenerateID(),
 						ActorID:        persist.DBIDToNullStr(userID),
 						ResourceTypeID: persist.ResourceTypeToken,
@@ -506,7 +517,7 @@ func processOwnersForAlchemyTokens(mc *multichain.Provider, queries *coredb.Quer
 							NewTokenID:       token.ID,
 							NewTokenQuantity: curTotal,
 						},
-					}, validator, nil)
+					})
 					if err != nil {
 						l.Errorf("error dispatching event: %s", err)
 					}
@@ -521,8 +532,20 @@ func processOwnersForAlchemyTokens(mc *multichain.Provider, queries *coredb.Quer
 func isValidAlchemySignatureForStringBody(
 	body []byte, // must be raw string body, not json transformed version of the body
 	signature string, // your "X-Alchemy-Signature" from header
+	chain persist.Chain,
 ) bool {
-	h := hmac.New(sha256.New, []byte(env.GetString("ALCHEMY_WEBHOOK_SECRET")))
+	var secret string
+	switch chain {
+	case persist.ChainETH:
+		secret = env.GetString("ALCHEMY_WEBHOOK_SECRET_ETH")
+	case persist.ChainArbitrum:
+		secret = env.GetString("ALCHEMY_WEBHOOK_SECRET_ARBITRUM")
+	default:
+		logger.For(nil).Errorf("invalid chain for alchemy webhook signature: %d", chain)
+		return false
+	}
+
+	h := hmac.New(sha256.New, []byte(secret))
 	h.Write([]byte(body))
 	digest := hex.EncodeToString(h.Sum(nil))
 	return digest == signature
@@ -534,6 +557,8 @@ func detectSpamContracts(queries *coredb.Queries) gin.HandlerFunc {
 		var params coredb.InsertSpamContractsParams
 
 		now := time.Now()
+
+		seen := make(map[persist.ContractIdentifiers]bool)
 
 		for _, source := range []struct {
 			Chain    persist.Chain
@@ -581,6 +606,11 @@ func detectSpamContracts(queries *coredb.Queries) gin.HandlerFunc {
 			}
 
 			for _, contract := range body.Contracts {
+				id := persist.NewContractIdentifiers(contract, source.Chain)
+				if seen[id] {
+					continue
+				}
+				seen[id] = true
 				params.ID = append(params.ID, persist.GenerateID().String())
 				params.Chain = append(params.Chain, int32(source.Chain))
 				params.Address = append(params.Address, source.Chain.NormalizeAddress(contract))
@@ -721,7 +751,7 @@ func processFromIdentifiersManaged(ctx context.Context, tp *tokenProcessor, tm *
 		"contractAddress": contract.Address,
 		"chain":           token.Chain,
 	})
-	err, closing := tm.StartProcessing(ctx, token, attempts)
+	closing, err := tm.StartProcessing(ctx, token, attempts)
 	if err != nil {
 		return coredb.TokenMedia{}, err
 	}

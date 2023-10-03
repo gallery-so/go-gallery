@@ -32,6 +32,8 @@ func (r *EventRepository) Add(ctx context.Context, event db.Event) (*db.Event, e
 		return r.AddCommentEvent(ctx, event)
 	case persist.ResourceTypeGallery:
 		return r.AddGalleryEvent(ctx, event)
+	case persist.ResourceTypePost:
+		return r.AddPostEvent(ctx, event)
 	default:
 		return nil, persist.ErrUnknownResourceType{ResourceType: event.ResourceTypeID}
 	}
@@ -144,6 +146,19 @@ func (r *EventRepository) AddGalleryEvent(ctx context.Context, event db.Event) (
 		ExternalID:     event.ExternalID,
 		GroupID:        event.GroupID,
 		Caption:        event.Caption,
+	})
+	return &event, err
+}
+
+func (r *EventRepository) AddPostEvent(ctx context.Context, event db.Event) (*db.Event, error) {
+	event, err := r.Queries.CreatePostEvent(ctx, db.CreatePostEventParams{
+		ID:             persist.GenerateID(),
+		ActorID:        event.ActorID,
+		Action:         event.Action,
+		ResourceTypeID: event.ResourceTypeID,
+		UserID:         event.UserID,
+		SubjectID:      event.SubjectID,
+		PostID:         event.PostID,
 	})
 	return &event, err
 }

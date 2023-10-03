@@ -443,12 +443,11 @@ func (api InteractionAPI) PaginateAdmiresByTokenID(ctx context.Context, tokenID 
 		return nil, PageInfo{}, err
 	}
 
-
 	var actorID persist.DBID
 	if userID != nil {
-    	actorID = *userID
+		actorID = *userID
 	} else {
-    	actorID = ""
+		actorID = ""
 	}
 	onlyForActor := actorID != ""
 
@@ -457,7 +456,7 @@ func (api InteractionAPI) PaginateAdmiresByTokenID(ctx context.Context, tokenID 
 			TokenID:       tokenID,
 			Limit:         params.Limit,
 			OnlyForActor:  onlyForActor,
-			ActorID: 	   actorID,
+			ActorID:       actorID,
 			CurBeforeTime: params.CursorBeforeTime,
 			CurBeforeID:   params.CursorBeforeID,
 			CurAfterTime:  params.CursorAfterTime,
@@ -719,17 +718,14 @@ func (api InteractionAPI) AdmireFeedEvent(ctx context.Context, feedEventID persi
 		return "", err
 	}
 
-	_, err = event.DispatchEvent(ctx, db.Event{
+	err = event.Dispatch(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		ResourceTypeID: persist.ResourceTypeAdmire,
 		SubjectID:      feedEventID,
 		FeedEventID:    feedEventID,
 		AdmireID:       admireID,
 		Action:         persist.ActionAdmiredFeedEvent,
-	}, api.validator, nil)
-	if err != nil {
-		return "", err
-	}
+	})
 
 	return admireID, err
 }
@@ -758,17 +754,14 @@ func (api InteractionAPI) AdmireToken(ctx context.Context, tokenID persist.DBID)
 		return "", err
 	}
 
-_, err = event.DispatchEvent(ctx, db.Event{
+	err = event.Dispatch(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		ResourceTypeID: persist.ResourceTypeAdmire,
 		SubjectID:      tokenID,
 		TokenID:        tokenID,
 		AdmireID:       admireID,
 		Action:         persist.ActionAdmiredToken,
-	}, api.validator, nil)
-	if err != nil {
-		return "", err
-	}
+	})
 
 	return admireID, err
 }
@@ -801,17 +794,14 @@ func (api InteractionAPI) AdmirePost(ctx context.Context, postID persist.DBID) (
 		return "", err
 	}
 
-	_, err = event.DispatchEvent(ctx, db.Event{
+	err = event.Dispatch(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		ResourceTypeID: persist.ResourceTypeAdmire,
 		SubjectID:      postID,
 		PostID:         postID,
 		AdmireID:       admireID,
 		Action:         persist.ActionAdmiredPost,
-	}, api.validator, nil)
-	if err != nil {
-		return "", err
-	}
+	})
 
 	return admireID, err
 }
@@ -929,7 +919,7 @@ func (api InteractionAPI) comment(ctx context.Context, comment string, feedEvent
 		panic("commenting on neither feed event nor post")
 	}
 
-	_, err = event.DispatchEvent(ctx, db.Event{
+	err = event.Dispatch(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(actor),
 		ResourceTypeID: persist.ResourceTypeComment,
 		SubjectID:      persist.DBID(util.FirstNonEmptyString(postID.String(), feedEventID.String())),
@@ -937,11 +927,9 @@ func (api InteractionAPI) comment(ctx context.Context, comment string, feedEvent
 		FeedEventID:    feedEventID,
 		CommentID:      commentID,
 		Action:         action,
-	}, api.validator, nil)
-	if err != nil {
-		return "", err
-	}
-	return commentID, nil
+	})
+
+	return commentID, err
 }
 
 func (api InteractionAPI) RemoveComment(ctx context.Context, commentID persist.DBID) (persist.DBID, persist.DBID, error) {

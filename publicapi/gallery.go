@@ -225,7 +225,7 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 	if update.Caption != nil && *update.Caption == "" {
 		update.Caption = nil
 	}
-	_, err = event.DispatchEvents(ctx, events, api.validator, update.EditID, nil)
+	err = event.DispatchMany(ctx, events, update.EditID)
 	if err != nil {
 		return db.Gallery{}, err
 	}
@@ -627,27 +627,27 @@ func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (
 		if gallery.OwnerUserID != userID {
 			// only view gallery if the user hasn't already viewed it in this most recent notification period
 
-			_, err = event.DispatchEvent(ctx, db.Event{
+			err = event.Dispatch(ctx, db.Event{
 				ActorID:        persist.DBIDToNullStr(userID),
 				ResourceTypeID: persist.ResourceTypeGallery,
 				SubjectID:      galleryID,
 				Action:         persist.ActionViewedGallery,
 				GalleryID:      galleryID,
-			}, api.validator, nil)
+			})
 			if err != nil {
-				return db.Gallery{}, err
+				return gallery, err
 			}
 		}
 	} else {
-		_, err := event.DispatchEvent(ctx, db.Event{
+		err := event.Dispatch(ctx, db.Event{
 			ResourceTypeID: persist.ResourceTypeGallery,
 			SubjectID:      galleryID,
 			Action:         persist.ActionViewedGallery,
 			GalleryID:      galleryID,
 			ExternalID:     persist.StrPtrToNullStr(getExternalID(ctx)),
-		}, api.validator, nil)
+		})
 		if err != nil {
-			return db.Gallery{}, err
+			return gallery, err
 		}
 	}
 

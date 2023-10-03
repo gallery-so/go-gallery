@@ -1096,6 +1096,13 @@ func (ErrNeedsToReconnectSocial) IsMintPremiumCardToWalletPayloadOrError()      
 func (ErrNeedsToReconnectSocial) IsDisconnectSocialAccountPayloadOrError()      {}
 func (ErrNeedsToReconnectSocial) IsFollowAllSocialConnectionsPayloadOrError()   {}
 
+type ErrNoAvatarRecordSet struct {
+	Message string `json:"message"`
+}
+
+func (ErrNoAvatarRecordSet) IsError()                         {}
+func (ErrNoAvatarRecordSet) IsSetProfileImagePayloadOrError() {}
+
 type ErrNoCookie struct {
 	Message string `json:"message"`
 }
@@ -1255,6 +1262,10 @@ func (ErrUsernameNotAvailable) IsCreateUserPayloadOrError()     {}
 type FallbackMedia struct {
 	MediaURL  *string `json:"mediaURL"`
 	MediaType *string `json:"mediaType"`
+}
+
+type FarcasterAuth struct {
+	Address persist.Address `json:"address"`
 }
 
 type FarcasterSocialAccount struct {
@@ -1526,6 +1537,10 @@ type JSONMedia struct {
 
 func (JSONMedia) IsMediaSubtype() {}
 func (JSONMedia) IsMedia()        {}
+
+type LensAuth struct {
+	Address persist.Address `json:"address"`
+}
 
 type LensSocialAccount struct {
 	Type            persist.SocialProvider `json:"type"`
@@ -1961,8 +1976,10 @@ type SocialAccounts struct {
 }
 
 type SocialAuthMechanism struct {
-	Twitter *TwitterAuth     `json:"twitter"`
-	Debug   *DebugSocialAuth `json:"debug"`
+	Twitter   *TwitterAuth     `json:"twitter"`
+	Debug     *DebugSocialAuth `json:"debug"`
+	Farcaster *FarcasterAuth   `json:"farcaster"`
+	Lens      *LensAuth        `json:"lens"`
 }
 
 type SocialConnection struct {

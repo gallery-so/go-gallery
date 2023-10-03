@@ -528,7 +528,7 @@ func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, c
 	}
 
 	// Send event
-	_, err = event.DispatchEvent(ctx, db.Event{
+	return event.Dispatch(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		Action:         persist.ActionCollectorsNoteAddedToToken,
 		ResourceTypeID: persist.ResourceTypeToken,
@@ -540,9 +540,7 @@ func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, c
 			TokenCollectionID:   collectionID,
 			TokenCollectorsNote: collectorsNote,
 		},
-	}, api.validator, nil)
-
-	return err
+	})
 }
 
 func (api TokenAPI) SetSpamPreference(ctx context.Context, tokens []persist.DBID, isSpam bool) error {

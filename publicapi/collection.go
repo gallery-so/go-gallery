@@ -253,7 +253,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 	}
 
 	// Send event
-	feedEvent, err := event.DispatchEvent(ctx, db.Event{
+	feedEvent, err := event.DispatchCaptioned(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		Action:         persist.ActionCollectionCreated,
 		ResourceTypeID: persist.ResourceTypeCollection,
@@ -261,12 +261,9 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 		GalleryID:      galleryID,
 		SubjectID:      collectionID,
 		Data:           persist.EventData{CollectionTokenIDs: createdCollection.Nfts, CollectionCollectorsNote: collectorsNote},
-	}, api.validator, caption)
-	if err != nil {
-		return nil, nil, err
-	}
+	}, caption)
 
-	return &createdCollection, feedEvent, nil
+	return &createdCollection, feedEvent, err
 }
 
 func (api CollectionAPI) DeleteCollection(ctx context.Context, collectionID persist.DBID) error {
@@ -325,7 +322,7 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 	}
 
 	// Send event
-	_, err = event.DispatchEvent(ctx, db.Event{
+	return event.Dispatch(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		Action:         persist.ActionCollectorsNoteAddedToCollection,
 		ResourceTypeID: persist.ResourceTypeCollection,
@@ -333,9 +330,7 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 		GalleryID:      galleryID,
 		SubjectID:      collectionID,
 		Data:           persist.EventData{CollectionCollectorsNote: collectorsNote},
-	}, api.validator, nil)
-
-	return err
+	})
 }
 
 func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionID persist.DBID, tokens []persist.DBID, layout persist.TokenLayout, tokenSettings map[persist.DBID]persist.CollectionTokenSettings, caption *string) (*db.FeedEvent, error) {
@@ -399,7 +394,7 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 	}
 
 	// Send event
-	return event.DispatchEvent(ctx, db.Event{
+	return event.DispatchCaptioned(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		Action:         persist.ActionTokensAddedToCollection,
 		ResourceTypeID: persist.ResourceTypeCollection,
@@ -407,8 +402,7 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 		GalleryID:      galleryID,
 		SubjectID:      collectionID,
 		Data:           persist.EventData{CollectionTokenIDs: tokens},
-		Caption:        persist.StrPtrToNullStr(caption),
-	}, api.validator, caption)
+	}, caption)
 }
 
 func (api CollectionAPI) UpdateCollectionHidden(ctx context.Context, collectionID persist.DBID, hidden bool) error {

@@ -40,12 +40,12 @@ func TestMain(t *testing.T) {
 		{
 			title:    "test GraphQL",
 			run:      testGraphQL,
-			fixtures: []fixture{useDefaultEnv, usePostgres, useRedis, useTokenQueue, useNotificationTopics},
+			fixtures: []fixture{useDefaultEnv, usePostgres, useRedis, useTokenQueue, useAutosocialQueue, useAutosocial, useNotificationTopics},
 		},
 		{
 			title:    "test syncing tokens",
 			run:      testTokenSyncs,
-			fixtures: []fixture{useDefaultEnv, usePostgres, useRedis, useTokenQueue, useTokenProcessing},
+			fixtures: []fixture{useDefaultEnv, usePostgres, useRedis, useTokenQueue, useAutosocialQueue, useAutosocial, useTokenProcessing},
 		},
 	}
 	for _, test := range tests {
@@ -378,42 +378,8 @@ func testUpdateGalleryWithPublish(t *testing.T) {
 	assert.NotNil(t, vPayload.User)
 	assert.NotNil(t, vPayload.User.Feed)
 	assert.NotNil(t, vPayload.User.Feed.Edges)
-	assert.Len(t, vPayload.User.Feed.Edges, 1)
-	node := vPayload.User.Feed.Edges[0].Node
-	assert.NotNil(t, node)
-	feedEvent := (*node).(*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent)
-	assert.Equal(t, "newCaption", *feedEvent.Caption)
-	edata := *(*feedEvent.EventData).(*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData)
-	assert.EqualValues(t, persist.ActionGalleryUpdated, *edata.Action)
-
-	nameIncluded := false
-	descIncluded := false
-
-	for _, c := range edata.SubEventDatas {
-		ac := c.GetAction()
-		if persist.Action(*ac) == persist.ActionCollectionCreated {
-			ca := c.(*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventData)
-			assert.Greater(t, len(ca.NewTokens), 0)
-		}
-		if persist.Action(*ac) == persist.ActionTokensAddedToCollection {
-			ca := c.(*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventData)
-			assert.Greater(t, len(ca.NewTokens), 0)
-		}
-		if persist.Action(*ac) == persist.ActionGalleryInfoUpdated {
-			ca := c.(*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryInfoUpdatedFeedEventData)
-			if ca.NewDescription != nil {
-				assert.Equal(t, "newDesc", *ca.NewDescription)
-				descIncluded = true
-			}
-			if ca.NewName != nil {
-				assert.Equal(t, "newName", *ca.NewName)
-				nameIncluded = true
-			}
-		}
-	}
-
-	assert.True(t, nameIncluded)
-	assert.True(t, descIncluded)
+	// Assert that feed events aren't shown on the user's activity feed
+	assert.Len(t, vPayload.User.Feed.Edges, 0)
 }
 
 func testCreateGallery(t *testing.T) {
@@ -741,24 +707,23 @@ func testTrendingFeedEvents(t *testing.T) {
 	userF := newUserWithFeedEntitiesFixture(t)
 	c := authedHandlerClient(t, userF.ID)
 	// four total interactions
-	admireFeedEvent(t, ctx, c, userF.FeedEventIDs[1])
-	commentOnFeedEvent(t, ctx, c, userF.FeedEventIDs[1], "a")
-	commentOnFeedEvent(t, ctx, c, userF.FeedEventIDs[1], "b")
-	commentOnFeedEvent(t, ctx, c, userF.FeedEventIDs[1], "c")
-	// three total interactions
-	admireFeedEvent(t, ctx, c, userF.FeedEventIDs[0])
-	commentOnFeedEvent(t, ctx, c, userF.FeedEventIDs[0], "a")
-	commentOnFeedEvent(t, ctx, c, userF.FeedEventIDs[0], "b")
-	// two total interactions
 	admirePost(t, ctx, c, userF.PostIDs[0])
 	commentOnPost(t, ctx, c, userF.PostIDs[0], "a")
+	commentOnPost(t, ctx, c, userF.PostIDs[0], "b")
+	commentOnPost(t, ctx, c, userF.PostIDs[0], "c")
+	// three total interactions
+	admirePost(t, ctx, c, userF.PostIDs[1])
+	commentOnPost(t, ctx, c, userF.PostIDs[1], "a")
+	commentOnPost(t, ctx, c, userF.PostIDs[1], "b")
+	// one total interactions
+	admirePost(t, ctx, c, userF.PostIDs[2])
+
 	// one total interactions
 	admireFeedEvent(t, ctx, c, userF.FeedEventIDs[2])
 	expected := []persist.DBID{
-		userF.FeedEventIDs[2],
+		userF.PostIDs[2],
+		userF.PostIDs[1],
 		userF.PostIDs[0],
-		userF.FeedEventIDs[0],
-		userF.FeedEventIDs[1],
 	}
 
 	actual := trendingFeedEvents(t, ctx, c, 4, true)

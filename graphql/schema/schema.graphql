@@ -115,13 +115,11 @@ type GalleryUser implements Node @goEmbedHelper {
     after: String
     first: Int
     last: Int
-    includePosts: Boolean! = false
+    includePosts: Boolean! = false @deprecated(reason: "Posts are always included now.")
   ): FeedConnection @goField(forceResolver: true)
   sharedFollowers(before: String, after: String, first: Int, last: Int): UsersConnection
-    @authRequired
     @goField(forceResolver: true)
   sharedCommunities(before: String, after: String, first: Int, last: Int): CommunitiesConnection
-    @authRequired
     @goField(forceResolver: true)
   createdCommunities(
     input: CreatedCommunitiesInput!
@@ -702,7 +700,7 @@ type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
     after: String
     first: Int
     last: Int
-    includePosts: Boolean! = false
+    includePosts: Boolean! = false @deprecated(reason: "Posts are always included now.")
   ): FeedConnection @goField(forceResolver: true)
 
   email: UserEmail @goField(forceResolver: true)
@@ -1280,7 +1278,7 @@ type Query {
     after: String
     first: Int
     last: Int
-    includePosts: Boolean! = false
+    includePosts: Boolean! = false @deprecated(reason: "Posts are always included now.")
   ): FeedConnection
   # Paging forward i.e. providing the `first` argument will return events in order of descending popularity.
   trendingFeed(
@@ -1288,14 +1286,14 @@ type Query {
     after: String
     first: Int
     last: Int
-    includePosts: Boolean! = false
+    includePosts: Boolean! = false @deprecated(reason: "Posts are always included now.")
   ): FeedConnection
   curatedFeed(
     before: String
     after: String
     first: Int
     last: Int
-    includePosts: Boolean! = false
+    includePosts: Boolean! = false @deprecated(reason: "Posts are always included now.")
   ): FeedConnection
   feedEventById(id: DBID!): FeedEventByIdOrError
   postById(id: DBID!): PostOrError
@@ -1759,10 +1757,22 @@ input OneTimeLoginTokenAuth {
 input SocialAuthMechanism {
   twitter: TwitterAuth
   debug: DebugSocialAuth
+  farcaster: FarcasterAuth
+  lens: LensAuth
 }
 
 input TwitterAuth {
   code: String!
+}
+
+input FarcasterAuth {
+  address: Address!
+  # farcaster only supports ETH addresses currently so no need to specify a chain
+}
+
+input LensAuth {
+  address: Address!
+  # lens only supports ETH addresses currently so no need to specify a chain
 }
 
 input DebugSocialAuth @restrictEnvironment(allowed: ["local", "development", "sandbox"]) {
@@ -2488,6 +2498,10 @@ type RemoveProfileImagePayload {
   viewer: Viewer
 }
 
+type ErrNoAvatarRecordSet implements Error {
+  message: String!
+}
+
 union SetProfileImagePayloadOrError =
     SetProfileImagePayload
   | ErrAuthenticationFailed
@@ -2495,6 +2509,7 @@ union SetProfileImagePayloadOrError =
   | ErrInvalidInput
   | ErrTokenNotFound
   | ErrNotAuthorized
+  | ErrNoAvatarRecordSet
 
 union RemoveProfileImagePayloadOrError =
     RemoveProfileImagePayload

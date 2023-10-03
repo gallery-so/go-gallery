@@ -132,7 +132,7 @@ func CoreInit(ctx context.Context, c *Clients, provider *multichain.Provider, re
 	recommender.Loop(ctx, time.NewTicker(time.Hour))
 	p.Loop(ctx, time.NewTicker(time.Minute*15))
 
-	return handlersInit(router, c.Repos, c.Queries, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, socialCache, authRefreshCache, c.MagicLinkClient, recommender, p)
+	return handlersInit(router, c.Repos, c.Queries, c.HTTPClient, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, socialCache, authRefreshCache, c.MagicLinkClient, recommender, p)
 }
 
 func newSecretsClient() *secretmanager.Client {
@@ -217,6 +217,7 @@ func SetDefaults() {
 	viper.SetDefault("TWITTER_AUTH_REDIRECT_URI", "http://localhost:3000/auth/twitter")
 	viper.SetDefault("FEEDBOT_URL", "")
 	viper.SetDefault("GCLOUD_FEEDBOT_TASK_QUEUE", "projects/gallery-local/locations/here/queues/feedbot")
+	viper.SetDefault("FEEDBOT_SECRET", "")
 	viper.SetDefault("ALCHEMY_API_URL", "")
 	viper.SetDefault("ALCHEMY_OPTIMISM_API_URL", "")
 	viper.SetDefault("ALCHEMY_POLYGON_API_URL", "")
@@ -230,6 +231,8 @@ func SetDefaults() {
 	viper.SetDefault("NEYNAR_API_KEY", "")
 	viper.SetDefault("EMAILS_QUEUE", "projects/gallery-local/locations/here/queues/email")
 	viper.SetDefault("EMAILS_TASK_SECRET", "emails-task-secret")
+	viper.SetDefault("AUTOSOCIAL_URL", "")
+	viper.SetDefault("AUTOSOCIAL_QUEUE", "")
 
 	viper.AutomaticEnv()
 

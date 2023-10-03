@@ -1,0 +1,2 @@
+alter index if exists contracts_chain_address_idx rename to contracts_chain_address_no_parent_idx;
+create unique index if not exists contracts_chain_address_idx on contracts(chain, address) where not deleted;
