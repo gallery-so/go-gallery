@@ -56,7 +56,7 @@ func processAllUsers(pg *pgxpool.Pool, ctc *cloudtasks.Client) gin.HandlerFunc {
 				if !ok {
 					it = make(map[persist.SocialProvider][]persist.ChainAddress)
 				}
-				it[persist.SocialProviderFarcaster] = append(it[persist.SocialProviderFarcaster], persist.NewChainAddress(walletAddress, persist.ChainBTC))
+				it[persist.SocialProviderFarcaster] = append(it[persist.SocialProviderFarcaster], persist.NewChainAddress(walletAddress, persist.ChainETH))
 				send[userID] = it
 			}
 
