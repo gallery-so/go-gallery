@@ -240,3 +240,5 @@ sql:
             go_type: 'github.com/mikeydub/go-gallery/service/persist.Socials'
           - column: '*.*.mentions'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.Mentions'
+          - column: '*.*.multichains'
+            go_type: 'github.com/mikeydub/go-gallery/service/persist.Multichains'

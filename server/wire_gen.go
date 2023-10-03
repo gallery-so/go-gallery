@@ -55,7 +55,6 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 	serverPolygonProviderList := polygonProviderSet(httpClient)
 	serverArbitrumProviderList := arbitrumProviderSet(httpClient)
 	v := newMultichainSet(serverEthProviderList, serverOptimismProviderList, serverTezosProviderList, serverPoapProviderList, serverZoraProviderList, serverBaseProviderList, serverPolygonProviderList, serverArbitrumProviderList)
-	v2 := defaultWalletOverrides()
 	manager := tokenmanage.New(ctx, client)
 	submitUserTokensF := newManagedTokens(ctx, manager)
 	provider := &multichain.Provider{
@@ -63,7 +62,6 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 		Queries:          queries,
 		Cache:            cache,
 		Chains:           v,
-		WalletOverrides:  v2,
 		SubmitUserTokens: submitUserTokensF,
 	}
 	return provider, func() {
@@ -426,11 +424,6 @@ func newMultichainSet(
 	chainToProviders[persist.ChainPolygon] = dedupe(polygonProviders)
 	chainToProviders[persist.ChainArbitrum] = dedupe(arbitrumProviders)
 	return chainToProviders
-}
-
-// defaultWalletOverrides is a wire provider for wallet overrides
-func defaultWalletOverrides() multichain.WalletOverrideMap {
-	return multichain.WalletOverrideMap{persist.ChainPOAP: persist.EvmChains, persist.ChainOptimism: persist.EvmChains, persist.ChainPolygon: persist.EvmChains, persist.ChainArbitrum: persist.EvmChains, persist.ChainETH: persist.EvmChains, persist.ChainZora: persist.EvmChains, persist.ChainBase: persist.EvmChains}
 }
 
 func newIndexerProvider(e envInit, httpClient *http.Client, ethClient *ethclient.Client, taskClient *cloudtasks.Client) *eth.Provider {

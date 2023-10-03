@@ -4180,23 +4180,23 @@ func (q *Queries) GetUniqueTokenIdentifiersByTokenID(ctx context.Context, id per
 	return i, err
 }
 
-const getUserByAddressAndChains = `-- name: GetUserByAddressAndChains :one
+const getUserByAddress = `-- name: GetUserByAddress :one
 select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id
 from users, wallets
 where wallets.address = $1
-	and wallets.chain = any($2::int[])
+	and wallets.chain = any($2)
 	and array[wallets.id] <@ users.wallets
 	and wallets.deleted = false
 	and users.deleted = false
 `
 
-type GetUserByAddressAndChainsParams struct {
-	Address persist.Address `json:"address"`
-	Chains  []int32         `json:"chains"`
+type GetUserByAddressParams struct {
+	Address     persist.Address     `json:"address"`
+	Multichains persist.Multichains `json:"multichains"`
 }
 
-func (q *Queries) GetUserByAddressAndChains(ctx context.Context, arg GetUserByAddressAndChainsParams) (User, error) {
-	row := q.db.QueryRow(ctx, getUserByAddressAndChains, arg.Address, arg.Chains)
+func (q *Queries) GetUserByAddress(ctx context.Context, arg GetUserByAddressParams) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByAddress, arg.Address, arg.Multichains)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -4595,12 +4595,27 @@ func (q *Queries) GetUserWithPIIByID(ctx context.Context, userID persist.DBID) (
 }
 
 const getUsersByChainAddresses = `-- name: GetUsersByChainAddresses :many
-select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id,wallets.address from users, wallets where wallets.address = ANY($1::varchar[]) AND wallets.chain = $2::int AND ARRAY[wallets.id] <@ users.wallets AND users.deleted = false AND wallets.deleted = false
+WITH numbered_addresses AS (
+  SELECT generate_series(1, array_length($1::varchar[], 1)) AS n, unnest($1::varchar[]) AS address
+),
+numbered_chains AS (
+  SELECT generate_series(1, array_length($2, 1)) AS n, unnest($2) AS chain
+),
+tuple_data AS (
+  SELECT a.address, c.chain
+  FROM numbered_addresses a
+  JOIN numbered_chains c ON a.n = c.n
+)
+SELECT users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id, wallets.address
+FROM users
+JOIN wallets ON ARRAY[wallets.id] <@ users.wallets
+JOIN tuple_data ON wallets.address = tuple_data.address AND wallets.chain = tuple_data.chain
+WHERE users.deleted = false AND wallets.deleted = false
 `
 
 type GetUsersByChainAddressesParams struct {
-	Addresses []string `json:"addresses"`
-	Chain     int32    `json:"chain"`
+	Addresses   []string    `json:"addresses"`
+	Multichains interface{} `json:"multichains"`
 }
 
 type GetUsersByChainAddressesRow struct {
@@ -4626,7 +4641,7 @@ type GetUsersByChainAddressesRow struct {
 }
 
 func (q *Queries) GetUsersByChainAddresses(ctx context.Context, arg GetUsersByChainAddressesParams) ([]GetUsersByChainAddressesRow, error) {
-	rows, err := q.db.Query(ctx, getUsersByChainAddresses, arg.Addresses, arg.Chain)
+	rows, err := q.db.Query(ctx, getUsersByChainAddresses, arg.Addresses, arg.Multichains)
 	if err != nil {
 		return nil, err
 	}

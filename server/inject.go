@@ -56,7 +56,6 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 	wire.Build(
 		setEnv,
 		wire.Value(&http.Client{Timeout: 0}), // HTTP client shared between providers
-		defaultWalletOverrides,
 		task.NewClient,
 		newCommunitiesCache,
 		postgres.NewRepositories,
@@ -439,19 +438,6 @@ func newMultichainSet(
 	chainToProviders[persist.ChainPolygon] = dedupe(polygonProviders)
 	chainToProviders[persist.ChainArbitrum] = dedupe(arbitrumProviders)
 	return chainToProviders
-}
-
-// defaultWalletOverrides is a wire provider for wallet overrides
-func defaultWalletOverrides() multichain.WalletOverrideMap {
-	return multichain.WalletOverrideMap{
-		persist.ChainPOAP:     persist.EvmChains,
-		persist.ChainOptimism: persist.EvmChains,
-		persist.ChainPolygon:  persist.EvmChains,
-		persist.ChainArbitrum: persist.EvmChains,
-		persist.ChainETH:      persist.EvmChains,
-		persist.ChainZora:     persist.EvmChains,
-		persist.ChainBase:     persist.EvmChains,
-	}
 }
 
 func ethFallbackProvider(httpClient *http.Client, r *redis.Cache) multichain.SyncFailureFallbackProvider {

@@ -71,9 +71,9 @@ type FarcasterAuthenticator struct {
 
 func (a FarcasterAuthenticator) Authenticate(ctx context.Context) (*SocialAuthResult, error) {
 	api := farcaster.NewNeynarAPI(a.HTTPClient)
-	user, err := a.Queries.GetUserByAddressAndChains(ctx, coredb.GetUserByAddressAndChainsParams{
-		Address: a.Address,
-		Chains:  util.MapWithoutError(persist.EvmChains, func(c persist.Chain) int32 { return int32(c) }),
+	user, err := a.Queries.GetUserByAddress(ctx, coredb.GetUserByAddressParams{
+		Address:     a.Address,
+		Multichains: persist.NewMultichains(persist.ChainETH),
 	})
 	if err != nil {
 		return nil, err
@@ -114,9 +114,9 @@ type LensAuthenticator struct {
 
 func (a LensAuthenticator) Authenticate(ctx context.Context) (*SocialAuthResult, error) {
 	api := lens.NewAPI(a.HTTPClient)
-	user, err := a.Queries.GetUserByAddressAndChains(ctx, coredb.GetUserByAddressAndChainsParams{
-		Address: a.Address,
-		Chains:  util.MapWithoutError(persist.EvmChains, func(c persist.Chain) int32 { return int32(c) }),
+	user, err := a.Queries.GetUserByAddress(ctx, coredb.GetUserByAddressParams{
+		Address:     a.Address,
+		Multichains: persist.NewMultichains(persist.ChainETH),
 	})
 	if err != nil {
 		return nil, err

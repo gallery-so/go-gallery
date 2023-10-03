@@ -28,11 +28,11 @@ where p.pii_email_address = lower($1)
   and p.deleted = false
   and u.deleted = false;
 
--- name: GetUserByAddressAndChains :one
+-- name: GetUserByAddress :one
 select users.*
 from users, wallets
 where wallets.address = sqlc.arg('address')
-	and wallets.chain = any(sqlc.arg('chains')::int[])
+	and wallets.chain = any(sqlc.arg('multichains'))
 	and array[wallets.id] <@ users.wallets
 	and wallets.deleted = false
 	and users.deleted = false;
@@ -41,7 +41,7 @@ where wallets.address = sqlc.arg('address')
 select users.*
 from users, wallets
 where wallets.address = sqlc.arg('address')
-	and wallets.chain = sqlc.arg('chain')::int
+	and wallets.chain = any(sqlc.arg('multichains'))
 	and array[wallets.id] <@ users.wallets
 	and wallets.deleted = false
 	and users.deleted = false;
@@ -857,7 +857,24 @@ update users set primary_wallet_id = @wallet_id from wallets
     and wallets.id = any(users.wallets) and wallets.deleted = false;
 
 -- name: GetUsersByChainAddresses :many
-select users.*,wallets.address from users, wallets where wallets.address = ANY(@addresses::varchar[]) AND wallets.chain = @chain::int AND ARRAY[wallets.id] <@ users.wallets AND users.deleted = false AND wallets.deleted = false;
+WITH numbered_addresses AS (
+  SELECT generate_series(1, array_length(sqlc.arg('addresses')::varchar[], 1)) AS n, unnest(sqlc.arg('addresses')::varchar[]) AS address
+),
+numbered_chains AS (
+  SELECT generate_series(1, array_length(sqlc.arg('multichains'), 1)) AS n, unnest(sqlc.arg('multichains')) AS chain
+),
+tuple_data AS (
+  SELECT a.address, c.chain
+  FROM numbered_addresses a
+  JOIN numbered_chains c ON a.n = c.n
+)
+SELECT users.*, wallets.address
+FROM users
+JOIN wallets ON ARRAY[wallets.id] <@ users.wallets
+JOIN tuple_data ON wallets.address = tuple_data.address AND wallets.chain = tuple_data.chain
+WHERE users.deleted = false AND wallets.deleted = false;
+
+
 
 -- name: GetFeedEventByID :one
 SELECT * FROM feed_events WHERE id = $1 AND deleted = false;

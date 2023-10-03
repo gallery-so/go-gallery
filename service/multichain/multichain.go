@@ -53,8 +53,6 @@ type Provider struct {
 	Cache   *redis.Cache
 	Chains  map[persist.Chain][]any
 
-	// some chains use the addresses of other chains, this will map of chain we want tokens from => chain that's address will be used for lookup
-	WalletOverrides  WalletOverrideMap
 	SubmitUserTokens SubmitUserTokensF
 }
 
@@ -223,8 +221,6 @@ type TokenDescriptorsFetcher interface {
 type ProviderSupplier interface {
 	GetSubproviders() []any
 }
-
-type WalletOverrideMap = map[persist.Chain][]persist.Chain
 
 // providersMatchingInterface returns providers that adhere to the given interface
 func providersMatchingInterface[T any](providers []any) []T {
@@ -1679,9 +1675,22 @@ func (p *Provider) createUsersForTokens(ctx context.Context, tokens []chainToken
 
 	// get all current users
 
+	// we search for users in tuples of (address, chain) because a user can exist on a different chain for the same wallet (evm chains)
+	searchAddresses := []string{}
+	searchChains := []int32{}
+	for _, a := range ownerAddresses {
+		ma := persist.NewMultichains(chain)
+
+		for _, c := range ma.Chains() {
+			searchAddresses = append(searchAddresses, a)
+			searchChains = append(searchChains, int32(c))
+		}
+
+	}
+
 	allCurrentUsers, err := p.Queries.GetUsersByChainAddresses(ctx, db.GetUsersByChainAddressesParams{
-		Addresses: ownerAddresses,
-		Chain:     int32(chain),
+		Addresses:   searchAddresses,
+		Multichains: searchChains,
 	})
 	if err != nil {
 		return nil, nil, err
@@ -1861,7 +1870,7 @@ func (p *Provider) matchingWallets(wallets []persist.Wallet, chains []persist.Ch
 		for _, wallet := range wallets {
 			if wallet.Chain == chain {
 				matches[chain] = append(matches[chain], wallet.Address)
-			} else if overrides, ok := p.WalletOverrides[chain]; ok && util.Contains(overrides, wallet.Chain) {
+			} else if overrides, ok := persist.WalletOverrideMap[chain]; ok && util.Contains(overrides, wallet.Chain) {
 				matches[chain] = append(matches[chain], wallet.Address)
 			}
 		}

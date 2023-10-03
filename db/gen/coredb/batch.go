@@ -3373,7 +3373,7 @@ const getUserByAddressBatch = `-- name: GetUserByAddressBatch :batchone
 select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id
 from users, wallets
 where wallets.address = $1
-	and wallets.chain = $2::int
+	and wallets.chain = any($2)
 	and array[wallets.id] <@ users.wallets
 	and wallets.deleted = false
 	and users.deleted = false
@@ -3386,8 +3386,8 @@ type GetUserByAddressBatchBatchResults struct {
 }
 
 type GetUserByAddressBatchParams struct {
-	Address persist.Address `json:"address"`
-	Chain   int32           `json:"chain"`
+	Address     persist.Address     `json:"address"`
+	Multichains persist.Multichains `json:"multichains"`
 }
 
 func (q *Queries) GetUserByAddressBatch(ctx context.Context, arg []GetUserByAddressBatchParams) *GetUserByAddressBatchBatchResults {
@@ -3395,7 +3395,7 @@ func (q *Queries) GetUserByAddressBatch(ctx context.Context, arg []GetUserByAddr
 	for _, a := range arg {
 		vals := []interface{}{
 			a.Address,
-			a.Chain,
+			a.Multichains,
 		}
 		batch.Queue(getUserByAddressBatch, vals...)
 	}

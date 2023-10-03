@@ -11,6 +11,7 @@ import (
 
 	"blockwatch.cc/tzgo/tezos"
 	"github.com/lib/pq"
+	"github.com/mikeydub/go-gallery/util"
 )
 
 // Wallet represents an address on any chain
@@ -51,6 +52,11 @@ type ChainAddress struct {
 	chainSet   bool
 	address    Address
 	chain      Chain
+}
+
+type Multichains struct {
+	set bool
+	ca  Chain
 }
 
 type ChainPubKey struct {
@@ -128,6 +134,38 @@ func (c *ChainAddress) GQLSetChainFromResolver(chain Chain) error {
 
 func (c ChainAddress) String() string {
 	return fmt.Sprintf("%d:%s", c.chain, c.address)
+}
+
+var WalletOverrideMap = map[Chain][]Chain{ChainPOAP: EvmChains, ChainOptimism: EvmChains, ChainPolygon: EvmChains, ChainArbitrum: EvmChains, ChainETH: EvmChains, ChainZora: EvmChains, ChainBase: EvmChains}
+
+func (c ChainAddress) Multichains() Multichains {
+	return NewMultichains(c.chain)
+}
+
+func NewMultichains(chain Chain) Multichains {
+	ca := Multichains{
+		set: true,
+		ca:  chain,
+	}
+
+	return ca
+}
+
+func (c *Multichains) Chain() Chain {
+	return c.ca
+}
+
+func (c *Multichains) Chains() []Chain {
+	if it, ok := WalletOverrideMap[c.ca]; ok {
+		return it
+	}
+	return []Chain{c.ca}
+}
+
+func (c Multichains) Value() (driver.Value, error) {
+	return util.Map(c.Chains(), func(chain Chain) (driver.Value, error) {
+		return chain.Value()
+	})
 }
 
 func NewChainPubKey(pubKey PubKey, chain Chain) ChainPubKey {
