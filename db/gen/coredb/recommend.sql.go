@@ -94,31 +94,21 @@ with refreshed as (
 select feed_entity_scores.id, feed_entity_scores.created_at, feed_entity_scores.actor_id, feed_entity_scores.action, feed_entity_scores.contract_ids, feed_entity_scores.interactions, feed_entity_scores.feed_entity_type, feed_entity_scores.last_updated, posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted
 from feed_entity_scores
 join posts on feed_entity_scores.id = posts.id
-where feed_entity_scores.created_at > $1::timestamptz
-  and ($2::bool or feed_entity_scores.actor_id != $3)
-  and not posts.deleted
+where feed_entity_scores.created_at > $1::timestamptz and not posts.deleted
 union
 select feed_entity_scores.id, feed_entity_scores.created_at, feed_entity_scores.actor_id, feed_entity_scores.action, feed_entity_scores.contract_ids, feed_entity_scores.interactions, feed_entity_scores.feed_entity_type, feed_entity_scores.last_updated, posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted
 from feed_entity_score_view feed_entity_scores
 join posts on feed_entity_scores.id = posts.id
-where feed_entity_scores.created_at > (select last_updated from refreshed limit 1)
-  and ($2::bool or feed_entity_scores.actor_id != $3)
-  and not posts.deleted
+where feed_entity_scores.created_at > (select last_updated from refreshed limit 1) and not posts.deleted
 `
-
-type GetFeedEntityScoresParams struct {
-	WindowEnd     time.Time    `json:"window_end"`
-	IncludeViewer bool         `json:"include_viewer"`
-	ViewerID      persist.DBID `json:"viewer_id"`
-}
 
 type GetFeedEntityScoresRow struct {
 	FeedEntityScore FeedEntityScore `json:"feedentityscore"`
 	Post            Post            `json:"post"`
 }
 
-func (q *Queries) GetFeedEntityScores(ctx context.Context, arg GetFeedEntityScoresParams) ([]GetFeedEntityScoresRow, error) {
-	rows, err := q.db.Query(ctx, getFeedEntityScores, arg.WindowEnd, arg.IncludeViewer, arg.ViewerID)
+func (q *Queries) GetFeedEntityScores(ctx context.Context, windowEnd time.Time) ([]GetFeedEntityScoresRow, error) {
+	rows, err := q.db.Query(ctx, getFeedEntityScores, windowEnd)
 	if err != nil {
 		return nil, err
 	}
