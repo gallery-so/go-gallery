@@ -1096,6 +1096,13 @@ func (ErrNeedsToReconnectSocial) IsMintPremiumCardToWalletPayloadOrError()      
 func (ErrNeedsToReconnectSocial) IsDisconnectSocialAccountPayloadOrError()      {}
 func (ErrNeedsToReconnectSocial) IsFollowAllSocialConnectionsPayloadOrError()   {}
 
+type ErrNoAvatarRecordSet struct {
+	Message string `json:"message"`
+}
+
+func (ErrNoAvatarRecordSet) IsError()                         {}
+func (ErrNoAvatarRecordSet) IsSetProfileImagePayloadOrError() {}
+
 type ErrNoCookie struct {
 	Message string `json:"message"`
 }

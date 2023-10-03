@@ -15,12 +15,12 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/everFinance/goar"
+	"github.com/gallery-so/fracdex"
 	"github.com/go-playground/validator/v10"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 	"github.com/jinzhu/copier"
-	"roci.dev/fracdex"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/event"
@@ -811,10 +811,11 @@ func (api UserAPI) GetFollowingByUserId(ctx context.Context, userID persist.DBID
 }
 
 func (api UserAPI) SharedFollowers(ctx context.Context, userID persist.DBID, before, after *string, first, last *int) ([]db.User, PageInfo, error) {
-	// Validate
-	curUserID, err := getAuthenticatedUserID(ctx)
-	if err != nil {
-		return nil, PageInfo{}, err
+	curUserID, _ := getAuthenticatedUserID(ctx)
+
+	// If the user is not logged in, return an empty list of users
+	if curUserID == "" {
+		return []db.User{}, PageInfo{}, nil
 	}
 
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
@@ -889,9 +890,11 @@ func (api UserAPI) SharedFollowers(ctx context.Context, userID persist.DBID, bef
 
 func (api UserAPI) SharedCommunities(ctx context.Context, userID persist.DBID, before, after *string, first, last *int) ([]db.Contract, PageInfo, error) {
 	// Validate
-	curUserID, err := getAuthenticatedUserID(ctx)
-	if err != nil {
-		return nil, PageInfo{}, err
+	curUserID, _ := getAuthenticatedUserID(ctx)
+
+	// If the user is not logged in, return an empty list of users
+	if curUserID == "" {
+		return []db.Contract{}, PageInfo{}, nil
 	}
 
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{

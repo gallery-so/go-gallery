@@ -181,6 +181,17 @@ func (q *Queries) CountPostsByContractID(ctx context.Context, contractID persist
 	return count, err
 }
 
+const countPostsByUserID = `-- name: CountPostsByUserID :one
+select count(*) from posts where actor_id = $1 and not posts.deleted
+`
+
+func (q *Queries) CountPostsByUserID(ctx context.Context, actorID persist.DBID) (int64, error) {
+	row := q.db.QueryRow(ctx, countPostsByUserID, actorID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countSharedContracts = `-- name: CountSharedContracts :one
 select count(*)
 from owned_contracts a, owned_contracts b, contracts
@@ -2984,11 +2995,15 @@ func (q *Queries) GetNotificationsByOwnerIDForActionAfter(ctx context.Context, a
 }
 
 const getPostsByIds = `-- name: GetPostsByIds :many
-SELECT id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted FROM posts WHERE id = ANY($1::varchar(255)[]) AND deleted = false
+select posts.id, posts.version, posts.token_ids, posts.contract_ids, posts.actor_id, posts.caption, posts.created_at, posts.last_updated, posts.deleted
+from posts
+join unnest($1::varchar(255)[]) with ordinality t(id, pos) using(id)
+where not posts.deleted
+order by pos asc
 `
 
-func (q *Queries) GetPostsByIds(ctx context.Context, ids []string) ([]Post, error) {
-	rows, err := q.db.Query(ctx, getPostsByIds, ids)
+func (q *Queries) GetPostsByIds(ctx context.Context, postIds []string) ([]Post, error) {
+	rows, err := q.db.Query(ctx, getPostsByIds, postIds)
 	if err != nil {
 		return nil, err
 	}
@@ -5634,22 +5649,19 @@ SELECT id, feed_entity_type, created_at, actor_id
 FROM feed_entities
 WHERE (created_at, id) < ($1, $2)
         AND (created_at, id) > ($3, $4)
-        AND ($5::bool OR feed_entity_type != $6)
 ORDER BY 
-    CASE WHEN $7::bool THEN (created_at, id) END ASC,
-    CASE WHEN NOT $7::bool THEN (created_at, id) END DESC
-LIMIT $8
+    CASE WHEN $5::bool THEN (created_at, id) END ASC,
+    CASE WHEN NOT $5::bool THEN (created_at, id) END DESC
+LIMIT $6
 `
 
 type PaginateGlobalFeedParams struct {
-	CurBeforeTime  time.Time    `json:"cur_before_time"`
-	CurBeforeID    persist.DBID `json:"cur_before_id"`
-	CurAfterTime   time.Time    `json:"cur_after_time"`
-	CurAfterID     persist.DBID `json:"cur_after_id"`
-	IncludePosts   bool         `json:"include_posts"`
-	PostEntityType int32        `json:"post_entity_type"`
-	PagingForward  bool         `json:"paging_forward"`
-	Limit          int32        `json:"limit"`
+	CurBeforeTime time.Time    `json:"cur_before_time"`
+	CurBeforeID   persist.DBID `json:"cur_before_id"`
+	CurAfterTime  time.Time    `json:"cur_after_time"`
+	CurAfterID    persist.DBID `json:"cur_after_id"`
+	PagingForward bool         `json:"paging_forward"`
+	Limit         int32        `json:"limit"`
 }
 
 func (q *Queries) PaginateGlobalFeed(ctx context.Context, arg PaginateGlobalFeedParams) ([]FeedEntity, error) {
@@ -5658,8 +5670,6 @@ func (q *Queries) PaginateGlobalFeed(ctx context.Context, arg PaginateGlobalFeed
 		arg.CurBeforeID,
 		arg.CurAfterTime,
 		arg.CurAfterID,
-		arg.IncludePosts,
-		arg.PostEntityType,
 		arg.PagingForward,
 		arg.Limit,
 	)
@@ -5693,23 +5703,20 @@ select fe.id, fe.feed_entity_type, fe.created_at, fe.actor_id from feed_entities
       and fl.follower = $1
       and (fe.created_at, fe.id) < ($2, $3)
       and (fe.created_at, fe.id) > ($4, $5)
-      and ($6::bool or feed_entity_type != $7)
 order by
-    case when $8::bool then (fe.created_at, fe.id) end asc,
-    case when not $8::bool then (fe.created_at, fe.id) end desc
-limit $9
+    case when $6::bool then (fe.created_at, fe.id) end asc,
+    case when not $6::bool then (fe.created_at, fe.id) end desc
+limit $7
 `
 
 type PaginatePersonalFeedByUserIDParams struct {
-	Follower       persist.DBID `json:"follower"`
-	CurBeforeTime  time.Time    `json:"cur_before_time"`
-	CurBeforeID    persist.DBID `json:"cur_before_id"`
-	CurAfterTime   time.Time    `json:"cur_after_time"`
-	CurAfterID     persist.DBID `json:"cur_after_id"`
-	IncludePosts   bool         `json:"include_posts"`
-	PostEntityType int32        `json:"post_entity_type"`
-	PagingForward  bool         `json:"paging_forward"`
-	Limit          int32        `json:"limit"`
+	Follower      persist.DBID `json:"follower"`
+	CurBeforeTime time.Time    `json:"cur_before_time"`
+	CurBeforeID   persist.DBID `json:"cur_before_id"`
+	CurAfterTime  time.Time    `json:"cur_after_time"`
+	CurAfterID    persist.DBID `json:"cur_after_id"`
+	PagingForward bool         `json:"paging_forward"`
+	Limit         int32        `json:"limit"`
 }
 
 func (q *Queries) PaginatePersonalFeedByUserID(ctx context.Context, arg PaginatePersonalFeedByUserIDParams) ([]FeedEntity, error) {
@@ -5719,8 +5726,6 @@ func (q *Queries) PaginatePersonalFeedByUserID(ctx context.Context, arg Paginate
 		arg.CurBeforeID,
 		arg.CurAfterTime,
 		arg.CurAfterID,
-		arg.IncludePosts,
-		arg.PostEntityType,
 		arg.PagingForward,
 		arg.Limit,
 	)
@@ -5819,40 +5824,36 @@ func (q *Queries) PaginatePostsByContractIDAndProjectID(ctx context.Context, arg
 	return items, nil
 }
 
-const paginateUserFeedByUserID = `-- name: PaginateUserFeedByUserID :many
-SELECT id, feed_entity_type, created_at, actor_id
-FROM feed_entities
-WHERE actor_id = $1
-        AND (created_at, id) < ($2, $3)
-        AND (created_at, id) > ($4, $5)
-        AND ($6::bool OR feed_entity_type != $7)
-ORDER BY 
-    CASE WHEN $8::bool THEN (created_at, id) END ASC,
-    CASE WHEN NOT $8::bool THEN (created_at, id) END DESC
-LIMIT $9
+const paginatePostsByUserID = `-- name: PaginatePostsByUserID :many
+select id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted
+from posts
+where actor_id = $1
+        and (created_at, id) < ($2, $3)
+        and (created_at, id) > ($4, $5)
+        and not posts.deleted
+order by
+    case when $6::bool then (created_at, id) end asc,
+    case when not $6::bool then (created_at, id) end desc
+limit $7
 `
 
-type PaginateUserFeedByUserIDParams struct {
-	OwnerID        persist.DBID `json:"owner_id"`
-	CurBeforeTime  time.Time    `json:"cur_before_time"`
-	CurBeforeID    persist.DBID `json:"cur_before_id"`
-	CurAfterTime   time.Time    `json:"cur_after_time"`
-	CurAfterID     persist.DBID `json:"cur_after_id"`
-	IncludePosts   bool         `json:"include_posts"`
-	PostEntityType int32        `json:"post_entity_type"`
-	PagingForward  bool         `json:"paging_forward"`
-	Limit          int32        `json:"limit"`
+type PaginatePostsByUserIDParams struct {
+	UserID        persist.DBID `json:"user_id"`
+	CurBeforeTime time.Time    `json:"cur_before_time"`
+	CurBeforeID   persist.DBID `json:"cur_before_id"`
+	CurAfterTime  time.Time    `json:"cur_after_time"`
+	CurAfterID    persist.DBID `json:"cur_after_id"`
+	PagingForward bool         `json:"paging_forward"`
+	Limit         int32        `json:"limit"`
 }
 
-func (q *Queries) PaginateUserFeedByUserID(ctx context.Context, arg PaginateUserFeedByUserIDParams) ([]FeedEntity, error) {
-	rows, err := q.db.Query(ctx, paginateUserFeedByUserID,
-		arg.OwnerID,
+func (q *Queries) PaginatePostsByUserID(ctx context.Context, arg PaginatePostsByUserIDParams) ([]Post, error) {
+	rows, err := q.db.Query(ctx, paginatePostsByUserID,
+		arg.UserID,
 		arg.CurBeforeTime,
 		arg.CurBeforeID,
 		arg.CurAfterTime,
 		arg.CurAfterID,
-		arg.IncludePosts,
-		arg.PostEntityType,
 		arg.PagingForward,
 		arg.Limit,
 	)
@@ -5860,14 +5861,19 @@ func (q *Queries) PaginateUserFeedByUserID(ctx context.Context, arg PaginateUser
 		return nil, err
 	}
 	defer rows.Close()
-	var items []FeedEntity
+	var items []Post
 	for rows.Next() {
-		var i FeedEntity
+		var i Post
 		if err := rows.Scan(
 			&i.ID,
-			&i.FeedEntityType,
-			&i.CreatedAt,
+			&i.Version,
+			&i.TokenIds,
+			&i.ContractIds,
 			&i.ActorID,
+			&i.Caption,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Deleted,
 		); err != nil {
 			return nil, err
 		}

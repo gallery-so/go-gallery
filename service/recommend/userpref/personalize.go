@@ -196,6 +196,11 @@ func (p *Personalization) RelevanceTo(userID persist.DBID, e db.FeedEntityScore)
 		return 0
 	}
 
+	// If scoring themselves, return 1 which is the max score
+	if userID == e.ActorID {
+		return 1.0
+	}
+
 	var relevanceScore float64
 
 	for _, contractID := range e.ContractIds {
@@ -208,7 +213,7 @@ func (p *Personalization) RelevanceTo(userID persist.DBID, e db.FeedEntityScore)
 	}
 
 	edgeScore, _ := p.scoreEdge(userID, e.ActorID)
-	return relevanceScore + edgeScore
+	return (relevanceScore + edgeScore) / 2.0
 }
 
 func (p *Personalization) scoreEdge(viewerID, queryID persist.DBID) (float64, error) {
@@ -219,7 +224,7 @@ func (p *Personalization) scoreEdge(viewerID, queryID persist.DBID) (float64, er
 	}
 	socialScore := calcSocialScore(p.pM.userM, vIdx, qIdx)
 	similarityScore := calcSimilarityScore(p.pM.simM, vIdx, qIdx)
-	return socialScore + similarityScore, nil
+	return (socialScore + similarityScore) / 2.0, nil
 }
 
 func (p *Personalization) scoreRelevance(viewerID, contractID persist.DBID) (float64, error) {
@@ -254,7 +259,7 @@ func (p *Personalization) updateMatrices(m *personalizationMatrices) {
 }
 
 func (p *Personalization) update(ctx context.Context) {
-	exists, err := p.b.Exists(ctx, gcpObjectName)
+	exists, err := p.b.ExistsRetry(ctx, gcpObjectName)
 	if !exists || err != nil {
 		panic(fmt.Sprintf("personalization data does not exist: %s", err))
 	}
@@ -288,6 +293,9 @@ func (p *Personalization) readCache(ctx context.Context) {
 
 // calcSocialScore determines if vIdx is in the same friend circle as qIdx by running a bfs on userM
 func calcSocialScore(userM *sparse.CSR, vIdx, qIdx int) float64 {
+	if vIdx == qIdx {
+		return 1
+	}
 	return bfs(userM, vIdx, qIdx)
 }
 
@@ -314,7 +322,7 @@ func calcSimilarityScore(simM *sparse.CSR, vIdx, qIdx int) float64 {
 }
 
 // idLookup uses a slice to lookup a value by its index
-// Its purpose is to avoid using a map because indexing a slice is suprisingly much quicker than a map lookup.
+// Its purpose is to avoid using a map because indexing a slice is surprisingly much quicker than a map lookup.
 // It should be pretty space efficient: with one million users, it should take: 1 million users * 1 byte = 1MB of memory.
 type idLookup struct {
 	l []uint8

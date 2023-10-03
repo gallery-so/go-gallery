@@ -541,7 +541,7 @@ func isValidAlchemySignatureForStringBody(
 	case persist.ChainArbitrum:
 		secret = env.GetString("ALCHEMY_WEBHOOK_SECRET_ARBITRUM")
 	default:
-		logger.For(nil).Errorf("invalid chain for alchemy webhook signature: %s", chain)
+		logger.For(nil).Errorf("invalid chain for alchemy webhook signature: %d", chain)
 		return false
 	}
 
@@ -557,6 +557,8 @@ func detectSpamContracts(queries *coredb.Queries) gin.HandlerFunc {
 		var params coredb.InsertSpamContractsParams
 
 		now := time.Now()
+
+		seen := make(map[persist.ContractIdentifiers]bool)
 
 		for _, source := range []struct {
 			Chain    persist.Chain
@@ -604,6 +606,11 @@ func detectSpamContracts(queries *coredb.Queries) gin.HandlerFunc {
 			}
 
 			for _, contract := range body.Contracts {
+				id := persist.NewContractIdentifiers(contract, source.Chain)
+				if seen[id] {
+					continue
+				}
+				seen[id] = true
 				params.ID = append(params.ID, persist.GenerateID().String())
 				params.Chain = append(params.Chain, int32(source.Chain))
 				params.Address = append(params.Address, source.Chain.NormalizeAddress(contract))
@@ -744,7 +751,7 @@ func processFromIdentifiersManaged(ctx context.Context, tp *tokenProcessor, tm *
 		"contractAddress": contract.Address,
 		"chain":           token.Chain,
 	})
-	err, closing := tm.StartProcessing(ctx, token, attempts)
+	closing, err := tm.StartProcessing(ctx, token, attempts)
 	if err != nil {
 		return coredb.TokenMedia{}, err
 	}

@@ -127,24 +127,25 @@ func CreateTaskForPushNotification(ctx context.Context, message PushNotification
 	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span), withBasicAuth(secret))
 }
 
-func CreateTaskForFeed(ctx context.Context, scheduleOn time.Time, message FeedMessage, client *gcptasks.Client) error {
+func CreateTaskForFeed(ctx context.Context, message FeedMessage, client *gcptasks.Client) error {
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForFeed")
 	defer tracing.FinishSpan(span)
 	tracing.AddEventDataToSpan(span, map[string]any{"Event ID": message.ID})
 	queue := env.GetString("GCLOUD_FEED_QUEUE")
 	url := fmt.Sprintf("%s/tasks/feed-event", env.GetString("FEED_URL"))
 	secret := env.GetString("FEED_SECRET")
-	return submitTask(ctx, client, queue, url, withScheduleOn(scheduleOn), withJSON(message), withTrace(span), withBasicAuth(secret))
+	delay := time.Duration(env.GetInt("GCLOUD_FEED_BUFFER_SECS")) * time.Second
+	return submitTask(ctx, client, queue, url, withDelay(delay), withJSON(message), withTrace(span), withBasicAuth(secret))
 }
 
-func CreateTaskForFeedbot(ctx context.Context, scheduleOn time.Time, message FeedbotMessage, client *gcptasks.Client) error {
+func CreateTaskForFeedbot(ctx context.Context, message FeedbotMessage, client *gcptasks.Client) error {
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForFeedbot")
 	defer tracing.FinishSpan(span)
 	tracing.AddEventDataToSpan(span, map[string]any{"Event ID": message.FeedEventID})
 	queue := env.GetString("GCLOUD_FEEDBOT_TASK_QUEUE")
 	url := fmt.Sprintf("%s/tasks/feed-event", env.GetString("FEEDBOT_URL"))
 	secret := env.GetString("FEEDBOT_SECRET")
-	return submitTask(ctx, client, queue, url, withScheduleOn(scheduleOn), withJSON(message), withTrace(span), withBasicAuth(secret))
+	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span), withBasicAuth(secret))
 }
 
 func CreateTaskForTokenProcessing(ctx context.Context, message TokenProcessingUserMessage, client *gcptasks.Client) error {
@@ -179,7 +180,7 @@ func CreateTaskForTokenTokenProcessing(ctx context.Context, message TokenProcess
 	defer tracing.FinishSpan(span)
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
 	url := fmt.Sprintf("%s/media/tokenmanage/process/token", env.GetString("TOKEN_PROCESSING_URL"))
-	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span), withScheduleOn(time.Now().Add(delay)))
+	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span), withDelay(delay))
 }
 
 func CreateTaskForWalletRemoval(ctx context.Context, message TokenProcessingWalletRemovalMessage, client *gcptasks.Client) error {
@@ -223,7 +224,7 @@ func CreateTaskForSlackPostFeedBot(ctx context.Context, message FeedbotSlackPost
 	queue := env.GetString("GCLOUD_FEEDBOT_TASK_QUEUE")
 	url := fmt.Sprintf("%s/tasks/slack-post", env.GetString("FEEDBOT_URL"))
 	secret := env.GetString("FEEDBOT_SECRET")
-	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span), withBasicAuth(secret))
+	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span), withBasicAuth(secret), withDelay(2*time.Minute))
 }
 
 // NewClient returns a new task client with tracing enabled.
@@ -265,8 +266,9 @@ func NewClient(ctx context.Context) *gcptasks.Client {
 	return client
 }
 
-func withScheduleOn(scheduleOn time.Time) func(*taskspb.Task) error {
+func withDelay(delay time.Duration) func(*taskspb.Task) error {
 	return func(t *taskspb.Task) error {
+		scheduleOn := time.Now().Add(delay)
 		t.ScheduleTime = timestamppb.New(scheduleOn)
 		return nil
 	}

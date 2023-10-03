@@ -3,7 +3,6 @@ package event
 import (
 	"context"
 	"fmt"
-	"time"
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/gin-gonic/gin"
@@ -11,7 +10,6 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
-	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/feed"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -381,9 +379,7 @@ func (h feedHandler) handleDelayed(ctx context.Context, persistedEvent db.Event)
 	if !actionsToBeHandledByFeedService[persistedEvent.Action] {
 		return nil
 	}
-
-	scheduleOn := persistedEvent.CreatedAt.Add(time.Duration(env.GetInt("GCLOUD_FEED_BUFFER_SECS")) * time.Second)
-	return task.CreateTaskForFeed(ctx, scheduleOn, task.FeedMessage{ID: persistedEvent.ID}, h.tc)
+	return task.CreateTaskForFeed(ctx, task.FeedMessage{ID: persistedEvent.ID}, h.tc)
 }
 
 // handledImmediate sidesteps the Feed service so that an event is immediately available as a feed event.
@@ -413,9 +409,7 @@ func (h feedHandler) handleGroup(ctx context.Context, groupID string, action per
 
 	if feedEvent != nil {
 		// Send event to feedbot
-		err = task.CreateTaskForFeedbot(ctx,
-			time.Now(), task.FeedbotMessage{FeedEventID: feedEvent.ID, Action: feedEvent.Action}, h.tc,
-		)
+		err = task.CreateTaskForFeedbot(ctx, task.FeedbotMessage{FeedEventID: feedEvent.ID, Action: feedEvent.Action}, h.tc)
 		if err != nil {
 			logger.For(ctx).Errorf("failed to create task for feedbot: %s", err.Error())
 		}

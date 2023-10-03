@@ -57,7 +57,6 @@ require (
 	google.golang.org/grpc v1.54.0
 	google.golang.org/protobuf v1.30.0
 	gopkg.in/yaml.v2 v2.4.0
-	roci.dev/fracdex v0.0.0-20220111221836-dbd126571100
 )
 
 require (
@@ -126,6 +125,7 @@ require (
 	github.com/everFinance/ttcrsa v1.1.3 // indirect
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
+	github.com/gallery-so/fracdex v0.0.0-20231002204609-f530b8914277 // indirect
 	github.com/gammazero/deque v0.1.1 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
