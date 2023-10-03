@@ -10,7 +10,6 @@ import (
 	"cloud.google.com/go/cloudtasks/apiv2"
 	"context"
 	"database/sql"
-	"fmt"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/google/wire"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -400,14 +399,13 @@ func newMultichainSet(
 		seen := map[string]bool{}
 		deduped := []any{}
 		for _, p := range providers {
-			if addr := fmt.Sprintf("%p", p); !seen[addr] {
-				seen[addr] = true
+			if id := p.(multichain.Configurer).GetBlockchainInfo().ProviderID; !seen[id] {
+				seen[id] = true
 				deduped = append(deduped, p)
 			}
 		}
 		return deduped
 	}
-
 	chainToProviders := map[persist.Chain][]any{}
 	chainToProviders[persist.ChainETH] = dedupe(ethProviders)
 	chainToProviders[persist.ChainOptimism] = dedupe(optimismProviders)

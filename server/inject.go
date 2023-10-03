@@ -6,7 +6,6 @@ package server
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"net/http"
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
@@ -409,13 +408,13 @@ func newMultichainSet(
 	baseProviders baseProviderList,
 	polygonProviders polygonProviderList,
 	arbitrumProviders arbitrumProviderList,
-) map[persist.Chain]]any {
+) map[persist.Chain][]any {
 	// dedupe providers based on provider ID
 	dedupe := func(providers []any) []any {
 		seen := map[string]bool{}
 		deduped := []any{}
 		for _, p := range providers {
-			if id := p.(multichain.Configurer).GetBlockhainInfo().ProviderID; !seen[id] {
+			if id := p.(multichain.Configurer).GetBlockchainInfo().ProviderID; !seen[id] {
 				seen[id] = true
 				deduped = append(deduped, p)
 			}
