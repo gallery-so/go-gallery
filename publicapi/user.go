@@ -1,25 +1,26 @@
 package publicapi
 
 import (
-	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/task"
 	"strconv"
 	"strings"
 	"time"
 
+	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
+	"github.com/mikeydub/go-gallery/service/task"
+
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/everFinance/goar"
+	"github.com/gallery-so/fracdex"
 	"github.com/go-playground/validator/v10"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 	"github.com/jinzhu/copier"
-	"roci.dev/fracdex"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/event"
@@ -430,6 +431,17 @@ func (api UserAPI) AddWalletToUser(ctx context.Context, chainAddress persist.Cha
 		return err
 	}
 
+	err = task.CreateTaskForAutosocialProcessUsers(ctx, task.AutosocialProcessUsersMessage{
+		Users: map[persist.DBID]map[persist.SocialProvider][]persist.ChainAddress{
+			userID: {
+				persist.SocialProviderFarcaster: []persist.ChainAddress{chainAddress},
+				persist.SocialProviderLens:      []persist.ChainAddress{chainAddress},
+			},
+		},
+	}, api.taskClient)
+	if err != nil {
+		logger.For(ctx).WithError(err).Error("failed to create task for autosocial process users")
+	}
 	return nil
 }
 
@@ -571,8 +583,24 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 		SubjectID:      userID,
 		Data:           persist.EventData{UserBio: bio},
 	})
+	if err != nil {
+		logger.For(ctx).Errorf("failed to dispatch event: %s", err)
+		return userID, galleryID, err
+	}
 
-	return userID, galleryID, err
+	err = task.CreateTaskForAutosocialProcessUsers(ctx, task.AutosocialProcessUsersMessage{
+		Users: map[persist.DBID]map[persist.SocialProvider][]persist.ChainAddress{
+			userID: {
+				persist.SocialProviderFarcaster: []persist.ChainAddress{createUserParams.ChainAddress},
+				persist.SocialProviderLens:      []persist.ChainAddress{createUserParams.ChainAddress},
+			},
+		},
+	}, api.taskClient)
+	if err != nil {
+		logger.For(ctx).Errorf("failed to create task for autosocial process users: %s", err)
+	}
+
+	return userID, galleryID, nil
 }
 
 func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio string) error {
@@ -783,10 +811,11 @@ func (api UserAPI) GetFollowingByUserId(ctx context.Context, userID persist.DBID
 }
 
 func (api UserAPI) SharedFollowers(ctx context.Context, userID persist.DBID, before, after *string, first, last *int) ([]db.User, PageInfo, error) {
-	// Validate
-	curUserID, err := getAuthenticatedUserID(ctx)
-	if err != nil {
-		return nil, PageInfo{}, err
+	curUserID, _ := getAuthenticatedUserID(ctx)
+
+	// If the user is not logged in, return an empty list of users
+	if curUserID == "" {
+		return []db.User{}, PageInfo{}, nil
 	}
 
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
@@ -861,9 +890,11 @@ func (api UserAPI) SharedFollowers(ctx context.Context, userID persist.DBID, bef
 
 func (api UserAPI) SharedCommunities(ctx context.Context, userID persist.DBID, before, after *string, first, last *int) ([]db.Contract, PageInfo, error) {
 	// Validate
-	curUserID, err := getAuthenticatedUserID(ctx)
-	if err != nil {
-		return nil, PageInfo{}, err
+	curUserID, _ := getAuthenticatedUserID(ctx)
+
+	// If the user is not logged in, return an empty list of users
+	if curUserID == "" {
+		return []db.Contract{}, PageInfo{}, nil
 	}
 
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{

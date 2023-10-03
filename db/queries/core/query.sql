@@ -425,7 +425,6 @@ SELECT *
 FROM feed_entities
 WHERE (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
         AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
-        AND (@include_posts::bool OR feed_entity_type != @post_entity_type)
 ORDER BY 
     CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
     CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
@@ -438,23 +437,25 @@ select fe.* from feed_entities fe, follows fl
       and fl.follower = sqlc.arg('follower')
       and (fe.created_at, fe.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
       and (fe.created_at, fe.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
-      and (@include_posts::bool or feed_entity_type != @post_entity_type)
 order by
     case when sqlc.arg('paging_forward')::bool then (fe.created_at, fe.id) end asc,
     case when not sqlc.arg('paging_forward')::bool then (fe.created_at, fe.id) end desc
 limit sqlc.arg('limit');
 
--- name: PaginateUserFeedByUserID :many
-SELECT *
-FROM feed_entities
-WHERE actor_id = sqlc.arg('owner_id')
-        AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-        AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
-        AND (@include_posts::bool OR feed_entity_type != @post_entity_type)
-ORDER BY 
-    CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
-    CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
-LIMIT sqlc.arg('limit');
+-- name: PaginatePostsByUserID :many
+select *
+from posts
+where actor_id = sqlc.arg('user_id')
+        and (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+        and (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+        and not posts.deleted
+order by
+    case when sqlc.arg('paging_forward')::bool then (created_at, id) end asc,
+    case when not sqlc.arg('paging_forward')::bool then (created_at, id) end desc
+limit sqlc.arg('limit');
+
+-- name: CountPostsByUserID :one
+select count(*) from posts where actor_id = $1 and not posts.deleted;
 
 -- name: PaginatePostsByContractID :batchmany
 SELECT posts.*
@@ -499,7 +500,11 @@ and posts.deleted = false;
 SELECT * FROM feed_events WHERE id = ANY(@ids::varchar(255)[]) AND deleted = false;
 
 -- name: GetPostsByIds :many
-SELECT * FROM posts WHERE id = ANY(@ids::varchar(255)[]) AND deleted = false;
+select posts.*
+from posts
+join unnest(@post_ids::varchar(255)[]) with ordinality t(id, pos) using(id)
+where not posts.deleted
+order by pos asc;
 
 -- name: GetEventByIdBatch :batchone
 SELECT * FROM feed_events WHERE id = $1 AND deleted = false;
@@ -1686,3 +1691,6 @@ select * from mentions where comment_id = @comment_id and not deleted;
 
 -- name: GetMentionsByPostID :batchmany
 select * from mentions where post_id = @post_id and not deleted;
+
+-- name: GetUsersWithoutSocials :many
+select u.id, w.address, u.pii_socials->>'Lens' is null, u.pii_socials->>'Farcaster' is null from pii.user_view u join wallets w on w.id = any(u.wallets) where u.deleted = false and w.chain = 0 and w.deleted = false and u.universal = false and (u.pii_socials->>'Lens' is null or u.pii_socials->>'Farcaster' is null) order by u.created_at desc;

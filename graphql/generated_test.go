@@ -280,6 +280,13 @@ func (v *EoaAuth) GetNonce() string { return v.Nonce }
 // GetSignature returns EoaAuth.Signature, and is useful for accessing the field via an interface.
 func (v *EoaAuth) GetSignature() string { return v.Signature }
 
+type FarcasterAuth struct {
+	Address string `json:"address"`
+}
+
+// GetAddress returns FarcasterAuth.Address, and is useful for accessing the field via an interface.
+func (v *FarcasterAuth) GetAddress() string { return v.Address }
+
 type GnosisSafeAuth struct {
 	Address string `json:"address"`
 	Nonce   string `json:"nonce"`
@@ -301,6 +308,13 @@ func (v *IntervalInput) GetStart() int { return v.Start }
 
 // GetLength returns IntervalInput.Length, and is useful for accessing the field via an interface.
 func (v *IntervalInput) GetLength() int { return v.Length }
+
+type LensAuth struct {
+	Address string `json:"address"`
+}
+
+// GetAddress returns LensAuth.Address, and is useful for accessing the field via an interface.
+func (v *LensAuth) GetAddress() string { return v.Address }
 
 type MagicLinkAuth struct {
 	Token string `json:"token"`
@@ -391,8 +405,10 @@ const (
 )
 
 type SocialAuthMechanism struct {
-	Twitter *TwitterAuth     `json:"twitter"`
-	Debug   *DebugSocialAuth `json:"debug"`
+	Twitter   *TwitterAuth     `json:"twitter"`
+	Debug     *DebugSocialAuth `json:"debug"`
+	Farcaster *FarcasterAuth   `json:"farcaster"`
+	Lens      *LensAuth        `json:"lens"`
 }
 
 // GetTwitter returns SocialAuthMechanism.Twitter, and is useful for accessing the field via an interface.
@@ -400,6 +416,12 @@ func (v *SocialAuthMechanism) GetTwitter() *TwitterAuth { return v.Twitter }
 
 // GetDebug returns SocialAuthMechanism.Debug, and is useful for accessing the field via an interface.
 func (v *SocialAuthMechanism) GetDebug() *DebugSocialAuth { return v.Debug }
+
+// GetFarcaster returns SocialAuthMechanism.Farcaster, and is useful for accessing the field via an interface.
+func (v *SocialAuthMechanism) GetFarcaster() *FarcasterAuth { return v.Farcaster }
+
+// GetLens returns SocialAuthMechanism.Lens, and is useful for accessing the field via an interface.
+func (v *SocialAuthMechanism) GetLens() *LensAuth { return v.Lens }
 
 type TrendingUsersInput struct {
 	Report ReportWindow `json:"report"`

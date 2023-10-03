@@ -55,7 +55,7 @@ func main() {
 			}
 			logrus.Infof("got farcaster connection for user %s (%s) len: %d", userID, fid, len(us))
 			fids, err := util.Map(us, func(i farcaster.NeynarUser) (string, error) {
-				return i.Fid, nil
+				return i.Fid.String(), nil
 			})
 			gus, err := queries.GetUsersBySocialIDs(ctx, coredb.GetUsersBySocialIDsParams{
 				SocialAccountType: "Farcaster",

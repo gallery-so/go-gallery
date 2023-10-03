@@ -57,13 +57,13 @@ require (
 	google.golang.org/grpc v1.54.0
 	google.golang.org/protobuf v1.30.0
 	gopkg.in/yaml.v2 v2.4.0
-	roci.dev/fracdex v0.0.0-20220111221836-dbd126571100
 )
 
 require (
 	cloud.google.com/go/compute/metadata v0.2.3
 	cloud.google.com/go/storage v1.30.1
 	github.com/ertan/go-farcaster v1.0.0-beta
+	github.com/gallery-so/fracdex v0.0.0-20231002204609-f530b8914277
 	github.com/golang-jwt/jwt/v5 v5.0.0
 	github.com/google/wire v0.5.0
 	github.com/james-bowman/sparse v0.0.0-20210729090128-1e6c7dd483e9

@@ -3,6 +3,7 @@ package publicapi
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/go-playground/validator/v10"
@@ -19,11 +20,12 @@ import (
 )
 
 type SocialAPI struct {
-	repos     *postgres.Repositories
-	redis     *redis.Cache
-	queries   *db.Queries
-	loaders   *dataloader.Loaders
-	validator *validator.Validate
+	repos      *postgres.Repositories
+	redis      *redis.Cache
+	queries    *db.Queries
+	loaders    *dataloader.Loaders
+	validator  *validator.Validate
+	httpClient *http.Client
 }
 
 func (s SocialAPI) NewTwitterAuthenticator(userID persist.DBID, authCode string) *socialauth.TwitterAuthenticator {
@@ -32,6 +34,24 @@ func (s SocialAPI) NewTwitterAuthenticator(userID persist.DBID, authCode string)
 		UserID:   userID,
 		Queries:  s.queries,
 		Redis:    s.redis,
+	}
+}
+
+func (s SocialAPI) NewFarcasterAuthenticator(userID persist.DBID, address persist.Address) *socialauth.FarcasterAuthenticator {
+	return &socialauth.FarcasterAuthenticator{
+		HTTPClient: s.httpClient,
+		UserID:     userID,
+		Queries:    s.queries,
+		Address:    address,
+	}
+}
+
+func (s SocialAPI) NewLensAuthenticator(userID persist.DBID, address persist.Address) *socialauth.LensAuthenticator {
+	return &socialauth.LensAuthenticator{
+		HTTPClient: s.httpClient,
+		UserID:     userID,
+		Queries:    s.queries,
+		Address:    address,
 	}
 }
 

@@ -25,7 +25,6 @@ type CollectionTokenRepository struct {
 	updateNFTsStmt               *sql.Stmt
 	updateNFTsUnsafeStmt         *sql.Stmt
 	nftsToRemoveStmt             *sql.Stmt
-	deleteNFTsStmt               *sql.Stmt
 	removeNFTFromCollectionsStmt *sql.Stmt
 	getNFTsForAddressStmt        *sql.Stmt
 	deleteCollectionStmt         *sql.Stmt
