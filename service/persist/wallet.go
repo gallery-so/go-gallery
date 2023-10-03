@@ -138,7 +138,7 @@ func (c ChainAddress) String() string {
 }
 
 func (c ChainAddress) MarshalJSON() ([]byte, error) {
-	return json.Marshal(map[string]any{"address": c.address, "chain": c.chain})
+	return json.Marshal(map[string]any{"address": c.address.String(), "chain": int(c.chain)})
 }
 
 func (c *ChainAddress) UnmarshalJSON(data []byte) error {
@@ -154,8 +154,13 @@ func (c *ChainAddress) UnmarshalJSON(data []byte) error {
 	}
 
 	if v["chain"] != nil {
-		c.chain = Chain(v["chain"].(float64))
-		c.chainSet = true
+		if chain, ok := v["chain"].(int); ok {
+			c.chain = Chain(chain)
+			c.chainSet = true
+		} else if chain, ok := v["chain"].(int32); ok {
+			c.chain = Chain(chain)
+			c.chainSet = true
+		}
 	}
 
 	return nil
