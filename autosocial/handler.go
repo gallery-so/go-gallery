@@ -32,67 +32,17 @@ func processUsers(q *coredb.Queries, n *farcaster.NeynarAPI, l *lens.LensAPI) gi
 			userID := u
 			socials := s
 
-			if address, ok := socials[persist.SocialProviderLens]; ok && address.Address() != "" {
+			if address, ok := socials[persist.SocialProviderLens]; ok {
 
 				lp.Go(func(ctx context.Context) error {
-					u, err := l.DefaultProfileByAddress(ctx, address.Address())
-					if err != nil {
-						if strings.Contains(err.Error(), "too many requests") {
-							time.Sleep(4 * time.Minute)
-							u, err = l.DefaultProfileByAddress(ctx, address.Address())
-							if err != nil {
-								logrus.Error(err)
-								return nil
-							}
-						} else {
-							return nil
-						}
-					}
-					logrus.Infof("got lens user %s %s %s %s", u.Name, u.Handle, u.Picture.Optimized.URL, u.Bio)
-					return q.AddSocialToUser(ctx, coredb.AddSocialToUserParams{
-						UserID: userID,
-						Socials: persist.Socials{
-							persist.SocialProviderLens: persist.SocialUserIdentifiers{
-								Provider: persist.SocialProviderLens,
-								ID:       u.ID,
-								Display:  true,
-								Metadata: map[string]interface{}{
-									"username":          u.Handle,
-									"name":              util.FirstNonEmptyString(u.Name, u.Handle),
-									"profile_image_url": util.FirstNonEmptyString(u.Picture.Optimized.URL, u.Picture.URI),
-									"bio":               u.Bio,
-								},
-							},
-						},
-					})
+					return addLensProfileToUser(ctx, l, address, q, userID)
 
 				})
 			}
 
-			if address, ok := socials[persist.SocialProviderFarcaster]; ok && address.Address() != "" {
+			if address, ok := socials[persist.SocialProviderFarcaster]; ok {
 				fp.Go(func(ctx context.Context) error {
-					u, err := n.UserByAddress(ctx, address.Address())
-					if err != nil {
-						return nil
-					}
-					logrus.Infof("got farcaster user %s %s %s %s", u.Username, u.DisplayName, u.Pfp.URL, u.Profile.Bio.Text)
-
-					return q.AddSocialToUser(ctx, coredb.AddSocialToUserParams{
-						UserID: userID,
-						Socials: persist.Socials{
-							persist.SocialProviderFarcaster: persist.SocialUserIdentifiers{
-								Provider: persist.SocialProviderFarcaster,
-								ID:       u.Fid,
-								Display:  true,
-								Metadata: map[string]interface{}{
-									"username":          u.Username,
-									"name":              u.DisplayName,
-									"profile_image_url": u.Pfp.URL,
-									"bio":               u.Profile.Bio.Text,
-								},
-							},
-						},
-					})
+					return addFarcasterProfileToUser(ctx, n, address, q, userID)
 
 				})
 			}
@@ -116,4 +66,75 @@ func processUsers(q *coredb.Queries, n *farcaster.NeynarAPI, l *lens.LensAPI) gi
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
+}
+
+func addLensProfileToUser(ctx context.Context, l *lens.LensAPI, address []persist.ChainAddress, q *coredb.Queries, userID persist.DBID) error {
+	for _, a := range address {
+		if a.Address() == "" {
+			continue
+		}
+		u, err := l.DefaultProfileByAddress(ctx, a.Address())
+		if err != nil {
+			if strings.Contains(err.Error(), "too many requests") {
+				time.Sleep(4 * time.Minute)
+				u, err = l.DefaultProfileByAddress(ctx, a.Address())
+				if err != nil {
+					logrus.Error(err)
+					continue
+				}
+			} else {
+				continue
+			}
+		}
+		logrus.Infof("got lens user %s %s %s %s", u.Name, u.Handle, u.Picture.Optimized.URL, u.Bio)
+		return q.AddSocialToUser(ctx, coredb.AddSocialToUserParams{
+			UserID: userID,
+			Socials: persist.Socials{
+				persist.SocialProviderLens: persist.SocialUserIdentifiers{
+					Provider: persist.SocialProviderLens,
+					ID:       u.ID,
+					Display:  true,
+					Metadata: map[string]interface{}{
+						"username":          u.Handle,
+						"name":              util.FirstNonEmptyString(u.Name, u.Handle),
+						"profile_image_url": util.FirstNonEmptyString(u.Picture.Optimized.URL, u.Picture.URI),
+						"bio":               u.Bio,
+					},
+				},
+			},
+		})
+
+	}
+	return nil
+}
+
+func addFarcasterProfileToUser(ctx context.Context, n *farcaster.NeynarAPI, address []persist.ChainAddress, q *coredb.Queries, userID persist.DBID) error {
+	for _, a := range address {
+		if a.Address() == "" {
+			continue
+		}
+		u, err := n.UserByAddress(ctx, a.Address())
+		if err != nil {
+			continue
+		}
+		logrus.Infof("got farcaster user %s %s %s %s", u.Username, u.DisplayName, u.Pfp.URL, u.Profile.Bio.Text)
+
+		return q.AddSocialToUser(ctx, coredb.AddSocialToUserParams{
+			UserID: userID,
+			Socials: persist.Socials{
+				persist.SocialProviderFarcaster: persist.SocialUserIdentifiers{
+					Provider: persist.SocialProviderFarcaster,
+					ID:       u.Fid,
+					Display:  true,
+					Metadata: map[string]interface{}{
+						"username":          u.Username,
+						"name":              u.DisplayName,
+						"profile_image_url": u.Pfp.URL,
+						"bio":               u.Profile.Bio.Text,
+					},
+				},
+			},
+		})
+	}
+	return nil
 }

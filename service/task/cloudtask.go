@@ -63,7 +63,7 @@ type PostPreflightMessage struct {
 }
 
 type AutosocialProcessUsersMessage struct {
-	Users map[persist.DBID]map[persist.SocialProvider]persist.ChainAddress `json:"users" binding:"required"`
+	Users map[persist.DBID]map[persist.SocialProvider][]persist.ChainAddress `json:"users" binding:"required"`
 }
 
 type TokenIdentifiersQuantities map[persist.TokenUniqueIdentifiers]persist.HexString

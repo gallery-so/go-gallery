@@ -431,14 +431,18 @@ func (api UserAPI) AddWalletToUser(ctx context.Context, chainAddress persist.Cha
 		return err
 	}
 
-	return task.CreateTaskForAutosocialProcessUsers(ctx, task.AutosocialProcessUsersMessage{
-		Users: map[persist.DBID]map[persist.SocialProvider]persist.ChainAddress{
+	err = task.CreateTaskForAutosocialProcessUsers(ctx, task.AutosocialProcessUsersMessage{
+		Users: map[persist.DBID]map[persist.SocialProvider][]persist.ChainAddress{
 			userID: {
-				persist.SocialProviderFarcaster: chainAddress,
-				persist.SocialProviderLens:      chainAddress,
+				persist.SocialProviderFarcaster: []persist.ChainAddress{chainAddress},
+				persist.SocialProviderLens:      []persist.ChainAddress{chainAddress},
 			},
 		},
 	}, api.taskClient)
+	if err != nil {
+		logger.For(ctx).WithError(err).Error("failed to create task for autosocial process users")
+	}
+	return nil
 }
 
 func (api UserAPI) RemoveWalletsFromUser(ctx context.Context, walletIDs []persist.DBID) error {
@@ -585,16 +589,15 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 	}
 
 	err = task.CreateTaskForAutosocialProcessUsers(ctx, task.AutosocialProcessUsersMessage{
-		Users: map[persist.DBID]map[persist.SocialProvider]persist.ChainAddress{
+		Users: map[persist.DBID]map[persist.SocialProvider][]persist.ChainAddress{
 			userID: {
-				persist.SocialProviderFarcaster: createUserParams.ChainAddress,
-				persist.SocialProviderLens:      createUserParams.ChainAddress,
+				persist.SocialProviderFarcaster: []persist.ChainAddress{createUserParams.ChainAddress},
+				persist.SocialProviderLens:      []persist.ChainAddress{createUserParams.ChainAddress},
 			},
 		},
 	}, api.taskClient)
 	if err != nil {
 		logger.For(ctx).Errorf("failed to create task for autosocial process users: %s", err)
-		return userID, galleryID, err
 	}
 
 	return userID, galleryID, nil
