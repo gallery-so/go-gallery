@@ -9,6 +9,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"golang.org/x/net/html"
 	"strings"
 	"time"
 
@@ -1652,7 +1653,7 @@ func postToModel(event *db.Post) (*model.Post, error) {
 
 	var captionVal *string
 	if caption != nil {
-		captionVal = util.ToPointer(caption.(string))
+		captionVal = util.ToPointer(html.UnescapeString(caption.(string)))
 	}
 
 	return &model.Post{
@@ -1730,7 +1731,7 @@ func userToModel(ctx context.Context, user db.User) *model.GalleryUser {
 		},
 		Dbid:      user.ID,
 		Username:  &user.Username.String,
-		Bio:       &user.Bio.String,
+		Bio:       util.ToPointer(html.UnescapeString(user.Bio.String)),
 		Wallets:   wallets,
 		Universal: &user.Universal,
 
@@ -1775,7 +1776,7 @@ func commentToModel(ctx context.Context, comment db.Comment) *model.Comment {
 		Dbid:         comment.ID,
 		CreationTime: &comment.CreatedAt,
 		LastUpdated:  &comment.LastUpdated,
-		Comment:      &comment.Comment,
+		Comment:      util.ToPointer(html.UnescapeString(comment.Comment)),
 		Commenter:    &model.GalleryUser{Dbid: comment.ActorID}, // remaining fields handled by dedicated resolver
 	}
 }
@@ -1915,7 +1916,7 @@ func tokenToModel(ctx context.Context, token db.Token, collectionID *persist.DBI
 		Dbid:             token.ID,
 		CreationTime:     &token.CreatedAt,
 		LastUpdated:      &token.LastUpdated,
-		CollectorsNote:   &token.CollectorsNote.String,
+		CollectorsNote:   util.ToPointer(html.UnescapeString(token.CollectorsNote.String)),
 		Media:            nil, // handled by dedicated resolver
 		TokenType:        &tokenType,
 		Chain:            &chain,
@@ -1980,8 +1981,8 @@ func communityToModel(ctx context.Context, community db.Contract, forceRefresh *
 		Contract:        contractToModel(ctx, community),
 		ContractAddress: &contractAddress,
 		CreatorAddress:  creatorAddress,
-		Name:            util.ToPointer(community.Name.String),
-		Description:     util.ToPointer(community.Description.String),
+		Name:            util.ToPointer(html.UnescapeString(community.Name.String)),
+		Description:     util.ToPointer(html.UnescapeString(community.Description.String)),
 		// PreviewImage:     util.ToPointer(community.Pr.String()), // TODO do we still need this with the new image fields?
 		Chain:             &chain,
 		ProfileImageURL:   util.ToPointer(community.ProfileImageUrl.String),
