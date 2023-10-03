@@ -203,25 +203,18 @@ func baseProvidersConfig(baseProvider *reservoir.Provider) baseProviderList {
 func polygonProviderSet(client *http.Client) polygonProviderList {
 	cache := newTokenProcessingCache()
 	serverPolygonProvider := newPolygonProvider(client, cache)
-	ethclientClient := rpc.NewEthClient()
-	chain := _wireChainValue4
-	provider := opensea.NewProvider(ethclientClient, client, chain)
-	serverPolygonProviderList := polygonProvidersConfig(serverPolygonProvider, provider)
+	serverPolygonProviderList := polygonProvidersConfig(serverPolygonProvider)
 	return serverPolygonProviderList
 }
 
-var (
-	_wireChainValue4 = persist.ChainPolygon
-)
-
 // polygonProvidersConfig is a wire injector that binds multichain interfaces to their concrete Polygon implementations
-func polygonProvidersConfig(polygonProvider2 *polygonProvider, openseaProvider *opensea.Provider) polygonProviderList {
-	serverPolygonProviderList := polygonRequirements(polygonProvider2, polygonProvider2, polygonProvider2, openseaProvider)
+func polygonProvidersConfig(polygonProvider2 *polygonProvider) polygonProviderList {
+	serverPolygonProviderList := polygonRequirements(polygonProvider2, polygonProvider2, polygonProvider2)
 	return serverPolygonProviderList
 }
 
 func ethFallbackProvider(httpClient *http.Client, r *redis.Cache) multichain.SyncFailureFallbackProvider {
-	chain := _wireChainValue5
+	chain := _wireChainValue4
 	provider := alchemy.NewProvider(chain, httpClient, r)
 	infuraProvider := infura.NewProvider(httpClient)
 	syncFailureFallbackProvider := multichain.SyncFailureFallbackProvider{
@@ -232,7 +225,7 @@ func ethFallbackProvider(httpClient *http.Client, r *redis.Cache) multichain.Syn
 }
 
 var (
-	_wireChainValue5 = persist.ChainETH
+	_wireChainValue4 = persist.ChainETH
 )
 
 func tezosFallbackProvider(httpClient *http.Client, tzktProvider *tezos.Provider, objktProvider *tezos.TezosObjktProvider) multichain.SyncWithContractEvalFallbackProvider {
@@ -386,10 +379,9 @@ func baseRequirements(
 func polygonRequirements(
 	tof multichain.TokensOwnerFetcher,
 	tiof multichain.TokensIncrementalOwnerFetcher,
-	toc multichain.TokensContractFetcher, opensea2 multichain.OpenSeaChildContractFetcher,
-
+	toc multichain.TokensContractFetcher,
 ) polygonProviderList {
-	return polygonProviderList{tof, tiof, toc, opensea2}
+	return polygonProviderList{tof, tiof, toc}
 }
 
 // newMultichain is a wire provider that creates a multichain provider

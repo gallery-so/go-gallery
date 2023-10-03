@@ -371,24 +371,20 @@ func baseRequirements(
 // polygonProviderSet is a wire injector that creates the set of polygon providers
 func polygonProviderSet(*http.Client) polygonProviderList {
 	wire.Build(
-		rpc.NewEthClient,
 		polygonProvidersConfig,
-		wire.Value(persist.ChainPolygon),
 		newTokenProcessingCache,
 		// Add providers for Polygon here
 		newPolygonProvider,
-		opensea.NewProvider,
 	)
 	return polygonProviderList{}
 }
 
 // polygonProvidersConfig is a wire injector that binds multichain interfaces to their concrete Polygon implementations
-func polygonProvidersConfig(polygonProvider *polygonProvider, openseaProvider *opensea.Provider) polygonProviderList {
+func polygonProvidersConfig(polygonProvider *polygonProvider) polygonProviderList {
 	wire.Build(
 		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(polygonProvider)),
 		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(polygonProvider)),
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(polygonProvider)),
-		wire.Bind(new(multichain.OpenSeaChildContractFetcher), util.ToPointer(openseaProvider)),
 		polygonRequirements,
 	)
 	return nil
@@ -399,9 +395,8 @@ func polygonRequirements(
 	tof multichain.TokensOwnerFetcher,
 	tiof multichain.TokensIncrementalOwnerFetcher,
 	toc multichain.TokensContractFetcher,
-	opensea multichain.OpenSeaChildContractFetcher,
 ) polygonProviderList {
-	return polygonProviderList{tof, tiof, toc, opensea}
+	return polygonProviderList{tof, tiof, toc}
 }
 
 // newMultichain is a wire provider that creates a multichain provider
@@ -414,21 +409,19 @@ func newMultichainSet(
 	baseProviders baseProviderList,
 	polygonProviders polygonProviderList,
 	arbitrumProviders arbitrumProviderList,
-) map[persist.Chain][]any {
-	// Dedupes providers by pointer address because
-	// providers may not be hashable
+) map[persist.Chain]]any {
+	// dedupe providers based on provider ID
 	dedupe := func(providers []any) []any {
 		seen := map[string]bool{}
 		deduped := []any{}
 		for _, p := range providers {
-			if addr := fmt.Sprintf("%p", p); !seen[addr] {
-				seen[addr] = true
+			if id := p.(multichain.Configurer).GetBlockhainInfo().ProviderID; !seen[id] {
+				seen[id] = true
 				deduped = append(deduped, p)
 			}
 		}
 		return deduped
 	}
-
 	chainToProviders := map[persist.Chain][]any{}
 	chainToProviders[persist.ChainETH] = dedupe(ethProviders)
 	chainToProviders[persist.ChainOptimism] = dedupe(optimismProviders)
