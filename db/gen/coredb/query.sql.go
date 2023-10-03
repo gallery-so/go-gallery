@@ -2847,6 +2847,27 @@ func (q *Queries) GetMembershipByMembershipId(ctx context.Context, id persist.DB
 	return i, err
 }
 
+const getMentionByID = `-- name: GetMentionByID :one
+select id, post_id, comment_id, user_id, contract_id, start, length, created_at, deleted from mentions where id = $1 and not deleted
+`
+
+func (q *Queries) GetMentionByID(ctx context.Context, id persist.DBID) (Mention, error) {
+	row := q.db.QueryRow(ctx, getMentionByID, id)
+	var i Mention
+	err := row.Scan(
+		&i.ID,
+		&i.PostID,
+		&i.CommentID,
+		&i.UserID,
+		&i.ContractID,
+		&i.Start,
+		&i.Length,
+		&i.CreatedAt,
+		&i.Deleted,
+	)
+	return i, err
+}
+
 const getMerchDiscountCodeByTokenID = `-- name: GetMerchDiscountCodeByTokenID :one
 select discount_code from merch where token_id = $1 and redeemed = true and deleted = false
 `
@@ -3184,6 +3205,27 @@ func (q *Queries) GetNotificationsByOwnerIDForActionAfter(ctx context.Context, a
 		return nil, err
 	}
 	return items, nil
+}
+
+const getPostByID = `-- name: GetPostByID :one
+SELECT id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted FROM posts WHERE id = $1 AND deleted = false
+`
+
+func (q *Queries) GetPostByID(ctx context.Context, id persist.DBID) (Post, error) {
+	row := q.db.QueryRow(ctx, getPostByID, id)
+	var i Post
+	err := row.Scan(
+		&i.ID,
+		&i.Version,
+		&i.TokenIds,
+		&i.ContractIds,
+		&i.ActorID,
+		&i.Caption,
+		&i.CreatedAt,
+		&i.LastUpdated,
+		&i.Deleted,
+	)
+	return i, err
 }
 
 const getPostsByIds = `-- name: GetPostsByIds :many

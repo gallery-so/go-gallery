@@ -512,6 +512,9 @@ SELECT * FROM feed_events WHERE id = $1 AND deleted = false;
 -- name: GetPostByIdBatch :batchone
 SELECT * FROM posts WHERE id = $1 AND deleted = false;
 
+-- name: GetPostByID :one
+SELECT * FROM posts WHERE id = $1 AND deleted = false;
+
 -- name: CreateFeedEvent :one
 INSERT INTO feed_events (id, owner_id, action, data, event_time, event_ids, group_id, caption) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *;
 
@@ -1691,6 +1694,9 @@ select * from mentions where comment_id = @comment_id and not deleted;
 
 -- name: GetMentionsByPostID :batchmany
 select * from mentions where post_id = @post_id and not deleted;
+
+-- name: GetMentionByID :one
+select * from mentions where id = @id and not deleted;
 
 -- name: GetUsersWithoutSocials :many
 select u.id, w.address, u.pii_socials->>'Lens' is null, u.pii_socials->>'Farcaster' is null from pii.user_view u join wallets w on w.id = any(u.wallets) where u.deleted = false and w.chain = 0 and w.deleted = false and u.universal = false and (u.pii_socials->>'Lens' is null or u.pii_socials->>'Farcaster' is null) order by u.created_at desc;
