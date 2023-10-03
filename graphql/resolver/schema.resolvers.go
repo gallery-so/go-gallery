@@ -983,14 +983,14 @@ func (r *mutationResolver) SetSpamPreference(ctx context.Context, input model.Se
 }
 
 // SyncTokens is the resolver for the syncTokens field.
-func (r *mutationResolver) SyncTokens(ctx context.Context, chains []persist.Chain) (model.SyncTokensPayloadOrError, error) {
+func (r *mutationResolver) SyncTokens(ctx context.Context, chains []persist.Chain, incrementally *bool) (model.SyncTokensPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
 	if len(chains) == 0 {
 		chains = []persist.Chain{persist.ChainETH}
 	}
 
-	err := api.Token.SyncTokens(ctx, chains)
+	err := api.Token.SyncTokens(ctx, chains, util.FromPointer(incrementally))
 	if err != nil {
 		return nil, err
 	}

@@ -316,7 +316,7 @@ func (api TokenAPI) SyncTokensAdmin(ctx context.Context, chains []persist.Chain,
 	return nil
 }
 
-func (api TokenAPI) SyncTokens(ctx context.Context, chains []persist.Chain) error {
+func (api TokenAPI) SyncTokens(ctx context.Context, chains []persist.Chain, incrementally bool) error {
 	userID, err := getAuthenticatedUserID(ctx)
 
 	if err != nil {
@@ -330,10 +330,18 @@ func (api TokenAPI) SyncTokens(ctx context.Context, chains []persist.Chain) erro
 	}
 	defer api.throttler.Unlock(ctx, key)
 
-	err = api.multichainProvider.SyncTokensByUserID(ctx, userID, chains)
-	if err != nil {
-		// Wrap all OpenSea sync failures in a generic type that can be returned to the frontend as an expected error type
-		return ErrTokenRefreshFailed{Message: err.Error()}
+	if incrementally {
+		err := api.multichainProvider.SyncTokensIncrementallyByUserID(ctx, userID, chains)
+		if err != nil {
+			return ErrTokenRefreshFailed{Message: err.Error()}
+		}
+
+	} else {
+		err = api.multichainProvider.SyncTokensByUserID(ctx, userID, chains)
+		if err != nil {
+			// Wrap all OpenSea sync failures in a generic type that can be returned to the frontend as an expected error type
+			return ErrTokenRefreshFailed{Message: err.Error()}
+		}
 	}
 
 	return nil

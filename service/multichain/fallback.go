@@ -19,6 +19,7 @@ type SyncWithContractEvalFallbackProvider struct {
 type SyncWithContractEvalPrimary interface {
 	Configurer
 	TokensOwnerFetcher
+	TokensIncrementalOwnerFetcher
 	TokensContractFetcher
 	TokenDescriptorsFetcher
 	TokenMetadataFetcher
@@ -26,6 +27,7 @@ type SyncWithContractEvalPrimary interface {
 
 type SyncWithContractEvalSecondary interface {
 	TokensOwnerFetcher
+	TokensIncrementalOwnerFetcher
 }
 
 // SyncFailureFallbackProvider will call its fallback if the primary Provider's token
@@ -38,6 +40,7 @@ type SyncFailureFallbackProvider struct {
 type SyncFailurePrimary interface {
 	Configurer
 	TokensOwnerFetcher
+	TokensIncrementalOwnerFetcher
 	TokenDescriptorsFetcher
 	TokensContractFetcher
 	ContractsFetcher
@@ -52,13 +55,17 @@ func (f SyncWithContractEvalFallbackProvider) GetBlockchainInfo() BlockchainInfo
 	return f.Primary.GetBlockchainInfo()
 }
 
-func (f SyncWithContractEvalFallbackProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]ChainAgnosticToken, []ChainAgnosticContract, error) {
-	tokens, contracts, err := f.Primary.GetTokensByWalletAddress(ctx, address, limit, offset)
+func (f SyncWithContractEvalFallbackProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address) ([]ChainAgnosticToken, []ChainAgnosticContract, error) {
+	tokens, contracts, err := f.Primary.GetTokensByWalletAddress(ctx, address)
 	if err != nil {
 		return nil, nil, err
 	}
 	tokens = f.resolveTokens(ctx, tokens)
 	return tokens, contracts, nil
+}
+
+func (f SyncWithContractEvalFallbackProvider) GetTokensIncrementallyByWalletAddress(ctx context.Context, address persist.Address) (<-chan ChainAgnosticTokensAndContracts, <-chan error) {
+	return getTokensIncrementallyByWalletAddressWithFallback(ctx, address, f.Primary, f.Fallback, f.resolveTokens, nil)
 }
 
 func (f SyncWithContractEvalFallbackProvider) GetTokensByContractAddress(ctx context.Context, contract persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error) {
@@ -136,14 +143,73 @@ func (f SyncFailureFallbackProvider) GetBlockchainInfo() BlockchainInfo {
 	return f.Primary.GetBlockchainInfo()
 }
 
-func (f SyncFailureFallbackProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]ChainAgnosticToken, []ChainAgnosticContract, error) {
-	tokens, contracts, err := f.Primary.GetTokensByWalletAddress(ctx, address, limit, offset)
+func (f SyncFailureFallbackProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address) ([]ChainAgnosticToken, []ChainAgnosticContract, error) {
+	tokens, contracts, err := f.Primary.GetTokensByWalletAddress(ctx, address)
 	if err != nil {
 		logger.For(ctx).WithError(err).Warn("failed to get tokens by wallet address from primary in failure fallback")
-		return f.Fallback.GetTokensByWalletAddress(ctx, address, limit, offset)
+		return f.Fallback.GetTokensByWalletAddress(ctx, address)
 	}
 
 	return tokens, contracts, nil
+}
+
+func (f SyncFailureFallbackProvider) GetTokensIncrementallyByWalletAddress(ctx context.Context, address persist.Address) (<-chan ChainAgnosticTokensAndContracts, <-chan error) {
+	return getTokensIncrementallyByWalletAddressWithFallback(ctx, address, f.Primary, f.Fallback, nil, nil)
+}
+
+func getTokensIncrementallyByWalletAddressWithFallback(ctx context.Context, address persist.Address, primary TokensIncrementalOwnerFetcher, fallback any, processTokens func(context.Context, []ChainAgnosticToken) []ChainAgnosticToken, processContracts func(context.Context, []ChainAgnosticContract) []ChainAgnosticContract) (<-chan ChainAgnosticTokensAndContracts, <-chan error) {
+	rec := make(chan ChainAgnosticTokensAndContracts)
+	errChan := make(chan error)
+
+	go func() {
+		defer close(rec)
+		// create sub channels so that we can separately keep track of the results and errors and handle them here as opposed to the original receiving channels
+		subRec, subErrChan := primary.GetTokensIncrementallyByWalletAddress(ctx, address)
+		for {
+			select {
+			case err := <-subErrChan:
+				// FIXIT maybe we return an error from the primary that specifies what tokens failed so we don't have to go through the whole process again on a fallback
+				if tiof, ok := fallback.(TokensIncrementalOwnerFetcher); ok {
+					logger.For(ctx).Warnf("failed to get tokens incrementally by wallet address from primary in failure fallback: %s", err)
+					fallbackRec, fallbackErrChan := tiof.GetTokensIncrementallyByWalletAddress(ctx, address)
+					for {
+						select {
+						case err := <-fallbackErrChan:
+							logger.For(ctx).Warnf("failed to get tokens incrementally by wallet address from fallback in failure fallback: %s", err)
+							errChan <- err
+							return
+						case tokens, ok := <-fallbackRec:
+							if !ok {
+								return
+							}
+							if processTokens != nil {
+								tokens.Tokens = processTokens(ctx, tokens.Tokens)
+							}
+							if processContracts != nil {
+								tokens.Contracts = processContracts(ctx, tokens.Contracts)
+							}
+							rec <- tokens
+						}
+					}
+				}
+				errChan <- err
+				return
+
+			case tokens, ok := <-subRec:
+				if !ok {
+					return
+				}
+				if processTokens != nil {
+					tokens.Tokens = processTokens(ctx, tokens.Tokens)
+				}
+				if processContracts != nil {
+					tokens.Contracts = processContracts(ctx, tokens.Contracts)
+				}
+				rec <- tokens
+			}
+		}
+	}()
+	return rec, errChan
 }
 
 func (f SyncFailureFallbackProvider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, id ChainAgnosticIdentifiers, address persist.Address) (ChainAgnosticToken, ChainAgnosticContract, error) {

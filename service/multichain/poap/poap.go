@@ -154,7 +154,7 @@ func (d *Provider) GetBlockchainInfo() multichain.BlockchainInfo {
 }
 
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the Poap Blockchain
-func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 
 	// DOES NOT SUPPORT PAGINATION
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/actions/scan/%s", d.apiURL, addr.String()), nil)
@@ -175,8 +175,26 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 		return nil, nil, err
 	}
 
-	resultTokens, resultContracts := d.poapsToTokens(tokens, limit, offset)
+	resultTokens, resultContracts := d.poapsToTokens(tokens)
 	return resultTokens, resultContracts, nil
+}
+
+func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, addr persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+	rec := make(chan multichain.ChainAgnosticTokensAndContracts)
+	errChan := make(chan error)
+	go func() {
+		defer close(rec)
+		tokens, contracts, err := d.GetTokensByWalletAddress(ctx, addr)
+		if err != nil {
+			errChan <- err
+			return
+		}
+		rec <- multichain.ChainAgnosticTokensAndContracts{
+			Tokens:    tokens,
+			Contracts: contracts,
+		}
+	}()
+	return rec, errChan
 }
 
 // GetTokensByContractAddress retrieves tokens for a contract address on the Poap Blockchain
@@ -314,21 +332,12 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti mu
 }
 
 // we should assume when using this function that the array is all of the tokens un paginated and we will need to paginate it with the offset and limit
-func (d *Provider) poapsToTokens(pPoap []poapToken, limit, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract) {
+func (d *Provider) poapsToTokens(pPoap []poapToken) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract) {
 	tokens := make([]multichain.ChainAgnosticToken, 0, len(pPoap))
 	contracts := make([]multichain.ChainAgnosticContract, 0, len(pPoap))
-	if limit < 1 {
-		limit = len(pPoap)
-	}
-	for i, poap := range pPoap {
-		if i < offset {
-			continue
-		}
+	for _, poap := range pPoap {
 		tokens = append(tokens, d.poapToToken(poap))
 		contracts = append(contracts, d.poapToContract(poap))
-		if i >= (offset + limit) {
-			break
-		}
 	}
 	return tokens, contracts
 }

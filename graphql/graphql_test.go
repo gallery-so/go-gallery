@@ -90,6 +90,7 @@ func testGraphQL(t *testing.T) {
 func testTokenSyncs(t *testing.T) {
 	tests := []testCase{
 		{title: "should sync new tokens", run: testSyncNewTokens},
+		{title: "should sync new tokens incrementally", run: testSyncNewTokensIncrementally},
 		{title: "should sync new tokens multichain", run: testSyncNewTokensMultichain},
 		{title: "should submit new tokens to tokenprocessing", run: testSyncOnlySubmitsNewTokens},
 		{title: "should not submit old tokens to tokenprocessing", run: testSyncSkipsSubmittingOldTokens},
@@ -811,7 +812,7 @@ func testSyncNewTokens(t *testing.T) {
 		h := handlerWithProviders(t, submitUserTokensNoop, provider)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
-		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		require.NoError(t, err)
 		payload := (*response.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
@@ -822,7 +823,37 @@ func testSyncNewTokens(t *testing.T) {
 		h := handlerWithProviders(t, submitUserTokensNoop, provider)
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
-		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
+
+		require.NoError(t, err)
+		payload := (*response.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
+		assert.Len(t, payload.Viewer.User.Tokens, len(provider.Tokens))
+	})
+
+}
+
+func testSyncNewTokensIncrementally(t *testing.T) {
+	userF := newUserFixture(t)
+	provider := defaultStubProvider(userF.Wallet.Address)
+	ctx := context.Background()
+
+	tr := util.ToPointer(true)
+	t.Run("should sync new tokens incrementally", func(t *testing.T) {
+		h := handlerWithProviders(t, submitUserTokensNoop, provider)
+		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, tr)
+
+		require.NoError(t, err)
+		payload := (*response.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
+		assert.Len(t, payload.Viewer.User.Tokens, len(provider.Tokens))
+	})
+
+	t.Run("should not duplicate tokens from repeat incremental syncs", func(t *testing.T) {
+		h := handlerWithProviders(t, submitUserTokensNoop, provider)
+		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, tr)
 
 		require.NoError(t, err)
 		payload := (*response.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
@@ -844,7 +875,7 @@ func testSyncNewTokensMultichain(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("should sync tokens from multiple chains", func(t *testing.T) {
-		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum, ChainOptimism})
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum, ChainOptimism}, nil)
 		require.NoError(t, err)
 		payload := (*response.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
 		assert.Len(t, payload.Viewer.User.Tokens, len(provider.Tokens)*2)
@@ -860,7 +891,7 @@ func testSyncOnlySubmitsNewTokens(t *testing.T) {
 	// Ideally this compares against expected values, but mocks seems to behave weirdly with slices
 	tokenRecorder.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Times(1).Return(nil)
 
-	_, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum})
+	_, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum}, nil)
 
 	require.NoError(t, err)
 	tokenRecorder.AssertExpectations(t)
@@ -873,7 +904,7 @@ func testSyncSkipsSubmittingOldTokens(t *testing.T) {
 	h := handlerWithProviders(t, tokenRecorder.Send, defaultStubProvider(userF.Wallet.Address))
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
-	_, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum})
+	_, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum}, nil)
 
 	require.NoError(t, err)
 	tokenRecorder.AssertNotCalled(t, "Send", mock.Anything, mock.Anything)
@@ -890,7 +921,7 @@ func testSyncDeletesOldTokens(t *testing.T) {
 	h := handlerWithProviders(t, submitUserTokensNoop, provider)
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
-	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum})
+	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum}, nil)
 
 	assertSyncedTokens(t, response, err, 4)
 }
@@ -912,7 +943,7 @@ func testSyncShouldCombineProviders(t *testing.T) {
 	h := handlerWithProviders(t, submitUserTokensNoop, providerA, providerB)
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
-	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum})
+	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum}, nil)
 
 	assertSyncedTokens(t, response, err, 4)
 }
@@ -930,7 +961,7 @@ func testSyncShouldMergeDuplicatesInProvider(t *testing.T) {
 	h := handlerWithProviders(t, submitUserTokensNoop, provider)
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
-	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum})
+	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum}, nil)
 
 	assertSyncedTokens(t, response, err, 1)
 }
@@ -946,7 +977,7 @@ func testSyncShouldMergeDuplicatesAcrossProviders(t *testing.T) {
 	h := handlerWithProviders(t, submitUserTokensNoop, providerA, providerB)
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
-	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum})
+	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum}, nil)
 
 	assertSyncedTokens(t, response, err, 1)
 }
@@ -980,7 +1011,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/image")
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
-		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
@@ -994,7 +1025,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/video")
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
-		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia)
@@ -1008,7 +1039,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/iframe")
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
-		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaHtmlMedia)
@@ -1022,7 +1053,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/gif")
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
-		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGIFMedia)
@@ -1036,7 +1067,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/bad")
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
-		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia)
@@ -1049,7 +1080,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/notfound")
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
-		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia)
@@ -1062,7 +1093,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/media/bad")
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
-		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia)
@@ -1075,7 +1106,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/media/notfound")
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
-		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia)
@@ -1088,7 +1119,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/svg")
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
-		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
@@ -1102,7 +1133,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/base64svg")
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
-		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
@@ -1117,7 +1148,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/base64")
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
-		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
@@ -1131,7 +1162,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/media/ipfs")
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
-		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
@@ -1145,7 +1176,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/media/dnsbad")
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
-		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaSyncingMedia)
@@ -1158,7 +1189,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/differentkeyword")
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
-		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
@@ -1172,7 +1203,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/wrongkeyword")
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
-		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaVideoMedia)
@@ -1186,7 +1217,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/animation")
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
-		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaGltfMedia)
@@ -1200,7 +1231,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/pdf")
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
-		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaPdfMedia)
@@ -1214,7 +1245,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/text")
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
-		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaTextMedia)
@@ -1228,7 +1259,7 @@ func testSyncShouldProcessMedia(t *testing.T) {
 		h := patchMetadata(t, ctx, userF.Wallet.Address, "/metadata/badimage")
 		c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
 
-		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum}, nil)
 
 		tokens := assertSyncedTokens(t, response, err, 1)
 		media := (*tokens[0].Media).(*syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserTokensTokenMediaImageMedia)
@@ -1319,7 +1350,7 @@ func newUser(t *testing.T, ctx context.Context, c genql.Client, w wallet) (userI
 // syncTokens makes a GraphQL request to sync a user's wallet
 func syncTokens(t *testing.T, ctx context.Context, c genql.Client, userID persist.DBID) []persist.DBID {
 	t.Helper()
-	resp, err := syncTokensMutation(ctx, c, []Chain{"Ethereum"})
+	resp, err := syncTokensMutation(ctx, c, []Chain{"Ethereum"}, nil)
 	require.NoError(t, err)
 	if err, ok := (*resp.SyncTokens).(*syncTokensMutationSyncTokensErrSyncFailed); ok {
 		t.Fatal(err.Message)

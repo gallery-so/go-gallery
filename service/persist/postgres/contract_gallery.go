@@ -20,6 +20,7 @@ type ContractGalleryRepository struct {
 	getByIDStmt           *sql.Stmt
 	getByAddressStmt      *sql.Stmt
 	getByAddressesStmt    *sql.Stmt
+	getByTokenIDsStmt     *sql.Stmt
 	upsertByAddressStmt   *sql.Stmt
 	getOwnersStmt         *sql.Stmt
 	getUserByWalletIDStmt *sql.Stmt
@@ -38,6 +39,9 @@ func NewContractGalleryRepository(db *sql.DB, queries *db.Queries) *ContractGall
 	checkNoErr(err)
 
 	getByAddressesStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,SYMBOL,NAME,OWNER_ADDRESS,CHAIN,IS_PROVIDER_MARKED_SPAM FROM contracts WHERE ADDRESS = ANY($1) AND CHAIN = $2 AND DELETED = false;`)
+	checkNoErr(err)
+
+	getByTokenIDsStmt, err := db.PrepareContext(ctx, `select distinct on (contracts.ID) contracts.ID,contracts.VERSION,contracts.CREATED_AT,contracts.LAST_UPDATED,contracts.ADDRESS,contracts.SYMBOL,contracts.NAME,contracts.OWNER_ADDRESS,contracts.CHAIN,contracts.IS_PROVIDER_MARKED_SPAM from contracts join tokens on contracts.id = tokens.contract where tokens.id = any($1) and contracts.deleted = false ORDER BY contracts.ID;`)
 	checkNoErr(err)
 
 	upsertByAddressStmt, err := db.PrepareContext(ctx, `
@@ -70,7 +74,7 @@ func NewContractGalleryRepository(db *sql.DB, queries *db.Queries) *ContractGall
 	getPreviewNFTsStmt, err := db.PrepareContext(ctx, `SELECT coalesce(nullif(token_medias.media->>'thumbnail_url', ''), nullif(token_medias.media->>'media_url', ''))::varchar FROM tokens LEFT JOIN token_medias ON token_medias.ID = tokens.TOKEN_MEDIA_ID WHERE tokens.CONTRACT = $1 AND tokens.DISPLAYABLE AND tokens.DELETED = false AND tokens.OWNED_BY_WALLETS && $2 AND (LENGTH(token_medias.MEDIA->>'thumbnail_url') > 0 or LENGTH(token_medias.MEDIA->>'media_url') > 0) ORDER BY tokens.ID LIMIT 3`)
 	checkNoErr(err)
 
-	return &ContractGalleryRepository{db: db, queries: queries, getByIDStmt: getByIDStmt, getByAddressStmt: getByAddressStmt, upsertByAddressStmt: upsertByAddressStmt, getByAddressesStmt: getByAddressesStmt, getOwnersStmt: getOwnersStmt, getUserByWalletIDStmt: getUserByWalletIDStmt, getPreviewNFTsStmt: getPreviewNFTsStmt}
+	return &ContractGalleryRepository{db: db, queries: queries, getByIDStmt: getByIDStmt, getByAddressStmt: getByAddressStmt, upsertByAddressStmt: upsertByAddressStmt, getByAddressesStmt: getByAddressesStmt, getOwnersStmt: getOwnersStmt, getUserByWalletIDStmt: getUserByWalletIDStmt, getPreviewNFTsStmt: getPreviewNFTsStmt, getByTokenIDsStmt: getByTokenIDsStmt}
 }
 
 func (c *ContractGalleryRepository) GetByID(ctx context.Context, id persist.DBID) (persist.ContractGallery, error) {
@@ -104,6 +108,30 @@ func (c *ContractGalleryRepository) GetByAddress(pCtx context.Context, pAddress 
 func (c *ContractGalleryRepository) GetByAddresses(pCtx context.Context, pAddresses []persist.Address, pChain persist.Chain) ([]persist.ContractGallery, error) {
 	res := []persist.ContractGallery{}
 	rows, err := c.getByAddressesStmt.QueryContext(pCtx, pAddresses, pChain)
+	if err != nil {
+		return res, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var contract persist.ContractGallery
+		err := rows.Scan(&contract.ID, &contract.Version, &contract.CreationTime, &contract.LastUpdated, &contract.Address, &contract.Symbol, &contract.Name, &contract.OwnerAddress, &contract.Chain, &contract.IsProviderMarkedSpam)
+		if err != nil {
+			return res, err
+		}
+		res = append(res, contract)
+	}
+
+	if err := rows.Err(); err != nil {
+		return res, err
+	}
+
+	return res, nil
+}
+
+func (c *ContractGalleryRepository) GetByTokenIDs(pCtx context.Context, pDBIDs persist.DBIDList) ([]persist.ContractGallery, error) {
+	res := []persist.ContractGallery{}
+	rows, err := c.getByTokenIDsStmt.QueryContext(pCtx, pDBIDs)
 	if err != nil {
 		return res, err
 	}

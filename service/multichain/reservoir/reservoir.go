@@ -197,20 +197,29 @@ func (d *Provider) GetBlockchainInfo() multichain.BlockchainInfo {
 	}
 }
 
-func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
-	tokens, err := d.getTokensByWalletAddressPaginate(ctx, addr, "")
-	if err != nil {
-		return nil, nil, err
-	}
-	t, c := d.tokensWithOwnershipToAgnosticTokens(ctx, tokens, addr)
-	return t, c, nil
+func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+	return d.getTokensByWalletAddressPaginate(ctx, addr, "", nil)
 }
 
-func (d *Provider) getTokensByWalletAddressPaginate(ctx context.Context, addr persist.Address, pageKey string) ([]TokenWithOwnership, error) {
+func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, addr persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
+	rec := make(chan multichain.ChainAgnosticTokensAndContracts)
+	errChan := make(chan error)
+	go func() {
+		defer close(rec)
+		_, _, err := d.getTokensByWalletAddressPaginate(ctx, addr, "", rec)
+		if err != nil {
+			errChan <- err
+			return
+		}
+	}()
+	return rec, errChan
+}
+
+func (d *Provider) getTokensByWalletAddressPaginate(ctx context.Context, addr persist.Address, pageKey string, rec chan<- multichain.ChainAgnosticTokensAndContracts) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	u := fmt.Sprintf("%s/users/%s/tokens/v7", d.apiURL, addr)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	req.Header.Add("x-api-key", d.apiKey)
 	q := req.URL.Query()
@@ -223,24 +232,34 @@ func (d *Provider) getTokensByWalletAddressPaginate(ctx context.Context, addr pe
 
 	resp, err := d.httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var result TokensResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	tokens := result.Tokens
-	if len(tokens) == 200 && result.Continuation != "" {
-		nextPageTokens, err := d.getTokensByWalletAddressPaginate(ctx, addr, result.Continuation)
-		if err != nil {
-			return nil, err
+	tokens, contracts := d.tokensWithOwnershipToAgnosticTokens(ctx, result.Tokens, addr)
+
+	if rec != nil {
+		rec <- multichain.ChainAgnosticTokensAndContracts{
+			Tokens:    tokens,
+			Contracts: contracts,
 		}
-		tokens = append(tokens, nextPageTokens...)
 	}
 
-	return tokens, nil
+	if len(tokens) == 200 && result.Continuation != "" {
+		nextPageTokens, nextPageContracts, err := d.getTokensByWalletAddressPaginate(ctx, addr, result.Continuation, rec)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		tokens = append(tokens, nextPageTokens...)
+		contracts = append(contracts, nextPageContracts...)
+	}
+
+	return tokens, contracts, nil
 }
 func (d *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	u := fmt.Sprintf("%s/users/%s/tokens/v7", d.apiURL, ownerAddress)

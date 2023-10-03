@@ -127,6 +127,7 @@ func ethProvidersConfig(indexerProvider *eth.Provider, openseaProvider *opensea.
 		wire.Bind(new(multichain.Verifier), util.ToPointer(indexerProvider)),
 		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(fallbackProvider)),
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(alchemyProvider)),
+		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(fallbackProvider)),
 		wire.Bind(new(multichain.ContractsFetcher), util.ToPointer(fallbackProvider)),
 		wire.Bind(new(multichain.ContractRefresher), util.ToPointer(indexerProvider)),
 		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(indexerProvider)),
@@ -144,6 +145,7 @@ func ethRequirements(
 	v multichain.Verifier,
 	tof multichain.TokensOwnerFetcher,
 	toc multichain.TokensContractFetcher,
+	tiof multichain.TokensIncrementalOwnerFetcher,
 	cf multichain.ContractsFetcher,
 	cr multichain.ContractRefresher,
 	tmf multichain.TokenMetadataFetcher,
@@ -151,7 +153,7 @@ func ethRequirements(
 	tdf multichain.TokenDescriptorsFetcher,
 	osccf multichain.OpenSeaChildContractFetcher,
 ) ethProviderList {
-	return ethProviderList{nr, v, tof, toc, cf, cr, tmf, tcof, tdf, osccf}
+	return ethProviderList{nr, v, tof, toc, tiof, cf, cr, tmf, tcof, tdf, osccf}
 }
 
 // tezosProviderSet is a wire injector that creates the set of Tezos providers
@@ -170,6 +172,7 @@ func tezosProviderSet(envInit, *http.Client) tezosProviderList {
 func tezosProvidersConfig(tezosProvider multichain.SyncWithContractEvalFallbackProvider) tezosProviderList {
 	wire.Build(
 		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(tezosProvider)),
+		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(tezosProvider)),
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(tezosProvider)),
 		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(tezosProvider)),
 		tezosRequirements,
@@ -180,10 +183,11 @@ func tezosProvidersConfig(tezosProvider multichain.SyncWithContractEvalFallbackP
 // tezosRequirements is the set of provider interfaces required for Tezos
 func tezosRequirements(
 	tof multichain.TokensOwnerFetcher,
+	tiof multichain.TokensIncrementalOwnerFetcher,
 	toc multichain.TokensContractFetcher,
 	tmf multichain.TokenMetadataFetcher,
 ) tezosProviderList {
-	return tezosProviderList{tof, toc, tmf}
+	return tezosProviderList{tof, tiof, toc, tmf}
 }
 
 // optimismProviderSet is a wire injector that creates the set of Optimism providers
@@ -204,6 +208,7 @@ func optimismProviderSet(*http.Client) optimismProviderList {
 func optimismProvidersConfig(optimismProvider *optimismProvider, openseaProvier *opensea.Provider) optimismProviderList {
 	wire.Build(
 		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(optimismProvider)),
+		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(optimismProvider)),
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(optimismProvider)),
 		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(optimismProvider)),
 		wire.Bind(new(multichain.OpenSeaChildContractFetcher), util.ToPointer(openseaProvier)),
@@ -215,11 +220,12 @@ func optimismProvidersConfig(optimismProvider *optimismProvider, openseaProvier 
 // optimismRequirements is the set of provider interfaces required for Optimism
 func optimismRequirements(
 	tof multichain.TokensOwnerFetcher,
+	tiof multichain.TokensIncrementalOwnerFetcher,
 	toc multichain.TokensContractFetcher,
 	tmf multichain.TokenMetadataFetcher,
 	opensea multichain.OpenSeaChildContractFetcher,
 ) optimismProviderList {
-	return optimismProviderList{tof, toc, tmf, opensea}
+	return optimismProviderList{tof, toc, tiof, tmf, opensea}
 }
 
 // arbitrumProviderSet is a wire injector that creates the set of Arbitrum providers
@@ -240,6 +246,7 @@ func arbitrumProviderSet(*http.Client) arbitrumProviderList {
 func arbitrumProvidersConfig(arbitrumProvider *arbitrumProvider, openseaProvider *opensea.Provider) arbitrumProviderList {
 	wire.Build(
 		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(arbitrumProvider)),
+		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(arbitrumProvider)),
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(arbitrumProvider)),
 		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(arbitrumProvider)),
 		wire.Bind(new(multichain.OpenSeaChildContractFetcher), util.ToPointer(openseaProvider)),
@@ -252,12 +259,13 @@ func arbitrumProvidersConfig(arbitrumProvider *arbitrumProvider, openseaProvider
 // arbitrumRequirements is the set of provider interfaces required for Arbitrum
 func arbitrumRequirements(
 	tof multichain.TokensOwnerFetcher,
+	tiof multichain.TokensIncrementalOwnerFetcher,
 	toc multichain.TokensContractFetcher,
 	tmf multichain.TokenMetadataFetcher,
 	opensea multichain.OpenSeaChildContractFetcher,
 	tdf multichain.TokenDescriptorsFetcher,
 ) arbitrumProviderList {
-	return arbitrumProviderList{tof, toc, tmf, opensea, tdf}
+	return arbitrumProviderList{tof, toc, tiof, tmf, opensea, tdf}
 }
 
 // poapProviderSet is a wire injector that creates the set of POAP providers
@@ -275,6 +283,7 @@ func poapProvidersConfig(poapProvider *poap.Provider) poapProviderList {
 	wire.Build(
 		wire.Bind(new(multichain.NameResolver), util.ToPointer(poapProvider)),
 		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(poapProvider)),
+		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(poapProvider)),
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(poapProvider)),
 		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(poapProvider)),
 		poapRequirements,
@@ -286,10 +295,11 @@ func poapProvidersConfig(poapProvider *poap.Provider) poapProviderList {
 func poapRequirements(
 	nr multichain.NameResolver,
 	tof multichain.TokensOwnerFetcher,
+	tiof multichain.TokensIncrementalOwnerFetcher,
 	toc multichain.TokensContractFetcher,
 	tmf multichain.TokenMetadataFetcher,
 ) poapProviderList {
-	return poapProviderList{nr, tof, toc, tmf}
+	return poapProviderList{nr, tof, tiof, toc, tmf}
 }
 
 // zoraProviderSet is a wire injector that creates the set of zora providers
@@ -307,6 +317,7 @@ func zoraProvidersConfig(zoraProvider *zora.Provider) zoraProviderList {
 	wire.Build(
 		wire.Bind(new(multichain.ContractsFetcher), util.ToPointer(zoraProvider)),
 		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(zoraProvider)),
+		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(zoraProvider)),
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(zoraProvider)),
 		wire.Bind(new(multichain.ContractsOwnerFetcher), util.ToPointer(zoraProvider)),
 		wire.Bind(new(multichain.TokenMetadataFetcher), util.ToPointer(zoraProvider)),
@@ -319,11 +330,12 @@ func zoraProvidersConfig(zoraProvider *zora.Provider) zoraProviderList {
 func zoraRequirements(
 	nr multichain.ContractsFetcher,
 	tof multichain.TokensOwnerFetcher,
+	tiof multichain.TokensIncrementalOwnerFetcher,
 	toc multichain.TokensContractFetcher,
 	tcof multichain.ContractsOwnerFetcher,
 	tmf multichain.TokenMetadataFetcher,
 ) zoraProviderList {
-	return zoraProviderList{nr, tof, toc, tcof, tmf}
+	return zoraProviderList{nr, tof, tiof, toc, tcof, tmf}
 }
 
 func baseProviderSet(*http.Client) baseProviderList {
@@ -340,6 +352,7 @@ func baseProviderSet(*http.Client) baseProviderList {
 func baseProvidersConfig(baseProvider *reservoir.Provider) baseProviderList {
 	wire.Build(
 		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(baseProvider)),
+		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(baseProvider)),
 		wire.Bind(new(multichain.TokenDescriptorsFetcher), util.ToPointer(baseProvider)),
 		baseRequirements,
 	)
@@ -349,9 +362,10 @@ func baseProvidersConfig(baseProvider *reservoir.Provider) baseProviderList {
 // zoraRequirements is the set of provider interfaces required for zora
 func baseRequirements(
 	tof multichain.TokensOwnerFetcher,
+	tiof multichain.TokensIncrementalOwnerFetcher,
 	tdf multichain.TokenDescriptorsFetcher,
 ) baseProviderList {
-	return baseProviderList{tof, tdf}
+	return baseProviderList{tof, tiof, tdf}
 }
 
 // polygonProviderSet is a wire injector that creates the set of polygon providers
@@ -372,6 +386,7 @@ func polygonProviderSet(*http.Client) polygonProviderList {
 func polygonProvidersConfig(polygonProvider *polygonProvider, openseaProvider *opensea.Provider) polygonProviderList {
 	wire.Build(
 		wire.Bind(new(multichain.TokensOwnerFetcher), util.ToPointer(polygonProvider)),
+		wire.Bind(new(multichain.TokensIncrementalOwnerFetcher), util.ToPointer(polygonProvider)),
 		wire.Bind(new(multichain.TokensContractFetcher), util.ToPointer(polygonProvider)),
 		wire.Bind(new(multichain.OpenSeaChildContractFetcher), util.ToPointer(openseaProvider)),
 		polygonRequirements,
@@ -382,10 +397,11 @@ func polygonProvidersConfig(polygonProvider *polygonProvider, openseaProvider *o
 // polygonRequirements is the set of provider interfaces required for Polygon
 func polygonRequirements(
 	tof multichain.TokensOwnerFetcher,
+	tiof multichain.TokensIncrementalOwnerFetcher,
 	toc multichain.TokensContractFetcher,
 	opensea multichain.OpenSeaChildContractFetcher,
 ) polygonProviderList {
-	return polygonProviderList{tof, toc, opensea}
+	return polygonProviderList{tof, tiof, toc, opensea}
 }
 
 // newMultichain is a wire provider that creates a multichain provider
