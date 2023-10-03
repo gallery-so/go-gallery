@@ -997,8 +997,35 @@ func (api InteractionAPI) comment(ctx context.Context, comment string, feedEvent
 		return "", err
 	}
 
+	var replyToUser *persist.DBID
+	if replyToID != nil {
+		err = event.Dispatch(ctx, db.Event{
+			ActorID:        persist.DBIDToNullStr(actor),
+			ResourceTypeID: persist.ResourceTypeComment,
+			SubjectID:      *replyToID,
+			PostID:         postID,
+			FeedEventID:    feedEventID,
+			CommentID:      commentID,
+			Action:         persist.ActionReplyToComment,
+		})
+		if err != nil {
+			return "", err
+		}
+
+		replyToComment, err := api.GetCommentByID(ctx, *replyToID)
+		if err != nil {
+			return "", err
+		}
+
+		replyToUser = &replyToComment.ActorID
+	}
+
 	if len(mentions) > 0 {
 		for _, mention := range resultMentions {
+
+			if replyToUser != nil && mention.UserID == *replyToUser {
+				continue
+			}
 
 			switch {
 			case mention.UserID != "":
@@ -1032,21 +1059,6 @@ func (api InteractionAPI) comment(ctx context.Context, comment string, feedEvent
 			default:
 				return "", fmt.Errorf("invalid mention type: %+v", mention)
 			}
-		}
-	}
-
-	if replyToID != nil {
-		err = event.Dispatch(ctx, db.Event{
-			ActorID:        persist.DBIDToNullStr(actor),
-			ResourceTypeID: persist.ResourceTypeComment,
-			SubjectID:      *replyToID,
-			PostID:         postID,
-			FeedEventID:    feedEventID,
-			CommentID:      commentID,
-			Action:         persist.ActionReplyToComment,
-		})
-		if err != nil {
-			return "", err
 		}
 	}
 
