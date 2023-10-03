@@ -26,12 +26,16 @@ type ContractGallery struct {
 	BadgeURL              NullString `json:"badge_url"`
 	IsProviderMarkedSpam  bool       `json:"is_provider_marked_spam"`
 	OverrideCreatorUserID DBID       `json:"override_creator_user_id"`
+
+	// this will not be persisted, only used in memory for contract comparison
+	Priority *int `json:"-"`
 }
 
 // ContractGalleryRepository represents a repository for interacting with persisted contracts
 type ContractGalleryRepository interface {
 	GetByID(ctx context.Context, id DBID) (ContractGallery, error)
 	GetByAddress(context.Context, Address, Chain) (ContractGallery, error)
+	GetByTokenIDs(context.Context, DBIDList) ([]ContractGallery, error)
 	UpsertByAddress(context.Context, Address, Chain, ContractGallery) error
 	BulkUpsert(context.Context, []ContractGallery, bool) ([]ContractGallery, error)
 	GetOwnersByAddress(context.Context, Address, Chain, int, int) ([]TokenHolder, error)

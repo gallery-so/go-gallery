@@ -2683,7 +2683,7 @@ type Mutation {
   updateTokenInfo(input: UpdateTokenInfoInput!): UpdateTokenInfoPayloadOrError @authRequired
   setSpamPreference(input: SetSpamPreferenceInput!): SetSpamPreferencePayloadOrError @authRequired
 
-  syncTokens(chains: [Chain!]): SyncTokensPayloadOrError @authRequired
+  syncTokens(chains: [Chain!], incrementally: Boolean): SyncTokensPayloadOrError @authRequired
   syncCreatedTokensForNewContracts(
     input: SyncCreatedTokensForNewContractsInput!
   ): SyncCreatedTokensForNewContractsPayloadOrError @authRequired

@@ -268,8 +268,8 @@ mutation removeUserWalletsMutation($walletIds: [DBID!]!) {
   }
 }
 
-mutation syncTokensMutation($chains: [Chain!]) {
-  syncTokens(chains: $chains) {
+mutation syncTokensMutation($chains: [Chain!], $incrementally: Boolean) {
+  syncTokens(chains: $chains, incrementally: $incrementally) {
     ... on Error {
       __typename
       message

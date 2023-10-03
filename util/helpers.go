@@ -238,6 +238,25 @@ func Dedupe[T comparable](src []T, filterInPlace bool) []T {
 	return result
 }
 
+// DedupeWithTranslate can be used when T is not good for comparison or there should be some other value used for comparison as opposed to golang equality check
+func DedupeWithTranslate[T any, V comparable](src []T, filterInPlace bool, translate func(T) V) []T {
+	var result []T
+	if filterInPlace {
+		result = src[:0]
+	} else {
+		result = make([]T, 0, len(src))
+	}
+	seen := make(map[V]bool)
+	for _, x := range src {
+		v := translate(x)
+		if !seen[v] {
+			result = append(result, x)
+			seen[v] = true
+		}
+	}
+	return result
+}
+
 func Contains[T comparable](s []T, str T) bool {
 	for _, v := range s {
 		if v == str {
