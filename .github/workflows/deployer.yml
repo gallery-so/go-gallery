@@ -169,7 +169,7 @@ jobs:
           gcp-credentials-json: ${{ secrets.GCP_PROD_CREDENTIALS }}
       - name: 'Deploy'
         run: make deploy-prod-pushnotifications
-  deploy-dev-autosocials:
+  deploy-dev-autosocial:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -179,8 +179,8 @@ jobs:
           sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
           gcp-credentials-json: ${{ secrets.GCP_DEV_CREDENTIALS }}
       - name: 'Deploy'
-        run: make deploy-dev-autosocials
-  deploy-prod-autosocials:
+        run: make deploy-dev-autosocial
+  deploy-prod-autosocial:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -190,8 +190,8 @@ jobs:
           sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
           gcp-credentials-json: ${{ secrets.GCP_PROD_CREDENTIALS }}
       - name: 'Deploy'
-        run: make deploy-prod-autosocials
-  deploy-dev-autosocials-orchestrator:
+        run: make deploy-prod-autosocial
+  deploy-dev-autosocial-orchestrator:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -201,8 +201,8 @@ jobs:
           sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
           gcp-credentials-json: ${{ secrets.GCP_DEV_CREDENTIALS }}
       - name: 'Deploy'
-        run: make deploy-dev-autosocials-orch
-  deploy-prod-autosocials-orchestrator:
+        run: make deploy-dev-autosocial-orch
+  deploy-prod-autosocial-orchestrator:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -212,4 +212,4 @@ jobs:
           sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
           gcp-credentials-json: ${{ secrets.GCP_PROD_CREDENTIALS }}
       - name: 'Deploy'
-        run: make deploy-prod-autosocials-orch
+        run: make deploy-prod-autosocial-orch
