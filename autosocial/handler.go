@@ -32,18 +32,15 @@ func processUsers(q *coredb.Queries, n *farcaster.NeynarAPI, l *lens.LensAPI) gi
 			userID := u
 			socials := s
 
-			if address, ok := socials[persist.SocialProviderLens]; ok {
-
+			if addresses, ok := socials[persist.SocialProviderLens]; ok {
 				lp.Go(func(ctx context.Context) error {
-					return addLensProfileToUser(ctx, l, address, q, userID)
-
+					return addLensProfileToUser(ctx, l, addresses, q, userID)
 				})
 			}
 
-			if address, ok := socials[persist.SocialProviderFarcaster]; ok {
+			if addresses, ok := socials[persist.SocialProviderFarcaster]; ok {
 				fp.Go(func(ctx context.Context) error {
-					return addFarcasterProfileToUser(ctx, n, address, q, userID)
-
+					return addFarcasterProfileToUser(ctx, n, addresses, q, userID)
 				})
 			}
 		}
@@ -86,6 +83,9 @@ func addLensProfileToUser(ctx context.Context, l *lens.LensAPI, address []persis
 				continue
 			}
 		}
+		if u.ID == "" {
+			continue
+		}
 		logrus.Infof("got lens user %s %s %s %s", u.Name, u.Handle, u.Picture.Optimized.URL, u.Bio)
 		return q.AddSocialToUser(ctx, coredb.AddSocialToUserParams{
 			UserID: userID,
@@ -117,14 +117,17 @@ func addFarcasterProfileToUser(ctx context.Context, n *farcaster.NeynarAPI, addr
 		if err != nil {
 			continue
 		}
-		logrus.Infof("got farcaster user %s %s %s %s", u.Username, u.DisplayName, u.Pfp.URL, u.Profile.Bio.Text)
+		if u.Fid.String() == "" {
+			continue
+		}
 
+		logrus.Infof("got farcaster user %s %s %s %s", u.Username, u.DisplayName, u.Pfp.URL, u.Profile.Bio.Text)
 		return q.AddSocialToUser(ctx, coredb.AddSocialToUserParams{
 			UserID: userID,
 			Socials: persist.Socials{
 				persist.SocialProviderFarcaster: persist.SocialUserIdentifiers{
 					Provider: persist.SocialProviderFarcaster,
-					ID:       u.Fid,
+					ID:       u.Fid.String(),
 					Display:  true,
 					Metadata: map[string]interface{}{
 						"username":          u.Username,
