@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"cloud.google.com/go/cloudtasks/apiv2/cloudtaskspb"
+	"github.com/mikeydub/go-gallery/autosocial"
 	migrate "github.com/mikeydub/go-gallery/db"
 	"github.com/mikeydub/go-gallery/docker"
 	"github.com/mikeydub/go-gallery/graphql/dummymetadata"
@@ -101,6 +102,22 @@ func useTokenQueue(t *testing.T) {
 	t.Setenv("TOKEN_PROCESSING_QUEUE", queue.Name)
 }
 
+func useAutosocialQueue(t *testing.T) {
+	t.Helper()
+	useCloudTasks(t)
+	ctx := context.Background()
+	client := task.NewClient(ctx)
+	defer client.Close()
+	queue, err := client.CreateQueue(ctx, &cloudtaskspb.CreateQueueRequest{
+		Parent: "projects/gallery-test/locations/here",
+		Queue: &cloudtaskspb.Queue{
+			Name: "projects/gallery-test/locations/here/queues/autosocial-" + persist.GenerateID().String(),
+		},
+	})
+	require.NoError(t, err)
+	t.Setenv("AUTOSOCIAL_QUEUE", queue.Name)
+}
+
 // useNotificationTopics is a fixture that creates dummy PubSub topics for notifications
 func useNotificationTopics(t *testing.T) {
 	t.Helper()
@@ -149,6 +166,16 @@ func useTokenProcessing(t *testing.T) {
 		server.Close()
 		c.Close()
 		cleanup()
+	})
+}
+
+func useAutosocial(t *testing.T) {
+	t.Helper()
+	ctx := context.Background()
+	server := httptest.NewServer(autosocial.CoreInitServer(ctx))
+	t.Setenv("AUTOSOCIAL_URL", server.URL)
+	t.Cleanup(func() {
+		server.Close()
 	})
 }
 

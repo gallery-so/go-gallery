@@ -63,6 +63,7 @@ require (
 	cloud.google.com/go/compute/metadata v0.2.3
 	cloud.google.com/go/storage v1.30.1
 	github.com/ertan/go-farcaster v1.0.0-beta
+	github.com/gallery-so/fracdex v0.0.0-20231002204609-f530b8914277
 	github.com/golang-jwt/jwt/v5 v5.0.0
 	github.com/google/wire v0.5.0
 	github.com/james-bowman/sparse v0.0.0-20210729090128-1e6c7dd483e9
@@ -125,7 +126,6 @@ require (
 	github.com/everFinance/ttcrsa v1.1.3 // indirect
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
-	github.com/gallery-so/fracdex v0.0.0-20231002204609-f530b8914277 // indirect
 	github.com/gammazero/deque v0.1.1 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect

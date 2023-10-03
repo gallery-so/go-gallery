@@ -62,6 +62,10 @@ type PostPreflightMessage struct {
 	UserID persist.DBID             `json:"user_id"`
 }
 
+type AutosocialProcessUsersMessage struct {
+	Users map[persist.DBID]map[persist.SocialProvider][]persist.ChainAddress `json:"users" binding:"required"`
+}
+
 type TokenIdentifiersQuantities map[persist.TokenUniqueIdentifiers]persist.HexString
 
 func (t TokenIdentifiersQuantities) MarshalJSON() ([]byte, error) {
@@ -203,6 +207,14 @@ func CreateTaskForPostPreflight(ctx context.Context, message PostPreflightMessag
 	defer tracing.FinishSpan(span)
 	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
 	url := fmt.Sprintf("%s/media/process/post-preflight", env.GetString("TOKEN_PROCESSING_URL"))
+	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span))
+}
+
+func CreateTaskForAutosocialProcessUsers(ctx context.Context, message AutosocialProcessUsersMessage, client *gcptasks.Client) error {
+	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForAutosocialProcessUsers")
+	defer tracing.FinishSpan(span)
+	queue := env.GetString("AUTOSOCIAL_QUEUE")
+	url := fmt.Sprintf("%s/process/users", env.GetString("AUTOSOCIAL_URL"))
 	return submitTask(ctx, client, queue, url, withJSON(message), withTrace(span))
 }
 

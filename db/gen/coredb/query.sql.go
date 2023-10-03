@@ -4923,6 +4923,42 @@ func (q *Queries) GetUsersWithTrait(ctx context.Context, dollar_1 string) ([]Use
 	return items, nil
 }
 
+const getUsersWithoutSocials = `-- name: GetUsersWithoutSocials :many
+select u.id, w.address, u.pii_socials->>'Lens' is null, u.pii_socials->>'Farcaster' is null from pii.user_view u join wallets w on w.id = any(u.wallets) where u.deleted = false and w.chain = 0 and w.deleted = false and u.universal = false and (u.pii_socials->>'Lens' is null or u.pii_socials->>'Farcaster' is null) order by u.created_at desc
+`
+
+type GetUsersWithoutSocialsRow struct {
+	ID      persist.DBID    `json:"id"`
+	Address persist.Address `json:"address"`
+	Column3 interface{}     `json:"column_3"`
+	Column4 interface{}     `json:"column_4"`
+}
+
+func (q *Queries) GetUsersWithoutSocials(ctx context.Context) ([]GetUsersWithoutSocialsRow, error) {
+	rows, err := q.db.Query(ctx, getUsersWithoutSocials)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetUsersWithoutSocialsRow
+	for rows.Next() {
+		var i GetUsersWithoutSocialsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Address,
+			&i.Column3,
+			&i.Column4,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getVisibleCollectionsByIDsPaginate = `-- name: GetVisibleCollectionsByIDsPaginate :many
 select collections.id, collections.deleted, collections.owner_user_id, collections.nfts, collections.version, collections.last_updated, collections.created_at, collections.hidden, collections.collectors_note, collections.name, collections.layout, collections.token_settings, collections.gallery_id
 from collections, unnest($2::varchar[]) with ordinality as t(id, pos)

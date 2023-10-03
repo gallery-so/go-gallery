@@ -231,6 +231,8 @@ func SetDefaults() {
 	viper.SetDefault("NEYNAR_API_KEY", "")
 	viper.SetDefault("EMAILS_QUEUE", "projects/gallery-local/locations/here/queues/email")
 	viper.SetDefault("EMAILS_TASK_SECRET", "emails-task-secret")
+	viper.SetDefault("AUTOSOCIAL_URL", "")
+	viper.SetDefault("AUTOSOCIAL_QUEUE", "")
 
 	viper.AutomaticEnv()
 
