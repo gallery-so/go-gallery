@@ -12,16 +12,10 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
-type idAddressTuple struct {
-	ID      persist.DBID
-	Address persist.ChainAddress
-	Social  persist.SocialProvider
-}
-
 func processAllUsers(pg *pgxpool.Pool, ctc *cloudtasks.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		noSocials, err := pg.Query(c, `select u.id, w.address, u.pii_socials->>'Lens' is null, u.pii_socials->>'Farcaster' is null from pii.user_view u join wallets w on w.id = any(u.wallets) where u.deleted = false and w.chain = 0 and w.deleted = false and u.universal = false and (u.pii_socials->>'Lens' is null or u.pii_socials->>'Farcaster' is null) order by u.created_at desc;`)
+		noSocials, err := pg.Query(c, `select u.id, w.address, u.pii_socials->>'Lens' is null, u.pii_socials->>'Farcaster' is null from pii.user_view u join wallets w on w.id = any(u.wallets) where u.deleted = false and w.chain = any($1) and w.deleted = false and u.universal = false and (u.pii_socials->>'Lens' is null or u.pii_socials->>'Farcaster' is null) order by u.created_at desc;`, persist.EvmChains)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -30,7 +24,6 @@ func processAllUsers(pg *pgxpool.Pool, ctc *cloudtasks.Client) gin.HandlerFunc {
 		send := make(map[persist.DBID]map[persist.SocialProvider][]persist.ChainAddress)
 		var allErrs []error
 
-		var tuples []idAddressTuple
 		for i := 0; noSocials.Next(); i++ {
 			var userID persist.DBID
 			var walletAddress persist.Address
@@ -49,21 +42,25 @@ func processAllUsers(pg *pgxpool.Pool, ctc *cloudtasks.Client) gin.HandlerFunc {
 			}
 
 			if noLens {
-				tuples = append(tuples, idAddressTuple{ID: userID, Address: persist.NewChainAddress(walletAddress, persist.ChainETH), Social: persist.SocialProviderLens})
+				it, ok := send[userID]
+				if !ok {
+					it = make(map[persist.SocialProvider][]persist.ChainAddress)
+				}
+				it[persist.SocialProviderLens] = append(it[persist.SocialProviderLens], persist.NewChainAddress(walletAddress, persist.ChainETH))
+				send[userID] = it
+
 			}
 
 			if noFarcaster {
-				tuples = append(tuples, idAddressTuple{ID: userID, Address: persist.NewChainAddress(walletAddress, persist.ChainETH), Social: persist.SocialProviderFarcaster})
+				it, ok := send[userID]
+				if !ok {
+					it = make(map[persist.SocialProvider][]persist.ChainAddress)
+				}
+				it[persist.SocialProviderFarcaster] = append(it[persist.SocialProviderFarcaster], persist.NewChainAddress(walletAddress, persist.ChainBTC))
+				send[userID] = it
 			}
 
-			if i%200 == 0 {
-				for _, t := range tuples {
-					if _, ok := send[t.ID]; !ok {
-						send[t.ID] = make(map[persist.SocialProvider][]persist.ChainAddress)
-					}
-					send[t.ID][t.Social] = append(send[t.ID][t.Social], t.Address)
-				}
-
+			if len(send) >= 200 {
 				err = task.CreateTaskForAutosocialProcessUsers(c, task.AutosocialProcessUsersMessage{
 					Users: send,
 				}, ctc)
@@ -73,17 +70,10 @@ func processAllUsers(pg *pgxpool.Pool, ctc *cloudtasks.Client) gin.HandlerFunc {
 
 				send = make(map[persist.DBID]map[persist.SocialProvider][]persist.ChainAddress)
 
-				tuples = nil
 			}
 		}
 
-		if len(tuples) > 0 {
-			for _, t := range tuples {
-				if _, ok := send[t.ID]; !ok {
-					send[t.ID] = make(map[persist.SocialProvider][]persist.ChainAddress)
-				}
-				send[t.ID][t.Social] = append(send[t.ID][t.Social], t.Address)
-			}
+		if len(send) > 0 {
 			err = task.CreateTaskForAutosocialProcessUsers(c, task.AutosocialProcessUsersMessage{
 				Users: send,
 			}, ctc)

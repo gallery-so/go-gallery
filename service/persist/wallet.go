@@ -3,6 +3,7 @@ package persist
 import (
 	"context"
 	"database/sql/driver"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -134,6 +135,30 @@ func (c *ChainAddress) GQLSetChainFromResolver(chain Chain) error {
 
 func (c ChainAddress) String() string {
 	return fmt.Sprintf("%d:%s", c.chain, c.address)
+}
+
+func (c ChainAddress) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{"address": c.address, "chain": c.chain})
+}
+
+func (c *ChainAddress) UnmarshalJSON(data []byte) error {
+	var v map[string]any
+	err := json.Unmarshal(data, &v)
+	if err != nil {
+		return err
+	}
+
+	if v["address"] != nil {
+		c.address = Address(v["address"].(string))
+		c.addressSet = true
+	}
+
+	if v["chain"] != nil {
+		c.chain = Chain(v["chain"].(float64))
+		c.chainSet = true
+	}
+
+	return nil
 }
 
 var WalletOverrideMap = map[Chain][]Chain{ChainPOAP: EvmChains, ChainOptimism: EvmChains, ChainPolygon: EvmChains, ChainArbitrum: EvmChains, ChainETH: EvmChains, ChainZora: EvmChains, ChainBase: EvmChains}
