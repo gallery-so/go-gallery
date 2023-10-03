@@ -59,6 +59,7 @@ type Comment struct {
 	CreatedAt   time.Time    `json:"created_at"`
 	LastUpdated time.Time    `json:"last_updated"`
 	PostID      persist.DBID `json:"post_id"`
+	Removed     bool         `json:"removed"`
 }
 
 type Contract struct {
@@ -126,6 +127,8 @@ type Event struct {
 	Caption        sql.NullString       `json:"caption"`
 	GroupID        sql.NullString       `json:"group_id"`
 	PostID         persist.DBID         `json:"post_id"`
+	ContractID     persist.DBID         `json:"contract_id"`
+	MentionID      persist.DBID         `json:"mention_id"`
 }
 
 type ExternalSocialConnection struct {
@@ -252,6 +255,18 @@ type Membership struct {
 	Owners      persist.TokenHolderList `json:"owners"`
 }
 
+type Mention struct {
+	ID         persist.DBID  `json:"id"`
+	PostID     persist.DBID  `json:"post_id"`
+	CommentID  persist.DBID  `json:"comment_id"`
+	UserID     persist.DBID  `json:"user_id"`
+	ContractID persist.DBID  `json:"contract_id"`
+	Start      sql.NullInt32 `json:"start"`
+	Length     sql.NullInt32 `json:"length"`
+	CreatedAt  time.Time     `json:"created_at"`
+	Deleted    bool          `json:"deleted"`
+}
+
 type Merch struct {
 	ID           persist.DBID    `json:"id"`
 	Deleted      bool            `json:"deleted"`
@@ -312,6 +327,8 @@ type Notification struct {
 	Amount      int32                    `json:"amount"`
 	PostID      persist.DBID             `json:"post_id"`
 	TokenID     persist.DBID             `json:"token_id"`
+	ContractID  persist.DBID             `json:"contract_id"`
+	MentionID   persist.DBID             `json:"mention_id"`
 }
 
 type OwnedContract struct {

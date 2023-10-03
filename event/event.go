@@ -62,6 +62,9 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 	sender.addDelayedHandler(notifications, persist.ActionViewedGallery, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionCommentedOnFeedEvent, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionCommentedOnPost, notificationHandler)
+	sender.addDelayedHandler(notifications, persist.ActionReplyToComment, notificationHandler)
+	sender.addDelayedHandler(notifications, persist.ActionMentionUser, notificationHandler)
+	sender.addDelayedHandler(notifications, persist.ActionMentionCommunity, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionNewTokensReceived, notificationHandler)
 
 	sender.feed = feed
@@ -431,9 +434,14 @@ func newNotificationHandler(notifiers *notifications.NotificationHandlers, disab
 }
 
 func (h notificationHandler) handleDelayed(ctx context.Context, persistedEvent db.Event) error {
-	owner, err := h.findOwnerForNotificationFromEvent(persistedEvent)
+	owner, err := h.findOwnerForNotificationFromEvent(ctx, persistedEvent)
 	if err != nil {
 		return err
+	}
+
+	// if no gallery user found to notify, don't notify (e.g. for mentions to community creators that are not gallery users)
+	if owner == "" {
+		return nil
 	}
 
 	// Don't notify the user on self events
@@ -456,6 +464,8 @@ func (h notificationHandler) handleDelayed(ctx context.Context, persistedEvent d
 		PostID:      persistedEvent.PostID,
 		CommentID:   persistedEvent.CommentID,
 		TokenID:     persistedEvent.TokenID,
+		ContractID:  persistedEvent.ContractID,
+		MentionID:   persistedEvent.MentionID,
 	})
 }
 
@@ -481,13 +491,15 @@ func (h notificationHandler) createNotificationDataForEvent(event db.Event) (dat
 	case persist.ActionNewTokensReceived:
 		data.NewTokenID = event.Data.NewTokenID
 		data.NewTokenQuantity = event.Data.NewTokenQuantity
+	case persist.ActionReplyToComment:
+		data.OriginalCommentID = event.SubjectID
 	default:
 		logger.For(nil).Debugf("no notification data for event: %s", event.Action)
 	}
 	return
 }
 
-func (h notificationHandler) findOwnerForNotificationFromEvent(event db.Event) (persist.DBID, error) {
+func (h notificationHandler) findOwnerForNotificationFromEvent(ctx context.Context, event db.Event) (persist.DBID, error) {
 	switch event.ResourceTypeID {
 	case persist.ResourceTypeGallery:
 		gallery, err := h.dataloaders.GalleryByGalleryID.Load(event.GalleryID)
@@ -496,6 +508,13 @@ func (h notificationHandler) findOwnerForNotificationFromEvent(event db.Event) (
 		}
 		return gallery.OwnerUserID, nil
 	case persist.ResourceTypeComment:
+		if event.Action == persist.ActionReplyToComment {
+			comment, err := h.dataloaders.CommentByCommentID.Load(event.SubjectID)
+			if err != nil {
+				return "", err
+			}
+			return comment.ActorID, nil
+		}
 		if event.FeedEventID != "" {
 			feedEvent, err := h.dataloaders.FeedEventByFeedEventID.Load(event.FeedEventID)
 			if err != nil {
@@ -528,6 +547,14 @@ func (h notificationHandler) findOwnerForNotificationFromEvent(event db.Event) (
 		return event.SubjectID, nil
 	case persist.ResourceTypeToken:
 		return persist.DBID(event.ActorID.String), nil
+	case persist.ResourceTypeContract:
+
+		u, err := h.dataloaders.ContractCreatorByContractID.Load(event.ContractID)
+		if err != nil || u.CreatorUserID == "" {
+			logger.For(ctx).Warnf("error loading user by address: %s", err)
+			return "", nil
+		}
+		return u.CreatorUserID, nil
 	}
 
 	return "", fmt.Errorf("no owner found for event: %s", event.Action)

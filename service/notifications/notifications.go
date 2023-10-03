@@ -49,6 +49,7 @@ type pushLimiter struct {
 	admires  *limiters.KeyRateLimiter
 	follows  *limiters.KeyRateLimiter
 	tokens   *limiters.KeyRateLimiter
+	mentions *limiters.KeyRateLimiter
 }
 
 func newPushLimiter() *pushLimiter {
@@ -59,6 +60,7 @@ func newPushLimiter() *pushLimiter {
 		admires:  limiters.NewKeyRateLimiter(ctx, cache, "admires", 1, time.Minute*10),
 		follows:  limiters.NewKeyRateLimiter(ctx, cache, "follows", 1, time.Minute*10),
 		tokens:   limiters.NewKeyRateLimiter(ctx, cache, "tokens", 1, time.Minute*10),
+		mentions: limiters.NewKeyRateLimiter(ctx, cache, "mentions", 5, time.Minute),
 	}
 }
 
@@ -70,6 +72,20 @@ func (p *pushLimiter) tryComment(ctx context.Context, sendingUserID persist.DBID
 
 	return errRateLimited{
 		limiterName: p.comments.Name(),
+		senderID:    sendingUserID,
+		receiverID:  receivingUserID,
+		feedEventID: feedEventID,
+	}
+}
+
+func (p *pushLimiter) tryMention(ctx context.Context, sendingUserID persist.DBID, receivingUserID persist.DBID, feedEventID persist.DBID) error {
+	key := fmt.Sprintf("%s:%s:%s", sendingUserID.String(), receivingUserID.String(), feedEventID.String())
+	if p.isActionAllowed(ctx, p.mentions, key) {
+		return nil
+	}
+
+	return errRateLimited{
+		limiterName: p.mentions.Name(),
 		senderID:    sendingUserID,
 		receiverID:  receivingUserID,
 		feedEventID: feedEventID,
@@ -144,6 +160,9 @@ func New(queries *db.Queries, pub *pubsub.Client, taskClient *cloudtasks.Client,
 	// single notification actions (default)
 	notifDispatcher.AddHandler(persist.ActionCommentedOnFeedEvent, def)
 	notifDispatcher.AddHandler(persist.ActionCommentedOnPost, def)
+	notifDispatcher.AddHandler(persist.ActionReplyToComment, def)
+	notifDispatcher.AddHandler(persist.ActionMentionUser, def)
+	notifDispatcher.AddHandler(persist.ActionMentionCommunity, def)
 
 	// notification actions that are grouped by token id
 	notifDispatcher.AddHandler(persist.ActionNewTokensReceived, tokenIDGrouped)
@@ -613,6 +632,97 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 		return message, nil
 	}
 
+	if notif.Action == persist.ActionReplyToComment {
+
+		comment, err := queries.GetCommentByCommentID(ctx, notif.CommentID)
+		if err != nil {
+			return task.PushNotificationMessage{}, err
+		}
+
+		commenter, err := queries.GetUserById(ctx, comment.ActorID)
+		if err != nil {
+			return task.PushNotificationMessage{}, err
+		}
+
+		if err = limiter.tryMention(ctx, commenter.ID, notif.OwnerID, notif.FeedEventID); err != nil {
+			return task.PushNotificationMessage{}, err
+		}
+
+		if !commenter.Username.Valid {
+			return task.PushNotificationMessage{}, fmt.Errorf("user with ID=%s has no username", commenter.ID)
+		}
+
+		message.Body = fmt.Sprintf("%s replied to your comment", commenter.Username.String)
+		return message, nil
+
+	}
+
+	if notif.Action == persist.ActionMentionUser || notif.Action == persist.ActionMentionCommunity {
+
+		var actor db.User
+		var mentionedIn string
+		var preview string
+		switch {
+		case notif.CommentID != "":
+
+			mentionedIn = "comment"
+
+			comment, err := queries.GetCommentByCommentID(ctx, notif.CommentID)
+			if err != nil {
+				return task.PushNotificationMessage{}, err
+			}
+
+			preview = util.TruncateWithEllipsis(comment.Comment, 20)
+
+			actor, err = queries.GetUserById(ctx, comment.ActorID)
+			if err != nil {
+				return task.PushNotificationMessage{}, err
+			}
+
+		case notif.PostID != "":
+			mentionedIn = "post"
+
+			post, err := queries.GetPostByID(ctx, notif.PostID)
+			if err != nil {
+				return task.PushNotificationMessage{}, err
+			}
+
+			preview = util.TruncateWithEllipsis(post.Caption.String, 20)
+
+			actor, err = queries.GetUserById(ctx, post.ActorID)
+			if err != nil {
+				return task.PushNotificationMessage{}, err
+			}
+
+		default:
+			return task.PushNotificationMessage{}, fmt.Errorf("no comment or post id provided for mention notification")
+		}
+		if mentionedIn == "" || preview == "" {
+			return task.PushNotificationMessage{}, fmt.Errorf("no push data found for mention notification")
+		}
+
+		if err := limiter.tryMention(ctx, actor.ID, notif.OwnerID, notif.FeedEventID); err != nil {
+			return task.PushNotificationMessage{}, err
+		}
+
+		if !actor.Username.Valid {
+			return task.PushNotificationMessage{}, fmt.Errorf("user with ID=%s has no username", actor.ID)
+		}
+
+		if notif.Action == persist.ActionMentionCommunity {
+			contract, err := queries.GetContractByID(ctx, notif.ContractID)
+			if err != nil {
+				return task.PushNotificationMessage{}, err
+			}
+
+			message.Body = fmt.Sprintf("%s mentioned @%s in a %s: %s", actor.Username.String, contract.Name.String, mentionedIn, preview)
+		} else {
+			message.Body = fmt.Sprintf("%s mentioned you in a %s: %s", actor.Username.String, mentionedIn, preview)
+		}
+		return message, nil
+
+	}
+
 	return task.PushNotificationMessage{}, fmt.Errorf("unsupported notification action: %s", notif.Action)
 }
 
@@ -825,6 +935,42 @@ func addNotification(ctx context.Context, notif db.Notification, queries *db.Que
 			EventIds: notif.EventIds,
 			TokenID:  notif.TokenID,
 			Amount:   int32(amount),
+		})
+	case persist.ActionReplyToComment:
+		return queries.CreateCommentNotification(ctx, db.CreateCommentNotificationParams{
+			ID:        id,
+			OwnerID:   notif.OwnerID,
+			Action:    notif.Action,
+			Data:      notif.Data,
+			EventIds:  notif.EventIds,
+			CommentID: notif.CommentID,
+			FeedEvent: util.ToNullString(notif.FeedEventID.String(), true),
+			Post:      util.ToNullString(notif.PostID.String(), true),
+		})
+	case persist.ActionMentionUser:
+		return queries.CreateMentionUserNotification(ctx, db.CreateMentionUserNotificationParams{
+			ID:        id,
+			OwnerID:   notif.OwnerID,
+			Action:    notif.Action,
+			Data:      notif.Data,
+			EventIds:  notif.EventIds,
+			FeedEvent: util.ToNullString(notif.FeedEventID.String(), true),
+			Post:      util.ToNullString(notif.PostID.String(), true),
+			Comment:   util.ToNullString(notif.CommentID.String(), true),
+			MentionID: notif.MentionID,
+		})
+	case persist.ActionMentionCommunity:
+		return queries.CreateContractNotification(ctx, db.CreateContractNotificationParams{
+			ID:         id,
+			OwnerID:    notif.OwnerID,
+			Action:     notif.Action,
+			Data:       notif.Data,
+			EventIds:   notif.EventIds,
+			FeedEvent:  util.ToNullString(notif.FeedEventID.String(), true),
+			Post:       util.ToNullString(notif.PostID.String(), true),
+			Comment:    util.ToNullString(notif.CommentID.String(), true),
+			MentionID:  notif.MentionID,
+			ContractID: notif.ContractID,
 		})
 	default:
 		return db.Notification{}, fmt.Errorf("unknown notification action: %s", notif.Action)

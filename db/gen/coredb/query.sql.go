@@ -105,7 +105,7 @@ func (q *Queries) BlockUserFromFeed(ctx context.Context, arg BlockUserFromFeedPa
 }
 
 const clearNotificationsForUser = `-- name: ClearNotificationsForUser :many
-UPDATE notifications SET seen = true WHERE owner_id = $1 AND seen = false RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id
+UPDATE notifications SET seen = true WHERE owner_id = $1 AND seen = false RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id
 `
 
 func (q *Queries) ClearNotificationsForUser(ctx context.Context, ownerID persist.DBID) ([]Notification, error) {
@@ -134,6 +134,8 @@ func (q *Queries) ClearNotificationsForUser(ctx context.Context, ownerID persist
 			&i.Amount,
 			&i.PostID,
 			&i.TokenID,
+			&i.ContractID,
+			&i.MentionID,
 		); err != nil {
 			return nil, err
 		}
@@ -314,7 +316,7 @@ func (q *Queries) CountUserUnseenNotifications(ctx context.Context, ownerID pers
 }
 
 const createAdmireEvent = `-- name: CreateAdmireEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, post_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $9, $10, $5, $6, $7, $8) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id
+INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, post_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $10, $11, $6, $7, $8, $9) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id, contract_id, mention_id
 `
 
 type CreateAdmireEventParams struct {
@@ -323,6 +325,7 @@ type CreateAdmireEventParams struct {
 	Action         persist.Action       `json:"action"`
 	ResourceTypeID persist.ResourceType `json:"resource_type_id"`
 	AdmireID       persist.DBID         `json:"admire_id"`
+	SubjectID      persist.DBID         `json:"subject_id"`
 	Data           persist.EventData    `json:"data"`
 	GroupID        sql.NullString       `json:"group_id"`
 	Caption        sql.NullString       `json:"caption"`
@@ -337,6 +340,7 @@ func (q *Queries) CreateAdmireEvent(ctx context.Context, arg CreateAdmireEventPa
 		arg.Action,
 		arg.ResourceTypeID,
 		arg.AdmireID,
+		arg.SubjectID,
 		arg.Data,
 		arg.GroupID,
 		arg.Caption,
@@ -366,12 +370,14 @@ func (q *Queries) CreateAdmireEvent(ctx context.Context, arg CreateAdmireEventPa
 		&i.Caption,
 		&i.GroupID,
 		&i.PostID,
+		&i.ContractID,
+		&i.MentionID,
 	)
 	return i, err
 }
 
 const createAdmireNotification = `-- name: CreateAdmireNotification :one
-INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, token_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id
+INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, token_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id
 `
 
 type CreateAdmireNotificationParams struct {
@@ -414,6 +420,8 @@ func (q *Queries) CreateAdmireNotification(ctx context.Context, arg CreateAdmire
 		&i.Amount,
 		&i.PostID,
 		&i.TokenID,
+		&i.ContractID,
+		&i.MentionID,
 	)
 	return i, err
 }
@@ -452,7 +460,7 @@ func (q *Queries) CreateCollection(ctx context.Context, arg CreateCollectionPara
 }
 
 const createCollectionEvent = `-- name: CreateCollectionEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data, caption, group_id, gallery_id) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, $9) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id
+INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data, caption, group_id, gallery_id) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, $9) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id, contract_id, mention_id
 `
 
 type CreateCollectionEventParams struct {
@@ -502,12 +510,14 @@ func (q *Queries) CreateCollectionEvent(ctx context.Context, arg CreateCollectio
 		&i.Caption,
 		&i.GroupID,
 		&i.PostID,
+		&i.ContractID,
+		&i.MentionID,
 	)
 	return i, err
 }
 
 const createCommentEvent = `-- name: CreateCommentEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, comment_id, feed_event_id, post_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $9, $10, $5, $6, $7, $8) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id
+INSERT INTO events (id, actor_id, action, resource_type_id, comment_id, feed_event_id, post_id, mention_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $10, $11, $12, $6, $7, $8, $9) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id, contract_id, mention_id
 `
 
 type CreateCommentEventParams struct {
@@ -516,11 +526,13 @@ type CreateCommentEventParams struct {
 	Action         persist.Action       `json:"action"`
 	ResourceTypeID persist.ResourceType `json:"resource_type_id"`
 	CommentID      persist.DBID         `json:"comment_id"`
+	SubjectID      persist.DBID         `json:"subject_id"`
 	Data           persist.EventData    `json:"data"`
 	GroupID        sql.NullString       `json:"group_id"`
 	Caption        sql.NullString       `json:"caption"`
 	FeedEvent      sql.NullString       `json:"feed_event"`
 	Post           sql.NullString       `json:"post"`
+	Mention        sql.NullString       `json:"mention"`
 }
 
 func (q *Queries) CreateCommentEvent(ctx context.Context, arg CreateCommentEventParams) (Event, error) {
@@ -530,11 +542,13 @@ func (q *Queries) CreateCommentEvent(ctx context.Context, arg CreateCommentEvent
 		arg.Action,
 		arg.ResourceTypeID,
 		arg.CommentID,
+		arg.SubjectID,
 		arg.Data,
 		arg.GroupID,
 		arg.Caption,
 		arg.FeedEvent,
 		arg.Post,
+		arg.Mention,
 	)
 	var i Event
 	err := row.Scan(
@@ -559,12 +573,14 @@ func (q *Queries) CreateCommentEvent(ctx context.Context, arg CreateCommentEvent
 		&i.Caption,
 		&i.GroupID,
 		&i.PostID,
+		&i.ContractID,
+		&i.MentionID,
 	)
 	return i, err
 }
 
 const createCommentNotification = `-- name: CreateCommentNotification :one
-INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, comment_id) VALUES ($1, $2, $3, $4, $5, $7, $8, $6) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id
+INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, comment_id) VALUES ($1, $2, $3, $4, $5, $7, $8, $6) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id
 `
 
 type CreateCommentNotificationParams struct {
@@ -607,6 +623,125 @@ func (q *Queries) CreateCommentNotification(ctx context.Context, arg CreateComme
 		&i.Amount,
 		&i.PostID,
 		&i.TokenID,
+		&i.ContractID,
+		&i.MentionID,
+	)
+	return i, err
+}
+
+const createContractEvent = `-- name: CreateContractEvent :one
+INSERT INTO events (id, actor_id, action, resource_type_id, contract_id, subject_id, post_id, comment_id, feed_event_id, mention_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, $9, $10, $11, $12, $6, $7, $8) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id, contract_id, mention_id
+`
+
+type CreateContractEventParams struct {
+	ID             persist.DBID         `json:"id"`
+	ActorID        sql.NullString       `json:"actor_id"`
+	Action         persist.Action       `json:"action"`
+	ResourceTypeID persist.ResourceType `json:"resource_type_id"`
+	ContractID     persist.DBID         `json:"contract_id"`
+	Data           persist.EventData    `json:"data"`
+	GroupID        sql.NullString       `json:"group_id"`
+	Caption        sql.NullString       `json:"caption"`
+	Post           sql.NullString       `json:"post"`
+	Comment        sql.NullString       `json:"comment"`
+	FeedEvent      sql.NullString       `json:"feed_event"`
+	Mention        sql.NullString       `json:"mention"`
+}
+
+func (q *Queries) CreateContractEvent(ctx context.Context, arg CreateContractEventParams) (Event, error) {
+	row := q.db.QueryRow(ctx, createContractEvent,
+		arg.ID,
+		arg.ActorID,
+		arg.Action,
+		arg.ResourceTypeID,
+		arg.ContractID,
+		arg.Data,
+		arg.GroupID,
+		arg.Caption,
+		arg.Post,
+		arg.Comment,
+		arg.FeedEvent,
+		arg.Mention,
+	)
+	var i Event
+	err := row.Scan(
+		&i.ID,
+		&i.Version,
+		&i.ActorID,
+		&i.ResourceTypeID,
+		&i.SubjectID,
+		&i.UserID,
+		&i.TokenID,
+		&i.CollectionID,
+		&i.Action,
+		&i.Data,
+		&i.Deleted,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.GalleryID,
+		&i.CommentID,
+		&i.AdmireID,
+		&i.FeedEventID,
+		&i.ExternalID,
+		&i.Caption,
+		&i.GroupID,
+		&i.PostID,
+		&i.ContractID,
+		&i.MentionID,
+	)
+	return i, err
+}
+
+const createContractNotification = `-- name: CreateContractNotification :one
+INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, comment_id, contract_id, mention_id) VALUES ($1, $2, $3, $4, $5, $8, $9, $10, $6, $7) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id
+`
+
+type CreateContractNotificationParams struct {
+	ID         persist.DBID             `json:"id"`
+	OwnerID    persist.DBID             `json:"owner_id"`
+	Action     persist.Action           `json:"action"`
+	Data       persist.NotificationData `json:"data"`
+	EventIds   persist.DBIDList         `json:"event_ids"`
+	ContractID persist.DBID             `json:"contract_id"`
+	MentionID  persist.DBID             `json:"mention_id"`
+	FeedEvent  sql.NullString           `json:"feed_event"`
+	Post       sql.NullString           `json:"post"`
+	Comment    sql.NullString           `json:"comment"`
+}
+
+func (q *Queries) CreateContractNotification(ctx context.Context, arg CreateContractNotificationParams) (Notification, error) {
+	row := q.db.QueryRow(ctx, createContractNotification,
+		arg.ID,
+		arg.OwnerID,
+		arg.Action,
+		arg.Data,
+		arg.EventIds,
+		arg.ContractID,
+		arg.MentionID,
+		arg.FeedEvent,
+		arg.Post,
+		arg.Comment,
+	)
+	var i Notification
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.OwnerID,
+		&i.Version,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.Action,
+		&i.Data,
+		&i.EventIds,
+		&i.FeedEventID,
+		&i.CommentID,
+		&i.GalleryID,
+		&i.Seen,
+		&i.Amount,
+		&i.PostID,
+		&i.TokenID,
+		&i.ContractID,
+		&i.MentionID,
 	)
 	return i, err
 }
@@ -656,7 +791,7 @@ func (q *Queries) CreateFeedEvent(ctx context.Context, arg CreateFeedEventParams
 }
 
 const createGalleryEvent = `-- name: CreateGalleryEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, gallery_id, subject_id, data, external_id, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, $9) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id
+INSERT INTO events (id, actor_id, action, resource_type_id, gallery_id, subject_id, data, external_id, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, $9) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id, contract_id, mention_id
 `
 
 type CreateGalleryEventParams struct {
@@ -706,12 +841,66 @@ func (q *Queries) CreateGalleryEvent(ctx context.Context, arg CreateGalleryEvent
 		&i.Caption,
 		&i.GroupID,
 		&i.PostID,
+		&i.ContractID,
+		&i.MentionID,
+	)
+	return i, err
+}
+
+const createMentionUserNotification = `-- name: CreateMentionUserNotification :one
+INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, comment_id, mention_id) VALUES ($1, $2, $3, $4, $5, $7, $8, $9, $6) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id
+`
+
+type CreateMentionUserNotificationParams struct {
+	ID        persist.DBID             `json:"id"`
+	OwnerID   persist.DBID             `json:"owner_id"`
+	Action    persist.Action           `json:"action"`
+	Data      persist.NotificationData `json:"data"`
+	EventIds  persist.DBIDList         `json:"event_ids"`
+	MentionID persist.DBID             `json:"mention_id"`
+	FeedEvent sql.NullString           `json:"feed_event"`
+	Post      sql.NullString           `json:"post"`
+	Comment   sql.NullString           `json:"comment"`
+}
+
+func (q *Queries) CreateMentionUserNotification(ctx context.Context, arg CreateMentionUserNotificationParams) (Notification, error) {
+	row := q.db.QueryRow(ctx, createMentionUserNotification,
+		arg.ID,
+		arg.OwnerID,
+		arg.Action,
+		arg.Data,
+		arg.EventIds,
+		arg.MentionID,
+		arg.FeedEvent,
+		arg.Post,
+		arg.Comment,
+	)
+	var i Notification
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.OwnerID,
+		&i.Version,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.Action,
+		&i.Data,
+		&i.EventIds,
+		&i.FeedEventID,
+		&i.CommentID,
+		&i.GalleryID,
+		&i.Seen,
+		&i.Amount,
+		&i.PostID,
+		&i.TokenID,
+		&i.ContractID,
+		&i.MentionID,
 	)
 	return i, err
 }
 
 const createPostEvent = `-- name: CreatePostEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, post_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id
+INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, post_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id, contract_id, mention_id
 `
 
 type CreatePostEventParams struct {
@@ -757,6 +946,8 @@ func (q *Queries) CreatePostEvent(ctx context.Context, arg CreatePostEventParams
 		&i.Caption,
 		&i.GroupID,
 		&i.PostID,
+		&i.ContractID,
+		&i.MentionID,
 	)
 	return i, err
 }
@@ -810,7 +1001,7 @@ func (q *Queries) CreatePushTokenForUser(ctx context.Context, arg CreatePushToke
 }
 
 const createSimpleNotification = `-- name: CreateSimpleNotification :one
-INSERT INTO notifications (id, owner_id, action, data, event_ids) VALUES ($1, $2, $3, $4, $5) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id
+INSERT INTO notifications (id, owner_id, action, data, event_ids) VALUES ($1, $2, $3, $4, $5) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id
 `
 
 type CreateSimpleNotificationParams struct {
@@ -847,12 +1038,14 @@ func (q *Queries) CreateSimpleNotification(ctx context.Context, arg CreateSimple
 		&i.Amount,
 		&i.PostID,
 		&i.TokenID,
+		&i.ContractID,
+		&i.MentionID,
 	)
 	return i, err
 }
 
 const createTokenEvent = `-- name: CreateTokenEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data, group_id, caption, gallery_id, collection_id) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, $9, $10) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id
+INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data, group_id, caption, gallery_id, collection_id) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, $9, $10) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id, contract_id, mention_id
 `
 
 type CreateTokenEventParams struct {
@@ -904,12 +1097,14 @@ func (q *Queries) CreateTokenEvent(ctx context.Context, arg CreateTokenEventPara
 		&i.Caption,
 		&i.GroupID,
 		&i.PostID,
+		&i.ContractID,
+		&i.MentionID,
 	)
 	return i, err
 }
 
 const createTokenNotification = `-- name: CreateTokenNotification :one
-INSERT INTO notifications (id, owner_id, action, data, event_ids, token_id, amount) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id
+INSERT INTO notifications (id, owner_id, action, data, event_ids, token_id, amount) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id
 `
 
 type CreateTokenNotificationParams struct {
@@ -950,12 +1145,14 @@ func (q *Queries) CreateTokenNotification(ctx context.Context, arg CreateTokenNo
 		&i.Amount,
 		&i.PostID,
 		&i.TokenID,
+		&i.ContractID,
+		&i.MentionID,
 	)
 	return i, err
 }
 
 const createUserEvent = `-- name: CreateUserEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id
+INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, post_id, comment_id, feed_event_id, mention_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, $9, $10, $11, $12, $6, $7, $8) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id, contract_id, mention_id
 `
 
 type CreateUserEventParams struct {
@@ -967,6 +1164,10 @@ type CreateUserEventParams struct {
 	Data           persist.EventData    `json:"data"`
 	GroupID        sql.NullString       `json:"group_id"`
 	Caption        sql.NullString       `json:"caption"`
+	Post           sql.NullString       `json:"post"`
+	Comment        sql.NullString       `json:"comment"`
+	FeedEvent      sql.NullString       `json:"feed_event"`
+	Mention        sql.NullString       `json:"mention"`
 }
 
 func (q *Queries) CreateUserEvent(ctx context.Context, arg CreateUserEventParams) (Event, error) {
@@ -979,6 +1180,10 @@ func (q *Queries) CreateUserEvent(ctx context.Context, arg CreateUserEventParams
 		arg.Data,
 		arg.GroupID,
 		arg.Caption,
+		arg.Post,
+		arg.Comment,
+		arg.FeedEvent,
+		arg.Mention,
 	)
 	var i Event
 	err := row.Scan(
@@ -1003,12 +1208,14 @@ func (q *Queries) CreateUserEvent(ctx context.Context, arg CreateUserEventParams
 		&i.Caption,
 		&i.GroupID,
 		&i.PostID,
+		&i.ContractID,
+		&i.MentionID,
 	)
 	return i, err
 }
 
 const createViewGalleryNotification = `-- name: CreateViewGalleryNotification :one
-INSERT INTO notifications (id, owner_id, action, data, event_ids, gallery_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id
+INSERT INTO notifications (id, owner_id, action, data, event_ids, gallery_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id
 `
 
 type CreateViewGalleryNotificationParams struct {
@@ -1047,6 +1254,8 @@ func (q *Queries) CreateViewGalleryNotification(ctx context.Context, arg CreateV
 		&i.Amount,
 		&i.PostID,
 		&i.TokenID,
+		&i.ContractID,
+		&i.MentionID,
 	)
 	return i, err
 }
@@ -1495,7 +1704,7 @@ func (q *Queries) GetCollectionsByGalleryId(ctx context.Context, id persist.DBID
 }
 
 const getCommentByCommentID = `-- name: GetCommentByCommentID :one
-SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id FROM comments WHERE id = $1 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id, removed FROM comments WHERE id = $1 and deleted = false
 `
 
 func (q *Queries) GetCommentByCommentID(ctx context.Context, id persist.DBID) (Comment, error) {
@@ -1512,47 +1721,13 @@ func (q *Queries) GetCommentByCommentID(ctx context.Context, id persist.DBID) (C
 		&i.CreatedAt,
 		&i.LastUpdated,
 		&i.PostID,
+		&i.Removed,
 	)
 	return i, err
 }
 
-const getCommentsByActorID = `-- name: GetCommentsByActorID :many
-SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id FROM comments WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC
-`
-
-func (q *Queries) GetCommentsByActorID(ctx context.Context, actorID persist.DBID) ([]Comment, error) {
-	rows, err := q.db.Query(ctx, getCommentsByActorID, actorID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Comment
-	for rows.Next() {
-		var i Comment
-		if err := rows.Scan(
-			&i.ID,
-			&i.Version,
-			&i.FeedEventID,
-			&i.ActorID,
-			&i.ReplyTo,
-			&i.Comment,
-			&i.Deleted,
-			&i.CreatedAt,
-			&i.LastUpdated,
-			&i.PostID,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getCommentsByCommentIDs = `-- name: GetCommentsByCommentIDs :many
-SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id from comments WHERE id = ANY($1) AND deleted = false
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated, post_id, removed from comments WHERE id = ANY($1) and deleted = false
 `
 
 func (q *Queries) GetCommentsByCommentIDs(ctx context.Context, commentIds persist.DBIDList) ([]Comment, error) {
@@ -1575,6 +1750,7 @@ func (q *Queries) GetCommentsByCommentIDs(ctx context.Context, commentIds persis
 			&i.CreatedAt,
 			&i.LastUpdated,
 			&i.PostID,
+			&i.Removed,
 		); err != nil {
 			return nil, err
 		}
@@ -2029,7 +2205,7 @@ func (q *Queries) GetEthereumWalletsForEnsProfileImagesByUserID(ctx context.Cont
 }
 
 const getEvent = `-- name: GetEvent :one
-SELECT id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id FROM events WHERE id = $1 AND deleted = false
+SELECT id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id, contract_id, mention_id FROM events WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetEvent(ctx context.Context, id persist.DBID) (Event, error) {
@@ -2057,12 +2233,14 @@ func (q *Queries) GetEvent(ctx context.Context, id persist.DBID) (Event, error) 
 		&i.Caption,
 		&i.GroupID,
 		&i.PostID,
+		&i.ContractID,
+		&i.MentionID,
 	)
 	return i, err
 }
 
 const getEventsInGroup = `-- name: GetEventsInGroup :many
-select id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id from events where group_id = $1 and deleted = false order by(created_at, id) asc
+select id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id, contract_id, mention_id from events where group_id = $1 and deleted = false order by(created_at, id) asc
 `
 
 func (q *Queries) GetEventsInGroup(ctx context.Context, groupID sql.NullString) ([]Event, error) {
@@ -2096,6 +2274,8 @@ func (q *Queries) GetEventsInGroup(ctx context.Context, groupID sql.NullString) 
 			&i.Caption,
 			&i.GroupID,
 			&i.PostID,
+			&i.ContractID,
+			&i.MentionID,
 		); err != nil {
 			return nil, err
 		}
@@ -2109,9 +2289,9 @@ func (q *Queries) GetEventsInGroup(ctx context.Context, groupID sql.NullString) 
 
 const getEventsInWindow = `-- name: GetEventsInWindow :many
 with recursive activity as (
-    select id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id from events where events.id = $1 and deleted = false
+    select id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id, contract_id, mention_id from events where events.id = $1 and deleted = false
     union
-    select e.id, e.version, e.actor_id, e.resource_type_id, e.subject_id, e.user_id, e.token_id, e.collection_id, e.action, e.data, e.deleted, e.last_updated, e.created_at, e.gallery_id, e.comment_id, e.admire_id, e.feed_event_id, e.external_id, e.caption, e.group_id, e.post_id from events e, activity a
+    select e.id, e.version, e.actor_id, e.resource_type_id, e.subject_id, e.user_id, e.token_id, e.collection_id, e.action, e.data, e.deleted, e.last_updated, e.created_at, e.gallery_id, e.comment_id, e.admire_id, e.feed_event_id, e.external_id, e.caption, e.group_id, e.post_id, e.contract_id, e.mention_id from events e, activity a
     where e.actor_id = a.actor_id
         and e.action = any($3)
         and e.created_at < a.created_at
@@ -2120,7 +2300,7 @@ with recursive activity as (
         and e.caption is null
         and (not $4::bool or e.subject_id = a.subject_id)
 )
-select id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id from events where id = any(select id from activity) order by (created_at, id) asc
+select id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id, contract_id, mention_id from events where id = any(select id from activity) order by (created_at, id) asc
 `
 
 type GetEventsInWindowParams struct {
@@ -2166,6 +2346,8 @@ func (q *Queries) GetEventsInWindow(ctx context.Context, arg GetEventsInWindowPa
 			&i.Caption,
 			&i.GroupID,
 			&i.PostID,
+			&i.ContractID,
+			&i.MentionID,
 		); err != nil {
 			return nil, err
 		}
@@ -2380,9 +2562,9 @@ func (q *Queries) GetGalleryById(ctx context.Context, id persist.DBID) (Gallery,
 
 const getGalleryEventsInWindow = `-- name: GetGalleryEventsInWindow :many
 with recursive activity as (
-    select id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id from events where events.id = $1 and deleted = false
+    select id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id, contract_id, mention_id from events where events.id = $1 and deleted = false
     union
-    select e.id, e.version, e.actor_id, e.resource_type_id, e.subject_id, e.user_id, e.token_id, e.collection_id, e.action, e.data, e.deleted, e.last_updated, e.created_at, e.gallery_id, e.comment_id, e.admire_id, e.feed_event_id, e.external_id, e.caption, e.group_id, e.post_id from events e, activity a
+    select e.id, e.version, e.actor_id, e.resource_type_id, e.subject_id, e.user_id, e.token_id, e.collection_id, e.action, e.data, e.deleted, e.last_updated, e.created_at, e.gallery_id, e.comment_id, e.admire_id, e.feed_event_id, e.external_id, e.caption, e.group_id, e.post_id, e.contract_id, e.mention_id from events e, activity a
     where e.actor_id = a.actor_id
         and e.action = any($3)
         and e.gallery_id = $4
@@ -2392,7 +2574,7 @@ with recursive activity as (
         and e.caption is null
         and (not $5::bool or e.subject_id = a.subject_id)
 )
-select id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id from events where id = any(select id from activity) order by (created_at, id) asc
+select id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id, post_id, contract_id, mention_id from events where id = any(select id from activity) order by (created_at, id) asc
 `
 
 type GetGalleryEventsInWindowParams struct {
@@ -2440,6 +2622,8 @@ func (q *Queries) GetGalleryEventsInWindow(ctx context.Context, arg GetGalleryEv
 			&i.Caption,
 			&i.GroupID,
 			&i.PostID,
+			&i.ContractID,
+			&i.MentionID,
 		); err != nil {
 			return nil, err
 		}
@@ -2663,6 +2847,27 @@ func (q *Queries) GetMembershipByMembershipId(ctx context.Context, id persist.DB
 	return i, err
 }
 
+const getMentionByID = `-- name: GetMentionByID :one
+select id, post_id, comment_id, user_id, contract_id, start, length, created_at, deleted from mentions where id = $1 and not deleted
+`
+
+func (q *Queries) GetMentionByID(ctx context.Context, id persist.DBID) (Mention, error) {
+	row := q.db.QueryRow(ctx, getMentionByID, id)
+	var i Mention
+	err := row.Scan(
+		&i.ID,
+		&i.PostID,
+		&i.CommentID,
+		&i.UserID,
+		&i.ContractID,
+		&i.Start,
+		&i.Length,
+		&i.CreatedAt,
+		&i.Deleted,
+	)
+	return i, err
+}
+
 const getMerchDiscountCodeByTokenID = `-- name: GetMerchDiscountCodeByTokenID :one
 select discount_code from merch where token_id = $1 and redeemed = true and deleted = false
 `
@@ -2813,7 +3018,7 @@ func (q *Queries) GetMissingThumbnailTokensByIDRange(ctx context.Context, arg Ge
 }
 
 const getMostRecentNotificationByOwnerIDForAction = `-- name: GetMostRecentNotificationByOwnerIDForAction :one
-select id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id from notifications
+select id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id from notifications
     where owner_id = $1
     and action = $2
     and deleted = false
@@ -2859,12 +3064,14 @@ func (q *Queries) GetMostRecentNotificationByOwnerIDForAction(ctx context.Contex
 		&i.Amount,
 		&i.PostID,
 		&i.TokenID,
+		&i.ContractID,
+		&i.MentionID,
 	)
 	return i, err
 }
 
 const getMostRecentNotificationByOwnerIDTokenIDForAction = `-- name: GetMostRecentNotificationByOwnerIDTokenIDForAction :one
-select id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id from notifications
+select id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id from notifications
     where owner_id = $1
     and token_id = $2
     and action = $3
@@ -2913,12 +3120,14 @@ func (q *Queries) GetMostRecentNotificationByOwnerIDTokenIDForAction(ctx context
 		&i.Amount,
 		&i.PostID,
 		&i.TokenID,
+		&i.ContractID,
+		&i.MentionID,
 	)
 	return i, err
 }
 
 const getNotificationByID = `-- name: GetNotificationByID :one
-SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id FROM notifications WHERE id = $1 AND deleted = false
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id FROM notifications WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetNotificationByID(ctx context.Context, id persist.DBID) (Notification, error) {
@@ -2941,12 +3150,14 @@ func (q *Queries) GetNotificationByID(ctx context.Context, id persist.DBID) (Not
 		&i.Amount,
 		&i.PostID,
 		&i.TokenID,
+		&i.ContractID,
+		&i.MentionID,
 	)
 	return i, err
 }
 
 const getNotificationsByOwnerIDForActionAfter = `-- name: GetNotificationsByOwnerIDForActionAfter :many
-SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id FROM notifications
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id FROM notifications
     WHERE owner_id = $1 AND action = $2 AND deleted = false AND created_at > $3
     ORDER BY created_at DESC
 `
@@ -2983,6 +3194,8 @@ func (q *Queries) GetNotificationsByOwnerIDForActionAfter(ctx context.Context, a
 			&i.Amount,
 			&i.PostID,
 			&i.TokenID,
+			&i.ContractID,
+			&i.MentionID,
 		); err != nil {
 			return nil, err
 		}
@@ -2992,6 +3205,27 @@ func (q *Queries) GetNotificationsByOwnerIDForActionAfter(ctx context.Context, a
 		return nil, err
 	}
 	return items, nil
+}
+
+const getPostByID = `-- name: GetPostByID :one
+SELECT id, version, token_ids, contract_ids, actor_id, caption, created_at, last_updated, deleted FROM posts WHERE id = $1 AND deleted = false
+`
+
+func (q *Queries) GetPostByID(ctx context.Context, id persist.DBID) (Post, error) {
+	row := q.db.QueryRow(ctx, getPostByID, id)
+	var i Post
+	err := row.Scan(
+		&i.ID,
+		&i.Version,
+		&i.TokenIds,
+		&i.ContractIds,
+		&i.ActorID,
+		&i.Caption,
+		&i.CreatedAt,
+		&i.LastUpdated,
+		&i.Deleted,
+	)
+	return i, err
 }
 
 const getPostsByIds = `-- name: GetPostsByIds :many
@@ -3148,7 +3382,7 @@ func (q *Queries) GetPushTokensByUserID(ctx context.Context, userID persist.DBID
 }
 
 const getRecentUnseenNotifications = `-- name: GetRecentUnseenNotifications :many
-SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false and created_at > $2 order by created_at desc limit $3
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false and created_at > $2 order by created_at desc limit $3
 `
 
 type GetRecentUnseenNotificationsParams struct {
@@ -3183,6 +3417,8 @@ func (q *Queries) GetRecentUnseenNotifications(ctx context.Context, arg GetRecen
 			&i.Amount,
 			&i.PostID,
 			&i.TokenID,
+			&i.ContractID,
+			&i.MentionID,
 		); err != nil {
 			return nil, err
 		}
@@ -4121,7 +4357,7 @@ func (q *Queries) GetUserExperiencesByUserID(ctx context.Context, id persist.DBI
 }
 
 const getUserNotifications = `-- name: GetUserNotifications :many
-SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id FROM notifications WHERE owner_id = $1 AND deleted = false
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id FROM notifications WHERE owner_id = $1 AND deleted = false
     AND (created_at, id) < ($3, $4)
     AND (created_at, id) > ($5, $6)
     ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
@@ -4173,6 +4409,8 @@ func (q *Queries) GetUserNotifications(ctx context.Context, arg GetUserNotificat
 			&i.Amount,
 			&i.PostID,
 			&i.TokenID,
+			&i.ContractID,
+			&i.MentionID,
 		); err != nil {
 			return nil, err
 		}
@@ -4260,7 +4498,7 @@ func (q *Queries) GetUserRolesByUserId(ctx context.Context, arg GetUserRolesByUs
 }
 
 const getUserUnseenNotifications = `-- name: GetUserUnseenNotifications :many
-SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false
     AND (created_at, id) < ($3, $4)
     AND (created_at, id) > ($5, $6)
     ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
@@ -4312,6 +4550,8 @@ func (q *Queries) GetUserUnseenNotifications(ctx context.Context, arg GetUserUns
 			&i.Amount,
 			&i.PostID,
 			&i.TokenID,
+			&i.ContractID,
+			&i.MentionID,
 		); err != nil {
 			return nil, err
 		}
@@ -5169,6 +5409,43 @@ func (q *Queries) HasLaterGroupedEvent(ctx context.Context, arg HasLaterGroupedE
 	return exists, err
 }
 
+const insertCommentMention = `-- name: InsertCommentMention :one
+insert into mentions (id, user_id, contract_id, comment_id, start, length) values ($1, $2, $3, $4, $5, $6) returning id, post_id, comment_id, user_id, contract_id, start, length, created_at, deleted
+`
+
+type InsertCommentMentionParams struct {
+	ID        persist.DBID   `json:"id"`
+	User      sql.NullString `json:"user"`
+	Contract  sql.NullString `json:"contract"`
+	CommentID persist.DBID   `json:"comment_id"`
+	Start     sql.NullInt32  `json:"start"`
+	Length    sql.NullInt32  `json:"length"`
+}
+
+func (q *Queries) InsertCommentMention(ctx context.Context, arg InsertCommentMentionParams) (Mention, error) {
+	row := q.db.QueryRow(ctx, insertCommentMention,
+		arg.ID,
+		arg.User,
+		arg.Contract,
+		arg.CommentID,
+		arg.Start,
+		arg.Length,
+	)
+	var i Mention
+	err := row.Scan(
+		&i.ID,
+		&i.PostID,
+		&i.CommentID,
+		&i.UserID,
+		&i.ContractID,
+		&i.Start,
+		&i.Length,
+		&i.CreatedAt,
+		&i.Deleted,
+	)
+	return i, err
+}
+
 const insertExternalSocialConnectionsForUser = `-- name: InsertExternalSocialConnectionsForUser :many
 insert into external_social_connections (id, social_account_type, follower_id, followee_id) 
 select id, $1::varchar, $2::varchar, followee_id
@@ -5241,6 +5518,43 @@ func (q *Queries) InsertPost(ctx context.Context, arg InsertPostParams) (persist
 	var id persist.DBID
 	err := row.Scan(&id)
 	return id, err
+}
+
+const insertPostMention = `-- name: InsertPostMention :one
+insert into mentions (id, user_id, contract_id, post_id, start, length) values ($1, $2, $3, $4, $5, $6) returning id, post_id, comment_id, user_id, contract_id, start, length, created_at, deleted
+`
+
+type InsertPostMentionParams struct {
+	ID       persist.DBID   `json:"id"`
+	User     sql.NullString `json:"user"`
+	Contract sql.NullString `json:"contract"`
+	PostID   persist.DBID   `json:"post_id"`
+	Start    sql.NullInt32  `json:"start"`
+	Length   sql.NullInt32  `json:"length"`
+}
+
+func (q *Queries) InsertPostMention(ctx context.Context, arg InsertPostMentionParams) (Mention, error) {
+	row := q.db.QueryRow(ctx, insertPostMention,
+		arg.ID,
+		arg.User,
+		arg.Contract,
+		arg.PostID,
+		arg.Start,
+		arg.Length,
+	)
+	var i Mention
+	err := row.Scan(
+		&i.ID,
+		&i.PostID,
+		&i.CommentID,
+		&i.UserID,
+		&i.ContractID,
+		&i.Start,
+		&i.Length,
+		&i.CreatedAt,
+		&i.Deleted,
+	)
+	return i, err
 }
 
 const insertSpamContracts = `-- name: InsertSpamContracts :exec

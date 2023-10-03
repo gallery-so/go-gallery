@@ -58,6 +58,22 @@ type HelperGalleryUserData struct {
 	FeaturedGalleryID *persist.DBID
 }
 
+type HelperCommentData struct {
+	PostID      *persist.DBID
+	FeedEventID *persist.DBID
+	ReplyToID   *persist.DBID
+}
+
+type HelperMentionData struct {
+	UserID      *persist.DBID
+	CommunityID *persist.DBID
+}
+
+type HelperAdmireData struct {
+	PostID      *persist.DBID
+	FeedEventID *persist.DBID
+}
+
 type HelperNotificationSettingsData struct {
 	UserId persist.DBID
 }
@@ -110,6 +126,24 @@ type HelperSomeoneAdmiredYourTokenNotificationData struct {
 type HelperNewTokensNotificationData struct {
 	OwnerID          persist.DBID
 	NotificationData persist.NotificationData
+}
+
+type HelperSomeoneRepliedToYourCommentNotificationData struct {
+	OwnerID          persist.DBID
+	CommentID        persist.DBID
+	NotificationData persist.NotificationData
+}
+
+type HelperSomeoneMentionedYouNotificationData struct {
+	OwnerID   persist.DBID
+	PostID    *persist.DBID
+	CommentID *persist.DBID
+}
+type HelperSomeoneMentionedYourCommunityNotificationData struct {
+	OwnerID    persist.DBID
+	ContractID persist.DBID
+	PostID     *persist.DBID
+	CommentID  *persist.DBID
 }
 
 type HelperNotificationsConnectionData struct {

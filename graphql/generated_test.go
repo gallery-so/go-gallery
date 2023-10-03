@@ -298,6 +298,17 @@ func (v *GnosisSafeAuth) GetAddress() string { return v.Address }
 // GetNonce returns GnosisSafeAuth.Nonce, and is useful for accessing the field via an interface.
 func (v *GnosisSafeAuth) GetNonce() string { return v.Nonce }
 
+type IntervalInput struct {
+	Start  int `json:"start"`
+	Length int `json:"length"`
+}
+
+// GetStart returns IntervalInput.Start, and is useful for accessing the field via an interface.
+func (v *IntervalInput) GetStart() int { return v.Start }
+
+// GetLength returns IntervalInput.Length, and is useful for accessing the field via an interface.
+func (v *IntervalInput) GetLength() int { return v.Length }
+
 type LensAuth struct {
 	Address string `json:"address"`
 }
@@ -311,6 +322,21 @@ type MagicLinkAuth struct {
 
 // GetToken returns MagicLinkAuth.Token, and is useful for accessing the field via an interface.
 func (v *MagicLinkAuth) GetToken() string { return v.Token }
+
+type MentionInput struct {
+	Interval    *IntervalInput `json:"interval"`
+	UserId      *persist.DBID  `json:"userId"`
+	CommunityId *persist.DBID  `json:"communityId"`
+}
+
+// GetInterval returns MentionInput.Interval, and is useful for accessing the field via an interface.
+func (v *MentionInput) GetInterval() *IntervalInput { return v.Interval }
+
+// GetUserId returns MentionInput.UserId, and is useful for accessing the field via an interface.
+func (v *MentionInput) GetUserId() *persist.DBID { return v.UserId }
+
+// GetCommunityId returns MentionInput.CommunityId, and is useful for accessing the field via an interface.
+func (v *MentionInput) GetCommunityId() *persist.DBID { return v.CommunityId }
 
 type MoveCollectionToGalleryInput struct {
 	SourceCollectionId persist.DBID `json:"sourceCollectionId"`
@@ -335,6 +361,7 @@ func (v *OneTimeLoginTokenAuth) GetToken() string { return v.Token }
 type PostTokensInput struct {
 	TokenIds []persist.DBID `json:"tokenIds"`
 	Caption  *string        `json:"caption"`
+	Mentions []MentionInput `json:"mentions"`
 }
 
 // GetTokenIds returns PostTokensInput.TokenIds, and is useful for accessing the field via an interface.
@@ -342,6 +369,9 @@ func (v *PostTokensInput) GetTokenIds() []persist.DBID { return v.TokenIds }
 
 // GetCaption returns PostTokensInput.Caption, and is useful for accessing the field via an interface.
 func (v *PostTokensInput) GetCaption() *string { return v.Caption }
+
+// GetMentions returns PostTokensInput.Mentions, and is useful for accessing the field via an interface.
+func (v *PostTokensInput) GetMentions() []MentionInput { return v.Mentions }
 
 type PublishGalleryInput struct {
 	GalleryId persist.DBID `json:"galleryId"`

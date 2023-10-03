@@ -10,25 +10,29 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mikeydub/go-gallery/event"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/redis"
+	"github.com/mikeydub/go-gallery/validate"
+
 	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
-	"github.com/mikeydub/go-gallery/event"
+
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
+
 	"github.com/mikeydub/go-gallery/service/recommend"
 	"github.com/mikeydub/go-gallery/service/recommend/userpref"
-	"github.com/mikeydub/go-gallery/service/redis"
+
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
-	"github.com/mikeydub/go-gallery/validate"
 )
 
 const tHalf = math.Ln2 / 0.002 // half-life of approx 6 hours
@@ -111,7 +115,7 @@ func (api FeedAPI) GetPostById(ctx context.Context, postID persist.DBID) (*db.Po
 	return &post, nil
 }
 
-func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, caption *string) (persist.DBID, error) {
+func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, mentions []*model.MentionInput, caption *string) (persist.DBID, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"tokenIDs": validate.WithTag(tokenIDs, "required"),
@@ -142,13 +146,60 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, capt
 		return c.ID, nil
 	})
 
-	postID, err := api.queries.InsertPost(ctx, db.InsertPostParams{
+	tx, err := api.repos.BeginTx(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback(ctx)
+
+	q := api.queries.WithTx(tx)
+
+	postID, err := q.InsertPost(ctx, db.InsertPostParams{
 		ID:          persist.GenerateID(),
 		TokenIds:    tokenIDs,
 		ContractIds: contractIDs,
 		ActorID:     actorID,
 		Caption:     c,
 	})
+	if err != nil {
+		return "", err
+	}
+
+	dbMentions, err := insertMentionsForPost(ctx, mentions, postID, q)
+	if len(dbMentions) > 0 {
+		for _, mention := range dbMentions {
+			switch {
+			case mention.UserID != "":
+				err = event.Dispatch(ctx, db.Event{
+					ActorID:        persist.DBIDToNullStr(actorID),
+					ResourceTypeID: persist.ResourceTypeUser,
+					SubjectID:      mention.UserID,
+					PostID:         postID,
+					UserID:         mention.UserID,
+					Action:         persist.ActionMentionUser,
+					MentionID:      mention.ID,
+				})
+				if err != nil {
+					return "", err
+				}
+			case mention.ContractID != "":
+				err = event.Dispatch(ctx, db.Event{
+					ActorID:        persist.DBIDToNullStr(actorID),
+					ResourceTypeID: persist.ResourceTypeContract,
+					SubjectID:      mention.ContractID,
+					PostID:         postID,
+					ContractID:     mention.ContractID,
+					Action:         persist.ActionMentionCommunity,
+					MentionID:      mention.ID,
+				})
+
+			default:
+				return "", fmt.Errorf("invalid mention type: %+v", mention)
+			}
+		}
+	}
+
+	err = tx.Commit(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -279,6 +330,44 @@ func (api FeedAPI) ReferralPostPreflight(ctx context.Context, t persist.TokenIde
 	}
 	userID, _ := getAuthenticatedUserID(ctx)
 	return task.CreateTaskForPostPreflight(ctx, task.PostPreflightMessage{Token: t, UserID: userID}, api.taskClient)
+}
+
+func insertMentionsForPost(ctx context.Context, mentions []*model.MentionInput, postID persist.DBID, q *db.Queries) ([]db.Mention, error) {
+	dbMentions, err := mentionInputsToMentions(ctx, mentions, q)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]db.Mention, len(dbMentions))
+
+	for i, m := range dbMentions {
+		var user, contract sql.NullString
+		if m.UserID != "" {
+			user = sql.NullString{
+				String: m.UserID.String(),
+				Valid:  true,
+			}
+		} else if m.ContractID != "" {
+			contract = sql.NullString{
+				String: m.ContractID.String(),
+				Valid:  true,
+			}
+		}
+		mid, err := q.InsertPostMention(ctx, db.InsertPostMentionParams{
+			ID:       persist.GenerateID(),
+			User:     user,
+			Contract: contract,
+			PostID:   postID,
+			Start:    m.Start,
+			Length:   m.Length,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		result[i] = mid
+	}
+
+	return result, nil
 }
 
 func (api FeedAPI) DeletePostById(ctx context.Context, postID persist.DBID) error {

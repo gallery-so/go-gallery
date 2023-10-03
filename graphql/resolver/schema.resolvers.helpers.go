@@ -59,96 +59,30 @@ var nodeFetcher = model.NodeFetcher{
 	OnCommunity: func(ctx context.Context, dbid persist.DBID) (*model.Community, error) {
 		return resolveCommunityByID(ctx, dbid)
 	},
-	OnSomeoneAdmiredYourFeedEventNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneAdmiredYourFeedEventNotification, error) {
-		notif, err := resolveNotificationByID(ctx, dbid)
-		if err != nil {
-			return nil, err
-		}
+	OnSomeoneAdmiredYourFeedEventNotification:     fetchNotificationByID[model.SomeoneAdmiredYourFeedEventNotification],
+	OnSomeoneCommentedOnYourFeedEventNotification: fetchNotificationByID[model.SomeoneCommentedOnYourFeedEventNotification],
+	OnSomeoneAdmiredYourPostNotification:          fetchNotificationByID[model.SomeoneAdmiredYourPostNotification],
+	OnSomeoneCommentedOnYourPostNotification:      fetchNotificationByID[model.SomeoneCommentedOnYourPostNotification],
+	OnSomeoneFollowedYouBackNotification:          fetchNotificationByID[model.SomeoneFollowedYouBackNotification],
+	OnSomeoneFollowedYouNotification:              fetchNotificationByID[model.SomeoneFollowedYouNotification],
+	OnSomeoneViewedYourGalleryNotification:        fetchNotificationByID[model.SomeoneViewedYourGalleryNotification],
+	OnNewTokensNotification:                       fetchNotificationByID[model.NewTokensNotification],
+	OnSomeoneMentionedYouNotification:             fetchNotificationByID[model.SomeoneMentionedYouNotification],
+	OnSomeoneMentionedYourCommunityNotification:   fetchNotificationByID[model.SomeoneMentionedYourCommunityNotification],
+	OnSomeoneRepliedToYourCommentNotification:     fetchNotificationByID[model.SomeoneRepliedToYourCommentNotification],
+	OnSomeoneAdmiredYourTokenNotification:         fetchNotificationByID[model.SomeoneAdmiredYourTokenNotification],
+}
 
-		notifConverted := notif.(model.SomeoneAdmiredYourFeedEventNotification)
+// T any is a notification type, will panic if it is not a notification type
+func fetchNotificationByID[T any](ctx context.Context, dbid persist.DBID) (*T, error) {
+	notif, err := resolveNotificationByID(ctx, dbid)
+	if err != nil {
+		return nil, err
+	}
 
-		return &notifConverted, nil
-	},
-	OnSomeoneCommentedOnYourFeedEventNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneCommentedOnYourFeedEventNotification, error) {
-		notif, err := resolveNotificationByID(ctx, dbid)
-		if err != nil {
-			return nil, err
-		}
+	notifConverted := notif.(T)
 
-		notifConverted := notif.(model.SomeoneCommentedOnYourFeedEventNotification)
-
-		return &notifConverted, nil
-	},
-	OnSomeoneAdmiredYourPostNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneAdmiredYourPostNotification, error) {
-		notif, err := resolveNotificationByID(ctx, dbid)
-		if err != nil {
-			return nil, err
-		}
-
-		notifConverted := notif.(model.SomeoneAdmiredYourPostNotification)
-
-		return &notifConverted, nil
-	},
-	OnSomeoneCommentedOnYourPostNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneCommentedOnYourPostNotification, error) {
-		notif, err := resolveNotificationByID(ctx, dbid)
-		if err != nil {
-			return nil, err
-		}
-
-		notifConverted := notif.(model.SomeoneCommentedOnYourPostNotification)
-
-		return &notifConverted, nil
-	},
-	OnSomeoneAdmiredYourTokenNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneAdmiredYourTokenNotification, error) {
-		notif, err := resolveNotificationByID(ctx, dbid)
-		if err != nil {
-			return nil, err
-		}
-
-		notifConverted := notif.(model.SomeoneAdmiredYourTokenNotification)
-
-		return &notifConverted, nil
-	},
-	OnSomeoneFollowedYouBackNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneFollowedYouBackNotification, error) {
-		notif, err := resolveNotificationByID(ctx, dbid)
-		if err != nil {
-			return nil, err
-		}
-
-		notifConverted := notif.(model.SomeoneFollowedYouBackNotification)
-
-		return &notifConverted, nil
-	},
-	OnSomeoneFollowedYouNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneFollowedYouNotification, error) {
-		notif, err := resolveNotificationByID(ctx, dbid)
-		if err != nil {
-			return nil, err
-		}
-
-		notifConverted := notif.(model.SomeoneFollowedYouNotification)
-
-		return &notifConverted, nil
-	},
-	OnSomeoneViewedYourGalleryNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneViewedYourGalleryNotification, error) {
-		notif, err := resolveNotificationByID(ctx, dbid)
-		if err != nil {
-			return nil, err
-		}
-
-		notifConverted := notif.(model.SomeoneViewedYourGalleryNotification)
-
-		return &notifConverted, nil
-	},
-	OnNewTokensNotification: func(ctx context.Context, dbid persist.DBID) (*model.NewTokensNotification, error) {
-		notif, err := resolveNotificationByID(ctx, dbid)
-		if err != nil {
-			return nil, err
-		}
-
-		notifConverted := notif.(model.NewTokensNotification)
-
-		return &notifConverted, nil
-	},
+	return &notifConverted, nil
 }
 
 var defaultTokenSettings = persist.CollectionTokenSettings{}
@@ -738,9 +672,9 @@ func postsToConnection(ctx context.Context, posts []db.Post, contractID persist.
 	edges := make([]*model.PostEdge, len(posts))
 	for i, post := range posts {
 
-		p := post
+		po := post
 
-		cval, _ := p.Caption.Value()
+		cval, _ := po.Caption.Value()
 
 		var caption *string
 		if cval != nil {
@@ -750,11 +684,11 @@ func postsToConnection(ctx context.Context, posts []db.Post, contractID persist.
 		edges[i] = &model.PostEdge{
 			Node: &model.Post{
 				HelperPostData: model.HelperPostData{
-					TokenIDs: p.TokenIds,
-					AuthorID: p.ActorID,
+					TokenIDs: po.TokenIds,
+					AuthorID: po.ActorID,
 				},
-				CreationTime: &p.CreatedAt,
-				Dbid:         p.ID,
+				CreationTime: &po.CreatedAt,
+				Dbid:         po.ID,
 				Tokens:       nil, // handled by dedicated resolver
 				Caption:      caption,
 				Admires:      nil, // handled by dedicated resolver
@@ -840,6 +774,34 @@ func resolvePostByPostID(ctx context.Context, postID persist.DBID) (*model.Post,
 	}
 
 	return postToModel(post)
+}
+
+func resolveMentionsByCommentID(ctx context.Context, commentID persist.DBID) ([]*model.Mention, error) {
+	mentions, err := publicapi.For(ctx).Interaction.GetMentionsByCommentID(ctx, commentID)
+	if err != nil {
+		return nil, err
+	}
+
+	return mentionsToModel(ctx, mentions)
+}
+
+func resolveMentionsByPostID(ctx context.Context, postID persist.DBID) ([]*model.Mention, error) {
+	mentions, err := publicapi.For(ctx).Interaction.GetMentionsByPostID(ctx, postID)
+	if err != nil {
+		return nil, err
+	}
+
+	return mentionsToModel(ctx, mentions)
+}
+
+func mentionsToModel(ctx context.Context, mentions []db.Mention) ([]*model.Mention, error) {
+	result := make([]*model.Mention, len(mentions))
+
+	for i, mention := range mentions {
+		result[i] = mentionToModel(ctx, mention)
+	}
+
+	return result, nil
 }
 
 func resolveViewerNotifications(ctx context.Context, before *string, after *string, first *int, last *int) (*model.NotificationsConnection, error) {
@@ -1016,6 +978,68 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 			Count:        &amount,
 			Token:        nil, // handled by dedicated resolver
 		}, nil
+	case persist.ActionReplyToComment:
+		return model.SomeoneRepliedToYourCommentNotification{
+			HelperSomeoneRepliedToYourCommentNotificationData: model.HelperSomeoneRepliedToYourCommentNotificationData{
+				OwnerID:          notif.OwnerID,
+				CommentID:        notif.CommentID,
+				NotificationData: notif.Data,
+			},
+			Dbid:            notif.ID,
+			Seen:            &notif.Seen,
+			CreationTime:    &notif.CreatedAt,
+			UpdatedTime:     &notif.LastUpdated,
+			Comment:         nil, // handled by dedicated resolver
+			OriginalComment: nil, // handled by dedicated resolver
+		}, nil
+	case persist.ActionMentionUser:
+		var postID *persist.DBID
+		var commentID *persist.DBID
+
+		if notif.PostID != "" {
+			postID = &notif.PostID
+		}
+		if notif.CommentID != "" {
+			commentID = &notif.CommentID
+		}
+		return model.SomeoneMentionedYouNotification{
+			HelperSomeoneMentionedYouNotificationData: model.HelperSomeoneMentionedYouNotificationData{
+				OwnerID:   notif.OwnerID,
+				PostID:    postID,
+				CommentID: commentID,
+			},
+			Dbid:          notif.ID,
+			Seen:          &notif.Seen,
+			CreationTime:  &notif.CreatedAt,
+			UpdatedTime:   &notif.LastUpdated,
+			MentionSource: nil, // handled by dedicated resolver
+		}, nil
+
+	case persist.ActionMentionCommunity:
+		var postID *persist.DBID
+		var commentID *persist.DBID
+
+		if notif.PostID != "" {
+			postID = &notif.PostID
+		}
+		if notif.CommentID != "" {
+			commentID = &notif.CommentID
+		}
+		return model.SomeoneMentionedYourCommunityNotification{
+			HelperSomeoneMentionedYourCommunityNotificationData: model.HelperSomeoneMentionedYourCommunityNotificationData{
+				OwnerID:    notif.OwnerID,
+				ContractID: notif.ContractID,
+				PostID:     postID,
+				CommentID:  commentID,
+			},
+			Dbid:          notif.ID,
+			Seen:          &notif.Seen,
+			CreationTime:  &notif.CreatedAt,
+			UpdatedTime:   &notif.LastUpdated,
+			Community:     nil, // handled by dedicated resolver
+			MentionSource: nil, // handled by dedicated resolver
+		}, nil
+
 	default:
 		return nil, fmt.Errorf("unknown notification action: %s", notif.Action)
 	}
@@ -1768,7 +1792,19 @@ func usersToEdges(ctx context.Context, users []db.User) []*model.UserEdge {
 // admireToModel converts a db.Admire to a model.Admire
 func admireToModel(ctx context.Context, admire db.Admire) *model.Admire {
 
+	var postID, feedEventID *persist.DBID
+	if admire.PostID != "" {
+		postID = &admire.PostID
+	}
+	if admire.FeedEventID != "" {
+		feedEventID = &admire.FeedEventID
+	}
+
 	return &model.Admire{
+		HelperAdmireData: model.HelperAdmireData{
+			PostID:      postID,
+			FeedEventID: feedEventID,
+		},
 		Dbid:         admire.ID,
 		CreationTime: &admire.CreatedAt,
 		LastUpdated:  &admire.LastUpdated,
@@ -1779,12 +1815,31 @@ func admireToModel(ctx context.Context, admire db.Admire) *model.Admire {
 // commentToModel converts a db.Admire to a model.Admire
 func commentToModel(ctx context.Context, comment db.Comment) *model.Comment {
 
+	var postID, feedEventID, replyToID *persist.DBID
+	if comment.PostID != "" {
+		postID = &comment.PostID
+	}
+	if comment.FeedEventID != "" {
+		feedEventID = &comment.FeedEventID
+	}
+	if comment.ReplyTo != "" {
+		replyToID = &comment.ReplyTo
+	}
 	return &model.Comment{
+		HelperCommentData: model.HelperCommentData{
+			PostID:      postID,
+			FeedEventID: feedEventID,
+			ReplyToID:   replyToID,
+		},
 		Dbid:         comment.ID,
 		CreationTime: &comment.CreatedAt,
 		LastUpdated:  &comment.LastUpdated,
 		Comment:      &comment.Comment,
 		Commenter:    &model.GalleryUser{Dbid: comment.ActorID}, // remaining fields handled by dedicated resolver
+		ReplyTo:      nil,                                       // handled by dedicated resolver
+		Replies:      nil,                                       // handled by dedicated resolver
+		Source:       nil,                                       // handled by dedicated resolver
+		Deleted:      &comment.Removed,
 	}
 }
 
@@ -1974,8 +2029,8 @@ func communityToModel(ctx context.Context, community db.Contract, forceRefresh *
 
 	// TODO: Should this use CreatorAddress or OwnerAddress?
 	var creatorAddress *persist.ChainAddress
-	if community.CreatorAddress != "" {
-		chainAddress := persist.NewChainAddress(community.CreatorAddress, chain)
+	if community.OwnerAddress != "" {
+		chainAddress := persist.NewChainAddress(community.OwnerAddress, chain)
 		creatorAddress = &chainAddress
 	}
 
@@ -2358,4 +2413,25 @@ func mediaToDimensions(dimensions persist.Dimensions) *model.MediaDimensions {
 		Width:       &dimensions.Width,
 		AspectRatio: &aspect,
 	}
+}
+
+func mentionToModel(ctx context.Context, mention db.Mention) *model.Mention {
+	m := &model.Mention{}
+	if mention.Start.Valid {
+		m.Interval = &model.Interval{
+			Start:  int(mention.Start.Int32),
+			Length: int(mention.Length.Int32),
+		}
+	}
+
+	switch {
+	case mention.UserID != "":
+		m.HelperMentionData.UserID = &mention.UserID
+	case mention.ContractID != "":
+		m.HelperMentionData.CommunityID = &mention.ContractID
+	default:
+		panic(fmt.Sprintf("unknown mention type: %+v", mention))
+	}
+
+	return m
 }

@@ -2,6 +2,7 @@ package publicapi
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -17,6 +18,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
+	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -207,8 +209,7 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 	return interactions, pageInfo, nil
 }
 
-func (api InteractionAPI) PaginateInteractionsByPostID(ctx context.Context, postID persist.DBID, before *string, after *string,
-	first *int, last *int) ([]interface{}, PageInfo, error) {
+func (api InteractionAPI) PaginateInteractionsByPostID(ctx context.Context, postID persist.DBID, before *string, after *string, first *int, last *int) ([]interface{}, PageInfo, error) {
 
 	err := api.validateInteractionParams(postID, first, last, "postID")
 	if err != nil {
@@ -366,8 +367,7 @@ func (api InteractionAPI) PaginateAdmiresByFeedEventID(ctx context.Context, feed
 	return admires, pageInfo, err
 }
 
-func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, feedEventID persist.DBID, before *string, after *string,
-	first *int, last *int) ([]db.Comment, PageInfo, error) {
+func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, feedEventID persist.DBID, before *string, after *string, first *int, last *int) ([]db.Comment, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"feedEventID": validate.WithTag(feedEventID, "required"),
@@ -428,6 +428,134 @@ func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, fee
 	}
 
 	return comments, pageInfo, err
+}
+
+func (api InteractionAPI) PaginateRepliesByCommentID(ctx context.Context, commentID persist.DBID, before *string, after *string, first *int, last *int) ([]db.Comment, PageInfo, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"commentID": validate.WithTag(commentID, "required"),
+	}); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
+
+		comments, err := api.loaders.RepliesByCommentID.Load(db.PaginateRepliesByCommentIDBatchParams{
+			CommentID:     commentID,
+			Limit:         params.Limit,
+			CurBeforeTime: params.CursorBeforeTime,
+			CurBeforeID:   params.CursorBeforeID,
+			CurAfterTime:  params.CursorAfterTime,
+			CurAfterID:    params.CursorAfterID,
+			PagingForward: params.PagingForward,
+		})
+
+		if err != nil {
+			return nil, err
+		}
+
+		results := make([]interface{}, len(comments))
+		for i, comment := range comments {
+			results[i] = comment
+		}
+
+		return results, nil
+	}
+
+	countFunc := func() (int, error) {
+		total, err := api.loaders.RepliesCountByCommentID.Load(commentID)
+		return total, err
+	}
+
+	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
+		if comment, ok := i.(db.Comment); ok {
+			return comment.CreatedAt, comment.ID, nil
+		}
+		return time.Time{}, "", fmt.Errorf("interface{} is not an comment")
+	}
+
+	paginator := timeIDPaginator{
+		QueryFunc:  queryFunc,
+		CursorFunc: cursorFunc,
+		CountFunc:  countFunc,
+	}
+
+	results, pageInfo, err := paginator.paginate(before, after, first, last)
+
+	comments := make([]db.Comment, len(results))
+	for i, result := range results {
+		comments[i] = result.(db.Comment)
+	}
+
+	return comments, pageInfo, err
+}
+
+func (api InteractionAPI) PaginateAdmiresByPostID(ctx context.Context, postID persist.DBID, before *string, after *string,
+	first *int, last *int) ([]db.Admire, PageInfo, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"feedEventID": validate.WithTag(postID, "required"),
+	}); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
+		admires, err := api.loaders.AdmiresByPostID.Load(db.PaginateAdmiresByPostIDBatchParams{
+			PostID:        postID,
+			Limit:         params.Limit,
+			CurBeforeTime: params.CursorBeforeTime,
+			CurBeforeID:   params.CursorBeforeID,
+			CurAfterTime:  params.CursorAfterTime,
+			CurAfterID:    params.CursorAfterID,
+			PagingForward: params.PagingForward,
+		})
+
+		if err != nil {
+			return nil, err
+		}
+
+		results := make([]interface{}, len(admires))
+		for i, admire := range admires {
+			results[i] = admire
+		}
+
+		return results, nil
+	}
+
+	countFunc := func() (int, error) {
+		total, err := api.loaders.AdmireCountByPostID.Load(postID)
+		return total, err
+	}
+
+	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
+		if admire, ok := i.(db.Admire); ok {
+			return admire.CreatedAt, admire.ID, nil
+		}
+		return time.Time{}, "", fmt.Errorf("interface{} is not an admire")
+	}
+
+	paginator := timeIDPaginator{
+		QueryFunc:  queryFunc,
+		CursorFunc: cursorFunc,
+		CountFunc:  countFunc,
+	}
+
+	results, pageInfo, err := paginator.paginate(before, after, first, last)
+
+	admires := make([]db.Admire, len(results))
+	for i, result := range results {
+		admires[i] = result.(db.Admire)
+	}
+
+	return admires, pageInfo, err
 }
 
 func (api InteractionAPI) PaginateAdmiresByTokenID(ctx context.Context, tokenID persist.DBID, before *string, after *string,
@@ -504,72 +632,7 @@ func (api InteractionAPI) PaginateAdmiresByTokenID(ctx context.Context, tokenID 
 	return admires, pageInfo, err
 }
 
-func (api InteractionAPI) PaginateAdmiresByPostID(ctx context.Context, postID persist.DBID, before *string, after *string,
-	first *int, last *int) ([]db.Admire, PageInfo, error) {
-	// Validate
-	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"feedEventID": validate.WithTag(postID, "required"),
-	}); err != nil {
-		return nil, PageInfo{}, err
-	}
-
-	if err := validatePaginationParams(api.validator, first, last); err != nil {
-		return nil, PageInfo{}, err
-	}
-
-	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-		admires, err := api.loaders.AdmiresByPostID.Load(db.PaginateAdmiresByPostIDBatchParams{
-			PostID:        postID,
-			Limit:         params.Limit,
-			CurBeforeTime: params.CursorBeforeTime,
-			CurBeforeID:   params.CursorBeforeID,
-			CurAfterTime:  params.CursorAfterTime,
-			CurAfterID:    params.CursorAfterID,
-			PagingForward: params.PagingForward,
-		})
-
-		if err != nil {
-			return nil, err
-		}
-
-		results := make([]interface{}, len(admires))
-		for i, admire := range admires {
-			results[i] = admire
-		}
-
-		return results, nil
-	}
-
-	countFunc := func() (int, error) {
-		total, err := api.loaders.AdmireCountByPostID.Load(postID)
-		return total, err
-	}
-
-	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
-		if admire, ok := i.(db.Admire); ok {
-			return admire.CreatedAt, admire.ID, nil
-		}
-		return time.Time{}, "", fmt.Errorf("interface{} is not an admire")
-	}
-
-	paginator := timeIDPaginator{
-		QueryFunc:  queryFunc,
-		CursorFunc: cursorFunc,
-		CountFunc:  countFunc,
-	}
-
-	results, pageInfo, err := paginator.paginate(before, after, first, last)
-
-	admires := make([]db.Admire, len(results))
-	for i, result := range results {
-		admires[i] = result.(db.Admire)
-	}
-
-	return admires, pageInfo, err
-}
-
-func (api InteractionAPI) PaginateCommentsByPostID(ctx context.Context, postID persist.DBID, before *string, after *string,
-	first *int, last *int) ([]db.Comment, PageInfo, error) {
+func (api InteractionAPI) PaginateCommentsByPostID(ctx context.Context, postID persist.DBID, before *string, after *string, first *int, last *int) ([]db.Comment, PageInfo, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"feedEventID": validate.WithTag(postID, "required"),
@@ -866,7 +929,7 @@ func (api InteractionAPI) GetCommentByID(ctx context.Context, commentID persist.
 	return &comment, nil
 }
 
-func (api InteractionAPI) CommentOnFeedEvent(ctx context.Context, feedEventID persist.DBID, replyToID *persist.DBID, comment string) (persist.DBID, error) {
+func (api InteractionAPI) CommentOnFeedEvent(ctx context.Context, feedEventID persist.DBID, replyToID *persist.DBID, mentions []*model.MentionInput, comment string) (persist.DBID, error) {
 	// Trim whitespace first, so comments consisting only of whitespace will fail
 	// the "required" validation below
 	comment = strings.TrimSpace(comment)
@@ -879,10 +942,10 @@ func (api InteractionAPI) CommentOnFeedEvent(ctx context.Context, feedEventID pe
 		return "", err
 	}
 
-	return api.comment(ctx, comment, feedEventID, "", replyToID)
+	return api.comment(ctx, comment, feedEventID, "", replyToID, mentions)
 }
 
-func (api InteractionAPI) CommentOnPost(ctx context.Context, postID persist.DBID, replyToID *persist.DBID, comment string) (persist.DBID, error) {
+func (api InteractionAPI) CommentOnPost(ctx context.Context, postID persist.DBID, replyToID *persist.DBID, mentions []*model.MentionInput, comment string) (persist.DBID, error) {
 	// Trim whitespace first, so comments consisting only of whitespace will fail
 	// the "required" validation below
 	comment = strings.TrimSpace(comment)
@@ -895,10 +958,10 @@ func (api InteractionAPI) CommentOnPost(ctx context.Context, postID persist.DBID
 		return "", err
 	}
 
-	return api.comment(ctx, comment, "", postID, replyToID)
+	return api.comment(ctx, comment, "", postID, replyToID, mentions)
 }
 
-func (api InteractionAPI) comment(ctx context.Context, comment string, feedEventID, postID persist.DBID, replyToID *persist.DBID) (persist.DBID, error) {
+func (api InteractionAPI) comment(ctx context.Context, comment string, feedEventID, postID persist.DBID, replyToID *persist.DBID, mentions []*model.MentionInput) (persist.DBID, error) {
 	actor, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return "", err
@@ -906,7 +969,9 @@ func (api InteractionAPI) comment(ctx context.Context, comment string, feedEvent
 
 	comment = validate.SanitizationPolicy.Sanitize(comment)
 
-	commentID, err := api.repos.CommentRepository.CreateComment(ctx, feedEventID, postID, actor, replyToID, comment)
+	dbMentions, err := mentionInputsToMentions(ctx, mentions, api.queries)
+
+	commentID, resultMentions, err := api.repos.CommentRepository.CreateComment(ctx, feedEventID, postID, actor, replyToID, comment, dbMentions)
 	if err != nil {
 		return "", err
 	}
@@ -928,8 +993,76 @@ func (api InteractionAPI) comment(ctx context.Context, comment string, feedEvent
 		CommentID:      commentID,
 		Action:         action,
 	})
+	if err != nil {
+		return "", err
+	}
 
-	return commentID, err
+	var replyToUser *persist.DBID
+	if replyToID != nil {
+		err = event.Dispatch(ctx, db.Event{
+			ActorID:        persist.DBIDToNullStr(actor),
+			ResourceTypeID: persist.ResourceTypeComment,
+			SubjectID:      *replyToID,
+			PostID:         postID,
+			FeedEventID:    feedEventID,
+			CommentID:      commentID,
+			Action:         persist.ActionReplyToComment,
+		})
+		if err != nil {
+			return "", err
+		}
+
+		replyToComment, err := api.GetCommentByID(ctx, *replyToID)
+		if err != nil {
+			return "", err
+		}
+
+		replyToUser = &replyToComment.ActorID
+	}
+
+	if len(mentions) > 0 {
+		for _, mention := range resultMentions {
+
+			if replyToUser != nil && mention.UserID == *replyToUser {
+				continue
+			}
+
+			switch {
+			case mention.UserID != "":
+				err = event.Dispatch(ctx, db.Event{
+					ActorID:        persist.DBIDToNullStr(actor),
+					ResourceTypeID: persist.ResourceTypeUser,
+					SubjectID:      mention.UserID,
+					PostID:         postID,
+					FeedEventID:    feedEventID,
+					UserID:         mention.UserID,
+					CommentID:      commentID,
+					MentionID:      mention.ID,
+					Action:         persist.ActionMentionUser,
+				})
+				if err != nil {
+					return "", err
+				}
+			case mention.ContractID != "":
+				err = event.Dispatch(ctx, db.Event{
+					ActorID:        persist.DBIDToNullStr(actor),
+					ResourceTypeID: persist.ResourceTypeContract,
+					SubjectID:      mention.ContractID,
+					PostID:         postID,
+					FeedEventID:    feedEventID,
+					ContractID:     mention.ContractID,
+					CommentID:      commentID,
+					MentionID:      mention.ID,
+					Action:         persist.ActionMentionCommunity,
+				})
+
+			default:
+				return "", fmt.Errorf("invalid mention type: %+v", mention)
+			}
+		}
+	}
+
+	return commentID, nil
 }
 
 func (api InteractionAPI) RemoveComment(ctx context.Context, commentID persist.DBID) (persist.DBID, persist.DBID, error) {
@@ -948,4 +1081,58 @@ func (api InteractionAPI) RemoveComment(ctx context.Context, commentID persist.D
 	}
 
 	return comment.FeedEventID, comment.PostID, api.repos.CommentRepository.RemoveComment(ctx, commentID)
+}
+
+func (api InteractionAPI) GetMentionsByCommentID(ctx context.Context, commentID persist.DBID) ([]db.Mention, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"commentID": validate.WithTag(commentID, "required"),
+	}); err != nil {
+		return nil, err
+	}
+
+	return api.loaders.MentionsByCommentID.Load(commentID)
+}
+
+func (api InteractionAPI) GetMentionsByPostID(ctx context.Context, postID persist.DBID) ([]db.Mention, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"postID": validate.WithTag(postID, "required"),
+	}); err != nil {
+		return nil, err
+	}
+
+	return api.loaders.MentionsByPostID.Load(postID)
+}
+
+func mentionInputsToMentions(ctx context.Context, ms []*model.MentionInput, queries *db.Queries) ([]db.Mention, error) {
+	res := make([]db.Mention, len(ms))
+
+	for i, m := range ms {
+		if m.CommunityID != nil && m.UserID != nil {
+			return nil, fmt.Errorf("mention input cannot have both communityID and userID set")
+		}
+		mention := db.Mention{}
+		if m.Interval != nil {
+			mention.Length = sql.NullInt32{Int32: int32(m.Interval.Length), Valid: true}
+			mention.Start = sql.NullInt32{Int32: int32(m.Interval.Start), Valid: true}
+
+		}
+		if m.CommunityID != nil {
+			if c, err := queries.GetContractByID(ctx, *m.CommunityID); c.ID == "" || err != nil {
+				return nil, fmt.Errorf("could retrieve community: %s (%s)", *m.CommunityID, err)
+			}
+			mention.CommentID = *m.CommunityID
+		}
+		if m.UserID != nil {
+			if u, err := queries.GetUserById(ctx, *m.UserID); u.ID == "" || err != nil {
+				return nil, fmt.Errorf("could retrieve user: %s (%s)", *m.UserID, err)
+			}
+			mention.UserID = *m.UserID
+		}
+
+		res[i] = mention
+	}
+
+	return res, nil
 }

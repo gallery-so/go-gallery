@@ -16,6 +16,7 @@ const (
 	ResourceTypeGallery
 	ResourceTypeAdmire
 	ResourceTypeComment
+	ResourceTypeContract
 	ResourceTypePost
 	ActionUserCreated                     Action = "UserCreated"
 	ActionUserFollowedUsers               Action = "UserFollowedUsers"
@@ -29,6 +30,9 @@ const (
 	ActionAdmiredToken                    Action = "AdmiredToken"
 	ActionCommentedOnFeedEvent            Action = "CommentedOnFeedEvent"
 	ActionCommentedOnPost                 Action = "CommentedOnPost"
+	ActionReplyToComment                  Action = "RepliedToComment"
+	ActionMentionUser                     Action = "MentionUser"
+	ActionMentionCommunity                Action = "MentionCommunity"
 	ActionViewedGallery                   Action = "ViewedGallery"
 	ActionViewedToken                     Action = "ViewedToken"
 	ActionCollectionUpdated               Action = "CollectionUpdated"

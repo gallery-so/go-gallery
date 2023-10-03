@@ -13,6 +13,7 @@ type NotificationData struct {
 	Refollowed        NullBool  `json:"refollowed,omitempty"`
 	NewTokenID        DBID      `json:"new_token_id,omitempty"`
 	NewTokenQuantity  HexString `json:"new_token_quantity,omitempty"`
+	OriginalCommentID DBID      `json:"original_comment_id,omitempty"`
 }
 
 func (n NotificationData) Validate() NotificationData {
@@ -23,6 +24,7 @@ func (n NotificationData) Validate() NotificationData {
 	result.UnauthedViewerIDs = uniqueStrings(n.UnauthedViewerIDs)
 	result.NewTokenID = n.NewTokenID
 	result.NewTokenQuantity = n.NewTokenQuantity
+	result.OriginalCommentID = n.OriginalCommentID
 
 	return result
 }
@@ -37,6 +39,7 @@ func (n NotificationData) Concat(other NotificationData) NotificationData {
 	result.Refollowed = other.Refollowed || n.Refollowed
 	result.NewTokenQuantity = other.NewTokenQuantity.Add(n.NewTokenQuantity)
 	result.NewTokenID = DBID(util.FirstNonEmptyString(other.NewTokenID.String(), n.NewTokenID.String()))
+	result.OriginalCommentID = DBID(util.FirstNonEmptyString(other.OriginalCommentID.String(), n.OriginalCommentID.String()))
 
 	return result.Validate()
 }

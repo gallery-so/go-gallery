@@ -316,7 +316,7 @@ select t.* from tokens t
     order by t.created_at desc, t.name desc, t.id desc;
 
 -- name: CreateUserEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, post_id, comment_id, feed_event_id, mention_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, sqlc.narg('post'), sqlc.narg('comment'), sqlc.narg('feed_event'), sqlc.narg('mention'), $6, $7, $8) RETURNING *;
 
 -- name: CreateTokenEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data, group_id, caption, gallery_id, collection_id) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, sqlc.narg('gallery'), sqlc.narg('collection')) RETURNING *;
@@ -327,14 +327,17 @@ INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subje
 -- name: CreateGalleryEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, gallery_id, subject_id, data, external_id, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, $9) RETURNING *;
 
+-- name: CreateContractEvent :one
+INSERT INTO events (id, actor_id, action, resource_type_id, contract_id, subject_id, post_id, comment_id, feed_event_id, mention_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, sqlc.narg('post'), sqlc.narg('comment'), sqlc.narg('feed_event'), sqlc.narg('mention'), $6, $7, $8) RETURNING *;
+
 -- name: CreatePostEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, post_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
 
 -- name: CreateAdmireEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, post_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), $5, $6, $7, $8) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, post_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), $6, $7, $8, $9) RETURNING *;
 
 -- name: CreateCommentEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, comment_id, feed_event_id, post_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), $5, $6, $7, $8) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, comment_id, feed_event_id, post_id, mention_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), sqlc.narg('mention'), $6, $7, $8, $9) RETURNING *;
 
 -- name: GetEvent :one
 SELECT * FROM events WHERE id = $1 AND deleted = false;
@@ -509,6 +512,9 @@ SELECT * FROM feed_events WHERE id = $1 AND deleted = false;
 -- name: GetPostByIdBatch :batchone
 SELECT * FROM posts WHERE id = $1 AND deleted = false;
 
+-- name: GetPostByID :one
+SELECT * FROM posts WHERE id = $1 AND deleted = false;
+
 -- name: CreateFeedEvent :one
 INSERT INTO feed_events (id, owner_id, action, data, event_time, event_ids, group_id, caption) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *;
 
@@ -602,16 +608,16 @@ SELECT * FROM admires WHERE token_id = sqlc.arg('token_id') AND (not @only_for_a
 SELECT count(*) FROM admires WHERE token_id = $1 AND deleted = false;
 
 -- name: GetCommentByCommentID :one
-SELECT * FROM comments WHERE id = $1 AND deleted = false;
+SELECT * FROM comments WHERE id = $1 and deleted = false;
 
 -- name: GetCommentsByCommentIDs :many
-SELECT * from comments WHERE id = ANY(@comment_ids) AND deleted = false;
+SELECT * from comments WHERE id = ANY(@comment_ids) and deleted = false;
 
 -- name: GetCommentByCommentIDBatch :batchone
-SELECT * FROM comments WHERE id = $1 AND deleted = false;
+SELECT * FROM comments WHERE id = $1 and deleted = false;
 
 -- name: PaginateCommentsByFeedEventIDBatch :batchmany
-SELECT * FROM comments WHERE feed_event_id = sqlc.arg('feed_event_id') AND deleted = false
+SELECT * FROM comments WHERE feed_event_id = sqlc.arg('feed_event_id') AND reply_to is null AND deleted = false
     AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
     AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
     ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
@@ -619,10 +625,18 @@ SELECT * FROM comments WHERE feed_event_id = sqlc.arg('feed_event_id') AND delet
     LIMIT sqlc.arg('limit');
 
 -- name: CountCommentsByFeedEventIDBatch :batchone
-SELECT count(*) FROM comments WHERE feed_event_id = $1 AND deleted = false;
+SELECT count(*) FROM comments WHERE feed_event_id = sqlc.arg('feed_event_id') AND reply_to is null AND deleted = false;
 
 -- name: PaginateCommentsByPostIDBatch :batchmany
-SELECT * FROM comments WHERE post_id = sqlc.arg('post_id') AND deleted = false
+SELECT * FROM comments WHERE post_id = sqlc.arg('post_id') AND reply_to is null AND deleted = false
+    AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+    AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+    ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
+    LIMIT sqlc.arg('limit');
+
+-- name: PaginateRepliesByCommentIDBatch :batchmany
+SELECT * FROM comments WHERE reply_to = sqlc.arg('comment_id') AND deleted = false
     AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
     AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
     ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
@@ -630,13 +644,10 @@ SELECT * FROM comments WHERE post_id = sqlc.arg('post_id') AND deleted = false
     LIMIT sqlc.arg('limit');
 
 -- name: CountCommentsByPostIDBatch :batchone
-SELECT count(*) FROM comments WHERE post_id = $1 AND deleted = false;
+SELECT count(*) FROM comments WHERE post_id = sqlc.arg('post_id') AND reply_to is null AND deleted = false;
 
--- name: GetCommentsByActorID :many
-SELECT * FROM comments WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC;
-
--- name: GetCommentsByActorIDBatch :batchmany
-SELECT * FROM comments WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC;
+-- name: CountRepliesByCommentIDBatch :batchone
+SELECT count(*) FROM comments WHERE reply_to = sqlc.arg('comment_id') AND deleted = false;
 
 -- name: GetUserNotifications :many
 SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false
@@ -709,11 +720,17 @@ INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id,
 -- name: CreateCommentNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, comment_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), $6) RETURNING *;
 
+-- name: CreateContractNotification :one
+INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, comment_id, contract_id, mention_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), sqlc.narg('comment'), $6, $7) RETURNING *;
+
 -- name: CreateSimpleNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids) VALUES ($1, $2, $3, $4, $5) RETURNING *;
 
 -- name: CreateTokenNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids, token_id, amount) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
+
+-- name: CreateMentionUserNotification :one
+INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, comment_id, mention_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), sqlc.narg('comment'), $6) RETURNING *;
 
 -- name: CreateViewGalleryNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids, gallery_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;
@@ -732,7 +749,7 @@ SELECT interactions.created_At, interactions.id, interactions.tag FROM (
     SELECT t.created_at, t.id, sqlc.arg('admire_tag')::int as tag FROM admires t WHERE sqlc.arg('admire_tag') != 0 AND t.feed_event_id = sqlc.arg('feed_event_id') AND t.deleted = false
         AND (sqlc.arg('admire_tag'), t.created_at, t.id) < (sqlc.arg('cur_before_tag')::int, sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (sqlc.arg('admire_tag'), t.created_at, t.id) > (sqlc.arg('cur_after_tag')::int, sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
                                                                     UNION
-    SELECT t.created_at, t.id, sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.arg('comment_tag') != 0 AND t.feed_event_id = sqlc.arg('feed_event_id') AND t.deleted = false
+    SELECT t.created_at, t.id, sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.arg('comment_tag') != 0 AND t.feed_event_id = sqlc.arg('feed_event_id') AND t.reply_to is null AND t.deleted = false
         AND (sqlc.arg('comment_tag'), t.created_at, t.id) < (sqlc.arg('cur_before_tag')::int, sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (sqlc.arg('comment_tag'), t.created_at, t.id) > (sqlc.arg('cur_after_tag')::int, sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
 ) as interactions
 
@@ -743,14 +760,14 @@ LIMIT sqlc.arg('limit');
 -- name: CountInteractionsByFeedEventIDBatch :batchmany
 SELECT count(*), sqlc.arg('admire_tag')::int as tag FROM admires t WHERE sqlc.arg('admire_tag') != 0 AND t.feed_event_id = sqlc.arg('feed_event_id') AND t.deleted = false
                                                         UNION
-SELECT count(*), sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.arg('comment_tag') != 0 AND t.feed_event_id = sqlc.arg('feed_event_id') AND t.deleted = false;
+SELECT count(*), sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.arg('comment_tag') != 0 AND t.feed_event_id = sqlc.arg('feed_event_id') AND t.reply_to is null AND t.deleted = false;
 
 -- name: PaginateInteractionsByPostIDBatch :batchmany
 SELECT interactions.created_At, interactions.id, interactions.tag FROM (
     SELECT t.created_at, t.id, sqlc.arg('admire_tag')::int as tag FROM admires t WHERE sqlc.arg('admire_tag') != 0 AND t.post_id = sqlc.arg('post_id') AND t.deleted = false
         AND (sqlc.arg('admire_tag'), t.created_at, t.id) < (sqlc.arg('cur_before_tag')::int, sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (sqlc.arg('admire_tag'), t.created_at, t.id) > (sqlc.arg('cur_after_tag')::int, sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
                                                                     UNION
-    SELECT t.created_at, t.id, sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.arg('comment_tag') != 0 AND t.post_id = sqlc.arg('post_id') AND t.deleted = false
+    SELECT t.created_at, t.id, sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.arg('comment_tag') != 0 AND t.post_id = sqlc.arg('post_id') AND t.reply_to is null AND t.deleted = false
         AND (sqlc.arg('comment_tag'), t.created_at, t.id) < (sqlc.arg('cur_before_tag')::int, sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (sqlc.arg('comment_tag'), t.created_at, t.id) > (sqlc.arg('cur_after_tag')::int, sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
 ) as interactions
 
@@ -761,7 +778,7 @@ LIMIT sqlc.arg('limit');
 -- name: CountInteractionsByPostIDBatch :batchmany
 SELECT count(*), sqlc.arg('admire_tag')::int as tag FROM admires t WHERE sqlc.arg('admire_tag') != 0 AND t.post_id = sqlc.arg('post_id') AND t.deleted = false
                                                         UNION
-SELECT count(*), sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.arg('comment_tag') != 0 AND t.post_id = sqlc.arg('post_id') AND t.deleted = false;
+SELECT count(*), sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.arg('comment_tag') != 0 AND t.post_id = sqlc.arg('post_id') AND t.reply_to is null AND t.deleted = false;
 
 -- name: GetAdmireByActorIDAndFeedEventID :batchone
 SELECT * FROM admires WHERE actor_id = $1 AND feed_event_id = $2 AND deleted = false;
@@ -1665,6 +1682,21 @@ returning *;
 
 -- name: GetUsersBySocialIDs :many
 select * from pii.user_view u where u.pii_socials->sqlc.arg('social_account_type')::varchar->>'id' = any(@social_ids::varchar[]) and not u.deleted and not u.universal;
+
+-- name: InsertCommentMention :one
+insert into mentions (id, user_id, contract_id, comment_id, start, length) values (@id, sqlc.narg('user'), sqlc.narg('contract'), @comment_id, @start, @length) returning *;
+
+-- name: InsertPostMention :one
+insert into mentions (id, user_id, contract_id, post_id, start, length) values (@id, sqlc.narg('user'), sqlc.narg('contract'), @post_id, @start, @length) returning *;
+
+-- name: GetMentionsByCommentID :batchmany
+select * from mentions where comment_id = @comment_id and not deleted;
+
+-- name: GetMentionsByPostID :batchmany
+select * from mentions where post_id = @post_id and not deleted;
+
+-- name: GetMentionByID :one
+select * from mentions where id = @id and not deleted;
 
 -- name: GetUsersWithoutSocials :many
 select u.id, w.address, u.pii_socials->>'Lens' is null, u.pii_socials->>'Farcaster' is null from pii.user_view u join wallets w on w.id = any(u.wallets) where u.deleted = false and w.chain = 0 and w.deleted = false and u.universal = false and (u.pii_socials->>'Lens' is null or u.pii_socials->>'Farcaster' is null) order by u.created_at desc;
