@@ -2,6 +2,7 @@ package publicapi
 
 import (
 	"context"
+	"net/http"
 	"time"
 
 	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
@@ -58,7 +59,7 @@ type PublicAPI struct {
 	Search        *SearchAPI
 }
 
-func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell,
+func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Repositories, queries *db.Queries, httpClient *http.Client, ethClient *ethclient.Client, ipfsClient *shell.Shell,
 	arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider, taskClient *gcptasks.Client, throttler *throttle.Locker, secrets *secretmanager.Client, apq *apq.APQCache, feedCache *redis.Cache, socialCache *redis.Cache, authRefreshCache *redis.Cache, magicClient *magicclient.API) *PublicAPI {
 	loaders := dataloader.NewLoaders(ctx, queries, disableDataloaderCaching)
 	validator := validate.WithCustomValidators()
@@ -84,7 +85,7 @@ func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Rep
 		Notifications: &NotificationsAPI{queries: queries, loaders: loaders, validator: validator},
 		Admin:         admin.NewAPI(repos, queries, authRefreshCache, validator, multichainProvider),
 		Merch:         &MerchAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, secrets: secrets},
-		Social:        &SocialAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, redis: socialCache},
+		Social:        &SocialAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, redis: socialCache, httpClient: httpClient},
 		Card:          &CardAPI{validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, secrets: secrets},
 		Search:        &SearchAPI{queries: queries, loaders: loaders, validator: validator},
 	}

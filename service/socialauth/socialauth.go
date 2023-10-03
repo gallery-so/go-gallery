@@ -2,8 +2,11 @@ package socialauth
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/service/farcaster"
+	"github.com/mikeydub/go-gallery/service/lens"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/twitter"
@@ -56,4 +59,90 @@ func (a TwitterAuthenticator) Authenticate(ctx context.Context) (*SocialAuthResu
 			"profile_image_url": ids.ProfileImageURL,
 		},
 	}, nil
+}
+
+type FarcasterAuthenticator struct {
+	Queries    *coredb.Queries
+	HTTPClient *http.Client
+
+	UserID  persist.DBID
+	Address persist.Address
+}
+
+func (a FarcasterAuthenticator) Authenticate(ctx context.Context) (*SocialAuthResult, error) {
+	api := farcaster.NewNeynarAPI(a.HTTPClient)
+	user, err := a.Queries.GetUserByAddressAndChains(ctx, coredb.GetUserByAddressAndChainsParams{
+		Address: a.Address,
+		Chains:  util.MapWithoutError(persist.EvmChains, func(c persist.Chain) int32 { return int32(c) }),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if user.ID != a.UserID {
+		return nil, persist.ErrAddressNotOwnedByUser{
+			ChainAddress: persist.NewChainAddress(a.Address, persist.ChainETH),
+			UserID:       a.UserID,
+		}
+	}
+
+	fu, err := api.UserByAddress(ctx, a.Address)
+	if err != nil {
+		return nil, err
+	}
+
+	return &SocialAuthResult{
+		Provider: persist.SocialProviderFarcaster,
+		ID:       fu.Fid.String(),
+		Metadata: map[string]interface{}{
+			"username":          fu.Username,
+			"name":              fu.DisplayName,
+			"profile_image_url": fu.Pfp.URL,
+			"bio":               fu.Profile.Bio.Text,
+		},
+	}, nil
+
+}
+
+type LensAuthenticator struct {
+	Queries    *coredb.Queries
+	HTTPClient *http.Client
+
+	UserID  persist.DBID
+	Address persist.Address
+}
+
+func (a LensAuthenticator) Authenticate(ctx context.Context) (*SocialAuthResult, error) {
+	api := lens.NewAPI(a.HTTPClient)
+	user, err := a.Queries.GetUserByAddressAndChains(ctx, coredb.GetUserByAddressAndChainsParams{
+		Address: a.Address,
+		Chains:  util.MapWithoutError(persist.EvmChains, func(c persist.Chain) int32 { return int32(c) }),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if user.ID != a.UserID {
+		return nil, persist.ErrAddressNotOwnedByUser{
+			ChainAddress: persist.NewChainAddress(a.Address, persist.ChainETH),
+			UserID:       a.UserID,
+		}
+	}
+
+	lu, err := api.DefaultProfileByAddress(ctx, a.Address)
+	if err != nil {
+		return nil, err
+	}
+
+	return &SocialAuthResult{
+		Provider: persist.SocialProviderFarcaster,
+		ID:       lu.ID,
+		Metadata: map[string]interface{}{
+			"username":          lu.Handle,
+			"name":              lu.Name,
+			"profile_image_url": lu.Picture.Optimized.URL,
+			"bio":               lu.Bio,
+		},
+	}, nil
+
 }

@@ -1264,6 +1264,10 @@ type FallbackMedia struct {
 	MediaType *string `json:"mediaType"`
 }
 
+type FarcasterAuth struct {
+	Address persist.Address `json:"address"`
+}
+
 type FarcasterSocialAccount struct {
 	Type            persist.SocialProvider `json:"type"`
 	SocialID        string                 `json:"social_id"`
@@ -1533,6 +1537,10 @@ type JSONMedia struct {
 
 func (JSONMedia) IsMediaSubtype() {}
 func (JSONMedia) IsMedia()        {}
+
+type LensAuth struct {
+	Address persist.Address `json:"address"`
+}
 
 type LensSocialAccount struct {
 	Type            persist.SocialProvider `json:"type"`
@@ -1968,8 +1976,10 @@ type SocialAccounts struct {
 }
 
 type SocialAuthMechanism struct {
-	Twitter *TwitterAuth     `json:"twitter"`
-	Debug   *DebugSocialAuth `json:"debug"`
+	Twitter   *TwitterAuth     `json:"twitter"`
+	Debug     *DebugSocialAuth `json:"debug"`
+	Farcaster *FarcasterAuth   `json:"farcaster"`
+	Lens      *LensAuth        `json:"lens"`
 }
 
 type SocialConnection struct {

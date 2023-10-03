@@ -8217,8 +8217,10 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputDebugAuth,
 		ec.unmarshalInputDebugSocialAuth,
 		ec.unmarshalInputEoaAuth,
+		ec.unmarshalInputFarcasterAuth,
 		ec.unmarshalInputGalleryPositionInput,
 		ec.unmarshalInputGnosisSafeAuth,
+		ec.unmarshalInputLensAuth,
 		ec.unmarshalInputMagicLinkAuth,
 		ec.unmarshalInputMintPremiumCardToWalletInput,
 		ec.unmarshalInputMoveCollectionToGalleryInput,
@@ -10094,10 +10096,22 @@ input OneTimeLoginTokenAuth {
 input SocialAuthMechanism {
   twitter: TwitterAuth
   debug: DebugSocialAuth
+  farcaster: FarcasterAuth
+  lens: LensAuth
 }
 
 input TwitterAuth {
   code: String!
+}
+
+input FarcasterAuth {
+  address: Address!
+  # farcaster only supports ETH addresses currently so no need to specify a chain
+}
+
+input LensAuth {
+  address: Address!
+  # lens only supports ETH addresses currently so no need to specify a chain
 }
 
 input DebugSocialAuth @restrictEnvironment(allowed: ["local", "development", "sandbox"]) {
@@ -59660,6 +59674,35 @@ func (ec *executionContext) unmarshalInputEoaAuth(ctx context.Context, obj inter
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputFarcasterAuth(ctx context.Context, obj interface{}) (model.FarcasterAuth, error) {
+	var it model.FarcasterAuth
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"address"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "address":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("address"))
+			data, err := ec.unmarshalNAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Address = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputGalleryPositionInput(ctx context.Context, obj interface{}) (model.GalleryPositionInput, error) {
 	var it model.GalleryPositionInput
 	asMap := map[string]interface{}{}
@@ -59730,6 +59773,35 @@ func (ec *executionContext) unmarshalInputGnosisSafeAuth(ctx context.Context, ob
 				return it, err
 			}
 			it.Nonce = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputLensAuth(ctx context.Context, obj interface{}) (model.LensAuth, error) {
+	var it model.LensAuth
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"address"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "address":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("address"))
+			data, err := ec.unmarshalNAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Address = data
 		}
 	}
 
@@ -60275,7 +60347,7 @@ func (ec *executionContext) unmarshalInputSocialAuthMechanism(ctx context.Contex
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"twitter", "debug"}
+	fieldsInOrder := [...]string{"twitter", "debug", "farcaster", "lens"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -60321,6 +60393,24 @@ func (ec *executionContext) unmarshalInputSocialAuthMechanism(ctx context.Contex
 				err := fmt.Errorf(`unexpected type %T from directive, should be *github.com/mikeydub/go-gallery/graphql/model.DebugSocialAuth`, tmp)
 				return it, graphql.ErrorOnPath(ctx, err)
 			}
+		case "farcaster":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("farcaster"))
+			data, err := ec.unmarshalOFarcasterAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFarcasterAuth(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Farcaster = data
+		case "lens":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("lens"))
+			data, err := ec.unmarshalOLensAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐLensAuth(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Lens = data
 		}
 	}
 
@@ -78708,6 +78798,14 @@ func (ec *executionContext) marshalOFallbackMedia2ᚖgithubᚗcomᚋmikeydubᚋg
 	return ec._FallbackMedia(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalOFarcasterAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFarcasterAuth(ctx context.Context, v interface{}) (*model.FarcasterAuth, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputFarcasterAuth(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) marshalOFarcasterSocialAccount2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFarcasterSocialAccount(ctx context.Context, sel ast.SelectionSet, v *model.FarcasterSocialAccount) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -79429,6 +79527,14 @@ func (ec *executionContext) marshalOInteraction2githubᚗcomᚋmikeydubᚋgoᚑg
 		return graphql.Null
 	}
 	return ec._Interaction(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOLensAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐLensAuth(ctx context.Context, v interface{}) (*model.LensAuth, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputLensAuth(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalOLensSocialAccount2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐLensSocialAccount(ctx context.Context, sel ast.SelectionSet, v *model.LensSocialAccount) graphql.Marshaler {

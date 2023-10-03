@@ -271,9 +271,17 @@ func (r *Resolver) socialAuthMechanismToAuthenticator(ctx context.Context, m mod
 		}
 	}
 
+	authedUserID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
 	if m.Twitter != nil {
-		authedUserID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
 		return publicapi.For(ctx).Social.NewTwitterAuthenticator(authedUserID, m.Twitter.Code), nil
+	}
+
+	if m.Farcaster != nil {
+		return publicapi.For(ctx).Social.NewFarcasterAuthenticator(authedUserID, m.Farcaster.Address), nil
+	}
+
+	if m.Lens != nil {
+		return publicapi.For(ctx).Social.NewLensAuthenticator(authedUserID, m.Lens.Address), nil
 	}
 
 	return nil, errNoAuthMechanismFound
