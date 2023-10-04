@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -93,10 +94,10 @@ type TezosObjktProvider struct {
 	ipfsGatewayURL string
 }
 
-func NewObjktProvider(ipfsGatewayURL string) *TezosObjktProvider {
+func NewObjktProvider() *TezosObjktProvider {
 	return &TezosObjktProvider{
 		gql:            graphql.NewClient(objktEndpoint, http.DefaultClient),
-		ipfsGatewayURL: ipfsGatewayURL,
+		ipfsGatewayURL: env.GetString("IPFS_URL"),
 	}
 }
 
