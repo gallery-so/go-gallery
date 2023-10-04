@@ -45,7 +45,7 @@
 //go:generate go run github.com/gallery-so/dataloaden IntLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID int
 //go:generate go run github.com/gallery-so/dataloaden AdmireLoaderByActorAndFeedEvent github.com/mikeydub/go-gallery/db/gen/coredb.GetAdmireByActorIDAndFeedEventIDParams github.com/mikeydub/go-gallery/db/gen/coredb.Admire
 //go:generate go run github.com/gallery-so/dataloaden AdmireLoaderByActorAndPost github.com/mikeydub/go-gallery/db/gen/coredb.GetAdmireByActorIDAndPostIDParams github.com/mikeydub/go-gallery/db/gen/coredb.Admire
-//go:generate go run github.com/gallery-so/dataloaden AdmireByActorIDAndToken github.com/mikeydub/go-gallery/db/gen/coredb.GetAdmireByActorIDAndTokenIDParams github.com/mikeydub/go-gallery/db/gen/coredb.Admire
+//go:generate go run github.com/gallery-so/dataloaden AdmireLoaderByActorAndToken github.com/mikeydub/go-gallery/db/gen/coredb.GetAdmireByActorIDAndTokenIDParams github.com/mikeydub/go-gallery/db/gen/coredb.Admire
 //go:generate go run github.com/gallery-so/dataloaden SharedFollowersLoaderByIDs github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedFollowersBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedFollowersBatchPaginateRow
 //go:generate go run github.com/gallery-so/dataloaden SharedContractsLoaderByIDs github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedContractsBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedContractsBatchPaginateRow
 //go:generate go run github.com/gallery-so/dataloaden MediaLoaderByTokenID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.TokenMedia
