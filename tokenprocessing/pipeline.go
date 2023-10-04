@@ -142,38 +142,19 @@ func (tpj *tokenProcessingJob) run(ctx context.Context) (coredb.TokenMedia, erro
 
 	logger.For(ctx).Infof("starting token processing pipeline for token %s", tpj.token.String())
 
-	var media coredb.TokenMedia
-	var mediaErr error
-
-	func() {
-		mediaCtx, cancel := context.WithTimeout(ctx, time.Minute*10)
-		defer cancel()
-		result := make(chan mediaResult, 1)
-		select {
-		case result <- tpj.createMediaForToken(mediaCtx):
-			r := <-result
-			media, mediaErr = r.media, r.err
-		case <-mediaCtx.Done():
-			mediaErr = mediaCtx.Err()
-		}
-	}()
-
-	persistCtx, cancel := context.WithTimeout(ctx, time.Minute*10)
+	mediaCtx, cancel := context.WithTimeout(ctx, time.Minute*10)
 	defer cancel()
 
-	if err := tpj.persistResults(persistCtx, media); err != nil {
+	media, mediaErr := tpj.createMediaForToken(mediaCtx)
+
+	if err := tpj.persistResults(ctx, media); err != nil {
 		return media, err
 	}
 
 	return media, mediaErr
 }
 
-type mediaResult struct {
-	media coredb.TokenMedia
-	err   error
-}
-
-func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) mediaResult {
+func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (coredb.TokenMedia, error) {
 	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.CreateMedia, "CreateMedia")
 	defer traceCallback()
 
@@ -198,7 +179,7 @@ func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) mediaRes
 		err = ErrBadToken{err}
 	}
 
-	return mediaResult{result, err}
+	return result, err
 }
 
 func (tpj *tokenProcessingJob) retrieveMetadata(ctx context.Context) persist.TokenMetadata {

@@ -14,13 +14,15 @@ import (
 	"blockwatch.cc/tzgo/tezos"
 	"github.com/gammazero/workerpool"
 	"github.com/machinebox/graphql"
+	"golang.org/x/crypto/blake2b"
+
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
-	"golang.org/x/crypto/blake2b"
 )
 
 const (
@@ -122,9 +124,9 @@ type Provider struct {
 }
 
 // NewProvider creates a new Tezos Provider
-func NewProvider(tezosAPIUrl string, httpClient *http.Client) *Provider {
+func NewProvider(httpClient *http.Client) *Provider {
 	return &Provider{
-		apiURL:     tezosAPIUrl,
+		apiURL:     env.GetString("TEZOS_API_URL"),
 		httpClient: httpClient,
 		graphQL:    graphql.NewClient(tezDomainsApiURL, graphql.WithHTTPClient(httpClient)),
 	}

@@ -231,26 +231,21 @@ func providersMatchingInterface[T any](providers []any) []T {
 	matches := make([]T, 0)
 	seen := map[string]bool{}
 	for _, p := range providers {
-
-		if conf, ok := p.(Configurer); ok && seen[conf.GetBlockchainInfo().ProviderID] {
+		match, ok := p.(T)
+		if !ok {
 			continue
-		} else if ok {
-			seen[conf.GetBlockchainInfo().ProviderID] = true
-		} else {
-			panic(fmt.Sprintf("provider %T does not implement Configurer", p))
 		}
 
-		if match, ok := p.(T); ok {
+		if id := p.(Configurer).GetBlockchainInfo().ProviderID; !seen[id] {
+			seen[id] = true
 			matches = append(matches, match)
+		}
 
-			// if the provider has subproviders, make sure we don't add them later
-			if ps, ok := p.(ProviderSupplier); ok {
-				for _, sp := range ps.GetSubproviders() {
-					if conf, ok := sp.(Configurer); ok {
-						seen[conf.GetBlockchainInfo().ProviderID] = true
-					} else {
-						panic(fmt.Sprintf("subprovider %T does not implement Configurer", sp))
-					}
+		// If the provider has subproviders, make sure we don't add them later
+		if ps, ok := p.(ProviderSupplier); ok {
+			for _, sp := range ps.GetSubproviders() {
+				if id := sp.(Configurer).GetBlockchainInfo().ProviderID; !seen[id] {
+					seen[id] = true
 				}
 			}
 		}
