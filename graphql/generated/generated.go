@@ -1364,6 +1364,7 @@ type ComplexityRoot struct {
 		TokenID               func(childComplexity int) int
 		TokenMetadata         func(childComplexity int) int
 		TokenType             func(childComplexity int) int
+		ViewerAdmire          func(childComplexity int) int
 	}
 
 	TokenAdmireEdge struct {
@@ -1981,6 +1982,7 @@ type TokenResolver interface {
 
 	IsSpamByProvider(ctx context.Context, obj *model.Token) (*bool, error)
 	Admires(ctx context.Context, obj *model.Token, before *string, after *string, first *int, last *int, userID *persist.DBID) (*model.TokenAdmiresConnection, error)
+	ViewerAdmire(ctx context.Context, obj *model.Token) (*model.Admire, error)
 }
 type TokenHolderResolver interface {
 	Wallets(ctx context.Context, obj *model.TokenHolder) ([]*model.Wallet, error)
@@ -7651,6 +7653,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Token.TokenType(childComplexity), true
 
+	case "Token.viewerAdmire":
+		if e.complexity.Token.ViewerAdmire == nil {
+			break
+		}
+
+		return e.complexity.Token.ViewerAdmire(childComplexity), true
+
 	case "TokenAdmireEdge.cursor":
 		if e.complexity.TokenAdmireEdge.Cursor == nil {
 			break
@@ -9028,6 +9037,9 @@ type Token implements Node @goEmbedHelper {
     last: Int
     userID: DBID
   ): TokenAdmiresConnection @goField(forceResolver: true)
+
+  viewerAdmire: Admire @goField(forceResolver: true)
+
   # These are subject to change; unlike the other fields, they aren't present on the current persist.Token
   # struct and may ultimately end up elsewhere
   creatorAddress: ChainAddress
@@ -15824,6 +15836,8 @@ func (ec *executionContext) fieldContext_AdmireTokenPayload_token(ctx context.Co
 				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
 			case "admires":
 				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Token_creatorAddress(ctx, field)
 			case "openseaCollectionName":
@@ -16786,6 +16800,8 @@ func (ec *executionContext) fieldContext_ChainTokens_tokens(ctx context.Context,
 				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
 			case "admires":
 				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Token_creatorAddress(ctx, field)
 			case "openseaCollectionName":
@@ -17992,6 +18008,8 @@ func (ec *executionContext) fieldContext_CollectionToken_token(ctx context.Conte
 				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
 			case "admires":
 				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Token_creatorAddress(ctx, field)
 			case "openseaCollectionName":
@@ -23237,6 +23255,8 @@ func (ec *executionContext) fieldContext_EnsProfileImage_token(ctx context.Conte
 				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
 			case "admires":
 				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Token_creatorAddress(ctx, field)
 			case "openseaCollectionName":
@@ -28547,6 +28567,8 @@ func (ec *executionContext) fieldContext_GalleryUser_tokens(ctx context.Context,
 				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
 			case "admires":
 				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Token_creatorAddress(ctx, field)
 			case "openseaCollectionName":
@@ -38597,6 +38619,8 @@ func (ec *executionContext) fieldContext_NewTokensNotification_token(ctx context
 				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
 			case "admires":
 				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Token_creatorAddress(ctx, field)
 			case "openseaCollectionName":
@@ -40114,6 +40138,8 @@ func (ec *executionContext) fieldContext_Post_tokens(ctx context.Context, field 
 				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
 			case "admires":
 				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Token_creatorAddress(ctx, field)
 			case "openseaCollectionName":
@@ -44231,6 +44257,8 @@ func (ec *executionContext) fieldContext_RefreshTokenPayload_token(ctx context.C
 				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
 			case "admires":
 				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Token_creatorAddress(ctx, field)
 			case "openseaCollectionName":
@@ -45292,6 +45320,8 @@ func (ec *executionContext) fieldContext_SetSpamPreferencePayload_tokens(ctx con
 				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
 			case "admires":
 				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Token_creatorAddress(ctx, field)
 			case "openseaCollectionName":
@@ -47224,6 +47254,8 @@ func (ec *executionContext) fieldContext_SomeoneAdmiredYourTokenNotification_tok
 				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
 			case "admires":
 				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Token_creatorAddress(ctx, field)
 			case "openseaCollectionName":
@@ -52106,6 +52138,61 @@ func (ec *executionContext) fieldContext_Token_admires(ctx context.Context, fiel
 	return fc, nil
 }
 
+func (ec *executionContext) _Token_viewerAdmire(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Token_viewerAdmire(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Token().ViewerAdmire(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Admire)
+	fc.Result = res
+	return ec.marshalOAdmire2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdmire(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Token_viewerAdmire(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Admire_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Admire_dbid(ctx, field)
+			case "creationTime":
+				return ec.fieldContext_Admire_creationTime(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Admire_lastUpdated(ctx, field)
+			case "admirer":
+				return ec.fieldContext_Admire_admirer(ctx, field)
+			case "source":
+				return ec.fieldContext_Admire_source(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Admire", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Token_creatorAddress(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Token_creatorAddress(ctx, field)
 	if err != nil {
@@ -52417,6 +52504,8 @@ func (ec *executionContext) fieldContext_TokenAdmireEdge_token(ctx context.Conte
 				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
 			case "admires":
 				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Token_creatorAddress(ctx, field)
 			case "openseaCollectionName":
@@ -52620,6 +52709,8 @@ func (ec *executionContext) fieldContext_TokenEdge_node(ctx context.Context, fie
 				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
 			case "admires":
 				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Token_creatorAddress(ctx, field)
 			case "openseaCollectionName":
@@ -53190,6 +53281,8 @@ func (ec *executionContext) fieldContext_TokenProfileImage_token(ctx context.Con
 				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
 			case "admires":
 				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Token_creatorAddress(ctx, field)
 			case "openseaCollectionName":
@@ -55598,6 +55691,8 @@ func (ec *executionContext) fieldContext_UpdateTokenInfoPayload_token(ctx contex
 				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
 			case "admires":
 				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Token_creatorAddress(ctx, field)
 			case "openseaCollectionName":
@@ -57411,6 +57506,8 @@ func (ec *executionContext) fieldContext_ViewTokenPayload_token(ctx context.Cont
 				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
 			case "admires":
 				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Token_creatorAddress(ctx, field)
 			case "openseaCollectionName":
@@ -58342,6 +58439,8 @@ func (ec *executionContext) fieldContext_Wallet_tokens(ctx context.Context, fiel
 				return ec.fieldContext_Token_isSpamByProvider(ctx, field)
 			case "admires":
 				return ec.fieldContext_Token_admires(ctx, field)
+			case "viewerAdmire":
+				return ec.fieldContext_Token_viewerAdmire(ctx, field)
 			case "creatorAddress":
 				return ec.fieldContext_Token_creatorAddress(ctx, field)
 			case "openseaCollectionName":
@@ -76480,6 +76579,23 @@ func (ec *executionContext) _Token(ctx context.Context, sel ast.SelectionSet, ob
 					}
 				}()
 				res = ec._Token_admires(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "viewerAdmire":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Token_viewerAdmire(ctx, field, obj)
 				return res
 			}
 
