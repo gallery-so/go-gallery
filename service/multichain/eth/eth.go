@@ -18,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mikeydub/go-gallery/contracts"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/indexer"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -37,9 +38,9 @@ type Provider struct {
 }
 
 // NewProvider creates a new ethereum Provider
-func NewProvider(indexerBaseURL string, httpClient *http.Client, ec *ethclient.Client, tc *cloudtasks.Client) *Provider {
+func NewProvider(httpClient *http.Client, ec *ethclient.Client, tc *cloudtasks.Client) *Provider {
 	return &Provider{
-		indexerBaseURL: indexerBaseURL,
+		indexerBaseURL: env.GetString("INDEXER_HOST"),
 		httpClient:     httpClient,
 		ethClient:      ec,
 		taskClient:     tc,

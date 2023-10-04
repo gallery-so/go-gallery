@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"net/http"
 
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
@@ -135,11 +136,11 @@ type Provider struct {
 }
 
 // NewProvider creates a new Tezos Provider
-func NewProvider(httpClient *http.Client, apiKey string, authToken string) *Provider {
+func NewProvider(httpClient *http.Client) *Provider {
 	return &Provider{
 		apiURL:     "https://api.poap.tech",
-		apiKey:     apiKey,
-		authToken:  authToken,
+		apiKey:     env.GetString("POAP_API_KEY"),
+		authToken:  env.GetString("POAP_AUTH_TOKEN"),
 		httpClient: httpClient,
 	}
 }
