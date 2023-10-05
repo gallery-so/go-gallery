@@ -37,11 +37,11 @@ where wallets.address = sqlc.arg('address')
 	and wallets.deleted = false
 	and users.deleted = false;
 
--- name: GetUserByAddressBatch :batchone
+-- name: GetUserByAddressAndL1Batch :batchone
 select users.*
 from users, wallets
 where wallets.address = sqlc.arg('address')
-	and wallets.chain = sqlc.arg('chain')::int
+	and wallets.l1_chain = sqlc.arg('l1_chain')
 	and array[wallets.id] <@ users.wallets
 	and wallets.deleted = false
 	and users.deleted = false;

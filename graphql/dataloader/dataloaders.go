@@ -405,17 +405,17 @@ func loadUserByUsername(q *db.Queries) func(context.Context, []string) ([]db.Use
 	}
 }
 
-func loadUserByAddress(q *db.Queries) func(context.Context, []db.GetUserByAddressBatchParams) ([]db.User, []error) {
-	return func(ctx context.Context, params []db.GetUserByAddressBatchParams) ([]db.User, []error) {
+func loadUserByAddress(q *db.Queries) func(context.Context, []db.GetUserByAddressAndL1BatchParams) ([]db.User, []error) {
+	return func(ctx context.Context, params []db.GetUserByAddressAndL1BatchParams) ([]db.User, []error) {
 		users := make([]db.User, len(params))
 		errors := make([]error, len(params))
 
-		b := q.GetUserByAddressBatch(ctx, params)
+		b := q.GetUserByAddressAndL1Batch(ctx, params)
 		defer b.Close()
 
 		b.QueryRow(func(i int, user db.User, err error) {
 			if err == pgx.ErrNoRows {
-				err = persist.ErrUserNotFound{ChainAddress: persist.NewChainAddress(params[i].Address, persist.Chain(params[i].Chain))}
+				err = persist.ErrUserNotFound{ChainAddress: persist.NewChainAddress(params[i].Address, persist.Chain(params[i].L1Chain))}
 			}
 
 			users[i], errors[i] = user, err

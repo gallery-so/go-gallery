@@ -3369,41 +3369,41 @@ func (b *GetTokensByWalletIdsBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
-const getUserByAddressBatch = `-- name: GetUserByAddressBatch :batchone
+const getUserByAddressAndL1Batch = `-- name: GetUserByAddressAndL1Batch :batchone
 select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.profile_image_id
 from users, wallets
 where wallets.address = $1
-	and wallets.chain = $2::int
+	and wallets.l1_chain = $2
 	and array[wallets.id] <@ users.wallets
 	and wallets.deleted = false
 	and users.deleted = false
 `
 
-type GetUserByAddressBatchBatchResults struct {
+type GetUserByAddressAndL1BatchBatchResults struct {
 	br     pgx.BatchResults
 	tot    int
 	closed bool
 }
 
-type GetUserByAddressBatchParams struct {
+type GetUserByAddressAndL1BatchParams struct {
 	Address persist.Address `json:"address"`
-	Chain   int32           `json:"chain"`
+	L1Chain persist.Chain   `json:"l1_chain"`
 }
 
-func (q *Queries) GetUserByAddressBatch(ctx context.Context, arg []GetUserByAddressBatchParams) *GetUserByAddressBatchBatchResults {
+func (q *Queries) GetUserByAddressAndL1Batch(ctx context.Context, arg []GetUserByAddressAndL1BatchParams) *GetUserByAddressAndL1BatchBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range arg {
 		vals := []interface{}{
 			a.Address,
-			a.Chain,
+			a.L1Chain,
 		}
-		batch.Queue(getUserByAddressBatch, vals...)
+		batch.Queue(getUserByAddressAndL1Batch, vals...)
 	}
 	br := q.db.SendBatch(ctx, batch)
-	return &GetUserByAddressBatchBatchResults{br, len(arg), false}
+	return &GetUserByAddressAndL1BatchBatchResults{br, len(arg), false}
 }
 
-func (b *GetUserByAddressBatchBatchResults) QueryRow(f func(int, User, error)) {
+func (b *GetUserByAddressAndL1BatchBatchResults) QueryRow(f func(int, User, error)) {
 	defer b.br.Close()
 	for t := 0; t < b.tot; t++ {
 		var i User
@@ -3440,7 +3440,7 @@ func (b *GetUserByAddressBatchBatchResults) QueryRow(f func(int, User, error)) {
 	}
 }
 
-func (b *GetUserByAddressBatchBatchResults) Close() error {
+func (b *GetUserByAddressAndL1BatchBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }
