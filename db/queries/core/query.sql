@@ -32,7 +32,7 @@ where p.pii_email_address = lower($1)
 select users.*
 from users, wallets
 where wallets.address = sqlc.arg('address')
-	and wallets.chain = sqlc.arg('l1_chain')
+	and wallets.l1_chain = sqlc.arg('l1_chain')
 	and array[wallets.id] <@ users.wallets
 	and wallets.deleted = false
 	and users.deleted = false;
