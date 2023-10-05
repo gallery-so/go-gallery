@@ -1,6 +1,6 @@
 //go:generate go run github.com/gallery-so/dataloaden UserLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.User
 //go:generate go run github.com/gallery-so/dataloaden UsersLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.User
-//go:generate go run github.com/gallery-so/dataloaden UserLoaderByAddress github.com/mikeydub/go-gallery/db/gen/coredb.GetUserByAddressBatchParams github.com/mikeydub/go-gallery/db/gen/coredb.User
+//go:generate go run github.com/gallery-so/dataloaden UserLoaderByAddress github.com/mikeydub/go-gallery/db/gen/coredb.GetUserByAddressAndL1BatchParams github.com/mikeydub/go-gallery/db/gen/coredb.User
 //go:generate go run github.com/gallery-so/dataloaden UserLoaderByString string github.com/mikeydub/go-gallery/db/gen/coredb.User
 //go:generate go run github.com/gallery-so/dataloaden UsersLoaderByString string []github.com/mikeydub/go-gallery/db/gen/coredb.User
 //go:generate go run github.com/gallery-so/dataloaden UsersLoaderByContractID github.com/mikeydub/go-gallery/db/gen/coredb.GetOwnersByContractIdBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.User
