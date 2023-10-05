@@ -110,16 +110,6 @@ const (
 	MaxChainValue = ChainBase
 )
 
-var WalletOverrides = map[Chain][]Chain{
-	ChainPOAP:     EvmChains,
-	ChainOptimism: EvmChains,
-	ChainPolygon:  EvmChains,
-	ChainArbitrum: EvmChains,
-	ChainETH:      EvmChains,
-	ChainZora:     EvmChains,
-	ChainBase:     EvmChains,
-}
-
 var L1Chains = map[Chain]Chain{
 	ChainPOAP:     ChainETH,
 	ChainOptimism: ChainETH,
@@ -129,6 +119,11 @@ var L1Chains = map[Chain]Chain{
 	ChainBase:     ChainETH,
 	ChainETH:      ChainETH,
 	ChainTezos:    ChainTezos,
+}
+
+var L1ChainGroups = map[Chain][]Chain{
+	ChainETH:   EvmChains,
+	ChainTezos: []Chain{ChainTezos},
 }
 
 var AllChains = []Chain{ChainETH, ChainArbitrum, ChainPolygon, ChainOptimism, ChainTezos, ChainPOAP, ChainZora, ChainBase}
@@ -559,6 +554,14 @@ func (c Chain) L1Chain() Chain {
 		panic("l1 chain not found")
 	}
 	return c
+}
+
+func (c Chain) L1ChainGroup() []Chain {
+	cg, ok := L1ChainGroups[c.L1Chain()]
+	if !ok {
+		panic("chain group not found")
+	}
+	return cg
 }
 
 // URL turns a token's URI into a URL
