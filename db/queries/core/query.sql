@@ -154,6 +154,9 @@ SELECT wallets.* FROM wallets WHERE address = $1 AND chain = $2 AND deleted = fa
 -- name: GetWalletByChainAddressBatch :batchone
 SELECT wallets.* FROM wallets WHERE address = $1 AND chain = $2 AND deleted = false;
 
+-- name: GetWalletByAddressAndL1Chain :one
+SELECT wallets.* FROM wallets WHERE address = $1 AND l1_chain = $2 AND deleted = false;
+
 -- name: GetWalletsByUserID :many
 SELECT w.* FROM users u, unnest(u.wallets) WITH ORDINALITY AS a(wallet_id, wallet_ord)INNER JOIN wallets w on w.id = a.wallet_id WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.wallet_ord;
 
@@ -1195,7 +1198,7 @@ select * from users where array[@wallet::varchar]::varchar[] <@ wallets and dele
 update users set deleted = true where id = $1;
 
 -- name: InsertWallet :exec
-with new_wallet as (insert into wallets(id, address, chain, wallet_type) values ($1, $2, $3, $4) returning id)
+with new_wallet as (insert into wallets(id, address, chain, l1_chain, wallet_type) values ($1, $2, $3, $4, $5) returning id)
 update users set
     primary_wallet_id = coalesce(users.primary_wallet_id, new_wallet.id),
     wallets = array_append(users.wallets, new_wallet.id)

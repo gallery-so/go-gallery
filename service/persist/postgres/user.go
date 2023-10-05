@@ -173,9 +173,9 @@ func (u *UserRepository) createWalletWithTx(ctx context.Context, queries *db.Que
 		queries = u.queries
 	}
 
-	wallet, err := queries.GetWalletByChainAddress(ctx, db.GetWalletByChainAddressParams{
+	wallet, err := queries.GetWalletByAddressAndL1Chain(ctx, db.GetWalletByAddressAndL1ChainParams{
 		Address: chainAddress.Address(),
-		Chain:   chainAddress.Chain(),
+		L1Chain: chainAddress.Chain().L1Chain(),
 	})
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return "", err
@@ -219,6 +219,7 @@ func (u *UserRepository) createWalletWithTx(ctx context.Context, queries *db.Que
 		Chain:      chainAddress.Chain(),
 		WalletType: walletType,
 		UserID:     userID,
+		L1Chain:    chainAddress.Chain().L1Chain(),
 	})
 	if err != nil {
 		return "", persist.ErrWalletCreateFailed{

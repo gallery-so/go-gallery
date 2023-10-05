@@ -23,10 +23,10 @@ func NewNonceRepository(db *sql.DB, queries *db.Queries) *NonceRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
-	getByChainAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,VALUE,ADDRESS,VERSION,DELETED,CREATED_AT,LAST_UPDATED FROM nonces WHERE ADDRESS = $1 AND L1_CHAIN = $2 ORDER BY LAST_UPDATED DESC LIMIT 1`)
+	getByChainAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,VALUE,ADDRESS,CHAIN,L1_CHAIN,VERSION,DELETED,CREATED_AT,LAST_UPDATED FROM nonces WHERE ADDRESS = $1 AND L1_CHAIN = $2 ORDER BY LAST_UPDATED DESC LIMIT 1`)
 	checkNoErr(err)
 
-	createStmt, err := db.PrepareContext(ctx, `INSERT INTO nonces (ID,VALUE,ADDRESS,CHAIN,VERSION,DELETED) VALUES ($1,$2,$3,$4,$5,$6)`)
+	createStmt, err := db.PrepareContext(ctx, `INSERT INTO nonces (ID,VALUE,ADDRESS,CHAIN,L1_CHAIN,VERSION,DELETED) VALUES ($1,$2,$3,$4,$5,$6,$7)`)
 	checkNoErr(err)
 
 	return &NonceRepository{db: db, queries: queries, getByChainAddressStmt: getByChainAddressStmt, createStmt: createStmt}
@@ -35,7 +35,7 @@ func NewNonceRepository(db *sql.DB, queries *db.Queries) *NonceRepository {
 // Get returns a nonce from the DB by its address
 func (n *NonceRepository) Get(pCtx context.Context, pChainAddress persist.ChainAddress) (persist.UserNonce, error) {
 	var nonce persist.UserNonce
-	err := n.getByChainAddressStmt.QueryRowContext(pCtx, pChainAddress.Address(), pChainAddress.Chain().L1Chain()).Scan(&nonce.ID, &nonce.Value, &nonce.Address, &nonce.Version, &nonce.Deleted, &nonce.CreationTime, &nonce.LastUpdated)
+	err := n.getByChainAddressStmt.QueryRowContext(pCtx, pChainAddress.Address(), pChainAddress.Chain().L1Chain()).Scan(&nonce.ID, &nonce.Value, &nonce.Address, &nonce.Chain, &nonce.L1Chain, &nonce.Version, &nonce.Deleted, &nonce.CreationTime, &nonce.LastUpdated)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return persist.UserNonce{}, persist.ErrNonceNotFoundForAddress{ChainAddress: pChainAddress}
@@ -47,6 +47,6 @@ func (n *NonceRepository) Get(pCtx context.Context, pChainAddress persist.ChainA
 
 // Create creates a new nonce in the DB
 func (n *NonceRepository) Create(pCtx context.Context, pNonceValue string, pChainAddress persist.ChainAddress) error {
-	_, err := n.createStmt.ExecContext(pCtx, persist.GenerateID(), pNonceValue, pChainAddress.Address(), pChainAddress.Chain(), 0, false)
+	_, err := n.createStmt.ExecContext(pCtx, persist.GenerateID(), pNonceValue, pChainAddress.Address(), pChainAddress.Chain(), pChainAddress.Chain().L1Chain(), 0, false)
 	return err
 }

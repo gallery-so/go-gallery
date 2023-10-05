@@ -5258,6 +5258,32 @@ func (q *Queries) GetVisibleCollectionsByIDsPaginate(ctx context.Context, arg Ge
 	return items, nil
 }
 
+const getWalletByAddressAndL1Chain = `-- name: GetWalletByAddressAndL1Chain :one
+SELECT wallets.id, wallets.created_at, wallets.last_updated, wallets.deleted, wallets.version, wallets.address, wallets.wallet_type, wallets.chain, wallets.l1_chain FROM wallets WHERE address = $1 AND l1_chain = $2 AND deleted = false
+`
+
+type GetWalletByAddressAndL1ChainParams struct {
+	Address persist.Address `json:"address"`
+	L1Chain persist.Chain   `json:"l1_chain"`
+}
+
+func (q *Queries) GetWalletByAddressAndL1Chain(ctx context.Context, arg GetWalletByAddressAndL1ChainParams) (Wallet, error) {
+	row := q.db.QueryRow(ctx, getWalletByAddressAndL1Chain, arg.Address, arg.L1Chain)
+	var i Wallet
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.LastUpdated,
+		&i.Deleted,
+		&i.Version,
+		&i.Address,
+		&i.WalletType,
+		&i.Chain,
+		&i.L1Chain,
+	)
+	return i, err
+}
+
 const getWalletByChainAddress = `-- name: GetWalletByChainAddress :one
 SELECT wallets.id, wallets.created_at, wallets.last_updated, wallets.deleted, wallets.version, wallets.address, wallets.wallet_type, wallets.chain, wallets.l1_chain FROM wallets WHERE address = $1 AND chain = $2 AND deleted = false
 `
@@ -5750,18 +5776,19 @@ func (q *Queries) InsertUser(ctx context.Context, arg InsertUserParams) (persist
 }
 
 const insertWallet = `-- name: InsertWallet :exec
-with new_wallet as (insert into wallets(id, address, chain, wallet_type) values ($1, $2, $3, $4) returning id)
+with new_wallet as (insert into wallets(id, address, chain, l1_chain, wallet_type) values ($1, $2, $3, $4, $5) returning id)
 update users set
     primary_wallet_id = coalesce(users.primary_wallet_id, new_wallet.id),
     wallets = array_append(users.wallets, new_wallet.id)
 from new_wallet
-where users.id = $5 and not users.deleted
+where users.id = $6 and not users.deleted
 `
 
 type InsertWalletParams struct {
 	ID         persist.DBID       `json:"id"`
 	Address    persist.Address    `json:"address"`
 	Chain      persist.Chain      `json:"chain"`
+	L1Chain    persist.Chain      `json:"l1_chain"`
 	WalletType persist.WalletType `json:"wallet_type"`
 	UserID     persist.DBID       `json:"user_id"`
 }
@@ -5771,6 +5798,7 @@ func (q *Queries) InsertWallet(ctx context.Context, arg InsertWalletParams) erro
 		arg.ID,
 		arg.Address,
 		arg.Chain,
+		arg.L1Chain,
 		arg.WalletType,
 		arg.UserID,
 	)

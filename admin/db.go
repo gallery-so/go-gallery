@@ -67,7 +67,7 @@ func newStatements(db *sql.DB) *statements {
 	createGalleryStmt, err := db.PrepareContext(ctx, `INSERT INTO galleries (ID,OWNER_USER_ID, COLLECTIONS) VALUES ($1, $2, $3) RETURNING ID;`)
 	checkNoErr(err)
 
-	createNonceStmt, err := db.PrepareContext(ctx, `INSERT INTO nonces (ID,USER_ID, ADDRESS, VALUE) VALUES ($1, $2, $3, $4);`)
+	createNonceStmt, err := db.PrepareContext(ctx, `INSERT INTO nonces (ID,USER_ID, ADDRESS, VALUE, L1_CHAIN, CHAIN) VALUES ($1, $2, $3, $4, $5, $6);`)
 	checkNoErr(err)
 
 	getCollectionsStmt, err := db.PrepareContext(ctx, `SELECT ID,OWNER_USER_ID,NFTS,NAME,COLLECTORS_NOTE,LAYOUT,HIDDEN,VERSION,CREATED_AT,LAST_UPDATED FROM collections WHERE OWNER_USER_ID = $1 AND DELETED = false;`)
