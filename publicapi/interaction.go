@@ -1122,7 +1122,7 @@ func mentionInputsToMentions(ctx context.Context, ms []*model.MentionInput, quer
 			if c, err := queries.GetContractByID(ctx, *m.CommunityID); c.ID == "" || err != nil {
 				return nil, fmt.Errorf("could retrieve community: %s (%s)", *m.CommunityID, err)
 			}
-			mention.CommentID = *m.CommunityID
+			mention.ContractID = *m.CommunityID
 		}
 		if m.UserID != nil {
 			if u, err := queries.GetUserById(ctx, *m.UserID); u.ID == "" || err != nil {
