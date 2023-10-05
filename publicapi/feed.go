@@ -166,6 +166,9 @@ func (api FeedAPI) PostTokens(ctx context.Context, tokenIDs []persist.DBID, ment
 	}
 
 	dbMentions, err := insertMentionsForPost(ctx, mentions, postID, q)
+	if err != nil {
+		return "", err
+	}
 	if len(dbMentions) > 0 {
 		for _, mention := range dbMentions {
 			switch {
