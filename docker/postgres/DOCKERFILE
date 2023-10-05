@@ -1,7 +1,7 @@
-FROM postgres:14
+FROM postgres:15
 
 RUN apt-get update
-RUN apt-get -y install postgresql-14-cron
+RUN apt-get -y install postgresql-15-cron
 
 ENV POSTGRES_HOST_AUTH_METHOD trust
 ENV POSTGRES_USER postgres

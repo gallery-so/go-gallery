@@ -15,7 +15,6 @@ type WalletRepository struct {
 	db      *sql.DB
 	queries *db.Queries
 
-	insertStmt            *sql.Stmt
 	getByIDStmt           *sql.Stmt
 	getByChainAddressStmt *sql.Stmt
 	getByUserIDStmt       *sql.Stmt
@@ -25,9 +24,6 @@ type WalletRepository struct {
 func NewWalletRepository(db *sql.DB, queries *db.Queries) *WalletRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
-
-	insertStmt, err := db.PrepareContext(ctx, `MERGE INTO wallets (USING (VALUES ($1,$2,$3,$4,$5,$6,false)) as new (ID,VERSION,ADDRESS,CHAIN,L1_CHAIN,WALLET_TYPE,DELETED) ON (new.ADDRESS = wallets.ADDRESS AND new.CHAIN = wallets.CHAIN and wallets.DELETED = false) or (new.ADDRESS = wallets.ADDRESS and new.L1_CHAIN = wallets.L1_CHAIN and wallets.DELETED = false) WHEN NOT MATCHED THEN INSERT VALUES (ID,VERSION,ADDRESS,CHAIN,L1_CHAIN,WALLET_TYPE,DELETED)`)
-	checkNoErr(err)
 
 	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,WALLET_TYPE,CHAIN,L1_CHAIN FROM wallets WHERE ID = $1 AND DELETED = FALSE;`)
 	checkNoErr(err)
@@ -44,7 +40,6 @@ func NewWalletRepository(db *sql.DB, queries *db.Queries) *WalletRepository {
 		getByIDStmt:           getByIDStmt,
 		getByChainAddressStmt: getByChainAddressStmt,
 		getByUserIDStmt:       getByUserIDStmt,
-		insertStmt:            insertStmt,
 	}
 }
 
@@ -101,21 +96,4 @@ func (w *WalletRepository) GetByUserID(ctx context.Context, userID persist.DBID)
 	}
 
 	return wallets, nil
-}
-
-// Insert inserts a wallet by its address and chain
-func (w *WalletRepository) Insert(ctx context.Context, chainAddress persist.ChainAddress, walletType persist.WalletType) (persist.DBID, error) {
-
-	_, err := w.insertStmt.ExecContext(ctx, persist.GenerateID(), 0, chainAddress.Address(), chainAddress.Chain(), chainAddress.Chain().L1Chain(), walletType)
-	if err != nil {
-		return "", err
-	}
-
-	// rather than using the ID generated above, we must retrieve it because in the case of conflict the ID above would be inaccurate.
-	wa, err := w.GetByChainAddress(ctx, chainAddress)
-	if err != nil {
-		return "", err
-	}
-
-	return wa.ID, nil
 }
