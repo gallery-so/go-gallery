@@ -123,7 +123,7 @@ var L1Chains = map[Chain]Chain{
 
 var L1ChainGroups = map[Chain][]Chain{
 	ChainETH:   EvmChains,
-	ChainTezos: []Chain{ChainTezos},
+	ChainTezos: {ChainTezos},
 }
 
 var AllChains = []Chain{ChainETH, ChainArbitrum, ChainPolygon, ChainOptimism, ChainTezos, ChainPOAP, ChainZora, ChainBase}

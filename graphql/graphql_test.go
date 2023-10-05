@@ -868,7 +868,7 @@ func testSyncNewTokensMultichain(t *testing.T) {
 	contract := multichain.ChainAgnosticContract{Address: "0x124", Descriptors: multichain.ChainAgnosticContractDescriptors{Name: "wow"}}
 	secondProvider := newStubProvider(
 		withContractTokens(contract, userF.Wallet.Address, 10),
-		withBlockchainInfo(multichain.BlockchainInfo{ProviderID: persist.GenerateID().String()}),
+		withBlockchainInfo(multichain.BlockchainInfo{ProviderID: persist.GenerateID().String(), Chain: persist.ChainOptimism, ChainID: 10}),
 	)
 	h := handlerWithProviders(t, submitUserTokensNoop, provider, secondProvider)
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
@@ -1580,7 +1580,7 @@ func newMultichainProvider(c *server.Clients, submitF multichain.SubmitUserToken
 	return multichain.Provider{
 		Repos:            c.Repos,
 		Queries:          c.Queries,
-		Chains:           map[persist.Chain][]any{persist.ChainETH: providers, persist.ChainOptimism: providers},
+		Chains:           chains,
 		SubmitUserTokens: submitF,
 	}
 }
