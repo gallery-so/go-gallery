@@ -3,11 +3,13 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -347,17 +349,18 @@ func (u *UserRepository) GetByIDs(pCtx context.Context, pIDs []persist.DBID) ([]
 
 // GetByChainAddress gets the user who owns the wallet with the specified ChainAddress (if any)
 func (u *UserRepository) GetByChainAddress(pCtx context.Context, pChainAddress persist.ChainAddress) (persist.User, error) {
-	var walletID persist.DBID
-
-	err := u.getWalletIDStmt.QueryRowContext(pCtx, pChainAddress.Address(), pChainAddress.Chain()).Scan(&walletID)
+	dbUser, err := u.queries.GetUserByAddressAndL1(pCtx, db.GetUserByAddressAndL1Params{
+		Address: pChainAddress.Address(),
+		L1Chain: pChainAddress.Chain().L1Chain(),
+	})
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return persist.User{}, persist.ErrWalletNotFound{ChainAddress: pChainAddress}
+		if errors.Is(err, pgx.ErrNoRows) {
+			return persist.User{}, persist.ErrUserNotFound{ChainAddress: pChainAddress}
 		}
 		return persist.User{}, err
 	}
 
-	return u.GetByWalletID(pCtx, walletID)
+	return u.dbUserToPersist(pCtx, dbUser)
 }
 
 // GetByWalletID gets the user with the given wallet in their list of addresses
@@ -599,4 +602,36 @@ func (u *UserRepository) FillWalletDataForUser(pCtx context.Context, user *persi
 	user.Wallets = wallets
 
 	return nil
+}
+
+func (u *UserRepository) dbUserToPersist(ctx context.Context, dbUser db.User) (persist.User, error) {
+	var traits persist.Traits
+	if dbUser.Traits.Status == pgtype.Present {
+		bs := dbUser.Traits.Bytes
+		if err := json.Unmarshal(bs, &traits); err != nil {
+			return persist.User{}, err
+		}
+	}
+	user := &persist.User{
+		Version:            persist.NullInt32(dbUser.Version.Int32),
+		ID:                 dbUser.ID,
+		CreationTime:       dbUser.CreatedAt,
+		Deleted:            persist.NullBool(dbUser.Deleted),
+		LastUpdated:        dbUser.LastUpdated,
+		Username:           persist.NullString(dbUser.Username.String),
+		UsernameIdempotent: persist.NullString(dbUser.UsernameIdempotent.String),
+		Wallets:            dbUser.Wallets,
+		Bio:                persist.NullString(dbUser.Bio.String),
+		Traits:             traits,
+		Universal:          persist.NullBool(dbUser.Universal),
+		PrimaryWalletID:    persist.NullString(dbUser.PrimaryWalletID),
+		EmailVerified:      persist.NullInt64(dbUser.EmailVerified),
+	}
+
+	err := u.FillWalletDataForUser(ctx, user)
+	if err != nil {
+		return persist.User{}, err
+	}
+
+	return *user, nil
 }

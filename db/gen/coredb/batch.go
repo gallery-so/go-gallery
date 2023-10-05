@@ -3749,7 +3749,7 @@ func (b *GetUsersWithTraitBatchBatchResults) Close() error {
 }
 
 const getWalletByChainAddressBatch = `-- name: GetWalletByChainAddressBatch :batchone
-SELECT wallets.id, wallets.created_at, wallets.last_updated, wallets.deleted, wallets.version, wallets.address, wallets.wallet_type, wallets.chain FROM wallets WHERE address = $1 AND chain = $2 AND deleted = false
+SELECT wallets.id, wallets.created_at, wallets.last_updated, wallets.deleted, wallets.version, wallets.address, wallets.wallet_type, wallets.chain, wallets.l1_chain FROM wallets WHERE address = $1 AND chain = $2 AND deleted = false
 `
 
 type GetWalletByChainAddressBatchBatchResults struct {
@@ -3796,6 +3796,7 @@ func (b *GetWalletByChainAddressBatchBatchResults) QueryRow(f func(int, Wallet, 
 			&i.Address,
 			&i.WalletType,
 			&i.Chain,
+			&i.L1Chain,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -3809,7 +3810,7 @@ func (b *GetWalletByChainAddressBatchBatchResults) Close() error {
 }
 
 const getWalletByIDBatch = `-- name: GetWalletByIDBatch :batchone
-SELECT id, created_at, last_updated, deleted, version, address, wallet_type, chain FROM wallets WHERE id = $1 AND deleted = false
+SELECT id, created_at, last_updated, deleted, version, address, wallet_type, chain, l1_chain FROM wallets WHERE id = $1 AND deleted = false
 `
 
 type GetWalletByIDBatchBatchResults struct {
@@ -3850,6 +3851,7 @@ func (b *GetWalletByIDBatchBatchResults) QueryRow(f func(int, Wallet, error)) {
 			&i.Address,
 			&i.WalletType,
 			&i.Chain,
+			&i.L1Chain,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -3863,7 +3865,7 @@ func (b *GetWalletByIDBatchBatchResults) Close() error {
 }
 
 const getWalletsByUserIDBatch = `-- name: GetWalletsByUserIDBatch :batchmany
-SELECT w.id, w.created_at, w.last_updated, w.deleted, w.version, w.address, w.wallet_type, w.chain FROM users u, unnest(u.wallets) WITH ORDINALITY AS a(wallet_id, wallet_ord)INNER JOIN wallets w on w.id = a.wallet_id WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.wallet_ord
+SELECT w.id, w.created_at, w.last_updated, w.deleted, w.version, w.address, w.wallet_type, w.chain, w.l1_chain FROM users u, unnest(u.wallets) WITH ORDINALITY AS a(wallet_id, wallet_ord)INNER JOIN wallets w on w.id = a.wallet_id WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.wallet_ord
 `
 
 type GetWalletsByUserIDBatchBatchResults struct {
@@ -3911,6 +3913,7 @@ func (b *GetWalletsByUserIDBatchBatchResults) Query(f func(int, []Wallet, error)
 					&i.Address,
 					&i.WalletType,
 					&i.Chain,
+					&i.L1Chain,
 				); err != nil {
 					return err
 				}

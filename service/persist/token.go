@@ -110,6 +110,27 @@ const (
 	MaxChainValue = ChainBase
 )
 
+var WalletOverrides = map[Chain][]Chain{
+	ChainPOAP:     EvmChains,
+	ChainOptimism: EvmChains,
+	ChainPolygon:  EvmChains,
+	ChainArbitrum: EvmChains,
+	ChainETH:      EvmChains,
+	ChainZora:     EvmChains,
+	ChainBase:     EvmChains,
+}
+
+var L1Chains = map[Chain]Chain{
+	ChainPOAP:     ChainETH,
+	ChainOptimism: ChainETH,
+	ChainPolygon:  ChainETH,
+	ChainArbitrum: ChainETH,
+	ChainZora:     ChainETH,
+	ChainBase:     ChainETH,
+	ChainETH:      ChainETH,
+	ChainTezos:    ChainTezos,
+}
+
 var AllChains = []Chain{ChainETH, ChainArbitrum, ChainPolygon, ChainOptimism, ChainTezos, ChainPOAP, ChainZora, ChainBase}
 var EvmChains = util.MapKeys(evmChains)
 var evmChains map[Chain]bool = map[Chain]bool{
@@ -530,6 +551,14 @@ func (c Chain) MarshalGQL(w io.Writer) {
 	case ChainBase:
 		w.Write([]byte(`"Base"`))
 	}
+}
+
+func (c Chain) L1Chain() Chain {
+	c, ok := L1Chains[c]
+	if !ok {
+		panic("l1 chain not found")
+	}
+	return c
 }
 
 // URL turns a token's URI into a URL

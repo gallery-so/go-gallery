@@ -28,11 +28,11 @@ where p.pii_email_address = lower($1)
   and p.deleted = false
   and u.deleted = false;
 
--- name: GetUserByAddressAndChains :one
+-- name: GetUserByAddressAndL1 :one
 select users.*
 from users, wallets
 where wallets.address = sqlc.arg('address')
-	and wallets.chain = any(sqlc.arg('chains')::int[])
+	and wallets.chain = sqlc.arg('l1_chain')
 	and array[wallets.id] <@ users.wallets
 	and wallets.deleted = false
 	and users.deleted = false;
@@ -857,7 +857,7 @@ update users set primary_wallet_id = @wallet_id from wallets
     and wallets.id = any(users.wallets) and wallets.deleted = false;
 
 -- name: GetUsersByChainAddresses :many
-select users.*,wallets.address from users, wallets where wallets.address = ANY(@addresses::varchar[]) AND wallets.chain = @chain::int AND ARRAY[wallets.id] <@ users.wallets AND users.deleted = false AND wallets.deleted = false;
+select users.*,wallets.address from users, wallets where wallets.address = ANY(@addresses::varchar[]) AND wallets.l1_chain = @l1_chain AND ARRAY[wallets.id] <@ users.wallets AND users.deleted = false AND wallets.deleted = false;
 
 -- name: GetFeedEventByID :one
 SELECT * FROM feed_events WHERE id = $1 AND deleted = false;
