@@ -2739,11 +2739,11 @@ func (r *someoneFollowedYouNotificationResolver) Followers(ctx context.Context, 
 
 // MentionSource is the resolver for the mentionSource field.
 func (r *someoneMentionedYouNotificationResolver) MentionSource(ctx context.Context, obj *model.SomeoneMentionedYouNotification) (model.MentionSource, error) {
-	if obj.PostID != nil {
-		return resolvePostByPostID(ctx, *obj.PostID)
-	}
 	if obj.CommentID != nil {
 		return resolveCommentByCommentID(ctx, *obj.CommentID)
+	}
+	if obj.PostID != nil {
+		return resolvePostByPostID(ctx, *obj.PostID)
 	}
 	return nil, fmt.Errorf("invalid mention source")
 }
