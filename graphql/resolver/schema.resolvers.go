@@ -2901,6 +2901,27 @@ func (r *tokenResolver) Admires(ctx context.Context, obj *model.Token, before *s
 	}, nil
 }
 
+// ViewerAdmire is the resolver for the viewerAdmire field.
+func (r *tokenResolver) ViewerAdmire(ctx context.Context, obj *model.Token) (*model.Admire, error) {
+	api := publicapi.For(ctx)
+
+	// If the user isn't logged in, there is no viewer
+	if !api.User.IsUserLoggedIn(ctx) {
+		return nil, nil
+	}
+
+	userID := api.User.GetLoggedInUserId(ctx)
+
+	admire, err := api.Interaction.GetAdmireByActorIDAndTokenID(ctx, userID, obj.Dbid)
+	if err != nil {
+		// If getting the admire fails for any reason, just return nil. This resolver doesn't
+		// return error types -- it just returns an admire (if it can find one) or nil.
+		return nil, nil
+	}
+
+	return admireToModel(ctx, *admire), nil
+}
+
 // Wallets is the resolver for the wallets field.
 func (r *tokenHolderResolver) Wallets(ctx context.Context, obj *model.TokenHolder) ([]*model.Wallet, error) {
 	wallets := make([]*model.Wallet, 0, len(obj.WalletIds))
