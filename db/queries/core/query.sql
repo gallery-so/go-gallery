@@ -1587,31 +1587,6 @@ join wallets on wallets.id = any(tokens.owned_by_wallets)
 where tokens.id = $1 and tokens.displayable and not tokens.deleted and not contracts.deleted and not wallets.deleted
 group by (tokens.token_id, contracts.address, contracts.chain, tokens.quantity) limit 1;
 
--- name: GetContractCreatorsByContractIDs :many
-with contract_creators as (
-    select c.id as contract_id,
-           u.id as creator_user_id,
-           c.chain as chain,
-           coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) as creator_address,
-           w.id as creator_wallet_id
-    from contracts c
-             left join wallets w on
-                w.deleted = false and
-                w.chain = c.chain and
-                coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) = w.address
-             left join users u on
-                u.deleted = false and
-                (
-                        (c.override_creator_user_id is not null and c.override_creator_user_id = u.id)
-                        or
-                        (c.override_creator_user_id is null and w.address is not null and array[w.id] <@ u.wallets)
-                    )
-    where c.deleted = false
-      and (u.id is not null or coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) is not null)
-)
-select * from unnest(@contract_ids::text[]) as ids
-                  join contract_creators cc on cc.contract_id = ids;
-
 -- name: GetCreatedContractsByUserID :many
 select sqlc.embed(c),
        w.id as wallet_id,
@@ -1619,8 +1594,8 @@ select sqlc.embed(c),
 from users u, contracts c, wallets w
 where u.id = @user_id
   and c.chain = any(@chains::int[])
-  and w.id = any(u.wallets) and coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) = w.address
-  and c.chain = w.chain
+  and w.id = any(u.wallets) and coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) = w.address 
+  and w.chain = any(@l1_chains::int[])
   and u.deleted = false
   and c.deleted = false
   and w.deleted = false

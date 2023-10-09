@@ -1827,66 +1827,6 @@ func (q *Queries) GetContractByID(ctx context.Context, id persist.DBID) (Contrac
 	return i, err
 }
 
-const getContractCreatorsByContractIDs = `-- name: GetContractCreatorsByContractIDs :many
-with contract_creators as (
-    select c.id as contract_id,
-           u.id as creator_user_id,
-           c.chain as chain,
-           coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) as creator_address,
-           w.id as creator_wallet_id
-    from contracts c
-             left join wallets w on
-                w.deleted = false and
-                w.chain = c.chain and
-                coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) = w.address
-             left join users u on
-                u.deleted = false and
-                (
-                        (c.override_creator_user_id is not null and c.override_creator_user_id = u.id)
-                        or
-                        (c.override_creator_user_id is null and w.address is not null and array[w.id] <@ u.wallets)
-                    )
-    where c.deleted = false
-      and (u.id is not null or coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) is not null)
-)
-select contract_id, creator_user_id, chain, creator_address, creator_wallet_id from unnest($1::text[]) as ids
-                  join contract_creators cc on cc.contract_id = ids
-`
-
-type GetContractCreatorsByContractIDsRow struct {
-	ContractID      persist.DBID    `json:"contract_id"`
-	CreatorUserID   persist.DBID    `json:"creator_user_id"`
-	Chain           persist.Chain   `json:"chain"`
-	CreatorAddress  persist.Address `json:"creator_address"`
-	CreatorWalletID persist.DBID    `json:"creator_wallet_id"`
-}
-
-func (q *Queries) GetContractCreatorsByContractIDs(ctx context.Context, contractIds []string) ([]GetContractCreatorsByContractIDsRow, error) {
-	rows, err := q.db.Query(ctx, getContractCreatorsByContractIDs, contractIds)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetContractCreatorsByContractIDsRow
-	for rows.Next() {
-		var i GetContractCreatorsByContractIDsRow
-		if err := rows.Scan(
-			&i.ContractID,
-			&i.CreatorUserID,
-			&i.Chain,
-			&i.CreatorAddress,
-			&i.CreatorWalletID,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getContractCreatorsByIds = `-- name: GetContractCreatorsByIds :many
 select o.contract_id, o.creator_user_id, o.chain, o.creator_address
     from unnest($1::text[]) as c(id)
@@ -2011,13 +1951,13 @@ select c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbo
 from users u, contracts c, wallets w
 where u.id = $1
   and c.chain = any($2::int[])
-  and w.id = any(u.wallets) and coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) = w.address
-  and c.chain = w.chain
+  and w.id = any(u.wallets) and coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) = w.address 
+  and w.chain = any($3::int[])
   and u.deleted = false
   and c.deleted = false
   and w.deleted = false
   and c.override_creator_user_id is null
-  and (not $3::bool or not exists(
+  and (not $4::bool or not exists(
     select 1 from tokens t
         where t.owner_user_id = $1
           and t.contract = c.id
@@ -2035,7 +1975,7 @@ from contracts c
 where c.override_creator_user_id = $1
   and c.chain = any($2::int[])
   and c.deleted = false
-  and (not $3::bool or not exists(
+  and (not $4::bool or not exists(
     select 1 from tokens t
         where t.owner_user_id = $1
           and t.contract = c.id
@@ -2048,6 +1988,7 @@ where c.override_creator_user_id = $1
 type GetCreatedContractsByUserIDParams struct {
 	UserID           persist.DBID `json:"user_id"`
 	Chains           []int32      `json:"chains"`
+	L1Chains         []int32      `json:"l1_chains"`
 	NewContractsOnly bool         `json:"new_contracts_only"`
 }
 
@@ -2058,7 +1999,12 @@ type GetCreatedContractsByUserIDRow struct {
 }
 
 func (q *Queries) GetCreatedContractsByUserID(ctx context.Context, arg GetCreatedContractsByUserIDParams) ([]GetCreatedContractsByUserIDRow, error) {
-	rows, err := q.db.Query(ctx, getCreatedContractsByUserID, arg.UserID, arg.Chains, arg.NewContractsOnly)
+	rows, err := q.db.Query(ctx, getCreatedContractsByUserID,
+		arg.UserID,
+		arg.Chains,
+		arg.L1Chains,
+		arg.NewContractsOnly,
+	)
 	if err != nil {
 		return nil, err
 	}
