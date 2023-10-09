@@ -298,7 +298,7 @@ func (d *Provider) getTokensByContractAddressPaginate(ctx context.Context, addr 
   }
 }`)
 
-	tokens, contracts, err := d.getTokensWithRequest(ctx, req, addr, "", endCursor, nil)
+	tokens, contracts, err := d.getTokensWithRequest(ctx, req, "", addr, endCursor, nil)
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
