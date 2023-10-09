@@ -2310,6 +2310,7 @@ type Token struct {
 	IsSpamByUser          *bool                   `json:"isSpamByUser"`
 	IsSpamByProvider      *bool                   `json:"isSpamByProvider"`
 	Admires               *TokenAdmiresConnection `json:"admires"`
+	ViewerAdmire          *Admire                 `json:"viewerAdmire"`
 	CreatorAddress        *persist.ChainAddress   `json:"creatorAddress"`
 	OpenseaCollectionName *string                 `json:"openseaCollectionName"`
 	OpenseaID             *int                    `json:"openseaId"`

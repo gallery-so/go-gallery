@@ -2739,11 +2739,11 @@ func (r *someoneFollowedYouNotificationResolver) Followers(ctx context.Context, 
 
 // MentionSource is the resolver for the mentionSource field.
 func (r *someoneMentionedYouNotificationResolver) MentionSource(ctx context.Context, obj *model.SomeoneMentionedYouNotification) (model.MentionSource, error) {
-	if obj.PostID != nil {
-		return resolvePostByPostID(ctx, *obj.PostID)
-	}
 	if obj.CommentID != nil {
 		return resolveCommentByCommentID(ctx, *obj.CommentID)
+	}
+	if obj.PostID != nil {
+		return resolvePostByPostID(ctx, *obj.PostID)
 	}
 	return nil, fmt.Errorf("invalid mention source")
 }
@@ -2899,6 +2899,27 @@ func (r *tokenResolver) Admires(ctx context.Context, obj *model.Token, before *s
 		Edges:    edges,
 		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}, nil
+}
+
+// ViewerAdmire is the resolver for the viewerAdmire field.
+func (r *tokenResolver) ViewerAdmire(ctx context.Context, obj *model.Token) (*model.Admire, error) {
+	api := publicapi.For(ctx)
+
+	// If the user isn't logged in, there is no viewer
+	if !api.User.IsUserLoggedIn(ctx) {
+		return nil, nil
+	}
+
+	userID := api.User.GetLoggedInUserId(ctx)
+
+	admire, err := api.Interaction.GetAdmireByActorIDAndTokenID(ctx, userID, obj.Dbid)
+	if err != nil {
+		// If getting the admire fails for any reason, just return nil. This resolver doesn't
+		// return error types -- it just returns an admire (if it can find one) or nil.
+		return nil, nil
+	}
+
+	return admireToModel(ctx, *admire), nil
 }
 
 // Wallets is the resolver for the wallets field.
