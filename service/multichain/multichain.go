@@ -320,7 +320,7 @@ func (p *Provider) SyncTokensByUserID(ctx context.Context, userID persist.DBID, 
 		wg.Wait()
 	}()
 
-	_, err = p.receiveSyncedTokensForUser(ctx, user, chains, incomingTokens, incomingContracts, errChan, false)
+	_, err = p.receiveSyncedTokensForUser(ctx, user, chains, incomingTokens, incomingContracts, errChan, true)
 	return err
 }
 
@@ -775,6 +775,8 @@ func (p *Provider) syncCreatedTokensForContract(ctx context.Context, user persis
 				errChan <- errWithPriority{err: err, priority: priority}
 				return
 			}
+
+			logger.For(ctx).Infof("got %d tokens for contract %s", len(tokens), address)
 
 			incomingTokens <- chainTokens{chain: chain, tokens: tokens, priority: priority}
 			incomingContracts <- chainContracts{chain: chain, contracts: []ChainAgnosticContract{contract}, priority: priority}
@@ -1618,6 +1620,9 @@ func (p *Provider) SyncContractsOwnedByUser(ctx context.Context, userID persist.
 					if err != nil {
 						return ContractOwnerResult{Priority: pr}, err
 					}
+
+					logger.For(ctx).Debugf("found %d contracts for address %s", len(contracts), a)
+
 					return ContractOwnerResult{Contracts: contracts, Chain: c, Priority: pr}, nil
 				})
 			}
