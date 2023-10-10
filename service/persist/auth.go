@@ -80,9 +80,9 @@ func (h ReqHeaders) Value() (driver.Value, error) {
 
 // ErrNonceNotFoundForAddress is returned when no nonce is found for a given address
 type ErrNonceNotFoundForAddress struct {
-	ChainAddress ChainAddress
+	L1ChainAddress L1ChainAddress
 }
 
 func (e ErrNonceNotFoundForAddress) Error() string {
-	return fmt.Sprintf("no nonce found for address: %v", e.ChainAddress)
+	return fmt.Sprintf("no nonce found for address: %v", e.L1ChainAddress)
 }

@@ -211,7 +211,7 @@ sql:
           - column: '*.*.chain'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.Chain'
           - column: '*.*.l1_chain'
-            go_type: 'github.com/mikeydub/go-gallery/service/persist.Chain'
+            go_type: 'github.com/mikeydub/go-gallery/service/persist.L1Chain'
           - column: '*.*.action'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.Action'
           - column: '*.*.thumbnail_url'

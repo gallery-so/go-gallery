@@ -33,12 +33,12 @@ func NewNonceRepository(db *sql.DB, queries *db.Queries) *NonceRepository {
 }
 
 // Get returns a nonce from the DB by its address
-func (n *NonceRepository) Get(pCtx context.Context, pChainAddress persist.ChainAddress) (persist.UserNonce, error) {
+func (n *NonceRepository) Get(pCtx context.Context, pChainAddress persist.L1ChainAddress) (persist.UserNonce, error) {
 	var nonce persist.UserNonce
-	err := n.getByChainAddressStmt.QueryRowContext(pCtx, pChainAddress.Address(), pChainAddress.Chain().L1Chain()).Scan(&nonce.ID, &nonce.Value, &nonce.Address, &nonce.Chain, &nonce.L1Chain, &nonce.Version, &nonce.Deleted, &nonce.CreationTime, &nonce.LastUpdated)
+	err := n.getByChainAddressStmt.QueryRowContext(pCtx, pChainAddress.Address(), pChainAddress.L1Chain()).Scan(&nonce.ID, &nonce.Value, &nonce.Address, &nonce.Chain, &nonce.L1Chain, &nonce.Version, &nonce.Deleted, &nonce.CreationTime, &nonce.LastUpdated)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return persist.UserNonce{}, persist.ErrNonceNotFoundForAddress{ChainAddress: pChainAddress}
+			return persist.UserNonce{}, persist.ErrNonceNotFoundForAddress{L1ChainAddress: pChainAddress}
 		}
 		return persist.UserNonce{}, err
 	}

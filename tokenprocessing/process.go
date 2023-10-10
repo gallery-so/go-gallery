@@ -405,7 +405,7 @@ func processOwnersForAlchemyTokens(mc *multichain.Provider, queries *coredb.Quer
 			if !ok {
 				user, err := queries.GetUserByAddressAndL1(c, coredb.GetUserByAddressAndL1Params{
 					Address: persist.Address(chain.NormalizeAddress(activity.ToAddress)),
-					L1Chain: persist.ChainETH,
+					L1Chain: persist.L1Chain(persist.ChainETH),
 				})
 				if err != nil {
 					logger.For(c).Warnf("error getting user by address: %s", err)

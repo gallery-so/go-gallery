@@ -189,12 +189,12 @@ func (s SocialProvider) IsValid() bool {
 
 // ErrUserNotFound is returned when a user is not found
 type ErrUserNotFound struct {
-	UserID        DBID
-	WalletID      DBID
-	ChainAddress  ChainAddress
-	Username      string
-	Email         Email
-	Authenticator string
+	UserID         DBID
+	WalletID       DBID
+	L1ChainAddress L1ChainAddress
+	Username       string
+	Email          Email
+	Authenticator  string
 }
 
 func (e ErrUserNotFound) Error() string {
@@ -215,8 +215,8 @@ func (e ErrUserNotFound) Error() string {
 		return fmt.Sprintf(template, method, e.Authenticator)
 	}
 
-	if e.ChainAddress != (ChainAddress{}) {
-		method := fmt.Sprintf("method=%s;chainAddress=%s", "byChainAddress", e.ChainAddress)
+	if e.L1ChainAddress != (L1ChainAddress{}) {
+		method := fmt.Sprintf("method=%s;chainAddress=%s", "byChainAddress", e.L1ChainAddress)
 		return fmt.Sprintf(template, method, e.Authenticator)
 	}
 

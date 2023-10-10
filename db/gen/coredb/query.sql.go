@@ -4140,7 +4140,7 @@ where wallets.address = $1
 
 type GetUserByAddressAndL1Params struct {
 	Address persist.Address `json:"address"`
-	L1Chain persist.Chain   `json:"l1_chain"`
+	L1Chain persist.L1Chain `json:"l1_chain"`
 }
 
 func (q *Queries) GetUserByAddressAndL1(ctx context.Context, arg GetUserByAddressAndL1Params) (User, error) {
@@ -4547,8 +4547,8 @@ select users.id, users.deleted, users.version, users.last_updated, users.created
 `
 
 type GetUsersByChainAddressesParams struct {
-	Addresses []string      `json:"addresses"`
-	L1Chain   persist.Chain `json:"l1_chain"`
+	Addresses []string        `json:"addresses"`
+	L1Chain   persist.L1Chain `json:"l1_chain"`
 }
 
 type GetUsersByChainAddressesRow struct {
@@ -5210,37 +5210,11 @@ SELECT wallets.id, wallets.created_at, wallets.last_updated, wallets.deleted, wa
 
 type GetWalletByAddressAndL1ChainParams struct {
 	Address persist.Address `json:"address"`
-	L1Chain persist.Chain   `json:"l1_chain"`
+	L1Chain persist.L1Chain `json:"l1_chain"`
 }
 
 func (q *Queries) GetWalletByAddressAndL1Chain(ctx context.Context, arg GetWalletByAddressAndL1ChainParams) (Wallet, error) {
 	row := q.db.QueryRow(ctx, getWalletByAddressAndL1Chain, arg.Address, arg.L1Chain)
-	var i Wallet
-	err := row.Scan(
-		&i.ID,
-		&i.CreatedAt,
-		&i.LastUpdated,
-		&i.Deleted,
-		&i.Version,
-		&i.Address,
-		&i.WalletType,
-		&i.Chain,
-		&i.L1Chain,
-	)
-	return i, err
-}
-
-const getWalletByChainAddress = `-- name: GetWalletByChainAddress :one
-SELECT wallets.id, wallets.created_at, wallets.last_updated, wallets.deleted, wallets.version, wallets.address, wallets.wallet_type, wallets.chain, wallets.l1_chain FROM wallets WHERE address = $1 AND chain = $2 AND deleted = false
-`
-
-type GetWalletByChainAddressParams struct {
-	Address persist.Address `json:"address"`
-	Chain   persist.Chain   `json:"chain"`
-}
-
-func (q *Queries) GetWalletByChainAddress(ctx context.Context, arg GetWalletByChainAddressParams) (Wallet, error) {
-	row := q.db.QueryRow(ctx, getWalletByChainAddress, arg.Address, arg.Chain)
 	var i Wallet
 	err := row.Scan(
 		&i.ID,
@@ -5734,7 +5708,7 @@ type InsertWalletParams struct {
 	ID         persist.DBID       `json:"id"`
 	Address    persist.Address    `json:"address"`
 	Chain      persist.Chain      `json:"chain"`
-	L1Chain    persist.Chain      `json:"l1_chain"`
+	L1Chain    persist.L1Chain    `json:"l1_chain"`
 	WalletType persist.WalletType `json:"wallet_type"`
 	UserID     persist.DBID       `json:"user_id"`
 }

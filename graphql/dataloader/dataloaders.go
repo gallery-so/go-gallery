@@ -10,7 +10,6 @@
 //go:generate go run github.com/gallery-so/dataloaden CollectionsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Collection
 //go:generate go run github.com/gallery-so/dataloaden MembershipLoaderById github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Membership
 //go:generate go run github.com/gallery-so/dataloaden WalletLoaderById github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Wallet
-//go:generate go run github.com/gallery-so/dataloaden WalletLoaderByChainAddress github.com/mikeydub/go-gallery/service/persist.ChainAddress github.com/mikeydub/go-gallery/db/gen/coredb.Wallet
 //go:generate go run github.com/gallery-so/dataloaden WalletsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Wallet
 //go:generate go run github.com/gallery-so/dataloaden TokenLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Token
 //go:generate go run github.com/gallery-so/dataloaden TokenLoaderByUserTokenIdentifiers github.com/mikeydub/go-gallery/db/gen/coredb.GetTokenByUserTokenIdentifiersBatchParams github.com/mikeydub/go-gallery/db/gen/coredb.Token
@@ -95,7 +94,6 @@ type Loaders struct {
 	MembershipByMembershipID        *MembershipLoaderById
 	WalletByWalletID                *WalletLoaderById
 	WalletsByUserID                 *WalletsLoaderByID
-	WalletByChainAddress            *WalletLoaderByChainAddress
 	TokenByTokenID                  *TokenLoaderByID
 	TokenByTokenIDIgnoreDisplayable *TokenLoaderByID
 	TokenByUserTokenIdentifiers     *TokenLoaderByUserTokenIdentifiers
@@ -228,12 +226,6 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 	})
 
 	loaders.WalletsByUserID = NewWalletsLoaderByID(defaults, loadWalletsByUserId(q))
-
-	loaders.WalletByChainAddress = NewWalletLoaderByChainAddress(defaults, loadWalletByChainAddress(q), WalletLoaderByChainAddressCacheSubscriptions{
-		AutoCacheWithKey: func(wallet db.Wallet) persist.ChainAddress {
-			return persist.NewChainAddress(wallet.Address, wallet.Chain)
-		},
-	})
 
 	loaders.FollowersByUserID = NewUsersLoaderByID(defaults, loadFollowersByUserId(q))
 
@@ -419,7 +411,7 @@ func loadUserByAddress(q *db.Queries) func(context.Context, []db.GetUserByAddres
 
 		b.QueryRow(func(i int, user db.User, err error) {
 			if err == pgx.ErrNoRows {
-				err = persist.ErrUserNotFound{ChainAddress: persist.NewChainAddress(params[i].Address, persist.Chain(params[i].L1Chain))}
+				err = persist.ErrUserNotFound{L1ChainAddress: persist.NewL1ChainAddress(params[i].Address, persist.Chain(params[i].L1Chain))}
 			}
 
 			users[i], errors[i] = user, err
@@ -623,34 +615,6 @@ func loadWalletsByUserId(q *db.Queries) func(context.Context, []persist.DBID) ([
 		b.Query(func(i int, w []db.Wallet, err error) {
 			// TODO err for not found by user ID
 			wallets[i], errors[i] = w, err
-		})
-
-		return wallets, errors
-	}
-}
-
-func loadWalletByChainAddress(q *db.Queries) func(context.Context, []persist.ChainAddress) ([]db.Wallet, []error) {
-	return func(ctx context.Context, chainAddresses []persist.ChainAddress) ([]db.Wallet, []error) {
-		wallets := make([]db.Wallet, len(chainAddresses))
-		errors := make([]error, len(chainAddresses))
-
-		sqlChainAddress := make([]db.GetWalletByChainAddressBatchParams, len(chainAddresses))
-		for i, chainAddress := range chainAddresses {
-			sqlChainAddress[i] = db.GetWalletByChainAddressBatchParams{
-				Address: chainAddress.Address(),
-				Chain:   chainAddress.Chain(),
-			}
-		}
-
-		b := q.GetWalletByChainAddressBatch(ctx, sqlChainAddress)
-		defer b.Close()
-
-		b.QueryRow(func(i int, wallet db.Wallet, err error) {
-			if err == pgx.ErrNoRows {
-				err = persist.ErrWalletNotFound{ChainAddress: chainAddresses[i]}
-			}
-
-			wallets[i], errors[i] = wallet, err
 		})
 
 		return wallets, errors

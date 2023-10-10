@@ -148,12 +148,6 @@ SELECT * FROM wallets WHERE id = $1 AND deleted = false;
 -- name: GetWalletByIDBatch :batchone
 SELECT * FROM wallets WHERE id = $1 AND deleted = false;
 
--- name: GetWalletByChainAddress :one
-SELECT wallets.* FROM wallets WHERE address = $1 AND chain = $2 AND deleted = false;
-
--- name: GetWalletByChainAddressBatch :batchone
-SELECT wallets.* FROM wallets WHERE address = $1 AND chain = $2 AND deleted = false;
-
 -- name: GetWalletByAddressAndL1Chain :one
 SELECT wallets.* FROM wallets WHERE address = $1 AND l1_chain = $2 AND deleted = false;
 

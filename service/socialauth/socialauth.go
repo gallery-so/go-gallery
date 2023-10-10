@@ -73,7 +73,7 @@ func (a FarcasterAuthenticator) Authenticate(ctx context.Context) (*SocialAuthRe
 	api := farcaster.NewNeynarAPI(a.HTTPClient)
 	user, err := a.Queries.GetUserByAddressAndL1(ctx, coredb.GetUserByAddressAndL1Params{
 		Address: a.Address,
-		L1Chain: persist.ChainETH,
+		L1Chain: persist.L1Chain(persist.ChainETH),
 	})
 	if err != nil {
 		return nil, err
@@ -116,7 +116,7 @@ func (a LensAuthenticator) Authenticate(ctx context.Context) (*SocialAuthResult,
 	api := lens.NewAPI(a.HTTPClient)
 	user, err := a.Queries.GetUserByAddressAndL1(ctx, coredb.GetUserByAddressAndL1Params{
 		Address: a.Address,
-		L1Chain: persist.ChainETH,
+		L1Chain: persist.L1Chain(persist.ChainETH),
 	})
 	if err != nil {
 		return nil, err

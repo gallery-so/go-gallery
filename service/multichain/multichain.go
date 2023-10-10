@@ -1190,7 +1190,7 @@ func (p *Provider) GetCommunityOwners(ctx context.Context, communityIdentifiers 
 }
 
 func (p *Provider) GetTokensOfContractForWallet(ctx context.Context, contractAddress persist.Address, wallet persist.ChainAddress, limit, offset int) ([]persist.TokenGallery, error) {
-	user, err := p.Repos.UserRepository.GetByChainAddress(ctx, wallet)
+	user, err := p.Repos.UserRepository.GetByChainAddress(ctx, wallet.ToL1ChainAddress())
 	if err != nil {
 		if _, ok := err.(persist.ErrWalletNotFound); ok {
 			return nil, nil
@@ -1766,14 +1766,14 @@ func (p *Provider) createUsersForTokens(ctx context.Context, tokens []chainToken
 								}
 							} else if _, ok := err.(persist.ErrAddressOwnedByUser); ok {
 								logger.For(ctx).Infof("address %s already owned by user", t.OwnerAddress)
-								user, err = p.Repos.UserRepository.GetByChainAddress(ctx, persist.NewChainAddress(t.OwnerAddress, ct.chain))
+								user, err = p.Repos.UserRepository.GetByChainAddress(ctx, persist.NewL1ChainAddress(t.OwnerAddress, ct.chain))
 								if err != nil {
 									errChan <- err
 									return
 								}
 							} else if _, ok := err.(persist.ErrWalletCreateFailed); ok {
 								logger.For(ctx).Infof("wallet creation failed for address %s", t.OwnerAddress)
-								user, err = p.Repos.UserRepository.GetByChainAddress(ctx, persist.NewChainAddress(t.OwnerAddress, ct.chain))
+								user, err = p.Repos.UserRepository.GetByChainAddress(ctx, persist.NewL1ChainAddress(t.OwnerAddress, ct.chain))
 								if err != nil {
 									errChan <- err
 									return

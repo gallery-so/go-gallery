@@ -3448,7 +3448,7 @@ type GetUserByAddressAndL1BatchBatchResults struct {
 
 type GetUserByAddressAndL1BatchParams struct {
 	Address persist.Address `json:"address"`
-	L1Chain persist.Chain   `json:"l1_chain"`
+	L1Chain persist.L1Chain `json:"l1_chain"`
 }
 
 func (q *Queries) GetUserByAddressAndL1Batch(ctx context.Context, arg []GetUserByAddressAndL1BatchParams) *GetUserByAddressAndL1BatchBatchResults {
@@ -3805,67 +3805,6 @@ func (b *GetUsersWithTraitBatchBatchResults) Query(f func(int, []User, error)) {
 }
 
 func (b *GetUsersWithTraitBatchBatchResults) Close() error {
-	b.closed = true
-	return b.br.Close()
-}
-
-const getWalletByChainAddressBatch = `-- name: GetWalletByChainAddressBatch :batchone
-SELECT wallets.id, wallets.created_at, wallets.last_updated, wallets.deleted, wallets.version, wallets.address, wallets.wallet_type, wallets.chain, wallets.l1_chain FROM wallets WHERE address = $1 AND chain = $2 AND deleted = false
-`
-
-type GetWalletByChainAddressBatchBatchResults struct {
-	br     pgx.BatchResults
-	tot    int
-	closed bool
-}
-
-type GetWalletByChainAddressBatchParams struct {
-	Address persist.Address `json:"address"`
-	Chain   persist.Chain   `json:"chain"`
-}
-
-func (q *Queries) GetWalletByChainAddressBatch(ctx context.Context, arg []GetWalletByChainAddressBatchParams) *GetWalletByChainAddressBatchBatchResults {
-	batch := &pgx.Batch{}
-	for _, a := range arg {
-		vals := []interface{}{
-			a.Address,
-			a.Chain,
-		}
-		batch.Queue(getWalletByChainAddressBatch, vals...)
-	}
-	br := q.db.SendBatch(ctx, batch)
-	return &GetWalletByChainAddressBatchBatchResults{br, len(arg), false}
-}
-
-func (b *GetWalletByChainAddressBatchBatchResults) QueryRow(f func(int, Wallet, error)) {
-	defer b.br.Close()
-	for t := 0; t < b.tot; t++ {
-		var i Wallet
-		if b.closed {
-			if f != nil {
-				f(t, i, ErrBatchAlreadyClosed)
-			}
-			continue
-		}
-		row := b.br.QueryRow()
-		err := row.Scan(
-			&i.ID,
-			&i.CreatedAt,
-			&i.LastUpdated,
-			&i.Deleted,
-			&i.Version,
-			&i.Address,
-			&i.WalletType,
-			&i.Chain,
-			&i.L1Chain,
-		)
-		if f != nil {
-			f(t, i, err)
-		}
-	}
-}
-
-func (b *GetWalletByChainAddressBatchBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }

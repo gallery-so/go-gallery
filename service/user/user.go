@@ -171,7 +171,7 @@ func GetUser(pCtx context.Context, pInput GetUserInput, userRepo postgres.UserRe
 
 	var user persist.User
 	var err error
-	chainAddress := persist.NewChainAddress(pInput.Address, pInput.Chain)
+	chainAddress := persist.NewL1ChainAddress(pInput.Address, pInput.Chain)
 	switch {
 	case pInput.UserID != "":
 		user, err = userRepo.GetByID(pCtx, pInput.UserID)
@@ -191,7 +191,7 @@ func GetUser(pCtx context.Context, pInput GetUserInput, userRepo postgres.UserRe
 	}
 
 	if user.ID == "" {
-		return GetUserOutput{}, persist.ErrUserNotFound{UserID: pInput.UserID, ChainAddress: chainAddress, Username: pInput.Username}
+		return GetUserOutput{}, persist.ErrUserNotFound{UserID: pInput.UserID, L1ChainAddress: chainAddress, Username: pInput.Username}
 	}
 
 	output := GetUserOutput{
