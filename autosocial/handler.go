@@ -26,7 +26,7 @@ func processUsers(q *coredb.Queries, n *farcaster.NeynarAPI, l *lens.LensAPI) gi
 		}
 
 		lp := pool.New().WithMaxGoroutines(3).WithErrors().WithContext(c)
-		fp := pool.New().WithMaxGoroutines(20).WithErrors().WithContext(c)
+		fp := pool.New().WithMaxGoroutines(3).WithErrors().WithContext(c)
 
 		for u, s := range in.Users {
 			userID := u
