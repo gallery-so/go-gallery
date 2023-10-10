@@ -1189,8 +1189,8 @@ func (p *Provider) GetCommunityOwners(ctx context.Context, communityIdentifiers 
 	return holders, nil
 }
 
-func (p *Provider) GetTokensOfContractForWallet(ctx context.Context, contractAddress persist.Address, wallet persist.ChainAddress, limit, offset int) ([]persist.TokenGallery, error) {
-	user, err := p.Repos.UserRepository.GetByChainAddress(ctx, wallet.ToL1ChainAddress())
+func (p *Provider) GetTokensOfContractForWallet(ctx context.Context, contractAddress persist.ChainAddress, wallet persist.L1ChainAddress, limit, offset int) ([]persist.TokenGallery, error) {
+	user, err := p.Repos.UserRepository.GetByChainAddress(ctx, wallet)
 	if err != nil {
 		if _, ok := err.(persist.ErrWalletNotFound); ok {
 			return nil, nil
@@ -1198,25 +1198,25 @@ func (p *Provider) GetTokensOfContractForWallet(ctx context.Context, contractAdd
 		return nil, err
 	}
 
-	contractFetchers := matchingProvidersForChain[TokensContractFetcher](p.Chains, wallet.Chain())
+	contractFetchers := matchingProvidersForChain[TokensContractFetcher](p.Chains, contractAddress.Chain())
 
 	tokensFromProviders := make([]chainTokens, 0, len(contractFetchers))
 	contracts := make([]chainContracts, 0, len(contractFetchers))
 	for i, tFetcher := range contractFetchers {
-		tokensOfOwner, contract, err := tFetcher.GetTokensByContractAddressAndOwner(ctx, wallet.Address(), contractAddress, limit, offset)
+		tokensOfOwner, contract, err := tFetcher.GetTokensByContractAddressAndOwner(ctx, wallet.Address(), contractAddress.Address(), limit, offset)
 		if err != nil {
 			return nil, err
 		}
 
 		contracts = append(contracts, chainContracts{
 			priority:  i,
-			chain:     wallet.Chain(),
+			chain:     contractAddress.Chain(),
 			contracts: []ChainAgnosticContract{contract},
 		})
 
 		tokensFromProviders = append(tokensFromProviders, chainTokens{
 			priority: i,
-			chain:    wallet.Chain(),
+			chain:    contractAddress.Chain(),
 			tokens:   tokensOfOwner,
 		})
 	}
@@ -1231,7 +1231,7 @@ func (p *Provider) GetTokensOfContractForWallet(ctx context.Context, contractAdd
 		return nil, err
 	}
 
-	allUserTokens, _, err := p.AddHolderTokensToUser(ctx, user, tokensFromProviders, persistedContracts, []persist.Chain{wallet.Chain()}, existingTokens)
+	allUserTokens, _, err := p.AddHolderTokensToUser(ctx, user, tokensFromProviders, persistedContracts, []persist.Chain{contractAddress.Chain()}, existingTokens)
 	if err != nil {
 		return nil, err
 	}
