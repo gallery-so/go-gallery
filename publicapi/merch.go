@@ -69,7 +69,7 @@ func (api MerchAPI) GetMerchTokens(ctx context.Context, address persist.Address)
 
 	merchAddress := env.GetString("MERCH_CONTRACT_ADDRESS")
 
-	tokens, err := api.multichainProvider.GetTokensOfContractForWallet(ctx, persist.Address(merchAddress), persist.NewChainAddress(address, persist.ChainETH), 0, 0)
+	tokens, err := api.multichainProvider.GetTokensOfContractForWallet(ctx, persist.NewChainAddress(persist.Address(merchAddress), persist.ChainETH), persist.NewL1ChainAddress(address, persist.ChainETH), 0, 0)
 	if err != nil {
 		return nil, err
 	}

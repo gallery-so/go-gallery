@@ -106,7 +106,7 @@ func createUser(db *sql.DB, createUserStmt, createGalleryStmt, createNonceStmt *
 		}
 
 		for _, address := range input.Addresses {
-			if _, err := tx.StmtContext(c, createNonceStmt).ExecContext(c, persist.GenerateID(), userID, address, auth.GenerateNonce()); err != nil {
+			if _, err := tx.StmtContext(c, createNonceStmt).ExecContext(c, persist.GenerateID(), userID, address, auth.GenerateNonce(), persist.ChainETH, persist.ChainETH); err != nil {
 				rollbackWithErr(c, tx, http.StatusInternalServerError, err)
 				return
 			}
