@@ -163,6 +163,7 @@ func New(queries *db.Queries, pub *pubsub.Client, taskClient *cloudtasks.Client,
 	notifDispatcher.AddHandler(persist.ActionReplyToComment, def)
 	notifDispatcher.AddHandler(persist.ActionMentionUser, def)
 	notifDispatcher.AddHandler(persist.ActionMentionCommunity, def)
+	notifDispatcher.AddHandler(persist.ActionUserPostedYourWork, def)
 
 	// notification actions that are grouped by token id
 	notifDispatcher.AddHandler(persist.ActionNewTokensReceived, tokenIDGrouped)
@@ -723,6 +724,31 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 
 	}
 
+	if notif.Action == persist.ActionUserPostedYourWork {
+
+		post, err := queries.GetPostByID(ctx, notif.PostID)
+		if err != nil {
+			return task.PushNotificationMessage{}, err
+		}
+		actor, err := queries.GetUserById(ctx, post.ActorID)
+		if err != nil {
+			return task.PushNotificationMessage{}, err
+		}
+
+		if err := limiter.tryMention(ctx, actor.ID, notif.OwnerID, notif.FeedEventID); err != nil {
+			return task.PushNotificationMessage{}, err
+		}
+
+		if !actor.Username.Valid {
+			return task.PushNotificationMessage{}, fmt.Errorf("user with ID=%s has no username", actor.ID)
+		}
+		contract, err := queries.GetContractByID(ctx, notif.ContractID)
+		if err != nil {
+			return task.PushNotificationMessage{}, err
+		}
+		message.Body = fmt.Sprintf("%s posted your work: %s", actor.Username.String, contract.Name.String)
+	}
+
 	return task.PushNotificationMessage{}, fmt.Errorf("unsupported notification action: %s", notif.Action)
 }
 
@@ -739,6 +765,8 @@ func actionSupportsPushNotifications(action persist.Action) bool {
 	case persist.ActionCommentedOnPost:
 		return true
 	case persist.ActionAdmiredPost:
+		return true
+	case persist.ActionUserPostedYourWork:
 		return true
 	default:
 		return false
@@ -970,6 +998,16 @@ func addNotification(ctx context.Context, notif db.Notification, queries *db.Que
 			Post:       util.ToNullString(notif.PostID.String(), true),
 			Comment:    util.ToNullString(notif.CommentID.String(), true),
 			MentionID:  notif.MentionID,
+			ContractID: notif.ContractID,
+		})
+	case persist.ActionUserPostedYourWork:
+		return queries.CreateUserPostedYourWorkNotification(ctx, db.CreateUserPostedYourWorkNotificationParams{
+			ID:         id,
+			OwnerID:    notif.OwnerID,
+			Action:     notif.Action,
+			Data:       notif.Data,
+			EventIds:   notif.EventIds,
+			Post:       util.ToNullString(notif.PostID.String(), true),
 			ContractID: notif.ContractID,
 		})
 	default:
