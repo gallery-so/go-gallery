@@ -2169,7 +2169,19 @@ func ensProfileImageToModel(ctx context.Context, userID, walletID persist.DBID, 
 
 	var pfp *model.HTTPSProfileImage = nil
 
-	if url != "" {
+	if strings.HasPrefix(url, "data:image/svg") {
+		previewURL := util.ToPointer(url)
+		pfp = &model.HTTPSProfileImage{
+			PreviewURLs: &model.PreviewURLSet{
+				Raw:       &url,
+				Thumbnail: previewURL,
+				Small:     previewURL,
+				Medium:    previewURL,
+				Large:     previewURL,
+				SrcSet:    previewURL,
+			},
+		}
+	} else {
 		pfp = &model.HTTPSProfileImage{PreviewURLs: previewURLs(ctx, url, nil)}
 	}
 
