@@ -257,7 +257,7 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 
 	// The token is already synced
 	if err == nil {
-		contract, err := api.queries.GetContractByID(ctx, token.Contract)
+		contract, err := api.queries.GetContractByID(ctx, token.ContractID)
 		if err != nil {
 			return "", err
 		}
@@ -303,7 +303,7 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 	postID, err := api.queries.InsertPost(ctx, db.InsertPostParams{
 		ID:          persist.GenerateID(),
 		TokenIds:    []persist.DBID{synced.ID},
-		ContractIds: []persist.DBID{synced.Contract},
+		ContractIds: []persist.DBID{synced.ContractID},
 		ActorID:     user.ID,
 		Caption:     c,
 	})

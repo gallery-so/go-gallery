@@ -604,20 +604,12 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 	}
 	if notif.Action == persist.ActionNewTokensReceived {
 
-		tm, err := queries.GetTokenMediaByTokenId(ctx, notif.Data.NewTokenID)
+		tokenDef, err := queries.GetTokenDefinitionByTokenId(ctx, notif.Data.NewTokenID)
 		if err != nil {
 			return task.PushNotificationMessage{}, err
 		}
-		name := tm.Name
-		if name == "" {
-			to, err := queries.GetTokenById(ctx, notif.Data.NewTokenID)
-			if err != nil {
-				return task.PushNotificationMessage{}, err
-			}
-			name = to.Name.String
-		}
 
-		name = util.TruncateWithEllipsis(name, 20)
+		name := util.TruncateWithEllipsis(tokenDef.Name.String, 20)
 
 		if err := limiter.tryTokens(ctx, notif.OwnerID, notif.Data.NewTokenID); err != nil {
 			return task.PushNotificationMessage{}, err

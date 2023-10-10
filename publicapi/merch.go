@@ -155,8 +155,8 @@ func (api MerchAPI) GetMerchTokenByTokenID(ctx context.Context, tokenID persist.
 
 	merchAddress := env.GetString("MERCH_CONTRACT_ADDRESS")
 
-	token, err := api.queries.GetTokenByTokenIdentifiers(ctx, db.GetTokenByTokenIdentifiersParams{
-		TokenHex:        tokenID,
+	token, err := api.queries.GetTokenDefinitionByTokenIdentifiers(ctx, db.GetTokenDefinitionByTokenIdentifiersParams{
+		TokenID:         tokenID,
 		ContractAddress: persist.Address(merchAddress),
 		Chain:           persist.ChainETH,
 	})

@@ -189,6 +189,12 @@ sql:
           - column: 'profile_images.*source_type'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.ProfileImageSource'
 
+          # Token Definitions
+          - column: 'token_definitions.token_id'
+            go_type: 'github.com/mikeydub/go-gallery/service/persist.TokenID'
+          - column: 'token_definitions.fallback_media'
+            go_type: 'github.com/mikeydub/go-gallery/service/persist.FallbackMedia'
+
           # Wildcards
           # Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above.
           # Format is schema.table.column; where *.*.<column> applies to all schemas and tables.

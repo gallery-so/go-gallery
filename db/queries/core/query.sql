@@ -91,8 +91,34 @@ SELECT c.* FROM galleries g, unnest(g.collections)
 -- name: GetTokenById :one
 select * from tokens where id = $1 and displayable and deleted = false;
 
--- name: GetTokenMediaByTokenId :one
-select tm.* from tokens join token_medias tm on tokens.token_media_id = tm.id where tokens.id = $1 and tokens.displayable and not tokens.deleted and not tm.deleted;
+-- name: GetTokenDefinitionByTokenDbid :one
+select token_definitions.* from token_definitions, tokens where token_definitions.id = tokens.token_definition_id and tokens.id = $1 and tokens.displayable and not tokens.deleted and not token_definitions.deleted;
+
+-- name: GetTokenDefinitionByTokenIdentifiers :one
+select *
+from token_definitions
+where token_definitions.chain = @chain
+    and contract_id = (
+        select contract.id
+        from contracts
+        where contracts.address = @contract_address and not contracts.deleted
+    )
+    and token_definitions.id = @token_id
+    and not token_definitions.deleted;
+
+-- name: GetTokenDefinitionAndMediaByTokenIdentifiers :one
+-- GetTokenDefinitionAndMediaByTokenIdentifiers returns a token definition and its associated media if it exists.
+select sqlc.embed(token_definitions), sqlc.embed(token_medias)
+from token_definitions, token_medias
+where token_definitions.chain = @chain
+    and contract_id = (
+        select contract.id
+        from contracts
+        where contracts.address = @contract_address and not contracts.deleted
+    )
+    and token_definitions.id = @token_id
+    and not token_definitions.deleted
+    and not token_medias.deleted;
 
 -- name: GetTokenByIdBatch :batchone
 select * from tokens where id = $1 and displayable and deleted = false;
@@ -291,7 +317,7 @@ select u.* from tokens t
 select coalesce(nullif(tm.media->>'thumbnail_url', ''), nullif(tm.media->>'media_url', ''))::varchar as thumbnail_url
     from tokens t
         inner join token_medias tm on t.token_media_id = tm.id
-    where t.contract = $1
+    where t.contract_id = $1
       and t.owner_user_id = $2
       and t.displayable
       and t.deleted = false
@@ -476,7 +502,7 @@ with valid_post_ids as (
         JOIN tokens on tokens.id = ANY(posts.token_ids)
             and tokens.displayable
             and tokens.deleted = false
-            and tokens.contract = sqlc.arg('contract_id')
+            and tokens.contract_id = sqlc.arg('contract_id')
             and ('x' || lpad(substring(tokens.token_id, 1, 16), 16, '0'))::bit(64)::bigint / 1000000 = sqlc.arg('project_id_int')::int
     WHERE sqlc.arg('contract_id') = ANY(posts.contract_ids)
       AND posts.deleted = false
@@ -897,7 +923,7 @@ update merch set redeemed = true, token_id = @token_hex, last_updated = now() wh
 select discount_code from merch where token_id = @token_hex and redeemed = true and deleted = false;
 
 -- name: GetUserOwnsTokenByIdentifiers :one
-select exists(select 1 from tokens where owner_user_id = @user_id and token_id = @token_hex and contract = @contract and chain = @chain and displayable and deleted = false) as owns_token;
+select exists(select 1 from tokens where owner_user_id = @user_id and token_id = @token_hex and contract_id = @contract and chain = @chain and displayable and deleted = false) as owns_token;
 
 -- name: UpdateGalleryHidden :one
 update galleries set hidden = @hidden, last_updated = now() where id = @id and deleted = false returning *;
@@ -1211,9 +1237,6 @@ update wallets set deleted = true, last_updated = now() where id = $1;
 -- name: InsertUser :one
 insert into users (id, username, username_idempotent, bio, universal, email_unsubscriptions) values ($1, $2, $3, $4, $5, $6) returning id;
 
--- name: IsExistsActiveTokenMediaByTokenIdentifers :one
-select exists(select 1 from token_medias where token_medias.contract_id = $1 and token_medias.token_id = $2 and token_medias.chain = $3 and active = true and deleted = false);
-
 -- name: InsertTokenPipelineResults :exec
 with insert_job(id) as (
     insert into token_processing_jobs (id, token_properties, pipeline_metadata, processing_cause, processor_version)
@@ -1275,7 +1298,7 @@ set token_media_id = (
 from insert_media_add_record insert_medias
 where
     tokens.chain = @chain
-    and tokens.contract = @contract_id
+    and tokens.contract_id = @contract_id
     and tokens.token_id = @token_id
     and not tokens.deleted
     and (
@@ -1458,12 +1481,20 @@ insert into sessions (id, user_id,
 update sessions set invalidated = true, active_until = least(active_until, now()), last_updated = now() where id = @id and deleted = false and invalidated = false;
 
 -- name: UpdateTokenMetadataFieldsByTokenIdentifiers :exec
-update tokens
+-- XXX: update tokens
+-- XXX: set name = @name,
+-- XXX:     description = @description,
+-- XXX:     last_updated = now()
+-- XXX: where token_id = @token_id
+-- XXX:     and contract = @contract_id
+-- XXX:     and chain = @chain
+-- XXX:     and deleted = false;
+update token_definitions
 set name = @name,
     description = @description,
     last_updated = now()
 where token_id = @token_id
-    and contract = @contract_id
+    and contract_id = @contract_id
     and chain = @chain
     and deleted = false;
 
@@ -1547,19 +1578,24 @@ where pfp.id = @id
 		0 = 1
 	end;
 
--- name: GetEnsProfileImagesByUserID :one
-select sqlc.embed(token_medias), sqlc.embed(wallets)
-from tokens, contracts, users, token_medias, wallets, unnest(tokens.owned_by_wallets) tw(id)
+-- name: GetPotentialENSProfileImageByUserId :one
+select sqlc.embed(token_definitions), sqlc.embed(token_medias), sqlc.embed(wallets)
+from token_definitions, tokens, contracts, users, token_medias, wallets, unnest(tokens.owned_by_wallets) tw(id)
 where contracts.address = @ens_address
     and contracts.chain = @chain
     and tokens.owner_user_id = @user_id
-    and tokens.contract = contracts.id
     and users.id = tokens.owner_user_id
-    and tokens.token_media_id = token_medias.id
     and tw.id = wallets.id
+    and token_definitions.id = tokens.token_definition_id
+    and tokens_definitions.contract_id = contracts.id
+    and token_definitions.token_media_id = token_medias.id
     and token_medias.active
     and nullif(token_medias.media->>'profile_image_url', '') is not null
-    and not contracts.deleted and not users.deleted and not token_medias.deleted and not wallets.deleted
+    and not contracts.deleted
+    and not users.deleted
+    and not token_medias.deleted
+    and not wallets.deleted
+    and not token_definitions.deleted
 order by tw.id = users.primary_wallet_id desc, tokens.id desc
 limit 1;
 
@@ -1674,7 +1710,7 @@ update tokens
       and not deleted;
       
 -- name: IsMemberOfCommunity :one
-select exists (select * from tokens where not deleted and displayable and owner_user_id = @user_id and contract = @contract_id limit 1) is_member;
+select exists (select * from tokens where not deleted and displayable and owner_user_id = @user_id and contract_id = @contract_id limit 1) is_member;
 
 -- name: InsertExternalSocialConnectionsForUser :many
 insert into external_social_connections (id, social_account_type, follower_id, followee_id) 

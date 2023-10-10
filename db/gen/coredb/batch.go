@@ -1712,7 +1712,7 @@ func (b *GetGalleryByIdBatchBatchResults) Close() error {
 }
 
 const getGalleryTokenMediasByGalleryIDBatch = `-- name: GetGalleryTokenMediasByGalleryIDBatch :batchmany
-select tm.id, tm.created_at, tm.last_updated, tm.version, tm.contract_id, tm.token_id, tm.chain, tm.active, tm.metadata, tm.media, tm.name, tm.description, tm.processing_job_id, tm.deleted
+select tm.id, tm.created_at, tm.last_updated, tm.version, tm.contract_id, tm.token_id, tm.chain, tm.active, tm.metadata, tm.media, tm.name__deprecated, tm.description__deprecated, tm.processing_job_id, tm.deleted
 	from galleries g, collections c, tokens t, token_medias tm
 	where
 		g.id = $1
@@ -1778,8 +1778,8 @@ func (b *GetGalleryTokenMediasByGalleryIDBatchBatchResults) Query(f func(int, []
 					&i.Active,
 					&i.Metadata,
 					&i.Media,
-					&i.Name,
-					&i.Description,
+					&i.NameDeprecated,
+					&i.DescriptionDeprecated,
 					&i.ProcessingJobID,
 					&i.Deleted,
 				); err != nil {
@@ -1801,7 +1801,7 @@ func (b *GetGalleryTokenMediasByGalleryIDBatchBatchResults) Close() error {
 }
 
 const getMediaByTokenIDIgnoringStatus = `-- name: GetMediaByTokenIDIgnoringStatus :batchone
-select m.id, m.created_at, m.last_updated, m.version, m.contract_id, m.token_id, m.chain, m.active, m.metadata, m.media, m.name, m.description, m.processing_job_id, m.deleted
+select m.id, m.created_at, m.last_updated, m.version, m.contract_id, m.token_id, m.chain, m.active, m.metadata, m.media, m.name__deprecated, m.description__deprecated, m.processing_job_id, m.deleted
 from token_medias m
 where m.id = (select token_media_id from tokens where tokens.id = $1) and not m.deleted
 `
@@ -1846,8 +1846,8 @@ func (b *GetMediaByTokenIDIgnoringStatusBatchResults) QueryRow(f func(int, Token
 			&i.Active,
 			&i.Metadata,
 			&i.Media,
-			&i.Name,
-			&i.Description,
+			&i.NameDeprecated,
+			&i.DescriptionDeprecated,
 			&i.ProcessingJobID,
 			&i.Deleted,
 		)
@@ -2058,7 +2058,7 @@ with new_tokens as (
     select added.id, row_number() over () added_order
     from (select jsonb_array_elements_text(data -> 'collection_new_token_ids') id from feed_events f where f.id = $1 and f.deleted = false) added
 )
-select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id, t.is_creator_token, t.is_holder_token, t.displayable from new_tokens a join tokens t on a.id = t.id and t.displayable and t.deleted = false order by a.added_order
+select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name__deprecated, t.description__deprecated, t.collectors_note, t.token_uri__deprecated, t.token_type__deprecated, t.token_id, t.quantity, t.ownership_history__deprecated, t.external_url__deprecated, t.block_number__deprecated, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract_id, t.is_user_marked_spam, t.is_provider_marked_spam__deprecated, t.last_synced, t.fallback_media__deprecated, t.token_media_id__deprecated, t.is_creator_token, t.is_holder_token, t.displayable, t.token_definition_id from new_tokens a join tokens t on a.id = t.id and t.displayable and t.deleted = false order by a.added_order
 `
 
 type GetNewTokensByFeedEventIdBatchBatchResults struct {
@@ -2103,28 +2103,29 @@ func (b *GetNewTokensByFeedEventIdBatchBatchResults) Query(f func(int, []Token, 
 					&i.Version,
 					&i.CreatedAt,
 					&i.LastUpdated,
-					&i.Name,
-					&i.Description,
+					&i.NameDeprecated,
+					&i.DescriptionDeprecated,
 					&i.CollectorsNote,
-					&i.TokenUri,
-					&i.TokenType,
+					&i.TokenUriDeprecated,
+					&i.TokenTypeDeprecated,
 					&i.TokenID,
 					&i.Quantity,
-					&i.OwnershipHistory,
-					&i.ExternalUrl,
-					&i.BlockNumber,
+					&i.OwnershipHistoryDeprecated,
+					&i.ExternalUrlDeprecated,
+					&i.BlockNumberDeprecated,
 					&i.OwnerUserID,
 					&i.OwnedByWallets,
 					&i.Chain,
-					&i.Contract,
+					&i.ContractID,
 					&i.IsUserMarkedSpam,
-					&i.IsProviderMarkedSpam,
+					&i.IsProviderMarkedSpamDeprecated,
 					&i.LastSynced,
-					&i.FallbackMedia,
-					&i.TokenMediaID,
+					&i.FallbackMediaDeprecated,
+					&i.TokenMediaIDDeprecated,
 					&i.IsCreatorToken,
 					&i.IsHolderToken,
 					&i.Displayable,
+					&i.TokenDefinitionID,
 				); err != nil {
 					return err
 				}
@@ -2749,7 +2750,7 @@ func (b *GetSharedFollowersBatchPaginateBatchResults) Close() error {
 }
 
 const getTokenByIdBatch = `-- name: GetTokenByIdBatch :batchone
-select id, deleted, version, created_at, last_updated, name, description, collectors_note, token_uri, token_type, token_id, quantity, ownership_history, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id, is_creator_token, is_holder_token, displayable from tokens where id = $1 and displayable and deleted = false
+select id, deleted, version, created_at, last_updated, name__deprecated, description__deprecated, collectors_note, token_uri__deprecated, token_type__deprecated, token_id, quantity, ownership_history__deprecated, external_url__deprecated, block_number__deprecated, owner_user_id, owned_by_wallets, chain, contract_id, is_user_marked_spam, is_provider_marked_spam__deprecated, last_synced, fallback_media__deprecated, token_media_id__deprecated, is_creator_token, is_holder_token, displayable, token_definition_id from tokens where id = $1 and displayable and deleted = false
 `
 
 type GetTokenByIdBatchBatchResults struct {
@@ -2787,28 +2788,29 @@ func (b *GetTokenByIdBatchBatchResults) QueryRow(f func(int, Token, error)) {
 			&i.Version,
 			&i.CreatedAt,
 			&i.LastUpdated,
-			&i.Name,
-			&i.Description,
+			&i.NameDeprecated,
+			&i.DescriptionDeprecated,
 			&i.CollectorsNote,
-			&i.TokenUri,
-			&i.TokenType,
+			&i.TokenUriDeprecated,
+			&i.TokenTypeDeprecated,
 			&i.TokenID,
 			&i.Quantity,
-			&i.OwnershipHistory,
-			&i.ExternalUrl,
-			&i.BlockNumber,
+			&i.OwnershipHistoryDeprecated,
+			&i.ExternalUrlDeprecated,
+			&i.BlockNumberDeprecated,
 			&i.OwnerUserID,
 			&i.OwnedByWallets,
 			&i.Chain,
-			&i.Contract,
+			&i.ContractID,
 			&i.IsUserMarkedSpam,
-			&i.IsProviderMarkedSpam,
+			&i.IsProviderMarkedSpamDeprecated,
 			&i.LastSynced,
-			&i.FallbackMedia,
-			&i.TokenMediaID,
+			&i.FallbackMediaDeprecated,
+			&i.TokenMediaIDDeprecated,
 			&i.IsCreatorToken,
 			&i.IsHolderToken,
 			&i.Displayable,
+			&i.TokenDefinitionID,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -2822,7 +2824,7 @@ func (b *GetTokenByIdBatchBatchResults) Close() error {
 }
 
 const getTokenByIdIgnoreDisplayableBatch = `-- name: GetTokenByIdIgnoreDisplayableBatch :batchone
-select id, deleted, version, created_at, last_updated, name, description, collectors_note, token_uri, token_type, token_id, quantity, ownership_history, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id, is_creator_token, is_holder_token, displayable from tokens where id = $1 and deleted = false
+select id, deleted, version, created_at, last_updated, name__deprecated, description__deprecated, collectors_note, token_uri__deprecated, token_type__deprecated, token_id, quantity, ownership_history__deprecated, external_url__deprecated, block_number__deprecated, owner_user_id, owned_by_wallets, chain, contract_id, is_user_marked_spam, is_provider_marked_spam__deprecated, last_synced, fallback_media__deprecated, token_media_id__deprecated, is_creator_token, is_holder_token, displayable, token_definition_id from tokens where id = $1 and deleted = false
 `
 
 type GetTokenByIdIgnoreDisplayableBatchBatchResults struct {
@@ -2860,28 +2862,29 @@ func (b *GetTokenByIdIgnoreDisplayableBatchBatchResults) QueryRow(f func(int, To
 			&i.Version,
 			&i.CreatedAt,
 			&i.LastUpdated,
-			&i.Name,
-			&i.Description,
+			&i.NameDeprecated,
+			&i.DescriptionDeprecated,
 			&i.CollectorsNote,
-			&i.TokenUri,
-			&i.TokenType,
+			&i.TokenUriDeprecated,
+			&i.TokenTypeDeprecated,
 			&i.TokenID,
 			&i.Quantity,
-			&i.OwnershipHistory,
-			&i.ExternalUrl,
-			&i.BlockNumber,
+			&i.OwnershipHistoryDeprecated,
+			&i.ExternalUrlDeprecated,
+			&i.BlockNumberDeprecated,
 			&i.OwnerUserID,
 			&i.OwnedByWallets,
 			&i.Chain,
-			&i.Contract,
+			&i.ContractID,
 			&i.IsUserMarkedSpam,
-			&i.IsProviderMarkedSpam,
+			&i.IsProviderMarkedSpamDeprecated,
 			&i.LastSynced,
-			&i.FallbackMedia,
-			&i.TokenMediaID,
+			&i.FallbackMediaDeprecated,
+			&i.TokenMediaIDDeprecated,
 			&i.IsCreatorToken,
 			&i.IsHolderToken,
 			&i.Displayable,
+			&i.TokenDefinitionID,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -2895,7 +2898,7 @@ func (b *GetTokenByIdIgnoreDisplayableBatchBatchResults) Close() error {
 }
 
 const getTokenByUserTokenIdentifiersBatch = `-- name: GetTokenByUserTokenIdentifiersBatch :batchone
-select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id, t.is_creator_token, t.is_holder_token, t.displayable
+select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name__deprecated, t.description__deprecated, t.collectors_note, t.token_uri__deprecated, t.token_type__deprecated, t.token_id, t.quantity, t.ownership_history__deprecated, t.external_url__deprecated, t.block_number__deprecated, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract_id, t.is_user_marked_spam, t.is_provider_marked_spam__deprecated, t.last_synced, t.fallback_media__deprecated, t.token_media_id__deprecated, t.is_creator_token, t.is_holder_token, t.displayable, t.token_definition_id
 from tokens t
 join contracts c on t.contract = c.id
 where t.owner_user_id = $1 and t.token_id = $2 and c.address = $3 and c.chain = $4 and t.displayable and not t.deleted and not c.deleted
@@ -2946,28 +2949,29 @@ func (b *GetTokenByUserTokenIdentifiersBatchBatchResults) QueryRow(f func(int, T
 			&i.Version,
 			&i.CreatedAt,
 			&i.LastUpdated,
-			&i.Name,
-			&i.Description,
+			&i.NameDeprecated,
+			&i.DescriptionDeprecated,
 			&i.CollectorsNote,
-			&i.TokenUri,
-			&i.TokenType,
+			&i.TokenUriDeprecated,
+			&i.TokenTypeDeprecated,
 			&i.TokenID,
 			&i.Quantity,
-			&i.OwnershipHistory,
-			&i.ExternalUrl,
-			&i.BlockNumber,
+			&i.OwnershipHistoryDeprecated,
+			&i.ExternalUrlDeprecated,
+			&i.BlockNumberDeprecated,
 			&i.OwnerUserID,
 			&i.OwnedByWallets,
 			&i.Chain,
-			&i.Contract,
+			&i.ContractID,
 			&i.IsUserMarkedSpam,
-			&i.IsProviderMarkedSpam,
+			&i.IsProviderMarkedSpamDeprecated,
 			&i.LastSynced,
-			&i.FallbackMedia,
-			&i.TokenMediaID,
+			&i.FallbackMediaDeprecated,
+			&i.TokenMediaIDDeprecated,
 			&i.IsCreatorToken,
 			&i.IsHolderToken,
 			&i.Displayable,
+			&i.TokenDefinitionID,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -3047,7 +3051,7 @@ func (b *GetTokenOwnerByIDBatchBatchResults) Close() error {
 }
 
 const getTokensByCollectionIdBatch = `-- name: GetTokensByCollectionIdBatch :batchmany
-select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id, t.is_creator_token, t.is_holder_token, t.displayable from collections c,
+select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name__deprecated, t.description__deprecated, t.collectors_note, t.token_uri__deprecated, t.token_type__deprecated, t.token_id, t.quantity, t.ownership_history__deprecated, t.external_url__deprecated, t.block_number__deprecated, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract_id, t.is_user_marked_spam, t.is_provider_marked_spam__deprecated, t.last_synced, t.fallback_media__deprecated, t.token_media_id__deprecated, t.is_creator_token, t.is_holder_token, t.displayable, t.token_definition_id from collections c,
     unnest(c.nfts) with ordinality as u(nft_id, nft_ord)
     join tokens t on t.id = u.nft_id
     where c.id = $1
@@ -3107,28 +3111,29 @@ func (b *GetTokensByCollectionIdBatchBatchResults) Query(f func(int, []Token, er
 					&i.Version,
 					&i.CreatedAt,
 					&i.LastUpdated,
-					&i.Name,
-					&i.Description,
+					&i.NameDeprecated,
+					&i.DescriptionDeprecated,
 					&i.CollectorsNote,
-					&i.TokenUri,
-					&i.TokenType,
+					&i.TokenUriDeprecated,
+					&i.TokenTypeDeprecated,
 					&i.TokenID,
 					&i.Quantity,
-					&i.OwnershipHistory,
-					&i.ExternalUrl,
-					&i.BlockNumber,
+					&i.OwnershipHistoryDeprecated,
+					&i.ExternalUrlDeprecated,
+					&i.BlockNumberDeprecated,
 					&i.OwnerUserID,
 					&i.OwnedByWallets,
 					&i.Chain,
-					&i.Contract,
+					&i.ContractID,
 					&i.IsUserMarkedSpam,
-					&i.IsProviderMarkedSpam,
+					&i.IsProviderMarkedSpamDeprecated,
 					&i.LastSynced,
-					&i.FallbackMedia,
-					&i.TokenMediaID,
+					&i.FallbackMediaDeprecated,
+					&i.TokenMediaIDDeprecated,
 					&i.IsCreatorToken,
 					&i.IsHolderToken,
 					&i.Displayable,
+					&i.TokenDefinitionID,
 				); err != nil {
 					return err
 				}
@@ -3148,7 +3153,7 @@ func (b *GetTokensByCollectionIdBatchBatchResults) Close() error {
 }
 
 const getTokensByUserIdAndChainBatch = `-- name: GetTokensByUserIdAndChainBatch :batchmany
-select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id, t.is_creator_token, t.is_holder_token, t.displayable from tokens t
+select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name__deprecated, t.description__deprecated, t.collectors_note, t.token_uri__deprecated, t.token_type__deprecated, t.token_id, t.quantity, t.ownership_history__deprecated, t.external_url__deprecated, t.block_number__deprecated, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract_id, t.is_user_marked_spam, t.is_provider_marked_spam__deprecated, t.last_synced, t.fallback_media__deprecated, t.token_media_id__deprecated, t.is_creator_token, t.is_holder_token, t.displayable, t.token_definition_id from tokens t
     where t.owner_user_id = $1
       and t.chain = $2
       and t.displayable
@@ -3204,28 +3209,29 @@ func (b *GetTokensByUserIdAndChainBatchBatchResults) Query(f func(int, []Token, 
 					&i.Version,
 					&i.CreatedAt,
 					&i.LastUpdated,
-					&i.Name,
-					&i.Description,
+					&i.NameDeprecated,
+					&i.DescriptionDeprecated,
 					&i.CollectorsNote,
-					&i.TokenUri,
-					&i.TokenType,
+					&i.TokenUriDeprecated,
+					&i.TokenTypeDeprecated,
 					&i.TokenID,
 					&i.Quantity,
-					&i.OwnershipHistory,
-					&i.ExternalUrl,
-					&i.BlockNumber,
+					&i.OwnershipHistoryDeprecated,
+					&i.ExternalUrlDeprecated,
+					&i.BlockNumberDeprecated,
 					&i.OwnerUserID,
 					&i.OwnedByWallets,
 					&i.Chain,
-					&i.Contract,
+					&i.ContractID,
 					&i.IsUserMarkedSpam,
-					&i.IsProviderMarkedSpam,
+					&i.IsProviderMarkedSpamDeprecated,
 					&i.LastSynced,
-					&i.FallbackMedia,
-					&i.TokenMediaID,
+					&i.FallbackMediaDeprecated,
+					&i.TokenMediaIDDeprecated,
 					&i.IsCreatorToken,
 					&i.IsHolderToken,
 					&i.Displayable,
+					&i.TokenDefinitionID,
 				); err != nil {
 					return err
 				}
@@ -3245,7 +3251,7 @@ func (b *GetTokensByUserIdAndChainBatchBatchResults) Close() error {
 }
 
 const getTokensByUserIdBatch = `-- name: GetTokensByUserIdBatch :batchmany
-select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam, t.last_synced, t.fallback_media, t.token_media_id, t.is_creator_token, t.is_holder_token, t.displayable from tokens t
+select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name__deprecated, t.description__deprecated, t.collectors_note, t.token_uri__deprecated, t.token_type__deprecated, t.token_id, t.quantity, t.ownership_history__deprecated, t.external_url__deprecated, t.block_number__deprecated, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract_id, t.is_user_marked_spam, t.is_provider_marked_spam__deprecated, t.last_synced, t.fallback_media__deprecated, t.token_media_id__deprecated, t.is_creator_token, t.is_holder_token, t.displayable, t.token_definition_id from tokens t
     where t.owner_user_id = $1
       and t.deleted = false
       and t.displayable
@@ -3303,28 +3309,29 @@ func (b *GetTokensByUserIdBatchBatchResults) Query(f func(int, []Token, error)) 
 					&i.Version,
 					&i.CreatedAt,
 					&i.LastUpdated,
-					&i.Name,
-					&i.Description,
+					&i.NameDeprecated,
+					&i.DescriptionDeprecated,
 					&i.CollectorsNote,
-					&i.TokenUri,
-					&i.TokenType,
+					&i.TokenUriDeprecated,
+					&i.TokenTypeDeprecated,
 					&i.TokenID,
 					&i.Quantity,
-					&i.OwnershipHistory,
-					&i.ExternalUrl,
-					&i.BlockNumber,
+					&i.OwnershipHistoryDeprecated,
+					&i.ExternalUrlDeprecated,
+					&i.BlockNumberDeprecated,
 					&i.OwnerUserID,
 					&i.OwnedByWallets,
 					&i.Chain,
-					&i.Contract,
+					&i.ContractID,
 					&i.IsUserMarkedSpam,
-					&i.IsProviderMarkedSpam,
+					&i.IsProviderMarkedSpamDeprecated,
 					&i.LastSynced,
-					&i.FallbackMedia,
-					&i.TokenMediaID,
+					&i.FallbackMediaDeprecated,
+					&i.TokenMediaIDDeprecated,
 					&i.IsCreatorToken,
 					&i.IsHolderToken,
 					&i.Displayable,
+					&i.TokenDefinitionID,
 				); err != nil {
 					return err
 				}
@@ -3344,7 +3351,7 @@ func (b *GetTokensByUserIdBatchBatchResults) Close() error {
 }
 
 const getTokensByWalletIdsBatch = `-- name: GetTokensByWalletIdsBatch :batchmany
-select id, deleted, version, created_at, last_updated, name, description, collectors_note, token_uri, token_type, token_id, quantity, ownership_history, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id, is_creator_token, is_holder_token, displayable from tokens where owned_by_wallets && $1 and displayable and deleted = false
+select id, deleted, version, created_at, last_updated, name__deprecated, description__deprecated, collectors_note, token_uri__deprecated, token_type__deprecated, token_id, quantity, ownership_history__deprecated, external_url__deprecated, block_number__deprecated, owner_user_id, owned_by_wallets, chain, contract_id, is_user_marked_spam, is_provider_marked_spam__deprecated, last_synced, fallback_media__deprecated, token_media_id__deprecated, is_creator_token, is_holder_token, displayable, token_definition_id from tokens where owned_by_wallets && $1 and displayable and deleted = false
     order by tokens.created_at desc, tokens.name desc, tokens.id desc
 `
 
@@ -3390,28 +3397,29 @@ func (b *GetTokensByWalletIdsBatchBatchResults) Query(f func(int, []Token, error
 					&i.Version,
 					&i.CreatedAt,
 					&i.LastUpdated,
-					&i.Name,
-					&i.Description,
+					&i.NameDeprecated,
+					&i.DescriptionDeprecated,
 					&i.CollectorsNote,
-					&i.TokenUri,
-					&i.TokenType,
+					&i.TokenUriDeprecated,
+					&i.TokenTypeDeprecated,
 					&i.TokenID,
 					&i.Quantity,
-					&i.OwnershipHistory,
-					&i.ExternalUrl,
-					&i.BlockNumber,
+					&i.OwnershipHistoryDeprecated,
+					&i.ExternalUrlDeprecated,
+					&i.BlockNumberDeprecated,
 					&i.OwnerUserID,
 					&i.OwnedByWallets,
 					&i.Chain,
-					&i.Contract,
+					&i.ContractID,
 					&i.IsUserMarkedSpam,
-					&i.IsProviderMarkedSpam,
+					&i.IsProviderMarkedSpamDeprecated,
 					&i.LastSynced,
-					&i.FallbackMedia,
-					&i.TokenMediaID,
+					&i.FallbackMediaDeprecated,
+					&i.TokenMediaIDDeprecated,
 					&i.IsCreatorToken,
 					&i.IsHolderToken,
 					&i.Displayable,
+					&i.TokenDefinitionID,
 				); err != nil {
 					return err
 				}

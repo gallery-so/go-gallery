@@ -426,7 +426,7 @@ func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) er
 	if err != nil {
 		return fmt.Errorf("failed to load token: %w", err)
 	}
-	contract, err := api.loaders.ContractByContractID.Load(token.Contract)
+	contract, err := api.loaders.ContractByContractID.Load(token.ContractID)
 	if err != nil {
 		return fmt.Errorf("failed to load contract for token: %w", err)
 	}
@@ -472,7 +472,7 @@ func (api TokenAPI) RefreshCollection(ctx context.Context, collectionDBID persis
 	for _, token := range tokens {
 		token := token
 		wp.Submit(func() {
-			contract, err := api.loaders.ContractByContractID.Load(token.Contract)
+			contract, err := api.loaders.ContractByContractID.Load(token.ContractID)
 			if err != nil {
 				errChan <- err
 				return
@@ -576,54 +576,20 @@ func (api TokenAPI) MediaByTokenID(ctx context.Context, tokenID persist.DBID) (d
 }
 
 // MediaByTokenIdentifiers returns media for a token and optionally returns a token instance with fallback media matching the identifiers if any exists.
-func (api TokenAPI) MediaByTokenIdentifiers(ctx context.Context, tokenIdentifiers persist.TokenIdentifiers) (db.TokenMedia, db.Token, error) {
+func (api TokenAPI) MediaByTokenIdentifiers(ctx context.Context, tokenIdentifiers persist.TokenIdentifiers) (db.TokenDefinition, db.TokenMedia, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"address": validate.WithTag(tokenIdentifiers.ContractAddress, "required"),
 		"tokenID": validate.WithTag(tokenIdentifiers.TokenID, "required"),
 	}); err != nil {
-		return db.TokenMedia{}, db.Token{}, err
+		return db.TokenDefinition{}, db.TokenMedia{}, err
 	}
-
-	// Check if the user is logged in, and if so sort results by prioritizing results specific to the user first
-	userID, _ := getAuthenticatedUserID(ctx)
-
-	// This query only returns a row if there is matching media, and it may not have a token instance even if it did return a row
-	media, err := api.queries.GetMediaByUserTokenIdentifiers(ctx, db.GetMediaByUserTokenIdentifiersParams{
-		UserID:  userID,
-		Chain:   tokenIdentifiers.Chain,
-		Address: tokenIdentifiers.ContractAddress,
-		TokenID: tokenIdentifiers.TokenID,
+	tokenDefAndMedia, err := api.queries.GetTokenDefinitionAndMediaByTokenIdentifiers(ctx, db.GetTokenDefinitionAndMediaByTokenIdentifiersParams{
+		Chain:           tokenIdentifiers.Chain,
+		ContractAddress: tokenIdentifiers.ContractAddress,
+		TokenID:         tokenIdentifiers.TokenID,
 	})
-
-	// Got media and a token instance
-	if err == nil && media.TokenInstanceID != "" {
-		token, err := api.GetTokenById(ctx, media.TokenInstanceID)
-		if err != nil || token == nil {
-			return media.TokenMedia, db.Token{}, err
-		}
-		return media.TokenMedia, *token, err
-	}
-
-	// Unexpected error
-	if err != nil && err != pgx.ErrNoRows {
-		return db.TokenMedia{}, db.Token{}, err
-	}
-
-	// Try to find a suitable instance with fallback media
-	token, err := api.queries.GetFallbackTokenByUserTokenIdentifiers(ctx, db.GetFallbackTokenByUserTokenIdentifiersParams{
-		UserID:  userID,
-		Chain:   tokenIdentifiers.Chain,
-		Address: tokenIdentifiers.ContractAddress,
-		TokenID: tokenIdentifiers.TokenID,
-	})
-
-	// Unexpected error
-	if err != nil && err != pgx.ErrNoRows {
-		return media.TokenMedia, db.Token{}, err
-	}
-
-	return media.TokenMedia, token, nil
+	return tokenDefAndMedia.TokenDefinition, tokenDefAndMedia.TokenMedia, err
 }
 
 func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (db.Event, error) {
@@ -661,7 +627,7 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collect
 			GalleryID:      currCol.GalleryID,
 			SubjectID:      tokenID,
 			Data: persist.EventData{
-				TokenContractID: token.Contract,
+				TokenContractID: token.ContractID,
 			},
 		})
 		if err != nil {
@@ -678,7 +644,7 @@ func (api TokenAPI) GetProcessingState(ctx context.Context, tokenID persist.DBID
 	if err != nil {
 		return false, err
 	}
-	contract, err := api.loaders.ContractByContractID.Load(token.Contract)
+	contract, err := api.loaders.ContractByContractID.Load(token.ContractID)
 	if err != nil {
 		return false, err
 	}

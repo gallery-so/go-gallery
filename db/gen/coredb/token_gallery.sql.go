@@ -158,7 +158,7 @@ do update set
   , last_updated = excluded.last_updated
   , is_provider_marked_spam = excluded.is_provider_marked_spam
   , last_synced = greatest(excluded.last_synced,tokens.last_synced)
-returning id, deleted, version, created_at, last_updated, name, description, collectors_note, token_uri, token_type, token_id, quantity, ownership_history, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced, fallback_media, token_media_id, is_creator_token, is_holder_token, displayable
+returning id, deleted, version, created_at, last_updated, name__deprecated, description__deprecated, collectors_note, token_uri__deprecated, token_type__deprecated, token_id, quantity, ownership_history__deprecated, external_url__deprecated, block_number__deprecated, owner_user_id, owned_by_wallets, chain, contract_id, is_user_marked_spam, is_provider_marked_spam__deprecated, last_synced, fallback_media__deprecated, token_media_id__deprecated, is_creator_token, is_holder_token, displayable, token_definition_id
 `
 
 type UpsertTokensParams struct {
@@ -230,28 +230,29 @@ func (q *Queries) UpsertTokens(ctx context.Context, arg UpsertTokensParams) ([]T
 			&i.Version,
 			&i.CreatedAt,
 			&i.LastUpdated,
-			&i.Name,
-			&i.Description,
+			&i.NameDeprecated,
+			&i.DescriptionDeprecated,
 			&i.CollectorsNote,
-			&i.TokenUri,
-			&i.TokenType,
+			&i.TokenUriDeprecated,
+			&i.TokenTypeDeprecated,
 			&i.TokenID,
 			&i.Quantity,
-			&i.OwnershipHistory,
-			&i.ExternalUrl,
-			&i.BlockNumber,
+			&i.OwnershipHistoryDeprecated,
+			&i.ExternalUrlDeprecated,
+			&i.BlockNumberDeprecated,
 			&i.OwnerUserID,
 			&i.OwnedByWallets,
 			&i.Chain,
-			&i.Contract,
+			&i.ContractID,
 			&i.IsUserMarkedSpam,
-			&i.IsProviderMarkedSpam,
+			&i.IsProviderMarkedSpamDeprecated,
 			&i.LastSynced,
-			&i.FallbackMedia,
-			&i.TokenMediaID,
+			&i.FallbackMediaDeprecated,
+			&i.TokenMediaIDDeprecated,
 			&i.IsCreatorToken,
 			&i.IsHolderToken,
 			&i.Displayable,
+			&i.TokenDefinitionID,
 		); err != nil {
 			return nil, err
 		}

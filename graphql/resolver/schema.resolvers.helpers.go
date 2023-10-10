@@ -2070,17 +2070,17 @@ func pageInfoToModel(ctx context.Context, pageInfo publicapi.PageInfo) *model.Pa
 	}
 }
 
-func resolveTokenMedia(ctx context.Context, token db.Token, tokenMedia db.TokenMedia, highDef bool) model.MediaSubtype {
+func resolveTokenMedia(ctx context.Context, tokenDefinition db.TokenDefinition, tokenMedia db.TokenMedia, highDef bool) model.MediaSubtype {
 	// Rewrite fallback IPFS and Arweave URLs to HTTP
-	if fallback := strings.ToLower(token.FallbackMedia.ImageURL.String()); strings.HasPrefix(fallback, "ipfs://") {
-		token.FallbackMedia.ImageURL = persist.NullString(ipfs.DefaultGatewayFrom(fallback))
+	if fallback := strings.ToLower(tokenDefinition.FallbackMedia.ImageURL.String()); strings.HasPrefix(fallback, "ipfs://") {
+		tokenDefinition.FallbackMedia.ImageURL = persist.NullString(ipfs.DefaultGatewayFrom(fallback))
 	} else if strings.HasPrefix(fallback, "ar://") {
-		token.FallbackMedia.ImageURL = persist.NullString(fmt.Sprintf("https://arweave.net/%s", util.GetURIPath(fallback, false)))
+		tokenDefinition.FallbackMedia.ImageURL = persist.NullString(fmt.Sprintf("https://arweave.net/%s", util.GetURIPath(fallback, false)))
 	}
 
 	// Media is found and is active.
 	if tokenMedia.ID != "" && tokenMedia.Active {
-		return mediaToModel(ctx, tokenMedia, token.FallbackMedia, highDef)
+		return mediaToModel(ctx, tokenMedia, tokenDefinition.FallbackMedia, highDef)
 	}
 
 	// If there is no media for a token, assume that the token is still being synced.
@@ -2090,11 +2090,11 @@ func resolveTokenMedia(ctx context.Context, token db.Token, tokenMedia db.TokenM
 		// we compare when the token was created to the current time. If it's longer than the grace period, we assume that the
 		// message was lost and set the media to invalid so it could be refreshed manually.
 		if inFlight, err := publicapi.For(ctx).Token.GetProcessingState(ctx, token.ID); !inFlight || err != nil {
-			if time.Since(token.CreatedAt) > time.Duration(1*time.Hour) {
+			if time.Since(tokenDefinition.CreatedAt) > time.Duration(1*time.Hour) {
 				tokenMedia.Media.MediaType = persist.MediaTypeInvalid
 			}
 		}
-		return mediaToModel(ctx, tokenMedia, token.FallbackMedia, highDef)
+		return mediaToModel(ctx, tokenMedia, tokenDefinition.FallbackMedia, highDef)
 	}
 
 	// If the media isn't valid, check if its still up for processing. If so, set the media as syncing.
@@ -2104,7 +2104,7 @@ func resolveTokenMedia(ctx context.Context, token db.Token, tokenMedia db.TokenM
 		}
 	}
 
-	return mediaToModel(ctx, tokenMedia, token.FallbackMedia, highDef)
+	return mediaToModel(ctx, tokenMedia, tokenDefinition.FallbackMedia, highDef)
 }
 
 func mediaToModel(ctx context.Context, tokenMedia db.TokenMedia, fallback persist.FallbackMedia, highDef bool) model.MediaSubtype {

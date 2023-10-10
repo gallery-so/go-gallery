@@ -540,7 +540,7 @@ func (r *galleryUserResolver) ProfileImage(ctx context.Context, obj *model.Galle
 
 // PotentialEnsProfileImage is the resolver for the potentialEnsProfileImage field.
 func (r *galleryUserResolver) PotentialEnsProfileImage(ctx context.Context, obj *model.GalleryUser) (*model.EnsProfileImage, error) {
-	a, err := publicapi.For(ctx).User.GetEnsProfileImageByUserID(ctx, obj.Dbid)
+	a, err := publicapi.For(ctx).User.GetPotentialENSProfileImageByUserID(ctx, obj.Dbid)
 	if err != nil && (errors.Is(err, eth.ErrNoResolution) || errors.Is(err, eth.ErrNoAvatarRecord)) {
 		return nil, nil
 	}
@@ -2567,42 +2567,27 @@ func (r *queryResolver) TopCollectionsForCommunity(ctx context.Context, input mo
 
 // PostComposerDraftDetails is the resolver for the postComposerDraftDetails field.
 func (r *queryResolver) PostComposerDraftDetails(ctx context.Context, input model.PostComposerDraftDetailsInput) (model.PostComposerDraftDetailsPayloadOrError, error) {
-	token := persist.TokenIdentifiers{
+	tokenIdentifiers := persist.TokenIdentifiers{
 		Chain:           input.Token.ChainAddress.Chain(),
 		ContractAddress: input.Token.ChainAddress.Address(),
 		TokenID:         input.Token.TokenID,
 	}
 
-	media, t, err := publicapi.For(ctx).Token.MediaByTokenIdentifiers(ctx, token)
+	tokenDefinition, tokenMedia, err := publicapi.For(ctx).Token.MediaByTokenIdentifiers(ctx, tokenIdentifiers)
 	if err != nil {
 		return nil, err
-	}
-
-	tokenName := t.Name.String
-	if media.ID != "" && media.Name != "" {
-		tokenName = media.Name
-	}
-
-	tokenDescription := t.Description.String
-	if media.ID != "" && media.Description != "" {
-		tokenDescription = media.Description
-	}
-
-	contractID := t.Contract
-	if media.ID != "" && media.ContractID != "" {
-		contractID = media.ContractID
 	}
 
 	highDef := false
 
 	return model.PostComposerDraftDetailsPayload{
-		Media:            resolveTokenMedia(ctx, t, media, highDef),
-		TokenName:        util.ToPointer(tokenName),
-		TokenDescription: util.ToPointer(tokenDescription),
+		Media:            resolveTokenMedia(ctx, tokenDefinition, tokenMedia, highDef),
+		TokenName:        util.ToPointer(tokenDefinition.Name.String),
+		TokenDescription: util.ToPointer(tokenDefinition.Description.String),
 		Community:        nil, // handled by dedicated resolver
 		HelperPostComposerDraftDetailsPayloadData: model.HelperPostComposerDraftDetailsPayloadData{
-			Token:      token,
-			ContractID: contractID,
+			Token:      tokenIdentifiers,
+			ContractID: tokenDefinition.ContractID,
 		},
 	}, err
 }
