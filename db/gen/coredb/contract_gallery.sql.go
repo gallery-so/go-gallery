@@ -30,7 +30,7 @@ do update set deleted = excluded.deleted
   , owner_address = excluded.owner_address
   , description = excluded.description
   , last_updated = now()
-returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id, override_creator_user_id
+returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id, override_creator_user_id, l1_chain
 `
 
 type UpsertChildContractsParams struct {
@@ -81,6 +81,7 @@ func (q *Queries) UpsertChildContracts(ctx context.Context, arg UpsertChildContr
 			&i.IsProviderMarkedSpam,
 			&i.ParentID,
 			&i.OverrideCreatorUserID,
+			&i.L1Chain,
 		); err != nil {
 			return nil, err
 		}
@@ -122,7 +123,7 @@ do update set symbol = coalesce(nullif(excluded.symbol, ''), nullif(contracts.sy
   , profile_image_url = coalesce(nullif(excluded.profile_image_url, ''), nullif(contracts.profile_image_url, ''))
   , deleted = excluded.deleted
   , last_updated = now()
-returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id, override_creator_user_id
+returning id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id, override_creator_user_id, l1_chain
 `
 
 type UpsertParentContractsParams struct {
@@ -179,6 +180,7 @@ func (q *Queries) UpsertParentContracts(ctx context.Context, arg UpsertParentCon
 			&i.IsProviderMarkedSpam,
 			&i.ParentID,
 			&i.OverrideCreatorUserID,
+			&i.L1Chain,
 		); err != nil {
 			return nil, err
 		}
