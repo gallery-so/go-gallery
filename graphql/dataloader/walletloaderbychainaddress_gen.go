@@ -26,18 +26,18 @@ type WalletLoaderByChainAddressSettings interface {
 
 // WalletLoaderByChainAddressCacheSubscriptions
 type WalletLoaderByChainAddressCacheSubscriptions struct {
-	// AutoCacheWithKey is a function that returns the persist.ChainAddress cache key for a coredb.Wallet.
+	// AutoCacheWithKey is a function that returns the persist.L1ChainAddress cache key for a coredb.Wallet.
 	// If AutoCacheWithKey is not nil, this loader will automatically cache published results from other loaders
 	// that return a coredb.Wallet. Loaders that return pointers or slices of coredb.Wallet
 	// will be dereferenced/iterated automatically, invoking this function with the base coredb.Wallet type.
-	AutoCacheWithKey func(coredb.Wallet) persist.ChainAddress
+	AutoCacheWithKey func(coredb.Wallet) persist.L1ChainAddress
 
-	// AutoCacheWithKeys is a function that returns the []persist.ChainAddress cache keys for a coredb.Wallet.
+	// AutoCacheWithKeys is a function that returns the []persist.L1ChainAddress cache keys for a coredb.Wallet.
 	// Similar to AutoCacheWithKey, but for cases where a single value gets cached by many keys.
 	// If AutoCacheWithKeys is not nil, this loader will automatically cache published results from other loaders
 	// that return a coredb.Wallet. Loaders that return pointers or slices of coredb.Wallet
 	// will be dereferenced/iterated automatically, invoking this function with the base coredb.Wallet type.
-	AutoCacheWithKeys func(coredb.Wallet) []persist.ChainAddress
+	AutoCacheWithKeys func(coredb.Wallet) []persist.L1ChainAddress
 
 	// TODO: Allow custom cache functions once we're able to use generics. It could be done without generics, but
 	// would be messy and error-prone. A non-generic implementation might look something like:
@@ -79,7 +79,7 @@ func (l *WalletLoaderByChainAddress) setPostFetchHook(postFetchHook func(context
 
 // NewWalletLoaderByChainAddress creates a new WalletLoaderByChainAddress with the given settings, functions, and options
 func NewWalletLoaderByChainAddress(
-	settings WalletLoaderByChainAddressSettings, fetch func(ctx context.Context, keys []persist.ChainAddress) ([]coredb.Wallet, []error),
+	settings WalletLoaderByChainAddressSettings, fetch func(ctx context.Context, keys []persist.L1ChainAddress) ([]coredb.Wallet, []error),
 	funcs WalletLoaderByChainAddressCacheSubscriptions,
 	opts ...func(interface {
 		setContext(context.Context)
@@ -108,7 +108,7 @@ func NewWalletLoaderByChainAddress(
 	}
 
 	// Set this after applying options, in case a different context was set via options
-	loader.fetch = func(keys []persist.ChainAddress) ([]coredb.Wallet, []error) {
+	loader.fetch = func(keys []persist.L1ChainAddress) ([]coredb.Wallet, []error) {
 		ctx := loader.ctx
 
 		// Allow the preFetchHook to modify and return a new context
@@ -163,7 +163,7 @@ type WalletLoaderByChainAddress struct {
 	ctx context.Context
 
 	// this method provides the data for the loader
-	fetch func(keys []persist.ChainAddress) ([]coredb.Wallet, []error)
+	fetch func(keys []persist.L1ChainAddress) ([]coredb.Wallet, []error)
 
 	// how long to wait before sending a batch
 	wait time.Duration
@@ -195,7 +195,7 @@ type WalletLoaderByChainAddress struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[persist.ChainAddress]coredb.Wallet
+	cache map[persist.L1ChainAddress]coredb.Wallet
 
 	// typed cache functions
 	//subscribers []func(coredb.Wallet)
@@ -216,7 +216,7 @@ type WalletLoaderByChainAddress struct {
 }
 
 type walletLoaderByChainAddressBatch struct {
-	keys    []persist.ChainAddress
+	keys    []persist.L1ChainAddress
 	data    []coredb.Wallet
 	error   []error
 	closing bool
@@ -224,14 +224,14 @@ type walletLoaderByChainAddressBatch struct {
 }
 
 // Load a Wallet by key, batching and caching will be applied automatically
-func (l *WalletLoaderByChainAddress) Load(key persist.ChainAddress) (coredb.Wallet, error) {
+func (l *WalletLoaderByChainAddress) Load(key persist.L1ChainAddress) (coredb.Wallet, error) {
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a Wallet.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *WalletLoaderByChainAddress) LoadThunk(key persist.ChainAddress) func() (coredb.Wallet, error) {
+func (l *WalletLoaderByChainAddress) LoadThunk(key persist.L1ChainAddress) func() (coredb.Wallet, error) {
 	l.mu.Lock()
 	if !l.disableCaching {
 		if it, ok := l.cache[key]; ok {
@@ -282,7 +282,7 @@ func (l *WalletLoaderByChainAddress) LoadThunk(key persist.ChainAddress) func() 
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *WalletLoaderByChainAddress) LoadAll(keys []persist.ChainAddress) ([]coredb.Wallet, []error) {
+func (l *WalletLoaderByChainAddress) LoadAll(keys []persist.L1ChainAddress) ([]coredb.Wallet, []error) {
 	results := make([]func() (coredb.Wallet, error), len(keys))
 
 	for i, key := range keys {
@@ -300,7 +300,7 @@ func (l *WalletLoaderByChainAddress) LoadAll(keys []persist.ChainAddress) ([]cor
 // LoadAllThunk returns a function that when called will block waiting for a Wallets.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *WalletLoaderByChainAddress) LoadAllThunk(keys []persist.ChainAddress) func() ([]coredb.Wallet, []error) {
+func (l *WalletLoaderByChainAddress) LoadAllThunk(keys []persist.L1ChainAddress) func() ([]coredb.Wallet, []error) {
 	results := make([]func() (coredb.Wallet, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
@@ -318,7 +318,7 @@ func (l *WalletLoaderByChainAddress) LoadAllThunk(keys []persist.ChainAddress) f
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *WalletLoaderByChainAddress) Prime(key persist.ChainAddress, value coredb.Wallet) bool {
+func (l *WalletLoaderByChainAddress) Prime(key persist.L1ChainAddress, value coredb.Wallet) bool {
 	if l.disableCaching {
 		return false
 	}
@@ -332,7 +332,7 @@ func (l *WalletLoaderByChainAddress) Prime(key persist.ChainAddress, value cored
 }
 
 // Prime the cache without acquiring locks. Should only be used when the lock is already held.
-func (l *WalletLoaderByChainAddress) unsafePrime(key persist.ChainAddress, value coredb.Wallet) bool {
+func (l *WalletLoaderByChainAddress) unsafePrime(key persist.L1ChainAddress, value coredb.Wallet) bool {
 	if l.disableCaching {
 		return false
 	}
@@ -344,7 +344,7 @@ func (l *WalletLoaderByChainAddress) unsafePrime(key persist.ChainAddress, value
 }
 
 // Clear the value at key from the cache, if it exists
-func (l *WalletLoaderByChainAddress) Clear(key persist.ChainAddress) {
+func (l *WalletLoaderByChainAddress) Clear(key persist.L1ChainAddress) {
 	if l.disableCaching {
 		return
 	}
@@ -353,16 +353,16 @@ func (l *WalletLoaderByChainAddress) Clear(key persist.ChainAddress) {
 	l.mu.Unlock()
 }
 
-func (l *WalletLoaderByChainAddress) unsafeSet(key persist.ChainAddress, value coredb.Wallet) {
+func (l *WalletLoaderByChainAddress) unsafeSet(key persist.L1ChainAddress, value coredb.Wallet) {
 	if l.cache == nil {
-		l.cache = map[persist.ChainAddress]coredb.Wallet{}
+		l.cache = map[persist.L1ChainAddress]coredb.Wallet{}
 	}
 	l.cache[key] = value
 }
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
-func (b *walletLoaderByChainAddressBatch) keyIndex(l *WalletLoaderByChainAddress, key persist.ChainAddress) int {
+func (b *walletLoaderByChainAddressBatch) keyIndex(l *WalletLoaderByChainAddress, key persist.L1ChainAddress) int {
 	for i, existingKey := range b.keys {
 		if key == existingKey {
 			return i

@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	db "github.com/mikeydub/go-gallery/db/gen/coredb"
-	"github.com/mikeydub/go-gallery/service/redis"
 	"math/rand"
 	"net/http"
 	"time"
+
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/service/redis"
 
 	"github.com/magiclabs/magic-admin-go"
 	magicclient "github.com/magiclabs/magic-admin-go/client"
@@ -145,11 +146,11 @@ func (e ErrDoesNotOwnRequiredNFT) Error() string {
 }
 
 type ErrNonceNotFound struct {
-	ChainAddress persist.ChainAddress
+	L1ChainAddress persist.L1ChainAddress
 }
 
 func (e ErrNonceNotFound) Error() string {
-	return fmt.Sprintf("nonce not found for address: %s", e.ChainAddress)
+	return fmt.Sprintf("nonce not found for address: %s", e.L1ChainAddress)
 }
 
 // GenerateNonce generates a random nonce to be signed by a wallet
@@ -178,9 +179,10 @@ func (e NonceAuthenticator) GetDescription() string {
 
 func (e NonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, error) {
 	asChainAddress := e.ChainPubKey.ToChainAddress()
-	nonce, user, _ := GetUserWithNonce(pCtx, asChainAddress, e.UserRepo, e.NonceRepo, e.WalletRepo)
+	asL1 := asChainAddress.ToL1ChainAddress()
+	nonce, user, _ := GetUserWithNonce(pCtx, asL1, e.UserRepo, e.NonceRepo, e.WalletRepo)
 	if nonce == "" {
-		return nil, ErrNonceNotFound{ChainAddress: asChainAddress}
+		return nil, ErrNonceNotFound{L1ChainAddress: asL1}
 	}
 
 	if e.WalletType != persist.WalletTypeEOA {
@@ -204,7 +206,7 @@ func (e NonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, err
 	}
 
 	walletID := persist.DBID("")
-	wallet, err := e.WalletRepo.GetByChainAddress(pCtx, asChainAddress)
+	wallet, err := e.WalletRepo.GetByChainAddress(pCtx, asL1)
 	if err != nil {
 		walletID = wallet.ID
 	}
@@ -342,7 +344,8 @@ func Logout(ctx context.Context, queries *db.Queries, authRefreshCache *redis.Ca
 func GetAuthNonce(pCtx context.Context, pChainAddress persist.ChainAddress, userRepo *postgres.UserRepository, nonceRepo *postgres.NonceRepository,
 	walletRepository *postgres.WalletRepository, earlyAccessRepo *postgres.EarlyAccessRepository, ethClient *ethclient.Client) (nonce string, userExists bool, err error) {
 
-	user, err := userRepo.GetByChainAddress(pCtx, pChainAddress)
+	asL1 := pChainAddress.ToL1ChainAddress()
+	user, err := userRepo.GetByChainAddress(pCtx, asL1)
 	if err != nil {
 		logger.For(pCtx).WithError(err).Error("error retrieving user by address to get login nonce")
 	}
@@ -350,7 +353,7 @@ func GetAuthNonce(pCtx context.Context, pChainAddress persist.ChainAddress, user
 	userExists = user.ID != "" && !user.Universal.Bool()
 
 	if userExists {
-		dbNonce, err := nonceRepo.Get(pCtx, pChainAddress)
+		dbNonce, err := nonceRepo.Get(pCtx, asL1)
 		if err != nil {
 			return "", false, err
 		}
@@ -359,14 +362,14 @@ func GetAuthNonce(pCtx context.Context, pChainAddress persist.ChainAddress, user
 		return nonce, userExists, nil
 	}
 
-	dbNonce, err := nonceRepo.Get(pCtx, pChainAddress)
+	dbNonce, err := nonceRepo.Get(pCtx, asL1)
 	if err != nil || dbNonce.ID == "" {
 		err = nonceRepo.Create(pCtx, GenerateNonce(), pChainAddress)
 		if err != nil {
 			return "", false, err
 		}
 
-		dbNonce, err = nonceRepo.Get(pCtx, pChainAddress)
+		dbNonce, err = nonceRepo.Get(pCtx, asL1)
 		if err != nil {
 			return "", false, err
 		}
@@ -388,7 +391,7 @@ func NonceRotate(pCtx context.Context, pChainAddress persist.ChainAddress, nonce
 // GetUserWithNonce returns nonce value string, user id
 // will return empty strings and error if no nonce found
 // will return empty string if no user found
-func GetUserWithNonce(pCtx context.Context, pChainAddress persist.ChainAddress, userRepo *postgres.UserRepository, nonceRepo *postgres.NonceRepository, walletRepository *postgres.WalletRepository) (nonceValue string, user *persist.User, err error) {
+func GetUserWithNonce(pCtx context.Context, pChainAddress persist.L1ChainAddress, userRepo *postgres.UserRepository, nonceRepo *postgres.NonceRepository, walletRepository *postgres.WalletRepository) (nonceValue string, user *persist.User, err error) {
 	nonce, err := nonceRepo.Get(pCtx, pChainAddress)
 	if err != nil {
 		return nonceValue, user, err
@@ -403,7 +406,7 @@ func GetUserWithNonce(pCtx context.Context, pChainAddress persist.ChainAddress, 
 	if dbUser.ID != "" {
 		user = &dbUser
 	} else {
-		return nonceValue, user, persist.ErrUserNotFound{ChainAddress: pChainAddress}
+		return nonceValue, user, persist.ErrUserNotFound{L1ChainAddress: pChainAddress}
 	}
 
 	return nonceValue, user, nil
