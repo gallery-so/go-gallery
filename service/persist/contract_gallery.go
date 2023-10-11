@@ -15,6 +15,7 @@ type ContractGallery struct {
 	LastUpdated  time.Time `json:"last_updated"`
 
 	Chain                 Chain      `json:"chain"`
+	L1CHain               L1Chain    `json:"l1_chain"`
 	Address               Address    `json:"address"`
 	Symbol                NullString `json:"symbol"`
 	Name                  NullString `json:"name"`

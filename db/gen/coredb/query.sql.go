@@ -1958,12 +1958,12 @@ from users u, contracts c, wallets w
 where u.id = $1
   and c.chain = any($2::int[])
   and w.id = any(u.wallets) and coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) = w.address 
-  and w.chain = any($3::int[])
+  and w.l1_chain = c.l1_chain
   and u.deleted = false
   and c.deleted = false
   and w.deleted = false
   and c.override_creator_user_id is null
-  and (not $4::bool or not exists(
+  and (not $3::bool or not exists(
     select 1 from tokens t
         where t.owner_user_id = $1
           and t.contract = c.id
@@ -1981,7 +1981,7 @@ from contracts c
 where c.override_creator_user_id = $1
   and c.chain = any($2::int[])
   and c.deleted = false
-  and (not $4::bool or not exists(
+  and (not $3::bool or not exists(
     select 1 from tokens t
         where t.owner_user_id = $1
           and t.contract = c.id
@@ -1994,7 +1994,6 @@ where c.override_creator_user_id = $1
 type GetCreatedContractsByUserIDParams struct {
 	UserID           persist.DBID `json:"user_id"`
 	Chains           []int32      `json:"chains"`
-	L1Chains         []int32      `json:"l1_chains"`
 	NewContractsOnly bool         `json:"new_contracts_only"`
 }
 
@@ -2005,12 +2004,7 @@ type GetCreatedContractsByUserIDRow struct {
 }
 
 func (q *Queries) GetCreatedContractsByUserID(ctx context.Context, arg GetCreatedContractsByUserIDParams) ([]GetCreatedContractsByUserIDRow, error) {
-	rows, err := q.db.Query(ctx, getCreatedContractsByUserID,
-		arg.UserID,
-		arg.Chains,
-		arg.L1Chains,
-		arg.NewContractsOnly,
-	)
+	rows, err := q.db.Query(ctx, getCreatedContractsByUserID, arg.UserID, arg.Chains, arg.NewContractsOnly)
 	if err != nil {
 		return nil, err
 	}
