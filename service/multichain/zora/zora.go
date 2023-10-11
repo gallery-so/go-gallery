@@ -135,7 +135,7 @@ type getTokensResponse struct {
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the zora Blockchain
 func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	url := fmt.Sprintf("%s/user/%s/tokens?chain_names=ZORA-MAINNET&sort_direction=DESC", zoraRESTURL, addr.String())
-	return d.getTokens(ctx, addr, url, nil)
+	return d.getTokens(ctx, url, nil)
 }
 
 func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, addr persist.Address) (<-chan multichain.ChainAgnosticTokensAndContracts, <-chan error) {
@@ -143,7 +143,7 @@ func (d *Provider) GetTokensIncrementallyByWalletAddress(ctx context.Context, ad
 	errChan := make(chan error)
 	url := fmt.Sprintf("%s/user/%s/tokens?chain_names=ZORA-MAINNET&sort_direction=DESC", zoraRESTURL, addr.String())
 	go func() {
-		_, _, err := d.getTokens(ctx, addr, url, rec)
+		_, _, err := d.getTokens(ctx, url, rec)
 		if err != nil {
 			errChan <- err
 			return
@@ -158,7 +158,6 @@ func (d *Provider) GetTokenByTokenIdentifiersAndOwner(ctx context.Context, ti mu
 }
 
 func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) (persist.TokenMetadata, error) {
-	// there is no way to get a single token by token ID, so we have to get all tokens for the contract and then filter
 	url := fmt.Sprintf("%s/contract/ZORA_MAINNET/%s/%s", zoraRESTURL, ti.ContractAddress.String(), ti.TokenID.Base10String())
 	token, _, err := d.getToken(ctx, "", url)
 	if err != nil {
@@ -171,7 +170,7 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti mu
 // GetTokensByContractAddress retrieves tokens for a contract address on the zora Blockchain
 func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	url := fmt.Sprintf("%s/tokens/ZORA_MAINNET/%s?offset=%d&limit=%d&sort_key=CREATED&sort_direction=DESC", zoraRESTURL, contractAddress.String(), offset, limit)
-	tokens, contracts, err := d.getTokens(ctx, "", url, nil)
+	tokens, contracts, err := d.getTokens(ctx, url, nil)
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
@@ -254,7 +253,7 @@ func (d *Provider) GetContractsByOwnerAddress(ctx context.Context, addr persist.
 	return result, nil
 }
 
-func (d *Provider) getTokens(ctx context.Context, ownerAddr persist.Address, url string, rec chan<- multichain.ChainAgnosticTokensAndContracts) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (d *Provider) getTokens(ctx context.Context, url string, rec chan<- multichain.ChainAgnosticTokensAndContracts) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	offset := 0
 	limit := 50
 	allTokens := []multichain.ChainAgnosticToken{}
@@ -278,7 +277,7 @@ func (d *Provider) getTokens(ctx context.Context, ownerAddr persist.Address, url
 			return nil, nil, err
 		}
 
-		tokens, contracts, err := d.tokensToChainAgnostic(ctx, result.Tokens, ownerAddr)
+		tokens, contracts, err := d.tokensToChainAgnostic(ctx, result.Tokens)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -324,18 +323,24 @@ func (d *Provider) getToken(ctx context.Context, ownerAddress persist.Address, u
 	tokens, contracts, err := d.tokensToChainAgnostic(ctx, []zoraBalanceToken{{
 		Balance: 1,
 		Token:   result,
-	}}, ownerAddress)
+	}})
 	if err != nil {
 		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
 	}
-	if len(tokens) != 1 || len(contracts) != 1 {
+	if len(tokens) == 0 || len(contracts) == 0 {
 		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, fmt.Errorf("invalid number of tokens or contracts returned from zora: %d %d", len(tokens), len(contracts))
+	}
+
+	for _, token := range tokens {
+		if strings.EqualFold(token.OwnerAddress.String(), ownerAddress.String()) {
+			return token, contracts[0], nil
+		}
 	}
 
 	return tokens[0], contracts[0], nil
 }
 
-func (d *Provider) tokensToChainAgnostic(ctx context.Context, tokens []zoraBalanceToken, owner persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (d *Provider) tokensToChainAgnostic(ctx context.Context, tokens []zoraBalanceToken) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	result := make([]multichain.ChainAgnosticToken, len(tokens))
 	contracts := map[string]multichain.ChainAgnosticContract{}
 	for i, token := range tokens {
@@ -366,7 +371,7 @@ func (d *Provider) tokensToChainAgnostic(ctx context.Context, tokens []zoraBalan
 			TokenMetadata:   token.Token.Metadata,
 			TokenID:         persist.TokenID(token.Token.TokenID.toBase16String()),
 			Quantity:        persist.HexString(balanceAsHex),
-			OwnerAddress:    persist.Address(util.FirstNonEmptyString(strings.ToLower(token.Token.Owner), owner.String())),
+			OwnerAddress:    persist.Address(strings.ToLower(token.Token.Owner)),
 			ContractAddress: persist.Address(strings.ToLower(token.Token.CollectionAddress)),
 
 			FallbackMedia: persist.FallbackMedia{
