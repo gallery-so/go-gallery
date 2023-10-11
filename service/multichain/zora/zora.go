@@ -331,10 +331,13 @@ func (d *Provider) getToken(ctx context.Context, ownerAddress persist.Address, u
 		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, fmt.Errorf("invalid number of tokens or contracts returned from zora: %d %d", len(tokens), len(contracts))
 	}
 
-	for _, token := range tokens {
-		if strings.EqualFold(token.OwnerAddress.String(), ownerAddress.String()) {
-			return token, contracts[0], nil
+	if ownerAddress != "" {
+		for _, token := range tokens {
+			if strings.EqualFold(token.OwnerAddress.String(), ownerAddress.String()) {
+				return token, contracts[0], nil
+			}
 		}
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, fmt.Errorf("no token found for owner %s", ownerAddress.String())
 	}
 
 	return tokens[0], contracts[0], nil
