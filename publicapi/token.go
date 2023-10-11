@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gammazero/workerpool"
 	"github.com/go-playground/validator/v10"
-	"github.com/jackc/pgx/v4"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/event"
@@ -638,16 +637,7 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collect
 	return db.Event{}, nil
 }
 
-// GetProcessingState returns true if a token is queued for processing, or is currently being processed.
-func (api TokenAPI) GetProcessingState(ctx context.Context, tokenID persist.DBID) (bool, error) {
-	token, err := api.loaders.TokenByTokenID.Load(tokenID)
-	if err != nil {
-		return false, err
-	}
-	contract, err := api.loaders.ContractByContractID.Load(token.ContractID)
-	if err != nil {
-		return false, err
-	}
-	t := persist.NewTokenIdentifiers(contract.Address, token.TokenID, contract.Chain)
-	return api.manager.Processing(ctx, t), nil
+// GetProcessingStateByTokenDefinitionID returns true if a token is queued for processing, or is currently being processed.
+func (api TokenAPI) GetProcessingStateByTokenDefinitionID(ctx context.Context, id persist.DBID) (bool, error) {
+	return api.manager.Processing(ctx, id), nil
 }

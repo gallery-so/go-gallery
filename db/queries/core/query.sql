@@ -208,6 +208,9 @@ select * FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false;
 -- name: GetContractByChainAddressBatch :batchone
 select * FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false;
 
+-- name: GetContractByTokenDefinitionId :one
+select * from contracts where contracts.id = (select contract_id from token_definitions where token_definitions.id = $1 and not token_definitions.deleted) and not contracts.deleted = false;
+
 -- name: GetContractsDisplayedByUserIDBatch :batchmany
 with last_refreshed as (
   select last_updated from owned_contracts limit 1

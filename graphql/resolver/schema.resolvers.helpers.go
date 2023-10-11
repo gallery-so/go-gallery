@@ -501,7 +501,7 @@ func resolveCommunityByTokenID(ctx context.Context, tokenID persist.DBID) (*mode
 		return nil, err
 	}
 
-	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, token.Contract)
+	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, token.ContractID)
 
 	if err != nil {
 		return nil, err
@@ -519,7 +519,7 @@ func resolveContractByTokenID(ctx context.Context, tokenID persist.DBID) (*model
 		return nil, err
 	}
 
-	return resolveContractByContractID(ctx, token.Contract)
+	return resolveContractByContractID(ctx, token.ContractID)
 }
 
 func resolveContractByContractID(ctx context.Context, contractID persist.DBID) (*model.Contract, error) {
@@ -2089,7 +2089,7 @@ func resolveTokenMedia(ctx context.Context, tokenDefinition db.TokenDefinition, 
 		// In the worse case the processing message was dropped and the token never gets handled. To address that,
 		// we compare when the token was created to the current time. If it's longer than the grace period, we assume that the
 		// message was lost and set the media to invalid so it could be refreshed manually.
-		if inFlight, err := publicapi.For(ctx).Token.GetProcessingState(ctx, token.ID); !inFlight || err != nil {
+		if inFlight, err := publicapi.For(ctx).Token.GetProcessingStateByTokenDefinitionID(ctx, tokenDefinition.ID); !inFlight || err != nil {
 			if time.Since(tokenDefinition.CreatedAt) > time.Duration(1*time.Hour) {
 				tokenMedia.Media.MediaType = persist.MediaTypeInvalid
 			}
@@ -2099,7 +2099,7 @@ func resolveTokenMedia(ctx context.Context, tokenDefinition db.TokenDefinition, 
 
 	// If the media isn't valid, check if its still up for processing. If so, set the media as syncing.
 	if tokenMedia.Media.MediaType != persist.MediaTypeSyncing && !tokenMedia.Media.MediaType.IsValid() {
-		if inFlight, _ := publicapi.For(ctx).Token.GetProcessingState(ctx, token.ID); inFlight {
+		if inFlight, _ := publicapi.For(ctx).Token.GetProcessingStateByTokenDefinitionID(ctx, tokenDefinition.ID); inFlight {
 			tokenMedia.Media.MediaType = persist.MediaTypeSyncing
 		}
 	}

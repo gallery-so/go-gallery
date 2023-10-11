@@ -1,4 +1,4 @@
-FROM postgres:14
+FROM postgres:15
 
 RUN apt-get update
 RUN apt-get -y install postgresql-14-cron

@@ -294,8 +294,8 @@ func (d *TokenUpsertDeletionParams) ToParams(upsertTime time.Time) db.DeleteToke
 	}
 }
 
-func (t *TokenGalleryRepository) UpsertTokens(ctx context.Context, pTokens []persist.TokenGallery, setCreatorFields bool, setHolderFields bool) (time.Time, []persist.TokenGallery, error) {
-	tokens, err := t.excludeZeroQuantityTokens(ctx, pTokens)
+func (t *TokenGalleryRepository) UpsertTokens(ctx context.Context, tokens []persist.TokenGallery, definitions []db.TokenDefinition, setCreatorFields bool, setHolderFields bool) (time.Time, []persist.TokenGallery, error) {
+	tokens, err := t.excludeZeroQuantityTokens(ctx, tokens)
 	if err != nil {
 		return time.Time{}, nil, err
 	}
@@ -310,7 +310,6 @@ func (t *TokenGalleryRepository) UpsertTokens(ctx context.Context, pTokens []per
 		return currentTime, []persist.TokenGallery{}, nil
 	}
 
-	tokens = t.dedupeTokens(tokens)
 	params := db.UpsertTokensParams{
 		SetCreatorFields: setCreatorFields,
 		SetHolderFields:  setHolderFields,
@@ -451,30 +450,4 @@ func (t *TokenGalleryRepository) TokensAreOwnedByUser(ctx context.Context, userI
 	}
 
 	return nil
-}
-
-type uniqueConstraintKey struct {
-	tokenID     persist.TokenID
-	contract    persist.DBID
-	chain       persist.Chain
-	ownerUserID persist.DBID
-}
-
-func (t *TokenGalleryRepository) dedupeTokens(pTokens []persist.TokenGallery) []persist.TokenGallery {
-	seen := map[uniqueConstraintKey]persist.TokenGallery{}
-	for _, token := range pTokens {
-		key := uniqueConstraintKey{chain: token.Chain, contract: token.Contract.ID, tokenID: token.TokenID, ownerUserID: token.OwnerUserID}
-		if seenToken, ok := seen[key]; ok {
-			if seenToken.BlockNumber.Uint64() > token.BlockNumber.Uint64() {
-				continue
-			}
-			seen[key] = token
-		}
-		seen[key] = token
-	}
-	result := make([]persist.TokenGallery, 0, len(seen))
-	for _, v := range seen {
-		result = append(result, v)
-	}
-	return result
 }

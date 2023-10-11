@@ -527,12 +527,11 @@ type TokenDefinition struct {
 	Deleted              bool                  `json:"deleted"`
 	Name                 sql.NullString        `json:"name"`
 	Description          sql.NullString        `json:"description"`
-	TokenType            sql.NullString        `json:"token_type"`
+	TokenType            persist.TokenType     `json:"token_type"`
 	TokenID              persist.TokenID       `json:"token_id"`
-	TokenUri             sql.NullString        `json:"token_uri"`
 	ExternalUrl          sql.NullString        `json:"external_url"`
 	Chain                persist.Chain         `json:"chain"`
-	IsProviderMarkedSpam sql.NullBool          `json:"is_provider_marked_spam"`
+	IsProviderMarkedSpam bool                  `json:"is_provider_marked_spam"`
 	FallbackMedia        persist.FallbackMedia `json:"fallback_media"`
 	ContractID           persist.DBID          `json:"contract_id"`
 	TokenMediaID         persist.DBID          `json:"token_media_id"`

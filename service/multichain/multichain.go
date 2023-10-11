@@ -44,8 +44,8 @@ var contractNameBlacklist = map[string]bool{
 	"unknown":               true,
 }
 
-// SubmitUserTokensF is called to process a user's batch of tokens
-type SubmitUserTokensF func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, tokens []persist.TokenIdentifiers) error
+// SubmitTokens is called to process a batch of tokens
+type SubmitUserTokensF func(ctx context.Context, tokenDefinitionIDs []persist.DBID) error
 
 type Provider struct {
 	Repos   *postgres.Repositories
@@ -54,8 +54,8 @@ type Provider struct {
 	Chains  map[persist.Chain][]any
 
 	// some chains use the addresses of other chains, this will map of chain we want tokens from => chain that's address will be used for lookup
-	WalletOverrides  WalletOverrideMap
-	SubmitUserTokens SubmitUserTokensF
+	WalletOverrides WalletOverrideMap
+	SubmitTokens    SubmitUserTokensF
 }
 
 // BlockchainInfo retrieves blockchain info from all chains
@@ -944,94 +944,86 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 	return err
 }
 
-func (p *Provider) prepTokensForTokenProcessing(ctx context.Context, tokensFromProviders []chainTokens, existingTokens []persist.TokenGallery, contracts []persist.ContractGallery, user persist.User) ([]persist.TokenGallery, map[persist.TokenIdentifiers]bool, error) {
-	providerTokens := tokensToNewDedupedTokens(tokensFromProviders, existingTokens, contracts, user)
+func tokensToDedupedAndNewTokens(tokensFromProviders []chainTokens, existingTokens []persist.TokenGallery, contracts []persist.ContractGallery, user persist.User) (upsertableTokens []persist.TokenGallery, isNewLookup map[persist.TokenIdentifiers]bool) {
+	upsertableTokens = tokensToUpsertableTokens(tokensFromProviders, existingTokens, contracts, user)
 
-	tokenLookup := make(map[persist.TokenIdentifiers]persist.TokenGallery)
+	// Create a map of existing tokens for quick lookup
+	existingTokenLookup := make(map[persist.TokenIdentifiers]bool)
 	for _, token := range existingTokens {
-		tokenLookup[token.TokenIdentifiers()] = token
+		existingTokenLookup[token.TokenIdentifiers()] = true
 	}
 
-	newTokens := make(map[persist.TokenIdentifiers]bool)
-
-	for _, token := range providerTokens {
-		existingToken, exists := tokenLookup[token.TokenIdentifiers()]
-
-		if !exists || existingToken.TokenMediaID == "" {
-			newTokens[token.TokenIdentifiers()] = true
-		}
+	// Create a lookup of tokens that are either new or missing media
+	for _, token := range upsertableTokens {
+		isNewLookup[token.TokenIdentifiers()] = existingTokenLookup[token.TokenIdentifiers()]
 	}
 
-	return providerTokens, newTokens, nil
+	return upsertableTokens, isNewLookup
+}
+
+// dedupeTokenDefinitions returns a slice of deduped token definitions. This is necessary because the upsert cannot handle duplicates in input.
+// Since the same set of providers are used for each user, we assume that the definitions for a token are the same so we can write them in any order.
+func dedupeTokenDefinitions(tokenDefs []db.TokenDefinition) (uniqueDefs []db.TokenDefinition) {
+	return util.DedupeWithTranslate(tokenDefs, false, func(t db.TokenDefinition) string {
+		return fmt.Sprintf("%d-%s-%s", t.Chain, t.ContractID, t.TokenID)
+	})
+}
+
+// dedupeTokens returns a slice of deduped tokens. This is necessary because the upsert cannot handle duplicates in input.
+func dedupeTokens(tokens []persist.TokenGallery) (uniqueTokens []persist.TokenGallery) {
+	return util.DedupeWithTranslate(tokens, false, func(t persist.TokenGallery) string {
+		return fmt.Sprintf("%d-%s-%s-%s", t.Chain, t.Contract.Address, t.TokenID, t.OwnerUserID)
+	})
 }
 
 func (p *Provider) processTokensForUsers(ctx context.Context, users map[persist.DBID]persist.User, chainTokensForUsers map[persist.DBID][]chainTokens,
 	existingTokensForUsers map[persist.DBID][]persist.TokenGallery, contracts []persist.ContractGallery, chains []persist.Chain,
 	upsertParams postgres.TokenUpsertParams) (currentUserTokens map[persist.DBID][]persist.TokenGallery, newUserTokens map[persist.DBID][]persist.TokenGallery, err error) {
 
-	tokensToUpsert := make([]persist.TokenGallery, 0, len(chainTokensForUsers)*3)
-	tokenIsNewForUser := make(map[persist.DBID]map[persist.TokenIdentifiers]bool)
+	upsertableDefinitions := make([]db.TokenDefinition, 0)
+	upsertableTokens := make([]persist.TokenGallery, 0)
+	isNewTokenPerUser := make(map[persist.DBID]map[persist.TokenIdentifiers]bool)
 
 	for userID, user := range users {
-		tokens, newTokens, err := p.prepTokensForTokenProcessing(ctx, chainTokensForUsers[userID], existingTokensForUsers[userID], contracts, user)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		tokensToUpsert = append(tokensToUpsert, tokens...)
-		tokenIsNewForUser[userID] = newTokens
+		tokens, isNewLookup := tokensToDedupedAndNewTokens(chainTokensForUsers[userID], existingTokensForUsers[userID], contracts, user)
+		definitions := tokensToUpsertableTokenDefinitions(chainTokensForUsers[userID], contracts)
+		upsertableTokens = append(upsertableTokens, tokens...)
+		isNewTokenPerUser[userID] = isNewLookup
+		upsertableDefinitions = append(upsertableDefinitions, definitions...)
 	}
 
-	upsertTime, persistedTokens, err := p.Repos.TokenRepository.UpsertTokens(ctx, tokensToUpsert, upsertParams.SetCreatorFields, upsertParams.SetHolderFields)
+	uniqueTokens := dedupeTokens(upsertableTokens)
+	uniqueDefinitions := dedupeTokenDefinitions(upsertableDefinitions)
+
+	upsertTime, persistedTokens, err := p.Repos.TokenRepository.UpsertTokens(ctx, uniqueTokens, uniqueDefinitions, upsertParams.SetCreatorFields, upsertParams.SetHolderFields)
 	if err != nil {
 		return nil, nil, err
 	}
 
+	if upsertParams.OptionalDelete != nil {
+		numAffectedRows, err := p.Queries.DeleteTokensBeforeTimestamp(ctx, upsertParams.OptionalDelete.ToParams(upsertTime))
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to delete tokens: %w", err)
+		}
+		logger.For(ctx).Infof("deleted %d tokens", numAffectedRows)
+	}
+
+	// Create a lookup for userID to persisted token IDs
 	currentUserTokens = make(map[persist.DBID][]persist.TokenGallery)
 	for _, token := range persistedTokens {
 		currentUserTokens[token.OwnerUserID] = append(currentUserTokens[token.OwnerUserID], token)
 	}
 
-	if upsertParams.OptionalDelete != nil {
-		numAffectedRows, err := p.Queries.DeleteTokensBeforeTimestamp(ctx, upsertParams.OptionalDelete.ToParams(upsertTime))
+	newUserTokens = make(map[persist.DBID][]persist.TokenGallery, len(users))
 
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to delete tokens: %w", err)
-		}
-
-		logger.For(ctx).Infof("deleted %d tokens", numAffectedRows)
-	}
-
-	newUserTokens = make(map[persist.DBID][]persist.TokenGallery)
-
-	errors := make([]error, 0)
 	for userID := range users {
-		newTokensForUser := tokenIsNewForUser[userID]
+		isNewForUser := isNewTokenPerUser[userID]
 		currentTokensForUser := currentUserTokens[userID]
-
-		newPersistedTokens := make([]persist.TokenGallery, 0, len(currentTokensForUser))
-		newPersistedTokenIDs := make([]persist.DBID, 0, len(currentTokensForUser))
-		newPersistedTokenIdentifiers := make([]persist.TokenIdentifiers, 0, len(currentTokensForUser))
-
-		for _, token := range currentTokensForUser {
-			if newTokensForUser[token.TokenIdentifiers()] {
-				newPersistedTokens = append(newPersistedTokens, token)
-				newPersistedTokenIDs = append(newPersistedTokenIDs, token.ID)
-				newPersistedTokenIdentifiers = append(newPersistedTokenIdentifiers, token.TokenIdentifiers())
-			}
-		}
-
+		newPersistedTokens := util.Filter(currentTokensForUser, func(t persist.TokenGallery) bool { return isNewForUser[t.TokenIdentifiers()] }, false)
 		newUserTokens[userID] = newPersistedTokens
-
-		err = p.SubmitUserTokens(ctx, userID, newPersistedTokenIDs, newPersistedTokenIdentifiers)
-		if err != nil {
-			errors = append(errors, err)
-		}
 	}
 
-	if len(errors) > 1 {
-		return nil, nil, errors[0]
-	}
+	panic("TODO: Submit token defs to be processed")
 
 	for userID := range users {
 		// include the existing tokens that were not persisted with the bulk upsert
@@ -1885,7 +1877,67 @@ func (d *Provider) processContracts(ctx context.Context, contractsFromProviders 
 	return util.DedupeWithTranslate(append(newUpsertedContracts, existingContracts...), false, func(c persist.ContractGallery) persist.DBID { return c.ID }), newUpsertedContracts, nil
 }
 
-func tokensToNewDedupedTokens(tokens []chainTokens, existingTokens []persist.TokenGallery, existingContracts []persist.ContractGallery, ownerUser persist.User) []persist.TokenGallery {
+// tokensToUpsertableTokenDefinitions returns a slice of token definitions that are ready to be upserted into the database from a slice of chainTokens.
+func tokensToUpsertableTokenDefinitions(chainTokens []chainTokens, existingContracts []persist.ContractGallery) []db.TokenDefinition {
+	definitions := make(map[persist.TokenIdentifiers]db.TokenDefinition)
+
+	// Create a lookup of contracts to their IDs
+	contractLookup := make(map[persist.ContractIdentifiers]persist.DBID)
+	for _, contract := range existingContracts {
+		contractIdentifiers := persist.NewContractIdentifiers(contract.Address, contract.Chain)
+		contractLookup[contractIdentifiers] = contract.ID
+	}
+
+	for _, chainToken := range chainTokens {
+		for _, token := range chainToken.tokens {
+			tokenIdentifiers := persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID, chainToken.chain)
+			contractIdentifiers := persist.NewContractIdentifiers(token.ContractAddress, chainToken.chain)
+			contractID, ok := contractLookup[contractIdentifiers]
+			if !ok {
+				panic(fmt.Sprintf("contract %s should have already been upserted", contractIdentifiers))
+			}
+			// Got a new token, add it to the list of token definitions
+			if definition, ok := definitions[tokenIdentifiers]; !ok {
+				definitions[tokenIdentifiers] = db.TokenDefinition{
+					Name:                 util.ToNullString(token.Descriptors.Name, true),
+					Description:          util.ToNullString(token.Descriptors.Description, true),
+					TokenID:              token.TokenID,
+					TokenType:            token.TokenType,
+					ExternalUrl:          util.ToNullString(token.ExternalURL, true),
+					Chain:                chainToken.chain,
+					IsProviderMarkedSpam: util.GetOptionalValue(token.IsSpam, false),
+					FallbackMedia:        token.FallbackMedia,
+					ContractID:           contractID,
+					// Upsert will set this if the definition already exists
+					TokenMediaID: "",
+				}
+			} else {
+				// Merge the token definition with the existing one. The fields that aren't merged below use the data of the first write.
+				name := util.FirstNonEmptyString(definition.Name.String, token.Descriptors.Name)
+				description := util.FirstNonEmptyString(definition.Description.String, token.Descriptors.Description)
+				externalURL := util.FirstNonEmptyString(definition.ExternalUrl.String, token.ExternalURL)
+				fallbackMedia, _ := util.FindFirst([]persist.FallbackMedia{definition.FallbackMedia, token.FallbackMedia}, func(m persist.FallbackMedia) bool { return m.IsServable() })
+				definition.Name = util.ToNullString(name, true)
+				definition.Description = util.ToNullString(description, true)
+				definition.ExternalUrl = util.ToNullString(externalURL, true)
+				definition.FallbackMedia = fallbackMedia
+				// If any provider reports the token as spam, mark it as spam
+				definition.IsProviderMarkedSpam = definition.IsProviderMarkedSpam || util.GetOptionalValue(token.IsSpam, false)
+				definitions[tokenIdentifiers] = definition
+			}
+		}
+	}
+
+	tokenDefinitions := make([]db.TokenDefinition, 0, len(definitions))
+	for _, definition := range definitions {
+		tokenDefinitions = append(tokenDefinitions, definition)
+	}
+
+	return tokenDefinitions
+}
+
+// tokensToUpsertableTokens returns a unique slice of tokens that are ready to be upserted into the database.
+func tokensToUpsertableTokens(tokens []chainTokens, existingTokens []persist.TokenGallery, existingContracts []persist.ContractGallery, ownerUser persist.User) []persist.TokenGallery {
 	addressToContract := make(map[string]persist.ContractGallery)
 
 	util.Map(existingContracts, func(c persist.ContractGallery) (any, error) {
