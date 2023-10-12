@@ -23,8 +23,6 @@ import (
 	// _ "github.com/lib/pq"
 )
 
-var InsertHelpers = BulkInsertHelpers{}
-
 type ErrRoleDoesNotExist struct {
 	role string
 }
@@ -306,7 +304,7 @@ type Repositories struct {
 	UserRepository        *UserRepository
 	NonceRepository       *NonceRepository
 	GalleryRepository     *GalleryRepository
-	TokenRepository       *TokenGalleryRepository
+	TokenRepository       *TokenFullDetailsRepository
 	CollectionRepository  *CollectionTokenRepository
 	ContractRepository    *ContractGalleryRepository
 	MembershipRepository  *MembershipRepository
@@ -325,7 +323,7 @@ func NewRepositories(pq *sql.DB, pgx *pgxpool.Pool) *Repositories {
 		pool:                  pgx,
 		UserRepository:        NewUserRepository(pq, queries, pgx),
 		NonceRepository:       NewNonceRepository(pq, queries),
-		TokenRepository:       NewTokenGalleryRepository(pq, queries),
+		TokenRepository:       NewTokenFullDetailsRepository(pq, queries),
 		CollectionRepository:  NewCollectionTokenRepository(pq, queries),
 		GalleryRepository:     NewGalleryRepository(queries),
 		ContractRepository:    NewContractGalleryRepository(pq, queries),
@@ -342,24 +340,6 @@ func (r *Repositories) BeginTx(ctx context.Context) (pgx.Tx, error) {
 	return r.pool.BeginTx(ctx, pgx.TxOptions{})
 }
 
-type BulkInsertHelpers struct{}
-
-func (b BulkInsertHelpers) AppendAddressAtBlock(dest *[]pgtype.JSONB, src []persist.AddressAtBlock, startIndices, endIndices *[]int32, errs *[]error) {
-	items := make([]any, len(src))
-	for i, item := range src {
-		items[i] = item
-	}
-	appendJSONBList(dest, items, startIndices, endIndices, errs)
-}
-
-func (b BulkInsertHelpers) AppendWalletList(dest *[]string, src []persist.Wallet, startIndices, endIndices *[]int32) {
-	items := make([]persist.DBID, len(src))
-	for i, wallet := range src {
-		items[i] = wallet.ID
-	}
-	appendDBIDList(dest, items, startIndices, endIndices)
-}
-
 func appendIndices(startIndices *[]int32, endIndices *[]int32, entryLength int) {
 	// Postgres uses 1-based indexing
 	startIndex := int32(1)
@@ -368,14 +348,6 @@ func appendIndices(startIndices *[]int32, endIndices *[]int32, entryLength int) 
 	}
 	*startIndices = append(*startIndices, startIndex)
 	*endIndices = append(*endIndices, startIndex+int32(entryLength)-1)
-}
-
-func appendBool(dest *[]bool, src *bool, errs *[]error) {
-	if src == nil {
-		*dest = append(*dest, false)
-		return
-	}
-	*dest = append(*dest, *src)
 }
 
 func appendJSONB(dest *[]pgtype.JSONB, src any, errs *[]error) error {
@@ -391,15 +363,6 @@ func appendJSONB(dest *[]pgtype.JSONB, src any, errs *[]error) error {
 func appendDBIDList(dest *[]string, src []persist.DBID, startIndices, endIndices *[]int32) {
 	for _, id := range src {
 		*dest = append(*dest, id.String())
-	}
-	appendIndices(startIndices, endIndices, len(src))
-}
-
-func appendJSONBList(dest *[]pgtype.JSONB, src []any, startIndices, endIndices *[]int32, errs *[]error) {
-	for _, item := range src {
-		if err := appendJSONB(dest, item, errs); err != nil {
-			return
-		}
 	}
 	appendIndices(startIndices, endIndices, len(src))
 }

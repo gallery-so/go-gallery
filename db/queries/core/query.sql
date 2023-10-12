@@ -120,6 +120,42 @@ where token_definitions.chain = @chain
     and not token_definitions.deleted
     and not token_medias.deleted;
 
+-- name: GetTokenFullDetailsByTokenDbid :one
+select sqlc.embed(tokens), sqlc.embed(token_definitions), sqlc.embed(token_medias), sqlc.embed(contracts)
+from tokens
+join token_definitions on tokens.token_definition_id = token_definitions.id
+join contracts on token_definitions.contract_id = contracts.id
+left join token_medias on token_definitions.token_media_id = token_medias.id
+where tokens.id = $1 and tokens.displayable and not tokens.deleted and not token_definitions.deleted and not contracts.deleted;
+
+-- name: GetTokenFullDetailsByUserId :many
+select sqlc.embed(tokens), sqlc.embed(token_definitions), sqlc.embed(token_medias), sqlc.embed(contracts)
+from tokens
+join token_definitions on tokens.token_definition_id = token_definitions.id
+join contracts on token_definitions.contract_id = contracts.id
+left join token_medias on token_definitions.token_media_id = token_medias.id
+where tokens.owner_user_id = $1 and tokens.displayable and not tokens.deleted and not token_definitions.deleted and not contracts.deleted
+order by tokens.block_number desc;
+
+-- name: GetTokenFullDetailsByContractId :many
+select sqlc.embed(tokens), sqlc.embed(token_definitions), sqlc.embed(token_medias), sqlc.embed(contracts)
+from tokens
+join token_definitions on tokens.token_definition_id = token_definitions.id
+join contracts on token_definitions.contract_id = contracts.id
+left join token_medias on token_definitions.token_media_id = token_medias.id
+where contracts.id = $1 and tokens.displayable and not tokens.deleted and not token_definitions.deleted and not contracts.deleted
+order by tokens.block_number desc;
+
+-- name: UpdateTokenCollectorsNoteByTokenDbidUserId :exec
+update tokens set collectors_note = $1, last_updated = now() where id = $2 and owner_user_id = $3;
+
+-- name: UpdateTokensAsUserMarkedSpam :exec
+update tokens set is_user_marked_spam = $1, last_updated = now() where owner_user_id = $2 and id = any(@token_ids) and deleted = false;
+
+-- name: CheckUserOwnsAllTokenDbids :one
+with user_tokens as (select count(*) total from tokens where id = any(@token_ids) and owner_user_id = $1 and not tokens.deleted), total_tokens as (select cardinality(@token_ids) total)
+select (select total from total_tokens) = (select total from user_tokens) owns_all;
+
 -- name: GetTokenByIdBatch :batchone
 select * from tokens where id = $1 and displayable and deleted = false;
 
@@ -128,9 +164,21 @@ select * from tokens where id = $1 and deleted = false;
 
 -- name: GetTokenByUserTokenIdentifiersBatch :batchone
 select t.*
-from tokens t
-join contracts c on t.contract = c.id
-where t.owner_user_id = @owner_id and t.token_id = @token_id and c.address = @contract_address and c.chain = @chain and t.displayable and not t.deleted and not c.deleted;
+from tokens t, token_definitions td, contracts c
+where t.token_definition_id = td.token_definition_id
+    and td.contract_id = c.id
+    and t.owner_user_id = @owner_id
+    and td.token_id = @token_id
+    and c.chain = @chain
+    and c.address = @contract_address
+    and t.displayable
+    and not t.deleted
+    and not c.deleted
+    and not td.deleted;
+-- XXX select t.*
+-- XXX from tokens t
+-- XXX join contracts c on t.contract = c.id
+-- XXX where t.owner_user_id = @owner_id and t.token_id = @token_id and c.address = @contract_address and c.chain = @chain and t.displayable and not t.deleted and not c.deleted;
 
 -- name: GetTokenByUserTokenIdentifiers :one
 select t.*
@@ -924,9 +972,6 @@ update merch set redeemed = true, token_id = @token_hex, last_updated = now() wh
 
 -- name: GetMerchDiscountCodeByTokenID :one
 select discount_code from merch where token_id = @token_hex and redeemed = true and deleted = false;
-
--- name: GetUserOwnsTokenByIdentifiers :one
-select exists(select 1 from tokens where owner_user_id = @user_id and token_id = @token_hex and contract_id = @contract and chain = @chain and displayable and deleted = false) as owns_token;
 
 -- name: UpdateGalleryHidden :one
 update galleries set hidden = @hidden, last_updated = now() where id = @id and deleted = false returning *;

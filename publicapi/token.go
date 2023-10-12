@@ -2,6 +2,7 @@ package publicapi
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -512,14 +513,11 @@ func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, c
 		return err
 	}
 
-	update := persist.TokenUpdateInfoInput{
-		CollectorsNote: persist.NullString(collectorsNote),
-	}
-
-	err = api.repos.TokenRepository.UpdateByID(ctx, tokenID, userID, update)
-	if err != nil {
-		return err
-	}
+	err = api.queries.UpdateTokenCollectorsNoteByTokenDbidUserId(ctx, db.UpdateTokenCollectorsNoteByTokenDbidUserIdParams{
+		ID:             tokenID,
+		OwnerUserID:    userID,
+		CollectorsNote: util.ToNullString(collectorsNote, true),
+	})
 
 	galleryID, err := api.queries.GetGalleryIDByCollectionID(ctx, collectionID)
 	if err != nil {
@@ -555,12 +553,11 @@ func (api TokenAPI) SetSpamPreference(ctx context.Context, tokens []persist.DBID
 		return err
 	}
 
-	err = api.repos.TokenRepository.TokensAreOwnedByUser(ctx, userID, tokens)
-	if err != nil {
-		return err
-	}
-
-	return api.repos.TokenRepository.FlagTokensAsUserMarkedSpam(ctx, userID, tokens, isSpam)
+	return api.queries.UpdateTokensAsUserMarkedSpam(ctx, db.UpdateTokensAsUserMarkedSpamParams{
+		IsUserMarkedSpam: sql.NullBool{Bool: isSpam, Valid: true},
+		OwnerUserID:      userID,
+		TokenIds:         tokens,
+	})
 }
 
 func (api TokenAPI) MediaByTokenID(ctx context.Context, tokenID persist.DBID) (db.TokenMedia, error) {

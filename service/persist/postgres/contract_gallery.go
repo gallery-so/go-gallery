@@ -164,9 +164,9 @@ func (c *ContractGalleryRepository) UpsertByAddress(pCtx context.Context, pAddre
 }
 
 // BulkUpsert bulk upserts the contracts by address
-func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, pContracts []persist.ContractGallery, canOverwriteOwnerAddress bool) ([]persist.ContractGallery, error) {
-	if len(pContracts) == 0 {
-		return []persist.ContractGallery{}, nil
+func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, contracts []db.Contract, canOverwriteOwnerAddress bool) ([]db.Contract, error) {
+	if len(contracts) == 0 {
+		return []db.Contract{}, nil
 	}
 
 	contracts := removeDuplicateContractsGallery(pContracts)
@@ -197,20 +197,7 @@ func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, pContracts 
 		panic(fmt.Sprintf("expected %d upserted contracts, got %d", len(contracts), len(upserted)))
 	}
 
-	// Update contracts with the existing data if the contract already exists.
-	// The remaining fields are skipped because the upsert logic ensures that the existing row is
-	// always replaced with the newer row.
-	for i := range contracts {
-		c := &contracts[i]
-		(*c).ID = upserted[i].ID
-		(*c).CreationTime = upserted[i].CreatedAt
-		(*c).CreatorAddress = upserted[i].CreatorAddress
-		(*c).ParentID = upserted[i].ParentID
-		(*c).OwnerAddress = upserted[i].OwnerAddress
-		(*c).OverrideCreatorUserID = upserted[i].OverrideCreatorUserID
-	}
-
-	return contracts, nil
+	return upserted, nil
 }
 
 func (c *ContractGalleryRepository) GetOwnersByAddress(ctx context.Context, contractAddr persist.Address, chain persist.Chain, limit, offset int) ([]persist.TokenHolder, error) {

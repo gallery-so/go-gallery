@@ -485,11 +485,11 @@ func newTokenMetadataCache() *tokenMetadataCache {
 	return util.ToPointer(tokenMetadataCache(*cache))
 }
 
-func newManagedTokens(ctx context.Context, tm *tokenmanage.Manager) multichain.SubmitUserTokensF {
-	return func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, tokens []persist.TokenIdentifiers) error {
-		if len(tokenIDs) == 0 {
+func newManagedTokens(ctx context.Context, tm *tokenmanage.Manager) multichain.SubmitTokensF {
+	return func(ctx context.Context, tokenDefinitionIDs []persist.DBID) error {
+		if len(tokenDefinitionIDs) == 0 {
 			return nil
 		}
-		return tm.SubmitUser(ctx, userID, tokenIDs, tokens)
+		return tm.SubmitUser(ctx, tokenDefinitionIDs)
 	}
 }

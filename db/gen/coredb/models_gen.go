@@ -504,7 +504,7 @@ type Token struct {
 	Quantity                       persist.HexString `json:"quantity"`
 	OwnershipHistoryDeprecated     []pgtype.JSONB    `json:"ownership_history__deprecated"`
 	ExternalUrlDeprecated          sql.NullString    `json:"external_url__deprecated"`
-	BlockNumberDeprecated          sql.NullInt64     `json:"block_number__deprecated"`
+	BlockNumber                    sql.NullInt64     `json:"block_number"`
 	OwnerUserID                    persist.DBID      `json:"owner_user_id"`
 	OwnedByWallets                 persist.DBIDList  `json:"owned_by_wallets"`
 	Chain                          persist.Chain     `json:"chain"`
