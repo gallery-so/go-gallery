@@ -701,11 +701,8 @@ func (p *Provider) SyncCreatedTokensForNewContracts(ctx context.Context, userID 
 
 	chainInts := util.MapWithoutError(chains, func(c persist.Chain) int32 { return int32(c) })
 	rows, err := p.Queries.GetCreatedContractsByUserID(ctx, db.GetCreatedContractsByUserIDParams{
-		UserID: userID,
-		Chains: chainInts,
-		L1Chains: util.MapWithoutError(chainInts, func(c int32) int32 {
-			return int32(persist.Chain(c).L1Chain())
-		}),
+		UserID:           userID,
+		Chains:           chainInts,
 		NewContractsOnly: true,
 	})
 
