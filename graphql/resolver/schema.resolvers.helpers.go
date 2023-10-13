@@ -2145,11 +2145,11 @@ func profileImageToModel(ctx context.Context, pfp db.ProfileImage) (model.Profil
 	}
 	switch pfp.SourceType {
 	case persist.ProfileImageSourceToken:
-		token, err := resolveTokenByTokenID(ctx, pfp.TokenID)
+		token, err := publicapi.For(ctx).Token.GetTokenByIdIgnoreDisplayable(ctx, pfp.TokenID)
 		if err != nil {
 			return nil, err
 		}
-		return &model.TokenProfileImage{Token: token}, nil
+		return &model.TokenProfileImage{Token: tokenToModel(ctx, *token, nil)}, nil
 	case persist.ProfileImageSourceENS:
 		return ensProfileImageToModel(ctx, pfp.UserID, pfp.WalletID, pfp.EnsAvatarUri.String, pfp.EnsDomain.String)
 	default:

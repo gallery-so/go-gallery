@@ -2386,7 +2386,7 @@ where pfp.id = $1
 		when pfp.source_type = $2
 		then exists(select 1 from wallets w where w.id = pfp.wallet_id and not w.deleted)
 		when pfp.source_type = $3
-		then exists(select 1 from tokens t where t.id = pfp.token_id and t.displayable and not t.deleted)
+		then exists(select 1 from tokens t where t.id = pfp.token_id and not t.deleted)
 		else
 		0 = 1
 	end
