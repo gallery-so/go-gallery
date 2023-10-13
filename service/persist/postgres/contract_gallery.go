@@ -165,6 +165,7 @@ func (c *ContractGalleryRepository) UpsertByAddress(pCtx context.Context, pAddre
 
 // BulkUpsert bulk upserts the contracts by address
 func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, contracts []db.Contract, canOverwriteOwnerAddress bool) ([]db.Contract, error) {
+	panic("fix me")
 	if len(contracts) == 0 {
 		return []db.Contract{}, nil
 	}

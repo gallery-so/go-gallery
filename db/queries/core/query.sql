@@ -92,7 +92,13 @@ SELECT c.* FROM galleries g, unnest(g.collections)
 select * from tokens where id = $1 and displayable and deleted = false;
 
 -- name: GetTokenDefinitionByTokenDbid :one
-select token_definitions.* from token_definitions, tokens where token_definitions.id = tokens.token_definition_id and tokens.id = $1 and tokens.displayable and not tokens.deleted and not token_definitions.deleted;
+select token_definitions.*
+from token_definitions, tokens
+where token_definitions.id = tokens.token_definition_id
+    and tokens.id = $1
+    and tokens.displayable
+    and not tokens.deleted
+    and not token_definitions.deleted;
 
 -- name: GetTokenDefinitionByTokenIdentifiers :one
 select *
@@ -103,11 +109,11 @@ where token_definitions.chain = @chain
         from contracts
         where contracts.address = @contract_address and not contracts.deleted
     )
-    and token_definitions.id = @token_id
+    and token_definitions.token_id = @token_id
     and not token_definitions.deleted;
 
 -- name: GetTokenDefinitionAndMediaByTokenIdentifiers :one
--- GetTokenDefinitionAndMediaByTokenIdentifiers returns a token definition and its associated media if it exists.
+-- XXX: Could be an extra query
 select sqlc.embed(token_definitions), sqlc.embed(token_medias)
 from token_definitions, token_medias
 where token_definitions.chain = @chain
@@ -116,9 +122,19 @@ where token_definitions.chain = @chain
         from contracts
         where contracts.address = @contract_address and not contracts.deleted
     )
-    and token_definitions.id = @token_id
+    and token_definitions.token_id = @token_id
     and not token_definitions.deleted
     and not token_medias.deleted;
+
+-- name: GetTokenDefinitionAndContractByTokenIdentifiers :one
+select sqlc.embed(token_definitions), sqlc.embed(contracts)
+from token_definitions, contracts
+where contracts.chain = @chain
+    and contracts.address = @contract_address
+    and token_definitions.token_id = @token_id
+    and not token_definitions.deleted
+    and not token_medias.deleted
+    and not contracts.deleted;
 
 -- name: GetTokenFullDetailsByTokenDbid :one
 select sqlc.embed(tokens), sqlc.embed(token_definitions), sqlc.embed(token_medias), sqlc.embed(contracts)

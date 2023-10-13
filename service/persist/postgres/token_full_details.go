@@ -101,20 +101,18 @@ func (t *TokenFullDetailsRepository) GetByUserID(ctx context.Context, userID per
 }
 
 // GetByTokenIdentifiers gets a token by its token ID and contract address and chain
-// XXX: May not need this function
-func (t *TokenFullDetailsRepository) GetByTokenIdentifiers(pCtx context.Context, pTokenID persist.TokenID, pContractAddress persist.Address, pChain persist.Chain, limit int64, page int64) ([]persist.TokenGallery, error) {
-
+func (t *TokenFullDetailsRepository) GetByTokenIdentifiers(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain) ([]TokenFullDetails, error) {
 	var contractID persist.DBID
-	err := t.getContractByAddressStmt.QueryRowContext(pCtx, pContractAddress, pChain).Scan(&contractID)
+	err := t.getContractByAddressStmt.QueryRowContext(ctx, pContractAddress, pChain).Scan(&contractID)
 	if err != nil {
 		return nil, err
 	}
 
 	var rows *sql.Rows
 	if limit > 0 {
-		rows, err = t.getByTokenIdentifiersPaginateStmt.QueryContext(pCtx, pTokenID, contractID, limit, page*limit)
+		rows, err = t.getByTokenIdentifiersPaginateStmt.QueryContext(ctx, pTokenID, contractID, limit, page*limit)
 	} else {
-		rows, err = t.getByTokenIdentifiersStmt.QueryContext(pCtx, pTokenID, contractID)
+		rows, err = t.getByTokenIdentifiersStmt.QueryContext(ctx, pTokenID, contractID)
 	}
 	if err != nil {
 		return nil, err

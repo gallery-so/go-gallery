@@ -49,8 +49,8 @@ type TokenProcessingContractTokensMessage struct {
 }
 
 type TokenProcessingTokenMessage struct {
-	Token    persist.TokenIdentifiers `json:"token" binding:"required"`
-	Attempts int                      `json:"attempts" binding:"required"`
+	TokenDefinitionID persist.DBID `json:"token_definition_id" binding:"required"`
+	Attempts          int          `json:"attempts" binding:"required"`
 }
 
 type AddEmailToMailingListMessage struct {

@@ -3995,6 +3995,68 @@ func (q *Queries) GetTokenByUserTokenIdentifiers(ctx context.Context, arg GetTok
 	return i, err
 }
 
+const getTokenDefinitionAndContractByTokenIdentifiers = `-- name: GetTokenDefinitionAndContractByTokenIdentifiers :one
+select token_definitions.id, token_definitions.created_at, token_definitions.last_updated, token_definitions.deleted, token_definitions.name, token_definitions.description, token_definitions.token_type, token_definitions.token_id, token_definitions.external_url, token_definitions.chain, token_definitions.is_provider_marked_spam, token_definitions.fallback_media, token_definitions.contract_id, token_definitions.token_media_id, contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id
+from token_definitions, contracts
+where contracts.chain = $1
+    and contracts.address = $2
+    and token_definitions.token_id = $3
+    and not token_definitions.deleted
+    and not token_medias.deleted
+    and not contracts.deleted
+`
+
+type GetTokenDefinitionAndContractByTokenIdentifiersParams struct {
+	Chain           persist.Chain   `json:"chain"`
+	ContractAddress persist.Address `json:"contract_address"`
+	TokenID         persist.TokenID `json:"token_id"`
+}
+
+type GetTokenDefinitionAndContractByTokenIdentifiersRow struct {
+	TokenDefinition TokenDefinition `json:"tokendefinition"`
+	Contract        Contract        `json:"contract"`
+}
+
+func (q *Queries) GetTokenDefinitionAndContractByTokenIdentifiers(ctx context.Context, arg GetTokenDefinitionAndContractByTokenIdentifiersParams) (GetTokenDefinitionAndContractByTokenIdentifiersRow, error) {
+	row := q.db.QueryRow(ctx, getTokenDefinitionAndContractByTokenIdentifiers, arg.Chain, arg.ContractAddress, arg.TokenID)
+	var i GetTokenDefinitionAndContractByTokenIdentifiersRow
+	err := row.Scan(
+		&i.TokenDefinition.ID,
+		&i.TokenDefinition.CreatedAt,
+		&i.TokenDefinition.LastUpdated,
+		&i.TokenDefinition.Deleted,
+		&i.TokenDefinition.Name,
+		&i.TokenDefinition.Description,
+		&i.TokenDefinition.TokenType,
+		&i.TokenDefinition.TokenID,
+		&i.TokenDefinition.ExternalUrl,
+		&i.TokenDefinition.Chain,
+		&i.TokenDefinition.IsProviderMarkedSpam,
+		&i.TokenDefinition.FallbackMedia,
+		&i.TokenDefinition.ContractID,
+		&i.TokenDefinition.TokenMediaID,
+		&i.Contract.ID,
+		&i.Contract.Deleted,
+		&i.Contract.Version,
+		&i.Contract.CreatedAt,
+		&i.Contract.LastUpdated,
+		&i.Contract.Name,
+		&i.Contract.Symbol,
+		&i.Contract.Address,
+		&i.Contract.CreatorAddress,
+		&i.Contract.Chain,
+		&i.Contract.ProfileBannerUrl,
+		&i.Contract.ProfileImageUrl,
+		&i.Contract.BadgeUrl,
+		&i.Contract.Description,
+		&i.Contract.OwnerAddress,
+		&i.Contract.IsProviderMarkedSpam,
+		&i.Contract.ParentID,
+		&i.Contract.OverrideCreatorUserID,
+	)
+	return i, err
+}
+
 const getTokenDefinitionAndMediaByTokenIdentifiers = `-- name: GetTokenDefinitionAndMediaByTokenIdentifiers :one
 select token_definitions.id, token_definitions.created_at, token_definitions.last_updated, token_definitions.deleted, token_definitions.name, token_definitions.description, token_definitions.token_type, token_definitions.token_id, token_definitions.external_url, token_definitions.chain, token_definitions.is_provider_marked_spam, token_definitions.fallback_media, token_definitions.contract_id, token_definitions.token_media_id, token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.contract_id, token_medias.token_id, token_medias.chain, token_medias.active, token_medias.metadata, token_medias.media, token_medias.name__deprecated, token_medias.description__deprecated, token_medias.processing_job_id, token_medias.deleted
 from token_definitions, token_medias
@@ -4004,7 +4066,7 @@ where token_definitions.chain = $1
         from contracts
         where contracts.address = $2 and not contracts.deleted
     )
-    and token_definitions.id = $3
+    and token_definitions.token_id = $3
     and not token_definitions.deleted
     and not token_medias.deleted
 `
@@ -4020,7 +4082,7 @@ type GetTokenDefinitionAndMediaByTokenIdentifiersRow struct {
 	TokenMedia      TokenMedia      `json:"tokenmedia"`
 }
 
-// GetTokenDefinitionAndMediaByTokenIdentifiers returns a token definition and its associated media if it exists.
+// XXX: Could be an extra query
 func (q *Queries) GetTokenDefinitionAndMediaByTokenIdentifiers(ctx context.Context, arg GetTokenDefinitionAndMediaByTokenIdentifiersParams) (GetTokenDefinitionAndMediaByTokenIdentifiersRow, error) {
 	row := q.db.QueryRow(ctx, getTokenDefinitionAndMediaByTokenIdentifiers, arg.Chain, arg.ContractAddress, arg.TokenID)
 	var i GetTokenDefinitionAndMediaByTokenIdentifiersRow
@@ -4058,7 +4120,13 @@ func (q *Queries) GetTokenDefinitionAndMediaByTokenIdentifiers(ctx context.Conte
 }
 
 const getTokenDefinitionByTokenDbid = `-- name: GetTokenDefinitionByTokenDbid :one
-select token_definitions.id, token_definitions.created_at, token_definitions.last_updated, token_definitions.deleted, token_definitions.name, token_definitions.description, token_definitions.token_type, token_definitions.token_id, token_definitions.external_url, token_definitions.chain, token_definitions.is_provider_marked_spam, token_definitions.fallback_media, token_definitions.contract_id, token_definitions.token_media_id from token_definitions, tokens where token_definitions.id = tokens.token_definition_id and tokens.id = $1 and tokens.displayable and not tokens.deleted and not token_definitions.deleted
+select token_definitions.id, token_definitions.created_at, token_definitions.last_updated, token_definitions.deleted, token_definitions.name, token_definitions.description, token_definitions.token_type, token_definitions.token_id, token_definitions.external_url, token_definitions.chain, token_definitions.is_provider_marked_spam, token_definitions.fallback_media, token_definitions.contract_id, token_definitions.token_media_id
+from token_definitions, tokens
+where token_definitions.id = tokens.token_definition_id
+    and tokens.id = $1
+    and tokens.displayable
+    and not tokens.deleted
+    and not token_definitions.deleted
 `
 
 func (q *Queries) GetTokenDefinitionByTokenDbid(ctx context.Context, id persist.DBID) (TokenDefinition, error) {
@@ -4092,7 +4160,7 @@ where token_definitions.chain = $1
         from contracts
         where contracts.address = $2 and not contracts.deleted
     )
-    and token_definitions.id = $3
+    and token_definitions.token_id = $3
     and not token_definitions.deleted
 `
 

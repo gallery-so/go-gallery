@@ -105,7 +105,7 @@ func (m Manager) tryRetry(ctx context.Context, tokenDefinitionID persist.DBID, e
 	}
 
 	m.processRegistry.setEnqueue(ctx, tokenDefinitionID)
-	message := task.TokenProcessingTokenMessage{Token: token, Attempts: attempts + 1}
+	message := task.TokenProcessingTokenMessage{TokenDefinitionID: tokenDefinitionID, Attempts: attempts + 1}
 	return task.CreateTaskForTokenTokenProcessing(ctx, message, m.taskClient, delay)
 }
 

@@ -79,7 +79,7 @@ func processMediaForUsersTokens(tp *tokenProcessor, tokenRepo *postgres.TokenGal
 	}
 }
 
-func processMediaForTokenIdentifiers(tp *tokenProcessor, tokenRepo *postgres.TokenGalleryRepository, contractRepo *postgres.ContractGalleryRepository, userRepo *postgres.UserRepository, walletRepo *postgres.WalletRepository, tm *tokenmanage.Manager) gin.HandlerFunc {
+func processMediaForTokenIdentifiers(tp *tokenProcessor, queries *coredb.Queries, tm *tokenmanage.Manager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input ProcessMediaForTokenInput
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -87,41 +87,48 @@ func processMediaForTokenIdentifiers(tp *tokenProcessor, tokenRepo *postgres.Tok
 			return
 		}
 
-		reqCtx := c.Request.Context()
-
-		var token persist.TokenGallery
-		tokens, err := tokenRepo.GetByTokenIdentifiers(reqCtx, input.TokenID, input.ContractAddress, input.Chain, 1, 0)
+		r, err := queries.GetTokenDefinitionAndContractByTokenIdentifiers(c, coredb.GetTokenDefinitionAndContractByTokenIdentifiersParams{
+			Chain:           input.Chain,
+			ContractAddress: input.ContractAddress,
+			TokenID:         input.TokenID,
+		})
 		if err != nil {
-			if util.ErrorAs[persist.ErrTokenGalleryNotFoundByIdentifiers](err) {
-				util.ErrResponse(c, http.StatusNotFound, err)
-				return
-			}
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
-		if len(tokens) == 0 {
-			util.ErrResponse(c, http.StatusNotFound, persist.ErrTokenGalleryNotFoundByIdentifiers{
-				TokenID:         input.TokenID,
-				ContractAddress: input.ContractAddress,
-				Chain:           input.Chain,
-			})
-			return
-		}
+		// token, err := tokenRepo.GetByTokenIdentifiers(c, input.TokenID, input.ContractAddress, input.Chain)
+		// if err != nil {
+		// 	if util.ErrorAs[persist.ErrTokenGalleryNotFoundByIdentifiers](err) {
+		// 		util.ErrResponse(c, http.StatusNotFound, err)
+		// 		return
+		// 	}
+		// 	util.ErrResponse(c, http.StatusInternalServerError, err)
+		// 	return
+		// }
 
-		token = tokens[0]
+		// if len(tokens) == 0 {
+		// 	util.ErrResponse(c, http.StatusNotFound, persist.ErrTokenGalleryNotFoundByIdentifiers{
+		// 		TokenID:         input.TokenID,
+		// 		ContractAddress: input.ContractAddress,
+		// 		Chain:           input.Chain,
+		// 	})
+		// 	return
+		// }
 
-		contract, err := contractRepo.GetByID(reqCtx, token.Contract.ID)
-		if err != nil {
-			if util.ErrorAs[persist.ErrContractNotFoundByID](err) {
-				util.ErrResponse(c, http.StatusNotFound, err)
-				return
-			}
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
+		// token = tokens[0]
 
-		_, err = processFromInstanceManaged(reqCtx, tp, tm, token, contract, persist.ProcessingCauseRefresh, 0)
+		// contract, err := contractRepo.GetByID(c, token.Contract.ID)
+		// if err != nil {
+		// 	if util.ErrorAs[persist.ErrContractNotFoundByID](err) {
+		// 		util.ErrResponse(c, http.StatusNotFound, err)
+		// 		return
+		// 	}
+		// 	util.ErrResponse(c, http.StatusInternalServerError, err)
+		// 	return
+		// }
+
+		_, err = processFromInstanceManaged(c, tp, tm, r.TokenDefinition, r.Contract, persist.ProcessingCauseRefresh, 0)
 
 		if err != nil {
 			if util.ErrorAs[ErrBadToken](err) {
@@ -734,6 +741,10 @@ func processPostPreflight(tp *tokenProcessor, tm *tokenmanage.Manager, q *coredb
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
+}
+
+func processTokenManaged(ctx context.Context, tp *tokenProcessor, tm *tokenmanage.Manager, td coredb.TokenDefinition, c coredb.Contract) {
+	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"tokenDefinitionDBID": td.ID})
 }
 
 func processFromInstanceManaged(ctx context.Context, tp *tokenProcessor, tm *tokenmanage.Manager, token persist.TokenGallery, contract persist.ContractGallery, cause persist.ProcessingCause, attempts int) (coredb.TokenMedia, error) {
