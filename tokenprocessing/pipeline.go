@@ -8,45 +8,40 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/everFinance/goar"
 	shell "github.com/ipfs/go-ipfs-api"
-	"github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/sirupsen/logrus"
+
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/metric"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/sirupsen/logrus"
 )
 
 type tokenProcessor struct {
-	queries       *coredb.Queries
-	ethClient     *ethclient.Client
+	queries       *db.Queries
 	httpClient    *http.Client
 	mc            *multichain.Provider
 	ipfsClient    *shell.Shell
 	arweaveClient *goar.Client
 	stg           *storage.Client
 	tokenBucket   string
-	tokenRepo     *postgres.TokenGalleryRepository
 	mr            metric.MetricReporter
 }
 
-func NewTokenProcessor(queries *coredb.Queries, ethClient *ethclient.Client, httpClient *http.Client, mc *multichain.Provider, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, tokenRepo *postgres.TokenGalleryRepository, mr metric.MetricReporter) *tokenProcessor {
+func NewTokenProcessor(queries *db.Queries, httpClient *http.Client, mc *multichain.Provider, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, mr metric.MetricReporter) *tokenProcessor {
 	return &tokenProcessor{
 		queries:       queries,
-		ethClient:     ethClient,
 		mc:            mc,
 		httpClient:    httpClient,
 		ipfsClient:    ipfsClient,
 		arweaveClient: arweaveClient,
 		stg:           stg,
 		tokenBucket:   tokenBucket,
-		tokenRepo:     tokenRepo,
 		mr:            mr,
 	}
 }
@@ -55,7 +50,7 @@ type tokenProcessingJob struct {
 	tp               *tokenProcessor
 	id               persist.DBID
 	token            persist.TokenIdentifiers
-	contract         persist.ContractGallery
+	contract         persist.ContractIdentifiers
 	cause            persist.ProcessingCause
 	pipelineMetadata *persist.PipelineMetadata
 	// profileImageKey is an optional key in the metadata that the pipeline should also process as a profile image.
@@ -64,10 +59,8 @@ type tokenProcessingJob struct {
 	profileImageKey string
 	// refreshMetadata is an optional flag that indicates that the pipeline should check for new metadata when enabled
 	refreshMetadata bool
-	// tokenInstance is an already instanced token to derive data (name, description, and metadata) from when fetching fails.
-	// If the job doesn't produce active media, only tokenInstance's media is updated (as opposed to all instances of a token).
-	// If there is active media from past jobs, tokenInstance's media will reference that media instead.
-	tokenInstance *persist.TokenGallery
+	// tokenMetadata is metadata to use to retrieve media from. If not set or refreshMetadata is enabled, the pipeline will try to get new metadata.
+	tokenMetadata persist.TokenMetadata
 }
 
 type PipelineOption func(*tokenProcessingJob)
@@ -88,13 +81,13 @@ func (pOpts) WithRefreshMetadata() PipelineOption {
 	}
 }
 
-func (pOpts) WithTokenInstance(t *persist.TokenGallery) PipelineOption {
+func (pOpts) WithMetadata(t persist.TokenMetadata) PipelineOption {
 	return func(j *tokenProcessingJob) {
-		j.tokenInstance = t
+		j.tokenMetadata = t
 	}
 }
 
-func (tp *tokenProcessor) ProcessTokenPipeline(ctx context.Context, token persist.TokenIdentifiers, contract persist.ContractGallery, cause persist.ProcessingCause, opts ...PipelineOption) (coredb.TokenMedia, error) {
+func (tp *tokenProcessor) ProcessTokenPipeline(ctx context.Context, token persist.TokenIdentifiers, contract persist.ContractIdentifiers, cause persist.ProcessingCause, opts ...PipelineOption) (db.TokenMedia, error) {
 	runID := persist.GenerateID()
 
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"runID": runID})
@@ -113,8 +106,8 @@ func (tp *tokenProcessor) ProcessTokenPipeline(ctx context.Context, token persis
 	}
 
 	startTime := time.Now()
-	media, err := job.run(ctx)
-	recordPipelineEndState(ctx, tp.mr, media, err, time.Since(startTime), cause)
+	media, err := job.Run(ctx)
+	recordPipelineEndState(ctx, tp.mr, job.token.Chain, media, err, time.Since(startTime), cause)
 
 	if err != nil {
 		reportJobError(ctx, err, *job)
@@ -136,7 +129,7 @@ func (e ErrBadToken) Unwrap() error {
 	return e.Err
 }
 
-func (tpj *tokenProcessingJob) run(ctx context.Context) (coredb.TokenMedia, error) {
+func (tpj *tokenProcessingJob) Run(ctx context.Context) (db.TokenMedia, error) {
 	span, ctx := tracing.StartSpan(ctx, "pipeline.run", fmt.Sprintf("run %s", tpj.id))
 	defer tracing.FinishSpan(span)
 
@@ -147,42 +140,38 @@ func (tpj *tokenProcessingJob) run(ctx context.Context) (coredb.TokenMedia, erro
 
 	media, mediaErr := tpj.createMediaForToken(mediaCtx)
 
-	if err := tpj.persistResults(ctx, media); err != nil {
+	err := tpj.persistResults(ctx, media)
+	if err != nil {
 		return media, err
 	}
 
 	return media, mediaErr
 }
 
-func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (coredb.TokenMedia, error) {
+func (tpj *tokenProcessingJob) createMediaForToken(ctx context.Context) (db.TokenMedia, error) {
 	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.CreateMedia, "CreateMedia")
 	defer traceCallback()
 
-	result := coredb.TokenMedia{
-		ID:              persist.GenerateID(),
-		ContractID:      tpj.contract.ID,
-		TokenID:         tpj.token.TokenID,
-		Chain:           tpj.token.Chain,
-		Active:          true,
-		ProcessingJobID: tpj.id,
+	if tpj.tokenMetadata == nil || tpj.refreshMetadata {
+		tpj.addMetadata(ctx)
 	}
 
-	result.Metadata = tpj.retrieveMetadata(ctx)
-
-	result.Name, result.Description = tpj.retrieveTokenInfo(ctx, result.Metadata)
-
-	tokenMedia, err := tpj.cacheMediaObjects(ctx, result.Metadata)
-	result.Media = tokenMedia
+	tokenMedia, err := tpj.cacheMediaObjects(ctx, tpj.tokenMetadata)
 
 	// Wrap the error to indicate that the token is bad to callers
 	if errors.Is(err, media.ErrNoMediaURLs) || util.ErrorAs[errInvalidMedia](err) {
 		err = ErrBadToken{err}
 	}
 
-	return result, err
+	return db.TokenMedia{
+		ID:              persist.GenerateID(),
+		Active:          true,
+		ProcessingJobID: tpj.id,
+		Media:           tokenMedia,
+	}, err
 }
 
-func (tpj *tokenProcessingJob) retrieveMetadata(ctx context.Context) persist.TokenMetadata {
+func (tpj *tokenProcessingJob) addMetadata(ctx context.Context) {
 	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.MetadataRetrieval, "MetadataRetrieval")
 	defer traceCallback()
 
@@ -190,59 +179,34 @@ func (tpj *tokenProcessingJob) retrieveMetadata(ctx context.Context) persist.Tok
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 
-	var newMetadata persist.TokenMetadata
-
-	if tpj.tokenInstance != nil {
-		newMetadata = tpj.tokenInstance.TokenMetadata
+	i, a := tpj.contract.Chain.BaseKeywords()
+	fieldRequests := []multichain.FieldRequest[string]{
+		{
+			FieldNames: append(i, a...),
+			Level:      multichain.FieldRequirementLevelOneRequired,
+		},
+		{
+			FieldNames: []string{"name", "description"},
+			Level:      multichain.FieldRequirementLevelAllOptional,
+		},
 	}
 
-	if len(newMetadata) == 0 || tpj.refreshMetadata {
-		i, a := tpj.contract.Chain.BaseKeywords()
-		fieldRequests := []multichain.FieldRequest[string]{
-			{
-				FieldNames: append(i, a...),
-				Level:      multichain.FieldRequirementLevelOneRequired,
-			},
-			{
-				FieldNames: []string{"name", "description"},
-				Level:      multichain.FieldRequirementLevelAllOptional,
-			},
-		}
-		mcMetadata, err := tpj.tp.mc.GetTokenMetadataByTokenIdentifiers(ctx, tpj.contract.Address, tpj.token.TokenID, tpj.token.Chain, fieldRequests)
-		if err != nil {
-			logger.For(ctx).Warnf("error getting metadata from chain: %s", err)
-			persist.FailStep(&tpj.pipelineMetadata.MetadataRetrieval)
-		} else if len(mcMetadata) > 0 {
-			logger.For(ctx).Infof("got metadata from chain: %v", mcMetadata)
-			newMetadata = mcMetadata
-		}
+	mcMetadata, err := tpj.tp.mc.GetTokenMetadataByTokenIdentifiers(ctx, tpj.contract.ContractAddress, tpj.token.TokenID, tpj.token.Chain, fieldRequests)
+	if err != nil {
+		logger.For(ctx).Warnf("error getting metadata from chain: %s", err)
+		persist.FailStep(&tpj.pipelineMetadata.MetadataRetrieval)
+	} else if len(mcMetadata) > 0 {
+		logger.For(ctx).Infof("got metadata from chain: %v", mcMetadata)
+		tpj.tokenMetadata = mcMetadata
 	}
 
-	if len(newMetadata) == 0 {
+	if len(tpj.tokenMetadata) == 0 {
 		persist.FailStep(&tpj.pipelineMetadata.MetadataRetrieval)
 	}
-
-	return newMetadata
-}
-
-func (tpj *tokenProcessingJob) retrieveTokenInfo(ctx context.Context, metadata persist.TokenMetadata) (string, string) {
-	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.TokenInfoRetrieval, "TokenInfoRetrieval")
-	defer traceCallback()
-
-	name, description := findNameAndDescription(ctx, metadata)
-
-	if name == "" && tpj.tokenInstance != nil {
-		name = tpj.tokenInstance.Name.String()
-	}
-
-	if description == "" && tpj.tokenInstance != nil {
-		description = tpj.tokenInstance.Description.String()
-	}
-	return name, description
 }
 
 func (tpj *tokenProcessingJob) cacheMediaObjects(ctx context.Context, metadata persist.TokenMetadata) (persist.Media, error) {
-	imgURL, animURL, err := findImageAndAnimationURLs(ctx, tpj.contract.Address, tpj.token.Chain, metadata, tpj.pipelineMetadata)
+	imgURL, animURL, err := findImageAndAnimationURLs(ctx, tpj.contract.ContractAddress, tpj.token.Chain, metadata, tpj.pipelineMetadata)
 	if err != nil {
 		return persist.Media{MediaType: persist.MediaTypeUnknown}, err
 	}
@@ -349,7 +313,7 @@ func (tpj *tokenProcessingJob) createRawMedia(ctx context.Context, mediaType per
 	traceCallback, ctx := persist.TrackStepStatus(ctx, &tpj.pipelineMetadata.CreateRawMedia, "CreateRawMedia")
 	defer traceCallback()
 
-	return createRawMedia(ctx, persist.NewTokenIdentifiers(tpj.contract.Address, tpj.token.TokenID, tpj.token.Chain), mediaType, tpj.tp.tokenBucket, animURL, imgURL, objects)
+	return createRawMedia(ctx, persist.NewTokenIdentifiers(tpj.contract.ContractAddress, tpj.token.TokenID, tpj.token.Chain), mediaType, tpj.tp.tokenBucket, animURL, imgURL, objects)
 }
 
 func (tpj *tokenProcessingJob) isNewMediaPreferable(ctx context.Context, media persist.Media) bool {
@@ -358,7 +322,7 @@ func (tpj *tokenProcessingJob) isNewMediaPreferable(ctx context.Context, media p
 	return media.IsServable()
 }
 
-func (tpj *tokenProcessingJob) persistResults(ctx context.Context, tmetadata coredb.TokenMedia) error {
+func (tpj *tokenProcessingJob) persistResults(ctx context.Context, tmetadata db.TokenMedia) error {
 	if !tpj.isNewMediaPreferable(ctx, tmetadata.Media) {
 		tmetadata.Active = false
 	}
@@ -367,7 +331,7 @@ func (tpj *tokenProcessingJob) persistResults(ctx context.Context, tmetadata cor
 
 }
 
-func (tpj *tokenProcessingJob) upsertDB(ctx context.Context, tmetadata coredb.TokenMedia) error {
+func (tpj *tokenProcessingJob) upsertDB(ctx context.Context, tmetadata db.TokenMedia) error {
 	p := persist.TokenProperties{
 		HasMetadata:     tmetadata.Metadata != nil && len(tmetadata.Metadata) > 0,
 		HasPrimaryMedia: tmetadata.Media.MediaType.IsValid() && tmetadata.Media.MediaURL != "",
@@ -384,7 +348,7 @@ func (tpj *tokenProcessingJob) upsertDB(ctx context.Context, tmetadata coredb.To
 		tokenDBID = tpj.tokenInstance.ID
 	}
 
-	return tpj.tp.queries.InsertTokenPipelineResults(ctx, coredb.InsertTokenPipelineResultsParams{
+	return tpj.tp.queries.InsertTokenPipelineResults(ctx, db.InsertTokenPipelineResultsParams{
 		Chain:            tpj.token.Chain,
 		ContractID:       tpj.contract.ID,
 		TokenID:          tpj.token.TokenID,
@@ -428,9 +392,9 @@ func pipelineErroredMetric() metric.Measure {
 	return metric.Measure{Name: metricPipelineErrored}
 }
 
-func recordPipelineEndState(ctx context.Context, mr metric.MetricReporter, tokenMedia coredb.TokenMedia, err error, d time.Duration, cause persist.ProcessingCause) {
+func recordPipelineEndState(ctx context.Context, mr metric.MetricReporter, chain persist.Chain, tokenMedia db.TokenMedia, err error, d time.Duration, cause persist.ProcessingCause) {
 	baseOpts := append([]any{}, metric.LogOptions.WithTags(map[string]string{
-		"chain":      fmt.Sprintf("%d", tokenMedia.Chain),
+		"chain":      fmt.Sprintf("%d", chain),
 		"mediaType":  tokenMedia.Media.MediaType.String(),
 		"cause":      cause.String(),
 		"isBadToken": fmt.Sprintf("%t", isBadTokenErr(err)),

@@ -532,26 +532,28 @@ type TokenDefinition struct {
 	ExternalUrl          sql.NullString        `json:"external_url"`
 	Chain                persist.Chain         `json:"chain"`
 	IsProviderMarkedSpam bool                  `json:"is_provider_marked_spam"`
+	Metadata             persist.TokenMetadata `json:"metadata"`
 	FallbackMedia        persist.FallbackMedia `json:"fallback_media"`
+	ContractAddress      persist.Address       `json:"contract_address"`
 	ContractID           persist.DBID          `json:"contract_id"`
 	TokenMediaID         persist.DBID          `json:"token_media_id"`
 }
 
 type TokenMedia struct {
-	ID                    persist.DBID          `json:"id"`
-	CreatedAt             time.Time             `json:"created_at"`
-	LastUpdated           time.Time             `json:"last_updated"`
-	Version               int32                 `json:"version"`
-	ContractID            persist.DBID          `json:"contract_id"`
-	TokenID               persist.TokenID       `json:"token_id"`
-	Chain                 persist.Chain         `json:"chain"`
-	Active                bool                  `json:"active"`
-	Metadata              persist.TokenMetadata `json:"metadata"`
-	Media                 persist.Media         `json:"media"`
-	NameDeprecated        string                `json:"name__deprecated"`
-	DescriptionDeprecated string                `json:"description__deprecated"`
-	ProcessingJobID       persist.DBID          `json:"processing_job_id"`
-	Deleted               bool                  `json:"deleted"`
+	ID                    persist.DBID  `json:"id"`
+	CreatedAt             time.Time     `json:"created_at"`
+	LastUpdated           time.Time     `json:"last_updated"`
+	Version               int32         `json:"version"`
+	ContractIDDeprecated  string        `json:"contract_id__deprecated"`
+	TokenIDDeprecated     string        `json:"token_id__deprecated"`
+	ChainDeprecated       int32         `json:"chain__deprecated"`
+	Active                bool          `json:"active"`
+	MetadataDeprecated    pgtype.JSONB  `json:"metadata__deprecated"`
+	Media                 persist.Media `json:"media"`
+	NameDeprecated        string        `json:"name__deprecated"`
+	DescriptionDeprecated string        `json:"description__deprecated"`
+	ProcessingJobID       persist.DBID  `json:"processing_job_id"`
+	Deleted               bool          `json:"deleted"`
 }
 
 type TokenMediasActive struct {

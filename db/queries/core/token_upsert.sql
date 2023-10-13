@@ -15,6 +15,7 @@ with token_definitions_insert as (
     , is_provider_marked_spam
     , fallback_media
     , contract_id
+    , metadata
   ) (
     select unnest(@definition_dbid::varchar[]) as id
       , now()
@@ -29,6 +30,7 @@ with token_definitions_insert as (
       , unnest(@definition_is_provider_marked_spam::bool[]) as is_provider_marked_spam
       , unnest(@definition_fallback_media::jsonb[]) as fallback_media
       , unnest(@definition_contract_id::varchar[]) as contract_id
+      , unnest(@definition_metadata::jsonb[]) as metadata
   )
   on conflict (chain, contract_id, token_id) where deleted = false
   do update set
@@ -37,7 +39,9 @@ with token_definitions_insert as (
     , description = coalesce(nullif(excluded.description, ''), nullif(description, ''))
     , external_url = coalesce(nullif(excluded.external_url, ''), nullif(external_url, ''))
     , is_provider_marked_spam = excluded.is_provider_marked_spam
+    -- Maybe smarter update logic for fallback media and metadata?
     , fallback_media = excluded.fallback_media
+    , metadata = excluded.metadata
   returning *
 )
 , tokens_insert as (

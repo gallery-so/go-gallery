@@ -1712,7 +1712,7 @@ func (b *GetGalleryByIdBatchBatchResults) Close() error {
 }
 
 const getGalleryTokenMediasByGalleryIDBatch = `-- name: GetGalleryTokenMediasByGalleryIDBatch :batchmany
-select tm.id, tm.created_at, tm.last_updated, tm.version, tm.contract_id, tm.token_id, tm.chain, tm.active, tm.metadata, tm.media, tm.name__deprecated, tm.description__deprecated, tm.processing_job_id, tm.deleted
+select tm.id, tm.created_at, tm.last_updated, tm.version, tm.contract_id__deprecated, tm.token_id__deprecated, tm.chain__deprecated, tm.active, tm.metadata__deprecated, tm.media, tm.name__deprecated, tm.description__deprecated, tm.processing_job_id, tm.deleted
 	from galleries g, collections c, tokens t, token_medias tm
 	where
 		g.id = $1
@@ -1772,11 +1772,11 @@ func (b *GetGalleryTokenMediasByGalleryIDBatchBatchResults) Query(f func(int, []
 					&i.CreatedAt,
 					&i.LastUpdated,
 					&i.Version,
-					&i.ContractID,
-					&i.TokenID,
-					&i.Chain,
+					&i.ContractIDDeprecated,
+					&i.TokenIDDeprecated,
+					&i.ChainDeprecated,
 					&i.Active,
-					&i.Metadata,
+					&i.MetadataDeprecated,
 					&i.Media,
 					&i.NameDeprecated,
 					&i.DescriptionDeprecated,
@@ -1801,7 +1801,7 @@ func (b *GetGalleryTokenMediasByGalleryIDBatchBatchResults) Close() error {
 }
 
 const getMediaByTokenIDIgnoringStatus = `-- name: GetMediaByTokenIDIgnoringStatus :batchone
-select m.id, m.created_at, m.last_updated, m.version, m.contract_id, m.token_id, m.chain, m.active, m.metadata, m.media, m.name__deprecated, m.description__deprecated, m.processing_job_id, m.deleted
+select m.id, m.created_at, m.last_updated, m.version, m.contract_id__deprecated, m.token_id__deprecated, m.chain__deprecated, m.active, m.metadata__deprecated, m.media, m.name__deprecated, m.description__deprecated, m.processing_job_id, m.deleted
 from token_medias m
 where m.id = (select token_media_id from tokens where tokens.id = $1) and not m.deleted
 `
@@ -1840,11 +1840,11 @@ func (b *GetMediaByTokenIDIgnoringStatusBatchResults) QueryRow(f func(int, Token
 			&i.CreatedAt,
 			&i.LastUpdated,
 			&i.Version,
-			&i.ContractID,
-			&i.TokenID,
-			&i.Chain,
+			&i.ContractIDDeprecated,
+			&i.TokenIDDeprecated,
+			&i.ChainDeprecated,
 			&i.Active,
-			&i.Metadata,
+			&i.MetadataDeprecated,
 			&i.Media,
 			&i.NameDeprecated,
 			&i.DescriptionDeprecated,

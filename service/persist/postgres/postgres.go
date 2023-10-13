@@ -323,7 +323,7 @@ func NewRepositories(pq *sql.DB, pgx *pgxpool.Pool) *Repositories {
 		pool:                  pgx,
 		UserRepository:        NewUserRepository(pq, queries, pgx),
 		NonceRepository:       NewNonceRepository(pq, queries),
-		TokenRepository:       NewTokenFullDetailsRepository(pq, queries),
+		TokenRepository:       NewTokenFullDetailsRepository(queries),
 		CollectionRepository:  NewCollectionTokenRepository(pq, queries),
 		GalleryRepository:     NewGalleryRepository(queries),
 		ContractRepository:    NewContractGalleryRepository(pq, queries),

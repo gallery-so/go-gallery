@@ -32,10 +32,10 @@ func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProces
 		if hub := sentryutil.SentryHubFromContext(c); hub != nil {
 			hub.Scope().AddEventProcessor(sentryutil.SpanFilterEventProcessor(c, 1000, 1*time.Millisecond, 8, true))
 		}
-		processMediaForUsersTokens(tp, repos.TokenRepository, repos.ContractRepository, syncManager)(c)
+		processMediaForUsersTokens(tp, repos.TokenRepository, syncManager)(c)
 	})
-	mediaGroup.POST("/process/token", processMediaForTokenIdentifiers(tp, repos.TokenRepository, repos.ContractRepository, repos.UserRepository, repos.WalletRepository, refreshManager))
-	mediaGroup.POST("/tokenmanage/process/token", processMediaForTokenManaged(tp, repos.TokenRepository, repos.ContractRepository, syncManager))
+	mediaGroup.POST("/process/token", processMediaForTokenIdentifiers(tp, mc.Queries, refreshManager))
+	mediaGroup.POST("/tokenmanage/process/token", processMediaForTokenManaged(tp, repos.TokenRepository, syncManager))
 	mediaGroup.POST("/process/post-preflight", processPostPreflight(tp, syncManager, mc.Queries, mc, repos.ContractRepository, repos.UserRepository, repos.TokenRepository))
 	ownersGroup := router.Group("/owners")
 	ownersGroup.POST("/process/contract", processOwnersForContractTokens(mc, repos.ContractRepository, throttler))
@@ -50,9 +50,9 @@ func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProces
 
 func syncMaxRetriesF(ctx context.Context, q *db.Queries) func(id persist.DBID) int {
 	return func(id persist.DBID) int {
-		contract, _ := q.GetContractByTokenDefinitionId(ctx, id)
-		contractIdentifiers := persist.NewContractIdentifiers(contract.Address, contract.Chain)
-		if retries, ok := contractSpecificRetries[contractIdentifiers]; ok {
+		td, _ := q.GetTokenDefinitionById(ctx, id)
+		cID := persist.NewContractIdentifiers(td.ContractAddress, td.Chain)
+		if retries, ok := contractSpecificRetries[cID]; ok {
 			return retries
 		}
 		return defaultSyncMaxRetries

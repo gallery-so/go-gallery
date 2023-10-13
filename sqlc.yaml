@@ -196,6 +196,8 @@ sql:
             go_type: 'github.com/mikeydub/go-gallery/service/persist.FallbackMedia'
           - column: 'token_definitions.token_type'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.TokenType'
+          - column: 'token_definitions.metadata'
+            go_type: 'github.com/mikeydub/go-gallery/service/persist.TokenMetadata'
 
           # Wildcards
           # Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above.

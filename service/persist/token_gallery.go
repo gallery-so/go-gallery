@@ -47,12 +47,6 @@ type ContractIdentifiers struct {
 	Chain           Chain   `json:"chain"`
 }
 
-type ErrTokenGalleryNotFoundByIdentifiers struct {
-	TokenID         TokenID
-	ContractAddress Address
-	Chain           Chain
-}
-
 // NewTokenIdentifiers creates a new token identifiers
 func NewTokenIdentifiers(pContractAddress Address, pTokenID TokenID, pChain Chain) TokenIdentifiers {
 	return TokenIdentifiers{
@@ -134,8 +128,4 @@ func (a *AddressAtBlock) Scan(src interface{}) error {
 // Value implements the database/sql/driver Valuer interface for the AddressAtBlock type
 func (a AddressAtBlock) Value() (driver.Value, error) {
 	return json.Marshal(a)
-}
-
-func (e ErrTokenGalleryNotFoundByIdentifiers) Error() string {
-	return fmt.Sprintf("token not found with contract address %v and token ID %v", e.ContractAddress, e.TokenID)
 }

@@ -863,7 +863,7 @@ func (c combinedProviderChildContractResults) ParentContracts() []db.Contract {
 			contracts: contracts,
 		})
 	}
-	return contractsToUpsertableContracts(combined, nil)
+	return chainContractsToUpsertableContracts(combined, nil)
 }
 
 // SyncTokensCreatedOnSharedContracts queries each provider to identify contracts created by the given user.
@@ -953,8 +953,8 @@ func (p *Provider) processTokensForUsers(ctx context.Context, users map[persist.
 	upsertableTokens := make([]db.Token, 0)
 
 	for userID, user := range users {
-		tokens := tokensToUpsertableTokens(chainTokensForUsers[userID], contracts, user)
-		definitions := tokensToUpsertableTokenDefinitions(chainTokensForUsers[userID], contracts)
+		tokens := chainTokensToUpsertableTokens(chainTokensForUsers[userID], contracts, user)
+		definitions := chainTokensToUpsertableTokenDefinitions(chainTokensForUsers[userID], contracts)
 		upsertableTokens = append(upsertableTokens, tokens...)
 		upsertableDefinitions = append(upsertableDefinitions, definitions...)
 	}
@@ -978,20 +978,20 @@ func (p *Provider) processTokensForUsers(ctx context.Context, users map[persist.
 	// Create a lookup for userID to persisted token IDs
 	currentUserTokens = make(map[persist.DBID][]postgres.TokenFullDetails)
 	for _, token := range upsertedTokens {
-		currentUserTokens[token.Token.OwnerUserID] = append(currentUserTokens[token.Token.OwnerUserID], token)
+		currentUserTokens[token.Instance.OwnerUserID] = append(currentUserTokens[token.Instance.OwnerUserID], token)
 	}
 
 	newUserTokens = make(map[persist.DBID][]postgres.TokenFullDetails, len(users))
 
 	for userID := range users {
 		currentTokensForUser := currentUserTokens[userID]
-		newPersistedTokens := util.Filter(currentTokensForUser, func(t postgres.TokenFullDetails) bool { return t.Token.CreatedAt.Equal(t.Token.LastUpdated) }, false)
+		newPersistedTokens := util.Filter(currentTokensForUser, func(t postgres.TokenFullDetails) bool { return t.Instance.CreatedAt.Equal(t.Instance.LastUpdated) }, false)
 		newUserTokens[userID] = newPersistedTokens
 	}
 
 	for userID := range users {
 		// include the existing tokens that were not persisted with the bulk upsert
-		currentUserTokens[userID] = util.DedupeWithTranslate(append(currentUserTokens[userID], existingTokensForUsers[userID]...), false, func(t postgres.TokenFullDetails) persist.DBID { return t.Token.ID })
+		currentUserTokens[userID] = util.DedupeWithTranslate(append(currentUserTokens[userID], existingTokensForUsers[userID]...), false, func(t postgres.TokenFullDetails) persist.DBID { return t.Instance.ID })
 	}
 
 	// Submit tokens that are missing media IDs. Tokens that are missing media IDs are new tokens, or tokens that weren't processed for whatever reason.
@@ -1075,7 +1075,7 @@ func (p *Provider) processTokensForOwnersOfContract(ctx context.Context, contrac
 
 	existingTokensForUsers := make(map[persist.DBID][]postgres.TokenFullDetails)
 	for _, t := range existingTokens {
-		existingTokensForUsers[t.Token.OwnerUserID] = append(existingTokensForUsers[t.Token.OwnerUserID], t)
+		existingTokensForUsers[t.Instance.OwnerUserID] = append(existingTokensForUsers[t.Instance.OwnerUserID], t)
 	}
 
 	return p.processTokensForUsers(ctx, users, chainTokensForUsers, existingTokensForUsers, []db.Contract{contract}, upsertParams)
@@ -1832,7 +1832,7 @@ func (p *Provider) matchingWalletsChain(wallets []persist.Wallet, chain persist.
 // the owner address of an existing contract will be overwritten if the new contract provides a non-empty owner address.
 // An empty owner address will never overwrite an existing address, even if canOverwriteOwnerAddress is true.
 func (d *Provider) processContracts(ctx context.Context, contractsFromProviders []chainContracts, existingContracts []db.Contract, canOverwriteOwnerAddress bool) (currentContractState []db.Contract, newContracts []db.Contract, err error) {
-	contractsToUpsert := contractsToUpsertableContracts(contractsFromProviders, existingContracts)
+	contractsToUpsert := chainContractsToUpsertableContracts(contractsFromProviders, existingContracts)
 	newUpsertedContracts, err := d.Repos.ContractRepository.BulkUpsert(ctx, contractsToUpsert, canOverwriteOwnerAddress)
 	if err != nil {
 		return nil, nil, err
@@ -1841,8 +1841,8 @@ func (d *Provider) processContracts(ctx context.Context, contractsFromProviders 
 	return util.DedupeWithTranslate(append(newUpsertedContracts, existingContracts...), false, func(c db.Contract) persist.DBID { return c.ID }), newUpsertedContracts, nil
 }
 
-// tokensToUpsertableTokenDefinitions returns a slice of token definitions that are ready to be upserted into the database from a slice of chainTokens.
-func tokensToUpsertableTokenDefinitions(chainTokens []chainTokens, existingContracts []db.Contract) []db.TokenDefinition {
+// chainTokensToUpsertableTokenDefinitions returns a slice of token definitions that are ready to be upserted into the database from a slice of chainTokens.
+func chainTokensToUpsertableTokenDefinitions(chainTokens []chainTokens, existingContracts []db.Contract) []db.TokenDefinition {
 	definitions := make(map[persist.TokenIdentifiers]db.TokenDefinition)
 
 	// Create a lookup of contracts to their IDs
@@ -1870,7 +1870,9 @@ func tokensToUpsertableTokenDefinitions(chainTokens []chainTokens, existingContr
 					ExternalUrl:          util.ToNullString(token.ExternalURL, true),
 					Chain:                chainToken.chain,
 					IsProviderMarkedSpam: util.GetOptionalValue(token.IsSpam, false),
+					Metadata:             token.TokenMetadata,
 					FallbackMedia:        token.FallbackMedia,
+					ContractAddress:      token.ContractAddress,
 					ContractID:           contractID,
 					TokenMediaID:         "", // Upsert will set this if the definition already exists
 				}
@@ -1880,11 +1882,13 @@ func tokensToUpsertableTokenDefinitions(chainTokens []chainTokens, existingContr
 				description := util.FirstNonEmptyString(definition.Description.String, token.Descriptors.Description)
 				externalURL := util.FirstNonEmptyString(definition.ExternalUrl.String, token.ExternalURL)
 				fallbackMedia, _ := util.FindFirst([]persist.FallbackMedia{definition.FallbackMedia, token.FallbackMedia}, func(m persist.FallbackMedia) bool { return m.IsServable() })
+				metadata, _ := util.FindFirst([]persist.TokenMetadata{definition.Metadata, token.TokenMetadata}, func(m persist.TokenMetadata) bool { return len(m) > 0 })
+
 				definition.Name = util.ToNullString(name, true)
 				definition.Description = util.ToNullString(description, true)
 				definition.ExternalUrl = util.ToNullString(externalURL, true)
 				definition.FallbackMedia = fallbackMedia
-				// If any provider reports the token as spam, mark it as spam
+				definition.Metadata = metadata
 				definition.IsProviderMarkedSpam = definition.IsProviderMarkedSpam || util.GetOptionalValue(token.IsSpam, false)
 				definitions[tokenIdentifiers] = definition
 			}
@@ -1899,8 +1903,8 @@ func tokensToUpsertableTokenDefinitions(chainTokens []chainTokens, existingContr
 	return tokenDefinitions
 }
 
-// tokensToUpsertableTokens returns a unique slice of tokens that are ready to be upserted into the database.
-func tokensToUpsertableTokens(tokens []chainTokens, existingContracts []db.Contract, ownerUser persist.User) []db.Token {
+// chainTokensToUpsertableTokens returns a unique slice of tokens that are ready to be upserted into the database.
+func chainTokensToUpsertableTokens(tokens []chainTokens, existingContracts []db.Contract, ownerUser persist.User) []db.Token {
 	addressToContract := make(map[string]db.Contract)
 
 	util.Map(existingContracts, func(c db.Contract) (any, error) {
@@ -2021,7 +2025,7 @@ type contractMetadata struct {
 }
 
 // contractsToUpsertableContracts returns a unique slice of contracts that are ready to be upserted into the database.
-func contractsToUpsertableContracts(contracts []chainContracts, existingContracts []db.Contract) []db.Contract {
+func chainContractsToUpsertableContracts(contracts []chainContracts, existingContracts []db.Contract) []db.Contract {
 
 	contractMetadatas := map[persist.ChainAddress]contractMetadata{}
 	existingMetadatas := map[persist.ChainAddress]contractMetadata{}
