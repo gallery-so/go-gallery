@@ -106,6 +106,20 @@ func (p *pushLimiter) tryAdmire(ctx context.Context, sendingUserID persist.DBID,
 	}
 }
 
+func (p *pushLimiter) tryAdmireToken(ctx context.Context, sendingUserID persist.DBID, receivingUserID persist.DBID, tokenID persist.DBID) error {
+	key := fmt.Sprintf("%s:%s:%s", sendingUserID.String(), receivingUserID.String(), tokenID.String())
+	if p.isActionAllowed(ctx, p.admires, key) {
+		return nil
+	}
+
+	return errRateLimited{
+		limiterName: p.admires.Name(),
+		senderID:    sendingUserID,
+		receiverID:  receivingUserID,
+		tokenID:     tokenID,
+	}
+}
+
 func (p *pushLimiter) tryFollow(ctx context.Context, sendingUserID persist.DBID, receivingUserID persist.DBID) error {
 	key := fmt.Sprintf("%s:%s", sendingUserID, receivingUserID)
 	if p.isActionAllowed(ctx, p.follows, key) {
@@ -550,6 +564,24 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 		return message, nil
 	}
 
+	if notif.Action == persist.ActionAdmiredToken {
+		admirer, err := queries.GetUserById(ctx, notif.Data.AdmirerIDs[0])
+		if err != nil {
+			return task.PushNotificationMessage{}, err
+		}
+
+		if err = limiter.tryAdmireToken(ctx, admirer.ID, notif.OwnerID, notif.TokenID); err != nil {
+			return task.PushNotificationMessage{}, err
+		}
+
+		if !admirer.Username.Valid {
+			return task.PushNotificationMessage{}, fmt.Errorf("user with ID=%s has no username", admirer.ID)
+		}
+
+		message.Body = fmt.Sprintf("%s admired your token", admirer.Username.String)
+		return message, nil
+	}
+
 	if notif.Action == persist.ActionCommentedOnFeedEvent || notif.Action == persist.ActionCommentedOnPost {
 		comment, err := queries.GetCommentByCommentID(ctx, notif.CommentID)
 		if err != nil {
@@ -740,6 +772,8 @@ func actionSupportsPushNotifications(action persist.Action) bool {
 		return true
 	case persist.ActionAdmiredPost:
 		return true
+	case persist.ActionAdmiredToken:
+		return true
 	default:
 		return false
 	}
@@ -818,7 +852,7 @@ func updateAndPublishNotif(ctx context.Context, notif db.Notification, mostRecen
 	var amount = notif.Amount
 	resultData := mostRecentNotif.Data.Concat(notif.Data)
 	switch notif.Action {
-	case persist.ActionAdmiredFeedEvent, persist.ActionAdmiredPost:
+	case persist.ActionAdmiredFeedEvent, persist.ActionAdmiredPost, persist.ActionAdmiredToken:
 		amount = int32(len(resultData.AdmirerIDs))
 	case persist.ActionViewedGallery:
 		amount = int32(len(resultData.AuthedViewerIDs) + len(resultData.UnauthedViewerIDs))
@@ -897,6 +931,15 @@ func addNotification(ctx context.Context, notif db.Notification, queries *db.Que
 			Data:     notif.Data,
 			EventIds: notif.EventIds,
 			Post:     sql.NullString{String: notif.PostID.String(), Valid: true},
+		})
+	case persist.ActionAdmiredToken:
+		return queries.CreateAdmireNotification(ctx, db.CreateAdmireNotificationParams{
+			ID:       id,
+			OwnerID:  notif.OwnerID,
+			Action:   notif.Action,
+			Data:     notif.Data,
+			EventIds: notif.EventIds,
+			Token:    sql.NullString{String: notif.TokenID.String(), Valid: true},
 		})
 	case persist.ActionCommentedOnPost:
 		return queries.CreateCommentNotification(ctx, db.CreateCommentNotificationParams{
@@ -1001,6 +1044,7 @@ type errRateLimited struct {
 	senderID    persist.DBID
 	receiverID  persist.DBID
 	feedEventID persist.DBID
+	tokenID     persist.DBID
 }
 
 func (e errRateLimited) Error() string {
