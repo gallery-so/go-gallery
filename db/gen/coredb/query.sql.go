@@ -2727,23 +2727,23 @@ func (q *Queries) GetLastFeedEventForUser(ctx context.Context, arg GetLastFeedEv
 	return i, err
 }
 
-const getMediaByUserTokenIdentifiers = `-- name: GetMediaByUserTokenIdentifiers :one
+const getMediaByTokenIdentifiers = `-- name: GetMediaByTokenIdentifiers :one
 select token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.contract_id__deprecated, token_medias.token_id__deprecated, token_medias.chain__deprecated, token_medias.active, token_medias.metadata__deprecated, token_medias.media, token_medias.name__deprecated, token_medias.description__deprecated, token_medias.processing_job_id, token_medias.deleted
-from token_medias
-join token_definitions on token_definitions.token_media_id = token_medias.id
-where (token_definitions.chain, token_definitions.contract_address, token_definitions.token_id) = ($1, $2, $3)
+from token_definitions
+join token_medias on token_definitions.token_media_id = token_medias.id
+where (chain, contract_address, token_id) = ($1, $2, $3)
     and not token_definitions.deleted
-order by token_medias.active desc, token_medias.last_updated desc
+    and not token_medias.deleted
 `
 
-type GetMediaByUserTokenIdentifiersParams struct {
+type GetMediaByTokenIdentifiersParams struct {
 	Chain           persist.Chain   `json:"chain"`
 	ContractAddress persist.Address `json:"contract_address"`
-	TokenUd         sql.NullInt32   `json:"token_ud"`
+	TokenID         persist.TokenID `json:"token_id"`
 }
 
-func (q *Queries) GetMediaByUserTokenIdentifiers(ctx context.Context, arg GetMediaByUserTokenIdentifiersParams) (TokenMedia, error) {
-	row := q.db.QueryRow(ctx, getMediaByUserTokenIdentifiers, arg.Chain, arg.ContractAddress, arg.TokenUd)
+func (q *Queries) GetMediaByTokenIdentifiers(ctx context.Context, arg GetMediaByTokenIdentifiersParams) (TokenMedia, error) {
+	row := q.db.QueryRow(ctx, getMediaByTokenIdentifiers, arg.Chain, arg.ContractAddress, arg.TokenID)
 	var i TokenMedia
 	err := row.Scan(
 		&i.ID,
@@ -6182,106 +6182,93 @@ func (q *Queries) InsertSpamContracts(ctx context.Context, arg InsertSpamContrac
 	return err
 }
 
-const insertTokenPipelineResults = `-- name: InsertTokenPipelineResults :exec
-select 'implement me'
+const insertTokenPipelineResults = `-- name: InsertTokenPipelineResults :one
+with insert_job(id) as (
+    insert into token_processing_jobs (id, token_properties, pipeline_metadata, processing_cause, processor_version)
+    values ($1, $2, $3, $4, $5)
+    returning id
+)
+, set_conditionally_current_media_to_inactive as (
+    insert into token_medias (id, media, processing_job_id, active, created_at, last_updated)
+    (
+        select $6, media, processing_job_id, false, created_at, now()
+        from token_medias
+        where id = (select token_media_id from token_definitions td where (td.chain, td.contract_address, td.token_id) = ($7, $8, $9) and not deleted)
+        and not deleted
+        and $10::bool
+    )
+)
+, insert_new_media as (
+    insert into token_medias (id, media, processing_job_id, active, created_at, last_updated)
+    values ($11, $12, (select id from insert_job), @@new_media_is_active,
+        -- Using timestamps generated from set_conditionally_current_media_to_inactive ensures that the new record is only inserted after the current media is moved
+        (select coalesce((select last_updated from set_conditionally_current_media_to_inactive), now())),
+        (select coalesce((select last_updated from set_conditionally_current_media_to_inactive), now()))
+    )
+    returning id, created_at, last_updated, version, contract_id__deprecated, token_id__deprecated, chain__deprecated, active, metadata__deprecated, media, name__deprecated, description__deprecated, processing_job_id, deleted
+)
+, update_token_definition(token_media_id) as (
+    update token_definitions
+    set metadata = $13, name = $14, description = $15, token_media_id = case when $10 then (select id from insert_new_media) else token_definitions.token_media_id end
+    returning token_media_id
+)
+select id, created_at, last_updated, version, contract_id__deprecated, token_id__deprecated, chain__deprecated, active, metadata__deprecated, media, name__deprecated, description__deprecated, processing_job_id, deleted from token_medias where id = update_token_definition.token_media_id
 `
 
-// with insert_job(id) as (
-//
-//	insert into token_processing_jobs (id, token_properties, pipeline_metadata, processing_cause, processor_version)
-//	values (@processing_job_id, @token_properties, @pipeline_metadata, @processing_cause, @processor_version)
-//	returning id
-//
-// ),
-// -- Optionally create an inactive record of the existing active record if the new media is also active
-// insert_media_move_active_record(last_updated) as (
-//
-//	insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
-//	(
-//	    select @retired_media_id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, now()
-//	    from token_medias
-//	    where contract_id = @contract_id
-//	        and token_id = @token_id
-//	        and chain = @chain
-//	        and active
-//	        and not deleted
-//	        and @active = true
-//	    limit 1
-//	)
-//	returning last_updated
-//
-// ),
-// -- Update the existing active record with the new media data
-// insert_media_add_record(insert_id, active, replaced_current) as (
-//
-//	insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
-//	values (@new_media_id, @contract_id, @token_id, @chain, @metadata, @media, @name, @description, (select id from insert_job), @active,
-//	    -- Using timestamps generated from insert_media_move_active_record ensures that the new record is only inserted after the current media is moved
-//	    (select coalesce((select last_updated from insert_media_move_active_record), now())),
-//	    (select coalesce((select last_updated from insert_media_move_active_record), now()))
-//	)
-//	on conflict (contract_id, token_id, chain) where active and not deleted do update
-//	    set metadata = excluded.metadata,
-//	        media = excluded.media,
-//	        name = coalesce(nullif(excluded.name, ''), token_medias.name),
-//	        description = coalesce(nullif(excluded.description, ''), token_medias.description),
-//	        processing_job_id = excluded.processing_job_id,
-//	        last_updated = now()
-//	returning id as insert_id, active, id = @new_media_id replaced_current
-//
-// ),
-// -- This will return the existing active record if it exists. If the incoming record is active,
-// -- this will still return the active record before the update, and not the new record.
-// existing_active(id) as (
-//
-//	select id
-//	from token_medias
-//	where chain = @chain and contract_id = @contract_id and token_id = @token_id and active and not deleted
-//	limit 1
-//
-// )
-// update tokens
-// set token_media_id = (
-//
-//	case
-//	    -- The pipeline didn't produce active media, but one already exists so use that one
-//	    when not insert_medias.active and (select id from existing_active) is not null
-//	    then (select id from existing_active)
-//
-//	    -- The pipeline produced active media, or didn't produce active media but no active media existed before
-//	    else insert_medias.insert_id
-//	end
-//
-// ), name = coalesce(nullif(@name, ”), tokens.name), description = coalesce(nullif(@description, ”), tokens.description), last_updated = now() -- update the duplicate fields on the token in the meantime before we get rid of these fields
-// from insert_media_add_record insert_medias
-// where
-//
-//	tokens.chain = @chain
-//	and tokens.contract_id = @contract_id
-//	and tokens.token_id = @token_id
-//	and not tokens.deleted
-//	and (
-//	    -- The case statement below handles which token instances get updated:
-//	    case
-//	        -- If the active media already existed, update tokens that have no media (new tokens that haven't been processed before) or tokens that don't use this media yet
-//	        when insert_medias.active and not insert_medias.replaced_current
-//	        then (tokens.token_media_id is null or tokens.token_media_id != insert_medias.insert_id)
-//
-//	        -- Brand new active media, update all tokens in the filter to use this media
-//	        when insert_medias.active and insert_medias.replaced_current
-//	        then 1 = 1
-//
-//	        -- The pipeline run produced inactive media, only update the token instance (since it may have not been processed before)
-//	        -- Since there is no db constraint on inactive media, all inactive media is new
-//	        when not insert_medias.active
-//	        then tokens.id = @token_dbid
-//
-//	        else 1 = 1
-//	    end
-//	);
-func (q *Queries) InsertTokenPipelineResults(ctx context.Context) error {
-	_, err := q.db.Exec(ctx, insertTokenPipelineResults)
-	return err
+type InsertTokenPipelineResultsParams struct {
+	ProcessingJobID  persist.DBID             `json:"processing_job_id"`
+	TokenProperties  persist.TokenProperties  `json:"token_properties"`
+	PipelineMetadata persist.PipelineMetadata `json:"pipeline_metadata"`
+	ProcessingCause  persist.ProcessingCause  `json:"processing_cause"`
+	ProcessorVersion string                   `json:"processor_version"`
+	RetiringMediaID  persist.DBID             `json:"retiring_media_id"`
+	Chain            persist.Chain            `json:"chain"`
+	ContractAddress  persist.Address          `json:"contract_address"`
+	TokenID          persist.TokenID          `json:"token_id"`
+	NewMediaIsActive bool                     `json:"new_media_is_active"`
+	NewMediaID       persist.DBID             `json:"new_media_id"`
+	NewMedia         pgtype.JSONB             `json:"new_media"`
+	NewMetadata      pgtype.JSONB             `json:"new_metadata"`
+	NewName          sql.NullString           `json:"new_name"`
+	NewDescription   sql.NullString           `json:"new_description"`
+}
+
+func (q *Queries) InsertTokenPipelineResults(ctx context.Context, arg InsertTokenPipelineResultsParams) (TokenMedia, error) {
+	row := q.db.QueryRow(ctx, insertTokenPipelineResults,
+		arg.ProcessingJobID,
+		arg.TokenProperties,
+		arg.PipelineMetadata,
+		arg.ProcessingCause,
+		arg.ProcessorVersion,
+		arg.RetiringMediaID,
+		arg.Chain,
+		arg.ContractAddress,
+		arg.TokenID,
+		arg.NewMediaIsActive,
+		arg.NewMediaID,
+		arg.NewMedia,
+		arg.NewMetadata,
+		arg.NewName,
+		arg.NewDescription,
+	)
+	var i TokenMedia
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.LastUpdated,
+		&i.Version,
+		&i.ContractIDDeprecated,
+		&i.TokenIDDeprecated,
+		&i.ChainDeprecated,
+		&i.Active,
+		&i.MetadataDeprecated,
+		&i.Media,
+		&i.NameDeprecated,
+		&i.DescriptionDeprecated,
+		&i.ProcessingJobID,
+		&i.Deleted,
+	)
+	return i, err
 }
 
 const insertUser = `-- name: InsertUser :one
@@ -7215,7 +7202,7 @@ func (q *Queries) UpdateTokenCollectorsNoteByTokenDbidUserId(ctx context.Context
 	return err
 }
 
-const updateTokenMetadataFieldsByTokenIdentifiers = `-- name: UpdateTokenMetadataFieldsByTokenIdentifiers :exec
+const updateTokenMetadataFieldsByTokenIdentifiers = `-- name: UpdateTokenMetadataFieldsByTokenIdentifiers :one
 update token_definitions
 set name = $1,
     description = $2,
@@ -7224,6 +7211,7 @@ where token_id = $3
     and contract_id = $4
     and chain = $5
     and deleted = false
+returning id, created_at, last_updated, deleted, name, description, token_type, token_id, external_url, chain, is_provider_marked_spam, metadata, fallback_media, contract_address, contract_id, token_media_id
 `
 
 type UpdateTokenMetadataFieldsByTokenIdentifiersParams struct {
@@ -7234,23 +7222,34 @@ type UpdateTokenMetadataFieldsByTokenIdentifiersParams struct {
 	Chain       persist.Chain   `json:"chain"`
 }
 
-// XXX: update tokens
-// XXX: set name = @name,
-// XXX:     description = @description,
-// XXX:     last_updated = now()
-// XXX: where token_id = @token_id
-// XXX:     and contract = @contract_id
-// XXX:     and chain = @chain
-// XXX:     and deleted = false;
-func (q *Queries) UpdateTokenMetadataFieldsByTokenIdentifiers(ctx context.Context, arg UpdateTokenMetadataFieldsByTokenIdentifiersParams) error {
-	_, err := q.db.Exec(ctx, updateTokenMetadataFieldsByTokenIdentifiers,
+func (q *Queries) UpdateTokenMetadataFieldsByTokenIdentifiers(ctx context.Context, arg UpdateTokenMetadataFieldsByTokenIdentifiersParams) (TokenDefinition, error) {
+	row := q.db.QueryRow(ctx, updateTokenMetadataFieldsByTokenIdentifiers,
 		arg.Name,
 		arg.Description,
 		arg.TokenID,
 		arg.ContractID,
 		arg.Chain,
 	)
-	return err
+	var i TokenDefinition
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.LastUpdated,
+		&i.Deleted,
+		&i.Name,
+		&i.Description,
+		&i.TokenType,
+		&i.TokenID,
+		&i.ExternalUrl,
+		&i.Chain,
+		&i.IsProviderMarkedSpam,
+		&i.Metadata,
+		&i.FallbackMedia,
+		&i.ContractAddress,
+		&i.ContractID,
+		&i.TokenMediaID,
+	)
+	return i, err
 }
 
 const updateTokensAsUserMarkedSpam = `-- name: UpdateTokensAsUserMarkedSpam :exec

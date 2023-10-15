@@ -26,8 +26,8 @@ func NewTokenFullDetailsRepository(queries *db.Queries) *TokenFullDetailsReposit
 	return &TokenFullDetailsRepository{queries: queries}
 }
 
-// GetByID gets a token by its DBID
-func (t *TokenFullDetailsRepository) GetByID(ctx context.Context, tokenID persist.DBID) (TokenFullDetails, error) {
+// GetByTokenDBID gets a token by its DBID
+func (t *TokenFullDetailsRepository) GetByTokenDBID(ctx context.Context, tokenID persist.DBID) (TokenFullDetails, error) {
 	r, err := t.queries.GetTokenFullDetailsByTokenDbid(ctx, tokenID)
 	if err != nil {
 		return TokenFullDetails{}, err
@@ -145,9 +145,6 @@ func (t *TokenFullDetailsRepository) UpsertTokens(ctx context.Context, tokens []
 
 	var errors []error
 
-	// XXX: Add address to definition
-	panic("ADD ADDRESS")
-
 	for i := range definitions {
 		d := &definitions[i]
 		params.DefinitionDbid = append(params.DefinitionDbid, persist.GenerateID().String())
@@ -160,6 +157,7 @@ func (t *TokenFullDetailsRepository) UpsertTokens(ctx context.Context, tokens []
 		params.DefinitionIsProviderMarkedSpam = append(params.DefinitionIsProviderMarkedSpam, d.IsProviderMarkedSpam)
 		appendJSONB(&params.DefinitionFallbackMedia, d.FallbackMedia, &errors)
 		appendJSONB(&params.DefinitionMetadata, d.Metadata, &errors)
+		params.DefinitionContractAddress = append(params.DefinitionContractAddress, d.ContractAddress.String())
 		params.DefinitionContractID = append(params.DefinitionContractID, d.ContractID.String())
 		// Defer error checking until now to keep the code above from being
 		// littered with multiline "if" statements

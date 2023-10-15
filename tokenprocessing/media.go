@@ -536,7 +536,7 @@ func findImageAndAnimationURLs(ctx context.Context, contractAddress persist.Addr
 	return imgURL, vURL, err
 }
 
-func findNameAndDescription(ctx context.Context, metadata persist.TokenMetadata) (string, string) {
+func findNameAndDescription(metadata persist.TokenMetadata) (string, string) {
 	name, ok := util.GetValueFromMapUnsafe(metadata, "name", util.DefaultSearchDepth).(string)
 	if !ok {
 		name = ""

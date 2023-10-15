@@ -1299,90 +1299,37 @@ update wallets set deleted = true, last_updated = now() where id = $1;
 -- name: InsertUser :one
 insert into users (id, username, username_idempotent, bio, universal, email_unsubscriptions) values ($1, $2, $3, $4, $5, $6) returning id;
 
--- name: InsertTokenPipelineResults :exec
--- with insert_job(id) as (
---     insert into token_processing_jobs (id, token_properties, pipeline_metadata, processing_cause, processor_version)
---     values (@processing_job_id, @token_properties, @pipeline_metadata, @processing_cause, @processor_version)
---     returning id
--- ),
--- -- Optionally create an inactive record of the existing active record if the new media is also active
--- insert_media_move_active_record(last_updated) as (
---     insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
---     (
---         select @retired_media_id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, false, created_at, now()
---         from token_medias
---         where contract_id = @contract_id
---             and token_id = @token_id
---             and chain = @chain
---             and active
---             and not deleted
---             and @active = true
---         limit 1
---     )
---     returning last_updated
--- ),
--- -- Update the existing active record with the new media data
--- insert_media_add_record(insert_id, active, replaced_current) as (
---     insert into token_medias (id, contract_id, token_id, chain, metadata, media, name, description, processing_job_id, active, created_at, last_updated)
---     values (@new_media_id, @contract_id, @token_id, @chain, @metadata, @media, @name, @description, (select id from insert_job), @active,
---         -- Using timestamps generated from insert_media_move_active_record ensures that the new record is only inserted after the current media is moved
---         (select coalesce((select last_updated from insert_media_move_active_record), now())),
---         (select coalesce((select last_updated from insert_media_move_active_record), now()))
---     )
---     on conflict (contract_id, token_id, chain) where active and not deleted do update
---         set metadata = excluded.metadata,
---             media = excluded.media,
---             name = coalesce(nullif(excluded.name, ''), token_medias.name),
---             description = coalesce(nullif(excluded.description, ''), token_medias.description),
---             processing_job_id = excluded.processing_job_id,
---             last_updated = now()
---     returning id as insert_id, active, id = @new_media_id replaced_current
--- ),
--- -- This will return the existing active record if it exists. If the incoming record is active,
--- -- this will still return the active record before the update, and not the new record.
--- existing_active(id) as (
---     select id
---     from token_medias
---     where chain = @chain and contract_id = @contract_id and token_id = @token_id and active and not deleted
---     limit 1
--- )
--- update tokens
--- set token_media_id = (
---     case
---         -- The pipeline didn't produce active media, but one already exists so use that one
---         when not insert_medias.active and (select id from existing_active) is not null
---         then (select id from existing_active)
--- 
---         -- The pipeline produced active media, or didn't produce active media but no active media existed before
---         else insert_medias.insert_id
---     end
--- ), name = coalesce(nullif(@name, ''), tokens.name), description = coalesce(nullif(@description, ''), tokens.description), last_updated = now() -- update the duplicate fields on the token in the meantime before we get rid of these fields
--- from insert_media_add_record insert_medias
--- where
---     tokens.chain = @chain
---     and tokens.contract_id = @contract_id
---     and tokens.token_id = @token_id
---     and not tokens.deleted
---     and (
---         -- The case statement below handles which token instances get updated:
---         case
---             -- If the active media already existed, update tokens that have no media (new tokens that haven't been processed before) or tokens that don't use this media yet
---             when insert_medias.active and not insert_medias.replaced_current
---             then (tokens.token_media_id is null or tokens.token_media_id != insert_medias.insert_id)
--- 
---             -- Brand new active media, update all tokens in the filter to use this media
---             when insert_medias.active and insert_medias.replaced_current
---             then 1 = 1
--- 
---             -- The pipeline run produced inactive media, only update the token instance (since it may have not been processed before)
---             -- Since there is no db constraint on inactive media, all inactive media is new
---             when not insert_medias.active
---             then tokens.id = @token_dbid
--- 
---             else 1 = 1
---         end
---     );
-select 'implement me';
+-- name: InsertTokenPipelineResults :one
+with insert_job(id) as (
+    insert into token_processing_jobs (id, token_properties, pipeline_metadata, processing_cause, processor_version)
+    values (@processing_job_id, @token_properties, @pipeline_metadata, @processing_cause, @processor_version)
+    returning id
+)
+, set_conditionally_current_media_to_inactive as (
+    insert into token_medias (id, media, processing_job_id, active, created_at, last_updated)
+    (
+        select @retiring_media_id, media, processing_job_id, false, created_at, now()
+        from token_medias
+        where id = (select token_media_id from token_definitions td where (td.chain, td.contract_address, td.token_id) = (@chain, @contract_address, @token_id) and not deleted)
+        and not deleted
+        and @new_media_is_active::bool
+    )
+)
+, insert_new_media as (
+    insert into token_medias (id, media, processing_job_id, active, created_at, last_updated)
+    values (@new_media_id, @new_media, (select id from insert_job), @@new_media_is_active,
+        -- Using timestamps generated from set_conditionally_current_media_to_inactive ensures that the new record is only inserted after the current media is moved
+        (select coalesce((select last_updated from set_conditionally_current_media_to_inactive), now())),
+        (select coalesce((select last_updated from set_conditionally_current_media_to_inactive), now()))
+    )
+    returning *
+)
+, update_token_definition(token_media_id) as (
+    update token_definitions
+    set metadata = @new_metadata, name = @new_name, description = @new_description, token_media_id = case when @new_media_is_active then (select id from insert_new_media) else token_definitions.token_media_id end
+    returning token_media_id
+)
+select * from token_medias where id = update_token_definition.token_media_id;
 
 -- name: InsertSpamContracts :exec
 with insert_spam_contracts as (
@@ -1495,13 +1442,13 @@ select m.*
 from token_medias m
 where m.id = (select token_media_id from tokens where tokens.id = $1) and not m.deleted;
 
--- name: GetMediaByUserTokenIdentifiers :one
+-- name: GetMediaByTokenIdentifiers :one
 select token_medias.*
-from token_medias
-join token_definitions on token_definitions.token_media_id = token_medias.id
-where (token_definitions.chain, token_definitions.contract_address, token_definitions.token_id) = (@chain, @contract_address, @token_ud)
+from token_definitions
+join token_medias on token_definitions.token_media_id = token_medias.id
+where (chain, contract_address, token_id) = (@chain, @contract_address, @token_id)
     and not token_definitions.deleted
-order by token_medias.active desc, token_medias.last_updated desc;
+    and not token_medias.deleted;
 
 -- name: GetFallbackTokenByUserTokenIdentifiers :one
 with contract as (
@@ -1531,15 +1478,7 @@ insert into sessions (id, user_id,
 -- name: InvalidateSession :exec
 update sessions set invalidated = true, active_until = least(active_until, now()), last_updated = now() where id = @id and deleted = false and invalidated = false;
 
--- name: UpdateTokenMetadataFieldsByTokenIdentifiers :exec
--- XXX: update tokens
--- XXX: set name = @name,
--- XXX:     description = @description,
--- XXX:     last_updated = now()
--- XXX: where token_id = @token_id
--- XXX:     and contract = @contract_id
--- XXX:     and chain = @chain
--- XXX:     and deleted = false;
+-- name: UpdateTokenMetadataFieldsByTokenIdentifiers :one
 update token_definitions
 set name = @name,
     description = @description,
@@ -1547,7 +1486,8 @@ set name = @name,
 where token_id = @token_id
     and contract_id = @contract_id
     and chain = @chain
-    and deleted = false;
+    and deleted = false
+returning *;
 
 -- name: GetTopCollectionsForCommunity :many
 with contract_tokens as (

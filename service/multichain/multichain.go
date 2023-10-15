@@ -505,13 +505,14 @@ func (p *Provider) SyncTokensByUserIDAndTokenIdentifiers(ctx context.Context, us
 
 // TokenExists checks if a token exists according to any provider by its identifiers. It returns nil if the token exists.
 // If a token exists, it will also update its contract and its descriptors in the database.
-func (p *Provider) TokenExists(ctx context.Context, token persist.TokenIdentifiers, r retry.Retry) error {
+func (p *Provider) TokenExists(ctx context.Context, token persist.TokenIdentifiers, r retry.Retry) (td db.TokenDefinition, err error) {
 	searchF := func(ctx context.Context) error {
-		return p.RefreshTokenDescriptorsByTokenIdentifiers(ctx, persist.TokenIdentifiers{
+		td, err = p.RefreshTokenDescriptorsByTokenIdentifiers(ctx, persist.TokenIdentifiers{
 			TokenID:         token.TokenID,
 			Chain:           token.Chain,
 			ContractAddress: token.ContractAddress,
 		})
+		return err
 	}
 
 	retryCondition := func(err error) bool {
@@ -519,7 +520,9 @@ func (p *Provider) TokenExists(ctx context.Context, token persist.TokenIdentifie
 		return true
 	}
 
-	return retry.RetryFunc(ctx, searchF, retryCondition, r)
+	retry.RetryFunc(ctx, searchF, retryCondition, r)
+
+	return
 }
 
 // SyncTokenByUserWalletsAndTokenIdentifiersRetry attempts to sync a token for a user by their wallets and token identifiers.
@@ -1368,11 +1371,12 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 	if err != nil {
 		return err
 	}
-	return p.RefreshTokenDescriptorsByTokenIdentifiers(ctx, ti)
+	_, err = p.RefreshTokenDescriptorsByTokenIdentifiers(ctx, ti)
+	return err
 }
 
 // RefreshTokenDescriptorsByTokenIdentifiers will refresh the token descriptors for a token by its identifiers.
-func (p *Provider) RefreshTokenDescriptorsByTokenIdentifiers(ctx context.Context, ti persist.TokenIdentifiers) error {
+func (p *Provider) RefreshTokenDescriptorsByTokenIdentifiers(ctx context.Context, ti persist.TokenIdentifiers) (db.TokenDefinition, error) {
 	finalTokenDescriptors := ChainAgnosticTokenDescriptors{}
 	finalContractDescriptors := ChainAgnosticContractDescriptors{}
 	tokenFetchers := matchingProvidersForChain[TokenDescriptorsFetcher](p.Chains, ti.Chain)
@@ -1414,7 +1418,7 @@ func (p *Provider) RefreshTokenDescriptorsByTokenIdentifiers(ctx context.Context
 	}
 
 	if !tokenExists {
-		return persist.ErrTokenNotFoundByTokenIdentifiers{Token: ti}
+		return db.TokenDefinition{}, persist.ErrTokenNotFoundByTokenIdentifiers{Token: ti}
 	}
 
 	contractID, err := p.Repos.ContractRepository.UpsertByAddress(ctx, ti.ContractAddress, ti.Chain, persist.ContractGallery{
@@ -1427,7 +1431,7 @@ func (p *Provider) RefreshTokenDescriptorsByTokenIdentifiers(ctx context.Context
 		OwnerAddress:    finalContractDescriptors.CreatorAddress,
 	})
 	if err != nil {
-		return err
+		return db.TokenDefinition{}, err
 	}
 
 	return p.Queries.UpdateTokenMetadataFieldsByTokenIdentifiers(ctx, db.UpdateTokenMetadataFieldsByTokenIdentifiersParams{

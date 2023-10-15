@@ -604,7 +604,7 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 	}
 	if notif.Action == persist.ActionNewTokensReceived {
 
-		tokenDef, err := queries.GetTokenDefinitionByTokenId(ctx, notif.Data.NewTokenID)
+		tokenDef, err := queries.GetTokenDefinitionByTokenDbid(ctx, notif.Data.NewTokenID)
 		if err != nil {
 			return task.PushNotificationMessage{}, err
 		}

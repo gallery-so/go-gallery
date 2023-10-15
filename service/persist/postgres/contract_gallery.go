@@ -77,7 +77,7 @@ func NewContractGalleryRepository(db *sql.DB, queries *db.Queries) *ContractGall
 	return &ContractGalleryRepository{db: db, queries: queries, getByIDStmt: getByIDStmt, getByAddressStmt: getByAddressStmt, upsertByAddressStmt: upsertByAddressStmt, getByAddressesStmt: getByAddressesStmt, getOwnersStmt: getOwnersStmt, getUserByWalletIDStmt: getUserByWalletIDStmt, getPreviewNFTsStmt: getPreviewNFTsStmt, getByTokenIDsStmt: getByTokenIDsStmt}
 }
 
-func (c *ContractGalleryRepository) GetByID(ctx context.Context, id persist.DBID) (persist.ContractGallery, error) {
+func (c *ContractGalleryRepository) GetByTokenDBID(ctx context.Context, id persist.DBID) (persist.ContractGallery, error) {
 	contract := persist.ContractGallery{}
 	err := c.getByIDStmt.QueryRowContext(ctx, id).Scan(&contract.ID, &contract.Version, &contract.CreationTime, &contract.LastUpdated, &contract.Address, &contract.Symbol, &contract.Name, &contract.OwnerAddress, &contract.Chain, &contract.IsProviderMarkedSpam)
 	if err != nil {
@@ -165,12 +165,10 @@ func (c *ContractGalleryRepository) UpsertByAddress(pCtx context.Context, pAddre
 
 // BulkUpsert bulk upserts the contracts by address
 func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, contracts []db.Contract, canOverwriteOwnerAddress bool) ([]db.Contract, error) {
-	panic("fix me")
 	if len(contracts) == 0 {
 		return []db.Contract{}, nil
 	}
 
-	contracts := removeDuplicateContractsGallery(pContracts)
 	params := db.UpsertParentContractsParams{
 		CanOverwriteOwnerAddress: canOverwriteOwnerAddress,
 	}
@@ -178,14 +176,14 @@ func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, contracts [
 	for i := range contracts {
 		c := &contracts[i]
 		params.Ids = append(params.Ids, persist.GenerateID().String())
-		params.Version = append(params.Version, c.Version.Int32())
+		params.Version = append(params.Version, c.Version.Int32)
 		params.Address = append(params.Address, c.Address.String())
-		params.Symbol = append(params.Symbol, c.Symbol.String())
-		params.Name = append(params.Name, c.Name.String())
+		params.Symbol = append(params.Symbol, c.Symbol.String)
+		params.Name = append(params.Name, c.Name.String)
 		params.OwnerAddress = append(params.OwnerAddress, c.OwnerAddress.String())
 		params.Chain = append(params.Chain, int32(c.Chain))
-		params.Description = append(params.Description, c.Description.String())
-		params.ProfileImageUrl = append(params.ProfileImageUrl, c.ProfileImageURL.String())
+		params.Description = append(params.Description, c.Description.String)
+		params.ProfileImageUrl = append(params.ProfileImageUrl, c.ProfileImageUrl.String)
 		params.ProviderMarkedSpam = append(params.ProviderMarkedSpam, c.IsProviderMarkedSpam)
 	}
 
@@ -295,20 +293,4 @@ func (c *ContractGalleryRepository) GetOwnersByAddress(ctx context.Context, cont
 
 	return result, nil
 
-}
-
-func removeDuplicateContractsGallery(pContracts []persist.ContractGallery) []persist.ContractGallery {
-	if len(pContracts) == 0 {
-		return pContracts
-	}
-	unique := map[persist.Address]bool{}
-	result := make([]persist.ContractGallery, 0, len(pContracts))
-	for _, v := range pContracts {
-		if unique[v.Address] {
-			continue
-		}
-		result = append(result, v)
-		unique[v.Address] = true
-	}
-	return result
 }
