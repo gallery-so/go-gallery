@@ -48,11 +48,12 @@
 //go:generate go run github.com/gallery-so/dataloaden AdmireLoaderByActorAndToken github.com/mikeydub/go-gallery/db/gen/coredb.GetAdmireByActorIDAndTokenIDParams github.com/mikeydub/go-gallery/db/gen/coredb.Admire
 //go:generate go run github.com/gallery-so/dataloaden SharedFollowersLoaderByIDs github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedFollowersBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedFollowersBatchPaginateRow
 //go:generate go run github.com/gallery-so/dataloaden SharedContractsLoaderByIDs github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedContractsBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedContractsBatchPaginateRow
-//go:generate go run github.com/gallery-so/dataloaden MediaLoaderByTokenID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.TokenMedia
 //go:generate go run github.com/gallery-so/dataloaden ContractCreatorLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.ContractCreator
 //go:generate go run github.com/gallery-so/dataloaden TokensLoaderByUserIDAndFilters github.com/mikeydub/go-gallery/db/gen/coredb.GetTokensByUserIdBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.Token
 //go:generate go run github.com/gallery-so/dataloaden ProfileImageLoaderByID github.com/mikeydub/go-gallery/db/gen/coredb.GetProfileImageByIDParams github.com/mikeydub/go-gallery/db/gen/coredb.ProfileImage
-//go:generate go run github.com/gallery-so/dataloaden GalleryTokenPreviewsByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.TokenMedia
+//go:generate go run github.com/gallery-so/dataloaden TokenMediaByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.TokenMedia
+//go:generate go run github.com/gallery-so/dataloaden TokenMediasByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.TokenMedia
+//go:generate go run github.com/gallery-so/dataloaden TokenDefinitionByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.TokenDefinition
 
 package dataloader
 
@@ -141,14 +142,16 @@ type Loaders struct {
 	AdmireByActorIDAndFeedEventID   *AdmireLoaderByActorAndFeedEvent
 	AdmireByActorIDAndPostID        *AdmireLoaderByActorAndPost
 	AdmireByActorIDAndTokenID       *AdmireLoaderByActorAndToken
-	MediaByTokenID                  *MediaLoaderByTokenID
+	MediaByTokenID                  *TokenMediaByID
+	MediaByTokenDefinitionID        *TokenMediaByID
 	ContractCreatorByContractID     *ContractCreatorLoaderByID
 	ProfileImageByID                *ProfileImageLoaderByID
-	GalleryTokenPreviewsByID        *GalleryTokenPreviewsByID
+	GalleryTokenPreviewsByID        *TokenMediasByID
 	MentionsByCommentID             *MentionsLoaderByID
 	MentionsByPostID                *MentionsLoaderByID
 	RepliesByCommentID              *RepliesLoader
 	RepliesCountByCommentID         *IntLoaderByID
+	TokenDefinitionByID             *TokenDefinitionByID
 }
 
 func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loaders {
@@ -355,16 +358,27 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 		AutoCacheWithKey: func(notification db.Notification) persist.DBID { return notification.ID },
 	})
 
-	loaders.MediaByTokenID = NewMediaLoaderByTokenID(
+	loaders.MediaByTokenID = NewTokenMediaByID(
 		defaultSettingsPlusOpts(ctx, disableCaching, &subscriptionRegistry, &mutexRegistry, withMaxBatchOne(500), withMaxWait(5*time.Millisecond)),
 		loadMediaByTokenID(q),
-		MediaLoaderByTokenIDCacheSubscriptions{AutoCacheWithKey: func(media db.TokenMedia) persist.DBID { return media.ID }})
+		TokenMediaByIDCacheSubscriptions{AutoCacheWithKey: func(media db.TokenMedia) persist.DBID { return media.ID }},
+	)
+
+	loaders.MediaByTokenDefinitionID = NewTokenMediaByID(
+		defaultSettingsPlusOpts(ctx, disableCaching, &subscriptionRegistry, &mutexRegistry, withMaxBatchOne(500), withMaxWait(5*time.Millisecond)),
+		loadMediaByTokenDefinitionID(q),
+		TokenMediaByIDCacheSubscriptions{AutoCacheWithKey: func(media db.TokenMedia) persist.DBID { return media.ID }},
+	)
 
 	loaders.ContractCreatorByContractID = NewContractCreatorLoaderByID(defaults, loadContractCreatorByContractID(q), ContractCreatorLoaderByIDCacheSubscriptions{})
 
 	loaders.ProfileImageByID = NewProfileImageLoaderByID(defaults, loadProfileImageByID(q), ProfileImageLoaderByIDCacheSubscriptions{})
 
-	loaders.GalleryTokenPreviewsByID = NewGalleryTokenPreviewsByID(defaults, loadGalleryTokenPreviewsByID(q))
+	loaders.GalleryTokenPreviewsByID = NewTokenMediasByID(defaults, loadGalleryTokenPreviewsByID(q))
+
+	loaders.TokenDefinitionByID = NewTokenDefinitionByID(defaults, loadTokenDefinitionByID(q), TokenDefinitionByIDCacheSubscriptions{
+		AutoCacheWithKey: func(tokenDefinition db.TokenDefinition) persist.DBID { return tokenDefinition.ID },
+	})
 
 	return loaders
 }
@@ -1504,7 +1518,26 @@ func loadMediaByTokenID(q *db.Queries) func(context.Context, []persist.DBID) ([]
 		results := make([]db.TokenMedia, len(tokenIDs))
 		errors := make([]error, len(tokenIDs))
 
-		b := q.GetMediaByTokenIDIgnoringStatus(ctx, tokenIDs)
+		b := q.GetMediaByTokenIDIgnoringStatusBatch(ctx, tokenIDs)
+		defer b.Close()
+
+		b.QueryRow(func(i int, media db.TokenMedia, err error) {
+			if err == pgx.ErrNoRows {
+				err = persist.ErrMediaNotFound{TokenID: tokenIDs[i]}
+			}
+			results[i], errors[i] = media, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadMediaByTokenDefinitionID(q *db.Queries) func(context.Context, []persist.DBID) ([]db.TokenMedia, []error) {
+	return func(ctx context.Context, tokenIDs []persist.DBID) ([]db.TokenMedia, []error) {
+		results := make([]db.TokenMedia, len(tokenIDs))
+		errors := make([]error, len(tokenIDs))
+
+		b := q.GetMediaByTokenDefinitionIDIgnoringStatusBatch(ctx, tokenIDs)
 		defer b.Close()
 
 		b.QueryRow(func(i int, media db.TokenMedia, err error) {
@@ -1566,6 +1599,26 @@ func loadGalleryTokenPreviewsByID(q *db.Queries) func(context.Context, []persist
 				err = persist.ErrGalleryNotFound{ID: keys[i]}
 			}
 			results[i], errors[i] = medias, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadTokenDefinitionByID(q *db.Queries) func(context.Context, []persist.DBID) ([]db.TokenDefinition, []error) {
+	return func(ctx context.Context, keys []persist.DBID) ([]db.TokenDefinition, []error) {
+		results := make([]db.TokenDefinition, len(keys))
+		errors := make([]error, len(keys))
+
+		b := q.GetTokenDefinitionByIdBatch(ctx, keys)
+		defer b.Close()
+
+		// func (b *GetTokenDefinitionByIdBatchBatchResults) QueryRow(f func(int, TokenDefinition, error)) {
+		b.QueryRow(func(i int, tokenDef db.TokenDefinition, err error) {
+			if err == pgx.ErrNoRows {
+				err = persist.TokenDefinitionNotFoundByID{ID: keys[i]}
+			}
+			results[i], errors[i] = tokenDef, err
 		})
 
 		return results, errors

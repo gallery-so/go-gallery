@@ -7,6 +7,7 @@ import (
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 
 	"github.com/mikeydub/go-gallery/service/limiters"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/task"
@@ -89,6 +90,7 @@ func (m Manager) StartProcessing(ctx context.Context, tokenDefinitionID persist.
 func (m Manager) SubmitBatch(ctx context.Context, tokenDefinitionIDs []persist.DBID) error {
 	m.processRegistry.setManyEnqueue(ctx, tokenDefinitionIDs)
 	message := task.TokenProcessingBatchMessage{BatchID: persist.GenerateID(), TokenDefinitionIDs: tokenDefinitionIDs}
+	logger.For(ctx).WithField("batchID", message.BatchID).Infof("enqueued batch: %s", message.BatchID)
 	return task.CreateTaskForTokenProcessing(ctx, message, m.taskClient)
 }
 

@@ -43,23 +43,6 @@ func (t *TokenFullDetailsRepository) GetByUserID(ctx context.Context, userID per
 	return tokens, nil
 }
 
-// GetByDefinitionID gets a token by its definition DBID
-func (t *TokenFullDetailsRepository) GetByDefinitionID(ctx context.Context, definitionID persist.DBID) ([]TokenFullDetails, error) {
-	r, err := t.queries.GetTokenFullDetailsByTokenDefinitionId(ctx, definitionID)
-	if err != nil {
-		return nil, err
-	}
-	tokens := util.MapWithoutError(r, func(r db.GetTokenFullDetailsByTokenDefinitionIdRow) TokenFullDetails {
-		return TokenFullDetails{
-			Instance:   r.Token,
-			Contract:   r.Contract,
-			Definition: r.TokenDefinition,
-			Media:      r.TokenMedia,
-		}
-	})
-	return tokens, nil
-}
-
 // GetByContractID gets all tokens for a contract
 func (t *TokenFullDetailsRepository) GetByContractID(ctx context.Context, contractID persist.DBID) ([]TokenFullDetails, error) {
 	r, err := t.queries.GetTokenFullDetailsByContractId(ctx, contractID)

@@ -1959,46 +1959,36 @@ func tokenHolderToModel(ctx context.Context, tokenHolder persist.TokenHolder) *m
 }
 
 func tokenToModel(ctx context.Context, token db.Token, collectionID *persist.DBID) *model.Token {
-	chain := token.Chain
-
-	blockNumber := fmt.Sprint(token.BlockNumber.Int64)
-	tokenType := model.TokenType(token.TokenType.String)
-
 	var isSpamByUser *bool
 	if token.IsUserMarkedSpam.Valid {
 		isSpamByUser = &token.IsUserMarkedSpam.Bool
 	}
-
-	var isSpamByProvider *bool
-	if token.IsProviderMarkedSpam.Valid {
-		isSpamByProvider = &token.IsProviderMarkedSpam.Bool
-	}
-
 	return &model.Token{
 		HelperTokenData:  model.HelperTokenData{Token: token, CollectionID: collectionID},
 		Dbid:             token.ID,
 		CreationTime:     &token.CreatedAt,
 		LastUpdated:      &token.LastUpdated,
 		CollectorsNote:   util.ToPointer(html.UnescapeString(token.CollectorsNote.String)),
-		Media:            nil, // handled by dedicated resolver
-		TokenType:        &tokenType,
-		Chain:            &chain,
-		Name:             &token.Name.String,
-		Description:      &token.Description.String,
-		OwnedByWallets:   nil, // handled by dedicated resolver
-		TokenID:          util.ToPointer(token.TokenID.String()),
 		Quantity:         util.ToPointer(token.Quantity.String()),
 		Owner:            nil, // handled by dedicated resolver
 		OwnershipHistory: nil, // TODO: later
 		OwnerIsHolder:    &token.IsHolderToken,
 		OwnerIsCreator:   &token.IsCreatorToken,
-		Contract:         nil, // handled by dedicated resolver
-		ExternalURL:      &token.ExternalUrl.String,
-		BlockNumber:      &blockNumber, // TODO: later
 		IsSpamByUser:     isSpamByUser,
-		IsSpamByProvider: isSpamByProvider,
-
-		// These are legacy mappings that will likely end up elsewhere when we pull data from the indexer
+		Definition:       nil, // handled by dedicated resolver
+		// Fields to be deprecated
+		Media:                 nil, // handled by dedicated resolver
+		TokenType:             nil, // handled by dedicated resolver
+		Chain:                 nil, // handled by dedicated resolver
+		Name:                  nil, // handled by dedicated resolver
+		Description:           nil, // handled by dedicated resolver
+		TokenID:               nil, // handled by dedicated resolver
+		TokenMetadata:         nil, // handled by dedicated resolver
+		Contract:              nil, // handled by dedicated resolver
+		ExternalURL:           nil, // handled by dedicated resolver
+		IsSpamByProvider:      nil, // handled by dedicated resolver
+		OwnedByWallets:        nil, // handled by dedicated resolver
+		BlockNumber:           nil,
 		OpenseaCollectionName: nil, // TODO: later
 	}
 }

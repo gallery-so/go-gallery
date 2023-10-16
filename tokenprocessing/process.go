@@ -38,7 +38,7 @@ type ProcessMediaForTokenInput struct {
 	Chain           persist.Chain   `json:"chain"`
 }
 
-func processBatch(tp *tokenProcessor, queries *coredb.Queries, tokenDetailsRepo *postgres.TokenFullDetailsRepository, tm *tokenmanage.Manager) gin.HandlerFunc {
+func processBatch(tp *tokenProcessor, queries *coredb.Queries, tm *tokenmanage.Manager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input task.TokenProcessingBatchMessage
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -60,9 +60,14 @@ func processBatch(tp *tokenProcessor, queries *coredb.Queries, tokenDetailsRepo 
 				if err != nil {
 					return err
 				}
+
+				c, err := queries.GetContractByID(reqCtx, td.ContractID)
+				if err != nil {
+					return err
+				}
+
 				ctx := sentryutil.NewSentryHubContext(reqCtx)
-				cID := persist.NewContractIdentifiers(td.ContractAddress, td.Chain)
-				_, err = processFromTokenDefinitionManaged(ctx, tp, tm, td, cID, persist.ProcessingCauseSync, 0)
+				_, err = processFromTokenDefinitionManaged(ctx, tp, tm, td, persist.ProcessingCauseSync, 0, addIsSpamJobOption(td, c))
 				return err
 			})
 		}
@@ -82,7 +87,7 @@ func processMediaForTokenIdentifiers(tp *tokenProcessor, queries *coredb.Queries
 			return
 		}
 
-		tokenDef, err := queries.GetTokenDefinitionByTokenIdentifiers(c, coredb.GetTokenDefinitionByTokenIdentifiersParams{
+		td, err := queries.GetTokenDefinitionByTokenIdentifiers(c, coredb.GetTokenDefinitionByTokenIdentifiersParams{
 			Chain:           input.Chain,
 			ContractAddress: input.ContractAddress,
 			TokenID:         input.TokenID,
@@ -96,9 +101,17 @@ func processMediaForTokenIdentifiers(tp *tokenProcessor, queries *coredb.Queries
 			return
 		}
 
-		cID := persist.NewContractIdentifiers(input.ContractAddress, input.Chain)
+		contract, err := queries.GetContractByID(c, td.ContractID)
+		if err == pgx.ErrNoRows {
+			util.ErrResponse(c, http.StatusNotFound, err)
+			return
+		}
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
 
-		_, err = processFromTokenDefinitionManaged(c, tp, tm, tokenDef, cID, persist.ProcessingCauseRefresh, 0)
+		_, err = processFromTokenDefinitionManaged(c, tp, tm, td, persist.ProcessingCauseRefresh, 0, addIsSpamJobOption(td, contract))
 
 		if err != nil {
 			if util.ErrorAs[ErrBadToken](err) {
@@ -114,7 +127,7 @@ func processMediaForTokenIdentifiers(tp *tokenProcessor, queries *coredb.Queries
 }
 
 // processMediaForTokenManaged processes a single token instance. It's only called for tokens that failed during a sync.
-func processMediaForTokenManaged(tp *tokenProcessor, tokenDetailsRepo *postgres.TokenFullDetailsRepository, tm *tokenmanage.Manager) gin.HandlerFunc {
+func processMediaForTokenManaged(tp *tokenProcessor, queries *coredb.Queries, tm *tokenmanage.Manager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input task.TokenProcessingTokenMessage
 
@@ -124,9 +137,10 @@ func processMediaForTokenManaged(tp *tokenProcessor, tokenDetailsRepo *postgres.
 			return
 		}
 
-		tDefs, err := tokenDetailsRepo.GetByDefinitionID(c, input.TokenDefinitionID)
+		td, err := queries.GetTokenDefinitionById(c, input.TokenDefinitionID)
 		if err == pgx.ErrNoRows {
-			util.ErrResponse(c, http.StatusNotFound, err)
+			// Remove from queue if not found
+			util.ErrResponse(c, http.StatusOK, err)
 			return
 		}
 		if err != nil {
@@ -134,9 +148,18 @@ func processMediaForTokenManaged(tp *tokenProcessor, tokenDetailsRepo *postgres.
 			return
 		}
 
-		cID := persist.NewContractIdentifiers(tDefs[0].Contract.Address, tDefs[0].Contract.Chain)
+		contract, err := queries.GetContractByID(c, td.ContractID)
+		if err == pgx.ErrNoRows {
+			// Remove from queue if not found
+			util.ErrResponse(c, http.StatusOK, err)
+			return
+		}
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
 
-		_, err = processFromTokenDefinitionManaged(c, tp, tm, tDefs[0].Definition, cID, persist.ProcessingCauseSyncRetry, input.Attempts)
+		_, err = processFromTokenDefinitionManaged(c, tp, tm, td, persist.ProcessingCauseSyncRetry, input.Attempts, addIsSpamJobOption(td, contract))
 		if err != nil {
 			// Only log the error, because tokenmanage will handle reprocessing
 			logger.For(c).Errorf("error processing token: %s", err)
@@ -679,8 +702,19 @@ func processPostPreflight(tp *tokenProcessor, tm *tokenmanage.Manager, mc *multi
 				util.ErrResponse(c, http.StatusInternalServerError, err)
 				return
 			}
-			cID := persist.NewContractIdentifiers(input.Token.ContractAddress, input.Token.Chain)
-			_, err = processFromTokenDefinitionManaged(c, tp, tm, td, cID, persist.ProcessingCausePostPreflight, 0)
+
+			contract, err := mc.Queries.GetContractByID(c, td.ContractID)
+			if err == pgx.ErrNoRows {
+				// Remove from queue if not found
+				util.ErrResponse(c, http.StatusOK, err)
+				return
+			}
+			if err != nil {
+				util.ErrResponse(c, http.StatusInternalServerError, err)
+				return
+			}
+
+			_, err = processFromTokenDefinitionManaged(c, tp, tm, td, persist.ProcessingCausePostPreflight, 0, addIsSpamJobOption(td, contract))
 			if err != nil {
 				// Only log the error, because tokenmanage will handle reprocessing
 				logger.For(c).Errorf("error in preflight: error processing token: %s", err)
@@ -710,24 +744,25 @@ func processPostPreflight(tp *tokenProcessor, tm *tokenmanage.Manager, mc *multi
 	}
 }
 
-func processFromTokenDefinitionManaged(ctx context.Context, tp *tokenProcessor, tm *tokenmanage.Manager, td coredb.TokenDefinition, cID persist.ContractIdentifiers, cause persist.ProcessingCause, attempts int, opts ...PipelineOption) (coredb.TokenMedia, error) {
+func processFromTokenDefinitionManaged(ctx context.Context, tp *tokenProcessor, tm *tokenmanage.Manager, td coredb.TokenDefinition, cause persist.ProcessingCause, attempts int, opts ...PipelineOption) (coredb.TokenMedia, error) {
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{
 		"tokenDefinitionDBID": td.ID,
 		"contractDBID":        td.ContractID,
 		"tokenID":             td.TokenID,
 		"tokenID_base10":      td.TokenID.Base10String(),
-		"contractAddress":     cID.ContractAddress,
-		"chain":               cID.Chain,
+		"contractAddress":     td.ContractAddress,
+		"chain":               td.Chain,
 	})
 	closing, err := tm.StartProcessing(ctx, td.ID, attempts)
 	if err != nil {
 		return coredb.TokenMedia{}, err
 	}
+	tID := persist.NewTokenIdentifiers(td.ContractAddress, td.TokenID, td.Chain)
+	cID := persist.NewContractIdentifiers(td.ContractAddress, td.Chain)
 	runOpts := append([]PipelineOption{}, addContractRunOptions(cID)...)
 	runOpts = append(runOpts, addContextRunOptions(cause)...)
 	runOpts = append(runOpts, PipelineOpts.WithMetadata(td.Metadata))
 	runOpts = append(runOpts, opts...)
-	tID := persist.NewTokenIdentifiers(cID.ContractAddress, td.TokenID, td.Chain)
 	media, err := tp.ProcessTokenPipeline(ctx, tID, cID, cause, runOpts...)
 	defer closing(err)
 	return media, err
@@ -747,4 +782,8 @@ func addContractRunOptions(contract persist.ContractIdentifiers) (opts []Pipelin
 		opts = append(opts, PipelineOpts.WithProfileImageKey("profile_image"))
 	}
 	return opts
+}
+
+func addIsSpamJobOption(td coredb.TokenDefinition, c coredb.Contract) PipelineOption {
+	return PipelineOpts.WithIsSpamJob(td.IsProviderMarkedSpam || c.IsProviderMarkedSpam)
 }

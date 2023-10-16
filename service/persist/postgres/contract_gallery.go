@@ -77,7 +77,7 @@ func NewContractGalleryRepository(db *sql.DB, queries *db.Queries) *ContractGall
 	return &ContractGalleryRepository{db: db, queries: queries, getByIDStmt: getByIDStmt, getByAddressStmt: getByAddressStmt, upsertByAddressStmt: upsertByAddressStmt, getByAddressesStmt: getByAddressesStmt, getOwnersStmt: getOwnersStmt, getUserByWalletIDStmt: getUserByWalletIDStmt, getPreviewNFTsStmt: getPreviewNFTsStmt, getByTokenIDsStmt: getByTokenIDsStmt}
 }
 
-func (c *ContractGalleryRepository) GetByTokenDBID(ctx context.Context, id persist.DBID) (persist.ContractGallery, error) {
+func (c *ContractGalleryRepository) GetByID(ctx context.Context, id persist.DBID) (persist.ContractGallery, error) {
 	contract := persist.ContractGallery{}
 	err := c.getByIDStmt.QueryRowContext(ctx, id).Scan(&contract.ID, &contract.Version, &contract.CreationTime, &contract.LastUpdated, &contract.Address, &contract.Symbol, &contract.Name, &contract.OwnerAddress, &contract.Chain, &contract.IsProviderMarkedSpam)
 	if err != nil {

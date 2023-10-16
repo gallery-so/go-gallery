@@ -417,32 +417,38 @@ enum InteractionType {
   Comment
 }
 
+type TokenDefinition implements Node {
+  id: ID!
+  dbid: DBID!
+  creationTime: Time
+  lastUpdated: Time
+  media: MediaSubtype @goField(forceResolver: true)
+  tokenType: TokenType
+  chain: Chain
+  name: String
+  description: String
+  tokenId: String
+  tokenMetadata: String @goField(forceResolver: true)
+  contract: Contract @goField(forceResolver: true)
+  community: Community @goField(forceResolver: true)
+  externalUrl: String
+  isSpamByProvider: Boolean @goField(forceResolver: true)
+}
+
 type Token implements Node @goEmbedHelper {
   id: ID!
   dbid: DBID!
   creationTime: Time
   lastUpdated: Time
   collectorsNote: String
-  media: MediaSubtype @goField(forceResolver: true)
-  tokenType: TokenType @goField(forceResolver: true)
-  chain: Chain
-  name: String @goField(forceResolver: true)
-  description: String @goField(forceResolver: true)
-  tokenId: String
   quantity: String # source is a hex string
   owner: GalleryUser @goField(forceResolver: true)
   ownedByWallets: [Wallet] @goField(forceResolver: true)
-  ownershipHistory: [OwnerAtBlock]
+  ownershipHistory: [OwnerAtBlock] @deprecated
   ownerIsHolder: Boolean
   ownerIsCreator: Boolean
-  tokenMetadata: String @goField(forceResolver: true)
-  contract: Contract @goField(forceResolver: true)
-  community: Community @goField(forceResolver: true)
-  externalUrl: String @goField(forceResolver: true)
-  blockNumber: String # source is uint64
+  definition: TokenDefinition! @goField(forceResolver: true)
   isSpamByUser: Boolean
-  isSpamByProvider: Boolean @goField(forceResolver: true) @goField(forceResolver: true)
-
   # Returns an admires connection
   admires(
     before: String
@@ -451,16 +457,42 @@ type Token implements Node @goEmbedHelper {
     last: Int
     userID: DBID
   ): TokenAdmiresConnection @goField(forceResolver: true)
-
   viewerAdmire: Admire @goField(forceResolver: true)
-
-  # These are subject to change; unlike the other fields, they aren't present on the current persist.Token
-  # struct and may ultimately end up elsewhere
+  # The following fields will be deprecated and removed in the future.
+  media: MediaSubtype
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use definition.media instead")
+  tokenType: TokenType
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use definition.tokenType instead")
+  chain: Chain @goField(forceResolver: true) @deprecated(reason: "Use definition.chain instead")
+  name: String @goField(forceResolver: true) @deprecated(reason: "Use definition.name instead")
+  description: String
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use definition.description instead")
+  tokenId: String
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use definition.tokenId instead")
+  tokenMetadata: String
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use definition.tokenMetadata instead")
+  contract: Contract
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use definition.contract instead")
+  community: Community
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use definition.community instead")
+  externalUrl: String
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use definition.externalUrl instead")
+  isSpamByProvider: Boolean
+    @goField(forceResolver: true)
+    @deprecated(reason: "Use definition.isSpamByProvider instead")
   creatorAddress: ChainAddress
-  openseaCollectionName: String
-
-  # temporary field while we're dependent on opensea
-  openseaId: Int
+    @deprecated(reason: "Use definition.community.creatorAddress instead")
+  openseaCollectionName: String @deprecated
+  blockNumber: String @deprecated # source is uint64
+  openseaId: Int @deprecated
 }
 
 type OwnerAtBlock {

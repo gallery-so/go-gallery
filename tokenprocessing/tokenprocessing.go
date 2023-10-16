@@ -66,7 +66,7 @@ func CoreInitServer(ctx context.Context, clients *server.Clients, mc *multichain
 	logger.For(nil).Info("Registering handlers...")
 
 	t := newThrottler()
-	tp := NewTokenProcessor(clients.Queries, clients.EthClient, clients.HTTPClient, mc, clients.IPFSClient, clients.ArweaveClient, clients.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), clients.Repos.TokenRepository, metric.NewLogMetricReporter())
+	tp := NewTokenProcessor(clients.Queries, clients.HTTPClient, mc, clients.IPFSClient, clients.ArweaveClient, clients.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), metric.NewLogMetricReporter())
 
 	return handlersInitServer(ctx, router, tp, mc, clients.Repos, t, clients.TaskClient)
 }
@@ -165,11 +165,8 @@ func InitSentry() {
 func reportJobError(ctx context.Context, err error, job tokenProcessingJob) {
 	sentryutil.ReportError(ctx, err, func(scope *sentry.Scope) {
 		setRunTags(scope, job.id)
-		setTokenTags(scope, job.token.Chain, job.contract.Address, job.token.TokenID)
-		setTokenContext(scope, job.token.Chain, job.contract.Address, job.token.TokenID, isSpamToken(job))
-		if job.tokenInstance != nil {
-			setDBIDTag(scope, job.tokenInstance.ID)
-		}
+		setTokenTags(scope, job.token.Chain, job.token.ContractAddress, job.token.TokenID)
+		setTokenContext(scope, job.token.Chain, job.token.ContractAddress, job.token.TokenID, job.isSpamJob)
 	})
 }
 
@@ -182,10 +179,6 @@ func setTokenTags(scope *sentry.Scope, chain persist.Chain, contractAddress pers
 		assetPage = "assetURL too long, see token context"
 	}
 	scope.SetTag("assetURL", assetPage)
-}
-
-func setDBIDTag(scope *sentry.Scope, id persist.DBID) {
-	scope.SetTag("tokenDBID", string(id))
 }
 
 func assetURL(chain persist.Chain, contractAddress persist.Address, tokenID persist.TokenID) string {
@@ -214,16 +207,6 @@ func setTokenContext(scope *sentry.Scope, chain persist.Chain, contractAddress p
 func setRunTags(scope *sentry.Scope, runID persist.DBID) {
 	scope.SetTag("runID", runID.String())
 	scope.SetTag("log", "go/tokenruns/"+runID.String())
-}
-
-// isSpamToken returns true if the token is marked as spam.
-func isSpamToken(job tokenProcessingJob) bool {
-	isSpam := job.contract.IsProviderMarkedSpam
-	if job.tokenInstance != nil {
-		isSpam = isSpam || util.GetOptionalValue(job.tokenInstance.IsProviderMarkedSpam, false)
-		isSpam = isSpam || util.GetOptionalValue(job.tokenInstance.IsUserMarkedSpam, false)
-	}
-	return isSpam
 }
 
 // isBadTokenErr returns true if the error is a bad token error.

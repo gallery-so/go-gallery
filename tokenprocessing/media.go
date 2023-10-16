@@ -115,7 +115,7 @@ type cachePipelineMetadata struct {
 }
 
 func cacheImageObjects(ctx context.Context, imageURL media.ImageURL, job *tokenProcessingJob) chan cacheResult {
-	tids := persist.NewTokenIdentifiers(job.contract.Address, job.token.TokenID, job.token.Chain)
+	tids := persist.NewTokenIdentifiers(job.token.ContractAddress, job.token.TokenID, job.token.Chain)
 	runMetadata := &cachePipelineMetadata{
 		ContentHeaderValueRetrieval:  &job.pipelineMetadata.ImageContentHeaderValueRetrieval,
 		ReaderRetrieval:              &job.pipelineMetadata.ImageReaderRetrieval,
@@ -131,7 +131,7 @@ func cacheImageObjects(ctx context.Context, imageURL media.ImageURL, job *tokenP
 }
 
 func cacheAnimationObjects(ctx context.Context, animationURL media.AnimationURL, job *tokenProcessingJob) chan cacheResult {
-	tids := persist.NewTokenIdentifiers(job.contract.Address, job.token.TokenID, job.token.Chain)
+	tids := persist.NewTokenIdentifiers(job.token.ContractAddress, job.token.TokenID, job.token.Chain)
 	runMetadata := &cachePipelineMetadata{
 		ContentHeaderValueRetrieval:  &job.pipelineMetadata.AnimationContentHeaderValueRetrieval,
 		ReaderRetrieval:              &job.pipelineMetadata.AnimationReaderRetrieval,
@@ -155,7 +155,7 @@ func cacheProfileImageObjects(ctx context.Context, job *tokenProcessingJob, meta
 	if !ok {
 		return nil, errors.New("url value is not a string")
 	}
-	tids := persist.NewTokenIdentifiers(job.contract.Address, job.token.TokenID, job.token.Chain)
+	tids := persist.NewTokenIdentifiers(job.token.ContractAddress, job.token.TokenID, job.token.Chain)
 	runMetadata := &cachePipelineMetadata{
 		ContentHeaderValueRetrieval:  &job.pipelineMetadata.ProfileImageContentHeaderValueRetrieval,
 		ReaderRetrieval:              &job.pipelineMetadata.ProfileImageReaderRetrieval,
@@ -171,7 +171,7 @@ func cacheProfileImageObjects(ctx context.Context, job *tokenProcessingJob, meta
 }
 
 func cacheOpenSeaObjects(ctx context.Context, job *tokenProcessingJob) ([]cachedMediaObject, error) {
-	tids := persist.NewTokenIdentifiers(job.contract.Address, job.token.TokenID, job.token.Chain)
+	tids := persist.NewTokenIdentifiers(job.token.ContractAddress, job.token.TokenID, job.token.Chain)
 	runMetadata := &cachePipelineMetadata{
 		ContentHeaderValueRetrieval:  &job.pipelineMetadata.AlternateContentHeaderValueRetrieval,
 		ReaderRetrieval:              &job.pipelineMetadata.AlternateReaderRetrieval,

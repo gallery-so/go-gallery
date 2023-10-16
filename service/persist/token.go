@@ -1039,3 +1039,11 @@ type ErrContractCreatorNotFound struct {
 func (e ErrContractCreatorNotFound) Error() string {
 	return fmt.Sprintf("ContractCreator not found for contractID %s", e.ContractID)
 }
+
+type TokenDefinitionNotFoundByID struct {
+	ID DBID
+}
+
+func (e TokenDefinitionNotFoundByID) Error() string {
+	return fmt.Sprintf("TokenDefinition not found for ID %s", e.ID)
+}

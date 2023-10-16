@@ -638,3 +638,23 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collect
 func (api TokenAPI) GetProcessingStateByTokenDefinitionID(ctx context.Context, id persist.DBID) (bool, error) {
 	return api.manager.Processing(ctx, id), nil
 }
+
+func (api TokenAPI) GetTokenDefinitionByID(ctx context.Context, id persist.DBID) (db.TokenDefinition, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"tokenDefinitionID": validate.WithTag(id, "required"),
+	}); err != nil {
+		return db.TokenDefinition{}, err
+	}
+	return api.loaders.TokenDefinitionByID.Load(id)
+}
+
+func (api TokenAPI) GetMediaByTokenDefinitionID(ctx context.Context, id persist.DBID) (db.TokenMedia, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"tokenDefinitionID": validate.WithTag(id, "required"),
+	}); err != nil {
+		return db.TokenMedia{}, err
+	}
+	return api.loaders.MediaByTokenDefinitionID.Load(id)
+}

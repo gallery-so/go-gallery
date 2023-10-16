@@ -208,8 +208,6 @@ func (r *commentResolver) Replies(ctx context.Context, obj *model.Comment, befor
 		Edges:    edges,
 		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}, nil
-
-	return nil, fmt.Errorf("comment has no source")
 }
 
 // Source is the resolver for the source field.
@@ -2779,41 +2777,6 @@ func (r *subscriptionResolver) NotificationUpdated(ctx context.Context) (<-chan 
 	return resolveUpdatedNotificationSubscription(ctx), nil
 }
 
-// Media is the resolver for the media field.
-func (r *tokenResolver) Media(ctx context.Context, obj *model.Token) (model.MediaSubtype, error) {
-	var highDef bool
-	if obj.CollectionID != nil {
-		settings, err := resolveTokenSettingsByIDs(ctx, obj.Dbid, *obj.CollectionID)
-		if err != nil {
-			return nil, err
-		}
-		highDef = *settings.HighDefinition
-	}
-
-	tokenMedia, err := publicapi.For(ctx).Token.MediaByTokenID(ctx, obj.Dbid)
-
-	if util.ErrorAs[persist.ErrMediaNotFound](err) {
-		err = nil
-	}
-
-	return resolveTokenMedia(ctx, obj.HelperTokenData.Token, tokenMedia, highDef), err
-}
-
-// TokenType is the resolver for the tokenType field.
-func (r *tokenResolver) TokenType(ctx context.Context, obj *model.Token) (*model.TokenType, error) {
-	panic(fmt.Errorf("not implemented: TokenType - tokenType"))
-}
-
-// Name is the resolver for the name field.
-func (r *tokenResolver) Name(ctx context.Context, obj *model.Token) (*string, error) {
-	panic(fmt.Errorf("not implemented: Name - name"))
-}
-
-// Description is the resolver for the description field.
-func (r *tokenResolver) Description(ctx context.Context, obj *model.Token) (*string, error) {
-	panic(fmt.Errorf("not implemented: Description - description"))
-}
-
 // Owner is the resolver for the owner field.
 func (r *tokenResolver) Owner(ctx context.Context, obj *model.Token) (*model.GalleryUser, error) {
 	return resolveTokenOwnerByTokenID(ctx, obj.Dbid)
@@ -2837,52 +2800,9 @@ func (r *tokenResolver) OwnedByWallets(ctx context.Context, obj *model.Token) ([
 	return wallets, nil
 }
 
-// TokenMetadata is the resolver for the tokenMetadata field.
-func (r *tokenResolver) TokenMetadata(ctx context.Context, obj *model.Token) (*string, error) {
-	tokenMedia, err := publicapi.For(ctx).Token.MediaByTokenID(ctx, obj.Dbid)
-	if err != nil {
-		return nil, err
-	}
-	mar, err := json.Marshal(tokenMedia.Metadata)
-	if err != nil {
-		return nil, err
-	}
-
-	return util.ToPointer(string(mar)), nil
-}
-
-// Contract is the resolver for the contract field.
-func (r *tokenResolver) Contract(ctx context.Context, obj *model.Token) (*model.Contract, error) {
-	if obj.HelperTokenData.Token.Contract != "" {
-		return resolveContractByContractID(ctx, obj.HelperTokenData.Token.Contract)
-	}
-	return resolveContractByTokenID(ctx, obj.Dbid)
-}
-
-// Community is the resolver for the community field.
-func (r *tokenResolver) Community(ctx context.Context, obj *model.Token) (*model.Community, error) {
-	return resolveCommunityByTokenID(ctx, obj.Dbid)
-}
-
-// ExternalURL is the resolver for the externalUrl field.
-func (r *tokenResolver) ExternalURL(ctx context.Context, obj *model.Token) (*string, error) {
-	panic(fmt.Errorf("not implemented: ExternalURL - externalUrl"))
-}
-
-// IsSpamByProvider is the resolver for the isSpamByProvider field.
-func (r *tokenResolver) IsSpamByProvider(ctx context.Context, obj *model.Token) (*bool, error) {
-	var c *model.Contract
-	var err error
-	if obj.Token.Contract != "" {
-		c, err = resolveContractByContractID(ctx, obj.Token.Contract)
-	} else {
-		c, err = resolveContractByTokenID(ctx, obj.Dbid)
-	}
-	if err != nil {
-		return nil, err
-	}
-	isSpam := (c.IsSpam != nil && *c.IsSpam) || (obj.IsSpamByProvider != nil && *obj.IsSpamByProvider)
-	return &isSpam, nil
+// Definition is the resolver for the definition field.
+func (r *tokenResolver) Definition(ctx context.Context, obj *model.Token) (*model.TokenDefinition, error) {
+	panic(fmt.Errorf("not implemented: Definition - definition"))
 }
 
 // Admires is the resolver for the admires field.
@@ -2925,6 +2845,128 @@ func (r *tokenResolver) ViewerAdmire(ctx context.Context, obj *model.Token) (*mo
 	}
 
 	return admireToModel(ctx, *admire), nil
+}
+
+// Media is the resolver for the media field.
+func (r *tokenResolver) Media(ctx context.Context, obj *model.Token) (model.MediaSubtype, error) {
+	var highDef bool
+	if obj.CollectionID != nil {
+		settings, err := resolveTokenSettingsByIDs(ctx, obj.Dbid, *obj.CollectionID)
+		if err != nil {
+			return nil, err
+		}
+		highDef = *settings.HighDefinition
+	}
+
+	tokenDef, err := publicapi.For(ctx).Token.GetTokenDefinitionByID(ctx, obj.HelperTokenData.Token.TokenDefinitionID)
+	if err != nil {
+		return nil, err
+	}
+
+	tokenMedia, err := publicapi.For(ctx).Token.GetMediaByTokenDefinitionID(ctx, obj.HelperTokenData.Token.TokenDefinitionID)
+	if util.ErrorAs[persist.ErrMediaNotFound](err) {
+		err = nil
+	}
+
+	return resolveTokenMedia(ctx, tokenDef, tokenMedia, highDef), err
+}
+
+// TokenType is the resolver for the tokenType field.
+func (r *tokenResolver) TokenType(ctx context.Context, obj *model.Token) (*model.TokenType, error) {
+	panic(fmt.Errorf("not implemented: TokenType - tokenType"))
+}
+
+// Chain is the resolver for the chain field.
+func (r *tokenResolver) Chain(ctx context.Context, obj *model.Token) (*persist.Chain, error) {
+	panic(fmt.Errorf("not implemented: Chain - chain"))
+}
+
+// Name is the resolver for the name field.
+func (r *tokenResolver) Name(ctx context.Context, obj *model.Token) (*string, error) {
+	panic(fmt.Errorf("not implemented: Name - name"))
+}
+
+// Description is the resolver for the description field.
+func (r *tokenResolver) Description(ctx context.Context, obj *model.Token) (*string, error) {
+	panic(fmt.Errorf("not implemented: Description - description"))
+}
+
+// TokenID is the resolver for the tokenId field.
+func (r *tokenResolver) TokenID(ctx context.Context, obj *model.Token) (*string, error) {
+	panic(fmt.Errorf("not implemented: TokenID - tokenId"))
+}
+
+// TokenMetadata is the resolver for the tokenMetadata field.
+func (r *tokenResolver) TokenMetadata(ctx context.Context, obj *model.Token) (*string, error) {
+	tokenMedia, err := publicapi.For(ctx).Token.GetTokenDefinitionByID(ctx, obj.HelperTokenData.Token.TokenDefinitionID)
+	if err != nil {
+		return nil, err
+	}
+	mar, err := json.Marshal(tokenMedia.Metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	return util.ToPointer(string(mar)), nil
+}
+
+// Contract is the resolver for the contract field.
+func (r *tokenResolver) Contract(ctx context.Context, obj *model.Token) (*model.Contract, error) {
+	if obj.HelperTokenData.Token.ContractID != "" {
+		return resolveContractByContractID(ctx, obj.HelperTokenData.Token.ContractID)
+	}
+	return resolveContractByTokenID(ctx, obj.Dbid)
+}
+
+// Community is the resolver for the community field.
+func (r *tokenResolver) Community(ctx context.Context, obj *model.Token) (*model.Community, error) {
+	return resolveCommunityByTokenID(ctx, obj.Dbid)
+}
+
+// ExternalURL is the resolver for the externalUrl field.
+func (r *tokenResolver) ExternalURL(ctx context.Context, obj *model.Token) (*string, error) {
+	panic(fmt.Errorf("not implemented: ExternalURL - externalUrl"))
+}
+
+// IsSpamByProvider is the resolver for the isSpamByProvider field.
+func (r *tokenResolver) IsSpamByProvider(ctx context.Context, obj *model.Token) (*bool, error) {
+	var c *model.Contract
+	var err error
+	if obj.Token.ContractID != "" {
+		c, err = resolveContractByContractID(ctx, obj.Token.ContractID)
+	} else {
+		c, err = resolveContractByTokenID(ctx, obj.Dbid)
+	}
+	if err != nil {
+		return nil, err
+	}
+	isSpam := (c.IsSpam != nil && *c.IsSpam) || (obj.IsSpamByProvider != nil && *obj.IsSpamByProvider)
+	return &isSpam, nil
+}
+
+// Media is the resolver for the media field.
+func (r *tokenDefinitionResolver) Media(ctx context.Context, obj *model.TokenDefinition) (model.MediaSubtype, error) {
+	panic(fmt.Errorf("not implemented: Media - media"))
+}
+
+// TokenMetadata is the resolver for the tokenMetadata field.
+func (r *tokenDefinitionResolver) TokenMetadata(ctx context.Context, obj *model.TokenDefinition) (*string, error) {
+	panic(fmt.Errorf("not implemented: TokenMetadata - tokenMetadata"))
+}
+
+// Contract is the resolver for the contract field.
+func (r *tokenDefinitionResolver) Contract(ctx context.Context, obj *model.TokenDefinition) (*model.Contract, error) {
+	panic(fmt.Errorf("not implemented: Contract - contract"))
+}
+
+// Community is the resolver for the community field.
+func (r *tokenDefinitionResolver) Community(ctx context.Context, obj *model.TokenDefinition) (*model.Community, error) {
+	panic(fmt.Errorf("not implemented: Community - community"))
+}
+
+// IsSpamByProvider is the resolver for the isSpamByProvider field.
+func (r *tokenDefinitionResolver) IsSpamByProvider(ctx context.Context, obj *model.TokenDefinition) (*bool, error) {
+	panic(fmt.Errorf("not implemented: IsSpamByProvider - isSpamByProvider"))
 }
 
 // Wallets is the resolver for the wallets field.
@@ -3313,6 +3355,11 @@ func (r *Resolver) Subscription() generated.SubscriptionResolver { return &subsc
 // Token returns generated.TokenResolver implementation.
 func (r *Resolver) Token() generated.TokenResolver { return &tokenResolver{r} }
 
+// TokenDefinition returns generated.TokenDefinitionResolver implementation.
+func (r *Resolver) TokenDefinition() generated.TokenDefinitionResolver {
+	return &tokenDefinitionResolver{r}
+}
+
 // TokenHolder returns generated.TokenHolderResolver implementation.
 func (r *Resolver) TokenHolder() generated.TokenHolderResolver { return &tokenHolderResolver{r} }
 
@@ -3406,6 +3453,7 @@ type someoneRepliedToYourCommentNotificationResolver struct{ *Resolver }
 type someoneViewedYourGalleryNotificationResolver struct{ *Resolver }
 type subscriptionResolver struct{ *Resolver }
 type tokenResolver struct{ *Resolver }
+type tokenDefinitionResolver struct{ *Resolver }
 type tokenHolderResolver struct{ *Resolver }
 type tokensAddedToCollectionFeedEventDataResolver struct{ *Resolver }
 type unfollowUserPayloadResolver struct{ *Resolver }

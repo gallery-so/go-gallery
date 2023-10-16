@@ -32,11 +32,11 @@ func handlersInitServer(ctx context.Context, router *gin.Engine, tp *tokenProces
 		if hub := sentryutil.SentryHubFromContext(c); hub != nil {
 			hub.Scope().AddEventProcessor(sentryutil.SpanFilterEventProcessor(c, 1000, 1*time.Millisecond, 8, true))
 		}
-		processMediaForUsersTokens(tp, repos.TokenRepository, syncManager)(c)
+		processBatch(tp, mc.Queries, syncManager)(c)
 	})
 	mediaGroup.POST("/process/token", processMediaForTokenIdentifiers(tp, mc.Queries, refreshManager))
-	mediaGroup.POST("/tokenmanage/process/token", processMediaForTokenManaged(tp, repos.TokenRepository, syncManager))
-	mediaGroup.POST("/process/post-preflight", processPostPreflight(tp, syncManager, mc.Queries, mc, repos.ContractRepository, repos.UserRepository, repos.TokenRepository))
+	mediaGroup.POST("/tokenmanage/process/token", processMediaForTokenManaged(tp, mc.Queries, syncManager))
+	mediaGroup.POST("/process/post-preflight", processPostPreflight(tp, syncManager, mc, repos.UserRepository))
 	ownersGroup := router.Group("/owners")
 	ownersGroup.POST("/process/contract", processOwnersForContractTokens(mc, repos.ContractRepository, throttler))
 	ownersGroup.POST("/process/user", processOwnersForUserTokens(mc, mc.Queries))

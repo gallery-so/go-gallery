@@ -11,7 +11,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-type GalleryTokenPreviewsByIDSettings interface {
+type TokenMediasByIDSettings interface {
 	getContext() context.Context
 	getWait() time.Duration
 	getMaxBatchOne() int
@@ -24,37 +24,37 @@ type GalleryTokenPreviewsByIDSettings interface {
 	getMutexRegistry() *[]*sync.Mutex
 }
 
-func (l *GalleryTokenPreviewsByID) setContext(ctx context.Context) {
+func (l *TokenMediasByID) setContext(ctx context.Context) {
 	l.ctx = ctx
 }
 
-func (l *GalleryTokenPreviewsByID) setWait(wait time.Duration) {
+func (l *TokenMediasByID) setWait(wait time.Duration) {
 	l.wait = wait
 }
 
-func (l *GalleryTokenPreviewsByID) setMaxBatch(maxBatch int) {
+func (l *TokenMediasByID) setMaxBatch(maxBatch int) {
 	l.maxBatch = maxBatch
 }
 
-func (l *GalleryTokenPreviewsByID) setDisableCaching(disableCaching bool) {
+func (l *TokenMediasByID) setDisableCaching(disableCaching bool) {
 	l.disableCaching = disableCaching
 }
 
-func (l *GalleryTokenPreviewsByID) setPublishResults(publishResults bool) {
+func (l *TokenMediasByID) setPublishResults(publishResults bool) {
 	l.publishResults = publishResults
 }
 
-func (l *GalleryTokenPreviewsByID) setPreFetchHook(preFetchHook func(context.Context, string) context.Context) {
+func (l *TokenMediasByID) setPreFetchHook(preFetchHook func(context.Context, string) context.Context) {
 	l.preFetchHook = preFetchHook
 }
 
-func (l *GalleryTokenPreviewsByID) setPostFetchHook(postFetchHook func(context.Context, string)) {
+func (l *TokenMediasByID) setPostFetchHook(postFetchHook func(context.Context, string)) {
 	l.postFetchHook = postFetchHook
 }
 
-// NewGalleryTokenPreviewsByID creates a new GalleryTokenPreviewsByID with the given settings, functions, and options
-func NewGalleryTokenPreviewsByID(
-	settings GalleryTokenPreviewsByIDSettings, fetch func(ctx context.Context, keys []persist.DBID) ([][]coredb.TokenMedia, []error),
+// NewTokenMediasByID creates a new TokenMediasByID with the given settings, functions, and options
+func NewTokenMediasByID(
+	settings TokenMediasByIDSettings, fetch func(ctx context.Context, keys []persist.DBID) ([][]coredb.TokenMedia, []error),
 	opts ...func(interface {
 		setContext(context.Context)
 		setWait(time.Duration)
@@ -64,8 +64,8 @@ func NewGalleryTokenPreviewsByID(
 		setPreFetchHook(func(context.Context, string) context.Context)
 		setPostFetchHook(func(context.Context, string))
 	}),
-) *GalleryTokenPreviewsByID {
-	loader := &GalleryTokenPreviewsByID{
+) *TokenMediasByID {
+	loader := &TokenMediasByID{
 		ctx:                  settings.getContext(),
 		wait:                 settings.getWait(),
 		disableCaching:       settings.getDisableCaching(),
@@ -87,13 +87,13 @@ func NewGalleryTokenPreviewsByID(
 
 		// Allow the preFetchHook to modify and return a new context
 		if loader.preFetchHook != nil {
-			ctx = loader.preFetchHook(ctx, "GalleryTokenPreviewsByID")
+			ctx = loader.preFetchHook(ctx, "TokenMediasByID")
 		}
 
 		results, errors := fetch(ctx, keys)
 
 		if loader.postFetchHook != nil {
-			loader.postFetchHook(ctx, "GalleryTokenPreviewsByID")
+			loader.postFetchHook(ctx, "TokenMediasByID")
 		}
 
 		return results, errors
@@ -113,8 +113,8 @@ func NewGalleryTokenPreviewsByID(
 	return loader
 }
 
-// GalleryTokenPreviewsByID batches and caches requests
-type GalleryTokenPreviewsByID struct {
+// TokenMediasByID batches and caches requests
+type TokenMediasByID struct {
 	// context passed to fetch functions
 	ctx context.Context
 
@@ -155,14 +155,14 @@ type GalleryTokenPreviewsByID struct {
 
 	// typed cache functions
 	//subscribers []func([]coredb.TokenMedia)
-	subscribers []galleryTokenPreviewsByIDSubscriber
+	subscribers []tokenMediasByIDSubscriber
 
 	// functions used to cache published results from other dataloaders
 	cacheFuncs []interface{}
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
-	batch *galleryTokenPreviewsByIDBatch
+	batch *tokenMediasByIDBatch
 
 	// mutex to prevent races
 	mu sync.Mutex
@@ -171,7 +171,7 @@ type GalleryTokenPreviewsByID struct {
 	once sync.Once
 }
 
-type galleryTokenPreviewsByIDBatch struct {
+type tokenMediasByIDBatch struct {
 	keys    []persist.DBID
 	data    [][]coredb.TokenMedia
 	error   []error
@@ -180,14 +180,14 @@ type galleryTokenPreviewsByIDBatch struct {
 }
 
 // Load a TokenMedia by key, batching and caching will be applied automatically
-func (l *GalleryTokenPreviewsByID) Load(key persist.DBID) ([]coredb.TokenMedia, error) {
+func (l *TokenMediasByID) Load(key persist.DBID) ([]coredb.TokenMedia, error) {
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a TokenMedia.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *GalleryTokenPreviewsByID) LoadThunk(key persist.DBID) func() ([]coredb.TokenMedia, error) {
+func (l *TokenMediasByID) LoadThunk(key persist.DBID) func() ([]coredb.TokenMedia, error) {
 	l.mu.Lock()
 	if !l.disableCaching {
 		if it, ok := l.cache[key]; ok {
@@ -198,7 +198,7 @@ func (l *GalleryTokenPreviewsByID) LoadThunk(key persist.DBID) func() ([]coredb.
 		}
 	}
 	if l.batch == nil {
-		l.batch = &galleryTokenPreviewsByIDBatch{done: make(chan struct{})}
+		l.batch = &tokenMediasByIDBatch{done: make(chan struct{})}
 	}
 	batch := l.batch
 	pos := batch.keyIndex(l, key)
@@ -238,7 +238,7 @@ func (l *GalleryTokenPreviewsByID) LoadThunk(key persist.DBID) func() ([]coredb.
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *GalleryTokenPreviewsByID) LoadAll(keys []persist.DBID) ([][]coredb.TokenMedia, []error) {
+func (l *TokenMediasByID) LoadAll(keys []persist.DBID) ([][]coredb.TokenMedia, []error) {
 	results := make([]func() ([]coredb.TokenMedia, error), len(keys))
 
 	for i, key := range keys {
@@ -256,7 +256,7 @@ func (l *GalleryTokenPreviewsByID) LoadAll(keys []persist.DBID) ([][]coredb.Toke
 // LoadAllThunk returns a function that when called will block waiting for a TokenMedias.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *GalleryTokenPreviewsByID) LoadAllThunk(keys []persist.DBID) func() ([][]coredb.TokenMedia, []error) {
+func (l *TokenMediasByID) LoadAllThunk(keys []persist.DBID) func() ([][]coredb.TokenMedia, []error) {
 	results := make([]func() ([]coredb.TokenMedia, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
@@ -274,7 +274,7 @@ func (l *GalleryTokenPreviewsByID) LoadAllThunk(keys []persist.DBID) func() ([][
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *GalleryTokenPreviewsByID) Prime(key persist.DBID, value []coredb.TokenMedia) bool {
+func (l *TokenMediasByID) Prime(key persist.DBID, value []coredb.TokenMedia) bool {
 	if l.disableCaching {
 		return false
 	}
@@ -292,7 +292,7 @@ func (l *GalleryTokenPreviewsByID) Prime(key persist.DBID, value []coredb.TokenM
 }
 
 // Clear the value at key from the cache, if it exists
-func (l *GalleryTokenPreviewsByID) Clear(key persist.DBID) {
+func (l *TokenMediasByID) Clear(key persist.DBID) {
 	if l.disableCaching {
 		return
 	}
@@ -301,7 +301,7 @@ func (l *GalleryTokenPreviewsByID) Clear(key persist.DBID) {
 	l.mu.Unlock()
 }
 
-func (l *GalleryTokenPreviewsByID) unsafeSet(key persist.DBID, value []coredb.TokenMedia) {
+func (l *TokenMediasByID) unsafeSet(key persist.DBID, value []coredb.TokenMedia) {
 	if l.cache == nil {
 		l.cache = map[persist.DBID][]coredb.TokenMedia{}
 	}
@@ -310,7 +310,7 @@ func (l *GalleryTokenPreviewsByID) unsafeSet(key persist.DBID, value []coredb.To
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
-func (b *galleryTokenPreviewsByIDBatch) keyIndex(l *GalleryTokenPreviewsByID, key persist.DBID) int {
+func (b *tokenMediasByIDBatch) keyIndex(l *TokenMediasByID, key persist.DBID) int {
 	for i, existingKey := range b.keys {
 		if key == existingKey {
 			return i
@@ -334,7 +334,7 @@ func (b *galleryTokenPreviewsByIDBatch) keyIndex(l *GalleryTokenPreviewsByID, ke
 	return pos
 }
 
-func (b *galleryTokenPreviewsByIDBatch) startTimer(l *GalleryTokenPreviewsByID) {
+func (b *tokenMediasByIDBatch) startTimer(l *TokenMediasByID) {
 	time.Sleep(l.wait)
 	l.mu.Lock()
 
@@ -350,24 +350,24 @@ func (b *galleryTokenPreviewsByIDBatch) startTimer(l *GalleryTokenPreviewsByID) 
 	b.end(l)
 }
 
-func (b *galleryTokenPreviewsByIDBatch) end(l *GalleryTokenPreviewsByID) {
+func (b *tokenMediasByIDBatch) end(l *TokenMediasByID) {
 	b.data, b.error = l.fetch(b.keys)
 	close(b.done)
 }
 
-type galleryTokenPreviewsByIDSubscriber struct {
+type tokenMediasByIDSubscriber struct {
 	cacheFunc func(coredb.TokenMedia)
 	mutex     *sync.Mutex
 }
 
-func (l *GalleryTokenPreviewsByID) publishToSubscribers(value []coredb.TokenMedia) {
+func (l *TokenMediasByID) publishToSubscribers(value []coredb.TokenMedia) {
 	// Lazy build our list of typed cache functions once
 	l.once.Do(func() {
 		for i, subscription := range *l.subscriptionRegistry {
 			if typedFunc, ok := subscription.(*func(coredb.TokenMedia)); ok {
 				// Don't invoke our own cache function
 				if !l.ownsCacheFunc(typedFunc) {
-					l.subscribers = append(l.subscribers, galleryTokenPreviewsByIDSubscriber{cacheFunc: *typedFunc, mutex: (*l.mutexRegistry)[i]})
+					l.subscribers = append(l.subscribers, tokenMediasByIDSubscriber{cacheFunc: *typedFunc, mutex: (*l.mutexRegistry)[i]})
 				}
 			}
 		}
@@ -385,13 +385,13 @@ func (l *GalleryTokenPreviewsByID) publishToSubscribers(value []coredb.TokenMedi
 	}
 }
 
-func (l *GalleryTokenPreviewsByID) registerCacheFunc(cacheFunc interface{}, mutex *sync.Mutex) {
+func (l *TokenMediasByID) registerCacheFunc(cacheFunc interface{}, mutex *sync.Mutex) {
 	l.cacheFuncs = append(l.cacheFuncs, cacheFunc)
 	*l.subscriptionRegistry = append(*l.subscriptionRegistry, cacheFunc)
 	*l.mutexRegistry = append(*l.mutexRegistry, mutex)
 }
 
-func (l *GalleryTokenPreviewsByID) ownsCacheFunc(f *func(coredb.TokenMedia)) bool {
+func (l *TokenMediasByID) ownsCacheFunc(f *func(coredb.TokenMedia)) bool {
 	for _, cacheFunc := range l.cacheFuncs {
 		if cacheFunc == f {
 			return true

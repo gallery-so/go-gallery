@@ -11,7 +11,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-type MediaLoaderByTokenIDSettings interface {
+type TokenMediaByIDSettings interface {
 	getContext() context.Context
 	getWait() time.Duration
 	getMaxBatchOne() int
@@ -24,8 +24,8 @@ type MediaLoaderByTokenIDSettings interface {
 	getMutexRegistry() *[]*sync.Mutex
 }
 
-// MediaLoaderByTokenIDCacheSubscriptions
-type MediaLoaderByTokenIDCacheSubscriptions struct {
+// TokenMediaByIDCacheSubscriptions
+type TokenMediaByIDCacheSubscriptions struct {
 	// AutoCacheWithKey is a function that returns the persist.DBID cache key for a coredb.TokenMedia.
 	// If AutoCacheWithKey is not nil, this loader will automatically cache published results from other loaders
 	// that return a coredb.TokenMedia. Loaders that return pointers or slices of coredb.TokenMedia
@@ -49,38 +49,38 @@ type MediaLoaderByTokenIDCacheSubscriptions struct {
 	// to prime the cache.
 }
 
-func (l *MediaLoaderByTokenID) setContext(ctx context.Context) {
+func (l *TokenMediaByID) setContext(ctx context.Context) {
 	l.ctx = ctx
 }
 
-func (l *MediaLoaderByTokenID) setWait(wait time.Duration) {
+func (l *TokenMediaByID) setWait(wait time.Duration) {
 	l.wait = wait
 }
 
-func (l *MediaLoaderByTokenID) setMaxBatch(maxBatch int) {
+func (l *TokenMediaByID) setMaxBatch(maxBatch int) {
 	l.maxBatch = maxBatch
 }
 
-func (l *MediaLoaderByTokenID) setDisableCaching(disableCaching bool) {
+func (l *TokenMediaByID) setDisableCaching(disableCaching bool) {
 	l.disableCaching = disableCaching
 }
 
-func (l *MediaLoaderByTokenID) setPublishResults(publishResults bool) {
+func (l *TokenMediaByID) setPublishResults(publishResults bool) {
 	l.publishResults = publishResults
 }
 
-func (l *MediaLoaderByTokenID) setPreFetchHook(preFetchHook func(context.Context, string) context.Context) {
+func (l *TokenMediaByID) setPreFetchHook(preFetchHook func(context.Context, string) context.Context) {
 	l.preFetchHook = preFetchHook
 }
 
-func (l *MediaLoaderByTokenID) setPostFetchHook(postFetchHook func(context.Context, string)) {
+func (l *TokenMediaByID) setPostFetchHook(postFetchHook func(context.Context, string)) {
 	l.postFetchHook = postFetchHook
 }
 
-// NewMediaLoaderByTokenID creates a new MediaLoaderByTokenID with the given settings, functions, and options
-func NewMediaLoaderByTokenID(
-	settings MediaLoaderByTokenIDSettings, fetch func(ctx context.Context, keys []persist.DBID) ([]coredb.TokenMedia, []error),
-	funcs MediaLoaderByTokenIDCacheSubscriptions,
+// NewTokenMediaByID creates a new TokenMediaByID with the given settings, functions, and options
+func NewTokenMediaByID(
+	settings TokenMediaByIDSettings, fetch func(ctx context.Context, keys []persist.DBID) ([]coredb.TokenMedia, []error),
+	funcs TokenMediaByIDCacheSubscriptions,
 	opts ...func(interface {
 		setContext(context.Context)
 		setWait(time.Duration)
@@ -90,8 +90,8 @@ func NewMediaLoaderByTokenID(
 		setPreFetchHook(func(context.Context, string) context.Context)
 		setPostFetchHook(func(context.Context, string))
 	}),
-) *MediaLoaderByTokenID {
-	loader := &MediaLoaderByTokenID{
+) *TokenMediaByID {
+	loader := &TokenMediaByID{
 		ctx:                  settings.getContext(),
 		wait:                 settings.getWait(),
 		disableCaching:       settings.getDisableCaching(),
@@ -113,13 +113,13 @@ func NewMediaLoaderByTokenID(
 
 		// Allow the preFetchHook to modify and return a new context
 		if loader.preFetchHook != nil {
-			ctx = loader.preFetchHook(ctx, "MediaLoaderByTokenID")
+			ctx = loader.preFetchHook(ctx, "TokenMediaByID")
 		}
 
 		results, errors := fetch(ctx, keys)
 
 		if loader.postFetchHook != nil {
-			loader.postFetchHook(ctx, "MediaLoaderByTokenID")
+			loader.postFetchHook(ctx, "TokenMediaByID")
 		}
 
 		return results, errors
@@ -157,8 +157,8 @@ func NewMediaLoaderByTokenID(
 	return loader
 }
 
-// MediaLoaderByTokenID batches and caches requests
-type MediaLoaderByTokenID struct {
+// TokenMediaByID batches and caches requests
+type TokenMediaByID struct {
 	// context passed to fetch functions
 	ctx context.Context
 
@@ -199,14 +199,14 @@ type MediaLoaderByTokenID struct {
 
 	// typed cache functions
 	//subscribers []func(coredb.TokenMedia)
-	subscribers []mediaLoaderByTokenIDSubscriber
+	subscribers []tokenMediaByIDSubscriber
 
 	// functions used to cache published results from other dataloaders
 	cacheFuncs []interface{}
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
-	batch *mediaLoaderByTokenIDBatch
+	batch *tokenMediaByIDBatch
 
 	// mutex to prevent races
 	mu sync.Mutex
@@ -215,7 +215,7 @@ type MediaLoaderByTokenID struct {
 	once sync.Once
 }
 
-type mediaLoaderByTokenIDBatch struct {
+type tokenMediaByIDBatch struct {
 	keys    []persist.DBID
 	data    []coredb.TokenMedia
 	error   []error
@@ -224,14 +224,14 @@ type mediaLoaderByTokenIDBatch struct {
 }
 
 // Load a TokenMedia by key, batching and caching will be applied automatically
-func (l *MediaLoaderByTokenID) Load(key persist.DBID) (coredb.TokenMedia, error) {
+func (l *TokenMediaByID) Load(key persist.DBID) (coredb.TokenMedia, error) {
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a TokenMedia.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *MediaLoaderByTokenID) LoadThunk(key persist.DBID) func() (coredb.TokenMedia, error) {
+func (l *TokenMediaByID) LoadThunk(key persist.DBID) func() (coredb.TokenMedia, error) {
 	l.mu.Lock()
 	if !l.disableCaching {
 		if it, ok := l.cache[key]; ok {
@@ -242,7 +242,7 @@ func (l *MediaLoaderByTokenID) LoadThunk(key persist.DBID) func() (coredb.TokenM
 		}
 	}
 	if l.batch == nil {
-		l.batch = &mediaLoaderByTokenIDBatch{done: make(chan struct{})}
+		l.batch = &tokenMediaByIDBatch{done: make(chan struct{})}
 	}
 	batch := l.batch
 	pos := batch.keyIndex(l, key)
@@ -282,7 +282,7 @@ func (l *MediaLoaderByTokenID) LoadThunk(key persist.DBID) func() (coredb.TokenM
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *MediaLoaderByTokenID) LoadAll(keys []persist.DBID) ([]coredb.TokenMedia, []error) {
+func (l *TokenMediaByID) LoadAll(keys []persist.DBID) ([]coredb.TokenMedia, []error) {
 	results := make([]func() (coredb.TokenMedia, error), len(keys))
 
 	for i, key := range keys {
@@ -300,7 +300,7 @@ func (l *MediaLoaderByTokenID) LoadAll(keys []persist.DBID) ([]coredb.TokenMedia
 // LoadAllThunk returns a function that when called will block waiting for a TokenMedias.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *MediaLoaderByTokenID) LoadAllThunk(keys []persist.DBID) func() ([]coredb.TokenMedia, []error) {
+func (l *TokenMediaByID) LoadAllThunk(keys []persist.DBID) func() ([]coredb.TokenMedia, []error) {
 	results := make([]func() (coredb.TokenMedia, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
@@ -318,7 +318,7 @@ func (l *MediaLoaderByTokenID) LoadAllThunk(keys []persist.DBID) func() ([]cored
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *MediaLoaderByTokenID) Prime(key persist.DBID, value coredb.TokenMedia) bool {
+func (l *TokenMediaByID) Prime(key persist.DBID, value coredb.TokenMedia) bool {
 	if l.disableCaching {
 		return false
 	}
@@ -332,7 +332,7 @@ func (l *MediaLoaderByTokenID) Prime(key persist.DBID, value coredb.TokenMedia) 
 }
 
 // Prime the cache without acquiring locks. Should only be used when the lock is already held.
-func (l *MediaLoaderByTokenID) unsafePrime(key persist.DBID, value coredb.TokenMedia) bool {
+func (l *TokenMediaByID) unsafePrime(key persist.DBID, value coredb.TokenMedia) bool {
 	if l.disableCaching {
 		return false
 	}
@@ -344,7 +344,7 @@ func (l *MediaLoaderByTokenID) unsafePrime(key persist.DBID, value coredb.TokenM
 }
 
 // Clear the value at key from the cache, if it exists
-func (l *MediaLoaderByTokenID) Clear(key persist.DBID) {
+func (l *TokenMediaByID) Clear(key persist.DBID) {
 	if l.disableCaching {
 		return
 	}
@@ -353,7 +353,7 @@ func (l *MediaLoaderByTokenID) Clear(key persist.DBID) {
 	l.mu.Unlock()
 }
 
-func (l *MediaLoaderByTokenID) unsafeSet(key persist.DBID, value coredb.TokenMedia) {
+func (l *TokenMediaByID) unsafeSet(key persist.DBID, value coredb.TokenMedia) {
 	if l.cache == nil {
 		l.cache = map[persist.DBID]coredb.TokenMedia{}
 	}
@@ -362,7 +362,7 @@ func (l *MediaLoaderByTokenID) unsafeSet(key persist.DBID, value coredb.TokenMed
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
-func (b *mediaLoaderByTokenIDBatch) keyIndex(l *MediaLoaderByTokenID, key persist.DBID) int {
+func (b *tokenMediaByIDBatch) keyIndex(l *TokenMediaByID, key persist.DBID) int {
 	for i, existingKey := range b.keys {
 		if key == existingKey {
 			return i
@@ -386,7 +386,7 @@ func (b *mediaLoaderByTokenIDBatch) keyIndex(l *MediaLoaderByTokenID, key persis
 	return pos
 }
 
-func (b *mediaLoaderByTokenIDBatch) startTimer(l *MediaLoaderByTokenID) {
+func (b *tokenMediaByIDBatch) startTimer(l *TokenMediaByID) {
 	time.Sleep(l.wait)
 	l.mu.Lock()
 
@@ -402,24 +402,24 @@ func (b *mediaLoaderByTokenIDBatch) startTimer(l *MediaLoaderByTokenID) {
 	b.end(l)
 }
 
-func (b *mediaLoaderByTokenIDBatch) end(l *MediaLoaderByTokenID) {
+func (b *tokenMediaByIDBatch) end(l *TokenMediaByID) {
 	b.data, b.error = l.fetch(b.keys)
 	close(b.done)
 }
 
-type mediaLoaderByTokenIDSubscriber struct {
+type tokenMediaByIDSubscriber struct {
 	cacheFunc func(coredb.TokenMedia)
 	mutex     *sync.Mutex
 }
 
-func (l *MediaLoaderByTokenID) publishToSubscribers(value coredb.TokenMedia) {
+func (l *TokenMediaByID) publishToSubscribers(value coredb.TokenMedia) {
 	// Lazy build our list of typed cache functions once
 	l.once.Do(func() {
 		for i, subscription := range *l.subscriptionRegistry {
 			if typedFunc, ok := subscription.(*func(coredb.TokenMedia)); ok {
 				// Don't invoke our own cache function
 				if !l.ownsCacheFunc(typedFunc) {
-					l.subscribers = append(l.subscribers, mediaLoaderByTokenIDSubscriber{cacheFunc: *typedFunc, mutex: (*l.mutexRegistry)[i]})
+					l.subscribers = append(l.subscribers, tokenMediaByIDSubscriber{cacheFunc: *typedFunc, mutex: (*l.mutexRegistry)[i]})
 				}
 			}
 		}
@@ -435,13 +435,13 @@ func (l *MediaLoaderByTokenID) publishToSubscribers(value coredb.TokenMedia) {
 	}
 }
 
-func (l *MediaLoaderByTokenID) registerCacheFunc(cacheFunc interface{}, mutex *sync.Mutex) {
+func (l *TokenMediaByID) registerCacheFunc(cacheFunc interface{}, mutex *sync.Mutex) {
 	l.cacheFuncs = append(l.cacheFuncs, cacheFunc)
 	*l.subscriptionRegistry = append(*l.subscriptionRegistry, cacheFunc)
 	*l.mutexRegistry = append(*l.mutexRegistry, mutex)
 }
 
-func (l *MediaLoaderByTokenID) ownsCacheFunc(f *func(coredb.TokenMedia)) bool {
+func (l *TokenMediaByID) ownsCacheFunc(f *func(coredb.TokenMedia)) bool {
 	for _, cacheFunc := range l.cacheFuncs {
 		if cacheFunc == f {
 			return true

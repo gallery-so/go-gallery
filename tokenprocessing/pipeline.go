@@ -62,6 +62,8 @@ type tokenProcessingJob struct {
 	refreshMetadata bool
 	// defaultMetadata is metadata to use to retrieve media from. If not set or refreshMetadata is enabled, the pipeline will try to get new metadata.
 	defaultMetadata persist.TokenMetadata
+	// isSpamJob is an optional flag that indicates that the token/contract is designated as spam. It's currently used to exclude events from Sentry. isSpamJob bool
+	isSpamJob bool
 }
 
 type PipelineOption func(*tokenProcessingJob)
@@ -85,6 +87,12 @@ func (pOpts) WithRefreshMetadata() PipelineOption {
 func (pOpts) WithMetadata(t persist.TokenMetadata) PipelineOption {
 	return func(j *tokenProcessingJob) {
 		j.defaultMetadata = t
+	}
+}
+
+func (pOpts) WithIsSpamJob(isSpamJob bool) PipelineOption {
+	return func(j *tokenProcessingJob) {
+		j.isSpamJob = isSpamJob
 	}
 }
 

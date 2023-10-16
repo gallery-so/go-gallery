@@ -94,6 +94,9 @@ select * from tokens where id = $1 and displayable and deleted = false;
 -- name: GetTokenDefinitionById :one
 select * from token_definitions where id = $1 and not deleted;
 
+-- name: GetTokenDefinitionByIdBatch :batchone
+select * from token_definitions where id = $1 and not deleted;
+
 -- name: GetTokenDefinitionByTokenDbid :one
 select token_definitions.*
 from token_definitions, tokens
@@ -144,15 +147,6 @@ join token_definitions on tokens.token_definition_id = token_definitions.id
 join contracts on token_definitions.contract_id = contracts.id
 left join token_medias on token_definitions.token_media_id = token_medias.id
 where contracts.id = $1 and tokens.displayable and not tokens.deleted and not token_definitions.deleted and not contracts.deleted
-order by tokens.block_number desc;
-
--- name: GetTokenFullDetailsByTokenDefinitionId :many
-select sqlc.embed(tokens), sqlc.embed(token_definitions), sqlc.embed(token_medias), sqlc.embed(contracts)
-from tokens
-join token_definitions on tokens.token_definition_id = token_definitions.id
-join contracts on token_definitions.contract_id = contracts.id
-left join token_medias on token_definitions.token_media_id = token_medias.id
-where token_definitions.id = $1 and tokens.displayable and not tokens.deleted and not token_definitions.deleted and not contracts.deleted
 order by tokens.block_number desc;
 
 -- name: UpdateTokenCollectorsNoteByTokenDbidUserId :exec
@@ -1429,10 +1423,15 @@ ORDER BY tokens.id;
 -- name: GetReprocessJobRangeByID :one
 select * from reprocess_jobs where id = $1;
 
--- name: GetMediaByTokenIDIgnoringStatus :batchone
+-- name: GetMediaByTokenIDIgnoringStatusBatch :batchone
 select m.*
 from token_medias m
 where m.id = (select token_media_id from tokens where tokens.id = $1) and not m.deleted;
+
+-- name: GetMediaByTokenDefinitionIDIgnoringStatusBatch :batchone
+select m.*
+from token_medias m
+where m.id = (select token_media_id from token_definitions where token_definitions.id = $1 and not token_definitions.deleted) and not m.deleted;
 
 -- name: GetMediaByTokenIdentifiers :one
 select token_medias.*
