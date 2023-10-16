@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/auth"
 	"net/http"
 	"sync/atomic"
 	"time"
+
+	"github.com/bsm/redislock"
+	"github.com/mikeydub/go-gallery/service/auth"
 
 	"cloud.google.com/go/pubsub"
 	"github.com/gin-gonic/gin"
@@ -141,12 +143,17 @@ func adminSendNotificationEmail(queries *coredb.Queries, s *sendgrid.Client) gin
 	}
 }
 
-func autoSendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, psub *pubsub.Client) error {
+func autoSendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, psub *pubsub.Client, r *redislock.Client) error {
 	ctx := context.Background()
 	sub := psub.Subscription(env.GetString("PUBSUB_NOTIFICATIONS_EMAILS_SUBSCRIPTION"))
 
 	return sub.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
-		err := sendNotificationEmailsToAllUsers(ctx, queries, s, env.GetString("ENV") == "production")
+		l, err := r.Obtain(ctx, "send-notification-emails", time.Minute*5, nil)
+		if err != nil {
+			return // don't ack message
+		}
+		defer l.Release(ctx)
+		err = sendNotificationEmailsToAllUsers(ctx, queries, s, env.GetString("ENV") == "production")
 		if err != nil {
 			logger.For(ctx).Errorf("error sending notification emails: %s", err)
 			msg.Nack()
@@ -372,6 +379,35 @@ func notifToTemplateData(ctx context.Context, queries *coredb.Queries, n coredb.
 		}
 
 		return notificationEmailDynamicTemplateData{}, fmt.Errorf("no viewer ids")
+
+	case persist.ActionAdmiredPost:
+		data := notificationEmailDynamicTemplateData{}
+		if len(n.Data.AdmirerIDs) > 1 {
+			data.Actor = fmt.Sprintf("%d collectors", len(n.Data.AdmirerIDs))
+		} else {
+			actorUser, err := queries.GetUserById(ctx, n.Data.AdmirerIDs[0])
+			if err != nil {
+				return notificationEmailDynamicTemplateData{}, err
+			}
+			data.Actor = actorUser.Username.String
+		}
+		data.Action = "admired your post"
+		return data, nil
+
+	case persist.ActionCommentedOnPost:
+		comment, err := queries.GetCommentByCommentID(ctx, n.CommentID)
+		if err != nil {
+			return notificationEmailDynamicTemplateData{}, fmt.Errorf("failed to get comment for comment %s: %w", n.CommentID, err)
+		}
+		userActor, err := queries.GetUserById(ctx, comment.ActorID)
+		if err != nil {
+			return notificationEmailDynamicTemplateData{}, fmt.Errorf("failed to get user for comment actor %s: %w", comment.ActorID, err)
+		}
+		return notificationEmailDynamicTemplateData{
+			Actor:       userActor.Username.String,
+			Action:      "commented on your post",
+			PreviewText: util.TruncateWithEllipsis(comment.Comment, 20),
+		}, nil
 	default:
 		return notificationEmailDynamicTemplateData{}, fmt.Errorf("unknown action %s", n.Action)
 	}
