@@ -532,6 +532,9 @@ func (r *galleryUpdatedFeedEventDataResolver) SubEventDatas(ctx context.Context,
 // ProfileImage is the resolver for the profileImage field.
 func (r *galleryUserResolver) ProfileImage(ctx context.Context, obj *model.GalleryUser) (model.ProfileImage, error) {
 	pfp, err := publicapi.For(ctx).User.GetProfileImageByUserID(ctx, obj.Dbid)
+	if err != nil && util.ErrorAs[persist.ErrProfileImageNotFound](err) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}
