@@ -108,26 +108,13 @@ where token_definitions.id = tokens.token_definition_id
 -- name: GetTokenDefinitionByTokenIdentifiers :one
 select *
 from token_definitions
-where token_definitions.chain = @chain
-    and contract_id = (
-        select contract.id
-        from contracts
-        where contracts.address = @contract_address and not contracts.deleted
-    )
-    and token_definitions.token_id = @token_id
-    and not token_definitions.deleted;
+where (chain, contract_address, token_id) = (@chain, @contract_address, @token_id) and not deleted;
 
 -- name: GetTokenDefinitionAndMediaByTokenIdentifiers :one
--- XXX: Could be an extra query
 select sqlc.embed(token_definitions), sqlc.embed(token_medias)
 from token_definitions, token_medias
-where token_definitions.chain = @chain
-    and contract_id = (
-        select contract.id
-        from contracts
-        where contracts.address = @contract_address and not contracts.deleted
-    )
-    and token_definitions.token_id = @token_id
+where (token_definitions.chain, token_definitions.contract_address, token_definitions.token_id) = (@chain, @contract_address, @token_id)
+    and token_definitions.token_media_id = token_medias.id
     and not token_definitions.deleted
     and not token_medias.deleted;
 
@@ -167,27 +154,22 @@ select * from tokens where id = $1 and deleted = false;
 
 -- name: GetTokenByUserTokenIdentifiersBatch :batchone
 select t.*
-from tokens t, token_definitions td, contracts c
+from tokens t, token_definitions td
 where t.token_definition_id = td.token_definition_id
-    and td.contract_id = c.id
     and t.owner_user_id = @owner_id
     and td.token_id = @token_id
-    and c.chain = @chain
-    and c.address = @contract_address
+    and td.chain = @chain
+    and td.contract_address = @contract_address
     and t.displayable
     and not t.deleted
-    and not c.deleted
     and not td.deleted;
--- XXX select t.*
--- XXX from tokens t
--- XXX join contracts c on t.contract = c.id
--- XXX where t.owner_user_id = @owner_id and t.token_id = @token_id and c.address = @contract_address and c.chain = @chain and t.displayable and not t.deleted and not c.deleted;
 
 -- name: GetTokenByUserTokenIdentifiers :one
-select t.*
-from tokens t
-join contracts c on t.contract = c.id
-where t.owner_user_id = @owner_id and t.token_id = @token_id and c.address = @contract_address and c.chain = @chain and t.displayable and not t.deleted and not c.deleted;
+select *
+from tokens
+where owner_user_id = @owner_id and token_definition_id = (select id from token_definitions td where (td.chain, td.contract_address, td.token_id) = (@chain, @contract_address, @token_id) and not deleted)
+    and not tokens.deleted
+    and tokens.displayable;
 
 -- name: GetTokensByCollectionIdBatch :batchmany
 select t.* from collections c,
@@ -365,16 +347,18 @@ select u.* from tokens t
     where t.id = $1 and t.displayable and t.deleted = false and u.deleted = false;
 
 -- name: GetPreviewURLsByContractIdAndUserId :many
-select coalesce(nullif(tm.media->>'thumbnail_url', ''), nullif(tm.media->>'media_url', ''))::varchar as thumbnail_url
-    from tokens t
-        inner join token_medias tm on t.token_media_id = tm.id
-    where t.contract_id = $1
-      and t.owner_user_id = $2
-      and t.displayable
-      and t.deleted = false
-      and (tm.media ->> 'thumbnail_url' != '' or tm.media->>'media_type' = 'image')
-      and tm.deleted = false
-    order by t.id limit 3;
+select coalesce(nullif(token_medias.media->>'thumbnail_url', ''), nullif(token_medias.media->>'media_url', ''))::varchar as thumbnail_url
+from tokens, token_definitions, token_medias
+where tokens.token_definition_id = token_definitions.id 
+    and token_definitions.token_media_id = token_medias.id
+    and token_definitions.contract_id = @contract_id
+    and tokens.owner_user_id = @owner_id
+    and tokens.displayable
+    and (token_medias.media ->> 'thumbnail_url' != '' or token_medias.media->>'media_type' = 'image')
+    and not tokens.deleted
+    and not token_definitions.deleted
+    and not token_medias.deleted
+order by tokens.id limit 3;
 
 -- name: GetTokensByUserIdBatch :batchmany
 select t.* from tokens t
@@ -382,14 +366,6 @@ select t.* from tokens t
       and t.deleted = false
       and t.displayable
       and ((@include_holder::bool and t.is_holder_token) or (@include_creator::bool and t.is_creator_token))
-    order by t.created_at desc, t.name desc, t.id desc;
-
--- name: GetTokensByUserIdAndChainBatch :batchmany
-select t.* from tokens t
-    where t.owner_user_id = $1
-      and t.chain = $2
-      and t.displayable
-      and t.deleted = false
     order by t.created_at desc, t.name desc, t.id desc;
 
 -- name: CreateUserEvent :one
@@ -1013,13 +989,6 @@ select tm.*
 	order by array_position(g.collections, c.id) , array_position(c.nfts, t.id)
 	limit 4;
 
--- name: GetTokenByTokenIdentifiers :one
-select * from tokens
-    where tokens.token_id = @token_hex
-      and contract = (select contracts.id from contracts where contracts.address = @contract_address)
-      and tokens.chain = @chain and tokens.deleted = false
-      and tokens.displayable;
-
 -- name: DeleteCollections :exec
 update collections set deleted = true, last_updated = now() where id = any(@ids::varchar[]);
 
@@ -1441,16 +1410,6 @@ where (chain, contract_address, token_id) = (@chain, @contract_address, @token_i
     and not token_definitions.deleted
     and not token_medias.deleted;
 
--- name: GetFallbackTokenByUserTokenIdentifiers :one
-with contract as (
-	select * from contracts where contracts.chain = @chain and contracts.address = @address and not contracts.deleted
-)
-select tokens.*
-from tokens, contract
-where tokens.contract = contract.id and tokens.chain = contract.chain and tokens.token_id = @token_id and not tokens.deleted
-order by tokens.owner_user_id = @user_id desc, nullif(tokens.fallback_media->>'image_url', '') asc, tokens.last_updated desc
-limit 1;
-
 -- name: UpsertSession :one
 insert into sessions (id, user_id,
                       created_at, created_with_user_agent, created_with_platform, created_with_os,
@@ -1562,18 +1521,16 @@ where pfp.id = @id
 
 -- name: GetPotentialENSProfileImageByUserId :one
 select sqlc.embed(token_definitions), sqlc.embed(token_medias), sqlc.embed(wallets)
-from token_definitions, tokens, contracts, users, token_medias, wallets, unnest(tokens.owned_by_wallets) tw(id)
-where contracts.address = @ens_address
-    and contracts.chain = @chain
+from token_definitions, tokens, users, token_medias, wallets, unnest(tokens.owned_by_wallets) tw(id)
+where token_definitions.contract_address = @ens_address
+    and token_definitions.chain = @chain
     and tokens.owner_user_id = @user_id
     and users.id = tokens.owner_user_id
     and tw.id = wallets.id
     and token_definitions.id = tokens.token_definition_id
-    and tokens_definitions.contract_id = contracts.id
     and token_definitions.token_media_id = token_medias.id
     and token_medias.active
     and nullif(token_medias.media->>'profile_image_url', '') is not null
-    and not contracts.deleted
     and not users.deleted
     and not token_medias.deleted
     and not wallets.deleted
@@ -1692,7 +1649,16 @@ update tokens
       and not deleted;
       
 -- name: IsMemberOfCommunity :one
-select exists (select * from tokens where not deleted and displayable and owner_user_id = @user_id and contract_id = @contract_id limit 1) is_member;
+with contract_tokens as (select id from token_definitions td where not td.deleted and td.contract_id = @contract_id)
+select exists(
+    select 1
+    from tokens, contract_tokens
+    where tokens.owner_user_id = @user_id
+        and not tokens.deleted
+        and tokens.displayable
+        and tokens.token_definition_id = contract_tokens.id
+    limit 1
+);
 
 -- name: InsertExternalSocialConnectionsForUser :many
 insert into external_social_connections (id, social_account_type, follower_id, followee_id) 

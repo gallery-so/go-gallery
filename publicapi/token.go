@@ -282,23 +282,6 @@ func (api TokenAPI) GetTokensByUserID(ctx context.Context, userID persist.DBID, 
 	return tokens, nil
 }
 
-func (api TokenAPI) GetTokensByUserIDAndChain(ctx context.Context, userID persist.DBID, chain persist.Chain) ([]db.Token, error) {
-	// Validate
-	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"userID": validate.WithTag(userID, "required"),
-		"chain":  validate.WithTag(chain, "chain"),
-	}); err != nil {
-		return nil, err
-	}
-
-	tokens, err := api.loaders.TokensByUserIDAndChain.Load(dataloader.IDAndChain{ID: userID, Chain: chain})
-	if err != nil {
-		return nil, err
-	}
-
-	return tokens, nil
-}
-
 func (api TokenAPI) SyncTokensAdmin(ctx context.Context, chains []persist.Chain, userID persist.DBID) error {
 	key := fmt.Sprintf("sync:owned:%s", userID.String())
 

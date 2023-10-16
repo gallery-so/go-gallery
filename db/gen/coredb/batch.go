@@ -2961,16 +2961,14 @@ func (b *GetTokenByIdIgnoreDisplayableBatchBatchResults) Close() error {
 
 const getTokenByUserTokenIdentifiersBatch = `-- name: GetTokenByUserTokenIdentifiersBatch :batchone
 select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name__deprecated, t.description__deprecated, t.collectors_note, t.token_uri__deprecated, t.token_type__deprecated, t.token_id, t.quantity, t.ownership_history__deprecated, t.external_url__deprecated, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract_id, t.is_user_marked_spam, t.is_provider_marked_spam__deprecated, t.last_synced, t.fallback_media__deprecated, t.token_media_id__deprecated, t.is_creator_token, t.is_holder_token, t.displayable, t.token_definition_id
-from tokens t, token_definitions td, contracts c
+from tokens t, token_definitions td
 where t.token_definition_id = td.token_definition_id
-    and td.contract_id = c.id
     and t.owner_user_id = $1
     and td.token_id = $2
-    and c.chain = $3
-    and c.address = $4
+    and td.chain = $3
+    and td.contract_address = $4
     and t.displayable
     and not t.deleted
-    and not c.deleted
     and not td.deleted
 `
 
@@ -3279,104 +3277,6 @@ func (b *GetTokensByCollectionIdBatchBatchResults) Query(f func(int, []Token, er
 }
 
 func (b *GetTokensByCollectionIdBatchBatchResults) Close() error {
-	b.closed = true
-	return b.br.Close()
-}
-
-const getTokensByUserIdAndChainBatch = `-- name: GetTokensByUserIdAndChainBatch :batchmany
-select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name__deprecated, t.description__deprecated, t.collectors_note, t.token_uri__deprecated, t.token_type__deprecated, t.token_id, t.quantity, t.ownership_history__deprecated, t.external_url__deprecated, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract_id, t.is_user_marked_spam, t.is_provider_marked_spam__deprecated, t.last_synced, t.fallback_media__deprecated, t.token_media_id__deprecated, t.is_creator_token, t.is_holder_token, t.displayable, t.token_definition_id from tokens t
-    where t.owner_user_id = $1
-      and t.chain = $2
-      and t.displayable
-      and t.deleted = false
-    order by t.created_at desc, t.name desc, t.id desc
-`
-
-type GetTokensByUserIdAndChainBatchBatchResults struct {
-	br     pgx.BatchResults
-	tot    int
-	closed bool
-}
-
-type GetTokensByUserIdAndChainBatchParams struct {
-	OwnerUserID persist.DBID  `json:"owner_user_id"`
-	Chain       persist.Chain `json:"chain"`
-}
-
-func (q *Queries) GetTokensByUserIdAndChainBatch(ctx context.Context, arg []GetTokensByUserIdAndChainBatchParams) *GetTokensByUserIdAndChainBatchBatchResults {
-	batch := &pgx.Batch{}
-	for _, a := range arg {
-		vals := []interface{}{
-			a.OwnerUserID,
-			a.Chain,
-		}
-		batch.Queue(getTokensByUserIdAndChainBatch, vals...)
-	}
-	br := q.db.SendBatch(ctx, batch)
-	return &GetTokensByUserIdAndChainBatchBatchResults{br, len(arg), false}
-}
-
-func (b *GetTokensByUserIdAndChainBatchBatchResults) Query(f func(int, []Token, error)) {
-	defer b.br.Close()
-	for t := 0; t < b.tot; t++ {
-		var items []Token
-		if b.closed {
-			if f != nil {
-				f(t, items, ErrBatchAlreadyClosed)
-			}
-			continue
-		}
-		err := func() error {
-			rows, err := b.br.Query()
-			defer rows.Close()
-			if err != nil {
-				return err
-			}
-			for rows.Next() {
-				var i Token
-				if err := rows.Scan(
-					&i.ID,
-					&i.Deleted,
-					&i.Version,
-					&i.CreatedAt,
-					&i.LastUpdated,
-					&i.NameDeprecated,
-					&i.DescriptionDeprecated,
-					&i.CollectorsNote,
-					&i.TokenUriDeprecated,
-					&i.TokenTypeDeprecated,
-					&i.TokenID,
-					&i.Quantity,
-					&i.OwnershipHistoryDeprecated,
-					&i.ExternalUrlDeprecated,
-					&i.BlockNumber,
-					&i.OwnerUserID,
-					&i.OwnedByWallets,
-					&i.Chain,
-					&i.ContractID,
-					&i.IsUserMarkedSpam,
-					&i.IsProviderMarkedSpamDeprecated,
-					&i.LastSynced,
-					&i.FallbackMediaDeprecated,
-					&i.TokenMediaIDDeprecated,
-					&i.IsCreatorToken,
-					&i.IsHolderToken,
-					&i.Displayable,
-					&i.TokenDefinitionID,
-				); err != nil {
-					return err
-				}
-				items = append(items, i)
-			}
-			return rows.Err()
-		}()
-		if f != nil {
-			f(t, items, err)
-		}
-	}
-}
-
-func (b *GetTokensByUserIdAndChainBatchBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }

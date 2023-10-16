@@ -580,19 +580,6 @@ func (r *galleryUserResolver) Tokens(ctx context.Context, obj *model.GalleryUser
 	return tokensToModel(ctx, tokens), nil
 }
 
-// TokensByChain is the resolver for the tokensByChain field.
-func (r *galleryUserResolver) TokensByChain(ctx context.Context, obj *model.GalleryUser, chain persist.Chain) (*model.ChainTokens, error) {
-	tokens, err := publicapi.For(ctx).Token.GetTokensByUserIDAndChain(ctx, obj.Dbid, chain)
-	if err != nil {
-		return nil, err
-	}
-
-	return &model.ChainTokens{
-		Chain:  &chain,
-		Tokens: tokensToModel(ctx, tokens),
-	}, nil
-}
-
 // Wallets is the resolver for the wallets field.
 func (r *galleryUserResolver) Wallets(ctx context.Context, obj *model.GalleryUser) ([]*model.Wallet, error) {
 	return resolveWalletsByUserID(ctx, obj.Dbid)

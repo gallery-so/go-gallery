@@ -17,9 +17,11 @@ create table if not exists token_definitions (
   foreign key(contract_id, chain, contract_address) references contacts(id, chain, contract_address)
 );
 create unique index if not exists token_definitions_chain_contract_token_idx on token_definitions(chain, contract_id, token_id) where not deleted;
-create index token_definitions_chain_contract_token_idx on token_definitions(chain, contract_id, token_id) where not deleted;
+create index token_definitions_chain_contract_token_idx on token_definitions(chain, contract_address, token_id) where not deleted;
+create index token_definitions_contract_id_idx on token_definitions(contract_id) where not deleted;
 
 create unique index if not exists tokens_owner_token_definition_idx on tokens(owner_user_id, token_definition_id) where not deleted;
+alter table tokens add constraint fk_tokens_token_definition_chain_address_token foreign key(token_definition_id, chain, contract_id, token_id) references token_definitions(id, chain, contract_id, token_id);
 alter table tokens add column if not exists token_definition_id character varying(255) not null references token_definitions(id);
 alter table tokens rename column contract to contract_id;
 alter table tokens rename column name to name__deprecated;
@@ -35,7 +37,6 @@ alter table tokens rename column token_media_id to token_media_id__deprecated;
 alter table token_medias rename column name to name__deprecated;
 alter table token_medias rename column description to description__deprecated;
 alter table token_medias rename column metadata to metadata__deprecated;
--- XXX: Remove me
 alter table token_medias rename column contract_id to contract_id__deprecated;
 alter table token_medias rename column token_id to token_id__deprecated;
 alter table token_medias rename column chain to chain__deprecated;

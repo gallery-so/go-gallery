@@ -16,7 +16,6 @@
 //go:generate go run github.com/gallery-so/dataloaden TokenLoaderByUserTokenIdentifiers github.com/mikeydub/go-gallery/db/gen/coredb.GetTokenByUserTokenIdentifiersBatchParams github.com/mikeydub/go-gallery/db/gen/coredb.Token
 //go:generate go run github.com/gallery-so/dataloaden TokensLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Token
 //go:generate go run github.com/gallery-so/dataloaden TokensLoaderByIDAndLimit github.com/mikeydub/go-gallery/graphql/dataloader.IDAndLimit []github.com/mikeydub/go-gallery/db/gen/coredb.Token
-//go:generate go run github.com/gallery-so/dataloaden TokensLoaderByIDAndChain github.com/mikeydub/go-gallery/graphql/dataloader.IDAndChain []github.com/mikeydub/go-gallery/db/gen/coredb.Token
 //go:generate go run github.com/gallery-so/dataloaden ContractLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Contract
 //go:generate go run github.com/gallery-so/dataloaden ContractsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Contract
 //go:generate go run github.com/gallery-so/dataloaden ContractsLoaderByCreatorID github.com/mikeydub/go-gallery/db/gen/coredb.GetCreatedContractsBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.Contract
@@ -104,7 +103,6 @@ type Loaders struct {
 	TokensByCollectionID            *TokensLoaderByIDAndLimit
 	TokensByWalletID                *TokensLoaderByID
 	TokensByUserID                  *TokensLoaderByUserIDAndFilters
-	TokensByUserIDAndChain          *TokensLoaderByIDAndChain
 	NewTokensByFeedEventID          *TokensLoaderByID
 	OwnerByTokenID                  *UserLoaderByID
 	ContractByContractID            *ContractLoaderByID
@@ -263,10 +261,6 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 	loaders.TokensByWalletID = NewTokensLoaderByID(defaults, loadTokensByWalletID(q))
 
 	loaders.TokensByUserID = NewTokensLoaderByUserIDAndFilters(defaults, loadTokensByUserID(q))
-
-	loaders.TokensByUserIDAndChain = NewTokensLoaderByIDAndChain(defaults, loadTokensByUserIDAndChain(q))
-
-	loaders.TokensByUserIDAndChain = NewTokensLoaderByIDAndChain(defaults, loadTokensByUserIDAndChain(q))
 
 	loaders.OwnerByTokenID = NewUserLoaderByID(defaults, loadOwnerByTokenID(q), UserLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(user db.User) persist.DBID { return user.ID },
@@ -877,30 +871,6 @@ func loadTokensByUserID(q *db.Queries) func(context.Context, []db.GetTokensByUse
 		errors := make([]error, len(params))
 
 		b := q.GetTokensByUserIdBatch(ctx, params)
-		defer b.Close()
-
-		b.Query(func(i int, t []db.Token, err error) {
-			tokens[i], errors[i] = t, err
-		})
-
-		return tokens, errors
-	}
-}
-
-func loadTokensByUserIDAndChain(q *db.Queries) func(context.Context, []IDAndChain) ([][]db.Token, []error) {
-	return func(ctx context.Context, userIDsAndChains []IDAndChain) ([][]db.Token, []error) {
-		tokens := make([][]db.Token, len(userIDsAndChains))
-		errors := make([]error, len(userIDsAndChains))
-
-		params := make([]db.GetTokensByUserIdAndChainBatchParams, len(userIDsAndChains))
-		for i, userIDAndChain := range userIDsAndChains {
-			params[i] = db.GetTokensByUserIdAndChainBatchParams{
-				OwnerUserID: userIDAndChain.ID,
-				Chain:       userIDAndChain.Chain,
-			}
-		}
-
-		b := q.GetTokensByUserIdAndChainBatch(ctx, params)
 		defer b.Close()
 
 		b.Query(func(i int, t []db.Token, err error) {

@@ -414,7 +414,7 @@ func (api ContractAPI) GetCommunityPostsByContractIDAndProjectID(ctx context.Con
 
 func (api ContractAPI) GetPreviewURLsByContractIDandUserID(ctx context.Context, userID, contractID persist.DBID) ([]string, error) {
 	return api.queries.GetPreviewURLsByContractIdAndUserId(ctx, db.GetPreviewURLsByContractIdAndUserIdParams{
-		ContractID:  contractID,
-		OwnerUserID: userID,
+		ContractID: contractID,
+		OwnerID:    userID,
 	})
 }

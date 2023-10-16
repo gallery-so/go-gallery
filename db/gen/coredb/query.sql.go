@@ -2320,65 +2320,6 @@ func (q *Queries) GetEventsInWindow(ctx context.Context, arg GetEventsInWindowPa
 	return items, nil
 }
 
-const getFallbackTokenByUserTokenIdentifiers = `-- name: GetFallbackTokenByUserTokenIdentifiers :one
-with contract as (
-	select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id, override_creator_user_id from contracts where contracts.chain = $3 and contracts.address = $4 and not contracts.deleted
-)
-select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name__deprecated, tokens.description__deprecated, tokens.collectors_note, tokens.token_uri__deprecated, tokens.token_type__deprecated, tokens.token_id, tokens.quantity, tokens.ownership_history__deprecated, tokens.external_url__deprecated, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract_id, tokens.is_user_marked_spam, tokens.is_provider_marked_spam__deprecated, tokens.last_synced, tokens.fallback_media__deprecated, tokens.token_media_id__deprecated, tokens.is_creator_token, tokens.is_holder_token, tokens.displayable, tokens.token_definition_id
-from tokens, contract
-where tokens.contract = contract.id and tokens.chain = contract.chain and tokens.token_id = $1 and not tokens.deleted
-order by tokens.owner_user_id = $2 desc, nullif(tokens.fallback_media->>'image_url', '') asc, tokens.last_updated desc
-limit 1
-`
-
-type GetFallbackTokenByUserTokenIdentifiersParams struct {
-	TokenID persist.TokenID `json:"token_id"`
-	UserID  persist.DBID    `json:"user_id"`
-	Chain   persist.Chain   `json:"chain"`
-	Address persist.Address `json:"address"`
-}
-
-func (q *Queries) GetFallbackTokenByUserTokenIdentifiers(ctx context.Context, arg GetFallbackTokenByUserTokenIdentifiersParams) (Token, error) {
-	row := q.db.QueryRow(ctx, getFallbackTokenByUserTokenIdentifiers,
-		arg.TokenID,
-		arg.UserID,
-		arg.Chain,
-		arg.Address,
-	)
-	var i Token
-	err := row.Scan(
-		&i.ID,
-		&i.Deleted,
-		&i.Version,
-		&i.CreatedAt,
-		&i.LastUpdated,
-		&i.NameDeprecated,
-		&i.DescriptionDeprecated,
-		&i.CollectorsNote,
-		&i.TokenUriDeprecated,
-		&i.TokenTypeDeprecated,
-		&i.TokenID,
-		&i.Quantity,
-		&i.OwnershipHistoryDeprecated,
-		&i.ExternalUrlDeprecated,
-		&i.BlockNumber,
-		&i.OwnerUserID,
-		&i.OwnedByWallets,
-		&i.Chain,
-		&i.ContractID,
-		&i.IsUserMarkedSpam,
-		&i.IsProviderMarkedSpamDeprecated,
-		&i.LastSynced,
-		&i.FallbackMediaDeprecated,
-		&i.TokenMediaIDDeprecated,
-		&i.IsCreatorToken,
-		&i.IsHolderToken,
-		&i.Displayable,
-		&i.TokenDefinitionID,
-	)
-	return i, err
-}
-
 const getFeedEventByID = `-- name: GetFeedEventByID :one
 SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption, group_id FROM feed_events WHERE id = $1 AND deleted = false
 `
@@ -3208,18 +3149,16 @@ func (q *Queries) GetPostsByIds(ctx context.Context, postIds []string) ([]Post, 
 
 const getPotentialENSProfileImageByUserId = `-- name: GetPotentialENSProfileImageByUserId :one
 select token_definitions.id, token_definitions.created_at, token_definitions.last_updated, token_definitions.deleted, token_definitions.name, token_definitions.description, token_definitions.token_type, token_definitions.token_id, token_definitions.external_url, token_definitions.chain, token_definitions.metadata, token_definitions.fallback_media, token_definitions.contract_address, token_definitions.contract_id, token_definitions.token_media_id, token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.contract_id__deprecated, token_medias.token_id__deprecated, token_medias.chain__deprecated, token_medias.active, token_medias.metadata__deprecated, token_medias.media, token_medias.name__deprecated, token_medias.description__deprecated, token_medias.processing_job_id, token_medias.deleted, wallets.id, wallets.created_at, wallets.last_updated, wallets.deleted, wallets.version, wallets.address, wallets.wallet_type, wallets.chain
-from token_definitions, tokens, contracts, users, token_medias, wallets, unnest(tokens.owned_by_wallets) tw(id)
-where contracts.address = $1
-    and contracts.chain = $2
+from token_definitions, tokens, users, token_medias, wallets, unnest(tokens.owned_by_wallets) tw(id)
+where token_definitions.contract_address = $1
+    and token_definitions.chain = $2
     and tokens.owner_user_id = $3
     and users.id = tokens.owner_user_id
     and tw.id = wallets.id
     and token_definitions.id = tokens.token_definition_id
-    and tokens_definitions.contract_id = contracts.id
     and token_definitions.token_media_id = token_medias.id
     and token_medias.active
     and nullif(token_medias.media->>'profile_image_url', '') is not null
-    and not contracts.deleted
     and not users.deleted
     and not token_medias.deleted
     and not wallets.deleted
@@ -3286,25 +3225,27 @@ func (q *Queries) GetPotentialENSProfileImageByUserId(ctx context.Context, arg G
 }
 
 const getPreviewURLsByContractIdAndUserId = `-- name: GetPreviewURLsByContractIdAndUserId :many
-select coalesce(nullif(tm.media->>'thumbnail_url', ''), nullif(tm.media->>'media_url', ''))::varchar as thumbnail_url
-    from tokens t
-        inner join token_medias tm on t.token_media_id = tm.id
-    where t.contract_id = $1
-      and t.owner_user_id = $2
-      and t.displayable
-      and t.deleted = false
-      and (tm.media ->> 'thumbnail_url' != '' or tm.media->>'media_type' = 'image')
-      and tm.deleted = false
-    order by t.id limit 3
+select coalesce(nullif(token_medias.media->>'thumbnail_url', ''), nullif(token_medias.media->>'media_url', ''))::varchar as thumbnail_url
+from tokens, token_definitions, token_medias
+where tokens.token_definition_id = token_definitions.id 
+    and token_definitions.token_media_id = token_medias.id
+    and token_definitions.contract_id = $1
+    and tokens.owner_user_id = $2
+    and tokens.displayable
+    and (token_medias.media ->> 'thumbnail_url' != '' or token_medias.media->>'media_type' = 'image')
+    and not tokens.deleted
+    and not token_definitions.deleted
+    and not token_medias.deleted
+order by tokens.id limit 3
 `
 
 type GetPreviewURLsByContractIdAndUserIdParams struct {
-	ContractID  persist.DBID `json:"contract_id"`
-	OwnerUserID persist.DBID `json:"owner_user_id"`
+	ContractID persist.DBID `json:"contract_id"`
+	OwnerID    persist.DBID `json:"owner_id"`
 }
 
 func (q *Queries) GetPreviewURLsByContractIdAndUserId(ctx context.Context, arg GetPreviewURLsByContractIdAndUserIdParams) ([]string, error) {
-	rows, err := q.db.Query(ctx, getPreviewURLsByContractIdAndUserId, arg.ContractID, arg.OwnerUserID)
+	rows, err := q.db.Query(ctx, getPreviewURLsByContractIdAndUserId, arg.ContractID, arg.OwnerID)
 	if err != nil {
 		return nil, err
 	}
@@ -3832,81 +3773,27 @@ func (q *Queries) GetTokenById(ctx context.Context, id persist.DBID) (Token, err
 	return i, err
 }
 
-const getTokenByTokenIdentifiers = `-- name: GetTokenByTokenIdentifiers :one
-select id, deleted, version, created_at, last_updated, name__deprecated, description__deprecated, collectors_note, token_uri__deprecated, token_type__deprecated, token_id, quantity, ownership_history__deprecated, external_url__deprecated, block_number, owner_user_id, owned_by_wallets, chain, contract_id, is_user_marked_spam, is_provider_marked_spam__deprecated, last_synced, fallback_media__deprecated, token_media_id__deprecated, is_creator_token, is_holder_token, displayable, token_definition_id from tokens
-    where tokens.token_id = $1
-      and contract = (select contracts.id from contracts where contracts.address = $2)
-      and tokens.chain = $3 and tokens.deleted = false
-      and tokens.displayable
-`
-
-type GetTokenByTokenIdentifiersParams struct {
-	TokenHex        persist.TokenID `json:"token_hex"`
-	ContractAddress persist.Address `json:"contract_address"`
-	Chain           persist.Chain   `json:"chain"`
-}
-
-func (q *Queries) GetTokenByTokenIdentifiers(ctx context.Context, arg GetTokenByTokenIdentifiersParams) (Token, error) {
-	row := q.db.QueryRow(ctx, getTokenByTokenIdentifiers, arg.TokenHex, arg.ContractAddress, arg.Chain)
-	var i Token
-	err := row.Scan(
-		&i.ID,
-		&i.Deleted,
-		&i.Version,
-		&i.CreatedAt,
-		&i.LastUpdated,
-		&i.NameDeprecated,
-		&i.DescriptionDeprecated,
-		&i.CollectorsNote,
-		&i.TokenUriDeprecated,
-		&i.TokenTypeDeprecated,
-		&i.TokenID,
-		&i.Quantity,
-		&i.OwnershipHistoryDeprecated,
-		&i.ExternalUrlDeprecated,
-		&i.BlockNumber,
-		&i.OwnerUserID,
-		&i.OwnedByWallets,
-		&i.Chain,
-		&i.ContractID,
-		&i.IsUserMarkedSpam,
-		&i.IsProviderMarkedSpamDeprecated,
-		&i.LastSynced,
-		&i.FallbackMediaDeprecated,
-		&i.TokenMediaIDDeprecated,
-		&i.IsCreatorToken,
-		&i.IsHolderToken,
-		&i.Displayable,
-		&i.TokenDefinitionID,
-	)
-	return i, err
-}
-
 const getTokenByUserTokenIdentifiers = `-- name: GetTokenByUserTokenIdentifiers :one
-
-select t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name__deprecated, t.description__deprecated, t.collectors_note, t.token_uri__deprecated, t.token_type__deprecated, t.token_id, t.quantity, t.ownership_history__deprecated, t.external_url__deprecated, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract_id, t.is_user_marked_spam, t.is_provider_marked_spam__deprecated, t.last_synced, t.fallback_media__deprecated, t.token_media_id__deprecated, t.is_creator_token, t.is_holder_token, t.displayable, t.token_definition_id
-from tokens t
-join contracts c on t.contract = c.id
-where t.owner_user_id = $1 and t.token_id = $2 and c.address = $3 and c.chain = $4 and t.displayable and not t.deleted and not c.deleted
+select id, deleted, version, created_at, last_updated, name__deprecated, description__deprecated, collectors_note, token_uri__deprecated, token_type__deprecated, token_id, quantity, ownership_history__deprecated, external_url__deprecated, block_number, owner_user_id, owned_by_wallets, chain, contract_id, is_user_marked_spam, is_provider_marked_spam__deprecated, last_synced, fallback_media__deprecated, token_media_id__deprecated, is_creator_token, is_holder_token, displayable, token_definition_id
+from tokens
+where owner_user_id = $1 and token_definition_id = (select id from token_definitions td where (td.chain, td.contract_address, td.token_id) = ($2, $3, $4) and not deleted)
+    and not tokens.deleted
+    and tokens.displayable
 `
 
 type GetTokenByUserTokenIdentifiersParams struct {
 	OwnerID         persist.DBID    `json:"owner_id"`
-	TokenID         persist.TokenID `json:"token_id"`
-	ContractAddress persist.Address `json:"contract_address"`
 	Chain           persist.Chain   `json:"chain"`
+	ContractAddress persist.Address `json:"contract_address"`
+	TokenID         persist.TokenID `json:"token_id"`
 }
 
-// XXX select t.*
-// XXX from tokens t
-// XXX join contracts c on t.contract = c.id
-// XXX where t.owner_user_id = @owner_id and t.token_id = @token_id and c.address = @contract_address and c.chain = @chain and t.displayable and not t.deleted and not c.deleted;
 func (q *Queries) GetTokenByUserTokenIdentifiers(ctx context.Context, arg GetTokenByUserTokenIdentifiersParams) (Token, error) {
 	row := q.db.QueryRow(ctx, getTokenByUserTokenIdentifiers,
 		arg.OwnerID,
-		arg.TokenID,
-		arg.ContractAddress,
 		arg.Chain,
+		arg.ContractAddress,
+		arg.TokenID,
 	)
 	var i Token
 	err := row.Scan(
@@ -3945,13 +3832,8 @@ func (q *Queries) GetTokenByUserTokenIdentifiers(ctx context.Context, arg GetTok
 const getTokenDefinitionAndMediaByTokenIdentifiers = `-- name: GetTokenDefinitionAndMediaByTokenIdentifiers :one
 select token_definitions.id, token_definitions.created_at, token_definitions.last_updated, token_definitions.deleted, token_definitions.name, token_definitions.description, token_definitions.token_type, token_definitions.token_id, token_definitions.external_url, token_definitions.chain, token_definitions.metadata, token_definitions.fallback_media, token_definitions.contract_address, token_definitions.contract_id, token_definitions.token_media_id, token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.contract_id__deprecated, token_medias.token_id__deprecated, token_medias.chain__deprecated, token_medias.active, token_medias.metadata__deprecated, token_medias.media, token_medias.name__deprecated, token_medias.description__deprecated, token_medias.processing_job_id, token_medias.deleted
 from token_definitions, token_medias
-where token_definitions.chain = $1
-    and contract_id = (
-        select contract.id
-        from contracts
-        where contracts.address = $2 and not contracts.deleted
-    )
-    and token_definitions.token_id = $3
+where (token_definitions.chain, token_definitions.contract_address, token_definitions.token_id) = ($1, $2, $3)
+    and token_definitions.token_media_id = token_medias.id
     and not token_definitions.deleted
     and not token_medias.deleted
 `
@@ -3967,7 +3849,6 @@ type GetTokenDefinitionAndMediaByTokenIdentifiersRow struct {
 	TokenMedia      TokenMedia      `json:"tokenmedia"`
 }
 
-// XXX: Could be an extra query
 func (q *Queries) GetTokenDefinitionAndMediaByTokenIdentifiers(ctx context.Context, arg GetTokenDefinitionAndMediaByTokenIdentifiersParams) (GetTokenDefinitionAndMediaByTokenIdentifiersRow, error) {
 	row := q.db.QueryRow(ctx, getTokenDefinitionAndMediaByTokenIdentifiers, arg.Chain, arg.ContractAddress, arg.TokenID)
 	var i GetTokenDefinitionAndMediaByTokenIdentifiersRow
@@ -4067,14 +3948,7 @@ func (q *Queries) GetTokenDefinitionByTokenDbid(ctx context.Context, id persist.
 const getTokenDefinitionByTokenIdentifiers = `-- name: GetTokenDefinitionByTokenIdentifiers :one
 select id, created_at, last_updated, deleted, name, description, token_type, token_id, external_url, chain, metadata, fallback_media, contract_address, contract_id, token_media_id
 from token_definitions
-where token_definitions.chain = $1
-    and contract_id = (
-        select contract.id
-        from contracts
-        where contracts.address = $2 and not contracts.deleted
-    )
-    and token_definitions.token_id = $3
-    and not token_definitions.deleted
+where (chain, contract_address, token_id) = ($1, $2, $3) and not deleted
 `
 
 type GetTokenDefinitionByTokenIdentifiersParams struct {
@@ -6260,7 +6134,16 @@ func (q *Queries) IsFeedUserActionBlocked(ctx context.Context, arg IsFeedUserAct
 }
 
 const isMemberOfCommunity = `-- name: IsMemberOfCommunity :one
-select exists (select id, deleted, version, created_at, last_updated, name__deprecated, description__deprecated, collectors_note, token_uri__deprecated, token_type__deprecated, token_id, quantity, ownership_history__deprecated, external_url__deprecated, block_number, owner_user_id, owned_by_wallets, chain, contract_id, is_user_marked_spam, is_provider_marked_spam__deprecated, last_synced, fallback_media__deprecated, token_media_id__deprecated, is_creator_token, is_holder_token, displayable, token_definition_id from tokens where not deleted and displayable and owner_user_id = $1 and contract_id = $2 limit 1) is_member
+with contract_tokens as (select id from token_definitions td where not td.deleted and td.contract_id = $2)
+select exists(
+    select 1
+    from tokens, contract_tokens
+    where tokens.owner_user_id = $1
+        and not tokens.deleted
+        and tokens.displayable
+        and tokens.token_definition_id = contract_tokens.id
+    limit 1
+)
 `
 
 type IsMemberOfCommunityParams struct {
@@ -6270,9 +6153,9 @@ type IsMemberOfCommunityParams struct {
 
 func (q *Queries) IsMemberOfCommunity(ctx context.Context, arg IsMemberOfCommunityParams) (bool, error) {
 	row := q.db.QueryRow(ctx, isMemberOfCommunity, arg.UserID, arg.ContractID)
-	var is_member bool
-	err := row.Scan(&is_member)
-	return is_member, err
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }
 
 const paginateGlobalFeed = `-- name: PaginateGlobalFeed :many
