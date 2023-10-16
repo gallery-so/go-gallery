@@ -56,14 +56,14 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 	v := newMultichainSet(serverEthProviderList, serverOptimismProviderList, serverTezosProviderList, serverPoapProviderList, serverZoraProviderList, serverBaseProviderList, serverPolygonProviderList, serverArbitrumProviderList)
 	v2 := defaultWalletOverrides()
 	manager := tokenmanage.New(ctx, client)
-	submitUserTokensF := newManagedTokens(ctx, manager)
+	submitTokensF := newManagedTokens(ctx, manager)
 	provider := &multichain.Provider{
-		Repos:            repositories,
-		Queries:          queries,
-		Cache:            cache,
-		Chains:           v,
-		WalletOverrides:  v2,
-		SubmitUserTokens: submitUserTokensF,
+		Repos:           repositories,
+		Queries:         queries,
+		Cache:           cache,
+		Chains:          v,
+		WalletOverrides: v2,
+		SubmitTokens:    submitTokensF,
 	}
 	return provider, func() {
 		cleanup2()
@@ -91,7 +91,6 @@ var (
 )
 
 // ethProvidersConfig is a wire injector that binds multichain interfaces to their concrete Ethereum implementations
-// func ethProvidersConfig(indexerProvider *eth.Provider, openseaProvider *opensea.Provider, fallbackProvider multichain.SyncFailureFallbackProvider, alchemyProvider *alchemy.Provider) ethProviderList {
 func ethProvidersConfig(indexerProvider *eth.Provider, openseaProvider *opensea.Provider, fallbackProvider multichain.SyncFailureFallbackProvider) ethProviderList {
 	serverEthProviderList := ethRequirements(indexerProvider, indexerProvider, fallbackProvider, fallbackProvider, fallbackProvider, fallbackProvider, indexerProvider, indexerProvider, indexerProvider, indexerProvider, openseaProvider)
 	return serverEthProviderList
@@ -443,11 +442,11 @@ func newTokenMetadataCache() *tokenMetadataCache {
 	return util.ToPointer(tokenMetadataCache(*cache))
 }
 
-func newManagedTokens(ctx context.Context, tm *tokenmanage.Manager) multichain.SubmitUserTokensF {
-	return func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, tokens []persist.TokenIdentifiers) error {
-		if len(tokenIDs) == 0 {
+func newManagedTokens(ctx context.Context, tm *tokenmanage.Manager) multichain.SubmitTokensF {
+	return func(ctx context.Context, tokenDefinitionIDs []persist.DBID) error {
+		if len(tokenDefinitionIDs) == 0 {
 			return nil
 		}
-		return tm.SubmitUser(ctx, userID, tokenIDs, tokens)
+		return tm.SubmitBatch(ctx, tokenDefinitionIDs)
 	}
 }

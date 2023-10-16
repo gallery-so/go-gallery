@@ -424,10 +424,10 @@ type Token implements Node @goEmbedHelper {
   lastUpdated: Time
   collectorsNote: String
   media: MediaSubtype @goField(forceResolver: true)
-  tokenType: TokenType
+  tokenType: TokenType @goField(forceResolver: true)
   chain: Chain
-  name: String
-  description: String
+  name: String @goField(forceResolver: true)
+  description: String @goField(forceResolver: true)
   tokenId: String
   quantity: String # source is a hex string
   owner: GalleryUser @goField(forceResolver: true)
@@ -438,10 +438,10 @@ type Token implements Node @goEmbedHelper {
   tokenMetadata: String @goField(forceResolver: true)
   contract: Contract @goField(forceResolver: true)
   community: Community @goField(forceResolver: true)
-  externalUrl: String
+  externalUrl: String @goField(forceResolver: true)
   blockNumber: String # source is uint64
   isSpamByUser: Boolean
-  isSpamByProvider: Boolean @goField(forceResolver: true)
+  isSpamByProvider: Boolean @goField(forceResolver: true) @goField(forceResolver: true)
 
   # Returns an admires connection
   admires(

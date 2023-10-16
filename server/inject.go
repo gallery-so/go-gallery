@@ -490,6 +490,6 @@ func newManagedTokens(ctx context.Context, tm *tokenmanage.Manager) multichain.S
 		if len(tokenDefinitionIDs) == 0 {
 			return nil
 		}
-		return tm.SubmitUser(ctx, tokenDefinitionIDs)
+		return tm.SubmitBatch(ctx, tokenDefinitionIDs)
 	}
 }

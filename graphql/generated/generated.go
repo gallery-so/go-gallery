@@ -1972,6 +1972,10 @@ type SubscriptionResolver interface {
 }
 type TokenResolver interface {
 	Media(ctx context.Context, obj *model.Token) (model.MediaSubtype, error)
+	TokenType(ctx context.Context, obj *model.Token) (*model.TokenType, error)
+
+	Name(ctx context.Context, obj *model.Token) (*string, error)
+	Description(ctx context.Context, obj *model.Token) (*string, error)
 
 	Owner(ctx context.Context, obj *model.Token) (*model.GalleryUser, error)
 	OwnedByWallets(ctx context.Context, obj *model.Token) ([]*model.Wallet, error)
@@ -1979,6 +1983,7 @@ type TokenResolver interface {
 	TokenMetadata(ctx context.Context, obj *model.Token) (*string, error)
 	Contract(ctx context.Context, obj *model.Token) (*model.Contract, error)
 	Community(ctx context.Context, obj *model.Token) (*model.Community, error)
+	ExternalURL(ctx context.Context, obj *model.Token) (*string, error)
 
 	IsSpamByProvider(ctx context.Context, obj *model.Token) (*bool, error)
 	Admires(ctx context.Context, obj *model.Token, before *string, after *string, first *int, last *int, userID *persist.DBID) (*model.TokenAdmiresConnection, error)
@@ -9010,10 +9015,10 @@ type Token implements Node @goEmbedHelper {
   lastUpdated: Time
   collectorsNote: String
   media: MediaSubtype @goField(forceResolver: true)
-  tokenType: TokenType
+  tokenType: TokenType @goField(forceResolver: true)
   chain: Chain
-  name: String
-  description: String
+  name: String @goField(forceResolver: true)
+  description: String @goField(forceResolver: true)
   tokenId: String
   quantity: String # source is a hex string
   owner: GalleryUser @goField(forceResolver: true)
@@ -9024,10 +9029,10 @@ type Token implements Node @goEmbedHelper {
   tokenMetadata: String @goField(forceResolver: true)
   contract: Contract @goField(forceResolver: true)
   community: Community @goField(forceResolver: true)
-  externalUrl: String
+  externalUrl: String @goField(forceResolver: true)
   blockNumber: String # source is uint64
   isSpamByUser: Boolean
-  isSpamByProvider: Boolean @goField(forceResolver: true)
+  isSpamByProvider: Boolean @goField(forceResolver: true) @goField(forceResolver: true)
 
   # Returns an admires connection
   admires(
@@ -51218,7 +51223,7 @@ func (ec *executionContext) _Token_tokenType(ctx context.Context, field graphql.
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.TokenType, nil
+		return ec.resolvers.Token().TokenType(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -51236,8 +51241,8 @@ func (ec *executionContext) fieldContext_Token_tokenType(ctx context.Context, fi
 	fc = &graphql.FieldContext{
 		Object:     "Token",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type TokenType does not have child fields")
 		},
@@ -51300,7 +51305,7 @@ func (ec *executionContext) _Token_name(ctx context.Context, field graphql.Colle
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Name, nil
+		return ec.resolvers.Token().Name(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -51318,8 +51323,8 @@ func (ec *executionContext) fieldContext_Token_name(ctx context.Context, field g
 	fc = &graphql.FieldContext{
 		Object:     "Token",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
 		},
@@ -51341,7 +51346,7 @@ func (ec *executionContext) _Token_description(ctx context.Context, field graphq
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Description, nil
+		return ec.resolvers.Token().Description(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -51359,8 +51364,8 @@ func (ec *executionContext) fieldContext_Token_description(ctx context.Context, 
 	fc = &graphql.FieldContext{
 		Object:     "Token",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
 		},
@@ -51930,7 +51935,7 @@ func (ec *executionContext) _Token_externalUrl(ctx context.Context, field graphq
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.ExternalURL, nil
+		return ec.resolvers.Token().ExternalURL(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -51948,8 +51953,8 @@ func (ec *executionContext) fieldContext_Token_externalUrl(ctx context.Context, 
 	fc = &graphql.FieldContext{
 		Object:     "Token",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
 		},
@@ -76420,21 +76425,60 @@ func (ec *executionContext) _Token(ctx context.Context, sel ast.SelectionSet, ob
 
 			})
 		case "tokenType":
+			field := field
 
-			out.Values[i] = ec._Token_tokenType(ctx, field, obj)
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Token_tokenType(ctx, field, obj)
+				return res
+			}
 
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "chain":
 
 			out.Values[i] = ec._Token_chain(ctx, field, obj)
 
 		case "name":
+			field := field
 
-			out.Values[i] = ec._Token_name(ctx, field, obj)
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Token_name(ctx, field, obj)
+				return res
+			}
 
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "description":
+			field := field
 
-			out.Values[i] = ec._Token_description(ctx, field, obj)
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Token_description(ctx, field, obj)
+				return res
+			}
 
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "tokenId":
 
 			out.Values[i] = ec._Token_tokenId(ctx, field, obj)
@@ -76541,9 +76585,22 @@ func (ec *executionContext) _Token(ctx context.Context, sel ast.SelectionSet, ob
 
 			})
 		case "externalUrl":
+			field := field
 
-			out.Values[i] = ec._Token_externalUrl(ctx, field, obj)
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Token_externalUrl(ctx, field, obj)
+				return res
+			}
 
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "blockNumber":
 
 			out.Values[i] = ec._Token_blockNumber(ctx, field, obj)

@@ -128,14 +128,6 @@ where token_definitions.chain = @chain
     and not token_definitions.deleted
     and not token_medias.deleted;
 
--- name: GetTokenFullDetailsByTokenDbid :one
-select sqlc.embed(tokens), sqlc.embed(token_definitions), sqlc.embed(token_medias), sqlc.embed(contracts)
-from tokens
-join token_definitions on tokens.token_definition_id = token_definitions.id
-join contracts on token_definitions.contract_id = contracts.id
-left join token_medias on token_definitions.token_media_id = token_medias.id
-where tokens.id = $1 and tokens.displayable and not tokens.deleted and not token_definitions.deleted and not contracts.deleted;
-
 -- name: GetTokenFullDetailsByUserId :many
 select sqlc.embed(tokens), sqlc.embed(token_definitions), sqlc.embed(token_medias), sqlc.embed(contracts)
 from tokens

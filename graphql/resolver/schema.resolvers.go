@@ -2799,6 +2799,21 @@ func (r *tokenResolver) Media(ctx context.Context, obj *model.Token) (model.Medi
 	return resolveTokenMedia(ctx, obj.HelperTokenData.Token, tokenMedia, highDef), err
 }
 
+// TokenType is the resolver for the tokenType field.
+func (r *tokenResolver) TokenType(ctx context.Context, obj *model.Token) (*model.TokenType, error) {
+	panic(fmt.Errorf("not implemented: TokenType - tokenType"))
+}
+
+// Name is the resolver for the name field.
+func (r *tokenResolver) Name(ctx context.Context, obj *model.Token) (*string, error) {
+	panic(fmt.Errorf("not implemented: Name - name"))
+}
+
+// Description is the resolver for the description field.
+func (r *tokenResolver) Description(ctx context.Context, obj *model.Token) (*string, error) {
+	panic(fmt.Errorf("not implemented: Description - description"))
+}
+
 // Owner is the resolver for the owner field.
 func (r *tokenResolver) Owner(ctx context.Context, obj *model.Token) (*model.GalleryUser, error) {
 	return resolveTokenOwnerByTokenID(ctx, obj.Dbid)
@@ -2847,6 +2862,11 @@ func (r *tokenResolver) Contract(ctx context.Context, obj *model.Token) (*model.
 // Community is the resolver for the community field.
 func (r *tokenResolver) Community(ctx context.Context, obj *model.Token) (*model.Community, error) {
 	return resolveCommunityByTokenID(ctx, obj.Dbid)
+}
+
+// ExternalURL is the resolver for the externalUrl field.
+func (r *tokenResolver) ExternalURL(ctx context.Context, obj *model.Token) (*string, error) {
+	panic(fmt.Errorf("not implemented: ExternalURL - externalUrl"))
 }
 
 // IsSpamByProvider is the resolver for the isSpamByProvider field.

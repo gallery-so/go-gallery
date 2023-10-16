@@ -85,10 +85,10 @@ func (m Manager) StartProcessing(ctx context.Context, tokenDefinitionID persist.
 	return callback, err
 }
 
-// SubmitUser enqueues a user's tokens for processing.
-func (m Manager) SubmitUser(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, tokens []persist.TokenIdentifiers) error {
-	m.processRegistry.setManyEnqueue(ctx, tokenIDs)
-	message := task.TokenProcessingUserMessage{UserID: userID, TokenIDs: tokenIDs}
+// SubmitBatch enqueues tokens for processing.
+func (m Manager) SubmitBatch(ctx context.Context, tokenDefinitionIDs []persist.DBID) error {
+	m.processRegistry.setManyEnqueue(ctx, tokenDefinitionIDs)
+	message := task.TokenProcessingBatchMessage{BatchID: persist.GenerateID(), TokenDefinitionIDs: tokenDefinitionIDs}
 	return task.CreateTaskForTokenProcessing(ctx, message, m.taskClient)
 }
 

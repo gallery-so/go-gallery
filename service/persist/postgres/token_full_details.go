@@ -26,20 +26,6 @@ func NewTokenFullDetailsRepository(queries *db.Queries) *TokenFullDetailsReposit
 	return &TokenFullDetailsRepository{queries: queries}
 }
 
-// GetByTokenDBID gets a token by its DBID
-func (t *TokenFullDetailsRepository) GetByTokenDBID(ctx context.Context, tokenID persist.DBID) (TokenFullDetails, error) {
-	r, err := t.queries.GetTokenFullDetailsByTokenDbid(ctx, tokenID)
-	if err != nil {
-		return TokenFullDetails{}, err
-	}
-	return TokenFullDetails{
-		Instance:   r.Token,
-		Contract:   r.Contract,
-		Definition: r.TokenDefinition,
-		Media:      r.TokenMedia,
-	}, nil
-}
-
 // GetByUserID gets all tokens for a user
 func (t *TokenFullDetailsRepository) GetByUserID(ctx context.Context, userID persist.DBID) ([]TokenFullDetails, error) {
 	r, err := t.queries.GetTokenFullDetailsByUserId(ctx, userID)

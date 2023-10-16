@@ -38,36 +38,37 @@ type ProcessMediaForTokenInput struct {
 	Chain           persist.Chain   `json:"chain"`
 }
 
-func processMediaForUsersTokens(tp *tokenProcessor, tokenDetailsRepo *postgres.TokenFullDetailsRepository, tm *tokenmanage.Manager) gin.HandlerFunc {
+func processBatch(tp *tokenProcessor, queries *coredb.Queries, tokenDetailsRepo *postgres.TokenFullDetailsRepository, tm *tokenmanage.Manager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var input task.TokenProcessingUserMessage
+		var input task.TokenProcessingBatchMessage
 		if err := c.ShouldBindJSON(&input); err != nil {
 			util.ErrResponse(c, http.StatusOK, err)
 			return
 		}
 
-		reqCtx := logger.NewContextWithFields(c.Request.Context(), logrus.Fields{"userID": input.UserID})
+		reqCtx := logger.NewContextWithFields(c.Request.Context(), logrus.Fields{"batchID": input.BatchID})
 
 		wp := pool.New().WithMaxGoroutines(50).WithErrors()
 
-		logger.For(reqCtx).Infof("Processing Media: %s - Started (%d tokens)", input.UserID, len(input.TokenIDs))
+		logger.For(reqCtx).Infof("Processing Batch: %s - Started (%d tokens)", input.BatchID, len(input.TokenDefinitionIDs))
 
-		for _, tokenID := range input.TokenIDs {
-			tokenID := tokenID
+		for _, id := range input.TokenDefinitionIDs {
+			id := id
 
 			wp.Go(func() error {
-				td, err := tokenDetailsRepo.GetByTokenDBID(reqCtx, tokenID)
+				td, err := queries.GetTokenDefinitionById(reqCtx, id)
 				if err != nil {
 					return err
 				}
 				ctx := sentryutil.NewSentryHubContext(reqCtx)
-				_, err = processFromInstanceManaged(ctx, tp, tm, td, persist.ProcessingCauseSync, 0)
+				cID := persist.NewContractIdentifiers(td.ContractAddress, td.Chain)
+				_, err = processFromTokenDefinitionManaged(ctx, tp, tm, td, cID, persist.ProcessingCauseSync, 0)
 				return err
 			})
 		}
 
 		wp.Wait()
-		logger.For(reqCtx).Infof("Processing Media: %s - Finished", input.UserID)
+		logger.For(reqCtx).Infof("Processing Batch: %s - Finished", input.BatchID)
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
@@ -707,12 +708,6 @@ func processPostPreflight(tp *tokenProcessor, tm *tokenmanage.Manager, mc *multi
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
-}
-
-func processFromInstanceManaged(ctx context.Context, tp *tokenProcessor, tm *tokenmanage.Manager, t postgres.TokenFullDetails, cause persist.ProcessingCause, attempts int, opts ...PipelineOption) (coredb.TokenMedia, error) {
-	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"tokenDBID": t.Instance.ID})
-	cID := persist.NewContractIdentifiers(t.Contract.Address, t.Contract.Chain)
-	return processFromTokenDefinitionManaged(ctx, tp, tm, t.Definition, cID, cause, attempts, opts...)
 }
 
 func processFromTokenDefinitionManaged(ctx context.Context, tp *tokenProcessor, tm *tokenmanage.Manager, td coredb.TokenDefinition, cID persist.ContractIdentifiers, cause persist.ProcessingCause, attempts int, opts ...PipelineOption) (coredb.TokenMedia, error) {
