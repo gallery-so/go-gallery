@@ -123,7 +123,6 @@ func (t *TokenFullDetailsRepository) UpsertTokens(ctx context.Context, tokens []
 		params.DefinitionTokenID = append(params.DefinitionTokenID, d.TokenID.String())
 		params.DefinitionExternalUrl = append(params.DefinitionExternalUrl, d.ExternalUrl.String)
 		params.DefinitionChain = append(params.DefinitionChain, int32(d.Chain))
-		params.DefinitionIsProviderMarkedSpam = append(params.DefinitionIsProviderMarkedSpam, d.IsProviderMarkedSpam)
 		appendJSONB(&params.DefinitionFallbackMedia, d.FallbackMedia, &errors)
 		appendJSONB(&params.DefinitionMetadata, d.Metadata, &errors)
 		params.DefinitionContractAddress = append(params.DefinitionContractAddress, d.ContractAddress.String())

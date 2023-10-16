@@ -417,7 +417,7 @@ enum InteractionType {
   Comment
 }
 
-type TokenDefinition implements Node {
+type TokenDefinition implements Node @goEmbedHelper {
   id: ID!
   dbid: DBID!
   creationTime: Time
@@ -429,10 +429,8 @@ type TokenDefinition implements Node {
   description: String
   tokenId: String
   tokenMetadata: String @goField(forceResolver: true)
-  contract: Contract @goField(forceResolver: true)
   community: Community @goField(forceResolver: true)
   externalUrl: String
-  isSpamByProvider: Boolean @goField(forceResolver: true)
 }
 
 type Token implements Node @goEmbedHelper {
@@ -458,6 +456,7 @@ type Token implements Node @goEmbedHelper {
     userID: DBID
   ): TokenAdmiresConnection @goField(forceResolver: true)
   viewerAdmire: Admire @goField(forceResolver: true)
+
   # The following fields will be deprecated and removed in the future.
   media: MediaSubtype
     @goField(forceResolver: true)
@@ -487,7 +486,7 @@ type Token implements Node @goEmbedHelper {
     @deprecated(reason: "Use definition.externalUrl instead")
   isSpamByProvider: Boolean
     @goField(forceResolver: true)
-    @deprecated(reason: "Use definition.isSpamByProvider instead")
+    @deprecated(reason: "Use definition.community.contract.isSpam instead")
   creatorAddress: ChainAddress
     @deprecated(reason: "Use definition.community.creatorAddress instead")
   openseaCollectionName: String @deprecated

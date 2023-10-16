@@ -9,7 +9,6 @@ create table if not exists token_definitions (
   token_id character varying,
   external_url character varying,
   chain integer,
-  is_provider_marked_spam boolean not null default false,
   metadata jsonb,
   fallback_media jsonb,
   contract_address character varying(255) not null,

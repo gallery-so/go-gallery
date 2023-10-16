@@ -68,9 +68,8 @@ with token_definitions_insert as (
     , token_id
     , external_url
     , chain
-    , is_provider_marked_spam
     , fallback_media
-    , contract_address, address
+    , contract_address
     , contract_id
     , metadata
   ) (
@@ -84,25 +83,22 @@ with token_definitions_insert as (
       , unnest($5::varchar[]) as token_id
       , unnest($6::varchar[]) as external_url
       , unnest($7::int[]) as chain
-      , unnest($8::bool[]) as is_provider_marked_spam
-      , unnest($9::jsonb[]) as fallback_media
-      , unnest($10::varchar[]) as contract_address
-      , unnest($11::varchar[]) as contract_id
-      , unnest($12::jsonb[]) as metadata
+      , unnest($8::jsonb[]) as fallback_media
+      , unnest($9::varchar[]) as contract_address
+      , unnest($10::varchar[]) as contract_id
+      , unnest($11::jsonb[]) as metadata
   )
   on conflict (chain, contract_id, token_id) where deleted = false
   do update set
     last_updated = excluded.last_updated
     , name = coalesce(nullif(excluded.name, ''), nullif(name, ''))
     , description = coalesce(nullif(excluded.description, ''), nullif(description, ''))
+    , token_type = excluded.token_type
     , external_url = coalesce(nullif(excluded.external_url, ''), nullif(external_url, ''))
-    , is_provider_marked_spam = excluded.is_provider_marked_spam
-    , contract_address = excluded.contract_address
-    , contract_id = excluded.contract_id
-    -- Maybe smarter update logic for fallback media and metadata?
     , fallback_media = excluded.fallback_media
+    , contract_address = excluded.contract_address
     , metadata = excluded.metadata
-  returning id, created_at, last_updated, deleted, name, description, token_type, token_id, external_url, chain, is_provider_marked_spam, metadata, fallback_media, contract_address, contract_id, token_media_id
+  returning id, created_at, last_updated, deleted, name, description, token_type, token_id, external_url, chain, metadata, fallback_media, contract_address, contract_id, token_media_id
 )
 , tokens_insert as (
   insert into tokens
@@ -133,47 +129,47 @@ with token_definitions_insert as (
       , collectors_note
       , token_id
       , quantity
-      , case when $13::bool then ownership_history[ownership_history_start_idx::int:ownership_history_end_idx::int] else '{}' end
+      , case when $12::bool then ownership_history[ownership_history_start_idx::int:ownership_history_end_idx::int] else '{}' end
       , block_number
       , owner_user_id
-      , case when $13 then owned_by_wallets[owned_by_wallets_start_idx::int:owned_by_wallets_end_idx::int] else '{}' end
-      , case when $14::bool then is_creator_token else false end
+      , case when $12 then owned_by_wallets[owned_by_wallets_start_idx::int:owned_by_wallets_end_idx::int] else '{}' end
+      , case when $13::bool then is_creator_token else false end
       , chain
       , contract_id
       , now()
     from (
-      select unnest($15::varchar[]) as id
-        , unnest($16::int[]) as version
-        , unnest($17::varchar[]) as collectors_note
-        , unnest($18::varchar[]) as quantity
-        , $19::jsonb[] as ownership_history
-        , unnest($20::int[]) as ownership_history_start_idx
-        , unnest($21::int[]) as ownership_history_end_idx
-        , unnest($22::bigint[]) as block_number
-        , unnest($23::varchar[]) as owner_user_id
-        , $24::varchar[] as owned_by_wallets
-        , unnest($25::int[]) as owned_by_wallets_start_idx
-        , unnest($26::int[]) as owned_by_wallets_end_idx
-        , unnest($27::bool[]) as is_creator_token
-        , unnest($28::varchar[]) as token_id
-        , unnest($29::varchar[]) as contract_id
-        , unnest($30::int[]) as chain
+      select unnest($14::varchar[]) as id
+        , unnest($15::int[]) as version
+        , unnest($16::varchar[]) as collectors_note
+        , unnest($17::varchar[]) as quantity
+        , $18::jsonb[] as ownership_history
+        , unnest($19::int[]) as ownership_history_start_idx
+        , unnest($20::int[]) as ownership_history_end_idx
+        , unnest($21::bigint[]) as block_number
+        , unnest($22::varchar[]) as owner_user_id
+        , $23::varchar[] as owned_by_wallets
+        , unnest($24::int[]) as owned_by_wallets_start_idx
+        , unnest($25::int[]) as owned_by_wallets_end_idx
+        , unnest($26::bool[]) as is_creator_token
+        , unnest($27::varchar[]) as token_id
+        , unnest($28::varchar[]) as contract_id
+        , unnest($29::int[]) as chain
     ) bulk_upsert
     join token_definitions on (bulk_upsert.chain, bulk_upsert.contract_id, bulk_upsert.token_id) = (token_definitions.chain, token_definitions.contract_id, token_definitions.token_id)
   )
   on conflict (owner_user_id, token_definition_id) where deleted = false
   do update set
     quantity = excluded.quantity
-    , owned_by_wallets = case when $13 then excluded.owned_by_wallets else tokens.owned_by_wallets end
-    , ownership_history = case when $13 then tokens.ownership_history || excluded.ownership_history else tokens.ownership_history end
-    , is_creator_token = case when $14 then excluded.is_creator_token else tokens.is_creator_token end
+    , owned_by_wallets = case when $12 then excluded.owned_by_wallets else tokens.owned_by_wallets end
+    , ownership_history = case when $12 then tokens.ownership_history || excluded.ownership_history else tokens.ownership_history end
+    , is_creator_token = case when $13 then excluded.is_creator_token else tokens.is_creator_token end
     , block_number = excluded.block_number
     , version = excluded.version
     , last_updated = excluded.last_updated
     , last_synced = greatest(excluded.last_synced,tokens.last_synced)
   returning id, deleted, version, created_at, last_updated, name__deprecated, description__deprecated, collectors_note, token_uri__deprecated, token_type__deprecated, token_id, quantity, ownership_history__deprecated, external_url__deprecated, block_number, owner_user_id, owned_by_wallets, chain, contract_id, is_user_marked_spam, is_provider_marked_spam__deprecated, last_synced, fallback_media__deprecated, token_media_id__deprecated, is_creator_token, is_holder_token, displayable, token_definition_id
 )
-select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name__deprecated, tokens.description__deprecated, tokens.collectors_note, tokens.token_uri__deprecated, tokens.token_type__deprecated, tokens.token_id, tokens.quantity, tokens.ownership_history__deprecated, tokens.external_url__deprecated, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract_id, tokens.is_user_marked_spam, tokens.is_provider_marked_spam__deprecated, tokens.last_synced, tokens.fallback_media__deprecated, tokens.token_media_id__deprecated, tokens.is_creator_token, tokens.is_holder_token, tokens.displayable, tokens.token_definition_id, token_definitions.id, token_definitions.created_at, token_definitions.last_updated, token_definitions.deleted, token_definitions.name, token_definitions.description, token_definitions.token_type, token_definitions.token_id, token_definitions.external_url, token_definitions.chain, token_definitions.is_provider_marked_spam, token_definitions.metadata, token_definitions.fallback_media, token_definitions.contract_address, token_definitions.contract_id, token_definitions.token_media_id, contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id, token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.contract_id__deprecated, token_medias.token_id__deprecated, token_medias.chain__deprecated, token_medias.active, token_medias.metadata__deprecated, token_medias.media, token_medias.name__deprecated, token_medias.description__deprecated, token_medias.processing_job_id, token_medias.deleted
+select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name__deprecated, tokens.description__deprecated, tokens.collectors_note, tokens.token_uri__deprecated, tokens.token_type__deprecated, tokens.token_id, tokens.quantity, tokens.ownership_history__deprecated, tokens.external_url__deprecated, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract_id, tokens.is_user_marked_spam, tokens.is_provider_marked_spam__deprecated, tokens.last_synced, tokens.fallback_media__deprecated, tokens.token_media_id__deprecated, tokens.is_creator_token, tokens.is_holder_token, tokens.displayable, tokens.token_definition_id, token_definitions.id, token_definitions.created_at, token_definitions.last_updated, token_definitions.deleted, token_definitions.name, token_definitions.description, token_definitions.token_type, token_definitions.token_id, token_definitions.external_url, token_definitions.chain, token_definitions.metadata, token_definitions.fallback_media, token_definitions.contract_address, token_definitions.contract_id, token_definitions.token_media_id, contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id, token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.contract_id__deprecated, token_medias.token_id__deprecated, token_medias.chain__deprecated, token_medias.active, token_medias.metadata__deprecated, token_medias.media, token_medias.name__deprecated, token_medias.description__deprecated, token_medias.processing_job_id, token_medias.deleted
 from tokens_insert tokens
 join token_definitions_insert token_definitions on tokens.token_definition_id = token_definitions.id
 join contracts on token_definitions.contract_id = contracts.id
@@ -181,36 +177,35 @@ left join token_medias on token_definitions.token_media_id = token_medias.id
 `
 
 type UpsertTokensParams struct {
-	DefinitionDbid                 []string       `json:"definition_dbid"`
-	DefinitionName                 []string       `json:"definition_name"`
-	DefinitionDescription          []string       `json:"definition_description"`
-	DefinitionTokenType            []string       `json:"definition_token_type"`
-	DefinitionTokenID              []string       `json:"definition_token_id"`
-	DefinitionExternalUrl          []string       `json:"definition_external_url"`
-	DefinitionChain                []int32        `json:"definition_chain"`
-	DefinitionIsProviderMarkedSpam []bool         `json:"definition_is_provider_marked_spam"`
-	DefinitionFallbackMedia        []pgtype.JSONB `json:"definition_fallback_media"`
-	DefinitionContractAddress      []string       `json:"definition_contract_address"`
-	DefinitionContractID           []string       `json:"definition_contract_id"`
-	DefinitionMetadata             []pgtype.JSONB `json:"definition_metadata"`
-	SetHolderFields                bool           `json:"set_holder_fields"`
-	SetCreatorFields               bool           `json:"set_creator_fields"`
-	TokenDbid                      []string       `json:"token_dbid"`
-	TokenVersion                   []int32        `json:"token_version"`
-	TokenCollectorsNote            []string       `json:"token_collectors_note"`
-	TokenQuantity                  []string       `json:"token_quantity"`
-	TokenOwnershipHistory          []pgtype.JSONB `json:"token_ownership_history"`
-	TokenOwnershipHistoryStartIdx  []int32        `json:"token_ownership_history_start_idx"`
-	TokenOwnershipHistoryEndIdx    []int32        `json:"token_ownership_history_end_idx"`
-	TokenBlockNumber               []int64        `json:"token_block_number"`
-	TokenOwnerUserID               []string       `json:"token_owner_user_id"`
-	TokenOwnedByWallets            []string       `json:"token_owned_by_wallets"`
-	TokenOwnedByWalletsStartIdx    []int32        `json:"token_owned_by_wallets_start_idx"`
-	TokenOwnedByWalletsEndIdx      []int32        `json:"token_owned_by_wallets_end_idx"`
-	TokenIsCreatorToken            []bool         `json:"token_is_creator_token"`
-	TokenTokenID                   []string       `json:"token_token_id"`
-	TokenContractID                []string       `json:"token_contract_id"`
-	TokenChain                     []int32        `json:"token_chain"`
+	DefinitionDbid                []string       `json:"definition_dbid"`
+	DefinitionName                []string       `json:"definition_name"`
+	DefinitionDescription         []string       `json:"definition_description"`
+	DefinitionTokenType           []string       `json:"definition_token_type"`
+	DefinitionTokenID             []string       `json:"definition_token_id"`
+	DefinitionExternalUrl         []string       `json:"definition_external_url"`
+	DefinitionChain               []int32        `json:"definition_chain"`
+	DefinitionFallbackMedia       []pgtype.JSONB `json:"definition_fallback_media"`
+	DefinitionContractAddress     []string       `json:"definition_contract_address"`
+	DefinitionContractID          []string       `json:"definition_contract_id"`
+	DefinitionMetadata            []pgtype.JSONB `json:"definition_metadata"`
+	SetHolderFields               bool           `json:"set_holder_fields"`
+	SetCreatorFields              bool           `json:"set_creator_fields"`
+	TokenDbid                     []string       `json:"token_dbid"`
+	TokenVersion                  []int32        `json:"token_version"`
+	TokenCollectorsNote           []string       `json:"token_collectors_note"`
+	TokenQuantity                 []string       `json:"token_quantity"`
+	TokenOwnershipHistory         []pgtype.JSONB `json:"token_ownership_history"`
+	TokenOwnershipHistoryStartIdx []int32        `json:"token_ownership_history_start_idx"`
+	TokenOwnershipHistoryEndIdx   []int32        `json:"token_ownership_history_end_idx"`
+	TokenBlockNumber              []int64        `json:"token_block_number"`
+	TokenOwnerUserID              []string       `json:"token_owner_user_id"`
+	TokenOwnedByWallets           []string       `json:"token_owned_by_wallets"`
+	TokenOwnedByWalletsStartIdx   []int32        `json:"token_owned_by_wallets_start_idx"`
+	TokenOwnedByWalletsEndIdx     []int32        `json:"token_owned_by_wallets_end_idx"`
+	TokenIsCreatorToken           []bool         `json:"token_is_creator_token"`
+	TokenTokenID                  []string       `json:"token_token_id"`
+	TokenContractID               []string       `json:"token_contract_id"`
+	TokenChain                    []int32        `json:"token_chain"`
 }
 
 type UpsertTokensRow struct {
@@ -229,7 +224,6 @@ func (q *Queries) UpsertTokens(ctx context.Context, arg UpsertTokensParams) ([]U
 		arg.DefinitionTokenID,
 		arg.DefinitionExternalUrl,
 		arg.DefinitionChain,
-		arg.DefinitionIsProviderMarkedSpam,
 		arg.DefinitionFallbackMedia,
 		arg.DefinitionContractAddress,
 		arg.DefinitionContractID,
@@ -299,7 +293,6 @@ func (q *Queries) UpsertTokens(ctx context.Context, arg UpsertTokensParams) ([]U
 			&i.TokenDefinition.TokenID,
 			&i.TokenDefinition.ExternalUrl,
 			&i.TokenDefinition.Chain,
-			&i.TokenDefinition.IsProviderMarkedSpam,
 			&i.TokenDefinition.Metadata,
 			&i.TokenDefinition.FallbackMedia,
 			&i.TokenDefinition.ContractAddress,

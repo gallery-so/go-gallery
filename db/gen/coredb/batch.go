@@ -3055,7 +3055,7 @@ func (b *GetTokenByUserTokenIdentifiersBatchBatchResults) Close() error {
 }
 
 const getTokenDefinitionByIdBatch = `-- name: GetTokenDefinitionByIdBatch :batchone
-select id, created_at, last_updated, deleted, name, description, token_type, token_id, external_url, chain, is_provider_marked_spam, metadata, fallback_media, contract_address, contract_id, token_media_id from token_definitions where id = $1 and not deleted
+select id, created_at, last_updated, deleted, name, description, token_type, token_id, external_url, chain, metadata, fallback_media, contract_address, contract_id, token_media_id from token_definitions where id = $1 and not deleted
 `
 
 type GetTokenDefinitionByIdBatchBatchResults struct {
@@ -3098,7 +3098,6 @@ func (b *GetTokenDefinitionByIdBatchBatchResults) QueryRow(f func(int, TokenDefi
 			&i.TokenID,
 			&i.ExternalUrl,
 			&i.Chain,
-			&i.IsProviderMarkedSpam,
 			&i.Metadata,
 			&i.FallbackMedia,
 			&i.ContractAddress,

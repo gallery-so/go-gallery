@@ -1381,21 +1381,19 @@ type ComplexityRoot struct {
 	}
 
 	TokenDefinition struct {
-		Chain            func(childComplexity int) int
-		Community        func(childComplexity int) int
-		Contract         func(childComplexity int) int
-		CreationTime     func(childComplexity int) int
-		Dbid             func(childComplexity int) int
-		Description      func(childComplexity int) int
-		ExternalURL      func(childComplexity int) int
-		ID               func(childComplexity int) int
-		IsSpamByProvider func(childComplexity int) int
-		LastUpdated      func(childComplexity int) int
-		Media            func(childComplexity int) int
-		Name             func(childComplexity int) int
-		TokenID          func(childComplexity int) int
-		TokenMetadata    func(childComplexity int) int
-		TokenType        func(childComplexity int) int
+		Chain         func(childComplexity int) int
+		Community     func(childComplexity int) int
+		CreationTime  func(childComplexity int) int
+		Dbid          func(childComplexity int) int
+		Description   func(childComplexity int) int
+		ExternalURL   func(childComplexity int) int
+		ID            func(childComplexity int) int
+		LastUpdated   func(childComplexity int) int
+		Media         func(childComplexity int) int
+		Name          func(childComplexity int) int
+		TokenID       func(childComplexity int) int
+		TokenMetadata func(childComplexity int) int
+		TokenType     func(childComplexity int) int
 	}
 
 	TokenEdge struct {
@@ -2014,10 +2012,7 @@ type TokenDefinitionResolver interface {
 	Media(ctx context.Context, obj *model.TokenDefinition) (model.MediaSubtype, error)
 
 	TokenMetadata(ctx context.Context, obj *model.TokenDefinition) (*string, error)
-	Contract(ctx context.Context, obj *model.TokenDefinition) (*model.Contract, error)
 	Community(ctx context.Context, obj *model.TokenDefinition) (*model.Community, error)
-
-	IsSpamByProvider(ctx context.Context, obj *model.TokenDefinition) (*bool, error)
 }
 type TokenHolderResolver interface {
 	Wallets(ctx context.Context, obj *model.TokenHolder) ([]*model.Wallet, error)
@@ -7751,13 +7746,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.TokenDefinition.Community(childComplexity), true
 
-	case "TokenDefinition.contract":
-		if e.complexity.TokenDefinition.Contract == nil {
-			break
-		}
-
-		return e.complexity.TokenDefinition.Contract(childComplexity), true
-
 	case "TokenDefinition.creationTime":
 		if e.complexity.TokenDefinition.CreationTime == nil {
 			break
@@ -7792,13 +7780,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.TokenDefinition.ID(childComplexity), true
-
-	case "TokenDefinition.isSpamByProvider":
-		if e.complexity.TokenDefinition.IsSpamByProvider == nil {
-			break
-		}
-
-		return e.complexity.TokenDefinition.IsSpamByProvider(childComplexity), true
 
 	case "TokenDefinition.lastUpdated":
 		if e.complexity.TokenDefinition.LastUpdated == nil {
@@ -9150,7 +9131,7 @@ enum InteractionType {
   Comment
 }
 
-type TokenDefinition implements Node {
+type TokenDefinition implements Node @goEmbedHelper {
   id: ID!
   dbid: DBID!
   creationTime: Time
@@ -9162,10 +9143,8 @@ type TokenDefinition implements Node {
   description: String
   tokenId: String
   tokenMetadata: String @goField(forceResolver: true)
-  contract: Contract @goField(forceResolver: true)
   community: Community @goField(forceResolver: true)
   externalUrl: String
-  isSpamByProvider: Boolean @goField(forceResolver: true)
 }
 
 type Token implements Node @goEmbedHelper {
@@ -9191,6 +9170,7 @@ type Token implements Node @goEmbedHelper {
     userID: DBID
   ): TokenAdmiresConnection @goField(forceResolver: true)
   viewerAdmire: Admire @goField(forceResolver: true)
+
   # The following fields will be deprecated and removed in the future.
   media: MediaSubtype
     @goField(forceResolver: true)
@@ -9220,7 +9200,7 @@ type Token implements Node @goEmbedHelper {
     @deprecated(reason: "Use definition.externalUrl instead")
   isSpamByProvider: Boolean
     @goField(forceResolver: true)
-    @deprecated(reason: "Use definition.isSpamByProvider instead")
+    @deprecated(reason: "Use definition.community.contract.isSpam instead")
   creatorAddress: ChainAddress
     @deprecated(reason: "Use definition.community.creatorAddress instead")
   openseaCollectionName: String @deprecated
@@ -51741,14 +51721,10 @@ func (ec *executionContext) fieldContext_Token_definition(ctx context.Context, f
 				return ec.fieldContext_TokenDefinition_tokenId(ctx, field)
 			case "tokenMetadata":
 				return ec.fieldContext_TokenDefinition_tokenMetadata(ctx, field)
-			case "contract":
-				return ec.fieldContext_TokenDefinition_contract(ctx, field)
 			case "community":
 				return ec.fieldContext_TokenDefinition_community(ctx, field)
 			case "externalUrl":
 				return ec.fieldContext_TokenDefinition_externalUrl(ctx, field)
-			case "isSpamByProvider":
-				return ec.fieldContext_TokenDefinition_isSpamByProvider(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type TokenDefinition", field.Name)
 		},
@@ -53357,71 +53333,6 @@ func (ec *executionContext) fieldContext_TokenDefinition_tokenMetadata(ctx conte
 	return fc, nil
 }
 
-func (ec *executionContext) _TokenDefinition_contract(ctx context.Context, field graphql.CollectedField, obj *model.TokenDefinition) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_TokenDefinition_contract(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.TokenDefinition().Contract(rctx, obj)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.Contract)
-	fc.Result = res
-	return ec.marshalOContract2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐContract(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_TokenDefinition_contract(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "TokenDefinition",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_Contract_id(ctx, field)
-			case "dbid":
-				return ec.fieldContext_Contract_dbid(ctx, field)
-			case "lastUpdated":
-				return ec.fieldContext_Contract_lastUpdated(ctx, field)
-			case "contractAddress":
-				return ec.fieldContext_Contract_contractAddress(ctx, field)
-			case "creatorAddress":
-				return ec.fieldContext_Contract_creatorAddress(ctx, field)
-			case "chain":
-				return ec.fieldContext_Contract_chain(ctx, field)
-			case "name":
-				return ec.fieldContext_Contract_name(ctx, field)
-			case "profileImageURL":
-				return ec.fieldContext_Contract_profileImageURL(ctx, field)
-			case "profileBannerURL":
-				return ec.fieldContext_Contract_profileBannerURL(ctx, field)
-			case "badgeURL":
-				return ec.fieldContext_Contract_badgeURL(ctx, field)
-			case "isSpam":
-				return ec.fieldContext_Contract_isSpam(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type Contract", field.Name)
-		},
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _TokenDefinition_community(ctx context.Context, field graphql.CollectedField, obj *model.TokenDefinition) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_TokenDefinition_community(ctx, field)
 	if err != nil {
@@ -53541,47 +53452,6 @@ func (ec *executionContext) fieldContext_TokenDefinition_externalUrl(ctx context
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _TokenDefinition_isSpamByProvider(ctx context.Context, field graphql.CollectedField, obj *model.TokenDefinition) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_TokenDefinition_isSpamByProvider(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.TokenDefinition().IsSpamByProvider(rctx, obj)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*bool)
-	fc.Result = res
-	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_TokenDefinition_isSpamByProvider(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "TokenDefinition",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Boolean does not have child fields")
 		},
 	}
 	return fc, nil
@@ -77853,23 +77723,6 @@ func (ec *executionContext) _TokenDefinition(ctx context.Context, sel ast.Select
 				return innerFunc(ctx)
 
 			})
-		case "contract":
-			field := field
-
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._TokenDefinition_contract(ctx, field, obj)
-				return res
-			}
-
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
-
-			})
 		case "community":
 			field := field
 
@@ -77891,23 +77744,6 @@ func (ec *executionContext) _TokenDefinition(ctx context.Context, sel ast.Select
 
 			out.Values[i] = ec._TokenDefinition_externalUrl(ctx, field, obj)
 
-		case "isSpamByProvider":
-			field := field
-
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._TokenDefinition_isSpamByProvider(ctx, field, obj)
-				return res
-			}
-
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
-
-			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

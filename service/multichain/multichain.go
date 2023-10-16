@@ -1867,18 +1867,17 @@ func chainTokensToUpsertableTokenDefinitions(chainTokens []chainTokens, existing
 			// Got a new token, add it to the list of token definitions
 			if definition, ok := definitions[tokenIdentifiers]; !ok {
 				definitions[tokenIdentifiers] = db.TokenDefinition{
-					Name:                 util.ToNullString(token.Descriptors.Name, true),
-					Description:          util.ToNullString(token.Descriptors.Description, true),
-					TokenID:              token.TokenID,
-					TokenType:            token.TokenType,
-					ExternalUrl:          util.ToNullString(token.ExternalURL, true),
-					Chain:                chainToken.chain,
-					IsProviderMarkedSpam: util.GetOptionalValue(token.IsSpam, false),
-					Metadata:             token.TokenMetadata,
-					FallbackMedia:        token.FallbackMedia,
-					ContractAddress:      token.ContractAddress,
-					ContractID:           contractID,
-					TokenMediaID:         "", // Upsert will set this if the definition already exists
+					Name:            util.ToNullString(token.Descriptors.Name, true),
+					Description:     util.ToNullString(token.Descriptors.Description, true),
+					TokenID:         token.TokenID,
+					TokenType:       token.TokenType,
+					ExternalUrl:     util.ToNullString(token.ExternalURL, true),
+					Chain:           chainToken.chain,
+					Metadata:        token.TokenMetadata,
+					FallbackMedia:   token.FallbackMedia,
+					ContractAddress: token.ContractAddress,
+					ContractID:      contractID,
+					TokenMediaID:    "", // Upsert will set this if the definition already exists
 				}
 			} else {
 				// Merge the token definition with the existing one. The fields that aren't merged below use the data of the first write.
@@ -1893,7 +1892,6 @@ func chainTokensToUpsertableTokenDefinitions(chainTokens []chainTokens, existing
 				definition.ExternalUrl = util.ToNullString(externalURL, true)
 				definition.FallbackMedia = fallbackMedia
 				definition.Metadata = metadata
-				definition.IsProviderMarkedSpam = definition.IsProviderMarkedSpam || util.GetOptionalValue(token.IsSpam, false)
 				definitions[tokenIdentifiers] = definition
 			}
 		}

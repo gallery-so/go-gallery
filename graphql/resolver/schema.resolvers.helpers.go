@@ -52,6 +52,7 @@ var nodeFetcher = model.NodeFetcher{
 	OnDeletedNode:      resolveDeletedNodeByID,
 	OnSocialConnection: resolveSocialConnectionByIdentifiers,
 	OnPost:             resolvePostByPostID,
+	OnTokenDefinition:  resolveTokenDefinitionByID,
 
 	OnCollectionToken: func(ctx context.Context, tokenId string, collectionId string) (*model.CollectionToken, error) {
 		return resolveCollectionTokenByID(ctx, persist.DBID(tokenId), persist.DBID(collectionId))
@@ -775,6 +776,14 @@ func resolvePostByPostID(ctx context.Context, postID persist.DBID) (*model.Post,
 	}
 
 	return postToModel(post)
+}
+
+func resolveTokenDefinitionByID(ctx context.Context, dbid persist.DBID) (*model.TokenDefinition, error) {
+	td, err := publicapi.For(ctx).Token.GetTokenDefinitionByID(ctx, dbid)
+	if err != nil {
+		return nil, err
+	}
+	return tokenDefinitionToModel(td), nil
 }
 
 func resolveMentionsByCommentID(ctx context.Context, commentID persist.DBID) ([]*model.Mention, error) {
@@ -1955,6 +1964,23 @@ func tokenHolderToModel(ctx context.Context, tokenHolder persist.TokenHolder) *m
 		User:                  nil, // handled by dedicated resolver
 		Wallets:               nil, // handled by dedicated resolver
 		PreviewTokens:         previewTokens,
+	}
+}
+
+func tokenDefinitionToModel(td db.TokenDefinition) *model.TokenDefinition {
+	return &model.TokenDefinition{
+		HelperTokenDefinitionData: model.HelperTokenDefinitionData{Definition: td},
+		Dbid:                      td.ID,
+		CreationTime:              &td.CreatedAt,
+		LastUpdated:               &td.LastUpdated,
+		Media:                     nil, // handled by dedicated resolver
+		TokenType:                 util.ToPointer(model.TokenType(td.TokenType)),
+		Chain:                     &td.Chain,
+		Name:                      &td.Name.String,
+		Description:               &td.Description.String,
+		TokenID:                   util.ToPointer(td.TokenID.String()),
+		Community:                 nil, // handled by dedicated resolver
+		ExternalURL:               &td.ExternalUrl.String,
 	}
 }
 

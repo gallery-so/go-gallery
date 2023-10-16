@@ -2332,20 +2332,19 @@ type TokenAdmiresConnection struct {
 }
 
 type TokenDefinition struct {
-	Dbid             persist.DBID   `json:"dbid"`
-	CreationTime     *time.Time     `json:"creationTime"`
-	LastUpdated      *time.Time     `json:"lastUpdated"`
-	Media            MediaSubtype   `json:"media"`
-	TokenType        *TokenType     `json:"tokenType"`
-	Chain            *persist.Chain `json:"chain"`
-	Name             *string        `json:"name"`
-	Description      *string        `json:"description"`
-	TokenID          *string        `json:"tokenId"`
-	TokenMetadata    *string        `json:"tokenMetadata"`
-	Contract         *Contract      `json:"contract"`
-	Community        *Community     `json:"community"`
-	ExternalURL      *string        `json:"externalUrl"`
-	IsSpamByProvider *bool          `json:"isSpamByProvider"`
+	HelperTokenDefinitionData
+	Dbid          persist.DBID   `json:"dbid"`
+	CreationTime  *time.Time     `json:"creationTime"`
+	LastUpdated   *time.Time     `json:"lastUpdated"`
+	Media         MediaSubtype   `json:"media"`
+	TokenType     *TokenType     `json:"tokenType"`
+	Chain         *persist.Chain `json:"chain"`
+	Name          *string        `json:"name"`
+	Description   *string        `json:"description"`
+	TokenID       *string        `json:"tokenId"`
+	TokenMetadata *string        `json:"tokenMetadata"`
+	Community     *Community     `json:"community"`
+	ExternalURL   *string        `json:"externalUrl"`
 }
 
 func (TokenDefinition) IsNode() {}

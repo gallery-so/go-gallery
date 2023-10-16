@@ -521,22 +521,21 @@ type Token struct {
 }
 
 type TokenDefinition struct {
-	ID                   persist.DBID          `json:"id"`
-	CreatedAt            time.Time             `json:"created_at"`
-	LastUpdated          time.Time             `json:"last_updated"`
-	Deleted              bool                  `json:"deleted"`
-	Name                 sql.NullString        `json:"name"`
-	Description          sql.NullString        `json:"description"`
-	TokenType            persist.TokenType     `json:"token_type"`
-	TokenID              persist.TokenID       `json:"token_id"`
-	ExternalUrl          sql.NullString        `json:"external_url"`
-	Chain                persist.Chain         `json:"chain"`
-	IsProviderMarkedSpam bool                  `json:"is_provider_marked_spam"`
-	Metadata             persist.TokenMetadata `json:"metadata"`
-	FallbackMedia        persist.FallbackMedia `json:"fallback_media"`
-	ContractAddress      persist.Address       `json:"contract_address"`
-	ContractID           persist.DBID          `json:"contract_id"`
-	TokenMediaID         persist.DBID          `json:"token_media_id"`
+	ID              persist.DBID          `json:"id"`
+	CreatedAt       time.Time             `json:"created_at"`
+	LastUpdated     time.Time             `json:"last_updated"`
+	Deleted         bool                  `json:"deleted"`
+	Name            sql.NullString        `json:"name"`
+	Description     sql.NullString        `json:"description"`
+	TokenType       persist.TokenType     `json:"token_type"`
+	TokenID         persist.TokenID       `json:"token_id"`
+	ExternalUrl     sql.NullString        `json:"external_url"`
+	Chain           persist.Chain         `json:"chain"`
+	Metadata        persist.TokenMetadata `json:"metadata"`
+	FallbackMedia   persist.FallbackMedia `json:"fallback_media"`
+	ContractAddress persist.Address       `json:"contract_address"`
+	ContractID      persist.DBID          `json:"contract_id"`
+	TokenMediaID    persist.DBID          `json:"token_media_id"`
 }
 
 type TokenMedia struct {

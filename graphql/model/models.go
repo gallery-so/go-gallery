@@ -180,6 +180,10 @@ type HelperTokenData struct {
 	CollectionID *persist.DBID
 }
 
+type HelperTokenDefinitionData struct {
+	Definition db.TokenDefinition
+}
+
 type HelperEnsProfileImageData struct {
 	UserID    persist.DBID
 	WalletID  persist.DBID

@@ -12,9 +12,8 @@ with token_definitions_insert as (
     , token_id
     , external_url
     , chain
-    , is_provider_marked_spam
     , fallback_media
-    , contract_address, address
+    , contract_address
     , contract_id
     , metadata
   ) (
@@ -28,7 +27,6 @@ with token_definitions_insert as (
       , unnest(@definition_token_id::varchar[]) as token_id
       , unnest(@definition_external_url::varchar[]) as external_url
       , unnest(@definition_chain::int[]) as chain
-      , unnest(@definition_is_provider_marked_spam::bool[]) as is_provider_marked_spam
       , unnest(@definition_fallback_media::jsonb[]) as fallback_media
       , unnest(@definition_contract_address::varchar[]) as contract_address
       , unnest(@definition_contract_id::varchar[]) as contract_id
@@ -39,12 +37,10 @@ with token_definitions_insert as (
     last_updated = excluded.last_updated
     , name = coalesce(nullif(excluded.name, ''), nullif(name, ''))
     , description = coalesce(nullif(excluded.description, ''), nullif(description, ''))
+    , token_type = excluded.token_type
     , external_url = coalesce(nullif(excluded.external_url, ''), nullif(external_url, ''))
-    , is_provider_marked_spam = excluded.is_provider_marked_spam
-    , contract_address = excluded.contract_address
-    , contract_id = excluded.contract_id
-    -- Maybe smarter update logic for fallback media and metadata?
     , fallback_media = excluded.fallback_media
+    , contract_address = excluded.contract_address
     , metadata = excluded.metadata
   returning *
 )
