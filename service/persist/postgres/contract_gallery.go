@@ -54,7 +54,7 @@ func NewContractGalleryRepository(db *sql.DB, queries *db.Queries) *ContractGall
 			description = coalesce(nullif(contracts.description, ''), nullif($9, '')),
 			profile_image_url = coalesce(nullif(contracts.profile_image_url, ''), nullif($10, '')),
 			owner_address = case when nullif(contracts.owner_address, '') is null then $6 else contracts.owner_address end,
-			chain = $7
+			chain = $7,
 			l1_chain = $8
 		returning id;
 	`)
