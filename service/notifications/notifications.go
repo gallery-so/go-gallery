@@ -533,6 +533,7 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 		return task.PushNotificationMessage{}, err
 	}
 
+	message.Body = userFacing.String()
 	if notif.Action == persist.ActionAdmiredFeedEvent || notif.Action == persist.ActionAdmiredPost {
 		admirer, err := queries.GetUserById(ctx, notif.Data.AdmirerIDs[0])
 		if err != nil {
@@ -543,7 +544,6 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 			return task.PushNotificationMessage{}, err
 		}
 
-		message.Body = userFacing.String()
 		return message, nil
 	}
 
@@ -562,7 +562,6 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 			return task.PushNotificationMessage{}, err
 		}
 
-		message.Body = userFacing.String()
 		return message, nil
 	}
 
@@ -576,7 +575,6 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 			return task.PushNotificationMessage{}, err
 		}
 
-		message.Body = userFacing.String()
 		return message, nil
 	}
 	if notif.Action == persist.ActionNewTokensReceived {
@@ -584,7 +582,7 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 		if err := limiter.tryTokens(ctx, notif.OwnerID, notif.Data.NewTokenID); err != nil {
 			return task.PushNotificationMessage{}, err
 		}
-		message.Body = userFacing.String()
+
 		return message, nil
 	}
 
@@ -604,7 +602,6 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 			return task.PushNotificationMessage{}, err
 		}
 
-		message.Body = userFacing.String()
 		return message, nil
 
 	}
@@ -645,8 +642,6 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 		if err := limiter.tryMention(ctx, actor.ID, notif.OwnerID, notif.FeedEventID); err != nil {
 			return task.PushNotificationMessage{}, err
 		}
-
-		message.Body = userFacing.String()
 
 		return message, nil
 
