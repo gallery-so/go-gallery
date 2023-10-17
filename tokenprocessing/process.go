@@ -177,7 +177,8 @@ func processOwnersForContractTokens(mc *multichain.Provider, contractRepo *postg
 			util.ErrResponse(c, http.StatusOK, err)
 			return
 		}
-		contract, err := contractRepo.GetByID(c, input.ContractID)
+
+		contract, err := mc.Queries.GetContractByID(c, input.ContractID)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -194,7 +195,8 @@ func processOwnersForContractTokens(mc *multichain.Provider, contractRepo *postg
 
 		// do not unlock, let expiry handle the unlock
 		logger.For(c).Infof("Processing: %s - Processing Collection Refresh", lockID)
-		if err := mc.RefreshTokensForContract(c, contract.ContractIdentifiers()); err != nil {
+		cID := persist.NewContractIdentifiers(contract.Address, contract.Chain)
+		if err := mc.RefreshTokensForContract(c, cID); err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}

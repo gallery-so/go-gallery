@@ -1,3 +1,6 @@
+-- Ensures that changes to a contract are mirrored in the token_definitions table. Note that a unique constraint on (chain, address) already exists to ensure uniqueness of contracts in the table.
+create unique index contracts_id_chain_address_idx on contracts(id, chain, address);
+
 create table if not exists token_definitions (
   id character varying(255) primary key,
   created_at timestamp with time zone not null default current_timestamp,
@@ -13,17 +16,20 @@ create table if not exists token_definitions (
   fallback_media jsonb,
   contract_address character varying(255) not null,
   contract_id character varying(255),
-  token_media_id character varying(255) references token_media(id),
-  foreign key(contract_id, chain, contract_address) references contacts(id, chain, contract_address)
+  token_media_id character varying(255) references token_medias(id),
+  foreign key(contract_id, chain, contract_address) references contracts(id, chain, address) on update cascade
 );
-create unique index if not exists token_definitions_chain_contract_token_idx on token_definitions(chain, contract_id, token_id) where not deleted;
-create index token_definitions_chain_contract_token_idx on token_definitions(chain, contract_address, token_id) where not deleted;
+create unique index if not exists token_definitions_chain_contract_id_token_idx on token_definitions(chain, contract_id, token_id) where not deleted;
+create unique index if not exists token_definitions_chain_contract_address_token_idx on token_definitions(chain, contract_address, token_id) where not deleted;
 create index token_definitions_contract_id_idx on token_definitions(contract_id) where not deleted;
 
+-- Made nullable in a later migration after back filling
+alter table tokens add column if not exists token_definition_id character varying(255) references token_definitions(id);
+
 create unique index if not exists tokens_owner_token_definition_idx on tokens(owner_user_id, token_definition_id) where not deleted;
-alter table tokens add constraint fk_tokens_token_definition_chain_address_token foreign key(token_definition_id, chain, contract_id, token_id) references token_definitions(id, chain, contract_id, token_id);
-alter table tokens add column if not exists token_definition_id character varying(255) not null references token_definitions(id);
-alter table tokens rename column contract to contract_id;
+alter table tokens rename column contract to contract__deprecated;
+alter table tokens rename column chain to chain__deprecated;
+alter table tokens rename column token_id to token_id__deprecated;
 alter table tokens rename column name to name__deprecated;
 alter table tokens rename column description to description__deprecated;
 alter table tokens rename column token_type to token_type__deprecated;

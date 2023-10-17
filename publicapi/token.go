@@ -383,7 +383,10 @@ func (api TokenAPI) SyncCreatedTokensForExistingContractAdmin(ctx context.Contex
 		return err
 	}
 
-	contract, err := api.repos.ContractRepository.GetByAddress(ctx, chainAddress.Address(), chainAddress.Chain())
+	contract, err := api.queries.GetContractByChainAddress(ctx, db.GetContractByChainAddressParams{
+		Address: chainAddress.Address(),
+		Chain:   chainAddress.Chain(),
+	})
 	if err != nil {
 		return err
 	}
