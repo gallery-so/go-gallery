@@ -546,7 +546,7 @@ func (p *Provider) SyncTokenByUserWalletsAndTokenIdentifiersRetry(ctx context.Co
 		// wallet in parallel and waits for each wallet to finish. We then check if a token exists in the database at the end and return
 		// if it does. Otherwise, we retry until a token is found or the retry limit is reached.
 		wg := sync.WaitGroup{}
-		for _, w := range p.matchingWalletsChain(user.Wallets, token.Chain) {
+		for _, w := range p.matchingWalletsChain(user.Wallets, t.Chain) {
 			w := w
 			searchWallet := persist.TokenUniqueIdentifiers{
 				Chain:           t.Chain,
@@ -953,7 +953,7 @@ func (p *Provider) processTokensForUsers(ctx context.Context, users map[persist.
 	upsertParams postgres.TokenUpsertParams) (currentUserTokens map[persist.DBID][]postgres.TokenFullDetails, newUserTokens map[persist.DBID][]postgres.TokenFullDetails, err error) {
 
 	upsertableDefinitions := make([]db.TokenDefinition, 0)
-	upsertableTokens := make([]db.Token, 0)
+	upsertableTokens := make([]postgres.UpsertToken, 0)
 
 	for userID, user := range users {
 		tokens := chainTokensToUpsertableTokens(chainTokensForUsers[userID], contracts, user)
@@ -962,10 +962,10 @@ func (p *Provider) processTokensForUsers(ctx context.Context, users map[persist.
 		upsertableDefinitions = append(upsertableDefinitions, definitions...)
 	}
 
-	uniqueTokens := dedupeTokens(upsertableTokens)
+	uniqueTokens := dedupeUpsertTokens(upsertableTokens)
 	uniqueDefinitions := dedupeTokenDefinitions(upsertableDefinitions)
 
-	upsertTime, upsertedTokens, err := p.Repos.TokenRepository.UpsertTokens(ctx, uniqueTokens, uniqueDefinitions, upsertParams.SetCreatorFields, upsertParams.SetHolderFields)
+	upsertTime, upsertedTokens, err := p.Repos.TokenRepository.BulkUpsert(ctx, uniqueTokens, uniqueDefinitions, upsertParams.SetCreatorFields, upsertParams.SetHolderFields)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1862,7 +1862,7 @@ func chainTokensToUpsertableTokenDefinitions(chainTokens []chainTokens, existing
 			contractIdentifiers := persist.NewContractIdentifiers(token.ContractAddress, chainToken.chain)
 			contractID, ok := contractLookup[contractIdentifiers]
 			if !ok {
-				panic(fmt.Sprintf("contract %s should have already been upserted", contractIdentifiers))
+				panic(fmt.Sprintf("contract %+v should have already been upserted", contractIdentifiers))
 			}
 			// Got a new token, add it to the list of token definitions
 			if definition, ok := definitions[tokenIdentifiers]; !ok {
@@ -1906,7 +1906,7 @@ func chainTokensToUpsertableTokenDefinitions(chainTokens []chainTokens, existing
 }
 
 // chainTokensToUpsertableTokens returns a unique slice of tokens that are ready to be upserted into the database.
-func chainTokensToUpsertableTokens(tokens []chainTokens, existingContracts []db.Contract, ownerUser persist.User) []db.Token {
+func chainTokensToUpsertableTokens(tokens []chainTokens, existingContracts []db.Contract, ownerUser persist.User) []postgres.UpsertToken {
 	addressToContract := make(map[string]db.Contract)
 
 	util.Map(existingContracts, func(c db.Contract) (any, error) {
@@ -1914,8 +1914,7 @@ func chainTokensToUpsertableTokens(tokens []chainTokens, existingContracts []db.
 		return nil, nil
 	})
 
-	seenTokens := make(map[persist.TokenIdentifiers]db.Token)
-
+	seenTokens := make(map[persist.TokenIdentifiers]postgres.UpsertToken)
 	seenWallets := make(map[persist.TokenIdentifiers][]persist.Wallet)
 	seenQuantities := make(map[persist.TokenIdentifiers]persist.HexString)
 	addressToWallets := make(map[string]persist.Wallet)
@@ -1967,16 +1966,15 @@ func chainTokensToUpsertableTokens(tokens []chainTokens, existingContracts []db.
 			ti := persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID, chainToken.chain)
 
 			contractAddress := chainToken.chain.NormalizeAddress(token.ContractAddress)
-			contract := addressToContract[contractAddress]
 
 			// Last write wins
-			seenTokens[ti] = db.Token{
-				Chain:          chainToken.chain,
-				TokenID:        token.TokenID,
-				OwnerUserID:    ownerUser.ID,
-				ContractID:     contract.ID,
-				BlockNumber:    sql.NullInt64{Int64: token.BlockNumber.BigInt().Int64(), Valid: true},
-				IsCreatorToken: createdContracts[persist.Address(contractAddress)],
+			seenTokens[ti] = postgres.UpsertToken{
+				Identifiers: ti,
+				Token: db.Token{
+					OwnerUserID:    ownerUser.ID,
+					BlockNumber:    sql.NullInt64{Int64: token.BlockNumber.BigInt().Int64(), Valid: true},
+					IsCreatorToken: createdContracts[persist.Address(contractAddress)],
+				},
 			}
 
 			var found bool
@@ -1999,13 +1997,13 @@ func chainTokensToUpsertableTokens(tokens []chainTokens, existingContracts []db.
 			}
 
 			finalSeenToken := seenTokens[ti]
-			finalSeenToken.OwnedByWallets = util.MapWithoutError(seenWallets[ti], func(w persist.Wallet) persist.DBID { return w.ID })
-			finalSeenToken.Quantity = seenQuantities[ti]
+			finalSeenToken.Token.OwnedByWallets = util.MapWithoutError(seenWallets[ti], func(w persist.Wallet) persist.DBID { return w.ID })
+			finalSeenToken.Token.Quantity = seenQuantities[ti]
 			seenTokens[ti] = finalSeenToken
 		}
 	}
 
-	res := make([]db.Token, len(seenTokens))
+	res := make([]postgres.UpsertToken, len(seenTokens))
 
 	i := 0
 	for _, t := range seenTokens {
@@ -2182,9 +2180,9 @@ func dedupeTokenDefinitions(tokenDefs []db.TokenDefinition) (uniqueDefs []db.Tok
 	})
 }
 
-// dedupeTokens returns a slice of deduped tokens. This is necessary because the upsert cannot handle duplicates in input.
-func dedupeTokens(tokens []db.Token) (uniqueTokens []db.Token) {
-	return util.DedupeWithTranslate(tokens, false, func(t db.Token) string {
-		return fmt.Sprintf("%d-%s-%s-%s", t.Chain, t.ContractID, t.TokenID, t.OwnerUserID)
+// dedupeUpsertTokens returns a slice of deduped tokens. This is necessary because the upsert cannot handle duplicates in input.
+func dedupeUpsertTokens(tokens []postgres.UpsertToken) (uniqueTokens []postgres.UpsertToken) {
+	return util.DedupeWithTranslate(tokens, false, func(t postgres.UpsertToken) string {
+		return fmt.Sprintf("%s-%s", t.Identifiers.String(), t.Token.OwnerUserID)
 	})
 }

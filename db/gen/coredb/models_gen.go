@@ -500,15 +500,15 @@ type Token struct {
 	CollectorsNote                 sql.NullString    `json:"collectors_note"`
 	TokenUriDeprecated             sql.NullString    `json:"token_uri__deprecated"`
 	TokenTypeDeprecated            sql.NullString    `json:"token_type__deprecated"`
-	TokenID                        persist.TokenID   `json:"token_id"`
+	TokenIDDeprecated              sql.NullString    `json:"token_id__deprecated"`
 	Quantity                       persist.HexString `json:"quantity"`
 	OwnershipHistoryDeprecated     []pgtype.JSONB    `json:"ownership_history__deprecated"`
 	ExternalUrlDeprecated          sql.NullString    `json:"external_url__deprecated"`
 	BlockNumber                    sql.NullInt64     `json:"block_number"`
 	OwnerUserID                    persist.DBID      `json:"owner_user_id"`
 	OwnedByWallets                 persist.DBIDList  `json:"owned_by_wallets"`
-	Chain                          persist.Chain     `json:"chain"`
-	ContractID                     persist.DBID      `json:"contract_id"`
+	ChainDeprecated                sql.NullInt32     `json:"chain__deprecated"`
+	ContractDeprecated             sql.NullString    `json:"contract__deprecated"`
 	IsUserMarkedSpam               sql.NullBool      `json:"is_user_marked_spam"`
 	IsProviderMarkedSpamDeprecated sql.NullBool      `json:"is_provider_marked_spam__deprecated"`
 	LastSynced                     time.Time         `json:"last_synced"`

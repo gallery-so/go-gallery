@@ -152,10 +152,10 @@ with token_definitions_insert as (
         , unnest($25::int[]) as owned_by_wallets_end_idx
         , unnest($26::bool[]) as is_creator_token
         , unnest($27::varchar[]) as token_id
-        , unnest($28::varchar[]) as contract_id
+        , unnest($28::varchar[]) as contract_address
         , unnest($29::int[]) as chain
     ) bulk_upsert
-    join token_definitions on (bulk_upsert.chain, bulk_upsert.contract_id, bulk_upsert.token_id) = (token_definitions.chain, token_definitions.contract_id, token_definitions.token_id)
+    join token_definitions on (bulk_upsert.chain, bulk_upsert.contract_address, bulk_upsert.token_id) = (token_definitions.chain, token_definitions.contract_address, token_definitions.token_id)
   )
   on conflict (owner_user_id, token_definition_id) where deleted = false
   do update set
@@ -167,9 +167,9 @@ with token_definitions_insert as (
     , version = excluded.version
     , last_updated = excluded.last_updated
     , last_synced = greatest(excluded.last_synced,tokens.last_synced)
-  returning id, deleted, version, created_at, last_updated, name__deprecated, description__deprecated, collectors_note, token_uri__deprecated, token_type__deprecated, token_id, quantity, ownership_history__deprecated, external_url__deprecated, block_number, owner_user_id, owned_by_wallets, chain, contract_id, is_user_marked_spam, is_provider_marked_spam__deprecated, last_synced, fallback_media__deprecated, token_media_id__deprecated, is_creator_token, is_holder_token, displayable, token_definition_id
+  returning id, deleted, version, created_at, last_updated, name__deprecated, description__deprecated, collectors_note, token_uri__deprecated, token_type__deprecated, token_id__deprecated, quantity, ownership_history__deprecated, external_url__deprecated, block_number, owner_user_id, owned_by_wallets, chain__deprecated, contract__deprecated, is_user_marked_spam, is_provider_marked_spam__deprecated, last_synced, fallback_media__deprecated, token_media_id__deprecated, is_creator_token, is_holder_token, displayable, token_definition_id
 )
-select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name__deprecated, tokens.description__deprecated, tokens.collectors_note, tokens.token_uri__deprecated, tokens.token_type__deprecated, tokens.token_id, tokens.quantity, tokens.ownership_history__deprecated, tokens.external_url__deprecated, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract_id, tokens.is_user_marked_spam, tokens.is_provider_marked_spam__deprecated, tokens.last_synced, tokens.fallback_media__deprecated, tokens.token_media_id__deprecated, tokens.is_creator_token, tokens.is_holder_token, tokens.displayable, tokens.token_definition_id, token_definitions.id, token_definitions.created_at, token_definitions.last_updated, token_definitions.deleted, token_definitions.name, token_definitions.description, token_definitions.token_type, token_definitions.token_id, token_definitions.external_url, token_definitions.chain, token_definitions.metadata, token_definitions.fallback_media, token_definitions.contract_address, token_definitions.contract_id, token_definitions.token_media_id, contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id, token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.contract_id__deprecated, token_medias.token_id__deprecated, token_medias.chain__deprecated, token_medias.active, token_medias.metadata__deprecated, token_medias.media, token_medias.name__deprecated, token_medias.description__deprecated, token_medias.processing_job_id, token_medias.deleted
+select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name__deprecated, tokens.description__deprecated, tokens.collectors_note, tokens.token_uri__deprecated, tokens.token_type__deprecated, tokens.token_id__deprecated, tokens.quantity, tokens.ownership_history__deprecated, tokens.external_url__deprecated, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain__deprecated, tokens.contract__deprecated, tokens.is_user_marked_spam, tokens.is_provider_marked_spam__deprecated, tokens.last_synced, tokens.fallback_media__deprecated, tokens.token_media_id__deprecated, tokens.is_creator_token, tokens.is_holder_token, tokens.displayable, tokens.token_definition_id, token_definitions.id, token_definitions.created_at, token_definitions.last_updated, token_definitions.deleted, token_definitions.name, token_definitions.description, token_definitions.token_type, token_definitions.token_id, token_definitions.external_url, token_definitions.chain, token_definitions.metadata, token_definitions.fallback_media, token_definitions.contract_address, token_definitions.contract_id, token_definitions.token_media_id, contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id, token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.contract_id__deprecated, token_medias.token_id__deprecated, token_medias.chain__deprecated, token_medias.active, token_medias.metadata__deprecated, token_medias.media, token_medias.name__deprecated, token_medias.description__deprecated, token_medias.processing_job_id, token_medias.deleted
 from tokens_insert tokens
 join token_definitions_insert token_definitions on tokens.token_definition_id = token_definitions.id
 join contracts on token_definitions.contract_id = contracts.id
@@ -204,7 +204,7 @@ type UpsertTokensParams struct {
 	TokenOwnedByWalletsEndIdx     []int32        `json:"token_owned_by_wallets_end_idx"`
 	TokenIsCreatorToken           []bool         `json:"token_is_creator_token"`
 	TokenTokenID                  []string       `json:"token_token_id"`
-	TokenContractID               []string       `json:"token_contract_id"`
+	TokenContractAddress          []string       `json:"token_contract_address"`
 	TokenChain                    []int32        `json:"token_chain"`
 }
 
@@ -244,7 +244,7 @@ func (q *Queries) UpsertTokens(ctx context.Context, arg UpsertTokensParams) ([]U
 		arg.TokenOwnedByWalletsEndIdx,
 		arg.TokenIsCreatorToken,
 		arg.TokenTokenID,
-		arg.TokenContractID,
+		arg.TokenContractAddress,
 		arg.TokenChain,
 	)
 	if err != nil {
@@ -265,15 +265,15 @@ func (q *Queries) UpsertTokens(ctx context.Context, arg UpsertTokensParams) ([]U
 			&i.Token.CollectorsNote,
 			&i.Token.TokenUriDeprecated,
 			&i.Token.TokenTypeDeprecated,
-			&i.Token.TokenID,
+			&i.Token.TokenIDDeprecated,
 			&i.Token.Quantity,
 			&i.Token.OwnershipHistoryDeprecated,
 			&i.Token.ExternalUrlDeprecated,
 			&i.Token.BlockNumber,
 			&i.Token.OwnerUserID,
 			&i.Token.OwnedByWallets,
-			&i.Token.Chain,
-			&i.Token.ContractID,
+			&i.Token.ChainDeprecated,
+			&i.Token.ContractDeprecated,
 			&i.Token.IsUserMarkedSpam,
 			&i.Token.IsProviderMarkedSpamDeprecated,
 			&i.Token.LastSynced,

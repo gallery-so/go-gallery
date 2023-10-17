@@ -93,7 +93,13 @@ func (d *TokenUpsertDeletionParams) ToParams(upsertTime time.Time) db.DeleteToke
 	}
 }
 
-func (t *TokenFullDetailsRepository) UpsertTokens(ctx context.Context, tokens []db.Token, definitions []db.TokenDefinition, setCreatorFields bool, setHolderFields bool) (time.Time, []TokenFullDetails, error) {
+type UpsertToken struct {
+	Token db.Token
+	// Identifiers aren't saved to the database, but are used for joining the token to its definitions
+	Identifiers persist.TokenIdentifiers
+}
+
+func (t *TokenFullDetailsRepository) BulkUpsert(ctx context.Context, tokens []UpsertToken, definitions []db.TokenDefinition, setCreatorFields bool, setHolderFields bool) (time.Time, []TokenFullDetails, error) {
 	tokens = t.excludeZeroQuantityTokens(ctx, tokens)
 
 	// If we're not upserting anything, we still need to return the current database time
@@ -135,17 +141,18 @@ func (t *TokenFullDetailsRepository) UpsertTokens(ctx context.Context, tokens []
 	}
 
 	for i := range tokens {
-		t := &tokens[i]
+		t := &tokens[i].Token
+		tID := &tokens[i].Identifiers
 		params.TokenDbid = append(params.TokenDbid, persist.GenerateID().String())
 		params.TokenVersion = append(params.TokenVersion, t.Version.Int32)
 		params.TokenCollectorsNote = append(params.TokenCollectorsNote, t.CollectorsNote.String)
-		params.TokenTokenID = append(params.TokenTokenID, t.TokenID.String())
+		params.TokenTokenID = append(params.TokenTokenID, tID.TokenID.String())
 		params.TokenQuantity = append(params.TokenQuantity, t.Quantity.String())
 		params.TokenBlockNumber = append(params.TokenBlockNumber, t.BlockNumber.Int64)
 		params.TokenOwnerUserID = append(params.TokenOwnerUserID, t.OwnerUserID.String())
 		appendDBIDList(&params.TokenOwnedByWallets, t.OwnedByWallets, &params.TokenOwnedByWalletsStartIdx, &params.TokenOwnedByWalletsEndIdx)
-		params.TokenChain = append(params.TokenChain, int32(t.Chain))
-		params.TokenContractID = append(params.TokenContractID, t.ContractID.String())
+		params.TokenChain = append(params.TokenChain, int32(tID.Chain))
+		params.TokenContractAddress = append(params.TokenContractAddress, tID.ContractAddress.String())
 		params.TokenIsCreatorToken = append(params.TokenIsCreatorToken, t.IsCreatorToken)
 		// Defer error checking until now to keep the code above from being
 		// littered with multiline "if" statements
@@ -171,10 +178,10 @@ func (t *TokenFullDetailsRepository) UpsertTokens(ctx context.Context, tokens []
 	return upserted[0].Token.LastSynced, upsertedTokens, nil
 }
 
-func (t *TokenFullDetailsRepository) excludeZeroQuantityTokens(ctx context.Context, tokens []db.Token) []db.Token {
-	return util.Filter(tokens, func(t db.Token) bool {
-		if t.Quantity == "" || t.Quantity == "0" {
-			logger.For(ctx).Warnf("Token(chain=%d, contractID=%s, tokenID=%s) has 0 quantity", t.Chain, t.ContractID, t.TokenID)
+func (t *TokenFullDetailsRepository) excludeZeroQuantityTokens(ctx context.Context, tokens []UpsertToken) []UpsertToken {
+	return util.Filter(tokens, func(t UpsertToken) bool {
+		if t.Token.Quantity == "" || t.Token.Quantity == "0" {
+			logger.For(ctx).Warnf("Token(chain=%d, address=%s, tokenID=%s) has 0 quantity", t.Identifiers.Chain, t.Identifiers.ContractAddress, t.Identifiers.TokenID)
 			return false
 		}
 		return true

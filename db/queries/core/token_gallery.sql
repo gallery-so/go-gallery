@@ -96,10 +96,10 @@ with token_definitions_insert as (
         , unnest(@token_owned_by_wallets_end_idx::int[]) as owned_by_wallets_end_idx
         , unnest(@token_is_creator_token::bool[]) as is_creator_token
         , unnest(@token_token_id::varchar[]) as token_id
-        , unnest(@token_contract_id::varchar[]) as contract_id
+        , unnest(@token_contract_address::varchar[]) as contract_address
         , unnest(@token_chain::int[]) as chain
     ) bulk_upsert
-    join token_definitions on (bulk_upsert.chain, bulk_upsert.contract_id, bulk_upsert.token_id) = (token_definitions.chain, token_definitions.contract_id, token_definitions.token_id)
+    join token_definitions on (bulk_upsert.chain, bulk_upsert.contract_address, bulk_upsert.token_id) = (token_definitions.chain, token_definitions.contract_address, token_definitions.token_id)
   )
   on conflict (owner_user_id, token_definition_id) where deleted = false
   do update set

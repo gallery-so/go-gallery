@@ -82,18 +82,18 @@ func (api MerchAPI) GetMerchTokens(ctx context.Context, address persist.Address)
 
 	for i, token := range tokens {
 		t := &model.MerchToken{
-			TokenID: token.Instance.TokenID.String(),
+			TokenID: token.Definition.TokenID.String(),
 		}
 
-		isRedeemed, err := mer.IsRedeemed(&bind.CallOpts{Context: ctx}, token.Instance.TokenID.BigInt())
+		isRedeemed, err := mer.IsRedeemed(&bind.CallOpts{Context: ctx}, token.Definition.TokenID.BigInt())
 		if err != nil {
-			return nil, fmt.Errorf("failed to check if token %v is redeemed: %w", token.Instance.TokenID, err)
+			return nil, fmt.Errorf("failed to check if token %v is redeemed: %w", token.Definition.TokenID, err)
 		}
 		t.Redeemed = isRedeemed
 
-		discountCode, err := api.queries.GetMerchDiscountCodeByTokenID(ctx, token.Instance.TokenID)
+		discountCode, err := api.queries.GetMerchDiscountCodeByTokenID(ctx, token.Definition.TokenID)
 		if err != nil && err != pgx.ErrNoRows {
-			return nil, fmt.Errorf("failed to get discount code for token %v: %w", token.Instance.TokenID, err)
+			return nil, fmt.Errorf("failed to get discount code for token %v: %w", token.Definition.TokenID, err)
 		}
 		if discountCode.Valid && discountCode.String != "" {
 			t.DiscountCode = &discountCode.String

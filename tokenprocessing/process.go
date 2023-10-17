@@ -67,7 +67,7 @@ func processBatch(tp *tokenProcessor, queries *coredb.Queries, tm *tokenmanage.M
 				}
 
 				ctx := sentryutil.NewSentryHubContext(reqCtx)
-				_, err = processFromTokenDefinitionManaged(ctx, tp, tm, td, persist.ProcessingCauseSync, 0, addIsSpamJobOption(td, c))
+				_, err = processFromTokenDefinitionManaged(ctx, tp, tm, td, persist.ProcessingCauseSync, 0, addIsSpamJobOption(c))
 				return err
 			})
 		}
@@ -111,7 +111,7 @@ func processMediaForTokenIdentifiers(tp *tokenProcessor, queries *coredb.Queries
 			return
 		}
 
-		_, err = processFromTokenDefinitionManaged(c, tp, tm, td, persist.ProcessingCauseRefresh, 0, addIsSpamJobOption(td, contract))
+		_, err = processFromTokenDefinitionManaged(c, tp, tm, td, persist.ProcessingCauseRefresh, 0, addIsSpamJobOption(contract))
 
 		if err != nil {
 			if util.ErrorAs[ErrBadToken](err) {
@@ -159,7 +159,7 @@ func processMediaForTokenManaged(tp *tokenProcessor, queries *coredb.Queries, tm
 			return
 		}
 
-		_, err = processFromTokenDefinitionManaged(c, tp, tm, td, persist.ProcessingCauseSyncRetry, input.Attempts, addIsSpamJobOption(td, contract))
+		_, err = processFromTokenDefinitionManaged(c, tp, tm, td, persist.ProcessingCauseSyncRetry, input.Attempts, addIsSpamJobOption(contract))
 		if err != nil {
 			// Only log the error, because tokenmanage will handle reprocessing
 			logger.For(c).Errorf("error processing token: %s", err)
@@ -716,7 +716,7 @@ func processPostPreflight(tp *tokenProcessor, tm *tokenmanage.Manager, mc *multi
 				return
 			}
 
-			_, err = processFromTokenDefinitionManaged(c, tp, tm, td, persist.ProcessingCausePostPreflight, 0, addIsSpamJobOption(td, contract))
+			_, err = processFromTokenDefinitionManaged(c, tp, tm, td, persist.ProcessingCausePostPreflight, 0, addIsSpamJobOption(contract))
 			if err != nil {
 				// Only log the error, because tokenmanage will handle reprocessing
 				logger.For(c).Errorf("error in preflight: error processing token: %s", err)
@@ -786,6 +786,6 @@ func addContractRunOptions(contract persist.ContractIdentifiers) (opts []Pipelin
 	return opts
 }
 
-func addIsSpamJobOption(td coredb.TokenDefinition, c coredb.Contract) PipelineOption {
-	return PipelineOpts.WithIsSpamJob(td.IsProviderMarkedSpam || c.IsProviderMarkedSpam)
+func addIsSpamJobOption(c coredb.Contract) PipelineOption {
+	return PipelineOpts.WithIsSpamJob(c.IsProviderMarkedSpam)
 }

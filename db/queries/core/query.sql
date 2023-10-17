@@ -529,8 +529,10 @@ with valid_post_ids as (
         JOIN tokens on tokens.id = ANY(posts.token_ids)
             and tokens.displayable
             and tokens.deleted = false
-            and tokens.contract_id = sqlc.arg('contract_id')
-            and ('x' || lpad(substring(tokens.token_id, 1, 16), 16, '0'))::bit(64)::bigint / 1000000 = sqlc.arg('project_id_int')::int
+        JOIN token_definitions on token_definitions.id = tokens.token_definitions_id
+            and token_definitions.contract_id = sqlc.arg('contract_id')
+            and ('x' || lpad(substring(token_definitions.token_id, 1, 16), 16, '0'))::bit(64)::bigint / 1000000 = sqlc.arg('project_id_int')::int
+            and token_definitions.deleted = false
     WHERE sqlc.arg('contract_id') = ANY(posts.contract_ids)
       AND posts.deleted = false
 )
@@ -1552,12 +1554,12 @@ JOIN params ON wallets.address = params.address AND wallets.chain = params.chain
 WHERE not wallets.deleted AND not users.deleted and not users.universal;
 
 -- name: GetUniqueTokenIdentifiersByTokenID :one
-select tokens.token_id, contracts.address as contract_address, contracts.chain, tokens.quantity, array_agg(wallets.address)::varchar[] as owner_addresses 
+select token_definitions.token_id, token_definitions.contract_address, token_definitions.chain, tokens.quantity, array_agg(wallets.address)::varchar[] as owner_addresses 
 from tokens
-join contracts on tokens.contract = contracts.id
+join token_definitions on tokens.token_definition_id = token_definitions.id
 join wallets on wallets.id = any(tokens.owned_by_wallets)
-where tokens.id = $1 and tokens.displayable and not tokens.deleted and not contracts.deleted and not wallets.deleted
-group by (tokens.token_id, contracts.address, contracts.chain, tokens.quantity) limit 1;
+where tokens.id = $1 and tokens.displayable and not tokens.deleted and not token_definitions.deleted and not wallets.deleted
+group by (token_definitions.token_id, token_definitions.contract_address, token_definitions.chain, tokens.quantity) limit 1;
 
 -- name: GetContractCreatorsByContractIDs :many
 with contract_creators as (
