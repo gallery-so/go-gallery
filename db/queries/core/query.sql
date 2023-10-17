@@ -1589,7 +1589,7 @@ from users u, contracts c, wallets w
 where u.id = @user_id
   and c.chain = any(@chains::int[])
   and w.id = any(u.wallets) and coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) = w.address 
-  and w.chain = any(@l1_chains::int[])
+  and w.l1_chain = c.l1_chain
   and u.deleted = false
   and c.deleted = false
   and w.deleted = false
