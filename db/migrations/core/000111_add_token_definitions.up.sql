@@ -1,4 +1,4 @@
--- Ensures that changes to a contract are mirrored in the token_definitions table. Note that a unique constraint on (chain, address) already exists to ensure uniqueness of contracts in the table.
+-- Ensures that changes to a contract are mirrored in the token_definitions table. A unique constraint on (chain, address) already exists to guarantee uniqueness within the table itself.
 create unique index contracts_id_chain_address_idx on contracts(id, chain, address);
 
 create table if not exists token_definitions (
@@ -23,7 +23,7 @@ create unique index if not exists token_definitions_chain_contract_id_token_idx 
 create unique index if not exists token_definitions_chain_contract_address_token_idx on token_definitions(chain, contract_address, token_id) where not deleted;
 create index token_definitions_contract_id_idx on token_definitions(contract_id) where not deleted;
 
--- Made nullable in a later migration after back filling
+-- Make nullable in a later migration after back filling
 alter table tokens add column if not exists token_definition_id character varying(255) references token_definitions(id);
 
 create unique index if not exists tokens_owner_token_definition_idx on tokens(owner_user_id, token_definition_id) where not deleted;

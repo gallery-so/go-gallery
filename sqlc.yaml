@@ -86,24 +86,12 @@ sql:
           # Tokens
           - column: 'tokens.owned_by_wallets'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.DBIDList'
-          - column: 'tokens.contract'
-            go_type: 'github.com/mikeydub/go-gallery/service/persist.DBID'
-          - column: 'tokens.token_id'
-            go_type: 'github.com/mikeydub/go-gallery/service/persist.TokenID'
-          - column: 'tokens.fallback_media'
-            go_type: 'github.com/mikeydub/go-gallery/service/persist.FallbackMedia'
           - column: 'tokens.ownership_history'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.AddressAtBlockList'
           - column: 'tokens.quantity'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.HexString'
 
           # TokenMedias
-          - column: 'token_medias.metadata'
-            go_type: 'github.com/mikeydub/go-gallery/service/persist.TokenMetadata'
-          - column: 'token_medias.token_id'
-            go_type: 'github.com/mikeydub/go-gallery/service/persist.TokenID'
-          - column: 'token_medias.chain'
-            go_type: 'github.com/mikeydub/go-gallery/service/persist.Chain'
           - column: 'token_medias.media'
             go_type: 'github.com/mikeydub/go-gallery/service/persist.Media'
 

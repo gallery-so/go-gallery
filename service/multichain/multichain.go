@@ -1415,15 +1415,15 @@ func (p *Provider) RefreshTokenDescriptorsByTokenIdentifiers(ctx context.Context
 		return db.TokenDefinition{}, persist.ErrTokenNotFoundByTokenIdentifiers{Token: ti}
 	}
 
-	contractID, err := p.Repos.ContractRepository.UpsertByAddress(ctx, ti.ContractAddress, ti.Chain, persist.ContractGallery{
-		Chain:           ti.Chain,
+	contract, err := p.Repos.ContractRepository.Upsert(ctx, db.Contract{
+		Name:            util.ToNullString(finalContractDescriptors.Name, true),
+		Symbol:          util.ToNullString(finalContractDescriptors.Symbol, true),
 		Address:         persist.Address(ti.Chain.NormalizeAddress(ti.ContractAddress)),
-		Symbol:          persist.NullString(finalContractDescriptors.Symbol),
-		Name:            persist.NullString(finalContractDescriptors.Name),
-		Description:     persist.NullString(finalContractDescriptors.Description),
-		ProfileImageURL: persist.NullString(finalContractDescriptors.ProfileImageURL),
+		Chain:           ti.Chain,
+		ProfileImageUrl: util.ToNullString(finalContractDescriptors.ProfileImageURL, true),
+		Description:     util.ToNullString(finalContractDescriptors.Description, true),
 		OwnerAddress:    finalContractDescriptors.CreatorAddress,
-	})
+	}, true)
 	if err != nil {
 		return db.TokenDefinition{}, err
 	}
@@ -1432,7 +1432,7 @@ func (p *Provider) RefreshTokenDescriptorsByTokenIdentifiers(ctx context.Context
 		Name:        util.ToNullString(finalTokenDescriptors.Name, true),
 		Description: util.ToNullString(finalTokenDescriptors.Description, true),
 		TokenID:     ti.TokenID,
-		ContractID:  contractID,
+		ContractID:  contract.ID,
 		Chain:       ti.Chain,
 	})
 }

@@ -4812,12 +4812,14 @@ with membership_roles(role) as (
     select (case when exists(
         select 1
         from tokens
+        join token_definitions on tokens.token_definition_id = token_definitions.id
         where owner_user_id = $1
-            and token_id = any($2::varchar[])
-            and contract = (select id from contracts where address = $3 and contracts.chain = $4 and contracts.deleted = false)
-            and exists(select 1 from users where id = $1 and email_verified = 1 and deleted = false)
-            and displayable
-            and deleted = false
+            and token_definitions.chain = $2
+            and token_definitions.contract_address = $3
+            and token_definitions.token_id = any($4::varchar[])
+            and tokens.displayable
+            and not tokens.deleted
+            and not token_definitions.deleted
     ) then $5 else null end)::varchar
 )
 select role from user_roles where user_id = $1 and deleted = false
@@ -4827,18 +4829,18 @@ select role from membership_roles where role is not null
 
 type GetUserRolesByUserIdParams struct {
 	UserID                persist.DBID    `json:"user_id"`
-	MembershipTokenIds    []string        `json:"membership_token_ids"`
-	MembershipAddress     persist.Address `json:"membership_address"`
 	Chain                 persist.Chain   `json:"chain"`
+	MembershipAddress     persist.Address `json:"membership_address"`
+	MembershipTokenIds    []string        `json:"membership_token_ids"`
 	GrantedMembershipRole string          `json:"granted_membership_role"`
 }
 
 func (q *Queries) GetUserRolesByUserId(ctx context.Context, arg GetUserRolesByUserIdParams) ([]persist.Role, error) {
 	rows, err := q.db.Query(ctx, getUserRolesByUserId,
 		arg.UserID,
-		arg.MembershipTokenIds,
-		arg.MembershipAddress,
 		arg.Chain,
+		arg.MembershipAddress,
+		arg.MembershipTokenIds,
 		arg.GrantedMembershipRole,
 	)
 	if err != nil {
@@ -5980,6 +5982,7 @@ with insert_job(id) as (
 , update_token_definition(token_media_id) as (
     update token_definitions
     set metadata = $13, name = $14, description = $15, token_media_id = case when $10 then (select id from insert_new_media) else token_definitions.token_media_id end
+    where (chain, contract_address, token_id) = ($7, $8, $9) and not deleted
     returning token_media_id
 )
 select id, created_at, last_updated, version, contract_id__deprecated, token_id__deprecated, chain__deprecated, active, metadata__deprecated, media, name__deprecated, description__deprecated, processing_job_id, deleted from token_medias where id = update_token_definition.token_media_id

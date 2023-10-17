@@ -963,12 +963,14 @@ with membership_roles(role) as (
     select (case when exists(
         select 1
         from tokens
+        join token_definitions on tokens.token_definition_id = token_definitions.id
         where owner_user_id = @user_id
-            and token_id = any(@membership_token_ids::varchar[])
-            and contract = (select id from contracts where address = @membership_address and contracts.chain = @chain and contracts.deleted = false)
-            and exists(select 1 from users where id = @user_id and email_verified = 1 and deleted = false)
-            and displayable
-            and deleted = false
+            and token_definitions.chain = @chain
+            and token_definitions.contract_address = @membership_address
+            and token_definitions.token_id = any(@membership_token_ids::varchar[])
+            and tokens.displayable
+            and not tokens.deleted
+            and not token_definitions.deleted
     ) then @granted_membership_role else null end)::varchar
 )
 select role from user_roles where user_id = @user_id and deleted = false
@@ -1314,6 +1316,7 @@ with insert_job(id) as (
 , update_token_definition(token_media_id) as (
     update token_definitions
     set metadata = @new_metadata, name = @new_name, description = @new_description, token_media_id = case when @new_media_is_active then (select id from insert_new_media) else token_definitions.token_media_id end
+    where (chain, contract_address, token_id) = (@chain, @contract_address, @token_id) and not deleted
     returning token_media_id
 )
 select * from token_medias where id = update_token_definition.token_media_id;

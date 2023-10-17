@@ -16,7 +16,6 @@ import (
 type ContractGalleryRepository struct {
 	db                    *sql.DB
 	queries               *db.Queries
-	upsertByAddressStmt   *sql.Stmt
 	getOwnersStmt         *sql.Stmt
 	getUserByWalletIDStmt *sql.Stmt
 	getPreviewNFTsStmt    *sql.Stmt
@@ -26,21 +25,6 @@ type ContractGalleryRepository struct {
 func NewContractGalleryRepository(db *sql.DB, queries *db.Queries) *ContractGalleryRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
-
-	upsertByAddressStmt, err := db.PrepareContext(ctx, `
-		insert into contracts (id,version,address,symbol,name,owner_address,chain,description,profile_image_url) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-			on conflict (address,chain) where parent_id is null do update set
-			version = $2,
-			address = $3,
-			symbol = coalesce(nullif(contracts.symbol, ''), nullif($4, '')),
-			name = coalesce(nullif(contracts.name, ''), nullif($5, '')),
-			description = coalesce(nullif(contracts.description, ''), nullif($8, '')),
-			profile_image_url = coalesce(nullif(contracts.profile_image_url, ''), nullif($9, '')),
-			owner_address = case when nullif(contracts.owner_address, '') is null then $6 else contracts.owner_address end,
-			chain = $7
-		returning id;
-	`)
-	checkNoErr(err)
 
 	getOwnersStmt, err := db.PrepareContext(ctx, `
 		select unnest(t.owned_by_wallets)
@@ -80,17 +64,15 @@ func NewContractGalleryRepository(db *sql.DB, queries *db.Queries) *ContractGall
 	`)
 	checkNoErr(err)
 
-	return &ContractGalleryRepository{db: db, queries: queries, upsertByAddressStmt: upsertByAddressStmt, getOwnersStmt: getOwnersStmt, getUserByWalletIDStmt: getUserByWalletIDStmt, getPreviewNFTsStmt: getPreviewNFTsStmt}
+	return &ContractGalleryRepository{db: db, queries: queries, getOwnersStmt: getOwnersStmt, getUserByWalletIDStmt: getUserByWalletIDStmt, getPreviewNFTsStmt: getPreviewNFTsStmt}
 }
 
-// UpsertByAddress upserts the contract with the given address
-func (c *ContractGalleryRepository) UpsertByAddress(pCtx context.Context, pAddress persist.Address, pChain persist.Chain, pContract persist.ContractGallery) (contractID persist.DBID, err error) {
-	err = c.upsertByAddressStmt.QueryRowContext(pCtx, persist.GenerateID(), pContract.Version, pContract.Address, pContract.Symbol, pContract.Name, pContract.OwnerAddress, pContract.Chain, pContract.Description, pContract.ProfileImageURL).Scan(&contractID)
+func (c *ContractGalleryRepository) Upsert(pCtx context.Context, contract db.Contract, canOverwriteOwnerAddress bool) (db.Contract, error) {
+	upserted, err := c.BulkUpsert(pCtx, []db.Contract{contract}, canOverwriteOwnerAddress)
 	if err != nil {
-		return "", err
+		return db.Contract{}, err
 	}
-
-	return contractID, nil
+	return upserted[0], nil
 }
 
 // BulkUpsert bulk upserts the contracts by address
@@ -130,44 +112,33 @@ func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, contracts [
 }
 
 func (c *ContractGalleryRepository) GetOwnersByAddress(ctx context.Context, contractAddr persist.Address, chain persist.Chain, limit, offset int) ([]persist.TokenHolder, error) {
-	panic("not implemented")
 	contract, err := c.queries.GetContractByChainAddress(ctx, db.GetContractByChainAddressParams{Address: contractAddr, Chain: chain})
 	if err != nil {
 		return nil, err
 	}
 
-	walletIDs := make([]persist.DBID, 0, 20)
 	rows, err := c.getOwnersStmt.QueryContext(ctx, contract.ID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("error getting owners: %w", err)
 	}
 	defer rows.Close()
 
-	seen := map[persist.DBID]bool{}
+	walletIDs := make([]persist.DBID, 0)
 
 	for rows.Next() {
-
-		var wallets []persist.DBID
-
-		err = rows.Scan(pq.Array(&wallets))
+		var walletID persist.DBID
+		err = rows.Scan(pq.Array(&walletID))
 		if err != nil {
 			return nil, fmt.Errorf("error scanning owners: %w", err)
 		}
-
-		for _, id := range wallets {
-			if !seen[id] {
-				walletIDs = append(walletIDs, id)
-			}
-
-			seen[id] = true
-		}
+		walletIDs = append(walletIDs, walletID)
 	}
 
 	if err = rows.Err(); err != nil {
 		return nil, fmt.Errorf("error getting owners: %w", err)
 	}
 
-	if len(seen) == 0 {
+	if len(walletIDs) == 0 {
 		return []persist.TokenHolder{}, nil
 	}
 
