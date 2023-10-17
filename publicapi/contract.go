@@ -46,6 +46,22 @@ func (api ContractAPI) GetContractByID(ctx context.Context, contractID persist.D
 	return &contract, nil
 }
 
+func (api ContractAPI) GetContractByTokenDefinitionID(ctx context.Context, tokenDefinitionID persist.DBID) (*db.Contract, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"tokenDefinitionID": validate.WithTag(tokenDefinitionID, "required"),
+	}); err != nil {
+		return nil, err
+	}
+
+	contract, err := api.loaders.ContractByTokenDefinitionID.Load(tokenDefinitionID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &contract, nil
+}
+
 func (api ContractAPI) GetContractByAddress(ctx context.Context, contractAddress persist.ChainAddress) (*db.Contract, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
@@ -85,7 +101,7 @@ func (api ContractAPI) GetChildContractsByParentID(ctx context.Context, contract
 			Limit:         params.Limit,
 		}
 
-		keys, err := api.loaders.ContractsLoaderByParentID.Load(queryParams)
+		keys, err := api.loaders.ContractsByParentID.Load(queryParams)
 		if err != nil {
 			return nil, err
 		}

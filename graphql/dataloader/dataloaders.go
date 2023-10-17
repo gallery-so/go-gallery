@@ -106,8 +106,9 @@ type Loaders struct {
 	NewTokensByFeedEventID          *TokensLoaderByID
 	OwnerByTokenID                  *UserLoaderByID
 	ContractByContractID            *ContractLoaderByID
-	ContractsLoaderByCreatorID      *ContractsLoaderByCreatorID
-	ContractsLoaderByParentID       *ContractsLoaderByParentID
+	ContractByTokenDefinitionID     *ContractLoaderByID
+	ContractsByCreatorID            *ContractsLoaderByCreatorID
+	ContractsByParentID             *ContractsLoaderByParentID
 	ContractsByUserID               *ContractsLoaderByID
 	ContractByChainAddress          *ContractLoaderByChainAddress
 	FollowersByUserID               *UsersLoaderByID
@@ -150,6 +151,7 @@ type Loaders struct {
 	RepliesByCommentID              *RepliesLoader
 	RepliesCountByCommentID         *IntLoaderByID
 	TokenDefinitionByID             *TokenDefinitionByID
+	TokenDefinitionByTokenDBID      *TokenDefinitionByID
 }
 
 func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loaders {
@@ -274,15 +276,21 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 		ContractLoaderByIDCacheSubscriptions{AutoCacheWithKey: func(contract db.Contract) persist.DBID { return contract.ID }},
 	)
 
+	loaders.ContractByTokenDefinitionID = NewContractLoaderByID(
+		defaultSettingsPlusOpts(ctx, disableCaching, &subscriptionRegistry, &mutexRegistry, withMaxBatchOne(500), withMaxWait(5*time.Millisecond)),
+		loadContractByTokenDefinitionID(q),
+		ContractLoaderByIDCacheSubscriptions{AutoCacheWithKey: func(contract db.Contract) persist.DBID { return contract.ID }},
+	)
+
 	loaders.ContractByChainAddress = NewContractLoaderByChainAddress(defaults, loadContractByChainAddress(q), ContractLoaderByChainAddressCacheSubscriptions{
 		AutoCacheWithKey: func(contract db.Contract) persist.ChainAddress {
 			return persist.NewChainAddress(contract.Address, contract.Chain)
 		},
 	})
 
-	loaders.ContractsLoaderByCreatorID = NewContractsLoaderByCreatorID(defaults, loadContractsByCreatorID(q))
+	loaders.ContractsByCreatorID = NewContractsLoaderByCreatorID(defaults, loadContractsByCreatorID(q))
 
-	loaders.ContractsLoaderByParentID = NewContractsLoaderByParentID(defaults, loadContractsByParentID(q))
+	loaders.ContractsByParentID = NewContractsLoaderByParentID(defaults, loadContractsByParentID(q))
 
 	loaders.FeedEventByFeedEventID = NewEventLoaderByID(defaults, loadEventById(q), EventLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(event db.FeedEvent) persist.DBID { return event.ID },
@@ -371,6 +379,10 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 	loaders.GalleryTokenPreviewsByID = NewTokenMediasByID(defaults, loadGalleryTokenPreviewsByID(q))
 
 	loaders.TokenDefinitionByID = NewTokenDefinitionByID(defaults, loadTokenDefinitionByID(q), TokenDefinitionByIDCacheSubscriptions{
+		AutoCacheWithKey: func(tokenDefinition db.TokenDefinition) persist.DBID { return tokenDefinition.ID },
+	})
+
+	loaders.TokenDefinitionByTokenDBID = NewTokenDefinitionByID(defaults, loadTokenDefinitionByTokenDBID(q), TokenDefinitionByIDCacheSubscriptions{
 		AutoCacheWithKey: func(tokenDefinition db.TokenDefinition) persist.DBID { return tokenDefinition.ID },
 	})
 
@@ -920,6 +932,25 @@ func loadContractByContractID(q *db.Queries) func(context.Context, []persist.DBI
 				errors[i] = persist.ErrContractNotFoundByID{ID: id}
 			}
 		}
+
+		return contracts, errors
+	}
+}
+
+func loadContractByTokenDefinitionID(q *db.Queries) func(context.Context, []persist.DBID) ([]db.Contract, []error) {
+	return func(ctx context.Context, contractIDs []persist.DBID) ([]db.Contract, []error) {
+		contracts := make([]db.Contract, len(contractIDs))
+		errors := make([]error, len(contractIDs))
+
+		b := q.GetContractByTokenDefinitionIdBatch(ctx, contractIDs)
+		defer b.Close()
+
+		b.QueryRow(func(i int, c db.Contract, err error) {
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = persist.ErrContractNotFoundByTokenDefinitionID{ID: contractIDs[i]}
+			}
+			contracts[i], errors[i] = c, err
+		})
 
 		return contracts, errors
 	}
@@ -1583,7 +1614,25 @@ func loadTokenDefinitionByID(q *db.Queries) func(context.Context, []persist.DBID
 		b := q.GetTokenDefinitionByIdBatch(ctx, keys)
 		defer b.Close()
 
-		// func (b *GetTokenDefinitionByIdBatchBatchResults) QueryRow(f func(int, TokenDefinition, error)) {
+		b.QueryRow(func(i int, tokenDef db.TokenDefinition, err error) {
+			if err == pgx.ErrNoRows {
+				err = persist.TokenDefinitionNotFoundByID{ID: keys[i]}
+			}
+			results[i], errors[i] = tokenDef, err
+		})
+
+		return results, errors
+	}
+}
+
+func loadTokenDefinitionByTokenDBID(q *db.Queries) func(context.Context, []persist.DBID) ([]db.TokenDefinition, []error) {
+	return func(ctx context.Context, keys []persist.DBID) ([]db.TokenDefinition, []error) {
+		results := make([]db.TokenDefinition, len(keys))
+		errors := make([]error, len(keys))
+
+		b := q.GetTokenDefinitionByTokenDbidBatch(ctx, keys)
+		defer b.Close()
+
 		b.QueryRow(func(i int, tokenDef db.TokenDefinition, err error) {
 			if err == pgx.ErrNoRows {
 				err = persist.TokenDefinitionNotFoundByID{ID: keys[i]}

@@ -105,6 +105,14 @@ where token_definitions.id = tokens.token_definition_id
     and not tokens.deleted
     and not token_definitions.deleted;
 
+-- name: GetTokenDefinitionByTokenDbidBatch :batchone
+select token_definitions.*
+from token_definitions, tokens
+where token_definitions.id = tokens.token_definition_id
+    and tokens.id = $1
+    and not tokens.deleted
+    and not token_definitions.deleted;
+
 -- name: GetTokenDefinitionByTokenIdentifiers :one
 select *
 from token_definitions
@@ -117,6 +125,20 @@ where (token_definitions.chain, token_definitions.contract_address, token_defini
     and token_definitions.token_media_id = token_medias.id
     and not token_definitions.deleted
     and not token_medias.deleted;
+
+-- name: GetTokenFullDetailsByUserTokenIdentifiers :one
+select sqlc.embed(tokens), sqlc.embed(token_definitions), sqlc.embed(token_medias), sqlc.embed(contracts)
+from tokens
+join token_definitions on tokens.token_definition_id = token_definitions.id
+join contracts on token_definitions.contract_id = contracts.id
+left join token_medias on token_definitions.token_media_id = token_medias.id
+where tokens.owner_user_id = $1 
+    and (token_definitions.chain, token_definitions.contract_address, token_definitions.token_id) = (@chain, @contract_address, @token_id)
+    and tokens.displayable
+    and not tokens.deleted
+    and not token_definitions.deleted
+    and not contracts.deleted
+order by tokens.block_number desc;
 
 -- name: GetTokenFullDetailsByUserId :many
 select sqlc.embed(tokens), sqlc.embed(token_definitions), sqlc.embed(token_medias), sqlc.embed(contracts)
@@ -228,6 +250,14 @@ order by u.primary_wallet_id = w.id desc, w.id desc;
 
 -- name: GetContractByID :one
 select * FROM contracts WHERE id = $1 AND deleted = false;
+
+-- name: GetContractByTokenDefinitionIdBatch :batchone
+select contracts.*
+from contracts, token_definitions
+where token_definitions.id = $1
+    and contracts.id = token_definitions.contract_id
+    and not contracts.deleted
+    and not token_definitions.deleted;
 
 -- name: GetContractsByIDs :many
 SELECT * from contracts WHERE id = ANY(@contract_ids) AND deleted = false;

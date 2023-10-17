@@ -4206,6 +4206,123 @@ func (q *Queries) GetTokenFullDetailsByUserId(ctx context.Context, ownerUserID p
 	return items, nil
 }
 
+const getTokenFullDetailsByUserTokenIdentifiers = `-- name: GetTokenFullDetailsByUserTokenIdentifiers :one
+select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name__deprecated, tokens.description__deprecated, tokens.collectors_note, tokens.token_uri__deprecated, tokens.token_type__deprecated, tokens.token_id__deprecated, tokens.quantity, tokens.ownership_history__deprecated, tokens.external_url__deprecated, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain__deprecated, tokens.contract__deprecated, tokens.is_user_marked_spam, tokens.is_provider_marked_spam__deprecated, tokens.last_synced, tokens.fallback_media__deprecated, tokens.token_media_id__deprecated, tokens.is_creator_token, tokens.is_holder_token, tokens.displayable, tokens.token_definition_id, token_definitions.id, token_definitions.created_at, token_definitions.last_updated, token_definitions.deleted, token_definitions.name, token_definitions.description, token_definitions.token_type, token_definitions.token_id, token_definitions.external_url, token_definitions.chain, token_definitions.metadata, token_definitions.fallback_media, token_definitions.contract_address, token_definitions.contract_id, token_definitions.token_media_id, token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.contract_id__deprecated, token_medias.token_id__deprecated, token_medias.chain__deprecated, token_medias.active, token_medias.metadata__deprecated, token_medias.media, token_medias.name__deprecated, token_medias.description__deprecated, token_medias.processing_job_id, token_medias.deleted, contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id
+from tokens
+join token_definitions on tokens.token_definition_id = token_definitions.id
+join contracts on token_definitions.contract_id = contracts.id
+left join token_medias on token_definitions.token_media_id = token_medias.id
+where tokens.owner_user_id = $1 
+    and (token_definitions.chain, token_definitions.contract_address, token_definitions.token_id) = ($2, $3, $4)
+    and tokens.displayable
+    and not tokens.deleted
+    and not token_definitions.deleted
+    and not contracts.deleted
+order by tokens.block_number desc
+`
+
+type GetTokenFullDetailsByUserTokenIdentifiersParams struct {
+	OwnerUserID     persist.DBID    `json:"owner_user_id"`
+	Chain           persist.Chain   `json:"chain"`
+	ContractAddress persist.Address `json:"contract_address"`
+	TokenID         persist.TokenID `json:"token_id"`
+}
+
+type GetTokenFullDetailsByUserTokenIdentifiersRow struct {
+	Token           Token           `json:"token"`
+	TokenDefinition TokenDefinition `json:"tokendefinition"`
+	TokenMedia      TokenMedia      `json:"tokenmedia"`
+	Contract        Contract        `json:"contract"`
+}
+
+func (q *Queries) GetTokenFullDetailsByUserTokenIdentifiers(ctx context.Context, arg GetTokenFullDetailsByUserTokenIdentifiersParams) (GetTokenFullDetailsByUserTokenIdentifiersRow, error) {
+	row := q.db.QueryRow(ctx, getTokenFullDetailsByUserTokenIdentifiers,
+		arg.OwnerUserID,
+		arg.Chain,
+		arg.ContractAddress,
+		arg.TokenID,
+	)
+	var i GetTokenFullDetailsByUserTokenIdentifiersRow
+	err := row.Scan(
+		&i.Token.ID,
+		&i.Token.Deleted,
+		&i.Token.Version,
+		&i.Token.CreatedAt,
+		&i.Token.LastUpdated,
+		&i.Token.NameDeprecated,
+		&i.Token.DescriptionDeprecated,
+		&i.Token.CollectorsNote,
+		&i.Token.TokenUriDeprecated,
+		&i.Token.TokenTypeDeprecated,
+		&i.Token.TokenIDDeprecated,
+		&i.Token.Quantity,
+		&i.Token.OwnershipHistoryDeprecated,
+		&i.Token.ExternalUrlDeprecated,
+		&i.Token.BlockNumber,
+		&i.Token.OwnerUserID,
+		&i.Token.OwnedByWallets,
+		&i.Token.ChainDeprecated,
+		&i.Token.ContractDeprecated,
+		&i.Token.IsUserMarkedSpam,
+		&i.Token.IsProviderMarkedSpamDeprecated,
+		&i.Token.LastSynced,
+		&i.Token.FallbackMediaDeprecated,
+		&i.Token.TokenMediaIDDeprecated,
+		&i.Token.IsCreatorToken,
+		&i.Token.IsHolderToken,
+		&i.Token.Displayable,
+		&i.Token.TokenDefinitionID,
+		&i.TokenDefinition.ID,
+		&i.TokenDefinition.CreatedAt,
+		&i.TokenDefinition.LastUpdated,
+		&i.TokenDefinition.Deleted,
+		&i.TokenDefinition.Name,
+		&i.TokenDefinition.Description,
+		&i.TokenDefinition.TokenType,
+		&i.TokenDefinition.TokenID,
+		&i.TokenDefinition.ExternalUrl,
+		&i.TokenDefinition.Chain,
+		&i.TokenDefinition.Metadata,
+		&i.TokenDefinition.FallbackMedia,
+		&i.TokenDefinition.ContractAddress,
+		&i.TokenDefinition.ContractID,
+		&i.TokenDefinition.TokenMediaID,
+		&i.TokenMedia.ID,
+		&i.TokenMedia.CreatedAt,
+		&i.TokenMedia.LastUpdated,
+		&i.TokenMedia.Version,
+		&i.TokenMedia.ContractIDDeprecated,
+		&i.TokenMedia.TokenIDDeprecated,
+		&i.TokenMedia.ChainDeprecated,
+		&i.TokenMedia.Active,
+		&i.TokenMedia.MetadataDeprecated,
+		&i.TokenMedia.Media,
+		&i.TokenMedia.NameDeprecated,
+		&i.TokenMedia.DescriptionDeprecated,
+		&i.TokenMedia.ProcessingJobID,
+		&i.TokenMedia.Deleted,
+		&i.Contract.ID,
+		&i.Contract.Deleted,
+		&i.Contract.Version,
+		&i.Contract.CreatedAt,
+		&i.Contract.LastUpdated,
+		&i.Contract.Name,
+		&i.Contract.Symbol,
+		&i.Contract.Address,
+		&i.Contract.CreatorAddress,
+		&i.Contract.Chain,
+		&i.Contract.ProfileBannerUrl,
+		&i.Contract.ProfileImageUrl,
+		&i.Contract.BadgeUrl,
+		&i.Contract.Description,
+		&i.Contract.OwnerAddress,
+		&i.Contract.IsProviderMarkedSpam,
+		&i.Contract.ParentID,
+		&i.Contract.OverrideCreatorUserID,
+	)
+	return i, err
+}
+
 const getTokenOwnerByID = `-- name: GetTokenOwnerByID :one
 select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.profile_image_id from tokens t
     join users u on u.id = t.owner_user_id

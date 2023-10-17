@@ -496,14 +496,12 @@ func resolveTokenOwnerByTokenID(ctx context.Context, tokenID persist.DBID) (*mod
 }
 
 func resolveCommunityByTokenID(ctx context.Context, tokenID persist.DBID) (*model.Community, error) {
-	token, err := publicapi.For(ctx).Token.GetTokenById(ctx, tokenID)
-
+	td, err := publicapi.For(ctx).Token.GetTokenDefinitionByTokenDBID(ctx, tokenID)
 	if err != nil {
 		return nil, err
 	}
 
-	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, token.ContractID)
-
+	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, td.ContractID)
 	if err != nil {
 		return nil, err
 	}
@@ -514,22 +512,26 @@ func resolveCommunityByTokenID(ctx context.Context, tokenID persist.DBID) (*mode
 }
 
 func resolveContractByTokenID(ctx context.Context, tokenID persist.DBID) (*model.Contract, error) {
-	token, err := publicapi.For(ctx).Token.GetTokenById(ctx, tokenID)
-
+	td, err := publicapi.For(ctx).Token.GetTokenDefinitionByTokenDBID(ctx, tokenID)
 	if err != nil {
 		return nil, err
 	}
+	return resolveContractByContractID(ctx, td.ContractID)
+}
 
-	return resolveContractByContractID(ctx, token.ContractID)
+func resolveContractByTokenDefinitionID(ctx context.Context, tokenDefinitionID persist.DBID) (*model.Contract, error) {
+	contract, err := publicapi.For(ctx).Contract.GetContractByTokenDefinitionID(ctx, tokenDefinitionID)
+	if err != nil {
+		return nil, err
+	}
+	return contractToModel(ctx, *contract), nil
 }
 
 func resolveContractByContractID(ctx context.Context, contractID persist.DBID) (*model.Contract, error) {
 	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, contractID)
-
 	if err != nil {
 		return nil, err
 	}
-
 	return contractToModel(ctx, *contract), nil
 }
 

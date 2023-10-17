@@ -408,16 +408,12 @@ func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) er
 		return err
 	}
 
-	token, err := api.loaders.TokenByTokenID.Load(tokenDBID)
+	td, err := api.queries.GetTokenDefinitionByTokenDbid(ctx, tokenDBID)
 	if err != nil {
 		return fmt.Errorf("failed to load token: %w", err)
 	}
-	contract, err := api.loaders.ContractByContractID.Load(token.ContractID)
-	if err != nil {
-		return fmt.Errorf("failed to load contract for token: %w", err)
-	}
 
-	err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(contract.Address, token.TokenID, contract.Chain))
+	err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(td.ContractAddress, td.TokenID, td.Chain))
 	if err != nil {
 		return ErrTokenRefreshFailed{Message: err.Error()}
 	}
@@ -458,13 +454,13 @@ func (api TokenAPI) RefreshCollection(ctx context.Context, collectionDBID persis
 	for _, token := range tokens {
 		token := token
 		wp.Submit(func() {
-			contract, err := api.loaders.ContractByContractID.Load(token.ContractID)
+			td, err := api.queries.GetTokenDefinitionByTokenDbid(ctx, token.ID)
 			if err != nil {
 				errChan <- err
 				return
 			}
 
-			err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(contract.Address, token.TokenID, contract.Chain))
+			err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(td.ContractAddress, td.TokenID, td.Chain))
 			if err != nil {
 				errChan <- ErrTokenRefreshFailed{Message: err.Error()}
 				return
@@ -557,7 +553,7 @@ func (api TokenAPI) MediaByTokenID(ctx context.Context, tokenID persist.DBID) (d
 	return api.loaders.MediaByTokenID.Load(tokenID)
 }
 
-// MediaByTokenIdentifiers returns media for a token and optionally returns a token instance with fallback media matching the identifiers if any exists.
+// MediaByTokenIdentifiers returns the token definitions and its media for a token
 func (api TokenAPI) MediaByTokenIdentifiers(ctx context.Context, tokenIdentifiers persist.TokenIdentifiers) (db.TokenDefinition, db.TokenMedia, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
@@ -583,7 +579,7 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collect
 		return db.Event{}, err
 	}
 
-	token, err := api.loaders.TokenByTokenID.Load(tokenID)
+	td, err := api.queries.GetTokenDefinitionByTokenDbid(ctx, tokenID)
 	if err != nil {
 		return db.Event{}, err
 	}
@@ -609,7 +605,8 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collect
 			GalleryID:      currCol.GalleryID,
 			SubjectID:      tokenID,
 			Data: persist.EventData{
-				TokenContractID: token.ContractID,
+				TokenContractID:   td.ContractID,
+				TokenDefinitionID: td.ID,
 			},
 		})
 		if err != nil {
@@ -623,6 +620,16 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collect
 // GetProcessingStateByTokenDefinitionID returns true if a token is queued for processing, or is currently being processed.
 func (api TokenAPI) GetProcessingStateByTokenDefinitionID(ctx context.Context, id persist.DBID) (bool, error) {
 	return api.manager.Processing(ctx, id), nil
+}
+
+func (api TokenAPI) GetTokenDefinitionByTokenDBID(ctx context.Context, id persist.DBID) (db.TokenDefinition, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"tokenDBID": validate.WithTag(id, "required"),
+	}); err != nil {
+		return db.TokenDefinition{}, err
+	}
+	return api.loaders.TokenDefinitionByTokenDBID.Load(id)
 }
 
 func (api TokenAPI) GetTokenDefinitionByID(ctx context.Context, id persist.DBID) (db.TokenDefinition, error) {

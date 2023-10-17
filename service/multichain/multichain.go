@@ -526,7 +526,7 @@ func (p *Provider) TokenExists(ctx context.Context, token persist.TokenIdentifie
 }
 
 // SyncTokenByUserWalletsAndTokenIdentifiersRetry attempts to sync a token for a user by their wallets and token identifiers.
-func (p *Provider) SyncTokenByUserWalletsAndTokenIdentifiersRetry(ctx context.Context, user persist.User, t persist.TokenIdentifiers, r retry.Retry) (token db.Token, err error) {
+func (p *Provider) SyncTokenByUserWalletsAndTokenIdentifiersRetry(ctx context.Context, user persist.User, t persist.TokenIdentifiers, r retry.Retry) (token postgres.TokenFullDetails, err error) {
 	searchF := func(ctx context.Context) error {
 		_, err := p.Queries.GetTokenByUserTokenIdentifiers(ctx, db.GetTokenByUserTokenIdentifiersParams{
 			OwnerID:         user.ID,
@@ -561,13 +561,7 @@ func (p *Provider) SyncTokenByUserWalletsAndTokenIdentifiersRetry(ctx context.Co
 			}()
 		}
 		wg.Wait()
-		// Check if we got a token at the end of it
-		token, err = p.Queries.GetTokenByUserTokenIdentifiers(ctx, db.GetTokenByUserTokenIdentifiersParams{
-			OwnerID:         user.ID,
-			TokenID:         t.TokenID,
-			ContractAddress: t.ContractAddress,
-			Chain:           t.Chain,
-		})
+		token, err = p.Repos.TokenRepository.GetByUserTokenIdentifiers(ctx, user.ID, t)
 		if err == pgx.ErrNoRows {
 			return persist.ErrTokenNotFoundByUserTokenIdentifers{UserID: user.ID, Token: t}
 		}

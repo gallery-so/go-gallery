@@ -2919,8 +2919,8 @@ func (r *tokenResolver) TokenMetadata(ctx context.Context, obj *model.Token) (*s
 
 // Contract is the resolver for the contract field.
 func (r *tokenResolver) Contract(ctx context.Context, obj *model.Token) (*model.Contract, error) {
-	if obj.HelperTokenData.Token.ContractID != "" {
-		return resolveContractByContractID(ctx, obj.HelperTokenData.Token.ContractID)
+	if obj.HelperTokenData.Token.TokenDefinitionID == "" {
+		return resolveContractByTokenDefinitionID(ctx, obj.HelperTokenData.Token.TokenDefinitionID)
 	}
 	return resolveContractByTokenID(ctx, obj.Dbid)
 }
@@ -2943,8 +2943,8 @@ func (r *tokenResolver) ExternalURL(ctx context.Context, obj *model.Token) (*str
 func (r *tokenResolver) IsSpamByProvider(ctx context.Context, obj *model.Token) (*bool, error) {
 	var c *model.Contract
 	var err error
-	if obj.Token.ContractID != "" {
-		c, err = resolveContractByContractID(ctx, obj.Token.ContractID)
+	if obj.HelperTokenData.Token.TokenDefinitionID == "" {
+		c, err = resolveContractByTokenDefinitionID(ctx, obj.HelperTokenData.Token.TokenDefinitionID)
 	} else {
 		c, err = resolveContractByTokenID(ctx, obj.Dbid)
 	}

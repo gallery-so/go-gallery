@@ -985,7 +985,7 @@ func (api UserAPI) CreatedCommunities(ctx context.Context, userID persist.DBID, 
 		for i, c := range includeChains {
 			serializedChains[i] = strconv.Itoa(int(c))
 		}
-		keys, err := api.loaders.ContractsLoaderByCreatorID.Load(db.GetCreatedContractsBatchPaginateParams{
+		keys, err := api.loaders.ContractsByCreatorID.Load(db.GetCreatedContractsBatchPaginateParams{
 			UserID:           userID,
 			Chains:           strings.Join(serializedChains, ","),
 			CurBeforeTime:    params.CursorBeforeTime,

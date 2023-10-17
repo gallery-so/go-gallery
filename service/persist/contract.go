@@ -87,3 +87,11 @@ type ErrContractNotFoundByAddress struct {
 func (e ErrContractNotFoundByAddress) Error() string {
 	return fmt.Sprintf("contract not found by address: %s-%d", e.Address, e.Chain)
 }
+
+type ErrContractNotFoundByTokenDefinitionID struct {
+	ID DBID
+}
+
+func (e ErrContractNotFoundByTokenDefinitionID) Error() string {
+	return fmt.Sprintf("contract not found by token definition ID: %s", e.ID)
+}

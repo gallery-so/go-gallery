@@ -1047,3 +1047,11 @@ type TokenDefinitionNotFoundByID struct {
 func (e TokenDefinitionNotFoundByID) Error() string {
 	return fmt.Sprintf("TokenDefinition not found for ID %s", e.ID)
 }
+
+type TokenDefinitionNotFoundByTokenDBID struct {
+	ID DBID
+}
+
+func (e TokenDefinitionNotFoundByTokenDBID) Error() string {
+	return fmt.Sprintf("TokenDefinition not found for token DBID %s", e.ID)
+}
