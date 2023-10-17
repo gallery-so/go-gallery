@@ -154,7 +154,7 @@ func (c *ContractGalleryRepository) GetByTokenIDs(pCtx context.Context, pDBIDs p
 
 // UpsertByAddress upserts the contract with the given address
 func (c *ContractGalleryRepository) UpsertByAddress(pCtx context.Context, pAddress persist.Address, pContract persist.ContractGallery) (contractID persist.DBID, err error) {
-	err = c.upsertByAddressStmt.QueryRowContext(pCtx, persist.GenerateID(), pContract.Version, pContract.Address, pContract.Symbol, pContract.Name, pContract.OwnerAddress, pContract.Chain, pContract.L1CHain, pContract.Description, pContract.ProfileImageURL).Scan(&contractID)
+	err = c.upsertByAddressStmt.QueryRowContext(pCtx, persist.GenerateID(), pContract.Version, pContract.Address, pContract.Symbol, pContract.Name, pContract.OwnerAddress, pContract.Chain, pContract.L1Chain, pContract.Description, pContract.ProfileImageURL).Scan(&contractID)
 	if err != nil {
 		return "", err
 	}

@@ -14,7 +14,7 @@ insert into contracts(id, deleted, version, created_at, address, symbol, name, o
     , unnest(@profile_image_url::varchar[])
     , unnest(@provider_marked_spam::bool[])
 )
-on conflict (l1_chain, address) where parent_id is null
+on conflict (l1_chain, chain, address) where parent_id is null
 do update set symbol = coalesce(nullif(excluded.symbol, ''), nullif(contracts.symbol, ''))
   , version = excluded.version
   , name = coalesce(nullif(excluded.name, ''), nullif(contracts.name, ''))
@@ -46,7 +46,7 @@ insert into contracts(id, deleted, version, created_at, name, address, creator_a
     , unnest(@description::varchar[])
     , unnest(@parent_ids::varchar[])
 )
-on conflict (l1_chain, parent_id, address) where parent_id is not null
+on conflict (l1_chain, chain, parent_id, address) where parent_id is not null
 do update set deleted = excluded.deleted
   , name = excluded.name
   , creator_address = excluded.creator_address

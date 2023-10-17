@@ -24,7 +24,7 @@ insert into contracts(id, deleted, version, created_at, name, address, creator_a
     , unnest($8::varchar[])
     , unnest($9::varchar[])
 )
-on conflict (l1_chain, parent_id, address) where parent_id is not null
+on conflict (l1_chain, chain, parent_id, address) where parent_id is not null
 do update set deleted = excluded.deleted
   , name = excluded.name
   , creator_address = excluded.creator_address
@@ -112,7 +112,7 @@ insert into contracts(id, deleted, version, created_at, address, symbol, name, o
     , unnest($10::varchar[])
     , unnest($11::bool[])
 )
-on conflict (l1_chain, address) where parent_id is null
+on conflict (l1_chain, chain, address) where parent_id is null
 do update set symbol = coalesce(nullif(excluded.symbol, ''), nullif(contracts.symbol, ''))
   , version = excluded.version
   , name = coalesce(nullif(excluded.name, ''), nullif(contracts.name, ''))

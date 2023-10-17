@@ -3,8 +3,8 @@ update contracts set l1_chain = 0;
 alter table contracts alter column l1_chain set not null;
 update contracts set l1_chain = 4 where chain = 4;
 create index contracts_l1_chain_idx on contracts (address,chain,l1_chain) where deleted = false;
-create unique index contracts_l1_chain_unique_idx on contracts (l1_chain,address) where parent_id is null;
-create unique index contracts_l1_chain_parent_unique_idx on contracts (l1_chain,parent_id,address) where parent_id is not null;
+create unique index contracts_l1_chain_unique_idx on contracts (l1_chain,chain,address) where parent_id is null;
+create unique index contracts_l1_chain_parent_unique_idx on contracts (l1_chain,chain,parent_id,address) where parent_id is not null;
 
 drop view if exists contract_creators;
 

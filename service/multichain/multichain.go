@@ -1463,7 +1463,7 @@ func (p *Provider) RefreshTokenDescriptorsByTokenIdentifiers(ctx context.Context
 
 	contractID, err := p.Repos.ContractRepository.UpsertByAddress(ctx, ti.ContractAddress, persist.ContractGallery{
 		Chain:           ti.Chain,
-		L1CHain:         ti.Chain.L1Chain(),
+		L1Chain:         ti.Chain.L1Chain(),
 		Address:         persist.Address(ti.Chain.NormalizeAddress(ti.ContractAddress)),
 		Symbol:          persist.NullString(finalContractDescriptors.Symbol),
 		Name:            persist.NullString(finalContractDescriptors.Name),
@@ -2138,7 +2138,7 @@ func contractsToNewDedupedContracts(contracts []chainContracts, existingContract
 	for address, meta := range contractMetadatas {
 		res = append(res, persist.ContractGallery{
 			Chain:                address.Chain(),
-			L1CHain:              address.Chain().L1Chain(),
+			L1Chain:              address.Chain().L1Chain(),
 			Address:              address.Address(),
 			Symbol:               persist.NullString(meta.Symbol),
 			Name:                 persist.NullString(meta.Name),
