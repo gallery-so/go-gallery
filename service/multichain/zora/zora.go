@@ -277,6 +277,9 @@ func (d *Provider) getTokens(ctx context.Context, url string, rec chan<- multich
 		}
 		defer resp.Body.Close()
 
+		var tokens []multichain.ChainAgnosticToken
+		var contracts []multichain.ChainAgnosticContract
+		var willBreak bool
 		if balance {
 			var result getBalanceTokensResponse
 			err = json.NewDecoder(resp.Body).Decode(&result)
@@ -286,21 +289,11 @@ func (d *Provider) getTokens(ctx context.Context, url string, rec chan<- multich
 
 			logger.For(ctx).Infof("zora raw tokens retrieved: %d", len(result.Tokens))
 
-			tokens, contracts := d.balanceTokensToChainAgnostic(ctx, result.Tokens)
-
-			allTokens = append(allTokens, tokens...)
-			allContracts = append(allContracts, contracts...)
-
-			if rec != nil {
-				rec <- multichain.ChainAgnosticTokensAndContracts{
-					Tokens:    tokens,
-					Contracts: contracts,
-				}
-			}
-
+			tokens, contracts = d.balanceTokensToChainAgnostic(ctx, result.Tokens)
 			if len(result.Tokens) < limit || !result.HasNextPage {
-				break
+				willBreak = true
 			}
+
 		} else {
 			var result getTokensResponse
 			err = json.NewDecoder(resp.Body).Decode(&result)
@@ -310,21 +303,23 @@ func (d *Provider) getTokens(ctx context.Context, url string, rec chan<- multich
 
 			logger.For(ctx).Infof("zora raw tokens retrieved: %d", len(result.Tokens))
 
-			tokens, contracts := d.tokensToChainAgnostic(ctx, result.Tokens)
-
-			allTokens = append(allTokens, tokens...)
-			allContracts = append(allContracts, contracts...)
-
-			if rec != nil {
-				rec <- multichain.ChainAgnosticTokensAndContracts{
-					Tokens:    tokens,
-					Contracts: contracts,
-				}
-			}
-
+			tokens, contracts = d.tokensToChainAgnostic(ctx, result.Tokens)
 			if len(result.Tokens) < limit || !result.HasNextPage {
-				break
+				willBreak = true
 			}
+		}
+
+		allTokens = append(allTokens, tokens...)
+		allContracts = append(allContracts, contracts...)
+
+		if rec != nil {
+			rec <- multichain.ChainAgnosticTokensAndContracts{
+				Tokens:    tokens,
+				Contracts: contracts,
+			}
+		}
+		if willBreak {
+			break
 		}
 
 	}
