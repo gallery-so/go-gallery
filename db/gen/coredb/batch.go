@@ -436,95 +436,6 @@ func (b *CountRepliesByCommentIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
-const dumbTest = `-- name: DumbTest :batchone
-select users.id, users.test_embed_name, users.test_embed_name, users.test_embed_name, users.test_embed_name, users.test_embed_name, users.test_embed_name, users.test_embed_name, users.test_embed_name, users.test_embed_name, users.test_embed_name, users.test_embed_name, users.test_embed_name, users.test_embed_name, users.test_embed_name, users.test_embed_name, users.test_embed_name, users.test_embed_name, users.test_embed_name as test_embed_name, galleries.id, galleries.deleted, galleries.last_updated, galleries.created_at, galleries.version, galleries.owner_user_id, galleries.collections, galleries.name, galleries.description, galleries.hidden, galleries.position from users, galleries where galleries.id = $1 and users.id = $1 and $2::bool is true
-`
-
-type DumbTestBatchResults struct {
-	br     pgx.BatchResults
-	tot    int
-	closed bool
-}
-
-type DumbTestParams struct {
-	MyMadeUpID persist.DBID `db:"my_made_up_id" json:"my_made_up_id"`
-	SomeBool   bool         `db:"some_bool" json:"some_bool"`
-}
-
-type DumbTestRow struct {
-	ID      persist.DBID `db:"id" json:"id"`
-	User    User         `db:"user" json:"user"`
-	Gallery Gallery      `db:"gallery" json:"gallery"`
-}
-
-// dataloader-config: maxBatchSize=10 batchTimeout=100ms publishResults=false
-func (q *Queries) DumbTest(ctx context.Context, arg []DumbTestParams) *DumbTestBatchResults {
-	batch := &pgx.Batch{}
-	for _, a := range arg {
-		vals := []interface{}{
-			a.MyMadeUpID,
-			a.SomeBool,
-		}
-		batch.Queue(dumbTest, vals...)
-	}
-	br := q.db.SendBatch(ctx, batch)
-	return &DumbTestBatchResults{br, len(arg), false}
-}
-
-func (b *DumbTestBatchResults) QueryRow(f func(int, DumbTestRow, error)) {
-	defer b.br.Close()
-	for t := 0; t < b.tot; t++ {
-		var i DumbTestRow
-		if b.closed {
-			if f != nil {
-				f(t, i, ErrBatchAlreadyClosed)
-			}
-			continue
-		}
-		row := b.br.QueryRow()
-		err := row.Scan(
-			&i.ID,
-			&i.User.ID,
-			&i.User.Deleted,
-			&i.User.Version,
-			&i.User.LastUpdated,
-			&i.User.CreatedAt,
-			&i.User.Username,
-			&i.User.UsernameIdempotent,
-			&i.User.Wallets,
-			&i.User.Bio,
-			&i.User.Traits,
-			&i.User.Universal,
-			&i.User.NotificationSettings,
-			&i.User.EmailVerified,
-			&i.User.EmailUnsubscriptions,
-			&i.User.FeaturedGallery,
-			&i.User.PrimaryWalletID,
-			&i.User.UserExperiences,
-			&i.User.ProfileImageID,
-			&i.Gallery.ID,
-			&i.Gallery.Deleted,
-			&i.Gallery.LastUpdated,
-			&i.Gallery.CreatedAt,
-			&i.Gallery.Version,
-			&i.Gallery.OwnerUserID,
-			&i.Gallery.Collections,
-			&i.Gallery.Name,
-			&i.Gallery.Description,
-			&i.Gallery.Hidden,
-			&i.Gallery.Position,
-		)
-		if f != nil {
-			f(t, i, err)
-		}
-	}
-}
-
-func (b *DumbTestBatchResults) Close() error {
-	b.closed = true
-	return b.br.Close()
-}
-
 const getAdmireByActorIDAndFeedEventID = `-- name: GetAdmireByActorIDAndFeedEventID :batchone
 SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id FROM admires WHERE actor_id = $1 AND feed_event_id = $2 AND deleted = false
 `
@@ -832,7 +743,7 @@ func (b *GetAdmiresByActorIDBatchBatchResults) Close() error {
 }
 
 const getChildContractsByParentIDBatchPaginate = `-- name: GetChildContractsByParentIDBatchPaginate :batchmany
-select c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id
+select c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain
 from contracts c
 where c.parent_id = $1
   and c.deleted = false
@@ -914,6 +825,7 @@ func (b *GetChildContractsByParentIDBatchPaginateBatchResults) Query(f func(int,
 					&i.IsProviderMarkedSpam,
 					&i.ParentID,
 					&i.OverrideCreatorUserID,
+					&i.L1Chain,
 				); err != nil {
 					return err
 				}
@@ -1124,7 +1036,7 @@ func (b *GetCommentByCommentIDBatchBatchResults) Close() error {
 }
 
 const getContractByChainAddressBatch = `-- name: GetContractByChainAddressBatch :batchone
-select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id, override_creator_user_id FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false
+select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id, override_creator_user_id, l1_chain FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false
 `
 
 type GetContractByChainAddressBatchBatchResults struct {
@@ -1181,6 +1093,7 @@ func (b *GetContractByChainAddressBatchBatchResults) QueryRow(f func(int, Contra
 			&i.IsProviderMarkedSpam,
 			&i.ParentID,
 			&i.OverrideCreatorUserID,
+			&i.L1Chain,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -1216,7 +1129,7 @@ displayed as (
     and galleries.last_updated > last_refreshed.last_updated
     and collections.last_updated > last_refreshed.last_updated
 )
-select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id from contracts, displayed
+select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id, contracts.l1_chain from contracts, displayed
 where contracts.id = displayed.contract_id and contracts.deleted = false
 `
 
@@ -1275,6 +1188,7 @@ func (b *GetContractsDisplayedByUserIDBatchBatchResults) Query(f func(int, []Con
 					&i.IsProviderMarkedSpam,
 					&i.ParentID,
 					&i.OverrideCreatorUserID,
+					&i.L1Chain,
 				); err != nil {
 					return err
 				}
@@ -1294,7 +1208,7 @@ func (b *GetContractsDisplayedByUserIDBatchBatchResults) Close() error {
 }
 
 const getCreatedContractsBatchPaginate = `-- name: GetCreatedContractsBatchPaginate :batchmany
-select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id
+select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id, contracts.l1_chain
 from contracts
     join contract_creators on contracts.id = contract_creators.contract_id and contract_creators.creator_user_id = $1
 where ($2::bool or contracts.chain = any(string_to_array($3, ',')::int[]))
@@ -1380,6 +1294,7 @@ func (b *GetCreatedContractsBatchPaginateBatchResults) Query(f func(int, []Contr
 					&i.IsProviderMarkedSpam,
 					&i.ParentID,
 					&i.OverrideCreatorUserID,
+					&i.L1Chain,
 				); err != nil {
 					return err
 				}
@@ -2475,7 +2390,7 @@ where pfp.id = $1
 		when pfp.source_type = $2
 		then exists(select 1 from wallets w where w.id = pfp.wallet_id and not w.deleted)
 		when pfp.source_type = $3
-		then exists(select 1 from tokens t where t.id = pfp.token_id and t.displayable and not t.deleted)
+		then exists(select 1 from tokens t where t.id = pfp.token_id and not t.deleted)
 		else
 		0 = 1
 	end
@@ -2542,7 +2457,7 @@ func (b *GetProfileImageByIDBatchResults) Close() error {
 }
 
 const getSharedContractsBatchPaginate = `-- name: GetSharedContractsBatchPaginate :batchmany
-select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id, a.displayed as displayed_by_user_a, b.displayed as displayed_by_user_b, a.owned_count
+select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id, contracts.l1_chain, a.displayed as displayed_by_user_a, b.displayed as displayed_by_user_b, a.owned_count
 from owned_contracts a, owned_contracts b, contracts
 left join marketplace_contracts on contracts.id = marketplace_contracts.contract_id
 where a.user_id = $1
@@ -2620,6 +2535,7 @@ type GetSharedContractsBatchPaginateRow struct {
 	IsProviderMarkedSpam  bool            `db:"is_provider_marked_spam" json:"is_provider_marked_spam"`
 	ParentID              persist.DBID    `db:"parent_id" json:"parent_id"`
 	OverrideCreatorUserID persist.DBID    `db:"override_creator_user_id" json:"override_creator_user_id"`
+	L1Chain               persist.L1Chain `db:"l1_chain" json:"l1_chain"`
 	DisplayedByUserA      bool            `db:"displayed_by_user_a" json:"displayed_by_user_a"`
 	DisplayedByUserB      bool            `db:"displayed_by_user_b" json:"displayed_by_user_b"`
 	OwnedCount            int64           `db:"owned_count" json:"owned_count"`
@@ -2685,6 +2601,7 @@ func (b *GetSharedContractsBatchPaginateBatchResults) Query(f func(int, []GetSha
 					&i.IsProviderMarkedSpam,
 					&i.ParentID,
 					&i.OverrideCreatorUserID,
+					&i.L1Chain,
 					&i.DisplayedByUserA,
 					&i.DisplayedByUserB,
 					&i.OwnedCount,

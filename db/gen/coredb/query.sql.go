@@ -1456,7 +1456,7 @@ func (q *Queries) GetAllTimeTrendingUserIDs(ctx context.Context, limit int32) ([
 const getAllTokensWithContractsByIDs = `-- name: GetAllTokensWithContractsByIDs :many
 select
     tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id, tokens.is_creator_token, tokens.is_holder_token, tokens.displayable,
-    contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id,
+    contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id, contracts.l1_chain,
     (
         select wallets.address
         from wallets
@@ -1523,6 +1523,7 @@ type GetAllTokensWithContractsByIDsRow struct {
 	IsProviderMarkedSpam_2 bool                       `db:"is_provider_marked_spam_2" json:"is_provider_marked_spam_2"`
 	ParentID               persist.DBID               `db:"parent_id" json:"parent_id"`
 	OverrideCreatorUserID  persist.DBID               `db:"override_creator_user_id" json:"override_creator_user_id"`
+	L1Chain                persist.L1Chain            `db:"l1_chain" json:"l1_chain"`
 	WalletAddress          persist.Address            `db:"wallet_address" json:"wallet_address"`
 }
 
@@ -1581,6 +1582,7 @@ func (q *Queries) GetAllTokensWithContractsByIDs(ctx context.Context, arg GetAll
 			&i.IsProviderMarkedSpam_2,
 			&i.ParentID,
 			&i.OverrideCreatorUserID,
+			&i.L1Chain,
 			&i.WalletAddress,
 		); err != nil {
 			return nil, err
@@ -1763,7 +1765,7 @@ func (q *Queries) GetCommentsByCommentIDs(ctx context.Context, commentIds persis
 }
 
 const getContractByChainAddress = `-- name: GetContractByChainAddress :one
-select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id, override_creator_user_id FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false
+select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id, override_creator_user_id, l1_chain FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false
 `
 
 type GetContractByChainAddressParams struct {
@@ -1793,12 +1795,13 @@ func (q *Queries) GetContractByChainAddress(ctx context.Context, arg GetContract
 		&i.IsProviderMarkedSpam,
 		&i.ParentID,
 		&i.OverrideCreatorUserID,
+		&i.L1Chain,
 	)
 	return i, err
 }
 
 const getContractByID = `-- name: GetContractByID :one
-select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id, override_creator_user_id FROM contracts WHERE id = $1 AND deleted = false
+select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id, override_creator_user_id, l1_chain FROM contracts WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetContractByID(ctx context.Context, id persist.DBID) (Contract, error) {
@@ -1823,6 +1826,7 @@ func (q *Queries) GetContractByID(ctx context.Context, id persist.DBID) (Contrac
 		&i.IsProviderMarkedSpam,
 		&i.ParentID,
 		&i.OverrideCreatorUserID,
+		&i.L1Chain,
 	)
 	return i, err
 }
@@ -1858,65 +1862,8 @@ func (q *Queries) GetContractCreatorsByIds(ctx context.Context, contractIds []st
 	return items, nil
 }
 
-const getContractsAgainByIDsTest = `-- name: GetContractsAgainByIDsTest :many
-with keys as (
-    select unnest ($1::varchar[]) as id
-         , generate_subscripts($1::varchar[], 1) as batch_key_index
-)
-select k.batch_key_index, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.name from keys k
-                                                 join contracts c on c.id = k.id
-where not c.deleted
-`
-
-type GetContractsAgainByIDsTestRow struct {
-	BatchKeyIndex int32          `db:"batch_key_index" json:"batch_key_index"`
-	Contract      Contract       `db:"contract" json:"contract"`
-	Name          sql.NullString `db:"name" json:"name"`
-}
-
-func (q *Queries) GetContractsAgainByIDsTest(ctx context.Context, contractIds []string) ([]GetContractsAgainByIDsTestRow, error) {
-	rows, err := q.db.Query(ctx, getContractsAgainByIDsTest, contractIds)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetContractsAgainByIDsTestRow
-	for rows.Next() {
-		var i GetContractsAgainByIDsTestRow
-		if err := rows.Scan(
-			&i.BatchKeyIndex,
-			&i.Contract.ID,
-			&i.Contract.Deleted,
-			&i.Contract.Version,
-			&i.Contract.CreatedAt,
-			&i.Contract.LastUpdated,
-			&i.Contract.Name,
-			&i.Contract.Symbol,
-			&i.Contract.Address,
-			&i.Contract.CreatorAddress,
-			&i.Contract.Chain,
-			&i.Contract.ProfileBannerUrl,
-			&i.Contract.ProfileImageUrl,
-			&i.Contract.BadgeUrl,
-			&i.Contract.Description,
-			&i.Contract.OwnerAddress,
-			&i.Contract.IsProviderMarkedSpam,
-			&i.Contract.ParentID,
-			&i.Contract.OverrideCreatorUserID,
-			&i.Name,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getContractsByIDs = `-- name: GetContractsByIDs :many
-SELECT id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id, override_creator_user_id from contracts WHERE id = ANY($1) AND deleted = false
+SELECT id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id, override_creator_user_id, l1_chain from contracts WHERE id = ANY($1) AND deleted = false
 `
 
 func (q *Queries) GetContractsByIDs(ctx context.Context, contractIds persist.DBIDList) ([]Contract, error) {
@@ -1947,61 +1894,7 @@ func (q *Queries) GetContractsByIDs(ctx context.Context, contractIds persist.DBI
 			&i.IsProviderMarkedSpam,
 			&i.ParentID,
 			&i.OverrideCreatorUserID,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getContractsByIDsTest = `-- name: GetContractsByIDsTest :many
-with keys as (
-    select unnest ($1::varchar[]) as id
-         , generate_subscripts($1::varchar[], 1) as batch_key_index
-)
-select k.batch_key_index, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id from keys k
-    join contracts c on c.id = k.id
-where not c.deleted
-`
-
-type GetContractsByIDsTestRow struct {
-	BatchKeyIndex int32    `db:"batch_key_index" json:"batch_key_index"`
-	Contract      Contract `db:"contract" json:"contract"`
-}
-
-func (q *Queries) GetContractsByIDsTest(ctx context.Context, contractIds []string) ([]GetContractsByIDsTestRow, error) {
-	rows, err := q.db.Query(ctx, getContractsByIDsTest, contractIds)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetContractsByIDsTestRow
-	for rows.Next() {
-		var i GetContractsByIDsTestRow
-		if err := rows.Scan(
-			&i.BatchKeyIndex,
-			&i.Contract.ID,
-			&i.Contract.Deleted,
-			&i.Contract.Version,
-			&i.Contract.CreatedAt,
-			&i.Contract.LastUpdated,
-			&i.Contract.Name,
-			&i.Contract.Symbol,
-			&i.Contract.Address,
-			&i.Contract.CreatorAddress,
-			&i.Contract.Chain,
-			&i.Contract.ProfileBannerUrl,
-			&i.Contract.ProfileImageUrl,
-			&i.Contract.BadgeUrl,
-			&i.Contract.Description,
-			&i.Contract.OwnerAddress,
-			&i.Contract.IsProviderMarkedSpam,
-			&i.Contract.ParentID,
-			&i.Contract.OverrideCreatorUserID,
+			&i.L1Chain,
 		); err != nil {
 			return nil, err
 		}
@@ -2014,7 +1907,7 @@ func (q *Queries) GetContractsByIDsTest(ctx context.Context, contractIds []strin
 }
 
 const getContractsByTokenIDs = `-- name: GetContractsByTokenIDs :many
-select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id from contracts join tokens on contracts.id = tokens.contract where tokens.id = any($1) and contracts.deleted = false
+select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id, contracts.l1_chain from contracts join tokens on contracts.id = tokens.contract where tokens.id = any($1) and contracts.deleted = false
 `
 
 func (q *Queries) GetContractsByTokenIDs(ctx context.Context, tokenIds persist.DBIDList) ([]Contract, error) {
@@ -2045,6 +1938,7 @@ func (q *Queries) GetContractsByTokenIDs(ctx context.Context, tokenIds persist.D
 			&i.IsProviderMarkedSpam,
 			&i.ParentID,
 			&i.OverrideCreatorUserID,
+			&i.L1Chain,
 		); err != nil {
 			return nil, err
 		}
@@ -2057,19 +1951,19 @@ func (q *Queries) GetContractsByTokenIDs(ctx context.Context, tokenIds persist.D
 }
 
 const getCreatedContractsByUserID = `-- name: GetCreatedContractsByUserID :many
-select c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id,
+select c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain,
        w.id as wallet_id,
        false as is_override_creator
 from users u, contracts c, wallets w
 where u.id = $1
   and c.chain = any($2::int[])
   and w.id = any(u.wallets) and coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) = w.address 
-  and w.chain = any($3::int[])
+  and w.l1_chain = c.l1_chain
   and u.deleted = false
   and c.deleted = false
   and w.deleted = false
   and c.override_creator_user_id is null
-  and (not $4::bool or not exists(
+  and (not $3::bool or not exists(
     select 1 from tokens t
         where t.owner_user_id = $1
           and t.contract = c.id
@@ -2080,14 +1974,14 @@ where u.id = $1
 
 union all
 
-select c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id,
+select c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain,
        null as wallet_id,
        true as is_override_creator
 from contracts c
 where c.override_creator_user_id = $1
   and c.chain = any($2::int[])
   and c.deleted = false
-  and (not $4::bool or not exists(
+  and (not $3::bool or not exists(
     select 1 from tokens t
         where t.owner_user_id = $1
           and t.contract = c.id
@@ -2100,7 +1994,6 @@ where c.override_creator_user_id = $1
 type GetCreatedContractsByUserIDParams struct {
 	UserID           persist.DBID `db:"user_id" json:"user_id"`
 	Chains           []int32      `db:"chains" json:"chains"`
-	L1Chains         []int32      `db:"l1_chains" json:"l1_chains"`
 	NewContractsOnly bool         `db:"new_contracts_only" json:"new_contracts_only"`
 }
 
@@ -2111,12 +2004,7 @@ type GetCreatedContractsByUserIDRow struct {
 }
 
 func (q *Queries) GetCreatedContractsByUserID(ctx context.Context, arg GetCreatedContractsByUserIDParams) ([]GetCreatedContractsByUserIDRow, error) {
-	rows, err := q.db.Query(ctx, getCreatedContractsByUserID,
-		arg.UserID,
-		arg.Chains,
-		arg.L1Chains,
-		arg.NewContractsOnly,
-	)
+	rows, err := q.db.Query(ctx, getCreatedContractsByUserID, arg.UserID, arg.Chains, arg.NewContractsOnly)
 	if err != nil {
 		return nil, err
 	}
@@ -2143,6 +2031,7 @@ func (q *Queries) GetCreatedContractsByUserID(ctx context.Context, arg GetCreate
 			&i.Contract.IsProviderMarkedSpam,
 			&i.Contract.ParentID,
 			&i.Contract.OverrideCreatorUserID,
+			&i.Contract.L1Chain,
 			&i.WalletID,
 			&i.IsOverrideCreator,
 		); err != nil {
@@ -2421,7 +2310,7 @@ func (q *Queries) GetEventsInWindow(ctx context.Context, arg GetEventsInWindowPa
 
 const getFallbackTokenByUserTokenIdentifiers = `-- name: GetFallbackTokenByUserTokenIdentifiers :one
 with contract as (
-	select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id, override_creator_user_id from contracts where contracts.chain = $3 and contracts.address = $4 and not contracts.deleted
+	select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id, override_creator_user_id, l1_chain from contracts where contracts.chain = $3 and contracts.address = $4 and not contracts.deleted
 )
 select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id, tokens.is_creator_token, tokens.is_holder_token, tokens.displayable
 from tokens, contract
@@ -2827,7 +2716,7 @@ func (q *Queries) GetLastFeedEventForUser(ctx context.Context, arg GetLastFeedEv
 
 const getMediaByUserTokenIdentifiers = `-- name: GetMediaByUserTokenIdentifiers :one
 with contract as (
-	select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id, override_creator_user_id from contracts where contracts.chain = $1 and contracts.address = $2 and not contracts.deleted
+	select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id, override_creator_user_id, l1_chain from contracts where contracts.chain = $1 and contracts.address = $2 and not contracts.deleted
 ),
 matching_media as (
 	select token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.contract_id, token_medias.token_id, token_medias.chain, token_medias.active, token_medias.metadata, token_medias.media, token_medias.name, token_medias.description, token_medias.processing_job_id, token_medias.deleted
@@ -2942,7 +2831,7 @@ func (q *Queries) GetMerchDiscountCodeByTokenID(ctx context.Context, tokenHex pe
 const getMissingThumbnailTokensByIDRange = `-- name: GetMissingThumbnailTokensByIDRange :many
 SELECT
     tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id, tokens.is_creator_token, tokens.is_holder_token, tokens.displayable,
-    contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id,
+    contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id, contracts.l1_chain,
     (
         SELECT wallets.address
         FROM wallets
@@ -3007,6 +2896,7 @@ type GetMissingThumbnailTokensByIDRangeRow struct {
 	IsProviderMarkedSpam_2 bool                       `db:"is_provider_marked_spam_2" json:"is_provider_marked_spam_2"`
 	ParentID               persist.DBID               `db:"parent_id" json:"parent_id"`
 	OverrideCreatorUserID  persist.DBID               `db:"override_creator_user_id" json:"override_creator_user_id"`
+	L1Chain                persist.L1Chain            `db:"l1_chain" json:"l1_chain"`
 	WalletAddress          persist.Address            `db:"wallet_address" json:"wallet_address"`
 }
 
@@ -3065,6 +2955,7 @@ func (q *Queries) GetMissingThumbnailTokensByIDRange(ctx context.Context, arg Ge
 			&i.IsProviderMarkedSpam_2,
 			&i.ParentID,
 			&i.OverrideCreatorUserID,
+			&i.L1Chain,
 			&i.WalletAddress,
 		); err != nil {
 			return nil, err
@@ -3504,7 +3395,7 @@ func (q *Queries) GetReprocessJobRangeByID(ctx context.Context, id int) (Reproce
 const getSVGTokensWithContractsByIDs = `-- name: GetSVGTokensWithContractsByIDs :many
 SELECT
     tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam, tokens.last_synced, tokens.fallback_media, tokens.token_media_id, tokens.is_creator_token, tokens.is_holder_token, tokens.displayable,
-    contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id,
+    contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, contracts.owner_address, contracts.is_provider_marked_spam, contracts.parent_id, contracts.override_creator_user_id, contracts.l1_chain,
     (
         SELECT wallets.address
         FROM wallets
@@ -3572,6 +3463,7 @@ type GetSVGTokensWithContractsByIDsRow struct {
 	IsProviderMarkedSpam_2 bool                       `db:"is_provider_marked_spam_2" json:"is_provider_marked_spam_2"`
 	ParentID               persist.DBID               `db:"parent_id" json:"parent_id"`
 	OverrideCreatorUserID  persist.DBID               `db:"override_creator_user_id" json:"override_creator_user_id"`
+	L1Chain                persist.L1Chain            `db:"l1_chain" json:"l1_chain"`
 	WalletAddress          persist.Address            `db:"wallet_address" json:"wallet_address"`
 }
 
@@ -3630,6 +3522,7 @@ func (q *Queries) GetSVGTokensWithContractsByIDs(ctx context.Context, arg GetSVG
 			&i.IsProviderMarkedSpam_2,
 			&i.ParentID,
 			&i.OverrideCreatorUserID,
+			&i.L1Chain,
 			&i.WalletAddress,
 		); err != nil {
 			return nil, err
