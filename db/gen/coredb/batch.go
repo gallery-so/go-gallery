@@ -258,14 +258,14 @@ type CountInteractionsByFeedEventIDBatchBatchResults struct {
 }
 
 type CountInteractionsByFeedEventIDBatchParams struct {
-	AdmireTag   int32        `json:"admire_tag"`
-	FeedEventID persist.DBID `json:"feed_event_id"`
-	CommentTag  int32        `json:"comment_tag"`
+	AdmireTag   int32        `db:"admire_tag" json:"admire_tag"`
+	FeedEventID persist.DBID `db:"feed_event_id" json:"feed_event_id"`
+	CommentTag  int32        `db:"comment_tag" json:"comment_tag"`
 }
 
 type CountInteractionsByFeedEventIDBatchRow struct {
-	Count int64 `json:"count"`
-	Tag   int32 `json:"tag"`
+	Count int64 `db:"count" json:"count"`
+	Tag   int32 `db:"tag" json:"tag"`
 }
 
 func (q *Queries) CountInteractionsByFeedEventIDBatch(ctx context.Context, arg []CountInteractionsByFeedEventIDBatchParams) *CountInteractionsByFeedEventIDBatchBatchResults {
@@ -331,14 +331,14 @@ type CountInteractionsByPostIDBatchBatchResults struct {
 }
 
 type CountInteractionsByPostIDBatchParams struct {
-	AdmireTag  int32        `json:"admire_tag"`
-	PostID     persist.DBID `json:"post_id"`
-	CommentTag int32        `json:"comment_tag"`
+	AdmireTag  int32        `db:"admire_tag" json:"admire_tag"`
+	PostID     persist.DBID `db:"post_id" json:"post_id"`
+	CommentTag int32        `db:"comment_tag" json:"comment_tag"`
 }
 
 type CountInteractionsByPostIDBatchRow struct {
-	Count int64 `json:"count"`
-	Tag   int32 `json:"tag"`
+	Count int64 `db:"count" json:"count"`
+	Tag   int32 `db:"tag" json:"tag"`
 }
 
 func (q *Queries) CountInteractionsByPostIDBatch(ctx context.Context, arg []CountInteractionsByPostIDBatchParams) *CountInteractionsByPostIDBatchBatchResults {
@@ -436,6 +436,95 @@ func (b *CountRepliesByCommentIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const dumbTest = `-- name: DumbTest :batchone
+select users.id, users.test_embed_name, users.test_embed_name, users.test_embed_name, users.test_embed_name, users.test_embed_name, users.test_embed_name, users.test_embed_name, users.test_embed_name, users.test_embed_name, users.test_embed_name, users.test_embed_name, users.test_embed_name, users.test_embed_name, users.test_embed_name, users.test_embed_name, users.test_embed_name, users.test_embed_name, users.test_embed_name as test_embed_name, galleries.id, galleries.deleted, galleries.last_updated, galleries.created_at, galleries.version, galleries.owner_user_id, galleries.collections, galleries.name, galleries.description, galleries.hidden, galleries.position from users, galleries where galleries.id = $1 and users.id = $1 and $2::bool is true
+`
+
+type DumbTestBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type DumbTestParams struct {
+	MyMadeUpID persist.DBID `db:"my_made_up_id" json:"my_made_up_id"`
+	SomeBool   bool         `db:"some_bool" json:"some_bool"`
+}
+
+type DumbTestRow struct {
+	ID      persist.DBID `db:"id" json:"id"`
+	User    User         `db:"user" json:"user"`
+	Gallery Gallery      `db:"gallery" json:"gallery"`
+}
+
+// dataloader-config: maxBatchSize=10 batchTimeout=100ms publishResults=false
+func (q *Queries) DumbTest(ctx context.Context, arg []DumbTestParams) *DumbTestBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.MyMadeUpID,
+			a.SomeBool,
+		}
+		batch.Queue(dumbTest, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &DumbTestBatchResults{br, len(arg), false}
+}
+
+func (b *DumbTestBatchResults) QueryRow(f func(int, DumbTestRow, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var i DumbTestRow
+		if b.closed {
+			if f != nil {
+				f(t, i, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		row := b.br.QueryRow()
+		err := row.Scan(
+			&i.ID,
+			&i.User.ID,
+			&i.User.Deleted,
+			&i.User.Version,
+			&i.User.LastUpdated,
+			&i.User.CreatedAt,
+			&i.User.Username,
+			&i.User.UsernameIdempotent,
+			&i.User.Wallets,
+			&i.User.Bio,
+			&i.User.Traits,
+			&i.User.Universal,
+			&i.User.NotificationSettings,
+			&i.User.EmailVerified,
+			&i.User.EmailUnsubscriptions,
+			&i.User.FeaturedGallery,
+			&i.User.PrimaryWalletID,
+			&i.User.UserExperiences,
+			&i.User.ProfileImageID,
+			&i.Gallery.ID,
+			&i.Gallery.Deleted,
+			&i.Gallery.LastUpdated,
+			&i.Gallery.CreatedAt,
+			&i.Gallery.Version,
+			&i.Gallery.OwnerUserID,
+			&i.Gallery.Collections,
+			&i.Gallery.Name,
+			&i.Gallery.Description,
+			&i.Gallery.Hidden,
+			&i.Gallery.Position,
+		)
+		if f != nil {
+			f(t, i, err)
+		}
+	}
+}
+
+func (b *DumbTestBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const getAdmireByActorIDAndFeedEventID = `-- name: GetAdmireByActorIDAndFeedEventID :batchone
 SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated, post_id, token_id FROM admires WHERE actor_id = $1 AND feed_event_id = $2 AND deleted = false
 `
@@ -447,8 +536,8 @@ type GetAdmireByActorIDAndFeedEventIDBatchResults struct {
 }
 
 type GetAdmireByActorIDAndFeedEventIDParams struct {
-	ActorID     persist.DBID `json:"actor_id"`
-	FeedEventID persist.DBID `json:"feed_event_id"`
+	ActorID     persist.DBID `db:"actor_id" json:"actor_id"`
+	FeedEventID persist.DBID `db:"feed_event_id" json:"feed_event_id"`
 }
 
 func (q *Queries) GetAdmireByActorIDAndFeedEventID(ctx context.Context, arg []GetAdmireByActorIDAndFeedEventIDParams) *GetAdmireByActorIDAndFeedEventIDBatchResults {
@@ -508,8 +597,8 @@ type GetAdmireByActorIDAndPostIDBatchResults struct {
 }
 
 type GetAdmireByActorIDAndPostIDParams struct {
-	ActorID persist.DBID `json:"actor_id"`
-	PostID  persist.DBID `json:"post_id"`
+	ActorID persist.DBID `db:"actor_id" json:"actor_id"`
+	PostID  persist.DBID `db:"post_id" json:"post_id"`
 }
 
 func (q *Queries) GetAdmireByActorIDAndPostID(ctx context.Context, arg []GetAdmireByActorIDAndPostIDParams) *GetAdmireByActorIDAndPostIDBatchResults {
@@ -569,8 +658,8 @@ type GetAdmireByActorIDAndTokenIDBatchResults struct {
 }
 
 type GetAdmireByActorIDAndTokenIDParams struct {
-	ActorID persist.DBID `json:"actor_id"`
-	TokenID persist.DBID `json:"token_id"`
+	ActorID persist.DBID `db:"actor_id" json:"actor_id"`
+	TokenID persist.DBID `db:"token_id" json:"token_id"`
 }
 
 func (q *Queries) GetAdmireByActorIDAndTokenID(ctx context.Context, arg []GetAdmireByActorIDAndTokenIDParams) *GetAdmireByActorIDAndTokenIDBatchResults {
@@ -761,13 +850,13 @@ type GetChildContractsByParentIDBatchPaginateBatchResults struct {
 }
 
 type GetChildContractsByParentIDBatchPaginateParams struct {
-	ParentID      persist.DBID `json:"parent_id"`
-	CurBeforeTime time.Time    `json:"cur_before_time"`
-	CurBeforeID   persist.DBID `json:"cur_before_id"`
-	CurAfterTime  time.Time    `json:"cur_after_time"`
-	CurAfterID    persist.DBID `json:"cur_after_id"`
-	PagingForward bool         `json:"paging_forward"`
-	Limit         int32        `json:"limit"`
+	ParentID      persist.DBID `db:"parent_id" json:"parent_id"`
+	CurBeforeTime time.Time    `db:"cur_before_time" json:"cur_before_time"`
+	CurBeforeID   persist.DBID `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterTime  time.Time    `db:"cur_after_time" json:"cur_after_time"`
+	CurAfterID    persist.DBID `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward bool         `db:"paging_forward" json:"paging_forward"`
+	Limit         int32        `db:"limit" json:"limit"`
 }
 
 func (q *Queries) GetChildContractsByParentIDBatchPaginate(ctx context.Context, arg []GetChildContractsByParentIDBatchPaginateParams) *GetChildContractsByParentIDBatchPaginateBatchResults {
@@ -1045,8 +1134,8 @@ type GetContractByChainAddressBatchBatchResults struct {
 }
 
 type GetContractByChainAddressBatchParams struct {
-	Address persist.Address `json:"address"`
-	Chain   persist.Chain   `json:"chain"`
+	Address persist.Address `db:"address" json:"address"`
+	Chain   persist.Chain   `db:"chain" json:"chain"`
 }
 
 func (q *Queries) GetContractByChainAddressBatch(ctx context.Context, arg []GetContractByChainAddressBatchParams) *GetContractByChainAddressBatchBatchResults {
@@ -1223,15 +1312,15 @@ type GetCreatedContractsBatchPaginateBatchResults struct {
 }
 
 type GetCreatedContractsBatchPaginateParams struct {
-	UserID           persist.DBID `json:"user_id"`
-	IncludeAllChains bool         `json:"include_all_chains"`
-	Chains           string       `json:"chains"`
-	CurBeforeTime    time.Time    `json:"cur_before_time"`
-	CurBeforeID      persist.DBID `json:"cur_before_id"`
-	CurAfterTime     time.Time    `json:"cur_after_time"`
-	CurAfterID       persist.DBID `json:"cur_after_id"`
-	PagingForward    bool         `json:"paging_forward"`
-	Limit            int32        `json:"limit"`
+	UserID           persist.DBID `db:"user_id" json:"user_id"`
+	IncludeAllChains bool         `db:"include_all_chains" json:"include_all_chains"`
+	Chains           string       `db:"chains" json:"chains"`
+	CurBeforeTime    time.Time    `db:"cur_before_time" json:"cur_before_time"`
+	CurBeforeID      persist.DBID `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterTime     time.Time    `db:"cur_after_time" json:"cur_after_time"`
+	CurAfterID       persist.DBID `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward    bool         `db:"paging_forward" json:"paging_forward"`
+	Limit            int32        `db:"limit" json:"limit"`
 }
 
 func (q *Queries) GetCreatedContractsBatchPaginate(ctx context.Context, arg []GetCreatedContractsBatchPaginateParams) *GetCreatedContractsBatchPaginateBatchResults {
@@ -2229,16 +2318,16 @@ type GetOwnersByContractIdBatchPaginateBatchResults struct {
 }
 
 type GetOwnersByContractIdBatchPaginateParams struct {
-	ID                 persist.DBID  `json:"id"`
-	GalleryUsersOnly   bool          `json:"gallery_users_only"`
-	CurBeforeUniversal bool          `json:"cur_before_universal"`
-	CurBeforeTime      time.Time     `json:"cur_before_time"`
-	CurBeforeID        persist.DBID  `json:"cur_before_id"`
-	CurAfterUniversal  bool          `json:"cur_after_universal"`
-	CurAfterTime       time.Time     `json:"cur_after_time"`
-	CurAfterID         persist.DBID  `json:"cur_after_id"`
-	PagingForward      bool          `json:"paging_forward"`
-	Limit              sql.NullInt32 `json:"limit"`
+	ID                 persist.DBID  `db:"id" json:"id"`
+	GalleryUsersOnly   bool          `db:"gallery_users_only" json:"gallery_users_only"`
+	CurBeforeUniversal bool          `db:"cur_before_universal" json:"cur_before_universal"`
+	CurBeforeTime      time.Time     `db:"cur_before_time" json:"cur_before_time"`
+	CurBeforeID        persist.DBID  `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterUniversal  bool          `db:"cur_after_universal" json:"cur_after_universal"`
+	CurAfterTime       time.Time     `db:"cur_after_time" json:"cur_after_time"`
+	CurAfterID         persist.DBID  `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward      bool          `db:"paging_forward" json:"paging_forward"`
+	Limit              sql.NullInt32 `db:"limit" json:"limit"`
 }
 
 // Note: sqlc has trouble recognizing that the output of the "select distinct" subquery below will
@@ -2399,9 +2488,9 @@ type GetProfileImageByIDBatchResults struct {
 }
 
 type GetProfileImageByIDParams struct {
-	ID              persist.DBID               `json:"id"`
-	EnsSourceType   persist.ProfileImageSource `json:"ens_source_type"`
-	TokenSourceType persist.ProfileImageSource `json:"token_source_type"`
+	ID              persist.DBID               `db:"id" json:"id"`
+	EnsSourceType   persist.ProfileImageSource `db:"ens_source_type" json:"ens_source_type"`
+	TokenSourceType persist.ProfileImageSource `db:"token_source_type" json:"token_source_type"`
 }
 
 func (q *Queries) GetProfileImageByID(ctx context.Context, arg []GetProfileImageByIDParams) *GetProfileImageByIDBatchResults {
@@ -2498,42 +2587,42 @@ type GetSharedContractsBatchPaginateBatchResults struct {
 }
 
 type GetSharedContractsBatchPaginateParams struct {
-	UserAID                   persist.DBID `json:"user_a_id"`
-	UserBID                   persist.DBID `json:"user_b_id"`
-	CurBeforeDisplayedByUserA bool         `json:"cur_before_displayed_by_user_a"`
-	CurBeforeDisplayedByUserB bool         `json:"cur_before_displayed_by_user_b"`
-	CurBeforeOwnedCount       int32        `json:"cur_before_owned_count"`
-	CurBeforeContractID       persist.DBID `json:"cur_before_contract_id"`
-	CurAfterDisplayedByUserA  bool         `json:"cur_after_displayed_by_user_a"`
-	CurAfterDisplayedByUserB  bool         `json:"cur_after_displayed_by_user_b"`
-	CurAfterOwnedCount        int32        `json:"cur_after_owned_count"`
-	CurAfterContractID        persist.DBID `json:"cur_after_contract_id"`
-	PagingForward             bool         `json:"paging_forward"`
-	Limit                     int32        `json:"limit"`
+	UserAID                   persist.DBID `db:"user_a_id" json:"user_a_id"`
+	UserBID                   persist.DBID `db:"user_b_id" json:"user_b_id"`
+	CurBeforeDisplayedByUserA bool         `db:"cur_before_displayed_by_user_a" json:"cur_before_displayed_by_user_a"`
+	CurBeforeDisplayedByUserB bool         `db:"cur_before_displayed_by_user_b" json:"cur_before_displayed_by_user_b"`
+	CurBeforeOwnedCount       int32        `db:"cur_before_owned_count" json:"cur_before_owned_count"`
+	CurBeforeContractID       persist.DBID `db:"cur_before_contract_id" json:"cur_before_contract_id"`
+	CurAfterDisplayedByUserA  bool         `db:"cur_after_displayed_by_user_a" json:"cur_after_displayed_by_user_a"`
+	CurAfterDisplayedByUserB  bool         `db:"cur_after_displayed_by_user_b" json:"cur_after_displayed_by_user_b"`
+	CurAfterOwnedCount        int32        `db:"cur_after_owned_count" json:"cur_after_owned_count"`
+	CurAfterContractID        persist.DBID `db:"cur_after_contract_id" json:"cur_after_contract_id"`
+	PagingForward             bool         `db:"paging_forward" json:"paging_forward"`
+	Limit                     int32        `db:"limit" json:"limit"`
 }
 
 type GetSharedContractsBatchPaginateRow struct {
-	ID                    persist.DBID    `json:"id"`
-	Deleted               bool            `json:"deleted"`
-	Version               sql.NullInt32   `json:"version"`
-	CreatedAt             time.Time       `json:"created_at"`
-	LastUpdated           time.Time       `json:"last_updated"`
-	Name                  sql.NullString  `json:"name"`
-	Symbol                sql.NullString  `json:"symbol"`
-	Address               persist.Address `json:"address"`
-	CreatorAddress        persist.Address `json:"creator_address"`
-	Chain                 persist.Chain   `json:"chain"`
-	ProfileBannerUrl      sql.NullString  `json:"profile_banner_url"`
-	ProfileImageUrl       sql.NullString  `json:"profile_image_url"`
-	BadgeUrl              sql.NullString  `json:"badge_url"`
-	Description           sql.NullString  `json:"description"`
-	OwnerAddress          persist.Address `json:"owner_address"`
-	IsProviderMarkedSpam  bool            `json:"is_provider_marked_spam"`
-	ParentID              persist.DBID    `json:"parent_id"`
-	OverrideCreatorUserID persist.DBID    `json:"override_creator_user_id"`
-	DisplayedByUserA      bool            `json:"displayed_by_user_a"`
-	DisplayedByUserB      bool            `json:"displayed_by_user_b"`
-	OwnedCount            int64           `json:"owned_count"`
+	ID                    persist.DBID    `db:"id" json:"id"`
+	Deleted               bool            `db:"deleted" json:"deleted"`
+	Version               sql.NullInt32   `db:"version" json:"version"`
+	CreatedAt             time.Time       `db:"created_at" json:"created_at"`
+	LastUpdated           time.Time       `db:"last_updated" json:"last_updated"`
+	Name                  sql.NullString  `db:"name" json:"name"`
+	Symbol                sql.NullString  `db:"symbol" json:"symbol"`
+	Address               persist.Address `db:"address" json:"address"`
+	CreatorAddress        persist.Address `db:"creator_address" json:"creator_address"`
+	Chain                 persist.Chain   `db:"chain" json:"chain"`
+	ProfileBannerUrl      sql.NullString  `db:"profile_banner_url" json:"profile_banner_url"`
+	ProfileImageUrl       sql.NullString  `db:"profile_image_url" json:"profile_image_url"`
+	BadgeUrl              sql.NullString  `db:"badge_url" json:"badge_url"`
+	Description           sql.NullString  `db:"description" json:"description"`
+	OwnerAddress          persist.Address `db:"owner_address" json:"owner_address"`
+	IsProviderMarkedSpam  bool            `db:"is_provider_marked_spam" json:"is_provider_marked_spam"`
+	ParentID              persist.DBID    `db:"parent_id" json:"parent_id"`
+	OverrideCreatorUserID persist.DBID    `db:"override_creator_user_id" json:"override_creator_user_id"`
+	DisplayedByUserA      bool            `db:"displayed_by_user_a" json:"displayed_by_user_a"`
+	DisplayedByUserB      bool            `db:"displayed_by_user_b" json:"displayed_by_user_b"`
+	OwnedCount            int64           `db:"owned_count" json:"owned_count"`
 }
 
 func (q *Queries) GetSharedContractsBatchPaginate(ctx context.Context, arg []GetSharedContractsBatchPaginateParams) *GetSharedContractsBatchPaginateBatchResults {
@@ -2641,36 +2730,36 @@ type GetSharedFollowersBatchPaginateBatchResults struct {
 }
 
 type GetSharedFollowersBatchPaginateParams struct {
-	Follower      persist.DBID `json:"follower"`
-	Followee      persist.DBID `json:"followee"`
-	CurBeforeTime time.Time    `json:"cur_before_time"`
-	CurBeforeID   persist.DBID `json:"cur_before_id"`
-	CurAfterTime  time.Time    `json:"cur_after_time"`
-	CurAfterID    persist.DBID `json:"cur_after_id"`
-	PagingForward bool         `json:"paging_forward"`
-	Limit         int32        `json:"limit"`
+	Follower      persist.DBID `db:"follower" json:"follower"`
+	Followee      persist.DBID `db:"followee" json:"followee"`
+	CurBeforeTime time.Time    `db:"cur_before_time" json:"cur_before_time"`
+	CurBeforeID   persist.DBID `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterTime  time.Time    `db:"cur_after_time" json:"cur_after_time"`
+	CurAfterID    persist.DBID `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward bool         `db:"paging_forward" json:"paging_forward"`
+	Limit         int32        `db:"limit" json:"limit"`
 }
 
 type GetSharedFollowersBatchPaginateRow struct {
-	ID                   persist.DBID                     `json:"id"`
-	Deleted              bool                             `json:"deleted"`
-	Version              sql.NullInt32                    `json:"version"`
-	LastUpdated          time.Time                        `json:"last_updated"`
-	CreatedAt            time.Time                        `json:"created_at"`
-	Username             sql.NullString                   `json:"username"`
-	UsernameIdempotent   sql.NullString                   `json:"username_idempotent"`
-	Wallets              persist.WalletList               `json:"wallets"`
-	Bio                  sql.NullString                   `json:"bio"`
-	Traits               pgtype.JSONB                     `json:"traits"`
-	Universal            bool                             `json:"universal"`
-	NotificationSettings persist.UserNotificationSettings `json:"notification_settings"`
-	EmailVerified        persist.EmailVerificationStatus  `json:"email_verified"`
-	EmailUnsubscriptions persist.EmailUnsubscriptions     `json:"email_unsubscriptions"`
-	FeaturedGallery      *persist.DBID                    `json:"featured_gallery"`
-	PrimaryWalletID      persist.DBID                     `json:"primary_wallet_id"`
-	UserExperiences      pgtype.JSONB                     `json:"user_experiences"`
-	ProfileImageID       persist.DBID                     `json:"profile_image_id"`
-	FollowedOn           time.Time                        `json:"followed_on"`
+	ID                   persist.DBID                     `db:"id" json:"id"`
+	Deleted              bool                             `db:"deleted" json:"deleted"`
+	Version              sql.NullInt32                    `db:"version" json:"version"`
+	LastUpdated          time.Time                        `db:"last_updated" json:"last_updated"`
+	CreatedAt            time.Time                        `db:"created_at" json:"created_at"`
+	Username             sql.NullString                   `db:"username" json:"username"`
+	UsernameIdempotent   sql.NullString                   `db:"username_idempotent" json:"username_idempotent"`
+	Wallets              persist.WalletList               `db:"wallets" json:"wallets"`
+	Bio                  sql.NullString                   `db:"bio" json:"bio"`
+	Traits               pgtype.JSONB                     `db:"traits" json:"traits"`
+	Universal            bool                             `db:"universal" json:"universal"`
+	NotificationSettings persist.UserNotificationSettings `db:"notification_settings" json:"notification_settings"`
+	EmailVerified        persist.EmailVerificationStatus  `db:"email_verified" json:"email_verified"`
+	EmailUnsubscriptions persist.EmailUnsubscriptions     `db:"email_unsubscriptions" json:"email_unsubscriptions"`
+	FeaturedGallery      *persist.DBID                    `db:"featured_gallery" json:"featured_gallery"`
+	PrimaryWalletID      persist.DBID                     `db:"primary_wallet_id" json:"primary_wallet_id"`
+	UserExperiences      pgtype.JSONB                     `db:"user_experiences" json:"user_experiences"`
+	ProfileImageID       persist.DBID                     `db:"profile_image_id" json:"profile_image_id"`
+	FollowedOn           time.Time                        `db:"followed_on" json:"followed_on"`
 }
 
 func (q *Queries) GetSharedFollowersBatchPaginate(ctx context.Context, arg []GetSharedFollowersBatchPaginateParams) *GetSharedFollowersBatchPaginateBatchResults {
@@ -2908,10 +2997,10 @@ type GetTokenByUserTokenIdentifiersBatchBatchResults struct {
 }
 
 type GetTokenByUserTokenIdentifiersBatchParams struct {
-	OwnerID         persist.DBID    `json:"owner_id"`
-	TokenID         persist.TokenID `json:"token_id"`
-	ContractAddress persist.Address `json:"contract_address"`
-	Chain           persist.Chain   `json:"chain"`
+	OwnerID         persist.DBID    `db:"owner_id" json:"owner_id"`
+	TokenID         persist.TokenID `db:"token_id" json:"token_id"`
+	ContractAddress persist.Address `db:"contract_address" json:"contract_address"`
+	Chain           persist.Chain   `db:"chain" json:"chain"`
 }
 
 func (q *Queries) GetTokenByUserTokenIdentifiersBatch(ctx context.Context, arg []GetTokenByUserTokenIdentifiersBatchParams) *GetTokenByUserTokenIdentifiersBatchBatchResults {
@@ -3066,8 +3155,8 @@ type GetTokensByCollectionIdBatchBatchResults struct {
 }
 
 type GetTokensByCollectionIdBatchParams struct {
-	CollectionID persist.DBID  `json:"collection_id"`
-	Limit        sql.NullInt32 `json:"limit"`
+	CollectionID persist.DBID  `db:"collection_id" json:"collection_id"`
+	Limit        sql.NullInt32 `db:"limit" json:"limit"`
 }
 
 func (q *Queries) GetTokensByCollectionIdBatch(ctx context.Context, arg []GetTokensByCollectionIdBatchParams) *GetTokensByCollectionIdBatchBatchResults {
@@ -3163,8 +3252,8 @@ type GetTokensByUserIdAndChainBatchBatchResults struct {
 }
 
 type GetTokensByUserIdAndChainBatchParams struct {
-	OwnerUserID persist.DBID  `json:"owner_user_id"`
-	Chain       persist.Chain `json:"chain"`
+	OwnerUserID persist.DBID  `db:"owner_user_id" json:"owner_user_id"`
+	Chain       persist.Chain `db:"chain" json:"chain"`
 }
 
 func (q *Queries) GetTokensByUserIdAndChainBatch(ctx context.Context, arg []GetTokensByUserIdAndChainBatchParams) *GetTokensByUserIdAndChainBatchBatchResults {
@@ -3260,9 +3349,9 @@ type GetTokensByUserIdBatchBatchResults struct {
 }
 
 type GetTokensByUserIdBatchParams struct {
-	OwnerUserID    persist.DBID `json:"owner_user_id"`
-	IncludeHolder  bool         `json:"include_holder"`
-	IncludeCreator bool         `json:"include_creator"`
+	OwnerUserID    persist.DBID `db:"owner_user_id" json:"owner_user_id"`
+	IncludeHolder  bool         `db:"include_holder" json:"include_holder"`
+	IncludeCreator bool         `db:"include_creator" json:"include_creator"`
 }
 
 func (q *Queries) GetTokensByUserIdBatch(ctx context.Context, arg []GetTokensByUserIdBatchParams) *GetTokensByUserIdBatchBatchResults {
@@ -3447,8 +3536,8 @@ type GetUserByAddressAndL1BatchBatchResults struct {
 }
 
 type GetUserByAddressAndL1BatchParams struct {
-	Address persist.Address `json:"address"`
-	L1Chain persist.L1Chain `json:"l1_chain"`
+	Address persist.Address `db:"address" json:"address"`
+	L1Chain persist.L1Chain `db:"l1_chain" json:"l1_chain"`
 }
 
 func (q *Queries) GetUserByAddressAndL1Batch(ctx context.Context, arg []GetUserByAddressAndL1BatchParams) *GetUserByAddressAndL1BatchBatchResults {
@@ -3650,13 +3739,13 @@ type GetUserNotificationsBatchBatchResults struct {
 }
 
 type GetUserNotificationsBatchParams struct {
-	OwnerID       persist.DBID `json:"owner_id"`
-	CurBeforeTime time.Time    `json:"cur_before_time"`
-	CurBeforeID   persist.DBID `json:"cur_before_id"`
-	CurAfterTime  time.Time    `json:"cur_after_time"`
-	CurAfterID    persist.DBID `json:"cur_after_id"`
-	PagingForward bool         `json:"paging_forward"`
-	Limit         int32        `json:"limit"`
+	OwnerID       persist.DBID `db:"owner_id" json:"owner_id"`
+	CurBeforeTime time.Time    `db:"cur_before_time" json:"cur_before_time"`
+	CurBeforeID   persist.DBID `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterTime  time.Time    `db:"cur_after_time" json:"cur_after_time"`
+	CurAfterID    persist.DBID `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward bool         `db:"paging_forward" json:"paging_forward"`
+	Limit         int32        `db:"limit" json:"limit"`
 }
 
 func (q *Queries) GetUserNotificationsBatch(ctx context.Context, arg []GetUserNotificationsBatchParams) *GetUserNotificationsBatchBatchResults {
@@ -3947,13 +4036,13 @@ type PaginateAdmiresByFeedEventIDBatchBatchResults struct {
 }
 
 type PaginateAdmiresByFeedEventIDBatchParams struct {
-	FeedEventID   persist.DBID `json:"feed_event_id"`
-	CurBeforeTime time.Time    `json:"cur_before_time"`
-	CurBeforeID   persist.DBID `json:"cur_before_id"`
-	CurAfterTime  time.Time    `json:"cur_after_time"`
-	CurAfterID    persist.DBID `json:"cur_after_id"`
-	PagingForward bool         `json:"paging_forward"`
-	Limit         int32        `json:"limit"`
+	FeedEventID   persist.DBID `db:"feed_event_id" json:"feed_event_id"`
+	CurBeforeTime time.Time    `db:"cur_before_time" json:"cur_before_time"`
+	CurBeforeID   persist.DBID `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterTime  time.Time    `db:"cur_after_time" json:"cur_after_time"`
+	CurAfterID    persist.DBID `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward bool         `db:"paging_forward" json:"paging_forward"`
+	Limit         int32        `db:"limit" json:"limit"`
 }
 
 func (q *Queries) PaginateAdmiresByFeedEventIDBatch(ctx context.Context, arg []PaginateAdmiresByFeedEventIDBatchParams) *PaginateAdmiresByFeedEventIDBatchBatchResults {
@@ -4035,13 +4124,13 @@ type PaginateAdmiresByPostIDBatchBatchResults struct {
 }
 
 type PaginateAdmiresByPostIDBatchParams struct {
-	PostID        persist.DBID `json:"post_id"`
-	CurBeforeTime time.Time    `json:"cur_before_time"`
-	CurBeforeID   persist.DBID `json:"cur_before_id"`
-	CurAfterTime  time.Time    `json:"cur_after_time"`
-	CurAfterID    persist.DBID `json:"cur_after_id"`
-	PagingForward bool         `json:"paging_forward"`
-	Limit         int32        `json:"limit"`
+	PostID        persist.DBID `db:"post_id" json:"post_id"`
+	CurBeforeTime time.Time    `db:"cur_before_time" json:"cur_before_time"`
+	CurBeforeID   persist.DBID `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterTime  time.Time    `db:"cur_after_time" json:"cur_after_time"`
+	CurAfterID    persist.DBID `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward bool         `db:"paging_forward" json:"paging_forward"`
+	Limit         int32        `db:"limit" json:"limit"`
 }
 
 func (q *Queries) PaginateAdmiresByPostIDBatch(ctx context.Context, arg []PaginateAdmiresByPostIDBatchParams) *PaginateAdmiresByPostIDBatchBatchResults {
@@ -4123,15 +4212,15 @@ type PaginateAdmiresByTokenIDBatchBatchResults struct {
 }
 
 type PaginateAdmiresByTokenIDBatchParams struct {
-	TokenID       persist.DBID `json:"token_id"`
-	OnlyForActor  bool         `json:"only_for_actor"`
-	ActorID       persist.DBID `json:"actor_id"`
-	CurBeforeTime time.Time    `json:"cur_before_time"`
-	CurBeforeID   persist.DBID `json:"cur_before_id"`
-	CurAfterTime  time.Time    `json:"cur_after_time"`
-	CurAfterID    persist.DBID `json:"cur_after_id"`
-	PagingForward bool         `json:"paging_forward"`
-	Limit         int32        `json:"limit"`
+	TokenID       persist.DBID `db:"token_id" json:"token_id"`
+	OnlyForActor  bool         `db:"only_for_actor" json:"only_for_actor"`
+	ActorID       persist.DBID `db:"actor_id" json:"actor_id"`
+	CurBeforeTime time.Time    `db:"cur_before_time" json:"cur_before_time"`
+	CurBeforeID   persist.DBID `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterTime  time.Time    `db:"cur_after_time" json:"cur_after_time"`
+	CurAfterID    persist.DBID `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward bool         `db:"paging_forward" json:"paging_forward"`
+	Limit         int32        `db:"limit" json:"limit"`
 }
 
 func (q *Queries) PaginateAdmiresByTokenIDBatch(ctx context.Context, arg []PaginateAdmiresByTokenIDBatchParams) *PaginateAdmiresByTokenIDBatchBatchResults {
@@ -4216,13 +4305,13 @@ type PaginateCommentsByFeedEventIDBatchBatchResults struct {
 }
 
 type PaginateCommentsByFeedEventIDBatchParams struct {
-	FeedEventID   persist.DBID `json:"feed_event_id"`
-	CurBeforeTime time.Time    `json:"cur_before_time"`
-	CurBeforeID   persist.DBID `json:"cur_before_id"`
-	CurAfterTime  time.Time    `json:"cur_after_time"`
-	CurAfterID    persist.DBID `json:"cur_after_id"`
-	PagingForward bool         `json:"paging_forward"`
-	Limit         int32        `json:"limit"`
+	FeedEventID   persist.DBID `db:"feed_event_id" json:"feed_event_id"`
+	CurBeforeTime time.Time    `db:"cur_before_time" json:"cur_before_time"`
+	CurBeforeID   persist.DBID `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterTime  time.Time    `db:"cur_after_time" json:"cur_after_time"`
+	CurAfterID    persist.DBID `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward bool         `db:"paging_forward" json:"paging_forward"`
+	Limit         int32        `db:"limit" json:"limit"`
 }
 
 func (q *Queries) PaginateCommentsByFeedEventIDBatch(ctx context.Context, arg []PaginateCommentsByFeedEventIDBatchParams) *PaginateCommentsByFeedEventIDBatchBatchResults {
@@ -4307,13 +4396,13 @@ type PaginateCommentsByPostIDBatchBatchResults struct {
 }
 
 type PaginateCommentsByPostIDBatchParams struct {
-	PostID        persist.DBID `json:"post_id"`
-	CurBeforeTime time.Time    `json:"cur_before_time"`
-	CurBeforeID   persist.DBID `json:"cur_before_id"`
-	CurAfterTime  time.Time    `json:"cur_after_time"`
-	CurAfterID    persist.DBID `json:"cur_after_id"`
-	PagingForward bool         `json:"paging_forward"`
-	Limit         int32        `json:"limit"`
+	PostID        persist.DBID `db:"post_id" json:"post_id"`
+	CurBeforeTime time.Time    `db:"cur_before_time" json:"cur_before_time"`
+	CurBeforeID   persist.DBID `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterTime  time.Time    `db:"cur_after_time" json:"cur_after_time"`
+	CurAfterID    persist.DBID `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward bool         `db:"paging_forward" json:"paging_forward"`
+	Limit         int32        `db:"limit" json:"limit"`
 }
 
 func (q *Queries) PaginateCommentsByPostIDBatch(ctx context.Context, arg []PaginateCommentsByPostIDBatchParams) *PaginateCommentsByPostIDBatchBatchResults {
@@ -4403,23 +4492,23 @@ type PaginateInteractionsByFeedEventIDBatchBatchResults struct {
 }
 
 type PaginateInteractionsByFeedEventIDBatchParams struct {
-	AdmireTag     int32        `json:"admire_tag"`
-	FeedEventID   persist.DBID `json:"feed_event_id"`
-	CurBeforeTag  int32        `json:"cur_before_tag"`
-	CurBeforeTime time.Time    `json:"cur_before_time"`
-	CurBeforeID   persist.DBID `json:"cur_before_id"`
-	CurAfterTag   int32        `json:"cur_after_tag"`
-	CurAfterTime  time.Time    `json:"cur_after_time"`
-	CurAfterID    persist.DBID `json:"cur_after_id"`
-	CommentTag    int32        `json:"comment_tag"`
-	PagingForward bool         `json:"paging_forward"`
-	Limit         int32        `json:"limit"`
+	AdmireTag     int32        `db:"admire_tag" json:"admire_tag"`
+	FeedEventID   persist.DBID `db:"feed_event_id" json:"feed_event_id"`
+	CurBeforeTag  int32        `db:"cur_before_tag" json:"cur_before_tag"`
+	CurBeforeTime time.Time    `db:"cur_before_time" json:"cur_before_time"`
+	CurBeforeID   persist.DBID `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterTag   int32        `db:"cur_after_tag" json:"cur_after_tag"`
+	CurAfterTime  time.Time    `db:"cur_after_time" json:"cur_after_time"`
+	CurAfterID    persist.DBID `db:"cur_after_id" json:"cur_after_id"`
+	CommentTag    int32        `db:"comment_tag" json:"comment_tag"`
+	PagingForward bool         `db:"paging_forward" json:"paging_forward"`
+	Limit         int32        `db:"limit" json:"limit"`
 }
 
 type PaginateInteractionsByFeedEventIDBatchRow struct {
-	CreatedAt time.Time    `json:"created_at"`
-	ID        persist.DBID `json:"id"`
-	Tag       int32        `json:"tag"`
+	CreatedAt time.Time    `db:"created_at" json:"created_at"`
+	ID        persist.DBID `db:"id" json:"id"`
+	Tag       int32        `db:"tag" json:"tag"`
 }
 
 func (q *Queries) PaginateInteractionsByFeedEventIDBatch(ctx context.Context, arg []PaginateInteractionsByFeedEventIDBatchParams) *PaginateInteractionsByFeedEventIDBatchBatchResults {
@@ -4501,23 +4590,23 @@ type PaginateInteractionsByPostIDBatchBatchResults struct {
 }
 
 type PaginateInteractionsByPostIDBatchParams struct {
-	AdmireTag     int32        `json:"admire_tag"`
-	PostID        persist.DBID `json:"post_id"`
-	CurBeforeTag  int32        `json:"cur_before_tag"`
-	CurBeforeTime time.Time    `json:"cur_before_time"`
-	CurBeforeID   persist.DBID `json:"cur_before_id"`
-	CurAfterTag   int32        `json:"cur_after_tag"`
-	CurAfterTime  time.Time    `json:"cur_after_time"`
-	CurAfterID    persist.DBID `json:"cur_after_id"`
-	CommentTag    int32        `json:"comment_tag"`
-	PagingForward bool         `json:"paging_forward"`
-	Limit         int32        `json:"limit"`
+	AdmireTag     int32        `db:"admire_tag" json:"admire_tag"`
+	PostID        persist.DBID `db:"post_id" json:"post_id"`
+	CurBeforeTag  int32        `db:"cur_before_tag" json:"cur_before_tag"`
+	CurBeforeTime time.Time    `db:"cur_before_time" json:"cur_before_time"`
+	CurBeforeID   persist.DBID `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterTag   int32        `db:"cur_after_tag" json:"cur_after_tag"`
+	CurAfterTime  time.Time    `db:"cur_after_time" json:"cur_after_time"`
+	CurAfterID    persist.DBID `db:"cur_after_id" json:"cur_after_id"`
+	CommentTag    int32        `db:"comment_tag" json:"comment_tag"`
+	PagingForward bool         `db:"paging_forward" json:"paging_forward"`
+	Limit         int32        `db:"limit" json:"limit"`
 }
 
 type PaginateInteractionsByPostIDBatchRow struct {
-	CreatedAt time.Time    `json:"created_at"`
-	ID        persist.DBID `json:"id"`
-	Tag       int32        `json:"tag"`
+	CreatedAt time.Time    `db:"created_at" json:"created_at"`
+	ID        persist.DBID `db:"id" json:"id"`
+	Tag       int32        `db:"tag" json:"tag"`
 }
 
 func (q *Queries) PaginateInteractionsByPostIDBatch(ctx context.Context, arg []PaginateInteractionsByPostIDBatchParams) *PaginateInteractionsByPostIDBatchBatchResults {
@@ -4598,13 +4687,13 @@ type PaginatePostsByContractIDBatchResults struct {
 }
 
 type PaginatePostsByContractIDParams struct {
-	ContractID    persist.DBID `json:"contract_id"`
-	CurBeforeTime time.Time    `json:"cur_before_time"`
-	CurBeforeID   persist.DBID `json:"cur_before_id"`
-	CurAfterTime  time.Time    `json:"cur_after_time"`
-	CurAfterID    persist.DBID `json:"cur_after_id"`
-	PagingForward bool         `json:"paging_forward"`
-	Limit         int32        `json:"limit"`
+	ContractID    persist.DBID `db:"contract_id" json:"contract_id"`
+	CurBeforeTime time.Time    `db:"cur_before_time" json:"cur_before_time"`
+	CurBeforeID   persist.DBID `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterTime  time.Time    `db:"cur_after_time" json:"cur_after_time"`
+	CurAfterID    persist.DBID `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward bool         `db:"paging_forward" json:"paging_forward"`
+	Limit         int32        `db:"limit" json:"limit"`
 }
 
 func (q *Queries) PaginatePostsByContractID(ctx context.Context, arg []PaginatePostsByContractIDParams) *PaginatePostsByContractIDBatchResults {
@@ -4687,13 +4776,13 @@ type PaginateRepliesByCommentIDBatchBatchResults struct {
 }
 
 type PaginateRepliesByCommentIDBatchParams struct {
-	CommentID     persist.DBID `json:"comment_id"`
-	CurBeforeTime time.Time    `json:"cur_before_time"`
-	CurBeforeID   persist.DBID `json:"cur_before_id"`
-	CurAfterTime  time.Time    `json:"cur_after_time"`
-	CurAfterID    persist.DBID `json:"cur_after_id"`
-	PagingForward bool         `json:"paging_forward"`
-	Limit         int32        `json:"limit"`
+	CommentID     persist.DBID `db:"comment_id" json:"comment_id"`
+	CurBeforeTime time.Time    `db:"cur_before_time" json:"cur_before_time"`
+	CurBeforeID   persist.DBID `db:"cur_before_id" json:"cur_before_id"`
+	CurAfterTime  time.Time    `db:"cur_after_time" json:"cur_after_time"`
+	CurAfterID    persist.DBID `db:"cur_after_id" json:"cur_after_id"`
+	PagingForward bool         `db:"paging_forward" json:"paging_forward"`
+	Limit         int32        `db:"limit" json:"limit"`
 }
 
 func (q *Queries) PaginateRepliesByCommentIDBatch(ctx context.Context, arg []PaginateRepliesByCommentIDBatchParams) *PaginateRepliesByCommentIDBatchBatchResults {

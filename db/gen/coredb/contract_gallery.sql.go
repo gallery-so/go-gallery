@@ -34,14 +34,14 @@ returning id, deleted, version, created_at, last_updated, name, symbol, address,
 `
 
 type UpsertChildContractsParams struct {
-	ID             []string `json:"id"`
-	Name           []string `json:"name"`
-	Address        []string `json:"address"`
-	CreatorAddress []string `json:"creator_address"`
-	OwnerAddress   []string `json:"owner_address"`
-	Chain          []int32  `json:"chain"`
-	Description    []string `json:"description"`
-	ParentIds      []string `json:"parent_ids"`
+	ID             []string `db:"id" json:"id"`
+	Name           []string `db:"name" json:"name"`
+	Address        []string `db:"address" json:"address"`
+	CreatorAddress []string `db:"creator_address" json:"creator_address"`
+	OwnerAddress   []string `db:"owner_address" json:"owner_address"`
+	Chain          []int32  `db:"chain" json:"chain"`
+	Description    []string `db:"description" json:"description"`
+	ParentIds      []string `db:"parent_ids" json:"parent_ids"`
 }
 
 func (q *Queries) UpsertChildContracts(ctx context.Context, arg UpsertChildContractsParams) ([]Contract, error) {
@@ -126,17 +126,17 @@ returning id, deleted, version, created_at, last_updated, name, symbol, address,
 `
 
 type UpsertParentContractsParams struct {
-	Ids                      []string `json:"ids"`
-	Version                  []int32  `json:"version"`
-	Address                  []string `json:"address"`
-	Symbol                   []string `json:"symbol"`
-	Name                     []string `json:"name"`
-	OwnerAddress             []string `json:"owner_address"`
-	Chain                    []int32  `json:"chain"`
-	Description              []string `json:"description"`
-	ProfileImageUrl          []string `json:"profile_image_url"`
-	ProviderMarkedSpam       []bool   `json:"provider_marked_spam"`
-	CanOverwriteOwnerAddress bool     `json:"can_overwrite_owner_address"`
+	Ids                      []string `db:"ids" json:"ids"`
+	Version                  []int32  `db:"version" json:"version"`
+	Address                  []string `db:"address" json:"address"`
+	Symbol                   []string `db:"symbol" json:"symbol"`
+	Name                     []string `db:"name" json:"name"`
+	OwnerAddress             []string `db:"owner_address" json:"owner_address"`
+	Chain                    []int32  `db:"chain" json:"chain"`
+	Description              []string `db:"description" json:"description"`
+	ProfileImageUrl          []string `db:"profile_image_url" json:"profile_image_url"`
+	ProviderMarkedSpam       []bool   `db:"provider_marked_spam" json:"provider_marked_spam"`
+	CanOverwriteOwnerAddress bool     `db:"can_overwrite_owner_address" json:"can_overwrite_owner_address"`
 }
 
 func (q *Queries) UpsertParentContracts(ctx context.Context, arg UpsertParentContractsParams) ([]Contract, error) {

@@ -1,0 +1,1 @@
+The `sqlc-gen-json` binary in this directory is just a compiled version of the `cmd/sqlc-gen-json/main.go` example in the sqlc repository: https://github.com/sqlc-dev/sqlc/tree/main/cmd/sqlc-gen-json
