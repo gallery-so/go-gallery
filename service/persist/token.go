@@ -1037,21 +1037,21 @@ type ErrContractCreatorNotFound struct {
 }
 
 func (e ErrContractCreatorNotFound) Error() string {
-	return fmt.Sprintf("ContractCreator not found for contractID %s", e.ContractID)
+	return fmt.Sprintf("contractCreator not found by contractID=%s", e.ContractID)
 }
 
-type TokenDefinitionNotFoundByID struct {
+type ErrTokenDefinitionNotFoundByID struct {
 	ID DBID
 }
 
-func (e TokenDefinitionNotFoundByID) Error() string {
-	return fmt.Sprintf("TokenDefinition not found for ID %s", e.ID)
+func (e ErrTokenDefinitionNotFoundByID) Error() string {
+	return fmt.Sprintf("tokenDefinition not found by ID=%s", e.ID)
 }
 
-type TokenDefinitionNotFoundByTokenDBID struct {
+type ErrTokenDefinitionNotFoundByTokenDBID struct {
 	ID DBID
 }
 
-func (e TokenDefinitionNotFoundByTokenDBID) Error() string {
-	return fmt.Sprintf("TokenDefinition not found for token DBID %s", e.ID)
+func (e ErrTokenDefinitionNotFoundByTokenDBID) Error() string {
+	return fmt.Sprintf("tokenDefinition not found by tokenDBID=%s", e.ID)
 }

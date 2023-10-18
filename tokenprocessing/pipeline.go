@@ -138,6 +138,7 @@ func (e ErrBadToken) Unwrap() error {
 	return e.Err
 }
 
+// Run runs the pipeline, returning the media that was created by the run.
 func (tpj *tokenProcessingJob) Run(ctx context.Context) (coredb.TokenMedia, error) {
 	span, ctx := tracing.StartSpan(ctx, "pipeline.run", fmt.Sprintf("run %s", tpj.id))
 	defer tracing.FinishSpan(span)
@@ -374,7 +375,8 @@ func (tpj *tokenProcessingJob) persistResults(ctx context.Context, media persist
 		HasDescription:  params.NewDescription.String != "",
 	}
 
-	return tpj.tp.queries.InsertTokenPipelineResults(ctx, params)
+	r, err := tpj.tp.queries.InsertTokenPipelineResults(ctx, params)
+	return r.TokenMedia, err
 }
 
 const (

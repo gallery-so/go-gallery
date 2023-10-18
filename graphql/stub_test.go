@@ -168,25 +168,25 @@ func newStubPersonaliztion(t *testing.T) *userpref.Personalization {
 // sendTokensRecorder records tokenprocessing messages
 type sendTokensRecorder struct {
 	mock.Mock
-	SubmitUserTokens multichain.SubmitUserTokensF
-	Tasks            []task.TokenProcessingUserMessage
+	SubmitTokens multichain.SubmitTokensF
+	Tasks        []task.TokenProcessingBatchMessage
 }
 
-func (r *sendTokensRecorder) Send(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, tokens []persist.TokenIdentifiers) error {
-	r.Called(ctx, userID, tokenIDs, tokens)
-	r.Tasks = append(r.Tasks, task.TokenProcessingUserMessage{UserID: userID, TokenIDs: tokenIDs})
+func (r *sendTokensRecorder) Send(ctx context.Context, tDefIDs []persist.DBID) error {
+	r.Called(ctx, tDefIDs)
+	r.Tasks = append(r.Tasks, task.TokenProcessingBatchMessage{TokenDefinitionIDs: tDefIDs})
 	return nil
 }
 
 // submitUserTokensNoop is useful when the code under test doesn't require tokenprocessing
-func submitUserTokensNoop(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, tokens []persist.TokenIdentifiers) error {
+func submitUserTokensNoop(ctx context.Context, tDefIDs []persist.DBID) error {
 	return nil
 }
 
 // sendTokensToHTTPHandler makes an HTTP request to the passed handler
-func sendTokensToHTTPHandler(handler http.Handler, method, endpoint string) multichain.SubmitUserTokensF {
-	return func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, _ []persist.TokenIdentifiers) error {
-		m := task.TokenProcessingUserMessage{UserID: userID, TokenIDs: tokenIDs}
+func sendTokensToHTTPHandler(handler http.Handler, method, endpoint string) multichain.SubmitTokensF {
+	return func(ctx context.Context, tDefIDs []persist.DBID) error {
+		m := task.TokenProcessingBatchMessage{TokenDefinitionIDs: tDefIDs}
 		byt, _ := json.Marshal(m)
 		r := bytes.NewReader(byt)
 		req := httptest.NewRequest(method, endpoint, r)
@@ -201,10 +201,10 @@ func sendTokensToHTTPHandler(handler http.Handler, method, endpoint string) mult
 }
 
 // sendTokensToTokenProcessing processes a batch of tokens synchronously through tokenprocessing
-func sendTokensToTokenProcessing(ctx context.Context, c *server.Clients, provider *multichain.Provider) multichain.SubmitUserTokensF {
-	return func(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID, tokens []persist.TokenIdentifiers) error {
+func sendTokensToTokenProcessing(ctx context.Context, c *server.Clients, provider *multichain.Provider) multichain.SubmitTokensF {
+	return func(ctx context.Context, tDefIDs []persist.DBID) error {
 		h := tokenprocessing.CoreInitServer(ctx, c, provider)
-		return sendTokensToHTTPHandler(h, http.MethodPost, "/media/process")(ctx, userID, tokenIDs, tokens)
+		return sendTokensToHTTPHandler(h, http.MethodPost, "/media/process")(ctx, tDefIDs)
 	}
 }
 

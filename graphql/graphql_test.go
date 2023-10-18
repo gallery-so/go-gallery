@@ -262,6 +262,8 @@ func testCreateCollection(t *testing.T) {
 	userF := newUserWithTokensFixture(t)
 	c := authedHandlerClient(t, userF.ID)
 
+	fmt.Println("tokens", len(userF.TokenIDs))
+
 	response, err := createCollectionMutation(context.Background(), c, CreateCollectionInput{
 		GalleryId:      userF.GalleryID,
 		Name:           "newCollection",
@@ -895,7 +897,7 @@ func testSyncOnlySubmitsNewTokens(t *testing.T) {
 
 	require.NoError(t, err)
 	tokenRecorder.AssertExpectations(t)
-	assert.Len(t, tokenRecorder.Tasks[0].TokenIDs, len(provider.Tokens))
+	assert.Len(t, tokenRecorder.Tasks[0].TokenDefinitionIDs, len(provider.Tokens))
 }
 
 func testSyncSkipsSubmittingOldTokens(t *testing.T) {
@@ -1558,7 +1560,7 @@ func defaultHandler(t *testing.T) http.Handler {
 }
 
 // handlerWithProviders returns a GraphQL http.Handler
-func handlerWithProviders(t *testing.T, submitF multichain.SubmitUserTokensF, providers ...any) http.Handler {
+func handlerWithProviders(t *testing.T, submitF multichain.SubmitTokensF, providers ...any) http.Handler {
 	ctx := context.Background()
 	c := server.ClientInit(context.Background())
 	provider := newMultichainProvider(c, submitF, providers)
@@ -1569,7 +1571,7 @@ func handlerWithProviders(t *testing.T, submitF multichain.SubmitUserTokensF, pr
 }
 
 // newMultichainProvider a new multichain provider configured with the given providers
-func newMultichainProvider(c *server.Clients, submitF multichain.SubmitUserTokensF, providers []any) multichain.Provider {
+func newMultichainProvider(c *server.Clients, submitF multichain.SubmitTokensF, providers []any) multichain.Provider {
 	chains := map[persist.Chain][]any{}
 	if len(providers) > 1 {
 		chains[persist.ChainETH] = providers[:1]
@@ -1578,10 +1580,10 @@ func newMultichainProvider(c *server.Clients, submitF multichain.SubmitUserToken
 		chains[persist.ChainETH] = providers
 	}
 	return multichain.Provider{
-		Repos:            c.Repos,
-		Queries:          c.Queries,
-		Chains:           map[persist.Chain][]any{persist.ChainETH: providers, persist.ChainOptimism: providers},
-		SubmitUserTokens: submitF,
+		Repos:        c.Repos,
+		Queries:      c.Queries,
+		Chains:       map[persist.Chain][]any{persist.ChainETH: providers, persist.ChainOptimism: providers},
+		SubmitTokens: submitF,
 	}
 }
 

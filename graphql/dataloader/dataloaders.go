@@ -1616,7 +1616,7 @@ func loadTokenDefinitionByID(q *db.Queries) func(context.Context, []persist.DBID
 
 		b.QueryRow(func(i int, tokenDef db.TokenDefinition, err error) {
 			if err == pgx.ErrNoRows {
-				err = persist.TokenDefinitionNotFoundByID{ID: keys[i]}
+				err = persist.ErrTokenDefinitionNotFoundByID{ID: keys[i]}
 			}
 			results[i], errors[i] = tokenDef, err
 		})
@@ -1635,7 +1635,7 @@ func loadTokenDefinitionByTokenDBID(q *db.Queries) func(context.Context, []persi
 
 		b.QueryRow(func(i int, tokenDef db.TokenDefinition, err error) {
 			if err == pgx.ErrNoRows {
-				err = persist.TokenDefinitionNotFoundByID{ID: keys[i]}
+				err = persist.ErrTokenDefinitionNotFoundByTokenDBID{ID: keys[i]}
 			}
 			results[i], errors[i] = tokenDef, err
 		})

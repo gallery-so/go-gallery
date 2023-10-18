@@ -90,7 +90,7 @@ func (m Manager) StartProcessing(ctx context.Context, tDefID persist.DBID, attem
 func (m Manager) SubmitBatch(ctx context.Context, tDefIDs []persist.DBID) error {
 	m.processRegistry.setManyEnqueue(ctx, tDefIDs)
 	message := task.TokenProcessingBatchMessage{BatchID: persist.GenerateID(), TokenDefinitionIDs: tDefIDs}
-	logger.For(ctx).WithField("batchID", message.BatchID).Infof("enqueued batch: %s", message.BatchID)
+	logger.For(ctx).WithField("batchID", message.BatchID).Infof("enqueued batch: %s (size=%d)", message.BatchID, len(tDefIDs))
 	return task.CreateTaskForTokenProcessing(ctx, message, m.taskClient)
 }
 

@@ -27,7 +27,7 @@ create index token_definitions_contract_id_idx on token_definitions(contract_id)
 alter table tokens add column if not exists token_definition_id character varying(255) references token_definitions(id);
 
 create unique index if not exists tokens_owner_token_definition_idx on tokens(owner_user_id, token_definition_id) where not deleted;
-alter table tokens rename column contract to contract__deprecated;
+alter table tokens rename column contract to contract_id;
 alter table tokens rename column chain to chain__deprecated;
 alter table tokens rename column token_id to token_id__deprecated;
 alter table tokens rename column name to name__deprecated;
@@ -46,3 +46,9 @@ alter table token_medias rename column metadata to metadata__deprecated;
 alter table token_medias rename column contract_id to contract_id__deprecated;
 alter table token_medias rename column token_id to token_id__deprecated;
 alter table token_medias rename column chain to chain__deprecated;
+alter table token_medias alter column name__deprecated drop not null;
+alter table token_medias alter column description__deprecated drop not null;
+alter table token_medias alter column metadata__deprecated drop not null;
+alter table token_medias alter column contract_id__deprecated drop not null;
+alter table token_medias alter column token_id__deprecated drop not null;
+alter table token_medias alter column chain__deprecated drop not null;

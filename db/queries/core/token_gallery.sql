@@ -35,10 +35,10 @@ with token_definitions_insert as (
   on conflict (chain, contract_id, token_id) where deleted = false
   do update set
     last_updated = excluded.last_updated
-    , name = coalesce(nullif(excluded.name, ''), nullif(name, ''))
-    , description = coalesce(nullif(excluded.description, ''), nullif(description, ''))
+    , name = coalesce(nullif(excluded.name, ''), nullif(token_definitions.name, ''))
+    , description = coalesce(nullif(excluded.description, ''), nullif(token_definitions.description, ''))
     , token_type = excluded.token_type
-    , external_url = coalesce(nullif(excluded.external_url, ''), nullif(external_url, ''))
+    , external_url = coalesce(nullif(excluded.external_url, ''), nullif(token_definitions.external_url, ''))
     , fallback_media = excluded.fallback_media
     , contract_address = excluded.contract_address
     , metadata = excluded.metadata
@@ -53,42 +53,35 @@ with token_definitions_insert as (
     , created_at
     , last_updated
     , collectors_note
-    , token_id
     , quantity
-    , ownership_history
     , block_number
     , owner_user_id
     , owned_by_wallets
     , is_creator_token
-    , chain
-    , contract_id
     , last_synced
+    , token_definition_id
+    , contract_id
   ) (
     select
-      id
+      bulk_upsert.id
       , false
-      , version
+      , bulk_upsert.version
       , now()
       , now()
-      , collectors_note
-      , token_id
-      , quantity
-      , case when @set_holder_fields::bool then ownership_history[ownership_history_start_idx::int:ownership_history_end_idx::int] else '{}' end
-      , block_number
-      , owner_user_id
-      , case when @set_holder_fields then owned_by_wallets[owned_by_wallets_start_idx::int:owned_by_wallets_end_idx::int] else '{}' end
-      , case when @set_creator_fields::bool then is_creator_token else false end
-      , chain
-      , contract_id
+      , bulk_upsert.collectors_note
+      , bulk_upsert.quantity
+      , bulk_upsert.block_number
+      , bulk_upsert.owner_user_id
+      , case when @set_holder_fields::bool then bulk_upsert.owned_by_wallets[bulk_upsert.owned_by_wallets_start_idx::int:bulk_upsert.owned_by_wallets_end_idx::int] else '{}' end
+      , case when @set_creator_fields::bool then bulk_upsert.is_creator_token else false end
       , now()
+      , token_definitions_insert.id
+      , bulk_upsert.contract_id
     from (
       select unnest(@token_dbid::varchar[]) as id
         , unnest(@token_version::int[]) as version
         , unnest(@token_collectors_note::varchar[]) as collectors_note
         , unnest(@token_quantity::varchar[]) as quantity
-        , @token_ownership_history::jsonb[] as ownership_history
-        , unnest(@token_ownership_history_start_idx::int[]) as ownership_history_start_idx
-        , unnest(@token_ownership_history_end_idx::int[]) as ownership_history_end_idx
         , unnest(@token_block_number::bigint[]) as block_number
         , unnest(@token_owner_user_id::varchar[]) as owner_user_id
         , @token_owned_by_wallets::varchar[] as owned_by_wallets
@@ -98,26 +91,26 @@ with token_definitions_insert as (
         , unnest(@token_token_id::varchar[]) as token_id
         , unnest(@token_contract_address::varchar[]) as contract_address
         , unnest(@token_chain::int[]) as chain
+        , unnest(@token_contract_id::varchar[]) as contract_id
     ) bulk_upsert
-    join token_definitions on (bulk_upsert.chain, bulk_upsert.contract_address, bulk_upsert.token_id) = (token_definitions.chain, token_definitions.contract_address, token_definitions.token_id)
+    join token_definitions_insert on (bulk_upsert.chain, bulk_upsert.contract_address, bulk_upsert.token_id) = (token_definitions_insert.chain, token_definitions_insert.contract_address, token_definitions_insert.token_id)
   )
   on conflict (owner_user_id, token_definition_id) where deleted = false
   do update set
     quantity = excluded.quantity
     , owned_by_wallets = case when @set_holder_fields then excluded.owned_by_wallets else tokens.owned_by_wallets end
-    , ownership_history = case when @set_holder_fields then tokens.ownership_history || excluded.ownership_history else tokens.ownership_history end
     , is_creator_token = case when @set_creator_fields then excluded.is_creator_token else tokens.is_creator_token end
     , block_number = excluded.block_number
     , version = excluded.version
     , last_updated = excluded.last_updated
     , last_synced = greatest(excluded.last_synced,tokens.last_synced)
+    , contract_id = excluded.contract_id
   returning *
 )
-select sqlc.embed(tokens), sqlc.embed(token_definitions), sqlc.embed(contracts), sqlc.embed(token_medias)
+select sqlc.embed(tokens), sqlc.embed(token_definitions), sqlc.embed(contracts)
 from tokens_insert tokens
 join token_definitions_insert token_definitions on tokens.token_definition_id = token_definitions.id
-join contracts on token_definitions.contract_id = contracts.id
-left join token_medias on token_definitions.token_media_id = token_medias.id;
+join contracts on token_definitions.contract_id = contracts.id;
 
 -- name: DeleteTokensBeforeTimestamp :execrows
 update tokens t

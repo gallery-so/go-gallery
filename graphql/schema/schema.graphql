@@ -1637,7 +1637,7 @@ type SyncCreatedTokensForExistingContractPayload {
   viewer: Viewer
 }
 
-union RefreshTokenPayloadOrError = RefreshTokenPayload | ErrInvalidInput | ErrSyncFailed
+union RefreshTokenPayloadOrError = RefreshTokenPayload | ErrInvalidInput | ErrSyncFailed | ErrTokenNotFound
 
 type RefreshTokenPayload {
   token: Token

@@ -114,7 +114,7 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrUsernameNotAvailable{Message: message}
 	case util.ErrorAs[persist.ErrCollectionNotFoundByID](err):
 		mappedErr = model.ErrCollectionNotFound{Message: message}
-	case util.ErrorAs[persist.ErrTokenNotFoundByID](err) || util.ErrorAs[persist.ErrTokenNotFoundByUserTokenIdentifers](err):
+	case util.ErrorAs[persist.ErrTokenNotFoundByID](err) || util.ErrorAs[persist.ErrTokenNotFoundByUserTokenIdentifers](err) || util.ErrorAs[persist.ErrTokenDefinitionNotFoundByID](err) || util.ErrorAs[persist.ErrTokenDefinitionNotFoundByTokenDBID](err):
 		mappedErr = model.ErrTokenNotFound{Message: message}
 	case util.ErrorAs[persist.ErrContractNotFoundByAddress](err):
 		mappedErr = model.ErrCommunityNotFound{Message: message}

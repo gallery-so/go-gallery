@@ -993,7 +993,7 @@ func (p *Provider) processTokensForUsers(ctx context.Context, users map[persist.
 
 	// Submit tokens that are missing media IDs. Tokens that are missing media IDs are new tokens, or tokens that weren't processed for whatever reason.
 	// This means we won't refresh tokens that have already been seen.
-	definitionsToProcess := util.Filter(upsertedTokens, func(t postgres.TokenFullDetails) bool { return t.Media.ID == "" }, false)
+	definitionsToProcess := util.Filter(upsertedTokens, func(t postgres.TokenFullDetails) bool { return t.Definition.TokenMediaID == "" }, false)
 	definitionIDs := util.MapWithoutError(definitionsToProcess, func(t postgres.TokenFullDetails) persist.DBID { return t.Definition.ID })
 	err = p.SubmitTokens(ctx, definitionIDs)
 
@@ -1960,6 +1960,10 @@ func chainTokensToUpsertableTokens(tokens []chainTokens, existingContracts []db.
 			ti := persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID, chainToken.chain)
 
 			contractAddress := chainToken.chain.NormalizeAddress(token.ContractAddress)
+			contract, ok := addressToContract[contractAddress]
+			if !ok {
+				panic(fmt.Sprintf("no persisted contract for chain=%s, address=%s", chainToken.chain, contractAddress))
+			}
 
 			// Last write wins
 			seenTokens[ti] = postgres.UpsertToken{
@@ -1968,6 +1972,7 @@ func chainTokensToUpsertableTokens(tokens []chainTokens, existingContracts []db.
 					OwnerUserID:    ownerUser.ID,
 					BlockNumber:    sql.NullInt64{Int64: token.BlockNumber.BigInt().Int64(), Valid: true},
 					IsCreatorToken: createdContracts[persist.Address(contractAddress)],
+					ContractID:     contract.ID,
 				},
 			}
 

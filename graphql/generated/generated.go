@@ -10337,7 +10337,7 @@ type SyncCreatedTokensForExistingContractPayload {
   viewer: Viewer
 }
 
-union RefreshTokenPayloadOrError = RefreshTokenPayload | ErrInvalidInput | ErrSyncFailed
+union RefreshTokenPayloadOrError = RefreshTokenPayload | ErrInvalidInput | ErrSyncFailed | ErrTokenNotFound
 
 type RefreshTokenPayload {
   token: Token
@@ -66245,6 +66245,13 @@ func (ec *executionContext) _RefreshTokenPayloadOrError(ctx context.Context, sel
 			return graphql.Null
 		}
 		return ec._ErrSyncFailed(ctx, sel, obj)
+	case model.ErrTokenNotFound:
+		return ec._ErrTokenNotFound(ctx, sel, &obj)
+	case *model.ErrTokenNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrTokenNotFound(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -70834,7 +70841,7 @@ func (ec *executionContext) _ErrSyncFailed(ctx context.Context, sel ast.Selectio
 	return out
 }
 
-var errTokenNotFoundImplementors = []string{"ErrTokenNotFound", "TokenByIdOrError", "Error", "CollectionTokenByIdOrError", "ViewTokenPayloadOrError", "SetProfileImagePayloadOrError", "ReferralPostTokenPayloadOrError", "AdmireTokenPayloadOrError"}
+var errTokenNotFoundImplementors = []string{"ErrTokenNotFound", "TokenByIdOrError", "Error", "CollectionTokenByIdOrError", "RefreshTokenPayloadOrError", "ViewTokenPayloadOrError", "SetProfileImagePayloadOrError", "ReferralPostTokenPayloadOrError", "AdmireTokenPayloadOrError"}
 
 func (ec *executionContext) _ErrTokenNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrTokenNotFound) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errTokenNotFoundImplementors)

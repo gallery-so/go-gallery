@@ -1251,6 +1251,7 @@ type ErrTokenNotFound struct {
 func (ErrTokenNotFound) IsTokenByIDOrError()                {}
 func (ErrTokenNotFound) IsError()                           {}
 func (ErrTokenNotFound) IsCollectionTokenByIDOrError()      {}
+func (ErrTokenNotFound) IsRefreshTokenPayloadOrError()      {}
 func (ErrTokenNotFound) IsViewTokenPayloadOrError()         {}
 func (ErrTokenNotFound) IsSetProfileImagePayloadOrError()   {}
 func (ErrTokenNotFound) IsReferralPostTokenPayloadOrError() {}

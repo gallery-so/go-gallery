@@ -508,7 +508,7 @@ type Token struct {
 	OwnerUserID                    persist.DBID      `json:"owner_user_id"`
 	OwnedByWallets                 persist.DBIDList  `json:"owned_by_wallets"`
 	ChainDeprecated                sql.NullInt32     `json:"chain__deprecated"`
-	ContractDeprecated             sql.NullString    `json:"contract__deprecated"`
+	ContractID                     persist.DBID      `json:"contract_id"`
 	IsUserMarkedSpam               sql.NullBool      `json:"is_user_marked_spam"`
 	IsProviderMarkedSpamDeprecated sql.NullBool      `json:"is_provider_marked_spam__deprecated"`
 	LastSynced                     time.Time         `json:"last_synced"`
@@ -539,20 +539,20 @@ type TokenDefinition struct {
 }
 
 type TokenMedia struct {
-	ID                    persist.DBID  `json:"id"`
-	CreatedAt             time.Time     `json:"created_at"`
-	LastUpdated           time.Time     `json:"last_updated"`
-	Version               int32         `json:"version"`
-	ContractIDDeprecated  string        `json:"contract_id__deprecated"`
-	TokenIDDeprecated     string        `json:"token_id__deprecated"`
-	ChainDeprecated       int32         `json:"chain__deprecated"`
-	Active                bool          `json:"active"`
-	MetadataDeprecated    pgtype.JSONB  `json:"metadata__deprecated"`
-	Media                 persist.Media `json:"media"`
-	NameDeprecated        string        `json:"name__deprecated"`
-	DescriptionDeprecated string        `json:"description__deprecated"`
-	ProcessingJobID       persist.DBID  `json:"processing_job_id"`
-	Deleted               bool          `json:"deleted"`
+	ID                    persist.DBID   `json:"id"`
+	CreatedAt             time.Time      `json:"created_at"`
+	LastUpdated           time.Time      `json:"last_updated"`
+	Version               int32          `json:"version"`
+	ContractIDDeprecated  sql.NullString `json:"contract_id__deprecated"`
+	TokenIDDeprecated     sql.NullString `json:"token_id__deprecated"`
+	ChainDeprecated       sql.NullInt32  `json:"chain__deprecated"`
+	Active                bool           `json:"active"`
+	MetadataDeprecated    pgtype.JSONB   `json:"metadata__deprecated"`
+	Media                 persist.Media  `json:"media"`
+	NameDeprecated        sql.NullString `json:"name__deprecated"`
+	DescriptionDeprecated sql.NullString `json:"description__deprecated"`
+	ProcessingJobID       persist.DBID   `json:"processing_job_id"`
+	Deleted               bool           `json:"deleted"`
 }
 
 type TokenMediasActive struct {

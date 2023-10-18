@@ -15,7 +15,6 @@ type TokenFullDetails struct {
 	Instance   db.Token
 	Contract   db.Contract
 	Definition db.TokenDefinition
-	Media      db.TokenMedia
 }
 
 type TokenFullDetailsRepository struct {
@@ -40,7 +39,6 @@ func (t *TokenFullDetailsRepository) GetByUserTokenIdentifiers(ctx context.Conte
 		Instance:   r.Token,
 		Contract:   r.Contract,
 		Definition: r.TokenDefinition,
-		Media:      r.TokenMedia,
 	}, nil
 }
 
@@ -55,7 +53,6 @@ func (t *TokenFullDetailsRepository) GetByUserID(ctx context.Context, userID per
 			Instance:   r.Token,
 			Contract:   r.Contract,
 			Definition: r.TokenDefinition,
-			Media:      r.TokenMedia,
 		}
 	})
 	return tokens, nil
@@ -72,7 +69,6 @@ func (t *TokenFullDetailsRepository) GetByContractID(ctx context.Context, contra
 			Instance:   r.Token,
 			Contract:   r.Contract,
 			Definition: r.TokenDefinition,
-			Media:      r.TokenMedia,
 		}
 	})
 	return tokens, nil
@@ -172,6 +168,7 @@ func (t *TokenFullDetailsRepository) BulkUpsert(ctx context.Context, tokens []Up
 		params.TokenChain = append(params.TokenChain, int32(tID.Chain))
 		params.TokenContractAddress = append(params.TokenContractAddress, tID.ContractAddress.String())
 		params.TokenIsCreatorToken = append(params.TokenIsCreatorToken, t.IsCreatorToken)
+		params.TokenContractID = append(params.TokenContractID, t.ContractID.String())
 		// Defer error checking until now to keep the code above from being
 		// littered with multiline "if" statements
 		if len(errors) > 0 {
@@ -189,7 +186,6 @@ func (t *TokenFullDetailsRepository) BulkUpsert(ctx context.Context, tokens []Up
 			Instance:   r.Token,
 			Contract:   r.Contract,
 			Definition: r.TokenDefinition,
-			Media:      r.TokenMedia,
 		}
 	})
 
