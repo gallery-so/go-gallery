@@ -54,7 +54,7 @@ func (api TokenAPI) GetTokenById(ctx context.Context, tokenID persist.DBID) (*db
 		return nil, err
 	}
 
-	token, err := api.loaders.TokenByTokenID.Load(tokenID)
+	token, err := api.loaders.GetTokenByIdBatch.Load(tokenID)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func (api TokenAPI) GetTokenByIdIgnoreDisplayable(ctx context.Context, tokenID p
 		return nil, err
 	}
 
-	token, err := api.loaders.TokenByTokenIDIgnoreDisplayable.Load(tokenID)
+	token, err := api.loaders.GetTokenByIdIgnoreDisplayableBatch.Load(tokenID)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +92,7 @@ func (api TokenAPI) GetTokenByEnsDomain(ctx context.Context, userID persist.DBID
 		return db.Token{}, err
 	}
 
-	return api.loaders.TokenByUserTokenIdentifiers.Load(db.GetTokenByUserTokenIdentifiersBatchParams{
+	return api.loaders.GetTokenByUserTokenIdentifiersBatch.Load(db.GetTokenByUserTokenIdentifiersBatchParams{
 		OwnerID:         userID,
 		TokenID:         persist.TokenID(tokenID),
 		ContractAddress: eth.EnsAddress,
@@ -108,9 +108,9 @@ func (api TokenAPI) GetTokensByCollectionId(ctx context.Context, collectionID pe
 		return nil, err
 	}
 
-	tokens, err := api.loaders.TokensByCollectionID.Load(dataloader.IDAndLimit{
-		ID:    collectionID,
-		Limit: limit,
+	tokens, err := api.loaders.GetTokensByCollectionIdBatch.Load(db.GetTokensByCollectionIdBatchParams{
+		CollectionID: collectionID,
+		Limit:        util.ToNullInt32(limit),
 	})
 	if err != nil {
 		return nil, err
@@ -168,7 +168,7 @@ func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractI
 
 	cursorFunc := func(i interface{}) (bool, time.Time, persist.DBID, error) {
 		if token, ok := i.(db.Token); ok {
-			owner, err := api.loaders.OwnerByTokenID.Load(token.ID)
+			owner, err := api.loaders.GetTokenOwnerByIDBatch.Load(token.ID)
 			if err != nil {
 				return false, time.Time{}, "", err
 			}
@@ -202,7 +202,7 @@ func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractI
 }
 
 func (api TokenAPI) GetTokensByIDs(ctx context.Context, tokenIDs []persist.DBID) ([]db.Token, error) {
-	tokens, errs := api.loaders.TokenByTokenID.LoadAll(tokenIDs)
+	tokens, errs := api.loaders.GetTokenByIdBatch.LoadAll(tokenIDs)
 	foundTokens := tokens[:0]
 	for i, t := range tokens {
 		if errs[i] == nil {
@@ -226,7 +226,7 @@ func (api TokenAPI) GetNewTokensByFeedEventID(ctx context.Context, eventID persi
 		return nil, err
 	}
 
-	tokens, err := api.loaders.NewTokensByFeedEventID.Load(eventID)
+	tokens, err := api.loaders.GetNewTokensByFeedEventIdBatch.Load(eventID)
 	if err != nil {
 		return nil, err
 	}
@@ -242,7 +242,7 @@ func (api TokenAPI) GetTokensByWalletID(ctx context.Context, walletID persist.DB
 		return nil, err
 	}
 
-	tokens, err := api.loaders.TokensByWalletID.Load(walletID)
+	tokens, err := api.loaders.GetTokensByWalletIdsBatch.Load(persist.DBIDList{walletID})
 	if err != nil {
 		return nil, err
 	}
@@ -274,7 +274,7 @@ func (api TokenAPI) GetTokensByUserID(ctx context.Context, userID persist.DBID, 
 		params.IncludeCreator = true
 	}
 
-	tokens, err := api.loaders.TokensByUserID.Load(params)
+	tokens, err := api.loaders.GetTokensByUserIdBatch.Load(params)
 	if err != nil {
 		return nil, err
 	}
@@ -291,7 +291,10 @@ func (api TokenAPI) GetTokensByUserIDAndChain(ctx context.Context, userID persis
 		return nil, err
 	}
 
-	tokens, err := api.loaders.TokensByUserIDAndChain.Load(dataloader.IDAndChain{ID: userID, Chain: chain})
+	tokens, err := api.loaders.GetTokensByUserIdAndChainBatch.Load(db.GetTokensByUserIdAndChainBatchParams{
+		OwnerUserID: userID,
+		Chain:       chain,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -422,11 +425,11 @@ func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) er
 		return err
 	}
 
-	token, err := api.loaders.TokenByTokenID.Load(tokenDBID)
+	token, err := api.loaders.GetTokenByIdBatch.Load(tokenDBID)
 	if err != nil {
 		return fmt.Errorf("failed to load token: %w", err)
 	}
-	contract, err := api.loaders.ContractByContractID.Load(token.Contract)
+	contract, err := api.loaders.GetContractsByIDs.Load(token.Contract.String())
 	if err != nil {
 		return fmt.Errorf("failed to load contract for token: %w", err)
 	}
@@ -461,8 +464,8 @@ func (api TokenAPI) RefreshCollection(ctx context.Context, collectionDBID persis
 		return err
 	}
 
-	tokens, err := api.loaders.TokensByCollectionID.Load(dataloader.IDAndLimit{
-		ID: collectionDBID,
+	tokens, err := api.loaders.GetTokensByCollectionIdBatch.Load(db.GetTokensByCollectionIdBatchParams{
+		CollectionID: collectionDBID,
 	})
 	if err != nil {
 		return err
@@ -472,7 +475,7 @@ func (api TokenAPI) RefreshCollection(ctx context.Context, collectionDBID persis
 	for _, token := range tokens {
 		token := token
 		wp.Submit(func() {
-			contract, err := api.loaders.ContractByContractID.Load(token.Contract)
+			contract, err := api.loaders.GetContractsByIDs.Load(token.Contract.String())
 			if err != nil {
 				errChan <- err
 				return
@@ -572,7 +575,7 @@ func (api TokenAPI) MediaByTokenID(ctx context.Context, tokenID persist.DBID) (d
 		return db.TokenMedia{}, err
 	}
 
-	return api.loaders.MediaByTokenID.Load(tokenID)
+	return api.loaders.GetMediaByTokenIDIgnoringStatus.Load(tokenID)
 }
 
 // MediaByTokenIdentifiers returns media for a token and optionally returns a token instance with fallback media matching the identifiers if any exists.
@@ -635,7 +638,7 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collect
 		return db.Event{}, err
 	}
 
-	token, err := api.loaders.TokenByTokenID.Load(tokenID)
+	token, err := api.loaders.GetTokenByIdBatch.Load(tokenID)
 	if err != nil {
 		return db.Event{}, err
 	}
@@ -674,11 +677,11 @@ func (api TokenAPI) ViewToken(ctx context.Context, tokenID persist.DBID, collect
 
 // GetProcessingState returns true if a token is queued for processing, or is currently being processed.
 func (api TokenAPI) GetProcessingState(ctx context.Context, tokenID persist.DBID) (bool, error) {
-	token, err := api.loaders.TokenByTokenID.Load(tokenID)
+	token, err := api.loaders.GetTokenByIdBatch.Load(tokenID)
 	if err != nil {
 		return false, err
 	}
-	contract, err := api.loaders.ContractByContractID.Load(token.Contract)
+	contract, err := api.loaders.GetContractsByIDs.Load(token.Contract.String())
 	if err != nil {
 		return false, err
 	}

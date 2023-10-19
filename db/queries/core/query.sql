@@ -125,9 +125,12 @@ select t.* from collections c,
     limit sqlc.narg('limit');
 
 -- name: GetContractCreatorsByIds :many
-select o.*
-    from unnest(@contract_ids::text[]) as c(id)
-        join contract_creators o on o.contract_id = c.id;
+with keys as (
+    select unnest (@contract_ids::text[]) as id
+         , generate_subscripts(@contract_ids::text[], 1) as batch_key_index
+)
+select k.batch_key_index, sqlc.embed(c) from keys k
+    join contract_creators c on c.contract_id = k.id;
 
 -- name: GetNewTokensByFeedEventIdBatch :batchmany
 with new_tokens as (
@@ -168,7 +171,13 @@ order by u.primary_wallet_id = w.id desc, w.id desc;
 select * FROM contracts WHERE id = $1 AND deleted = false;
 
 -- name: GetContractsByIDs :many
-SELECT * from contracts WHERE id = ANY(@contract_ids) AND deleted = false;
+with keys as (
+    select unnest (@contract_ids::varchar[]) as id
+         , generate_subscripts(@contract_ids::varchar[], 1) as batch_key_index
+)
+select k.batch_key_index, sqlc.embed(c) from keys k
+    join contracts c on c.id = k.id
+    where not c.deleted;
 
 -- name: GetContractsByTokenIDs :many
 select contracts.* from contracts join tokens on contracts.id = tokens.contract where tokens.id = any(@token_ids) and contracts.deleted = false;

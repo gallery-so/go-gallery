@@ -3,7 +3,6 @@ package generator
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -223,7 +222,6 @@ func (b *batch[TKey, TResult]) closeAfterTimeout(timeout time.Duration) {
 	if b.status == Open {
 		b.status = Closed
 		b.mu.Unlock()
-		fmt.Printf("batch %d closed after %v timeout\n", b.id, timeout)
 		b.submitBatch()
 	} else {
 		b.mu.Unlock()
@@ -295,8 +293,8 @@ func (d *Dataloader[TKey, TResult]) addKeyToBatch(key TKey, jsonKey string) (*ba
 
 		if len(b.keys) == d.maxBatchSize {
 			b.status = Closed
-			fmt.Printf("batch %d closed after reaching max batch size of %d\n", b.id, d.maxBatchSize)
 			b.mu.Unlock()
+			b.submitBatch()
 			atomic.CompareAndSwapInt32(&d.currentBatchID, currentID, currentID+1)
 		} else {
 			b.mu.Unlock()

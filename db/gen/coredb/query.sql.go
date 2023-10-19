@@ -1832,25 +1832,34 @@ func (q *Queries) GetContractByID(ctx context.Context, id persist.DBID) (Contrac
 }
 
 const getContractCreatorsByIds = `-- name: GetContractCreatorsByIds :many
-select o.contract_id, o.creator_user_id, o.chain, o.creator_address
-    from unnest($1::text[]) as c(id)
-        join contract_creators o on o.contract_id = c.id
+with keys as (
+    select unnest ($1::text[]) as id
+         , generate_subscripts($1::text[], 1) as batch_key_index
+)
+select k.batch_key_index, c.contract_id, c.creator_user_id, c.chain, c.creator_address from keys k
+    join contract_creators c on c.contract_id = k.id
 `
 
-func (q *Queries) GetContractCreatorsByIds(ctx context.Context, contractIds []string) ([]ContractCreator, error) {
+type GetContractCreatorsByIdsRow struct {
+	BatchKeyIndex   int32           `db:"batch_key_index" json:"batch_key_index"`
+	ContractCreator ContractCreator `db:"contractcreator" json:"contractcreator"`
+}
+
+func (q *Queries) GetContractCreatorsByIds(ctx context.Context, contractIds []string) ([]GetContractCreatorsByIdsRow, error) {
 	rows, err := q.db.Query(ctx, getContractCreatorsByIds, contractIds)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ContractCreator
+	var items []GetContractCreatorsByIdsRow
 	for rows.Next() {
-		var i ContractCreator
+		var i GetContractCreatorsByIdsRow
 		if err := rows.Scan(
-			&i.ContractID,
-			&i.CreatorUserID,
-			&i.Chain,
-			&i.CreatorAddress,
+			&i.BatchKeyIndex,
+			&i.ContractCreator.ContractID,
+			&i.ContractCreator.CreatorUserID,
+			&i.ContractCreator.Chain,
+			&i.ContractCreator.CreatorAddress,
 		); err != nil {
 			return nil, err
 		}
@@ -1863,38 +1872,50 @@ func (q *Queries) GetContractCreatorsByIds(ctx context.Context, contractIds []st
 }
 
 const getContractsByIDs = `-- name: GetContractsByIDs :many
-SELECT id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description, owner_address, is_provider_marked_spam, parent_id, override_creator_user_id, l1_chain from contracts WHERE id = ANY($1) AND deleted = false
+with keys as (
+    select unnest ($1::varchar[]) as id
+         , generate_subscripts($1::varchar[], 1) as batch_key_index
+)
+select k.batch_key_index, c.id, c.deleted, c.version, c.created_at, c.last_updated, c.name, c.symbol, c.address, c.creator_address, c.chain, c.profile_banner_url, c.profile_image_url, c.badge_url, c.description, c.owner_address, c.is_provider_marked_spam, c.parent_id, c.override_creator_user_id, c.l1_chain from keys k
+    join contracts c on c.id = k.id
+    where not c.deleted
 `
 
-func (q *Queries) GetContractsByIDs(ctx context.Context, contractIds persist.DBIDList) ([]Contract, error) {
+type GetContractsByIDsRow struct {
+	BatchKeyIndex int32    `db:"batch_key_index" json:"batch_key_index"`
+	Contract      Contract `db:"contract" json:"contract"`
+}
+
+func (q *Queries) GetContractsByIDs(ctx context.Context, contractIds []string) ([]GetContractsByIDsRow, error) {
 	rows, err := q.db.Query(ctx, getContractsByIDs, contractIds)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Contract
+	var items []GetContractsByIDsRow
 	for rows.Next() {
-		var i Contract
+		var i GetContractsByIDsRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.Deleted,
-			&i.Version,
-			&i.CreatedAt,
-			&i.LastUpdated,
-			&i.Name,
-			&i.Symbol,
-			&i.Address,
-			&i.CreatorAddress,
-			&i.Chain,
-			&i.ProfileBannerUrl,
-			&i.ProfileImageUrl,
-			&i.BadgeUrl,
-			&i.Description,
-			&i.OwnerAddress,
-			&i.IsProviderMarkedSpam,
-			&i.ParentID,
-			&i.OverrideCreatorUserID,
-			&i.L1Chain,
+			&i.BatchKeyIndex,
+			&i.Contract.ID,
+			&i.Contract.Deleted,
+			&i.Contract.Version,
+			&i.Contract.CreatedAt,
+			&i.Contract.LastUpdated,
+			&i.Contract.Name,
+			&i.Contract.Symbol,
+			&i.Contract.Address,
+			&i.Contract.CreatorAddress,
+			&i.Contract.Chain,
+			&i.Contract.ProfileBannerUrl,
+			&i.Contract.ProfileImageUrl,
+			&i.Contract.BadgeUrl,
+			&i.Contract.Description,
+			&i.Contract.OwnerAddress,
+			&i.Contract.IsProviderMarkedSpam,
+			&i.Contract.ParentID,
+			&i.Contract.OverrideCreatorUserID,
+			&i.Contract.L1Chain,
 		); err != nil {
 			return nil, err
 		}

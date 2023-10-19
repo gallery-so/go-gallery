@@ -91,7 +91,7 @@ func (api FeedAPI) GetFeedEventById(ctx context.Context, feedEventID persist.DBI
 		return nil, err
 	}
 
-	event, err := api.loaders.FeedEventByFeedEventID.Load(feedEventID)
+	event, err := api.loaders.GetEventByIdBatch.Load(feedEventID)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +107,7 @@ func (api FeedAPI) GetPostById(ctx context.Context, postID persist.DBID) (*db.Po
 		return nil, err
 	}
 
-	post, err := api.loaders.PostByPostID.Load(postID)
+	post, err := api.loaders.GetPostByIdBatch.Load(postID)
 	if err != nil {
 		return nil, err
 	}
@@ -248,7 +248,7 @@ func (api FeedAPI) ReferralPostToken(ctx context.Context, t persist.TokenIdentif
 		}
 	}
 
-	token, err := api.loaders.TokenByUserTokenIdentifiers.Load(db.GetTokenByUserTokenIdentifiersBatchParams{
+	token, err := api.loaders.GetTokenByUserTokenIdentifiersBatch.Load(db.GetTokenByUserTokenIdentifiersBatchParams{
 		OwnerID:         user.ID,
 		TokenID:         t.TokenID,
 		ContractAddress: t.ContractAddress,
@@ -851,7 +851,7 @@ func loadFeedEntities(ctx context.Context, d *dataloader.Loaders, typs []persist
 	}
 
 	go func() {
-		batchResults, batchErrs := d.FeedEventByFeedEventID.LoadAll(eventsFetch)
+		batchResults, batchErrs := d.GetEventByIdBatch.LoadAll(eventsFetch)
 		for i := 0; i < len(batchResults); i++ {
 			pos := idToPosition[eventsFetch[i]]
 			err := batchErrs[i]
@@ -866,7 +866,7 @@ func loadFeedEntities(ctx context.Context, d *dataloader.Loaders, typs []persist
 	}()
 
 	go func() {
-		batchResults, batchErrs := d.PostByPostID.LoadAll(postsFetch)
+		batchResults, batchErrs := d.GetPostByIdBatch.LoadAll(postsFetch)
 		for i := 0; i < len(batchResults); i++ {
 			pos := idToPosition[postsFetch[i]]
 			err := batchErrs[i]

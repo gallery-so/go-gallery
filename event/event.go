@@ -3,6 +3,7 @@ package event
 import (
 	"context"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/tracing"
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/gin-gonic/gin"
@@ -429,7 +430,7 @@ type notificationHandler struct {
 func newNotificationHandler(notifiers *notifications.NotificationHandlers, disableDataloaderCaching bool, queries *db.Queries) *notificationHandler {
 	return &notificationHandler{
 		notificationHandlers: notifiers,
-		dataloaders:          dataloader.NewLoaders(context.Background(), queries, disableDataloaderCaching),
+		dataloaders:          dataloader.NewLoaders(context.Background(), queries, disableDataloaderCaching, tracing.DataloaderPreFetchHook, tracing.DataloaderPostFetchHook),
 	}
 }
 
@@ -502,27 +503,27 @@ func (h notificationHandler) createNotificationDataForEvent(event db.Event) (dat
 func (h notificationHandler) findOwnerForNotificationFromEvent(ctx context.Context, event db.Event) (persist.DBID, error) {
 	switch event.ResourceTypeID {
 	case persist.ResourceTypeGallery:
-		gallery, err := h.dataloaders.GalleryByGalleryID.Load(event.GalleryID)
+		gallery, err := h.dataloaders.GetGalleryByIdBatch.Load(event.GalleryID)
 		if err != nil {
 			return "", err
 		}
 		return gallery.OwnerUserID, nil
 	case persist.ResourceTypeComment:
 		if event.Action == persist.ActionReplyToComment {
-			comment, err := h.dataloaders.CommentByCommentID.Load(event.SubjectID)
+			comment, err := h.dataloaders.GetCommentByCommentIDBatch.Load(event.SubjectID)
 			if err != nil {
 				return "", err
 			}
 			return comment.ActorID, nil
 		}
 		if event.FeedEventID != "" {
-			feedEvent, err := h.dataloaders.FeedEventByFeedEventID.Load(event.FeedEventID)
+			feedEvent, err := h.dataloaders.GetEventByIdBatch.Load(event.FeedEventID)
 			if err != nil {
 				return "", err
 			}
 			return feedEvent.OwnerID, nil
 		} else if event.PostID != "" {
-			post, err := h.dataloaders.PostByPostID.Load(event.PostID)
+			post, err := h.dataloaders.GetPostByIdBatch.Load(event.PostID)
 			if err != nil {
 				return "", err
 			}
@@ -531,13 +532,13 @@ func (h notificationHandler) findOwnerForNotificationFromEvent(ctx context.Conte
 
 	case persist.ResourceTypeAdmire:
 		if event.FeedEventID != "" {
-			feedEvent, err := h.dataloaders.FeedEventByFeedEventID.Load(event.FeedEventID)
+			feedEvent, err := h.dataloaders.GetEventByIdBatch.Load(event.FeedEventID)
 			if err != nil {
 				return "", err
 			}
 			return feedEvent.OwnerID, nil
 		} else if event.PostID != "" {
-			post, err := h.dataloaders.PostByPostID.Load(event.PostID)
+			post, err := h.dataloaders.GetPostByIdBatch.Load(event.PostID)
 			if err != nil {
 				return "", err
 			}
@@ -549,7 +550,7 @@ func (h notificationHandler) findOwnerForNotificationFromEvent(ctx context.Conte
 		return persist.DBID(event.ActorID.String), nil
 	case persist.ResourceTypeContract:
 
-		u, err := h.dataloaders.ContractCreatorByContractID.Load(event.ContractID)
+		u, err := h.dataloaders.GetContractCreatorsByIds.Load(event.ContractID.String())
 		if err != nil || u.CreatorUserID == "" {
 			logger.For(ctx).Warnf("error loading user by address: %s", err)
 			return "", nil
