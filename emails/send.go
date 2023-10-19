@@ -144,7 +144,8 @@ func autoSendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, psu
 	return sub.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 		l, err := r.Obtain(ctx, "send-notification-emails", time.Minute*5, nil)
 		if err != nil {
-			return // don't ack message
+			msg.Ack()
+			return
 		}
 		defer l.Release(ctx)
 		err = sendNotificationEmailsToAllUsers(ctx, queries, s, env.GetString("ENV") == "production")
@@ -154,6 +155,7 @@ func autoSendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, psu
 			return
 		}
 		msg.Ack()
+
 	})
 }
 
