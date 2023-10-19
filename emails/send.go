@@ -4,10 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/auth"
 	"net/http"
 	"sync/atomic"
 	"time"
+
+	"github.com/bsm/redislock"
+	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/notifications"
 
 	"cloud.google.com/go/pubsub"
 	"github.com/gin-gonic/gin"
@@ -103,17 +106,10 @@ func sendVerificationEmail(dataloaders *dataloader.Loaders, queries *coredb.Quer
 	}
 }
 
-type notificationEmailDynamicTemplateData struct {
-	Actor          string       `json:"actor"`
-	Action         string       `json:"action"`
-	CollectionName string       `json:"collectionName"`
-	CollectionID   persist.DBID `json:"collectionId"`
-	PreviewText    string       `json:"previewText"`
-}
 type notificationsEmailDynamicTemplateData struct {
-	Notifications    []notificationEmailDynamicTemplateData `json:"notifications"`
-	Username         string                                 `json:"username"`
-	UnsubscribeToken string                                 `json:"unsubscribeToken"`
+	Notifications    []notifications.UserFacingNotificationData `json:"notifications"`
+	Username         string                                     `json:"username"`
+	UnsubscribeToken string                                     `json:"unsubscribeToken"`
 }
 
 func adminSendNotificationEmail(queries *coredb.Queries, s *sendgrid.Client) gin.HandlerFunc {
@@ -141,18 +137,25 @@ func adminSendNotificationEmail(queries *coredb.Queries, s *sendgrid.Client) gin
 	}
 }
 
-func autoSendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, psub *pubsub.Client) error {
+func autoSendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, psub *pubsub.Client, r *redislock.Client) error {
 	ctx := context.Background()
 	sub := psub.Subscription(env.GetString("PUBSUB_NOTIFICATIONS_EMAILS_SUBSCRIPTION"))
 
 	return sub.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
-		err := sendNotificationEmailsToAllUsers(ctx, queries, s, env.GetString("ENV") == "production")
+		l, err := r.Obtain(ctx, "send-notification-emails", time.Minute*5, nil)
+		if err != nil {
+			msg.Ack()
+			return
+		}
+		defer l.Release(ctx)
+		err = sendNotificationEmailsToAllUsers(ctx, queries, s, env.GetString("ENV") == "production")
 		if err != nil {
 			logger.For(ctx).Errorf("error sending notification emails: %s", err)
 			msg.Nack()
 			return
 		}
 		msg.Ack()
+
 	})
 }
 
@@ -198,17 +201,18 @@ func sendNotificationEmailToUser(c context.Context, u coredb.PiiUserView, emailR
 	}
 
 	data := notificationsEmailDynamicTemplateData{
-		Notifications:    make([]notificationEmailDynamicTemplateData, 0, resultLimit),
+		Notifications:    make([]notifications.UserFacingNotificationData, 0, resultLimit),
 		Username:         u.Username.String,
 		UnsubscribeToken: j,
 	}
-	notifTemplates := make(chan notificationEmailDynamicTemplateData)
+	notifTemplates := make(chan notifications.UserFacingNotificationData)
 	errChan := make(chan error)
 
 	for _, n := range notifs {
 		notif := n
 		go func() {
-			notifTemplate, err := notifToTemplateData(c, queries, notif)
+			// notifTemplate, err := notifToTemplateData(c, queries, notif)
+			notifTemplate, err := notifications.NotificationToUserFacingData(c, queries, notif)
 			if err != nil {
 				errChan <- err
 				return
@@ -268,113 +272,6 @@ outer:
 	logger.For(c).Infof("would have sent email to %s (username: %s): %s", u.ID, u.Username.String, string(asJSON))
 
 	return &rest.Response{StatusCode: 200, Body: "not sending real emails", Headers: map[string][]string{}}, nil
-}
-
-func notifToTemplateData(ctx context.Context, queries *coredb.Queries, n coredb.Notification) (notificationEmailDynamicTemplateData, error) {
-
-	switch n.Action {
-	case persist.ActionAdmiredFeedEvent:
-		feedEvent, err := queries.GetFeedEventByID(ctx, n.FeedEventID)
-		if err != nil {
-			return notificationEmailDynamicTemplateData{}, fmt.Errorf("failed to get feed event for admire %s: %w", n.FeedEventID, err)
-		}
-		collection, _ := queries.GetCollectionById(ctx, feedEvent.Data.CollectionID)
-		data := notificationEmailDynamicTemplateData{}
-		if collection.ID != "" && collection.Name.String != "" {
-			data.CollectionID = collection.ID
-			data.CollectionName = collection.Name.String
-			data.Action = "admired your additions to"
-		} else {
-			data.Action = "admired your gallery update"
-		}
-		if len(n.Data.AdmirerIDs) > 1 {
-			data.Actor = fmt.Sprintf("%d collectors", len(n.Data.AdmirerIDs))
-		} else {
-			actorUser, err := queries.GetUserById(ctx, n.Data.AdmirerIDs[0])
-			if err != nil {
-				return notificationEmailDynamicTemplateData{}, err
-			}
-			data.Actor = actorUser.Username.String
-		}
-		return data, nil
-	case persist.ActionUserFollowedUsers:
-		if len(n.Data.FollowerIDs) > 1 {
-			return notificationEmailDynamicTemplateData{
-				Actor:  fmt.Sprintf("%d users", len(n.Data.FollowerIDs)),
-				Action: "followed you",
-			}, nil
-		}
-		if len(n.Data.FollowerIDs) == 1 {
-			userActor, err := queries.GetUserById(ctx, n.Data.FollowerIDs[0])
-			if err != nil {
-				return notificationEmailDynamicTemplateData{}, fmt.Errorf("failed to get user for follower %s: %w", n.Data.FollowerIDs[0], err)
-			}
-			action := "followed you"
-			if n.Data.FollowedBack {
-				action = "followed you back"
-			}
-			return notificationEmailDynamicTemplateData{
-				Actor:  userActor.Username.String,
-				Action: action,
-			}, nil
-		}
-		return notificationEmailDynamicTemplateData{}, fmt.Errorf("no follower ids")
-	case persist.ActionCommentedOnFeedEvent:
-		comment, err := queries.GetCommentByCommentID(ctx, n.CommentID)
-		if err != nil {
-			return notificationEmailDynamicTemplateData{}, fmt.Errorf("failed to get comment for comment %s: %w", n.CommentID, err)
-		}
-		userActor, err := queries.GetUserById(ctx, comment.ActorID)
-		if err != nil {
-			return notificationEmailDynamicTemplateData{}, fmt.Errorf("failed to get user for comment actor %s: %w", comment.ActorID, err)
-		}
-		feedEvent, err := queries.GetFeedEventByID(ctx, n.FeedEventID)
-		if err != nil {
-			return notificationEmailDynamicTemplateData{}, fmt.Errorf("failed to get feed event for comment %s: %w", n.FeedEventID, err)
-		}
-		collection, _ := queries.GetCollectionById(ctx, feedEvent.Data.CollectionID)
-		if collection.ID != "" {
-			return notificationEmailDynamicTemplateData{
-				Actor:          userActor.Username.String,
-				Action:         "commented on your additions to",
-				CollectionName: collection.Name.String,
-				CollectionID:   collection.ID,
-				PreviewText:    util.TruncateWithEllipsis(comment.Comment, 20),
-			}, nil
-		}
-		return notificationEmailDynamicTemplateData{
-			Actor:       userActor.Username.String,
-			Action:      "commented on your gallery update",
-			PreviewText: util.TruncateWithEllipsis(comment.Comment, 20),
-		}, nil
-	case persist.ActionViewedGallery:
-		if len(n.Data.AuthedViewerIDs)+len(n.Data.UnauthedViewerIDs) > 1 {
-			return notificationEmailDynamicTemplateData{
-				Actor:  fmt.Sprintf("%d collectors", len(n.Data.AuthedViewerIDs)+len(n.Data.UnauthedViewerIDs)),
-				Action: "viewed your gallery",
-			}, nil
-		}
-		if len(n.Data.AuthedViewerIDs) == 1 {
-			userActor, err := queries.GetUserById(ctx, n.Data.AuthedViewerIDs[0])
-			if err != nil {
-				return notificationEmailDynamicTemplateData{}, fmt.Errorf("failed to get user for viewer %s: %w", n.Data.AuthedViewerIDs[0], err)
-			}
-			return notificationEmailDynamicTemplateData{
-				Actor:  userActor.Username.String,
-				Action: "viewed your gallery",
-			}, nil
-		}
-		if len(n.Data.UnauthedViewerIDs) == 1 {
-			return notificationEmailDynamicTemplateData{
-				Actor:  "Someone",
-				Action: "viewed your gallery",
-			}, nil
-		}
-
-		return notificationEmailDynamicTemplateData{}, fmt.Errorf("no viewer ids")
-	default:
-		return notificationEmailDynamicTemplateData{}, fmt.Errorf("unknown action %s", n.Action)
-	}
 }
 
 func runForUsersWithNotificationsOnForEmailType(ctx context.Context, emailType persist.EmailType, queries *coredb.Queries, fn func(u coredb.PiiUserView) error) error {

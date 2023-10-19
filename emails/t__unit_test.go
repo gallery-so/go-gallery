@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/service/notifications"
 )
 
 func TestNotificationTemplating_Success(t *testing.T) {
@@ -17,20 +18,20 @@ func TestNotificationTemplating_Success(t *testing.T) {
 	q := coredb.New(pgx)
 
 	t.Run("creates a template for admire notifications", func(t *testing.T) {
-		data, err := notifToTemplateData(ctx, q, admireNotif)
+		data, err := notifications.NotificationToUserFacingData(ctx, q, admireNotif)
 		a.NoError(err)
 		a.Equal(testUser2.Username.String, data.Actor)
 		a.Equal(data.CollectionID, testGallery.Collections[0])
 	})
 
 	t.Run("creates a template for follow notifications", func(t *testing.T) {
-		data, err := notifToTemplateData(ctx, q, followNotif)
+		data, err := notifications.NotificationToUserFacingData(ctx, q, followNotif)
 		a.NoError(err)
 		a.Equal(testUser2.Username.String, data.Actor)
 	})
 
 	t.Run("creates a template for comment notifications", func(t *testing.T) {
-		data, err := notifToTemplateData(ctx, q, commentNotif)
+		data, err := notifications.NotificationToUserFacingData(ctx, q, commentNotif)
 		a.NoError(err)
 		a.Equal(testUser2.Username.String, data.Actor)
 		a.Equal(data.CollectionID, testGallery.Collections[0])
@@ -38,7 +39,7 @@ func TestNotificationTemplating_Success(t *testing.T) {
 	})
 
 	t.Run("creates a template for view notifications", func(t *testing.T) {
-		data, err := notifToTemplateData(ctx, q, viewNotif)
+		data, err := notifications.NotificationToUserFacingData(ctx, q, viewNotif)
 		a.NoError(err)
 		a.Equal(testUser2.Username.String, data.Actor)
 	})
