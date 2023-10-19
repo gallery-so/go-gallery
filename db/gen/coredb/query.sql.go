@@ -1214,6 +1214,54 @@ func (q *Queries) CreateUserEvent(ctx context.Context, arg CreateUserEventParams
 	return i, err
 }
 
+const createUserPostedYourWorkNotification = `-- name: CreateUserPostedYourWorkNotification :one
+INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id, contract_id) VALUES ($1, $2, $3, $4, $5, $7, $6) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id
+`
+
+type CreateUserPostedYourWorkNotificationParams struct {
+	ID         persist.DBID             `json:"id"`
+	OwnerID    persist.DBID             `json:"owner_id"`
+	Action     persist.Action           `json:"action"`
+	Data       persist.NotificationData `json:"data"`
+	EventIds   persist.DBIDList         `json:"event_ids"`
+	ContractID persist.DBID             `json:"contract_id"`
+	Post       sql.NullString           `json:"post"`
+}
+
+func (q *Queries) CreateUserPostedYourWorkNotification(ctx context.Context, arg CreateUserPostedYourWorkNotificationParams) (Notification, error) {
+	row := q.db.QueryRow(ctx, createUserPostedYourWorkNotification,
+		arg.ID,
+		arg.OwnerID,
+		arg.Action,
+		arg.Data,
+		arg.EventIds,
+		arg.ContractID,
+		arg.Post,
+	)
+	var i Notification
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.OwnerID,
+		&i.Version,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.Action,
+		&i.Data,
+		&i.EventIds,
+		&i.FeedEventID,
+		&i.CommentID,
+		&i.GalleryID,
+		&i.Seen,
+		&i.Amount,
+		&i.PostID,
+		&i.TokenID,
+		&i.ContractID,
+		&i.MentionID,
+	)
+	return i, err
+}
+
 const createViewGalleryNotification = `-- name: CreateViewGalleryNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids, gallery_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount, post_id, token_id, contract_id, mention_id
 `
