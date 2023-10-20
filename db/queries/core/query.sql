@@ -306,7 +306,9 @@ select coalesce(nullif(tm.media->>'thumbnail_url', ''), nullif(tm.media->>'media
     order by t.id limit 3;
 
 -- name: GetTokensByUserIdBatch :batchmany
-select t.* from tokens t
+select sqlc.embed(t), sqlc.embed(tm), sqlc.embed(c) from tokens t
+       join token_medias tm on tm.id = t.token_media_id
+       join contracts c on c.id = t.contract
     where t.owner_user_id = @owner_user_id
       and t.deleted = false
       and t.displayable
@@ -1410,10 +1412,8 @@ ORDER BY tokens.id;
 -- name: GetReprocessJobRangeByID :one
 select * from reprocess_jobs where id = $1;
 
--- name: GetMediaByTokenIDIgnoringStatus :batchone
-select m.*
-from token_medias m
-where m.id = (select token_media_id from tokens where tokens.id = $1) and not m.deleted;
+-- name: GetMediaByMediaIDIgnoringStatus :batchone
+select m.* from token_medias m where m.id = $1 and not m.deleted;
 
 -- name: GetMediaByUserTokenIdentifiers :one
 with contract as (

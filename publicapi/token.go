@@ -274,10 +274,14 @@ func (api TokenAPI) GetTokensByUserID(ctx context.Context, userID persist.DBID, 
 		params.IncludeCreator = true
 	}
 
-	tokens, err := api.loaders.GetTokensByUserIdBatch.Load(params)
+	results, err := api.loaders.GetTokensByUserIdBatch.Load(params)
 	if err != nil {
 		return nil, err
 	}
+
+	tokens := util.MapWithoutError(results, func(r db.GetTokensByUserIdBatchRow) db.Token {
+		return r.Token
+	})
 
 	return tokens, nil
 }
@@ -567,15 +571,15 @@ func (api TokenAPI) SetSpamPreference(ctx context.Context, tokens []persist.DBID
 	return api.repos.TokenRepository.FlagTokensAsUserMarkedSpam(ctx, userID, tokens, isSpam)
 }
 
-func (api TokenAPI) MediaByTokenID(ctx context.Context, tokenID persist.DBID) (db.TokenMedia, error) {
+func (api TokenAPI) MediaByMediaID(ctx context.Context, mediaID persist.DBID) (db.TokenMedia, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"tokenID": validate.WithTag(tokenID, "required"),
+		"mediaID": validate.WithTag(mediaID, "required"),
 	}); err != nil {
 		return db.TokenMedia{}, err
 	}
 
-	return api.loaders.GetMediaByTokenIDIgnoringStatus.Load(tokenID)
+	return api.loaders.GetMediaByMediaIDIgnoringStatus.Load(mediaID)
 }
 
 // MediaByTokenIdentifiers returns media for a token and optionally returns a token instance with fallback media matching the identifiers if any exists.

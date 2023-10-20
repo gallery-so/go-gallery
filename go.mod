@@ -17,7 +17,6 @@ require (
 	github.com/bsm/redislock v0.7.2
 	github.com/ethereum/go-ethereum v1.10.26
 	github.com/everFinance/goar v1.4.0
-	github.com/gallery-so/dataloaden v0.0.0-20221214221404-9d30d4c39aa7
 	github.com/gammazero/workerpool v1.1.2
 	github.com/getsentry/sentry-go v0.15.0
 	github.com/gin-gonic/gin v1.8.1
@@ -71,7 +70,6 @@ require (
 	github.com/jinzhu/copier v0.3.5
 	github.com/pkg/errors v0.9.1
 	github.com/sourcegraph/conc v0.3.0
-	github.com/sqlc-dev/sqlc v1.22.0
 	github.com/wealdtech/go-ens/v3 v3.5.5
 	go.mozilla.org/sops/v3 v3.7.3
 	golang.org/x/net v0.12.0
@@ -224,9 +222,11 @@ require (
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.5 // indirect
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
+	github.com/pingcap/errors v0.11.5-0.20210425183316-da1aaba5fb63 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/rjeczalik/notify v0.9.2 // indirect
+	github.com/rogpeppe/go-internal v1.10.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
 	github.com/samuel/go-zookeeper v0.0.0-20190810000440-0ceca61e4d75 // indirect

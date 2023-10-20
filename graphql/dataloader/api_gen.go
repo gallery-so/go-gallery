@@ -40,7 +40,7 @@ type Loaders struct {
 	GetGalleryByCollectionIdBatch            *GetGalleryByCollectionIdBatch
 	GetGalleryByIdBatch                      *GetGalleryByIdBatch
 	GetGalleryTokenMediasByGalleryIDBatch    *GetGalleryTokenMediasByGalleryIDBatch
-	GetMediaByTokenIDIgnoringStatus          *GetMediaByTokenIDIgnoringStatus
+	GetMediaByMediaIDIgnoringStatus          *GetMediaByMediaIDIgnoringStatus
 	GetMembershipByMembershipIdBatch         *GetMembershipByMembershipIdBatch
 	GetMentionsByCommentID                   *GetMentionsByCommentID
 	GetMentionsByPostID                      *GetMentionsByPostID
@@ -109,7 +109,7 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	loaders.GetGalleryByCollectionIdBatch = newGetGalleryByCollectionIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetGalleryByCollectionIdBatch(q), preFetchHook, postFetchHook)
 	loaders.GetGalleryByIdBatch = newGetGalleryByIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetGalleryByIdBatch(q), preFetchHook, postFetchHook)
 	loaders.GetGalleryTokenMediasByGalleryIDBatch = newGetGalleryTokenMediasByGalleryIDBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetGalleryTokenMediasByGalleryIDBatch(q), preFetchHook, postFetchHook)
-	loaders.GetMediaByTokenIDIgnoringStatus = newGetMediaByTokenIDIgnoringStatus(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetMediaByTokenIDIgnoringStatus(q), preFetchHook, postFetchHook)
+	loaders.GetMediaByMediaIDIgnoringStatus = newGetMediaByMediaIDIgnoringStatus(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetMediaByMediaIDIgnoringStatus(q), preFetchHook, postFetchHook)
 	loaders.GetMembershipByMembershipIdBatch = newGetMembershipByMembershipIdBatch(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetMembershipByMembershipIdBatch(q), preFetchHook, postFetchHook)
 	loaders.GetMentionsByCommentID = newGetMentionsByCommentID(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetMentionsByCommentID(q), preFetchHook, postFetchHook)
 	loaders.GetMentionsByPostID = newGetMentionsByPostID(ctx, 100, time.Duration(2000000), !disableCaching, true, loadGetMentionsByPostID(q), preFetchHook, postFetchHook)
@@ -211,6 +211,11 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 			loaders.GetContractByChainAddressBatch.Prime(loaders.GetContractByChainAddressBatch.getKeyForResult(entry), entry)
 		}
 	})
+	loaders.GetTokensByUserIdBatch.RegisterResultSubscriber(func(result []coredb.GetTokensByUserIdBatchRow) {
+		for _, entry := range result {
+			loaders.GetContractByChainAddressBatch.Prime(loaders.GetContractByChainAddressBatch.getKeyForResult(entry.Contract), entry.Contract)
+		}
+	})
 	loaders.GetContractsByIDs.RegisterResultSubscriber(func(result coredb.Contract) {
 		loaders.GetContractByChainAddressBatch.Prime(loaders.GetContractByChainAddressBatch.getKeyForResult(result), result)
 	})
@@ -244,7 +249,12 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	})
 	loaders.GetGalleryTokenMediasByGalleryIDBatch.RegisterResultSubscriber(func(result []coredb.TokenMedia) {
 		for _, entry := range result {
-			loaders.GetMediaByTokenIDIgnoringStatus.Prime(loaders.GetMediaByTokenIDIgnoringStatus.getKeyForResult(entry), entry)
+			loaders.GetMediaByMediaIDIgnoringStatus.Prime(loaders.GetMediaByMediaIDIgnoringStatus.getKeyForResult(entry), entry)
+		}
+	})
+	loaders.GetTokensByUserIdBatch.RegisterResultSubscriber(func(result []coredb.GetTokensByUserIdBatchRow) {
+		for _, entry := range result {
+			loaders.GetMediaByMediaIDIgnoringStatus.Prime(loaders.GetMediaByMediaIDIgnoringStatus.getKeyForResult(entry.TokenMedia), entry.TokenMedia)
 		}
 	})
 	loaders.GetUserNotificationsBatch.RegisterResultSubscriber(func(result []coredb.Notification) {
@@ -278,9 +288,9 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 			loaders.GetTokenByIdBatch.Prime(loaders.GetTokenByIdBatch.getKeyForResult(entry), entry)
 		}
 	})
-	loaders.GetTokensByUserIdBatch.RegisterResultSubscriber(func(result []coredb.Token) {
+	loaders.GetTokensByUserIdBatch.RegisterResultSubscriber(func(result []coredb.GetTokensByUserIdBatchRow) {
 		for _, entry := range result {
-			loaders.GetTokenByIdBatch.Prime(loaders.GetTokenByIdBatch.getKeyForResult(entry), entry)
+			loaders.GetTokenByIdBatch.Prime(loaders.GetTokenByIdBatch.getKeyForResult(entry.Token), entry.Token)
 		}
 	})
 	loaders.GetTokensByWalletIdsBatch.RegisterResultSubscriber(func(result []coredb.Token) {
@@ -309,9 +319,9 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 			loaders.GetTokenByIdIgnoreDisplayableBatch.Prime(loaders.GetTokenByIdIgnoreDisplayableBatch.getKeyForResult(entry), entry)
 		}
 	})
-	loaders.GetTokensByUserIdBatch.RegisterResultSubscriber(func(result []coredb.Token) {
+	loaders.GetTokensByUserIdBatch.RegisterResultSubscriber(func(result []coredb.GetTokensByUserIdBatchRow) {
 		for _, entry := range result {
-			loaders.GetTokenByIdIgnoreDisplayableBatch.Prime(loaders.GetTokenByIdIgnoreDisplayableBatch.getKeyForResult(entry), entry)
+			loaders.GetTokenByIdIgnoreDisplayableBatch.Prime(loaders.GetTokenByIdIgnoreDisplayableBatch.getKeyForResult(entry.Token), entry.Token)
 		}
 	})
 	loaders.GetTokensByWalletIdsBatch.RegisterResultSubscriber(func(result []coredb.Token) {
@@ -427,6 +437,11 @@ func NewLoaders(ctx context.Context, q *coredb.Queries, disableCaching bool, pre
 	loaders.GetCreatedContractsBatchPaginate.RegisterResultSubscriber(func(result []coredb.Contract) {
 		for _, entry := range result {
 			loaders.GetContractsByIDs.Prime(loaders.GetContractsByIDs.getKeyForResult(entry), entry)
+		}
+	})
+	loaders.GetTokensByUserIdBatch.RegisterResultSubscriber(func(result []coredb.GetTokensByUserIdBatchRow) {
+		for _, entry := range result {
+			loaders.GetContractsByIDs.Prime(loaders.GetContractsByIDs.getKeyForResult(entry.Contract), entry.Contract)
 		}
 	})
 

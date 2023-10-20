@@ -1651,13 +1651,13 @@ func loadGetGalleryTokenMediasByGalleryIDBatch(q *coredb.Queries) func(context.C
 	}
 }
 
-// GetMediaByTokenIDIgnoringStatus batches and caches requests
-type GetMediaByTokenIDIgnoringStatus struct {
+// GetMediaByMediaIDIgnoringStatus batches and caches requests
+type GetMediaByMediaIDIgnoringStatus struct {
 	generator.Dataloader[persist.DBID, coredb.TokenMedia]
 }
 
-// newGetMediaByTokenIDIgnoringStatus creates a new GetMediaByTokenIDIgnoringStatus with the given settings, functions, and options
-func newGetMediaByTokenIDIgnoringStatus(
+// newGetMediaByMediaIDIgnoringStatus creates a new GetMediaByMediaIDIgnoringStatus with the given settings, functions, and options
+func newGetMediaByMediaIDIgnoringStatus(
 	ctx context.Context,
 	maxBatchSize int,
 	batchTimeout time.Duration,
@@ -1666,17 +1666,17 @@ func newGetMediaByTokenIDIgnoringStatus(
 	fetch func(context.Context, []persist.DBID) ([]coredb.TokenMedia, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
-) *GetMediaByTokenIDIgnoringStatus {
+) *GetMediaByMediaIDIgnoringStatus {
 	fetchWithHooks := func(ctx context.Context, keys []persist.DBID) ([]coredb.TokenMedia, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
-			ctx = preFetchHook(ctx, "GetMediaByTokenIDIgnoringStatus")
+			ctx = preFetchHook(ctx, "GetMediaByMediaIDIgnoringStatus")
 		}
 
 		results, errors := fetch(ctx, keys)
 
 		if postFetchHook != nil {
-			postFetchHook(ctx, "GetMediaByTokenIDIgnoringStatus")
+			postFetchHook(ctx, "GetMediaByMediaIDIgnoringStatus")
 		}
 
 		return results, errors
@@ -1684,23 +1684,23 @@ func newGetMediaByTokenIDIgnoringStatus(
 
 	dataloader := generator.NewDataloader(ctx, maxBatchSize, batchTimeout, cacheResults, publishResults, fetchWithHooks)
 
-	d := &GetMediaByTokenIDIgnoringStatus{
+	d := &GetMediaByMediaIDIgnoringStatus{
 		Dataloader: *dataloader,
 	}
 
 	return d
 }
 
-func (*GetMediaByTokenIDIgnoringStatus) getKeyForResult(result coredb.TokenMedia) persist.DBID {
+func (*GetMediaByMediaIDIgnoringStatus) getKeyForResult(result coredb.TokenMedia) persist.DBID {
 	return result.ID
 }
 
-func loadGetMediaByTokenIDIgnoringStatus(q *coredb.Queries) func(context.Context, []persist.DBID) ([]coredb.TokenMedia, []error) {
+func loadGetMediaByMediaIDIgnoringStatus(q *coredb.Queries) func(context.Context, []persist.DBID) ([]coredb.TokenMedia, []error) {
 	return func(ctx context.Context, params []persist.DBID) ([]coredb.TokenMedia, []error) {
 		results := make([]coredb.TokenMedia, len(params))
 		errors := make([]error, len(params))
 
-		b := q.GetMediaByTokenIDIgnoringStatus(ctx, params)
+		b := q.GetMediaByMediaIDIgnoringStatus(ctx, params)
 		defer b.Close()
 
 		b.QueryRow(func(i int, r coredb.TokenMedia, err error) {
@@ -2684,7 +2684,7 @@ func loadGetTokensByUserIdAndChainBatch(q *coredb.Queries) func(context.Context,
 
 // GetTokensByUserIdBatch batches and caches requests
 type GetTokensByUserIdBatch struct {
-	generator.Dataloader[coredb.GetTokensByUserIdBatchParams, []coredb.Token]
+	generator.Dataloader[coredb.GetTokensByUserIdBatchParams, []coredb.GetTokensByUserIdBatchRow]
 }
 
 // newGetTokensByUserIdBatch creates a new GetTokensByUserIdBatch with the given settings, functions, and options
@@ -2694,11 +2694,11 @@ func newGetTokensByUserIdBatch(
 	batchTimeout time.Duration,
 	cacheResults bool,
 	publishResults bool,
-	fetch func(context.Context, []coredb.GetTokensByUserIdBatchParams) ([][]coredb.Token, []error),
+	fetch func(context.Context, []coredb.GetTokensByUserIdBatchParams) ([][]coredb.GetTokensByUserIdBatchRow, []error),
 	preFetchHook PreFetchHook,
 	postFetchHook PostFetchHook,
 ) *GetTokensByUserIdBatch {
-	fetchWithHooks := func(ctx context.Context, keys []coredb.GetTokensByUserIdBatchParams) ([][]coredb.Token, []error) {
+	fetchWithHooks := func(ctx context.Context, keys []coredb.GetTokensByUserIdBatchParams) ([][]coredb.GetTokensByUserIdBatchRow, []error) {
 		// Allow the preFetchHook to modify and return a new context
 		if preFetchHook != nil {
 			ctx = preFetchHook(ctx, "GetTokensByUserIdBatch")
@@ -2722,15 +2722,15 @@ func newGetTokensByUserIdBatch(
 	return d
 }
 
-func loadGetTokensByUserIdBatch(q *coredb.Queries) func(context.Context, []coredb.GetTokensByUserIdBatchParams) ([][]coredb.Token, []error) {
-	return func(ctx context.Context, params []coredb.GetTokensByUserIdBatchParams) ([][]coredb.Token, []error) {
-		results := make([][]coredb.Token, len(params))
+func loadGetTokensByUserIdBatch(q *coredb.Queries) func(context.Context, []coredb.GetTokensByUserIdBatchParams) ([][]coredb.GetTokensByUserIdBatchRow, []error) {
+	return func(ctx context.Context, params []coredb.GetTokensByUserIdBatchParams) ([][]coredb.GetTokensByUserIdBatchRow, []error) {
+		results := make([][]coredb.GetTokensByUserIdBatchRow, len(params))
 		errors := make([]error, len(params))
 
 		b := q.GetTokensByUserIdBatch(ctx, params)
 		defer b.Close()
 
-		b.Query(func(i int, r []coredb.Token, err error) {
+		b.Query(func(i int, r []coredb.GetTokensByUserIdBatchRow, err error) {
 			results[i], errors[i] = r, err
 			if errors[i] == pgx.ErrNoRows {
 				errors[i] = NotFound[coredb.GetTokensByUserIdBatchParams]{Key: params[i]}
