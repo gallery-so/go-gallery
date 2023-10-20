@@ -34,15 +34,16 @@ type Dataloader[TKey any, TResult any] struct {
 }
 
 type batch[TKey any, TResult any] struct {
-	dataloader *Dataloader[TKey, TResult]
-	id         int32
-	keys       []TKey
-	jsonKeys   []string
-	results    []TResult
-	errors     []error
-	status     batchStatus
-	done       chan struct{}
-	mu         sync.Mutex
+	dataloader  *Dataloader[TKey, TResult]
+	id          int32
+	keys        []TKey
+	jsonKeys    []string
+	results     []TResult
+	errors      []error
+	status      batchStatus
+	done        chan struct{}
+	mu          sync.Mutex
+	numAssigned int32
 }
 
 func NewDataloader[TKey comparable, TResult any](ctx context.Context, maxBatchSize int, batchTimeout time.Duration, cacheResults bool, publishResults bool,
@@ -252,6 +253,11 @@ func (d *Dataloader[TKey, TResult]) addKeyToBatch(key TKey, jsonKey string) (*ba
 		}
 
 		b := actual.(*batch[TKey, TResult])
+		numAssigned := atomic.AddInt32(&b.numAssigned, 1)
+		if numAssigned > int32(d.maxBatchSize) {
+			atomic.CompareAndSwapInt32(&d.currentBatchID, currentID, currentID+1)
+			continue
+		}
 
 		b.mu.Lock()
 
