@@ -253,6 +253,9 @@ func (d *Dataloader[TKey, TResult]) addKeyToBatch(key TKey, jsonKey string) (*ba
 		}
 
 		b := actual.(*batch[TKey, TResult])
+
+		// Prevent lock contention within a batch by allowing only the first maxBatchSize callers
+		// to obtain the lock.
 		numAssigned := atomic.AddInt32(&b.numAssigned, 1)
 		if numAssigned > int32(d.maxBatchSize) {
 			atomic.CompareAndSwapInt32(&d.currentBatchID, currentID, currentID+1)
