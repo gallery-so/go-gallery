@@ -506,7 +506,7 @@ type Token struct {
 	BlockNumber                    sql.NullInt64     `json:"block_number"`
 	OwnerUserID                    persist.DBID      `json:"owner_user_id"`
 	OwnedByWallets                 persist.DBIDList  `json:"owned_by_wallets"`
-	Chain                          persist.Chain     `json:"chain"`
+	ChainDeprecated                sql.NullInt32     `json:"chain__deprecated"`
 	ContractID                     persist.DBID      `json:"contract_id"`
 	IsUserMarkedSpam               sql.NullBool      `json:"is_user_marked_spam"`
 	IsProviderMarkedSpamDeprecated sql.NullBool      `json:"is_provider_marked_spam__deprecated"`

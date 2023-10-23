@@ -55,3 +55,4 @@ create or replace view feed_entity_score_view as (
   select id, created_at, actor_id, '', contract_ids, interactions, 1 feed_entity_type, now()::timestamptz as last_updated
   from selected_posts
 );
+refresh materialized view feed_entity_scores;

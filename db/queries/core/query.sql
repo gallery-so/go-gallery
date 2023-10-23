@@ -374,18 +374,19 @@ select u.* from tokens t
     where t.id = $1 and t.displayable and t.deleted = false and u.deleted = false;
 
 -- name: GetPreviewURLsByContractIdAndUserId :many
-select coalesce(nullif(token_medias.media->>'thumbnail_url', ''), nullif(token_medias.media->>'media_url', ''))::varchar as thumbnail_url
-from tokens, token_definitions, token_medias
-where tokens.token_definition_id = token_definitions.id 
-    and token_definitions.token_media_id = token_medias.id
-    and token_definitions.contract_id = @contract_id
-    and tokens.owner_user_id = @owner_id
-    and tokens.displayable
-    and (token_medias.media ->> 'thumbnail_url' != '' or token_medias.media->>'media_type' = 'image')
-    and not tokens.deleted
-    and not token_definitions.deleted
-    and not token_medias.deleted
-order by tokens.id limit 3;
+select coalesce(nullif(tm.media->>'thumbnail_url', ''), nullif(tm.media->>'media_url', ''))::varchar as thumbnail_url
+from tokens t
+join token_definitions td on t.token_definition_id = td.id
+join token_medias tm on td.token_media_id = tm.id
+where t.owner_user_id = @owner_id
+	and t.contract_id = @contract_id
+	and t.displayable
+	and (tm.media ->> 'thumbnail_url' != '' or tm.media->>'media_type' = 'image')
+	and not t.deleted
+	and not td.deleted
+	and not tm.deleted
+	and tm.active
+order by t.id limit 3;
 
 -- name: GetTokensByUserIdBatch :batchmany
 select t.* 

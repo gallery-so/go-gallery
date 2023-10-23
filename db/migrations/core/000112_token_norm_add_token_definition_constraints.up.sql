@@ -43,14 +43,20 @@ join token_definitions td on (t.chain, t.contract, t.token_id) = (td.chain, td.c
 alter table tokens_with_token_definition_fk add column is_holder_token boolean not null generated always as (cardinality(owned_by_wallets) > 0) stored;
 alter table tokens_with_token_definition_fk add column displayable boolean not null generated always as (cardinality(owned_by_wallets) > 0 or is_creator_token) stored;
 
--- Add back constraints
+-- Add back constraints and indices
 alter table tokens_with_token_definition_fk add primary key(id);
 alter table tokens_with_token_definition_fk add constraint contracts_contract_id_fkey foreign key(contract) references contracts(id) on delete cascade on update cascade;
 alter table tokens_with_token_definition_fk alter column token_definition_id set not null;
 alter table tokens_with_token_definition_fk alter column contract set not null;
 alter table tokens_with_token_definition_fk add constraint token_definitions_token_definition_id_fkey foreign key(token_definition_id) references token_definitions(id) on update cascade;
-create index if not exists tokens_owner_user_id_chain_idx on tokens_with_token_definition_fk(owner_user_id, chain) where not deleted;
-create unique index if not exists tokens_owner_token_definition_idx on tokens_with_token_definition_fk(owner_user_id, token_definition_id) where not deleted;
+create unique index on tokens_with_token_definition_fk(owner_user_id, token_definition_id) where not deleted;
+create index on tokens_with_token_definition_fk(owner_user_id, is_creator_token) where deleted = false;
+create index on tokens_with_token_definition_fk(owner_user_id, is_holder_token) where deleted = false;
+create index on tokens_with_token_definition_fk(owner_user_id, displayable) where deleted = false;
+create index on tokens_with_token_definition_fk(owner_user_id, contract_id) where deleted = false;
+create index on tokens_with_token_definition_fk using gin (owned_by_wallets);
+create index on tokens_with_token_definition_fk(last_updated) where deleted = false;
+create index on tokens_with_token_definition_fk(contract_id, token_definition_id) where deleted = false;
 
 -- Rename the table, create a backup of the old table
 alter table tokens rename to tokens_backup;
@@ -60,6 +66,7 @@ alter table tokens_with_token_definition_fk rename to tokens;
 alter table tokens rename column contract to contract_id;
 
 -- Keep migrated columns around for a bit
+alter table tokens rename column chain to chain__deprecated;
 alter table tokens rename column token_id to token_id__deprecated;
 alter table tokens rename column name to name__deprecated;
 alter table tokens rename column description to description__deprecated;
