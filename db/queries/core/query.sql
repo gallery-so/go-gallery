@@ -1572,6 +1572,7 @@ where token_definitions.contract_address = @ens_address
     and not token_medias.deleted
     and not wallets.deleted
     and not token_definitions.deleted
+    and not tokens.deleted
 order by tw.id = users.primary_wallet_id desc, tokens.id desc
 limit 1;
 
