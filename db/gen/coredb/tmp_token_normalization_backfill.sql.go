@@ -12,7 +12,7 @@ import (
 )
 
 const getTokenBackfillBatch = `-- name: GetTokenBackfillBatch :many
-select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name__deprecated, tokens.description__deprecated, tokens.collectors_note, tokens.token_uri__deprecated, tokens.token_type__deprecated, tokens.token_id__deprecated, tokens.quantity, tokens.ownership_history__deprecated, tokens.external_url__deprecated, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain__deprecated, tokens.contract_id, tokens.is_user_marked_spam, tokens.is_provider_marked_spam__deprecated, tokens.last_synced, tokens.fallback_media__deprecated, tokens.token_media_id__deprecated, tokens.is_creator_token, tokens.is_holder_token, tokens.displayable, tokens.token_definition_id, token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.contract_id__deprecated, token_medias.token_id__deprecated, token_medias.chain__deprecated, token_medias.active, token_medias.metadata__deprecated, token_medias.media, token_medias.name__deprecated, token_medias.description__deprecated, token_medias.processing_job_id, token_medias.deleted
+select tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name__deprecated, tokens.description__deprecated, tokens.collectors_note, tokens.token_type__deprecated, tokens.token_id__deprecated, tokens.quantity, tokens.ownership_history__deprecated, tokens.external_url__deprecated, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract_id, tokens.is_user_marked_spam, tokens.is_provider_marked_spam__deprecated, tokens.last_synced, tokens.token_uri__deprecated, tokens.fallback_media__deprecated, tokens.token_media_id__deprecated, tokens.is_creator_token, tokens.token_definition_id, tokens.is_holder_token, tokens.displayable, token_medias.id, token_medias.created_at, token_medias.last_updated, token_medias.version, token_medias.contract_id__deprecated, token_medias.token_id__deprecated, token_medias.chain__deprecated, token_medias.active, token_medias.metadata__deprecated, token_medias.media, token_medias.name__deprecated, token_medias.description__deprecated, token_medias.processing_job_id, token_medias.deleted
 from tokens
 left join token_medias on tokens.token_media_id__deprecated = token_medias.id
 where $1 < tokens.id and tokens.id <= $2
@@ -46,7 +46,6 @@ func (q *Queries) GetTokenBackfillBatch(ctx context.Context, arg GetTokenBackfil
 			&i.Token.NameDeprecated,
 			&i.Token.DescriptionDeprecated,
 			&i.Token.CollectorsNote,
-			&i.Token.TokenUriDeprecated,
 			&i.Token.TokenTypeDeprecated,
 			&i.Token.TokenIDDeprecated,
 			&i.Token.Quantity,
@@ -55,17 +54,18 @@ func (q *Queries) GetTokenBackfillBatch(ctx context.Context, arg GetTokenBackfil
 			&i.Token.BlockNumber,
 			&i.Token.OwnerUserID,
 			&i.Token.OwnedByWallets,
-			&i.Token.ChainDeprecated,
+			&i.Token.Chain,
 			&i.Token.ContractID,
 			&i.Token.IsUserMarkedSpam,
 			&i.Token.IsProviderMarkedSpamDeprecated,
 			&i.Token.LastSynced,
+			&i.Token.TokenUriDeprecated,
 			&i.Token.FallbackMediaDeprecated,
 			&i.Token.TokenMediaIDDeprecated,
 			&i.Token.IsCreatorToken,
+			&i.Token.TokenDefinitionID,
 			&i.Token.IsHolderToken,
 			&i.Token.Displayable,
-			&i.Token.TokenDefinitionID,
 			&i.TokenMedia.ID,
 			&i.TokenMedia.CreatedAt,
 			&i.TokenMedia.LastUpdated,

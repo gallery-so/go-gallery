@@ -498,7 +498,6 @@ type Token struct {
 	NameDeprecated                 sql.NullString    `json:"name__deprecated"`
 	DescriptionDeprecated          sql.NullString    `json:"description__deprecated"`
 	CollectorsNote                 sql.NullString    `json:"collectors_note"`
-	TokenUriDeprecated             sql.NullString    `json:"token_uri__deprecated"`
 	TokenTypeDeprecated            sql.NullString    `json:"token_type__deprecated"`
 	TokenIDDeprecated              sql.NullString    `json:"token_id__deprecated"`
 	Quantity                       persist.HexString `json:"quantity"`
@@ -507,17 +506,18 @@ type Token struct {
 	BlockNumber                    sql.NullInt64     `json:"block_number"`
 	OwnerUserID                    persist.DBID      `json:"owner_user_id"`
 	OwnedByWallets                 persist.DBIDList  `json:"owned_by_wallets"`
-	ChainDeprecated                sql.NullInt32     `json:"chain__deprecated"`
+	Chain                          persist.Chain     `json:"chain"`
 	ContractID                     persist.DBID      `json:"contract_id"`
 	IsUserMarkedSpam               sql.NullBool      `json:"is_user_marked_spam"`
 	IsProviderMarkedSpamDeprecated sql.NullBool      `json:"is_provider_marked_spam__deprecated"`
 	LastSynced                     time.Time         `json:"last_synced"`
+	TokenUriDeprecated             sql.NullString    `json:"token_uri__deprecated"`
 	FallbackMediaDeprecated        pgtype.JSONB      `json:"fallback_media__deprecated"`
 	TokenMediaIDDeprecated         sql.NullString    `json:"token_media_id__deprecated"`
 	IsCreatorToken                 bool              `json:"is_creator_token"`
+	TokenDefinitionID              persist.DBID      `json:"token_definition_id"`
 	IsHolderToken                  bool              `json:"is_holder_token"`
 	Displayable                    bool              `json:"displayable"`
-	TokenDefinitionID              persist.DBID      `json:"token_definition_id"`
 }
 
 type TokenDefinition struct {
@@ -588,6 +588,36 @@ type TokenProcessingJob struct {
 	ProcessingCause  persist.ProcessingCause  `json:"processing_cause"`
 	ProcessorVersion string                   `json:"processor_version"`
 	Deleted          bool                     `json:"deleted"`
+}
+
+type TokensBackup struct {
+	ID                   persist.DBID   `json:"id"`
+	Deleted              bool           `json:"deleted"`
+	Version              sql.NullInt32  `json:"version"`
+	CreatedAt            time.Time      `json:"created_at"`
+	LastUpdated          time.Time      `json:"last_updated"`
+	Name                 sql.NullString `json:"name"`
+	Description          sql.NullString `json:"description"`
+	CollectorsNote       sql.NullString `json:"collectors_note"`
+	TokenUri             sql.NullString `json:"token_uri"`
+	TokenType            sql.NullString `json:"token_type"`
+	TokenID              persist.DBID   `json:"token_id"`
+	Quantity             sql.NullString `json:"quantity"`
+	OwnershipHistory     []pgtype.JSONB `json:"ownership_history"`
+	ExternalUrl          sql.NullString `json:"external_url"`
+	BlockNumber          sql.NullInt64  `json:"block_number"`
+	OwnerUserID          persist.DBID   `json:"owner_user_id"`
+	OwnedByWallets       []string       `json:"owned_by_wallets"`
+	Chain                persist.Chain  `json:"chain"`
+	Contract             sql.NullString `json:"contract"`
+	IsUserMarkedSpam     sql.NullBool   `json:"is_user_marked_spam"`
+	IsProviderMarkedSpam sql.NullBool   `json:"is_provider_marked_spam"`
+	LastSynced           time.Time      `json:"last_synced"`
+	FallbackMedia        pgtype.JSONB   `json:"fallback_media"`
+	TokenMediaID         persist.DBID   `json:"token_media_id"`
+	IsCreatorToken       bool           `json:"is_creator_token"`
+	IsHolderToken        bool           `json:"is_holder_token"`
+	Displayable          bool           `json:"displayable"`
 }
 
 type TopRecommendedUser struct {
