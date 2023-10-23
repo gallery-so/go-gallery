@@ -53,10 +53,10 @@ create unique index on tokens_with_token_definition_fk(owner_user_id, token_defi
 create index on tokens_with_token_definition_fk(owner_user_id, is_creator_token) where deleted = false;
 create index on tokens_with_token_definition_fk(owner_user_id, is_holder_token) where deleted = false;
 create index on tokens_with_token_definition_fk(owner_user_id, displayable) where deleted = false;
-create index on tokens_with_token_definition_fk(owner_user_id, contract_id) where deleted = false;
+create index on tokens_with_token_definition_fk(owner_user_id, contract) where deleted = false;
 create index on tokens_with_token_definition_fk using gin (owned_by_wallets);
 create index on tokens_with_token_definition_fk(last_updated) where deleted = false;
-create index on tokens_with_token_definition_fk(contract_id, token_definition_id) where deleted = false;
+create index on tokens_with_token_definition_fk(contract, token_definition_id) where deleted = false;
 
 -- Rename the table, create a backup of the old table
 alter table tokens rename to tokens_backup;
