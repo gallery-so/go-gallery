@@ -117,13 +117,14 @@ update tokens t
 set owned_by_wallets = case when @remove_holder_status::bool then '{}' else owned_by_wallets end,
     is_creator_token = case when @remove_creator_status::bool then false else is_creator_token end,
     last_updated = now()
+from token_definitions td
 where
   -- Guard against only_from_user_id and only_from_contract_ids both being null/empty, as this would
   -- result in deleting more tokens than intended.
   (sqlc.narg('only_from_user_id')::text is not null or cardinality(@only_from_contract_ids::text[]) > 0)
-  and (sqlc.narg('only_from_user_id') is null or owner_user_id = @only_from_user_id)
-  and (cardinality(@only_from_contract_ids) = 0 or contract = any(@only_from_contract_ids))
-  and (cardinality(@only_from_chains::int[]) = 0 or chain = any(@only_from_chains))
-  and deleted = false
-  and ((@remove_holder_status and is_holder_token) or (@remove_creator_status and is_creator_token))
-  and last_synced < @timestamp;
+  and (sqlc.narg('only_from_user_id') is null or t.owner_user_id = @only_from_user_id)
+  and (cardinality(@only_from_contract_ids) = 0 or td.contract_id = any(@only_from_contract_ids))
+  and (cardinality(@only_from_chains::int[]) = 0 or td.chain = any(@only_from_chains))
+  and t.deleted = false
+  and ((@remove_holder_status and t.is_holder_token) or (@remove_creator_status and t.is_creator_token))
+  and t.last_synced < @timestamp;

@@ -18,16 +18,17 @@ update tokens t
 set owned_by_wallets = case when $1::bool then '{}' else owned_by_wallets end,
     is_creator_token = case when $2::bool then false else is_creator_token end,
     last_updated = now()
+from token_definitions td
 where
   -- Guard against only_from_user_id and only_from_contract_ids both being null/empty, as this would
   -- result in deleting more tokens than intended.
   ($3::text is not null or cardinality($4::text[]) > 0)
-  and ($3 is null or owner_user_id = $3)
-  and (cardinality($4) = 0 or contract = any($4))
-  and (cardinality($5::int[]) = 0 or chain = any($5))
-  and deleted = false
-  and (($1 and is_holder_token) or ($2 and is_creator_token))
-  and last_synced < $6
+  and ($3 is null or t.owner_user_id = $3)
+  and (cardinality($4) = 0 or td.contract_id = any($4))
+  and (cardinality($5::int[]) = 0 or td.chain = any($5))
+  and t.deleted = false
+  and (($1 and t.is_holder_token) or ($2 and t.is_creator_token))
+  and t.last_synced < $6
 `
 
 type DeleteTokensBeforeTimestampParams struct {
