@@ -135,7 +135,7 @@ func testUserByAddress(t *testing.T) {
 	userF := newUserFixture(t)
 	c := authedHandlerClient(t, userF.ID)
 
-	response, err := userByAddressQuery(context.Background(), c, chainAddressInput(userF.Wallet.Address))
+	response, err := userByAddressQuery(context.Background(), c, chainAddressInput(userF.Wallet.Address.String()))
 
 	require.NoError(t, err)
 	payload, _ := (*response.UserByAddress).(*userByAddressQueryUserByAddressGalleryUser)
@@ -200,12 +200,12 @@ func testAddWallet(t *testing.T) {
 	c := authedHandlerClient(t, userF.ID)
 	nonce := newNonce(t, ctx, c, walletToAdd)
 
-	response, err := addUserWalletMutation(ctx, c, chainAddressInput(walletToAdd.Address), authMechanismInput(walletToAdd, nonce))
+	response, err := addUserWalletMutation(ctx, c, chainAddressInput(walletToAdd.Address.String()), authMechanismInput(walletToAdd, nonce))
 
 	require.NoError(t, err)
 	payload, _ := (*response.AddUserWallet).(*addUserWalletMutationAddUserWalletAddUserWalletPayload)
 	wallets := payload.Viewer.User.Wallets
-	assert.Equal(t, walletToAdd.Address, *wallets[len(wallets)-1].ChainAddress.Address)
+	assert.Equal(t, walletToAdd.Address.String(), *wallets[len(wallets)-1].ChainAddress.Address)
 	assert.Equal(t, Chain("Ethereum"), *wallets[len(wallets)-1].ChainAddress.Chain)
 	assert.Len(t, wallets, 2)
 }
@@ -216,7 +216,7 @@ func testRemoveWallet(t *testing.T) {
 	ctx := context.Background()
 	c := authedHandlerClient(t, userF.ID)
 	nonce := newNonce(t, ctx, c, walletToRemove)
-	addResponse, err := addUserWalletMutation(ctx, c, chainAddressInput(walletToRemove.Address), authMechanismInput(walletToRemove, nonce))
+	addResponse, err := addUserWalletMutation(ctx, c, chainAddressInput(walletToRemove.Address.String()), authMechanismInput(walletToRemove, nonce))
 	require.NoError(t, err)
 	wallets := (*addResponse.AddUserWallet).(*addUserWalletMutationAddUserWalletAddUserWalletPayload).Viewer.User.Wallets
 	lastWallet := wallets[len(wallets)-1]
@@ -975,7 +975,7 @@ func testSyncShouldMergeDuplicatesAcrossProviders(t *testing.T) {
 }
 
 // newDummyMetadataProviderFixture creates a new handler configured with a stubbed provider that reads from a fixed dummy metadata server endpoint
-func newDummyMetadataProviderFixture(t *testing.T, ctx context.Context, ownerAddress, dummyEndpointToHit string, opts ...providerOpt) http.Handler {
+func newDummyMetadataProviderFixture(t *testing.T, ctx context.Context, ownerAddress persist.Address, dummyEndpointToHit string, opts ...providerOpt) http.Handler {
 	metadataServerF := newMetadataServerFixture(t)
 	metadataFetchF := fetchFromDummyEndpoint(metadataServerF.URL, dummyEndpointToHit)
 	pOpts := append([]providerOpt{withFetchMetadata(metadataFetchF)}, opts...)
@@ -1284,7 +1284,7 @@ func authMechanismInput(w wallet, nonce string) AuthMechanism {
 			Nonce:     nonce,
 			Signature: w.Sign(nonce),
 			ChainPubKey: ChainPubKeyInput{
-				PubKey: w.Address,
+				PubKey: w.Address.String(),
 				Chain:  "Ethereum",
 			},
 		},
@@ -1298,7 +1298,7 @@ func chainAddressInput(address string) ChainAddressInput {
 type wallet struct {
 	PKey    *ecdsa.PrivateKey
 	PubKey  *ecdsa.PublicKey
-	Address string
+	Address persist.Address
 }
 
 func (w *wallet) Sign(msg string) string {
@@ -1321,13 +1321,13 @@ func newWallet(t *testing.T) wallet {
 	return wallet{
 		PKey:    pk,
 		PubKey:  pubKey,
-		Address: address,
+		Address: persist.Address(address),
 	}
 }
 
 func newNonce(t *testing.T, ctx context.Context, c genql.Client, w wallet) string {
 	t.Helper()
-	response, err := getAuthNonceMutation(ctx, c, chainAddressInput(w.Address))
+	response, err := getAuthNonceMutation(ctx, c, chainAddressInput(w.Address.String()))
 	require.NoError(t, err)
 	payload := (*response.GetAuthNonce).(*getAuthNonceMutationGetAuthNonce)
 	return *payload.Nonce
@@ -1522,22 +1522,22 @@ func defaultLayout() CollectionLayoutInput {
 }
 
 // dummyToken returns a dummy token owned by the provided address
-func dummyToken(ownerAddress string) multichain.ChainAgnosticToken {
+func dummyToken(ownerAddress persist.Address) multichain.ChainAgnosticToken {
 	return dummyTokenContract(ownerAddress, "0x123")
 }
 
 // dummyTokenContract returns a dummy token owned by the provided address from the provided contract
-func dummyTokenContract(ownerAddress, contractAddress string) multichain.ChainAgnosticToken {
+func dummyTokenContract(ownerAddress, contractAddress persist.Address) multichain.ChainAgnosticToken {
 	return dummyTokenIDContract(ownerAddress, contractAddress, "1")
 }
 
 // dummyTokenIDContract returns a dummy token owned by the provided address from the provided contract with the given tokenID
-func dummyTokenIDContract(ownerAddress, contractAddress string, tokenID persist.TokenID) multichain.ChainAgnosticToken {
+func dummyTokenIDContract(ownerAddress, contractAddress persist.Address, tokenID persist.TokenID) multichain.ChainAgnosticToken {
 	return multichain.ChainAgnosticToken{
-		TokenID:         persist.TokenID(tokenID),
+		TokenID:         tokenID,
 		Quantity:        "1",
-		ContractAddress: persist.Address(contractAddress),
-		OwnerAddress:    persist.Address(ownerAddress),
+		ContractAddress: contractAddress,
+		OwnerAddress:    ownerAddress,
 	}
 }
 

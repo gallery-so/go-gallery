@@ -100,12 +100,12 @@ func withTokens(tokens []multichain.ChainAgnosticToken) providerOpt {
 }
 
 // withDummyTokenN will generate n dummy tokens from the provided contract
-func withDummyTokenN(contract multichain.ChainAgnosticContract, ownerAddress string, n int) providerOpt {
+func withDummyTokenN(contract multichain.ChainAgnosticContract, ownerAddress persist.Address, n int) providerOpt {
 	return func(p *stubProvider) {
 		tokens := []multichain.ChainAgnosticToken{}
 		for i := 0; i < n; i++ {
 			tokenID := persist.TokenID(fmt.Sprintf("%X", i))
-			token := dummyTokenIDContract(ownerAddress, contract.Address.String(), tokenID)
+			token := dummyTokenIDContract(ownerAddress, contract.Address, tokenID)
 			tokens = append(tokens, token)
 		}
 		withContracts([]multichain.ChainAgnosticContract{contract})(p)
@@ -114,12 +114,11 @@ func withDummyTokenN(contract multichain.ChainAgnosticContract, ownerAddress str
 }
 
 // withDummyTokenID will generate a token with the provided token ID
-func withDummyTokenID(ownerAddress string, tokenID persist.TokenID) providerOpt {
-	contractAddress := "0x123"
-	c := multichain.ChainAgnosticContract{Address: persist.Address(contractAddress)}
+func withDummyTokenID(ownerAddress persist.Address, tokenID persist.TokenID) providerOpt {
+	c := multichain.ChainAgnosticContract{Address: "0x123"}
 	return func(p *stubProvider) {
 		withContracts([]multichain.ChainAgnosticContract{c})(p)
-		withTokens([]multichain.ChainAgnosticToken{dummyTokenIDContract(ownerAddress, contractAddress, tokenID)})(p)
+		withTokens([]multichain.ChainAgnosticToken{dummyTokenIDContract(ownerAddress, c.Address, tokenID)})(p)
 	}
 }
 
@@ -131,9 +130,9 @@ func withFetchMetadata(f func() (persist.TokenMetadata, error)) providerOpt {
 }
 
 // defaultStubProvider returns a stubProvider that returns dummy tokens
-func defaultStubProvider(address string) stubProvider {
+func defaultStubProvider(ownerAddress persist.Address) stubProvider {
 	contract := multichain.ChainAgnosticContract{Address: "0x123", Descriptors: multichain.ChainAgnosticContractDescriptors{Name: "testContract"}}
-	return newStubProvider(withDummyTokenN(contract, address, 10))
+	return newStubProvider(withDummyTokenN(contract, ownerAddress, 10))
 }
 
 // newStubRecommender returns a recommender that returns a canned set of recommendations
