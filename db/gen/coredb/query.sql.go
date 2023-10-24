@@ -4590,7 +4590,7 @@ func (q *Queries) GetUserById(ctx context.Context, id persist.DBID) (User, error
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id FROM users WHERE username_idempotent = lower($1) AND deleted = false
+select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, profile_image_id from users where username_idempotent = lower($1) and deleted = false and universal = false
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {

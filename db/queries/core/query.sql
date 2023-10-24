@@ -16,10 +16,10 @@ SELECT * FROM users WHERE id = ANY(@user_ids) AND deleted = false
     LIMIT $1;
 
 -- name: GetUserByUsername :one
-SELECT * FROM users WHERE username_idempotent = lower(sqlc.arg('username')) AND deleted = false;
+select * from users where username_idempotent = lower(sqlc.arg('username')) and deleted = false and universal = false;
 
 -- name: GetUserByUsernameBatch :batchone
-SELECT * FROM users WHERE username_idempotent = lower($1) AND deleted = false;
+select * from users where username_idempotent = lower($1) and deleted = false and universal = false;
 
 -- name: GetUserByVerifiedEmailAddress :one
 select u.* from users u join pii.for_users p on u.id = p.user_id
