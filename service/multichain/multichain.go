@@ -992,10 +992,12 @@ func (p *Provider) processTokensForUsers(ctx context.Context, users map[persist.
 	}
 
 	// Submit tokens that are missing media IDs. Tokens that are missing media IDs are new tokens, or tokens that weren't processed for whatever reason.
-	// This means we won't refresh tokens that have already been seen.
 	definitionsToProcess := util.Filter(upsertedTokens, func(t postgres.TokenFullDetails) bool { return t.Definition.TokenMediaID == "" }, false)
 	definitionIDs := util.MapWithoutError(definitionsToProcess, func(t postgres.TokenFullDetails) persist.DBID { return t.Definition.ID })
-	err = p.SubmitTokens(ctx, definitionIDs)
+
+	if len(definitionIDs) > 0 {
+		err = p.SubmitTokens(ctx, definitionIDs)
+	}
 
 	return currentUserTokens, newUserTokens, err
 }
@@ -1871,7 +1873,7 @@ func chainTokensToUpsertableTokenDefinitions(chainTokens []chainTokens, existing
 					FallbackMedia:   token.FallbackMedia,
 					ContractAddress: token.ContractAddress,
 					ContractID:      contractID,
-					TokenMediaID:    "", // Upsert will set this if the definition already exists
+					TokenMediaID:    "", // Upsert will handle this in the db if the definition already exists
 				}
 			} else {
 				// Merge the token definition with the existing one. The fields that aren't merged below use the data of the first write.

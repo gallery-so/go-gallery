@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"cloud.google.com/go/cloudtasks/apiv2/cloudtaskspb"
+	"github.com/stretchr/testify/require"
+
 	"github.com/mikeydub/go-gallery/autosocial"
 	migrate "github.com/mikeydub/go-gallery/db"
 	"github.com/mikeydub/go-gallery/docker"
@@ -19,7 +21,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/tokenprocessing"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/stretchr/testify/require"
 )
 
 // fixture runs setup and teardown for a test
