@@ -1782,22 +1782,24 @@ func (b *GetGalleryByIdBatchBatchResults) Close() error {
 
 const getGalleryTokenMediasByGalleryIDBatch = `-- name: GetGalleryTokenMediasByGalleryIDBatch :batchmany
 select tm.id, tm.created_at, tm.last_updated, tm.version, tm.contract_id__deprecated, tm.token_id__deprecated, tm.chain__deprecated, tm.active, tm.metadata__deprecated, tm.media, tm.name__deprecated, tm.description__deprecated, tm.processing_job_id, tm.deleted
-	from galleries g, collections c, tokens t, token_medias tm
-	where
-		g.id = $1
-		and c.id = any(g.collections[:8])
-		and t.id = any(c.nfts[:8])
-		and t.token_media_id = tm.id
-	    and t.owner_user_id = g.owner_user_id
-	    and t.displayable
-		and not g.deleted
-		and not c.deleted
-		and not t.deleted
-		and not tm.deleted
-		and tm.active
-		and (length(tm.media ->> 'thumbnail_url'::varchar) > 0 or length(tm.media ->> 'media_url'::varchar) > 0)
-	order by array_position(g.collections, c.id) , array_position(c.nfts, t.id)
-	limit 4
+from galleries g, collections c, tokens t, token_medias tm, token_definitions td
+where
+	g.id = $1
+	and c.id = any(g.collections[:8])
+	and t.id = any(c.nfts[:8])
+    and t.owner_user_id = g.owner_user_id
+    and t.displayable
+    and t.token_definition_id = td.id
+    and td.token_media_id = tm.id
+    and not td.deleted
+	and not g.deleted
+	and not c.deleted
+	and not t.deleted
+	and not tm.deleted
+	and tm.active
+	and (length(tm.media ->> 'thumbnail_url'::varchar) > 0 or length(tm.media ->> 'media_url'::varchar) > 0)
+order by array_position(g.collections, c.id) , array_position(c.nfts, t.id)
+limit 4
 `
 
 type GetGalleryTokenMediasByGalleryIDBatchBatchResults struct {
