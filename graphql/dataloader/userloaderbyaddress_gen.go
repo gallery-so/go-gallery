@@ -25,18 +25,18 @@ type UserLoaderByAddressSettings interface {
 
 // UserLoaderByAddressCacheSubscriptions
 type UserLoaderByAddressCacheSubscriptions struct {
-	// AutoCacheWithKey is a function that returns the coredb.GetUserByAddressBatchParams cache key for a coredb.User.
+	// AutoCacheWithKey is a function that returns the coredb.GetUserByAddressAndL1BatchParams cache key for a coredb.User.
 	// If AutoCacheWithKey is not nil, this loader will automatically cache published results from other loaders
 	// that return a coredb.User. Loaders that return pointers or slices of coredb.User
 	// will be dereferenced/iterated automatically, invoking this function with the base coredb.User type.
-	AutoCacheWithKey func(coredb.User) coredb.GetUserByAddressBatchParams
+	AutoCacheWithKey func(coredb.User) coredb.GetUserByAddressAndL1BatchParams
 
-	// AutoCacheWithKeys is a function that returns the []coredb.GetUserByAddressBatchParams cache keys for a coredb.User.
+	// AutoCacheWithKeys is a function that returns the []coredb.GetUserByAddressAndL1BatchParams cache keys for a coredb.User.
 	// Similar to AutoCacheWithKey, but for cases where a single value gets cached by many keys.
 	// If AutoCacheWithKeys is not nil, this loader will automatically cache published results from other loaders
 	// that return a coredb.User. Loaders that return pointers or slices of coredb.User
 	// will be dereferenced/iterated automatically, invoking this function with the base coredb.User type.
-	AutoCacheWithKeys func(coredb.User) []coredb.GetUserByAddressBatchParams
+	AutoCacheWithKeys func(coredb.User) []coredb.GetUserByAddressAndL1BatchParams
 
 	// TODO: Allow custom cache functions once we're able to use generics. It could be done without generics, but
 	// would be messy and error-prone. A non-generic implementation might look something like:
@@ -78,7 +78,7 @@ func (l *UserLoaderByAddress) setPostFetchHook(postFetchHook func(context.Contex
 
 // NewUserLoaderByAddress creates a new UserLoaderByAddress with the given settings, functions, and options
 func NewUserLoaderByAddress(
-	settings UserLoaderByAddressSettings, fetch func(ctx context.Context, keys []coredb.GetUserByAddressBatchParams) ([]coredb.User, []error),
+	settings UserLoaderByAddressSettings, fetch func(ctx context.Context, keys []coredb.GetUserByAddressAndL1BatchParams) ([]coredb.User, []error),
 	funcs UserLoaderByAddressCacheSubscriptions,
 	opts ...func(interface {
 		setContext(context.Context)
@@ -107,7 +107,7 @@ func NewUserLoaderByAddress(
 	}
 
 	// Set this after applying options, in case a different context was set via options
-	loader.fetch = func(keys []coredb.GetUserByAddressBatchParams) ([]coredb.User, []error) {
+	loader.fetch = func(keys []coredb.GetUserByAddressAndL1BatchParams) ([]coredb.User, []error) {
 		ctx := loader.ctx
 
 		// Allow the preFetchHook to modify and return a new context
@@ -162,7 +162,7 @@ type UserLoaderByAddress struct {
 	ctx context.Context
 
 	// this method provides the data for the loader
-	fetch func(keys []coredb.GetUserByAddressBatchParams) ([]coredb.User, []error)
+	fetch func(keys []coredb.GetUserByAddressAndL1BatchParams) ([]coredb.User, []error)
 
 	// how long to wait before sending a batch
 	wait time.Duration
@@ -194,7 +194,7 @@ type UserLoaderByAddress struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[coredb.GetUserByAddressBatchParams]coredb.User
+	cache map[coredb.GetUserByAddressAndL1BatchParams]coredb.User
 
 	// typed cache functions
 	//subscribers []func(coredb.User)
@@ -215,7 +215,7 @@ type UserLoaderByAddress struct {
 }
 
 type userLoaderByAddressBatch struct {
-	keys    []coredb.GetUserByAddressBatchParams
+	keys    []coredb.GetUserByAddressAndL1BatchParams
 	data    []coredb.User
 	error   []error
 	closing bool
@@ -223,14 +223,14 @@ type userLoaderByAddressBatch struct {
 }
 
 // Load a User by key, batching and caching will be applied automatically
-func (l *UserLoaderByAddress) Load(key coredb.GetUserByAddressBatchParams) (coredb.User, error) {
+func (l *UserLoaderByAddress) Load(key coredb.GetUserByAddressAndL1BatchParams) (coredb.User, error) {
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a User.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *UserLoaderByAddress) LoadThunk(key coredb.GetUserByAddressBatchParams) func() (coredb.User, error) {
+func (l *UserLoaderByAddress) LoadThunk(key coredb.GetUserByAddressAndL1BatchParams) func() (coredb.User, error) {
 	l.mu.Lock()
 	if !l.disableCaching {
 		if it, ok := l.cache[key]; ok {
@@ -281,7 +281,7 @@ func (l *UserLoaderByAddress) LoadThunk(key coredb.GetUserByAddressBatchParams) 
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *UserLoaderByAddress) LoadAll(keys []coredb.GetUserByAddressBatchParams) ([]coredb.User, []error) {
+func (l *UserLoaderByAddress) LoadAll(keys []coredb.GetUserByAddressAndL1BatchParams) ([]coredb.User, []error) {
 	results := make([]func() (coredb.User, error), len(keys))
 
 	for i, key := range keys {
@@ -299,7 +299,7 @@ func (l *UserLoaderByAddress) LoadAll(keys []coredb.GetUserByAddressBatchParams)
 // LoadAllThunk returns a function that when called will block waiting for a Users.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *UserLoaderByAddress) LoadAllThunk(keys []coredb.GetUserByAddressBatchParams) func() ([]coredb.User, []error) {
+func (l *UserLoaderByAddress) LoadAllThunk(keys []coredb.GetUserByAddressAndL1BatchParams) func() ([]coredb.User, []error) {
 	results := make([]func() (coredb.User, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
@@ -317,7 +317,7 @@ func (l *UserLoaderByAddress) LoadAllThunk(keys []coredb.GetUserByAddressBatchPa
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *UserLoaderByAddress) Prime(key coredb.GetUserByAddressBatchParams, value coredb.User) bool {
+func (l *UserLoaderByAddress) Prime(key coredb.GetUserByAddressAndL1BatchParams, value coredb.User) bool {
 	if l.disableCaching {
 		return false
 	}
@@ -331,7 +331,7 @@ func (l *UserLoaderByAddress) Prime(key coredb.GetUserByAddressBatchParams, valu
 }
 
 // Prime the cache without acquiring locks. Should only be used when the lock is already held.
-func (l *UserLoaderByAddress) unsafePrime(key coredb.GetUserByAddressBatchParams, value coredb.User) bool {
+func (l *UserLoaderByAddress) unsafePrime(key coredb.GetUserByAddressAndL1BatchParams, value coredb.User) bool {
 	if l.disableCaching {
 		return false
 	}
@@ -343,7 +343,7 @@ func (l *UserLoaderByAddress) unsafePrime(key coredb.GetUserByAddressBatchParams
 }
 
 // Clear the value at key from the cache, if it exists
-func (l *UserLoaderByAddress) Clear(key coredb.GetUserByAddressBatchParams) {
+func (l *UserLoaderByAddress) Clear(key coredb.GetUserByAddressAndL1BatchParams) {
 	if l.disableCaching {
 		return
 	}
@@ -352,16 +352,16 @@ func (l *UserLoaderByAddress) Clear(key coredb.GetUserByAddressBatchParams) {
 	l.mu.Unlock()
 }
 
-func (l *UserLoaderByAddress) unsafeSet(key coredb.GetUserByAddressBatchParams, value coredb.User) {
+func (l *UserLoaderByAddress) unsafeSet(key coredb.GetUserByAddressAndL1BatchParams, value coredb.User) {
 	if l.cache == nil {
-		l.cache = map[coredb.GetUserByAddressBatchParams]coredb.User{}
+		l.cache = map[coredb.GetUserByAddressAndL1BatchParams]coredb.User{}
 	}
 	l.cache[key] = value
 }
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
-func (b *userLoaderByAddressBatch) keyIndex(l *UserLoaderByAddress, key coredb.GetUserByAddressBatchParams) int {
+func (b *userLoaderByAddressBatch) keyIndex(l *UserLoaderByAddress, key coredb.GetUserByAddressAndL1BatchParams) int {
 	for i, existingKey := range b.keys {
 		if key == existingKey {
 			return i

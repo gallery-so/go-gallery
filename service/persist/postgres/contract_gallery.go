@@ -94,6 +94,7 @@ func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, contracts [
 		params.Name = append(params.Name, c.Name.String)
 		params.OwnerAddress = append(params.OwnerAddress, c.OwnerAddress.String())
 		params.Chain = append(params.Chain, int32(c.Chain))
+		params.L1Chain = append(params.L1Chain, int32(c.Chain.L1Chain()))
 		params.Description = append(params.Description, c.Description.String)
 		params.ProfileImageUrl = append(params.ProfileImageUrl, c.ProfileImageUrl.String)
 		params.ProviderMarkedSpam = append(params.ProviderMarkedSpam, c.IsProviderMarkedSpam)

@@ -81,6 +81,7 @@ type Contract struct {
 	IsProviderMarkedSpam  bool            `json:"is_provider_marked_spam"`
 	ParentID              persist.DBID    `json:"parent_id"`
 	OverrideCreatorUserID persist.DBID    `json:"override_creator_user_id"`
+	L1Chain               persist.L1Chain `json:"l1_chain"`
 }
 
 type ContractCreator struct {
@@ -308,6 +309,7 @@ type Nonce struct {
 	Address     persist.Address `json:"address"`
 	Value       sql.NullString  `json:"value"`
 	Chain       persist.Chain   `json:"chain"`
+	L1Chain     persist.L1Chain `json:"l1_chain"`
 }
 
 type Notification struct {
@@ -671,4 +673,5 @@ type Wallet struct {
 	Address     persist.Address    `json:"address"`
 	WalletType  persist.WalletType `json:"wallet_type"`
 	Chain       persist.Chain      `json:"chain"`
+	L1Chain     persist.L1Chain    `json:"l1_chain"`
 }

@@ -54,16 +54,14 @@ func NewMultichainProvider(ctx context.Context, envFunc func()) (*multichain.Pro
 	serverPolygonProviderList := polygonProviderSet(httpClient, serverTokenMetadataCache)
 	serverArbitrumProviderList := arbitrumProviderSet(httpClient, serverTokenMetadataCache)
 	v := newMultichainSet(serverEthProviderList, serverOptimismProviderList, serverTezosProviderList, serverPoapProviderList, serverZoraProviderList, serverBaseProviderList, serverPolygonProviderList, serverArbitrumProviderList)
-	v2 := defaultWalletOverrides()
 	manager := tokenmanage.New(ctx, client)
 	submitTokensF := newManagedTokens(ctx, manager)
 	provider := &multichain.Provider{
-		Repos:           repositories,
-		Queries:         queries,
-		Cache:           cache,
-		Chains:          v,
-		WalletOverrides: v2,
-		SubmitTokens:    submitTokensF,
+		Repos:        repositories,
+		Queries:      queries,
+		Cache:        cache,
+		Chains:       v,
+		SubmitTokens: submitTokensF,
 	}
 	return provider, func() {
 		cleanup2()
@@ -415,11 +413,6 @@ func newMultichainSet(
 	chainToProviders[persist.ChainPolygon] = dedupe(polygonProviders)
 	chainToProviders[persist.ChainArbitrum] = dedupe(arbitrumProviders)
 	return chainToProviders
-}
-
-// defaultWalletOverrides is a wire provider for wallet overrides
-func defaultWalletOverrides() multichain.WalletOverrideMap {
-	return multichain.WalletOverrideMap{persist.ChainPOAP: persist.EvmChains, persist.ChainOptimism: persist.EvmChains, persist.ChainPolygon: persist.EvmChains, persist.ChainArbitrum: persist.EvmChains, persist.ChainETH: persist.EvmChains, persist.ChainZora: persist.EvmChains, persist.ChainBase: persist.EvmChains}
 }
 
 func tezosTokenEvalFunc() func(context.Context, multichain.ChainAgnosticToken) bool {

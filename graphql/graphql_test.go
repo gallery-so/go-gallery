@@ -1588,7 +1588,7 @@ func newMultichainProvider(c *server.Clients, submitF multichain.SubmitTokensF, 
 	return multichain.Provider{
 		Repos:        c.Repos,
 		Queries:      c.Queries,
-		Chains:       map[persist.Chain][]any{persist.ChainETH: providers, persist.ChainOptimism: providers},
+		Chains:       chains,
 		SubmitTokens: submitF,
 	}
 }

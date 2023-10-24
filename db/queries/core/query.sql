@@ -28,20 +28,20 @@ where p.pii_email_address = lower($1)
   and p.deleted = false
   and u.deleted = false;
 
--- name: GetUserByAddressAndChains :one
+-- name: GetUserByAddressAndL1 :one
 select users.*
 from users, wallets
 where wallets.address = sqlc.arg('address')
-	and wallets.chain = any(sqlc.arg('chains')::int[])
+	and wallets.l1_chain = sqlc.arg('l1_chain')
 	and array[wallets.id] <@ users.wallets
 	and wallets.deleted = false
 	and users.deleted = false;
 
--- name: GetUserByAddressBatch :batchone
+-- name: GetUserByAddressAndL1Batch :batchone
 select users.*
 from users, wallets
 where wallets.address = sqlc.arg('address')
-	and wallets.chain = sqlc.arg('chain')::int
+	and wallets.l1_chain = sqlc.arg('l1_chain')
 	and array[wallets.id] <@ users.wallets
 	and wallets.deleted = false
 	and users.deleted = false;
@@ -226,11 +226,8 @@ SELECT * FROM wallets WHERE id = $1 AND deleted = false;
 -- name: GetWalletByIDBatch :batchone
 SELECT * FROM wallets WHERE id = $1 AND deleted = false;
 
--- name: GetWalletByChainAddress :one
-SELECT wallets.* FROM wallets WHERE address = $1 AND chain = $2 AND deleted = false;
-
--- name: GetWalletByChainAddressBatch :batchone
-SELECT wallets.* FROM wallets WHERE address = $1 AND chain = $2 AND deleted = false;
+-- name: GetWalletByAddressAndL1Chain :one
+SELECT wallets.* FROM wallets WHERE address = $1 AND l1_chain = $2 AND deleted = false;
 
 -- name: GetWalletsByUserID :many
 SELECT w.* FROM users u, unnest(u.wallets) WITH ORDINALITY AS a(wallet_id, wallet_ord)INNER JOIN wallets w on w.id = a.wallet_id WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.wallet_ord;
@@ -808,6 +805,9 @@ INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id,
 -- name: CreateContractNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, post_id, comment_id, contract_id, mention_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('feed_event'), sqlc.narg('post'), sqlc.narg('comment'), $6, $7) RETURNING *;
 
+-- name: CreateUserPostedYourWorkNotification :one
+INSERT INTO notifications (id, owner_id, action, data, event_ids, post_id, contract_id) VALUES ($1, $2, $3, $4, $5, sqlc.narg('post'), $6) RETURNING *;
+
 -- name: CreateSimpleNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids) VALUES ($1, $2, $3, $4, $5) RETURNING *;
 
@@ -945,7 +945,7 @@ update users set primary_wallet_id = @wallet_id from wallets
     and wallets.id = any(users.wallets) and wallets.deleted = false;
 
 -- name: GetUsersByChainAddresses :many
-select users.*,wallets.address from users, wallets where wallets.address = ANY(@addresses::varchar[]) AND wallets.chain = @chain::int AND ARRAY[wallets.id] <@ users.wallets AND users.deleted = false AND wallets.deleted = false;
+select users.*,wallets.address from users, wallets where wallets.address = ANY(@addresses::varchar[]) AND wallets.l1_chain = @l1_chain AND ARRAY[wallets.id] <@ users.wallets AND users.deleted = false AND wallets.deleted = false;
 
 -- name: GetFeedEventByID :one
 SELECT * FROM feed_events WHERE id = $1 AND deleted = false;
@@ -1277,7 +1277,7 @@ select * from users where array[@wallet::varchar]::varchar[] <@ wallets and dele
 update users set deleted = true where id = $1;
 
 -- name: InsertWallet :exec
-with new_wallet as (insert into wallets(id, address, chain, wallet_type) values ($1, $2, $3, $4) returning id)
+with new_wallet as (insert into wallets(id, address, chain, l1_chain, wallet_type) values ($1, $2, $3, $4, $5) returning id)
 update users set
     primary_wallet_id = coalesce(users.primary_wallet_id, new_wallet.id),
     wallets = array_append(users.wallets, new_wallet.id)
@@ -1554,7 +1554,7 @@ where pfp.id = @id
 		when pfp.source_type = @ens_source_type
 		then exists(select 1 from wallets w where w.id = pfp.wallet_id and not w.deleted)
 		when pfp.source_type = @token_source_type
-		then exists(select 1 from tokens t where t.id = pfp.token_id and t.displayable and not t.deleted)
+		then exists(select 1 from tokens t where t.id = pfp.token_id and not t.deleted)
 		else
 		0 = 1
 	end;
@@ -1600,31 +1600,6 @@ join wallets on wallets.id = any(tokens.owned_by_wallets)
 where tokens.id = $1 and tokens.displayable and not tokens.deleted and not token_definitions.deleted and not wallets.deleted
 group by (token_definitions.token_id, token_definitions.contract_address, token_definitions.chain, tokens.quantity) limit 1;
 
--- name: GetContractCreatorsByContractIDs :many
-with contract_creators as (
-    select c.id as contract_id,
-           u.id as creator_user_id,
-           c.chain as chain,
-           coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) as creator_address,
-           w.id as creator_wallet_id
-    from contracts c
-             left join wallets w on
-                w.deleted = false and
-                w.chain = c.chain and
-                coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) = w.address
-             left join users u on
-                u.deleted = false and
-                (
-                        (c.override_creator_user_id is not null and c.override_creator_user_id = u.id)
-                        or
-                        (c.override_creator_user_id is null and w.address is not null and array[w.id] <@ u.wallets)
-                    )
-    where c.deleted = false
-      and (u.id is not null or coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) is not null)
-)
-select * from unnest(@contract_ids::text[]) as ids
-                  join contract_creators cc on cc.contract_id = ids;
-
 -- name: GetCreatedContractsByUserID :many
 select sqlc.embed(c),
        w.id as wallet_id,
@@ -1632,8 +1607,8 @@ select sqlc.embed(c),
 from users u, contracts c, wallets w
 where u.id = @user_id
   and c.chain = any(@chains::int[])
-  and w.id = any(u.wallets) and coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) = w.address
-  and c.chain = w.chain
+  and w.id = any(u.wallets) and coalesce(nullif(c.owner_address, ''), nullif(c.creator_address, '')) = w.address 
+  and w.l1_chain = c.l1_chain
   and u.deleted = false
   and c.deleted = false
   and w.deleted = false

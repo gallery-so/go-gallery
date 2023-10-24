@@ -48,14 +48,11 @@ var contractNameBlacklist = map[string]bool{
 type SubmitTokensF func(ctx context.Context, tokenDefinitionIDs []persist.DBID) error
 
 type Provider struct {
-	Repos   *postgres.Repositories
-	Queries *db.Queries
-	Cache   *redis.Cache
-	Chains  map[persist.Chain][]any
-
-	// some chains use the addresses of other chains, this will map of chain we want tokens from => chain that's address will be used for lookup
-	WalletOverrides WalletOverrideMap
-	SubmitTokens    SubmitTokensF
+	Repos        *postgres.Repositories
+	Queries      *db.Queries
+	Cache        *redis.Cache
+	Chains       map[persist.Chain][]any
+	SubmitTokens SubmitTokensF
 }
 
 // BlockchainInfo retrieves blockchain info from all chains
@@ -223,8 +220,6 @@ type TokenDescriptorsFetcher interface {
 type ProviderSupplier interface {
 	GetSubproviders() []any
 }
-
-type WalletOverrideMap = map[persist.Chain][]persist.Chain
 
 // providersMatchingInterface returns providers that adhere to the given interface
 func providersMatchingInterface[T any](providers []any) []T {
@@ -773,6 +768,8 @@ func (p *Provider) syncCreatedTokensForContract(ctx context.Context, user persis
 				return
 			}
 
+			logger.For(ctx).Infof("got %d tokens for contract %s", len(tokens), address)
+
 			incomingTokens <- chainTokens{chain: chain, tokens: tokens, priority: priority}
 			incomingContracts <- chainContracts{chain: chain, contracts: []ChainAgnosticContract{contract}, priority: priority}
 		})
@@ -932,6 +929,7 @@ func (p *Provider) SyncTokensCreatedOnSharedContracts(ctx context.Context, userI
 				params.CreatorAddress = append(params.CreatorAddress, child.CreatorAddress.String())
 				params.OwnerAddress = append(params.OwnerAddress, child.OwnerAddress.String())
 				params.Chain = append(params.Chain, int32(result.Chain))
+				params.L1Chain = append(params.L1Chain, int32(result.Chain.L1Chain()))
 				params.Description = append(params.Description, child.Description)
 				params.ParentIds = append(params.ParentIds, contractToDBID[persist.NewContractIdentifiers(edge.Parent.Address, result.Chain)].String())
 			}
@@ -1146,7 +1144,7 @@ func (p *Provider) GetCommunityOwners(ctx context.Context, communityIdentifiers 
 	return holders, nil
 }
 
-func (p *Provider) GetTokensOfContractForWallet(ctx context.Context, contractAddress persist.Address, wallet persist.ChainAddress, limit, offset int) ([]postgres.TokenFullDetails, error) {
+func (p *Provider) GetTokensOfContractForWallet(ctx context.Context, contractAddress persist.ChainAddress, wallet persist.L1ChainAddress, limit, offset int) ([]postgres.TokenFullDetails, error) {
 	user, err := p.Repos.UserRepository.GetByChainAddress(ctx, wallet)
 	if err != nil {
 		if _, ok := err.(persist.ErrWalletNotFound); ok {
@@ -1155,25 +1153,25 @@ func (p *Provider) GetTokensOfContractForWallet(ctx context.Context, contractAdd
 		return nil, err
 	}
 
-	contractFetchers := matchingProvidersForChain[TokensContractFetcher](p.Chains, wallet.Chain())
+	contractFetchers := matchingProvidersForChain[TokensContractFetcher](p.Chains, contractAddress.Chain())
 
 	tokensFromProviders := make([]chainTokens, 0, len(contractFetchers))
 	contracts := make([]chainContracts, 0, len(contractFetchers))
 	for i, tFetcher := range contractFetchers {
-		tokensOfOwner, contract, err := tFetcher.GetTokensByContractAddressAndOwner(ctx, wallet.Address(), contractAddress, limit, offset)
+		tokensOfOwner, contract, err := tFetcher.GetTokensByContractAddressAndOwner(ctx, wallet.Address(), contractAddress.Address(), limit, offset)
 		if err != nil {
 			return nil, err
 		}
 
 		contracts = append(contracts, chainContracts{
 			priority:  i,
-			chain:     wallet.Chain(),
+			chain:     contractAddress.Chain(),
 			contracts: []ChainAgnosticContract{contract},
 		})
 
 		tokensFromProviders = append(tokensFromProviders, chainTokens{
 			priority: i,
-			chain:    wallet.Chain(),
+			chain:    contractAddress.Chain(),
 			tokens:   tokensOfOwner,
 		})
 	}
@@ -1188,7 +1186,7 @@ func (p *Provider) GetTokensOfContractForWallet(ctx context.Context, contractAdd
 		return nil, err
 	}
 
-	allUserTokens, _, err := p.AddHolderTokensToUser(ctx, user, tokensFromProviders, persistedContracts, []persist.Chain{wallet.Chain()}, existingTokens)
+	allUserTokens, _, err := p.AddHolderTokensToUser(ctx, user, tokensFromProviders, persistedContracts, []persist.Chain{contractAddress.Chain()}, existingTokens)
 	if err != nil {
 		return nil, err
 	}
@@ -1574,6 +1572,9 @@ func (p *Provider) SyncContractsOwnedByUser(ctx context.Context, userID persist.
 					if err != nil {
 						return ContractOwnerResult{Priority: pr}, err
 					}
+
+					logger.For(ctx).Debugf("found %d contracts for address %s", len(contracts), a)
+
 					return ContractOwnerResult{Contracts: contracts, Chain: c, Priority: pr}, nil
 				})
 			}
@@ -1632,7 +1633,7 @@ func (p *Provider) createUsersForTokens(ctx context.Context, tokens []chainToken
 
 	allCurrentUsers, err := p.Queries.GetUsersByChainAddresses(ctx, db.GetUsersByChainAddressesParams{
 		Addresses: ownerAddresses,
-		Chain:     int32(chain),
+		L1Chain:   chain.L1Chain(),
 	})
 	if err != nil {
 		return nil, nil, err
@@ -1722,14 +1723,14 @@ func (p *Provider) createUsersForTokens(ctx context.Context, tokens []chainToken
 								}
 							} else if _, ok := err.(persist.ErrAddressOwnedByUser); ok {
 								logger.For(ctx).Infof("address %s already owned by user", t.OwnerAddress)
-								user, err = p.Repos.UserRepository.GetByChainAddress(ctx, persist.NewChainAddress(t.OwnerAddress, ct.chain))
+								user, err = p.Repos.UserRepository.GetByChainAddress(ctx, persist.NewL1ChainAddress(t.OwnerAddress, ct.chain))
 								if err != nil {
 									errChan <- err
 									return
 								}
 							} else if _, ok := err.(persist.ErrWalletCreateFailed); ok {
 								logger.For(ctx).Infof("wallet creation failed for address %s", t.OwnerAddress)
-								user, err = p.Repos.UserRepository.GetByChainAddress(ctx, persist.NewChainAddress(t.OwnerAddress, ct.chain))
+								user, err = p.Repos.UserRepository.GetByChainAddress(ctx, persist.NewL1ChainAddress(t.OwnerAddress, ct.chain))
 								if err != nil {
 									errChan <- err
 									return
@@ -1812,7 +1813,7 @@ func (p *Provider) matchingWallets(wallets []persist.Wallet, chains []persist.Ch
 		for _, wallet := range wallets {
 			if wallet.Chain == chain {
 				matches[chain] = append(matches[chain], wallet.Address)
-			} else if overrides, ok := p.WalletOverrides[chain]; ok && util.Contains(overrides, wallet.Chain) {
+			} else if overrides := wallet.Chain.L1ChainGroup(); util.Contains(overrides, wallet.Chain) {
 				matches[chain] = append(matches[chain], wallet.Address)
 			}
 		}
@@ -2079,6 +2080,7 @@ func chainContractsToUpsertableContracts(contracts []chainContracts, existingCon
 	for address, meta := range contractMetadatas {
 		res = append(res, db.Contract{
 			Chain:                address.Chain(),
+			L1Chain:              address.Chain().L1Chain(),
 			Address:              address.Address(),
 			Symbol:               util.ToNullString(meta.Symbol, true),
 			Name:                 util.ToNullString(meta.Name, true),

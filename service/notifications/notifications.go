@@ -18,6 +18,7 @@ import (
 	"github.com/bsm/redislock"
 	"github.com/gin-gonic/gin"
 	"github.com/googleapis/gax-go/v2/apierror"
+	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -163,6 +164,7 @@ func New(queries *db.Queries, pub *pubsub.Client, taskClient *cloudtasks.Client,
 	notifDispatcher.AddHandler(persist.ActionReplyToComment, def)
 	notifDispatcher.AddHandler(persist.ActionMentionUser, def)
 	notifDispatcher.AddHandler(persist.ActionMentionCommunity, def)
+	notifDispatcher.AddHandler(persist.ActionUserPostedYourWork, def)
 
 	// notification actions that are grouped by token id
 	notifDispatcher.AddHandler(persist.ActionNewTokensReceived, tokenIDGrouped)
@@ -527,6 +529,12 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 		},
 	}
 
+	userFacing, err := NotificationToUserFacingData(ctx, queries, notif)
+	if err != nil {
+		return task.PushNotificationMessage{}, err
+	}
+
+	message.Body = userFacing.String()
 	if notif.Action == persist.ActionAdmiredFeedEvent || notif.Action == persist.ActionAdmiredPost {
 		admirer, err := queries.GetUserById(ctx, notif.Data.AdmirerIDs[0])
 		if err != nil {
@@ -537,16 +545,6 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 			return task.PushNotificationMessage{}, err
 		}
 
-		if !admirer.Username.Valid {
-			return task.PushNotificationMessage{}, fmt.Errorf("user with ID=%s has no username", admirer.ID)
-		}
-
-		ac := "activity"
-		if notif.Action == persist.ActionAdmiredPost {
-			ac = "post"
-		}
-
-		message.Body = fmt.Sprintf("%s admired your %s", admirer.Username.String, ac)
 		return message, nil
 	}
 
@@ -565,16 +563,6 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 			return task.PushNotificationMessage{}, err
 		}
 
-		if !commenter.Username.Valid {
-			return task.PushNotificationMessage{}, fmt.Errorf("user with ID=%s has no username", commenter.ID)
-		}
-
-		ac := "activity"
-		if notif.Action == persist.ActionCommentedOnPost {
-			ac = "post"
-		}
-
-		message.Body = fmt.Sprintf("%s commented on your %s", commenter.Username.String, ac)
 		return message, nil
 	}
 
@@ -588,39 +576,14 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 			return task.PushNotificationMessage{}, err
 		}
 
-		if !follower.Username.Valid {
-			return task.PushNotificationMessage{}, fmt.Errorf("user with ID=%s has no username", follower.ID)
-		}
-
-		var body string
-		if notif.Data.FollowedBack {
-			body = fmt.Sprintf("%s followed you back", follower.Username.String)
-		} else {
-			body = fmt.Sprintf("%s followed you", follower.Username.String)
-		}
-
-		message.Body = body
 		return message, nil
 	}
 	if notif.Action == persist.ActionNewTokensReceived {
 
-		tokenDef, err := queries.GetTokenDefinitionByTokenDbid(ctx, notif.Data.NewTokenID)
-		if err != nil {
-			return task.PushNotificationMessage{}, err
-		}
-
-		name := util.TruncateWithEllipsis(tokenDef.Name.String, 20)
-
 		if err := limiter.tryTokens(ctx, notif.OwnerID, notif.Data.NewTokenID); err != nil {
 			return task.PushNotificationMessage{}, err
 		}
-		amount := notif.Data.NewTokenQuantity
-		i := amount.BigInt().Uint64()
-		if i > 1 {
-			message.Body = fmt.Sprintf("You received %d new %s tokens", i, name)
-		} else {
-			message.Body = fmt.Sprintf("You received a new %s token", name)
-		}
+
 		return message, nil
 	}
 
@@ -640,11 +603,6 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 			return task.PushNotificationMessage{}, err
 		}
 
-		if !commenter.Username.Valid {
-			return task.PushNotificationMessage{}, fmt.Errorf("user with ID=%s has no username", commenter.ID)
-		}
-
-		message.Body = fmt.Sprintf("%s replied to your comment", commenter.Username.String)
 		return message, nil
 
 	}
@@ -652,19 +610,14 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 	if notif.Action == persist.ActionMentionUser || notif.Action == persist.ActionMentionCommunity {
 
 		var actor db.User
-		var mentionedIn string
-		var preview string
+
 		switch {
 		case notif.CommentID != "":
-
-			mentionedIn = "comment"
 
 			comment, err := queries.GetCommentByCommentID(ctx, notif.CommentID)
 			if err != nil {
 				return task.PushNotificationMessage{}, err
 			}
-
-			preview = util.TruncateWithEllipsis(comment.Comment, 20)
 
 			actor, err = queries.GetUserById(ctx, comment.ActorID)
 			if err != nil {
@@ -672,14 +625,11 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 			}
 
 		case notif.PostID != "":
-			mentionedIn = "post"
 
 			post, err := queries.GetPostByID(ctx, notif.PostID)
 			if err != nil {
 				return task.PushNotificationMessage{}, err
 			}
-
-			preview = util.TruncateWithEllipsis(post.Caption.String, 20)
 
 			actor, err = queries.GetUserById(ctx, post.ActorID)
 			if err != nil {
@@ -689,8 +639,24 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 		default:
 			return task.PushNotificationMessage{}, fmt.Errorf("no comment or post id provided for mention notification")
 		}
-		if mentionedIn == "" || preview == "" {
-			return task.PushNotificationMessage{}, fmt.Errorf("no push data found for mention notification")
+
+		if err := limiter.tryMention(ctx, actor.ID, notif.OwnerID, notif.FeedEventID); err != nil {
+			return task.PushNotificationMessage{}, err
+		}
+
+		return message, nil
+
+	}
+
+	if notif.Action == persist.ActionUserPostedYourWork {
+
+		post, err := queries.GetPostByID(ctx, notif.PostID)
+		if err != nil {
+			return task.PushNotificationMessage{}, err
+		}
+		actor, err := queries.GetUserById(ctx, post.ActorID)
+		if err != nil {
+			return task.PushNotificationMessage{}, err
 		}
 
 		if err := limiter.tryMention(ctx, actor.ID, notif.OwnerID, notif.FeedEventID); err != nil {
@@ -700,22 +666,257 @@ func createPushMessage(ctx context.Context, notif db.Notification, queries *db.Q
 		if !actor.Username.Valid {
 			return task.PushNotificationMessage{}, fmt.Errorf("user with ID=%s has no username", actor.ID)
 		}
-
-		if notif.Action == persist.ActionMentionCommunity {
-			contract, err := queries.GetContractByID(ctx, notif.ContractID)
-			if err != nil {
-				return task.PushNotificationMessage{}, err
-			}
-
-			message.Body = fmt.Sprintf("%s mentioned @%s in a %s: %s", actor.Username.String, contract.Name.String, mentionedIn, preview)
-		} else {
-			message.Body = fmt.Sprintf("%s mentioned you in a %s: %s", actor.Username.String, mentionedIn, preview)
+		contract, err := queries.GetContractByID(ctx, notif.ContractID)
+		if err != nil {
+			return task.PushNotificationMessage{}, err
 		}
-		return message, nil
-
+		message.Body = fmt.Sprintf("%s posted your work: %s", actor.Username.String, contract.Name.String)
 	}
 
 	return task.PushNotificationMessage{}, fmt.Errorf("unsupported notification action: %s", notif.Action)
+}
+
+type UserFacingNotificationData struct {
+	Actor          string       `json:"actor"`
+	Action         string       `json:"action"`
+	CollectionName string       `json:"collectionName"`
+	CollectionID   persist.DBID `json:"collectionId"`
+	PreviewText    string       `json:"previewText"`
+}
+
+func (u UserFacingNotificationData) String() string {
+	cur := fmt.Sprintf("%s %s", u.Actor, u.Action)
+	if u.CollectionName != "" {
+		cur = fmt.Sprintf("%s %s", cur, u.CollectionName)
+	}
+	if u.PreviewText != "" {
+		cur = fmt.Sprintf("%s: %s", cur, u.PreviewText)
+	}
+	return cur
+}
+
+func NotificationToUserFacingData(ctx context.Context, queries *coredb.Queries, n coredb.Notification) (UserFacingNotificationData, error) {
+
+	switch n.Action {
+	case persist.ActionAdmiredFeedEvent, persist.ActionAdmiredPost:
+		feedEvent, err := queries.GetFeedEventByID(ctx, n.FeedEventID)
+		if err != nil {
+			return UserFacingNotificationData{}, fmt.Errorf("failed to get feed event for admire %s: %w", n.FeedEventID, err)
+		}
+		collection, _ := queries.GetCollectionById(ctx, feedEvent.Data.CollectionID)
+		data := UserFacingNotificationData{}
+		if n.Action == persist.ActionAdmiredFeedEvent && collection.ID != "" && collection.Name.String != "" {
+			data.CollectionID = collection.ID
+			data.CollectionName = collection.Name.String
+			data.Action = "admired your additions to"
+		} else if n.Action == persist.ActionAdmiredFeedEvent {
+			data.Action = "admired your gallery update"
+		} else {
+			data.Action = "admired your post"
+		}
+		if len(n.Data.AdmirerIDs) > 1 {
+			data.Actor = fmt.Sprintf("%d collectors", len(n.Data.AdmirerIDs))
+		} else {
+			actorUser, err := queries.GetUserById(ctx, n.Data.AdmirerIDs[0])
+			if err != nil {
+				return UserFacingNotificationData{}, err
+			}
+			data.Actor = actorUser.Username.String
+		}
+		return data, nil
+	case persist.ActionUserFollowedUsers:
+		if len(n.Data.FollowerIDs) > 1 {
+			return UserFacingNotificationData{
+				Actor:  fmt.Sprintf("%d users", len(n.Data.FollowerIDs)),
+				Action: "followed you",
+			}, nil
+		}
+		if len(n.Data.FollowerIDs) == 1 {
+			userActor, err := queries.GetUserById(ctx, n.Data.FollowerIDs[0])
+			if err != nil {
+				return UserFacingNotificationData{}, fmt.Errorf("failed to get user for follower %s: %w", n.Data.FollowerIDs[0], err)
+			}
+			action := "followed you"
+			if n.Data.FollowedBack {
+				action = "followed you back"
+			}
+			return UserFacingNotificationData{
+				Actor:  userActor.Username.String,
+				Action: action,
+			}, nil
+		}
+		return UserFacingNotificationData{}, fmt.Errorf("no follower ids")
+	case persist.ActionCommentedOnFeedEvent, persist.ActionCommentedOnPost:
+		comment, err := queries.GetCommentByCommentID(ctx, n.CommentID)
+		if err != nil {
+			return UserFacingNotificationData{}, fmt.Errorf("failed to get comment for comment %s: %w", n.CommentID, err)
+		}
+		userActor, err := queries.GetUserById(ctx, comment.ActorID)
+		if err != nil {
+			return UserFacingNotificationData{}, fmt.Errorf("failed to get user for comment actor %s: %w", comment.ActorID, err)
+		}
+		feedEvent, err := queries.GetFeedEventByID(ctx, n.FeedEventID)
+		if err != nil {
+			return UserFacingNotificationData{}, fmt.Errorf("failed to get feed event for comment %s: %w", n.FeedEventID, err)
+		}
+		action := "commented on your post"
+		if n.Action == persist.ActionCommentedOnFeedEvent && feedEvent.Data.CollectionID != "" {
+			collection, err := queries.GetCollectionById(ctx, feedEvent.Data.CollectionID)
+			if err != nil {
+				return UserFacingNotificationData{}, fmt.Errorf("failed to get collection for comment %s: %w", feedEvent.Data.CollectionID, err)
+			}
+
+			return UserFacingNotificationData{
+				Actor:          userActor.Username.String,
+				Action:         "commented on your additions to",
+				CollectionName: collection.Name.String,
+				CollectionID:   collection.ID,
+				PreviewText:    util.TruncateWithEllipsis(comment.Comment, 20),
+			}, nil
+
+		} else if n.Action == persist.ActionCommentedOnFeedEvent {
+			action = "commented on your gallery update"
+		}
+
+		return UserFacingNotificationData{
+			Actor:       userActor.Username.String,
+			Action:      action,
+			PreviewText: util.TruncateWithEllipsis(comment.Comment, 20),
+		}, nil
+	case persist.ActionViewedGallery:
+		if len(n.Data.AuthedViewerIDs)+len(n.Data.UnauthedViewerIDs) > 1 {
+			return UserFacingNotificationData{
+				Actor:  fmt.Sprintf("%d collectors", len(n.Data.AuthedViewerIDs)+len(n.Data.UnauthedViewerIDs)),
+				Action: "viewed your gallery",
+			}, nil
+		}
+		if len(n.Data.AuthedViewerIDs) == 1 {
+			userActor, err := queries.GetUserById(ctx, n.Data.AuthedViewerIDs[0])
+			if err != nil {
+				return UserFacingNotificationData{}, fmt.Errorf("failed to get user for viewer %s: %w", n.Data.AuthedViewerIDs[0], err)
+			}
+			return UserFacingNotificationData{
+				Actor:  userActor.Username.String,
+				Action: "viewed your gallery",
+			}, nil
+		}
+		if len(n.Data.UnauthedViewerIDs) == 1 {
+			return UserFacingNotificationData{
+				Actor:  "Someone",
+				Action: "viewed your gallery",
+			}, nil
+		}
+
+		return UserFacingNotificationData{}, fmt.Errorf("no viewer ids")
+
+	case persist.ActionMentionUser, persist.ActionMentionCommunity:
+
+		data := UserFacingNotificationData{}
+		var actor db.User
+		var mentionedIn string
+		var preview string
+		switch {
+		case n.CommentID != "":
+
+			mentionedIn = "comment"
+
+			comment, err := queries.GetCommentByCommentID(ctx, n.CommentID)
+			if err != nil {
+				return UserFacingNotificationData{}, err
+			}
+
+			preview = util.TruncateWithEllipsis(comment.Comment, 20)
+
+			actor, err = queries.GetUserById(ctx, comment.ActorID)
+			if err != nil {
+				return UserFacingNotificationData{}, err
+			}
+
+		case n.PostID != "":
+			mentionedIn = "post"
+
+			post, err := queries.GetPostByID(ctx, n.PostID)
+			if err != nil {
+				return UserFacingNotificationData{}, err
+			}
+
+			preview = util.TruncateWithEllipsis(post.Caption.String, 20)
+
+			actor, err = queries.GetUserById(ctx, post.ActorID)
+			if err != nil {
+				return UserFacingNotificationData{}, err
+			}
+
+		default:
+			return UserFacingNotificationData{}, fmt.Errorf("no comment or post id provided for mention notification")
+		}
+		if mentionedIn == "" || preview == "" {
+			return UserFacingNotificationData{}, fmt.Errorf("no push data found for mention notification")
+		}
+
+		if !actor.Username.Valid {
+			return UserFacingNotificationData{}, fmt.Errorf("user with ID=%s has no username", actor.ID)
+		}
+
+		data.Actor = actor.Username.String
+		data.PreviewText = preview
+
+		if n.Action == persist.ActionMentionCommunity {
+			contract, err := queries.GetContractByID(ctx, n.ContractID)
+			if err != nil {
+				return UserFacingNotificationData{}, err
+			}
+
+			data.Action = fmt.Sprintf("mentioned your community @%s in a comment", contract.Name.String)
+		} else {
+			data.Action = "mentioned you in a comment"
+		}
+		return data, nil
+	case persist.ActionReplyToComment:
+
+		comment, err := queries.GetCommentByCommentID(ctx, n.CommentID)
+		if err != nil {
+			return UserFacingNotificationData{}, err
+		}
+
+		commenter, err := queries.GetUserById(ctx, comment.ActorID)
+		if err != nil {
+			return UserFacingNotificationData{}, err
+		}
+
+		if !commenter.Username.Valid {
+			return UserFacingNotificationData{}, fmt.Errorf("user with ID=%s has no username", commenter.ID)
+		}
+
+		return UserFacingNotificationData{
+			Actor:       commenter.Username.String,
+			Action:      "replied to your comment",
+			PreviewText: util.TruncateWithEllipsis(comment.Comment, 20),
+		}, nil
+	case persist.ActionNewTokensReceived:
+		data := UserFacingNotificationData{}
+
+		td, err := queries.GetTokenDefinitionByTokenDbid(ctx, n.Data.NewTokenID)
+		if err != nil {
+			return UserFacingNotificationData{}, err
+		}
+
+		name := util.TruncateWithEllipsis(td.Name.String, 20)
+
+		amount := n.Data.NewTokenQuantity
+		i := amount.BigInt().Uint64()
+		if i > 1 {
+			data.Actor = "you"
+			data.Action = fmt.Sprintf("received %d new %s tokens", i, name)
+		} else {
+			data.Actor = "you"
+			data.Action = fmt.Sprintf("received a new %s token", name)
+		}
+
+		return data, nil
+	default:
+		return UserFacingNotificationData{}, fmt.Errorf("unknown action %s", n.Action)
+	}
 }
 
 func actionSupportsPushNotifications(action persist.Action) bool {
@@ -731,6 +932,8 @@ func actionSupportsPushNotifications(action persist.Action) bool {
 	case persist.ActionCommentedOnPost:
 		return true
 	case persist.ActionAdmiredPost:
+		return true
+	case persist.ActionUserPostedYourWork:
 		return true
 	default:
 		return false
@@ -962,6 +1165,16 @@ func addNotification(ctx context.Context, notif db.Notification, queries *db.Que
 			Post:       util.ToNullString(notif.PostID.String(), true),
 			Comment:    util.ToNullString(notif.CommentID.String(), true),
 			MentionID:  notif.MentionID,
+			ContractID: notif.ContractID,
+		})
+	case persist.ActionUserPostedYourWork:
+		return queries.CreateUserPostedYourWorkNotification(ctx, db.CreateUserPostedYourWorkNotificationParams{
+			ID:         id,
+			OwnerID:    notif.OwnerID,
+			Action:     notif.Action,
+			Data:       notif.Data,
+			EventIds:   notif.EventIds,
+			Post:       util.ToNullString(notif.PostID.String(), true),
 			ContractID: notif.ContractID,
 		})
 	default:

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/mikeydub/go-gallery/env"
@@ -109,6 +110,14 @@ func (n *NeynarAPI) UserByAddress(ctx context.Context, address persist.Address) 
 	resp, err := n.httpClient.Do(req)
 	if err != nil {
 		return NeynarUser{}, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		bs, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return NeynarUser{}, err
+		}
+		return NeynarUser{}, fmt.Errorf("neynar returned status %d (%s)", resp.StatusCode, bs)
 	}
 
 	defer resp.Body.Close()

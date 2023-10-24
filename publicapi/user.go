@@ -217,8 +217,8 @@ func (api UserAPI) GetUserByAddress(ctx context.Context, chainAddress persist.Ch
 	}
 
 	chain := chainAddress.Chain()
-	user, err := api.loaders.UserByAddress.Load(db.GetUserByAddressBatchParams{
-		Chain:   int32(chain),
+	user, err := api.loaders.UserByAddress.Load(db.GetUserByAddressAndL1BatchParams{
+		L1Chain: chain.L1Chain(),
 		Address: persist.Address(chain.NormalizeAddress(chainAddress.Address())),
 	})
 	if err != nil {
@@ -585,7 +585,6 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 	})
 	if err != nil {
 		logger.For(ctx).Errorf("failed to dispatch event: %s", err)
-		return userID, galleryID, err
 	}
 
 	err = task.CreateTaskForAutosocialProcessUsers(ctx, task.AutosocialProcessUsersMessage{

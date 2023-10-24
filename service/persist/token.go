@@ -110,6 +110,22 @@ const (
 	MaxChainValue = ChainBase
 )
 
+var L1Chains = map[Chain]L1Chain{
+	ChainPOAP:     L1Chain(ChainETH),
+	ChainOptimism: L1Chain(ChainETH),
+	ChainPolygon:  L1Chain(ChainETH),
+	ChainArbitrum: L1Chain(ChainETH),
+	ChainZora:     L1Chain(ChainETH),
+	ChainBase:     L1Chain(ChainETH),
+	ChainETH:      L1Chain(ChainETH),
+	ChainTezos:    L1Chain(ChainTezos),
+}
+
+var L1ChainGroups = map[L1Chain][]Chain{
+	L1Chain(ChainETH):   EvmChains,
+	L1Chain(ChainTezos): {ChainTezos},
+}
+
 var AllChains = []Chain{ChainETH, ChainArbitrum, ChainPolygon, ChainOptimism, ChainTezos, ChainPOAP, ChainZora, ChainBase}
 var EvmChains = util.MapKeys(evmChains)
 var evmChains map[Chain]bool = map[Chain]bool{
@@ -258,6 +274,8 @@ type TokenCountType string
 
 // Chain represents which blockchain a token is on
 type Chain int
+
+type L1Chain Chain
 
 // TokenID represents the ID of a token
 type TokenID string
@@ -529,6 +547,22 @@ func (c Chain) MarshalGQL(w io.Writer) {
 	case ChainBase:
 		w.Write([]byte(`"Base"`))
 	}
+}
+
+func (c Chain) L1Chain() L1Chain {
+	lc, ok := L1Chains[c]
+	if !ok {
+		panic("l1 chain not found")
+	}
+	return lc
+}
+
+func (c Chain) L1ChainGroup() []Chain {
+	cg, ok := L1ChainGroups[c.L1Chain()]
+	if !ok {
+		panic("chain group not found")
+	}
+	return cg
 }
 
 // URL turns a token's URI into a URL

@@ -2,6 +2,7 @@ package socialauth
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -71,12 +72,12 @@ type FarcasterAuthenticator struct {
 
 func (a FarcasterAuthenticator) Authenticate(ctx context.Context) (*SocialAuthResult, error) {
 	api := farcaster.NewNeynarAPI(a.HTTPClient)
-	user, err := a.Queries.GetUserByAddressAndChains(ctx, coredb.GetUserByAddressAndChainsParams{
-		Address: a.Address,
-		Chains:  util.MapWithoutError(persist.EvmChains, func(c persist.Chain) int32 { return int32(c) }),
+	user, err := a.Queries.GetUserByAddressAndL1(ctx, coredb.GetUserByAddressAndL1Params{
+		Address: persist.Address(persist.ChainETH.NormalizeAddress(a.Address)),
+		L1Chain: persist.L1Chain(persist.ChainETH),
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get user by address and l1: %w", err)
 	}
 
 	if user.ID != a.UserID {
@@ -88,7 +89,7 @@ func (a FarcasterAuthenticator) Authenticate(ctx context.Context) (*SocialAuthRe
 
 	fu, err := api.UserByAddress(ctx, a.Address)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get user by address: %w", err)
 	}
 
 	return &SocialAuthResult{
@@ -114,9 +115,9 @@ type LensAuthenticator struct {
 
 func (a LensAuthenticator) Authenticate(ctx context.Context) (*SocialAuthResult, error) {
 	api := lens.NewAPI(a.HTTPClient)
-	user, err := a.Queries.GetUserByAddressAndChains(ctx, coredb.GetUserByAddressAndChainsParams{
+	user, err := a.Queries.GetUserByAddressAndL1(ctx, coredb.GetUserByAddressAndL1Params{
 		Address: a.Address,
-		Chains:  util.MapWithoutError(persist.EvmChains, func(c persist.Chain) int32 { return int32(c) }),
+		L1Chain: persist.L1Chain(persist.ChainETH),
 	})
 	if err != nil {
 		return nil, err
